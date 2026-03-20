@@ -1,14 +1,14 @@
 """
 Backup Service
 ===============
-Wraps the existing backup_supabase_to_json.py script with status tracking
+Wraps the PostgreSQL logical backup script with status tracking
 and async execution for the Settings UI manual trigger.
 """
 
 import json
 import logging
+import os
 import subprocess
-import sys
 from datetime import datetime
 from pathlib import Path
 from threading import Lock
@@ -16,13 +16,14 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-BACKUP_DIR = Path(__file__).parent.parent / "data" / "supabase_backup"
-BACKUP_SCRIPT = Path(__file__).parent.parent.parent / "scripts" / "backup_supabase_to_json.py"
-STATUS_FILE = BACKUP_DIR / "_backup_status.json"
+REPO_ROOT = Path(__file__).resolve().parents[3]
+BACKUP_DIR = REPO_ROOT / "backups" / "postgres"
+BACKUP_SCRIPT = REPO_ROOT / "scripts" / "backup" / "postgres_logical_backup.sh"
+STATUS_FILE = REPO_ROOT / "backups" / "logs" / "postgres_backup_status.json"
 
 
 class BackupService:
-    """Manages Supabase-to-JSON backup with status tracking."""
+    """Manages PostgreSQL logical backups with status tracking."""
 
     _instance: Optional["BackupService"] = None
     _lock = Lock()
@@ -65,13 +66,17 @@ class BackupService:
 
         # Scan backup directory
         if BACKUP_DIR.exists():
-            files = [f for f in BACKUP_DIR.iterdir() if f.suffix == ".json" and f.name != "_backup_status.json"]
-            status["file_count"] = len(files)
-            status["total_size_mb"] = round(sum(f.stat().st_size for f in files) / (1024 * 1024), 2)
+            backup_sets = [
+                d
+                for d in BACKUP_DIR.rglob("*")
+                if d.is_dir() and d.name not in {"daily", "manual"} and (d / "backup.env").exists()
+            ]
+            backup_files = [f for f in BACKUP_DIR.rglob("*") if f.is_file()]
+            status["file_count"] = len(backup_sets)
+            status["total_size_mb"] = round(sum(f.stat().st_size for f in backup_files) / (1024 * 1024), 2)
 
-            # Get most recent file modification time
-            if files:
-                newest = max(f.stat().st_mtime for f in files)
+            if backup_sets:
+                newest = max(d.stat().st_mtime for d in backup_sets)
                 last_dt = datetime.fromtimestamp(newest)
                 status["last_backup"] = last_dt.isoformat()
                 age_hours = (datetime.now() - last_dt).total_seconds() / 3600
@@ -91,15 +96,16 @@ class BackupService:
         result = {"status": "unknown", "started_at": start.isoformat()}
 
         try:
-            logger.info("Starting manual Supabase backup...")
+            logger.info("Starting manual PostgreSQL logical backup...")
 
-            # Run the existing backup script as a subprocess
+            # Run the PostgreSQL logical backup script as a subprocess
             proc = subprocess.run(
-                [sys.executable, str(BACKUP_SCRIPT)],
+                ["/bin/bash", str(BACKUP_SCRIPT)],
                 capture_output=True,
                 text=True,
-                timeout=300,  # 5 min max
-                cwd=str(BACKUP_SCRIPT.parent.parent),  # backend/
+                timeout=600,
+                cwd=str(REPO_ROOT),
+                env={**os.environ, "BACKUP_MODE": "manual"},
             )
 
             duration = (datetime.now() - start).total_seconds()
@@ -124,7 +130,7 @@ class BackupService:
                 logger.error(f"Backup failed (rc={proc.returncode}): {proc.stderr[:200]}")
 
         except subprocess.TimeoutExpired:
-            result = {"status": "timeout", "error": "Backup exceeded 5-minute limit"}
+            result = {"status": "timeout", "error": "Backup exceeded 10-minute limit"}
             logger.error("Backup timed out")
         except FileNotFoundError:
             result = {"status": "failed", "error": f"Backup script not found: {BACKUP_SCRIPT}"}
@@ -137,7 +143,7 @@ class BackupService:
 
             # Persist status
             try:
-                BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+                STATUS_FILE.parent.mkdir(parents=True, exist_ok=True)
                 save_data = {
                     "last_backup": datetime.now().isoformat(),
                     "result": result.get("status"),

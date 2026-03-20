@@ -1,22 +1,13 @@
-"""Repository for agent memory operations.
+"""Repository for agent memory operations."""
 
-Persistent conversational memory for SENTINEL AI agents.
-Follows the 3-tier fallback pattern: Supabase -> JSON fallback.
-"""
-
-import json
 import logging
 import uuid
 from datetime import datetime
-from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from app.database.supabase_client import get_supabase_client
 
 logger = logging.getLogger(__name__)
-
-DATA_DIR = Path(__file__).parent.parent.parent / "data"
-JSON_PATH = DATA_DIR / "agent_memory.json"
 
 VALID_CONTEXT_TYPES = {
     "building_quirk",
@@ -30,14 +21,10 @@ VALID_SOURCES = {"claude", "sentry", "simbiot", "operator", "system"}
 
 
 class AgentMemoryRepository:
-    """Repository for agent memory CRUD operations."""
+    """Repository for agent memory CRUD operations in the canonical DB store."""
 
     def __init__(self):
         self.client = get_supabase_client()
-
-    # ------------------------------------------------------------------
-    # Read
-    # ------------------------------------------------------------------
 
     def get_by_site(
         self,
@@ -59,8 +46,8 @@ class AgentMemoryRepository:
             response = query.execute()
             return response.data or []
         except Exception as e:
-            logger.warning("Supabase agent_memory read failed, using JSON: %s", e)
-            return self._get_by_site_json(site_id, context_type, limit)
+            logger.error("Canonical agent_memory read failed: %s", e)
+            return []
 
     def get_by_equipment(
         self,
@@ -79,8 +66,8 @@ class AgentMemoryRepository:
             )
             return response.data or []
         except Exception as e:
-            logger.warning("Supabase agent_memory read failed, using JSON: %s", e)
-            return self._get_by_equipment_json(equipment_code, limit)
+            logger.error("Canonical agent_memory equipment read failed: %s", e)
+            return []
 
     def get_by_id(self, memory_id: str) -> Optional[Dict[str, Any]]:
         """Get a single memory by ID."""
@@ -89,16 +76,11 @@ class AgentMemoryRepository:
             data = response.data
             return data[0] if data else None
         except Exception as e:
-            logger.warning("Supabase agent_memory get_by_id failed: %s", e)
-            return self._get_by_id_json(memory_id)
-
-    # ------------------------------------------------------------------
-    # Write
-    # ------------------------------------------------------------------
+            logger.error("Canonical agent_memory get_by_id failed: %s", e)
+            return None
 
     def upsert(self, memory: Dict[str, Any]) -> Dict[str, Any]:
         """Create or update a memory (upsert on site_id + equipment_code + key)."""
-        # Validate
         ctx = memory.get("context_type")
         if ctx and ctx not in VALID_CONTEXT_TYPES:
             raise ValueError(f"Invalid context_type: {ctx}")
@@ -114,20 +96,28 @@ class AgentMemoryRepository:
         memory.setdefault("confidence", 1.0)
         memory.setdefault("source", "system")
 
-        try:
-            response = (
-                self.client.table("agent_memory")
-                .upsert(
-                    memory,
-                    on_conflict="site_id,COALESCE(equipment_code,'__site__'),key",
-                )
-                .execute()
-            )
-            data = response.data
-            return data[0] if data else memory
-        except Exception as e:
-            logger.warning("Supabase agent_memory upsert failed, using JSON: %s", e)
-            return self._upsert_json(memory)
+        existing_rows = (
+            self.client.table("agent_memory")
+            .select("id,equipment_code")
+            .eq("site_id", memory.get("site_id"))
+            .eq("key", memory.get("key"))
+            .execute()
+        ).data or []
+
+        target_id = None
+        for row in existing_rows:
+            if row.get("equipment_code") == memory.get("equipment_code"):
+                target_id = row.get("id")
+                break
+
+        if target_id:
+            memory["id"] = target_id
+            response = self.client.table("agent_memory").update(memory).eq("id", target_id).execute()
+        else:
+            response = self.client.table("agent_memory").insert(memory).execute()
+
+        data = response.data
+        return data[0] if data else memory
 
     def delete(self, memory_id: str) -> bool:
         """Delete a memory by ID."""
@@ -135,71 +125,10 @@ class AgentMemoryRepository:
             self.client.table("agent_memory").delete().eq("id", memory_id).execute()
             return True
         except Exception as e:
-            logger.warning("Supabase agent_memory delete failed: %s", e)
-            return self._delete_json(memory_id)
-
-    # ------------------------------------------------------------------
-    # JSON fallback
-    # ------------------------------------------------------------------
-
-    def _load_json(self) -> List[Dict[str, Any]]:
-        if JSON_PATH.exists():
-            with open(JSON_PATH) as f:
-                return json.load(f)
-        return []
-
-    def _save_json(self, data: List[Dict[str, Any]]) -> None:
-        JSON_PATH.parent.mkdir(parents=True, exist_ok=True)
-        with open(JSON_PATH, "w") as f:
-            json.dump(data, f, indent=2, default=str)
-
-    def _get_by_site_json(self, site_id: str, context_type: Optional[str], limit: int) -> List[Dict[str, Any]]:
-        memories = self._load_json()
-        result = [m for m in memories if m.get("site_id") == site_id]
-        if context_type:
-            result = [m for m in result if m.get("context_type") == context_type]
-        result.sort(key=lambda m: m.get("updated_at", ""), reverse=True)
-        return result[:limit]
-
-    def _get_by_equipment_json(self, equipment_code: str, limit: int) -> List[Dict[str, Any]]:
-        memories = self._load_json()
-        result = [m for m in memories if m.get("equipment_code") == equipment_code]
-        result.sort(key=lambda m: m.get("updated_at", ""), reverse=True)
-        return result[:limit]
-
-    def _get_by_id_json(self, memory_id: str) -> Optional[Dict[str, Any]]:
-        memories = self._load_json()
-        for m in memories:
-            if m.get("id") == memory_id:
-                return m
-        return None
-
-    def _upsert_json(self, memory: Dict[str, Any]) -> Dict[str, Any]:
-        memories = self._load_json()
-        # Find existing by site_id + equipment_code + key
-        site_id = memory.get("site_id")
-        equip = memory.get("equipment_code")
-        key = memory.get("key")
-        for i, m in enumerate(memories):
-            if m.get("site_id") == site_id and m.get("equipment_code") == equip and m.get("key") == key:
-                memories[i] = memory
-                self._save_json(memories)
-                return memory
-        memories.append(memory)
-        self._save_json(memories)
-        return memory
-
-    def _delete_json(self, memory_id: str) -> bool:
-        memories = self._load_json()
-        before = len(memories)
-        memories = [m for m in memories if m.get("id") != memory_id]
-        if len(memories) < before:
-            self._save_json(memories)
-            return True
-        return False
+            logger.error("Canonical agent_memory delete failed: %s", e)
+            return False
 
 
-# Singleton
 _agent_memory_repo: Optional[AgentMemoryRepository] = None
 
 

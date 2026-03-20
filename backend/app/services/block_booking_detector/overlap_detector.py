@@ -26,9 +26,66 @@ from app.services.block_booking_detector.booking_store import BookingStore
 logger = logging.getLogger(__name__)
 
 
-def _time_slot_key(booking: BookingRecord) -> tuple[str, str]:
-    """Return a stable key for an exact booking time window."""
-    return (booking.start_time.isoformat(), booking.end_time.isoformat())
+def _duration_hours(booking: BookingRecord) -> float:
+    """Return booking duration in hours."""
+    return (booking.end_time - booking.start_time).total_seconds() / 3600.0
+
+
+def _merge_long_overlap_segments(
+    bookings: list[BookingRecord],
+    min_rooms_for_alert: int,
+    threshold_hours: float,
+) -> list[tuple[datetime, datetime, list[BookingRecord]]]:
+    """Return merged long-overlap clusters for a day's bookings.
+
+    We treat block booking as a long overlapping hold across multiple rooms on
+    the same date, not merely identical time slots. A cluster only qualifies if:
+    - each constituent booking is at least `threshold_hours` long
+    - the shared overlap window itself is at least `threshold_hours` long
+    - the active room count meets `min_rooms_for_alert`
+    """
+    long_bookings = [b for b in bookings if _duration_hours(b) >= threshold_hours]
+    if len(long_bookings) < min_rooms_for_alert:
+        return []
+
+    boundaries = sorted({b.start_time for b in long_bookings} | {b.end_time for b in long_bookings})
+    segments: list[tuple[datetime, datetime, list[BookingRecord]]] = []
+
+    for index in range(len(boundaries) - 1):
+        segment_start = boundaries[index]
+        segment_end = boundaries[index + 1]
+        if segment_start >= segment_end:
+            continue
+
+        active = [
+            booking
+            for booking in long_bookings
+            if booking.start_time <= segment_start and booking.end_time >= segment_end
+        ]
+        if len({booking.room_name for booking in active}) < min_rooms_for_alert:
+            continue
+
+        segments.append((segment_start, segment_end, active))
+
+    merged: list[tuple[datetime, datetime, list[BookingRecord]]] = []
+    for segment_start, segment_end, active in segments:
+        active_ids = sorted(booking.id for booking in active)
+        if merged:
+            prev_start, prev_end, prev_active = merged[-1]
+            prev_ids = sorted(booking.id for booking in prev_active)
+            if active_ids == prev_ids and prev_end == segment_start:
+                merged[-1] = (prev_start, segment_end, prev_active)
+                continue
+
+        merged.append((segment_start, segment_end, active))
+
+    qualifying: list[tuple[datetime, datetime, list[BookingRecord]]] = []
+    for overlap_start, overlap_end, active in merged:
+        overlap_hours = (overlap_end - overlap_start).total_seconds() / 3600.0
+        if overlap_hours >= threshold_hours:
+            qualifying.append((overlap_start, overlap_end, active))
+
+    return qualifying
 
 
 def detect_overlaps(
@@ -68,17 +125,14 @@ def detect_overlaps(
             if len(day_bookings) < config.min_rooms_for_alert:
                 continue
 
-            by_slot: dict[tuple[str, str], list[BookingRecord]] = defaultdict(list)
-            for booking in day_bookings:
-                by_slot[_time_slot_key(booking)].append(booking)
+            overlap_clusters = _merge_long_overlap_segments(
+                day_bookings,
+                min_rooms_for_alert=config.min_rooms_for_alert,
+                threshold_hours=config.full_day_threshold_hours,
+            )
 
-            for slot_bookings in by_slot.values():
+            for overlap_start, overlap_end, slot_bookings in overlap_clusters:
                 rooms = sorted({b.room_name for b in slot_bookings})
-                if len(rooms) < config.min_rooms_for_alert:
-                    continue
-
-                slot_start = slot_bookings[0].start_time
-                slot_end = slot_bookings[0].end_time
                 booking_date = slot_bookings[0].booking_date
 
                 # De-duplicate: skip if open alert already exists
@@ -86,15 +140,15 @@ def detect_overlaps(
                     site_id,
                     organiser_email,
                     booking_date,
-                    slot_start,
-                    slot_end,
+                    overlap_start,
+                    overlap_end,
                 ):
                     logger.debug(
                         "Skipping duplicate alert for %s on %s %s-%s",
                         organiser_email,
                         date_str,
-                        slot_start.strftime("%H:%M"),
-                        slot_end.strftime("%H:%M"),
+                        overlap_start.strftime("%H:%M"),
+                        overlap_end.strftime("%H:%M"),
                     )
                     continue
 
@@ -105,8 +159,8 @@ def detect_overlaps(
                     site_id=site_id,
                     organiser_email=organiser_email,
                     organiser_name=organiser_name,
-                    overlap_window_start=slot_start,
-                    overlap_window_end=slot_end,
+                    overlap_window_start=overlap_start,
+                    overlap_window_end=overlap_end,
                     rooms=rooms,
                     room_count=len(rooms),
                     booking_ids=[b.id for b in slot_bookings],
@@ -119,8 +173,8 @@ def detect_overlaps(
                     organiser_email,
                     len(rooms),
                     date_str,
-                    slot_start.strftime("%H:%M"),
-                    slot_end.strftime("%H:%M"),
+                    overlap_start.strftime("%H:%M"),
+                    overlap_end.strftime("%H:%M"),
                 )
 
     return new_alerts

@@ -2,12 +2,14 @@
 title: "SIMBIOT Concept Evolution Connector"
 type: "technical"
 status: "ready"
-version: "1.0.0"
+version: "1.1.0"
 created: "2026-02-04"
-updated: "2026-02-04"
+updated: "2026-03-16"
 author: "Sentinel Development Team"
 tags: [simbiot, concept, mri-evolution, fsi, cafm, work-orders, integration]
 related:
+  - "05-integrations/bms-adapter-contract.md"
+  - "architecture-repository/principles/building-operating-lifecycle.md"
   - "07-integrations/simbiot-mcp-server.md"
   - "07-integrations/cafm-schema.md"
   - "05-integrations/workflow-triggers.md"
@@ -19,6 +21,31 @@ estimated_read_time: 15
 ---
 
 # SIMBIOT Concept Evolution Connector
+
+## Platform Boundary
+
+The repository uses one canonical operational boundary:
+
+```text
+building -> BMS source -> SIMBIOT -> SENTINEL
+```
+
+Where:
+
+- `building` is the real site and its equipment, schedules, and operational state.
+- `BMS source` is either the live BMS or the lifecycle simulation acting as a simulated BMS for that building.
+- `SIMBIOT` is the integration boundary for connection setup, discovery, ingestion, mapping, and command transport.
+- `SENTINEL` is the overlay that stores data, runs ML, produces recommendations, and optionally issues control actions through SIMBIOT.
+
+Operational rules:
+
+- The lifecycle simulation engine is not part of SENTINEL. It is one possible BMS source.
+- `site_processing = off` means disconnected from the building from SENTINEL's perspective.
+- Production deployment is one SENTINEL instance per building.
+- Any future multi-site console is read-only and not the operational control plane.
+
+The stage-by-stage operating model for this boundary is defined in
+[building-operating-lifecycle.md](/opt/bms-intelligence/docs/architecture-repository/principles/building-operating-lifecycle.md).
 
 ## Overview
 

@@ -8,15 +8,14 @@ Security: GET endpoints require AUDITOR (level 1), mutations require ADMIN (leve
 Phase 155: CONFIG_CHANGE audit events on all PUT/POST/DELETE endpoints.
 """
 
-import json
 import logging
 from dataclasses import asdict
-from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from app.config.settings import settings as app_settings
+from app.database import get_supabase_client
 from app.models.auth import AuthContext
 from app.security.audit_events import audit_config_change
 from app.security.pipeline import require_role
@@ -31,13 +30,9 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# Path to space settings data file
-DATA_DIR = Path(__file__).parent.parent / "data"
-SPACE_SETTINGS_FILE = DATA_DIR / "space" / "space_settings.json"
-
 # Default grace period settings (from config/settings.py)
 DEFAULT_SPACE_SETTINGS: Dict[str, Any] = {
-    "ghost_booking_grace_minutes": 15,
+    "ghost_booking_grace_minutes": 5,
     "concierge_response_window_minutes": 15,
     "sensor_silence_threshold_minutes": 30,
     "right_sizing_grace_minutes": 20,
@@ -59,18 +54,17 @@ _SETTING_RANGES: Dict[str, tuple] = {
 
 
 def _load_space_settings() -> Dict[str, Any]:
-    """Load space settings from JSON file, falling back to defaults."""
-    if SPACE_SETTINGS_FILE.exists():
-        try:
-            with open(SPACE_SETTINGS_FILE) as f:
-                saved = json.load(f)
-            # Merge with defaults (saved values take priority)
-            result = {**DEFAULT_SPACE_SETTINGS, **saved}
-            return result
-        except (json.JSONDecodeError, OSError):
-            pass
+    """Load space settings from canonical system_settings, falling back to defaults."""
+    try:
+        supabase = get_supabase_client()
+        result = supabase.table("system_settings").select("value").eq("key", "space_settings").limit(1).execute()
+        if result.data:
+            saved = result.data[0].get("value") or {}
+            if isinstance(saved, dict):
+                return {**DEFAULT_SPACE_SETTINGS, **saved}
+    except Exception as exc:
+        logger.warning("Canonical space settings load failed, using defaults: %s", exc)
 
-    # Fall back to app config values
     return {
         "ghost_booking_grace_minutes": app_settings.ghost_booking_grace_minutes,
         "concierge_response_window_minutes": app_settings.concierge_response_window_minutes,
@@ -83,10 +77,20 @@ def _load_space_settings() -> Dict[str, Any]:
 
 
 def _save_space_settings(data: Dict[str, Any]) -> None:
-    """Save space settings to JSON file."""
-    SPACE_SETTINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    with open(SPACE_SETTINGS_FILE, "w") as f:
-        json.dump(data, f, indent=2)
+    """Save space settings to canonical system_settings."""
+    supabase = get_supabase_client()
+    supabase.table("system_settings").upsert(
+        {
+            "key": "space_settings",
+            "value": data,
+            "category": "space",
+            "description": "Space optimization operational settings",
+            "data_type": "object",
+            "is_public": False,
+            "is_editable": True,
+        },
+        on_conflict="key",
+    ).execute()
 
 
 def get_space_setting(key: str) -> Any:
@@ -236,17 +240,17 @@ async def delete_concierge_endpoint(
 # Site / Building / Floor Structure
 # ---------------------------------------------------------------------------
 
-SITE_STRUCTURE_FILE = DATA_DIR / "space" / "site_structure.json"
-
 
 def _load_site_structure() -> List[Dict[str, Any]]:
-    """Load site/building/floor structure from JSON config file."""
-    if not SITE_STRUCTURE_FILE.exists():
-        return []
     try:
-        with open(SITE_STRUCTURE_FILE) as f:
-            return json.load(f)
-    except (json.JSONDecodeError, OSError):
+        supabase = get_supabase_client()
+        result = supabase.table("system_settings").select("value").eq("key", "space_site_structure").limit(1).execute()
+        if result.data:
+            value = result.data[0].get("value")
+            if isinstance(value, list):
+                return value
+    except Exception as exc:
+        logger.warning("Canonical space site structure load failed: %s", exc)
         return []
 
 

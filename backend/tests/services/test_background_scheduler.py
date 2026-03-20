@@ -4,6 +4,8 @@ Background scheduler tests for APScheduler integration.
 Tests scheduled jobs, job management, and cron triggers.
 """
 
+import logging
+
 import pytest
 
 
@@ -231,6 +233,23 @@ class TestJobDataAccess:
 
         # Jobs should be able to query devices
         assert device_manager is not None
+
+    def test_process_sentry_notifications_uses_repository_import_path(self, monkeypatch, caplog):
+        """Sentry notification polling should resolve the repository import."""
+        from app.services.background_scheduler import scheduler_service
+        from app.database.repositories.service_record_repository import ServiceRecordRepository
+
+        async def _fake_list(self, filters=None):
+            assert filters == {"status": "notified"}
+            return []
+
+        monkeypatch.setattr(ServiceRecordRepository, "list", _fake_list)
+
+        with caplog.at_level(logging.ERROR):
+            scheduler_service._process_sentry_notifications()
+
+        assert "app.database.service_record_repository" not in caplog.text
+        assert "Failed to process Sentry notifications" not in caplog.text
 
 
 @pytest.mark.integration

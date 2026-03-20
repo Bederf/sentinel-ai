@@ -20,12 +20,10 @@ Usage:
 
 from __future__ import annotations
 
-import json
 import logging
 import time
 from dataclasses import dataclass, field
 from enum import Enum
-from pathlib import Path
 from typing import Any, Awaitable, Callable, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
@@ -497,39 +495,23 @@ async def _verify_setpoint(args: Dict[str, Any]) -> VerificationEvidence:
 
 @register_verifier("email_smtp", "send")
 async def _verify_email_send(args: Dict[str, Any]) -> VerificationEvidence:
-    """Verify an email was sent by checking the notification delivery log."""
+    """Verify an email was sent by checking the canonical notification delivery log."""
     t0 = time.monotonic()
     message_id = args.get("message_id", "")
 
-    log_path = Path(__file__).parent.parent.parent / "database" / "data" / "notification_delivery_log.json"
-
     try:
-        if not log_path.exists():
-            elapsed = (time.monotonic() - t0) * 1000
-            return _evidence(
-                action="send",
-                target=f"email:{message_id}",
-                expected={"message_id": message_id, "found_in_log": True},
-                actual={"log_exists": False},
-                status=VerificationStatus.ERROR,
-                detail="Notification delivery log not found",
-                duration_ms=elapsed,
-            )
+        client = _get_supabase_client() if _get_supabase_client else None
+        if not client:
+            raise RuntimeError("Supabase client unavailable")
 
-        with open(log_path) as f:
-            log_data = json.load(f)
-
-        # Search across all technician entries for the message_id
-        found = False
-        for _tech_id, entries in log_data.items():
-            if not isinstance(entries, list):
-                continue
-            for entry in entries:
-                if entry.get("id") == message_id or entry.get("external_message_id") == message_id:
-                    found = True
-                    break
-            if found:
-                break
+        result = (
+            client.table("notification_delivery_log")
+            .select("id,external_message_id")
+            .or_(f"id.eq.{message_id},external_message_id.eq.{message_id}")
+            .limit(1)
+            .execute()
+        )
+        found = bool(result.data)
 
     except Exception as exc:
         elapsed = (time.monotonic() - t0) * 1000
@@ -539,7 +521,7 @@ async def _verify_email_send(args: Dict[str, Any]) -> VerificationEvidence:
             expected={"message_id": message_id},
             actual={},
             status=VerificationStatus.ERROR,
-            detail=f"Error reading notification log: {type(exc).__name__}: {exc}",
+            detail=f"Error reading notification delivery log: {type(exc).__name__}: {exc}",
             duration_ms=elapsed,
         )
 

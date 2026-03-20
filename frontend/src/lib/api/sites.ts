@@ -89,13 +89,12 @@ export interface DeskStatsResponse {
 }
 
 export interface CreateSiteRequest {
-  code: string;
   name: string;
   address?: string;
+  region?: string;
   type?: string;
-  gps_lat?: number;
-  gps_lon?: number;
-  square_meters?: number;
+  floors?: string[];
+  sqm?: number;
 }
 
 export interface SiteListResponse {

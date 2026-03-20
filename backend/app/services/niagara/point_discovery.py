@@ -18,7 +18,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from app.database.supabase_client import get_supabase_client
 from app.services.niagara.bacnet_client import (
     BACnetException,
     NiagaraBACnetClient,
@@ -28,6 +27,15 @@ from app.services.niagara.point_classifier import (
     ClassifiedPoint,
     PointClassifier,
     get_point_classifier,
+)
+from app.services.simbiot import (
+    BmsConnectionConfig,
+    BmsDeviceDescriptor,
+    BmsPointDescriptor,
+    BmsPointValue,
+    create_bms_adapter,
+    filter_classified_points_for_site,
+    resolve_bms_adapter_type,
 )
 
 logger = logging.getLogger(__name__)
@@ -162,16 +170,18 @@ class PointDiscoveryService:
         site_id: str,
         device_bacnet_id: Optional[int] = None,
         bms_vendor: Optional[str] = None,
+        adapter_type: Optional[str] = None,
     ) -> DiscoveryResult:
         """Run full point discovery and classification workflow.
 
-        Routes: BACnet (live device) -> Simulation (Supabase) -> JSON fallback.
+        Routes: BACnet (live device) -> Simulation adapter -> JSON fallback.
 
         Args:
             device_ip: IP address of the BACnet device, or 'simulation' for simulation data
             site_id: SENTINEL site ID for mapping (the NEW site being created)
             device_bacnet_id: Optional BACnet device instance ID
             bms_vendor: Optional BMS vendor identifier
+            adapter_type: Explicit adapter selection ('bacnet', 'simulation')
 
         Returns:
             DiscoveryResult with classified points and summary
@@ -194,7 +204,7 @@ class PointDiscoveryService:
         try:
             # Phase 1: Discover points (BACnet -> Simulation -> JSON fallback)
             result.status = "discovering"
-            raw_points = await self._discover_points(device_ip, site_id, device_bacnet_id)
+            raw_points = await self._discover_points(device_ip, site_id, device_bacnet_id, adapter_type, bms_vendor)
             result.raw_points = [p if isinstance(p, dict) else p.to_dict() for p in raw_points]
 
             logger.info(
@@ -207,10 +217,14 @@ class PointDiscoveryService:
             # Phase 2: Classify points
             result.status = "classifying"
             classified = self._classify_discovered_points(raw_points)
+            raw_points, classified, dropped_points = self._apply_module_policy(site_id, raw_points, classified)
+            result.raw_points = [p if isinstance(p, dict) else p.to_dict() for p in raw_points]
             result.classified_points = [cp.to_dict() for cp in classified]
 
             # Phase 3: Generate summary
             result.summary = self._classifier.get_classification_summary(classified)
+            if dropped_points:
+                result.summary["module_filtered_points"] = dropped_points
             result.status = "complete"
             result.completed_at = datetime.utcnow().isoformat()
 
@@ -289,10 +303,14 @@ class PointDiscoveryService:
             # Phase 2: Classify points
             result.status = "classifying"
             classified = self._classifier.classify_points(raw_points)
+            raw_points, classified, dropped_points = self._apply_module_policy(site_id, raw_points, classified)
+            result.raw_points = raw_points
             result.classified_points = [cp.to_dict() for cp in classified]
 
             # Phase 3: Generate summary
             result.summary = self._classifier.get_classification_summary(classified)
+            if dropped_points:
+                result.summary["module_filtered_points"] = dropped_points
 
             # Add lighting-specific summary
             result.summary["lighting_points"] = self._extract_lighting_summary(classified)
@@ -468,49 +486,64 @@ class PointDiscoveryService:
         device_ip: str,
         site_id: str,
         device_bacnet_id: Optional[int] = None,
+        adapter_type: Optional[str] = None,
+        bms_vendor: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
-        """Discover points using 3-tier routing: BACnet -> Simulation -> JSON fallback.
+        """Discover points using 3-tier routing: selected adapter -> simulation -> JSON fallback.
 
         Args:
             device_ip: Device IP address (or 'simulation' for simulation-only)
             site_id: SENTINEL site ID for simulation/fallback lookup
             device_bacnet_id: BACnet device ID (if provided, tries BACnet first)
+            adapter_type: Explicit adapter selection ('bacnet', 'simulation', ...)
+            bms_vendor: Optional vendor/source alias resolved by the adapter registry
 
         Returns:
             List of point dicts with name, description, object_type, etc.
         """
-        # Tier 1: Try BACnet discovery first (if device_bacnet_id provided)
-        if device_bacnet_id is not None:
-            client = self._get_bacnet_client()
-            if not client.is_running and not client._bac0_unavailable:
-                try:
-                    logger.info("Auto-starting BACnet client for discovery...")
-                    await client.start()
-                except BACnetException as e:
-                    logger.warning(
-                        "BACnet auto-start failed: %s. Falling back to simulation data.",
-                        e,
-                    )
+        selected_adapter = resolve_bms_adapter_type(
+            adapter_type=adapter_type,
+            bms_vendor=bms_vendor,
+            device_ip=device_ip,
+        )
 
-            if client.is_running:
-                try:
-                    return await self._discover_from_bacnet(client, device_bacnet_id)
-                except BACnetException as e:
-                    logger.warning(
-                        "BACnet discovery failed for device %d: %s. Falling back to simulation data.",
-                        device_bacnet_id,
-                        e,
-                    )
+        should_try_selected_adapter = (
+            selected_adapter == "simulation"
+            or adapter_type is not None
+            or bms_vendor is not None
+            or device_bacnet_id is not None
+        )
 
-        # Tier 2: Try simulation data from Supabase
-        sim_points = self._load_simulation_points(site_id)
-        if sim_points:
-            logger.info(
-                "Loaded %d points from simulation data for site %s",
-                len(sim_points),
-                site_id,
+        # Tier 1: Try the selected adapter first when it was explicitly
+        # requested or when sufficient live connection context is present.
+        if should_try_selected_adapter:
+            adapter_points = await self._load_adapter_points(
+                adapter_type=selected_adapter,
+                site_id=site_id,
+                device_ip=device_ip,
+                device_bacnet_id=device_bacnet_id,
+                bms_vendor=bms_vendor,
             )
-            return sim_points
+            if adapter_points:
+                logger.info(
+                    "Loaded %d points through %s adapter for site %s",
+                    len(adapter_points),
+                    selected_adapter,
+                    site_id,
+                )
+                return adapter_points
+
+        # Tier 2: Fall back to the simulation-backed adapter when the selected
+        # live adapter is unavailable or yields no data.
+        if selected_adapter != "simulation":
+            sim_points = await self._load_simulation_points(site_id)
+            if sim_points:
+                logger.info(
+                    "Loaded %d points from simulation adapter for site %s",
+                    len(sim_points),
+                    site_id,
+                )
+                return sim_points
 
         # Tier 3: Fall back to static JSON files
         json_points = self._load_demo_points(site_id)
@@ -523,6 +556,71 @@ class PointDiscoveryService:
             return json_points
 
         raise BACnetException(f"No points found for {device_ip} (site {site_id}): all tiers exhausted")
+
+    async def _load_adapter_points(
+        self,
+        adapter_type: str,
+        site_id: str,
+        device_ip: str,
+        device_bacnet_id: Optional[int] = None,
+        bms_vendor: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """Load points through the canonical SIMBIOT adapter boundary."""
+        adapter = create_bms_adapter(
+            adapter_type=adapter_type,
+            bms_vendor=bms_vendor,
+            device_ip=device_ip,
+        )
+        config = BmsConnectionConfig(
+            site_id=site_id,
+            source_type=adapter_type,
+            host=None if device_ip == "simulation" else device_ip,
+            metadata={
+                "bms_vendor": bms_vendor,
+                "commissioning": True,
+            },
+        )
+
+        try:
+            status = await adapter.connect(config)
+            if not status.connected:
+                logger.warning("Adapter %s did not connect for site %s: %s", adapter_type, site_id, status.message)
+                return []
+
+            devices = await adapter.discover_devices()
+            target_devices = self._select_target_devices(
+                adapter_type=adapter_type,
+                devices=devices,
+                device_ip=device_ip,
+                device_bacnet_id=device_bacnet_id,
+            )
+            if not target_devices:
+                logger.info("No %s adapter devices selected for site %s", adapter_type, site_id)
+                return []
+
+            points: List[Dict[str, Any]] = []
+            instance_counter = 2000
+            for device in target_devices:
+                device_points = await adapter.discover_points(device.device_id)
+                reading_map = {}
+                if device_points:
+                    readings = await adapter.read_points(device.device_id, [point.point_id for point in device_points])
+                    reading_map = {reading.point_id: reading for reading in readings}
+                for point in device_points:
+                    reading = reading_map.get(point.point_id)
+                    if reading is None:
+                        reading = await self._safe_adapter_read(adapter, device.device_id, point.point_id)
+                    points.append(self._format_adapter_point(adapter_type, device, point, reading, instance_counter))
+                    instance_counter += 1
+            return points
+        except Exception as e:
+            logger.warning("Failed to load %s adapter points for %s: %s", adapter_type, site_id, e)
+            return []
+        finally:
+            try:
+                await adapter.disconnect()
+            except Exception:
+                pass
 
     async def _discover_from_bacnet(
         self,
@@ -735,130 +833,125 @@ class PointDiscoveryService:
             logger.error("Failed to load demo points from haystack_tags.json: %s", e)
             return []
 
-    def _load_simulation_points(self, site_id: str) -> List[Dict[str, Any]]:
-        """Load points from Supabase equipment + sensor readings (simulation data).
+    async def _load_simulation_points(self, site_id: str) -> List[Dict[str, Any]]:
+        """Load points from the simulation-backed BMS adapter.
 
-        Queries the equipment table for equipment belonging to the site, then
-        fetches latest sensor readings from equipment_sensor_readings. Formats
-        results as point dicts matching the classifier's expected input format.
+        The lifecycle simulation is exposed to SENTINEL as a BMS source via
+        SimulationBmsAdapter. Discovery must use that adapter boundary rather
+        than reaching into simulator internals or Supabase state directly.
 
         Args:
             site_id: SENTINEL site ID (e.g., 'site-002')
 
         Returns:
-            List of point dicts, or empty list if Supabase unavailable or no data.
+            List of point dicts, or empty list if the simulation adapter has no data.
         """
-        try:
-            client = get_supabase_client()
-        except Exception as e:
-            logger.warning("Supabase client unavailable for simulation points: %s", e)
-            return []
+        return await self._load_adapter_points(
+            adapter_type="simulation",
+            site_id=site_id,
+            device_ip="simulation",
+        )
 
-        try:
-            # Try to find equipment via buildings table first
-            equipment_rows = []
-            try:
-                import re
+    def _select_target_devices(
+        self,
+        adapter_type: str,
+        devices: List[BmsDeviceDescriptor],
+        device_ip: str,
+        device_bacnet_id: Optional[int],
+    ) -> List[BmsDeviceDescriptor]:
+        """Select the device set to discover for an adapter invocation."""
+        if adapter_type == "simulation":
+            return devices
 
-                safe_site_id = re.sub(r"[,.()\s]", "", site_id)
-                buildings_resp = (
-                    client.table("sites")
-                    .select("id")
-                    .or_(f"code.eq.{safe_site_id},site_id.eq.{safe_site_id}")
-                    .execute()
+        if device_bacnet_id is not None:
+            matching = [device for device in devices if device.device_id == str(device_bacnet_id)]
+            if matching:
+                return matching
+            return [
+                BmsDeviceDescriptor(
+                    device_id=str(device_bacnet_id),
+                    display_name=f"BACnet Device {device_bacnet_id}",
+                    protocol=adapter_type,
+                    address=device_ip,
                 )
-                site_ids = [b["id"] for b in (buildings_resp.data or [])]
+            ]
 
-                if site_ids:
-                    equip_resp = (
-                        client.table("equipment")
-                        .select("code,name,type,status,health_score")
-                        .in_("site_id", site_ids)
-                        .execute()
-                    )
-                    equipment_rows = equip_resp.data or []
-            except Exception as e:
-                logger.debug("Buildings-based equipment lookup failed: %s", e)
+        if device_ip:
+            matching = [device for device in devices if self._device_matches_host(device, device_ip)]
+            if matching:
+                return matching
 
-            # Fallback: match by equipment code prefix (e.g., S002-)
-            if not equipment_rows:
-                prefix = site_id.upper().replace("SITE-", "S")
-                try:
-                    equip_resp = (
-                        client.table("equipment")
-                        .select("code,name,type,status,health_score")
-                        .like("code", f"{prefix}-%")
-                        .execute()
-                    )
-                    equipment_rows = equip_resp.data or []
-                except Exception as e:
-                    logger.debug("Prefix-based equipment lookup failed: %s", e)
+        if len(devices) == 1:
+            return devices
 
-            if not equipment_rows:
-                logger.info("No simulation equipment found for site %s", site_id)
-                return []
+        return []
 
-            # Fetch sensor readings for each equipment and build point dicts
-            points: List[Dict[str, Any]] = []
-            instance_counter = 2000  # Offset from JSON fallback range (1000+)
+    def _device_matches_host(self, device: BmsDeviceDescriptor, host: str) -> bool:
+        address = (device.address or "").lower()
+        normalized_host = host.lower()
+        return address.startswith(normalized_host) or normalized_host in address
 
-            for equip in equipment_rows:
-                eq_code = equip.get("code", "")
-                eq_name = equip.get("name", eq_code)
-                eq_type = equip.get("type", "unknown")
+    async def _safe_adapter_read(self, adapter, device_id: str, point_id: str) -> Optional[BmsPointValue]:
+        try:
+            return await adapter.read_point(device_id, point_id)
+        except Exception:
+            return None
 
-                try:
-                    readings_resp = (
-                        client.table("equipment_sensor_readings")
-                        .select("sensor_type,value,unit")
-                        .eq("equipment_id", eq_code)
-                        .order("recorded_at", desc=True)
-                        .limit(50)
-                    ).execute()
-                    readings = readings_resp.data or []
-                except Exception as e:
-                    logger.debug("Sensor readings query failed for %s: %s", eq_code, e)
-                    readings = []
+    def _format_adapter_point(
+        self,
+        adapter_type: str,
+        device: BmsDeviceDescriptor,
+        point: BmsPointDescriptor,
+        reading: Optional[BmsPointValue],
+        instance_counter: int,
+    ) -> Dict[str, Any]:
+        point_name = point.point_name or point.point_id
+        description = (
+            point.metadata.get("description") or f"{device.display_name} - {point_name.replace('_', ' ').title()}"
+        )
+        object_type = point.metadata.get("object_type") or _infer_object_type(point_name)
+        instance = point.metadata.get("instance", instance_counter)
+        value = reading.value if reading else None
+        unit = point.unit or (reading.unit if reading else None) or ""
 
-                # Deduplicate by sensor_type (keep first = most recent)
-                seen_types: set = set()
-                for reading in readings:
-                    sensor_type = reading.get("sensor_type", "")
-                    if not sensor_type or sensor_type in seen_types:
-                        continue
-                    seen_types.add(sensor_type)
+        if adapter_type == "simulation":
+            name = f"{device.device_id}.{point.point_id}"
+        else:
+            name = point_name
 
-                    points.append(
-                        {
-                            "name": f"{eq_code}.{sensor_type}",
-                            "description": f"{eq_name} - {sensor_type.replace('_', ' ').title()}",
-                            "object_type": _infer_object_type(sensor_type),
-                            "instance": instance_counter,
-                            "units": reading.get("unit", ""),
-                            "present_value": reading.get("value"),
-                            "writable": _infer_point_type(sensor_type) in ("setpoint", "command"),
-                            "_equipment_id": eq_code,
-                            "_equipment_type": eq_type,
-                            "_point_type": _infer_point_type(sensor_type),
-                        }
-                    )
-                    instance_counter += 1
-
-            logger.info(
-                "Loaded %d simulation points from %d equipment for site %s",
-                len(points),
-                len(equipment_rows),
-                site_id,
-            )
-            return points
-
-        except Exception as e:
-            logger.warning("Failed to load simulation points for %s: %s", site_id, e)
-            return []
+        return {
+            "name": name,
+            "description": description,
+            "object_type": object_type,
+            "instance": instance,
+            "units": unit,
+            "present_value": value,
+            "writable": point.writable,
+            "_equipment_id": device.device_id,
+            "_equipment_type": device.metadata.get("equipment_type", "unknown"),
+            "_point_type": _infer_point_type(point_name),
+        }
 
     def _classify_discovered_points(self, points: List[Dict[str, Any]]) -> List[ClassifiedPoint]:
         """Classify all discovered points using the point classifier."""
         return self._classifier.classify_points(points)
+
+    def _apply_module_policy(
+        self,
+        site_id: str,
+        raw_points: List[Dict[str, Any]],
+        classified_points: List[ClassifiedPoint],
+    ) -> tuple[List[Dict[str, Any]], List[ClassifiedPoint], int]:
+        """Filter discovered points against the site's explicit module policy."""
+        filtered_classified, dropped_points = filter_classified_points_for_site(site_id, classified_points)
+        if not dropped_points:
+            return raw_points, filtered_classified, 0
+
+        allowed_keys = {(point.original_name, point.instance) for point in filtered_classified}
+        filtered_raw = [
+            point for point in raw_points if (str(point.get("name", "")), int(point.get("instance", 0))) in allowed_keys
+        ]
+        return filtered_raw, filtered_classified, dropped_points
 
     def get_discovery_result(self, discovery_id: str) -> Optional[DiscoveryResult]:
         """Get a cached discovery result by ID.

@@ -60,6 +60,12 @@ const PROVIDER_COLORS: Record<string, string> = {
   ollama: "rgb(168, 85, 247)",
   sentry: "var(--color-sentinel-amber)",
   elevenlabs: "var(--color-sentinel-red)",
+  zhipuai: "rgb(56, 189, 248)",
+  whatsapp_meta: "rgb(37, 211, 102)",
+  whatsapp_twilio: "rgb(37, 211, 102)",
+  bulksms: "rgb(251, 146, 60)",
+  telegram: "rgb(0, 136, 204)",
+  eskomsepush: "rgb(239, 68, 68)",
 };
 
 export function AiCostTracker({ onError }: AiCostTrackerProps) {
@@ -108,9 +114,9 @@ export function AiCostTracker({ onError }: AiCostTrackerProps) {
               <Coins className="h-5 w-5" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>AI API Costs</h2>
+              <h2 className="text-lg font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>API & Service Costs</h2>
               <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                Token usage and spend across Claude, ChatGPT, Sentry, Ollama
+                Spend across AI, messaging, and external services
               </p>
             </div>
           </div>

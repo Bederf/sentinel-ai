@@ -27,6 +27,7 @@ from app.models.space_occupancy import (
     RightSizingFinding,
     RightSizingPattern,
 )
+from tests.services.fake_space_store import FakeSpaceSupabase
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -34,14 +35,10 @@ from app.models.space_occupancy import (
 
 
 @pytest.fixture(autouse=True)
-def _clean_store(tmp_path):
-    """Point occupancy_store to a temp directory to isolate tests."""
-    with (
-        patch("app.services.occupancy_store._DATA_DIR", tmp_path),
-        patch("app.services.occupancy_store._EVENTS_FILE", tmp_path / "occupancy_events.json"),
-        patch("app.services.occupancy_store._GHOST_FILE", tmp_path / "ghost_findings.json"),
-        patch("app.services.occupancy_store._RIGHTSIZING_FILE", tmp_path / "rightsizing_findings.json"),
-    ):
+def _clean_store():
+    """Use an isolated in-memory canonical store for space tests."""
+    fake = FakeSpaceSupabase()
+    with patch("app.services.occupancy_store._client", return_value=fake):
         yield
 
 
@@ -250,7 +247,7 @@ class TestGhostBookingDetection:
         from app.services.ghost_booking_detector import detect_ghost_booking
 
         now = datetime(2026, 3, 7, 10, 0)
-        booking = _make_booking(start_offset_min=-5, duration_min=120, now=now)
+        booking = _make_booking(start_offset_min=-4, duration_min=120, now=now)
 
         finding = detect_ghost_booking(booking, now=now, room_code="FA1-1Q1-MR1")
         assert finding is None
@@ -267,6 +264,19 @@ class TestGhostBookingDetection:
 
         finding = detect_ghost_booking(booking, now=now, room_code="FA1-1Q1-MR1")
         assert finding is None
+
+    def test_block_booked_room_can_still_be_ghost_booking(self):
+        """A booking already flagged as block-booked is still eligible for ghost detection."""
+        from app.services.ghost_booking_detector import detect_ghost_booking
+
+        now = datetime(2026, 3, 7, 10, 0)
+        booking = _make_booking(start_offset_min=-30, duration_min=120, now=now)
+        booking.flagged = True
+
+        _seed_sensor_alive("FA1-1Q1-MR1")
+        finding = detect_ghost_booking(booking, now=now, room_code="FA1-1Q1-MR1")
+        assert finding is not None
+        assert finding.source_booking_flagged is True
 
     def test_auto_resolve_ghost_on_occupation(self):
         """occupied=True with open ghost finding -> auto-resolve."""

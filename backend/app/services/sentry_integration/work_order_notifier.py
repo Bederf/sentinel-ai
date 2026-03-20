@@ -1359,27 +1359,9 @@ async def handle_telegram_recommendation_approval(telegram_user_id: str, message
                 from app.database.repositories import get_recommendation_repository
 
                 repo = get_recommendation_repository()
-                rec = await repo.get(value)
-                if rec:
-                    return value
+                return await repo.resolve_id_prefix(value)
             except Exception:
-                pass
-
-            try:
-                data_path = os.path.join(
-                    os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-                    "data",
-                    "recommendations.json",
-                )
-                if os.path.exists(data_path):
-                    with open(data_path) as f:
-                        payload = json.load(f)
-                    recs = payload.get("recommendations", {})
-                    for rec_id in recs.keys():
-                        if rec_id.startswith(value):
-                            return rec_id
-            except Exception:
-                pass
+                return ""
             return ""
 
         rec_id = await _resolve_recommendation_id(token)

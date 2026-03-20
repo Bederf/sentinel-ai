@@ -8,7 +8,6 @@ import hmac
 import json
 import logging
 import os
-from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
@@ -46,24 +45,9 @@ async def _resolve_recommendation_id(token: str) -> str:
         from app.database.repositories import get_recommendation_repository
 
         repo = get_recommendation_repository()
-        rec = await repo.get(token)
-        if rec:
-            return token
+        return await repo.resolve_id_prefix(token)
     except Exception:
-        pass
-
-    # Fallback: match prefix from JSON backup when available.
-    try:
-        data_path = Path(__file__).parent.parent / "data" / "recommendations.json"
-        if data_path.exists():
-            with open(data_path) as f:
-                data = json.load(f)
-            recs = data.get("recommendations", {})
-            for rec_id in recs.keys():
-                if rec_id.startswith(token):
-                    return rec_id
-    except Exception:
-        pass
+        return ""
 
     return ""
 

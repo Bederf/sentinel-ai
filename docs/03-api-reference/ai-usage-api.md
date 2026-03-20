@@ -1,8 +1,9 @@
-# AI Usage & Cost Tracking API Reference
+# Service Usage & Cost Tracking API Reference
 
 **Base URL:** `http://localhost:9095/api`
 **Authentication:** Bearer token (JWT) — ADMIN or OPERATOR role
 **Router prefix:** `/api/ai-usage`
+**Updated:** 2026-03-15 (Phase 158 — Unified Service Cost Tracking)
 
 ---
 
@@ -10,7 +11,7 @@
 
 ### GET /api/ai-usage/summary
 
-Returns aggregated AI API costs over a configurable period. Breaks down by provider, model, and daily time series.
+Returns aggregated costs across all external services (AI, messaging, unit-based) over a configurable period. Breaks down by provider, model, and daily time series.
 
 **Method:** `GET`
 **Path:** `/api/ai-usage/summary`
@@ -49,6 +50,18 @@ curl -X GET "http://localhost:9095/api/ai-usage/summary?days=30" \
       "tokens": 747291,
       "cost_usd": 2.22,
       "cost_zar": 41.07
+    },
+    "whatsapp_meta": {
+      "calls": 15,
+      "tokens": 0,
+      "cost_usd": 0.075,
+      "cost_zar": 1.39
+    },
+    "elevenlabs": {
+      "calls": 5,
+      "tokens": 0,
+      "cost_usd": 0.045,
+      "cost_zar": 0.83
     }
   },
   "by_model": {
@@ -122,6 +135,20 @@ curl -X GET http://localhost:9095/api/ai-usage/today \
       "output_tokens": 8200,
       "cost_usd": 0.0565,
       "cost_zar": 1.05
+    },
+    "whatsapp_meta/message": {
+      "calls": 3,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "cost_usd": 0.015,
+      "cost_zar": 0.28
+    },
+    "elevenlabs/chars": {
+      "calls": 1,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "cost_usd": 0.012,
+      "cost_zar": 0.22
     }
   }
 }
@@ -169,7 +196,7 @@ Force flush in-memory usage data to disk. Automatically called every 10 API call
 
 ## Pricing Model
 
-Token costs are calculated using published API pricing (per 1M tokens, USD):
+### AI Providers (per 1M tokens, USD)
 
 | Model | Input | Output | Provider |
 |-------|-------|--------|----------|
@@ -186,6 +213,22 @@ Token costs are calculated using published API pricing (per 1M tokens, USD):
 - Cache read tokens: 90% discount (10% of input price)
 - Cache creation tokens: 25% surcharge (125% of input price)
 
+### Messaging Providers (per message, USD)
+
+| Provider | Cost/Message | Notes |
+|----------|-------------|-------|
+| whatsapp_meta | $0.005 | Meta Cloud API |
+| whatsapp_twilio | $0.005 | Twilio |
+| bulksms | $0.006 | ZA SMS rate |
+| telegram | $0.000 | Free (audit only) |
+
+### Unit-Based Services (per unit, USD)
+
+| Provider | Cost/Unit | Unit Type | Notes |
+|----------|----------|-----------|-------|
+| elevenlabs | $0.00003 | Character | ~$0.03/1K chars |
+| eskomsepush | $0.000 | API call | Free tier (50/day) |
+
 **Currency:** All ZAR values use configurable USD/ZAR rate (default R18.50, editable via PUT endpoint).
 
 ## Daily Email Report
@@ -194,10 +237,20 @@ A daily summary email is sent at **23:55** to `info@sentinel-ai.co.za` via the b
 
 - Today's total spend (ZAR + USD)
 - API call count and token count
-- Per-model breakdown
+- Per-model AI breakdown
+- Messaging section (WhatsApp, BulkSMS, Telegram counts and costs)
+- Services section (ElevenLabs, EskomSePush counts and costs)
 - 30-day running total by provider
 
 Uses the `notification_smtp_*` settings from `.env`.
+
+## Cost Alert Threshold
+
+When daily spend exceeds `COST_ALERT_DAILY_THRESHOLD_ZAR` (default: R100), a Telegram alert is sent. Fires once per day per threshold crossing.
+
+**Config:**
+- `COST_ALERT_DAILY_THRESHOLD_ZAR` — ZAR amount (0 = disabled)
+- `COST_ALERT_TELEGRAM_CHAT_ID` — target chat (falls back to `TELEGRAM_ALERT_CHAT_ID`)
 
 ## Data Storage
 
@@ -207,9 +260,15 @@ Usage data is persisted to `backend/app/data/ai_usage_log.json` with daily rollu
 
 | File | Purpose |
 |------|---------|
-| `backend/app/services/ai_usage_tracker.py` | Singleton tracker service, pricing, email report |
+| `backend/app/services/ai_usage_tracker.py` | Singleton tracker service, pricing, email report, cost alert |
 | `backend/app/api/ai_usage.py` | REST API endpoints |
-| `backend/app/services/claude_service.py` | Anthropic token capture (lines 549, 437) |
-| `backend/app/services/openai_service.py` | OpenAI token capture (lines 201, 275) |
+| `backend/app/services/claude_service.py` | Anthropic token capture |
+| `backend/app/services/openai_service.py` | OpenAI token capture |
+| `backend/app/services/zai_service.py` | ZhipuAI token capture |
+| `backend/app/integrations/whatsapp_service.py` | WhatsApp message tracking |
+| `backend/app/services/notification_providers/bulksms_provider.py` | BulkSMS tracking |
+| `backend/app/services/notification_providers/telegram_provider.py` | Telegram tracking |
+| `backend/app/services/tts_service.py` | ElevenLabs TTS tracking |
+| `backend/app/services/eskomsepush_service.py` | EskomSePush tracking |
 | `backend/app/startup/events.py` | Daily email job registration |
 | `frontend/src/components/settings/AiCostTracker.tsx` | Settings panel UI |

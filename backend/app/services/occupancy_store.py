@@ -1,17 +1,13 @@
-"""Persistence layer for occupancy events and space findings.
-
-Stores OccupancyEvent, GhostBookingFinding, and RightSizingFinding.
-Uses 3-tier fallback: Supabase -> JSON file.
-"""
+"""Persistence layer for occupancy events and space findings."""
 
 from __future__ import annotations
 
-import json
 import logging
 import threading
-from datetime import datetime
-from pathlib import Path
+from datetime import datetime, timezone
 
+from app.config.settings import settings
+from app.database.supabase_client import get_supabase_client
 from app.models.space_occupancy import (
     FocusRoomSession,
     GhostBookingFinding,
@@ -21,46 +17,44 @@ from app.models.space_occupancy import (
 
 logger = logging.getLogger(__name__)
 
-_DATA_DIR = Path(__file__).resolve().parent.parent / "data" / "space"
-_EVENTS_FILE = _DATA_DIR / "occupancy_events.json"
-_GHOST_FILE = _DATA_DIR / "ghost_findings.json"
-_RIGHTSIZING_FILE = _DATA_DIR / "rightsizing_findings.json"
-_SESSIONS_FILE = _DATA_DIR / "focus_room_sessions.json"
-
 _lock = threading.Lock()
 
 
-def _ensure_data_dir() -> None:
-    _DATA_DIR.mkdir(parents=True, exist_ok=True)
+def _use_supabase() -> bool:
+    try:
+        return bool(settings.supabase_url and settings.supabase_service_role_key)
+    except Exception:
+        return False
+
+
+def _client():
+    return get_supabase_client()
 
 
 def _dt_to_str(dt: datetime) -> str:
     return dt.isoformat()
 
 
-def _str_to_dt(s: str) -> datetime:
-    return datetime.fromisoformat(s)
+def _str_to_dt(s: str | datetime) -> datetime:
+    if isinstance(s, datetime):
+        dt = s
+    else:
+        normalized = s.replace("Z", "+00:00")
+        dt = datetime.fromisoformat(normalized)
+    if dt.tzinfo is not None:
+        dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+    return dt
 
 
-def _load_json(path: Path) -> list[dict]:
-    if not path.exists():
-        return []
-    try:
-        with open(path) as f:
-            return json.load(f)
-    except (json.JSONDecodeError, OSError):
-        return []
+def _make_naive(dt: datetime) -> datetime:
+    return dt.replace(tzinfo=None) if dt.tzinfo else dt
 
 
-def _save_json(path: Path, data: list[dict]) -> None:
-    _ensure_data_dir()
-    with open(path, "w") as f:
-        json.dump(data, f, indent=2, default=str)
-
-
-# ---------------------------------------------------------------------------
-# OccupancyEvent persistence
-# ---------------------------------------------------------------------------
+def _effective_time(event: OccupancyEvent) -> datetime:
+    ts = _make_naive(event.timestamp)
+    if ts.year < 2020 and event.received_at:
+        return _make_naive(event.received_at)
+    return ts
 
 
 def _event_to_dict(e: OccupancyEvent) -> dict:
@@ -74,7 +68,6 @@ def _event_to_dict(e: OccupancyEvent) -> dict:
         "source": e.source,
         "received_at": _dt_to_str(e.received_at),
     }
-    # Radar telemetry (only include if present — keeps JSON lean)
     if e.moving is not None:
         d["moving"] = e.moving
     if e.stationary is not None:
@@ -107,27 +100,12 @@ def _dict_to_event(d: dict) -> OccupancyEvent:
 
 
 def save_event(event: OccupancyEvent) -> OccupancyEvent:
-    """Persist a single occupancy event."""
     with _lock:
-        rows = _load_json(_EVENTS_FILE)
-        rows.append(_event_to_dict(event))
-        # Keep last 10000 events to prevent unbounded growth
-        if len(rows) > 10000:
-            rows = rows[-10000:]
-        _save_json(_EVENTS_FILE, rows)
-    return event
-
-
-def _effective_time(event: OccupancyEvent) -> datetime:
-    """Return the best available timestamp for an event.
-
-    ESP32 nodes without NTP send epoch-relative timestamps (1970-01-xx).
-    In that case, fall back to received_at (server clock).
-    """
-    ts = _make_naive(event.timestamp)
-    if ts.year < 2020 and event.received_at:
-        return _make_naive(event.received_at)
-    return ts
+        try:
+            _client().table("space_occupancy_events").insert(_event_to_dict(event)).execute()
+        except Exception as exc:
+            logger.error("Canonical save_event failed: %s", exc)
+        return event
 
 
 def get_events_for_room(
@@ -135,28 +113,24 @@ def get_events_for_room(
     from_dt: datetime | None = None,
     to_dt: datetime | None = None,
 ) -> list[OccupancyEvent]:
-    """Return events for a room, optionally filtered by time range."""
-    rows = _load_json(_EVENTS_FILE)
-    events = [_dict_to_event(r) for r in rows if r.get("room_code") == room_code]
-    if from_dt:
-        events = [e for e in events if _effective_time(e) >= from_dt]
-    if to_dt:
-        events = [e for e in events if _effective_time(e) <= to_dt]
-    events.sort(key=lambda e: _effective_time(e))
-    return events
+    try:
+        query = _client().table("space_occupancy_events").select("*").eq("room_code", room_code)
+        if from_dt:
+            query = query.gte("timestamp", _dt_to_str(from_dt))
+        if to_dt:
+            query = query.lte("timestamp", _dt_to_str(to_dt))
+        response = query.order("timestamp").execute()
+        return [_dict_to_event(r) for r in (response.data or [])]
+    except Exception as exc:
+        logger.error("Canonical get_events_for_room failed: %s", exc)
+        return []
 
 
 def room_has_sensor_data(room_code: str) -> bool:
-    """Return True if we have ever received any occupancy event for this room.
-
-    Used to distinguish 'no presence detected' (ghost) from 'no sensor deployed'.
-    """
-    events = get_events_for_room(room_code)
-    return len(events) > 0
+    return len(get_events_for_room(room_code)) > 0
 
 
 def _get_sensor_silence_threshold() -> int:
-    """Read sensor silence threshold from space settings, fall back to config."""
     try:
         from app.api.space_settings import get_space_setting
 
@@ -166,55 +140,34 @@ def _get_sensor_silence_threshold() -> int:
     except Exception:
         pass
     try:
-        from app.config.settings import settings
-
         return settings.sensor_silence_threshold_minutes or 30
     except Exception:
         return 30
 
 
 def room_sensor_is_alive(room_code: str, max_silence_minutes: int = 0) -> bool:
-    """Return True if the sensor has reported within the last N minutes.
-
-    If the sensor has gone silent (no events for max_silence_minutes), this
-    indicates a connectivity or hardware fault — not a ghost booking.
-    Returns True if no events exist at all (defer to room_has_sensor_data).
-    """
     if max_silence_minutes <= 0:
         max_silence_minutes = _get_sensor_silence_threshold()
     events = get_events_for_room(room_code)
     if not events:
-        return True  # No data at all — handled by room_has_sensor_data
+        return True
     last = events[-1]
-    # Use received_at (server clock) — ESP32 without NTP sends epoch timestamps (1970)
     last_seen = _make_naive(last.received_at) if last.received_at else _make_naive(last.timestamp)
     age_minutes = (datetime.utcnow() - last_seen).total_seconds() / 60
     return age_minutes <= max_silence_minutes
 
 
-def _make_naive(dt: datetime) -> datetime:
-    """Strip timezone info for safe comparison with naive datetimes."""
-    return dt.replace(tzinfo=None) if dt.tzinfo else dt
-
-
 def get_last_event(room_code: str) -> OccupancyEvent | None:
-    """Return the most recent event for a room regardless of state."""
     events = get_events_for_room(room_code)
     return events[-1] if events else None
 
 
 def get_occupied_minutes(room_code: str, from_dt: datetime, to_dt: datetime) -> int:
-    """Calculate total minutes where occupied=True between from_dt and to_dt.
-
-    Uses event timestamps to compute duration of each occupied segment.
-    """
     events = get_events_for_room(room_code, from_dt, to_dt)
     if not events:
         return 0
-
     total_seconds = 0.0
     segment_start: datetime | None = None
-
     for event in events:
         et = _effective_time(event)
         if event.occupied and segment_start is None:
@@ -222,28 +175,16 @@ def get_occupied_minutes(room_code: str, from_dt: datetime, to_dt: datetime) -> 
         elif not event.occupied and segment_start is not None:
             total_seconds += (et - segment_start).total_seconds()
             segment_start = None
-
-    # If still occupied at to_dt, count up to to_dt
     if segment_start is not None:
         total_seconds += (to_dt - segment_start).total_seconds()
-
     return int(total_seconds / 60)
 
 
 def get_current_vacancy_start(room_code: str) -> datetime | None:
-    """Return the timestamp of the most recent transition to occupied=False.
-
-    Returns None if the room is currently occupied or has no events.
-    """
     last = get_last_event(room_code)
     if last is None or last.occupied:
         return None
     return _effective_time(last)
-
-
-# ---------------------------------------------------------------------------
-# GhostBookingFinding persistence
-# ---------------------------------------------------------------------------
 
 
 def _ghost_to_dict(f: GhostBookingFinding) -> dict:
@@ -255,6 +196,7 @@ def _ghost_to_dict(f: GhostBookingFinding) -> dict:
         "booking_id": f.booking_id,
         "organiser_email": f.organiser_email,
         "organiser_name": f.organiser_name,
+        "source_booking_flagged": f.source_booking_flagged,
         "booking_start": _dt_to_str(f.booking_start),
         "booking_end": _dt_to_str(f.booking_end),
         "grace_period_minutes": f.grace_period_minutes,
@@ -284,7 +226,6 @@ def _dict_to_ghost(d: dict) -> GhostBookingFinding:
     status = d.get("status", "open")
     if status == "released":
         status = "confirmed_empty"
-
     return GhostBookingFinding(
         id=d["id"],
         site_id=d.get("site_id", ""),
@@ -293,6 +234,7 @@ def _dict_to_ghost(d: dict) -> GhostBookingFinding:
         booking_id=d.get("booking_id", ""),
         organiser_email=d.get("organiser_email", ""),
         organiser_name=d.get("organiser_name", ""),
+        source_booking_flagged=d.get("source_booking_flagged", False),
         booking_start=_str_to_dt(d["booking_start"]),
         booking_end=_str_to_dt(d["booking_end"]),
         grace_period_minutes=d.get("grace_period_minutes", 0),
@@ -320,24 +262,21 @@ def _dict_to_ghost(d: dict) -> GhostBookingFinding:
 
 def save_ghost_finding(finding: GhostBookingFinding) -> GhostBookingFinding:
     with _lock:
-        rows = _load_json(_GHOST_FILE)
-        rows.append(_ghost_to_dict(finding))
-        _save_json(_GHOST_FILE, rows)
-    return finding
+        try:
+            _client().table("ghost_findings").upsert(_ghost_to_dict(finding), on_conflict="id").execute()
+        except Exception as exc:
+            logger.error("Canonical save_ghost_finding failed: %s", exc)
+        return finding
 
 
 def get_open_ghost_finding(booking_id: str) -> GhostBookingFinding | None:
-    """Return any existing ghost finding for a booking (prevents duplicates).
-
-    Once a finding exists for a booking — regardless of status — we never
-    create another one.  The scanner and event handler both call this before
-    inserting a new finding.
-    """
-    rows = _load_json(_GHOST_FILE)
-    for r in rows:
-        if r.get("booking_id") == booking_id:
-            return _dict_to_ghost(r)
-    return None
+    try:
+        response = _client().table("ghost_findings").select("*").eq("booking_id", booking_id).limit(1).execute()
+        rows = response.data or []
+        return _dict_to_ghost(rows[0]) if rows else None
+    except Exception as exc:
+        logger.error("Canonical get_open_ghost_finding failed: %s", exc)
+        return None
 
 
 def update_ghost_finding_status(
@@ -352,48 +291,63 @@ def update_ghost_finding_status(
     response_text: str | None = None,
 ) -> GhostBookingFinding | None:
     with _lock:
-        rows = _load_json(_GHOST_FILE)
-        for r in rows:
-            if r["id"] == finding_id:
-                if status == "released":
-                    status = "confirmed_empty"
-                r["status"] = status
-                if status in ("verified_occupied", "confirmed_empty", "dismissed"):
-                    r["resolved_at"] = _dt_to_str(datetime.utcnow())
-                if inspected_by:
-                    r["inspected_by"] = inspected_by
-                    r["inspected_at"] = _dt_to_str(datetime.utcnow())
-                if response_message_id:
-                    r["response_message_id"] = response_message_id
-                if response_text:
-                    r["response_text"] = response_text
-                if cost_centre:
-                    r["cost_centre"] = cost_centre
-                if charge_amount is not None:
-                    r["charge_amount"] = charge_amount
-                if charge_reason:
-                    r["charge_reason"] = charge_reason
-                _save_json(_GHOST_FILE, rows)
-                return _dict_to_ghost(r)
-    return None
+        try:
+            response = _client().table("ghost_findings").select("*").eq("id", finding_id).limit(1).execute()
+            rows = response.data or []
+            if not rows:
+                return None
+            r = rows[0]
+            if status == "released":
+                status = "confirmed_empty"
+            r["status"] = status
+            if status in ("verified_occupied", "confirmed_empty", "dismissed"):
+                r["resolved_at"] = _dt_to_str(datetime.utcnow())
+            if inspected_by:
+                r["inspected_by"] = inspected_by
+                r["inspected_at"] = _dt_to_str(datetime.utcnow())
+            if response_message_id:
+                r["response_message_id"] = response_message_id
+            if response_text:
+                r["response_text"] = response_text
+            if cost_centre:
+                r["cost_centre"] = cost_centre
+            if charge_amount is not None:
+                r["charge_amount"] = charge_amount
+            if charge_reason:
+                r["charge_reason"] = charge_reason
+            _client().table("ghost_findings").update(r).eq("id", finding_id).execute()
+            return _dict_to_ghost(r)
+        except Exception as exc:
+            logger.error("Canonical update_ghost_finding_status failed: %s", exc)
+            return None
 
 
 def get_ghost_finding_by_id(finding_id: str) -> GhostBookingFinding | None:
-    """Return a ghost finding by ID."""
-    rows = _load_json(_GHOST_FILE)
-    for r in rows:
-        if r["id"] == finding_id:
-            return _dict_to_ghost(r)
-    return None
+    try:
+        response = _client().table("ghost_findings").select("*").eq("id", finding_id).limit(1).execute()
+        rows = response.data or []
+        return _dict_to_ghost(rows[0]) if rows else None
+    except Exception as exc:
+        logger.error("Canonical get_ghost_finding_by_id failed: %s", exc)
+        return None
 
 
 def get_open_or_pending_ghost_finding(booking_id: str) -> GhostBookingFinding | None:
-    """Return open or pending_inspection ghost finding for a booking."""
-    rows = _load_json(_GHOST_FILE)
-    for r in rows:
-        if r.get("booking_id") == booking_id and r.get("status") in ("open", "pending_inspection"):
-            return _dict_to_ghost(r)
-    return None
+    try:
+        response = (
+            _client()
+            .table("ghost_findings")
+            .select("*")
+            .eq("booking_id", booking_id)
+            .in_("status", ["open", "pending_inspection"])
+            .limit(1)
+            .execute()
+        )
+        rows = response.data or []
+        return _dict_to_ghost(rows[0]) if rows else None
+    except Exception as exc:
+        logger.error("Canonical get_open_or_pending_ghost_finding failed: %s", exc)
+        return None
 
 
 def _normalise_whatsapp_number(value: str | None) -> str:
@@ -412,11 +366,12 @@ def mark_ghost_finding_notified(
     whatsapp_message_id: str | None = None,
 ) -> GhostBookingFinding | None:
     with _lock:
-        rows = _load_json(_GHOST_FILE)
-        for r in rows:
-            if r["id"] != finding_id:
-                continue
-
+        try:
+            response = _client().table("ghost_findings").select("*").eq("id", finding_id).limit(1).execute()
+            rows = response.data or []
+            if not rows:
+                return None
+            r = rows[0]
             now_str = _dt_to_str(datetime.utcnow())
             r["notification_sent"] = bool(r.get("notification_sent")) or email_sent or whatsapp_sent
             r["notification_sent_at"] = now_str
@@ -432,9 +387,11 @@ def mark_ghost_finding_notified(
                 r["whatsapp_message_id"] = whatsapp_message_id
             if r.get("status") == "open":
                 r["status"] = "pending_inspection"
-            _save_json(_GHOST_FILE, rows)
+            _client().table("ghost_findings").update(r).eq("id", finding_id).execute()
             return _dict_to_ghost(r)
-    return None
+        except Exception as exc:
+            logger.error("Canonical mark_ghost_finding_notified failed: %s", exc)
+            return None
 
 
 def mark_ghost_finding_reminder_sent(
@@ -442,20 +399,23 @@ def mark_ghost_finding_reminder_sent(
     *,
     whatsapp_message_id: str | None = None,
 ) -> GhostBookingFinding | None:
-    """Mark that the 15-min reminder was sent for this finding."""
     with _lock:
-        rows = _load_json(_GHOST_FILE)
-        for r in rows:
-            if r["id"] != finding_id:
-                continue
+        try:
+            response = _client().table("ghost_findings").select("*").eq("id", finding_id).limit(1).execute()
+            rows = response.data or []
+            if not rows:
+                return None
+            r = rows[0]
             now_str = _dt_to_str(datetime.utcnow())
             r["reminder_sent"] = True
             r["reminder_sent_at"] = now_str
             if whatsapp_message_id:
                 r["whatsapp_message_id"] = whatsapp_message_id
-            _save_json(_GHOST_FILE, rows)
+            _client().table("ghost_findings").update(r).eq("id", finding_id).execute()
             return _dict_to_ghost(r)
-    return None
+        except Exception as exc:
+            logger.error("Canonical mark_ghost_finding_reminder_sent failed: %s", exc)
+            return None
 
 
 def find_pending_ghost_for_whatsapp(
@@ -464,36 +424,44 @@ def find_pending_ghost_for_whatsapp(
     reply_to_message_id: str | None = None,
 ) -> GhostBookingFinding | None:
     target = _normalise_whatsapp_number(concierge_whatsapp)
-    if not target:
+    if not target or not reply_to_message_id:
         return None
-
-    rows = _load_json(_GHOST_FILE)
-    candidates = [
-        r
-        for r in rows
-        if r.get("status") in ("open", "pending_inspection")
-        and _normalise_whatsapp_number(r.get("concierge_whatsapp")) == target
-    ]
-    if not candidates:
-        return None
-
-    # Always require swipe-reply — match quoted message exactly
-    if not reply_to_message_id:
-        return None
-
-    for row in candidates:
+    try:
+        response = (
+            _client()
+            .table("ghost_findings")
+            .select("*")
+            .in_("status", ["open", "pending_inspection"])
+            .eq("concierge_whatsapp", target)
+            .execute()
+        )
+        rows = response.data or []
+    except Exception as exc:
+        logger.error("Canonical find_pending_ghost_for_whatsapp failed: %s", exc)
+        rows = []
+    for row in rows:
         if row.get("whatsapp_message_id") == reply_to_message_id:
             return _dict_to_ghost(row)
-
     return None
 
 
 def get_pending_ghost_findings_for_whatsapp(concierge_whatsapp: str) -> list[GhostBookingFinding]:
-    """Return all pending ghost findings for a concierge WhatsApp number."""
     target = _normalise_whatsapp_number(concierge_whatsapp)
     if not target:
         return []
-    rows = _load_json(_GHOST_FILE)
+    try:
+        response = (
+            _client()
+            .table("ghost_findings")
+            .select("*")
+            .in_("status", ["open", "pending_inspection"])
+            .eq("concierge_whatsapp", target)
+            .execute()
+        )
+        rows = response.data or []
+    except Exception as exc:
+        logger.error("Canonical get_pending_ghost_findings_for_whatsapp failed: %s", exc)
+        rows = []
     return [
         _dict_to_ghost(r)
         for r in rows
@@ -503,16 +471,15 @@ def get_pending_ghost_findings_for_whatsapp(concierge_whatsapp: str) -> list[Gho
 
 
 def get_ghost_findings(site_id: str, status: str | None = None) -> list[GhostBookingFinding]:
-    rows = _load_json(_GHOST_FILE)
-    findings = [_dict_to_ghost(r) for r in rows if r.get("site_id") == site_id]
-    if status:
-        findings = [f for f in findings if f.status == status]
-    return findings
-
-
-# ---------------------------------------------------------------------------
-# RightSizingFinding persistence
-# ---------------------------------------------------------------------------
+    try:
+        query = _client().table("ghost_findings").select("*").eq("site_id", site_id)
+        if status:
+            query = query.eq("status", status)
+        response = query.execute()
+        return [_dict_to_ghost(r) for r in (response.data or [])]
+    except Exception as exc:
+        logger.error("Canonical get_ghost_findings failed: %s", exc)
+        return []
 
 
 def _rs_to_dict(f: RightSizingFinding) -> dict:
@@ -565,43 +532,56 @@ def _dict_to_rs(d: dict) -> RightSizingFinding:
 
 def save_rightsizing_finding(finding: RightSizingFinding) -> RightSizingFinding:
     with _lock:
-        rows = _load_json(_RIGHTSIZING_FILE)
-        rows.append(_rs_to_dict(finding))
-        _save_json(_RIGHTSIZING_FILE, rows)
-    return finding
+        try:
+            _client().table("space_rightsizing_findings").upsert(_rs_to_dict(finding), on_conflict="id").execute()
+        except Exception as exc:
+            logger.error("Canonical save_rightsizing_finding failed: %s", exc)
+        return finding
 
 
 def get_open_rightsizing_finding(booking_id: str) -> RightSizingFinding | None:
-    """Return open right-sizing finding for a booking, if any."""
-    rows = _load_json(_RIGHTSIZING_FILE)
-    for r in rows:
-        if r.get("booking_id") == booking_id and r.get("status") == "open":
-            return _dict_to_rs(r)
-    return None
+    try:
+        response = (
+            _client()
+            .table("space_rightsizing_findings")
+            .select("*")
+            .eq("booking_id", booking_id)
+            .eq("status", "open")
+            .limit(1)
+            .execute()
+        )
+        rows = response.data or []
+        return _dict_to_rs(rows[0]) if rows else None
+    except Exception as exc:
+        logger.error("Canonical get_open_rightsizing_finding failed: %s", exc)
+        return None
 
 
 def update_rightsizing_finding_status(finding_id: str, status: str) -> RightSizingFinding | None:
     with _lock:
-        rows = _load_json(_RIGHTSIZING_FILE)
-        for r in rows:
-            if r["id"] == finding_id:
-                r["status"] = status
-                _save_json(_RIGHTSIZING_FILE, rows)
-                return _dict_to_rs(r)
-    return None
+        try:
+            response = _client().table("space_rightsizing_findings").select("*").eq("id", finding_id).limit(1).execute()
+            rows = response.data or []
+            if not rows:
+                return None
+            rows[0]["status"] = status
+            _client().table("space_rightsizing_findings").update(rows[0]).eq("id", finding_id).execute()
+            return _dict_to_rs(rows[0])
+        except Exception as exc:
+            logger.error("Canonical update_rightsizing_finding_status failed: %s", exc)
+            return None
 
 
 def get_rightsizing_findings(site_id: str, status: str | None = None) -> list[RightSizingFinding]:
-    rows = _load_json(_RIGHTSIZING_FILE)
-    findings = [_dict_to_rs(r) for r in rows if r.get("site_id") == site_id]
-    if status:
-        findings = [f for f in findings if f.status == status]
-    return findings
-
-
-# ---------------------------------------------------------------------------
-# FocusRoomSession persistence (Phase 2)
-# ---------------------------------------------------------------------------
+    try:
+        query = _client().table("space_rightsizing_findings").select("*").eq("site_id", site_id)
+        if status:
+            query = query.eq("status", status)
+        response = query.execute()
+        return [_dict_to_rs(r) for r in (response.data or [])]
+    except Exception as exc:
+        logger.error("Canonical get_rightsizing_findings failed: %s", exc)
+        return []
 
 
 def _session_to_dict(s: FocusRoomSession) -> dict:
@@ -637,24 +617,32 @@ def _dict_to_session(d: dict) -> FocusRoomSession:
 
 
 def save_session(session: FocusRoomSession) -> FocusRoomSession:
-    """Persist a new focus room session."""
     with _lock:
-        rows = _load_json(_SESSIONS_FILE)
-        rows.append(_session_to_dict(session))
-        # Keep last 10000 sessions
-        if len(rows) > 10000:
-            rows = rows[-10000:]
-        _save_json(_SESSIONS_FILE, rows)
-    return session
+        try:
+            _client().table("space_focus_room_sessions").upsert(
+                _session_to_dict(session), on_conflict="session_id"
+            ).execute()
+        except Exception as exc:
+            logger.error("Canonical save_session failed: %s", exc)
+        return session
 
 
 def get_active_session(room_code: str) -> FocusRoomSession | None:
-    """Return the currently open (no end_time) session for a room."""
-    rows = _load_json(_SESSIONS_FILE)
-    for r in reversed(rows):
-        if r.get("room_code") == room_code and r.get("end_time") is None:
-            return _dict_to_session(r)
-    return None
+    try:
+        response = (
+            _client()
+            .table("space_focus_room_sessions")
+            .select("*")
+            .eq("room_code", room_code)
+            .is_("end_time", "null")
+            .limit(1)
+            .execute()
+        )
+        rows = response.data or []
+        return _dict_to_session(rows[0]) if rows else None
+    except Exception as exc:
+        logger.error("Canonical get_active_session failed: %s", exc)
+        return None
 
 
 def close_session(
@@ -662,31 +650,35 @@ def close_session(
     end_time: datetime,
     extended_threshold: int = 7200,
 ) -> FocusRoomSession | None:
-    """Close a session: set end_time, compute duration, flag extended_use."""
     with _lock:
-        rows = _load_json(_SESSIONS_FILE)
-        for r in rows:
-            if r["session_id"] == session_id:
-                start = _str_to_dt(r["start_time"])
-                duration = int((end_time - start).total_seconds())
-                r["end_time"] = _dt_to_str(end_time)
-                r["duration_seconds"] = duration
-                r["extended_use"] = duration > extended_threshold
-                _save_json(_SESSIONS_FILE, rows)
-                return _dict_to_session(r)
-    return None
+        try:
+            response = (
+                _client().table("space_focus_room_sessions").select("*").eq("session_id", session_id).limit(1).execute()
+            )
+            rows = response.data or []
+            if not rows:
+                return None
+            r = rows[0]
+            start = _str_to_dt(r["start_time"])
+            duration = int((end_time - start).total_seconds())
+            r["end_time"] = _dt_to_str(end_time)
+            r["duration_seconds"] = duration
+            r["extended_use"] = duration > extended_threshold
+            _client().table("space_focus_room_sessions").update(r).eq("session_id", session_id).execute()
+            return _dict_to_session(r)
+        except Exception as exc:
+            logger.error("Canonical close_session failed: %s", exc)
+            return None
 
 
 def discard_session(session_id: str) -> bool:
-    """Remove a session (noise filtering — too short)."""
     with _lock:
-        rows = _load_json(_SESSIONS_FILE)
-        before = len(rows)
-        rows = [r for r in rows if r["session_id"] != session_id]
-        if len(rows) < before:
-            _save_json(_SESSIONS_FILE, rows)
-            return True
-    return False
+        try:
+            response = _client().table("space_focus_room_sessions").delete().eq("session_id", session_id).execute()
+            return bool(response.data is not None)
+        except Exception as exc:
+            logger.error("Canonical discard_session failed: %s", exc)
+            return False
 
 
 def get_sessions_for_room(
@@ -694,15 +686,17 @@ def get_sessions_for_room(
     from_dt: datetime | None = None,
     to_dt: datetime | None = None,
 ) -> list[FocusRoomSession]:
-    """Return closed sessions for a room, optionally filtered by time range."""
-    rows = _load_json(_SESSIONS_FILE)
-    sessions = [_dict_to_session(r) for r in rows if r.get("room_code") == room_code]
-    if from_dt:
-        sessions = [s for s in sessions if s.start_time >= from_dt]
-    if to_dt:
-        sessions = [s for s in sessions if s.start_time <= to_dt]
-    sessions.sort(key=lambda s: s.start_time)
-    return sessions
+    try:
+        query = _client().table("space_focus_room_sessions").select("*").eq("room_code", room_code)
+        if from_dt:
+            query = query.gte("start_time", _dt_to_str(from_dt))
+        if to_dt:
+            query = query.lte("start_time", _dt_to_str(to_dt))
+        response = query.order("start_time").execute()
+        return [_dict_to_session(r) for r in (response.data or [])]
+    except Exception as exc:
+        logger.error("Canonical get_sessions_for_room failed: %s", exc)
+        return []
 
 
 def get_sessions_for_site(
@@ -711,14 +705,16 @@ def get_sessions_for_site(
     to_dt: datetime | None = None,
     extended_only: bool = False,
 ) -> list[FocusRoomSession]:
-    """Return sessions for a site with optional filters."""
-    rows = _load_json(_SESSIONS_FILE)
-    sessions = [_dict_to_session(r) for r in rows if r.get("site_id") == site_id]
-    if from_dt:
-        sessions = [s for s in sessions if s.start_time >= from_dt]
-    if to_dt:
-        sessions = [s for s in sessions if s.start_time <= to_dt]
-    if extended_only:
-        sessions = [s for s in sessions if s.extended_use]
-    sessions.sort(key=lambda s: s.start_time)
-    return sessions
+    try:
+        query = _client().table("space_focus_room_sessions").select("*").eq("site_id", site_id)
+        if from_dt:
+            query = query.gte("start_time", _dt_to_str(from_dt))
+        if to_dt:
+            query = query.lte("start_time", _dt_to_str(to_dt))
+        if extended_only:
+            query = query.eq("extended_use", True)
+        response = query.order("start_time").execute()
+        return [_dict_to_session(r) for r in (response.data or [])]
+    except Exception as exc:
+        logger.error("Canonical get_sessions_for_site failed: %s", exc)
+        return []

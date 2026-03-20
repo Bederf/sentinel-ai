@@ -90,7 +90,7 @@ async def emit_ghost_booking_signal(finding: dict) -> Optional[dict]:
 
     signal_row = build_signal_row(
         source_module="booking_system",
-        signal_type="ghost_booking",
+        signal_type="no_show_pattern",
         severity=severity,
         confidence=0.85,
         location_ref=location_ref,
@@ -184,7 +184,7 @@ async def emit_block_booking_signal(alert: dict) -> Optional[dict]:
 
     signal_row = build_signal_row(
         source_module="booking_system",
-        signal_type="block_booking",
+        signal_type="booking_conflict",
         severity="medium",
         confidence=0.75,
         location_ref=location_ref,
@@ -199,6 +199,12 @@ async def emit_block_booking_signal(alert: dict) -> Optional[dict]:
             "pattern": alert.get("pattern", ""),
             "booking_count": alert.get("booking_count", 0),
             "date_range": alert.get("date_range", ""),
+            "alert_id": alert.get("alert_id"),
+            "booking_ids": alert.get("booking_ids", []),
+            "overlap_window_start": alert.get("overlap_window_start"),
+            "overlap_window_end": alert.get("overlap_window_end"),
+            "signal_stage": alert.get("signal_stage", "planning"),
+            "signal_lifecycle": alert.get("signal_lifecycle", "warn"),
         },
         site_id=alert.get("site_id"),
     )

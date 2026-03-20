@@ -1,4 +1,4 @@
-import { useReducer, useCallback } from "react";
+import { useReducer, useCallback, useRef } from "react";
 import {
   CheckCircle,
   AlertTriangle,
@@ -18,9 +18,10 @@ import type {
   NiagaraMappingSummary,
   DiscoverClassifyResponse,
   BMSVendor,
+  BACnetDevice,
 } from '@/lib/api';
 import { sitesApi } from '@/lib/api/sites';
-import { niagaraApi } from '@/lib/api';
+import { api, niagaraApi } from '@/lib/api';
 import { HelpSection } from "./HelpSection";
 import { Tooltip } from "./Tooltip";
 import { EquipmentVerificationWizard } from "./EquipmentVerificationWizard";
@@ -80,6 +81,8 @@ interface WizardState {
   useHttps: boolean;
   useSimulation: boolean;  // Discover equipment from simulation database instead of live BMS
   siteId: string;  // Auto-generated on site creation
+  discoveredDevices: BACnetDevice[];
+  selectedDeviceId: number | null;
   connectionStatus: ConnectionStatus;
   connectionMessage: string;
   discoveryId: string | null;
@@ -100,7 +103,8 @@ interface WizardState {
 }
 
 type WizardAction =
-  | { type: "SET_FIELD"; field: string; value: string | number | boolean }
+  | { type: "SET_FIELD"; field: string; value: string | number | boolean | null }
+  | { type: "SET_BACNET_DEVICES"; devices: BACnetDevice[]; selectedDeviceId: number | null }
   | { type: "SET_CONNECTION_STATUS"; status: ConnectionStatus; message?: string }
   | { type: "SET_STEP"; step: number }
   | { type: "SET_DISCOVERY"; id: string; summary: DiscoverClassifyResponse }
@@ -122,6 +126,12 @@ function wizardReducer(state: WizardState, action: WizardAction): WizardState {
         ...state,
         connectionStatus: action.status,
         connectionMessage: action.message || "",
+      };
+    case "SET_BACNET_DEVICES":
+      return {
+        ...state,
+        discoveredDevices: action.devices,
+        selectedDeviceId: action.selectedDeviceId,
       };
     case "SET_STEP":
       return { ...state, step: action.step, error: null };
@@ -296,6 +306,8 @@ export function BMSConnectionWizard({
     useHttps: false,
     useSimulation: true,  // Default to simulation mode for wizard
     siteId: initialSiteId || "",
+    discoveredDevices: [],
+    selectedDeviceId: null,
     connectionStatus: "idle",
     connectionMessage: "",
     discoveryId: null,
@@ -312,9 +324,61 @@ export function BMSConnectionWizard({
     discoveryPhase: 0,
     showZoneIngestionWizard: false,
   });
+  const siteIdRef = useRef(initialSiteId || "");
+  const createSitePromiseRef = useRef<Promise<string> | null>(null);
 
   const isNiagara = state.bmsVendor === "niagara";
   const vendorLabel = BMS_VENDORS.find((v) => v.value === state.bmsVendor)?.label ?? state.bmsVendor;
+
+  const buildConnectionMessage = useCallback((devices: BACnetDevice[], selectedId: number | null): string => {
+    const selected = devices.find((device) => device.device_id === selectedId) ?? null;
+    if (selected) {
+      return `Connected. Selected ${selected.object_name || `Device ${selected.device_id}`} at ${selected.ip_address}.`;
+    }
+    return `Connected. Found ${devices.length} BACnet device(s). Select the controller to continue.`;
+  }, []);
+
+  const pickDefaultDeviceId = useCallback((devices: BACnetDevice[], host: string): number | null => {
+    if (devices.length === 0) return null;
+    const normalizedHost = host.trim().toLowerCase();
+    if (normalizedHost) {
+      const exactMatch = devices.find((device) => device.ip_address.toLowerCase().startsWith(normalizedHost));
+      if (exactMatch) return exactMatch.device_id;
+    }
+    return devices.length === 1 ? devices[0].device_id : null;
+  }, []);
+
+  const ensureSiteCreated = useCallback(async (): Promise<string> => {
+    const existingSiteId = state.siteId || siteIdRef.current;
+    if (existingSiteId) {
+      siteIdRef.current = existingSiteId;
+      return existingSiteId;
+    }
+
+    if (createSitePromiseRef.current) {
+      return createSitePromiseRef.current;
+    }
+
+    createSitePromiseRef.current = sitesApi.create({
+      name: state.siteName.trim(),
+      address: state.siteAddress,
+      region: state.siteRegion,
+      type: state.siteType,
+      floors: state.siteFloors
+        .split(",")
+        .map((floor) => floor.trim())
+        .filter(Boolean),
+      sqm: state.siteSqm,
+    }).then((siteResult) => {
+      siteIdRef.current = siteResult.id;
+      dispatch({ type: "SET_FIELD", field: "siteId", value: siteResult.id });
+      return siteResult.id;
+    }).finally(() => {
+      createSitePromiseRef.current = null;
+    });
+
+    return createSitePromiseRef.current;
+  }, [state.siteAddress, state.siteFloors, state.siteId, state.siteName, state.siteRegion, state.siteSqm, state.siteType]);
 
   // ---------- Step 1: Test Connection ----------
   const handleTestConnection = useCallback(async () => {
@@ -331,28 +395,24 @@ export function BMSConnectionWizard({
       return;
     }
 
-    if (state.useSimulation) {
-      // Simulation mode: create the site, discovery will pull from Supabase
-      try {
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-ignore - Type mismatch in CreateSiteRequest, but API accepts number
-        const siteResult = await sitesApi.create({
-          code: state.siteName.toLowerCase().replace(/\s+/g, '-'),
-          name: state.siteName,
-          address: state.siteAddress,
-          type: state.siteType,
-          // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-          // @ts-ignore - square_meters type mismatch
-          square_meters: state.siteSqm ? parseInt(state.siteSqm, 10) : undefined,
-        } as any);
+    if (!state.useSimulation && !state.host.trim()) {
+      dispatch({
+        type: "SET_CONNECTION_STATUS",
+        status: "failed",
+        message: "Please enter the BMS host or IP address",
+      });
+      return;
+    }
 
-        // Store the created site ID
-        dispatch({ type: "SET_FIELD", field: "siteId", value: siteResult.id });
+    if (state.useSimulation) {
+      try {
+        const siteId = await ensureSiteCreated();
+        dispatch({ type: "SET_BACNET_DEVICES", devices: [], selectedDeviceId: null });
 
         dispatch({
           type: "SET_CONNECTION_STATUS",
           status: "connected",
-          message: `Site "${state.siteName}" created (${siteResult.id}). Equipment will be discovered from the simulation database.`,
+          message: `Site "${state.siteName}" created (${siteId}). Equipment will be discovered from the simulation database.`,
         });
       } catch (err) {
         dispatch({
@@ -366,7 +426,6 @@ export function BMSConnectionWizard({
 
     try {
       if (state.bmsVendor === 'niagara') {
-        // oBIX connection test (existing flow)
         const res = await niagaraApi.configureOBIX({
           host: state.host,
           port: state.port,
@@ -375,32 +434,40 @@ export function BMSConnectionWizard({
           use_https: state.useHttps,
           timeout: 10,
         });
-        dispatch({
-          type: "SET_CONNECTION_STATUS",
-          status: res.connected ? "connected" : "failed",
-          message: res.message,
-        });
-      } else {
-        // BACnet WhoIs test (new flow for non-Niagara vendors)
-        const res = await niagaraApi.testBACnetConnection({ timeout: 5 });
-        if (res.count > 0) {
-          const deviceNames = res.devices
-            .map((d) => d.object_name || `Device ${d.device_id}`)
-            .join(", ");
-          dispatch({
-            type: "SET_CONNECTION_STATUS",
-            status: "connected",
-            message: `Found ${res.count} BACnet device(s): ${deviceNames}`,
-          });
-        } else {
+        if (!res.connected) {
           dispatch({
             type: "SET_CONNECTION_STATUS",
             status: "failed",
-            message:
-              "No BACnet devices found on the network. Check network connectivity and BACnet port (47808).",
+            message: res.message,
           });
+          return;
         }
       }
+
+      const res = await niagaraApi.testBACnetConnection({
+        timeout: 5,
+        host: state.host.trim(),
+      });
+
+      if (res.count === 0) {
+        dispatch({ type: "SET_BACNET_DEVICES", devices: [], selectedDeviceId: null });
+        dispatch({
+          type: "SET_CONNECTION_STATUS",
+          status: "failed",
+          message:
+            "No BACnet devices matched this host. Check the controller IP, BACnet routing, and UDP port 47808.",
+        });
+        return;
+      }
+
+      await ensureSiteCreated();
+      const selectedDeviceId = pickDefaultDeviceId(res.devices, state.host);
+      dispatch({ type: "SET_BACNET_DEVICES", devices: res.devices, selectedDeviceId });
+      dispatch({
+        type: "SET_CONNECTION_STATUS",
+        status: "connected",
+        message: buildConnectionMessage(res.devices, selectedDeviceId),
+      });
     } catch (err) {
       dispatch({
         type: "SET_CONNECTION_STATUS",
@@ -408,10 +475,18 @@ export function BMSConnectionWizard({
         message: err instanceof Error ? err.message : "Connection failed",
       });
     }
-  }, [state.bmsVendor, state.host, state.port, state.username, state.password, state.useHttps, state.useSimulation, state.siteName, state.siteAddress, state.siteType, state.siteSqm]);
+  }, [buildConnectionMessage, ensureSiteCreated, pickDefaultDeviceId, state.bmsVendor, state.host, state.password, state.port, state.siteName, state.useHttps, state.useSimulation, state.username]);
 
   // ---------- Step 2: Discover & Classify ----------
   const handleDiscover = useCallback(async () => {
+    if (!state.siteId) {
+      dispatch({ type: "SET_ERROR", error: "Create the site before starting discovery" });
+      return;
+    }
+    if (!state.useSimulation && state.selectedDeviceId == null) {
+      dispatch({ type: "SET_ERROR", error: "Select the BACnet device to ingest before discovery" });
+      return;
+    }
     dispatch({ type: "SET_LOADING", loading: true });
     dispatch({ type: "SET_ERROR", error: null });
     dispatch({ type: "SET_DISCOVERY_PHASE", phase: 1 }); // Connecting...
@@ -427,6 +502,8 @@ export function BMSConnectionWizard({
       const res = await niagaraApi.discoverAndClassify({
         device_ip: state.useSimulation ? "simulation" : state.host,
         site_id: state.siteId,
+        device_bacnet_id: state.useSimulation ? undefined : state.selectedDeviceId ?? undefined,
+        adapter_type: state.useSimulation ? "simulation" : "bacnet",
         bms_vendor: state.bmsVendor,
       });
       dispatch({ type: "SET_DISCOVERY_PHASE", phase: 4 }); // Grouping into zones...
@@ -441,7 +518,7 @@ export function BMSConnectionWizard({
       });
       dispatch({ type: "SET_DISCOVERY_PHASE", phase: 0 });
     }
-  }, [state.host, state.siteId, state.useSimulation, state.bmsVendor]);
+  }, [state.bmsVendor, state.host, state.selectedDeviceId, state.siteId, state.useSimulation]);
 
   // ---------- Step 3: Load Mappings ----------
   const handleLoadMappings = useCallback(async () => {
@@ -470,6 +547,9 @@ export function BMSConnectionWizard({
         state.discoveryId,
         state.approvedBy,
       );
+      if (res.success && state.siteId) {
+        await api.toggleSiteProcessing(state.siteId, true);
+      }
       dispatch({
         type: "SET_APPROVE_STATUS",
         status: res.success ? "approved" : "failed",
@@ -491,7 +571,7 @@ export function BMSConnectionWizard({
         message: err instanceof Error ? err.message : "Approval failed",
       });
     }
-  }, [state.discoveryId, state.approvedBy]);
+  }, [state.approvedBy, state.discoveryId, state.siteId]);
 
   // ---------- Step navigation ----------
   const goNext = useCallback(async () => {
@@ -512,7 +592,7 @@ export function BMSConnectionWizard({
   const canGoNext = (): boolean => {
     switch (state.step) {
       case 1:
-        return state.connectionStatus === "connected" && !!state.siteId;
+        return state.connectionStatus === "connected" && !!state.siteId && (state.useSimulation || state.selectedDeviceId !== null);
       case 2:
         return !!state.discoveryId && !state.loading;
       case 3:
@@ -756,6 +836,12 @@ export function BMSConnectionWizard({
                 field: "bmsVendor",
                 value: e.target.value,
               });
+              dispatch({ type: "SET_BACNET_DEVICES", devices: [], selectedDeviceId: null });
+              dispatch({
+                type: "SET_FIELD",
+                field: "port",
+                value: e.target.value === "niagara" ? 80 : 47808,
+              });
               dispatch({ type: "SET_CONNECTION_STATUS", status: "idle" });
             }}
             className="w-full rounded px-3 py-2 text-sm"
@@ -798,16 +884,20 @@ export function BMSConnectionWizard({
             <input
               type="radio"
               name="connectionMode"
-              checked={!state.useSimulation}
-              onChange={() =>
+            checked={!state.useSimulation}
+            onChange={() =>
+              {
                 dispatch({
                   type: "SET_FIELD",
                   field: "useSimulation",
                   value: false,
-                })
+                });
+                dispatch({ type: "SET_BACNET_DEVICES", devices: [], selectedDeviceId: null });
+                dispatch({ type: "SET_CONNECTION_STATUS", status: "idle" });
               }
-              className="w-4 h-4"
-            />
+            }
+            className="w-4 h-4"
+          />
             <div>
               <span
                 className="text-sm font-medium"
@@ -837,16 +927,20 @@ export function BMSConnectionWizard({
             <input
               type="radio"
               name="connectionMode"
-              checked={state.useSimulation}
-              onChange={() =>
+            checked={state.useSimulation}
+            onChange={() =>
+              {
                 dispatch({
                   type: "SET_FIELD",
                   field: "useSimulation",
                   value: true,
-                })
+                });
+                dispatch({ type: "SET_BACNET_DEVICES", devices: [], selectedDeviceId: null });
+                dispatch({ type: "SET_CONNECTION_STATUS", status: "idle" });
               }
-              className="w-4 h-4"
-            />
+            }
+            className="w-4 h-4"
+          />
             <div>
               <span
                 className="text-sm font-medium"
@@ -865,7 +959,7 @@ export function BMSConnectionWizard({
         </div>
 
         {/* BMS Connection fields — shown when Connect to BMS is selected */}
-        {!state.useSimulation && isNiagara && (
+        {!state.useSimulation && (
           <div className="grid grid-cols-2 gap-4 mt-4">
             <div className="col-span-2 sm:col-span-1">
               <label className="block text-sm font-medium mb-1 flex items-center gap-2" style={labelStyle}>
@@ -903,13 +997,15 @@ export function BMSConnectionWizard({
                   dispatch({
                     type: "SET_FIELD",
                     field: "port",
-                    value: parseInt(e.target.value, 10) || 80,
+                    value: parseInt(e.target.value, 10) || (isNiagara ? 80 : 47808),
                   })
                 }
                 className="w-full rounded px-3 py-2 text-sm"
                 style={inputStyle}
               />
             </div>
+            {isNiagara && (
+              <>
             <div className="col-span-2 sm:col-span-1">
               <label className="block text-sm font-medium mb-1 flex items-center gap-2" style={labelStyle}>
                 <span>Username</span>
@@ -972,6 +1068,39 @@ export function BMSConnectionWizard({
                 </span>
               </label>
             </div>
+              </>
+            )}
+            {state.discoveredDevices.length > 0 && (
+              <div className="col-span-2">
+                <label className="block text-sm font-medium mb-1" style={labelStyle}>
+                  Discovered BACnet Device
+                </label>
+                <select
+                  value={state.selectedDeviceId ?? ""}
+                  onChange={(e) => {
+                    const nextValue = e.target.value ? parseInt(e.target.value, 10) : null;
+                    dispatch({ type: "SET_FIELD", field: "selectedDeviceId", value: nextValue });
+                    dispatch({
+                      type: "SET_CONNECTION_STATUS",
+                      status: "connected",
+                      message: buildConnectionMessage(state.discoveredDevices, nextValue),
+                    });
+                  }}
+                  className="w-full rounded px-3 py-2 text-sm"
+                  style={inputStyle}
+                >
+                  <option value="">Select a BACnet device</option>
+                  {state.discoveredDevices.map((device) => (
+                    <option key={device.device_id} value={device.device_id}>
+                      {(device.object_name || `Device ${device.device_id}`)} · {device.ip_address} · ID {device.device_id}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs mt-2" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                  Discovery, point ingestion, and control will use this device instance.
+                </p>
+              </div>
+            )}
           </div>
         )}
 
@@ -985,7 +1114,8 @@ export function BMSConnectionWizard({
               color: "var(--color-sentinel-text-secondary)",
             }}
           >
-            No credentials required. SENTINEL will broadcast a BACnet WhoIs on the local network (UDP port 47808) to discover {vendorLabel} controllers.
+            No credentials are required for {vendorLabel}. SENTINEL will verify BACnet connectivity,
+            list matching controllers for the host you entered, and use your selected device for discovery.
           </div>
         )}
       </div>
@@ -996,7 +1126,7 @@ export function BMSConnectionWizard({
         disabled={
           state.connectionStatus === "testing" ||
           !state.siteName.trim() ||
-          (!state.useSimulation && isNiagara && !state.host)
+          (!state.useSimulation && !state.host.trim())
         }
         className="flex items-center gap-2 px-4 py-2 rounded text-sm font-medium transition-opacity disabled:opacity-50"
         style={{

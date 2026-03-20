@@ -14,6 +14,7 @@ File layout:
         power_meters.json        — current meter state (latest values)
         energy_history.json      — daily energy aggregation {date: {hvac_kwh, lighting_kwh, ...}}
         equipment_state.json     — equipment health/status overrides
+        command_writes.jsonl     — command writes issued to the simulated BMS
         task_progress.json       — simulation task progress tracking
         validations.jsonl        — power meter / cost validation audit trail
 """
@@ -36,6 +37,7 @@ _JSONL_MAX_BYTES: Dict[str, int] = {
     "zone_history.jsonl": 50 * 1024 * 1024,  # 50 MB
     "solar_hourly_snapshots.jsonl": 20 * 1024 * 1024,  # 20 MB
     "solar_daily_aggregates.jsonl": 10 * 1024 * 1024,  # 10 MB
+    "command_writes.jsonl": 10 * 1024 * 1024,  # 10 MB
     "validations.jsonl": 10 * 1024 * 1024,  # 10 MB
 }
 _DEFAULT_JSONL_MAX_BYTES = 50 * 1024 * 1024  # 50 MB default
@@ -185,6 +187,82 @@ class SimulationStore:
         """Get equipment state."""
         return self._equipment_state.get(equipment_code, {})
 
+    def get_all_equipment_state(self) -> Dict[str, Dict[str, Any]]:
+        """Get all equipment state for the building."""
+        return dict(self._equipment_state)
+
+    def get_equipment_codes(self) -> List[str]:
+        """Get the known equipment codes for the building."""
+        codes = set(self._equipment_state.keys())
+        latest_readings = self.get_latest_sensor_readings()
+        codes.update(latest_readings.keys())
+        return sorted(codes)
+
+    def get_latest_sensor_readings(self, equipment_code: Optional[str] = None) -> Dict[str, Dict[str, Dict[str, Any]]]:
+        """Get latest reading per point from the append-only sensor JSONL file.
+
+        Returns:
+            {
+                "S002-FCU-201": {
+                    "room_temp": {"value": 22.1, "timestamp": "...", "site_id": "site-002"},
+                    ...
+                },
+                ...
+            }
+        """
+        path = self._dir / "sensor_readings.jsonl"
+        latest: Dict[str, Dict[str, Dict[str, Any]]] = {}
+        if not path.exists():
+            return latest
+
+        try:
+            with open(path) as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        record = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+
+                    code = record.get("equipment_code")
+                    point_name = record.get("point_name")
+                    if not code or not point_name:
+                        continue
+                    if equipment_code and code != equipment_code:
+                        continue
+
+                    latest.setdefault(code, {})[point_name] = {
+                        "value": record.get("value"),
+                        "timestamp": record.get("timestamp"),
+                        "site_id": record.get("site_id", self.site_id),
+                    }
+        except Exception as e:
+            logger.warning(f"[SIM-STORE] Failed to load latest sensor readings: {e}")
+
+        return latest
+
+    def write_command(self, record: Dict[str, Any]):
+        """Append a command write and persist it as the latest desired state."""
+        equipment_code = record.get("device_id") or record.get("equipment_code")
+        point_name = record.get("point_id") or record.get("point_name")
+        if not equipment_code or not point_name:
+            raise ValueError("Command record requires device/equipment code and point name")
+
+        self._append_jsonl("command_writes.jsonl", record)
+
+        current_state = self.get_equipment_state(equipment_code)
+        command_overrides = dict(current_state.get("command_overrides", {}))
+        command_overrides[point_name] = record.get("value")
+        self.update_equipment_state(
+            equipment_code,
+            {
+                "command_overrides": command_overrides,
+                "last_command": dict(record),
+            },
+        )
+
     # ------------------------------------------------------------------
     # Simulation Task Progress
     # ------------------------------------------------------------------
@@ -194,6 +272,8 @@ class SimulationStore:
         with self._lock:
             if task_id not in self._task_progress:
                 self._task_progress[task_id] = {}
+            updates = dict(updates)
+            updates.setdefault("updated_at", datetime.now().isoformat())
             self._task_progress[task_id].update(updates)
             self._save_json("task_progress.json", self._task_progress)
 

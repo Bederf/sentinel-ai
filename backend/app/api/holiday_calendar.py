@@ -8,7 +8,6 @@ Pre-seeded with SA public holidays.
 import json
 import logging
 import uuid
-from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -16,27 +15,10 @@ from pydantic import BaseModel
 
 from app.middleware.auth_middleware import require_site_access, require_role
 from app.models.auth import AuthContext, SentinelRole
+from app.services.site_holiday_service import DATA_PATH, SA_PUBLIC_HOLIDAYS, get_site_holiday_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["holiday-calendar"])
-
-DATA_PATH = Path(__file__).parent.parent / "data" / "buildings"
-
-# South African public holidays (recurring annually)
-SA_PUBLIC_HOLIDAYS = [
-    {"date": "01-01", "name": "New Year's Day", "type": "public", "recurring": True},
-    {"date": "03-21", "name": "Human Rights Day", "type": "public", "recurring": True},
-    {"date": "04-18", "name": "Good Friday", "type": "public", "recurring": True},
-    {"date": "04-21", "name": "Family Day", "type": "public", "recurring": True},
-    {"date": "04-27", "name": "Freedom Day", "type": "public", "recurring": True},
-    {"date": "05-01", "name": "Workers' Day", "type": "public", "recurring": True},
-    {"date": "06-16", "name": "Youth Day", "type": "public", "recurring": True},
-    {"date": "08-09", "name": "National Women's Day", "type": "public", "recurring": True},
-    {"date": "09-24", "name": "Heritage Day", "type": "public", "recurring": True},
-    {"date": "12-16", "name": "Day of Reconciliation", "type": "public", "recurring": True},
-    {"date": "12-25", "name": "Christmas Day", "type": "public", "recurring": True},
-    {"date": "12-26", "name": "Day of Goodwill", "type": "public", "recurring": True},
-]
 
 
 class HolidayCreate(BaseModel):
@@ -72,7 +54,7 @@ async def list_holidays(
     auth: AuthContext = Depends(require_site_access("site_id")),
 ) -> dict:
     """List holidays for a site. Returns SA public holidays + custom holidays."""
-    custom_holidays = _load_holidays(site_id)
+    effective_holidays = get_site_holiday_service().list_holidays(site_id)
 
     # Build combined list
     all_holidays = []
@@ -90,7 +72,9 @@ async def list_holidays(
         all_holidays.append(entry)
 
     # Add custom holidays
-    for h in custom_holidays:
+    for h in effective_holidays:
+        if h in SA_PUBLIC_HOLIDAYS:
+            continue
         entry = {
             "id": h.get("id", str(uuid.uuid4())),
             "date": h["date"],

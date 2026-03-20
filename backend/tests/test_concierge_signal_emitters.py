@@ -37,6 +37,12 @@ def test_extract_room_id_case_insensitive():
     assert result == "FA2-1Q1-MR-01"
 
 
+def test_extract_room_id_normalises_non_canonical_email_format():
+    """Email-native room IDs like MR5 normalise to registry format."""
+    result = extract_room_id("TV in FA1-1Q2-MR5 is not wroking please fix")
+    assert result == "FA1-1Q2-MR-05"
+
+
 def test_extract_room_id_no_match():
     """No room ID in text returns None."""
     result = extract_room_id("No room mentioned here")
@@ -127,9 +133,9 @@ async def test_ghost_booking_signal_format():
         assert result is not None
         # Verify the signal row passed to write_signal
         call_args = mock_write.call_args[0][0]
-        assert call_args["source_module"] == "space_optimisation"
+        assert call_args["source_module"] == "booking_system"
         assert call_args["signal_type"] == "no_show_pattern"
-        assert call_args["severity"] == "medium"
+        assert call_args["severity"] == "critical"
         assert call_args["confidence"] == 0.85
         assert "FA2-1Q1-MR-06" in call_args["location_ref"]
 
@@ -190,9 +196,9 @@ async def test_block_booking_signal_format():
 
         assert len(results) >= 1
         call_args = mock_write.call_args[0][0]
-        assert call_args["source_module"] == "space_optimisation"
+        assert call_args["source_module"] == "booking_system"
         assert call_args["signal_type"] == "booking_conflict"
-        assert call_args["severity"] == "high"
+        assert call_args["severity"] == "medium"
 
 
 # ---------------------------------------------------------------------------

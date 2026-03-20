@@ -4,7 +4,7 @@
 -- so that Claude doesn't re-discover the same knowledge every session.
 
 CREATE TABLE IF NOT EXISTS agent_memory (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id TEXT PRIMARY KEY,
     site_id TEXT NOT NULL,
     equipment_code TEXT,
     context_type TEXT NOT NULL CHECK (context_type IN (

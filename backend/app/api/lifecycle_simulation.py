@@ -16,7 +16,7 @@ from app.services.simulation_orchestrator import (
     get_simulation_by_task_id,
 )
 from app.services.simulation_store import get_simulation_store
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 import uuid
 
 logger = logging.getLogger(__name__)
@@ -32,6 +32,92 @@ def _numeric_or_default(value, default=0):
         return float(value)
     except (TypeError, ValueError):
         return default
+
+
+_STALE_RUNNING_TASK_WINDOW = timedelta(minutes=10)
+
+
+def _parse_iso_datetime(value: object) -> datetime | None:
+    """Parse an ISO datetime into UTC for stable task freshness checks."""
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _task_latest_timestamp(task: dict) -> datetime | None:
+    """Return the newest known timestamp for a task."""
+    candidates = [
+        _parse_iso_datetime(task.get("updated_at")),
+        _parse_iso_datetime(task.get("completed_at")),
+        _parse_iso_datetime(task.get("created_at")),
+    ]
+    valid = [ts for ts in candidates if ts is not None]
+    return max(valid) if valid else None
+
+
+def _task_is_recently_active(task: dict) -> bool:
+    """Treat old persisted 'running' tasks as stale unless they updated recently."""
+    latest = _task_latest_timestamp(task)
+    if latest is None:
+        return False
+    return latest >= (datetime.now(timezone.utc) - _STALE_RUNNING_TASK_WINDOW)
+
+
+def _find_live_site_orchestrator(site_id: str) -> tuple[str | None, object | None]:
+    """Resolve a live orchestrator for a specific site only."""
+    from app.services.simulation_orchestrator import get_all_active_simulations
+
+    for active_tid, active_orch in get_all_active_simulations().items():
+        if not getattr(active_orch, "running", False):
+            continue
+        if getattr(active_orch, "site_id", None) != site_id:
+            continue
+        return active_tid, active_orch
+    return None, None
+
+
+def _select_site_task(site_id: str) -> tuple[str | None, dict | None]:
+    """Choose the best persisted task for a site, ignoring stale running entries."""
+    store = get_simulation_store(site_id)
+    all_tasks = store.get_all_tasks()
+
+    best_running: tuple[datetime, str, dict] | None = None
+    best_queued: tuple[datetime, str, dict] | None = None
+    best_inactive: tuple[datetime, str, dict] | None = None
+    best_stale_running: tuple[datetime, str, dict] | None = None
+
+    for tid, task_data in all_tasks.items():
+        if task_data.get("site_id", site_id) != site_id:
+            continue
+
+        timestamp = _task_latest_timestamp(task_data) or datetime.min.replace(tzinfo=timezone.utc)
+        entry = (timestamp, tid, task_data)
+        status = task_data.get("status")
+
+        if status == "running":
+            if _task_is_recently_active(task_data):
+                if best_running is None or timestamp > best_running[0]:
+                    best_running = entry
+            elif best_stale_running is None or timestamp > best_stale_running[0]:
+                best_stale_running = entry
+        elif status == "queued":
+            if best_queued is None or timestamp > best_queued[0]:
+                best_queued = entry
+        else:
+            if best_inactive is None or timestamp > best_inactive[0]:
+                best_inactive = entry
+
+    chosen = best_running or best_queued or best_inactive or best_stale_running
+    if chosen is None:
+        return None, None
+    _, task_id, task_data = chosen
+    return task_id, task_data
 
 
 # ============================================================================
@@ -521,29 +607,32 @@ async def get_simulation_status(task_id: str):
     # If this looks like a site_id (e.g., "site-002"), find the most recent running/queued task
     if task_id.startswith("site-"):
         try:
-            # First check if there's a live orchestrator (preferred — real-time data)
-            from app.services.simulation_orchestrator import _active_simulations
+            requested_site_id = task_id
 
-            resolved = False
-            for active_tid, active_orch in _active_simulations.items():
-                if active_orch.running:
-                    task_id = active_tid
-                    resolved = True
-                    logger.debug(f"Resolved site to live orchestrator: {task_id}")
-                    break
+            resolved_task_id, live_orchestrator = _find_live_site_orchestrator(requested_site_id)
+            if resolved_task_id:
+                task_id = resolved_task_id
+                logger.debug(f"Resolved site to live orchestrator: %s", task_id)
+            else:
+                resolved_task_id, _task_data = _select_site_task(requested_site_id)
+                if resolved_task_id:
+                    task_id = resolved_task_id
+                    logger.info("Resolved site %s to stored task %s", requested_site_id, task_id)
+                else:
+                    return SimulationStatusResponse(
+                        running=False,
+                        paused=False,
+                        scenario=None,
+                        simulated_time=None,
+                        simulated_hour=None,
+                        real_elapsed_seconds=0,
+                        events_count=0,
+                        active_faults=0,
+                        pending_repairs=0,
+                        recent_events=[],
+                    )
 
-            if not resolved:
-                # Fallback: find a running/queued task in the store
-                store = get_simulation_store(task_id)
-                all_tasks = store._task_progress  # Direct access to find running tasks
-                for tid, tdata in all_tasks.items():
-                    if tdata.get("status") in ("running", "queued"):
-                        task_id = tid
-                        resolved = True
-                        logger.info(f"Resolved site to store task: {task_id}")
-                        break
-
-            if not resolved:
+            if not resolved_task_id and live_orchestrator is None:
                 return SimulationStatusResponse(
                     running=False,
                     paused=False,
@@ -701,6 +790,8 @@ async def get_simulation_status(task_id: str):
             # For completed simulations, also use progress_pct from database
             # If task is completed and progress > 0, update simulated_time from completion timestamp
             task_status = task.get("status") if task else "unknown"
+            if task_status == "running" and not _task_is_recently_active(task):
+                task_status = "stopped"
             progress_pct = _numeric_or_default(task.get("progress_pct", 0) if task else 0, 0)
 
             # If simulation is completed but has progress, derive simulated_time from completion date
@@ -831,52 +922,37 @@ async def get_default_simulation_status():
         }
 
 
-async def get_site_simulation_status(site_id: str):
-    """
-    Get status of a simulation for a specific site.
-
-    Args:
-        site_id: Site identifier (e.g., 'site-002')
-
-    Returns:
-        Simulation status or empty response if none running
-    """
+def get_site_simulation_status_sync(site_id: str) -> SimulationStatusResponse:
+    """Get status of a simulation for a specific site."""
     try:
-        from app.services.simulation_orchestrator import _active_simulations
+        active_task_id, orchestrator = _find_live_site_orchestrator(site_id)
+        if active_task_id and orchestrator:
+            status = orchestrator.get_status()
 
-        # Look for any running simulation (simulations run site-wide)
-        for task_id, orchestrator in _active_simulations.items():
-            if orchestrator.running:
-                # Get full status from orchestrator
-                status = orchestrator.get_status()
-
-                return SimulationStatusResponse(
-                    running=True,
-                    paused=orchestrator.paused,
-                    scenario=orchestrator.current_scenario.name if orchestrator.current_scenario else None,
-                    simulated_time=orchestrator.simulated_time.isoformat() if orchestrator.simulated_time else None,
-                    simulated_hour=orchestrator.simulated_time.hour if orchestrator.simulated_time else None,
-                    real_elapsed_seconds=status.get("real_elapsed_seconds", 0),
-                    events_count=status.get("events_count", 0),
-                    active_faults=status.get("active_faults", 0),
-                    pending_repairs=status.get("pending_repairs", 0),
-                    recent_events=status.get("recent_events", []),
-                    progress_pct=status.get("progress_percent", 0),
-                    days_simulated=orchestrator.days_simulated,
-                    # Weather fields
-                    ambient_temp=status.get("ambient_temp"),
-                    is_raining=status.get("is_raining"),
-                    cloud_cover=status.get("cloud_cover"),
-                    solar_efficiency=status.get("solar_efficiency"),
-                    current_season=status.get("current_season"),
-                    occupancy_percent=status.get("occupancy_percent"),
-                    # Energy consumption fields
-                    total_energy_kwh=status.get("total_energy_kwh"),
-                    current_hour_power_kw=status.get("current_hour_power_kw"),
-                    # Speed control
-                    speed_multiplier=orchestrator.speed_multiplier,
-                    seconds_per_hour=orchestrator.seconds_per_simulated_hour,
-                )
+            return SimulationStatusResponse(
+                running=True,
+                paused=orchestrator.paused,
+                scenario=orchestrator.current_scenario.name if orchestrator.current_scenario else None,
+                simulated_time=orchestrator.simulated_time.isoformat() if orchestrator.simulated_time else None,
+                simulated_hour=orchestrator.simulated_time.hour if orchestrator.simulated_time else None,
+                real_elapsed_seconds=status.get("real_elapsed_seconds", 0),
+                events_count=status.get("events_count", 0),
+                active_faults=status.get("active_faults", 0),
+                pending_repairs=status.get("pending_repairs", 0),
+                recent_events=status.get("recent_events", []),
+                progress_pct=status.get("progress_percent", 0),
+                days_simulated=orchestrator.days_simulated,
+                ambient_temp=status.get("ambient_temp"),
+                is_raining=status.get("is_raining"),
+                cloud_cover=status.get("cloud_cover"),
+                solar_efficiency=status.get("solar_efficiency"),
+                current_season=status.get("current_season"),
+                occupancy_percent=status.get("occupancy_percent"),
+                total_energy_kwh=status.get("total_energy_kwh"),
+                current_hour_power_kw=status.get("current_hour_power_kw"),
+                speed_multiplier=orchestrator.speed_multiplier,
+                seconds_per_hour=orchestrator.seconds_per_simulated_hour,
+            )
     except Exception as e:
         logger.debug(f"Error getting simulation status: {e}")
 
@@ -895,6 +971,19 @@ async def get_site_simulation_status(site_id: str):
         progress_pct=0,
         days_simulated=0,
     )
+
+
+async def get_site_simulation_status(site_id: str):
+    """
+    Get status of a simulation for a specific site.
+
+    Args:
+        site_id: Site identifier (e.g., 'site-002')
+
+    Returns:
+        Simulation status or empty response if none running
+    """
+    return get_site_simulation_status_sync(site_id)
 
 
 # ============================================================================

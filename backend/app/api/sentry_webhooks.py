@@ -1369,6 +1369,8 @@ class TelegramMessagePayload(BaseModel):
     text: str = ""
     has_photo: bool = False
     photo_file_id: Optional[str] = None
+    has_document: bool = False
+    document_file_id: Optional[str] = None
     message_id: Optional[int] = None
 
 
@@ -1418,12 +1420,53 @@ async def handle_telegram_message(
             "consent_status": consent_decision.status,
         }
 
-    # Classify and route
+    telegram_file_id = None
+    if payload.has_photo and payload.photo_file_id:
+        telegram_file_id = payload.photo_file_id
+    elif payload.has_document and payload.document_file_id:
+        telegram_file_id = payload.document_file_id
+
+    if telegram_file_id:
+        from app.services.telegram_document_intake_service import get_telegram_document_intake_service
+
+        intake_service = get_telegram_document_intake_service()
+        started = await intake_service.start_intake(
+            chat_id=payload.chat_id,
+            telegram_user_id=payload.user_id,
+            telegram_file_id=telegram_file_id,
+        )
+        if not started:
+            return {"success": False, "error": "Technician site mapping not configured"}
+        return {
+            "success": True,
+            "intent": "document_intake",
+            "confidence": 1.0,
+        }
+
     from app.services.telegram_conversation_manager import get_conversation_manager
+
+    mgr = get_conversation_manager()
+    session = mgr.get_session(payload.chat_id)
+    if session is not None and session.flow == "document_intake":
+        from app.services.telegram_document_intake_service import get_telegram_document_intake_service
+
+        intake_service = get_telegram_document_intake_service()
+        handled = await intake_service.handle_text(
+            chat_id=payload.chat_id,
+            telegram_user_id=payload.user_id,
+            text=payload.text,
+        )
+        if handled:
+            return {
+                "success": True,
+                "intent": "document_intake",
+                "confidence": 1.0,
+            }
+
+    # Classify and route
     from app.services.telegram_intent_classifier import classify_intent
     from app.services.telegram_flow_handlers import route_to_handler
 
-    mgr = get_conversation_manager()
     session = mgr.get_session(payload.chat_id)
     has_session = session is not None
 
@@ -1467,6 +1510,22 @@ async def handle_telegram_callback(
         await sender.answer_callback_query(payload.callback_query_id)
     except Exception as e:
         logger.warning("Failed to answer callback query: %s", e)
+
+    if payload.data.startswith("docintake:"):
+        from app.services.telegram_document_intake_service import get_telegram_document_intake_service
+
+        intake_service = get_telegram_document_intake_service()
+        handled = await intake_service.handle_callback(
+            chat_id=payload.chat_id,
+            telegram_user_id=payload.user_id,
+            callback_data=payload.data,
+        )
+        if handled:
+            return {
+                "success": True,
+                "intent": "document_intake",
+                "confidence": 1.0,
+            }
 
     # Classify and route
     from app.services.telegram_conversation_manager import get_conversation_manager

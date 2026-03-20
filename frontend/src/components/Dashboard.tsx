@@ -51,6 +51,7 @@ import { EnergyChart } from "./EnergyChart";
 import { type View } from "./Sidebar";
 import type { BuildingTabId } from "../lib/navigation";
 import { useModules } from "@/contexts/ModuleHooks";
+import { setStoredSelectedSite } from "@/lib/siteSelection";
 
 // Time period options for energy chart
 const TIME_PERIODS = [7, 30, 90] as const;
@@ -193,6 +194,7 @@ export function Dashboard({ onViewChange, autoSelectSiteId, defaultBuildingTab }
   // Handle site card click - navigate to site detail view
   const handleSiteClick = (site: Site) => {
     setSelectedSiteId(site.id);
+    setStoredSelectedSite(site.id);
     window.scrollTo(0, 0);
   };
 

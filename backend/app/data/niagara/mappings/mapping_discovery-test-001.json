@@ -1,7 +1,7 @@
 {
   "discovery_id": "discovery-test-001",
   "site_id": "site-002",
-  "created_at": "2026-03-14T05:50:36.014558",
+  "created_at": "2026-03-14T19:42:28.315947",
   "equipment_count": 3,
   "total_points": 7,
   "equipment": {
@@ -52,9 +52,9 @@
           "site_id": "site-002"
         }
       },
-      "created_at": "2026-03-14T05:50:36.013353",
+      "created_at": "2026-03-14T19:42:28.314602",
       "approved": true,
-      "approved_at": "2026-03-14T05:50:36.014446",
+      "approved_at": "2026-03-14T19:42:28.315868",
       "approved_by": "test-user"
     },
     "S002-VAV-L1-A": {
@@ -116,9 +116,9 @@
           "site_id": "site-002"
         }
       },
-      "created_at": "2026-03-14T05:50:36.013409",
+      "created_at": "2026-03-14T19:42:28.314763",
       "approved": true,
-      "approved_at": "2026-03-14T05:50:36.014446",
+      "approved_at": "2026-03-14T19:42:28.315868",
       "approved_by": "test-user"
     },
     "S002-FCU-L2-B": {
@@ -168,9 +168,9 @@
           "site_id": "site-002"
         }
       },
-      "created_at": "2026-03-14T05:50:36.013446",
+      "created_at": "2026-03-14T19:42:28.314853",
       "approved": true,
-      "approved_at": "2026-03-14T05:50:36.014446",
+      "approved_at": "2026-03-14T19:42:28.315868",
       "approved_by": "test-user"
     }
   }

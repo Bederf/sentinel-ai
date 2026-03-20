@@ -66,6 +66,19 @@ Content-Type: text/plain; charset="utf-8"
 Here are this week's highlights...
 """
 
+SITE_ROUTED_EMAIL = """\
+From: Rooms Scheduler <rooms@sentinel-ai.co.za>
+To: rooms@sentinel-ai.co.za
+Subject: Accepted: Site 002 planning session
+Date: Mon, 02 Mar 2026 08:00:00 +0200
+Content-Type: text/plain; charset="utf-8"
+
+Organizer: Shaun Grose <shaun.grose@example.com>
+Location: S002-L1-MR1
+Start: Monday, 02 March 2026 09:00
+End: Monday, 02 March 2026 11:00
+"""
+
 
 def _make_booking(
     organiser: str = "shaun@example.com",
@@ -94,6 +107,7 @@ def _make_booking(
 DEFAULT_CONFIG = BlockBookingConfig(
     site_id=SITE_ID,
     min_rooms_for_alert=3,
+    full_day_threshold_hours=6.0,
     enabled=True,
 )
 
@@ -138,6 +152,12 @@ class TestEmailParser:
         assert r1 is not None
         assert r2 is not None
         assert r1.raw_email_hash == r2.raw_email_hash
+
+    def test_parser_resolves_site_from_room_identity(self):
+        record = parse_booking_confirmation(SITE_ROUTED_EMAIL)
+        assert record is not None
+        assert record.site_id == SITE_ID
+        assert record.room_name == "S002-L1-MR1"
 
 
 # ---------------------------------------------------------------------------
@@ -197,22 +217,24 @@ class TestOverlapDetector:
         assert len(alerts) == 0
 
     def test_three_rooms_same_organiser(self):
-        """Three rooms in the same slot should produce one alert with room_count=3."""
+        """Three long same-day bookings should produce one alert with room_count=3."""
         bookings = [
-            _make_booking(room="Boardroom 1", start_hour=9, end_hour=11),
-            _make_booking(room="Boardroom 2", start_hour=9, end_hour=11),
-            _make_booking(room="Boardroom 3", start_hour=9, end_hour=11),
+            _make_booking(room="Boardroom 1", start_hour=8, end_hour=17),
+            _make_booking(room="Boardroom 2", start_hour=8, end_hour=17),
+            _make_booking(room="Boardroom 3", start_hour=8, end_hour=17),
         ]
         alerts = detect_overlaps(SITE_ID, bookings, DEFAULT_CONFIG)
         assert len(alerts) == 1
         assert alerts[0].room_count == 3
+        assert alerts[0].overlap_window_start.hour == 8
+        assert alerts[0].overlap_window_end.hour == 17
 
     def test_disabled_config_returns_no_alerts(self):
         """When config.enabled is False, no alerts should be generated."""
         bookings = [
-            _make_booking(room="Boardroom 1", start_hour=9, end_hour=11),
-            _make_booking(room="Boardroom 2", start_hour=9, end_hour=11),
-            _make_booking(room="Boardroom 3", start_hour=9, end_hour=11),
+            _make_booking(room="Boardroom 1", start_hour=8, end_hour=17),
+            _make_booking(room="Boardroom 2", start_hour=8, end_hour=17),
+            _make_booking(room="Boardroom 3", start_hour=8, end_hour=17),
         ]
         config = BlockBookingConfig(site_id=SITE_ID, enabled=False)
         alerts = detect_overlaps(SITE_ID, bookings, config)
@@ -221,9 +243,9 @@ class TestOverlapDetector:
     def test_partial_overlap(self):
         """Bookings that only partially overlap should not trigger an alert."""
         bookings = [
-            _make_booking(room="Boardroom 1", start_hour=9, end_hour=11),
+            _make_booking(room="Boardroom 1", start_hour=8, end_hour=17),
             _make_booking(room="Boardroom 2", start_hour=10, end_hour=12),
-            _make_booking(room="Boardroom 3", start_hour=9, end_hour=11),
+            _make_booking(room="Boardroom 3", start_hour=8, end_hour=17),
         ]
         alerts = detect_overlaps(SITE_ID, bookings, DEFAULT_CONFIG)
         assert len(alerts) == 0
@@ -231,9 +253,9 @@ class TestOverlapDetector:
     def test_min_rooms_threshold(self):
         """Only flag when room count meets min_rooms_for_alert."""
         bookings = [
-            _make_booking(room="Boardroom 1", start_hour=9, end_hour=11),
-            _make_booking(room="Boardroom 2", start_hour=9, end_hour=11),
-            _make_booking(room="Boardroom 3", start_hour=9, end_hour=11),
+            _make_booking(room="Boardroom 1", start_hour=8, end_hour=17),
+            _make_booking(room="Boardroom 2", start_hour=8, end_hour=17),
+            _make_booking(room="Boardroom 3", start_hour=8, end_hour=17),
         ]
         config = BlockBookingConfig(site_id=SITE_ID, min_rooms_for_alert=4, enabled=True)
         alerts = detect_overlaps(SITE_ID, bookings, config)
@@ -242,15 +264,41 @@ class TestOverlapDetector:
     def test_multiple_time_slots_same_day_create_distinct_alerts(self):
         """Separate same-day slots should each alert once."""
         bookings = [
-            _make_booking(room="Boardroom 1", start_hour=9, end_hour=11),
-            _make_booking(room="Boardroom 2", start_hour=9, end_hour=11),
-            _make_booking(room="Boardroom 3", start_hour=9, end_hour=11),
-            _make_booking(room="Boardroom 4", start_hour=13, end_hour=14),
-            _make_booking(room="Boardroom 5", start_hour=13, end_hour=14),
-            _make_booking(room="Boardroom 6", start_hour=13, end_hour=14),
+            _make_booking(room="Boardroom 1", start_hour=6, end_hour=12),
+            _make_booking(room="Boardroom 2", start_hour=6, end_hour=12),
+            _make_booking(room="Boardroom 3", start_hour=6, end_hour=12),
+            _make_booking(room="Boardroom 4", start_hour=12, end_hour=18),
+            _make_booking(room="Boardroom 5", start_hour=12, end_hour=18),
+            _make_booking(room="Boardroom 6", start_hour=12, end_hour=18),
         ]
         alerts = detect_overlaps(SITE_ID, bookings, DEFAULT_CONFIG)
         assert len(alerts) == 2
+
+    def test_near_full_day_similar_windows_trigger_alert(self):
+        """Similar long windows should still flag when the common overlap is long enough."""
+        bookings = [
+            _make_booking(room="Boardroom 1", start_hour=8, end_hour=17),
+            _make_booking(room="Boardroom 2", start_hour=8, end_hour=16),
+            _make_booking(room="Boardroom 3", start_hour=9, end_hour=17),
+        ]
+
+        alerts = detect_overlaps(SITE_ID, bookings, DEFAULT_CONFIG)
+
+        assert len(alerts) == 1
+        assert alerts[0].overlap_window_start.hour == 9
+        assert alerts[0].overlap_window_end.hour == 16
+
+    def test_short_same_slot_bookings_do_not_trigger_full_day_alert(self):
+        """Three short same-slot bookings are not a block-booking anomaly in this mode."""
+        bookings = [
+            _make_booking(room="Boardroom 1", start_hour=9, end_hour=11),
+            _make_booking(room="Boardroom 2", start_hour=9, end_hour=11),
+            _make_booking(room="Boardroom 3", start_hour=9, end_hour=11),
+        ]
+
+        alerts = detect_overlaps(SITE_ID, bookings, DEFAULT_CONFIG)
+
+        assert len(alerts) == 0
 
 
 # ---------------------------------------------------------------------------

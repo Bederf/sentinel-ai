@@ -37,6 +37,7 @@ class DiscoverRequest(BaseModel):
     device_ip: str = Field(..., description="IP address of the BACnet device, or 'simulation' for simulation data")
     site_id: str = Field(..., description="SENTINEL site ID for mapping (e.g., 'site-002')")
     device_bacnet_id: Optional[int] = Field(None, description="Optional BACnet device instance ID")
+    adapter_type: Optional[str] = Field(None, description="Explicit adapter selection (bacnet, simulation)")
     bms_vendor: Optional[str] = Field(
         None,
         description="BMS vendor identifier (niagara, desigo, metasys, honeywell, schneider, trend, generic)",
@@ -118,8 +119,8 @@ async def discover_and_classify(request: DiscoverRequest):
     """
     Trigger point discovery and AI classification.
 
-    Routes through 3-tier data source: BACnet (live device) -> Simulation
-    (Supabase equipment_sensor_readings) -> JSON fallback (static files).
+    Routes through 3-tier data source: selected adapter (BACnet or simulation)
+    -> JSON fallback (static files).
     Classifies points using Haystack/Brick ontology, groups into equipment,
     and stores results for review.
 
@@ -135,6 +136,7 @@ async def discover_and_classify(request: DiscoverRequest):
             site_id=request.site_id,
             device_bacnet_id=request.device_bacnet_id,
             bms_vendor=request.bms_vendor,
+            adapter_type=request.adapter_type,
         )
 
         if result.status == "error":
@@ -154,6 +156,7 @@ async def discover_and_classify(request: DiscoverRequest):
             "state": WorkflowState.PENDING_REVIEW,
             "device_ip": request.device_ip,
             "site_id": request.site_id,
+            "adapter_type": request.adapter_type,
             "bms_vendor": request.bms_vendor,
             "points_count": len(result.classified_points),
             "equipment_count": len(result.summary.get("unique_equipment", {})),

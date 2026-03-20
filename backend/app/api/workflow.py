@@ -482,7 +482,7 @@ async def get_dashboard_equipment(site_id: Optional[str] = Query(None, descripti
 
             # Get baseline summary
             try:
-                baseline_summary = baseline_repo.get_baseline_summary(eq_uuid) if eq_uuid else {}
+                baseline_summary = await baseline_repo.get_baseline_summary(eq_uuid) if eq_uuid else {}
             except Exception:
                 baseline_summary = {}
 

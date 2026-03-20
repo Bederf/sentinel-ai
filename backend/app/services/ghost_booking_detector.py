@@ -33,7 +33,7 @@ def _make_naive(dt: datetime) -> datetime:
 # Config — sourced from settings / env vars
 # ---------------------------------------------------------------------------
 
-GHOST_GRACE_MINUTES = 15  # Wait N minutes after booking start before flagging
+GHOST_GRACE_MINUTES = 5  # Wait N minutes after booking start before flagging
 
 EARLY_VACATE_THRESHOLD_MINUTES = 90  # Room empty with >90 min of booking remaining
 SPORADIC_USE_THRESHOLD_PCT = 25  # Occupied < 25% of total booking duration
@@ -125,6 +125,7 @@ def detect_ghost_booking(
         booking_id=booking.id,
         organiser_email=booking.organiser_email,
         organiser_name=booking.organiser_name,
+        source_booking_flagged=booking.flagged,
         booking_start=booking.start_time,
         booking_end=booking.end_time,
         grace_period_minutes=grace,

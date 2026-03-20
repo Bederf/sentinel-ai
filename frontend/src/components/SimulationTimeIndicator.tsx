@@ -9,7 +9,7 @@ interface SimulationTimeIndicatorProps {
 
 /**
  * Draggable simulation clock pill using SimulationContext.
- * Shows: grip handle | weather icon | HH:MM | Day X/365 | Season | temp
+ * Shows: grip handle | weather icon | HH:MM | Day X/365 | speed | Season | temp
  * Click-and-drag to reposition anywhere on screen.
  */
 export function SimulationTimeIndicator({
@@ -25,6 +25,8 @@ export function SimulationTimeIndicator({
     ambientTemp,
     simulatedHour,
     currentSeason,
+    speedMultiplier,
+    secondsPerHour,
   } = useSimulation();
 
   // Draggable state
@@ -69,6 +71,17 @@ export function SimulationTimeIndicator({
 
   const isDaytime = simulatedHour >= 6 && simulatedHour < 18;
   const isHighCloudCover = (cloudCover || 0) > 70;
+  const simulatedMinutesPerSecond = secondsPerHour > 0 ? Math.round(60 / secondsPerHour) : 10;
+
+  const speedTickLabel = (() => {
+    if (simulatedMinutesPerSecond >= 60) {
+      const hours = Math.floor(simulatedMinutesPerSecond / 60);
+      const minutes = simulatedMinutesPerSecond % 60;
+      return minutes > 0 ? `1s=${hours}h ${minutes}m` : `1s=${hours}h`;
+    }
+
+    return `1s=${simulatedMinutesPerSecond}m`;
+  })();
 
   // Pick icon
   const WeatherIcon = isRaining
@@ -113,6 +126,8 @@ export function SimulationTimeIndicator({
       <WeatherIcon className="h-4 w-4 flex-shrink-0" />
       <span className="tabular-nums font-bold text-sm">{timeDisplay}</span>
       <span className="opacity-80">D{daysSimulated}/365</span>
+      <span className="opacity-80">{speedMultiplier}x</span>
+      <span className="opacity-80">{speedTickLabel}</span>
       <span className="opacity-80">{seasonEmoji} {currentSeason}</span>
       <span className="opacity-80">{ambientTemp?.toFixed(0)}°C</span>
     </div>

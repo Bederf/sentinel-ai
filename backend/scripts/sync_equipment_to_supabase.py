@@ -5,7 +5,7 @@ Deletes all S002-% equipment from Supabase (and dependent rows in
 work_orders, predictions, alerts) and re-inserts from the 90 JSON
 equipment files in backend/app/data/buildings/site-002/equipment/.
 
-After sync, dumps the new state to supabase_backup/equipment.json.
+This updates the authoritative Postgres state only.
 
 Usage:
     cd backend && python scripts/sync_equipment_to_supabase.py
@@ -13,10 +13,7 @@ Usage:
 
 import json
 import os
-from datetime import date, datetime
-from decimal import Decimal
 from pathlib import Path
-from uuid import UUID
 
 import psycopg2
 import psycopg2.extras
@@ -25,25 +22,12 @@ import psycopg2.extras
 SCRIPT_DIR = Path(__file__).parent
 BACKEND_DIR = SCRIPT_DIR.parent
 EQUIPMENT_DIR = BACKEND_DIR / "app" / "data" / "sites" / "site-002" / "equipment"
-BACKUP_DIR = BACKEND_DIR / "app" / "data" / "supabase_backup"
-
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
     "postgresql://postgres:postgres@127.0.0.1:55322/postgres",
 )
 
 BUILDING_ID = "d73a5a5f-6de5-4081-8c46-411954013156"
-
-
-def json_serializer(obj):
-    """Handle non-serializable types."""
-    if isinstance(obj, (datetime, date)):
-        return obj.isoformat()
-    if isinstance(obj, Decimal):
-        return float(obj)
-    if isinstance(obj, UUID):
-        return str(obj)
-    raise TypeError(f"Not serializable: {type(obj)}")
 
 
 def load_equipment_files() -> list[dict]:
@@ -143,31 +127,6 @@ def main():
         conn.commit()
         print("\n✓ Committed successfully")
 
-        # ── Step 7: Dump backup ──
-        print(f"\nDumping backup to {BACKUP_DIR / 'equipment.json'}...")
-        cur.execute("SELECT * FROM equipment ORDER BY code")
-        all_equipment = cur.fetchall()
-
-        # Convert to serializable list
-        backup_data = []
-        for row in all_equipment:
-            record = {}
-            for key, value in row.items():
-                if isinstance(value, (datetime, date)):
-                    record[key] = value.isoformat() if value else None
-                elif isinstance(value, Decimal):
-                    record[key] = float(value)
-                elif isinstance(value, UUID):
-                    record[key] = str(value)
-                else:
-                    record[key] = value
-            backup_data.append(record)
-
-        BACKUP_DIR.mkdir(parents=True, exist_ok=True)
-        with open(BACKUP_DIR / "equipment.json", "w") as f:
-            json.dump(backup_data, f, indent=2, default=json_serializer)
-
-        print(f"  Saved {len(backup_data)} total equipment records to backup")
         print("\n✓ Done!")
 
     except Exception as e:

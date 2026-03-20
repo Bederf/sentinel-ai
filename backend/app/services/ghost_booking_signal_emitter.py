@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import logging
 
+from app.database.supabase_client import get_supabase_client
 from app.models.space_occupancy import GhostBookingFinding
 from app.services.room_signal_mapper import link_signal_to_room
 from app.services.signal_emitter_base import (
@@ -23,10 +24,42 @@ from app.services.signal_emitter_base import (
 
 logger = logging.getLogger(__name__)
 
-SOURCE_MODULE = "space_optimisation"
+SOURCE_MODULE = "booking_system"
 
 # Dedup window: same room + booking within 60 min
 _GHOST_DEDUP_WINDOW = 60 * 60
+
+
+def _linked_block_booking_metadata(room_id: str, finding: GhostBookingFinding) -> dict:
+    """Return linkage metadata to the earlier planning-stage block-booking signal."""
+    if not finding.source_booking_flagged:
+        return {
+            "previously_flagged": False,
+            "linked_signal_type": None,
+            "linked_signal_ids": [],
+        }
+
+    linked_ids: list[str] = []
+    client = get_supabase_client()
+    if client:
+        try:
+            result = (
+                client.table("signal")
+                .select("id")
+                .eq("signal_type", "booking_conflict")
+                .eq("resolution_state", "active")
+                .filter("metadata->>room_code", "eq", room_id)
+                .execute()
+            )
+            linked_ids = [row["id"] for row in (result.data or []) if row.get("id")]
+        except Exception as exc:
+            logger.warning("Failed to resolve linked block-booking signal for %s: %s", room_id, exc)
+
+    return {
+        "previously_flagged": True,
+        "linked_signal_type": "booking_conflict",
+        "linked_signal_ids": linked_ids,
+    }
 
 
 async def emit_ghost_booking_signal(
@@ -56,11 +89,12 @@ async def emit_ghost_booking_signal(
         return None
 
     grace_min = finding.grace_period_minutes
+    linkage = _linked_block_booking_metadata(room_id, finding)
 
     signal_row = build_signal_row(
         source_module=SOURCE_MODULE,
         signal_type="no_show_pattern",
-        severity="medium",
+        severity="critical",
         confidence=0.85,
         location_ref=location_ref,
         raw_content=(
@@ -75,6 +109,9 @@ async def emit_ghost_booking_signal(
             "booking_start": finding.booking_start.isoformat(),
             "booking_end": finding.booking_end.isoformat(),
             "grace_period_minutes": grace_min,
+            "signal_stage": "runtime",
+            "signal_lifecycle": "confirm",
+            **linkage,
         },
         site_id=finding.site_id or None,
     )

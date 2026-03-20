@@ -39,6 +39,9 @@ from app.services.feedback_collection_service import (
     get_feedback_collection_service,
 )
 from app.services.power_meter_validation_engine import get_power_meter_validation_engine
+from app.services.occupancy_profile_service import calculate_building_occupancy_percent, calculate_zone_occupancy
+from app.services.site_capacity_service import get_site_capacity_service
+from app.services.site_holiday_service import get_site_holiday_service
 from app.services.seasonal_modeler import SeasonalModeler
 from app.services.equipment_json_loader import load_site_equipment
 from app.services.sentinel_alert_engine import SentinelAlertEngine, AlertContext
@@ -296,7 +299,11 @@ class LifecycleOrchestrator:
         self.seasonal_modeler: SeasonalModeler | None = None
 
         # Building schedule engine for time-of-day operating states
-        self.site_schedule = SiteSchedule()
+        self.site_schedule = SiteSchedule(self.site_id)
+        self.site_holiday_service = get_site_holiday_service()
+        self.site_capacity_service = get_site_capacity_service()
+        self.site_total_capacity = self.site_capacity_service.get_total_capacity(self.site_id)
+        self.site_desk_count = self.site_capacity_service.get_desk_count(self.site_id)
 
         # Chilled water model for physics-based zone cooling (105-01)
         self.chw_model = ChilledWaterModel()
@@ -1283,6 +1290,50 @@ class LifecycleOrchestrator:
                 )
             )
 
+        if hour == 0:
+            try:
+                from app.services.space_booking_simulator import get_space_booking_simulator
+
+                booking_summary = await get_space_booking_simulator().ingest_day(
+                    self.site_id,
+                    self.simulated_time.date(),
+                )
+                if booking_summary["generated_bookings"]:
+                    logger.info(
+                        "[SPACE BOOKINGS] %s day=%s generated=%s saved=%s alerts=%s notified=%s intake_emails=%s intelligence_signals=%s",
+                        self.site_id,
+                        self.simulated_time.date().isoformat(),
+                        booking_summary["generated_bookings"],
+                        booking_summary["saved_bookings"],
+                        booking_summary["alerts_generated"],
+                        booking_summary["alerts_notified"],
+                        booking_summary.get("intelligence_emails_generated", 0),
+                        booking_summary.get("intelligence_signals_created", 0),
+                    )
+            except Exception as exc:
+                logger.warning("[SPACE BOOKINGS] Failed to simulate room bookings: %s", exc)
+
+        try:
+            from app.services.space_booking_simulator import get_space_booking_simulator
+
+            room_summary = await get_space_booking_simulator().replay_hour(
+                self.site_id,
+                self.simulated_time,
+            )
+            if room_summary["events_replayed"] or room_summary["ghost_findings_created"]:
+                logger.info(
+                    "[SPACE ROOMS] %s hour=%02d events=%s meeting=%s focus=%s ghosts=%s notified=%s",
+                    self.site_id,
+                    hour,
+                    room_summary["events_replayed"],
+                    room_summary.get("meeting_room_events_replayed", 0),
+                    room_summary.get("focus_room_events_replayed", 0),
+                    room_summary["ghost_findings_created"],
+                    room_summary["ghost_notifications_sent"],
+                )
+        except Exception as exc:
+            logger.warning("[SPACE ROOMS] Failed to simulate room occupancy: %s", exc)
+
         # === FAULT INJECTION (scenario-driven) ===
         if self.current_scenario and self.current_scenario.fault_probability > 0:
             if self.current_scenario.fault_hour == hour:
@@ -1560,22 +1611,9 @@ class LifecycleOrchestrator:
         except Exception as e:
             logger.debug(f"[SOLAR SNAPSHOT] Failed: {e}")
 
-        # === SENTINEL PROCESSING GATE ===
-        # When processing is disabled for this site, skip ML feeding, health
-        # monitoring, alerts, and recommendations. Data persistence above continues.
-        sentinel_processing = True
-        try:
-            from app.api.sites import is_site_processing_enabled
-
-            sentinel_processing = await is_site_processing_enabled(self.site_id)
-        except Exception as e:
-            logger.debug(f"[PROCESSING GATE] Could not check state, defaulting to enabled: {e}")
-
-        if not sentinel_processing:
-            logger.debug(
-                f"[PROCESSING GATE] SENTINEL processing disabled for {self.site_id}, skipping intelligence layer"
-            )
-            return
+        # Runtime processing/ingestion gates now live at the SIMBIOT connector
+        # boundary. The building simulator should not own the site connection
+        # state.
 
         # ML feeding is handled by SENTINEL persistence layer (simulation_persistence.py)
         # after writing to Supabase — SENTINEL feeds ML, not the orchestrator.
@@ -1914,19 +1952,35 @@ class LifecycleOrchestrator:
         Returns:
             Dictionary mapping zone_id -> occupancy_percent (0-100)
         """
-        from app.api.lighting import calculate_zone_occupancy
-
         # Get day-of-week info
         day_of_week = self.simulated_time.weekday()  # 0=Monday, 6=Sunday
         is_weekend = day_of_week >= 5
+        is_holiday = self._is_site_holiday()
 
-        # Site 002 actual zone IDs and their typical occupancy patterns
+        # Site 002 zone occupancy profiles, including both meeting rooms on each office floor.
         zone_profiles = {
             "Zone-B1-001": "utility",  # Basement plant room
             "Zone-L1-A": "office",  # Level 1 Zone A
             "Zone-L1-B": "office",  # Level 1 Zone B
+            "Zone-L1-C": "office",  # Level 1 Zone C
+            "Zone-L1-D": "office",  # Level 1 Zone D
+            "Zone-L1-E": "office",  # Level 1 Zone E
+            "Zone-L1-MR1": "meeting",  # Level 1 meeting room
+            "Zone-L1-MR2": "meeting",  # Level 1 meeting room
             "Zone-L2-A": "office",  # Level 2 Zone A
             "Zone-L2-B": "office",  # Level 2 Zone B
+            "Zone-L2-C": "office",  # Level 2 Zone C
+            "Zone-L2-D": "office",  # Level 2 Zone D
+            "Zone-L2-E": "office",  # Level 2 Zone E
+            "Zone-L2-MR1": "meeting",  # Level 2 meeting room
+            "Zone-L2-MR2": "meeting",  # Level 2 meeting room
+            "Zone-L3-A": "office",  # Level 3 Zone A
+            "Zone-L3-B": "office",  # Level 3 Zone B
+            "Zone-L3-C": "office",  # Level 3 Zone C
+            "Zone-L3-D": "office",  # Level 3 Zone D
+            "Zone-L3-E": "office",  # Level 3 Zone E
+            "Zone-L3-MR1": "meeting",  # Level 3 meeting room
+            "Zone-L3-MR2": "meeting",  # Level 3 meeting room
         }
 
         occupancy_data = {}
@@ -1934,7 +1988,12 @@ class LifecycleOrchestrator:
         for zone_id, zone_type in zone_profiles.items():
             # Calculate occupancy using existing dali logic
             occupancy_pct = calculate_zone_occupancy(
-                hour=hour, day_of_week=day_of_week, is_weekend=is_weekend, zone_type=zone_type
+                hour=hour,
+                day_of_week=day_of_week,
+                is_weekend=is_weekend,
+                zone_type=zone_type,
+                is_holiday=is_holiday,
+                rng=self._scenario_rng,
             )
 
             # Apply seasonal variation if in annual simulation
@@ -1950,6 +2009,10 @@ class LifecycleOrchestrator:
             occupancy_data[zone_id] = max(0.0, min(100.0, occupancy_pct))
 
         return occupancy_data
+
+    def _is_site_holiday(self) -> bool:
+        """Return whether the current simulated date is a configured holiday."""
+        return self.site_holiday_service.is_holiday(self.site_id, self.simulated_time.date())
 
     def _get_zone_occupancy(self, zone_id: str) -> float:
         """Map a temperature zone (Zone-001..Zone-205) to DALI occupancy %.
@@ -2153,92 +2216,87 @@ class LifecycleOrchestrator:
                 f"occupancy={occupancy_percent}%, daylight={daylight_factor}%, zones={zones_active}"
             )
 
-            equipment_list = self.equipment_repo.get_all()
-            if not equipment_list:
-                return
-
-            # Filter to target site if available — process ALL equipment (no cap)
-            equip_prefix = f"{self.site_prefix}-"
-            site_equipment = [eq for eq in equipment_list if eq.get("code", "").startswith(equip_prefix)]
-            if not site_equipment:
-                site_equipment = equipment_list
-
-            # Filter to controllable equipment
-            controllable_equipment = [
-                eq for eq in site_equipment if self.device_control_service.is_controllable(eq.get("code", eq.get("id")))
-            ]
-
             recommendations_created = []
             hvac_recs = []
             dali_recs = []
 
-            # Track lighting equipment (never optimized by AI — Tridonic handles natively)
-            for eq in site_equipment:
-                eq_type = eq.get("type", "unknown").lower()
-                if eq_type in ["dali", "luminaire", "controller", "dali_zone"]:
-                    dali_recs.append(eq.get("code", eq.get("id")))
-
             # ========== OPTIMIZATION MODE DISPATCH ==========
             if self._optimization_mode == "sentinel":
+                equipment_list = self.equipment_repo.get_all()
+                if not equipment_list:
+                    return
+
+                # Filter to target site if available — process ALL equipment (no cap)
+                equip_prefix = f"{self.site_prefix}-"
+                site_equipment = [eq for eq in equipment_list if eq.get("code", "").startswith(equip_prefix)]
+                if not site_equipment:
+                    site_equipment = equipment_list
+
+                # Filter to controllable equipment
+                controllable_equipment = [
+                    eq
+                    for eq in site_equipment
+                    if self.device_control_service.is_controllable(eq.get("code", eq.get("id")))
+                ]
+
+                # Track lighting equipment (never optimized by AI — Tridonic handles natively)
+                for eq in site_equipment:
+                    eq_type = eq.get("type", "unknown").lower()
+                    if eq_type in ["dali", "luminaire", "controller", "dali_zone"]:
+                        dali_recs.append(eq.get("code", eq.get("id")))
+
                 sentinel_recs = await self._sentinel_optimization(
                     controllable_equipment, context, occupancy_percent, daylight_factor, current_hour
                 )
                 recommendations_created = sentinel_recs
                 hvac_recs = [r.get("equipment", "") for r in sentinel_recs]
             elif self._optimization_mode == "hybrid":
+                equipment_list = self.equipment_repo.get_all()
+                if not equipment_list:
+                    return
+
+                equip_prefix = f"{self.site_prefix}-"
+                site_equipment = [eq for eq in equipment_list if eq.get("code", "").startswith(equip_prefix)]
+                if not site_equipment:
+                    site_equipment = equipment_list
+
+                controllable_equipment = [
+                    eq
+                    for eq in site_equipment
+                    if self.device_control_service.is_controllable(eq.get("code", eq.get("id")))
+                ]
+
+                for eq in site_equipment:
+                    eq_type = eq.get("type", "unknown").lower()
+                    if eq_type in ["dali", "luminaire", "controller", "dali_zone"]:
+                        dali_recs.append(eq.get("code", eq.get("id")))
+
                 sentinel_recs = await self._sentinel_optimization(
                     controllable_equipment, context, occupancy_percent, daylight_factor, current_hour
                 )
-                hardcoded_recs = self._hardcoded_optimization_batch(
-                    controllable_equipment, context, occupancy_percent, daylight_factor, current_hour
+                hardcoded_plan = self._build_hardcoded_control_plan(
+                    context=context,
+                    occupancy_percent=occupancy_percent,
+                    daylight_factor=daylight_factor,
+                    current_hour=current_hour,
+                    zones_active=zones_active,
                 )
+                hardcoded_recs = hardcoded_plan["recommendations"]
                 self._log_optimization_comparison(sentinel_recs, hardcoded_recs, current_hour)
                 # Use SENTINEL results, log hardcoded for comparison
                 recommendations_created = sentinel_recs
                 hvac_recs = [r.get("equipment", "") for r in sentinel_recs]
             else:  # "hardcoded"
-                hardcoded_recs = self._hardcoded_optimization_batch(
-                    controllable_equipment, context, occupancy_percent, daylight_factor, current_hour
+                hardcoded_plan = self._build_hardcoded_control_plan(
+                    context=context,
+                    occupancy_percent=occupancy_percent,
+                    daylight_factor=daylight_factor,
+                    current_hour=current_hour,
+                    zones_active=zones_active,
                 )
-                recommendations_created = hardcoded_recs
-                hvac_recs = [r.get("equipment", "") for r in hardcoded_recs]
-
-            # ========== DEMO MODE: BESS TOU ARBITRAGE ==========
-            if self.current_scenario and self.current_scenario.demo_mode:
-                # BESS TOU arbitrage: charge during off-peak, discharge during peak
-                if current_hour in [7, 8, 9, 18, 19]:  # Peak hours (R 3.45/kWh)
-                    bess_rec = {
-                        "equipment": f"{self.site_prefix}-BESS-001",
-                        "control_point": "discharge_power",
-                        "target_value": 500,  # kW
-                        "reason": "Peak tariff arbitrage - discharge BESS to grid",
-                        "description": "Discharge 500kW during peak hours to reduce grid purchase",
-                        "savings": 15,
-                    }
-                    recommendations_created.append(bess_rec)
-                elif current_hour in [0, 1, 2, 3, 4, 5]:  # Off-peak (R 1.05/kWh)
-                    bess_rec = {
-                        "equipment": f"{self.site_prefix}-BESS-001",
-                        "control_point": "charge_power",
-                        "target_value": 300,  # kW
-                        "reason": "Off-peak charging - cheap grid power",
-                        "description": "Charge 300kW during off-peak hours",
-                        "savings": 12,
-                    }
-                    recommendations_created.append(bess_rec)
-
-                # ========== DEMO MODE: GENERATOR LOAD SHEDDING ==========
-                # 5% chance per hour to simulate load shedding event
-                if random.random() < 0.05:
-                    gen_rec = {
-                        "equipment": f"{self.site_prefix}-GEN-B1-001",
-                        "control_point": "start",
-                        "target_value": 1,
-                        "reason": "Load shedding event from grid operator",
-                        "description": "Start backup generator due to grid demand response",
-                        "savings": 8,
-                    }
-                    recommendations_created.append(gen_rec)
+                recommendations_created = hardcoded_plan["recommendations"]
+                hvac_recs = hardcoded_plan["hvac_recommendations"]
+                dali_recs = hardcoded_plan["dali_recommendations"]
 
             # Emit comprehensive optimization event
             self._emit_event(
@@ -2265,44 +2323,121 @@ class LifecycleOrchestrator:
         except Exception as e:
             logger.warning(f"AI optimization error: {e}")
 
+    def _build_hardcoded_control_plan(
+        self,
+        *,
+        context: str,
+        occupancy_percent: int,
+        daylight_factor: int,
+        current_hour: int,
+        zones_active: int,
+    ) -> dict[str, Any]:
+        """Build a simulator-owned control plan without any SENTINEL coupling.
+
+        This method is the stable seam for the lifecycle engine's internal
+        building behavior. It scopes equipment to the current site, filters to
+        controllable assets, applies the hardcoded control policy, and appends
+        demo-only building actions such as BESS arbitrage.
+        """
+        equipment_list = self.equipment_repo.get_all()
+        if not equipment_list:
+            return {
+                "context": context,
+                "occupancy_percent": occupancy_percent,
+                "daylight_factor": daylight_factor,
+                "zones_active": zones_active,
+                "hvac_recommendations": [],
+                "dali_recommendations": [],
+                "total_recommendations": 0,
+                "recommendations": [],
+            }
+
+        equip_prefix = f"{self.site_prefix}-"
+        site_equipment = [eq for eq in equipment_list if eq.get("code", "").startswith(equip_prefix)]
+        if not site_equipment:
+            site_equipment = equipment_list
+
+        controllable_equipment = [
+            eq for eq in site_equipment if self.device_control_service.is_controllable(eq.get("code", eq.get("id")))
+        ]
+        dali_recs = []
+        for eq in site_equipment:
+            eq_type = eq.get("type", "unknown").lower()
+            if eq_type in ["dali", "luminaire", "controller", "dali_zone"]:
+                dali_recs.append(eq.get("code", eq.get("id")))
+
+        recommendations = self._hardcoded_optimization_batch(
+            controllable_equipment, context, occupancy_percent, daylight_factor, current_hour
+        )
+
+        if self.current_scenario and self.current_scenario.demo_mode:
+            if current_hour in [7, 8, 9, 18, 19]:
+                recommendations.append(
+                    {
+                        "equipment": f"{self.site_prefix}-BESS-001",
+                        "control_point": "discharge_power",
+                        "target_value": 500,
+                        "reason": "Peak tariff arbitrage - discharge BESS to grid",
+                        "description": "Discharge 500kW during peak hours to reduce grid purchase",
+                        "savings": 15,
+                    }
+                )
+            elif current_hour in [0, 1, 2, 3, 4, 5]:
+                recommendations.append(
+                    {
+                        "equipment": f"{self.site_prefix}-BESS-001",
+                        "control_point": "charge_power",
+                        "target_value": 300,
+                        "reason": "Off-peak charging - cheap grid power",
+                        "description": "Charge 300kW during off-peak hours",
+                        "savings": 12,
+                    }
+                )
+
+            if random.random() < 0.05:
+                recommendations.append(
+                    {
+                        "equipment": f"{self.site_prefix}-GEN-B1-001",
+                        "control_point": "start",
+                        "target_value": 1,
+                        "reason": "Load shedding event from grid operator",
+                        "description": "Start backup generator due to grid demand response",
+                        "savings": 8,
+                    }
+                )
+
+        return {
+            "context": context,
+            "occupancy_percent": occupancy_percent,
+            "daylight_factor": daylight_factor,
+            "zones_active": zones_active,
+            "hvac_recommendations": [r.get("equipment", "") for r in recommendations],
+            "dali_recommendations": dali_recs,
+            "total_recommendations": len(recommendations),
+            "recommendations": recommendations,
+        }
+
     def _calculate_occupancy(self, hour: int) -> int:
         """Calculate occupancy percent based on hour and day of week.
 
         Applies weekend/holiday factors: Sat 30%, Sun 20% of weekday base.
         """
-        # Base occupancy from time of day (weekday profile)
-        if hour < 6 or hour >= 22:
-            base = 0  # Night: 0%
-        elif hour < 8:
-            base = 10  # Early morning: arriving
-        elif hour < 11:
-            base = 70  # Morning: ramping up
-        elif hour < 12:
-            base = 90  # Pre-peak: approaching peak
-        elif hour < 13:
-            base = 95  # Peak: lunch time, still high
-        elif hour < 17:
-            base = 80  # Afternoon: peak declining
-        elif hour < 18:
-            base = 60  # Late afternoon: people leaving
-        elif hour < 20:
-            base = 30  # Evening: mostly gone
-        else:
-            base = 5  # Late evening: security/cleaning only
+        day_of_week = self.simulated_time.weekday() if self.simulated_time else 0
+        is_weekend = day_of_week >= 5
+        is_holiday = self._is_site_holiday()
+        occupancy_percent = calculate_building_occupancy_percent(
+            hour=hour,
+            day_of_week=day_of_week,
+            is_weekend=is_weekend,
+            is_holiday=is_holiday,
+            rng=self._scenario_rng,
+            demo_mode=bool(self.current_scenario and self.current_scenario.demo_mode),
+        )
 
-        # Apply day-of-week factor (Mon=0 .. Sun=6)
-        # Weekend occupancy is skeleton staff only
-        if self.simulated_time:
-            day_of_week = self.simulated_time.weekday()
-            day_factors = [1.0, 0.95, 0.90, 0.88, 0.80, 0.3, 0.2]  # Mon-Sun
-            base = int(base * day_factors[day_of_week])
+        if self.seasonal_modeler:
+            occupancy_percent *= self._get_seasonal_occupancy_factor(hour)
 
-        # Demo mode: add occupancy drift (±15%) to keep rules triggering
-        if self.current_scenario and self.current_scenario.demo_mode:
-            drift = self._scenario_rng.uniform(0.85, 1.15)
-            base = int(max(0, min(100, base * drift)))
-
-        return base
+        return int(max(0, min(100, occupancy_percent)))
 
     def _calculate_daylight(self, hour: int) -> int:
         """Calculate available natural daylight as percentage (0-100%)."""

@@ -11,8 +11,30 @@
 
 import { useState, useRef, useEffect } from 'react';
 import type { FormEvent, KeyboardEvent } from 'react';
-import { Send, Wrench, Search, AlertTriangle, CheckCircle, Info, ChevronDown, ChevronUp, ExternalLink, Clipboard, PlayCircle, Eye, ImageIcon } from 'lucide-react';
+import {
+  Send,
+  Wrench,
+  Search,
+  AlertTriangle,
+  CheckCircle,
+  Info,
+  ChevronDown,
+  ChevronUp,
+  ExternalLink,
+  Clipboard,
+  PlayCircle,
+  Eye,
+  ImageIcon,
+  FileText,
+  Download,
+  Building2,
+} from 'lucide-react';
 import { authorizedFetch } from '../lib/api/client';
+import {
+  conceptDocumentsApi,
+  type ConceptDocumentSearchResult,
+  type ConceptDocumentSearchResponse,
+} from '../lib/api/conceptDocuments';
 import DiagnosisFlow from './DiagnosisFlow';
 import PhotoCapture from './PhotoCapture';
 import OfflineIndicator from './OfflineIndicator';
@@ -23,8 +45,6 @@ import {
   getCachedRepairProcedures,
   clearSyncQueue,
 } from '../lib/offlineStorage';
-
-const _API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
 // Message types for conversation
 interface Message {
@@ -133,13 +153,42 @@ interface SuggestionsData {
   note?: string;
 }
 
-export default function TechnicianChat() {
+type ConceptSearchStatus = 'idle' | 'loading' | 'ready' | 'empty' | 'unavailable' | 'error';
+
+interface TechnicianChatProps {
+  siteId?: string;
+  siteLabel?: string;
+}
+
+interface ConceptSearchState {
+  status: ConceptSearchStatus;
+  query: string;
+  results: ConceptDocumentSearchResult[];
+  totalResults: number;
+  weakResults: boolean;
+  message: string | null;
+}
+
+function isBrowserOpenableConceptLink(url?: string | null): boolean {
+  return Boolean(url && /^https?:\/\//i.test(url));
+}
+
+export default function TechnicianChat({ siteId, siteLabel }: TechnicianChatProps = {}) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [showQuickActions, setShowQuickActions] = useState(true);
   const [activeFlowId, setActiveFlowId] = useState<string | null>(null);
   const [isOnlineMode, setIsOnlineMode] = useState(isOnline());
+  const [conceptSearchEnabled, setConceptSearchEnabled] = useState(false);
+  const [conceptSearch, setConceptSearch] = useState<ConceptSearchState>({
+    status: 'idle',
+    query: '',
+    results: [],
+    totalResults: 0,
+    weakResults: false,
+    message: null,
+  });
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -149,7 +198,7 @@ export default function TechnicianChat() {
   // Auto-scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [messages, conceptSearch]);
 
   // Setup offline/online listeners and cache initial data
   useEffect(() => {
@@ -282,8 +331,98 @@ export default function TechnicianChat() {
     setMessages(prev => [...prev, errorMessage]);
   };
 
+  const runConceptSearch = async (messageText?: string) => {
+    const text = messageText || input.trim();
+    if (!text || isTyping) return;
+    if (!siteId) {
+      setConceptSearch({
+        status: 'error',
+        query: text,
+        results: [],
+        totalResults: 0,
+        weakResults: false,
+        message: 'Select a site before searching Concept documents.',
+      });
+      return;
+    }
+
+    setInput('');
+    setIsTyping(true);
+    setShowQuickActions(false);
+      setConceptSearch({
+        status: 'loading',
+        query: text,
+        results: [],
+        totalResults: 0,
+      weakResults: false,
+      message: null,
+    });
+
+    try {
+      const response: ConceptDocumentSearchResponse = await conceptDocumentsApi.search({
+        site_id: siteId,
+        query: text,
+        top_k: 10,
+      });
+
+      setConceptSearch({
+        status: response.total_results > 0 ? 'ready' : 'empty',
+        query: text,
+        results: response.results,
+        totalResults: response.total_results,
+        weakResults: response.weak_results ?? false,
+        message: null,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Concept document search failed.';
+      const unavailable = message.toLowerCase().includes('unavailable');
+      setConceptSearch({
+        status: unavailable ? 'unavailable' : 'error',
+        query: text,
+        results: [],
+        totalResults: 0,
+        weakResults: false,
+        message,
+      });
+    } finally {
+      setIsTyping(false);
+      inputRef.current?.focus();
+    }
+  };
+
+  const openConceptDocument = async (
+    result: ConceptDocumentSearchResult,
+    action: 'open' | 'download',
+  ) => {
+    if (!siteId) return;
+
+    const targetUrl = action === 'download' ? result.download_url : result.open_url;
+    if (!targetUrl) return;
+    if (!isBrowserOpenableConceptLink(targetUrl)) {
+      setConceptSearch((current) => ({
+        ...current,
+        message:
+          'This result does not have a live browser-openable Concept link yet. The current export only provides an internal document reference or file path.',
+      }));
+      return;
+    }
+
+    try {
+      await conceptDocumentsApi.logAction({
+        site_id: siteId,
+        document_id: result.document_id,
+        action,
+        query: conceptSearch.query || undefined,
+      });
+    } catch (error) {
+      console.error('Failed to audit Concept document action:', error);
+    }
+
+    window.open(targetUrl, '_blank', 'noopener,noreferrer');
+  };
+
   // Send message to equipment lookup API
-  const sendMessage = async (messageText?: string) => {
+  const sendTechnicalMessage = async (messageText?: string) => {
     const text = messageText || input.trim();
     if (!text || isTyping) return;
 
@@ -421,14 +560,22 @@ export default function TechnicianChat() {
   // Handle form submission
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    sendMessage();
+    if (conceptSearchEnabled) {
+      void runConceptSearch();
+      return;
+    }
+    void sendTechnicalMessage();
   };
 
   // Handle Enter key
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      sendMessage();
+      if (conceptSearchEnabled) {
+        void runConceptSearch();
+        return;
+      }
+      void sendTechnicalMessage();
     }
   };
 
@@ -446,6 +593,13 @@ export default function TechnicianChat() {
     { label: 'Low Pressure', query: 'low refrigerant pressure alarm', icon: Clipboard },
   ];
 
+  const conceptSearchExamples = [
+    { label: 'Generator sheets', query: 'last generator service sheets', icon: Search },
+    { label: 'Lift inspection', query: 'elevator annual lift inspection certificate', icon: FileText },
+    { label: 'Fire pump reports', query: 'fire pump maintenance reports for 2025', icon: Building2 },
+    { label: 'Chiller commissioning', query: 'chiller commissioning sheets', icon: Clipboard },
+  ];
+
   return (
     <div className="flex flex-col h-full bg-gray-50 dark:bg-gray-900">
       {/* Offline Indicator */}
@@ -453,8 +607,8 @@ export default function TechnicianChat() {
 
       {/* Header */}
       <div className="flex-none bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3">
-        <div className="flex items-center justify-between">
-          <div>
+        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+          <div className="min-w-0">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
               <Wrench className="w-5 h-5 text-blue-600" />
               SENTINEL Tech Chat
@@ -462,100 +616,227 @@ export default function TechnicianChat() {
             <p className="text-sm text-gray-500 dark:text-gray-400">
               Your expert colleague in your pocket
             </p>
+            {siteLabel && (
+              <p className="mt-1 text-xs uppercase tracking-[0.16em] text-gray-400 dark:text-gray-500">
+                Site scoped to {siteLabel}
+              </p>
+            )}
+          </div>
+
+          <div className="flex flex-col items-start gap-2 md:items-end">
+            <button
+              type="button"
+              onClick={() => setConceptSearchEnabled((prev) => !prev)}
+              className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
+                conceptSearchEnabled
+                  ? 'bg-blue-600 text-white ring-1 ring-blue-600 shadow-sm hover:bg-blue-700 dark:bg-blue-500 dark:ring-blue-500 dark:hover:bg-blue-400'
+                  : 'bg-white text-gray-900 ring-1 ring-gray-300 shadow-sm hover:bg-gray-50 hover:ring-gray-400 dark:bg-gray-800 dark:text-gray-100 dark:ring-gray-500 dark:hover:bg-gray-700 dark:hover:ring-gray-400'
+              }`}
+              aria-pressed={conceptSearchEnabled}
+            >
+              <FileText className="h-4 w-4" />
+              Search Concept documents
+            </button>
+            {conceptSearchEnabled && (
+              <div className="flex flex-col items-start gap-1 md:items-end">
+                <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-800 dark:bg-blue-900/40 dark:text-blue-100">
+                  Concept document search active
+                </span>
+                <p className="text-xs text-gray-600 dark:text-gray-300">
+                  Find saved documents in Concept using natural language
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </div>
 
       {/* Messages Area */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-32 md:pb-4">
-        {/* Welcome message */}
-        {messages.length === 0 && (
-          <div className="text-center py-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-100 dark:bg-blue-900 rounded-full mb-4">
-              <Wrench className="w-8 h-8 text-blue-600 dark:text-blue-400" />
-            </div>
-            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-              How can I help you today?
-            </h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
-              Describe a fault, equipment problem, or search for parts
-            </p>
-
-            {/* Quick Actions */}
-            {showQuickActions && (
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <p className="text-xs text-gray-400 dark:text-gray-500 uppercase tracking-wide">
-                    Try asking about:
-                  </p>
-                  <div className="flex flex-wrap justify-center gap-2">
-                    {quickActions.map((action, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => sendMessage(action.query)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                      >
-                        <action.icon className="w-3.5 h-3.5" />
-                        {action.label}
-                      </button>
-                    ))}
-                  </div>
+        {conceptSearchEnabled ? (
+          <div className="mx-auto flex w-full max-w-4xl flex-col gap-4">
+            {conceptSearch.status === 'idle' && (
+              <div className="rounded-2xl border border-dashed border-blue-200 bg-blue-50/70 p-6 text-center dark:border-blue-900 dark:bg-blue-950/20">
+                <div className="mx-auto mb-4 inline-flex h-14 w-14 items-center justify-center rounded-full bg-white text-blue-600 shadow-sm dark:bg-gray-800 dark:text-blue-300">
+                  <FileText className="h-7 w-7" />
                 </div>
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white">Search stored site documents</h3>
+                <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                  Find saved documents in Concept using natural language.
+                </p>
+                <div className="mt-5 flex flex-wrap justify-center gap-2">
+                  {conceptSearchExamples.map((action, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => void runConceptSearch(action.query)}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-900 shadow-sm transition-colors hover:border-blue-300 hover:bg-blue-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:hover:border-blue-500 dark:hover:bg-gray-700"
+                    >
+                      <action.icon className="h-3.5 w-3.5" />
+                      {action.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
-                {/* Guided Diagnosis Actions */}
-                <div className="space-y-2">
-                  <p className="text-xs text-gray-400 dark:text-gray-500 uppercase tracking-wide">
-                    Or start guided diagnosis:
-                  </p>
-                  <div className="flex flex-wrap justify-center gap-2">
-                    {guidedActions.map((action, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => startGuidedDiagnosis(action.query)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-full text-sm text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors"
-                      >
-                        <PlayCircle className="w-3.5 h-3.5" />
-                        {action.label}
-                      </button>
-                    ))}
+            {conceptSearch.status === 'loading' && (
+              <div className="rounded-2xl border border-gray-200 bg-white px-4 py-5 text-sm text-gray-500 shadow-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">
+                Searching Concept documents...
+              </div>
+            )}
+
+            {conceptSearch.query && conceptSearch.status !== 'idle' && conceptSearch.status !== 'loading' && (
+              <div className="rounded-2xl border border-gray-200 bg-white px-4 py-3 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+                <p className="text-xs uppercase tracking-[0.16em] text-gray-400 dark:text-gray-500">Query</p>
+                <p className="mt-1 text-sm text-gray-900 dark:text-white">{conceptSearch.query}</p>
+              </div>
+            )}
+
+            {conceptSearch.status === 'ready' && (
+              <>
+                <div className="text-sm text-gray-500 dark:text-gray-400">
+                  {conceptSearch.totalResults} matching document{conceptSearch.totalResults === 1 ? '' : 's'} found
+                </div>
+                {conceptSearch.weakResults && (
+                  <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-200">
+                    We found related documents, but no strong exact matches.
+                  </div>
+                )}
+                {conceptSearch.message && (
+                  <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-200">
+                    {conceptSearch.message}
+                  </div>
+                )}
+                <div className="grid gap-3">
+                  {conceptSearch.results.map((result) => (
+                    <ConceptDocumentCard
+                      key={result.document_id}
+                      result={result}
+                      onAction={openConceptDocument}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
+
+            {conceptSearch.status === 'empty' && (
+              <div className="rounded-2xl border border-gray-200 bg-white px-4 py-5 text-sm shadow-sm dark:border-gray-700 dark:bg-gray-800">
+                <p className="font-medium text-gray-900 dark:text-white">
+                  No matching documents found in Concept for this site.
+                </p>
+                <p className="mt-2 text-gray-500 dark:text-gray-400">
+                  Try broader wording or remove date-specific terms.
+                </p>
+              </div>
+            )}
+
+            {conceptSearch.status === 'unavailable' && (
+              <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-5 text-sm shadow-sm dark:border-red-900/60 dark:bg-red-950/20">
+                <p className="font-medium text-red-900 dark:text-red-200">
+                  Concept document search is currently unavailable.
+                </p>
+                <p className="mt-2 text-red-700 dark:text-red-300">
+                  Please try again later or open documents directly in Concept.
+                </p>
+              </div>
+            )}
+
+            {conceptSearch.status === 'error' && conceptSearch.message && (
+              <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-5 text-sm text-red-800 shadow-sm dark:border-red-900/60 dark:bg-red-950/20 dark:text-red-200">
+                {conceptSearch.message}
+              </div>
+            )}
+          </div>
+        ) : (
+          <>
+            {messages.length === 0 && (
+              <div className="text-center py-8">
+                <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-100 dark:bg-blue-900 rounded-full mb-4">
+                  <Wrench className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+                </div>
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                  How can I help you today?
+                </h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+                  Describe a fault, equipment problem, or search for parts
+                </p>
+
+                {showQuickActions && (
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <p className="text-xs text-gray-400 dark:text-gray-500 uppercase tracking-wide">
+                        Try asking about:
+                      </p>
+                      <div className="flex flex-wrap justify-center gap-2">
+                        {quickActions.map((action, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => void sendTechnicalMessage(action.query)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                          >
+                            <action.icon className="w-3.5 h-3.5" />
+                            {action.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <p className="text-xs text-gray-400 dark:text-gray-500 uppercase tracking-wide">
+                        Or start guided diagnosis:
+                      </p>
+                      <div className="flex flex-wrap justify-center gap-2">
+                        {guidedActions.map((action, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => startGuidedDiagnosis(action.query)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-full text-sm text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors"
+                          >
+                            <PlayCircle className="w-3.5 h-3.5" />
+                            {action.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {messages.map((message) => (
+              message.type === 'guided-flow' && message.flowQuery ? (
+                <div key={message.id} className="w-full max-w-2xl mx-auto">
+                  <DiagnosisFlow
+                    initialQuery={message.flowQuery}
+                    onComplete={handleFlowComplete}
+                    onClose={handleFlowClose}
+                  />
+                </div>
+              ) : (
+                <MessageBubble key={message.id} message={message} onStartGuided={startGuidedDiagnosis} />
+              )
+            ))}
+
+            {isTyping && (
+              <div className="flex justify-start">
+                <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl px-4 py-3 shadow-sm">
+                  <div className="flex items-center gap-2">
+                    <div className="flex gap-1">
+                      <span className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                      <span className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                      <span className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                    </div>
+                    <span className="text-sm text-gray-500 dark:text-gray-400">
+                      SENTINEL is thinking...
+                    </span>
                   </div>
                 </div>
               </div>
             )}
-          </div>
-        )}
-
-        {/* Message list */}
-        {messages.map((message) => (
-          message.type === 'guided-flow' && message.flowQuery ? (
-            <div key={message.id} className="w-full max-w-2xl mx-auto">
-              <DiagnosisFlow
-                initialQuery={message.flowQuery}
-                onComplete={handleFlowComplete}
-                onClose={handleFlowClose}
-              />
-            </div>
-          ) : (
-            <MessageBubble key={message.id} message={message} onStartGuided={startGuidedDiagnosis} />
-          )
-        ))}
-
-        {/* Typing indicator */}
-        {isTyping && (
-          <div className="flex justify-start">
-            <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl px-4 py-3 shadow-sm">
-              <div className="flex items-center gap-2">
-                <div className="flex gap-1">
-                  <span className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                  <span className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                  <span className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                </div>
-                <span className="text-sm text-gray-500 dark:text-gray-400">
-                  SENTINEL is thinking...
-                </span>
-              </div>
-            </div>
-          </div>
+          </>
         )}
 
         <div ref={messagesEndRef} />
@@ -567,20 +848,28 @@ export default function TechnicianChat() {
         className="flex-none bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 px-4 py-3 fixed bottom-0 left-0 right-0 md:relative md:bottom-auto"
         style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
       >
-        <div className="flex items-center gap-2 max-w-4xl mx-auto">
-          <PhotoCapture
-            onAnalysisComplete={handlePhotoAnalysis}
-            onError={handlePhotoError}
-            analysisType="component"
-            disabled={isTyping}
-          />
+        <div className="mx-auto flex max-w-4xl flex-col gap-2">
+          {conceptSearchEnabled && (
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              {siteLabel ? `Searching ${siteLabel} only.` : 'Searching the current site only.'}
+            </p>
+          )}
+          <div className="flex items-center gap-2">
+            {!conceptSearchEnabled && (
+              <PhotoCapture
+                onAnalysisComplete={handlePhotoAnalysis}
+                onError={handlePhotoError}
+                analysisType="component"
+                disabled={isTyping}
+              />
+            )}
           <input
             ref={inputRef}
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Describe a fault or search for parts..."
+            placeholder={conceptSearchEnabled ? 'Search stored site documents' : 'Describe a fault or search for parts...'}
             disabled={isTyping}
             className="flex-1 px-4 py-2.5 bg-gray-100 dark:bg-gray-700 border-0 rounded-full text-sm text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
           />
@@ -588,9 +877,11 @@ export default function TechnicianChat() {
             type="submit"
             disabled={!input.trim() || isTyping}
             className="flex-none p-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors"
+            aria-label={conceptSearchEnabled ? 'Run Concept document search' : 'Send technical chat message'}
           >
             <Send className="w-5 h-5" />
           </button>
+        </div>
         </div>
       </form>
     </div>
@@ -630,6 +921,94 @@ function MessageBubble({ message, onStartGuided }: { message: Message; onStartGu
         <p className={`text-xs mt-2 ${isUser ? 'text-blue-200' : 'text-gray-400 dark:text-gray-500'}`}>
           {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
         </p>
+      </div>
+    </div>
+  );
+}
+
+function ConceptDocumentCard({
+  result,
+  onAction,
+}: {
+  result: ConceptDocumentSearchResult;
+  onAction: (result: ConceptDocumentSearchResult, action: 'open' | 'download') => void | Promise<void>;
+}) {
+  const canOpenFile = isBrowserOpenableConceptLink(result.open_url);
+  const canDownloadFile = isBrowserOpenableConceptLink(result.download_url);
+
+  return (
+    <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start gap-3">
+            <div className="mt-0.5 flex h-10 w-10 flex-none items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-300">
+              <FileText className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h4 className="truncate text-base font-semibold text-gray-900 dark:text-white">{result.title}</h4>
+              <div className="mt-2 grid gap-1 text-sm text-gray-500 dark:text-gray-400">
+                <p><span className="font-medium text-gray-700 dark:text-gray-300">Type:</span> {result.document_type || 'Unknown'}</p>
+                <p><span className="font-medium text-gray-700 dark:text-gray-300">Date:</span> {result.document_date || 'Unknown'}</p>
+                <p><span className="font-medium text-gray-700 dark:text-gray-300">Site:</span> {result.building_name || 'Current site'}</p>
+                {(result.equipment_category || result.equipment_name) && (
+                  <p>
+                    <span className="font-medium text-gray-700 dark:text-gray-300">
+                      {result.equipment_name ? 'Equipment:' : 'Category:'}
+                    </span>{' '}
+                    {result.equipment_name || result.equipment_category}
+                  </p>
+                )}
+                <p className="truncate">
+                  <span className="font-medium text-gray-700 dark:text-gray-300">Path:</span> {result.path}
+                </p>
+              </div>
+            </div>
+          </div>
+          {result.match_reasons.length > 0 && (
+            <p className="mt-3 text-xs uppercase tracking-[0.16em] text-gray-400 dark:text-gray-500">
+              Matched on: {result.match_reasons.join(', ')}
+            </p>
+          )}
+          {result.snippet && (
+            <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">{result.snippet}</p>
+          )}
+          {!canOpenFile && (
+            <p className="mt-3 text-sm text-amber-700 dark:text-amber-300">
+              Live Concept link not available in this pilot export yet.
+            </p>
+          )}
+        </div>
+
+        <div className="flex flex-none gap-2">
+          <button
+            type="button"
+            onClick={() => void onAction(result, 'open')}
+            disabled={!canOpenFile}
+            className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+              canOpenFile
+                ? 'bg-blue-600 text-white hover:bg-blue-700'
+                : 'cursor-not-allowed bg-gray-200 text-gray-500 dark:bg-gray-700 dark:text-gray-400'
+            }`}
+          >
+            <ExternalLink className="h-4 w-4" />
+            {canOpenFile ? 'Open file' : 'Link unavailable'}
+          </button>
+          {result.download_url && (
+            <button
+              type="button"
+              onClick={() => void onAction(result, 'download')}
+              disabled={!canDownloadFile}
+              className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                canDownloadFile
+                  ? 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700'
+                  : 'cursor-not-allowed border-gray-200 bg-gray-100 text-gray-400 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-500'
+              }`}
+            >
+              <Download className="h-4 w-4" />
+              Download
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

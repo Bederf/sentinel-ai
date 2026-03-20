@@ -167,6 +167,21 @@ class ZAIService:
             if not choices:
                 raise Exception("Z.ai response did not include any choices.")
 
+            # Track Z.ai token usage
+            try:
+                from app.services.ai_usage_tracker import usage_tracker
+
+                u = body.get("usage", {})
+                usage_tracker.record(
+                    provider="zhipuai",
+                    model=self._model,
+                    input_tokens=u.get("prompt_tokens", 0),
+                    output_tokens=u.get("completion_tokens", 0),
+                    source="chat",
+                )
+            except Exception:
+                pass  # Never let tracking break chat
+
             message = choices[0].get("message", {})
             content = self._extract_text_content(message.get("content"))
             yield content or "I could not generate a response from Z.ai."

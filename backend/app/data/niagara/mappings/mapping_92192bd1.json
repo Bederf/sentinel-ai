@@ -1,0 +1,97 @@
+{
+  "discovery_id": "92192bd1",
+  "site_id": "site-001",
+  "created_at": "2026-03-16T13:34:37.422534",
+  "equipment_count": 2,
+  "total_points": 3,
+  "equipment": {
+    "S001-UNKNOWN-L1-001": {
+      "equipment_id": "S001-UNKNOWN-L1-001",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (S001-UNKNOWN-L1-001)",
+      "site_id": "site-001",
+      "points": [
+        {
+          "original_name": "ZONE-L1_CO2",
+          "standardized_name": "ZONE-L1/co2_sensor",
+          "point_type": "sensor",
+          "point_category": "co2",
+          "unit": "ppm",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 0,
+          "present_value": null,
+          "writable": false
+        },
+        {
+          "original_name": "ZONE-L1_Humidity",
+          "standardized_name": "ZONE-L1/humidity_sensor",
+          "point_type": "sensor",
+          "point_category": "humidity",
+          "unit": "%",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 0,
+          "present_value": null,
+          "writable": false
+        }
+      ],
+      "point_count": 2,
+      "confidence": "medium",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 2.0,
+        "bms_original_id": "ZONE-L1",
+        "zone": {
+          "zone_id": "Zone-L1-001",
+          "floor": "L1",
+          "zone_letter": "001",
+          "zone_type": "open_office",
+          "site_id": "site-001"
+        }
+      },
+      "created_at": "2026-03-16T13:34:37.422329",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S001-UNKNOWN-L2-001": {
+      "equipment_id": "S001-UNKNOWN-L2-001",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (S001-UNKNOWN-L2-001)",
+      "site_id": "site-001",
+      "points": [
+        {
+          "original_name": "ZONE-L2_CO2",
+          "standardized_name": "ZONE-L2/co2_sensor",
+          "point_type": "sensor",
+          "point_category": "co2",
+          "unit": "ppm",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 0,
+          "present_value": null,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "medium",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 2.0,
+        "bms_original_id": "ZONE-L2",
+        "zone": {
+          "zone_id": "Zone-L2-001",
+          "floor": "L2",
+          "zone_letter": "001",
+          "zone_type": "open_office",
+          "site_id": "site-001"
+        }
+      },
+      "created_at": "2026-03-16T13:34:37.422448",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    }
+  }
+}

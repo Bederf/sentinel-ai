@@ -84,6 +84,14 @@ class BulkSMSProvider(BaseNotificationProvider):
                     data = response.json()
                     message_id = data.get("id", "unknown")
                     logger.info(f"SMS message sent to {recipient}, ID: {message_id}")
+
+                    try:
+                        from app.services.ai_usage_tracker import usage_tracker
+
+                        usage_tracker.record_message("bulksms", source="alert")
+                    except Exception:
+                        pass
+
                     return NotificationResult(success=True, message_id=message_id, provider_response=data)
                 else:
                     error_data = response.json() if response.text else {}

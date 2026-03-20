@@ -14,6 +14,8 @@ Workflow:
 
 import json
 import logging
+import os
+import re
 from collections import Counter
 from datetime import datetime
 from pathlib import Path
@@ -646,6 +648,9 @@ class PointMappingService:
             return {"success": True, "equipment_created": equipment_created}
 
         except Exception as e:
+            if self._is_testing_supabase_skip(e):
+                logger.info("Skipping Supabase save for discovery %s in TESTING mode: %s", discovery_id, e)
+                return {"success": False, "skipped": True, "reason": str(e)}
             logger.error("Supabase save failed: %s", e)
             return {"success": False, "reason": str(e)}
 
@@ -728,21 +733,8 @@ class PointMappingService:
             return {"success": False, "error": f"Discovery {discovery_id} not found"}
 
         # Find the point
-        found = False
-        source_equip = None
-        point_data = None
-
-        for eid, mapping in mappings.items():
-            for p in mapping.points:
-                if p.get("original_name") == point_name:
-                    found = True
-                    source_equip = eid
-                    point_data = p
-                    break
-            if found:
-                break
-
-        if not found:
+        source_equip, point_data = self._find_point_reference(mappings, point_name)
+        if point_data is None:
             return {"success": False, "error": f"Point '{point_name}' not found"}
 
         corrections_applied = []
@@ -799,6 +791,120 @@ class PointMappingService:
             "point_name": point_name,
         }
 
+    def _find_point_reference(
+        self,
+        mappings: Dict[str, EquipmentMapping],
+        point_reference: str,
+    ) -> tuple[Optional[str], Optional[Dict[str, Any]]]:
+        """Resolve a manual correction reference to a concrete mapped point.
+
+        Supports:
+        - exact ``original_name``
+        - exact ``standardized_name``
+        - shorthand references like ``S002-CHILLER-B1-001.temperature``
+        """
+        for eid, mapping in mappings.items():
+            for point in mapping.points:
+                if point.get("original_name") == point_reference or point.get("standardized_name") == point_reference:
+                    return eid, point
+
+        equip_hint = ""
+        point_hint = point_reference
+        if "." in point_reference:
+            equip_hint, point_hint = point_reference.rsplit(".", 1)
+
+        point_hint_norm = self._normalize_match_key(point_hint)
+        full_ref_norm = self._normalize_match_key(point_reference)
+        equipment_type_hint = self._infer_equipment_type_hint(equip_hint)
+
+        best_match: tuple[int, Optional[str], Optional[Dict[str, Any]]] = (0, None, None)
+
+        for eid, mapping in mappings.items():
+            for point in mapping.points:
+                score = self._score_point_reference_match(
+                    mapping=mapping,
+                    point=point,
+                    full_ref_norm=full_ref_norm,
+                    equip_hint=equip_hint,
+                    point_hint_norm=point_hint_norm,
+                    equipment_type_hint=equipment_type_hint,
+                )
+                if score > best_match[0]:
+                    best_match = (score, eid, point)
+
+        if best_match[0] >= 6:
+            return best_match[1], best_match[2]
+
+        return None, None
+
+    def _score_point_reference_match(
+        self,
+        mapping: EquipmentMapping,
+        point: Dict[str, Any],
+        full_ref_norm: str,
+        equip_hint: str,
+        point_hint_norm: str,
+        equipment_type_hint: str,
+    ) -> int:
+        original_name = point.get("original_name", "")
+        standardized_name = point.get("standardized_name", "")
+        original_norm = self._normalize_match_key(original_name)
+        standardized_norm = self._normalize_match_key(standardized_name)
+
+        if full_ref_norm and (original_norm == full_ref_norm or standardized_norm == full_ref_norm):
+            return 100
+
+        score = 0
+        equip_hint_norm = self._normalize_match_key(equip_hint)
+        mapping_id_norm = self._normalize_match_key(mapping.equipment_id)
+        mapping_name_norm = self._normalize_match_key(mapping.equipment_name)
+
+        if equip_hint_norm:
+            if equip_hint_norm in mapping_id_norm or mapping_id_norm in equip_hint_norm:
+                score += 5
+            if equip_hint_norm in mapping_name_norm or mapping_name_norm in equip_hint_norm:
+                score += 4
+            if equipment_type_hint and mapping.equipment_type == equipment_type_hint:
+                score += 3
+
+        if point_hint_norm:
+            if self._normalize_match_key(point.get("point_category", "")) == point_hint_norm:
+                score += 4
+            if self._normalize_match_key(point.get("point_type", "")) == point_hint_norm:
+                score += 3
+            if point_hint_norm in original_norm:
+                score += 2
+            if point_hint_norm in standardized_norm:
+                score += 2
+
+        return score
+
+    def _infer_equipment_type_hint(self, equipment_reference: str) -> str:
+        ref = equipment_reference.lower()
+        for equipment_type in (
+            "chiller",
+            "ahu",
+            "fcu",
+            "vav",
+            "pump",
+            "meter",
+            "dali",
+            "generator",
+            "zone",
+            "ups",
+        ):
+            if equipment_type in ref:
+                return equipment_type
+        return ""
+
+    def _normalize_match_key(self, value: str) -> str:
+        return re.sub(r"[^a-z0-9]+", "", value.lower())
+
+    def _is_testing_supabase_skip(self, error: Exception) -> bool:
+        if os.getenv("TESTING", "").lower() == "true":
+            return True
+        return "TESTING mode" in str(error)
+
     def approve_mappings(
         self,
         discovery_id: str,
@@ -817,6 +923,11 @@ class PointMappingService:
         if mappings is None:
             return {"success": False, "error": f"Discovery {discovery_id} not found"}
 
+        site_id = next((m.site_id for m in mappings.values() if m.site_id), "")
+        from app.services.simbiot import filter_equipment_mappings_for_site
+
+        mappings, dropped_equipment = filter_equipment_mappings_for_site(site_id, mappings)
+
         now = datetime.utcnow().isoformat()
         equipment_models = []
 
@@ -833,7 +944,6 @@ class PointMappingService:
             equipment_models.append(model)
 
         # Re-save with approval status
-        site_id = next((m.site_id for m in mappings.values() if m.site_id), "")
         self.save_mappings(discovery_id, mappings, site_id)
 
         # Save equipment models to buildings directory
@@ -849,6 +959,7 @@ class PointMappingService:
             "timestamp": now,
             "equipment_count": len(equipment_models),
             "zones_generated": zones_result.get("zones_count", 0),
+            "module_filtered_equipment": dropped_equipment,
         }
         if discovery_id not in self._mapping_history:
             self._mapping_history[discovery_id] = []
@@ -861,6 +972,7 @@ class PointMappingService:
             "models_saved": models_saved,
             "zones_generated": zones_result.get("success", False),
             "zones_count": zones_result.get("zones_count", 0),
+            "module_filtered_equipment": dropped_equipment,
         }
 
     def _save_equipment_models(

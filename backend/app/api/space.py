@@ -125,6 +125,7 @@ async def list_ghost_findings(
                 "booking_id": f.booking_id,
                 "organiser_email": f.organiser_email,
                 "organiser_name": f.organiser_name,
+                "source_booking_flagged": f.source_booking_flagged,
                 "booking_start": f.booking_start.isoformat(),
                 "booking_end": f.booking_end.isoformat(),
                 "grace_period_minutes": f.grace_period_minutes,
@@ -287,27 +288,30 @@ async def list_focus_sessions(
 ) -> dict[str, Any]:
     """List focus room sessions for a site."""
     from app.services import occupancy_store
+    from app.services.focus_room_session_service import describe_focus_session_state
 
     if room_code:
         sessions = occupancy_store.get_sessions_for_room(room_code)
         if extended_only:
-            sessions = [s for s in sessions if s.extended_use]
+            sessions = [s for s in sessions if describe_focus_session_state(s)["extended_use"]]
     else:
-        sessions = occupancy_store.get_sessions_for_site(site_id, extended_only=extended_only)
+        sessions = occupancy_store.get_sessions_for_site(site_id, extended_only=False)
+        if extended_only:
+            sessions = [s for s in sessions if describe_focus_session_state(s)["extended_use"]]
 
     return {
         "sessions": [
             {
-                "session_id": s.session_id,
-                "room_code": s.room_code,
-                "room_type": s.room_type,
-                "sensor_id": s.sensor_id,
-                "start_time": s.start_time.isoformat(),
-                "end_time": s.end_time.isoformat() if s.end_time else None,
-                "duration_seconds": s.duration_seconds,
-                "duration_minutes": round(s.duration_seconds / 60, 1),
-                "extended_use": s.extended_use,
-                "is_active": s.is_active,
+                **{
+                    "session_id": s.session_id,
+                    "room_code": s.room_code,
+                    "room_type": s.room_type,
+                    "sensor_id": s.sensor_id,
+                    "start_time": s.start_time.isoformat(),
+                    "end_time": s.end_time.isoformat() if s.end_time else None,
+                    "is_active": s.is_active,
+                },
+                **describe_focus_session_state(s),
             }
             for s in sessions
         ],

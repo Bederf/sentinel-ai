@@ -70,6 +70,7 @@ import CardLibrary from "./CardLibrary";
 import { DEFAULT_KPI_CARDS, DEFAULT_SECTIONS } from "../lib/cardDefinitions";
 import { BUILDING_TAB_ITEMS } from "../lib/navigation";
 import type { BuildingTabId } from "../lib/navigation";
+import { setStoredSelectedSite } from "../lib/siteSelection";
 
 // ─── Lazy-loaded tab components ─────────────────────────────────────
 // HVAC
@@ -222,6 +223,7 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
   useEffect(() => {
     if (siteId) {
       setModuleSite(siteId, siteId);
+      setStoredSelectedSite(siteId);
     }
   }, [siteId, setModuleSite]);
 

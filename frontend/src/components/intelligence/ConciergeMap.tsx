@@ -1,16 +1,16 @@
 /**
- * ConciergeMap — Cytoscape.js gravitational circle mind map.
+ * ConciergeMap — Site-scoped meeting room map for concierge operations.
  *
- * Rooms orbit a centre anchor. Size = signal count, position = urgency
- * (high urgency = close to centre), colour = highest severity.
- *
- * Phase 161-04 — Concierge Intelligence Dashboard.
+ * Layout:
+ * - centre node: Meeting Rooms
+ * - first ring: room nodes
+ * - second ring: signal nodes for the expanded room only
  */
 
 import { useEffect, useRef, useCallback, useState } from "react";
 import cytoscape from "cytoscape";
 import type { Core } from "cytoscape";
-import type { ConciergeRoom } from "../../lib/api";
+import type { ConciergeRoom, ConciergeSignalSummary } from "../../lib/api";
 import { conciergeApi } from "../../lib/api";
 
 // ---- Severity colour mapping ----
@@ -27,17 +27,6 @@ const SEVERITY_BG: Record<string, string> = {
   medium: "#1a1800",
   high: "#1f1208",
   critical: "#1f0d0d",
-};
-
-// ---- Domain colour chips ----
-
-const DOMAIN_COLORS: Record<string, string> = {
-  space_optimisation: "#f4900c",
-  email: "#4a9eff",
-  hvac: "#e74c3c",
-  maintenance: "#f1c40f",
-  cleaning: "#1abc9c",
-  general: "#8b7fd4",
 };
 
 // ---- Helpers ----
@@ -61,22 +50,173 @@ function glowOpacity(urgency: number): number {
   return 0.15 + urgency * 0.55;
 }
 
+function signalLabelFromType(signalType: string): string {
+  switch (signalType) {
+    case "booking_conflict":
+      return "Block";
+    case "no_show_pattern":
+    case "booking_no_show":
+      return "Ghost";
+    default:
+      return "Info";
+  }
+}
+
+function getRoomDisplayName(room: ConciergeRoom): string {
+  const raw = (room.room_id || "").trim();
+  if (!raw) return "";
+
+  // Prefer compact, circle-friendly labels for the map.
+  // Examples:
+  // - S002-L1-MR2 -> L1-MR2
+  // - S001-FA2-1Q4-MR28 -> FA2-1Q4-MR28
+  const compact = raw.replace(/^S\d{3}-/i, "");
+  if (compact && compact !== raw) return compact;
+
+  // Fall back to friendly name only if it's already short.
+  const friendly = room.friendly_name?.trim() || "";
+  if (friendly && friendly.length <= 18) return friendly;
+
+  return raw;
+}
+
+function roomLabelWithOptionalCount(room: ConciergeRoom): string {
+  const baseLabel = getRoomDisplayName(room);
+  if (room.signal_count > 0 && room.signal_count <= 9) {
+    return `${baseLabel}\n${room.signal_count}`;
+  }
+  return baseLabel;
+}
+
+function labelSizeForText(value: string, minSize = 40, maxSize = 72): number {
+  const cleaned = value.replace(/\s+/g, " ").trim();
+  if (!cleaned) return minSize;
+  const estimated = cleaned.length * 7 + 16;
+  return Math.min(maxSize, Math.max(minSize, estimated));
+}
+
+type CategoryKey = "ghost" | "block_risk" | "info";
+
+interface SignalCategory {
+  key: CategoryKey;
+  label: string;
+  severity: string;
+  signals: ConciergeSignalSummary[];
+}
+
+interface Point {
+  x: number;
+  y: number;
+}
+
+type RoomPositions = Record<string, Point>;
+
+function categoryKeyFromSignal(signalType: string): CategoryKey {
+  switch (signalType) {
+    case "booking_conflict":
+      return "block_risk";
+    case "no_show_pattern":
+    case "booking_no_show":
+      return "ghost";
+    default:
+      return "info";
+  }
+}
+
+function categoryLabelFromKey(key: CategoryKey): string {
+  switch (key) {
+    case "ghost":
+      return "Ghost";
+    case "block_risk":
+      return "Block";
+    case "info":
+      return "Info";
+  }
+}
+
+const CATEGORY_BORDER_COLORS: Record<CategoryKey, string> = {
+  ghost: "#e11d48",
+  block_risk: "#f59e0b",
+  info: "#f59e0b",
+};
+
+function severityRank(severity: string): number {
+  switch (severity) {
+    case "critical":
+      return 4;
+    case "high":
+      return 3;
+    case "medium":
+      return 2;
+    default:
+      return 1;
+  }
+}
+
+function buildSignalCategories(room: ConciergeRoom): SignalCategory[] {
+  const categories = new Map<CategoryKey, SignalCategory>();
+
+  room.signals.forEach((signal) => {
+    const key = categoryKeyFromSignal(signal.signal_type);
+    const existing = categories.get(key);
+
+    if (!existing) {
+      categories.set(key, {
+        key,
+        label: categoryLabelFromKey(key),
+        severity: signal.severity,
+        signals: [signal],
+      });
+      return;
+    }
+
+    existing.signals.push(signal);
+    if (severityRank(signal.severity) > severityRank(existing.severity)) {
+      existing.severity = signal.severity;
+    }
+  });
+
+  return Array.from(categories.values()).sort((left, right) => {
+    const severityDelta = severityRank(right.severity) - severityRank(left.severity);
+    if (severityDelta !== 0) return severityDelta;
+    return right.signals.length - left.signals.length;
+  });
+}
+
+function buildDefaultRoomPositions(rooms: ConciergeRoom[], dims: CanvasDims): RoomPositions {
+  const { centreX, centreY, maxRadius } = dims;
+  const gap = 24; // visual breathing room between adjacent room circles
+  const diameters = rooms.map((r) => sizeFromSignalCount(r.signal_count));
+  const perimeterNeeded = diameters.reduce((acc, d) => acc + d, 0) + gap * Math.max(0, rooms.length);
+  const radiusNeeded = Math.max(120, perimeterNeeded / (2 * Math.PI));
+  const ringRadius = Math.min(Math.max(maxRadius - 70, 120), radiusNeeded);
+  return Object.fromEntries(
+    rooms.map((room, i) => {
+      const distance = rooms.length === 1 ? 120 : ringRadius;
+      const angle = rooms.length === 1 ? 0 : (i / rooms.length) * 2 * Math.PI - Math.PI / 2;
+      return [
+        room.room_id,
+        {
+          x: centreX + distance * Math.cos(angle),
+          y: centreY + distance * Math.sin(angle),
+        },
+      ];
+    }),
+  );
+}
+
 // ---- Props ----
 
 interface ConciergeMapProps {
   siteId: string;
-  onRoomSelect: (room: ConciergeRoom) => void;
+  onSignalSelect: (room: ConciergeRoom, signalId: string) => void;
 }
 
-const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
+const REFRESH_INTERVAL_MS = 30 * 1000;
 
 // ---- Element builders (extracted for ESLint max-lines) ----
 
-interface CanvasDims {
-  centreX: number;
-  centreY: number;
-  maxRadius: number;
-}
+interface CanvasDims { centreX: number; centreY: number; maxRadius: number; }
 
 interface NodeData {
   data: Record<string, unknown>;
@@ -85,28 +225,14 @@ interface NodeData {
   classes: string;
 }
 
-function buildRoomNodes(rooms: ConciergeRoom[], dims: CanvasDims): NodeData[] {
-  const { centreX, centreY, maxRadius } = dims;
-  const anchor: NodeData = {
-    data: {
-      id: "__centre__",
-      label: "Fairlands",
-      node_type: "anchor",
-      signal_count: 0,
-      highest_severity: "low",
-      urgency_score: 0,
-    },
-    position: { x: centreX, y: centreY },
-    locked: true,
-    classes: "anchor",
-  };
-  const roomNodes = rooms.map((room, i) => {
-    const distance = maxRadius * (1 - room.urgency_score);
-    const angle = (i / rooms.length) * 2 * Math.PI - Math.PI / 2;
+function buildRoomNodes(rooms: ConciergeRoom[], positions: RoomPositions, dims: CanvasDims): NodeData[] {
+  const defaults = buildDefaultRoomPositions(rooms, dims);
+  return rooms.map((room) => {
+    const position = positions[room.room_id] || defaults[room.room_id];
     return {
       data: {
         id: room.room_id,
-        label: room.friendly_name || room.room_id,
+        label: roomLabelWithOptionalCount(room),
         node_type: "room",
         signal_count: room.signal_count,
         highest_severity: room.highest_severity,
@@ -114,37 +240,117 @@ function buildRoomNodes(rooms: ConciergeRoom[], dims: CanvasDims): NodeData[] {
         domains: room.domains,
         _room: room,
       },
-      position: {
-        x: centreX + distance * Math.cos(angle),
-        y: centreY + distance * Math.sin(angle),
-      },
+      position,
       classes: "room",
     };
   });
-  return [anchor, ...roomNodes];
 }
 
-function buildChipElements(rooms: ConciergeRoom[], allNodes: NodeData[]) {
-  const chipNodes: NodeData[] = [];
-  const chipEdges: { data: Record<string, string>; classes: string }[] = [];
-  for (const room of rooms) {
-    const rn = allNodes.find((n) => n.data.id === room.room_id);
-    if (!rn || !room.domains.length) continue;
-    const chipR = sizeFromSignalCount(room.signal_count) / 2 + 8;
-    const domSlice = room.domains.slice(0, 6);
-    domSlice.forEach((domain, di) => {
-      const a = (di / domSlice.length) * 2 * Math.PI - Math.PI / 2;
-      const cid = `chip-${room.room_id}-${domain}`;
-      chipNodes.push({
-        data: { id: cid, label: "", node_type: "chip", signal_count: 0, highest_severity: "low", urgency_score: 0, domains: [domain] },
-        position: { x: rn.position.x + chipR * Math.cos(a), y: rn.position.y + chipR * Math.sin(a) },
-        locked: true,
-        classes: "chip",
-      });
-      chipEdges.push({ data: { id: `ce-${cid}`, source: room.room_id, target: cid }, classes: "chip-edge" });
+function buildCentreNode(dims: CanvasDims): NodeData {
+  return {
+    data: {
+      id: "meeting-rooms-root",
+      label: "Meeting Rooms",
+      node_type: "root",
+      highest_severity: "low",
+    },
+    position: { x: dims.centreX, y: dims.centreY },
+    locked: true,
+    classes: "root",
+  };
+}
+
+function buildRoomEdges(rooms: ConciergeRoom[]) {
+  return rooms.map((room) => ({
+    data: {
+      id: `room-edge-${room.room_id}`,
+      source: "meeting-rooms-root",
+      target: room.room_id,
+    },
+    classes: "room-edge",
+  }));
+}
+
+function buildChildElements(
+  expandedRoomId: string | null,
+  expandedCategoryKey: CategoryKey | null,
+  rooms: ConciergeRoom[],
+  allNodes: NodeData[],
+  dims: CanvasDims,
+) {
+  const summaryNodes: NodeData[] = [];
+  const summaryEdges: { data: Record<string, string>; classes: string }[] = [];
+  // We intentionally do NOT spawn a node per-signal.
+  // Rendering one bubble per signal causes overlap/visual clutter (as seen in screenshots).
+  // Instead we keep a single category bubble (Ghost/Block/Info) and show a count in its label.
+  const issueNodes: NodeData[] = [];
+  const issueEdges: { data: Record<string, string>; classes: string }[] = [];
+  if (!expandedRoomId) return { summaryNodes, summaryEdges, issueNodes, issueEdges };
+
+  const room = rooms.find((candidate) => candidate.room_id === expandedRoomId);
+  const roomNode = allNodes.find((candidate) => candidate.data.id === expandedRoomId);
+  if (!room || !roomNode) return { summaryNodes, summaryEdges, issueNodes, issueEdges };
+
+  const categories = buildSignalCategories(room);
+  if (!categories.length) return { summaryNodes, summaryEdges, issueNodes, issueEdges };
+
+  const centreX = dims.centreX;
+  const centreY = dims.centreY;
+  const dirX = roomNode.position.x - centreX;
+  const dirY = roomNode.position.y - centreY;
+  const baseAngle = dirX === 0 && dirY === 0 ? -Math.PI / 2 : Math.atan2(dirY, dirX);
+  const roomDiameter = sizeFromSignalCount(room.signal_count);
+  const roomRadius = roomDiameter / 2;
+  const childDistance = Math.max(roomRadius + 70, 90);
+  const spread = categories.length > 1 ? Math.min(Math.PI / 2, categories.length * 0.25) : 0;
+  const startAngle = baseAngle - spread / 2;
+
+  categories.forEach((category, index) => {
+    const angle =
+      categories.length > 1
+        ? startAngle + (index / (categories.length - 1)) * spread
+        : baseAngle;
+
+    const categoryNodeId = `summary-${room.room_id}-${category.key}`;
+    const categoryPosition = {
+      x: roomNode.position.x + childDistance * Math.cos(angle),
+      y: roomNode.position.y + childDistance * Math.sin(angle),
+    };
+    const categoryLabel = category.signals.length > 0 ? `${category.label}\n${category.signals.length}` : category.label;
+    const categorySize = Math.max(46, 44 + Math.min(22, category.signals.length * 2));
+
+    summaryNodes.push({
+      data: {
+        id: categoryNodeId,
+        label: categoryLabel,
+        node_type: "category",
+        category_key: category.key,
+        highest_severity: category.severity,
+        offset_x: categoryPosition.x - roomNode.position.x,
+        offset_y: categoryPosition.y - roomNode.position.y,
+        node_size: categorySize,
+        signal_ids: category.signals.map((s) => s.id),
+        _room: room,
+      },
+      position: categoryPosition,
+      classes: "category",
     });
-  }
-  return { chipNodes, chipEdges };
+
+    summaryEdges.push({
+      data: {
+        id: `summary-edge-${room.room_id}-${category.key}`,
+        source: room.room_id,
+        target: categoryNodeId,
+      },
+      classes: "summary-edge",
+    });
+
+    // No per-signal nodes.
+    // Clicking the category bubble should navigate to the most relevant signal in that category.
+    void expandedCategoryKey;
+  });
+
+  return { summaryNodes, summaryEdges, issueNodes, issueEdges };
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -153,7 +359,7 @@ function getCyStylesheet(): any[] {
     {
       selector: "node",
       style: {
-        label: "",
+        label: "data(label)",
         "font-family": "'DM Mono', 'JetBrains Mono', monospace",
         "font-size": 8,
         color: "#a0a0a0",
@@ -161,21 +367,6 @@ function getCyStylesheet(): any[] {
         "text-halign": "center",
         "text-margin-y": 8,
         "min-zoomed-font-size": 6,
-      },
-    },
-    {
-      selector: "node.anchor",
-      style: {
-        shape: "hexagon",
-        width: 72, height: 72,
-        "background-color": "#0d1f3c",
-        "border-width": 2.5, "border-color": "#3B82F6",
-        label: "data(label)", color: "#e6edf3",
-        "font-size": 10, "font-weight": 600,
-        "text-valign": "center", "text-halign": "center", "text-margin-y": 0,
-        "z-index": 10,
-        "shadow-blur": 25, "shadow-color": "#3B82F6", "shadow-opacity": 0.4,
-        "shadow-offset-x": 0, "shadow-offset-y": 0,
       },
     },
     {
@@ -191,7 +382,14 @@ function getCyStylesheet(): any[] {
         "border-width": 2,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         "border-color": (ele: any) => colorFromSeverity(ele.data("highest_severity")),
-        label: "data(label)",
+        "text-valign": "center",
+        "text-halign": "center",
+        "text-wrap": "wrap",
+        // Keep labels constrained to the circle diameter so they don't explode visually.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        "text-max-width": (ele: any) => Math.max(40, sizeFromSignalCount(ele.data("signal_count")) * 0.9),
+        "text-margin-y": 0,
+        "font-weight": 700,
         "z-index": 5,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         "shadow-blur": (ele: any) => 8 + ele.data("urgency_score") * 20,
@@ -200,24 +398,107 @@ function getCyStylesheet(): any[] {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         "shadow-opacity": (ele: any) => glowOpacity(ele.data("urgency_score")),
         "shadow-offset-x": 0, "shadow-offset-y": 0,
+        color: "#f8fafc",
       },
     },
     {
-      selector: "node.chip",
+      selector: "node.root",
       style: {
-        width: 8, height: 8,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        "background-color": (ele: any) => DOMAIN_COLORS[ele.data("domains")?.[0]] || "#8b7fd4",
-        "border-width": 0, label: "", "z-index": 3,
+        shape: "round-rectangle",
+        width: 96,
+        height: 48,
+        "background-color": "#0f172a",
+        "border-width": 1.5,
+        "border-color": "#475569",
+        color: "#e2e8f0",
+        "font-size": 10,
+        "font-weight": 600,
+        "text-valign": "center",
+        "text-halign": "center",
+        "text-margin-y": 0,
+        "z-index": 25,
       },
     },
     {
-      selector: "edge.gravity-edge",
-      style: { width: 0.5, "line-color": "rgba(59,130,246,0.08)", "line-style": "dotted", "curve-style": "straight" },
+      selector: "node.category",
+      style: {
+        shape: "ellipse",
+        width: (ele: any) => Number(ele.data("node_size") || 44),
+        height: (ele: any) => Number(ele.data("node_size") || 44),
+        "background-color": "#111827",
+        "border-width": 2,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        "border-color": (ele: any) => colorFromSeverity(ele.data("highest_severity")),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        "shadow-color": (ele: any) => colorFromSeverity(ele.data("highest_severity")),
+        "shadow-blur": 12,
+        "shadow-opacity": 0.28,
+        "shadow-offset-x": 0,
+        "shadow-offset-y": 0,
+        color: "#ffffff",
+        "font-size": 10,
+        "font-weight": 600,
+        "text-max-width": 70,
+        "text-wrap": "wrap",
+        "text-margin-y": 0,
+        "text-valign": "center",
+        "text-halign": "center",
+        "z-index": 16,
+      },
     },
     {
-      selector: "edge.chip-edge",
-      style: { width: 0, opacity: 0, "curve-style": "straight" },
+      selector: "node.signal",
+      style: {
+        shape: "ellipse",
+        width: (ele: any) => Number(ele.data("node_size") || 26),
+        height: (ele: any) => Number(ele.data("node_size") || 26),
+        "background-color": "#111827",
+        "border-width": 2,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        "border-color": (ele: any) => colorFromSeverity(ele.data("highest_severity")),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        "shadow-color": (ele: any) => colorFromSeverity(ele.data("highest_severity")),
+        "shadow-blur": 14,
+        "shadow-opacity": 0.35,
+        "shadow-offset-x": 0,
+        "shadow-offset-y": 0,
+        color: "#d1d5db",
+        "font-size": 8,
+        "text-max-width": 56,
+        "text-wrap": "wrap",
+        "text-margin-y": 0,
+        "z-index": 18,
+      },
+    },
+    {
+      selector: "edge.room-edge",
+      style: {
+        width: 1.5,
+        opacity: 0.5,
+        "line-color": "#334155",
+        "curve-style": "straight",
+        "z-index": 8,
+      },
+    },
+    {
+      selector: "edge.summary-edge",
+      style: {
+        width: 1.5,
+        opacity: 0.6,
+        "line-color": "#334155",
+        "curve-style": "straight",
+        "z-index": 10,
+      },
+    },
+    {
+      selector: "edge.signal-edge",
+      style: {
+        width: 1.5,
+        opacity: 0.7,
+        "line-color": "#334155",
+        "curve-style": "straight",
+        "z-index": 12,
+      },
     },
   ];
 }
@@ -236,8 +517,16 @@ function MapPlaceholder({ children }: { children: React.ReactNode }) {
 
 function useConciergeGraph(
   containerRef: React.RefObject<HTMLDivElement | null>,
+  siteId: string,
   rooms: ConciergeRoom[],
-  onRoomSelect: (room: ConciergeRoom) => void,
+  expandedRoomId: string | null,
+  expandedCategoryKey: CategoryKey | null,
+  roomPositions: RoomPositions,
+  onRoomPositionChange: (roomId: string, position: Point) => void,
+  onRoomToggle: (room: ConciergeRoom) => void,
+  onCategoryToggle: (room: ConciergeRoom, categoryKey: CategoryKey) => void,
+  onSignalSelect: (room: ConciergeRoom, signalId: string) => void,
+  onSignalResolved: () => void,
 ) {
   const cyRef = useRef<Core | null>(null);
 
@@ -248,19 +537,29 @@ function useConciergeGraph(
     const h = el.clientHeight || 600;
     const dims: CanvasDims = { centreX: w / 2, centreY: h / 2, maxRadius: Math.min(w, h) / 2 - 60 };
 
-    const nodes = buildRoomNodes(rooms, dims);
-    const gravEdges = rooms.map((r) => ({ data: { id: `e-${r.room_id}`, source: "__centre__", target: r.room_id }, classes: "gravity-edge" }));
-    const { chipNodes, chipEdges } = buildChipElements(rooms, nodes);
+    const centreNode = buildCentreNode(dims);
+    const nodes = buildRoomNodes(rooms, roomPositions, dims);
+    const roomEdges = buildRoomEdges(rooms);
+    const { summaryNodes, summaryEdges, issueNodes, issueEdges } = buildChildElements(
+      expandedRoomId,
+      expandedCategoryKey,
+      rooms,
+      nodes,
+      dims,
+    );
 
     if (cyRef.current) cyRef.current.destroy();
 
     const cy = cytoscape({
       container: el,
       elements: [
+        { group: "nodes" as const, ...centreNode },
         ...nodes.map((n) => ({ group: "nodes" as const, ...n })),
-        ...chipNodes.map((n) => ({ group: "nodes" as const, ...n })),
-        ...gravEdges.map((e) => ({ group: "edges" as const, ...e })),
-        ...chipEdges.map((e) => ({ group: "edges" as const, ...e })),
+        ...summaryNodes.map((n) => ({ group: "nodes" as const, ...n })),
+        ...issueNodes.map((n) => ({ group: "nodes" as const, ...n })),
+        ...roomEdges.map((e) => ({ group: "edges" as const, ...e })),
+        ...summaryEdges.map((e) => ({ group: "edges" as const, ...e })),
+        ...issueEdges.map((e) => ({ group: "edges" as const, ...e })),
       ],
       style: getCyStylesheet(),
       layout: { name: "preset" },
@@ -272,23 +571,169 @@ function useConciergeGraph(
     });
     cyRef.current = cy;
 
+    const adjustRoomLabelSizes = () => {
+      cy.nodes("node.room").forEach((node) => {
+        const size = node.width();
+        // Keep labels inside the circle; avoid explosive scaling on large viewports.
+        const fontSize = Math.min(16, Math.max(10, size * 0.28));
+        node.style("font-size", `${fontSize}px`);
+      });
+    };
+
+    adjustRoomLabelSizes();
+    cy.on("layoutstop", adjustRoomLabelSizes);
+
     cy.on("tap", "node.room", (evt) => {
       const rd = evt.target.data("_room") as ConciergeRoom | undefined;
-      if (rd) onRoomSelect(rd);
+      if (rd) onRoomToggle(rd);
+    });
+    cy.on("tap", "node.category", (evt) => {
+      const room = evt.target.data("_room") as ConciergeRoom | undefined;
+      const categoryKey = evt.target.data("category_key") as CategoryKey | undefined;
+      if (!room || !categoryKey) return;
+
+      // Prefer opening the highest-priority signal in this category instead of expanding
+      // multiple overlapping per-signal nodes.
+      const signalIds = (evt.target.data("signal_ids") as string[] | undefined) || [];
+      if (signalIds.length > 0) {
+        onSignalSelect(room, signalIds[0]);
+        return;
+      }
+
+      // Fallback (no signals) — just toggle selection state.
+      onCategoryToggle(room, categoryKey);
+    });
+    cy.on("drag", "node.room", (evt) => {
+      const roomNode = evt.target;
+      const roomId = roomNode.id();
+      const anchor = roomNode.position();
+
+      cy.nodes('[node_type = "category"]').forEach((node) => {
+        const room = node.data("_room") as ConciergeRoom | undefined;
+        if (!room || room.room_id !== roomId) return;
+
+        const dx = Number(node.data("offset_x") || 0);
+        const dy = Number(node.data("offset_y") || 0);
+        node.position({ x: anchor.x + dx, y: anchor.y + dy });
+      });
+
+      cy.nodes('[node_type = "signal"]').forEach((node) => {
+        const room = node.data("_room") as ConciergeRoom | undefined;
+        if (!room || room.room_id !== roomId) return;
+
+        const dx = Number(node.data("offset_x") || 0);
+        const dy = Number(node.data("offset_y") || 0);
+        node.position({ x: anchor.x + dx, y: anchor.y + dy });
+      });
+
+      adjustRoomLabelSizes();
+    });
+    cy.on("dragfree", "node.room", (evt) => {
+      const roomNode = evt.target;
+      onRoomPositionChange(roomNode.id(), roomNode.position());
+    });
+    cy.on("dragfree", "node.category", async (evt) => {
+      const categoryNode = evt.target;
+      const categoryPosition = categoryNode.position();
+      const room = categoryNode.data("_room") as ConciergeRoom | undefined;
+      const signalIds = (categoryNode.data("signal_ids") as string[] | undefined) || [];
+      if (!room || signalIds.length === 0) return;
+
+      const roomNode = cy.getElementById(room.room_id);
+      const revert = () => {
+        if (!roomNode.length) return;
+        const anchor = roomNode.position();
+        const dx = Number(categoryNode.data("offset_x") || 0);
+        const dy = Number(categoryNode.data("offset_y") || 0);
+        categoryNode.animate({ position: { x: anchor.x + dx, y: anchor.y + dy } }, { duration: 180 });
+      };
+
+      // Drop inside the room circle = resolve this category's signals.
+      if (roomNode.length) {
+        const roomPosition = roomNode.position();
+        const dx = categoryPosition.x - roomPosition.x;
+        const dy = categoryPosition.y - roomPosition.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        const roomDiameter = roomNode.width() || sizeFromSignalCount(room.signal_count);
+        const captureRadius = roomDiameter / 2 + 12;
+        if (distance <= captureRadius) {
+          try {
+            await Promise.all(
+              signalIds.map((id) => conciergeApi.resolveSignal(siteId, room.room_id, id, "resolved", "Resolved via drag-to-room")),
+            );
+            categoryNode.animate(
+              { style: { opacity: 0, "border-color": "#22c55e" } },
+              {
+                duration: 220,
+                complete: () => {
+                  categoryNode.remove();
+                  onSignalResolved();
+                },
+              },
+            );
+            return;
+          } catch {
+            revert();
+            return;
+          }
+        }
+      }
+
+      // Drop near the centre root = resolve as well.
+      const root = cy.getElementById("meeting-rooms-root");
+      if (root.length) {
+        const rootPosition = root.position();
+        const dxRoot = categoryPosition.x - rootPosition.x;
+        const dyRoot = categoryPosition.y - rootPosition.y;
+        const distanceToRoot = Math.sqrt(dxRoot * dxRoot + dyRoot * dyRoot);
+        const resolutionRadius = 56;
+        if (distanceToRoot <= resolutionRadius) {
+          try {
+            await Promise.all(
+              signalIds.map((id) => conciergeApi.resolveSignal(siteId, room.room_id, id, "resolved", "Resolved via drag-to-root")),
+            );
+            categoryNode.remove();
+            onSignalResolved();
+            return;
+          } catch {
+            revert();
+            return;
+          }
+        }
+      }
+
+      // Otherwise snap back to its orbit position.
+      revert();
     });
     cy.on("mouseover", "node.room", (evt) => { evt.target.style("border-width", 3); evt.target.style("z-index", 20); });
     cy.on("mouseout", "node.room", (evt) => { evt.target.style("border-width", 2); evt.target.style("z-index", 5); });
+    // Category nodes have variable size; avoid overriding width/height on hover.
     cy.fit(undefined, 40);
 
     return () => { cy.destroy(); cyRef.current = null; };
-  }, [rooms, onRoomSelect, containerRef]);
+  }, [
+    siteId,
+    rooms,
+    expandedRoomId,
+    expandedCategoryKey,
+    roomPositions,
+    onRoomPositionChange,
+    onRoomToggle,
+    onCategoryToggle,
+    onSignalSelect,
+    onSignalResolved,
+    containerRef,
+  ]);
 }
 
 // ---- Main component ----
 
-export function ConciergeMap({ siteId, onRoomSelect }: ConciergeMapProps) {
+export function ConciergeMap({ siteId, onSignalSelect }: ConciergeMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [rooms, setRooms] = useState<ConciergeRoom[]>([]);
+  const [expandedRoomId, setExpandedRoomId] = useState<string | null>(null);
+  const [expandedCategoryKey, setExpandedCategoryKey] = useState<CategoryKey | null>(null);
+  const [roomPositions, setRoomPositions] = useState<RoomPositions>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -296,6 +741,15 @@ export function ConciergeMap({ siteId, onRoomSelect }: ConciergeMapProps) {
     try {
       const data = await conciergeApi.getRooms(siteId);
       setRooms(data.rooms || []);
+      setRoomPositions((current) => {
+        const next: RoomPositions = {};
+        (data.rooms || []).forEach((room) => {
+          if (current[room.room_id]) {
+            next[room.room_id] = current[room.room_id];
+          }
+        });
+        return next;
+      });
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load rooms");
@@ -310,14 +764,49 @@ export function ConciergeMap({ siteId, onRoomSelect }: ConciergeMapProps) {
     return () => clearInterval(iv);
   }, [fetchRooms]);
 
-  useConciergeGraph(containerRef, rooms, onRoomSelect);
+  const handleRoomToggle = useCallback((room: ConciergeRoom) => {
+    setExpandedRoomId((current) => {
+      const next = current === room.room_id ? null : room.room_id;
+      setExpandedCategoryKey(null);
+      return next;
+    });
+  }, []);
+
+  const handleCategoryToggle = useCallback((room: ConciergeRoom, categoryKey: CategoryKey) => {
+    setExpandedRoomId(room.room_id);
+    setExpandedCategoryKey((current) => (expandedRoomId === room.room_id && current === categoryKey ? null : categoryKey));
+  }, [expandedRoomId]);
+
+  const handleRoomPositionChange = useCallback((roomId: string, position: Point) => {
+    setRoomPositions((current) => ({ ...current, [roomId]: position }));
+  }, []);
+
+  const handleSignalResolved = useCallback(() => {
+    void fetchRooms();
+    setExpandedRoomId(null);
+    setExpandedCategoryKey(null);
+  }, [fetchRooms]);
+
+  useConciergeGraph(
+    containerRef,
+    siteId,
+    rooms,
+    expandedRoomId,
+    expandedCategoryKey,
+    roomPositions,
+    handleRoomPositionChange,
+    handleRoomToggle,
+    handleCategoryToggle,
+    onSignalSelect,
+    handleSignalResolved,
+  );
 
   if (loading) {
     return (
       <MapPlaceholder>
         <div className="text-center">
           <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-          <p className="text-xs text-gray-500">Loading concierge map...</p>
+          <p className="text-xs text-gray-500">Loading meeting room signals...</p>
         </div>
       </MapPlaceholder>
     );
@@ -343,7 +832,7 @@ export function ConciergeMap({ siteId, onRoomSelect }: ConciergeMapProps) {
   if (rooms.length === 0) {
     return (
       <MapPlaceholder>
-        <p className="text-xs text-gray-500">No rooms with active signals</p>
+        <p className="text-xs text-gray-500">No meeting room signals for this building</p>
       </MapPlaceholder>
     );
   }

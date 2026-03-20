@@ -18,6 +18,7 @@ from datetime import datetime
 from typing import Optional
 
 from app.middleware.auth_middleware import require_query_site_access
+from app.services.occupancy_profile_service import calculate_zone_occupancy
 
 router = APIRouter(prefix="/occupancy/analytics", tags=["occupancy-analytics"])
 control_router = APIRouter(prefix="/occupancy/control", tags=["occupancy-control"])
@@ -62,8 +63,6 @@ async def get_hourly_occupancy_trend(
     hours = list(range(24))
 
     # Use same occupancy heuristics as Phase 4
-    from app.api.lighting import calculate_zone_occupancy
-
     # Generate data for each zone type
     zone_types = ["office", "meeting", "common", "utility", "entry"]
     zones_data = {}
@@ -139,8 +138,6 @@ async def get_zone_utilization(
         }
     """
     # Simulate current occupancy (would use database in production)
-    from app.api.lighting import calculate_zone_occupancy
-
     now = datetime.now()
     hour = now.hour
     day_of_week = now.weekday()

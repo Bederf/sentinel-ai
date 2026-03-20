@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
-"""Backup Supabase data to JSON files.
+"""Legacy JSON export helper.
 
-Exports all tables that contain site-002 data (or global data) to
-backend/app/data/ as the 3-tier fallback JSON layer.
+JSON files are no longer used as SENTINEL backups.
+The authoritative backup path is PostgreSQL logical backup.
+
+This script is retained only for exceptional one-off export/archive work and
+is disabled by default.
 
 Usage:
     python3 scripts/backup_supabase_to_json.py
@@ -21,8 +24,8 @@ import psycopg2.extras
 # Resolve paths
 SCRIPT_DIR = Path(__file__).parent
 BACKEND_DIR = SCRIPT_DIR.parent
-DATA_DIR = BACKEND_DIR / "app" / "data"
-BACKUP_DIR = DATA_DIR / "supabase_backup"
+REPO_ROOT = BACKEND_DIR.parent
+JSON_BACKUP_ROOT = REPO_ROOT / "backups" / "json" / "manual"
 
 # Load DATABASE_URL from .env
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@127.0.0.1:55322/postgres")
@@ -69,18 +72,25 @@ def save_json(data: list | dict, filepath: Path):
     with open(filepath, "w") as f:
         json.dump(data, f, indent=2, default=json_serializer)
     count = len(data) if isinstance(data, list) else 1
-    print(f"  -> {filepath.relative_to(BACKEND_DIR)} ({count} rows)")
+    print(f"  -> {filepath.relative_to(REPO_ROOT)} ({count} rows)")
 
 
 def main():
+    if os.getenv("ALLOW_LEGACY_JSON_EXPORT", "").strip() != "1":
+        raise SystemExit(
+            "Legacy JSON export is disabled. JSON files are no longer used as backups. "
+            "Use scripts/backup/postgres_logical_backup.sh for operational backups."
+        )
+
     print(f"Connecting to: {DATABASE_URL.split('@')[1] if '@' in DATABASE_URL else DATABASE_URL}")
     conn = psycopg2.connect(DATABASE_URL)
     cur = conn.cursor()
 
-    BACKUP_DIR.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    backup_dir = JSON_BACKUP_ROOT / f"supabase_export_{timestamp}"
+    backup_dir.mkdir(parents=True, exist_ok=True)
     print(f"Backup timestamp: {timestamp}")
-    print(f"Backup dir: {BACKUP_DIR}")
+    print(f"Backup dir: {backup_dir}")
     print()
 
     # =========================================================================
@@ -160,7 +170,7 @@ def main():
         if cur.fetchone():
             data = query_table(cur, table, "site_id = %s", (BUILDING_ID,))
             if data:
-                save_json(data, BACKUP_DIR / f"{table}.json")
+                save_json(data, backup_dir / f"{table}.json")
             else:
                 print(f"  {table}: 0 rows (skipping file)")
         else:
@@ -176,7 +186,7 @@ def main():
             if cur.fetchone():
                 data = query_table(cur, table, "site_id = %s", (BUILDING_CODE,))
                 if data:
-                    save_json(data, BACKUP_DIR / f"{table}.json")
+                    save_json(data, backup_dir / f"{table}.json")
                 else:
                     print(f"  {table}: 0 rows (skipping file)")
             else:
@@ -220,7 +230,7 @@ def main():
                 # Use ANY array for efficiency
                 data = query_table(cur, table, "equipment_id = ANY(%s)", (equipment_ids,))
                 if data:
-                    save_json(data, BACKUP_DIR / f"{table}.json")
+                    save_json(data, backup_dir / f"{table}.json")
                 else:
                     print(f"  {table}: 0 rows (skipping file)")
             else:
@@ -233,7 +243,7 @@ def main():
     print("=== Building record ===")
     data = query_table(cur, "sites", "id = %s", (BUILDING_ID,))
     if data:
-        save_json(data, BACKUP_DIR / "sites.json")
+        save_json(data, backup_dir / "sites.json")
 
     # =========================================================================
     # Energy centre and related electrical infrastructure
@@ -274,7 +284,7 @@ def main():
         if cur.fetchone():
             data = query_table(cur, table, f"{col} = %s", (BUILDING_ID,))
             if data:
-                save_json(data, BACKUP_DIR / f"{table}.json")
+                save_json(data, backup_dir / f"{table}.json")
             else:
                 print(f"  {table}: 0 rows")
         else:
@@ -289,7 +299,7 @@ def main():
             if cur.fetchone():
                 data = query_table(cur, table, "site_id = %s", (BUILDING_CODE,))
                 if data:
-                    save_json(data, BACKUP_DIR / f"{table}.json")
+                    save_json(data, backup_dir / f"{table}.json")
                 else:
                     print(f"  {table}: 0 rows")
             else:
@@ -320,7 +330,7 @@ def main():
     for table in global_tables:
         data = query_table(cur, table)
         if data:
-            save_json(data, BACKUP_DIR / f"{table}.json")
+            save_json(data, backup_dir / f"{table}.json")
         else:
             print(f"  {table}: 0 rows")
 
@@ -328,12 +338,21 @@ def main():
     # Summary
     # =========================================================================
     print()
-    backup_files = list(BACKUP_DIR.glob("*.json"))
+    manifest = {
+        "timestamp": timestamp,
+        "export_type": "secondary_json_snapshot",
+        "source_of_truth": "local_supabase_postgres",
+        "building_id": BUILDING_ID,
+        "building_code": BUILDING_CODE,
+    }
+    save_json(manifest, backup_dir / "export_manifest.json")
+
+    backup_files = list(backup_dir.glob("*.json"))
     total_size = sum(f.stat().st_size for f in backup_files)
     print("=== BACKUP COMPLETE ===")
     print(f"  Files: {len(backup_files)}")
     print(f"  Size: {total_size / 1024:.1f} KB")
-    print(f"  Location: {BACKUP_DIR}")
+    print(f"  Location: {backup_dir}")
 
     conn.close()
 

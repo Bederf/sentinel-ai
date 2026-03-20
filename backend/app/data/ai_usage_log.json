@@ -1,0 +1,78 @@
+{
+  "daily": {
+    "2026-03-14": {
+      "openai/gpt-4.1-mini": {
+        "provider": "openai",
+        "model": "gpt-4.1-mini",
+        "calls": 10,
+        "input_tokens": 22065,
+        "output_tokens": 345,
+        "cache_read_tokens": 0,
+        "cache_creation_tokens": 0,
+        "cost_usd": 0.009378,
+        "sources": {
+          "tools": 10
+        }
+      },
+      "openai/gpt-4.1-nano": {
+        "provider": "openai",
+        "model": "gpt-4.1-nano",
+        "calls": 1,
+        "input_tokens": 2211,
+        "output_tokens": 183,
+        "cache_read_tokens": 0,
+        "cache_creation_tokens": 0,
+        "cost_usd": 0.0002943,
+        "sources": {
+          "chat": 1
+        }
+      }
+    },
+    "2026-03-15": {},
+    "2026-03-16": {},
+    "2026-03-17": {
+      "telegram/message": {
+        "provider": "telegram",
+        "model": "message",
+        "calls": 20,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cache_read_tokens": 0,
+        "cache_creation_tokens": 0,
+        "cost_usd": 0.0,
+        "sources": {
+          "signal_emitter": 20
+        }
+      },
+      "whatsapp_twilio/message": {
+        "provider": "whatsapp_twilio",
+        "model": "message",
+        "calls": 25,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cache_read_tokens": 0,
+        "cache_creation_tokens": 0,
+        "cost_usd": 0.11500000000000003,
+        "sources": {
+          "alert": 25
+        }
+      },
+      "openai/gpt-4.1-mini": {
+        "provider": "openai",
+        "model": "gpt-4.1-mini",
+        "calls": 1,
+        "input_tokens": 491,
+        "output_tokens": 22,
+        "cache_read_tokens": 0,
+        "cache_creation_tokens": 0,
+        "cost_usd": 0.00023160000000000002,
+        "sources": {
+          "concept_search": 1
+        }
+      }
+    },
+    "2026-03-18": {},
+    "2026-03-19": {}
+  },
+  "usd_zar_rate": 18.5
+}

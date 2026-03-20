@@ -1,5 +1,6 @@
 """Vector database service using Supabase + pgvector."""
 
+from datetime import datetime, timezone
 from typing import List, Optional, Dict, Any
 import re
 import logging
@@ -22,6 +23,20 @@ class VectorDBService:
             self._embedding_service = get_embedding_service()
         return self._embedding_service
 
+    def _resolve_site_uuid(self, site_id: Optional[str]) -> Optional[str]:
+        """Resolve a site code like ``site-001`` to the canonical UUID."""
+        if not site_id:
+            return None
+        if re.fullmatch(r"[0-9a-fA-F-]{36}", site_id):
+            return site_id
+        try:
+            result = self.client.table("sites").select("id").eq("code", site_id).limit(1).execute()
+            if result.data:
+                return result.data[0]["id"]
+        except Exception as exc:
+            logger.warning("Failed to resolve site code %s to UUID: %s", site_id, exc)
+        return site_id
+
     def add_document(
         self,
         code: str,
@@ -29,6 +44,7 @@ class VectorDBService:
         document_type: str,
         equipment_type: str,
         full_text: str,
+        site_id: Optional[str] = None,
         source: str = "internal_procedure",
         manufacturer: Optional[str] = None,
         model: Optional[str] = None,
@@ -37,6 +53,7 @@ class VectorDBService:
         failure_modes: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         """Add a document to the RAG system."""
+        resolved_site_id = self._resolve_site_uuid(site_id)
         result = (
             self.client.table("documents")
             .insert(
@@ -46,6 +63,7 @@ class VectorDBService:
                     "document_type": document_type,
                     "equipment_type": equipment_type,
                     "full_text": full_text,
+                    "site_id": resolved_site_id,
                     "source": source,
                     "manufacturer": manufacturer,
                     "model": model,
@@ -96,6 +114,7 @@ class VectorDBService:
                     "embedding": embedding,
                     "equipment_type": document["equipment_type"],
                     "document_type": document["document_type"],
+                    "site_id": document.get("site_id"),
                     "manufacturer": document.get("manufacturer"),
                     "model": document.get("model"),
                     "keywords": document.get("keywords"),
@@ -108,7 +127,11 @@ class VectorDBService:
 
         # Update document status
         self.client.table("documents").update(
-            {"indexing_status": "embedded", "indexed_at": "now()", "chunk_count": len(chunk_records)}
+            {
+                "indexing_status": "embedded",
+                "indexed_at": datetime.now(timezone.utc).isoformat(),
+                "chunk_count": len(chunk_records),
+            }
         ).eq("id", document_id).execute()
 
         logger.info(f"Indexed document {document_id}: {len(chunk_records)} chunks")

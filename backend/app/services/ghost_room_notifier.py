@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 from typing import Any
 
 from app.models.booking_record import BlockBookingConfig
@@ -14,12 +15,58 @@ from app.services.n8n_service import get_n8n_service
 logger = logging.getLogger(__name__)
 
 
+def _resolve_related_ghost_signal(finding: GhostBookingFinding, *, resolution_state: str) -> None:
+    """Mark the active concierge signal for this ghost finding as resolved/acknowledged."""
+    from app.database.supabase_client import get_supabase_client
+
+    client = get_supabase_client()
+    if not client:
+        return
+
+    try:
+        result = (
+            client.table("signal")
+            .select("id, metadata")
+            .eq("signal_type", "no_show_pattern")
+            .eq("resolution_state", "active")
+            .filter("metadata->>booking_id", "eq", finding.booking_id)
+            .filter("metadata->>room_id", "eq", finding.room_code)
+            .execute()
+        )
+    except Exception as exc:
+        logger.warning("Failed to look up related ghost signal for %s: %s", finding.id, exc)
+        return
+
+    for row in result.data or []:
+        metadata = row.get("metadata") if isinstance(row.get("metadata"), dict) else {}
+        try:
+            client.table("signal").update(
+                {
+                    "resolution_state": resolution_state,
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                    "metadata": {
+                        **metadata,
+                        "concierge_outcome": {
+                            "finding_id": finding.id,
+                            "status": finding.status,
+                            "inspected_by": finding.inspected_by,
+                            "inspected_at": finding.inspected_at.isoformat() if finding.inspected_at else None,
+                            "response_text": finding.response_text,
+                        },
+                    },
+                }
+            ).eq("id", row["id"]).execute()
+        except Exception as exc:
+            logger.warning("Failed to resolve related ghost signal %s: %s", row.get("id"), exc)
+
+
 def format_ghost_email_message(finding: GhostBookingFinding, site_name: str = "", *, is_reminder: bool = False) -> str:
     site_label = site_name or finding.site_id
     prefix = "REMINDER — " if is_reminder else ""
-    start_local = _to_sast(finding.booking_start)
-    end_local = _to_sast(finding.booking_end)
+    start_local = _to_sast(finding.booking_start, assume_utc_if_naive=False)
+    end_local = _to_sast(finding.booking_end, assume_utc_if_naive=False)
     booking_date = start_local.strftime("%A %d %B %Y")
+    flagged_at = _to_sast(finding.detected_at).strftime("%A %d %B %Y %H:%M SAST")
     start = start_local.strftime("%H:%M")
     end = end_local.strftime("%H:%M")
     duration_min = int((finding.booking_end - finding.booking_start).total_seconds() / 60)
@@ -35,6 +82,7 @@ def format_ghost_email_message(finding: GhostBookingFinding, site_name: str = ""
         "",
         "BOOKING DETAILS",
         "-" * 30,
+        f"  Date Flagged: {flagged_at}",
         f"  Room:       {finding.room_name or finding.room_code}",
         f"  Room Code:  {finding.room_code}",
         f"  Date:       {booking_date}",
@@ -45,44 +93,69 @@ def format_ghost_email_message(finding: GhostBookingFinding, site_name: str = ""
         f"  Name:       {organiser_name}",
         f"  Email:      {organiser_email}",
         "",
-        "ACTION REQUIRED",
-        "-" * 30,
-        f"  1. Physically inspect {finding.room_code}",
-        "  2. If empty — the room can be released for other use",
-        "  3. If occupied — no action needed (sensor may need recalibration)",
-        "",
-        "If the organiser needs to be contacted:",
-        f"  → Email: {organiser_email}",
-        "",
-        f"Finding ID: {finding.id}",
-        "",
-        "—",
-        f"SENTINEL Space Intelligence — {site_label}",
     ]
+
+    if finding.source_booking_flagged:
+        lines.extend(
+            [
+                "RELATED ANOMALY",
+                "-" * 30,
+                "  This booking was already flagged as a block-booking anomaly.",
+                "",
+            ]
+        )
+
+    lines.extend(
+        [
+            "ACTION REQUIRED",
+            "-" * 30,
+            f"  1. Physically inspect {finding.room_code}",
+            "  2. If empty — the room can be released for other use",
+            "  3. If occupied — no action needed (sensor may need recalibration)",
+            "",
+            "If the organiser needs to be contacted:",
+            f"  → Email: {organiser_email}",
+            "",
+            f"Finding ID: {finding.id}",
+            "",
+            "—",
+            f"SENTINEL Space Intelligence — {site_label}",
+        ]
+    )
     return "\n".join(lines)
 
 
-def _to_sast(dt):
-    """Convert a datetime to SAST (UTC+2) for display."""
+def _to_sast(dt, *, assume_utc_if_naive: bool = True):
+    """Convert a datetime to SAST for display.
+
+    Booking timestamps are often already parsed as local SAST naive datetimes,
+    while detection timestamps are usually stored as naive UTC.
+    """
     from datetime import timezone, timedelta
 
     sast = timezone(timedelta(hours=2))
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
+        dt = dt.replace(tzinfo=timezone.utc if assume_utc_if_naive else sast)
     return dt.astimezone(sast)
 
 
 def format_ghost_whatsapp_message(finding: GhostBookingFinding, *, is_reminder: bool = False) -> str:
     prefix = "REMINDER: " if is_reminder else ""
-    start_local = _to_sast(finding.booking_start)
-    end_local = _to_sast(finding.booking_end)
-    return (
+    start_local = _to_sast(finding.booking_start, assume_utc_if_naive=False)
+    end_local = _to_sast(finding.booking_end, assume_utc_if_naive=False)
+    message = (
         f"{prefix}Ghost booking: *{finding.room_code}*\n"
         f"Organiser: {finding.organiser_name or finding.organiser_email}\n"
+        f"Date: {start_local.strftime('%d %b %Y')}\n"
         f"Booked: {start_local.strftime('%H:%M')}-{end_local.strftime('%H:%M')}\n"
         f"No movement detected for {finding.grace_period_minutes} min.\n\n"
-        f"Swipe-reply on THIS message with *yes* or *no*."
+        "Swipe-reply on THIS message with:\n"
+        "*yes* = room in use\n"
+        "*no* = room empty"
     )
+    if finding.source_booking_flagged:
+        message = f"{message}\nPreviously flagged: block booking."
+    return message
 
 
 def _send_email_direct_smtp(to_email: str, subject: str, body: str) -> bool:
@@ -147,8 +220,11 @@ async def _send_email(
                 "to_email": config.concierge_email,
                 "subject": subject,
                 "message": body,
+                "booking_date": finding.booking_start.date().isoformat(),
+                "flagged_at": finding.detected_at.isoformat(),
                 "organiser_email": finding.organiser_email,
                 "organiser_name": finding.organiser_name,
+                "source_booking_flagged": finding.source_booking_flagged,
                 "booking_start": finding.booking_start.isoformat(),
                 "booking_end": finding.booking_end.isoformat(),
             },
@@ -282,6 +358,18 @@ async def process_concierge_whatsapp_reply(
             "handled": True,
             "response_message": f"{finding.room_code} was already resolved.",
         }
+
+    # Only create a concierge dashboard "Ghost" signal once concierge confirmed the room is empty.
+    if updated.status == "confirmed_empty":
+        try:
+            from app.services.ghost_booking_signal_emitter import emit_ghost_booking_signal
+
+            await emit_ghost_booking_signal(updated.room_code, updated)
+        except Exception as exc:
+            logger.warning("Failed to emit confirmed ghost booking signal for %s: %s", updated.id, exc)
+
+    # If a legacy signal exists (older runs), mark it resolved.
+    _resolve_related_ghost_signal(updated, resolution_state="resolved")
 
     return {
         "handled": True,

@@ -483,6 +483,7 @@ class ClaudeService:
         user_email: str | None = None,
         user_role: SentinelRole | None = None,
         model_override: str | None = None,
+        include_system_docs: bool = False,
     ) -> AsyncGenerator[str, None]:
         """
         Stream a response from Claude with tool calling support.
@@ -531,6 +532,7 @@ class ClaudeService:
             site_id,
             user_email=user_email,
             user_role=user_role,
+            include_system_docs=include_system_docs,
         )
 
         # Cache tool definitions too — they rarely change between requests.

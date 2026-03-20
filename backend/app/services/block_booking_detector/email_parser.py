@@ -25,6 +25,7 @@ from email.utils import parseaddr
 from typing import Optional
 
 from app.models.booking_record import BookingRecord
+from app.services.block_booking_detector.site_resolver import resolve_site_id_for_room
 
 logger = logging.getLogger(__name__)
 
@@ -262,7 +263,7 @@ def _get_body(msg: email.message.Message) -> str:
 
 def parse_booking_confirmation(
     raw_email: str,
-    site_id: str,
+    site_id: str = "",
 ) -> Optional[BookingRecord]:
     """Parse a room booking confirmation email.
 
@@ -316,8 +317,11 @@ def _parse_resource_scheduler(
         return None
 
     # Extract site from room code if not provided
-    if site_id == "UNKNOWN" or not site_id:
-        site_id = _extract_site_from_room_code(room_code) or site_id
+    site_id = resolve_site_id_for_room(
+        room_code,
+        location,
+        fallback_site_id=_extract_site_from_room_code(room_code) or site_id,
+    )
 
     # Date and time
     start_time, end_time = _parse_rs_datetime(body)
@@ -341,7 +345,7 @@ def _parse_resource_scheduler(
 
 def parse_ics_booking(
     ics_data: str,
-    site_id: str,
+    site_id: str = "",
 ) -> Optional[BookingRecord]:
     """Parse an iCalendar (.ics) VEVENT into a BookingRecord.
 
@@ -407,8 +411,11 @@ def parse_ics_booking(
             return None
 
         # Extract site from room code if not provided
-        if (not site_id or site_id == "UNKNOWN") and room_code:
-            site_id = _extract_site_from_room_code(room_code) or site_id
+        site_id = resolve_site_id_for_room(
+            room_code,
+            location,
+            fallback_site_id=_extract_site_from_room_code(room_code) or site_id,
+        )
 
         # DTSTART / DTEND
         dtstart = component.get("DTSTART")
@@ -496,8 +503,10 @@ def _parse_outlook(
         logger.debug("Could not parse start/end times: start=%s end=%s", start_str, end_str)
         return None
 
+    resolved_site_id = resolve_site_id_for_room(room_name, room_id, fallback_site_id=site_id)
+
     return BookingRecord(
-        site_id=site_id,
+        site_id=resolved_site_id,
         organiser_email=organiser_email.lower(),
         organiser_name=organiser_name or organiser_email.split("@")[0],
         room_id=room_id,

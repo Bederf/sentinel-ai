@@ -7,7 +7,7 @@ view/update config, trigger manual scans, and ingest booking emails.
 from __future__ import annotations
 
 import logging
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -16,10 +16,27 @@ from pydantic import BaseModel, Field
 from app.config.settings import settings
 from app.core.site_resolver import require_any_site
 from app.models.booking_record import BlockBookingConfig
+from app.services.block_booking_detector.site_resolver import normalize_site_id, resolve_site_id_for_room
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/block-bookings", tags=["block-bookings"])
+
+
+def _default_booking_window(site_id: str) -> tuple[date, date]:
+    """Use simulated date for booking visibility when a site simulation is running."""
+    try:
+        from app.api.lifecycle_simulation import get_site_simulation_status_sync
+
+        sim_status = get_site_simulation_status_sync(site_id)
+        if sim_status.running and sim_status.simulated_time:
+            simulated_date = datetime.fromisoformat(sim_status.simulated_time).date()
+            return simulated_date, simulated_date + timedelta(days=28)
+    except Exception:
+        pass
+
+    today = date.today()
+    return today, today + timedelta(days=28)
 
 
 # ---------------------------------------------------------------------------
@@ -32,7 +49,7 @@ class BookingEmailRequest(BaseModel):
 
     raw_email: str = Field("", description="Raw email content (RFC 822)")
     ics_data: Optional[str] = Field(None, description="iCalendar (.ics) content — preferred over raw_email")
-    site_id: str = Field(..., description="Site code")
+    site_id: str = Field("", description="Optional site code override")
 
 
 class DismissRequest(BaseModel):
@@ -138,18 +155,20 @@ async def ingest_booking_email(
     )
     from app.services.block_booking_detector.overlap_detector import detect_overlaps
 
-    config = _get_config(body.site_id)
-    if not config.enabled:
-        return {"success": False, "reason": "Block booking detection disabled"}
-
     store = get_booking_store()
 
     # Handle cancellations (email path only — .ics cancellations handled below)
     if body.raw_email and is_cancellation(body.raw_email):
         info = extract_cancelled_room(body.raw_email, body.site_id)
         if info:
+            resolved_site_id = resolve_site_id_for_room(
+                info.get("room_name"),
+                fallback_site_id=body.site_id,
+            )
+            if not resolved_site_id:
+                return {"success": False, "reason": "Could not resolve site from cancelled booking room"}
             removed = store.remove_booking(
-                site_id=body.site_id,
+                site_id=resolved_site_id,
                 organiser_email=info["organiser_email"],
                 room_name=info["room_name"],
                 start_time=info.get("start_time"),
@@ -179,6 +198,23 @@ async def ingest_booking_email(
     if not record:
         return {"success": False, "reason": "Could not parse booking email"}
 
+    resolved_site_id = normalize_site_id(record.site_id)
+    if not resolved_site_id or resolved_site_id == "unknown":
+        return {"success": False, "reason": "Could not resolve site from booking room"}
+
+    requested_site_id = normalize_site_id(body.site_id)
+    if requested_site_id and requested_site_id != resolved_site_id:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Booking room belongs to {resolved_site_id}, not {requested_site_id}",
+        )
+
+    config = _get_config(resolved_site_id)
+    if not config.enabled:
+        return {"success": False, "reason": "Block booking detection disabled"}
+
+    record.site_id = resolved_site_id
+
     # Dedup
     if store.booking_exists(record.raw_email_hash):
         return {"success": True, "action": "duplicate_skipped"}
@@ -187,13 +223,14 @@ async def ingest_booking_email(
     saved = store.save_booking(record)
 
     # Scan for overlaps on this booking's date
-    day_bookings = store.get_bookings_for_site(body.site_id, record.booking_date)
-    new_alerts = detect_overlaps(body.site_id, day_bookings, config, store)
+    day_bookings = store.get_bookings_for_site(resolved_site_id, record.booking_date)
+    new_alerts = detect_overlaps(resolved_site_id, day_bookings, config, store)
 
     # Persist and notify
     alerts_sent = 0
     for alert in new_alerts:
         stored_alert = store.save_alert(alert)
+        store.flag_bookings(alert.booking_ids)
         sent = await send_block_booking_alert(stored_alert, config)
         if sent:
             alerts_sent += 1
@@ -298,9 +335,9 @@ async def list_bookings(
     from app.services.block_booking_detector.booking_store import get_booking_store
 
     store = get_booking_store()
-    today = date.today()
-    start = date.fromisoformat(from_date) if from_date else today
-    end = date.fromisoformat(to_date) if to_date else today + timedelta(days=14)
+    default_start, default_end = _default_booking_window(site_id)
+    start = date.fromisoformat(from_date) if from_date else default_start
+    end = date.fromisoformat(to_date) if to_date else default_end
 
     all_bookings = []
     current = start
@@ -413,6 +450,7 @@ async def trigger_scan(
 
         for alert in new_alerts:
             stored_alert = store.save_alert(alert)
+            store.flag_bookings(alert.booking_ids)
             await send_block_booking_alert(stored_alert, config)
             total_alerts += 1
 

@@ -23,6 +23,48 @@ logger = logging.getLogger(__name__)
 # Default thresholds (overridden by settings)
 DEFAULT_MIN_SESSION_SECONDS = 180  # 3 minutes — discard shorter visits
 DEFAULT_EXTENDED_USE_SECONDS = 7200  # 2 hours — flag as extended
+DEFAULT_RED_LIGHT_COOLDOWN_SECONDS = 300  # 5 minutes — keep red light on after overstay ends
+
+
+def describe_focus_session_state(
+    session: FocusRoomSession,
+    now: Optional[datetime] = None,
+    extended_use_seconds: Optional[int] = None,
+    red_light_cooldown_seconds: Optional[int] = None,
+) -> dict[str, int | float | bool]:
+    """Compute live session state for API/UI use.
+
+    Active sessions should expose current elapsed duration and whether the
+    overstay red-light indicator should be on right now.
+    """
+    current_time = now or datetime.utcnow()
+    extended_threshold = extended_use_seconds or _get_extended_use_seconds()
+    cooldown_threshold = red_light_cooldown_seconds or _get_red_light_cooldown_seconds()
+
+    if session.is_active:
+        duration_seconds = max(int((current_time - session.start_time).total_seconds()), 0)
+        red_light_on = duration_seconds > extended_threshold
+    else:
+        duration_seconds = session.duration_seconds
+        red_light_on = bool(
+            session.extended_use
+            and session.end_time
+            and (current_time - session.end_time).total_seconds() <= cooldown_threshold
+        )
+    cooldown_remaining_seconds = 0
+    if red_light_on and not session.is_active and session.end_time:
+        cooldown_elapsed = max(int((current_time - session.end_time).total_seconds()), 0)
+        cooldown_remaining_seconds = max(cooldown_threshold - cooldown_elapsed, 0)
+
+    return {
+        "duration_seconds": duration_seconds,
+        "duration_minutes": round(duration_seconds / 60, 1),
+        "extended_use": session.extended_use or red_light_on,
+        "red_light_on": red_light_on,
+        "max_allowed_minutes": round(extended_threshold / 60),
+        "red_light_cooldown_seconds": cooldown_threshold,
+        "red_light_cooldown_remaining_seconds": cooldown_remaining_seconds,
+    }
 
 
 def process_focus_room_event(
@@ -132,27 +174,32 @@ def get_focus_room_analytics(
     from app.services import occupancy_store
 
     sessions = occupancy_store.get_sessions_for_site(site_id, from_dt, to_dt)
-    # Only include closed sessions
+    active = [s for s in sessions if s.end_time is None]
     closed = [s for s in sessions if s.end_time is not None]
 
-    if not closed:
+    if not sessions:
         return {
+            "site_id": site_id,
             "total_sessions": 0,
+            "active_sessions": 0,
+            "completed_sessions": 0,
             "average_duration_minutes": 0,
             "longest_session_minutes": 0,
             "extended_use_count": 0,
+            "extended_use_sessions": 0,
             "sessions_by_room": {},
             "peak_hour": None,
         }
 
     durations = [s.duration_seconds for s in closed]
-    avg_min = round(sum(durations) / len(durations) / 60, 1)
-    longest_min = round(max(durations) / 60, 1)
-    extended = sum(1 for s in closed if s.extended_use)
+    avg_min = round(sum(durations) / len(durations) / 60, 1) if durations else 0
+    longest_min = round(max(durations) / 60, 1) if durations else 0
+    active_extended = sum(1 for s in active if describe_focus_session_state(s)["red_light_on"])
+    extended = sum(1 for s in closed if s.extended_use) + active_extended
 
     by_room: dict[str, int] = {}
     hour_counts: dict[int, int] = {}
-    for s in closed:
+    for s in sessions:
         by_room[s.room_code] = by_room.get(s.room_code, 0) + 1
         h = s.start_time.hour
         hour_counts[h] = hour_counts.get(h, 0) + 1
@@ -160,10 +207,14 @@ def get_focus_room_analytics(
     peak_hour = max(hour_counts, key=hour_counts.get) if hour_counts else None
 
     return {
+        "site_id": site_id,
         "total_sessions": len(closed),
+        "active_sessions": len(active),
+        "completed_sessions": len(closed),
         "average_duration_minutes": avg_min,
         "longest_session_minutes": longest_min,
         "extended_use_count": extended,
+        "extended_use_sessions": extended,
         "sessions_by_room": by_room,
         "peak_hour": peak_hour,
     }
@@ -185,3 +236,12 @@ def _get_extended_use_seconds() -> int:
         return get_settings().focus_extended_use_seconds
     except Exception:
         return DEFAULT_EXTENDED_USE_SECONDS
+
+
+def _get_red_light_cooldown_seconds() -> int:
+    try:
+        from app.config.settings import get_settings
+
+        return get_settings().focus_red_light_cooldown_seconds
+    except Exception:
+        return DEFAULT_RED_LIGHT_COOLDOWN_SECONDS

@@ -884,6 +884,10 @@ async def create_site(request: CreateSiteRequest) -> CreateSiteResponse:
 
         with open(registry_path, "w") as f:
             json.dump(registry, f, indent=2)
+
+        processing_state = _load_processing_state()
+        processing_state[site_id] = False
+        _save_processing_state(processing_state)
     except Exception as e:
         logger.error(f"Failed to update registry: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to update registry: {e}")
@@ -905,6 +909,7 @@ async def create_site(request: CreateSiteRequest) -> CreateSiteResponse:
                         "sqm": request.sqm,
                         "floors": len(request.floors) if request.floors else 1,
                         "timezone": "Africa/Johannesburg",
+                        "sentinel_processing_enabled": False,
                     }
                 ).execute()
                 logger.info(f"Created building in Supabase: {site_id}")

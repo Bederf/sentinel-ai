@@ -167,6 +167,7 @@ Move active WO session state from in-memory to Redis or Supabase:
 
 ## Related Documents
 
+- [Building Operating Lifecycle](../architecture-repository/principles/building-operating-lifecycle.md) — Canonical promotion path from disconnected building to autonomous control
 - [Agent Contract](agent-contract.md) — Clean agent specs, tool permissions, workflows, caching plan
 - [Agent Contract Appendix](agent-contract-appendix.md) — 42-entry quality gate threshold table, 6 safety rule types, full ParasiteDecision schema
 - [AI Recommendation Agent Full Spec](ai-recommendation-agent-spec.md) — Detailed PARASITE reference

@@ -23,6 +23,7 @@ import {
   Sliders,
   LayoutGrid,
   Fuel,
+  Network,
 } from "lucide-react";
 import type { ModuleType } from "./moduleRegistry";
 
@@ -36,7 +37,8 @@ export type View =
   | "settings"
   | "financial"
   | "compliance"
-  | "fleet-ml";
+  | "fleet-ml"
+  | "intelligence";
 
 export type NavCategory = "base" | "addon" | "admin";
 
@@ -63,6 +65,7 @@ export const VIEW_TITLES: Record<View, string> = {
   financial: "Financial",
   compliance: "Compliance & ESG",
   "fleet-ml": "Fleet ML",
+  intelligence: "Issue Intelligence",
 };
 
 /**
@@ -74,6 +77,7 @@ export const BASE_NAV_ITEMS: NavItem[] = [
   { id: "integrations", label: "System Health", icon: Activity, description: "Integration monitoring", category: "base" },
   { id: "logs", label: "Logs", icon: FileText, description: "Audit trail and event logs", category: "base" },
   { id: "maintenance", label: "Maintenance", icon: Wrench, description: "Equipment, work orders & tech chat", category: "base", requiredModule: "maintenance" },
+  { id: "intelligence", label: "Intelligence", icon: Network, description: "Issue clusters & correlation graph", category: "base" },
 ];
 
 /**
@@ -124,27 +128,26 @@ export interface BuildingTabItem {
   icon: LucideIcon;
   /** Module that gates the control features within this tab (not tab visibility) */
   controlModule?: ModuleType;
-  /** If set, tab only shows when this add-on module is active */
+  /** If set, tab only shows when this site has the matching module active */
   requiredModule?: ModuleType;
 }
 
 /**
- * Building detail tab definitions — 10 discipline-specific tabs.
- * Tabs show based on SIMBIOT data availability, not module toggles.
- * Control features within each tab are gated by the respective {x}_control add-on.
- * Fire tab has no control toggle (always read-only).
- * Simulation tab only shows if simulation add-on is active.
+ * Building detail tab definitions.
+ * Tabs should only appear when the selected site has the matching module active.
+ * Control features within each tab are gated separately by the respective {x}_control add-on.
+ * Fire tab has no control toggle (always read-only when present).
  */
 export const BUILDING_TAB_ITEMS: BuildingTabItem[] = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
-  { id: "hvac", label: "HVAC", icon: Activity, controlModule: "hvac_control" },
-  { id: "energy", label: "Energy", icon: Activity, controlModule: "energy_control" },
-  { id: "lighting", label: "Lighting", icon: Lightbulb, controlModule: "lighting_control" },
-  { id: "solar-bess", label: "Solar & BESS", icon: Sun, controlModule: "solar_control" },
-  { id: "water", label: "Water", icon: Droplets, controlModule: "water_control" },
-  { id: "fire", label: "Fire", icon: Activity },
-  { id: "security", label: "Security", icon: Shield, controlModule: "security_control" },
-  { id: "digital-twin", label: "Digital Twin", icon: Activity, controlModule: "digital_twin_control" },
+  { id: "hvac", label: "HVAC", icon: Activity, controlModule: "hvac_control", requiredModule: "hvac" },
+  { id: "energy", label: "Energy", icon: Activity, controlModule: "energy_control", requiredModule: "energy" },
+  { id: "lighting", label: "Lighting", icon: Lightbulb, controlModule: "lighting_control", requiredModule: "lighting" },
+  { id: "solar-bess", label: "Solar & BESS", icon: Sun, controlModule: "solar_control", requiredModule: "solar" },
+  { id: "water", label: "Water", icon: Droplets, controlModule: "water_control", requiredModule: "water" },
+  { id: "fire", label: "Fire", icon: Activity, requiredModule: "fire" },
+  { id: "security", label: "Security", icon: Shield, controlModule: "security_control", requiredModule: "security" },
+  { id: "digital-twin", label: "Digital Twin", icon: Activity, controlModule: "digital_twin_control", requiredModule: "digital_twin" },
   { id: "controls", label: "Controls", icon: Sliders },
   { id: "simulation", label: "Simulation", icon: Activity, requiredModule: "simulation" },
   { id: "space", label: "Space", icon: LayoutGrid, requiredModule: "space_optimization" },

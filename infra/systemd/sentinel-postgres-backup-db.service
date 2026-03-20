@@ -1,0 +1,28 @@
+[Unit]
+Description=SENTINEL standalone backup PostgreSQL database
+After=network.target
+
+[Service]
+Type=simple
+User=bederf
+Group=bederf
+WorkingDirectory=/opt/bms-intelligence
+Environment=PG_BIN_DIR=/usr/lib/postgresql/15/bin
+Environment=BACKUP_PGDATA=/opt/bms-intelligence/backups/postgres/standby-data
+Environment=BACKUP_PGHOST=127.0.0.1
+Environment=BACKUP_PGPORT=55432
+Environment=BACKUP_PGUSER=postgres
+Environment=BACKUP_PGPASSWORD=postgres
+Environment=BACKUP_DB_NAME=sentinel_backup
+ExecStartPre=/opt/bms-intelligence/scripts/backup/init_backup_postgres_cluster.sh
+ExecStart=/usr/lib/postgresql/15/bin/postgres -D /opt/bms-intelligence/backups/postgres/standby-data
+ExecReload=/bin/kill -HUP $MAINPID
+KillSignal=SIGINT
+TimeoutStopSec=60
+Restart=on-failure
+RestartSec=5
+StandardOutput=append:/opt/bms-intelligence/backups/logs/postgres-backup-db-systemd.log
+StandardError=append:/opt/bms-intelligence/backups/logs/postgres-backup-db-systemd.log
+
+[Install]
+WantedBy=multi-user.target

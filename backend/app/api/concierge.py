@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
 
 from app.database.repositories.room_registry_repository import get_room_registry_repository
 from app.services.concierge_urgency import compute_urgency_score, normalise_urgency_scores
@@ -35,6 +36,12 @@ _FIXTURE_PATH = Path(__file__).resolve().parents[1] / "data" / "space" / "concie
 ADVISORY_LABEL = "For awareness only. Act at your discretion."
 
 SEVERITY_ORDER = {"critical": 4, "high": 3, "medium": 2, "low": 1}
+
+
+class SignalResolutionRequest(BaseModel):
+    resolution_state: str = "acknowledged"
+    resolved_by: str | None = "concierge_ui"
+    resolution_note: str | None = "Noted from concierge room map"
 
 
 # ---------------------------------------------------------------------------
@@ -57,7 +64,8 @@ def _signal_room_id(signal: dict) -> str | None:
     # Check metadata.room_id first (most explicit)
     meta = signal.get("metadata") or {}
     if isinstance(meta, dict) and meta.get("room_id"):
-        return meta["room_id"].upper()
+        canonical = extract_room_id(str(meta["room_id"]))
+        return canonical or str(meta["room_id"]).upper()
 
     # Check location_ref
     location_ref = signal.get("location_ref", "")
@@ -300,6 +308,72 @@ async def get_signal_detail(site_id: str, room_id: str, signal_id: str) -> dict[
         "advisory_label": ADVISORY_LABEL,
         "suggested_actions": concierge_template.get("actions", []),
         "card_focus_fields": concierge_template.get("card_focus_fields", []),
+    }
+
+
+@router.post("/rooms/{site_id}/{room_id}/signals/{signal_id}/resolve")
+async def resolve_signal(
+    site_id: str,
+    room_id: str,
+    signal_id: str,
+    body: SignalResolutionRequest,
+) -> dict[str, Any]:
+    """Mark a room signal as acknowledged or resolved so it drops from the active concierge view."""
+    from app.database.supabase_client import get_supabase_client
+
+    client = get_supabase_client()
+    if not client:
+        raise HTTPException(status_code=503, detail="Supabase client unavailable")
+
+    signal = await _get_signal_by_id(signal_id)
+    if not signal:
+        raise HTTPException(status_code=404, detail="Signal not found")
+
+    signal_room_id = _signal_room_id(signal)
+    if signal_room_id and signal_room_id != room_id.upper():
+        raise HTTPException(status_code=400, detail="Signal does not belong to this room")
+
+    state = (body.resolution_state or "acknowledged").strip().lower()
+    if state not in {"acknowledged", "resolved"}:
+        raise HTTPException(status_code=400, detail="resolution_state must be acknowledged or resolved")
+
+    try:
+        metadata = signal.get("metadata") if isinstance(signal.get("metadata"), dict) else {}
+        updated_metadata = {
+            **metadata,
+            "concierge_resolution": {
+                "state": state,
+                "resolved_by": body.resolved_by or "concierge_ui",
+                "resolution_note": body.resolution_note or "",
+                "room_id": room_id.upper(),
+                "site_id": site_id,
+                "recorded_at": datetime.utcnow().isoformat() + "Z",
+            },
+        }
+
+        result = (
+            client.table("signal")
+            .update(
+                {
+                    "resolution_state": state,
+                    "updated_at": datetime.utcnow().isoformat() + "Z",
+                    "metadata": updated_metadata,
+                }
+            )
+            .eq("id", signal_id)
+            .execute()
+        )
+    except Exception as exc:
+        logger.error("Failed to resolve concierge signal %s: %s", signal_id, exc)
+        raise HTTPException(status_code=500, detail="Failed to resolve signal") from exc
+
+    updated = result.data[0] if getattr(result, "data", None) else None
+    return {
+        "signal_id": signal_id,
+        "room_id": room_id.upper(),
+        "site_id": site_id,
+        "resolution_state": state,
+        "updated": updated,
     }
 
 

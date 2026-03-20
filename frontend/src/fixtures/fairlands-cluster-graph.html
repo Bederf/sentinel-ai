@@ -1,0 +1,1304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SENTINEL — Issue Graph</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.28.1/cytoscape.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #070b0f;
+    --surface: #0d1117;
+    --surface2: #111827;
+    --border: #1e2d3d;
+    --text: #c9d1d9;
+    --text-muted: #6e7b8a;
+    --cluster: #4a9eff;
+    --email: #4a9eff;
+    --space: #f4900c;
+    --occupancy: #2ecc71;
+    --hvac: #e74c3c;
+    --maintenance: #f1c40f;
+    --security: #1abc9c;
+    --energy: #9b59b6;
+    --entity-person: #8b7fd4;
+    --entity-room: #2980b9;
+    --escalation: #e74c3c;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* Header */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 20px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    z-index: 10;
+  }
+
+  .header-left { display: flex; align-items: center; gap: 14px; }
+
+  .sentinel-mark {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 13px;
+    letter-spacing: 0.15em;
+    color: var(--cluster);
+    text-transform: uppercase;
+  }
+
+  .header-divider {
+    width: 1px; height: 20px;
+    background: var(--border);
+  }
+
+  .cluster-title {
+    font-size: 11px;
+    color: var(--text-muted);
+    letter-spacing: 0.05em;
+  }
+
+  .cluster-state {
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: 3px;
+    background: rgba(231, 76, 60, 0.15);
+    border: 1px solid rgba(231, 76, 60, 0.4);
+    color: #e74c3c;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .header-stats {
+    display: flex;
+    gap: 20px;
+  }
+
+  .stat {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+  }
+
+  .stat-value {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 16px;
+    color: var(--text);
+    line-height: 1;
+  }
+
+  .stat-label {
+    font-size: 9px;
+    color: var(--text-muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-top: 2px;
+  }
+
+  /* Main layout */
+  .main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* Graph area */
+  #cy {
+    flex: 1;
+    background: radial-gradient(ellipse at 50% 40%, #0d1520 0%, #070b0f 65%, #030507 100%);
+    position: relative;
+  }
+
+  /* Legend */
+  .legend {
+    position: absolute;
+    bottom: 20px;
+    left: 20px;
+    background: rgba(13, 17, 23, 0.92);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 14px;
+    z-index: 5;
+    backdrop-filter: blur(8px);
+  }
+
+  .legend-title {
+    font-size: 9px;
+    color: var(--text-muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .legend-items {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 9px;
+    color: var(--text-muted);
+  }
+
+  .legend-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  /* Controls */
+  .controls {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    z-index: 5;
+  }
+
+  .ctrl-btn {
+    width: 32px; height: 32px;
+    background: rgba(13, 17, 23, 0.92);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text-muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    transition: all 0.15s;
+    backdrop-filter: blur(8px);
+  }
+
+  .ctrl-btn:hover {
+    border-color: var(--cluster);
+    color: var(--cluster);
+  }
+
+  /* Detail panel */
+  .detail-panel {
+    width: 300px;
+    background: var(--surface);
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    flex-shrink: 0;
+    transform: translateX(100%);
+    transition: transform 0.2s ease;
+  }
+
+  .detail-panel.open {
+    transform: translateX(0);
+  }
+
+  .panel-header {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  .panel-type-badge {
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 2px 6px;
+    border-radius: 2px;
+    margin-bottom: 6px;
+    display: inline-block;
+  }
+
+  .panel-title {
+    font-family: 'Syne', sans-serif;
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--text);
+    line-height: 1.3;
+  }
+
+  .panel-close {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 16px;
+    padding: 2px;
+    flex-shrink: 0;
+  }
+
+  .panel-close:hover { color: var(--text); }
+
+  .panel-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 14px 16px;
+  }
+
+  .panel-body::-webkit-scrollbar { width: 4px; }
+  .panel-body::-webkit-scrollbar-track { background: transparent; }
+  .panel-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .panel-section {
+    margin-bottom: 16px;
+  }
+
+  .panel-section-title {
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+  }
+
+  .metric-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 5px 0;
+    border-bottom: 1px solid rgba(30, 45, 61, 0.5);
+    font-size: 10px;
+  }
+
+  .metric-row:last-child { border-bottom: none; }
+
+  .metric-key { color: var(--text-muted); }
+  .metric-val { color: var(--text); }
+
+  .confidence-bar-wrap {
+    margin-top: 4px;
+  }
+
+  .confidence-bar {
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 4px;
+  }
+
+  .confidence-fill {
+    height: 100%;
+    background: var(--cluster);
+    border-radius: 2px;
+    transition: width 0.4s ease;
+  }
+
+  .classification-item {
+    margin-bottom: 8px;
+  }
+
+  .classification-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    margin-bottom: 3px;
+  }
+
+  .classification-domain { color: var(--text); }
+  .classification-score { color: var(--text-muted); }
+
+  .evidence-item {
+    font-size: 9px;
+    padding: 4px 8px;
+    background: var(--surface2);
+    border-radius: 3px;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .evidence-dot {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: var(--cluster);
+    flex-shrink: 0;
+  }
+
+  .action-list { list-style: none; }
+  .action-list li {
+    font-size: 9px;
+    color: var(--text-muted);
+    padding: 5px 0;
+    border-bottom: 1px solid rgba(30, 45, 61, 0.4);
+    padding-left: 12px;
+    position: relative;
+  }
+  .action-list li::before {
+    content: '\2192';
+    position: absolute;
+    left: 0;
+    color: var(--cluster);
+  }
+
+  .advisory-note {
+    font-size: 8px;
+    color: var(--text-muted);
+    background: rgba(74, 158, 255, 0.05);
+    border: 1px solid rgba(74, 158, 255, 0.15);
+    border-radius: 3px;
+    padding: 6px 8px;
+    margin-top: 12px;
+    line-height: 1.5;
+  }
+
+  /* Hint bar */
+  .hint-bar {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 9px;
+    color: var(--text-muted);
+    letter-spacing: 0.05em;
+    pointer-events: none;
+    opacity: 0.7;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <span class="sentinel-mark">SENTINEL</span>
+    <div class="header-divider"></div>
+    <span class="cluster-title">Fairlands — Meeting Room Availability Conflict</span>
+    <span class="cluster-state">Escalated</span>
+  </div>
+  <div class="header-stats">
+    <div class="stat">
+      <span class="stat-value">9</span>
+      <span class="stat-label">Signals</span>
+    </div>
+    <div class="stat">
+      <span class="stat-value">60</span>
+      <span class="stat-label">Days open</span>
+    </div>
+    <div class="stat">
+      <span class="stat-value">0.87</span>
+      <span class="stat-label">Confidence</span>
+    </div>
+    <div class="stat">
+      <span class="stat-value" style="color: var(--space);">0.92</span>
+      <span class="stat-label">Space opt.</span>
+    </div>
+  </div>
+</div>
+
+<div class="main">
+  <div style="position:relative; flex:1; overflow:hidden;">
+    <div id="cy"></div>
+
+    <div class="hint-bar">Click any node to inspect · Hover to highlight connections · Scroll to zoom</div>
+
+    <div class="legend">
+      <div class="legend-title">Domain</div>
+      <div class="legend-items">
+        <div class="legend-item"><div class="legend-dot" style="background:var(--email)"></div>Email signal</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--space)"></div>Space / booking</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--occupancy)"></div>Occupancy</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--hvac)"></div>HVAC</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--entity-person)"></div>Person</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--entity-room)"></div>Room / location</div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button class="ctrl-btn" id="btn-fit" title="Fit to view">&#x229E;</button>
+      <button class="ctrl-btn" id="btn-zoom-in" title="Zoom in">+</button>
+      <button class="ctrl-btn" id="btn-zoom-out" title="Zoom out">&minus;</button>
+    </div>
+  </div>
+
+  <div class="detail-panel" id="detail-panel">
+    <div class="panel-header">
+      <div style="flex:1">
+        <div class="panel-type-badge" id="panel-type-badge"></div>
+        <div class="panel-title" id="panel-title"></div>
+      </div>
+      <button class="panel-close" id="panel-close">&#x2715;</button>
+    </div>
+    <div class="panel-body" id="panel-body"></div>
+  </div>
+</div>
+
+<script>
+// ---- Graph data: Fairlands cluster (frozen acceptance fixture) ----
+
+const ELEMENTS = {
+  nodes: [
+    // Cluster centre
+    {
+      data: {
+        id: 'cluster:001',
+        label: 'Issue Cluster',
+        sub_label: 'Fairlands Meeting Rooms',
+        node_type: 'cluster',
+        domain: 'cluster',
+        signal_type: null,
+        severity: 'high',
+        confidence: 0.87,
+        is_collapsed_summary_node: false,
+        metadata: {
+          cluster_state: 'escalated',
+          duration_days: 60,
+          likely_root_cause: 'Block booking behaviour reducing effective room capacity',
+          classifications: [
+            { domain: 'space_optimisation', confidence: 0.92 },
+            { domain: 'workplace_experience', confidence: 0.81 },
+          ],
+          recommended_actions: [
+            'Review block bookings across FA1, FA2, Springboks, FNB',
+            'Cancel confirmed unoccupied slots',
+            'Monitor no-show patterns this week',
+            'Approach Bronwyn Mollentze re: booking reduction',
+            'Define booking release policy with EXCO',
+          ]
+        }
+      },
+      position: { x: 0, y: 0 }
+    },
+
+    // Email signals
+    {
+      data: {
+        id: 'signal:001',
+        label: 'Initial Complaint',
+        badge: null,
+        node_type: 'signal',
+        domain: 'email',
+        signal_type: 'complaint_email',
+        severity: 'medium',
+        confidence: 0.88,
+        is_collapsed_summary_node: false,
+        metadata: {
+          signal_subtype: 'initial',
+          sender: 'Shaun Grose',
+          sent_at: '05 Jan 2026',
+          summary: 'Half of first-floor capacity block booked through March. Requesting engagement with responsible teams.',
+          evidence_basis: ['same_building', 'same_floor', 'initial_thread_signal']
+        }
+      }
+    },
+    {
+      data: {
+        id: 'signal:002',
+        label: 'Helpdesk Intake',
+        badge: null,
+        node_type: 'signal',
+        domain: 'email',
+        signal_type: 'intake_email',
+        severity: 'medium',
+        confidence: 0.80,
+        is_collapsed_summary_node: false,
+        metadata: {
+          signal_subtype: 'initial',
+          sender: 'REMS Helpdesk',
+          sent_at: '05 Jan 2026',
+          summary: 'REMS Helpdesk forwarding complaint to concierge and IT admin for action.',
+          evidence_basis: ['same_thread_id', 'same_building', 'overlapping_time_window']
+        }
+      }
+    },
+    {
+      data: {
+        id: 'signal:004',
+        label: 'Follow-up',
+        badge: '10+ rooms',
+        node_type: 'signal',
+        domain: 'email',
+        signal_type: 'complaint_email',
+        severity: 'medium',
+        confidence: 0.87,
+        is_collapsed_summary_node: false,
+        metadata: {
+          signal_subtype: 'repeat',
+          sender: 'Shaun Grose',
+          sent_at: '22 Jan 2026',
+          summary: 'No visible progress. More than 10 rooms still block booked a week ahead.',
+          evidence_basis: ['same_thread_id', 'same_building', 'both_unresolved', 'shared_entities:shaun_grose,keryn_norman']
+        }
+      }
+    },
+    {
+      data: {
+        id: 'signal:006',
+        label: 'Frustration Email',
+        badge: '60d unresolved',
+        node_type: 'signal',
+        domain: 'email',
+        signal_type: 'complaint_email',
+        severity: 'high',
+        confidence: 0.91,
+        is_collapsed_summary_node: false,
+        metadata: {
+          signal_subtype: 'repeat',
+          sender: 'Shaun Grose',
+          sent_at: '11 Feb 2026',
+          summary: 'No real change. Requests REMS remove block bookings directly. Escalation language.',
+          evidence_basis: ['same_thread_id', 'both_unresolved', 'repeat_complaint', 'semantic_similarity_0.91']
+        }
+      }
+    },
+    {
+      data: {
+        id: 'signal:007',
+        label: 'EXCO Escalation',
+        badge: 'executive',
+        node_type: 'signal',
+        domain: 'email',
+        signal_type: 'escalation_email',
+        severity: 'high',
+        confidence: 0.90,
+        is_collapsed_summary_node: false,
+        metadata: {
+          signal_subtype: 'follow_up',
+          sender: 'Keryn Norman',
+          sent_at: '11 Feb 2026',
+          summary: 'Issue escalated to EXCO. Will seek harder enforcing solution. Policy decision required.',
+          evidence_basis: ['same_thread_id', 'escalation_signal', 'executive_visibility']
+        }
+      }
+    },
+    {
+      data: {
+        id: 'signal:008',
+        label: 'Booking Release Request',
+        badge: '12-seater needed',
+        node_type: 'signal',
+        domain: 'email',
+        signal_type: 'action_request_email',
+        severity: 'high',
+        confidence: 0.92,
+        is_collapsed_summary_node: false,
+        metadata: {
+          signal_subtype: 'urgent',
+          sender: 'Greg Temlett',
+          sent_at: '06 Mar 2026',
+          summary: 'Candice unable to book 12-seater for 11 Mar. Bronwyn Mollentze holds multiple rooms. Requesting release.',
+          evidence_basis: ['same_thread_id', 'same_building', 'named_blocker:bronwyn_mollentze']
+        }
+      }
+    },
+    {
+      data: {
+        id: 'signal:009',
+        label: 'Concierge Observation',
+        badge: 'FA1+FA2+Springboks',
+        node_type: 'signal',
+        domain: 'email',
+        signal_type: 'observation_email',
+        severity: 'high',
+        confidence: 0.94,
+        is_collapsed_summary_node: false,
+        metadata: {
+          signal_subtype: 'informational',
+          sender: 'Thandi Dineka',
+          sent_at: '06 Mar 2026',
+          summary: 'Schedule full. Pattern confirmed in FA1, FA2, Springboks, FNB. Rooms cancelled when visibly empty but pre-preparation prevents blanket cancellation.',
+          evidence_basis: ['ground_truth_observation', 'location_confirmation', 'concierge_authority']
+        }
+      }
+    },
+
+    // Space / booking signals
+    {
+      data: {
+        id: 'signal:booking-sat',
+        label: 'Booking Saturation',
+        badge: '92% booked',
+        node_type: 'signal',
+        domain: 'space_optimisation',
+        signal_type: 'booking_saturation',
+        severity: 'high',
+        confidence: 0.95,
+        is_collapsed_summary_node: false,
+        metadata: {
+          sensor_type: 'booking_system',
+          booking_density_pct: 92,
+          rooms_affected: ['FA1', 'FA2', 'Springboks'],
+          summary: 'FA1, FA2, Springboks booked at 92% capacity for target weeks.',
+          evidence_basis: ['same_building', 'same_floor', 'booking_system_data']
+        }
+      }
+    },
+    {
+      data: {
+        id: 'signal:noshow',
+        label: 'No-Show Pattern',
+        badge: '4 no-shows',
+        node_type: 'signal',
+        domain: 'occupancy',
+        signal_type: 'no_show_pattern',
+        severity: 'medium',
+        confidence: 0.78,
+        is_collapsed_summary_node: false,
+        metadata: {
+          no_show_count: 4,
+          summary: 'Rooms reserved but observed unoccupied on 4 separate occasions.',
+          evidence_basis: ['concierge_observation', 'occupancy_sensor_mismatch']
+        }
+      }
+    },
+    {
+      data: {
+        id: 'signal:occupancy',
+        label: 'Occupancy Mismatch',
+        badge: 'util: 0.31',
+        node_type: 'signal',
+        domain: 'occupancy',
+        signal_type: 'occupancy_anomaly',
+        severity: 'high',
+        confidence: 0.82,
+        is_collapsed_summary_node: false,
+        metadata: {
+          utilisation_ratio: 0.31,
+          summary: 'Actual room utilisation 0.31 vs booking rate of 0.92. Significant mismatch indicating ghost bookings.',
+          evidence_basis: ['occupancy_sensor', 'booking_system_correlation', 'same_location']
+        }
+      }
+    },
+
+    // Entity nodes - people
+    {
+      data: {
+        id: 'entity:shaun',
+        label: 'Shaun Grose',
+        node_type: 'entity',
+        domain: 'entity',
+        entity_type: 'person',
+        signal_type: null,
+        severity: null,
+        confidence: null,
+        is_collapsed_summary_node: false,
+        metadata: { role: 'iDnA Business Solutions Manager', department: 'iDnA', entity_type: 'person' }
+      }
+    },
+    {
+      data: {
+        id: 'entity:keryn',
+        label: 'Keryn Norman',
+        node_type: 'entity',
+        domain: 'entity',
+        entity_type: 'person',
+        signal_type: null,
+        severity: null,
+        confidence: null,
+        is_collapsed_summary_node: false,
+        metadata: { role: 'REMS Management', department: 'REMS', entity_type: 'person' }
+      }
+    },
+    {
+      data: {
+        id: 'entity:thandi',
+        label: 'Thandi Dineka',
+        node_type: 'entity',
+        domain: 'entity',
+        entity_type: 'person',
+        signal_type: null,
+        severity: null,
+        confidence: null,
+        is_collapsed_summary_node: false,
+        metadata: { role: 'Concierge — Fairlands', department: 'REMS', entity_type: 'person',
+                    note: 'Not CC\'d on original thread — routed by role ownership' }
+      }
+    },
+    {
+      data: {
+        id: 'entity:bronwyn',
+        label: 'Bronwyn Mollentze',
+        node_type: 'entity',
+        domain: 'entity',
+        entity_type: 'person',
+        signal_type: null,
+        severity: null,
+        confidence: null,
+        is_collapsed_summary_node: false,
+        metadata: { role: 'Identified block booker', entity_type: 'person' }
+      }
+    },
+
+    // Entity nodes - rooms
+    {
+      data: {
+        id: 'entity:fa1',
+        label: 'FA1 Rooms',
+        node_type: 'entity',
+        domain: 'entity',
+        entity_type: 'room',
+        signal_type: null,
+        severity: null,
+        confidence: null,
+        is_collapsed_summary_node: false,
+        metadata: { location_ref: 'Fairlands/FA1', entity_type: 'room' }
+      }
+    },
+    {
+      data: {
+        id: 'entity:springboks',
+        label: 'Springboks',
+        node_type: 'entity',
+        domain: 'entity',
+        entity_type: 'room',
+        signal_type: null,
+        severity: null,
+        confidence: null,
+        is_collapsed_summary_node: false,
+        metadata: { location_ref: 'Fairlands/FA1/L1/Springboks', entity_type: 'room' }
+      }
+    },
+    {
+      data: {
+        id: 'entity:fa2',
+        label: 'FA2 Rooms',
+        node_type: 'entity',
+        domain: 'entity',
+        entity_type: 'room',
+        signal_type: null,
+        severity: null,
+        confidence: null,
+        is_collapsed_summary_node: false,
+        metadata: { location_ref: 'Fairlands/FA2', entity_type: 'room' }
+      }
+    },
+  ],
+
+  edges: [
+    // Cluster <- signals (evidenced_by)
+    { data: { id: 'edge:e1',  source: 'cluster:001', target: 'signal:001',         edge_type: 'evidenced_by', weight: 0.88, confidence: 0.88 } },
+    { data: { id: 'edge:e2',  source: 'cluster:001', target: 'signal:002',         edge_type: 'evidenced_by', weight: 0.80, confidence: 0.80 } },
+    { data: { id: 'edge:e3',  source: 'cluster:001', target: 'signal:004',         edge_type: 'evidenced_by', weight: 0.87, confidence: 0.87 } },
+    { data: { id: 'edge:e4',  source: 'cluster:001', target: 'signal:006',         edge_type: 'evidenced_by', weight: 0.91, confidence: 0.91 } },
+    { data: { id: 'edge:e5',  source: 'cluster:001', target: 'signal:007',         edge_type: 'evidenced_by', weight: 0.90, confidence: 0.90 } },
+    { data: { id: 'edge:e6',  source: 'cluster:001', target: 'signal:008',         edge_type: 'evidenced_by', weight: 0.92, confidence: 0.92 } },
+    { data: { id: 'edge:e7',  source: 'cluster:001', target: 'signal:009',         edge_type: 'evidenced_by', weight: 0.94, confidence: 0.94 } },
+    { data: { id: 'edge:e8',  source: 'cluster:001', target: 'signal:booking-sat', edge_type: 'evidenced_by', weight: 0.95, confidence: 0.95 } },
+    { data: { id: 'edge:e9',  source: 'cluster:001', target: 'signal:noshow',      edge_type: 'evidenced_by', weight: 0.78, confidence: 0.78 } },
+    { data: { id: 'edge:e10', source: 'cluster:001', target: 'signal:occupancy',   edge_type: 'evidenced_by', weight: 0.82, confidence: 0.82 } },
+
+    // Cluster -> rooms (affects)
+    { data: { id: 'edge:e11', source: 'cluster:001', target: 'entity:fa1',       edge_type: 'affects', weight: 0.97, confidence: 0.97 } },
+    { data: { id: 'edge:e12', source: 'cluster:001', target: 'entity:springboks', edge_type: 'affects', weight: 0.97, confidence: 0.97 } },
+    { data: { id: 'edge:e13', source: 'cluster:001', target: 'entity:fa2',       edge_type: 'affects', weight: 0.90, confidence: 0.90 } },
+
+    // Cluster -> people (involves / escalated_to / owned_by)
+    { data: { id: 'edge:e14', source: 'cluster:001', target: 'entity:shaun',   edge_type: 'involves',     weight: 0.99, confidence: 0.99 } },
+    { data: { id: 'edge:e15', source: 'cluster:001', target: 'entity:keryn',   edge_type: 'escalated_to', weight: 0.95, confidence: 0.95 } },
+    { data: { id: 'edge:e16', source: 'cluster:001', target: 'entity:thandi',  edge_type: 'owned_by',     weight: 0.92, confidence: 0.92 } },
+    { data: { id: 'edge:e17', source: 'cluster:001', target: 'entity:bronwyn', edge_type: 'involves',     weight: 0.88, confidence: 0.88 } },
+
+    // Signal -> person (related_to)
+    { data: { id: 'edge:e18', source: 'signal:001', target: 'entity:shaun',   edge_type: 'related_to', weight: 0.99, confidence: 0.99 } },
+    { data: { id: 'edge:e19', source: 'signal:007', target: 'entity:keryn',   edge_type: 'related_to', weight: 0.99, confidence: 0.99 } },
+    { data: { id: 'edge:e20', source: 'signal:009', target: 'entity:thandi',  edge_type: 'related_to', weight: 0.99, confidence: 0.99 } },
+    { data: { id: 'edge:e21', source: 'signal:008', target: 'entity:bronwyn', edge_type: 'related_to', weight: 0.88, confidence: 0.88 } },
+
+    // Booking signal -> rooms
+    { data: { id: 'edge:e22', source: 'signal:booking-sat', target: 'entity:springboks', edge_type: 'affects', weight: 0.95, confidence: 0.95 } },
+    { data: { id: 'edge:e23', source: 'signal:occupancy',   target: 'entity:fa1',        edge_type: 'affects', weight: 0.82, confidence: 0.82 } },
+  ]
+};
+
+// ---- Domain colour map ----
+const DOMAIN_COLORS = {
+  cluster:            '#4a9eff',
+  email:              '#4a9eff',
+  space_optimisation: '#f4900c',
+  occupancy:          '#2ecc71',
+  hvac:               '#e74c3c',
+  maintenance:        '#f1c40f',
+  security:           '#1abc9c',
+  energy:             '#9b59b6',
+  entity:             '#8b7fd4',
+};
+
+const ENTITY_COLORS = {
+  person: '#8b7fd4',
+  room:   '#2980b9',
+  department: '#9b59b6',
+};
+
+// ---- Cytoscape init ----
+const cy = cytoscape({
+  container: document.getElementById('cy'),
+  elements: ELEMENTS,
+
+  style: [
+    // Base node
+    {
+      selector: 'node',
+      style: {
+        'label': 'data(label)',
+        'font-family': 'DM Mono, monospace',
+        'font-size': 9,
+        'color': '#8a9ab0',
+        'text-valign': 'bottom',
+        'text-halign': 'center',
+        'text-margin-y': 5,
+        'text-wrap': 'wrap',
+        'text-max-width': 80,
+        'min-zoomed-font-size': 6,
+      }
+    },
+
+    // Cluster node
+    {
+      selector: 'node[node_type="cluster"]',
+      style: {
+        'shape': 'hexagon',
+        'width': 86,
+        'height': 86,
+        'background-color': '#0d1f3c',
+        'border-width': 2.5,
+        'border-color': '#4a9eff',
+        'color': '#e8f0ff',
+        'font-size': 10,
+        'font-weight': 500,
+        'text-valign': 'center',
+        'text-halign': 'center',
+        'text-margin-y': 0,
+        'text-wrap': 'wrap',
+        'text-max-width': 70,
+        'z-index': 10,
+        'shadow-blur': 30,
+        'shadow-color': '#4a9eff',
+        'shadow-opacity': 0.5,
+        'shadow-offset-x': 0,
+        'shadow-offset-y': 0,
+      }
+    },
+
+    // Email signals
+    {
+      selector: 'node[domain="email"]',
+      style: {
+        'shape': 'ellipse',
+        'width': 48,
+        'height': 48,
+        'background-color': '#0d1520',
+        'border-width': 1.8,
+        'border-color': '#4a9eff',
+        'color': '#7aacdd',
+      }
+    },
+
+    // Space signals
+    {
+      selector: 'node[domain="space_optimisation"]',
+      style: {
+        'shape': 'ellipse',
+        'width': 52,
+        'height': 52,
+        'background-color': '#1a1000',
+        'border-width': 2,
+        'border-color': '#f4900c',
+        'color': '#d4800c',
+      }
+    },
+
+    // Occupancy signals
+    {
+      selector: 'node[domain="occupancy"]',
+      style: {
+        'shape': 'ellipse',
+        'width': 50,
+        'height': 50,
+        'background-color': '#001510',
+        'border-width': 2,
+        'border-color': '#2ecc71',
+        'color': '#2ecc71',
+      }
+    },
+
+    // Entity - person
+    {
+      selector: 'node[entity_type="person"]',
+      style: {
+        'shape': 'ellipse',
+        'width': 36,
+        'height': 36,
+        'background-color': '#100d1f',
+        'border-width': 1.5,
+        'border-color': '#8b7fd4',
+        'color': '#8b7fd4',
+        'font-size': 8,
+      }
+    },
+
+    // Entity - room
+    {
+      selector: 'node[entity_type="room"]',
+      style: {
+        'shape': 'round-rectangle',
+        'width': 62,
+        'height': 24,
+        'background-color': '#050f1a',
+        'border-width': 1.5,
+        'border-color': '#2980b9',
+        'color': '#5a9fd4',
+        'font-size': 8,
+        'text-valign': 'center',
+        'text-margin-y': 0,
+      }
+    },
+
+    // Badge nodes
+    {
+      selector: 'node[?badge]',
+      style: {
+        'label': function(ele) {
+          return ele.data('label') + '\n' + ele.data('badge');
+        },
+        'font-size': 8,
+        'color': '#7a8a9a',
+      }
+    },
+
+    // Edges - base
+    {
+      selector: 'edge',
+      style: {
+        'curve-style': 'bezier',
+        'width': 1,
+        'opacity': 0.6,
+        'font-family': 'DM Mono, monospace',
+        'font-size': 7,
+        'color': '#3a4a5a',
+        'text-background-color': '#070b0f',
+        'text-background-opacity': 0.85,
+        'text-background-padding': '2px',
+      }
+    },
+
+    // evidenced_by
+    {
+      selector: 'edge[edge_type="evidenced_by"]',
+      style: {
+        'line-color': '#1a3a5a',
+        'target-arrow-color': '#1a3a5a',
+        'target-arrow-shape': 'triangle',
+        'width': 1.2,
+        'opacity': 0.5,
+      }
+    },
+
+    // affects
+    {
+      selector: 'edge[edge_type="affects"]',
+      style: {
+        'line-color': '#5a3000',
+        'target-arrow-color': '#f4900c',
+        'target-arrow-shape': 'triangle',
+        'label': 'affects',
+        'width': 1.8,
+        'opacity': 0.7,
+        'color': '#5a3a10',
+      }
+    },
+
+    // escalated_to
+    {
+      selector: 'edge[edge_type="escalated_to"]',
+      style: {
+        'line-color': '#5a1a10',
+        'target-arrow-color': '#e74c3c',
+        'target-arrow-shape': 'triangle',
+        'line-style': 'dashed',
+        'line-dash-pattern': [6, 3],
+        'label': 'escalated to',
+        'width': 2,
+        'opacity': 0.85,
+        'color': '#8a2a20',
+      }
+    },
+
+    // owned_by
+    {
+      selector: 'edge[edge_type="owned_by"]',
+      style: {
+        'line-color': '#2a1a4a',
+        'target-arrow-color': '#8b7fd4',
+        'target-arrow-shape': 'triangle',
+        'label': 'owned by',
+        'width': 2,
+        'opacity': 0.8,
+        'color': '#6a5ab4',
+      }
+    },
+
+    // involves
+    {
+      selector: 'edge[edge_type="involves"]',
+      style: {
+        'line-color': '#2a1a4a',
+        'target-arrow-shape': 'none',
+        'width': 1,
+        'opacity': 0.45,
+      }
+    },
+
+    // related_to
+    {
+      selector: 'edge[edge_type="related_to"]',
+      style: {
+        'line-color': '#1a2030',
+        'target-arrow-shape': 'none',
+        'width': 0.8,
+        'opacity': 0.3,
+        'line-style': 'dotted',
+      }
+    },
+
+    // Hover states
+    {
+      selector: 'node.highlighted',
+      style: {
+        'border-width': 3,
+        'opacity': 1,
+        'z-index': 5,
+      }
+    },
+    {
+      selector: 'node.dimmed',
+      style: { 'opacity': 0.1 }
+    },
+    {
+      selector: 'edge.dimmed',
+      style: { 'opacity': 0.05 }
+    },
+    {
+      selector: 'edge.highlighted',
+      style: { 'opacity': 1, 'width': 2.5 }
+    },
+  ],
+
+  layout: {
+    name: 'cose',
+    animate: true,
+    animationDuration: 900,
+    animationEasing: 'ease-out-cubic',
+    randomize: false,
+    componentSpacing: 80,
+    nodeRepulsion: function() { return 6000; },
+    idealEdgeLength: function() { return 110; },
+    edgeElasticity: function() { return 0.45; },
+    gravity: 0.25,
+    numIter: 2000,
+    initialTemp: 1000,
+    coolingFactor: 0.99,
+    minTemp: 1,
+    positions: { 'cluster:001': { x: 0, y: 0 } },
+  },
+
+  wheelSensitivity: 0.3,
+  boxSelectionEnabled: false,
+  userPanningEnabled: true,
+  userZoomingEnabled: true,
+});
+
+// Pin cluster at centre after layout (pinned, not locked - user can drag)
+cy.ready(function() {
+  setTimeout(function() {
+    var clusterNode = cy.$('#cluster\\:001');
+    clusterNode.lock();
+  }, 1000);
+});
+
+// ---- Hover interactions ----
+cy.on('mouseover', 'node', function(evt) {
+  var node = evt.target;
+  var neighborhood = node.closedNeighborhood();
+  cy.elements().not(neighborhood).addClass('dimmed');
+  neighborhood.removeClass('dimmed').addClass('highlighted');
+  neighborhood.connectedEdges().addClass('highlighted').removeClass('dimmed');
+});
+
+cy.on('mouseout', 'node', function() {
+  cy.elements().removeClass('dimmed highlighted');
+});
+
+// ---- Click -> detail panel ----
+cy.on('tap', 'node', function(evt) {
+  var node = evt.target;
+  var data = node.data();
+  openPanel(data);
+});
+
+cy.on('tap', function(evt) {
+  if (evt.target === cy) closePanel();
+});
+
+// ---- Detail panel ----
+var panel      = document.getElementById('detail-panel');
+var panelTitle = document.getElementById('panel-title');
+var panelBadge = document.getElementById('panel-type-badge');
+var panelBody  = document.getElementById('panel-body');
+
+document.getElementById('panel-close').addEventListener('click', closePanel);
+
+var DOMAIN_LABELS = {
+  cluster: 'Issue Cluster',
+  email:   'Email Signal',
+  space_optimisation: 'Space Signal',
+  occupancy: 'Occupancy Signal',
+  hvac: 'HVAC Signal',
+  maintenance: 'Maintenance Signal',
+  entity: 'Entity',
+};
+
+var DOMAIN_HEX = {
+  cluster: '#4a9eff',
+  email:   '#4a9eff',
+  space_optimisation: '#f4900c',
+  occupancy: '#2ecc71',
+  hvac: '#e74c3c',
+  maintenance: '#f1c40f',
+  entity: '#8b7fd4',
+};
+
+function openPanel(data) {
+  var color = DOMAIN_HEX[data.domain] || '#4a9eff';
+  var typeLabel = DOMAIN_LABELS[data.domain] || data.domain;
+
+  panelBadge.textContent = typeLabel.toUpperCase();
+  panelBadge.style.background = color + '18';
+  panelBadge.style.border = '1px solid ' + color + '44';
+  panelBadge.style.color = color;
+
+  panelTitle.textContent = data.label;
+
+  if (data.node_type === 'cluster') {
+    panelBody.innerHTML = renderClusterPanel(data.metadata, data);
+  } else if (data.node_type === 'signal') {
+    panelBody.innerHTML = renderSignalPanel(data);
+  } else if (data.node_type === 'entity') {
+    panelBody.innerHTML = renderEntityPanel(data);
+  }
+
+  panel.classList.add('open');
+}
+
+function closePanel() {
+  panel.classList.remove('open');
+}
+
+function renderClusterPanel(m, data) {
+  var classItems = (m.classifications || []).map(function(c) {
+    return '<div class="classification-item">' +
+      '<div class="classification-row">' +
+        '<span class="classification-domain">' + c.domain.replace(/_/g, ' ') + '</span>' +
+        '<span class="classification-score">' + (c.confidence * 100).toFixed(0) + '%</span>' +
+      '</div>' +
+      '<div class="confidence-bar">' +
+        '<div class="confidence-fill" style="width:' + (c.confidence*100) + '%; background:' + (DOMAIN_HEX[c.domain] || '#4a9eff') + '"></div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+
+  var actions = (m.recommended_actions || []).map(function(a) { return '<li>' + a + '</li>'; }).join('');
+
+  return '<div class="panel-section">' +
+    '<div class="panel-section-title">Status</div>' +
+    '<div class="metric-row"><span class="metric-key">State</span><span class="metric-val" style="color:#e74c3c">' + m.cluster_state + '</span></div>' +
+    '<div class="metric-row"><span class="metric-key">Severity</span><span class="metric-val">' + (data.severity || 'unknown') + '</span></div>' +
+    '<div class="metric-row"><span class="metric-key">Open for</span><span class="metric-val">' + m.duration_days + ' days</span></div>' +
+    '<div class="metric-row"><span class="metric-key">Confidence</span><span class="metric-val">' + (data.confidence || 0) + '</span></div>' +
+  '</div>' +
+  '<div class="panel-section">' +
+    '<div class="panel-section-title">Classifications</div>' +
+    classItems +
+  '</div>' +
+  '<div class="panel-section">' +
+    '<div class="panel-section-title">Likely Root Cause</div>' +
+    '<div style="font-size:10px; color:#a0b0c0; line-height:1.5;">' + (m.likely_root_cause || '\u2014') + '</div>' +
+  '</div>' +
+  '<div class="panel-section">' +
+    '<div class="panel-section-title">Recommended Actions</div>' +
+    '<ul class="action-list">' + actions + '</ul>' +
+    '<div class="advisory-note">These actions are advisory. Human decision required before acting on any booking or policy change.</div>' +
+  '</div>';
+}
+
+function renderSignalPanel(data) {
+  var m = data.metadata || {};
+  var color = DOMAIN_HEX[data.domain] || '#4a9eff';
+  var evidence = (m.evidence_basis || []).map(function(e) {
+    return '<div class="evidence-item"><div class="evidence-dot" style="background:' + color + '"></div>' + e.replace(/_/g, ' ') + '</div>';
+  }).join('');
+
+  return '<div class="panel-section">' +
+    '<div class="panel-section-title">Signal Details</div>' +
+    (m.sender ? '<div class="metric-row"><span class="metric-key">Sender</span><span class="metric-val">' + m.sender + '</span></div>' : '') +
+    (m.sent_at ? '<div class="metric-row"><span class="metric-key">Date</span><span class="metric-val">' + m.sent_at + '</span></div>' : '') +
+    '<div class="metric-row"><span class="metric-key">Type</span><span class="metric-val">' + (data.signal_type || '').replace(/_/g, ' ') + '</span></div>' +
+    (m.signal_subtype ? '<div class="metric-row"><span class="metric-key">Subtype</span><span class="metric-val">' + m.signal_subtype + '</span></div>' : '') +
+    '<div class="metric-row"><span class="metric-key">Severity</span><span class="metric-val">' + (data.severity || '\u2014') + '</span></div>' +
+    '<div class="metric-row"><span class="metric-key">Confidence</span><span class="metric-val">' + (data.confidence || '\u2014') + '</span></div>' +
+    '<div class="confidence-bar-wrap">' +
+      '<div class="confidence-bar">' +
+        '<div class="confidence-fill" style="width:' + ((data.confidence||0)*100) + '%; background:' + color + '"></div>' +
+      '</div>' +
+    '</div>' +
+  '</div>' +
+  '<div class="panel-section">' +
+    '<div class="panel-section-title">Summary</div>' +
+    '<div style="font-size:10px; color:#a0b0c0; line-height:1.6;">' + (m.summary || '\u2014') + '</div>' +
+  '</div>' +
+  (evidence ? '<div class="panel-section">' +
+    '<div class="panel-section-title">Evidence Basis</div>' +
+    evidence +
+  '</div>' : '');
+}
+
+function renderEntityPanel(data) {
+  var m = data.metadata || {};
+
+  return '<div class="panel-section">' +
+    '<div class="panel-section-title">Entity</div>' +
+    '<div class="metric-row"><span class="metric-key">Type</span><span class="metric-val">' + (data.entity_type || 'unknown') + '</span></div>' +
+    (m.role ? '<div class="metric-row"><span class="metric-key">Role</span><span class="metric-val">' + m.role + '</span></div>' : '') +
+    (m.department ? '<div class="metric-row"><span class="metric-key">Department</span><span class="metric-val">' + m.department + '</span></div>' : '') +
+    (m.location_ref ? '<div class="metric-row"><span class="metric-key">Location</span><span class="metric-val">' + m.location_ref + '</span></div>' : '') +
+  '</div>' +
+  (m.note ? '<div class="advisory-note">' + m.note + '</div>' : '');
+}
+
+// ---- Controls ----
+document.getElementById('btn-fit').addEventListener('click', function() {
+  cy.fit(undefined, 40);
+});
+document.getElementById('btn-zoom-in').addEventListener('click', function() {
+  cy.zoom({ level: cy.zoom() * 1.25, renderedPosition: { x: cy.width()/2, y: cy.height()/2 } });
+});
+document.getElementById('btn-zoom-out').addEventListener('click', function() {
+  cy.zoom({ level: cy.zoom() * 0.8, renderedPosition: { x: cy.width()/2, y: cy.height()/2 } });
+});
+</script>
+</body>
+</html>

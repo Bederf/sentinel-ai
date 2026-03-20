@@ -22,11 +22,25 @@ from app.services.signal_emitter_base import write_entities
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Room ID pattern — matches Fairlands-style room codes
-# Examples: FA2-1Q1-MR-01, FA1-2Q3-PR-05, fa2-1q1-mr-06
+# Room ID patterns — match both Fairlands-style registry codes and the
+# site-local room ids used by site-002 meeting rooms.
+# Examples:
+#   FA2-1Q1-MR-01
+#   FA1-2Q3-PR-05
+#   FA1-1Q2-MR5
+#   FA2/1Q1/MR06
+#   S002-L1-MR1
+#   S002/B1/PR2
 # ---------------------------------------------------------------------------
 
-ROOM_ID_PATTERN = re.compile(r"\b(FA[12]-\d+Q\d+-(?:MR|PR)-\d+)\b", re.IGNORECASE)
+FAIRLANDS_ROOM_PATTERN = re.compile(
+    r"\b(FA[12])(?:[-/\s])(\d+Q\d+)(?:[-/\s])(MR|PR)(?:[-/\s]?)(\d{1,2})\b",
+    re.IGNORECASE,
+)
+SITE_ROOM_PATTERN = re.compile(
+    r"\b(S\d{3})(?:[-/\s])(L\d+|B\d+)(?:[-/\s])(MR|PR)(?:[-/\s]?)(\d{1,2})\b",
+    re.IGNORECASE,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -37,13 +51,28 @@ ROOM_ID_PATTERN = re.compile(r"\b(FA[12]-\d+Q\d+-(?:MR|PR)-\d+)\b", re.IGNORECAS
 def extract_room_id(text: str) -> str | None:
     """Extract the first room ID match from any text.
 
-    Returns the room ID uppercased, or None if no match found.
+    Returns the room ID in canonical registry format, or None if no match
+    found.
     """
     if not text:
         return None
-    match = ROOM_ID_PATTERN.search(text)
+
+    match = FAIRLANDS_ROOM_PATTERN.search(text)
     if match:
-        return match.group(1).upper()
+        building = match.group(1).upper()
+        quadrant = match.group(2).upper()
+        room_type = match.group(3).upper()
+        room_number = match.group(4).zfill(2)
+        return f"{building}-{quadrant}-{room_type}-{room_number}"
+
+    match = SITE_ROOM_PATTERN.search(text)
+    if match:
+        site_code = match.group(1).upper()
+        floor = match.group(2).upper()
+        room_type = match.group(3).upper()
+        room_number = str(int(match.group(4)))
+        return f"{site_code}-{floor}-{room_type}{room_number}"
+
     return None
 
 
@@ -93,7 +122,8 @@ async def map_signal_to_room(room_repo, signal: dict) -> str | None:
         # Direct room_id field
         meta_room = metadata.get("room_id", "")
         if meta_room:
-            upper_room = meta_room.upper()
+            extracted = extract_room_id(meta_room)
+            upper_room = extracted or meta_room.upper()
             if upper_room not in candidates:
                 candidates.append(upper_room)
 

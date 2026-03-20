@@ -56,7 +56,15 @@ def _make_naive(dt: datetime) -> datetime:
 
 
 def _booking_is_due(booking: BookingRecord, now: datetime) -> bool:
-    grace = timedelta(minutes=settings.ghost_booking_grace_minutes or 15)
+    try:
+        from app.api.space_settings import get_space_setting
+
+        configured = get_space_setting("ghost_booking_grace_minutes")
+        grace_minutes = int(configured) if configured is not None else (settings.ghost_booking_grace_minutes or 5)
+    except Exception:
+        grace_minutes = settings.ghost_booking_grace_minutes or 5
+
+    grace = timedelta(minutes=grace_minutes)
     start_n = _make_naive(booking.start_time)
     end_n = _make_naive(booking.end_time)
     now_n = _make_naive(now)

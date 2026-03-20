@@ -27,9 +27,14 @@ import { useSimulation } from "../contexts/SimulationContext";
 import type { ModuleType } from "../lib/moduleRegistry";
 import { MANDATORY_MODULES } from "../lib/mandatoryModules";
 import { changeSimulationSpeed, stopSimulation, startSimulation, setSimulationStopped, getSimulationStopped } from "../lib/simulationApi";
+import { SiteSelector } from "./SiteSelector";
+import { useBuildingsList } from "../hooks/useBuildingsList";
+import { setStoredSelectedSite } from "../lib/siteSelection";
 
 interface SettingsProps {
+  siteId?: string;
   onError?: (error: string) => void;
+  onNavigate?: (view: import("../lib/navigation").View) => void;
 }
 
 interface FeatureToggleCard {
@@ -85,9 +90,11 @@ const ADDON_TOGGLE_CARDS: FeatureToggleCard[] = [
   { id: "space-optimization-addon", label: "Space Optimization", moduleType: "space_optimization", description: "Ghost booking detection, room right-sizing, focus room analytics." },
 ];
 
-export const Settings = memo(function Settings({ onError }: SettingsProps) {
+export const Settings = memo(function Settings({ siteId, onError, onNavigate }: SettingsProps) {
   const { thresholds, loading, error, updateThresholds } = useHealthThresholds();
-  const { isModuleActive, activateModule, deactivateModule } = useModules();
+  const { data: buildings = [] } = useBuildingsList();
+  const { isModuleActive, activateModule, deactivateModule, setSite: setModuleSite } = useModules();
+  const [selectedSiteId, setSelectedSiteId] = useState<string | null>(siteId || null);
   const currentUserEmail = (() => {
     try {
       const raw = localStorage.getItem("sentinel_user");
@@ -118,6 +125,18 @@ export const Settings = memo(function Settings({ onError }: SettingsProps) {
   const [togglingCardId, setTogglingCardId] = useState<string | null>(null);
   const [mlTrainingEnabled, setMlTrainingEnabled] = useState(false);
   const [mlTrainingLoading, setMlTrainingLoading] = useState(true);
+
+  useEffect(() => {
+    if (siteId && siteId !== selectedSiteId) {
+      setSelectedSiteId(siteId);
+    }
+  }, [siteId, selectedSiteId]);
+
+  useEffect(() => {
+    if (!selectedSiteId) return;
+    const selectedSiteName = buildings.find((building) => building.id === selectedSiteId)?.name || selectedSiteId;
+    setModuleSite(selectedSiteId, selectedSiteName);
+  }, [buildings, selectedSiteId, setModuleSite]);
 
   useEffect(() => {
     if (currentUserEmail && !hasSessionToken) {
@@ -219,6 +238,12 @@ export const Settings = memo(function Settings({ onError }: SettingsProps) {
     }
   };
 
+  const handleSiteChange = useCallback((nextSiteId: string | null) => {
+    if (!nextSiteId) return;
+    setSelectedSiteId(nextSiteId);
+    setStoredSelectedSite(nextSiteId);
+  }, []);
+
   if (loading) {
     return (
       <div
@@ -249,12 +274,17 @@ export const Settings = memo(function Settings({ onError }: SettingsProps) {
         <div className="flex items-center justify-between gap-3 mb-2">
           <div className="flex items-center gap-3">
             <SettingsIcon className="h-8 w-8" style={{ color: "var(--color-sentinel-amber)" }} />
-            <h1
-              className="text-2xl font-semibold"
-              style={{ color: "var(--color-sentinel-text-primary)" }}
-            >
-              System Settings
-            </h1>
+            <div>
+              <h1
+                className="text-2xl font-semibold"
+                style={{ color: "var(--color-sentinel-text-primary)" }}
+              >
+                System Settings
+              </h1>
+              <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                {selectedSiteId || "No site selected"}
+              </p>
+            </div>
           </div>
 
           {/* Page-Level Lock/Unlock Button (Demo Users Only) */}
@@ -295,6 +325,14 @@ export const Settings = memo(function Settings({ onError }: SettingsProps) {
         <p style={{ color: "var(--color-sentinel-text-secondary)" }}>
           Configure global system settings and preferences
         </p>
+        <div className="mt-4 max-w-sm">
+          <SiteSelector
+            sites={buildings}
+            selectedSiteId={selectedSiteId}
+            onSiteChange={handleSiteChange}
+            includeAllOption={false}
+          />
+        </div>
       </div>
 
       {/* Unlocked Warning Banner (Page Level) */}
@@ -332,7 +370,7 @@ export const Settings = memo(function Settings({ onError }: SettingsProps) {
       {/* Settings Sections */}
       <div className="space-y-6 max-w-4xl">
         {/* System Health Dashboard (Phase 160) */}
-        <SystemHealthDashboard onError={onError} />
+        <SystemHealthDashboard onError={onError} onNavigate={onNavigate} />
 
         {/* AI API Cost Tracker */}
         <AiCostTracker onError={onError} />
@@ -724,6 +762,7 @@ export const Settings = memo(function Settings({ onError }: SettingsProps) {
         {/* Simulation Controls — always interactive (operational, not configuration) */}
         <SimulationControlsPanel
           readOnly={false}
+          selectedSiteId={selectedSiteId}
           onError={onError}
         />
       </div>
@@ -748,9 +787,11 @@ const SPEED_PRESETS = [1, 5, 10, 50, 100] as const;
 
 const SimulationControlsPanel = memo(function SimulationControlsPanel({
   readOnly,
+  selectedSiteId,
   onError,
 }: {
   readOnly: boolean;
+  selectedSiteId: string | null;
   onError?: (msg: string) => void;
 }) {
   const sim = useSimulation();
@@ -801,6 +842,10 @@ const SimulationControlsPanel = memo(function SimulationControlsPanel({
 
   const handleStart = useCallback(async () => {
     if (readOnly || starting) return;
+    if (!selectedSiteId) {
+      onError?.("Select a site before starting the simulation.");
+      return;
+    }
     setStarting(true);
     try {
       await setSimulationStopped(false);
@@ -808,6 +853,7 @@ const SimulationControlsPanel = memo(function SimulationControlsPanel({
       await startSimulation({
         scenario: "sentinel_annual",
         duration_minutes: 3650,
+        site_id: selectedSiteId,
       });
       await sim.refresh();
     } catch (err) {
@@ -815,7 +861,7 @@ const SimulationControlsPanel = memo(function SimulationControlsPanel({
     } finally {
       setStarting(false);
     }
-  }, [readOnly, starting, sim, onError]);
+  }, [readOnly, selectedSiteId, starting, sim, onError]);
 
   // Convert linear slider (0-100) to log scale (0.1 - 1000)
   const speedToSlider = (speed: number) =>

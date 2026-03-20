@@ -11,7 +11,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import type { FormEvent, KeyboardEvent } from "react";
-import { Send, MessageSquare, Bot, Mic, MicOff, Trash2 } from "lucide-react";
+import { Send, MessageSquare, Bot, Mic, MicOff, Trash2, BookOpen } from "lucide-react";
 import { ChatMessage } from "./ChatMessage";
 import { DocumentUpload } from "./DocumentUpload";
 import { BuildingSelector } from "./BuildingSelector";
@@ -34,6 +34,7 @@ export function Chat() {
   const [streamingContent, setStreamingContent] = useState("");
   const [sites, setSites] = useState<Site[]>([]);
   const [selectedSiteId, setSelectedSiteId] = useState<string>("");
+  const [includeSystemDocs, setIncludeSystemDocs] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -153,7 +154,7 @@ export function Chat() {
             m.id === assistantId ? { ...m, content: fullResponse } : m
           )
         );
-      }, selectedSiteId);
+      }, selectedSiteId, includeSystemDocs);
 
       // Mark streaming complete (same message, no unmount/remount)
       setMessages((prev) =>
@@ -253,6 +254,29 @@ export function Chat() {
           >
             <Trash2 className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">Clear chat</span>
+          </button>
+
+          {/* System docs toggle */}
+          <button
+            type="button"
+            onClick={() => setIncludeSystemDocs((prev) => !prev)}
+            className="px-3 py-1.5 rounded text-xs flex items-center gap-1.5 transition-all hover:brightness-110"
+            style={{
+              background: includeSystemDocs
+                ? "rgba(50, 116, 217, 0.15)"
+                : "var(--color-grafana-bg-secondary)",
+              border: includeSystemDocs
+                ? "1px solid var(--color-grafana-blue)"
+                : "1px solid var(--color-grafana-border)",
+              color: includeSystemDocs
+                ? "var(--color-grafana-blue)"
+                : "var(--color-grafana-text-secondary)",
+            }}
+            aria-label="Include SENTINEL platform documentation"
+            title="Include SENTINEL platform documentation in search"
+          >
+            <BookOpen className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Platform docs</span>
           </button>
 
           {/* Building selector */}

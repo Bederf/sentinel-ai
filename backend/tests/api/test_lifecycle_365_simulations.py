@@ -1089,5 +1089,86 @@ class TestSimulationErrorHandling:
             assert isinstance(data, dict)
 
 
+class TestSiteScopedStatusResolution:
+    """Validates site-specific lifecycle status resolution."""
+
+    @pytest.mark.asyncio
+    async def test_site_status_does_not_leak_other_site_live_orchestrator(self, async_client: AsyncClient):
+        """A running sim on another site must not make site-002 look active."""
+        other_site_orchestrator = Mock()
+        other_site_orchestrator.running = True
+        other_site_orchestrator.site_id = "site-001"
+
+        with (
+            patch(
+                "app.services.simulation_orchestrator.get_all_active_simulations",
+                return_value={"site-001-task": other_site_orchestrator},
+            ),
+            patch("app.api.lifecycle_simulation.get_simulation_store") as mock_get_store,
+            patch("app.api.lifecycle_simulation.get_simulation_by_task_id", return_value=None),
+        ):
+            mock_store = Mock()
+            mock_store.get_all_tasks.return_value = {}
+            mock_get_store.return_value = mock_store
+
+            response = await async_client.get("/api/lifecycle/status/site-002")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["running"] is False
+        assert data["scenario"] is None
+
+    @pytest.mark.asyncio
+    async def test_site_status_ignores_stale_running_task_and_uses_last_real_state(self, async_client: AsyncClient):
+        """Old ghost 'running' tasks should not hide the last meaningful stopped state."""
+        stale_running = {
+            "task_id": "stale-task",
+            "site_id": "site-002",
+            "status": "running",
+            "scenario": "sentinel_annual",
+            "progress_pct": 0,
+            "days_completed": 0,
+            "created_at": "2000-01-02T10:00:00",
+        }
+        last_real_state = {
+            "task_id": "stopped-task",
+            "site_id": "site-002",
+            "status": "stopped",
+            "scenario": "sentinel_annual",
+            "progress_pct": 71,
+            "days_completed": 260,
+            "created_at": "2000-01-01T08:00:00",
+            "completed_at": "2000-01-01T12:00:00",
+            "state_snapshot": {
+                "simulated_time": "2024-09-22T01:00:00",
+                "recent_events": [],
+            },
+        }
+        tasks = {
+            "stale-task": stale_running,
+            "stopped-task": last_real_state,
+        }
+
+        with (
+            patch("app.services.simulation_orchestrator.get_all_active_simulations", return_value={}),
+            patch("app.api.lifecycle_simulation.get_simulation_store") as mock_get_store,
+            patch("app.api.lifecycle_simulation.get_simulation_by_task_id", return_value=None),
+            patch("app.api.lifecycle_simulation.get_registered_site_ids", return_value=["site-002"]),
+        ):
+            mock_store = Mock()
+            mock_store.get_all_tasks.return_value = tasks
+            mock_store.get_task_progress.side_effect = lambda task_id: tasks.get(task_id, {})
+            mock_get_store.return_value = mock_store
+
+            response = await async_client.get("/api/lifecycle/status/site-002")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["running"] is False
+        assert data["scenario"] == "sentinel_annual"
+        assert data["progress_pct"] == 71
+        assert data["days_simulated"] == 260
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

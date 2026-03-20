@@ -135,6 +135,7 @@ export async function startSimulation(opts: {
   scenario: string;
   duration_minutes: number;
   start_hour?: number;
+  site_id?: string;
 }): Promise<{ success: boolean; run_id: string; scenario: string; duration_minutes: number }> {
   return fetchJson("/api/lifecycle/start", {
     method: "POST",

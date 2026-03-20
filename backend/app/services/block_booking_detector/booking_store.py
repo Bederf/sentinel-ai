@@ -10,11 +10,13 @@ import logging
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Optional
+from zoneinfo import ZoneInfo
 
 from app.database.supabase_client import get_supabase_client
 from app.models.booking_record import BlockBookingAlert, BookingRecord
 
 logger = logging.getLogger(__name__)
+_LOCAL_TIMEZONE = ZoneInfo("Africa/Johannesburg")
 
 DATA_DIR = Path(__file__).parent.parent.parent / "data"
 BOOKINGS_JSON = DATA_DIR / "block_bookings.json"
@@ -26,6 +28,11 @@ def _now_iso() -> str:
 
 
 def _record_to_dict(r: BookingRecord) -> dict[str, Any]:
+    def _booking_dt(value: datetime) -> str:
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=_LOCAL_TIMEZONE)
+        return value.isoformat()
+
     return {
         "id": r.id,
         "site_id": r.site_id,
@@ -34,8 +41,8 @@ def _record_to_dict(r: BookingRecord) -> dict[str, Any]:
         "room_id": r.room_id,
         "room_name": r.room_name,
         "booking_date": r.booking_date.isoformat(),
-        "start_time": r.start_time.isoformat(),
-        "end_time": r.end_time.isoformat(),
+        "start_time": _booking_dt(r.start_time),
+        "end_time": _booking_dt(r.end_time),
         "raw_email_hash": r.raw_email_hash,
         "ingested_at": r.ingested_at.isoformat(),
         "flagged": r.flagged,
@@ -281,6 +288,20 @@ class BookingStore:
 
         return self._remove_booking_json(site_id, organiser_email, room_name, start_time)
 
+    def flag_bookings(self, booking_ids: list[str]) -> None:
+        """Mark bookings as flagged after an anomaly has been raised."""
+        if not booking_ids:
+            return
+
+        if self.client:
+            try:
+                self.client.table("block_booking_records").update({"flagged": True}).in_("id", booking_ids).execute()
+                return
+            except Exception as exc:
+                logger.error("BookingStore.flag_bookings Supabase failed: %s", exc)
+
+        self._flag_bookings_json(booking_ids)
+
     # ------------------------------------------------------------------
     # BlockBookingAlert CRUD
     # ------------------------------------------------------------------
@@ -479,6 +500,17 @@ class BookingStore:
             self._save_json(BOOKINGS_JSON, records)
             return True
         return False
+
+    def _flag_bookings_json(self, booking_ids: list[str]) -> None:
+        records = self._load_json(BOOKINGS_JSON)
+        booking_id_set = set(booking_ids)
+        changed = False
+        for record in records:
+            if record.get("id") in booking_id_set and not record.get("flagged", False):
+                record["flagged"] = True
+                changed = True
+        if changed:
+            self._save_json(BOOKINGS_JSON, records)
 
     # Alerts JSON
     def _save_alert_json(self, row: dict) -> BlockBookingAlert:

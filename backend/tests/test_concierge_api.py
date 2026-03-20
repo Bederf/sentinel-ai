@@ -151,3 +151,66 @@ def test_concierge_dashboard_by_email(client):
     assert data["person_email"] == "TDineka@fnb.co.za"
     assert "cards" in data
     assert len(data["cards"]) > 0
+
+
+def test_concierge_signal_resolve_updates_resolution_state(client, monkeypatch):
+    class FakeResult:
+        def __init__(self, data):
+            self.data = data
+
+    class FakeTable:
+        def __init__(self):
+            self.updated_payload = None
+
+        def select(self, *_args, **_kwargs):
+            return self
+
+        def update(self, payload):
+            self.updated_payload = payload
+            return self
+
+        def eq(self, *_args, **_kwargs):
+            return self
+
+        def execute(self):
+            if self.updated_payload is None:
+                return FakeResult(
+                    [
+                        {
+                            "id": "a1000000-0000-0000-0000-000000000001",
+                            "signal_type": "complaint_email",
+                            "resolution_state": "active",
+                            "location_ref": "FA2-1Q1-MR-01",
+                            "metadata": {"room_id": "FA2-1Q1-MR-01"},
+                        }
+                    ]
+                )
+            return FakeResult(
+                [
+                    {
+                        "id": "a1000000-0000-0000-0000-000000000001",
+                        "resolution_state": self.updated_payload["resolution_state"],
+                        "metadata": self.updated_payload["metadata"],
+                    }
+                ]
+            )
+
+    class FakeSupabase:
+        def __init__(self):
+            self.signal_table = FakeTable()
+
+        def table(self, _name):
+            return self.signal_table
+
+    fake_supabase = FakeSupabase()
+    monkeypatch.setattr("app.database.supabase_client.get_supabase_client", lambda: fake_supabase)
+
+    resp = client.post(
+        "/api/concierge/rooms/S001/FA2-1Q1-MR-01/signals/a1000000-0000-0000-0000-000000000001/resolve",
+        json={"resolution_state": "acknowledged", "resolved_by": "concierge_ui", "resolution_note": "Noted"},
+    )
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["resolution_state"] == "acknowledged"
+    assert data["room_id"] == "FA2-1Q1-MR-01"

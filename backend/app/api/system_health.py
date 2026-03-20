@@ -375,7 +375,7 @@ async def get_monitoring_snapshot(site_id: Optional[str] = Query(None)):
 
 @router.get("/backup-status")
 async def get_backup_status():
-    """Get current backup status: last run timestamp, file count, size, state."""
+    """Get current PostgreSQL backup status: last run timestamp, set count, size, state."""
     from app.services.backup_service import backup_service
 
     return backup_service.get_status()
@@ -383,7 +383,7 @@ async def get_backup_status():
 
 @router.post("/backup/trigger")
 async def trigger_backup(background_tasks: BackgroundTasks):
-    """Trigger a manual Supabase-to-JSON backup. Runs in background.
+    """Trigger a manual PostgreSQL logical backup. Runs in background.
 
     ADMIN role required. Returns immediately with status.
     """

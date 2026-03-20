@@ -73,6 +73,7 @@ class GhostBookingFinding:
     booking_id: str = ""
     organiser_email: str = ""
     organiser_name: str = ""
+    source_booking_flagged: bool = False
     booking_start: datetime = field(default_factory=datetime.utcnow)
     booking_end: datetime = field(default_factory=datetime.utcnow)
     grace_period_minutes: int = 0

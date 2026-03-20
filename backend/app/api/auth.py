@@ -130,7 +130,7 @@ _ADMIN_EMAILS: list[str] = [
 _ADMIN_PIN_HASH: str = os.environ.get("ADMIN_PIN_HASH", "")
 
 
-# User repository — Supabase-backed with JSON fallback
+# User repository — canonical Supabase-backed store
 _user_repo = get_user_repository()
 
 
@@ -163,7 +163,7 @@ async def login_with_email(request: Request, email: str):
     The email address IS the credential - no password required.
     Token expires after jwt_expiration_hours (default 8h, one work shift).
 
-    Users must be pre-registered in sentinel_users (Supabase or JSON fallback).
+    Users must be pre-registered in sentinel_users.
     Unknown emails are rejected with 403.
 
     For ADMIN users, MFA is required (FSR 4.6.3). If MFA is required:
@@ -184,7 +184,7 @@ async def login_with_email(request: Request, email: str):
         # Brute-force check (Phase 58-04 M-5) — keyed by email
         _check_brute_force(email)
 
-        # Look up user in Supabase → JSON fallback
+        # Look up user in the canonical sentinel_users store
         user_data = _user_repo.get_user_by_email(email)
 
         if not user_data:
@@ -543,7 +543,7 @@ async def complete_mfa_login(request: Request, email: str, mfa_code: str):
     # Brute-force check (Phase 58-04 M-5) — keyed by email
     _check_brute_force(email)
 
-    # Look up user in Supabase → JSON fallback
+    # Look up user in the canonical sentinel_users store
     user_data = _user_repo.get_user_by_email(email)
     if not user_data:
         raise HTTPException(status_code=403, detail="User not registered. Contact your administrator.")

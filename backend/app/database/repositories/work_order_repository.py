@@ -20,6 +20,16 @@ class WorkOrderRepository:
         "estimated_duration_hours"
     )
 
+    _DETAIL_COLUMNS = (
+        "id, code, title, description, priority, status, "
+        "assigned_to, assigned_team, equipment_id, site_id, "
+        "scheduled_date, completed_at, created_at, created_by, "
+        "estimated_duration_hours, actual_duration_hours, "
+        "labour_cost_zar, parts_cost_zar, total_cost_zar, "
+        "notes, resolution, category, updated_at, "
+        "equipment(code, name, type), buildings(code, name)"
+    )
+
     def __init__(self):
         self.client = get_supabase_client()
 
@@ -111,12 +121,7 @@ class WorkOrderRepository:
             return None
 
         try:
-            result = (
-                self.client.table("work_orders")
-                .select("*, equipment(code, name, type), buildings(code, name)")
-                .eq("id", work_order_id)
-                .execute()
-            )
+            result = self.client.table("work_orders").select(self._DETAIL_COLUMNS).eq("id", work_order_id).execute()
 
             if result.data and len(result.data) > 0:
                 return result.data[0]
@@ -136,12 +141,7 @@ class WorkOrderRepository:
             return None
 
         try:
-            result = (
-                self.client.table("work_orders")
-                .select("*, equipment(code, name, type), buildings(code, name)")
-                .eq("code", code)
-                .execute()
-            )
+            result = self.client.table("work_orders").select(self._DETAIL_COLUMNS).eq("code", code).execute()
 
             if result.data and len(result.data) > 0:
                 return result.data[0]

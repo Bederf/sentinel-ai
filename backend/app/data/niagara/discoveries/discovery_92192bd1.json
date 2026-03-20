@@ -1,0 +1,128 @@
+{
+  "metadata": {
+    "discovery_id": "92192bd1",
+    "device_ip": "192.168.1.100",
+    "site_id": "site-001",
+    "device_id": null,
+    "status": "complete",
+    "started_at": "2026-03-16T13:34:37.378918",
+    "completed_at": "2026-03-16T13:34:37.420980",
+    "points_count": 3,
+    "classified_count": 3,
+    "summary": {
+      "total_points": 3,
+      "equipment_type_counts": {
+        "unknown": 3
+      },
+      "confidence_counts": {
+        "medium": 3
+      },
+      "point_type_counts": {
+        "sensor": 3
+      },
+      "unique_equipment": {
+        "unknown": 2
+      },
+      "equipment_ids": {
+        "unknown": [
+          "ZONE-L1",
+          "ZONE-L2"
+        ]
+      },
+      "needs_review": 0,
+      "module_filtered_points": 54
+    },
+    "error": null
+  },
+  "classified_points": [
+    {
+      "original_name": "ZONE-L1_CO2",
+      "original_description": "Level 1 CO2 Sensor",
+      "equipment_type": "unknown",
+      "equipment_id": "ZONE-L1",
+      "point_type": "sensor",
+      "point_category": "co2",
+      "brick_class": "CO2_Sensor",
+      "standardized_name": "ZONE-L1/co2_sensor",
+      "unit": "ppm",
+      "confidence": "medium",
+      "tags": [
+        "co2",
+        "sensor",
+        "point",
+        "cur"
+      ],
+      "object_type": "analogInput",
+      "instance": 0,
+      "present_value": null,
+      "writable": false
+    },
+    {
+      "original_name": "ZONE-L1_Humidity",
+      "original_description": "Level 1 Humidity Sensor",
+      "equipment_type": "unknown",
+      "equipment_id": "ZONE-L1",
+      "point_type": "sensor",
+      "point_category": "humidity",
+      "brick_class": "Humidity_Sensor",
+      "standardized_name": "ZONE-L1/humidity_sensor",
+      "unit": "%",
+      "confidence": "medium",
+      "tags": [
+        "humidity",
+        "sensor",
+        "point",
+        "cur"
+      ],
+      "object_type": "analogInput",
+      "instance": 0,
+      "present_value": null,
+      "writable": false
+    },
+    {
+      "original_name": "ZONE-L2_CO2",
+      "original_description": "Level 2 CO2 Sensor",
+      "equipment_type": "unknown",
+      "equipment_id": "ZONE-L2",
+      "point_type": "sensor",
+      "point_category": "co2",
+      "brick_class": "CO2_Sensor",
+      "standardized_name": "ZONE-L2/co2_sensor",
+      "unit": "ppm",
+      "confidence": "medium",
+      "tags": [
+        "co2",
+        "sensor",
+        "point",
+        "cur"
+      ],
+      "object_type": "analogInput",
+      "instance": 0,
+      "present_value": null,
+      "writable": false
+    }
+  ],
+  "raw_points": [
+    {
+      "name": "ZONE-L1_CO2",
+      "description": "Level 1 CO2 Sensor",
+      "object_type": "analogInput",
+      "units": "ppm",
+      "value": 650
+    },
+    {
+      "name": "ZONE-L1_Humidity",
+      "description": "Level 1 Humidity Sensor",
+      "object_type": "analogInput",
+      "units": "%",
+      "value": 55
+    },
+    {
+      "name": "ZONE-L2_CO2",
+      "description": "Level 2 CO2 Sensor",
+      "object_type": "analogInput",
+      "units": "ppm",
+      "value": 720
+    }
+  ]
+}

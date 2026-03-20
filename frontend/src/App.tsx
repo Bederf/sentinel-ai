@@ -6,6 +6,7 @@ import api, { AUTH_EXPIRED_EVENT, isExpectedApiError, type Alert, type AuthUser 
 import { SimulationTimeIndicator } from "./components/SimulationTimeIndicator";
 import { useRecommendationToasts, RecommendationCard } from "./components/RecommendationToast";
 import { useBuildingsList } from "./hooks/useBuildingsList";
+import { SITE_SELECTION_CHANGED_EVENT, getStoredSelectedSite } from "./lib/siteSelection";
 
 // Security: Prevent console logging in production (Phase 75-07)
 import { initializeSecurityProtections } from "./lib/api/security-utils";
@@ -83,6 +84,13 @@ function App() {
   const { data: buildings = [] } = useBuildingsList({ enabled: !!currentUser });
   const primarySiteId = useMemo(() => buildings[0]?.id || null, [buildings]);
   const primarySiteName = useMemo(() => buildings[0]?.name || null, [buildings]);
+  const [selectedSiteId, setSelectedSiteId] = useState<string | null>(() => getStoredSelectedSite());
+  const selectedSite = useMemo(
+    () => buildings.find((building) => building.id === selectedSiteId) || null,
+    [buildings, selectedSiteId]
+  );
+  const effectiveSiteId = selectedSiteId || primarySiteId || "";
+  const effectiveSiteName = selectedSite?.name || primarySiteName || undefined;
   // Auto-landing: if user only has one site with space module, go straight there
   const [autoSelectSiteId, setAutoSelectSiteId] = useState<string | null>(null);
   const [defaultBuildingTab, setDefaultBuildingTab] = useState<import("./lib/navigation").BuildingTabId | undefined>(undefined);
@@ -114,6 +122,33 @@ function App() {
       })
       .catch(() => {});
   }, [currentUser?.email, buildings.length]);
+
+  useEffect(() => {
+    if (buildings.length === 0) return;
+
+    const storedSiteId = getStoredSelectedSite();
+    const preferredSiteId = storedSiteId || selectedSiteId;
+    const validSiteId = preferredSiteId && buildings.some((building) => building.id === preferredSiteId)
+      ? preferredSiteId
+      : buildings[0]?.id || null;
+
+    if (validSiteId !== selectedSiteId) {
+      setSelectedSiteId(validSiteId);
+    }
+  }, [buildings, selectedSiteId]);
+
+  useEffect(() => {
+    const handleSiteSelectionChanged = (event: Event) => {
+      const customEvent = event as CustomEvent<{ siteId?: string | null }>;
+      const nextSiteId = customEvent.detail?.siteId || getStoredSelectedSite();
+      setSelectedSiteId(nextSiteId || null);
+    };
+
+    window.addEventListener(SITE_SELECTION_CHANGED_EVENT, handleSiteSelectionChanged as EventListener);
+    return () => {
+      window.removeEventListener(SITE_SELECTION_CHANGED_EVENT, handleSiteSelectionChanged as EventListener);
+    };
+  }, []);
 
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -193,7 +228,7 @@ function App() {
   }, []);
 
   // Use recommendation toasts hook when logged in
-  const siteId = currentUser ? (primarySiteId || '') : '';
+  const siteId = currentUser ? effectiveSiteId : '';
   useRecommendationToasts(siteId, handleShowRecCard);
 
   // Initialize devices from simulation on login
@@ -486,9 +521,9 @@ function App() {
   }
 
   return (
-    <SimulationProvider siteId={primarySiteId || undefined}>
+    <SimulationProvider siteId={effectiveSiteId || undefined}>
     <ThemeProvider>
-    <ModuleProvider initialSiteId={primarySiteId || undefined} initialSiteName={primarySiteName || undefined}>
+    <ModuleProvider initialSiteId={effectiveSiteId || undefined} initialSiteName={effectiveSiteName}>
     <div
       className="h-screen flex"
       style={{ background: "var(--color-sentinel-bg-canvas)" }}
@@ -503,7 +538,7 @@ function App() {
       />
 
       {/* Simulation Time Indicator - Shows when simulation is running */}
-      <SimulationTimeIndicator simulationRunning={simulationRunning} siteId={primarySiteId || ''} />
+      <SimulationTimeIndicator simulationRunning={simulationRunning} siteId={effectiveSiteId} />
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0">
@@ -820,7 +855,7 @@ function App() {
           ) : currentView === "simbiot" ? (
             <SimbiotPage />
           ) : currentView === "settings" ? (
-            <Settings onError={setError} onNavigate={handleViewChange} />
+            <Settings siteId={effectiveSiteId || undefined} onError={setError} onNavigate={handleViewChange} />
           ) : currentView === "maintenance" ? (
             <div className="h-full overflow-y-auto">
               <AssetWorkflowDashboard />
@@ -835,7 +870,7 @@ function App() {
             <FleetInsights />
           ) : currentView === "intelligence" ? (
             <div className="h-full">
-              <IntelligencePage />
+              <IntelligencePage siteId={effectiveSiteId || undefined} />
             </div>
           ) : (
             <div className="h-full flex items-center justify-center">

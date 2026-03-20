@@ -1,0 +1,59 @@
+{
+  "discovery_id": "b730d86c",
+  "site_id": "site-001",
+  "created_at": "2026-03-16T12:36:18.505837",
+  "equipment_count": 1,
+  "total_points": 2,
+  "equipment": {
+    "S001-UNKNOWN-B1-001": {
+      "equipment_id": "S001-UNKNOWN-B1-001",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (S001-UNKNOWN-B1-001)",
+      "site_id": "site-001",
+      "points": [
+        {
+          "original_name": "SITE001-WEATHER.outdoor_humidity",
+          "standardized_name": "SITE001-WEATHER/humidity_sensor",
+          "point_type": "sensor",
+          "point_category": "humidity",
+          "unit": "%",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2000,
+          "present_value": 65.0,
+          "writable": false
+        },
+        {
+          "original_name": "SITE001-WEATHER.outdoor_temperature",
+          "standardized_name": "SITE001-WEATHER/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2001,
+          "present_value": 10.424951180069401,
+          "writable": false
+        }
+      ],
+      "point_count": 2,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "SITE001-WEATHER",
+        "zone": {
+          "zone_id": "Zone-B1-001",
+          "floor": "B1",
+          "zone_letter": "001",
+          "zone_type": "open_office",
+          "site_id": "site-001"
+        }
+      },
+      "created_at": "2026-03-16T12:36:18.505730",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    }
+  }
+}

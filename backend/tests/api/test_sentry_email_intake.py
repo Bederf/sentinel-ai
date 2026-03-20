@@ -7,6 +7,7 @@ BMS enrichment escalation, and routing branches.
 import os
 import uuid
 from pathlib import Path
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -195,6 +196,68 @@ class TestEmailIntakeHappyPath:
         assert resp.status_code == 200
         data = resp.json()
         assert data["success"] is True
+
+    def test_intelligence_source_routes_to_signal_pipeline(self):
+        payload = _make_payload(
+            subject="AV issue",
+            body_plain="Good day the TV in FA1-1Q2-MR5 is not wroking please fix",
+            source="intelligence_intake",
+            to=["intake@sentinel-ai.co.za"],
+            cc=["remshelpdesk@fnb.co.za"],
+        )
+
+        with patch("app.services.signal_emitter.emit_email_signal", new_callable=AsyncMock) as mock_emit:
+            mock_emit.return_value = {
+                "signal_id": "signal-123",
+                "status": "created",
+                "signal_type": "observation_email",
+                "severity": "low",
+                "location_ref": "Fairlands/FA1/1Q2/FA1-1Q2-MR-05",
+            }
+
+            resp = client.post(
+                "/api/sentry/email/intake",
+                json=payload,
+                headers=VALID_HEADERS,
+            )
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["success"] is True
+        assert data["intake_id"] == "signal-123"
+        assert data["action_taken"] == "routed"
+        mock_emit.assert_awaited_once()
+
+    def test_intelligence_source_ignores_non_meeting_room_email(self):
+        payload = _make_payload(
+            subject="Fw: Team work space - Fairlands 2",
+            body_plain=(
+                "We are arranging a team work in office day and would like to find out if there "
+                "is available work desk space available at Fairlands 2."
+            ),
+            source="intelligence_intake",
+            to=["intake@sentinel-ai.co.za"],
+        )
+
+        with patch("app.services.signal_emitter.emit_email_signal", new_callable=AsyncMock) as mock_emit:
+            mock_emit.return_value = {
+                "signal_id": None,
+                "status": "ignored",
+                "reason": "non_meeting_room_email",
+            }
+
+            resp = client.post(
+                "/api/sentry/email/intake",
+                json=payload,
+                headers=VALID_HEADERS,
+            )
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["success"] is True
+        assert data["intake_id"] is None
+        assert data["action_taken"] == "manual_review"
+        assert "Ignored non-meeting-room" in data["message"]
 
 
 # -----------------------------------------------------------------------

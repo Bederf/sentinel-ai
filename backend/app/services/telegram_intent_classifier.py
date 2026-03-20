@@ -19,6 +19,7 @@ class TelegramIntent(str, Enum):
     WO_UPDATE = "wo_update"
     CHECKLIST_REPLY = "checklist_reply"
     AD_HOC_FAULT = "ad_hoc_fault"
+    DOCUMENT_INTAKE = "document_intake"
     UNKNOWN = "unknown"
 
 

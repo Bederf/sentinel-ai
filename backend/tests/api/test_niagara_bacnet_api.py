@@ -119,6 +119,23 @@ class TestDeviceDiscoveryEndpoint:
         assert result.devices == []
 
     @pytest.mark.asyncio
+    async def test_discover_filters_devices_by_host(self, mock_bacnet_client):
+        from app.api.niagara_bacnet import discover_devices
+        from app.models.niagara import BACnetDiscoverRequest
+
+        mock_devices = [
+            DiscoveredDevice(device_id=1000, ip_address="192.168.1.100:47808", vendor_name="Tridium"),
+            DiscoveredDevice(device_id=2000, ip_address="192.168.1.101:47808", vendor_name="Tridium"),
+        ]
+        mock_bacnet_client.discover_devices = AsyncMock(return_value=mock_devices)
+
+        with patch("app.api.niagara_bacnet.get_bacnet_client", return_value=mock_bacnet_client):
+            result = await discover_devices(BACnetDiscoverRequest(timeout=5.0, host="192.168.1.100"))
+
+        assert result.count == 1
+        assert result.devices[0].device_id == 1000
+
+    @pytest.mark.asyncio
     async def test_discover_client_not_started(self, mock_bacnet_client):
         from app.api.niagara_bacnet import discover_devices
         from app.models.niagara import BACnetDiscoverRequest
@@ -142,6 +159,44 @@ class TestDeviceDiscoveryEndpoint:
             result = await discover_devices(BACnetDiscoverRequest())
 
         assert result.count == 0
+
+
+class TestBACnetConnectionEndpoint:
+    """Tests for test_bacnet_connection endpoint function."""
+
+    @pytest.mark.asyncio
+    async def test_test_connection_starts_client_when_needed(self, mock_bacnet_client):
+        from app.api.niagara_bacnet import test_bacnet_connection
+        from app.models.niagara import BACnetTestConnectionRequest
+
+        mock_bacnet_client.is_running = False
+        mock_bacnet_client.start = AsyncMock()
+        mock_bacnet_client.discover_devices = AsyncMock(
+            return_value=[DiscoveredDevice(device_id=1000, ip_address="192.168.1.100", vendor_name="Tridium")]
+        )
+
+        with patch("app.api.niagara_bacnet.get_bacnet_client", return_value=mock_bacnet_client):
+            result = await test_bacnet_connection(BACnetTestConnectionRequest(timeout=5))
+
+        mock_bacnet_client.start.assert_awaited_once()
+        assert result.count == 1
+
+    @pytest.mark.asyncio
+    async def test_test_connection_filters_devices_by_host(self, mock_bacnet_client):
+        from app.api.niagara_bacnet import test_bacnet_connection
+        from app.models.niagara import BACnetTestConnectionRequest
+
+        mock_devices = [
+            DiscoveredDevice(device_id=1000, ip_address="192.168.1.100:47808", vendor_name="Tridium"),
+            DiscoveredDevice(device_id=2000, ip_address="192.168.1.101:47808", vendor_name="Tridium"),
+        ]
+        mock_bacnet_client.discover_devices = AsyncMock(return_value=mock_devices)
+
+        with patch("app.api.niagara_bacnet.get_bacnet_client", return_value=mock_bacnet_client):
+            result = await test_bacnet_connection(BACnetTestConnectionRequest(timeout=5, host="192.168.1.101"))
+
+        assert result.count == 1
+        assert result.devices[0].device_id == 2000
 
 
 # ---------------------------------------------------------------------------
@@ -494,8 +549,16 @@ class TestModelValidation:
     def test_discover_request_custom(self):
         from app.models.niagara import BACnetDiscoverRequest
 
-        req = BACnetDiscoverRequest(timeout=10.0)
+        req = BACnetDiscoverRequest(timeout=10.0, host="192.168.1.100")
         assert req.timeout == 10.0
+        assert req.host == "192.168.1.100"
+
+    def test_test_connection_request_accepts_host(self):
+        from app.models.niagara import BACnetTestConnectionRequest
+
+        req = BACnetTestConnectionRequest(timeout=10, host="192.168.1.101")
+        assert req.timeout == 10
+        assert req.host == "192.168.1.101"
 
     def test_write_request_valid_priority(self):
         from app.models.niagara import BACnetPointWriteRequest

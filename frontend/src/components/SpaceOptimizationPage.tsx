@@ -21,9 +21,11 @@ import {
   ChevronUp,
   DoorOpen,
   BarChart3,
+  Orbit,
 } from "lucide-react";
 
 import { authorizedFetch } from "@/lib/api";
+import { ConciergeDashboardPage } from "./intelligence/ConciergeDashboardPage";
 
 interface BlockBookingAlert {
   id: string;
@@ -99,6 +101,10 @@ interface FocusSession {
   duration_seconds: number;
   duration_minutes: number;
   extended_use: boolean;
+  red_light_on: boolean;
+  max_allowed_minutes: number;
+  red_light_cooldown_seconds?: number;
+  red_light_cooldown_remaining_seconds?: number;
   is_active: boolean;
 }
 
@@ -119,10 +125,10 @@ interface HourlyTrend {
   zone_type: string;
 }
 
-type TabId = "block" | "ghost" | "rightsizing" | "focus" | "trends";
+type TabId = "intelligence" | "block" | "ghost" | "rightsizing" | "focus" | "trends";
 
 export function SpaceOptimizationPage({ siteId: propSiteId }: { siteId?: string } = {}) {
-  const [activeTab, setActiveTab] = useState<TabId>("block");
+  const [activeTab, setActiveTab] = useState<TabId>("intelligence");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -162,37 +168,63 @@ export function SpaceOptimizationPage({ siteId: propSiteId }: { siteId?: string 
         authorizedFetch(`/api/space/focus-analytics?${sq}`, { headers }),
         authorizedFetch(trendsUrl, { headers }),
       ]);
+      const apiErrors: string[] = [];
+
+      const readApiError = async (label: string, response: Response) => {
+        let detail = response.statusText || `HTTP ${response.status}`;
+        try {
+          const body = await response.json() as { detail?: string; message?: string };
+          detail = body.detail || body.message || detail;
+        } catch {
+          // ignore JSON parse issues
+        }
+        apiErrors.push(`${label}: ${detail}`);
+      };
 
       if (alertsRes.ok) {
         const data = await alertsRes.json();
         setBlockAlerts(data.alerts || []);
+      } else {
+        await readApiError("block booking alerts", alertsRes);
       }
       if (ghostRes.ok) {
         const data = await ghostRes.json();
         setGhostFindings(data.findings || []);
+      } else {
+        await readApiError("ghost rooms", ghostRes);
       }
       if (bookingsRes.ok) {
         const data = await bookingsRes.json();
         setIngestedBookings(data.bookings || []);
         setTotalIngested(data.total_ingested ?? data.bookings?.length ?? 0);
+      } else {
+        await readApiError("bookings", bookingsRes);
       }
       if (rightsizingRes.ok) {
         const data = await rightsizingRes.json();
         setRightsizingFindings(data.findings || []);
+      } else {
+        await readApiError("right-sizing", rightsizingRes);
       }
       if (focusRes.ok) {
         const data = await focusRes.json();
         setFocusSessions(data.sessions || []);
+      } else {
+        await readApiError("focus rooms", focusRes);
       }
       if (analyticsRes.ok) {
         setFocusAnalytics(await analyticsRes.json());
+      } else {
+        await readApiError("focus analytics", analyticsRes);
       }
       if (trendsRes.ok) {
         const data = await trendsRes.json();
         setHourlyTrends(transformHourlyTrendData(data));
+      } else {
+        await readApiError("occupancy trends", trendsRes);
       }
 
-      setError(null);
+      setError(apiErrors.length > 0 ? `Failed to load: ${apiErrors.join("; ")}` : null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load space optimization data");
     } finally {
@@ -268,6 +300,7 @@ export function SpaceOptimizationPage({ siteId: propSiteId }: { siteId?: string 
   const flaggedBookings = ingestedBookings.filter((booking) => booking.flagged).length;
 
   const tabs: { id: TabId; label: string; count?: number }[] = [
+    { id: "intelligence", label: "Meeting Room Intelligence" },
     { id: "block", label: "Block Bookings", count: openBlockAlerts },
     { id: "ghost", label: "Ghost Rooms", count: openGhostFindings },
     { id: "rightsizing", label: "Right-Sizing", count: openRightsizing },
@@ -336,6 +369,14 @@ export function SpaceOptimizationPage({ siteId: propSiteId }: { siteId?: string 
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
+        <KpiCard
+          icon={<Orbit className="h-5 w-5" />}
+          label="Meeting Room Intelligence"
+          value={openBlockAlerts + openGhostFindings}
+          color="#3b82f6"
+          bgColor="rgba(59, 130, 246, 0.15)"
+          subtitle="room signals for this building"
+        />
         <KpiCard
           icon={<Mail className="h-5 w-5" />}
           label="Block Booking Alerts"
@@ -409,6 +450,9 @@ export function SpaceOptimizationPage({ siteId: propSiteId }: { siteId?: string 
         ))}
       </div>
 
+      {activeTab === "intelligence" && (
+        <MeetingRoomIntelligencePanel siteId={siteId} />
+      )}
       {activeTab === "block" && (
         <BlockBookingsPanel
           alerts={blockAlerts}
@@ -428,6 +472,34 @@ export function SpaceOptimizationPage({ siteId: propSiteId }: { siteId?: string 
       {activeTab === "trends" && (
         <OccupancyTrendsPanel trends={hourlyTrends} />
       )}
+    </div>
+  );
+}
+
+function MeetingRoomIntelligencePanel({ siteId }: { siteId: string }) {
+  return (
+    <div className="space-y-4">
+      <div
+        className="rounded-md p-4"
+        style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}
+      >
+        <p className="text-sm font-medium mb-1" style={{ color: "var(--color-sentinel-text-primary)" }}>
+          Concierge room intelligence
+        </p>
+        <p className="text-xs leading-6" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+          Room intelligence here is locked to this building only. Meeting-room issue emails, block bookings, ghost rooms,
+          and related concierge signals are grouped by room so the concierge can work directly from the Space tab.
+        </p>
+      </div>
+
+      <div
+        className="rounded-md overflow-hidden"
+        style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}
+      >
+        <div className="h-[720px] min-h-[540px]">
+          <ConciergeDashboardPage siteId={siteId} siteLabel="Sandton City" showHeader={false} />
+        </div>
+      </div>
     </div>
   );
 }
@@ -467,8 +539,8 @@ function GhostRoomsPanel({
           Ghost room rule
         </p>
         <p className="text-xs leading-6" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-          When a booked meeting room shows no presence for 15 minutes after the start time, SENTINEL flags the room,
-          sends the concierge an email through n8n, and sends a WhatsApp inspection message through Sentry/Twilio.
+          When a booked meeting room shows no presence after the configured grace period, SENTINEL flags the room,
+          sends the concierge an email, and sends a WhatsApp inspection message.
         </p>
       </div>
 
@@ -1031,6 +1103,7 @@ function FocusRoomsPanel({
 }
 
 function SessionCard({ session }: { session: FocusSession }) {
+  const overLimit = session.red_light_on;
   return (
     <div
       className="rounded-md p-3 flex items-center gap-3"
@@ -1039,10 +1112,16 @@ function SessionCard({ session }: { session: FocusSession }) {
       <div
         className="p-2 rounded"
         style={{
-          background: session.is_active ? "rgba(16, 185, 129, 0.15)" : "rgba(59, 130, 246, 0.1)",
+          background: overLimit
+            ? "rgba(239, 68, 68, 0.16)"
+            : session.is_active
+              ? "rgba(16, 185, 129, 0.15)"
+              : "rgba(59, 130, 246, 0.1)",
         }}
       >
-        {session.is_active ? (
+        {overLimit ? (
+          <AlertTriangle className="h-4 w-4" style={{ color: "var(--color-sentinel-red)" }} />
+        ) : session.is_active ? (
           <Users className="h-4 w-4" style={{ color: "var(--color-sentinel-green)" }} />
         ) : (
           <CheckCircle2 className="h-4 w-4" style={{ color: "var(--color-sentinel-blue)" }} />
@@ -1056,6 +1135,19 @@ function SessionCard({ session }: { session: FocusSession }) {
           <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
             {session.duration_minutes.toFixed(0)} min
           </span>
+          <span className="text-xs" style={{ color: "var(--color-sentinel-text-disabled)" }}>
+            max {session.max_allowed_minutes} min
+          </span>
+          {session.red_light_on && (
+            <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: "rgba(239, 68, 68, 0.16)", color: "var(--color-sentinel-red)" }}>
+              Red Light On
+            </span>
+          )}
+          {session.red_light_on && !session.is_active && (session.red_light_cooldown_remaining_seconds ?? 0) > 0 && (
+            <span className="text-xs" style={{ color: "var(--color-sentinel-text-disabled)" }}>
+              cooldown {Math.ceil((session.red_light_cooldown_remaining_seconds ?? 0) / 60)} min
+            </span>
+          )}
           {session.extended_use && (
             <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: "rgba(245, 158, 11, 0.15)", color: "var(--color-sentinel-amber)" }}>
               Extended

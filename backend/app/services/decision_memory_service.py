@@ -20,6 +20,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from app.database.supabase_client import get_supabase_client
 from app.models.decision_memory import (
     DecisionOutcome,
     DecisionPattern,
@@ -54,10 +55,27 @@ class DecisionMemoryService:
         self._records: List[DecisionRecord] = []
         self._patterns: List[DecisionPattern] = []
         self._loaded = False
+        self._client = None
         # Allow explicit path overrides for testing isolation
         self._data_dir_override = data_dir
         self._records_file_override = records_file
         self._patterns_file_override = patterns_file
+
+    @property
+    def _db_enabled(self) -> bool:
+        return (
+            self._data_dir_override is None
+            and self._records_file_override is None
+            and self._patterns_file_override is None
+        )
+
+    @property
+    def client(self):
+        if not self._db_enabled:
+            return None
+        if self._client is None:
+            self._client = get_supabase_client()
+        return self._client
 
     @property
     def _data_dir(self) -> Path:
@@ -412,7 +430,7 @@ class DecisionMemoryService:
         return "\n".join(sections) if sections else ""
 
     # -----------------------------------------------------------------
-    # Persistence (JSON fallback)
+    # Persistence (Postgres primary, JSON fallback for test/local overrides)
     # -----------------------------------------------------------------
 
     def _find_record(self, record_id: str) -> Optional[DecisionRecord]:
@@ -430,6 +448,9 @@ class DecisionMemoryService:
     def _load_records(self) -> List[DecisionRecord]:
         records_file = self._records_file
         try:
+            if self._db_enabled and self.client:
+                response = self.client.table("decision_records").select("*").order("created_at").execute()
+                return [DecisionRecord.from_dict(d) for d in (response.data or [])]
             if records_file.exists():
                 with open(records_file) as f:
                     data = json.load(f)
@@ -441,6 +462,9 @@ class DecisionMemoryService:
     def _load_patterns(self) -> List[DecisionPattern]:
         patterns_file = self._patterns_file
         try:
+            if self._db_enabled and self.client:
+                response = self.client.table("decision_patterns").select("*").order("created_at").execute()
+                return [DecisionPattern.from_dict(d) for d in (response.data or [])]
             if patterns_file.exists():
                 with open(patterns_file) as f:
                     data = json.load(f)
@@ -451,6 +475,11 @@ class DecisionMemoryService:
 
     def _save_records(self) -> None:
         try:
+            if self._db_enabled and self.client:
+                payload = [r.to_dict() for r in self._records]
+                if payload:
+                    self.client.table("decision_records").upsert(payload, on_conflict="record_id").execute()
+                return
             self._data_dir.mkdir(parents=True, exist_ok=True)
             with open(self._records_file, "w") as f:
                 json.dump([r.to_dict() for r in self._records], f, indent=2)
@@ -459,6 +488,11 @@ class DecisionMemoryService:
 
     def _save_patterns(self) -> None:
         try:
+            if self._db_enabled and self.client:
+                payload = [p.to_dict() for p in self._patterns]
+                if payload:
+                    self.client.table("decision_patterns").upsert(payload, on_conflict="pattern_id").execute()
+                return
             self._data_dir.mkdir(parents=True, exist_ok=True)
             with open(self._patterns_file, "w") as f:
                 json.dump([p.to_dict() for p in self._patterns], f, indent=2)

@@ -13,6 +13,51 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+FORWARDED_THREAD_BODY = """
+[signatureImage]
+________________________________
+From: REMSHelpdesk <remshelpdesk@fnb.co.za>
+Sent: Monday, March 16, 2026 3:21:40 PM
+To: Nthau, Palesa <Palesa.Nthau@fnb.co.za>; Mamafha, Andrew <Andrew.Mamafha@fnb.co.za>
+Cc: Van Rooyen, Pieter <Pieter.VanRooyen@fnb.co.za>
+Subject: RE: Team work space - Fairlands 2
+
+Good day Thandi
+
+Please see below and advise.
+
+From: Nthau, Palesa <Palesa.Nthau@fnb.co.za>
+Sent: Wednesday, 11 March 2026 15:21
+To: REMSHelpdesk <remshelpdesk@fnb.co.za>
+Subject: Team work space - Fairlands 2
+
+Good day
+
+We are arranging a team work in office day and would like to find out if there is available work desk space available at Fairlands 2.
+
+Team size: 13
+Preferred day: Mondays
+Office: Fairlands 2
+Bu/segment: Personal and Private IT
+""".strip()
+
+FORWARDED_ROOM_THREAD_BODY = """
+________________________________
+From: REMSHelpdesk <remshelpdesk@fnb.co.za>
+Sent: Monday, March 16, 2026 3:21:40 PM
+To: Dineka, Thandi <TDineka@fnb.co.za>
+Subject: RE: Meeting room issue
+
+Please see below and advise.
+
+From: User, Example <user@example.com>
+Sent: Monday, 16 March 2026 15:19
+To: REMSHelpdesk <remshelpdesk@fnb.co.za>
+Subject: Meeting room issue
+
+Good day the TV in FA1-1Q2-MR5 is not wroking please fix.
+""".strip()
+
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -71,6 +116,14 @@ class TestClassifyEmail:
         assert sig == "observation_email"
         assert sev == "medium"
 
+    def test_classify_room_issue_email_low_severity(self):
+        from app.services.signal_emitter import _classify_email
+
+        mod, sig, sev = _classify_email("Room AV issue", "The TV in FA1-1Q2-MR5 is not wroking please fix")
+        assert mod == "email_helpdesk"
+        assert sig == "observation_email"
+        assert sev == "low"
+
 
 # ---------------------------------------------------------------------------
 # Location extraction
@@ -91,7 +144,22 @@ class TestExtractLocationRef:
         assert ref is not None
         assert "FA1" in ref
         assert "1Q4" in ref
-        assert "MR10" in ref
+        assert "FA1-1Q4-MR-10" in ref
+
+    def test_extract_location_ref_normalises_email_room_code(self):
+        from app.services.signal_emitter import _extract_location_ref
+
+        ref = _extract_location_ref("AV issue", "TV in FA1-1Q2-MR5 is not wroking please fix")
+        assert ref == "Fairlands/FA1/1Q2/FA1-1Q2-MR-05"
+
+    def test_extract_location_ref_site_002_room_code(self):
+        from app.services.signal_emitter import _extract_location_ref
+
+        ref = _extract_location_ref(
+            "Meeting room catering issue",
+            "The catering for meeting room S002-L2-MR1 at site-002 has still not arrived",
+        )
+        assert ref == "S002-L2-MR1"
 
     def test_extract_location_ref_unknown(self):
         from app.services.signal_emitter import _extract_location_ref
@@ -144,6 +212,92 @@ class TestThreadId:
         assert tid is None
 
 
+class TestThreadExtraction:
+    def test_extract_email_thread_messages_parses_forwarded_chain(self):
+        from app.services.signal_emitter import _extract_email_thread_messages
+
+        messages = _extract_email_thread_messages(FORWARDED_THREAD_BODY)
+
+        assert len(messages) == 2
+        assert messages[0]["from_email"] == "remshelpdesk@fnb.co.za"
+        assert messages[0]["subject"] == "RE: Team work space - Fairlands 2"
+        assert "Please see below and advise." in messages[0]["body_plain"]
+        assert messages[1]["from_email"] == "palesa.nthau@fnb.co.za"
+        assert messages[1]["subject"] == "Team work space - Fairlands 2"
+        assert "Fairlands 2" in messages[1]["body_plain"]
+
+
+class TestMeetingRoomGate:
+    def test_is_meeting_room_email_accepts_room_id(self):
+        from app.services.signal_emitter import _is_meeting_room_email
+
+        assert _is_meeting_room_email(
+            "AV issue",
+            "Good day the TV in FA1-1Q2-MR5 is not wroking please fix",
+        )
+
+    def test_is_meeting_room_email_accepts_meeting_room_language(self):
+        from app.services.signal_emitter import _is_meeting_room_email
+
+        assert _is_meeting_room_email(
+            "Block Bookings of Meeting Rooms in Fairland",
+            "Trying to book a 12-seater room without success",
+        )
+
+    def test_is_meeting_room_email_rejects_workspace_planning_email(self):
+        from app.services.signal_emitter import _is_meeting_room_email
+
+        assert not _is_meeting_room_email(
+            "Fw: Team work space - Fairlands 2",
+            FORWARDED_THREAD_BODY,
+        )
+
+
+class TestReceivedAtNormalisation:
+    def test_normalise_received_at_converts_utc_header_to_johannesburg(self):
+        from app.services.signal_emitter import _normalise_received_at
+
+        normalised, original = _normalise_received_at("Mon, 16 Mar 2026 13:52:54 +0000")
+        assert normalised == "2026-03-16T15:52:54+02:00"
+        assert original == "Mon, 16 Mar 2026 13:52:54 +0000"
+
+    def test_normalise_received_at_keeps_johannesburg_iso(self):
+        from app.services.signal_emitter import _normalise_received_at
+
+        normalised, original = _normalise_received_at("2026-03-16T15:52:54+02:00")
+        assert normalised == "2026-03-16T15:52:54+02:00"
+        assert original is None
+
+
+class TestStorageNormalisation:
+    def test_normalise_signal_type_for_storage_maps_non_schema_email_types(self):
+        from app.services.signal_emitter import _normalise_signal_type_for_storage
+
+        assert _normalise_signal_type_for_storage("observation_email") == (
+            "information_email",
+            "observation_email",
+        )
+        assert _normalise_signal_type_for_storage("intake_email") == (
+            "information_email",
+            "intake_email",
+        )
+        assert _normalise_signal_type_for_storage("action_request_email") == (
+            "escalation_email",
+            "action_request_email",
+        )
+
+    def test_coerce_site_uuid_preserves_logical_site_codes(self):
+        from app.services.signal_emitter import _coerce_site_uuid
+
+        persisted, logical = _coerce_site_uuid("S001")
+        assert persisted is None
+        assert logical == "S001"
+
+        persisted, logical = _coerce_site_uuid("123e4567-e89b-12d3-a456-426614174000")
+        assert persisted == "123e4567-e89b-12d3-a456-426614174000"
+        assert logical is None
+
+
 # ---------------------------------------------------------------------------
 # Deduplication
 # ---------------------------------------------------------------------------
@@ -188,7 +342,7 @@ class TestEntityExtraction:
         entities = extract_entities_from_text("Issue in FA1-1Q4-MR10 is urgent")
         room_entities = [e for e in entities if e["entity_type"] == "room"]
         assert len(room_entities) >= 1
-        assert any("FA1-1Q4-MR10" in e["name"] for e in room_entities)
+        assert any(e["name"] == "FA1-1Q4-MR-10" for e in room_entities)
 
     def test_extract_building_code(self):
         from app.services.signal_emitter_base import extract_entities_from_text
@@ -308,8 +462,8 @@ class TestEmitEmailSignal:
             result = await emit_email_signal(
                 from_email="user@example.com",
                 from_name="Test User",
-                subject="Room issue at Fairlands",
-                body_plain="The room is too cold and there is a problem",
+                subject="Meeting room issue at Fairlands",
+                body_plain="The meeting room is too cold and there is a problem",
             )
 
         assert result["status"] == "created"
@@ -343,8 +497,8 @@ class TestEmitEmailSignal:
             result1 = await emit_email_signal(
                 from_email="user@example.com",
                 from_name="Test User",
-                subject="Room issue at Fairlands",
-                body_plain="The room is too cold and there is a problem",
+                subject="Meeting room issue at Fairlands",
+                body_plain="The meeting room is too cold and there is a problem",
             )
             assert result1["status"] == "created"
 
@@ -352,8 +506,8 @@ class TestEmitEmailSignal:
             result2 = await emit_email_signal(
                 from_email="user@example.com",
                 from_name="Test User",
-                subject="Room issue at Fairlands",
-                body_plain="The room is too cold and there is a problem",
+                subject="Meeting room issue at Fairlands",
+                body_plain="The meeting room is too cold and there is a problem",
             )
             assert result2["status"] == "deduplicated"
 
@@ -405,3 +559,346 @@ class TestEmitEmailSignal:
         entity_payload = entity_calls[0]["json"]
         assert isinstance(entity_payload, list)
         assert len(entity_payload) >= 1
+
+    @pytest.mark.asyncio
+    async def test_emit_email_signal_sets_canonical_room_metadata_for_concierge(self):
+        """Room-linked intelligence email should stamp canonical room_id and site_id."""
+        from app.services.signal_emitter import emit_email_signal
+
+        fake_signal = {
+            "id": str(uuid.uuid4()),
+            "source_module": "email_helpdesk",
+            "signal_type": "observation_email",
+            "severity": "low",
+            "location_ref": "Fairlands/FA1/1Q2/FA1-1Q2-MR-05",
+        }
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = [fake_signal]
+        mock_response.raise_for_status = MagicMock()
+
+        post_calls = []
+
+        async def capture_post(url, **kwargs):
+            post_calls.append({"url": url, "json": kwargs.get("json")})
+            return mock_response
+
+        mock_repo = MagicMock()
+        mock_repo.get_room = AsyncMock(
+            return_value={
+                "site_id": "S001",
+                "room_id": "FA1-1Q2-MR-05",
+                "building": "FA1",
+                "quadrant": "1Q2",
+            }
+        )
+
+        with (
+            patch("app.services.signal_emitter.get_room_registry_repository", return_value=mock_repo),
+            patch("app.services.signal_emitter_base.httpx.AsyncClient") as mock_client_cls,
+        ):
+            mock_client = AsyncMock()
+            mock_client.post = AsyncMock(side_effect=capture_post)
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=False)
+            mock_client_cls.return_value = mock_client
+
+            result = await emit_email_signal(
+                from_email="user@example.com",
+                from_name="Test User",
+                subject="AV issue",
+                body_plain="Good day the TV in FA1-1Q2-MR5 is not wroking please fix",
+            )
+
+        assert result["status"] == "created"
+        signal_calls = [c for c in post_calls if "/signal" in c["url"] and "/entity" not in c["url"]]
+        assert len(signal_calls) == 1
+        signal_payload = signal_calls[0]["json"]
+        assert "site_id" not in signal_payload
+        assert signal_payload["location_ref"] == "Fairlands/FA1/1Q2/FA1-1Q2-MR-05"
+        assert signal_payload["metadata"]["room_id"] == "FA1-1Q2-MR-05"
+        assert signal_payload["metadata"]["logical_site_id"] == "S001"
+        assert signal_payload["signal_type"] == "information_email"
+        assert signal_payload["metadata"]["email_signal_variant"] == "observation_email"
+
+    @pytest.mark.asyncio
+    async def test_emit_email_signal_sets_site_002_room_metadata_for_concierge(self):
+        """Site-002 room emails should resolve onto the local meeting room registry."""
+        from app.services.signal_emitter import emit_email_signal
+
+        fake_signal = {
+            "id": str(uuid.uuid4()),
+            "source_module": "email_helpdesk",
+            "signal_type": "information_email",
+            "severity": "medium",
+            "location_ref": "S002-L2-MR1",
+        }
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = [fake_signal]
+        mock_response.raise_for_status = MagicMock()
+
+        post_calls = []
+
+        async def capture_post(url, **kwargs):
+            post_calls.append({"url": url, "json": kwargs.get("json")})
+            return mock_response
+
+        mock_repo = MagicMock()
+        mock_repo.get_room = AsyncMock(
+            return_value={
+                "site_id": "site-002",
+                "room_id": "S002-L2-MR1",
+                "building": "S002",
+                "quadrant": "L2",
+            }
+        )
+
+        with (
+            patch("app.services.signal_emitter.get_room_registry_repository", return_value=mock_repo),
+            patch("app.services.signal_emitter_base.httpx.AsyncClient") as mock_client_cls,
+        ):
+            mock_client = AsyncMock()
+            mock_client.post = AsyncMock(side_effect=capture_post)
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=False)
+            mock_client_cls.return_value = mock_client
+
+            result = await emit_email_signal(
+                from_email="helpdesk@site002.example.com",
+                from_name="Site 002 Helpdesk",
+                subject="Fw: Meeting room catering issue - S002-L2-MR1",
+                body_plain="Please attend. The meeting room catering in S002-L2-MR1 has not arrived.",
+            )
+
+        assert result["status"] == "created"
+        signal_calls = [c for c in post_calls if "/signal" in c["url"] and "/entity" not in c["url"]]
+        assert len(signal_calls) == 1
+        signal_payload = signal_calls[0]["json"]
+        assert signal_payload["location_ref"] == "S002-L2-MR1"
+        assert signal_payload["metadata"]["room_id"] == "S002-L2-MR1"
+        assert signal_payload["metadata"]["logical_site_id"] == "site-002"
+
+    @pytest.mark.asyncio
+    async def test_emit_email_signal_accepts_fairlands_room_code_with_space_before_number(self):
+        from app.services.signal_emitter import emit_email_signal
+
+        fake_signal = {
+            "id": str(uuid.uuid4()),
+            "source_module": "email_helpdesk",
+            "signal_type": "information_email",
+            "severity": "medium",
+            "location_ref": "Fairlands/FA1/2Q2/FA1-2Q2-MR-23",
+        }
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = [fake_signal]
+        mock_response.raise_for_status = MagicMock()
+
+        post_calls = []
+
+        async def capture_post(url, **kwargs):
+            post_calls.append({"url": url, "json": kwargs.get("json")})
+            return mock_response
+
+        mock_repo = MagicMock()
+        mock_repo.get_room = AsyncMock(
+            return_value={
+                "site_id": "S001",
+                "room_id": "FA1-2Q2-MR-23",
+                "building": "FA1",
+                "quadrant": "2Q2",
+            }
+        )
+
+        with (
+            patch("app.services.signal_emitter.get_room_registry_repository", return_value=mock_repo),
+            patch("app.services.signal_emitter_base.httpx.AsyncClient") as mock_client_cls,
+        ):
+            mock_client = AsyncMock()
+            mock_client.post = AsyncMock(side_effect=capture_post)
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=False)
+            mock_client_cls.return_value = mock_client
+
+            result = await emit_email_signal(
+                from_email="helpdesk@fairlands.example.com",
+                from_name="Fairlands Helpdesk",
+                subject="Meeting room catering",
+                body_plain="Hi, please can I have catering at 12:00 today for FA1-2Q2-MR 23",
+            )
+
+        assert result["status"] == "created"
+        signal_calls = [c for c in post_calls if "/signal" in c["url"] and "/entity" not in c["url"]]
+        assert len(signal_calls) == 1
+        signal_payload = signal_calls[0]["json"]
+        assert signal_payload["location_ref"] == "Fairlands/FA1/2Q2/FA1-2Q2-MR-23"
+        assert signal_payload["metadata"]["room_id"] == "FA1-2Q2-MR-23"
+
+    @pytest.mark.asyncio
+    async def test_emit_email_signal_normalises_received_at_to_local_time(self):
+        from app.services.signal_emitter import emit_email_signal
+
+        fake_signal = {
+            "id": str(uuid.uuid4()),
+            "source_module": "email_helpdesk",
+            "signal_type": "observation_email",
+            "severity": "low",
+            "location_ref": "Fairlands/FA1/1Q2/FA1-1Q2-MR-05",
+        }
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = [fake_signal]
+        mock_response.raise_for_status = MagicMock()
+
+        post_calls = []
+
+        async def capture_post(url, **kwargs):
+            post_calls.append({"url": url, "json": kwargs.get("json")})
+            return mock_response
+
+        with patch("app.services.signal_emitter_base.httpx.AsyncClient") as mock_client_cls:
+            mock_client = AsyncMock()
+            mock_client.post = AsyncMock(side_effect=capture_post)
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=False)
+            mock_client_cls.return_value = mock_client
+
+            result = await emit_email_signal(
+                from_email="user@example.com",
+                from_name="Test User",
+                subject="Fairlands room issue",
+                body_plain="The TV in FA1-1Q2-MR5 is not wroking please fix",
+                received_at="Mon, 16 Mar 2026 13:52:54 +0000",
+            )
+
+        assert result["status"] == "created"
+        signal_calls = [c for c in post_calls if "/signal" in c["url"] and "/entity" not in c["url"]]
+        assert len(signal_calls) == 1
+        signal_payload = signal_calls[0]["json"]
+        assert signal_payload["metadata"]["received_at"] == "2026-03-16T15:52:54+02:00"
+        assert signal_payload["metadata"]["received_at_original"] == "Mon, 16 Mar 2026 13:52:54 +0000"
+
+    @pytest.mark.asyncio
+    async def test_emit_email_signal_maps_intake_email_to_schema_supported_type(self):
+        from app.services.signal_emitter import emit_email_signal
+
+        fake_signal = {
+            "id": str(uuid.uuid4()),
+            "source_module": "email_helpdesk",
+            "signal_type": "information_email",
+            "severity": "medium",
+            "location_ref": "Fairlands",
+        }
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = [fake_signal]
+        mock_response.raise_for_status = MagicMock()
+
+        post_calls = []
+
+        async def capture_post(url, **kwargs):
+            post_calls.append({"url": url, "json": kwargs.get("json")})
+            return mock_response
+
+        with patch("app.services.signal_emitter_base.httpx.AsyncClient") as mock_client_cls:
+            mock_client = AsyncMock()
+            mock_client.post = AsyncMock(side_effect=capture_post)
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=False)
+            mock_client_cls.return_value = mock_client
+
+            result = await emit_email_signal(
+                from_email="pieter.vanrooyen@fnb.co.za",
+                from_name="Van Rooyen, Pieter",
+                subject="Fw: Meeting room support - Fairlands 2",
+                body_plain=(
+                    "From: REMSHelpdesk <remshelpdesk@fnb.co.za>\n"
+                    "Please attend to the meeting room query at Fairlands 2."
+                ),
+                received_at="Mon, 16 Mar 2026 13:52:54 +0000",
+            )
+
+        assert result["status"] == "created"
+        signal_calls = [c for c in post_calls if "/signal" in c["url"] and "/entity" not in c["url"]]
+        assert len(signal_calls) == 1
+        signal_payload = signal_calls[0]["json"]
+        assert signal_payload["signal_type"] == "information_email"
+        assert signal_payload["metadata"]["email_signal_variant"] == "intake_email"
+        assert signal_payload["metadata"]["logical_site_id"] == "S001"
+        assert "site_id" not in signal_payload
+
+    @pytest.mark.asyncio
+    async def test_emit_email_signal_ignores_non_meeting_room_email(self):
+        from app.services.signal_emitter import emit_email_signal
+
+        result = await emit_email_signal(
+            from_email="pieter.vanrooyen@fnb.co.za",
+            from_name="Van Rooyen, Pieter",
+            subject="Fw: Team work space - Fairlands 2",
+            body_plain=FORWARDED_THREAD_BODY,
+            received_at="Mon, 16 Mar 2026 13:52:54 +0000",
+        )
+
+        assert result["status"] == "ignored"
+        assert result["reason"] == "non_meeting_room_email"
+        assert result["signal_id"] is None
+
+    @pytest.mark.asyncio
+    async def test_emit_email_signal_uses_forwarded_thread_context_for_room_issue(self):
+        from app.services.signal_emitter import emit_email_signal
+
+        fake_signal = {
+            "id": str(uuid.uuid4()),
+            "source_module": "email_helpdesk",
+            "signal_type": "information_email",
+            "severity": "low",
+            "location_ref": "Fairlands/FA1/1Q2/FA1-1Q2-MR-05",
+        }
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = [fake_signal]
+        mock_response.raise_for_status = MagicMock()
+
+        post_calls = []
+
+        async def capture_post(url, **kwargs):
+            post_calls.append({"url": url, "json": kwargs.get("json")})
+            return mock_response
+
+        mock_repo = MagicMock()
+        mock_repo.get_room = AsyncMock(
+            return_value={
+                "site_id": "S001",
+                "room_id": "FA1-1Q2-MR-05",
+                "building": "FA1",
+                "quadrant": "1Q2",
+            }
+        )
+
+        with (
+            patch("app.services.signal_emitter.get_room_registry_repository", return_value=mock_repo),
+            patch("app.services.signal_emitter_base.httpx.AsyncClient") as mock_client_cls,
+        ):
+            mock_client = AsyncMock()
+            mock_client.post = AsyncMock(side_effect=capture_post)
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=False)
+            mock_client_cls.return_value = mock_client
+
+            result = await emit_email_signal(
+                from_email="pieter.vanrooyen@fnb.co.za",
+                from_name="Van Rooyen, Pieter",
+                subject="Fw: Meeting room issue",
+                body_plain=FORWARDED_ROOM_THREAD_BODY,
+                received_at="Mon, 16 Mar 2026 13:52:54 +0000",
+            )
+
+        assert result["status"] == "created"
+        signal_calls = [c for c in post_calls if "/signal" in c["url"] and "/entity" not in c["url"]]
+        assert len(signal_calls) == 1
+        signal_payload = signal_calls[0]["json"]
+        assert signal_payload["location_ref"] == "Fairlands/FA1/1Q2/FA1-1Q2-MR-05"
+        assert signal_payload["metadata"]["room_id"] == "FA1-1Q2-MR-05"
+        assert signal_payload["metadata"]["thread_message_count"] == 2
+        assert len(signal_payload["metadata"]["thread_messages"]) == 2

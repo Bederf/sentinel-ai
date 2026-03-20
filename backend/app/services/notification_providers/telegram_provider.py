@@ -74,6 +74,14 @@ class TelegramProvider(BaseNotificationProvider):
 
                 message_id = str(data.get("result", {}).get("message_id", "unknown"))
                 logger.info(f"Telegram message sent to {chat_id}, message_id: {message_id}")
+
+                try:
+                    from app.services.ai_usage_tracker import usage_tracker
+
+                    usage_tracker.record_message("telegram", source="alert")
+                except Exception:
+                    pass
+
                 return NotificationResult(
                     success=True,
                     message_id=message_id,

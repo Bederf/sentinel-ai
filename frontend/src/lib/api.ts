@@ -3913,6 +3913,7 @@ export type BMSVendor = 'niagara' | 'desigo' | 'metasys' | 'honeywell' | 'schnei
 // BACnet test connection request
 export interface BACnetTestConnectionRequest {
   timeout?: number;
+  host?: string;
 }
 
 // BACnet test connection response (reuses BACnet device types)
@@ -3925,6 +3926,7 @@ export interface DiscoverClassifyRequest {
   device_ip: string;
   site_id: string;
   device_bacnet_id?: number;
+  adapter_type?: 'bacnet' | 'simulation';
   bms_vendor?: BMSVendor;
 }
 
@@ -4949,6 +4951,7 @@ export interface ConciergeSignalDetail {
   raw_content: string | null;
   metadata: Record<string, unknown>;
   created_at: string;
+  source_module?: string;
   related_signals: ConciergeSignalSummary[];
   evidence_basis: string[];
   suggested_action: string;
@@ -4961,6 +4964,14 @@ export interface ConciergeSignalDetail {
   };
 }
 
+export interface ConciergeSignalResolutionResponse {
+  signal_id: string;
+  room_id: string;
+  site_id: string;
+  resolution_state: string;
+  updated?: Record<string, unknown> | null;
+}
+
 export const conciergeApi = {
   getRooms: (siteId: string) =>
     fetchApi<{ rooms: ConciergeRoom[] }>(`/api/concierge/rooms/${siteId}`),
@@ -4968,6 +4979,25 @@ export const conciergeApi = {
     fetchApi<ConciergeSignalSummary[]>(`/api/concierge/rooms/${siteId}/${encodeURIComponent(roomId)}/signals`),
   getSignalDetail: (siteId: string, roomId: string, signalId: string) =>
     fetchApi<ConciergeSignalDetail>(`/api/concierge/rooms/${siteId}/${encodeURIComponent(roomId)}/signals/${signalId}`),
+  resolveSignal: (
+    siteId: string,
+    roomId: string,
+    signalId: string,
+    resolutionState: "acknowledged" | "resolved" = "acknowledged",
+    resolutionNote?: string,
+  ) =>
+    fetchApi<ConciergeSignalResolutionResponse>(
+      `/api/concierge/rooms/${siteId}/${encodeURIComponent(roomId)}/signals/${signalId}/resolve`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          resolution_state: resolutionState,
+          resolved_by: "concierge_ui",
+          resolution_note: resolutionNote ?? "Noted from concierge meeting room map",
+        }),
+      }
+    ),
   getDashboard: (email: string) =>
     fetchApi<{ cards: unknown[] }>(`/api/concierge/dashboard/${encodeURIComponent(email)}`),
 };

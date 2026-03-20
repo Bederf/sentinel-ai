@@ -1,0 +1,318 @@
+{
+  "_description": "Frozen Fairlands cluster graph fixture — acceptance test for GET /api/clusters/{id}/graph. All node IDs use stable prefix convention (cluster:, signal:, entity:, edge:). All nodes have top-level signal_type, severity, confidence, is_collapsed_summary_node per API contract.",
+  "_version": "1.0",
+  "_frozen": "2026-03-15",
+  "cluster_id": "cluster:001",
+  "cluster_state": "escalated",
+  "signal_count": 10,
+  "domain_count": 3,
+  "confidence": 0.87,
+  "duration_days": 60,
+  "nodes": [
+    {
+      "id": "cluster:001",
+      "node_type": "cluster",
+      "signal_type": null,
+      "domain": "cluster",
+      "label": "Issue Cluster",
+      "severity": "high",
+      "confidence": 0.87,
+      "is_collapsed_summary_node": false,
+      "metadata": {
+        "cluster_state": "escalated",
+        "duration_days": 60,
+        "likely_root_cause": "Block booking behaviour reducing effective room capacity",
+        "classifications": [
+          {"domain": "space_optimisation", "confidence": 0.92},
+          {"domain": "workplace_experience", "confidence": 0.81}
+        ],
+        "recommended_actions": [
+          "Review block bookings across FA1, FA2, Springboks, FNB",
+          "Cancel confirmed unoccupied slots",
+          "Monitor no-show patterns this week",
+          "Approach Bronwyn Mollentze re: booking reduction",
+          "Define booking release policy with EXCO"
+        ]
+      }
+    },
+    {
+      "id": "signal:001",
+      "node_type": "signal",
+      "signal_type": "complaint_email",
+      "domain": "email",
+      "label": "Initial Complaint",
+      "severity": "medium",
+      "confidence": 0.88,
+      "is_collapsed_summary_node": false,
+      "metadata": {
+        "signal_subtype": "initial",
+        "sender": "Shaun Grose",
+        "sent_at": "2026-01-05",
+        "summary": "Half of first-floor capacity block booked through March. Requesting engagement with responsible teams.",
+        "evidence_basis": ["same_building", "same_floor", "initial_thread_signal"]
+      }
+    },
+    {
+      "id": "signal:002",
+      "node_type": "signal",
+      "signal_type": "intake_email",
+      "domain": "email",
+      "label": "Helpdesk Intake",
+      "severity": "medium",
+      "confidence": 0.80,
+      "is_collapsed_summary_node": false,
+      "metadata": {
+        "signal_subtype": "initial",
+        "sender": "REMS Helpdesk",
+        "sent_at": "2026-01-05",
+        "summary": "REMS Helpdesk forwarding complaint to concierge and IT admin for action.",
+        "evidence_basis": ["same_thread_id", "same_building", "overlapping_time_window"]
+      }
+    },
+    {
+      "id": "signal:004",
+      "node_type": "signal",
+      "signal_type": "complaint_email",
+      "domain": "email",
+      "label": "Follow-up",
+      "severity": "medium",
+      "confidence": 0.87,
+      "is_collapsed_summary_node": false,
+      "metadata": {
+        "signal_subtype": "repeat",
+        "sender": "Shaun Grose",
+        "sent_at": "2026-01-22",
+        "summary": "No visible progress. More than 10 rooms still block booked a week ahead.",
+        "evidence_basis": ["same_thread_id", "same_building", "both_unresolved", "shared_entities:shaun_grose,keryn_norman"]
+      }
+    },
+    {
+      "id": "signal:006",
+      "node_type": "signal",
+      "signal_type": "complaint_email",
+      "domain": "email",
+      "label": "Frustration Email",
+      "severity": "high",
+      "confidence": 0.91,
+      "is_collapsed_summary_node": false,
+      "metadata": {
+        "signal_subtype": "repeat",
+        "sender": "Shaun Grose",
+        "sent_at": "2026-02-11",
+        "summary": "No real change. Requests REMS remove block bookings directly. Escalation language.",
+        "evidence_basis": ["same_thread_id", "both_unresolved", "repeat_complaint", "semantic_similarity_0.91"]
+      }
+    },
+    {
+      "id": "signal:007",
+      "node_type": "signal",
+      "signal_type": "escalation_email",
+      "domain": "email",
+      "label": "EXCO Escalation",
+      "severity": "high",
+      "confidence": 0.90,
+      "is_collapsed_summary_node": false,
+      "metadata": {
+        "signal_subtype": "follow_up",
+        "sender": "Keryn Norman",
+        "sent_at": "2026-02-11",
+        "summary": "Issue escalated to EXCO. Will seek harder enforcing solution. Policy decision required.",
+        "evidence_basis": ["same_thread_id", "escalation_signal", "executive_visibility"]
+      }
+    },
+    {
+      "id": "signal:008",
+      "node_type": "signal",
+      "signal_type": "action_request_email",
+      "domain": "email",
+      "label": "Booking Release Request",
+      "severity": "high",
+      "confidence": 0.92,
+      "is_collapsed_summary_node": false,
+      "metadata": {
+        "signal_subtype": "urgent",
+        "sender": "Greg Temlett",
+        "sent_at": "2026-03-06",
+        "summary": "Candice unable to book 12-seater for 11 Mar. Bronwyn Mollentze holds multiple rooms. Requesting release.",
+        "evidence_basis": ["same_thread_id", "same_building", "named_blocker:bronwyn_mollentze"]
+      }
+    },
+    {
+      "id": "signal:009",
+      "node_type": "signal",
+      "signal_type": "observation_email",
+      "domain": "email",
+      "label": "Concierge Observation",
+      "severity": "high",
+      "confidence": 0.94,
+      "is_collapsed_summary_node": false,
+      "metadata": {
+        "signal_subtype": "informational",
+        "sender": "Thandi Dineka",
+        "sent_at": "2026-03-06",
+        "summary": "Schedule full. Pattern confirmed in FA1, FA2, Springboks, FNB. Rooms cancelled when visibly empty but pre-preparation prevents blanket cancellation.",
+        "evidence_basis": ["ground_truth_observation", "location_confirmation", "concierge_authority"]
+      }
+    },
+    {
+      "id": "signal:booking-sat",
+      "node_type": "signal",
+      "signal_type": "booking_saturation",
+      "domain": "space_optimisation",
+      "label": "Booking Saturation",
+      "severity": "high",
+      "confidence": 0.95,
+      "is_collapsed_summary_node": false,
+      "metadata": {
+        "sensor_type": "booking_system",
+        "booking_density_pct": 92,
+        "rooms_affected": ["FA1", "FA2", "Springboks"],
+        "summary": "FA1, FA2, Springboks booked at 92% capacity for target weeks.",
+        "evidence_basis": ["same_building", "same_floor", "booking_system_data"]
+      }
+    },
+    {
+      "id": "signal:noshow",
+      "node_type": "signal",
+      "signal_type": "no_show_pattern",
+      "domain": "occupancy",
+      "label": "No-Show Pattern",
+      "severity": "medium",
+      "confidence": 0.78,
+      "is_collapsed_summary_node": false,
+      "metadata": {
+        "no_show_count": 4,
+        "summary": "Rooms reserved but observed unoccupied on 4 separate occasions.",
+        "evidence_basis": ["concierge_observation", "occupancy_sensor_mismatch"]
+      }
+    },
+    {
+      "id": "signal:occupancy",
+      "node_type": "signal",
+      "signal_type": "occupancy_anomaly",
+      "domain": "occupancy",
+      "label": "Occupancy Mismatch",
+      "severity": "high",
+      "confidence": 0.82,
+      "is_collapsed_summary_node": false,
+      "metadata": {
+        "utilisation_ratio": 0.31,
+        "summary": "Actual room utilisation 0.31 vs booking rate of 0.92. Significant mismatch indicating ghost bookings.",
+        "evidence_basis": ["occupancy_sensor", "booking_system_correlation", "same_location"]
+      }
+    },
+    {
+      "id": "entity:shaun",
+      "node_type": "entity",
+      "signal_type": null,
+      "domain": "entity",
+      "label": "Shaun Grose",
+      "severity": null,
+      "confidence": null,
+      "is_collapsed_summary_node": false,
+      "metadata": {"role": "iDnA Business Solutions Manager", "department": "iDnA", "entity_type": "person"}
+    },
+    {
+      "id": "entity:keryn",
+      "node_type": "entity",
+      "signal_type": null,
+      "domain": "entity",
+      "label": "Keryn Norman",
+      "severity": null,
+      "confidence": null,
+      "is_collapsed_summary_node": false,
+      "metadata": {"role": "REMS Management", "department": "REMS", "entity_type": "person"}
+    },
+    {
+      "id": "entity:thandi",
+      "node_type": "entity",
+      "signal_type": null,
+      "domain": "entity",
+      "label": "Thandi Dineka",
+      "severity": null,
+      "confidence": null,
+      "is_collapsed_summary_node": false,
+      "metadata": {"role": "Concierge — Fairlands", "department": "REMS", "entity_type": "person", "note": "Not CC'd on original thread — routed by role ownership"}
+    },
+    {
+      "id": "entity:bronwyn",
+      "node_type": "entity",
+      "signal_type": null,
+      "domain": "entity",
+      "label": "Bronwyn Mollentze",
+      "severity": null,
+      "confidence": null,
+      "is_collapsed_summary_node": false,
+      "metadata": {"role": "Identified block booker", "entity_type": "person"}
+    },
+    {
+      "id": "entity:fa1",
+      "node_type": "entity",
+      "signal_type": null,
+      "domain": "entity",
+      "label": "FA1 Rooms",
+      "severity": null,
+      "confidence": null,
+      "is_collapsed_summary_node": false,
+      "metadata": {"location_ref": "Fairlands/FA1", "entity_type": "room"}
+    },
+    {
+      "id": "entity:springboks",
+      "node_type": "entity",
+      "signal_type": null,
+      "domain": "entity",
+      "label": "Springboks",
+      "severity": null,
+      "confidence": null,
+      "is_collapsed_summary_node": false,
+      "metadata": {"location_ref": "Fairlands/FA1/L1/Springboks", "entity_type": "room"}
+    },
+    {
+      "id": "entity:fa2",
+      "node_type": "entity",
+      "signal_type": null,
+      "domain": "entity",
+      "label": "FA2 Rooms",
+      "severity": null,
+      "confidence": null,
+      "is_collapsed_summary_node": false,
+      "metadata": {"location_ref": "Fairlands/FA2", "entity_type": "room"}
+    }
+  ],
+  "edges": [
+    {"id": "edge:e1",  "source": "cluster:001", "target": "signal:001",         "edge_type": "evidenced_by", "weight": 0.88, "confidence": 0.88},
+    {"id": "edge:e2",  "source": "cluster:001", "target": "signal:002",         "edge_type": "evidenced_by", "weight": 0.80, "confidence": 0.80},
+    {"id": "edge:e3",  "source": "cluster:001", "target": "signal:004",         "edge_type": "evidenced_by", "weight": 0.87, "confidence": 0.87},
+    {"id": "edge:e4",  "source": "cluster:001", "target": "signal:006",         "edge_type": "evidenced_by", "weight": 0.91, "confidence": 0.91},
+    {"id": "edge:e5",  "source": "cluster:001", "target": "signal:007",         "edge_type": "evidenced_by", "weight": 0.90, "confidence": 0.90},
+    {"id": "edge:e6",  "source": "cluster:001", "target": "signal:008",         "edge_type": "evidenced_by", "weight": 0.92, "confidence": 0.92},
+    {"id": "edge:e7",  "source": "cluster:001", "target": "signal:009",         "edge_type": "evidenced_by", "weight": 0.94, "confidence": 0.94},
+    {"id": "edge:e8",  "source": "cluster:001", "target": "signal:booking-sat", "edge_type": "evidenced_by", "weight": 0.95, "confidence": 0.95},
+    {"id": "edge:e9",  "source": "cluster:001", "target": "signal:noshow",      "edge_type": "evidenced_by", "weight": 0.78, "confidence": 0.78},
+    {"id": "edge:e10", "source": "cluster:001", "target": "signal:occupancy",   "edge_type": "evidenced_by", "weight": 0.82, "confidence": 0.82},
+    {"id": "edge:e11", "source": "cluster:001", "target": "entity:fa1",         "edge_type": "affects",      "weight": 0.97, "confidence": 0.97},
+    {"id": "edge:e12", "source": "cluster:001", "target": "entity:springboks",  "edge_type": "affects",      "weight": 0.97, "confidence": 0.97},
+    {"id": "edge:e13", "source": "cluster:001", "target": "entity:fa2",         "edge_type": "affects",      "weight": 0.90, "confidence": 0.90},
+    {"id": "edge:e14", "source": "cluster:001", "target": "entity:shaun",       "edge_type": "involves",     "weight": 0.99, "confidence": 0.99},
+    {"id": "edge:e15", "source": "cluster:001", "target": "entity:keryn",       "edge_type": "escalated_to", "weight": 0.95, "confidence": 0.95},
+    {"id": "edge:e16", "source": "cluster:001", "target": "entity:thandi",      "edge_type": "owned_by",     "weight": 0.92, "confidence": 0.92},
+    {"id": "edge:e17", "source": "cluster:001", "target": "entity:bronwyn",     "edge_type": "involves",     "weight": 0.88, "confidence": 0.88},
+    {"id": "edge:e18", "source": "signal:001",  "target": "entity:shaun",       "edge_type": "related_to",   "weight": 0.99, "confidence": 0.99},
+    {"id": "edge:e19", "source": "signal:007",  "target": "entity:keryn",       "edge_type": "related_to",   "weight": 0.99, "confidence": 0.99},
+    {"id": "edge:e20", "source": "signal:009",  "target": "entity:thandi",      "edge_type": "related_to",   "weight": 0.99, "confidence": 0.99},
+    {"id": "edge:e21", "source": "signal:008",  "target": "entity:bronwyn",     "edge_type": "related_to",   "weight": 0.88, "confidence": 0.88},
+    {"id": "edge:e22", "source": "signal:booking-sat", "target": "entity:springboks", "edge_type": "affects", "weight": 0.95, "confidence": 0.95},
+    {"id": "edge:e23", "source": "signal:occupancy",   "target": "entity:fa1",        "edge_type": "affects", "weight": 0.82, "confidence": 0.82}
+  ],
+  "_acceptance_test": {
+    "description": "Fairlands graph acceptance test — 6 assertions",
+    "assertions": [
+      "1 cluster node (cluster:001) present with node_type=cluster",
+      "Thandi (entity:thandi) connected via owned_by edge (edge:e16) — proves routing independent of email thread",
+      "All key evidence signals present: complaint_email, booking_saturation, occupancy_anomaly, escalation_email",
+      "At least 1 evidenced_by edge with label shown",
+      "Metric badges: booking_density_pct=92, utilisation_ratio=0.31, no_show_count=4, duration_days=60",
+      "Keryn connected via escalated_to edge (edge:e15)"
+    ]
+  }
+}

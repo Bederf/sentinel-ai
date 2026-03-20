@@ -1,0 +1,9 @@
+[Unit]
+Description=Run SENTINEL PostgreSQL backup daily at 02:15 SAST
+
+[Timer]
+OnCalendar=*-*-* 02:15:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

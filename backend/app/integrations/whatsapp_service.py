@@ -109,6 +109,13 @@ class WhatsAppService:
             message_id = data.get("messages", [{}])[0].get("id", "unknown")
             logger.info(f"WhatsApp message sent to {to_number}, ID: {message_id}")
 
+            try:
+                from app.services.ai_usage_tracker import usage_tracker
+
+                usage_tracker.record_message("whatsapp_meta", source="alert")
+            except Exception:
+                pass
+
             return {
                 "success": True,
                 "message_id": message_id,
@@ -134,6 +141,13 @@ class WhatsAppService:
 
             message_id = data.get("sid", "unknown")
             logger.info(f"WhatsApp message sent to {to_number}, ID: {message_id}")
+
+            try:
+                from app.services.ai_usage_tracker import usage_tracker
+
+                usage_tracker.record_message("whatsapp_twilio", source="alert")
+            except Exception:
+                pass
 
             return {
                 "success": True,

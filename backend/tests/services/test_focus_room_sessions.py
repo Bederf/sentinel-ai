@@ -7,12 +7,12 @@ analytics, and API integration.
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
 from app.models.space_occupancy import FocusRoomSession
+from tests.services.fake_space_store import FakeSpaceSupabase
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -20,18 +20,10 @@ from app.models.space_occupancy import FocusRoomSession
 
 
 @pytest.fixture(autouse=True)
-def _isolate_store(tmp_path: Path):
-    """Redirect all store files to tmp_path so tests don't interfere."""
-    data_dir = tmp_path / "space"
-    data_dir.mkdir()
-    patches = {
-        "app.services.occupancy_store._DATA_DIR": data_dir,
-        "app.services.occupancy_store._EVENTS_FILE": data_dir / "occupancy_events.json",
-        "app.services.occupancy_store._GHOST_FILE": data_dir / "ghost_findings.json",
-        "app.services.occupancy_store._RIGHTSIZING_FILE": data_dir / "rightsizing_findings.json",
-        "app.services.occupancy_store._SESSIONS_FILE": data_dir / "focus_room_sessions.json",
-    }
-    with patch.multiple("app.services.occupancy_store", **{k.split(".")[-1]: v for k, v in patches.items()}):
+def _isolate_store():
+    """Use an isolated in-memory canonical store for focus-room tests."""
+    fake = FakeSpaceSupabase()
+    with patch("app.services.occupancy_store._client", return_value=fake):
         yield
 
 
@@ -82,6 +74,73 @@ class TestFocusRoomSessionModel:
 
 
 class TestFocusRoomSessionService:
+    def test_active_session_turns_red_light_on_after_two_hours(self):
+        from app.services.focus_room_session_service import describe_focus_session_state
+
+        session = FocusRoomSession(
+            site_id="site-002",
+            room_code="FR-01",
+            sensor_id="LD2410C-FR-01",
+            start_time=_ts(9),
+        )
+
+        state = describe_focus_session_state(
+            session,
+            now=_ts(11, 5),
+            extended_use_seconds=7200,
+        )
+
+        assert state["duration_seconds"] == 7500
+        assert state["extended_use"] is True
+        assert state["red_light_on"] is True
+        assert state["max_allowed_minutes"] == 120
+        assert state["red_light_cooldown_seconds"] == 300
+        assert state["red_light_cooldown_remaining_seconds"] == 0
+
+    def test_closed_extended_session_keeps_red_light_on_for_cooldown(self):
+        from app.services.focus_room_session_service import describe_focus_session_state
+
+        session = FocusRoomSession(
+            site_id="site-002",
+            room_code="FR-01",
+            sensor_id="LD2410C-FR-01",
+            start_time=_ts(9),
+        )
+        session.close(_ts(11, 10), extended_threshold=7200)
+
+        state = describe_focus_session_state(
+            session,
+            now=_ts(11, 13),
+            extended_use_seconds=7200,
+            red_light_cooldown_seconds=300,
+        )
+
+        assert state["extended_use"] is True
+        assert state["red_light_on"] is True
+        assert state["red_light_cooldown_remaining_seconds"] == 120
+
+    def test_closed_extended_session_turns_red_light_off_after_cooldown(self):
+        from app.services.focus_room_session_service import describe_focus_session_state
+
+        session = FocusRoomSession(
+            site_id="site-002",
+            room_code="FR-01",
+            sensor_id="LD2410C-FR-01",
+            start_time=_ts(9),
+        )
+        session.close(_ts(11, 10), extended_threshold=7200)
+
+        state = describe_focus_session_state(
+            session,
+            now=_ts(11, 16),
+            extended_use_seconds=7200,
+            red_light_cooldown_seconds=300,
+        )
+
+        assert state["extended_use"] is True
+        assert state["red_light_on"] is False
+        assert state["red_light_cooldown_remaining_seconds"] == 0
+
     def test_occupied_true_starts_session(self):
         from app.services.focus_room_session_service import process_focus_room_event
 
@@ -360,6 +419,26 @@ class TestFocusRoomAnalytics:
         assert result["sessions_by_room"]["FR-01"] == 2
         assert result["sessions_by_room"]["FR-02"] == 1
         assert result["peak_hour"] == 9
+
+    def test_analytics_counts_active_overstays(self):
+        from app.services import occupancy_store
+        from app.services.focus_room_session_service import get_focus_room_analytics
+
+        active = FocusRoomSession(
+            site_id="site-002",
+            room_code="FR-02",
+            sensor_id="LD2410C-FR-02",
+            start_time=_ts(9),
+        )
+        occupancy_store.save_session(active)
+
+        with patch("app.services.focus_room_session_service.datetime") as fake_datetime:
+            fake_datetime.utcnow.return_value = _ts(11, 5)
+            result = get_focus_room_analytics("site-002")
+
+        assert result["active_sessions"] == 1
+        assert result["completed_sessions"] == 0
+        assert result["extended_use_sessions"] == 1
 
 
 # ---------------------------------------------------------------------------

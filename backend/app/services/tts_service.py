@@ -116,6 +116,14 @@ class TTSService:
                     },
                 )
                 response.raise_for_status()
+
+                try:
+                    from app.services.ai_usage_tracker import usage_tracker
+
+                    usage_tracker.record_service("elevenlabs", units=len(text), unit_type="chars", source="tts")
+                except Exception:
+                    pass
+
                 return response.content
         except httpx.HTTPStatusError as e:
             logger.error(f"ElevenLabs API error {e.response.status_code}: {e.response.text[:200]}")

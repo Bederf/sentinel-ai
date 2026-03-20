@@ -146,8 +146,9 @@ async def process_occupancy_event(
             notification = await send_ghost_booking_alert(ghost, config, site_name=site_id)
             if notification.get("success"):
                 ghost_notifications_sent += 1
-            # Fire-and-forget: emit signal into correlation pipeline
-            _emit_ghost_signal_background(room_code, ghost)
+            # IMPORTANT:
+            # Do NOT emit a concierge "Ghost booking" signal at detection time.
+            # Ghost bookings should only appear in the dashboard after concierge confirmation (confirmed_empty).
 
     rs_findings = detect_right_sizing_patterns(
         site_id=site_id,

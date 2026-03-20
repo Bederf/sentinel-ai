@@ -11,36 +11,37 @@ import { useState, useCallback } from "react";
 import { RefreshCw } from "lucide-react";
 import type { ConciergeRoom } from "../../lib/api";
 import { ConciergeMap } from "./ConciergeMap";
-import { RoomDetailPanel } from "./RoomDetailPanel";
 import { SignalDrillDown } from "./SignalDrillDown";
 
 interface ConciergeDashboardPageProps {
   siteId?: string;
+  showHeader?: boolean;
+  siteLabel?: string;
 }
 
 const DEFAULT_SITE = "S001";
 
-export function ConciergeDashboardPage({ siteId }: ConciergeDashboardPageProps) {
+function formatSiteLabel(siteId: string, siteLabel?: string): string {
+  if (siteLabel) return siteLabel;
+  if (siteId === "S001") return "Fairlands";
+  if (siteId === "site-002") return "Sandton City";
+  return siteId;
+}
+
+export function ConciergeDashboardPage({ siteId, showHeader = true, siteLabel }: ConciergeDashboardPageProps) {
   const effectiveSiteId = siteId || DEFAULT_SITE;
+  const effectiveSiteLabel = formatSiteLabel(effectiveSiteId, siteLabel);
   const [selectedRoom, setSelectedRoom] = useState<ConciergeRoom | null>(null);
   const [selectedSignalId, setSelectedSignalId] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
-  const handleRoomSelect = useCallback((room: ConciergeRoom) => {
+  const handleSignalSelect = useCallback((room: ConciergeRoom, signalId: string) => {
     setSelectedRoom(room);
-    setSelectedSignalId(null);
-  }, []);
-
-  const handleClosePanel = useCallback(() => {
-    setSelectedRoom(null);
-    setSelectedSignalId(null);
-  }, []);
-
-  const handleSignalSelect = useCallback((signalId: string) => {
     setSelectedSignalId(signalId);
   }, []);
 
   const handleBackToRoom = useCallback(() => {
+    setSelectedRoom(null);
     setSelectedSignalId(null);
   }, []);
 
@@ -52,8 +53,9 @@ export function ConciergeDashboardPage({ siteId }: ConciergeDashboardPageProps) 
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
-      {/* Header bar */}
-      <HeaderBar siteId={effectiveSiteId} onRefresh={handleRefresh} />
+      {showHeader && (
+        <HeaderBar siteId={effectiveSiteId} siteLabel={effectiveSiteLabel} onRefresh={handleRefresh} />
+      )}
 
       {/* Map + overlay panels */}
       <div className="flex-1 min-h-0 relative">
@@ -62,19 +64,9 @@ export function ConciergeDashboardPage({ siteId }: ConciergeDashboardPageProps) 
           <ConciergeMap
             key={refreshKey}
             siteId={effectiveSiteId}
-            onRoomSelect={handleRoomSelect}
-          />
-        </div>
-
-        {/* Room detail panel (slide in from right) */}
-        {selectedRoom && !selectedSignalId && (
-          <RoomDetailPanel
-            siteId={effectiveSiteId}
-            room={selectedRoom}
-            onClose={handleClosePanel}
             onSignalSelect={handleSignalSelect}
           />
-        )}
+        </div>
 
         {/* Signal drill-down (replaces room panel) */}
         {selectedRoom && selectedSignalId && (
@@ -83,6 +75,7 @@ export function ConciergeDashboardPage({ siteId }: ConciergeDashboardPageProps) 
             roomId={selectedRoom.room_id}
             signalId={selectedSignalId}
             onBack={handleBackToRoom}
+            onResolved={handleRefresh}
           />
         )}
       </div>
@@ -92,7 +85,7 @@ export function ConciergeDashboardPage({ siteId }: ConciergeDashboardPageProps) 
 
 // ---- Header bar subcomponent ----
 
-function HeaderBar({ siteId, onRefresh }: { siteId: string; onRefresh: () => void }) {
+function HeaderBar({ siteId, siteLabel, onRefresh }: { siteId: string; siteLabel: string; onRefresh: () => void }) {
   return (
     <div
       className="flex items-center justify-between px-5 py-3 flex-shrink-0"
@@ -106,7 +99,7 @@ function HeaderBar({ siteId, onRefresh }: { siteId: string; onRefresh: () => voi
           Concierge Intelligence
         </h1>
         <span className="text-[10px] text-gray-500 uppercase tracking-wider">
-          {siteId === "S001" ? "Fairlands" : siteId}
+          {siteLabel}
         </span>
       </div>
       <button

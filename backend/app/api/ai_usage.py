@@ -1,7 +1,9 @@
 """
-AI Usage & Cost Tracking API
-==============================
-Endpoints for monitoring AI API spend across all providers.
+Service Usage & Cost Tracking API
+===================================
+Endpoints for monitoring spend across all external services:
+AI providers, messaging (WhatsApp, BulkSMS, Telegram), and
+unit-based services (ElevenLabs TTS, EskomSePush).
 """
 
 import logging

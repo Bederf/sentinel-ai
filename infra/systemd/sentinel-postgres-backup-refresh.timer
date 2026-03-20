@@ -1,0 +1,10 @@
+[Unit]
+Description=Run SENTINEL PostgreSQL backup and standby refresh daily
+
+[Timer]
+OnCalendar=*-*-* 02:45:00
+Persistent=true
+Unit=sentinel-postgres-backup-refresh.service
+
+[Install]
+WantedBy=timers.target

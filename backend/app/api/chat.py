@@ -42,6 +42,11 @@ class ChatRequest(BaseModel):
     conversation_id: str | None = None
     search_docs: bool = False  # Deprecated: doc search is now a tool, not a mode
     site_id: str | None = Field(None, pattern=r"^site-\d{3}$")  # Selected building/site
+    include_system_docs: bool = Field(
+        False,
+        description="Include SENTINEL platform documentation in RAG retrieval. "
+        "Off by default to avoid polluting operational answers.",
+    )
 
 
 class ChatMetadata(BaseModel):
@@ -122,6 +127,34 @@ def _is_knowledge_query(message: str) -> bool:
     return any(kw in lower for kw in _KNOWLEDGE_KEYWORDS)
 
 
+# Keywords that signal a platform/architecture question — suggest enabling system docs.
+_PLATFORM_DOC_KEYWORDS = {
+    "how do i upload",
+    "how does sentinel",
+    "how does the security",
+    "how does onboarding",
+    "compliance controls",
+    "platform architecture",
+    "security architecture",
+    "system design",
+    "building upload",
+    "configuration guide",
+    "onboarding",
+    "how to configure",
+    "how to set up",
+    "what compliance",
+    "audit framework",
+    "data privacy",
+    "deployment guide",
+}
+
+
+def _is_platform_doc_query(message: str) -> bool:
+    """Detect if a query is about SENTINEL platform docs (architecture, onboarding, etc.)."""
+    lower = message.lower()
+    return any(kw in lower for kw in _PLATFORM_DOC_KEYWORDS)
+
+
 _NO_RESULTS_SENTINEL = "__NO_RESULTS__"
 
 
@@ -159,6 +192,7 @@ async def generate_sse_stream(
     user_email: str | None = None,
     user_role: str | None = None,
     data_subject_id: str | None = None,
+    include_system_docs: bool = False,
 ) -> AsyncGenerator[str, None]:
     """
     Generate SSE-formatted stream from Claude response.
@@ -181,6 +215,13 @@ async def generate_sse_stream(
         message_with_context = context_prefix + user_message
     else:
         message_with_context = user_message
+
+    # Suggest enabling platform documentation when relevant
+    if not include_system_docs and _is_platform_doc_query(user_message):
+        yield format_sse_chunk(
+            "💡 This question may require SENTINEL platform documentation. "
+            "Enable **Include SENTINEL platform documentation** toggle above for better results.\n\n---\n\n"
+        )
 
     # Pre-fetch doc search for knowledge queries to avoid an extra Claude round-trip.
     # If search returns no results, fast-path with a static answer (skip Claude entirely).
@@ -236,6 +277,7 @@ async def generate_sse_stream(
                         site_id=site_id,
                         user_email=user_email,
                         user_role=user_role,
+                        include_system_docs=include_system_docs,
                     ):
                         safe_text = buffer.add_token(chunk)
                         if safe_text is not None:
@@ -441,6 +483,7 @@ async def chat(
             user_email=getattr(auth_ctx, "email", None),
             user_role=getattr(auth_ctx, "role", None),
             data_subject_id=data_subject_id,
+            include_system_docs=chat_request.include_system_docs,
         ),
         media_type="text/event-stream",
         headers={

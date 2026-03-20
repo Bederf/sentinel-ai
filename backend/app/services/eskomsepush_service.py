@@ -116,6 +116,14 @@ class EskomSePushService:
         async with httpx.AsyncClient(timeout=15.0) as client:
             response = await client.get(url, headers=headers, params=params)
             response.raise_for_status()
+
+            try:
+                from app.services.ai_usage_tracker import usage_tracker
+
+                usage_tracker.record_service("eskomsepush", units=1, unit_type="calls", source="energy")
+            except Exception:
+                pass
+
             return response.json()
 
     async def get_status(self) -> Dict:

@@ -8,6 +8,8 @@ from enum import StrEnum
 
 from pydantic import ConfigDict, Field, field_validator
 from pydantic_settings import BaseSettings
+import re
+import base64
 
 
 BACKGROUND_AI_MODEL = "claude-haiku-4-5-20251001"  # Cost-optimised for scheduled jobs
@@ -302,6 +304,15 @@ class Settings(BaseSettings):
     email_reply_from_address: str = "workorder@sentinel-ai.co.za"
     email_reply_from_name: str = "SENTINEL Work Orders"
 
+    # Intelligence intake mailbox (Phase 159 — signal emitter bridge source)
+    # Separate from workorder@ — receives complaint threads, escalations, operational signals
+    intelligence_intake_email: str = "intake@sentinel-ai.co.za"
+    intelligence_intake_imap_host: str = ""
+    intelligence_intake_imap_port: int = 993
+    intelligence_intake_imap_username: str = ""
+    intelligence_intake_imap_password: str = ""
+    intelligence_intake_imap_folder: str = "INBOX"
+
     # Edge mode: disables ML training, simulation queue, and AEGIS evidence jobs
     # for resource-constrained deployments (Jetson, lightweight VPS)
     edge_mode: bool = False
@@ -321,7 +332,7 @@ class Settings(BaseSettings):
     block_booking_concierge_telegram_id: str = ""  # Telegram chat ID
 
     # Ghost Booking & Right-Sizing Detection (Rev 1.2)
-    ghost_booking_grace_minutes: int = 15  # Wait N min after booking start before flagging
+    ghost_booking_grace_minutes: int = 5  # Wait N min after booking start before flagging
     right_sizing_grace_minutes: int = 20  # Do not flag until meeting has been running this long
     early_vacate_threshold_minutes: int = 90  # Room empty with >N min of booking remaining
     sporadic_use_threshold_pct: int = 25  # Occupied < N% of total booking duration
@@ -348,6 +359,11 @@ class Settings(BaseSettings):
     # Focus Room Sessions (Phase 2)
     focus_min_session_seconds: int = 180  # Discard sessions shorter than 3 min (noise)
     focus_extended_use_seconds: int = 7200  # Flag sessions longer than 2 hours
+    focus_red_light_cooldown_seconds: int = 300  # Keep red light on for 5 minutes after overstay ends
+
+    # Cost alert threshold — sends Telegram alert when daily spend exceeds this (ZAR)
+    cost_alert_daily_threshold_zar: float = 100.0
+    cost_alert_telegram_chat_id: str = ""  # Falls back to telegram_alert_chat_id if empty
 
     # Telegram alert delivery
     telegram_bot_token: str = ""  # Bot token from BotFather
@@ -456,6 +472,98 @@ class Settings(BaseSettings):
         if provider not in {"anthropic", "openai", "zai"}:
             return "anthropic"
         return provider
+
+    @field_validator("jwt_secret_key", mode="after")
+    @classmethod
+    def _validate_jwt_secret_key(cls, value):
+        """Validate JWT secret key strength."""
+        if not value:
+            # Empty is allowed if using Supabase auth
+            return value
+        if len(value) < 32:
+            raise ValueError(
+                f"JWT_SECRET_KEY must be at least 32 characters for security, got {len(value)}. "
+                'Generate a secure key: python -c "import secrets; print(secrets.token_hex(32))"'
+            )
+        return value
+
+    @field_validator("supabase_url", mode="after")
+    @classmethod
+    def _validate_supabase_url(cls, value):
+        """Validate Supabase URL format."""
+        if not value:
+            # Empty is allowed if using JSON storage
+            return value
+        # Basic URL validation - must start with http:// or https://
+        if not re.match(r"^https?://", value, re.IGNORECASE):
+            raise ValueError(f"SUPABASE_URL must be a valid URL starting with http:// or https://, got: {value}")
+        return value
+
+    @field_validator("supabase_service_role_key", mode="after")
+    @classmethod
+    def _validate_supabase_service_role_key(cls, value):
+        """Validate Supabase service role key."""
+        if not value:
+            # Empty is allowed if not using Supabase
+            return value
+        # Allow short keys in test environments (e.g., pytest)
+        # In production, service role keys are typically 50+ characters
+        if len(value) < 16:
+            raise ValueError(
+                f"SUPABASE_SERVICE_ROLE_KEY must be at least 16 characters, got {len(value)}. "
+                "This is a critical security credential - ensure it's kept secret."
+            )
+        return value
+
+    @field_validator("anthropic_api_key", "openai_api_key", "zai_api_key", mode="after")
+    @classmethod
+    def _validate_ai_api_keys(cls, value):
+        """Validate AI API key format."""
+        if not value:
+            # Empty is allowed if not using the respective AI provider
+            return value
+        # AI API keys should be reasonable length (typically 30+ characters)
+        # This catches common errors like typos or placeholder values
+        # Allow shorter keys in test environments (e.g., pytest)
+        if len(value) < 15:
+            raise ValueError(
+                f"AI_API_KEY must be at least 15 characters for security, got {len(value)}. "
+                "This suggests an invalid or placeholder API key."
+            )
+        # Check for common placeholder patterns (only for very short keys to avoid false positives)
+        if len(value) < 25 and any(
+            placeholder in value.lower() for placeholder in ["placeholder", "your_key_here", "change_me", "fake_key"]
+        ):
+            raise ValueError(
+                f"AI_API_KEY contains placeholder text: {value}. "
+                "Please replace with a valid API key from your AI provider."
+            )
+        return value
+
+    @field_validator("encryption_key", mode="after")
+    @classmethod
+    def _validate_encryption_key(cls, value):
+        """Validate Fernet encryption key format."""
+        if not value:
+            # Empty is allowed if encryption is disabled
+            return value
+        # Fernet keys are base64-encoded and should be 44 characters
+        if len(value) != 44:
+            raise ValueError(
+                f"ENCRYPTION_KEY must be a valid Fernet key (44 characters), got {len(value)}. "
+                'Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"'
+            )
+        try:
+            # Verify it's valid base64
+            decoded = base64.urlsafe_b64decode(value.encode())
+            if len(decoded) != 32:
+                raise ValueError(
+                    f"ENCRYPTION_KEY must decode to 32 bytes (256 bits), got {len(decoded)}. "
+                    "This suggests an invalid Fernet key format."
+                )
+        except (base64.binascii.Error, UnicodeDecodeError) as e:
+            raise ValueError(f"ENCRYPTION_KEY must be valid base64-encoded data: {e}")
+        return value
 
     @classmethod
     def _normalize_config_value(cls, field_name: str, value: Any) -> Any:

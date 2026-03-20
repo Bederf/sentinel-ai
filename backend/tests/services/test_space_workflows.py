@@ -7,17 +7,13 @@ import pytest
 
 from app.models.booking_record import BlockBookingConfig, BookingRecord
 from app.models.space_occupancy import GhostBookingFinding, OccupancyEvent
+from tests.services.fake_space_store import FakeSpaceSupabase
 
 
 @pytest.fixture(autouse=True)
-def _clean_space_store(tmp_path):
-    with (
-        patch("app.services.occupancy_store._DATA_DIR", tmp_path),
-        patch("app.services.occupancy_store._EVENTS_FILE", tmp_path / "occupancy_events.json"),
-        patch("app.services.occupancy_store._GHOST_FILE", tmp_path / "ghost_findings.json"),
-        patch("app.services.occupancy_store._RIGHTSIZING_FILE", tmp_path / "rightsizing_findings.json"),
-        patch("app.services.occupancy_store._SESSIONS_FILE", tmp_path / "focus_room_sessions.json"),
-    ):
+def _clean_space_store():
+    fake = FakeSpaceSupabase()
+    with patch("app.services.occupancy_store._client", return_value=fake):
         yield
 
 
@@ -51,6 +47,7 @@ async def test_block_booking_notifier_uses_n8n():
         rooms=["MR1", "MR2", "MR3"],
         room_count=3,
         booking_ids=["b1", "b2", "b3"],
+        detected_at=datetime(2026, 3, 10, 9, 5),
     )
     config = BlockBookingConfig(site_id="site-002", concierge_email="concierge@example.com")
     service = AsyncMock()
@@ -66,6 +63,13 @@ async def test_block_booking_notifier_uses_n8n():
     assert sent is True
     service.trigger_webhook.assert_awaited_once()
     assert service.trigger_webhook.await_args.kwargs["webhook_path"] == "space-block-booking-alert"
+    payload = service.trigger_webhook.await_args.kwargs["payload"]
+    assert payload["organiser_email"] == "alice@example.com"
+    assert payload["organiser_name"] == "Alice Smith"
+    assert payload["booking_date"] == "2026-03-10"
+    assert payload["flagged_at"].startswith("2026-03-10")
+    assert "Date flagged:" in payload["message"]
+    assert "Contact: alice@example.com" in payload["message"]
     store.mark_alert_notified.assert_called_once_with("alert-001")
 
 
@@ -180,6 +184,65 @@ async def test_process_concierge_whatsapp_reply_no_marks_empty():
     assert result["handled"] is True
     assert updated is not None
     assert updated.status == "confirmed_empty"
+
+
+@pytest.mark.asyncio
+async def test_ghost_booking_notifier_sends_email_and_whatsapp_details():
+    from app.services.ghost_room_notifier import (
+        format_ghost_email_message,
+        format_ghost_whatsapp_message,
+        send_ghost_booking_alert,
+    )
+
+    finding = GhostBookingFinding(
+        id="ghost-003",
+        site_id="site-002",
+        room_code="S002-L1-MR1",
+        room_name="S002-L1-MR1",
+        booking_id="booking-003",
+        organiser_email="alice@example.com",
+        organiser_name="Alice Smith",
+        source_booking_flagged=True,
+        booking_start=datetime(2026, 3, 10, 9, 0),
+        booking_end=datetime(2026, 3, 10, 17, 0),
+        grace_period_minutes=15,
+        detected_at=datetime(2026, 3, 10, 9, 20),
+    )
+    config = BlockBookingConfig(
+        site_id="site-002",
+        concierge_email="concierge@example.com",
+        concierge_whatsapp="whatsapp:+27721234567",
+    )
+    n8n = AsyncMock()
+    n8n.trigger_webhook.return_value = {"success": True}
+    whatsapp_service = AsyncMock()
+    whatsapp_service.send_text_message.return_value = {"success": True, "message_id": "WA-001"}
+
+    email_message = format_ghost_email_message(finding, "Site 002")
+    whatsapp_message = format_ghost_whatsapp_message(finding)
+
+    assert "Date Flagged:" in email_message
+    assert "Email:      alice@example.com" in email_message
+    assert "block-booking anomaly" in email_message
+    assert "Date: 10 Mar 2026" in whatsapp_message
+    assert "*yes* = room in use" in whatsapp_message
+    assert "*no* = room empty" in whatsapp_message
+    assert "Previously flagged: block booking." in whatsapp_message
+
+    with (
+        patch("app.services.ghost_room_notifier.get_n8n_service", return_value=n8n),
+        patch("app.integrations.whatsapp_service.get_whatsapp_service", return_value=whatsapp_service),
+    ):
+        result = await send_ghost_booking_alert(finding, config, site_name="Site 002")
+
+    assert result["success"] is True
+    assert result["email_sent"] is True
+    assert result["whatsapp_sent"] is True
+    payload = n8n.trigger_webhook.await_args.kwargs["payload"]
+    assert payload["organiser_email"] == "alice@example.com"
+    assert payload["booking_date"] == "2026-03-10"
+    assert payload["source_booking_flagged"] is True
+    whatsapp_service.send_text_message.assert_awaited_once()
 
 
 def test_parse_mqtt_presence_message_prefers_zone_as_room_code():

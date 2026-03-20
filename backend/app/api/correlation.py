@@ -10,7 +10,7 @@ import logging
 import uuid
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
 logger = logging.getLogger(__name__)
 
@@ -224,7 +224,7 @@ async def acknowledge_card(card_id: str) -> dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
-# Email ingest endpoint
+# Email ingest endpoint (stub — kept for backward compatibility)
 # ---------------------------------------------------------------------------
 
 
@@ -239,3 +239,47 @@ async def ingest_email(body: dict[str, Any] | None = None) -> dict[str, Any]:
         "cluster_action": "created",
         "cluster_id": str(uuid.uuid4()),
     }
+
+
+# ---------------------------------------------------------------------------
+# Signal ingest endpoint (Phase 159 — live)
+# ---------------------------------------------------------------------------
+
+
+@router.post("/signals/ingest/email")
+async def ingest_email_signal(body: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Ingest an email from n8n Intelligence Intake and emit a correlation signal.
+
+    Called by the SENTINEL — Intelligence Intake (IMAP) n8n workflow.
+    Writes directly to the Supabase `signal` table.
+
+    Expected body (from n8n Extract Email Fields node):
+        from_email, from_name, subject, body_plain, body_html,
+        message_id, in_reply_to, references, to, cc, received_at, source
+    """
+    from app.services.signal_emitter import emit_email_signal
+
+    if not body:
+        raise HTTPException(status_code=400, detail="Empty request body")
+
+    from_email = body.get("from_email", "")
+    if not from_email:
+        raise HTTPException(status_code=400, detail="from_email is required")
+
+    try:
+        result = await emit_email_signal(
+            from_email=from_email,
+            from_name=body.get("from_name", ""),
+            subject=body.get("subject", ""),
+            body_plain=body.get("body_plain", body.get("body_html", "")),
+            message_id=body.get("message_id", ""),
+            in_reply_to=body.get("in_reply_to", ""),
+            references=body.get("references", ""),
+            to=body.get("to", []),
+            cc=body.get("cc", []),
+            received_at=body.get("received_at", ""),
+        )
+        return result
+    except Exception as exc:
+        logger.error("Signal ingest failed: %s", exc)
+        raise HTTPException(status_code=500, detail=f"Signal ingest failed: {exc}")

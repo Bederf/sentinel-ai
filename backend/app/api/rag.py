@@ -46,6 +46,7 @@ class DocumentRequest(BaseModel):
     document_type: str
     equipment_type: str
     full_text: str
+    site_id: Optional[str] = None
     source: str = "internal_procedure"
     manufacturer: Optional[str] = None
     model: Optional[str] = None
@@ -237,6 +238,7 @@ async def add_document(request: DocumentRequest, auth: AuthContext = Depends(req
         document_type=request.document_type,
         equipment_type=request.equipment_type,
         full_text=request.full_text,
+        site_id=request.site_id,
         source=request.source,
         manufacturer=request.manufacturer,
         model=request.model,

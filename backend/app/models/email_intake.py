@@ -67,9 +67,13 @@ class EmailIntakeRequest(BaseModel):
     # Email metadata
     subject: str
     body_plain: Optional[str] = None
+    body_html: Optional[str] = None
     message_id: Optional[str] = None
     in_reply_to: Optional[str] = None
     received_at: Optional[str] = None  # ISO timestamp
+    to: Optional[list[str]] = None
+    cc: Optional[list[str]] = None
+    source: Optional[str] = None
 
     # AI extraction (optional — Phase 134 moves classification to backend agent)
     site_id: Optional[str] = None

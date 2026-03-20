@@ -85,7 +85,13 @@ def parse_mqtt_presence_message(topic: str, payload: bytes | str | dict[str, Any
     timestamp_raw = raw_data.get("ts") or raw_data.get("timestamp")
     parsed_timestamp: datetime | None = None
     if isinstance(timestamp_raw, (int, float)):
-        parsed_timestamp = datetime.utcfromtimestamp(timestamp_raw)
+        # Guard against firmware sending uptime_seconds as ts instead of epoch.
+        # Any ts before 2020-01-01 (epoch 1577836800) is clearly uptime, not a real timestamp.
+        if timestamp_raw > 1577836800:
+            parsed_timestamp = datetime.utcfromtimestamp(timestamp_raw)
+        else:
+            # Uptime value — use server receive time instead
+            parsed_timestamp = datetime.utcnow()
     elif isinstance(timestamp_raw, str):
         try:
             parsed_timestamp = datetime.fromisoformat(timestamp_raw.replace("Z", "+00:00")).replace(tzinfo=None)
@@ -191,19 +197,24 @@ class SpaceMqttListener:
 
         def _on_connect(client, _userdata, _flags, reason_code, _properties=None):
             if reason_code == 0:
-                # Subscribe to configured topic (legacy: sentinel/nodes/+/presence)
-                client.subscribe(settings.space_mqtt_topic)
-                # Also subscribe to radar topic (LD2410C extended payload)
+                # Subscribe to radar topic only (v2.x nodes).
+                # Legacy sentinel/nodes/+/presence topic removed — v1.x backward
+                # compat no longer needed. Remove mqtt.publish(topicLegacy, ...)
+                # from firmware to stop double-publish at source.
                 radar_topic = settings.space_mqtt_radar_topic
-                if radar_topic and radar_topic != settings.space_mqtt_topic:
+                if radar_topic:
                     client.subscribe(radar_topic)
                     logger.warning(
-                        "Space MQTT listener connected — subscribed to %s and %s",
-                        settings.space_mqtt_topic,
+                        "Space MQTT listener connected — subscribed to %s",
                         radar_topic,
                     )
                 else:
-                    logger.warning("Space MQTT listener connected and subscribed to %s", settings.space_mqtt_topic)
+                    # Fallback: use legacy topic if radar topic not configured
+                    client.subscribe(settings.space_mqtt_topic)
+                    logger.warning(
+                        "Space MQTT listener connected — subscribed to %s (legacy)",
+                        settings.space_mqtt_topic,
+                    )
             else:
                 logger.warning("Space MQTT listener connect failed: %s", reason_code)
 

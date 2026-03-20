@@ -82,6 +82,7 @@ export function AssetWorkflowDashboard() {
   const [sites, setSites] = useState<Site[]>([]);
   const [selectedSiteId, setSelectedSiteId] = useState<string>('');
   const [loadingSites, setLoadingSites] = useState(true);
+  const selectedSite = sites.find((site) => site.id === selectedSiteId) ?? null;
 
   // Fetch equipment list and workflow states from API
   const fetchDashboardData = useCallback(async () => {
@@ -224,7 +225,7 @@ export function AssetWorkflowDashboard() {
       {/* Tab Content */}
       {activeTab === 'tech-chat' ? (
         <div className="flex-1 min-h-0">
-          <TechnicianChat />
+          <TechnicianChat siteId={selectedSiteId || undefined} siteLabel={selectedSite?.name} />
         </div>
       ) : initialLoading ? (
         <PageLoading message="Loading equipment workflow data..." />

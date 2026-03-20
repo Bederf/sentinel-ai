@@ -15,7 +15,7 @@ import { conciergeApi } from "../../lib/api";
 // ---- Signal type display labels ----
 
 const SIGNAL_TYPE_LABELS: Record<string, string> = {
-  booking_conflict: "Block Booking",
+  booking_conflict: "Block Booking Risk",
   booking_saturation: "Booking Saturation",
   no_show_pattern: "Ghost Booking",
   complaint_email: "Complaint",
@@ -30,7 +30,7 @@ const SIGNAL_TYPE_LABELS: Record<string, string> = {
 const SIGNAL_DOMAIN_COLORS: Record<string, string> = {
   booking_conflict: "#f4900c",
   booking_saturation: "#f4900c",
-  no_show_pattern: "#f4900c",
+  no_show_pattern: "#e74c3c",
   complaint_email: "#4a9eff",
   escalation_email: "#4a9eff",
   observation_email: "#4a9eff",

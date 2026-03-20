@@ -9,7 +9,7 @@ from fastapi import FastAPI
 from app.config.settings import settings
 from app.api import chat, hybrid_chat, local_chat
 from app.api import predictions, optimization, energy, ml_predictions
-from app.api import equipment_lookup, diagnosis, vision, ocr
+from app.api import equipment_lookup, diagnosis, vision, ocr, technical
 from app.api import timeseries, sensor_analysis, features, data_quality
 from app.api import survival, classification, ml_feedback, repair_effectiveness
 from app.api import rag, ml_retraining, fleet_learning, mlops
@@ -40,6 +40,7 @@ def register_analytics_routers(app: FastAPI) -> None:
 
     # Equipment lookup and diagnostics
     app.include_router(equipment_lookup.router, prefix="/api", tags=["equipment-lookup"])
+    app.include_router(technical.router, tags=["technical"])
     app.include_router(diagnosis.router, prefix="/api", tags=["diagnosis"])
     app.include_router(vision.router, prefix="/api", tags=["vision"])
     app.include_router(ocr.router, prefix="/api", tags=["ocr"])

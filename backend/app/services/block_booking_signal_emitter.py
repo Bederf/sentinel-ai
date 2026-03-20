@@ -37,7 +37,7 @@ SATURATION_THRESHOLD_PCT = 70
 SATURATION_HIGH_PCT = 90
 SATURATION_LOOKAHEAD_DAYS = 7
 
-SOURCE_MODULE = "space_optimisation"
+SOURCE_MODULE = "booking_system"
 
 # Dedup windows
 _BLOCK_BOOKING_DEDUP_WINDOW = 24 * 60 * 60  # 24 hours
@@ -126,7 +126,7 @@ async def _detect_block_bookers(site_id: str, bookings: list) -> list[dict]:
         signal_row = build_signal_row(
             source_module=SOURCE_MODULE,
             signal_type="booking_conflict",
-            severity="high",
+            severity="medium",
             confidence=0.90,
             location_ref=location_ref,
             raw_content=(
@@ -141,6 +141,8 @@ async def _detect_block_bookers(site_id: str, bookings: list) -> list[dict]:
                 "room_count": len(rooms),
                 "booking_date": booking_date.isoformat(),
                 "booking_ids": [b.id for b in org_bookings],
+                "signal_stage": "planning",
+                "signal_lifecycle": "warn",
             },
             site_id=site_id,
         )

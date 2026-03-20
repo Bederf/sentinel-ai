@@ -1,24 +1,17 @@
-"""Concierge user CRUD store.
-
-Manages concierge users who receive ghost booking notifications and
-confirm room status. JSON file persistence at data/space/concierges.json.
-"""
+"""Concierge user CRUD store backed by the canonical Postgres store."""
 
 from __future__ import annotations
 
-import json
 import logging
 import threading
 import uuid
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from datetime import datetime
-from pathlib import Path
 from typing import Optional
 
-logger = logging.getLogger(__name__)
+from app.database.supabase_client import get_supabase_client
 
-_DATA_DIR = Path(__file__).resolve().parent.parent / "data" / "space"
-_CONCIERGES_FILE = _DATA_DIR / "concierges.json"
+logger = logging.getLogger(__name__)
 _lock = threading.Lock()
 
 
@@ -28,34 +21,18 @@ class ConciergeUser:
 
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     name: str = ""
-    mobile: str = ""  # WhatsApp number, E.164 format
+    mobile: str = ""
     email: str = ""
     site_id: str = ""
     building_codes: list[str] = field(default_factory=list)
-    floor_assignments: dict[str, list[int]] = field(default_factory=dict)  # building_code -> [floor_nums]
+    floor_assignments: dict[str, list[int]] = field(default_factory=dict)
     active: bool = True
     created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
     updated_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
 
 
-def _ensure_dir() -> None:
-    _DATA_DIR.mkdir(parents=True, exist_ok=True)
-
-
-def _load_all() -> list[dict]:
-    if not _CONCIERGES_FILE.exists():
-        return []
-    try:
-        with open(_CONCIERGES_FILE) as f:
-            return json.load(f)
-    except (json.JSONDecodeError, OSError):
-        return []
-
-
-def _save_all(data: list[dict]) -> None:
-    _ensure_dir()
-    with open(_CONCIERGES_FILE, "w") as f:
-        json.dump(data, f, indent=2, default=str)
+def _client():
+    return get_supabase_client()
 
 
 def _dict_to_concierge(d: dict) -> ConciergeUser:
@@ -75,22 +52,26 @@ def _dict_to_concierge(d: dict) -> ConciergeUser:
 
 def list_concierges(site_id: Optional[str] = None) -> list[ConciergeUser]:
     """List all concierge users, optionally filtered by site_id."""
-    with _lock:
-        records = _load_all()
-    concierges = [_dict_to_concierge(r) for r in records]
-    if site_id:
-        concierges = [c for c in concierges if c.site_id == site_id]
-    return concierges
+    try:
+        query = _client().table("space_concierges").select("*")
+        if site_id:
+            query = query.eq("site_id", site_id)
+        response = query.execute()
+        return [_dict_to_concierge(row) for row in (response.data or [])]
+    except Exception as exc:
+        logger.error("Canonical list_concierges failed: %s", exc)
+        return []
 
 
 def get_concierge(concierge_id: str) -> Optional[ConciergeUser]:
     """Get a single concierge by ID."""
-    with _lock:
-        records = _load_all()
-    for r in records:
-        if r.get("id") == concierge_id:
-            return _dict_to_concierge(r)
-    return None
+    try:
+        response = _client().table("space_concierges").select("*").eq("id", concierge_id).limit(1).execute()
+        rows = response.data or []
+        return _dict_to_concierge(rows[0]) if rows else None
+    except Exception as exc:
+        logger.error("Canonical get_concierge failed: %s", exc)
+        return None
 
 
 def create_concierge(data: dict) -> ConciergeUser:
@@ -109,63 +90,59 @@ def create_concierge(data: dict) -> ConciergeUser:
         updated_at=now,
     )
     with _lock:
-        records = _load_all()
-        records.append(asdict(concierge))
-        _save_all(records)
+        try:
+            _client().table("space_concierges").insert(concierge.__dict__).execute()
+        except Exception as exc:
+            logger.error("Canonical create_concierge failed: %s", exc)
+            raise
     return concierge
 
 
 def update_concierge(concierge_id: str, data: dict) -> Optional[ConciergeUser]:
     """Update an existing concierge. Returns updated user or None if not found."""
     with _lock:
-        records = _load_all()
-        for i, r in enumerate(records):
-            if r.get("id") == concierge_id:
-                # Merge provided fields
-                for key in ("name", "mobile", "email", "site_id", "building_codes", "floor_assignments", "active"):
-                    if key in data:
-                        r[key] = data[key]
-                r["updated_at"] = datetime.utcnow().isoformat()
-                records[i] = r
-                _save_all(records)
-                return _dict_to_concierge(r)
-    return None
+        concierge = get_concierge(concierge_id)
+        if concierge is None:
+            return None
+        record = concierge.__dict__.copy()
+        for key in ("name", "mobile", "email", "site_id", "building_codes", "floor_assignments", "active"):
+            if key in data:
+                record[key] = data[key]
+        record["updated_at"] = datetime.utcnow().isoformat()
+        try:
+            _client().table("space_concierges").update(record).eq("id", concierge_id).execute()
+            return _dict_to_concierge(record)
+        except Exception as exc:
+            logger.error("Canonical update_concierge failed: %s", exc)
+            return None
 
 
 def delete_concierge(concierge_id: str) -> bool:
     """Delete a concierge by ID. Returns True if found and deleted."""
     with _lock:
-        records = _load_all()
-        new_records = [r for r in records if r.get("id") != concierge_id]
-        if len(new_records) == len(records):
+        try:
+            response = _client().table("space_concierges").delete().eq("id", concierge_id).execute()
+            return bool(response.data is not None)
+        except Exception as exc:
+            logger.error("Canonical delete_concierge failed: %s", exc)
             return False
-        _save_all(new_records)
-    return True
 
 
 def find_concierge_for_room(site_id: str, building_code: str, floor: Optional[int] = None) -> Optional[ConciergeUser]:
-    """Find the best matching active concierge for a room location.
-
-    Matches by site_id + building_code, optionally narrowing by floor.
-    Returns the most specific match (floor-assigned first).
-    """
+    """Find the best matching active concierge for a room location."""
     concierges = list_concierges(site_id=site_id)
     active = [c for c in concierges if c.active]
 
-    # First pass: match building + floor
     if floor is not None:
-        for c in active:
-            if building_code in c.building_codes:
-                floor_list = c.floor_assignments.get(building_code, [])
-                if floor in floor_list:
-                    return c
+        for concierge in active:
+            if building_code in concierge.building_codes:
+                if floor in concierge.floor_assignments.get(building_code, []):
+                    return concierge
 
-    # Second pass: match building (any floor)
-    for c in active:
-        if building_code in c.building_codes:
-            return c
+    for concierge in active:
+        if building_code in concierge.building_codes:
+            return concierge
 
-    # Third pass: match site (any building)
     if active:
         return active[0]
 

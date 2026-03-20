@@ -63,6 +63,9 @@ async def discover_devices(request: BACnetDiscoverRequest = BACnetDiscoverReques
 
     try:
         discovered = await client.discover_devices(timeout=request.timeout)
+        if request.host:
+            normalized_host = request.host.strip().lower()
+            discovered = [device for device in discovered if device.ip_address.lower().startswith(normalized_host)]
 
         devices = [
             BACnetDeviceInfo(
@@ -113,6 +116,9 @@ async def test_bacnet_connection(
 
     try:
         discovered = await client.discover_devices(timeout=request.timeout)
+        if request.host:
+            normalized_host = request.host.strip().lower()
+            discovered = [device for device in discovered if device.ip_address.lower().startswith(normalized_host)]
 
         devices = [
             BACnetDeviceInfo(

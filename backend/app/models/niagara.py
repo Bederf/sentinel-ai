@@ -155,6 +155,7 @@ class BACnetDiscoverRequest(BaseModel):
     """Request parameters for BACnet device discovery."""
 
     timeout: float = Field(5.0, description="Discovery timeout in seconds", ge=1.0, le=30.0)
+    host: Optional[str] = Field(None, description="Optional host/IP to match discovered devices against")
 
 
 class BACnetDiscoverResponse(BaseModel):
@@ -282,6 +283,7 @@ class BACnetTestConnectionRequest(BaseModel):
     """Request to test BACnet connectivity."""
 
     timeout: int = Field(5, description="Discovery timeout in seconds", ge=1, le=30)
+    host: Optional[str] = Field(None, description="Optional host/IP to match discovered devices against")
 
 
 class BACnetClientStatus(BaseModel):

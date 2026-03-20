@@ -1,0 +1,13 @@
+[Unit]
+Description=SENTINEL PostgreSQL logical backup
+After=network.target
+
+[Service]
+Type=oneshot
+User=bederf
+Group=bederf
+WorkingDirectory=/opt/bms-intelligence
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+ExecStart=/opt/bms-intelligence/scripts/backup/run_postgres_backup_daily.sh
+StandardOutput=append:/opt/bms-intelligence/backups/logs/postgres-backup-systemd.log
+StandardError=append:/opt/bms-intelligence/backups/logs/postgres-backup-systemd.log

@@ -18,6 +18,9 @@ Sentry is a Telegram AI bot located at `$SENTRY_HOME` that integrates with SENTI
 | **Query Mode** | User → Sentry → SENTINEL | Technician asks questions, gets BMS data |
 | **Alert Mode** | SENTINEL → Sentry → User | BMS sends alerts to FM team |
 | **Work Order Mode** | Bidirectional | Alert → Dispatch → Data Collection |
+| **Document Intake Mode** | User → Sentry → SENTINEL | Technician sends a photo, bot captures metadata, raw file is saved to Concept |
+
+See [sentry-telegram-document-intake.md](/opt/bms-intelligence/docs/05-integrations/sentry-telegram-document-intake.md) for the guided raw-document upload flow.
 
 ## POPIA Runtime Controls
 

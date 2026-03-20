@@ -1,12 +1,4 @@
-"""
-Tests for the simulation data adapter in PointDiscoveryService.
-
-Covers:
-- _load_simulation_points() Supabase queries and formatting
-- _infer_object_type() and _infer_point_type() helpers
-- 3-tier routing: BACnet -> Simulation -> JSON fallback
-- DiscoverRequest API model (demo fields removed)
-"""
+"""Tests for adapter-backed discovery in ``PointDiscoveryService``."""
 
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -16,6 +8,7 @@ from app.services.niagara.point_discovery import (
     _infer_object_type,
     _infer_point_type,
 )
+from app.services.niagara.point_classifier import ClassifiedPoint, ConfidenceLevel, PointType
 
 
 # ---------------------------------------------------------------------------
@@ -25,116 +18,74 @@ from app.services.niagara.point_discovery import (
 
 @pytest.mark.unit
 class TestSimulationPointAdapter:
-    """Test _load_simulation_points() and helper functions."""
+    """Test adapter-backed simulation discovery and helper functions."""
 
-    def test_load_simulation_points_returns_formatted_points(self):
-        """Mock Supabase to return equipment + readings, verify point format."""
+    @pytest.mark.asyncio
+    async def test_load_simulation_points_returns_formatted_points(self):
+        """Mock the simulation adapter and verify discovery point format."""
         svc = PointDiscoveryService()
 
-        # Sensor readings data per equipment code
-        readings_map = {
+        devices = [
+            MagicMock(
+                device_id="S002-CHILLER-B1-001", display_name="Chiller 1", metadata={"equipment_type": "CHILLER"}
+            ),
+            MagicMock(device_id="S002-AHU-B1-001", display_name="AHU 1", metadata={"equipment_type": "AHU"}),
+            MagicMock(device_id="S002-FCU-101", display_name="FCU Zone 101", metadata={"equipment_type": "FCU"}),
+        ]
+        device_points = {
             "S002-CHILLER-B1-001": [
-                {"sensor_type": "chilled_water_supply_temp", "value": 7.2, "unit": "°C"},
-                {"sensor_type": "chilled_water_setpoint", "value": 6.5, "unit": "°C"},
+                MagicMock(
+                    point_id="chilled_water_supply_temp",
+                    point_name="chilled_water_supply_temp",
+                    unit="°C",
+                    writable=False,
+                    metadata={},
+                ),
+                MagicMock(
+                    point_id="chilled_water_setpoint",
+                    point_name="chilled_water_setpoint",
+                    unit="°C",
+                    writable=True,
+                    metadata={},
+                ),
             ],
             "S002-AHU-B1-001": [
-                {"sensor_type": "supply_air_temp", "value": 14.5, "unit": "°C"},
-                {"sensor_type": "fault_status", "value": 0, "unit": ""},
+                MagicMock(
+                    point_id="supply_air_temp", point_name="supply_air_temp", unit="°C", writable=False, metadata={}
+                ),
+                MagicMock(point_id="fault_status", point_name="fault_status", unit="", writable=False, metadata={}),
             ],
             "S002-FCU-101": [
-                {"sensor_type": "room_temp", "value": 22.1, "unit": "°C"},
-                {"sensor_type": "enable_command", "value": 1, "unit": ""},
+                MagicMock(point_id="room_temp", point_name="room_temp", unit="°C", writable=False, metadata={}),
+                MagicMock(point_id="enable_command", point_name="enable_command", unit="", writable=True, metadata={}),
             ],
         }
+        point_values = {
+            ("S002-CHILLER-B1-001", "chilled_water_supply_temp"): 7.2,
+            ("S002-CHILLER-B1-001", "chilled_water_setpoint"): 6.5,
+            ("S002-AHU-B1-001", "supply_air_temp"): 14.5,
+            ("S002-AHU-B1-001", "fault_status"): 0,
+            ("S002-FCU-101", "room_temp"): 22.1,
+            ("S002-FCU-101", "enable_command"): 1,
+        }
 
-        equipment_data = [
-            {
-                "code": "S002-CHILLER-B1-001",
-                "name": "Chiller 1",
-                "type": "CHILLER",
-                "status": "active",
-                "health_score": 85,
-            },
-            {"code": "S002-AHU-B1-001", "name": "AHU 1", "type": "AHU", "status": "active", "health_score": 90},
-            {"code": "S002-FCU-101", "name": "FCU Zone 101", "type": "FCU", "status": "active", "health_score": 78},
-        ]
+        adapter_instance = MagicMock()
+        adapter_instance.connect = AsyncMock()
+        adapter_instance.disconnect = AsyncMock()
+        adapter_instance.discover_devices = AsyncMock(return_value=devices)
+        adapter_instance.discover_points = AsyncMock(side_effect=lambda device_id: device_points[device_id])
+        adapter_instance.read_points = AsyncMock(
+            side_effect=lambda device_id, point_ids: [
+                MagicMock(point_id=point_id, value=point_values[(device_id, point_id)], unit=None)
+                for point_id in point_ids
+            ]
+        )
+        adapter_instance.read_point = AsyncMock(
+            side_effect=lambda device_id, point_id: MagicMock(value=point_values[(device_id, point_id)], unit=None)
+        )
 
-        def _build_chain_mock(final_data):
-            """Build a mock that supports arbitrary .method() chaining ending in .execute()."""
-
-            class ChainMock(MagicMock):
-                def __init__(self, *a, **kw):
-                    super().__init__(*a, **kw)
-                    self._terminal_data = final_data
-
-                def __getattr__(self, name):
-                    if name == "execute":
-
-                        def execute_fn(*a, **kw):
-                            resp = MagicMock()
-                            resp.data = self._terminal_data
-                            return resp
-
-                        return execute_fn
-                    if name.startswith("_"):
-                        return super().__getattr__(name)
-
-                    # All chainable methods return self
-                    def chain_fn(*a, **kw):
-                        return self
-
-                    return chain_fn
-
-            return ChainMock()
-
-        # Track which eq_code is being queried for readings
-        current_eq_code = {"code": None}
-
-        def mock_table(table_name):
-            if table_name == "sites":
-                return _build_chain_mock([])  # empty buildings
-            elif table_name == "equipment":
-                return _build_chain_mock(equipment_data)
-            elif table_name == "equipment_sensor_readings":
-                # Need to capture the .eq("equipment_id", code) call
-                class ReadingsChain(MagicMock):
-                    def __init__(self, *a, **kw):
-                        super().__init__(*a, **kw)
-                        self._eq_code = None
-
-                    def __getattr__(self, name):
-                        if name == "execute":
-                            data = readings_map.get(self._eq_code, [])
-
-                            def execute_fn(*a, **kw):
-                                resp = MagicMock()
-                                resp.data = data
-                                return resp
-
-                            return execute_fn
-                        if name == "eq":
-
-                            def eq_fn(field, value):
-                                self._eq_code = value
-                                return self
-
-                            return eq_fn
-                        if name.startswith("_"):
-                            return super().__getattr__(name)
-
-                        def chain_fn(*a, **kw):
-                            return self
-
-                        return chain_fn
-
-                return ReadingsChain()
-            return MagicMock()
-
-        mock_client = MagicMock()
-        mock_client.table = mock_table
-
-        with patch("app.services.niagara.point_discovery.get_supabase_client", return_value=mock_client):
-            points = svc._load_simulation_points("site-002")
+        with patch("app.services.niagara.point_discovery.create_bms_adapter", return_value=adapter_instance):
+            points = await svc._load_simulation_points("site-002")
 
         # Should have 6 points total (2 per equipment x 3 equipment)
         assert len(points) == 6
@@ -167,36 +118,32 @@ class TestSimulationPointAdapter:
         assert ahu_fault["object_type"] == "binaryInput"
         assert ahu_fault["_point_type"] == "status"
 
-    def test_load_simulation_points_empty_when_no_equipment(self):
-        """Mock Supabase to return empty result, assert empty list."""
+    @pytest.mark.asyncio
+    async def test_load_simulation_points_empty_when_no_equipment(self):
+        """Mock adapter to return no devices, assert empty list."""
         svc = PointDiscoveryService()
 
-        mock_client = MagicMock()
+        adapter_instance = MagicMock()
+        adapter_instance.connect = AsyncMock()
+        adapter_instance.disconnect = AsyncMock()
+        adapter_instance.discover_devices = AsyncMock(return_value=[])
 
-        # Buildings returns empty
-        mock_buildings_resp = MagicMock()
-        mock_buildings_resp.data = []
-        mock_client.table.return_value.select.return_value.or_.return_value.execute.return_value = mock_buildings_resp
-
-        # Equipment prefix returns empty
-        mock_equip_resp = MagicMock()
-        mock_equip_resp.data = []
-        mock_client.table.return_value.select.return_value.like.return_value.execute.return_value = mock_equip_resp
-
-        with patch("app.services.niagara.point_discovery.get_supabase_client", return_value=mock_client):
-            points = svc._load_simulation_points("site-999")
+        with patch("app.services.niagara.point_discovery.create_bms_adapter", return_value=adapter_instance):
+            points = await svc._load_simulation_points("site-999")
 
         assert points == []
 
-    def test_load_simulation_points_handles_supabase_error(self):
-        """Mock Supabase to raise exception, assert empty list (graceful degradation)."""
+    @pytest.mark.asyncio
+    async def test_load_simulation_points_handles_adapter_error(self):
+        """Mock adapter to raise exception, assert empty list (graceful degradation)."""
         svc = PointDiscoveryService()
 
-        with patch(
-            "app.services.niagara.point_discovery.get_supabase_client",
-            side_effect=RuntimeError("Supabase unavailable"),
-        ):
-            points = svc._load_simulation_points("site-002")
+        adapter_instance = MagicMock()
+        adapter_instance.connect = AsyncMock(side_effect=RuntimeError("adapter unavailable"))
+        adapter_instance.disconnect = AsyncMock()
+
+        with patch("app.services.niagara.point_discovery.create_bms_adapter", return_value=adapter_instance):
+            points = await svc._load_simulation_points("site-002")
 
         assert points == []
 
@@ -224,6 +171,41 @@ class TestSimulationPointAdapter:
         assert _infer_point_type("fault_status") == "status"
         assert _infer_point_type("alarm") == "status"
 
+    def test_apply_module_policy_filters_inactive_module_points(self):
+        svc = PointDiscoveryService()
+        raw_points = [
+            {"name": "S002-AHU-L1-001.room_temp", "instance": 1},
+            {"name": "S002-PV-R-001.pv_power_kw", "instance": 2},
+        ]
+        classified_points = [
+            ClassifiedPoint(
+                original_name="S002-AHU-L1-001.room_temp",
+                equipment_type="ahu",
+                point_type=PointType.SENSOR,
+                confidence=ConfidenceLevel.HIGH,
+                instance=1,
+            ),
+            ClassifiedPoint(
+                original_name="S002-PV-R-001.pv_power_kw",
+                equipment_type="solar",
+                point_type=PointType.SENSOR,
+                confidence=ConfidenceLevel.HIGH,
+                instance=2,
+            ),
+        ]
+
+        with patch(
+            "app.services.niagara.point_discovery.filter_classified_points_for_site",
+            return_value=([classified_points[0]], 1),
+        ):
+            filtered_raw, filtered_classified, dropped = svc._apply_module_policy(
+                "site-002", raw_points, classified_points
+            )
+
+        assert filtered_raw == [{"name": "S002-AHU-L1-001.room_temp", "instance": 1}]
+        assert filtered_classified == [classified_points[0]]
+        assert dropped == 1
+
 
 # ---------------------------------------------------------------------------
 # Test: Discovery Routing
@@ -236,38 +218,69 @@ class TestDiscoveryRouting:
 
     @pytest.mark.asyncio
     async def test_routing_bacnet_first(self):
-        """When BACnet ID provided and client works, use BACnet (skip simulation)."""
+        """When a live adapter yields points, use it and skip simulation fallback."""
         svc = PointDiscoveryService()
 
-        mock_client = MagicMock()
-        mock_client.is_running = True
-        svc._bacnet_client = mock_client
-
         bacnet_points = [{"name": "BACnet-Point-1", "object_type": "analogInput"}]
-        mock_client.read_point_list = AsyncMock(return_value=[])
-        svc._discover_from_bacnet = AsyncMock(return_value=bacnet_points)
 
-        with patch.object(svc, "_load_simulation_points") as mock_sim:
+        with (
+            patch.object(svc, "_load_adapter_points", new=AsyncMock(return_value=bacnet_points)) as mock_live,
+            patch.object(svc, "_load_simulation_points") as mock_sim,
+        ):
             points = await svc._discover_points("192.168.1.100", "site-002", device_bacnet_id=1234)
 
         assert points == bacnet_points
+        mock_live.assert_called_once_with(
+            adapter_type="bacnet",
+            site_id="site-002",
+            device_ip="192.168.1.100",
+            device_bacnet_id=1234,
+            bms_vendor=None,
+        )
         mock_sim.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_routing_simulation_fallback_when_no_bacnet(self):
-        """When no BACnet ID, try simulation. If simulation has data, use it."""
+        """Without explicit live adapter selection, discovery should fall back directly to simulation."""
         svc = PointDiscoveryService()
 
         sim_points = [{"name": "S002-CHILLER.temp", "object_type": "analogInput"}]
 
         with (
-            patch.object(svc, "_load_simulation_points", return_value=sim_points) as mock_sim,
+            patch.object(svc, "_load_adapter_points", new=AsyncMock(return_value=[])) as mock_live,
+            patch.object(svc, "_load_simulation_points", new=AsyncMock(return_value=sim_points)) as mock_sim,
             patch.object(svc, "_load_demo_points") as mock_json,
         ):
-            points = await svc._discover_points("simulation", "site-002")
+            points = await svc._discover_points("192.168.1.100", "site-002")
 
         assert points == sim_points
+        mock_live.assert_not_called()
         mock_sim.assert_called_once_with("site-002")
+        mock_json.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_routing_honors_explicit_simulation_adapter(self):
+        """Adapter selection should drive simulation routing without relying on device_ip magic."""
+        svc = PointDiscoveryService()
+
+        sim_points = [{"name": "S002-CHILLER.temp", "object_type": "analogInput"}]
+
+        with (
+            patch.object(svc, "_load_adapter_points", new=AsyncMock(return_value=sim_points)) as mock_adapter,
+            patch.object(svc, "_load_simulation_points") as mock_sim,
+            patch.object(svc, "_load_demo_points") as mock_json,
+        ):
+            points = await svc._discover_points("192.168.1.100", "site-002", adapter_type="simulation")
+
+        assert points == sim_points
+        mock_adapter.assert_called_once_with(
+            adapter_type="simulation",
+            site_id="site-002",
+            device_ip="192.168.1.100",
+            device_bacnet_id=None,
+            bms_vendor=None,
+        )
+        mock_sim.assert_not_called()
         mock_json.assert_not_called()
 
     @pytest.mark.asyncio
@@ -278,14 +291,49 @@ class TestDiscoveryRouting:
         json_points = [{"name": "S002-FCU-101.room_temp", "object_type": "analogInput"}]
 
         with (
-            patch.object(svc, "_load_simulation_points", return_value=[]) as mock_sim,
+            patch.object(svc, "_load_adapter_points", new=AsyncMock(return_value=[])) as mock_live,
+            patch.object(svc, "_load_simulation_points", new=AsyncMock(return_value=[])) as mock_sim,
             patch.object(svc, "_load_demo_points", return_value=json_points) as mock_json,
         ):
             points = await svc._discover_points("simulation", "site-002")
 
         assert points == json_points
-        mock_sim.assert_called_once_with("site-002")
+        mock_live.assert_called_once_with(
+            adapter_type="simulation",
+            site_id="site-002",
+            device_ip="simulation",
+            device_bacnet_id=None,
+            bms_vendor=None,
+        )
+        mock_sim.assert_not_called()
         mock_json.assert_called_once_with("site-002")
+
+    @pytest.mark.asyncio
+    async def test_routing_vendor_alias_uses_resolved_adapter(self):
+        """Vendor aliases should resolve to the underlying live adapter type."""
+        svc = PointDiscoveryService()
+        live_points = [{"name": "AV-1", "object_type": "analogValue"}]
+
+        with (
+            patch.object(svc, "_load_adapter_points", new=AsyncMock(return_value=live_points)) as mock_live,
+            patch.object(svc, "_load_simulation_points") as mock_sim,
+        ):
+            points = await svc._discover_points(
+                "192.168.1.100",
+                "site-002",
+                adapter_type=None,
+                bms_vendor="desigo",
+            )
+
+        assert points == live_points
+        mock_live.assert_called_once_with(
+            adapter_type="bacnet",
+            site_id="site-002",
+            device_ip="192.168.1.100",
+            device_bacnet_id=None,
+            bms_vendor="desigo",
+        )
+        mock_sim.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_discover_and_classify_no_demo_params(self):
@@ -332,6 +380,7 @@ class TestAPIEndpoint:
         assert req.device_ip == "simulation"
         assert req.site_id == "site-002"
         assert req.device_bacnet_id is None
+        assert req.adapter_type is None
         assert req.bms_vendor is None
 
         # Verify demo fields are NOT in model
@@ -340,7 +389,7 @@ class TestAPIEndpoint:
         assert "demo_site_id" not in fields, "demo_site_id should be removed"
 
         # Verify only expected fields exist
-        expected_fields = {"device_ip", "site_id", "device_bacnet_id", "bms_vendor"}
+        expected_fields = {"device_ip", "site_id", "device_bacnet_id", "adapter_type", "bms_vendor"}
         assert set(fields.keys()) == expected_fields, f"Unexpected fields: {set(fields.keys()) - expected_fields}"
 
         # Even if use_demo is passed, it should NOT appear on the model instance

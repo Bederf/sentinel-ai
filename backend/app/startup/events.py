@@ -7,6 +7,7 @@ to improve maintainability and separation of concerns.
 import asyncio
 import logging
 import os
+from datetime import datetime, timedelta, timezone
 
 from fastapi import FastAPI
 
@@ -16,6 +17,33 @@ from app.services.health_simulation_service import health_simulation_service  # 
 from app.services.simbiot_service import simbiot_service  # SIMBIOT Concept Evolution connector
 
 _logger = logging.getLogger("sentinel.startup")
+_SIMULATION_RECOVERY_WINDOW = timedelta(minutes=30)
+
+
+def _parse_task_timestamp(value: object) -> datetime | None:
+    """Parse ISO timestamps from persisted simulation tasks."""
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _task_is_recoverable(task: dict) -> bool:
+    """Only recover tasks that were active recently enough to represent a real restart."""
+    timestamps = [
+        _parse_task_timestamp(task.get("updated_at")),
+        _parse_task_timestamp(task.get("created_at")),
+    ]
+    valid = [ts for ts in timestamps if ts is not None]
+    if not valid:
+        return False
+    latest = max(valid)
+    return latest >= (datetime.now(timezone.utc) - _SIMULATION_RECOVERY_WINDOW)
 
 
 async def startup_event(app: FastAPI) -> None:
@@ -519,6 +547,11 @@ async def startup_event(app: FastAPI) -> None:
                 for task_id, task in crashed:
                     state_snapshot = task.get("state_snapshot")
 
+                    if not _task_is_recoverable(task):
+                        store.update_task_progress(task_id, {"status": "stopped"})
+                        _logger.info("Marked stale crashed task %s as stopped", task_id)
+                        continue
+
                     if not resumed_one and state_snapshot:
                         # Resume the newest task that has a checkpoint
                         try:
@@ -608,83 +641,22 @@ async def startup_event(app: FastAPI) -> None:
         _logger.info("Simulation stopped by admin (simulationStopped=true in settings.json) — skipping auto-start")
 
     if settings.site002_source_enabled and not _simulation_stopped and not settings.edge_mode:
-        # Run crash recovery on startup (replaces old deactivate_all_simulations)
-        # Re-queues simulations that have valid checkpoints, fails those without
+        # Keep the API responsive on restart by deactivating stale persisted
+        # simulation tasks instead of auto-resuming or auto-starting them.
         if not testing_mode:
             try:
-                await recover_crashed_simulations()
+                await deactivate_all_simulations()
             except Exception as e:
-                _logger.error(f"Error during crash recovery: {e}")
-                # Fallback: deactivate everything if recovery itself fails
-                try:
-                    await deactivate_all_simulations()
-                except Exception as e2:
-                    _logger.error(f"Fallback deactivation also failed: {e2}")
+                _logger.error(f"Error during startup simulation deactivation: {e}")
 
-        # Start simulation queue processor job
-        # Polls JSON store for queued lifecycle simulations every 10s
+        # Manual lifecycle start endpoints still rely on the queue processor.
         try:
             scheduler_service.add_simulation_queue_processor_job(interval_seconds=10)
-            _logger.info("Simulation queue processor initialized (10s interval, JSON store)")
+            _logger.info("Simulation queue processor initialized (10s interval, manual queue only)")
         except Exception as e:
             _logger.error(f"Simulation queue processor initialization failed: {e}", exc_info=True)
 
-        # Auto-start sentinel_annual simulation for each registered site if none is active
-        async def auto_start_sentinel_simulation():
-            """Auto-queue sentinel_annual for registered sites if no active simulation exists."""
-            try:
-                import uuid
-                from datetime import datetime
-
-                from app.services.simulation_store import get_simulation_store
-
-                _sim_site_ids = _get_site_ids()
-                if not _sim_site_ids:
-                    _logger.info("No registered buildings — skipping simulation auto-start")
-                    return
-
-                for _sim_site_id in _sim_site_ids:
-                    store = get_simulation_store(_sim_site_id)
-                    all_tasks = store.get_all_tasks()
-
-                    # Check for any active simulation (running or queued)
-                    active = any(
-                        t.get("status") in ("running", "queued")
-                        and t.get("simulation_type", "lifecycle") == "lifecycle"
-                        for t in all_tasks.values()
-                    )
-
-                    if active:
-                        _logger.info("Active simulation already exists for %s, skipping auto-start", _sim_site_id)
-                        continue
-
-                    # Queue sentinel_annual for this site
-                    task_id = str(uuid.uuid4())
-                    store.update_task_progress(
-                        task_id,
-                        {
-                            "task_id": task_id,
-                            "site_id": _sim_site_id,
-                            "scenario": "sentinel_annual",
-                            "simulation_type": "lifecycle",
-                            "status": "queued",
-                            "progress_pct": 0,
-                            "days_completed": 0,
-                            "duration_minutes": 3650.0,
-                            "created_at": datetime.utcnow().isoformat() + "Z",
-                        },
-                    )
-
-                    _logger.info("Auto-queued sentinel_annual simulation for %s: %s", _sim_site_id, task_id)
-            except Exception as e:
-                _logger.error(f"Failed to auto-start sentinel_annual simulation: {e}")
-
-        # Auto-resume: if crash recovery queued a simulation it will be picked up
-        # by the queue processor. If nothing is queued/running, auto-start fresh.
-        try:
-            await auto_start_sentinel_simulation()
-        except Exception as e:
-            _logger.error(f"Error during sentinel auto-start: {e}")
+        _logger.info("Lifecycle simulations are manual-start only on backend startup")
     else:
         if settings.edge_mode and settings.site002_source_enabled:
             _logger.info("ℹ️ Simulation queue disabled (EDGE_MODE=true)")

@@ -55,9 +55,28 @@ _PUBLIC_PREFIXES = (
     "/api/lifecycle/",  # Lifecycle simulation status endpoints (frontend health checks)
     "/api/recommendations/",  # Recommendations endpoints (can be public for UI)
 )
+_PUBLIC_READ_PATHS = {
+    "/api/block-bookings/alerts",
+    "/api/block-bookings/bookings",
+    "/api/space/ghost-findings",
+    "/api/space/rightsizing-findings",
+    "/api/space/focus-sessions",
+    "/api/space/focus-analytics",
+}
+_PUBLIC_READ_PREFIXES = (
+    "/api/concierge/rooms/",
+    "/api/occupancy/analytics/",
+)
 _ADMIN_RATE_LIMIT_PER_MINUTE = 30
 _admin_requests_by_ip: dict[str, list[datetime]] = defaultdict(list)
 _SAFE_HTTP_METHODS = {"GET", "HEAD", "OPTIONS"}
+
+
+def _is_public_read_request(path: str, method: str) -> bool:
+    """Allow read-only Space/Concierge dashboard routes without requiring JWT."""
+    if method.upper() not in _SAFE_HTTP_METHODS:
+        return False
+    return path in _PUBLIC_READ_PATHS or path.startswith(_PUBLIC_READ_PREFIXES)
 
 
 def _check_admin_rate_limit(source_ip: str) -> JSONResponse | None:
@@ -196,7 +215,12 @@ def register_middleware(app: FastAPI) -> None:
             return await call_next(request)
 
         # Skip non-API routes and public paths
-        if path in _PUBLIC_PATHS or path.startswith(_PUBLIC_PREFIXES) or not path.startswith("/api/"):
+        if (
+            path in _PUBLIC_PATHS
+            or path.startswith(_PUBLIC_PREFIXES)
+            or _is_public_read_request(path, request.method)
+            or not path.startswith("/api/")
+        ):
             return await call_next(request)
 
         # Allow any /api/* request with valid Sentry bot API key

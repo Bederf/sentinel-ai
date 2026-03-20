@@ -1799,7 +1799,7 @@ class BackgroundSchedulerService:
         try:
             logger.debug("Processing pending Sentry notifications...")
 
-            from app.database.service_record_repository import ServiceRecordRepository
+            from app.database.repositories.service_record_repository import ServiceRecordRepository
 
             service_repo = ServiceRecordRepository()
 
@@ -1879,6 +1879,7 @@ class BackgroundSchedulerService:
         try:
             from app.services.simulation_store import get_simulation_store
             from app.services.simulation_orchestrator import (
+                create_orchestrator,
                 register_simulation,
                 get_simulation_by_task_id,
             )
@@ -1921,13 +1922,10 @@ class BackgroundSchedulerService:
             store.update_task_progress(task_id, {"status": "running"})
             logger.info(f"Starting lifecycle simulation task {task_id}")
 
-            # Create orchestrator and register — use the global singleton
-            # so /api/simulation/* endpoints see the recovered simulation
+            # Create a dedicated orchestrator per task/site.
+            # The global lifecycle singleton is not safe for queued multi-site runs.
             site_id = task.get("site_id", site_ids[0] if site_ids else "unknown")
-            from app.services.lifecycle_orchestrator import get_lifecycle_orchestrator
-
-            orchestrator = get_lifecycle_orchestrator(site_id=site_id)
-            orchestrator.task_id = task_id
+            orchestrator = create_orchestrator(task_id=task_id, site_id=site_id)
             register_simulation(task_id, orchestrator)
 
             # Start simulation

@@ -1,17 +1,11 @@
 """
 Notification Repository — Database operations for multi-channel notifications.
 
-Phase 102: Manages technician notification channels, preferences, and delivery logs.
-
-Implements fallback pattern:
-- Primary: Supabase (if available)
-- Fallback: JSON file (if USE_JSON_STORAGE=true or Supabase unavailable)
+Phase 102: Manages technician notification channels, preferences, and delivery logs
+in the canonical DB store.
 """
 
-import json
 import logging
-import os
-from pathlib import Path
 from typing import Optional, List, Dict, Any
 from uuid import UUID
 from datetime import datetime
@@ -38,54 +32,11 @@ class NotificationRepository:
 
     def __init__(self):
         """Initialize the repository."""
-        self.use_json = os.getenv("USE_JSON_STORAGE", "false").lower() == "true"
-        self.json_dir = Path(__file__).parent.parent / "data"
-        self.channels_file = self.json_dir / "notification_channels.json"
-        self.preferences_file = self.json_dir / "notification_preferences.json"
-        self.delivery_log_file = self.json_dir / "notification_delivery_log.json"
-        self.client = None
-
-        # Force JSON in DEMO_MODE
-        if os.getenv("DEMO_MODE", "false").lower() == "true":
-            self.use_json = True
-
-        if not self.use_json:
-            try:
-                self.client = get_supabase_client()
-            except Exception as e:
-                logger.warning(f"Supabase client initialization failed, falling back to JSON: {e}")
-                self.use_json = True
-
-        # Ensure JSON files exist
-        if self.use_json:
-            self._ensure_json_files_exist()
-
-    def _ensure_json_files_exist(self) -> None:
-        """Ensure all JSON storage files exist."""
-        self.json_dir.mkdir(parents=True, exist_ok=True)
-
-        for json_file in [self.channels_file, self.preferences_file, self.delivery_log_file]:
-            if not json_file.exists():
-                with open(json_file, "w") as f:
-                    json.dump({}, f, indent=2)
-                logger.info(f"Created JSON notification file: {json_file}")
-
-    def _load_json_data(self, json_file: Path) -> Dict[str, Any]:
-        """Load data from JSON file."""
         try:
-            with open(json_file, "r") as f:
-                return json.load(f)
+            self.client = get_supabase_client()
         except Exception as e:
-            logger.error(f"Error loading JSON from {json_file}: {e}")
-            return {}
-
-    def _save_json_data(self, json_file: Path, data: Dict[str, Any]) -> None:
-        """Save data to JSON file."""
-        try:
-            with open(json_file, "w") as f:
-                json.dump(data, f, indent=2)
-        except Exception as e:
-            logger.error(f"Error saving JSON to {json_file}: {e}")
+            logger.error("Supabase client initialization failed for notifications: %s", e)
+            self.client = None
 
     # ========== Alert Subscribers ==========
 
@@ -95,15 +46,6 @@ class NotificationRepository:
         notification_type: str = "plant_alert",
     ) -> List[UUID]:
         """Get technician IDs subscribed to alerts at this level."""
-        if self.use_json:
-            data = self._load_json_data(self.preferences_file)
-            result = []
-            for tid, prefs in data.items():
-                min_level = prefs.get("alert_level_min", "warning")
-                if min_level in self._level_includes(alert_level):
-                    result.append(UUID(tid))
-            return result
-
         try:
             result = self.client.table("technician_notification_preferences").select("technician_id").execute()
             return [UUID(r["technician_id"]) for r in (result.data or [])]
@@ -134,14 +76,6 @@ class NotificationRepository:
         Returns:
             List of TechnicianNotificationChannel objects
         """
-        if self.use_json:
-            data = self._load_json_data(self.channels_file)
-            tech_id_str = str(technician_id)
-            channels = data.get(tech_id_str, [])
-            if channel_types:
-                channels = [c for c in channels if c.get("channel_type") in [ct.value for ct in channel_types]]
-            return [self._channel_dict_to_model(c) for c in channels]
-
         try:
             query = (
                 self.client.table("technician_notification_channels")
@@ -170,14 +104,6 @@ class NotificationRepository:
         Returns:
             TechnicianNotificationChannel or None if not found
         """
-        if self.use_json:
-            data = self._load_json_data(self.channels_file)
-            tech_id_str = str(technician_id)
-            for channel in data.get(tech_id_str, []):
-                if channel.get("id") == str(channel_id):
-                    return self._channel_dict_to_model(channel)
-            return None
-
         try:
             result = (
                 self.client.table("technician_notification_channels")
@@ -204,15 +130,6 @@ class NotificationRepository:
         Returns:
             Created channel with ID populated
         """
-        if self.use_json:
-            data = self._load_json_data(self.channels_file)
-            tech_id_str = str(channel.technician_id)
-            if tech_id_str not in data:
-                data[tech_id_str] = []
-            data[tech_id_str].append(self._channel_model_to_dict(channel))
-            self._save_json_data(self.channels_file, data)
-            return channel
-
         try:
             result = (
                 self.client.table("technician_notification_channels")
@@ -237,16 +154,6 @@ class NotificationRepository:
         Returns:
             Updated channel
         """
-        if self.use_json:
-            data = self._load_json_data(self.channels_file)
-            tech_id_str = str(channel.technician_id)
-            for i, c in enumerate(data.get(tech_id_str, [])):
-                if c.get("id") == str(channel.id):
-                    data[tech_id_str][i] = self._channel_model_to_dict(channel)
-                    self._save_json_data(self.channels_file, data)
-                    return channel
-            return channel
-
         try:
             result = (
                 self.client.table("technician_notification_channels")
@@ -272,13 +179,6 @@ class NotificationRepository:
         Returns:
             TechnicianNotificationPreferences or None if not found
         """
-        if self.use_json:
-            data = self._load_json_data(self.preferences_file)
-            pref_data = data.get(str(technician_id))
-            if pref_data:
-                return self._preferences_dict_to_model(pref_data)
-            return None
-
         try:
             result = (
                 self.client.table("technician_notification_preferences")
@@ -304,12 +204,6 @@ class NotificationRepository:
         Returns:
             Created preferences
         """
-        if self.use_json:
-            data = self._load_json_data(self.preferences_file)
-            data[str(preferences.technician_id)] = self._preferences_model_to_dict(preferences)
-            self._save_json_data(self.preferences_file, data)
-            return preferences
-
         try:
             result = (
                 self.client.table("technician_notification_preferences")
@@ -334,12 +228,6 @@ class NotificationRepository:
         Returns:
             Updated preferences
         """
-        if self.use_json:
-            data = self._load_json_data(self.preferences_file)
-            data[str(preferences.technician_id)] = self._preferences_model_to_dict(preferences)
-            self._save_json_data(self.preferences_file, data)
-            return preferences
-
         try:
             result = (
                 self.client.table("technician_notification_preferences")
@@ -358,9 +246,6 @@ class NotificationRepository:
 
     def _resolve_delivery_log_technician_id(self, technician_id: UUID) -> UUID:
         """Resolve delivery-log technician ID with FK-safe system notifier fallback."""
-        if self.use_json:
-            return technician_id
-
         if technician_id not in (UUID(int=0), SYSTEM_NOTIFIER_TECHNICIAN_ID):
             return technician_id
 
@@ -399,15 +284,6 @@ class NotificationRepository:
         Returns:
             Created log entry
         """
-        if self.use_json:
-            data = self._load_json_data(self.delivery_log_file)
-            log_id = str(log.technician_id)
-            if log_id not in data:
-                data[log_id] = []
-            data[log_id].append(self._delivery_log_model_to_dict(log))
-            self._save_json_data(self.delivery_log_file, data)
-            return log
-
         try:
             payload = self._delivery_log_model_to_dict(log)
             payload["technician_id"] = str(self._resolve_delivery_log_technician_id(log.technician_id))
@@ -436,20 +312,6 @@ class NotificationRepository:
         Returns:
             List of NotificationDeliveryLog objects
         """
-        if self.use_json:
-            data = self._load_json_data(self.delivery_log_file)
-            all_logs = []
-            for logs in data.values():
-                all_logs.extend(logs)
-
-            if technician_id:
-                all_logs = [log for log in all_logs if log.get("technician_id") == str(technician_id)]
-
-            if status:
-                all_logs = [log for log in all_logs if log.get("status") == status.value]
-
-            return [self._delivery_log_dict_to_model(log) for log in all_logs[-limit:]]
-
         try:
             query = (
                 self.client.table("notification_delivery_log").select("*").order("created_at", desc=True).limit(limit)

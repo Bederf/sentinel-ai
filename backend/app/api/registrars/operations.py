@@ -12,6 +12,7 @@ from app.api import remote_ops, remote_commands, dispatch
 from app.api import alerts, stats, audit, safety, autonomous, simulation
 from app.api import complaints, sentry_webhooks, whatsapp_webhooks, lifecycle_simulation, simulation_analytics
 from app.api import integration, concept
+from app.api import concept_rag
 from app.api import modules, health_config, service_records, preferences
 from app.api import solar, water, sustainability, contracts, pricing, municipal_billing
 from app.api import parts_orders, approval_workflow, delivery_tracking, approvals, parasite_decisions
@@ -194,3 +195,5 @@ def register_operations_routers(app: FastAPI) -> None:
         from app.plant.plant_alerts import router as plant_alerts_router
 
         app.include_router(plant_alerts_router, tags=["plant-alerts"])
+
+    app.include_router(concept_rag.router)

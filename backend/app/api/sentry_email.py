@@ -936,6 +936,43 @@ async def email_intake(
             detail="Email content blocked by prompt injection guard",
         )
 
+    if req.source == "intelligence_intake":
+        from app.services.signal_emitter import emit_email_signal
+
+        result = await emit_email_signal(
+            from_email=req.from_email,
+            from_name=req.from_name or "",
+            subject=req.subject,
+            body_plain=req.body_plain or req.body_html or "",
+            message_id=req.message_id or "",
+            in_reply_to=req.in_reply_to or "",
+            references=req.references or "",
+            to=req.to or [],
+            cc=req.cc or [],
+            received_at=req.received_at or "",
+        )
+        if result.get("status") == "ignored":
+            return EmailIntakeResponse(
+                success=True,
+                intake_id=None,
+                action_taken="manual_review",
+                concept_ref=None,
+                reply_template=None,
+                reply_html=None,
+                message="Ignored non-meeting-room intelligence email",
+                urgency="low",
+            )
+        return EmailIntakeResponse(
+            success=True,
+            intake_id=result.get("signal_id"),
+            action_taken="routed",
+            concept_ref=result.get("signal_id"),
+            reply_template=None,
+            reply_html=None,
+            message="Routed to intelligence signal pipeline",
+            urgency="normal",
+        )
+
     repo = get_email_intake_repository()
     intake_id = str(uuid.uuid4())
     now_iso = datetime.utcnow().isoformat()
@@ -1273,18 +1310,17 @@ async def email_intake(
     repo.create(record)
 
     # ------------------------------------------------------------------
-    # 7b. Work order creation — always create so WO number is in reply
+    # 7b. Work order creation — DISABLED
+    # Email intake classifies and replies only; WO creation is a separate
+    # downstream decision made by the FM team after triage.
     # ------------------------------------------------------------------
     concept_ref: Optional[str] = None
-    concept_ref = await _create_concept_work_order(record)
-    if concept_ref:
-        record["concept_ref"] = concept_ref
 
     # ------------------------------------------------------------------
-    # 7c. Replace {ref} placeholder in agent reply with actual WO code
+    # 7c. Replace {ref} placeholder in agent reply with intake ID
     # ------------------------------------------------------------------
     if agent_result is not None:
-        ref_value = concept_ref or record.get("id", "")[:8]
+        ref_value = record.get("id", "")[:8]
         agent_reply_text = agent_result.reply_text.replace("{ref}", ref_value)
         agent_reply_html = agent_result.reply_html.replace("{ref}", ref_value)
         # Override the template reply functions with agent-generated reply

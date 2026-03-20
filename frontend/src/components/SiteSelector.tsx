@@ -17,12 +17,14 @@ interface SiteSelectorProps {
   sites: Site[];
   selectedSiteId: string | null;
   onSiteChange: (siteId: string | null) => void;
+  includeAllOption?: boolean;
 }
 
 export function SiteSelector({
   sites,
   selectedSiteId,
   onSiteChange,
+  includeAllOption = true,
 }: SiteSelectorProps) {
   const handleChange = (value: string) => {
     // "all" means no filter
@@ -36,7 +38,7 @@ export function SiteSelector({
       icon={Building2}
       placeholder="Select a site"
     >
-      <SelectItem value="all">All Sites</SelectItem>
+      {includeAllOption && <SelectItem value="all">All Sites</SelectItem>}
       {sites.map((site) => (
         <SelectItem key={site.id} value={site.id}>
           {site.name}

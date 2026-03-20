@@ -22,6 +22,7 @@ from fastapi import APIRouter, Query
 
 from app.database.supabase_client import get_supabase_client
 from app.core.site_resolver import get_primary_site_code
+from app.services.occupancy_profile_service import calculate_zone_occupancy
 
 router = APIRouter()
 
@@ -1183,64 +1184,6 @@ async def get_detailed_occupancy(
             "total_occupancy": 0,
             "error": str(e),
         }
-
-
-def calculate_zone_occupancy(hour: int, day_of_week: int, is_weekend: bool, zone_type: str) -> float:
-    """
-    Calculate occupancy percentage for a zone at a given time.
-
-    Based on Grant HVAC/DALI scenario patterns.
-    Returns: 0-100 occupancy percentage
-    """
-    if is_weekend:
-        # Weekend: Only security and minimal occupancy
-        return 5.0 if zone_type != "utility" else 2.0
-
-    # Weekday patterns by zone type
-    if zone_type == "entry":  # Reception
-        if 7 <= hour < 9:
-            return 60.0 + (hour - 7) * 15  # 60% → 90% arrival rush
-        elif 9 <= hour < 17:
-            return 30.0  # Steady trickle during day
-        elif 17 <= hour < 19:
-            return 50.0 + (hour - 17) * 15  # Departure rush
-        else:
-            return 5.0
-
-    elif zone_type == "office":  # Workspaces
-        if 7 <= hour < 9:
-            return 30.0 + (hour - 7) * 27.5  # 30% → 85% arrivals
-        elif 9 <= hour < 12:
-            return 85.0 + random.uniform(-5, 5)  # Peak morning
-        elif 12 <= hour < 14:
-            return 65.0 + random.uniform(-10, 10)  # Lunch dip
-        elif 14 <= hour < 17:
-            return 75.0 + random.uniform(-5, 10)  # Afternoon
-        elif 17 <= hour < 19:
-            return max(5.0, 75.0 - (hour - 17) * 25)  # Departures
-        else:
-            return 5.0
-
-    elif zone_type == "meeting":  # Meeting rooms
-        if 9 <= hour < 17:
-            return 50.0 + random.uniform(-20, 30)  # Highly variable
-        else:
-            return 0.0
-
-    elif zone_type == "common":  # Common areas, kitchen
-        if 12 <= hour < 14:
-            return 80.0  # Lunch peak
-        elif 9 <= hour < 17:
-            return 30.0  # Throughout day
-        else:
-            return 5.0
-
-    elif zone_type == "utility":  # Utility rooms
-        return 10.0 if 9 <= hour < 17 else 2.0
-
-    else:
-        # Default
-        return 20.0 if 9 <= hour < 17 else 5.0
 
 
 def get_persona_distribution(hour: int, day_of_week: int, is_weekend: bool, zone_type: str) -> dict:

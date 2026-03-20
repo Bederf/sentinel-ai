@@ -25,6 +25,8 @@ import httpx
 from app.config.settings import settings
 
 logger = logging.getLogger(__name__)
+_UUID_RE = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$")
+_site_uuid_cache: dict[str, str] = {}
 
 # ---------------------------------------------------------------------------
 # In-memory deduplication store
@@ -55,9 +57,14 @@ async def write_signal(signal_row: dict) -> dict:
     """
     url = f"{settings.supabase_url}/rest/v1/signal"
     headers = _get_supabase_headers()
+    payload = dict(signal_row)
+
+    site_id = payload.get("site_id")
+    if isinstance(site_id, str) and site_id:
+        payload["site_id"] = await _resolve_site_uuid(site_id)
 
     async with httpx.AsyncClient(timeout=10.0) as client:
-        resp = await client.post(url, headers=headers, json=signal_row)
+        resp = await client.post(url, headers=headers, json=payload)
         resp.raise_for_status()
         created = resp.json()
         row = created[0] if isinstance(created, list) else created
@@ -69,6 +76,32 @@ async def write_signal(signal_row: dict) -> dict:
             row.get("signal_type"),
         )
         return row
+
+
+async def _resolve_site_uuid(site_ref: str) -> str:
+    """Convert a site code like ``site-002`` into the UUID expected by ``signal.site_id``."""
+    if _UUID_RE.match(site_ref):
+        return site_ref
+
+    cached = _site_uuid_cache.get(site_ref)
+    if cached:
+        return cached
+
+    url = f"{settings.supabase_url}/rest/v1/sites"
+    headers = _get_supabase_headers()
+    params = {"select": "id", "code": f"eq.{site_ref}", "limit": "1"}
+
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        resp = await client.get(url, headers=headers, params=params)
+        resp.raise_for_status()
+        rows = resp.json()
+
+    if not rows:
+        raise ValueError(f"Unknown site code for signal write: {site_ref}")
+
+    site_uuid = rows[0]["id"]
+    _site_uuid_cache[site_ref] = site_uuid
+    return site_uuid
 
 
 async def write_entities(entities: list[dict]) -> list[dict]:
@@ -154,9 +187,9 @@ def extract_entities_from_text(
     seen: set[str] = set()
 
     # Room code pattern: {building}-{floor}Q{quadrant}-{type}{number}
-    room_pattern = re.compile(r"\b(FA[12])-(\dQ\d)-([A-Z]{2})(\d+)\b", re.IGNORECASE)
+    room_pattern = re.compile(r"\b(FA[12])[-/](\dQ\d)[-/]([A-Z]{2})[-/]?(\d{1,2})\b", re.IGNORECASE)
     for m in room_pattern.finditer(text):
-        code = f"{m.group(1).upper()}-{m.group(2).upper()}-{m.group(3).upper()}{m.group(4)}"
+        code = f"{m.group(1).upper()}-{m.group(2).upper()}-{m.group(3).upper()}-{m.group(4).zfill(2)}"
         if code not in seen:
             seen.add(code)
             entities.append(
