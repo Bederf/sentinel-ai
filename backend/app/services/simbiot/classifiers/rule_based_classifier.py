@@ -21,6 +21,7 @@ from app.models.semantic_tag import ClassificationRule, EvidenceSource, SafetyCl
 from app.services.simbiot.classifiers.base_classifier import BasePointClassifier
 from app.services.simbiot.classifiers.confidence_calculator import ConfidenceCalculator
 from app.services.simbiot.semantic_dictionary import SemanticDictionaryService
+from app.services.simbiot.validators.validation_engine import StaticValidationEngine
 
 
 class RuleBasedPointClassifier(BasePointClassifier):
@@ -37,6 +38,7 @@ class RuleBasedPointClassifier(BasePointClassifier):
     def __init__(self, dictionary_service: SemanticDictionaryService | None = None) -> None:
         self._dict_service = dictionary_service or SemanticDictionaryService()
         self._dict_service.load()
+        self._validation_engine = StaticValidationEngine()
 
     @property
     def classifier_id(self) -> str:
@@ -271,7 +273,7 @@ class RuleBasedPointClassifier(BasePointClassifier):
 
         matched_tags = [best_tag] if best_tag else []
 
-        return PointClassification(
+        point_classification = PointClassification(
             point_id=point_id,
             device_id=point_data.get("device_id"),
             site_id=site_id,
@@ -284,9 +286,19 @@ class RuleBasedPointClassifier(BasePointClassifier):
             evidence_records=best_evidence,
             highest_safety_class=best_safety_class,
             control_envelope=best_control_envelope,
-            validation_passed=best_confidence >= 0.4,
             current_value=point_data.get("current_value"),
+            historic_values=point_data.get("historic_values"),
         )
+
+        # Run static validation — safety guard before the review queue
+        validation_report = self._validation_engine.validate_classification(
+            point_classification,
+            historic_values=point_data.get("historic_values"),
+        )
+        point_classification.validation_passed = validation_report.validation_passed
+        point_classification.validation_errors = [f"{err.category}: {err.message}" for err in validation_report.errors]
+
+        return point_classification
 
     async def classify_equipment_batch(
         self,
