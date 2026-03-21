@@ -16,6 +16,7 @@ from dataclasses import dataclass
 import anthropic
 
 from app.config.settings import settings
+from app.services.ai_usage_tracker import usage_tracker
 
 logger = logging.getLogger(__name__)
 
@@ -89,6 +90,17 @@ class VisionService:
                     }
                 ],
             )
+            try:
+                u = message.usage
+                usage_tracker.record(
+                    provider="anthropic",
+                    model=self.model,
+                    input_tokens=getattr(u, "input_tokens", 0),
+                    output_tokens=getattr(u, "output_tokens", 0),
+                    source="vision_analysis",
+                )
+            except Exception:
+                pass  # Never break vision for tracking
             return message.content[0].text
         except Exception as e:
             logger.error(f"Vision API error: {e}")
