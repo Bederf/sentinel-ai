@@ -7,9 +7,10 @@ from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from app.services.hybrid_ai_service import hybrid_ai_service
+from app.config.settings import SENTINEL_BOT_TECH_DEFAULT_CLASS
 from app.middleware.auth_middleware import get_current_auth
 from app.security.sse_buffer import SecureSSEBuffer
+from app.services.model_gateway import model_gateway
 
 logger = logging.getLogger(__name__)
 
@@ -54,12 +55,14 @@ async def generate_hybrid_sse_stream(
     buffer = SecureSSEBuffer(user_role=user_role)
 
     try:
-        # Route and stream from appropriate model
-        async for chunk in hybrid_ai_service.stream_response(
-            user_message,
-            use_tools,
-            data_subject_id=data_subject_id,
-        ):
+        # Route through model_gateway using the tech bot class
+        messages = [{"role": "user", "content": user_message}]
+        stream_gen = await model_gateway.call(
+            task_class=SENTINEL_BOT_TECH_DEFAULT_CLASS,
+            messages=messages,
+            stream=True,
+        )
+        async for chunk in stream_gen:
             safe_text = buffer.add_token(chunk)
             if safe_text is not None:
                 yield f"data: {safe_text}\n\n"
