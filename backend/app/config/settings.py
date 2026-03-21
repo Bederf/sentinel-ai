@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import os
 from typing import Any
 
 from enum import StrEnum
@@ -14,6 +15,17 @@ import base64
 
 BACKGROUND_AI_MODEL = "claude-haiku-4-5-20251001"  # Cost-optimised for scheduled jobs
 INTERACTIVE_AI_MODEL = "claude-sonnet-4-20250514"  # Full capability for chat
+
+# 3-layer model routing (Phase 163)
+# Layer 2 — Execution mode: api | cloud | local
+# Layer 3 — Active routing profile name
+SENTINEL_EXECUTION_MODE: str = os.getenv("SENTINEL_EXECUTION_MODE", "api")
+SENTINEL_ROUTING_PROFILE: str = os.getenv("SENTINEL_ROUTING_PROFILE", "api_prod")
+
+# Bot entry classes and escalation target
+SENTINEL_BOT_DEFAULT_CLASS: str = "chat_ai"  # General occupant/facilities bot
+SENTINEL_BOT_TECH_DEFAULT_CLASS: str = "chat_tech"  # Engineer/diagnostic bot
+SENTINEL_BOT_ESCALATION_CLASS: str = "heavy"  # Escalation target for both bots
 
 
 def _parse_csv_list(value):
@@ -70,10 +82,13 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     claude_model: str = "claude-sonnet-4-20250514"
     claude_max_tokens: int = 1536
-    ai_cloud_provider: str = "anthropic"  # anthropic|openai|zai
+    ai_cloud_provider: str = "anthropic"  # anthropic|openai|zai|xiaomi
     zai_api_key: str = ""
     zai_model: str = "glm-4.7-flash"
     zai_base_url: str = "https://api.z.ai/api/paas/v4"
+    xiaomi_api_key: str = ""
+    xiaomi_model: str = "mimo-v2-flash"
+    xiaomi_base_url: str = "https://api.mimo.xiaomi.com/v1"
     openai_api_key: str = ""
     openai_model: str = "gpt-4.1-nano"  # Tier 1: fast/cheap for routine queries
     openai_model_heavy: str = "gpt-4.1-mini"  # Tier 2: complex reasoning & diagnostics
@@ -469,7 +484,7 @@ class Settings(BaseSettings):
     @classmethod
     def _validate_ai_cloud_provider(cls, value):
         provider = (value or "anthropic").strip().lower()
-        if provider not in {"anthropic", "openai", "zai"}:
+        if provider not in {"anthropic", "openai", "zai", "xiaomi"}:
             return "anthropic"
         return provider
 
@@ -551,7 +566,8 @@ class Settings(BaseSettings):
         if len(value) != 44:
             raise ValueError(
                 f"ENCRYPTION_KEY must be a valid Fernet key (44 characters), got {len(value)}. "
-                'Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"'
+                "Generate with: "
+                'python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"'
             )
         try:
             # Verify it's valid base64
