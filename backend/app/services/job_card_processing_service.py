@@ -21,6 +21,7 @@ from typing import Any, Dict, List, Optional
 
 import anthropic
 from app.config.settings import settings
+from app.services.ai_usage_tracker import usage_tracker
 
 logger = logging.getLogger(__name__)
 
@@ -242,6 +243,17 @@ class JobCardProcessingService:
                     }
                 ],
             )
+            try:
+                u = response.usage
+                usage_tracker.record(
+                    provider="anthropic",
+                    model=settings.claude_model,
+                    input_tokens=getattr(u, "input_tokens", 0),
+                    output_tokens=getattr(u, "output_tokens", 0),
+                    source="job_card_processing",
+                )
+            except Exception:
+                pass  # Never break classification for tracking
             result = response.content[0].text.strip().lower()
             # Normalize response
             for valid_type in ["job_card", "service_sheet", "compliance_certificate"]:
@@ -290,6 +302,17 @@ class JobCardProcessingService:
                 ],
             )
 
+            try:
+                u = response.usage
+                usage_tracker.record(
+                    provider="anthropic",
+                    model=settings.claude_model,
+                    input_tokens=getattr(u, "input_tokens", 0),
+                    output_tokens=getattr(u, "output_tokens", 0),
+                    source="job_card_processing",
+                )
+            except Exception:
+                pass  # Never break extraction for tracking
             response_text = response.content[0].text
             json_match = re.search(r"\{[\s\S]*\}", response_text)
             if json_match:
