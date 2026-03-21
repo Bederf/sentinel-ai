@@ -291,12 +291,24 @@ class RuleBasedPointClassifier(BasePointClassifier):
         )
 
         # Run static validation — safety guard before the review queue
-        validation_report = self._validation_engine.validate_classification(
-            point_classification,
-            historic_values=point_data.get("historic_values"),
-        )
-        point_classification.validation_passed = validation_report.validation_passed
-        point_classification.validation_errors = [f"{err.category}: {err.message}" for err in validation_report.errors]
+        try:
+            validation_report = self._validation_engine.validate_classification(
+                point_classification,
+                historic_values=point_data.get("historic_values"),
+            )
+            point_classification.validation_passed = validation_report.validation_passed
+            point_classification.validation_errors = [
+                f"{err.category}: {err.message}" for err in validation_report.errors
+            ]
+        except Exception:
+            import logging
+
+            logging.getLogger(__name__).exception(
+                "StaticValidationEngine failed for point %s — marking validation_passed=False",
+                point_classification.point_id,
+            )
+            point_classification.validation_passed = False
+            point_classification.validation_errors = ["validation_engine_error: internal validation failure"]
 
         return point_classification
 

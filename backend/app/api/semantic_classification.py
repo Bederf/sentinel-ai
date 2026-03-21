@@ -99,7 +99,10 @@ async def classify_point(request: ClassifyPointRequest) -> ClassifyPointResponse
         classifier = _get_classifier()
         classification = await classifier.classify_point(point_data)
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        import logging
+
+        logging.getLogger(__name__).exception("semantic classification error")
+        raise HTTPException(status_code=500, detail="Classification failed — see server logs") from exc
     elapsed = int(time.monotonic() * 1000) - t0
 
     return ClassifyPointResponse(classification=classification, processing_time_ms=elapsed)
@@ -131,7 +134,10 @@ async def classify_equipment(request: ClassifyEquipmentRequest) -> ClassifyEquip
             points=points,
         )
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        import logging
+
+        logging.getLogger(__name__).exception("semantic classification error")
+        raise HTTPException(status_code=500, detail="Classification failed — see server logs") from exc
 
     return ClassifyEquipmentResponse(batch_result=batch_result)
 

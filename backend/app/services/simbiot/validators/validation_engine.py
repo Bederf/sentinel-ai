@@ -108,6 +108,11 @@ class StaticValidationEngine:
             svc.load()
             return svc.get_tag(tag)
         except Exception:
+            import logging
+
+            logging.getLogger(__name__).warning(
+                "SemanticDictionaryService unavailable for tag '%s' — bounds/rate checks skipped", tag
+            )
             return None
 
     # ------------------------------------------------------------------
