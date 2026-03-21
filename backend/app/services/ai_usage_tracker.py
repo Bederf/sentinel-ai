@@ -244,6 +244,60 @@ class AiUsageTracker:
                 self._today_cache[key]["cost_usd"] += unit_cost
         self._check_cost_alert()
 
+    def record_escalation(
+        self,
+        from_class: str,
+        to_class: str,
+        reason: str,
+        mode: str,
+        resolved_model: str,
+        session_id: str = "",
+        provider: str = "",
+    ) -> None:
+        """
+        Log an escalation event to ai_usage_log.json.
+
+        Escalation schema (extends existing log format):
+        {
+            "event": "escalation_triggered",
+            "timestamp": "<ISO8601>",
+            "from_class": "<from_class>",
+            "to_class": "<to_class>",
+            "reason": "<reason>",
+            "mode": "<mode>",
+            "resolved_model": "<resolved_model>",
+            "session_id": "<session_id>",
+            "provider": "<provider>"
+        }
+
+        Written to the same ai_usage_log.json file via the existing write mechanism.
+        No cost fields — escalation events are metadata, not billable calls.
+        The actual escalated call is recorded separately via record() when it executes.
+        """
+        from datetime import datetime
+
+        event = {
+            "event": "escalation_triggered",
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "from_class": from_class,
+            "to_class": to_class,
+            "reason": reason,
+            "mode": mode,
+            "resolved_model": resolved_model,
+            "session_id": session_id,
+            "provider": provider,
+        }
+
+        with self._write_lock:
+            try:
+                data = self._read_file()
+                if "escalations" not in data:
+                    data["escalations"] = []
+                data["escalations"].append(event)
+                self._write_file(data)
+            except Exception as exc:
+                logger.error("Failed to write escalation event: %s", exc)
+
     def _check_cost_alert(self):
         """Send Telegram alert if daily spend exceeds threshold."""
         try:
