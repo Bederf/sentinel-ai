@@ -15,6 +15,7 @@ import logging
 from typing import List, Dict, Any, Optional
 
 from app.config.settings import settings
+from app.services.model_gateway import model_gateway
 
 logger = logging.getLogger(__name__)
 
@@ -94,16 +95,11 @@ class ChecklistGeneratorService:
         prompt = self._build_prompt(equipment_type, manufacturer, model, capacity, additional_specs)
 
         try:
-            from anthropic import Anthropic
-
-            client = Anthropic(api_key=settings.anthropic_api_key)
-            message = client.messages.create(
-                model=settings.claude_model,
-                max_tokens=settings.claude_max_tokens,
-                temperature=0.1,
+            response_text = await model_gateway.call(
+                task_class="medium",
                 messages=[{"role": "user", "content": prompt}],
+                max_tokens=settings.claude_max_tokens,
             )
-            response_text = message.content[0].text
 
             templates = self._parse_response(response_text, equipment_type, manufacturer, model)
 
