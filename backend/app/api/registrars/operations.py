@@ -39,6 +39,7 @@ from app.api import concierge
 from app.api import signal_replay
 from app.api import semantic_classification
 from app.api import trust_scoring
+from app.api import review_queue
 from app.api import ai_usage
 from app.api import technicians as technicians_api
 from app.config.settings import settings
@@ -188,6 +189,9 @@ def register_operations_routers(app: FastAPI) -> None:
 
     # Dynamic Validation + Trust Scoring (Phase 162-04)
     app.include_router(trust_scoring.router, tags=["trust-scoring"])
+
+    # Review Queue — Human-in-the-loop for Classification (Phase 162-05)
+    app.include_router(review_queue.router, tags=["review-queue"])
 
     # Signal Replay Tool (Phase 159-04)
     app.include_router(signal_replay.router, tags=["signal-replay"])
