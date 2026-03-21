@@ -37,6 +37,7 @@ from app.api import space
 from app.api import correlation
 from app.api import concierge
 from app.api import signal_replay
+from app.api import semantic_classification
 from app.api import ai_usage
 from app.api import technicians as technicians_api
 from app.config.settings import settings
@@ -180,6 +181,9 @@ def register_operations_routers(app: FastAPI) -> None:
 
     # Concierge Intelligence Dashboard (Phase 161)
     app.include_router(concierge.router, tags=["concierge"])
+
+    # Semantic Classification (Phase 162)
+    app.include_router(semantic_classification.router, tags=["semantic-classification"])
 
     # Signal Replay Tool (Phase 159-04)
     app.include_router(signal_replay.router, tags=["signal-replay"])
