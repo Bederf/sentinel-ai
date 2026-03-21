@@ -31,16 +31,16 @@ def setup_logging() -> None:
     _setup_file_handler(
         logger_name="sentinel.audit",
         filename=log_dir / "security.log",
-        max_bytes=10 * 1024 * 1024,  # 10 MB
-        backup_count=5,
+        max_bytes=5 * 1024 * 1024,  # 5 MB  ← dev-appropriate cap
+        backup_count=3,  # 3 backups = 15 MB total per logger
     )
 
     # sentinel.decisions → decisions.log
     _setup_file_handler(
         logger_name="sentinel.decisions",
         filename=log_dir / "decisions.log",
-        max_bytes=10 * 1024 * 1024,  # 10 MB
-        backup_count=5,
+        max_bytes=5 * 1024 * 1024,  # 5 MB  ← dev-appropriate cap
+        backup_count=3,  # 3 backups = 15 MB total per logger
     )
 
 
