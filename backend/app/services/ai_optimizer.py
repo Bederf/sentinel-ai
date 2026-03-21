@@ -26,9 +26,8 @@ from app.models.optimization import (
     SiteOptimizationStatus,
 )
 from app.models.device import Device, DeviceType, DevicePoint, ZoneType, ExposureDirection
-from app.config.settings import settings, BACKGROUND_AI_MODEL
-from app.services.claude_service import claude_service
-from app.services.zai_service import zai_service
+from app.config.settings import settings
+from app.services.model_gateway import model_gateway
 from app.services.device_abstraction import device_manager
 from app.services.safety_interlocks import safety_engine
 from app.services.lighting_service import get_lighting_service
@@ -126,26 +125,7 @@ class AIOptimizerService:
 
     def __init__(self):
         """Initialize AI optimizer service."""
-        # Route through configured cloud provider
-        provider = (settings.ai_cloud_provider or "anthropic").strip().lower()
-        if provider == "openai":
-            from app.services.openai_service import openai_service
-
-            self._llm_service = openai_service
-            self._llm_provider = "openai"
-        elif provider == "zai" and zai_service.is_configured():
-            self._llm_service = zai_service
-            self._llm_provider = "zai"
-        else:
-            self._llm_service = claude_service
-            self._llm_provider = "anthropic"
-        # Use cheaper model for background optimization if configured
-        if settings.optimization_model:
-            self._optimization_model_override = settings.optimization_model
-        elif self._llm_provider == "anthropic":
-            self._optimization_model_override = BACKGROUND_AI_MODEL
-        else:
-            self._optimization_model_override = None
+        # Provider selection handled by model_gateway using active routing profile
         self._sites = None
         self._optimization_status_cache: Dict[str, SiteOptimizationStatus] = {}
 
@@ -251,22 +231,10 @@ class AIOptimizerService:
         )
 
         try:
-            # Try to use Claude for analysis
-            if self._llm_service.is_configured():
-                recommendation = await self._analyze_with_claude(
-                    site_id, prompt, current_conditions, equipment_inventory, lighting_zones, profile
-                )
-            else:
-                # Fall back to rule-based optimization
-                recommendation = self._analyze_with_rules(
-                    site_id,
-                    current_conditions,
-                    weather_forecast,
-                    energy_prices,
-                    equipment_inventory,
-                    lighting_zones,
-                    profile,
-                )
+            # Try LLM analysis via model_gateway
+            recommendation = await self._analyze_with_claude(
+                site_id, prompt, current_conditions, equipment_inventory, lighting_zones, profile
+            )
 
             # Apply recommendation scoring and ranking with profile weights
             if profile:
@@ -1369,18 +1337,15 @@ Provide ONLY the JSON response, no additional text."""
             profile: Active optimization profile (if any)
         """
         try:
-            model_label = self._optimization_model_override or self._llm_provider
-            logger.info(f"Using {model_label} for optimization of site {site_id}")
+            logger.info(f"Using model_gateway(heavy) for optimization of site {site_id}")
 
-            # Call LLM (via configured provider)
-
-            response_text = ""
-            async for chunk in self._llm_service.stream_response(
+            # Call LLM via model_gateway (task_class=heavy for complex multi-system reasoning)
+            response_text = await model_gateway.call(
+                task_class="heavy",
                 messages=[{"role": "user", "content": prompt}],
-                include_site_context=False,  # Don't include full context to save tokens
-                model_override=self._optimization_model_override,
-            ):
-                response_text += chunk
+                max_tokens=settings.optimization_max_tokens,
+                stream=False,
+            )
 
             # Parse JSON response
             try:
@@ -1852,8 +1817,8 @@ Provide ONLY the JSON response, no additional text."""
 
         lines = ["**Zone Classification:**"]
         for key, devices in sorted(zones_by_type.items()):
-            zone_type, exposure, priority = key.split("|")
-            lines.append(f"- {zone_type} ({exposure}, {priority}): {', '.join(devices)}")
+            zone_type_label, exposure_label, priority_label = key.split("|")
+            lines.append(f"- {zone_type_label} ({exposure_label}, {priority_label}): {', '.join(devices)}")
         return "\n".join(lines)
 
     # DALI Lighting Optimization Helper Methods
@@ -2425,7 +2390,7 @@ Provide ONLY the JSON response, no additional text."""
                     current_value = eco_point.default_value if eco_point else 20.0
                     # For damper points, open to 80-100%; for mode points, set to 1 (enabled)
                     if "mode" in eco_point.name:
-                        target_value = 1  # enabled
+                        target_value = 1.0  # enabled (1 = on)
                         reason = (
                             f"Enable AHU economizer — outdoor temp {outdoor_temp}°C"
                             f" and humidity {humidity}% ideal for free cooling"
@@ -2541,8 +2506,8 @@ Provide ONLY the JSON response, no additional text."""
         #   - Tariff-aware scheduling (shift loads to off-peak)
         #   - Predictive pre-conditioning (anticipate occupancy patterns)
         #   - Cross-zone energy balancing (redistribute across building)
-        lighting_recommendations = []
-        cross_system_recommendations = []
+        lighting_recommendations: List[Dict[str, Any]] = []
+        cross_system_recommendations: List[Dict[str, Any]] = []
         lighting_savings_kw = 0.0
 
         if lighting_zones:
