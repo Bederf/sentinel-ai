@@ -1,0 +1,1250 @@
+{
+  "version": "1.0",
+  "generated_at": "2026-03-21",
+  "semantic_tags": {
+    "supply_air_temperature_sensor": {
+      "description": "Measures temperature of air leaving AHU/supply duct",
+      "applies_to": ["AHU", "FCU", "VAV", "CRAC", "SPLIT"],
+      "expected_units": ["C", "F"],
+      "point_types": ["analog_input", "analog_value"],
+      "classification_rules": [
+        {
+          "source": "haystack_id",
+          "pattern": "**supply**air**temp*",
+          "weight": 0.95,
+          "evidence": "Perfect Haystack match"
+        },
+        {
+          "source": "point_name",
+          "patterns": ["SAT", "SA-TEMP", "SUPPLY-AIR-TEMP", "SA TEMP", "SUPPLY_AIR_TEMP"],
+          "weight": 0.85,
+          "evidence": "Conventional naming pattern"
+        },
+        {
+          "source": "equipment_type",
+          "must_be": ["ahu", "fcu", "vav", "crac", "split"],
+          "weight": 0.15,
+          "evidence": "Equipment type context"
+        }
+      ],
+      "required_evidence": 2,
+      "minimum_confidence": 0.7,
+      "negative_samples": [
+        "SPACE_TEMP_SENSOR",
+        "ROOM_TEMP",
+        "OAT",
+        "OUTSIDE_AIR_TEMP"
+      ],
+      "validation_rules": {
+        "bounds": {
+          "min": 5,
+          "max": 35,
+          "unit": "C",
+          "rationale": "Physical limits of conditioned air"
+        },
+        "rate_of_change": {
+          "max_per_minute": 3,
+          "alarm_if_exceeded": true
+        }
+      },
+      "safety_class": "LOW"
+    },
+    "return_air_temperature_sensor": {
+      "description": "Measures temperature of air returning to AHU/return duct",
+      "applies_to": ["AHU", "FCU", "CRAC"],
+      "expected_units": ["C", "F"],
+      "point_types": ["analog_input", "analog_value"],
+      "classification_rules": [
+        {
+          "source": "haystack_id",
+          "pattern": "**return**air**temp*",
+          "weight": 0.95,
+          "evidence": "Perfect Haystack match"
+        },
+        {
+          "source": "point_name",
+          "patterns": ["RAT", "RA-TEMP", "RETURN-AIR-TEMP", "RETURN_AIR_TEMP"],
+          "weight": 0.85,
+          "evidence": "Conventional naming pattern"
+        },
+        {
+          "source": "equipment_type",
+          "must_be": ["ahu", "fcu", "crac"],
+          "weight": 0.15,
+          "evidence": "Equipment type context"
+        }
+      ],
+      "required_evidence": 2,
+      "minimum_confidence": 0.7,
+      "negative_samples": ["SUPPLY_AIR_TEMP", "SPACE_TEMP"],
+      "validation_rules": {
+        "bounds": {
+          "min": 10,
+          "max": 40,
+          "unit": "C",
+          "rationale": "Room return air range"
+        }
+      },
+      "safety_class": "LOW"
+    },
+    "mixed_air_temperature_sensor": {
+      "description": "Measures temperature of mixed outside and return air",
+      "applies_to": ["AHU"],
+      "expected_units": ["C", "F"],
+      "point_types": ["analog_input", "analog_value"],
+      "classification_rules": [
+        {
+          "source": "haystack_id",
+          "pattern": "**mixed**air**temp*",
+          "weight": 0.95,
+          "evidence": "Haystack match"
+        },
+        {
+          "source": "point_name",
+          "patterns": ["MAT", "MA-TEMP", "MIXED-AIR-TEMP", "MIXED_AIR_TEMP"],
+          "weight": 0.85,
+          "evidence": "Conventional naming"
+        }
+      ],
+      "required_evidence": 1,
+      "minimum_confidence": 0.7,
+      "negative_samples": [],
+      "safety_class": "LOW"
+    },
+    "outside_air_temperature_sensor": {
+      "description": "Measures outdoor ambient temperature",
+      "applies_to": ["AHU", "WEATHER_STATION"],
+      "expected_units": ["C", "F"],
+      "point_types": ["analog_input", "analog_value"],
+      "classification_rules": [
+        {
+          "source": "haystack_id",
+          "pattern": "**outside**air**temp*",
+          "weight": 0.95,
+          "evidence": "Haystack match"
+        },
+        {
+          "source": "point_name",
+          "patterns": ["OAT", "OA-TEMP", "OUTSIDE-AIR-TEMP", "OUTSIDE_AIR_TEMP", "AMBIENT_TEMP"],
+          "weight": 0.85,
+          "evidence": "Conventional naming"
+        }
+      ],
+      "required_evidence": 1,
+      "minimum_confidence": 0.7,
+      "negative_samples": [],
+      "validation_rules": {
+        "bounds": {
+          "min": -20,
+          "max": 55,
+          "unit": "C",
+          "rationale": "Extreme weather range"
+        }
+      },
+      "safety_class": "LOW"
+    },
+    "space_temperature_sensor": {
+      "description": "Measures occupied zone/room temperature",
+      "applies_to": ["VAV", "FCU", "THERMOSTAT"],
+      "expected_units": ["C", "F"],
+      "point_types": ["analog_input", "analog_value"],
+      "classification_rules": [
+        {
+          "source": "haystack_id",
+          "pattern": "**space**temp*",
+          "weight": 0.95,
+          "evidence": "Haystack match"
+        },
+        {
+          "source": "point_name",
+          "patterns": ["SPACE_TEMP", "ROOM_TEMP", "ZONE_TEMP", "ZAT"],
+          "weight": 0.85,
+          "evidence": "Conventional naming"
+        }
+      ],
+      "required_evidence": 1,
+      "minimum_confidence": 0.7,
+      "negative_samples": ["SAT", "SUPPLY_AIR_TEMP", "OAT"],
+      "validation_rules": {
+        "bounds": {
+          "min": 15,
+          "max": 35,
+          "unit": "C",
+          "rationale": "Occupied comfort range"
+        }
+      },
+      "safety_class": "LOW"
+    },
+    "cooling_setpoint_command": {
+      "description": "Cooling temperature setpoint command for zone/AHU",
+      "applies_to": ["AHU", "FCU", "VAV", "SPLIT"],
+      "expected_units": ["C", "F"],
+      "point_types": ["analog_output", "analog_value"],
+      "classification_rules": [
+        {
+          "source": "haystack_id",
+          "pattern": "**cooling**setpoint*",
+          "weight": 0.95,
+          "evidence": "Haystack match"
+        },
+        {
+          "source": "point_name",
+          "patterns": ["COOL_SP", "COOLING_SETPOINT", "CLGSP", "CLG_SP"],
+          "weight": 0.85,
+          "evidence": "Conventional naming"
+        }
+      ],
+      "required_evidence": 1,
+      "minimum_confidence": 0.7,
+      "negative_samples": [],
+      "validation_rules": {
+        "bounds": {
+          "min": 18,
+          "max": 30,
+          "unit": "C",
+          "rationale": "Reasonable cooling setpoint range"
+        }
+      },
+      "safety_class": "MEDIUM",
+      "control_envelope": {
+        "bounds": {"min": 18, "max": 30, "unit": "C", "rationale": "Reasonable cooling setpoint range"},
+        "min_cooldown_seconds": 300,
+        "max_daily_writes": 96
+      }
+    },
+    "heating_setpoint_command": {
+      "description": "Heating temperature setpoint command for zone/AHU",
+      "applies_to": ["AHU", "FCU", "VAV"],
+      "expected_units": ["C", "F"],
+      "point_types": ["analog_output", "analog_value"],
+      "classification_rules": [
+        {
+          "source": "haystack_id",
+          "pattern": "**heating**setpoint*",
+          "weight": 0.95,
+          "evidence": "Haystack match"
+        },
+        {
+          "source": "point_name",
+          "patterns": ["HTG_SP", "HEATING_SETPOINT", "HTGSP", "HTG-SP"],
+          "weight": 0.85,
+          "evidence": "Conventional naming"
+        }
+      ],
+      "required_evidence": 1,
+      "minimum_confidence": 0.7,
+      "negative_samples": [],
+      "validation_rules": {
+        "bounds": {
+          "min": 15,
+          "max": 26,
+          "unit": "C",
+          "rationale": "Reasonable heating setpoint range"
+        }
+      },
+      "safety_class": "MEDIUM",
+      "control_envelope": {
+        "bounds": {"min": 15, "max": 26, "unit": "C", "rationale": "Reasonable heating setpoint range"},
+        "min_cooldown_seconds": 300,
+        "max_daily_writes": 96
+      }
+    },
+    "compressor_occupancy_command": {
+      "description": "Enables/disables compressor operation",
+      "applies_to": ["AHU", "FCU", "SPLIT"],
+      "expected_units": ["binary"],
+      "point_types": ["binary_output", "binary_value"],
+      "classification_rules": [
+        {
+          "source": "point_name",
+          "patterns": ["COMP_OCC", "COMPRESSOR_OCC", "COMP-START", "COMP_START"],
+          "weight": 0.9,
+          "evidence": "Conventional naming"
+        },
+        {
+          "source": "haystack_id",
+          "pattern": "**compressor**occupancy**",
+          "weight": 0.98,
+          "evidence": "Haystack semantic tag"
+        }
+      ],
+      "required_evidence": 1,
+      "minimum_confidence": 0.8,
+      "negative_samples": [],
+      "safety_class": "MEDIUM",
+      "control_envelope": {
+        "min_cooldown_seconds": 180,
+        "max_daily_writes": 50,
+        "requires_approval_above": 10
+      }
+    },
+    "fan_speed_command": {
+      "description": "Fan speed or enable/disable command",
+      "applies_to": ["AHU", "FCU", "CRAC"],
+      "expected_units": ["%", "binary"],
+      "point_types": ["analog_output", "binary_output"],
+      "classification_rules": [
+        {
+          "source": "point_name",
+          "patterns": ["FAN_SPEED", "FAN_CMD", "FAN-SPEED", "SA_FAN_SPEED"],
+          "weight": 0.85,
+          "evidence": "Naming match"
+        },
+        {
+          "source": "haystack_id",
+          "pattern": "**fan**speed*",
+          "weight": 0.9,
+          "evidence": "Haystack match"
+        }
+      ],
+      "required_evidence": 1,
+      "minimum_confidence": 0.7,
+      "negative_samples": [],
+      "safety_class": "MEDIUM",
+      "control_envelope": {
+        "bounds": {"min": 0, "max": 100, "unit": "%", "rationale": "VFD speed range"},
+        "min_cooldown_seconds": 60,
+        "max_daily_writes": 200
+      }
+    },
+    "chilled_water_valve_command": {
+      "description": "Chilled water coil valve position command",
+      "applies_to": ["AHU", "FCU"],
+      "expected_units": ["%"],
+      "point_types": ["analog_output"],
+      "classification_rules": [
+        {
+          "source": "point_name",
+          "patterns": ["CHW_VALVE", "CHWV", "CWV", "CHW_VLV"],
+          "weight": 0.85,
+          "evidence": "Naming match"
+        },
+        {
+          "source": "haystack_id",
+          "pattern": "**chilled**water**valve*",
+          "weight": 0.95,
+          "evidence": "Haystack match"
+        }
+      ],
+      "required_evidence": 1,
+      "minimum_confidence": 0.7,
+      "negative_samples": [],
+      "safety_class": "MEDIUM",
+      "control_envelope": {
+        "bounds": {"min": 0, "max": 100, "unit": "%", "rationale": "Valve position 0-100%"},
+        "min_cooldown_seconds": 60,
+        "max_daily_writes": 300
+      }
+    },
+    "hot_water_valve_command": {
+      "description": "Hot water coil valve position command",
+      "applies_to": ["AHU", "FCU"],
+      "expected_units": ["%"],
+      "point_types": ["analog_output"],
+      "classification_rules": [
+        {
+          "source": "point_name",
+          "patterns": ["HW_VALVE", "HWV", "HHW_VLV", "HW_VLV"],
+          "weight": 0.85,
+          "evidence": "Naming match"
+        },
+        {
+          "source": "haystack_id",
+          "pattern": "**hot**water**valve*",
+          "weight": 0.95,
+          "evidence": "Haystack match"
+        }
+      ],
+      "required_evidence": 1,
+      "minimum_confidence": 0.7,
+      "negative_samples": [],
+      "safety_class": "MEDIUM",
+      "control_envelope": {
+        "bounds": {"min": 0, "max": 100, "unit": "%", "rationale": "Valve position 0-100%"},
+        "min_cooldown_seconds": 60,
+        "max_daily_writes": 300
+      }
+    },
+    "chiller_run_status": {
+      "description": "Chiller running/stopped status feedback",
+      "applies_to": ["CHILLER"],
+      "expected_units": ["binary"],
+      "point_types": ["binary_input", "binary_value"],
+      "classification_rules": [
+        {
+          "source": "point_name",
+          "patterns": ["CHILLER_RUN", "CH_STATUS", "CH_RUN", "CHILLER_STATUS"],
+          "weight": 0.85,
+          "evidence": "Naming match"
+        },
+        {
+          "source": "haystack_id",
+          "pattern": "**chiller**run*",
+          "weight": 0.9,
+          "evidence": "Haystack match"
+        }
+      ],
+      "required_evidence": 1,
+      "minimum_confidence": 0.7,
+      "negative_samples": [],
+      "safety_class": "LOW"
+    },
+    "chiller_enable_command": {
+      "description": "Enable/disable chiller command",
+      "applies_to": ["CHILLER"],
+      "expected_units": ["binary"],
+      "point_types": ["binary_output"],
+      "classification_rules": [
+        {
+          "source": "point_name",
+          "patterns": ["CH_ENABLE", "CHILLER_ENABLE", "CH_CMD", "CHILLER_CMD"],
+          "weight": 0.85,
+          "evidence": "Naming match"
+        },
+        {
+          "source": "haystack_id",
+          "pattern": "**chiller**enable*",
+          "weight": 0.95,
+          "evidence": "Haystack match"
+        }
+      ],
+      "required_evidence": 1,
+      "minimum_confidence": 0.8,
+      "negative_samples": [],
+      "safety_class": "HIGH",
+      "control_envelope": {
+        "writable": true,
+        "monitor_only": false,
+        "requires_approval_above": 1,
+        "min_cooldown_seconds": 600,
+        "max_daily_writes": 10
+      }
+    },
+    "chilled_water_primary_pump_vfd_speed_command": {
+      "description": "VFD speed command for primary chilled water pump",
+      "applies_to": ["PUMP"],
+      "expected_units": ["%", "Hz"],
+      "point_types": ["analog_output"],
+      "classification_rules": [
+        {
+          "source": "point_name",
+          "patterns": ["PCHWP-*-SPEED", "PCHWP-*-VFD", "PRIMARY-CHW-PUMP", "PCHWP_SPEED"],
+          "weight": 0.8,
+          "evidence": "Equipment-based detection"
+        },
+        {
+          "source": "equipment_type",
+          "must_be": ["pump"],
+          "weight": 0.15,
+          "evidence": "Equipment type context"
+        }
+      ],
+      "required_evidence": 2,
+      "minimum_confidence": 0.7,
+      "negative_samples": [],
+      "safety_class": "MEDIUM",
+      "control_envelope": {
+        "bounds": {"min": 0, "max": 100, "unit": "%", "rationale": "VFD speed range"},
+        "ramp_limits": {"max_per_second": 5, "alarm_if_exceeded": false},
+        "min_cooldown_seconds": 120
+      }
+    },
+    "emergency_stop_status": {
+      "description": "Emergency stop button status (normally closed)",
+      "applies_to": ["GEN", "AHU", "CHILLER"],
+      "expected_units": ["binary"],
+      "point_types": ["binary_input"],
+      "classification_rules": [
+        {
+          "source": "point_name",
+          "patterns": ["ESTOP", "EMERGENCY_STOP", "MOP_BUTTON", "E_STOP"],
+          "weight": 0.95,
+          "evidence": "Clear naming"
+        }
+      ],
+      "required_evidence": 1,
+      "minimum_confidence": 0.8,
+      "negative_samples": [],
+      "safety_class": "HIGH",
+      "control_envelope": {
+        "writable": false,
+        "monitor_only": true,
+        "alarm_on_change": true,
+        "requires_immediate_review": true
+      }
+    },
+    "fire_alarm_status": {
+      "description": "Fire alarm panel signal or smoke detector status",
+      "applies_to": ["FIRE", "AHU"],
+      "expected_units": ["binary"],
+      "point_types": ["binary_input"],
+      "classification_rules": [
+        {
+          "source": "point_name",
+          "patterns": ["FIRE_ALARM", "SMOKE_DETECT", "FA_STATUS", "FIRE_STATUS"],
+          "weight": 0.9,
+          "evidence": "Naming match"
+        },
+        {
+          "source": "haystack_id",
+          "pattern": "**fire**alarm*",
+          "weight": 0.95,
+          "evidence": "Haystack match"
+        }
+      ],
+      "required_evidence": 1,
+      "minimum_confidence": 0.8,
+      "negative_samples": [],
+      "safety_class": "HIGH",
+      "control_envelope": {
+        "writable": false,
+        "monitor_only": true,
+        "alarm_on_change": true,
+        "requires_immediate_review": true
+      }
+    },
+    "fire_suppression_command": {
+      "description": "Fire suppression system activation command",
+      "applies_to": ["FIRE"],
+      "expected_units": ["binary"],
+      "point_types": ["binary_output"],
+      "classification_rules": [
+        {
+          "source": "point_name",
+          "patterns": ["FIRE_SUPPRESS", "SPRINKLER_CMD", "SUPPRESSION_CMD"],
+          "weight": 0.95,
+          "evidence": "Naming match"
+        }
+      ],
+      "required_evidence": 1,
+      "minimum_confidence": 0.9,
+      "negative_samples": [],
+      "safety_class": "HIGH",
+      "control_envelope": {
+        "writable": false,
+        "monitor_only": true,
+        "alarm_on_change": true,
+        "requires_immediate_review": true
+      }
+    },
+    "smoke_damper_status": {
+      "description": "Smoke/fire damper open/closed status",
+      "applies_to": ["AHU", "FIRE"],
+      "expected_units": ["binary"],
+      "point_types": ["binary_input"],
+      "classification_rules": [
+        {
+          "source": "point_name",
+          "patterns": ["SMOKE_DAMPER", "FIRE_DAMPER", "FSD_STATUS", "SD_STATUS"],
+          "weight": 0.9,
+          "evidence": "Naming match"
+        }
+      ],
+      "required_evidence": 1,
+      "minimum_confidence": 0.8,
+      "negative_samples": [],
+      "safety_class": "HIGH",
+      "control_envelope": {
+        "writable": false,
+        "monitor_only": true,
+        "alarm_on_change": true
+      }
+    },
+    "lighting_level_sensor": {
+      "description": "Ambient light level sensor (lux)",
+      "applies_to": ["DALI", "LIGHTING", "LUM"],
+      "expected_units": ["lux", "fc"],
+      "point_types": ["analog_input", "analog_value"],
+      "classification_rules": [
+        {
+          "source": "haystack_id",
+          "pattern": "**light**level*",
+          "weight": 0.9,
+          "evidence": "Haystack match"
+        },
+        {
+          "source": "point_name",
+          "patterns": ["LIGHT_LEVEL", "LUX_SENSOR", "ILLUMINANCE", "AMBIENT_LIGHT"],
+          "weight": 0.85,
+          "evidence": "Naming match"
+        }
+      ],
+      "required_evidence": 1,
+      "minimum_confidence": 0.7,
+      "negative_samples": [],
+      "safety_class": "LOW"
+    },
+    "lighting_dimmer_command": {
+      "description": "DALI/PWM dimming level command (0-100%)",
+      "applies_to": ["DALI", "LIGHTING", "LUM"],
+      "expected_units": ["%"],
+      "point_types": ["analog_output", "analog_value"],
+      "classification_rules": [
+        {
+          "source": "haystack_id",
+          "pattern": "**dim**level*",
+          "weight": 0.9,
+          "evidence": "Haystack match"
+        },
+        {
+          "source": "point_name",
+          "patterns": ["DIM_LEVEL", "DIMMER", "LIGHT_LEVEL_CMD", "DALI_LEVEL"],
+          "weight": 0.85,
+          "evidence": "Naming match"
+        }
+      ],
+      "required_evidence": 1,
+      "minimum_confidence": 0.7,
+      "negative_samples": [],
+      "safety_class": "LOW",
+      "control_envelope": {
+        "bounds": {"min": 0, "max": 100, "unit": "%", "rationale": "DALI scale 0-100%"},
+        "max_daily_writes": 1000
+      }
+    },
+    "lighting_occupancy_sensor": {
+      "description": "Occupancy/motion detection for lighting control",
+      "applies_to": ["DALI", "LIGHTING", "LUM"],
+      "expected_units": ["binary"],
+      "point_types": ["binary_input"],
+      "classification_rules": [
+        {
+          "source": "haystack_id",
+          "pattern": "**occupancy**sensor*",
+          "weight": 0.9,
+          "evidence": "Haystack match"
+        },
+        {
+          "source": "point_name",
+          "patterns": ["OCC_SENSOR", "MOTION_DETECT", "PIR_STATUS", "OCCUPANCY"],
+          "weight": 0.85,
+          "evidence": "Naming match"
+        }
+      ],
+      "required_evidence": 1,
+      "minimum_confidence": 0.7,
+      "negative_samples": [],
+      "safety_class": "LOW"
+    },
+    "lighting_on_off_command": {
+      "description": "Lighting circuit on/off command",
+      "applies_to": ["DALI", "LIGHTING", "LUM"],
+      "expected_units": ["binary"],
+      "point_types": ["binary_output"],
+      "classification_rules": [
+        {
+          "source": "point_name",
+          "patterns": ["LIGHT_ON", "LIGHT_CMD", "LIGHTING_CMD", "LIGHT_ENABLE"],
+          "weight": 0.85,
+          "evidence": "Naming match"
+        }
+      ],
+      "required_evidence": 1,
+      "minimum_confidence": 0.7,
+      "negative_samples": [],
+      "safety_class": "LOW",
+      "control_envelope": {
+        "max_daily_writes": 500
+      }
+    },
+    "active_power_meter": {
+      "description": "Active electrical power consumption (kW)",
+      "applies_to": ["MTR", "METER", "ENERGY", "MSB"],
+      "expected_units": ["kW", "W"],
+      "point_types": ["analog_input", "analog_value"],
+      "classification_rules": [
+        {
+          "source": "haystack_id",
+          "pattern": "**active**power*",
+          "weight": 0.95,
+          "evidence": "Haystack match"
+        },
+        {
+          "source": "point_name",
+          "patterns": ["ACTIVE_POWER", "KW_DEMAND", "POWER_KW", "ACTIVE_PWR"],
+          "weight": 0.85,
+          "evidence": "Naming match"
+        }
+      ],
+      "required_evidence": 1,
+      "minimum_confidence": 0.7,
+      "negative_samples": [],
+      "validation_rules": {
+        "bounds": {
+          "min": 0,
+          "max": 10000,
+          "unit": "kW",
+          "rationale": "Building power range"
+        }
+      },
+      "safety_class": "LOW"
+    },
+    "reactive_power_meter": {
+      "description": "Reactive electrical power (kVAR)",
+      "applies_to": ["MTR", "METER", "ENERGY"],
+      "expected_units": ["kVAR", "VAR"],
+      "point_types": ["analog_input", "analog_value"],
+      "classification_rules": [
+        {
+          "source": "point_name",
+          "patterns": ["REACTIVE_POWER", "KVAR_DEMAND", "POWER_KVAR", "REACTIVE_PWR"],
+          "weight": 0.85,
+          "evidence": "Naming match"
+        }
+      ],
+      "required_evidence": 1,
+      "minimum_confidence": 0.7,
+      "negative_samples": [],
+      "safety_class": "LOW"
+    },
+    "power_factor_meter": {
+      "description": "Power factor reading (0-1)",
+      "applies_to": ["MTR", "METER", "ENERGY", "PFC"],
+      "expected_units": ["unitless"],
+      "point_types": ["analog_input", "analog_value"],
+      "classification_rules": [
+        {
+          "source": "point_name",
+          "patterns": ["POWER_FACTOR", "PF_READING", "PF_METER"],
+          "weight": 0.85,
+          "evidence": "Naming match"
+        }
+      ],
+      "required_evidence": 1,
+      "minimum_confidence": 0.7,
+      "negative_samples": [],
+      "validation_rules": {
+        "bounds": {
+          "min": 0,
+          "max": 1,
+          "unit": "unitless",
+          "rationale": "Power factor range"
+        }
+      },
+      "safety_class": "LOW"
+    },
+    "energy_consumption_meter": {
+      "description": "Cumulative energy consumption (kWh)",
+      "applies_to": ["MTR", "METER", "ENERGY"],
+      "expected_units": ["kWh", "MWh"],
+      "point_types": ["analog_input", "analog_value"],
+      "classification_rules": [
+        {
+          "source": "haystack_id",
+          "pattern": "**energy**kwh*",
+          "weight": 0.95,
+          "evidence": "Haystack match"
+        },
+        {
+          "source": "point_name",
+          "patterns": ["ENERGY_KWH", "KWH_TOTAL", "ENERGY_TOTAL", "CUMULATIVE_KWH"],
+          "weight": 0.85,
+          "evidence": "Naming match"
+        }
+      ],
+      "required_evidence": 1,
+      "minimum_confidence": 0.7,
+      "negative_samples": [],
+      "safety_class": "LOW"
+    },
+    "generator_run_status": {
+      "description": "Generator running/stopped status",
+      "applies_to": ["GEN", "GENERATOR"],
+      "expected_units": ["binary"],
+      "point_types": ["binary_input", "binary_value"],
+      "classification_rules": [
+        {
+          "source": "point_name",
+          "patterns": ["GEN_RUN", "GENERATOR_STATUS", "GEN_STATUS", "GEN_RUN_STATUS"],
+          "weight": 0.85,
+          "evidence": "Naming match"
+        }
+      ],
+      "required_evidence": 1,
+      "minimum_confidence": 0.7,
+      "negative_samples": [],
+      "safety_class": "LOW"
+    },
+    "generator_fuel_level": {
+      "description": "Generator fuel tank level (%)",
+      "applies_to": ["GEN", "GENERATOR"],
+      "expected_units": ["%", "L"],
+      "point_types": ["analog_input", "analog_value"],
+      "classification_rules": [
+        {
+          "source": "point_name",
+          "patterns": ["FUEL_LEVEL", "GEN_FUEL", "FUEL_TANK_LEVEL"],
+          "weight": 0.85,
+          "evidence": "Naming match"
+        }
+      ],
+      "required_evidence": 1,
+      "minimum_confidence": 0.7,
+      "negative_samples": [],
+      "validation_rules": {
+        "bounds": {
+          "min": 0,
+          "max": 100,
+          "unit": "%",
+          "rationale": "Percentage full"
+        }
+      },
+      "safety_class": "LOW"
+    },
+    "generator_start_command": {
+      "description": "Manual/auto generator start command",
+      "applies_to": ["GEN", "GENERATOR"],
+      "expected_units": ["binary"],
+      "point_types": ["binary_output"],
+      "classification_rules": [
+        {
+          "source": "point_name",
+          "patterns": ["GEN_START", "GENERATOR_START", "GEN_CMD"],
+          "weight": 0.9,
+          "evidence": "Naming match"
+        }
+      ],
+      "required_evidence": 1,
+      "minimum_confidence": 0.8,
+      "negative_samples": [],
+      "safety_class": "HIGH",
+      "control_envelope": {
+        "requires_approval_above": 1,
+        "min_cooldown_seconds": 1800,
+        "max_daily_writes": 5,
+        "alarm_on_change": true
+      }
+    },
+    "ups_battery_status": {
+      "description": "UPS battery charge level or fault status",
+      "applies_to": ["UPS"],
+      "expected_units": ["%"],
+      "point_types": ["analog_input", "binary_input"],
+      "classification_rules": [
+        {
+          "source": "point_name",
+          "patterns": ["UPS_BATTERY", "BATTERY_LEVEL", "UPS_CHARGE", "BATT_STATUS"],
+          "weight": 0.85,
+          "evidence": "Naming match"
+        }
+      ],
+      "required_evidence": 1,
+      "minimum_confidence": 0.7,
+      "negative_samples": [],
+      "safety_class": "LOW"
+    },
+    "ups_bypass_status": {
+      "description": "UPS on bypass (mains direct, no battery protection)",
+      "applies_to": ["UPS"],
+      "expected_units": ["binary"],
+      "point_types": ["binary_input"],
+      "classification_rules": [
+        {
+          "source": "point_name",
+          "patterns": ["UPS_BYPASS", "BYPASS_STATUS", "UPS_BYPASS_MODE"],
+          "weight": 0.9,
+          "evidence": "Naming match"
+        }
+      ],
+      "required_evidence": 1,
+      "minimum_confidence": 0.8,
+      "negative_samples": [],
+      "safety_class": "MEDIUM"
+    },
+    "ats_position_status": {
+      "description": "Automatic Transfer Switch position (NORMAL/GENERATOR)",
+      "applies_to": ["ATS"],
+      "expected_units": ["binary", "multistate"],
+      "point_types": ["binary_input", "multistate_value"],
+      "classification_rules": [
+        {
+          "source": "point_name",
+          "patterns": ["ATS_POSITION", "ATS_STATUS", "TRANSFER_STATUS"],
+          "weight": 0.9,
+          "evidence": "Naming match"
+        }
+      ],
+      "required_evidence": 1,
+      "minimum_confidence": 0.8,
+      "negative_samples": [],
+      "safety_class": "HIGH",
+      "control_envelope": {
+        "writable": false,
+        "monitor_only": true,
+        "alarm_on_change": true,
+        "requires_immediate_review": true
+      }
+    },
+    "water_flow_meter": {
+      "description": "Water flow rate (L/s, m3/h)",
+      "applies_to": ["WATER_METER", "MTR"],
+      "expected_units": ["L/s", "m3/h"],
+      "point_types": ["analog_input", "analog_value"],
+      "classification_rules": [
+        {
+          "source": "point_name",
+          "patterns": ["WATER_FLOW", "FLOW_RATE", "FLOW_METER", "H2O_FLOW"],
+          "weight": 0.85,
+          "evidence": "Naming match"
+        }
+      ],
+      "required_evidence": 1,
+      "minimum_confidence": 0.7,
+      "negative_samples": [],
+      "safety_class": "LOW"
+    },
+    "water_consumption_meter": {
+      "description": "Cumulative water consumption (m3, kL)",
+      "applies_to": ["WATER_METER", "MTR"],
+      "expected_units": ["m3", "kL"],
+      "point_types": ["analog_input", "analog_value"],
+      "classification_rules": [
+        {
+          "source": "point_name",
+          "patterns": ["WATER_TOTAL", "WATER_KL", "H2O_CONSUMPTION", "WATER_M3"],
+          "weight": 0.85,
+          "evidence": "Naming match"
+        }
+      ],
+      "required_evidence": 1,
+      "minimum_confidence": 0.7,
+      "negative_samples": [],
+      "safety_class": "LOW"
+    },
+    "chilled_water_supply_temp": {
+      "description": "Chilled water supply temperature leaving chiller",
+      "applies_to": ["CHILLER"],
+      "expected_units": ["C"],
+      "point_types": ["analog_input", "analog_value"],
+      "classification_rules": [
+        {
+          "source": "haystack_id",
+          "pattern": "**chilled**water**supply**temp*",
+          "weight": 0.95,
+          "evidence": "Haystack match"
+        },
+        {
+          "source": "point_name",
+          "patterns": ["CHWST", "CHW_SUPPLY_TEMP", "CWS_TEMP"],
+          "weight": 0.85,
+          "evidence": "Naming match"
+        }
+      ],
+      "required_evidence": 1,
+      "minimum_confidence": 0.7,
+      "negative_samples": [],
+      "validation_rules": {
+        "bounds": {
+          "min": 2,
+          "max": 20,
+          "unit": "C",
+          "rationale": "Chilled water supply range"
+        }
+      },
+      "safety_class": "LOW"
+    },
+    "chilled_water_return_temp": {
+      "description": "Chilled water return temperature entering chiller",
+      "applies_to": ["CHILLER"],
+      "expected_units": ["C"],
+      "point_types": ["analog_input", "analog_value"],
+      "classification_rules": [
+        {
+          "source": "haystack_id",
+          "pattern": "**chilled**water**return**temp*",
+          "weight": 0.95,
+          "evidence": "Haystack match"
+        },
+        {
+          "source": "point_name",
+          "patterns": ["CHWRT", "CHW_RETURN_TEMP", "CWR_TEMP"],
+          "weight": 0.85,
+          "evidence": "Naming match"
+        }
+      ],
+      "required_evidence": 1,
+      "minimum_confidence": 0.7,
+      "negative_samples": [],
+      "safety_class": "LOW"
+    },
+    "cooling_tower_fan_command": {
+      "description": "Cooling tower fan enable or speed command",
+      "applies_to": ["CT"],
+      "expected_units": ["binary", "%"],
+      "point_types": ["binary_output", "analog_output"],
+      "classification_rules": [
+        {
+          "source": "point_name",
+          "patterns": ["CT_FAN", "CT_FAN_CMD", "TOWER_FAN", "COOLING_TOWER_FAN"],
+          "weight": 0.85,
+          "evidence": "Naming match"
+        }
+      ],
+      "required_evidence": 1,
+      "minimum_confidence": 0.7,
+      "negative_samples": [],
+      "safety_class": "MEDIUM",
+      "control_envelope": {
+        "min_cooldown_seconds": 120,
+        "max_daily_writes": 100
+      }
+    },
+    "differential_pressure_sensor": {
+      "description": "Differential pressure across filter, coil, or duct",
+      "applies_to": ["AHU", "CHILLER", "PUMP"],
+      "expected_units": ["Pa", "kPa", "inWC"],
+      "point_types": ["analog_input", "analog_value"],
+      "classification_rules": [
+        {
+          "source": "point_name",
+          "patterns": ["DP_SENSOR", "DIFF_PRESS", "DIFF_PRESSURE", "DP_FILTER"],
+          "weight": 0.85,
+          "evidence": "Naming match"
+        },
+        {
+          "source": "haystack_id",
+          "pattern": "**differential**pressure*",
+          "weight": 0.9,
+          "evidence": "Haystack match"
+        }
+      ],
+      "required_evidence": 1,
+      "minimum_confidence": 0.7,
+      "negative_samples": [],
+      "safety_class": "LOW"
+    },
+    "co2_sensor": {
+      "description": "CO2 concentration sensor for IAQ (ppm)",
+      "applies_to": ["AHU", "VAV", "IAQ"],
+      "expected_units": ["ppm"],
+      "point_types": ["analog_input", "analog_value"],
+      "classification_rules": [
+        {
+          "source": "point_name",
+          "patterns": ["CO2_SENSOR", "CO2_PPM", "IAQ_CO2", "CARBON_DIOXIDE"],
+          "weight": 0.9,
+          "evidence": "Naming match"
+        },
+        {
+          "source": "haystack_id",
+          "pattern": "**co2**ppm*",
+          "weight": 0.95,
+          "evidence": "Haystack match"
+        }
+      ],
+      "required_evidence": 1,
+      "minimum_confidence": 0.7,
+      "negative_samples": [],
+      "validation_rules": {
+        "bounds": {
+          "min": 300,
+          "max": 5000,
+          "unit": "ppm",
+          "rationale": "Indoor air quality range"
+        }
+      },
+      "safety_class": "LOW"
+    },
+    "relative_humidity_sensor": {
+      "description": "Relative humidity sensor (%RH)",
+      "applies_to": ["AHU", "VAV", "IAQ"],
+      "expected_units": ["%RH", "%"],
+      "point_types": ["analog_input", "analog_value"],
+      "classification_rules": [
+        {
+          "source": "point_name",
+          "patterns": ["RH_SENSOR", "HUMIDITY", "RELATIVE_HUMIDITY", "RH_PCT"],
+          "weight": 0.85,
+          "evidence": "Naming match"
+        },
+        {
+          "source": "haystack_id",
+          "pattern": "**humidity**sensor*",
+          "weight": 0.9,
+          "evidence": "Haystack match"
+        }
+      ],
+      "required_evidence": 1,
+      "minimum_confidence": 0.7,
+      "negative_samples": [],
+      "validation_rules": {
+        "bounds": {
+          "min": 0,
+          "max": 100,
+          "unit": "%RH",
+          "rationale": "Relative humidity range"
+        }
+      },
+      "safety_class": "LOW"
+    },
+    "access_door_status": {
+      "description": "Door open/closed status for access control",
+      "applies_to": ["ACC", "SECURITY"],
+      "expected_units": ["binary"],
+      "point_types": ["binary_input"],
+      "classification_rules": [
+        {
+          "source": "point_name",
+          "patterns": ["DOOR_STATUS", "DOOR_OPEN", "ACCESS_STATUS", "DOOR_SENSOR"],
+          "weight": 0.85,
+          "evidence": "Naming match"
+        }
+      ],
+      "required_evidence": 1,
+      "minimum_confidence": 0.7,
+      "negative_samples": [],
+      "safety_class": "MEDIUM"
+    },
+    "access_lock_command": {
+      "description": "Door lock/unlock command for access control",
+      "applies_to": ["ACC", "SECURITY"],
+      "expected_units": ["binary"],
+      "point_types": ["binary_output"],
+      "classification_rules": [
+        {
+          "source": "point_name",
+          "patterns": ["DOOR_LOCK", "LOCK_CMD", "ACCESS_LOCK", "ELECTRIC_LOCK"],
+          "weight": 0.85,
+          "evidence": "Naming match"
+        }
+      ],
+      "required_evidence": 1,
+      "minimum_confidence": 0.8,
+      "negative_samples": [],
+      "safety_class": "HIGH",
+      "control_envelope": {
+        "requires_approval_above": 1,
+        "min_cooldown_seconds": 30,
+        "alarm_on_change": true
+      }
+    },
+    "cctv_camera_status": {
+      "description": "CCTV camera online/fault status",
+      "applies_to": ["CCTV", "SECURITY"],
+      "expected_units": ["binary"],
+      "point_types": ["binary_input"],
+      "classification_rules": [
+        {
+          "source": "point_name",
+          "patterns": ["CAMERA_STATUS", "CCTV_STATUS", "CAM_FAULT", "CAMERA_FAULT"],
+          "weight": 0.85,
+          "evidence": "Naming match"
+        }
+      ],
+      "required_evidence": 1,
+      "minimum_confidence": 0.7,
+      "negative_samples": [],
+      "safety_class": "LOW"
+    },
+    "solar_inverter_output_power": {
+      "description": "Solar inverter active power output (kW)",
+      "applies_to": ["SOLAR", "MTR"],
+      "expected_units": ["kW", "W"],
+      "point_types": ["analog_input", "analog_value"],
+      "classification_rules": [
+        {
+          "source": "point_name",
+          "patterns": ["SOLAR_POWER", "PV_OUTPUT", "INVERTER_KW", "PV_KW"],
+          "weight": 0.85,
+          "evidence": "Naming match"
+        },
+        {
+          "source": "haystack_id",
+          "pattern": "**solar**power*",
+          "weight": 0.9,
+          "evidence": "Haystack match"
+        }
+      ],
+      "required_evidence": 1,
+      "minimum_confidence": 0.7,
+      "negative_samples": [],
+      "safety_class": "LOW"
+    },
+    "bess_state_of_charge": {
+      "description": "Battery Energy Storage System state of charge (%)",
+      "applies_to": ["BESS"],
+      "expected_units": ["%"],
+      "point_types": ["analog_input", "analog_value"],
+      "classification_rules": [
+        {
+          "source": "point_name",
+          "patterns": ["BESS_SOC", "BATTERY_SOC", "SOC_PCT", "STATE_OF_CHARGE"],
+          "weight": 0.9,
+          "evidence": "Naming match"
+        }
+      ],
+      "required_evidence": 1,
+      "minimum_confidence": 0.8,
+      "negative_samples": [],
+      "validation_rules": {
+        "bounds": {
+          "min": 0,
+          "max": 100,
+          "unit": "%",
+          "rationale": "Battery charge percentage"
+        }
+      },
+      "safety_class": "LOW"
+    },
+    "bess_charge_discharge_command": {
+      "description": "BESS charge or discharge power command (kW)",
+      "applies_to": ["BESS"],
+      "expected_units": ["kW"],
+      "point_types": ["analog_output", "analog_value"],
+      "classification_rules": [
+        {
+          "source": "point_name",
+          "patterns": ["BESS_CMD", "BESS_POWER_CMD", "BATTERY_DISPATCH"],
+          "weight": 0.9,
+          "evidence": "Naming match"
+        }
+      ],
+      "required_evidence": 1,
+      "minimum_confidence": 0.8,
+      "negative_samples": [],
+      "safety_class": "HIGH",
+      "control_envelope": {
+        "bounds": {"min": -40, "max": 40, "unit": "kW", "rationale": "BESS charge/discharge limit"},
+        "requires_approval_above": 1,
+        "min_cooldown_seconds": 300
+      }
+    },
+    "vav_damper_position": {
+      "description": "VAV box damper position feedback or command (%)",
+      "applies_to": ["VAV"],
+      "expected_units": ["%"],
+      "point_types": ["analog_input", "analog_output", "analog_value"],
+      "classification_rules": [
+        {
+          "source": "point_name",
+          "patterns": ["DAMPER_POS", "VAV_DAMPER", "DAMPER_CMD", "DAMPER_POSITION"],
+          "weight": 0.85,
+          "evidence": "Naming match"
+        },
+        {
+          "source": "haystack_id",
+          "pattern": "**damper**position*",
+          "weight": 0.9,
+          "evidence": "Haystack match"
+        }
+      ],
+      "required_evidence": 1,
+      "minimum_confidence": 0.7,
+      "negative_samples": [],
+      "validation_rules": {
+        "bounds": {
+          "min": 0,
+          "max": 100,
+          "unit": "%",
+          "rationale": "Damper position 0-100%"
+        }
+      },
+      "safety_class": "MEDIUM",
+      "control_envelope": {
+        "bounds": {"min": 0, "max": 100, "unit": "%", "rationale": "Damper position 0-100%"},
+        "min_cooldown_seconds": 60,
+        "max_daily_writes": 288
+      }
+    }
+  }
+}
