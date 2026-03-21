@@ -423,6 +423,17 @@ class ClaudeService:
         else:
             system = FM_SYSTEM_PROMPT_BASE
 
+        # Prompt caching: wrap system prompt as a content block with cache_control.
+        # Anthropic caches the prefix server-side for ~5 min, saving 90% of input
+        # token cost on repeated requests with the same system prompt.
+        system_blocks = [
+            {
+                "type": "text",
+                "text": system,
+                "cache_control": {"type": "ephemeral"},
+            }
+        ]
+
         effective_model = model_override or self._model
 
         try:
@@ -430,7 +441,7 @@ class ClaudeService:
             with self.client.messages.stream(
                 model=effective_model,
                 max_tokens=self._max_tokens,
-                system=system,
+                system=system_blocks,
                 messages=messages,
             ) as stream:
                 for text in stream.text_stream:
