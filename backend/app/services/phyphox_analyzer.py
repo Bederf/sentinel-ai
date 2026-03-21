@@ -13,20 +13,13 @@ import json
 import logging
 from typing import Dict, Any, Optional
 
-import anthropic
-
-from app.config.settings import settings
-from app.services.ai_usage_tracker import usage_tracker
+from app.services.model_gateway import model_gateway
 
 logger = logging.getLogger(__name__)
 
 
 class PhyphoxAnalyzer:
     """Extract vibration/audio data from phyphox screenshots using Vision API."""
-
-    def __init__(self):
-        self.client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
-        self.model = settings.claude_model
 
     async def analyze_spectrum_screenshot(
         self,
@@ -52,9 +45,8 @@ class PhyphoxAnalyzer:
         prompt = self._get_extraction_prompt(measurement_type)
 
         try:
-            response = self.client.messages.create(
-                model=self.model,
-                max_tokens=1024,
+            response_text = await model_gateway.call(
+                task_class="light",
                 messages=[
                     {
                         "role": "user",
@@ -67,22 +59,11 @@ class PhyphoxAnalyzer:
                         ],
                     }
                 ],
+                max_tokens=1024,
             )
 
-            try:
-                u = response.usage
-                usage_tracker.record(
-                    provider="anthropic",
-                    model=self.model,
-                    input_tokens=getattr(u, "input_tokens", 0),
-                    output_tokens=getattr(u, "output_tokens", 0),
-                    source="phyphox_analysis",
-                )
-            except Exception:
-                pass  # Never break analysis for tracking
-
             # Parse structured response
-            return self._parse_response(response.content[0].text, measurement_type)
+            return self._parse_response(response_text, measurement_type)
 
         except Exception as e:
             logger.error(f"phyphox screenshot analysis failed: {e}")
