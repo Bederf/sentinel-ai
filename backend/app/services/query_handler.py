@@ -2,13 +2,13 @@
 
 Routes natural language queries through the intent classifier, gathers
 relevant context from repositories and services, formats prompts, and
-generates responses via Ollama (local LLM).
+generates responses via the model gateway.
 """
 
 import logging
 from typing import Any, Dict, Optional
 
-from app.services.ollama_client import OllamaClient
+from app.services.model_gateway import model_gateway
 from app.services.rag_service import get_rag_service
 from app.database.repositories.equipment_repository import EquipmentRepository
 from app.database.repositories.alert_repository import AlertRepository
@@ -26,7 +26,6 @@ class QueryHandler:
 
     def __init__(self):
         self.classifier = IntentClassifier()
-        self.ollama = OllamaClient()
         self.equipment_repo = EquipmentRepository()
         self.alert_repo = AlertRepository()
 
@@ -36,7 +35,7 @@ class QueryHandler:
         1. Classify intent and extract entities
         2. Gather context from relevant services
         3. Format prompt with context
-        4. Generate response via Ollama
+        4. Generate response via model gateway
 
         Args:
             query: Natural language user query
@@ -62,12 +61,15 @@ class QueryHandler:
             context = {}
             prompt = self._build_fallback_prompt(classified)
 
-        # Step 3: Generate response
-        ollama_available = await self.ollama.is_available()
-        if ollama_available:
-            response_text = await self.ollama.generate(prompt, temperature=0.3)
-            model_used = self.ollama.default_model
-        else:
+        # Step 3: Generate response via model_gateway
+        try:
+            response_text = await model_gateway.call(
+                task_class="medium",
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=1024,
+            )
+            model_used = "gateway:medium"
+        except Exception:
             response_text = self._generate_offline_response(classified, context)
             model_used = None
 
@@ -79,7 +81,7 @@ class QueryHandler:
             "equipment_type": classified.equipment_type,
             "time_range": classified.time_range,
             "model_used": model_used,
-            "llm_available": ollama_available,
+            "llm_available": model_used is not None,
         }
 
     async def _gather_context(self, classified: ClassifiedQuery) -> Dict[str, Any]:
