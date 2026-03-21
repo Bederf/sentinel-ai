@@ -13,9 +13,6 @@ import re
 import base64
 
 
-BACKGROUND_AI_MODEL = "claude-haiku-4-5-20251001"  # Cost-optimised for scheduled jobs
-INTERACTIVE_AI_MODEL = "claude-sonnet-4-20250514"  # Full capability for chat
-
 # 3-layer model routing (Phase 163)
 # Layer 2 — Execution mode: api | cloud | local
 # Layer 3 — Active routing profile name
