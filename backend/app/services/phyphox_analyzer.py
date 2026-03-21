@@ -16,6 +16,7 @@ from typing import Dict, Any, Optional
 import anthropic
 
 from app.config.settings import settings
+from app.services.ai_usage_tracker import usage_tracker
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +68,18 @@ class PhyphoxAnalyzer:
                     }
                 ],
             )
+
+            try:
+                u = response.usage
+                usage_tracker.record(
+                    provider="anthropic",
+                    model=self.model,
+                    input_tokens=getattr(u, "input_tokens", 0),
+                    output_tokens=getattr(u, "output_tokens", 0),
+                    source="phyphox_analysis",
+                )
+            except Exception:
+                pass  # Never break analysis for tracking
 
             # Parse structured response
             return self._parse_response(response.content[0].text, measurement_type)
