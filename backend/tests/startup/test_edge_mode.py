@@ -128,3 +128,38 @@ class TestEdgeModeGating:
         _simulation_stopped = False
         should_start_sim = settings.site002_source_enabled and not _simulation_stopped and not settings.edge_mode
         assert should_start_sim is False
+
+
+class TestEdgeModeProfileOverride:
+    """Test that EDGE_MODE=true forces SENTINEL_ROUTING_PROFILE to local_full."""
+
+    def test_edge_mode_overrides_routing_profile_to_local_full(self):
+        """EDGE_MODE=true must force SENTINEL_ROUTING_PROFILE to local_full."""
+        import app.config.settings as settings_mod
+
+        original = settings_mod.SENTINEL_ROUTING_PROFILE
+        try:
+            settings_mod.settings.edge_mode = True
+            settings_mod.SENTINEL_ROUTING_PROFILE = "api_prod"  # simulate pre-override state
+            from app.config.settings import apply_edge_mode_overrides
+
+            apply_edge_mode_overrides()
+            assert settings_mod.SENTINEL_ROUTING_PROFILE == "local_full"
+        finally:
+            settings_mod.SENTINEL_ROUTING_PROFILE = original
+            settings_mod.settings.edge_mode = False
+
+    def test_edge_mode_false_does_not_override_routing_profile(self):
+        """EDGE_MODE=false must NOT change SENTINEL_ROUTING_PROFILE."""
+        import app.config.settings as settings_mod
+
+        original = settings_mod.SENTINEL_ROUTING_PROFILE
+        try:
+            settings_mod.settings.edge_mode = False
+            settings_mod.SENTINEL_ROUTING_PROFILE = "api_prod"
+            from app.config.settings import apply_edge_mode_overrides
+
+            apply_edge_mode_overrides()
+            assert settings_mod.SENTINEL_ROUTING_PROFILE == "api_prod"
+        finally:
+            settings_mod.SENTINEL_ROUTING_PROFILE = original

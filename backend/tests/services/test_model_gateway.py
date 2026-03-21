@@ -114,6 +114,30 @@ class TestEscalation:
         assert passed_messages == original_context
 
 
+class TestLocalFullHardFail:
+    @pytest.mark.asyncio
+    async def test_local_full_profile_raises_on_ollama_failure(self):
+        """In local_full mode, model_gateway must raise LocalInferenceUnavailableError
+        when Ollama is unreachable — no silent cloud fallback."""
+        import app.config.settings as settings_mod
+        from app.services.model_gateway import ModelGateway, LocalInferenceUnavailableError
+
+        original = settings_mod.SENTINEL_ROUTING_PROFILE
+        try:
+            settings_mod.SENTINEL_ROUTING_PROFILE = "local_full"
+            with patch(
+                "app.services.hybrid_ai_service.hybrid_ai_service.query_ollama",
+                side_effect=Exception("Connection refused"),
+            ):
+                with pytest.raises(LocalInferenceUnavailableError):
+                    await ModelGateway().call(
+                        task_class="medium",
+                        messages=[{"role": "user", "content": "test"}],
+                    )
+        finally:
+            settings_mod.SENTINEL_ROUTING_PROFILE = original
+
+
 class TestProfileSwitching:
     def test_local_full_profile_resolves_to_ollama(self):
         with patch("app.config.settings.SENTINEL_ROUTING_PROFILE", "local_full"):
