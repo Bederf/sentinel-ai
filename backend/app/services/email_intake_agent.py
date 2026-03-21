@@ -22,6 +22,7 @@ from typing import Any, Optional
 import httpx
 
 from app.config.settings import settings
+from app.services.ai_usage_tracker import usage_tracker
 from app.services.issue_classifier import (
     CALL_LOG_TAXONOMY,
     DISCIPLINE_TO_CATEGORY,
@@ -285,26 +286,28 @@ Respond with ONLY a JSON object (no markdown, no explanation):
     # ------------------------------------------------------------------
 
     async def _call_llm(self, prompt: str) -> tuple[str, str]:
-        """OpenAI → Claude → raise. Returns (response_text, model_name)."""
-        # Try OpenAI first
-        if self._api_key:
-            try:
-                text = await self._call_openai(prompt)
-                return text, self._model
-            except Exception as exc:
-                logger.error(
-                    "OpenAI call failed (model=%s): %s — trying Claude fallback",
-                    self._model,
-                    exc,
-                )
-
-        # Try Claude fallback
+        """Claude → OpenAI → raise. Returns (response_text, model_name)."""
+        # Try Claude first
         claude_model = settings.claude_model or "claude-haiku-4-5-20251001"
         try:
             text = await self._call_claude(prompt)
             return text, f"claude:{claude_model}"
         except Exception as exc:
-            raise RuntimeError(f"All LLM providers failed. Last error: {exc}") from exc
+            logger.error(
+                "Claude call failed (model=%s): %s — trying OpenAI fallback",
+                claude_model,
+                exc,
+            )
+
+        # Try OpenAI fallback
+        if self._api_key:
+            try:
+                text = await self._call_openai(prompt)
+                return text, self._model
+            except Exception as exc:
+                raise RuntimeError(f"All LLM providers failed. Last error: {exc}") from exc
+
+        raise RuntimeError("All LLM providers failed. No OpenAI API key configured.")
 
     async def _call_openai(self, prompt: str) -> str:
         """Call OpenAI chat completions API."""
@@ -339,6 +342,18 @@ Respond with ONLY a JSON object (no markdown, no explanation):
         content = choices[0].get("message", {}).get("content", "")
         if not content:
             raise RuntimeError("OpenAI returned empty content")
+
+        try:
+            usage = body.get("usage", {})
+            usage_tracker.record(
+                provider="openai",
+                model=self._model,
+                input_tokens=usage.get("prompt_tokens", 0),
+                output_tokens=usage.get("completion_tokens", 0),
+                source="email_intake",
+            )
+        except Exception:
+            pass  # Never break email intake for tracking
 
         logger.info("Agent LLM response from %s (%d chars)", self._model, len(content))
         return content
@@ -375,6 +390,18 @@ Respond with ONLY a JSON object (no markdown, no explanation):
                 text += block.get("text", "")
         if not text:
             raise RuntimeError("Claude returned empty content")
+
+        try:
+            usage = body.get("usage", {})
+            usage_tracker.record(
+                provider="anthropic",
+                model=claude_model,
+                input_tokens=usage.get("input_tokens", 0),
+                output_tokens=usage.get("output_tokens", 0),
+                source="email_intake",
+            )
+        except Exception:
+            pass  # Never break email intake for tracking
 
         logger.info("Agent LLM response from Claude/%s (%d chars)", claude_model, len(text))
         return text
