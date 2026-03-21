@@ -4,7 +4,7 @@ import logging
 from typing import Any, Dict, List, Optional
 
 from app.security.trust_levels import get_allowed_trust_levels, wrap_rag_chunk
-from app.services.ollama_client import get_ollama_client
+from app.services.model_gateway import model_gateway
 from app.services.vector_db import get_vector_db_service
 
 logger = logging.getLogger(__name__)
@@ -56,7 +56,6 @@ Keep the language practical and technical but accessible to field technicians.""
 
     def __init__(self, supabase_client):
         self.vector_db = get_vector_db_service(supabase_client)
-        self.ollama = get_ollama_client()
         self._supabase_client = supabase_client
 
     async def get_context(
@@ -142,14 +141,20 @@ Keep the language practical and technical but accessible to field technicians.""
 
         # Generate response
         if use_local_llm:
-            ollama_available = await self.ollama.is_available()
-            if ollama_available:
-                response = await self.ollama.generate(prompt)
-            else:
-                response = f"[Ollama not available] Context retrieved:\n\n{context}"
+            try:
+                response = await model_gateway.call(
+                    task_class="heavy",
+                    messages=[{"role": "user", "content": prompt}],
+                )
+                llm_used = "model_gateway"
+            except Exception as e:
+                logger.warning("model_gateway unavailable for RAG query: %s", e)
+                response = f"[LLM not available] Context retrieved:\n\n{context}"
+                llm_used = "none"
         else:
-            # Could integrate with Claude here if needed
+            # LLM disabled by caller
             response = f"[LLM disabled] Context retrieved:\n\n{context}"
+            llm_used = "none"
 
         # Log query for analytics
         self._log_query(query, equipment_type, len(context.split()))
@@ -159,7 +164,7 @@ Keep the language practical and technical but accessible to field technicians.""
             "response": response,
             "context_used": context,
             "equipment_type": equipment_type,
-            "llm_used": "ollama" if use_local_llm else "none",
+            "llm_used": llm_used,
         }
 
     async def explain_prediction(self, equipment_id: str, prediction: Dict[str, Any]) -> Dict[str, Any]:
@@ -209,18 +214,22 @@ Keep the language practical and technical but accessible to field technicians.""
             rag_context=rag_context,
         )
 
-        # Check if Ollama is available
-        ollama_available = await self.ollama.is_available()
-
-        if ollama_available:
-            # Generate explanation with lower temperature for more consistent output
-            explanation = await self.ollama.generate(prompt, temperature=0.3)
-        else:
+        # Generate explanation via model_gateway
+        llm_available = False
+        try:
+            # Use lower temperature for consistent output; gateway handles routing
+            explanation = await model_gateway.call(
+                task_class="heavy",
+                messages=[{"role": "user", "content": prompt}],
+            )
+            llm_available = True
+        except Exception as e:
+            logger.warning("model_gateway unavailable for explain_prediction: %s", e)
             fail_prob = prediction.get("failure_probability_30d", 0) * 100
             pred_failure = prediction.get("predicted_failure", "Unknown")
             risk_lvl = prediction.get("risk_level", "Unknown")
             explanation = (
-                f"[Ollama not available]\n\nBased on the prediction data:\n"
+                f"[LLM not available]\n\nBased on the prediction data:\n"
                 f"- Failure probability: {fail_prob:.1f}%\n"
                 f"- Predicted failure: {pred_failure}\n"
                 f"- Risk level: {risk_lvl}\n\n"
@@ -236,7 +245,7 @@ Keep the language practical and technical but accessible to field technicians.""
                 "risk_level": prediction.get("risk_level"),
             },
             "context_sources": rag_context[:500] + "..." if len(rag_context) > 500 else rag_context,
-            "llm_available": ollama_available,
+            "llm_available": llm_available,
         }
 
     def _log_query(self, query: str, equipment_type: Optional[str], context_word_count: int):
