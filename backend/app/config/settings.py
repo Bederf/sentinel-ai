@@ -25,6 +25,25 @@ SENTINEL_BOT_TECH_DEFAULT_CLASS: str = "chat_tech"  # Engineer/diagnostic bot
 SENTINEL_BOT_ESCALATION_CLASS: str = "heavy"  # Escalation target for both bots
 
 
+def apply_edge_mode_overrides() -> None:
+    """Override routing profile for edge deployment.
+
+    SENTINEL_ROUTING_PROFILE is read at import time and cannot be changed via
+    environment variable after module load. This function must be called once at
+    startup (before any model_gateway.call() invocations) to apply edge overrides.
+    """
+    import app.config.settings as _self
+
+    if _self.settings.edge_mode and _self.SENTINEL_ROUTING_PROFILE != "local_full":
+        _self.SENTINEL_ROUTING_PROFILE = "local_full"
+        import logging
+
+        logging.getLogger(__name__).info(
+            "EDGE_MODE=true: SENTINEL_ROUTING_PROFILE overridden to 'local_full' "
+            "(all LLM calls route through local Ollama; no cloud fallback)"
+        )
+
+
 def _parse_csv_list(value):
     if isinstance(value, list):
         return value

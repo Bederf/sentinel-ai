@@ -11,7 +11,7 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import FastAPI
 
-from app.config.settings import settings
+from app.config.settings import apply_edge_mode_overrides, settings
 from app.services.background_scheduler import scheduler_service
 from app.services.health_simulation_service import health_simulation_service  # Supabase health simulation
 from app.services.simbiot_service import simbiot_service  # SIMBIOT Concept Evolution connector
@@ -53,6 +53,7 @@ async def startup_event(app: FastAPI) -> None:
     It performs security checks, initializes services, and starts
     background tasks.
     """
+    apply_edge_mode_overrides()
     testing_mode = os.getenv("TESTING", "").lower() == "true"
 
     # === Security startup checks ===
