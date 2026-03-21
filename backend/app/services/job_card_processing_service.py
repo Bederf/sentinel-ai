@@ -19,9 +19,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
-import anthropic
-from app.config.settings import settings
-from app.services.ai_usage_tracker import usage_tracker
+from app.services.model_gateway import model_gateway
 
 logger = logging.getLogger(__name__)
 
@@ -133,7 +131,7 @@ class JobCardProcessingService:
     """Orchestrates photo → OCR → structured data → RAG text pipeline."""
 
     def __init__(self):
-        self.client = anthropic.Anthropic()
+        pass  # Provider selection handled by model_gateway
 
     async def process_document(
         self,
@@ -213,13 +211,11 @@ class JobCardProcessingService:
             )
 
     async def _classify_document_type(self, image_data: bytes, media_type: str) -> str:
-        """Classify document type using Claude Vision."""
+        """Classify document type using Vision API via model_gateway."""
         try:
             image_b64 = base64.b64encode(image_data).decode()
-            response = self.client.messages.create(
-                model=settings.claude_model,
-                max_tokens=100,
-                temperature=0.0,
+            result_text = await model_gateway.call(
+                task_class="light",
                 messages=[
                     {
                         "role": "user",
@@ -242,19 +238,9 @@ class JobCardProcessingService:
                         ],
                     }
                 ],
+                max_tokens=100,
             )
-            try:
-                u = response.usage
-                usage_tracker.record(
-                    provider="anthropic",
-                    model=settings.claude_model,
-                    input_tokens=getattr(u, "input_tokens", 0),
-                    output_tokens=getattr(u, "output_tokens", 0),
-                    source="job_card_processing",
-                )
-            except Exception:
-                pass  # Never break classification for tracking
-            result = response.content[0].text.strip().lower()
+            result = result_text.strip().lower()
             # Normalize response
             for valid_type in ["job_card", "service_sheet", "compliance_certificate"]:
                 if valid_type in result:
@@ -280,10 +266,8 @@ class JobCardProcessingService:
 
         try:
             image_b64 = base64.b64encode(image_data).decode()
-            response = self.client.messages.create(
-                model=settings.claude_model,
-                max_tokens=4000,
-                temperature=0.1,
+            response_text = await model_gateway.call(
+                task_class="light",
                 messages=[
                     {
                         "role": "user",
@@ -300,20 +284,8 @@ class JobCardProcessingService:
                         ],
                     }
                 ],
+                max_tokens=4000,
             )
-
-            try:
-                u = response.usage
-                usage_tracker.record(
-                    provider="anthropic",
-                    model=settings.claude_model,
-                    input_tokens=getattr(u, "input_tokens", 0),
-                    output_tokens=getattr(u, "output_tokens", 0),
-                    source="job_card_processing",
-                )
-            except Exception:
-                pass  # Never break extraction for tracking
-            response_text = response.content[0].text
             json_match = re.search(r"\{[\s\S]*\}", response_text)
             if json_match:
                 data = json.loads(json_match.group())
