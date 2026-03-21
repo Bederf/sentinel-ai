@@ -7,15 +7,11 @@ from app.services.explanation_service import ExplanationService, ExplanationResu
 
 
 @pytest.fixture
-def mock_ollama_client():
-    """Mock Ollama client."""
-    with patch("app.services.explanation_service.get_ollama_client") as mock_get:
-        client = Mock()
-        client.is_available = AsyncMock(return_value=True)
-        client.generate = AsyncMock(return_value="Test explanation")
-        client.model = "qwen:7b"
-        mock_get.return_value = client
-        yield client
+def mock_model_gateway():
+    """Mock model_gateway for explanation service."""
+    with patch("app.services.explanation_service.model_gateway") as mock_gw:
+        mock_gw.call = AsyncMock(return_value="Test explanation")
+        yield mock_gw
 
 
 @pytest.fixture
@@ -35,7 +31,7 @@ def mock_supabase_client():
 
 
 @pytest.fixture
-def explanation_service(mock_supabase_client, mock_ollama_client, mock_vector_db):
+def explanation_service(mock_supabase_client, mock_model_gateway, mock_vector_db):
     """Create explanation service with mocked dependencies."""
     service = ExplanationService(mock_supabase_client)
     yield service
@@ -44,7 +40,7 @@ def explanation_service(mock_supabase_client, mock_ollama_client, mock_vector_db
 class TestExplanationService:
     """Test cases for ExplanationService."""
 
-    async def test_explain_prediction_basic(self, explanation_service, mock_ollama_client):
+    async def test_explain_prediction_basic(self, explanation_service, mock_model_gateway):
         """Test basic prediction explanation generation."""
         # Setup
         predictions = {
@@ -52,7 +48,7 @@ class TestExplanationService:
             "predictions": {"24h": 12.5, "48h": 13.2, "72h": 14.1},
             "confidence": 0.85,
         }
-        mock_ollama_client.generate.return_value = """## Analysis Summary
+        mock_model_gateway.call.return_value = """## Analysis Summary
 The chiller efficiency is within normal parameters.
 
 ## Contributing Factors
@@ -71,12 +67,12 @@ No immediate action required. Continue monitoring.
         assert result.equipment_id == "chiller-001"
         assert result.equipment_type == "chiller"
         assert "normal" in result.raw_explanation.lower()
-        assert result.model_used == "qwen:7b"
+        assert result.model_used == "gateway:medium"
 
-    async def test_explain_prediction_with_fallback(self, explanation_service, mock_ollama_client):
-        """Test fallback explanation when Ollama is unavailable."""
-        # Setup
-        mock_ollama_client.is_available.return_value = False
+    async def test_explain_prediction_with_fallback(self, explanation_service, mock_model_gateway):
+        """Test fallback explanation when gateway is unavailable."""
+        # Setup: make gateway raise to trigger fallback
+        mock_model_gateway.call.side_effect = Exception("Gateway unavailable")
         predictions = {"equipment_type": "chiller", "predictions": {"24h": 15.0}}
 
         # Execute
@@ -141,10 +137,10 @@ No immediate action required. Continue monitoring.
         assert result.parsed is not None
         assert isinstance(result.parsed, dict)
 
-    async def test_parse_explanation_output(self, explanation_service, mock_ollama_client):
+    async def test_parse_explanation_output(self, explanation_service, mock_model_gateway):
         """Test parsing of explanation output."""
         # Setup
-        mock_ollama_client.generate.return_value = """## Analysis Summary
+        mock_model_gateway.call.return_value = """## Analysis Summary
 The generator load is approaching maximum capacity.
 
 ## Contributing Factors
@@ -168,7 +164,7 @@ The generator load is approaching maximum capacity.
         # Should have parsed structure
         assert "actions" in result.parsed or isinstance(result.parsed, dict)
 
-    async def test_concurrent_explanations(self, explanation_service, mock_ollama_client):
+    async def test_concurrent_explanations(self, explanation_service, mock_model_gateway):
         """Test generating multiple explanations concurrently."""
         predictions1 = {"equipment_type": "chiller", "predictions": {"24h": 12.0}}
         predictions2 = {"equipment_type": "ahu", "predictions": {"24h": 22.0}}
