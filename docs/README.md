@@ -4,7 +4,7 @@ type: "guide"
 status: "approved"
 version: "1.3.0"
 created: "2026-01-30"
-updated: "2026-03-15"
+updated: "2026-03-21"
 author: "Sentinel Development Team"
 tags: ["documentation", "overview"]
 domain: "general"
@@ -26,6 +26,7 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 
 ### 🏗️ Architecture
 - [System Overview](02-architecture/system-overview.md) - High-level architecture
+- [Document Retrieval Canonical Index](02-architecture/document-retrieval-canonical-note.md) - Canonical subsystem names and boundaries for retrieval/intake/OCR pipelines
 - **[Frontend Navigation Architecture](02-architecture/frontend-navigation.md)** - Two-level navigation: minimal global sidebar (4 items) + scrollable module-gated building detail tabs (23 views)
 - [Architecture Repository (TOGAF)](architecture-repository/README.md) - TOGAF-aligned architecture principles, governance, landscapes, and roadmaps
 - [Module System](02-architecture/module-system.md) - Bolt-on module architecture, activation, cross-module integrations
@@ -72,6 +73,7 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 - **[Gateway Log API](03-api-reference/gateway-log-api.md)** - Sentry gateway tool-level observability, activity log query (ADR-001)
 - **[AI Usage & Cost Tracking API](03-api-reference/ai-usage-api.md)** - Token usage summaries, daily breakdowns, exchange rate config, per-provider/model cost tracking (v48.0)
 - **[Alert Routing API](03-api-reference/buildings.md)** - Configurable alert routing rules, equipment muting, channel status (Phase 159)
+- **[Semantic Classification API](03-api-reference/semantic-classification-api.md)** - Classify BACnet/DALI points against 47-tag Haystack dictionary, batch equipment classification, tag dictionary inspection (Phase 162)
 
 ### ✨ Features
 
@@ -135,7 +137,7 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 - **[Plant Room Notification Pipeline](04-features/plant-room-notification-pipeline.md)** - Desigo BMS fault email ingestion, severity classification, Twilio WhatsApp delivery with alarm flood protection and rate limiting (Phase 146)
 
 #### Settings & Operations
-- **[API & Service Cost Tracking](04-features/ai-cost-tracking.md)** - Unified cost tracking across AI providers, messaging (WhatsApp, BulkSMS, Telegram), and services (ElevenLabs, EskomSePush) with daily email reports and cost threshold alerts (v48.0 + Phase 158)
+- **[API & Service Cost Tracking](04-features/ai-cost-tracking.md)** - Unified cost tracking across AI providers, messaging (WhatsApp, BulkSMS, Telegram), and services (ElevenLabs, EskomSePush) with daily email reports and cost threshold alerts (v48.0 + Phase 158 + 2026-03-21 coverage fixes)
 - **[160: AI Governance Metrics](04-features/160-ai-governance-metrics.md)** - 5 Prometheus metric families (quality gates, model drift, tool errors, approval latency, AI cost/route), POPIA evidence packs, 6 Grafana panels, 5 REST endpoints (Phase 160)
 
 #### Additional Features
@@ -186,6 +188,7 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 - **[Tridium Niagara Integration](07-integrations/tridium-niagara-integration.md)** - BACnet/IP, oBIX, AI point discovery for Niagara JACE/Supervisor
 - **[SIMBIOT Concept Connector](07-integrations/simbiot-concept-connector.md)** - MRI Evolution CAFM integration via FSI API (auto work orders, status polling, asset sync)
 - **[SIMBIOT Universal Adapter Pattern](05-integrations/simbiot-universal-adapter-pattern.md)** - One SBC, any building: SIMBIOT translates any BMS format (Desigo, Trane, JCI, BACnet, Modbus, simulation) to SENTINEL's fixed Supabase schema without code changes
+- **[Semantic Control Foundation — Classifier & Validation](05-integrations/162-semantic-classifier.md)** - Deterministic Haystack-inspired point classifier with weighted evidence scoring, safety-class gating, and static validation engine for blind site onboarding (Phase 162)
 - **[Asset Workflow Architecture](05-integrations/asset-workflow-architecture.md)** - SIMBIOT + Baseline + Inspection + ML integration (Phase 53-01)
 - **[Asset Lifecycle State Machine](05-integrations/asset-lifecycle-state-machine.md)** - 13 states from onboarding to monitoring (Phase 53-01)
 - **[Workflow Triggers & Automation](05-integrations/workflow-triggers.md)** - 5 automated triggers for ML → Inspection → Repair → Validation (Phase 53-02)

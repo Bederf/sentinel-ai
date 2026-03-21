@@ -259,3 +259,48 @@ Add pricing to `SERVICE_PRICING_USD` dict using key format `{provider}_{unit_typ
 | `backend/app/data/ai_usage_log.json` | Persistent daily data |
 | `frontend/src/components/settings/AiCostTracker.tsx` | UI component |
 | `backend/tests/services/test_service_cost_tracking.py` | 16 tests (Phase 158) |
+| `backend/app/services/vision_service.py` | `usage_tracker.record()` after LLM call (2026-03-21) |
+| `backend/app/services/ocr_service.py` | `usage_tracker.record()` after LLM call (2026-03-21) |
+| `backend/app/services/job_card_processing_service.py` | `usage_tracker.record()` at both call sites (2026-03-21) |
+| `backend/app/services/email_intake_agent.py` | `usage_tracker.record()` + Claude-primary/OpenAI-fallback order (2026-03-21) |
+| `backend/app/services/phyphox_analyzer.py` | `usage_tracker.record()` after LLM call (2026-03-21) |
+
+## Cost control fixes (2026-03-21)
+
+### Previously untracked call sites
+
+Seven LLM call sites were not writing to `ai_usage_log.json`, making daily cost reports
+understated. The following services now call `usage_tracker.record()` immediately after every
+LLM response:
+
+| Service | Model used | Source label |
+|---------|-----------|-------------|
+| `vision_service.py` | Claude (vision) | `vision` |
+| `ocr_service.py` | Claude (OCR) | `vision` |
+| `job_card_processing_service.py` (×2) | Claude | `wo` |
+| `email_intake_agent.py` | Claude / OpenAI (fallback) | `background` |
+| `phyphox_analyzer.py` | Claude | `background` |
+
+### Provider order correction — email intake agent
+
+`email_intake_agent.py` previously hardcoded OpenAI as the primary provider. It now uses
+Claude (Anthropic) as primary with OpenAI as fallback, consistent with the rest of SENTINEL's
+hybrid AI routing policy. This also means email intake token costs now appear under
+`anthropic/*` in the daily report rather than `openai/*`.
+
+### Prompt caching — second Claude streaming path
+
+`claude_service.py` exposes two streaming functions:
+
+- `stream_response_with_tools()` — had prompt caching enabled (pre-existing)
+- `stream_response()` — did not have prompt caching
+
+`cache_control: ephemeral` is now applied to system prompts in `stream_response()`, matching
+the existing pattern in `stream_response_with_tools()`. For workloads with large repeated system
+prompts, this can reduce Anthropic input token costs by up to 90% on cache hits.
+
+### Impact
+
+After these fixes, the 23:55 daily cost report via `background_scheduler` captures **all**
+LLM spend rather than roughly 60%. No schema or API changes were required; the fixes are
+purely additive `record()` calls at each call site.
