@@ -26,6 +26,7 @@ import { FleetInsights } from "./components/FleetInsights";
 import { ESGPage } from "./components/sustainability/ESGPage";
 import { ContractManagementPage } from "./pages/ContractManagementPage";
 import { IntelligencePage } from "./components/intelligence/IntelligencePage";
+import { DecisionMomentPage, type DecisionMomentPayload } from "./pages/DecisionMomentPage";
 import { ModuleProvider } from "./contexts/ModuleContext";
 import { useModules } from "./contexts/ModuleHooks";
 import { ThemeProvider } from "./contexts/ThemeContext";
@@ -210,6 +211,8 @@ function App() {
   // AI Recommendation card state
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- RecommendationData type not exported from RecommendationToast
   const [selectedRec, setSelectedRec] = useState<any>(null);
+  const [crisisUrgencyScore, setCrisisUrgencyScore] = useState(0);
+  const [crisisPayload, setCrisisPayload] = useState<DecisionMomentPayload | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleShowRecCard = useCallback((rec: any) => setSelectedRec(rec), []);
   const handleApproveRec = useCallback(async (id: string) => {
@@ -280,6 +283,28 @@ function App() {
     const healthInterval = setInterval(checkHealth, 30000);
     return () => clearInterval(healthInterval);
   }, []);
+
+  // Crisis state polling — pre-warms DecisionMomentPage when urgency > 0.7
+  useEffect(() => {
+    if (!effectiveSiteId) return;
+
+    const pollDecisions = async () => {
+      try {
+        const resp = await fetch(`/api/decisions/current/${effectiveSiteId}`);
+        if (!resp.ok) return; // 422 (no active fault) or network error — fail silently
+        const data = await resp.json();
+        const score = typeof data.urgency_score === "number" ? data.urgency_score : 0;
+        setCrisisUrgencyScore(score);
+        if (score > 0.7) setCrisisPayload(data as DecisionMomentPayload);
+      } catch {
+        // Network unavailable — keep previous state, do not reset
+      }
+    };
+
+    pollDecisions();
+    const interval = setInterval(pollDecisions, 30000);
+    return () => clearInterval(interval);
+  }, [effectiveSiteId]);
 
   // Fetch and count unread alerts
   useEffect(() => {
@@ -518,6 +543,22 @@ function App() {
   // Show email entry if not authenticated
   if (!currentUser) {
     return <EmailEntry onSuccess={handleEmailEntrySuccess} />;
+  }
+
+  // Crisis gate — collapses to full-page Crisis State when urgency > 0.7
+  if (crisisUrgencyScore > 0.7 && crisisPayload) {
+    return (
+      <SimulationProvider siteId={effectiveSiteId || undefined}>
+      <ThemeProvider>
+      <ModuleProvider initialSiteId={effectiveSiteId || undefined} initialSiteName={effectiveSiteName}>
+        <DecisionMomentPage
+          payload={crisisPayload}
+          onDismiss={() => { setCrisisUrgencyScore(0); setCrisisPayload(null); }}
+        />
+      </ModuleProvider>
+      </ThemeProvider>
+      </SimulationProvider>
+    );
   }
 
   return (
