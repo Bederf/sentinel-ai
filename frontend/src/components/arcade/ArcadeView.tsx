@@ -1,8 +1,8 @@
 /**
  * ArcadeView — spatial intelligence interface for the building Overview tab.
  * Fetches DecisionMomentPayload from /api/decisions/current/{siteId} on mount + every 30s.
- * Renders FloorStack + SummaryStrip. ContextPanel and CrisisOverlay are Phase 167 shells.
- * Phase 166-02.
+ * Renders FloorStack + SummaryStrip in quiet mode; CrisisOverlay when urgency gate fires.
+ * Phase 167-03.
  */
 
 import { useState, useEffect, useRef } from "react";
@@ -11,6 +11,7 @@ import { FloorStack } from "./FloorStack";
 import type { FloorStackProps } from "./FloorStack";
 import { SummaryStrip } from "./SummaryStrip";
 import { ContextPanel } from "./ContextPanel";
+import { CrisisOverlay } from "./CrisisOverlay";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -35,6 +36,11 @@ interface BuildingMetadata {
 interface DecisionPayload {
   building_id: string;
   renderer_hint?: string;
+  urgency_score?: number;
+  alert_text?: string;
+  reasoning_summary?: string;
+  recommended_action?: string;
+  time_to_discomfort?: number | null;
   active_incident_map?: Record<string, IncidentFloor>;
   building_metadata?: BuildingMetadata;
 }
@@ -49,8 +55,33 @@ export interface ArcadeViewProps {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 const POLL_INTERVAL_MS = 30_000;
+const URGENCY_THRESHOLD = 0.70;
+const SUPPRESS_MINUTES = 30;
 
 const DEFAULT_FLOOR_ORDER = ["R", "L2", "L1", "L0", "G", "B1"];
+
+// ─── Suppress helpers (localStorage) ─────────────────────────────────────────
+
+const suppressKey = (siteId: string) => `sentinel_crisis_suppress_${siteId}`;
+
+function isSuppressed(siteId: string): boolean {
+  try {
+    const ts = localStorage.getItem(suppressKey(siteId));
+    if (!ts) return false;
+    return new Date() < new Date(ts);
+  } catch {
+    return false;
+  }
+}
+
+function setSuppressed(siteId: string): void {
+  try {
+    const until = new Date(Date.now() + SUPPRESS_MINUTES * 60 * 1000);
+    localStorage.setItem(suppressKey(siteId), until.toISOString());
+  } catch {
+    // localStorage unavailable — ignore
+  }
+}
 
 function SkeletonFloors({ count }: { count: number }) {
   return (
@@ -82,6 +113,21 @@ export function ArcadeView({ siteId, onModuleDisplayChange }: ArcadeViewProps) {
   const [selectedFloor, setSelectedFloor] = useState<string | null>(null);
   const [contextOpen, setContextOpen] = useState(false);
   const [_triggerModuleDisplay, setTriggerModuleDisplay] = useState<Record<string, string>>({});
+
+  // ── Crisis handlers ──────────────────────────────────────────────────────
+
+  const handleCrisisDismiss = () => {
+    setSuppressed(siteId);
+    // Suppress is re-evaluated on next poll (every 30s) or re-render.
+    // Force re-render by re-fetching immediately so UI updates without waiting.
+    fetchPayload();
+  };
+
+  const handleCrisisApprove = async () => {
+    setSuppressed(siteId);
+    // Future: POST to /api/decisions/approve — Phase 168.
+    fetchPayload();
+  };
 
   const handleFloorClick = async (floorId: string) => {
     setSelectedFloor(floorId);
@@ -156,6 +202,14 @@ export function ArcadeView({ siteId, onModuleDisplayChange }: ArcadeViewProps) {
   const activeRiskCount: number | null = metadata.active_risk_count ?? null;
   const healthPct: number | null = metadata.health_pct ?? null;
 
+  // Urgency gate — crisis overlay fires when:
+  //   renderer_hint === "crisis" AND urgency_score >= 0.70 AND not suppressed
+  const showCrisis =
+    payload !== null &&
+    payload.renderer_hint === "crisis" &&
+    (payload.urgency_score ?? 0) >= URGENCY_THRESHOLD &&
+    !isSuppressed(siteId);
+
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
@@ -206,47 +260,64 @@ export function ArcadeView({ siteId, onModuleDisplayChange }: ArcadeViewProps) {
         )}
       </div>
 
-      {/* Summary strip */}
-      <SummaryStrip
-        equipmentCount={equipmentCount}
-        activeRiskCount={activeRiskCount}
-        healthPct={healthPct}
-      />
-
-      {/* Floor stack */}
-      {loading && !payload ? (
-        <SkeletonFloors count={floorStackOrder.length} />
-      ) : (
-        <FloorStack
-          floorStackOrder={floorStackOrder}
-          floorLabels={floorLabels}
-          activeIncidentMap={activeIncidentMap}
-          rendererHint={rendererHint}
-          onFloorClick={handleFloorClick}
-          selectedFloor={selectedFloor}
+      {/* Crisis overlay replaces FloorStack + SummaryStrip when urgency gate fires */}
+      {showCrisis ? (
+        <CrisisOverlay
+          alertText={payload?.alert_text ?? ""}
+          reasoningSummary={payload?.reasoning_summary ?? ""}
+          recommendedAction={payload?.recommended_action ?? ""}
+          timeToDiscomfort={payload?.time_to_discomfort ?? null}
+          affectedFloor={
+            payload?.active_incident_map
+              ? (Object.keys(payload.active_incident_map)[0] ?? null)
+              : null
+          }
+          deploymentMode={payload?.building_metadata?.deployment_mode ?? "ghost"}
+          onDismiss={handleCrisisDismiss}
+          onApprove={handleCrisisApprove}
         />
+      ) : (
+        <>
+          {/* Summary strip */}
+          <SummaryStrip
+            equipmentCount={equipmentCount}
+            activeRiskCount={activeRiskCount}
+            healthPct={healthPct}
+          />
+
+          {/* Floor stack */}
+          {loading && !payload ? (
+            <SkeletonFloors count={floorStackOrder.length} />
+          ) : (
+            <FloorStack
+              floorStackOrder={floorStackOrder}
+              floorLabels={floorLabels}
+              activeIncidentMap={activeIncidentMap}
+              rendererHint={rendererHint}
+              onFloorClick={handleFloorClick}
+              selectedFloor={selectedFloor}
+            />
+          )}
+
+          {/* ContextPanel — slides in from right on floor selection */}
+          <ContextPanel
+            open={contextOpen}
+            floorId={selectedFloor}
+            floorLabel={
+              payload?.building_metadata?.floor_labels?.[selectedFloor ?? ""] ??
+              selectedFloor ??
+              ""
+            }
+            siteId={siteId}
+            onClose={() => {
+              setContextOpen(false);
+              setSelectedFloor(null);
+              setTriggerModuleDisplay({});
+              onModuleDisplayChange?.({});
+            }}
+          />
+        </>
       )}
-
-      {/* ContextPanel — slides in from right on floor selection */}
-      <ContextPanel
-        open={contextOpen}
-        floorId={selectedFloor}
-        floorLabel={
-          payload?.building_metadata?.floor_labels?.[selectedFloor ?? ""] ??
-          selectedFloor ??
-          ""
-        }
-        siteId={siteId}
-        onClose={() => {
-          setContextOpen(false);
-          setSelectedFloor(null);
-          setTriggerModuleDisplay({});
-          onModuleDisplayChange?.({});
-        }}
-      />
-
-      {/* CrisisOverlay — Phase 167 shell (hidden by default) */}
-      <div data-slot="crisis-overlay" style={{ display: "none" }} />
     </div>
   );
 }
