@@ -95,7 +95,7 @@ Gaps are controls that exist in policy but lack code enforcement or test proof.
 
 | Priority | Gap | File | Missing | Framework Ref | Suggested Fix |
 |----------|-----|------|---------|--------------|---------------|
-| **CRITICAL** | Safety validation placeholder in approval path | `services/approval_service.py` | `SafetyEngine.evaluate()` called before device write | ISO-A.6.2, NIST-MS-2.6 | Replace placeholder (line 45 oversight docs) with real call; block if BLOCKED |
+| ~~**CRITICAL**~~ CLOSED | ~~Safety validation placeholder in approval path~~ | `services/approval_service.py` | Fixed 2026-03-22: fail-open (no adapter→allow) → fail-closed (no adapter→reject, SAFETY-001) | ISO-A.6.2, NIST-MS-2.6 | See commit 3096a1c6 |
 | **HIGH** | API key in-memory store not production-ready | `middleware/auth_middleware.py` | Supabase migration with hashed keys + rotation | ISO-A.7.1 | Move `_API_KEY_STORE` to `api_keys` table |
 | **HIGH** | Demo mode bypass not startup-gated for production | `middleware/auth_middleware.py` | Startup check: DEMO_MODE=true + prod domain → fail | FSR 4.7 | Add startup validation in `main.py` |
 | **HIGH** | Approval endpoint role not proven in tests | `api/approval_workflow.py` | Test: viewer POSTs approve → 403 | ISO-A.10.1 | Add integration test |
@@ -110,6 +110,10 @@ Gaps are controls that exist in policy but lack code enforcement or test proof.
 ---
 
 ## D. Recently Fixed (2026-03-22)
+
+| Finding | File | Fix |
+|---------|------|-----|
+| CRITICAL: Safety validation fail-open | `services/approval_service.py` | No-adapter path now returns `is_safe=False` (SAFETY-001); was `is_safe=True` |
 
 | Finding | File | Fix |
 |---------|------|-----|
