@@ -240,11 +240,13 @@ async def notify_technician_of_work_order(
 async def mark_service_record_complete(
     service_record_code: str,
     force: bool = Query(True, description="Allow completion even if some evidence items are missing"),
+    x_sentry_secret: Optional[str] = Header(None),
 ):
     """Mark service record as complete manually.
 
     Called when technician confirms completion via Sentry.
     """
+    _require_sentry_secret(x_sentry_secret, endpoint_name="work_order_complete")
     result = await work_order_notifier.complete_service_record(service_record_code, force=force)
     if "error" in result:
         error_code = result.get("error")
@@ -1585,12 +1587,14 @@ _GATEWAY_LOG_MAX = 1000
 async def log_gateway_activity(
     entry: GatewayLogEntry,
     x_sentry_api_key: Optional[str] = Header(None),
+    x_sentry_secret: Optional[str] = Header(None),
 ) -> dict:
     """Record a gateway tool invocation for observability.
 
     Called by Sentry tool scripts (bms_query.py, bms_wo.py, etc.)
     after each command execution.
     """
+    _require_sentry_secret(x_sentry_secret, endpoint_name="gateway_log", allow_public_in_simulation=True)
     from datetime import timezone
 
     record = {
