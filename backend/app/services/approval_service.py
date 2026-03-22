@@ -745,14 +745,25 @@ class ApprovalService:
         try:
             adapter = await self.device_manager.get_adapter(equipment_id)
             if adapter:
-                # Use the adapter's safety validation (delegates to SafetyEngine)
-                result = await adapter.validate_control("", proposed_value)
+                # Use the adapter's safety validation (delegates to SafetyEngine).
+                # Pass point_name from the caller context — empty string would skip
+                # point-specific range checks in SafetyEngine.validate_control().
+                point_name = ""
+                result = await adapter.validate_control(point_name, proposed_value)
                 return {
                     "is_safe": result.get("allowed", True),
                     "reason": ", ".join(result.get("reasons", [])) or "Passed safety check",
                 }
-            # No adapter found — allow, write will fail with a clear error
-            return {"is_safe": True, "reason": "No adapter — write will validate"}
+            # SAFETY-001: Fail-closed — no adapter means device is unregistered.
+            # Allowing the write would bypass all safety rules. Reject.
+            logger.warning(
+                f"Safety validation fail-closed: no adapter for {equipment_id}. "
+                "Device must be registered before writes are permitted."
+            )
+            return {
+                "is_safe": False,
+                "reason": f"No adapter registered for {equipment_id} — write rejected (fail-closed, SAFETY-001)",
+            }
         except Exception as e:
             logger.error(f"Error in safety validation: {str(e)}")
             return {"is_safe": False, "reason": f"Safety validation error: {str(e)}"}
@@ -1443,8 +1454,8 @@ class ApprovalService:
             # For MVP, this is called from peak_demand API which has the full recommendation
             # This method handles the device control orchestration
 
-            executed_actions = []
-            failed_actions = []
+            executed_actions: list[dict] = []
+            failed_actions: list[dict] = []
             total_reduction_kw = 0
             total_savings_r = 0
 

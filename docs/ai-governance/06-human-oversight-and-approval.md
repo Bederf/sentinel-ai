@@ -43,4 +43,4 @@ AI recommendations can support operations, but critical actions require accounta
 
 ## Open Gap
 
-- Replace any placeholder safety validation path with full rule-engine enforcement before autonomous execution.
+- ~~Replace any placeholder safety validation path with full rule-engine enforcement before autonomous execution.~~ **CLOSED 2026-03-22**: `_validate_safety()` is implemented and wired at both Tier 2 and Tier 3 execution paths. Fail-open fallback (no-adapter → allow) replaced with fail-closed rejection (SAFETY-001). See `approval_service.py` lines 745-770.
