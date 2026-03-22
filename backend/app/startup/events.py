@@ -58,6 +58,15 @@ async def startup_event(app: FastAPI) -> None:
 
     # === Security startup checks ===
 
+    # DEMO_MODE production safety validation (AUTH-006, Phase 168-01)
+    # Fail-closed: reject DEMO_MODE=true in production environments
+    if settings.demo_mode and settings.is_live_mode:
+        raise RuntimeError(
+            f"FATAL: DEMO_MODE=true with is_live_mode={settings.is_live_mode}. "
+            "Demo mode must not run in production. Set DEMO_MODE=false."
+        )
+    _logger.info(f"Auth configuration: demo_mode={settings.demo_mode} | is_live_mode={settings.is_live_mode}")
+
     # DEMO_MODE deprecation warning
     if settings.demo_mode:
         _logger.warning(
