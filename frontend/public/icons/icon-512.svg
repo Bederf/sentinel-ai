@@ -1,0 +1,103 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!-- Background -->
+  <rect width="512" height="512" fill="#0a0a0f" rx="72"/>
+
+  <!-- Outer shield glow -->
+  <path
+    d="M256 44
+       L396 104
+       L396 254
+       Q396 374 256 452
+       Q116 374 116 254
+       L116 104
+       Z"
+    fill="none"
+    stroke="#4a9eff"
+    stroke-width="2"
+    stroke-linejoin="round"
+    opacity="0.2"
+  />
+
+  <!-- Shield main body -->
+  <path
+    d="M256 56
+       L388 112
+       L388 252
+       Q388 366 256 440
+       Q124 366 124 252
+       L124 112
+       Z"
+    fill="#1a1a2e"
+    stroke="#4a9eff"
+    stroke-width="4"
+    stroke-linejoin="round"
+  />
+
+  <!-- Inner shield accent -->
+  <path
+    d="M256 82
+       L364 128
+       L364 250
+       Q364 348 256 414
+       Q148 348 148 250
+       L148 128
+       Z"
+    fill="none"
+    stroke="#4a9eff"
+    stroke-width="1.5"
+    stroke-linejoin="round"
+    opacity="0.3"
+  />
+
+  <!-- Shield fill gradient effect via layered rect -->
+  <path
+    d="M256 56
+       L388 112
+       L388 252
+       Q388 366 256 440
+       Q124 366 124 252
+       L124 112
+       Z"
+    fill="url(#shieldGrad)"
+  />
+
+  <defs>
+    <radialGradient id="shieldGrad" cx="50%" cy="40%" r="55%">
+      <stop offset="0%" stop-color="#1e2a4a" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#0d0d1a" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- "S" glyph — large, bold, geometric -->
+  <text
+    x="256"
+    y="308"
+    font-family="'Arial Black', 'Helvetica Neue', Arial, sans-serif"
+    font-size="196"
+    font-weight="900"
+    fill="#4a9eff"
+    text-anchor="middle"
+    dominant-baseline="auto"
+    letter-spacing="-4"
+  >S</text>
+
+  <!-- Bottom wordmark: SENTINEL -->
+  <text
+    x="256"
+    y="420"
+    font-family="'Arial', 'Helvetica Neue', Arial, sans-serif"
+    font-size="28"
+    font-weight="700"
+    fill="#4a9eff"
+    text-anchor="middle"
+    dominant-baseline="auto"
+    letter-spacing="8"
+    opacity="0.75"
+  >SENTINEL</text>
+
+  <!-- Decorative corner marks -->
+  <line x1="124" y1="112" x2="136" y2="112" stroke="#4a9eff" stroke-width="2" opacity="0.5"/>
+  <line x1="124" y1="112" x2="124" y2="124" stroke="#4a9eff" stroke-width="2" opacity="0.5"/>
+  <line x1="388" y1="112" x2="376" y2="112" stroke="#4a9eff" stroke-width="2" opacity="0.5"/>
+  <line x1="388" y1="112" x2="388" y2="124" stroke="#4a9eff" stroke-width="2" opacity="0.5"/>
+</svg>

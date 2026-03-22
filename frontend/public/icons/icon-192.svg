@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192">
+  <!-- Background -->
+  <rect width="192" height="192" fill="#0a0a0f" rx="28"/>
+
+  <!-- Shield shape -->
+  <path
+    d="M96 18
+       L148 40
+       L148 95
+       Q148 140 96 170
+       Q44 140 44 95
+       L44 40
+       Z"
+    fill="#1a1a2e"
+    stroke="#4a9eff"
+    stroke-width="3"
+    stroke-linejoin="round"
+  />
+
+  <!-- Inner shield accent line -->
+  <path
+    d="M96 30
+       L138 48
+       L138 94
+       Q138 132 96 158
+       Q54 132 54 94
+       L54 48
+       Z"
+    fill="none"
+    stroke="#4a9eff"
+    stroke-width="1"
+    stroke-linejoin="round"
+    opacity="0.35"
+  />
+
+  <!-- "S" glyph — bold, geometric -->
+  <text
+    x="96"
+    y="115"
+    font-family="'Arial Black', 'Helvetica Neue', Arial, sans-serif"
+    font-size="72"
+    font-weight="900"
+    fill="#4a9eff"
+    text-anchor="middle"
+    dominant-baseline="auto"
+    letter-spacing="-2"
+  >S</text>
+
+  <!-- Bottom accent bar -->
+  <rect x="72" y="158" width="48" height="3" rx="1.5" fill="#4a9eff" opacity="0.6"/>
+</svg>
