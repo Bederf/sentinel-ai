@@ -20,6 +20,8 @@ export interface FloorStackProps {
   floorLabels: Record<string, string>;
   activeIncidentMap: Record<string, IncidentFloor>;
   rendererHint: "quiet" | "crisis";
+  onFloorClick?: (floorId: string) => void;
+  selectedFloor?: string | null;
 }
 
 export function FloorStack({
@@ -27,6 +29,8 @@ export function FloorStack({
   floorLabels,
   activeIncidentMap,
   rendererHint,
+  onFloorClick,
+  selectedFloor,
 }: FloorStackProps) {
   if (!floorStackOrder || floorStackOrder.length === 0) {
     const fallbackH = FLOOR_HEIGHT;
@@ -105,6 +109,10 @@ export function FloorStack({
               height={FLOOR_HEIGHT}
               rx={RECT_RADIUS}
               fill={fillColor}
+              onClick={() => onFloorClick?.(floorId)}
+              style={{ cursor: onFloorClick ? "pointer" : undefined }}
+              strokeWidth={selectedFloor === floorId ? 2 : 0}
+              stroke="#4a9eff"
             >
               {isAffected && (
                 <animate
