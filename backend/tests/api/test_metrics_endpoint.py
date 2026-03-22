@@ -1,4 +1,14 @@
-"""Tests for /metrics Prometheus endpoint (Phases 125, 127)."""
+"""Tests for /metrics Prometheus endpoint (Phases 125, 127, 168-01).
+
+Phase 168-01: Adds authentication tests for MONITORING-001 gap closure.
+Gap 6 (MEDIUM): /metrics endpoint unauthenticated → add AuthLevel.AUTHENTICATED guard.
+"""
+
+import os
+
+os.environ.setdefault("DEMO_MODE", "true")
+os.environ.setdefault("TESTING", "true")
+os.environ.setdefault("JWT_SECRET_KEY", "test-only-jwt-secret-for-ci-at-least-32-chars")
 
 
 class TestMetricsEndpoint:
@@ -96,3 +106,103 @@ class TestMetricsEndpoint:
         assert _is_allowed("192.168.1.1") is True
         assert _is_allowed("8.8.8.8") is False
         assert _is_allowed("203.0.113.1") is False
+
+
+class TestMetricsAuthenticationGateway:
+    """Test Phase 168-01: Authentication gateway on /metrics endpoint.
+
+    Gap 6 (MEDIUM): /metrics endpoint unauthenticated.
+    Control: MONITORING-001 (Prometheus Metrics).
+    """
+
+    def test_metrics_endpoint_requires_auth(self):
+        """GET /metrics without auth should return 401."""
+        from fastapi.testclient import TestClient
+        from app.main import app
+
+        client = TestClient(app)
+        response = client.get("/metrics")
+
+        # Without credentials, should get 401
+        assert response.status_code == 401, f"Expected 401, got {response.status_code}"
+
+    def test_metrics_endpoint_with_valid_auditor_token(self):
+        """GET /metrics with valid AUDITOR token should return 200."""
+        from fastapi.testclient import TestClient
+        from app.main import app
+        from app.middleware.auth_middleware import create_jwt_token
+        from app.models.auth import SentinelRole
+
+        client = TestClient(app)
+
+        # Create a valid AUDITOR token
+        token = create_jwt_token(
+            user_id="test-auditor",
+            email="auditor@example.com",
+            role=SentinelRole.AUDITOR.value,
+            full_name="Test Auditor",
+        )
+
+        response = client.get("/metrics", headers={"Authorization": f"Bearer {token}"})
+
+        # With valid AUDITOR token, should return 200
+        assert response.status_code == 200, f"Expected 200, got {response.status_code}"
+        assert "sentinel_" in response.text
+
+    def test_metrics_endpoint_with_valid_admin_token(self):
+        """GET /metrics with valid ADMIN token should return 200."""
+        from fastapi.testclient import TestClient
+        from app.main import app
+        from app.middleware.auth_middleware import create_jwt_token
+        from app.models.auth import SentinelRole
+
+        client = TestClient(app)
+
+        # Create a valid ADMIN token
+        token = create_jwt_token(
+            user_id="test-admin",
+            email="admin@example.com",
+            role=SentinelRole.ADMIN.value,
+            full_name="Test Admin",
+        )
+
+        response = client.get("/metrics", headers={"Authorization": f"Bearer {token}"})
+
+        # With valid ADMIN token, should return 200
+        assert response.status_code == 200, f"Expected 200, got {response.status_code}"
+        assert "sentinel_" in response.text
+
+    def test_metrics_endpoint_with_invalid_token(self):
+        """GET /metrics with invalid token should return 401."""
+        from fastapi.testclient import TestClient
+        from app.main import app
+
+        client = TestClient(app)
+
+        response = client.get("/metrics", headers={"Authorization": "Bearer invalid.token.here"})
+
+        # Invalid token should return 401
+        assert response.status_code == 401, f"Expected 401, got {response.status_code}"
+
+    def test_metrics_endpoint_with_operator_token(self):
+        """GET /metrics with OPERATOR token should return 200 (OPERATOR >= AUDITOR in auth)."""
+        from fastapi.testclient import TestClient
+        from app.main import app
+        from app.middleware.auth_middleware import create_jwt_token
+        from app.models.auth import SentinelRole
+
+        client = TestClient(app)
+
+        # Create a valid OPERATOR token
+        token = create_jwt_token(
+            user_id="test-operator",
+            email="operator@example.com",
+            role=SentinelRole.OPERATOR.value,
+            full_name="Test Operator",
+        )
+
+        response = client.get("/metrics", headers={"Authorization": f"Bearer {token}"})
+
+        # OPERATOR should have access (higher privilege than AUDITOR)
+        assert response.status_code == 200, f"Expected 200, got {response.status_code}"
+        assert "sentinel_" in response.text
