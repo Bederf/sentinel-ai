@@ -15,11 +15,12 @@ Phase 63-06: FSR privacy controls — consent capture mechanism.
 import hashlib
 import json
 import logging
+import os
 import threading
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -65,8 +66,24 @@ CONSENT_TEMPLATES: Dict[str, Dict[str, str]] = {
     },
 }
 
-# Salt for phone number hashing — in production, load from environment
-HASH_SALT = "sentinel-bms-consent-2026"
+# Salt for phone number hashing — must be set via CONSENT_HASH_SALT env var.
+# In live mode, an unset salt raises ValueError (fail-closed, POPIA compliance).
+# In dev/test, a warning is logged and an insecure default is used.
+_raw_salt = os.environ.get("CONSENT_HASH_SALT", "")
+if not _raw_salt:
+    from app.config.settings import settings as _settings
+
+    if _settings.is_live_mode:
+        raise ValueError(
+            "CONSENT_HASH_SALT environment variable must be set in live mode. "
+            "This is required for POPIA compliance. Set it to a long random secret."
+        )
+    logging.getLogger(__name__).warning(
+        "CONSENT_HASH_SALT not set — using insecure default. Set CONSENT_HASH_SALT in production."
+    )
+    _raw_salt = "sentinel-bms-consent-2026-insecure-dev"
+
+HASH_SALT: str = _raw_salt
 
 
 # ---------------------------------------------------------------------------
@@ -125,11 +142,11 @@ class ConsentService:
             with cls._lock:
                 if cls._instance is None:
                     cls._instance = super().__new__(cls)
-                    cls._instance._initialized = False
+                    cls._instance._initialized = False  # type: ignore[has-type]
         return cls._instance
 
     def __init__(self) -> None:
-        if self._initialized:
+        if self._initialized:  # type: ignore[has-type]
             return
         self._initialized = True
         self._json_path = Path(__file__).parent.parent / "data" / "consent_records.json"
