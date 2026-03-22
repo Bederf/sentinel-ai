@@ -105,7 +105,7 @@ def _should_rate_limit_admin_request(request: Request) -> bool:
 
 def _get_cors_headers(request: Request | None = None) -> dict:
     """Get standard CORS headers for error responses."""
-    headers = {}
+    headers: dict[str, str] = {}
     if not settings.cors_origins:
         return headers
 
@@ -251,7 +251,8 @@ def register_middleware(app: FastAPI) -> None:
         # Testing bypass: when TESTING=true (test suite), grant OPERATOR access.
         # This preserves test compatibility after v39.0 security hardening.
         # Skip IP check — test clients report varying IPs across CI environments.
-        is_testing = os.environ.get("TESTING", "").lower() == "true"
+        # Guard: bypass is disabled in live mode regardless of TESTING flag.
+        is_testing = os.environ.get("TESTING", "").lower() == "true" and not getattr(settings, "is_live_mode", False)
         if is_testing:
             source_ip = _extract_ip_address(request)
             demo_ctx = AuthContext(
