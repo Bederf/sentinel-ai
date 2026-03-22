@@ -86,7 +86,7 @@ export const SECTION_CARDS: CardDefinition[] = [
     description: 'Climate control health, thermal runway, and zone status',
     icon: <Thermometer className="w-4 h-4" />,
     category: 'section',
-    defaultVisible: true
+    defaultVisible: false
   },
   {
     id: 'energy-intelligence',
@@ -94,7 +94,7 @@ export const SECTION_CARDS: CardDefinition[] = [
     description: 'Optimisation savings, mode, and applied recommendations',
     icon: <Zap className="w-4 h-4" />,
     category: 'section',
-    defaultVisible: true
+    defaultVisible: false
   },
   {
     id: 'solar-intelligence',
@@ -102,7 +102,7 @@ export const SECTION_CARDS: CardDefinition[] = [
     description: 'Generation, self-consumption, and performance ratio',
     icon: <Sun className="w-4 h-4" />,
     category: 'section',
-    defaultVisible: true
+    defaultVisible: false
   },
   {
     id: 'water-intelligence',
@@ -110,7 +110,7 @@ export const SECTION_CARDS: CardDefinition[] = [
     description: 'Consumption vs baseline, leak alerts, and peak flow',
     icon: <Droplets className="w-4 h-4" />,
     category: 'section',
-    defaultVisible: true
+    defaultVisible: false
   },
   {
     id: 'fire-intelligence',
@@ -118,7 +118,7 @@ export const SECTION_CARDS: CardDefinition[] = [
     description: 'Equipment compliance, system status, and overdue items',
     icon: <Flame className="w-4 h-4" />,
     category: 'section',
-    defaultVisible: true
+    defaultVisible: false
   },
   {
     id: 'security-intelligence',
@@ -126,7 +126,7 @@ export const SECTION_CARDS: CardDefinition[] = [
     description: 'Access control zones, cameras, and occupancy',
     icon: <Shield className="w-4 h-4" />,
     category: 'section',
-    defaultVisible: true
+    defaultVisible: false
   },
   {
     id: 'occupancy-dashboard',
@@ -134,7 +134,7 @@ export const SECTION_CARDS: CardDefinition[] = [
     description: 'Real-time occupancy tracking and patterns',
     icon: <Users className="w-4 h-4" />,
     category: 'section',
-    defaultVisible: true
+    defaultVisible: false
   },
   {
     id: 'lighting-intelligence',
@@ -142,7 +142,7 @@ export const SECTION_CARDS: CardDefinition[] = [
     description: 'AI-powered lighting optimization and zone control',
     icon: <Lightbulb className="w-4 h-4" />,
     category: 'section',
-    defaultVisible: true
+    defaultVisible: false
   },
 ];
 
@@ -152,5 +152,6 @@ export const ALL_CARDS = [...KPI_CARDS, ...SECTION_CARDS];
 // Default KPI card IDs
 export const DEFAULT_KPI_CARDS = KPI_CARDS.map(c => c.id);
 
-// Default section IDs
-export const DEFAULT_SECTIONS = SECTION_CARDS.map(c => c.id);
+// Default section IDs — only ai-optimization visible by default.
+// Intelligence cards (HVAC onwards) are revealed via Customize Panels.
+export const DEFAULT_SECTIONS = SECTION_CARDS.filter(c => c.defaultVisible).map(c => c.id);

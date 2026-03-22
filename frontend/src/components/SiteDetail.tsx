@@ -202,7 +202,8 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
   });
   const [visibleSections, setVisibleSections] = useState<string[]>(() => {
     try {
-      const saved = localStorage.getItem("sentinel_visible_sections");
+      // v2 key: forces reset to new defaults (intelligence cards hidden by default)
+      const saved = localStorage.getItem("sentinel_visible_sections_v2");
       return saved ? JSON.parse(saved) : DEFAULT_SECTIONS;
     } catch { return DEFAULT_SECTIONS; }
   });
@@ -1501,7 +1502,7 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
         onSectionVisibilityChange={(id, visible) => {
           setVisibleSections(prev => {
             const next = visible ? [...prev, id] : prev.filter(c => c !== id);
-            localStorage.setItem("sentinel_visible_sections", JSON.stringify(next));
+            localStorage.setItem("sentinel_visible_sections_v2", JSON.stringify(next));
             return next;
           });
         }}
@@ -1509,7 +1510,7 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
           setVisibleKpiCards(DEFAULT_KPI_CARDS);
           setVisibleSections(DEFAULT_SECTIONS);
           localStorage.removeItem("sentinel_visible_kpi_cards");
-          localStorage.removeItem("sentinel_visible_sections");
+          localStorage.removeItem("sentinel_visible_sections_v2");
         }}
       />
 
