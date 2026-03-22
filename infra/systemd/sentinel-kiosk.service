@@ -1,0 +1,58 @@
+# SENTINEL Kiosk Display — drives a wall-mounted display showing the live dashboard
+#
+# Waits for the backend to report healthy before launching Chromium, preventing
+# a blank error page on boot (Chromium starts before FastAPI is ready without this probe).
+#
+# Install:
+#   sudo cp infra/systemd/sentinel-kiosk.service /etc/systemd/system/sentinel-kiosk.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable sentinel-kiosk.service
+#   # Only enable on units with a local display — not headless Jetson configs
+#
+# Note: chromium-browser is the Jetson/Debian package name.
+#       Ubuntu uses chromium-browser or google-chrome-stable. Adjust ExecStart if needed.
+
+[Unit]
+Description=SENTINEL Kiosk Display
+Documentation=https://github.com/your-org/bms-intelligence
+# Only start after backend is listening
+After=sentinel-backend.service network.target
+Requires=sentinel-backend.service
+
+[Service]
+Type=simple
+User=sentinel
+Environment=DISPLAY=:0
+EnvironmentFile=/etc/sentinel/edge.conf
+
+# Wait until the backend API is healthy before launching the browser.
+# Polls every 2s, gives up after 30 attempts (~60s max).
+# Failure is non-fatal — kiosk still launches, shows connection refused page.
+ExecStartPre=/bin/bash -c '\
+  attempt=0; max=30; \
+  until curl -sf http://localhost:${SENTINEL_PORT:-9095}/api/health > /dev/null 2>&1; do \
+    attempt=$((attempt + 1)); \
+    if [ $attempt -ge $max ]; then \
+      echo "WARN: backend health check timed out after ${max} attempts — launching anyway"; \
+      break; \
+    fi; \
+    sleep 2; \
+  done'
+
+# Launch Chromium in kiosk mode
+# --disable-infobars: suppress "Chrome is being controlled by automated test software"
+# --disable-session-crashed-bubble: suppress crash restore prompt after power loss
+ExecStart=/usr/bin/chromium-browser \
+  --kiosk \
+  --no-first-run \
+  --disable-infobars \
+  --disable-session-crashed-bubble \
+  --disable-restore-session-state \
+  --app=http://localhost:${SENTINEL_PORT:-9095}/kiosk.html?building_id=${SITE_ID}
+
+# Restart browser if it crashes (display stays live)
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=graphical.target
