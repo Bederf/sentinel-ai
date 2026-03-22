@@ -1,0 +1,46 @@
+<?xml version="1.0" standalone='no'?>
+<!--*-nxml-*-->
+<!DOCTYPE service-group SYSTEM "avahi-service.dtd">
+
+<!--
+  SENTINEL mDNS Service Descriptor — Phase 165 (The Discovery)
+  Deployed to: /etc/avahi/services/sentinel.service
+  Rebuilt by: sentinel-avahi-register.service on boot (SITE_ID from /etc/sentinel/edge.conf)
+
+  Advertises: _sentinel._tcp on port 9095
+  mDNS name:  sentinel-{SITE_ID}.local
+  Browser:    http://sentinel-site-002.local:9095/kiosk.html
+
+  For multi-building deployments, each Jetson has its own SITE_ID.
+  Kiosk displays auto-discover their building's SENTINEL node via:
+    avahi-browse -t _sentinel._tcp
+
+  Deployment:
+    sudo cp infra/avahi/sentinel.service /etc/avahi/services/sentinel.service
+    sudo systemctl restart avahi-daemon
+    # Verify:
+    avahi-browse -t _sentinel._tcp
+-->
+
+<service-group>
+  <!-- Name is overwritten at boot by sentinel-avahi-register.service
+       using the SITE_ID from /etc/sentinel/edge.conf -->
+  <name replace-wildcards="yes">SENTINEL %h</name>
+
+  <service>
+    <type>_sentinel._tcp</type>
+    <port>9095</port>
+    <!-- TXT records for service metadata -->
+    <txt-record>site_id=site-002</txt-record>
+    <txt-record>version=v165</txt-record>
+    <txt-record>mode=edge</txt-record>
+    <txt-record>kiosk=/kiosk.html</txt-record>
+  </service>
+
+  <!-- Also announce as generic HTTP for browser discovery -->
+  <service>
+    <type>_http._tcp</type>
+    <port>9095</port>
+    <txt-record>path=/kiosk.html</txt-record>
+  </service>
+</service-group>
