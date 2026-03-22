@@ -237,6 +237,12 @@ async def startup_event(app: FastAPI) -> None:
     register_dashboard_gen_subscribers()
     _logger.info("Dashboard generator subscribers registered")
 
+    # Decision Moment subscribers — pre-warm crisis page cache on CRITICAL events (Phase 164)
+    from app.services.event_bus_subscribers import register_decision_subscribers
+
+    register_decision_subscribers()
+    _logger.info("Decision moment subscribers registered")
+
     # Background notification tasks (escalation checker, digest scheduler)
     from app.services.notification_tasks import start_notification_tasks
 

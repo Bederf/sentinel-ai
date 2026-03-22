@@ -41,6 +41,7 @@ from app.api import semantic_classification
 from app.api import trust_scoring
 from app.api import review_queue
 from app.api import ai_usage
+from app.api import decisions
 from app.api import technicians as technicians_api
 from app.config.settings import settings
 
@@ -209,3 +210,6 @@ def register_operations_routers(app: FastAPI) -> None:
         app.include_router(plant_alerts_router, tags=["plant-alerts"])
 
     app.include_router(concept_rag.router)
+
+    # Decision Moment API — Crisis State page (Phase 164)
+    app.include_router(decisions.router, tags=["decisions"])
