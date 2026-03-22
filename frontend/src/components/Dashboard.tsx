@@ -15,6 +15,7 @@
  */
 
 import { useState, useEffect, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { useServerEvents } from "@/hooks/useServerEvents";
 import { useSimulation } from "@/contexts/SimulationContext";
 import {
@@ -46,7 +47,6 @@ import { useBuildingsList } from "@/hooks/useBuildingsList";
 import { SortableKPICard } from "./SortableKPICard";
 import { DashboardSection } from "./DashboardSection";
 import { SiteCard } from "./SiteCard";
-import { SiteDetail } from "./SiteDetail";
 import { EnergyChart } from "./EnergyChart";
 import { type View } from "./Sidebar";
 import type { BuildingTabId } from "../lib/navigation";
@@ -70,7 +70,9 @@ interface DashboardProps {
   defaultBuildingTab?: BuildingTabId;
 }
 
-export function Dashboard({ onViewChange, autoSelectSiteId, defaultBuildingTab }: DashboardProps) {
+export function Dashboard({ onViewChange, autoSelectSiteId, defaultBuildingTab: _defaultBuildingTab }: DashboardProps) {
+  const navigate = useNavigate();
+
   // React Query hooks — filter to primary site only
   const { data: allSites = [] } = useBuildingsList();
   const buildingsList = allSites;
@@ -89,8 +91,12 @@ export function Dashboard({ onViewChange, autoSelectSiteId, defaultBuildingTab }
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Site detail view state
-  const [selectedSiteId, setSelectedSiteId] = useState<string | null>(autoSelectSiteId || null);
+  // Auto-navigate when autoSelectSiteId is set (e.g. single-site user login)
+  useEffect(() => {
+    if (autoSelectSiteId) {
+      navigate(`/buildings/${autoSelectSiteId}`);
+    }
+  }, [autoSelectSiteId, navigate]);
 
   // Energy chart state
   const [energyData, setEnergyData] = useState<EnergyDataPoint[]>([]);
@@ -191,19 +197,10 @@ export function Dashboard({ onViewChange, autoSelectSiteId, defaultBuildingTab }
       maximumFractionDigits: 0,
     }).format(amount);
 
-  // Handle site card click - navigate to site detail view
+  // Handle site card click - navigate to /buildings/:siteId URL
   const handleSiteClick = (site: Site) => {
-    setSelectedSiteId(site.id);
     setStoredSelectedSite(site.id);
-    window.scrollTo(0, 0);
-  };
-
-  // Handle back from site detail view - navigate to dashboard
-  const handleSiteDetailBack = () => {
-    // First ensure we're on the dashboard view
-    onViewChange("dashboard");
-    // Then clear the selected site to show dashboard content
-    setSelectedSiteId(null);
+    navigate(`/buildings/${site.id}`);
   };
 
   // Handle equipment control navigation from SiteCard risk list
@@ -332,15 +329,6 @@ export function Dashboard({ onViewChange, autoSelectSiteId, defaultBuildingTab }
           </h2>
           <p style={{ color: "var(--color-sentinel-text-secondary)" }}>{error}</p>
         </div>
-      </div>
-    );
-  }
-
-  // Show site detail view if a site is selected
-  if (selectedSiteId) {
-    return (
-      <div className="h-full">
-        <SiteDetail siteId={selectedSiteId} onBack={handleSiteDetailBack} defaultMainTab={defaultBuildingTab} />
       </div>
     );
   }
