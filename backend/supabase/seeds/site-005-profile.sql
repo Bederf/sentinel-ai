@@ -40,6 +40,16 @@ SET profile = '{
     "urgency_threshold": 0.60,
     "dismiss_window_minutes": 15,
     "min_time_to_discomfort_alert": 5
+  },
+  "module_display": {
+    "hvac":      "hidden",
+    "energy":    "hidden",
+    "lighting":  "hidden",
+    "solar":     "hidden",
+    "occupancy": "hidden",
+    "fire":      "hidden",
+    "security":  "hidden",
+    "water":     "hidden"
   }
 }'::jsonb
 WHERE code = 'site-005'

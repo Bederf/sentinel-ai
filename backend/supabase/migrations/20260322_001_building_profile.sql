@@ -33,6 +33,16 @@ ALTER TABLE buildings
       "urgency_threshold": 0.70,
       "dismiss_window_minutes": 30,
       "min_time_to_discomfort_alert": 15
+    },
+    "module_display": {
+      "hvac":      "hidden",
+      "energy":    "hidden",
+      "lighting":  "hidden",
+      "solar":     "hidden",
+      "occupancy": "hidden",
+      "fire":      "hidden",
+      "security":  "hidden",
+      "water":     "hidden"
     }
   }'::jsonb;
 
