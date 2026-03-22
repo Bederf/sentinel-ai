@@ -68,6 +68,7 @@ import { FireIntelligenceCard } from "./intelligence/FireIntelligenceCard";
 import { SecurityIntelligenceCard } from "./intelligence/SecurityIntelligenceCard";
 import CardLibrary from "./CardLibrary";
 import { DEFAULT_KPI_CARDS, DEFAULT_SECTIONS } from "../lib/cardDefinitions";
+import { ArcadeView } from "./arcade/ArcadeView";
 import { BUILDING_TAB_ITEMS } from "../lib/navigation";
 import type { BuildingTabId } from "../lib/navigation";
 import { setStoredSelectedSite } from "../lib/siteSelection";
@@ -935,6 +936,8 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
 
       {activeMainTab === "overview" ? (
       <>
+      {/* ArcadeView — spatial intelligence interface */}
+      <ArcadeView siteId={siteId} />
       {/* Overview Tab — original Equipment/Alerts/Energy/Predictions tabs + summary panels */}
       <div
         className="rounded-md overflow-hidden mb-6"
