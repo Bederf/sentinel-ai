@@ -1,8 +1,8 @@
 """Remote Command API Endpoints.
 
 REST API for remote command execution, rollback, override management,
-and command history.  All endpoints extract the user from ``X-User-Id``
-and ``X-User-Role`` headers (demo mode) and enforce authorization +
+and command history.  All endpoints extract the user from verified JWT
+auth state (set by the auth middleware) and enforce authorization +
 audit logging.
 
 Phase 59-02: Remote Operations
@@ -65,13 +65,22 @@ class BatchCommandRequest(BaseModel):
 
 
 def _extract_user(request: Request):
-    """Extract user_id and user_role from request headers.
+    """Extract user_id and user_role from the verified JWT auth state.
 
-    Demo mode: uses X-User-Id and X-User-Role headers.
-    Falls back to demo defaults if headers are missing.
+    Role is taken exclusively from request.state.auth (populated by the
+    auth middleware after JWT verification).  The X-User-Role header is
+    intentionally ignored to prevent role escalation attacks.
+    Falls back to safe defaults if auth state is not present.
     """
-    user_id = request.headers.get("X-User-Id", "demo-user")
-    user_role = request.headers.get("X-User-Role", "technician")
+    auth = getattr(request.state, "auth", None)
+    if auth is not None:
+        user_id = getattr(auth, "user_id", "unknown")
+        # auth.role is a SentinelRole enum; .value gives the string name
+        role_obj = getattr(auth, "role", None)
+        user_role = role_obj.value if role_obj is not None else "viewer"
+    else:
+        user_id = "unknown"
+        user_role = "viewer"
     return user_id, user_role
 
 
