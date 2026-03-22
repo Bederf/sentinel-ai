@@ -1,0 +1,208 @@
+/**
+ * ArcadeView — spatial intelligence interface for the building Overview tab.
+ * Fetches DecisionMomentPayload from /api/decisions/current/{siteId} on mount + every 30s.
+ * Renders FloorStack + SummaryStrip. ContextPanel and CrisisOverlay are Phase 167 shells.
+ * Phase 166-02.
+ */
+
+import { useState, useEffect, useRef } from "react";
+import { authorizedFetch } from "@/lib/api";
+import { FloorStack } from "./FloorStack";
+import type { FloorStackProps } from "./FloorStack";
+import { SummaryStrip } from "./SummaryStrip";
+
+// ─── Types ──────────────────────────────────────────────────────────────────
+
+interface IncidentFloor {
+  stack_index: number;
+  svg_y_pct: number;
+  affected: boolean;
+}
+
+interface BuildingMetadata {
+  floors_count?: number;
+  floor_labels?: Record<string, string>;
+  floor_stack_order?: string[];
+  has_spatial_data?: boolean;
+  floor_stack?: unknown[];
+  deployment_mode?: string;
+  equipment_count?: number | null;
+  active_risk_count?: number | null;
+  health_pct?: number | null;
+}
+
+interface DecisionPayload {
+  building_id: string;
+  renderer_hint?: string;
+  active_incident_map?: Record<string, IncidentFloor>;
+  building_metadata?: BuildingMetadata;
+}
+
+// ─── Props ───────────────────────────────────────────────────────────────────
+
+export interface ArcadeViewProps {
+  siteId: string;
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+const POLL_INTERVAL_MS = 30_000;
+
+const DEFAULT_FLOOR_ORDER = ["R", "L2", "L1", "L0", "G", "B1"];
+
+function SkeletonFloors({ count }: { count: number }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      {Array.from({ length: count }).map((_, i) => (
+        <div
+          key={i}
+          style={{
+            height: 40,
+            borderRadius: 4,
+            background: "rgba(255,255,255,0.05)",
+            animation: "pulse 1.5s ease-in-out infinite",
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+// ─── Component ───────────────────────────────────────────────────────────────
+
+export function ArcadeView({ siteId }: ArcadeViewProps) {
+  const [payload, setPayload] = useState<DecisionPayload | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  async function fetchPayload() {
+    try {
+      const response = await authorizedFetch(
+        `/api/decisions/current/${encodeURIComponent(siteId)}`
+      );
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      const data: DecisionPayload = await response.json();
+      setPayload(data);
+      setError(null);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      setError(msg);
+      // Keep stale payload if we have one — graceful degradation.
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    setLoading(true);
+    fetchPayload();
+
+    timerRef.current = setInterval(() => {
+      fetchPayload();
+    }, POLL_INTERVAL_MS);
+
+    return () => {
+      if (timerRef.current !== null) {
+        clearInterval(timerRef.current);
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [siteId]);
+
+  // ── Derived values ────────────────────────────────────────────────────────
+
+  const metadata = payload?.building_metadata ?? {};
+  const floorStackOrder: string[] =
+    (metadata.floor_stack_order ?? []).length > 0
+      ? (metadata.floor_stack_order as string[])
+      : DEFAULT_FLOOR_ORDER;
+  const floorLabels: Record<string, string> = metadata.floor_labels ?? {};
+  const activeIncidentMap: FloorStackProps["activeIncidentMap"] =
+    payload?.active_incident_map ?? {};
+  const rendererHint: "quiet" | "crisis" =
+    payload?.renderer_hint === "crisis" ? "crisis" : "quiet";
+
+  const equipmentCount: number | null = metadata.equipment_count ?? null;
+  const activeRiskCount: number | null = metadata.active_risk_count ?? null;
+  const healthPct: number | null = metadata.health_pct ?? null;
+
+  // ── Render ────────────────────────────────────────────────────────────────
+
+  return (
+    <div
+      className="arcade-view"
+      style={{
+        background: "var(--color-sentinel-bg-panel, #0a0a0f)",
+        border: "1px solid var(--color-sentinel-border, rgba(255,255,255,0.08))",
+        borderRadius: 8,
+        padding: 16,
+        marginBottom: 16,
+      }}
+      data-renderer-hint={rendererHint}
+      data-site-id={siteId}
+    >
+      {/* Header row */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginBottom: 12,
+        }}
+      >
+        <span
+          style={{
+            fontSize: 12,
+            fontWeight: 600,
+            textTransform: "uppercase",
+            letterSpacing: "0.08em",
+            color: "var(--color-sentinel-text-secondary, #94a3b8)",
+            fontFamily: "system-ui, sans-serif",
+          }}
+        >
+          Building Spatial View
+        </span>
+        {error && !loading && (
+          <span
+            style={{
+              fontSize: 11,
+              color: "#f59e0b",
+              fontFamily: "system-ui, sans-serif",
+            }}
+            title={error}
+          >
+            Offline — using cached data
+          </span>
+        )}
+      </div>
+
+      {/* Summary strip */}
+      <SummaryStrip
+        equipmentCount={equipmentCount}
+        activeRiskCount={activeRiskCount}
+        healthPct={healthPct}
+      />
+
+      {/* Floor stack */}
+      {loading && !payload ? (
+        <SkeletonFloors count={floorStackOrder.length} />
+      ) : (
+        <FloorStack
+          floorStackOrder={floorStackOrder}
+          floorLabels={floorLabels}
+          activeIncidentMap={activeIncidentMap}
+          rendererHint={rendererHint}
+        />
+      )}
+
+      {/* ContextPanel — Phase 167 shell */}
+      <div data-slot="context-panel" />
+
+      {/* CrisisOverlay — Phase 167 shell (hidden by default) */}
+      <div data-slot="crisis-overlay" style={{ display: "none" }} />
+    </div>
+  );
+}
