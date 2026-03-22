@@ -286,6 +286,90 @@ class ZoneMappingService:
         logger.info(f"Auto-assigned {len(equipment_list)} equipment to {len(zone_assignments)} zones")
         return zone_assignments
 
+    def _load_zones_data(self) -> list:
+        """Load zones from the canonical zones.json file.
+
+        Searches for zones.json under data/sites/*/zones.json — the first file
+        found is used. Returns [] on missing or malformed file (logs warning).
+
+        This is intentionally separate from _load_mappings() which deals with
+        HVAC↔DALI cross-zone mapping config, not the zone→equipment membership.
+        """
+        data_root = Path(__file__).parent.parent / "data" / "sites"
+        candidates = sorted(data_root.glob("*/zones.json"))
+        if not candidates:
+            logger.warning("No zones.json found under data/sites/*/zones.json")
+            return []
+
+        zones_path = candidates[0]
+        try:
+            with open(zones_path) as f:
+                data = json.load(f)
+            return data.get("zones", [])
+        except Exception as e:
+            logger.warning(f"Failed to load zones.json from {zones_path}: {e}")
+            return []
+
+    def get_zones_for_equipment(self, equipment_id: str) -> list[str]:
+        """Return all zone_ids that contain the given equipment_id.
+
+        Traverses zones.json and collects every zone whose ``equipment`` array
+        includes *equipment_id*.  The lookup is exact-match and case-sensitive
+        (matching the storage convention in zones.json).
+
+        Args:
+            equipment_id: Equipment identifier, e.g. ``"S002-CHILLER-B1-001"``
+
+        Returns:
+            List of zone_id strings.  Empty list if the equipment is not found
+            in any zone, or if zones.json is missing/malformed.  Never raises.
+        """
+        zones = self._load_zones_data()
+        matched: list[str] = []
+        for zone in zones:
+            equipment_list = zone.get("equipment", [])
+            if equipment_id in equipment_list:
+                matched.append(zone["zone_id"])
+        return matched
+
+    def get_zone_label(self, zone_id: str) -> str:
+        """Return a human-readable label for a zone.
+
+        Looks up the zone in zones.json and constructs a label from the
+        ``floor`` and ``zone_letter`` fields when available.  Falls back to
+        *zone_id* itself if the zone is not found or metadata is incomplete.
+
+        Args:
+            zone_id: Zone identifier, e.g. ``"Zone-B1-001"``
+
+        Returns:
+            Human-readable string, e.g. ``"Basement 1 — Zone 001"``.
+            Never raises.
+        """
+        floor_labels: dict[str, str] = {
+            "B1": "Basement 1",
+            "B2": "Basement 2",
+            "G": "Ground Floor",
+            "L0": "Ground Floor",
+            "L1": "Level 1",
+            "L2": "Level 2",
+            "L3": "Level 3",
+            "R": "Roof",
+        }
+        zones = self._load_zones_data()
+        for zone in zones:
+            if zone.get("zone_id") == zone_id:
+                floor = zone.get("floor", "")
+                letter = zone.get("zone_letter", "")
+                floor_readable = floor_labels.get(floor, floor)
+                if floor_readable and letter:
+                    return f"{floor_readable} — Zone {letter}"
+                if floor_readable:
+                    return floor_readable
+                break
+        # Fallback: return zone_id unchanged
+        return zone_id
+
     def create_zones_from_equipment(
         self,
         equipment_list: List[Dict[str, Any]],
