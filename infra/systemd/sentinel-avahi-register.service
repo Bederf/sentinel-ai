@@ -1,0 +1,56 @@
+# SENTINEL Avahi mDNS Registration
+# Reads SITE_ID from /etc/sentinel/edge.conf and rewrites the Avahi service
+# descriptor before restarting avahi-daemon. Runs before sentinel-backend.service
+# so the device is discoverable on the LAN before the API is ready.
+#
+# Install:
+#   sudo cp infra/systemd/sentinel-avahi-register.service \
+#        /etc/systemd/system/sentinel-avahi-register.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable sentinel-avahi-register.service
+#   sudo systemctl start sentinel-avahi-register.service
+
+[Unit]
+Description=SENTINEL Avahi mDNS Registration
+Documentation=https://github.com/your-org/bms-intelligence
+# Run before the backend so the device is discoverable before API is ready
+Before=sentinel-backend.service
+# Avahi must exist before we restart it
+After=network.target avahi-daemon.service
+Requires=avahi-daemon.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+EnvironmentFile=/etc/sentinel/edge.conf
+
+# Rewrite the Avahi service descriptor with the correct SITE_ID
+ExecStart=/bin/bash -c '\
+  MDNS_NAME="sentinel-${SITE_ID}"; \
+  cat > /etc/avahi/services/sentinel.service << EOF\n\
+<?xml version="1.0" standalone='"'"'no'"'"'?>\n\
+<!DOCTYPE service-group SYSTEM "avahi-service.dtd">\n\
+<service-group>\n\
+  <name>${MDNS_NAME}</name>\n\
+  <service>\n\
+    <type>_sentinel._tcp</type>\n\
+    <port>9095</port>\n\
+    <txt-record>site_id=${SITE_ID}</txt-record>\n\
+    <txt-record>version=v165</txt-record>\n\
+    <txt-record>kiosk=/kiosk.html</txt-record>\n\
+  </service>\n\
+  <service>\n\
+    <type>_http._tcp</type>\n\
+    <port>9095</port>\n\
+    <txt-record>path=/kiosk.html</txt-record>\n\
+  </service>\n\
+</service-group>\n\
+EOF\n\
+  systemctl kill -s HUP avahi-daemon.service \
+'
+
+# Verify mDNS is broadcasting (non-fatal — log only)
+ExecStartPost=/bin/bash -c 'sleep 1 && avahi-browse -t _sentinel._tcp 2>/dev/null | head -3 || true'
+
+[Install]
+WantedBy=multi-user.target
