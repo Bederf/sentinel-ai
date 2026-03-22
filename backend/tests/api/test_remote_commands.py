@@ -97,3 +97,82 @@ class TestExtractUserIgnoresHeader:
         # role from auth state, not from X-User-Role header
         assert user_role == "auditor"
         assert user_role not in ("engineer", "admin", "operator")
+
+    def test_bot_agent_role_extracted(self):
+        """BOT_AGENT role is correctly extracted from auth state."""
+        auth_ctx = AuthContext(
+            user_id="bot-agent-001",
+            role=SentinelRole.BOT_AGENT,
+            auth_method="jwt",
+            source_ip="127.0.0.1",
+        )
+        req = _FakeRequest(auth=auth_ctx, headers={})
+
+        user_id, user_role = _extract_user(req)
+
+        assert user_id == "bot-agent-001"
+        assert user_role == "bot_agent"
+
+
+# ---------------------------------------------------------------------------
+# Integration tests for BOT_AGENT role boundary (Gap 10 - MEDIUM)
+# ---------------------------------------------------------------------------
+
+
+class TestBotAgentControlBoundary:
+    """Test that BOT_AGENT role is rejected from control endpoints.
+
+    Gap 10 (MEDIUM): BOT_AGENT rejected from control endpoints not tested.
+    Control: AUTH-002 (Role Hierarchy & RBAC)
+    """
+
+    def test_bot_agent_role_value(self):
+        """BOT_AGENT has role value 1 (same as AUDITOR, below OPERATOR)."""
+        from app.models.auth import ROLE_HIERARCHY
+
+        bot_level = ROLE_HIERARCHY.get(SentinelRole.BOT_AGENT, -1)
+        operator_level = ROLE_HIERARCHY.get(SentinelRole.OPERATOR, -1)
+        auditor_level = ROLE_HIERARCHY.get(SentinelRole.AUDITOR, -1)
+
+        # BOT_AGENT should be level 1 (same as AUDITOR)
+        assert bot_level == 1, f"BOT_AGENT should be level 1, got {bot_level}"
+        # OPERATOR should be level 2
+        assert operator_level == 2, f"OPERATOR should be level 2, got {operator_level}"
+        # Both should be equal
+        assert bot_level == auditor_level
+
+    def test_bot_agent_cannot_pass_operator_check(self):
+        """BOT_AGENT role (level=1) fails OPERATOR required (level=2) checks."""
+        auth_ctx = AuthContext(
+            user_id="bot-001",
+            role=SentinelRole.BOT_AGENT,
+            auth_method="jwt",
+            source_ip="127.0.0.1",
+        )
+
+        # BOT_AGENT should fail has_role(OPERATOR) check
+        assert not auth_ctx.has_role(SentinelRole.OPERATOR)
+
+    def test_bot_agent_cannot_pass_admin_check(self):
+        """BOT_AGENT role (level=1) fails ADMIN required (level=4) checks."""
+        auth_ctx = AuthContext(
+            user_id="bot-001",
+            role=SentinelRole.BOT_AGENT,
+            auth_method="jwt",
+            source_ip="127.0.0.1",
+        )
+
+        # BOT_AGENT should fail has_role(ADMIN) check
+        assert not auth_ctx.has_role(SentinelRole.ADMIN)
+
+    def test_bot_agent_passes_auditor_check(self):
+        """BOT_AGENT role (level=1) passes AUDITOR required (level=1) checks."""
+        auth_ctx = AuthContext(
+            user_id="bot-001",
+            role=SentinelRole.BOT_AGENT,
+            auth_method="jwt",
+            source_ip="127.0.0.1",
+        )
+
+        # BOT_AGENT should pass has_role(AUDITOR) check (same level)
+        assert auth_ctx.has_role(SentinelRole.AUDITOR)

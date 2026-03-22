@@ -14,7 +14,7 @@ import ipaddress
 import os
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import PlainTextResponse
 
 from prometheus_client import (
@@ -28,6 +28,8 @@ from prometheus_client import (
 )
 
 from app.config.settings import settings
+from app.middleware.auth_middleware import require_auth
+from app.models.auth import AuthContext, AuthLevel
 
 router = APIRouter()
 
@@ -564,21 +566,19 @@ def _is_allowed(client_ip: str) -> bool:
     tags=["monitoring"],
     summary="Prometheus metrics endpoint",
     description="Returns AI governance metrics in Prometheus text exposition format.",
+    dependencies=[Depends(require_auth(AuthLevel.AUTHENTICATED))],
 )
-async def prometheus_metrics(request: Request) -> PlainTextResponse:
+async def prometheus_metrics(
+    request: Request,
+    auth: AuthContext = Depends(require_auth(AuthLevel.AUTHENTICATED)),
+) -> PlainTextResponse:
     """Serve Prometheus-format metrics.
 
-    No authentication required (Prometheus scrape needs unauthenticated access).
-    Access is restricted by IP allowlist (localhost, Docker networks, private LAN).
+    Requires AUTHENTICATED level (AUDITOR role or higher) for access.
+    Phase 168-01: Closed MONITORING-001 gap by adding authentication requirement.
     """
-    client_ip = request.client.host if request.client else "127.0.0.1"
-
-    if not _is_allowed(client_ip):
-        return PlainTextResponse(
-            content="# Access denied: client IP not in allowlist\n",
-            status_code=403,
-            media_type="text/plain",
-        )
+    # Authentication check is done via require_auth dependency above
+    # client_ip check removed - role-based access now the primary control
 
     # Seed demo values on first request (only in DEMO_MODE)
     if settings.demo_mode:
