@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
+import { Routes, Route, useParams, useNavigate } from "react-router-dom";
 import { Clock, Wifi, WifiOff, Bell, X, LogOut } from "lucide-react";
 import { Toaster, toast } from "sonner";
 import { formatTime } from "./lib/timeFormat";
@@ -27,6 +28,7 @@ import { ESGPage } from "./components/sustainability/ESGPage";
 import { ContractManagementPage } from "./pages/ContractManagementPage";
 import { IntelligencePage } from "./components/intelligence/IntelligencePage";
 import { DecisionMomentPage, type DecisionMomentPayload } from "./pages/DecisionMomentPage";
+import { SiteDetail } from "./components/SiteDetail";
 import { ModuleProvider } from "./contexts/ModuleContext";
 import { useModules } from "./contexts/ModuleHooks";
 import { ThemeProvider } from "./contexts/ThemeContext";
@@ -37,6 +39,19 @@ import { canAccessView, getDefaultView } from "./lib/access-control";
 interface HealthStatus {
   status: string;
   version: string;
+}
+
+/**
+ * Route component for /buildings/:siteId — renders SiteDetail at a stable URL.
+ * onBack navigates to / (portfolio dashboard).
+ */
+function BuildingRoute() {
+  const { siteId } = useParams<{ siteId: string }>();
+  const navigate = useNavigate();
+  if (!siteId) return null;
+  return (
+    <SiteDetail siteId={siteId} onBack={() => navigate("/")} defaultMainTab="overview" />
+  );
 }
 
 /**
@@ -565,6 +580,9 @@ function App() {
     <SimulationProvider siteId={effectiveSiteId || undefined}>
     <ThemeProvider>
     <ModuleProvider initialSiteId={effectiveSiteId || undefined} initialSiteName={effectiveSiteName}>
+    <Routes>
+      <Route path="/buildings/:siteId" element={<BuildingRoute />} />
+      <Route path="*" element={
     <div
       className="h-screen flex"
       style={{ background: "var(--color-sentinel-bg-canvas)" }}
@@ -946,6 +964,8 @@ function App() {
         theme="dark"
       />
     </div>
+      } />
+    </Routes>
     </ModuleProvider>
     </ThemeProvider>
     </SimulationProvider>
