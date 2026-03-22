@@ -10,7 +10,7 @@
 
 [Unit]
 Description=SENTINEL Backend (Edge Mode)
-After=network-online.target ollama.service
+After=network-online.target ollama.service sentinel-avahi-register.service
 Wants=network-online.target ollama.service
 
 [Service]
@@ -19,12 +19,12 @@ User=sentinel
 WorkingDirectory=/opt/sentinel/backend
 ExecStart=/opt/sentinel/backend/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 9095 --workers 1
 
-# Edge runtime environment
-Environment=EDGE_MODE=true
-Environment=DEMO_MODE=false
+# Canonical edge configuration — all deployment-specific values
+# Source: /etc/sentinel/edge.conf (deployed from infra/edge.conf)
+EnvironmentFile=/etc/sentinel/edge.conf
+
+# Edge runtime environment (values here override edge.conf defaults)
 Environment=ENABLE_SITE002_SOURCE=false
-Environment=OLLAMA_MODEL=deepseek-r1:14b
-Environment=OLLAMA_URL=http://localhost:11434
 Environment=MODEL_STORAGE_PATH=/opt/sentinel/ml/models
 Environment=PYTHONPATH=/opt/sentinel/backend
 
