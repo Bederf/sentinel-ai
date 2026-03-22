@@ -1,0 +1,33 @@
+{
+  "building_id": "site-002",
+  "triggered_at": "2026-03-22T08:00:00+02:00",
+  "trigger_reason": "scheduled_heartbeat",
+  "urgency_score": 0.12,
+  "urgency_components": {"thermal": 0.05, "equipment": 0.07},
+  "alert_text": "All systems nominal",
+  "primary_asset_id": null,
+  "affected_zone_ids": [],
+  "affected_mesh_ids": [],
+  "reasoning_summary": "No active faults. HVAC running within parameters.",
+  "active_posture": "comfort_priority",
+  "posture_weights": {"comfort": 0.7, "energy": 0.3},
+  "time_to_discomfort": null,
+  "time_confidence": null,
+  "recommended_action": "monitor",
+  "action_validation_state": "unverified",
+  "requires_module": null,
+  "estimated_impact": {},
+  "building_metadata": {
+    "floors_count": 6,
+    "floor_labels": {
+      "R": "Roof", "L2": "Level 2", "L1": "Level 1",
+      "L0": "Ground", "G": "Ground Parking", "B1": "Basement"
+    },
+    "floor_stack_order": ["R", "L2", "L1", "L0", "G", "B1"],
+    "has_spatial_data": false,
+    "floor_stack": [],
+    "deployment_mode": "supervised"
+  },
+  "active_incident_map": {},
+  "renderer_hint": "quiet"
+}

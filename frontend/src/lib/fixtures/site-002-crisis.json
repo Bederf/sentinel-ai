@@ -1,0 +1,35 @@
+{
+  "building_id": "site-002",
+  "triggered_at": "2026-03-22T10:47:00+02:00",
+  "trigger_reason": "equipment_fault",
+  "urgency_score": 0.82,
+  "urgency_components": {"thermal": 0.55, "equipment": 0.27},
+  "alert_text": "CHILLER B1-001 fault — thermal runway risk in 42 min",
+  "primary_asset_id": "S002-CHILLER-B1-001",
+  "affected_zone_ids": ["Zone-B1-001", "Zone-B1-002"],
+  "affected_mesh_ids": [],
+  "reasoning_summary": "Chiller fault on B1 detected. Predicted thermal discomfort in 42 min without intervention.",
+  "active_posture": "energy_priority",
+  "posture_weights": {"comfort": 0.3, "energy": 0.7},
+  "time_to_discomfort": 42,
+  "time_confidence": 0.78,
+  "recommended_action": "Switch to backup chiller B1-002 and schedule emergency maintenance",
+  "action_validation_state": "validated",
+  "requires_module": null,
+  "estimated_impact": {"risk_avoided_zar": 45000},
+  "building_metadata": {
+    "floors_count": 6,
+    "floor_labels": {
+      "R": "Roof", "L2": "Level 2", "L1": "Level 1",
+      "L0": "Ground", "G": "Ground Parking", "B1": "Basement"
+    },
+    "floor_stack_order": ["R", "L2", "L1", "L0", "G", "B1"],
+    "has_spatial_data": false,
+    "floor_stack": [],
+    "deployment_mode": "supervised"
+  },
+  "active_incident_map": {
+    "B1": {"stack_index": 5, "svg_y_pct": 91.7, "affected": true}
+  },
+  "renderer_hint": "crisis"
+}
