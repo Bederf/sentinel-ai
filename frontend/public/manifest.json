@@ -1,0 +1,28 @@
+{
+  "name": "SENTINEL — Building Intelligence",
+  "short_name": "SENTINEL",
+  "description": "Building intelligence overlay for FNB Sandton City. Real-time fault detection, spatial floor view, and AI-assisted FM decision support.",
+  "start_url": "/kiosk.html",
+  "display": "standalone",
+  "background_color": "#0a0a0f",
+  "theme_color": "#0a0a0f",
+  "orientation": "any",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [],
+  "categories": ["business", "utilities"],
+  "prefer_related_applications": false
+}

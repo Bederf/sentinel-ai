@@ -1,0 +1,37 @@
+# Cloudflare Tunnel configuration — SENTINEL edge appliance
+#
+# Deployment model: ONE Jetson = ONE building = ONE tunnel
+#
+# Three-tier access:
+#   Tier 1 — Building LAN:        sentinel-${SITE_ID}.local (mDNS — always on)
+#   Tier 2 — FNB corporate net:   sentinel-${SITE_ID}.fnb.co.za (FNB IT DNS — Phase 2)
+#   Tier 3 — External / off-site: sentinel-${SITE_ID}.aimthelaw.co.za (this tunnel — optional)
+#
+# This file is Tier 3 only. Tier 1 is handled by Avahi (infra/avahi/sentinel.service).
+# Tier 2 is FNB IT network configuration — not SENTINEL software.
+#
+# SITE_ID is injected from /etc/sentinel/edge.conf by the sentinel-cloudflared.service
+# systemd unit via EnvironmentFile before cloudflared starts.
+#
+# The tunnel UUID and credentials file are generated once per site during onboarding:
+#   cloudflared tunnel create sentinel-${SITE_ID}
+#   cloudflared tunnel route dns sentinel-${SITE_ID} sentinel-${SITE_ID}.aimthelaw.co.za
+#
+# Credentials file is written to /etc/sentinel/cloudflared-creds.json by onboarding script.
+# It is NOT committed to git — it contains the tunnel secret.
+
+tunnel: sentinel-${SITE_ID}
+credentials-file: /etc/sentinel/cloudflared-creds.json
+
+ingress:
+  # Kiosk display — primary public surface
+  - hostname: sentinel-${SITE_ID}.aimthelaw.co.za
+    path: /kiosk
+    service: http://localhost:${SENTINEL_PORT:-9095}
+
+  # Full SENTINEL management interface
+  - hostname: sentinel-${SITE_ID}.aimthelaw.co.za
+    service: http://localhost:${SENTINEL_PORT:-9095}
+
+  # Catch-all required by cloudflared
+  - service: http_status:404
