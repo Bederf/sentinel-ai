@@ -1,9 +1,11 @@
 """Autonomous System API endpoints for autonomous decision management."""
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from typing import Dict, Any, Optional
 import logging
 
+from app.models.auth import AuthContext
+from app.security.pipeline import require_role
 from app.services.autonomous_decision_engine import autonomous_decision_engine
 from app.services.safety_boundary_service import safety_boundary_service
 from app.services.device_abstraction import device_manager
@@ -24,7 +26,7 @@ async def get_autonomous_status():
 
 
 @router.post("/enable")
-async def enable_autonomous_mode():
+async def enable_autonomous_mode(auth: AuthContext = Depends(require_role(2))):
     """Enable autonomous mode."""
     if not autonomous_decision_engine._initialized:
         await autonomous_decision_engine.initialize()
@@ -38,7 +40,7 @@ async def enable_autonomous_mode():
 
 
 @router.post("/disable")
-async def disable_autonomous_mode():
+async def disable_autonomous_mode(auth: AuthContext = Depends(require_role(2))):
     """Disable autonomous mode."""
     if not autonomous_decision_engine._initialized:
         await autonomous_decision_engine.initialize()
@@ -97,7 +99,7 @@ async def get_autonomous_decision(decision_id: str):
 
 
 @router.post("/decisions/{decision_id}/approve")
-async def approve_autonomous_decision(decision_id: str):
+async def approve_autonomous_decision(decision_id: str, auth: AuthContext = Depends(require_role(2))):
     """Approve a pending autonomous decision."""
     if not autonomous_decision_engine._initialized:
         await autonomous_decision_engine.initialize()
@@ -167,7 +169,7 @@ async def get_boundary_status(device_id: Optional[str] = None):
 
 
 @router.post("/boundaries/update")
-async def update_boundary_config(request: Dict[str, Any]):
+async def update_boundary_config(request: Dict[str, Any], auth: AuthContext = Depends(require_role(2))):
     """Update boundary configuration for a device/point."""
     device_id = request.get("device_id")
     point_name = request.get("point_name")
@@ -256,7 +258,7 @@ async def calculate_safety_score(decisions):
 
 
 @router.post("/test")
-async def test_autonomous_decision():
+async def test_autonomous_decision(auth: AuthContext = Depends(require_role(2))):
     """Create a test autonomous decision (for demo purposes)."""
     if not autonomous_decision_engine._initialized:
         await autonomous_decision_engine.initialize()
