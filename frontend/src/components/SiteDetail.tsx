@@ -10,7 +10,7 @@
  * - AI predictions for this site
  */
 
-import { useState, useEffect, useRef, lazy, Suspense } from "react";
+import { useState, useEffect, useRef, useMemo, lazy, Suspense } from "react";
 import {
   ArrowLeft,
   Building2,
@@ -208,6 +208,36 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
       return saved ? JSON.parse(saved) : DEFAULT_SECTIONS;
     } catch { return DEFAULT_SECTIONS; }
   });
+
+  // Trigger-engine overrides from ArcadeView floor clicks
+  const [triggerVisibleSections, setTriggerVisibleSections] = useState<string[]>([]);
+
+  // Map module keys (from trigger API) to section IDs used in render conditions
+  const MODULE_TO_SECTION: Record<string, string> = {
+    hvac: "hvac-intelligence",
+    energy: "energy-intelligence",
+    solar: "solar-intelligence",
+    water: "water-intelligence",
+    fire: "fire-intelligence",
+    security: "security-intelligence",
+    occupancy: "occupancy-dashboard",
+    lighting: "lighting-intelligence",
+  };
+
+  const handleModuleDisplayChange = (moduleDisplay: Record<string, string>) => {
+    const revealed = Object.entries(moduleDisplay)
+      .filter(([, state]) => state !== "hidden")
+      .map(([module]) => MODULE_TO_SECTION[module])
+      .filter(Boolean) as string[];
+    setTriggerVisibleSections(revealed);
+  };
+
+  // Combine user preference sections with transient trigger overrides.
+  // useMemo is mandatory — prevents stale closure bugs in render conditions.
+  const effectiveVisibleSections = useMemo(
+    () => [...new Set([...visibleSections, ...triggerVisibleSections])],
+    [visibleSections, triggerVisibleSections]
+  );
 
   // Scroll container ref — reset to top on mount
   const containerRef = useRef<HTMLDivElement>(null);
@@ -715,7 +745,7 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
       </div>
 
       {/* AI Optimization Info Card */}
-      {visibleSections.includes('ai-optimization') && (
+      {effectiveVisibleSections.includes('ai-optimization') && (
         <OptimizationInfoCard
           siteId={siteId}
           optimizationEnabled={site.optimization_enabled || false}
@@ -937,7 +967,7 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
       {activeMainTab === "overview" ? (
       <>
       {/* ArcadeView — spatial intelligence interface */}
-      <ArcadeView siteId={siteId} />
+      <ArcadeView siteId={siteId} onModuleDisplayChange={handleModuleDisplayChange} />
       {/* Overview Tab — original Equipment/Alerts/Energy/Predictions tabs + summary panels */}
       <div
         className="rounded-md overflow-hidden mb-6"
@@ -1519,30 +1549,30 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
 
       {/* ── Discipline Intelligence Cards ── */}
       <div className="space-y-4">
-        {isModuleActive('hvac') && visibleSections.includes('hvac-intelligence') && (
+        {isModuleActive('hvac') && effectiveVisibleSections.includes('hvac-intelligence') && (
           <HVACIntelligenceCard siteId={siteId} onNavigate={() => setActiveMainTab('hvac')} />
         )}
-        {isModuleActive('energy') && visibleSections.includes('energy-intelligence') && (
+        {isModuleActive('energy') && effectiveVisibleSections.includes('energy-intelligence') && (
           <EnergyIntelligenceCard siteId={siteId} onNavigate={() => setActiveMainTab('energy')} />
         )}
-        {isModuleActive('solar') && visibleSections.includes('solar-intelligence') && (
+        {isModuleActive('solar') && effectiveVisibleSections.includes('solar-intelligence') && (
           <SolarIntelligenceCard siteId={siteId} onNavigate={() => setActiveMainTab('solar-bess')} />
         )}
-        {isModuleActive('water') && visibleSections.includes('water-intelligence') && (
+        {isModuleActive('water') && effectiveVisibleSections.includes('water-intelligence') && (
           <WaterIntelligenceCard siteId={siteId} onNavigate={() => setActiveMainTab('water')} />
         )}
-        {isModuleActive('fire') && visibleSections.includes('fire-intelligence') && (
+        {isModuleActive('fire') && effectiveVisibleSections.includes('fire-intelligence') && (
           <FireIntelligenceCard siteId={siteId} onNavigate={() => setActiveMainTab('fire')} />
         )}
-        {isModuleActive('security') && visibleSections.includes('security-intelligence') && (
+        {isModuleActive('security') && effectiveVisibleSections.includes('security-intelligence') && (
           <SecurityIntelligenceCard siteId={siteId} onNavigate={() => setActiveMainTab('security')} />
         )}
         {/* #7 Occupancy */}
-        {isModuleActive('lighting') && visibleSections.includes('occupancy-dashboard') && (
+        {isModuleActive('lighting') && effectiveVisibleSections.includes('occupancy-dashboard') && (
           <OccupancyPanel compact={true} />
         )}
         {/* #8 Lighting Intelligence */}
-        {isModuleActive('lighting') && visibleSections.includes('lighting-intelligence') && (
+        {isModuleActive('lighting') && effectiveVisibleSections.includes('lighting-intelligence') && (
           <LightingIntelligencePanel siteId={siteId} compact />
         )}
       </div>

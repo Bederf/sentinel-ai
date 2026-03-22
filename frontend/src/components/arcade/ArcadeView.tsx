@@ -10,6 +10,7 @@ import { authorizedFetch } from "@/lib/api";
 import { FloorStack } from "./FloorStack";
 import type { FloorStackProps } from "./FloorStack";
 import { SummaryStrip } from "./SummaryStrip";
+import { ContextPanel } from "./ContextPanel";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -42,6 +43,7 @@ interface DecisionPayload {
 
 export interface ArcadeViewProps {
   siteId: string;
+  onModuleDisplayChange?: (moduleDisplay: Record<string, string>) => void;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -70,11 +72,36 @@ function SkeletonFloors({ count }: { count: number }) {
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export function ArcadeView({ siteId }: ArcadeViewProps) {
+export function ArcadeView({ siteId, onModuleDisplayChange }: ArcadeViewProps) {
   const [payload, setPayload] = useState<DecisionPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Trigger state
+  const [selectedFloor, setSelectedFloor] = useState<string | null>(null);
+  const [contextOpen, setContextOpen] = useState(false);
+  const [_triggerModuleDisplay, setTriggerModuleDisplay] = useState<Record<string, string>>({});
+
+  const handleFloorClick = async (floorId: string) => {
+    setSelectedFloor(floorId);
+    setContextOpen(true);
+    try {
+      const resp = await authorizedFetch(`/api/decisions/trigger/${encodeURIComponent(siteId)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ trigger_type: "floor", context: { floor_id: floorId } }),
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        const moduleDisplay: Record<string, string> = data.module_display ?? {};
+        setTriggerModuleDisplay(moduleDisplay);
+        onModuleDisplayChange?.(moduleDisplay);
+      }
+    } catch {
+      // Graceful — trigger failure doesn't break arcade view
+    }
+  };
 
   async function fetchPayload() {
     try {
@@ -195,11 +222,28 @@ export function ArcadeView({ siteId }: ArcadeViewProps) {
           floorLabels={floorLabels}
           activeIncidentMap={activeIncidentMap}
           rendererHint={rendererHint}
+          onFloorClick={handleFloorClick}
+          selectedFloor={selectedFloor}
         />
       )}
 
-      {/* ContextPanel — Phase 167 shell */}
-      <div data-slot="context-panel" />
+      {/* ContextPanel — slides in from right on floor selection */}
+      <ContextPanel
+        open={contextOpen}
+        floorId={selectedFloor}
+        floorLabel={
+          payload?.building_metadata?.floor_labels?.[selectedFloor ?? ""] ??
+          selectedFloor ??
+          ""
+        }
+        siteId={siteId}
+        onClose={() => {
+          setContextOpen(false);
+          setSelectedFloor(null);
+          setTriggerModuleDisplay({});
+          onModuleDisplayChange?.({});
+        }}
+      />
 
       {/* CrisisOverlay — Phase 167 shell (hidden by default) */}
       <div data-slot="crisis-overlay" style={{ display: "none" }} />
