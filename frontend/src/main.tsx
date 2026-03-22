@@ -6,6 +6,15 @@ import './index.css'
 import App from './App.tsx'
 import { queryClient } from './lib/queryClient'
 
+// PWA foundation — caches last decision payload for offline/kiosk resilience
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker
+      .register("/service-worker.js")
+      .catch((err) => console.warn("Service worker registration failed:", err));
+  });
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
