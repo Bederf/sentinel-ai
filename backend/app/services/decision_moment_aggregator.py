@@ -23,6 +23,7 @@ from app.models.decision_moment import DecisionMomentPayload
 from app.services.zone_mapping_service import ZoneMappingService
 from app.services.fault_urgency import compute_fault_urgency, build_alert_text
 from app.services.thermal_model import calculate_thermal_runway
+from app.services.floor_zone_utils import build_active_incident_map
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +62,22 @@ def _load_building_profile(building_id: str) -> dict[str, Any]:
     except Exception as e:
         logger.warning("Could not load building profile for %s: %s", building_id, e)
     return {}
+
+
+def _compute_renderer_hint(urgency_score: float, profile: dict | None) -> str:
+    """
+    Compute renderer hint from urgency score and building profile threshold.
+
+    Reads crisis_logic.urgency_threshold from the building profile.
+    Falls back to 0.70 if missing — but NEVER hardcodes the threshold
+    into the comparator. This allows per-building threshold tuning via
+    a Supabase UPDATE, not a code deployment.
+    """
+    threshold = 0.70  # default (matches buildings.profile DEFAULT in migration 20260322_001)
+    if profile:
+        crisis_logic = profile.get("crisis_logic", {})
+        threshold = float(crisis_logic.get("urgency_threshold", 0.70))
+    return "crisis" if urgency_score >= threshold else "quiet"
 
 
 def _get_posture_weights(profile: dict) -> dict[str, float]:
@@ -120,6 +137,94 @@ class DecisionMomentAggregator:
 
     def __init__(self, zone_mapping_service: ZoneMappingService | None = None):
         self._zone_svc = zone_mapping_service or ZoneMappingService()
+
+    async def _build_building_metadata(self, building_id: str) -> dict:
+        """
+        Build building_metadata dict for the kiosk renderer.
+
+        Queries site_3d_configs for spatial floor data.
+        Falls back to sane defaults if no spatial data exists.
+        deployment_mode comes from buildings.profile (loaded separately).
+
+        Returns:
+            {
+              "floors_count": int,
+              "floor_labels": {"B1": "Basement 1", ...},
+              "floor_stack_order": ["R", "L2", "L1", "L0", "G", "B1"],
+              "has_spatial_data": bool,
+              "floor_stack": [
+                {
+                  "floor_id": "B1",
+                  "floor_width_m": 150.0,
+                  "floor_depth_m": 120.0,
+                  "equipment_positions": [{"x": 50, "y": 30, "type": "chiller"}, ...]
+                }
+              ],
+              "deployment_mode": "ghost"
+            }
+        """
+        from app.services.floor_zone_utils import FLOOR_STACK_ORDER, FLOOR_LABELS
+        from app.database.repositories.site_3d_config_repository import get_site_3d_config_repository
+
+        # Defaults
+        metadata: dict = {
+            "floors_count": 0,
+            "floor_labels": dict(FLOOR_LABELS),
+            "floor_stack_order": list(FLOOR_STACK_ORDER),
+            "has_spatial_data": False,
+            "floor_stack": [],
+            "deployment_mode": "ghost",
+        }
+
+        # Load deployment_mode from profile
+        try:
+            profile = _load_building_profile(building_id)
+            metadata["deployment_mode"] = profile.get("deployment_mode", "ghost") if profile else "ghost"
+        except Exception as e:
+            logger.warning("Could not load building profile for %s: %s", building_id, e)
+
+        # Load spatial data from site_3d_configs
+        try:
+            repo = get_site_3d_config_repository()
+            config = repo.get_by_site_id(building_id)
+            if config:
+                floors_raw = config.get("floors", [])
+                equipment_positions = config.get("equipment_positions", [])
+
+                # Build floor stack from stored floor dimensions
+                floor_stack = []
+                for floor_def in floors_raw:
+                    floor_id = floor_def.get("level") or floor_def.get("floor_id", "")
+                    # Get equipment for this floor from positions
+                    floor_equipment = [
+                        ep for ep in equipment_positions if ep.get("floor") == floor_id or ep.get("level") == floor_id
+                    ]
+                    floor_stack.append(
+                        {
+                            "floor_id": floor_id,
+                            "floor_width_m": float(floor_def.get("width", 0)),
+                            "floor_depth_m": float(floor_def.get("depth", 0)),
+                            "equipment_positions": [
+                                {
+                                    "x": ep.get("x", 0),
+                                    "y": ep.get("y", 0),
+                                    "type": ep.get("equipment_type", "unknown"),
+                                }
+                                for ep in floor_equipment
+                            ],
+                        }
+                    )
+
+                if floor_stack:
+                    metadata["has_spatial_data"] = True
+                    metadata["floor_stack"] = floor_stack
+                    metadata["floors_count"] = len(floor_stack)
+
+        except Exception as e:
+            logger.warning("Could not load site_3d_config for %s: %s", building_id, e)
+            # has_spatial_data remains False — safe degraded state
+
+        return metadata
 
     def assemble(
         self,
@@ -196,6 +301,48 @@ class DecisionMomentAggregator:
             active_posture, posture_weights, urgency_score, urgency_components, profile_configured
         )
 
+        # Phase 165 fields — build inline (sync path; _build_building_metadata is async for v2)
+        from app.services.floor_zone_utils import FLOOR_STACK_ORDER, FLOOR_LABELS
+        from app.database.repositories.site_3d_config_repository import get_site_3d_config_repository
+
+        building_metadata: dict = {
+            "floors_count": 0,
+            "floor_labels": dict(FLOOR_LABELS),
+            "floor_stack_order": list(FLOOR_STACK_ORDER),
+            "has_spatial_data": False,
+            "floor_stack": [],
+            "deployment_mode": profile.get("deployment_mode", "ghost") if profile else "ghost",
+        }
+        try:
+            repo = get_site_3d_config_repository()
+            config = repo.get_by_site_id(building_id)
+            if config:
+                floors_raw = config.get("floors", [])
+                equipment_positions = config.get("equipment_positions", [])
+                floor_stack = []
+                for floor_def in floors_raw:
+                    floor_id = floor_def.get("level") or floor_def.get("floor_id", "")
+                    floor_equipment = [
+                        ep for ep in equipment_positions if ep.get("floor") == floor_id or ep.get("level") == floor_id
+                    ]
+                    floor_stack.append(
+                        {
+                            "floor_id": floor_id,
+                            "floor_width_m": float(floor_def.get("width", 0)),
+                            "floor_depth_m": float(floor_def.get("depth", 0)),
+                            "equipment_positions": [
+                                {"x": ep.get("x", 0), "y": ep.get("y", 0), "type": ep.get("equipment_type", "unknown")}
+                                for ep in floor_equipment
+                            ],
+                        }
+                    )
+                if floor_stack:
+                    building_metadata["has_spatial_data"] = True
+                    building_metadata["floor_stack"] = floor_stack
+                    building_metadata["floors_count"] = len(floor_stack)
+        except Exception as e:
+            logger.warning("Could not load site_3d_config for %s: %s", building_id, e)
+
         result = DecisionMomentPayload(
             building_id=building_id,
             triggered_at=triggered_at,
@@ -219,6 +366,12 @@ class DecisionMomentAggregator:
                 if not profile_configured
                 else "Estimated impact pending cost model."
             ),
+            building_metadata=building_metadata,
+            active_incident_map=build_active_incident_map(
+                affected_zone_ids,
+                asset_id,
+            ),
+            renderer_hint=_compute_renderer_hint(urgency_score, profile),
         )
         elapsed_ms = (time.perf_counter() - t0) * 1000
         logger.info(
