@@ -527,9 +527,9 @@ class AuditLogger:
             return {"total_entries": 0, "by_action": {}, "by_result": {}, "by_user": {}, "recent_activity": []}
 
         # Calculate statistics
-        by_action = {}
-        by_result = {}
-        by_user = {}
+        by_action: Dict[str, int] = {}
+        by_result: Dict[str, int] = {}
+        by_user: Dict[str, int] = {}
 
         for entry in all_entries:
             by_action[entry.action.value] = by_action.get(entry.action.value, 0) + 1
@@ -559,3 +559,114 @@ class AuditLogger:
             self.buffer = []
             self._save_logs([])
             logger.info("Cleared all audit logs")
+
+    async def archive_old_audit_logs(self, days_old: int = 30) -> int:
+        """Archive audit logs older than specified days to immutable Supabase table.
+
+        Implements immutable audit trail archival for AUDIT-001 control.
+
+        Args:
+            days_old: Archive entries older than this many days (default: 30)
+
+        Returns:
+            Number of entries archived
+        """
+        import asyncio
+        from datetime import datetime, timedelta
+        from app.database.supabase_client import get_supabase_client
+
+        try:
+            self._flush_buffer()  # Ensure all entries are saved first
+
+            # Load all entries from audit log file
+            all_entries = []
+            if self.log_file.exists():
+                try:
+                    with open(self.log_file, "r") as f:
+                        data = json.load(f)
+                        for entry in data.get("entries", []):
+                            decrypted_entry = self._decrypt_audit_entry(entry)
+                            all_entries.append(AuditLogEntry.from_dict(decrypted_entry))
+                except Exception as e:
+                    logger.error(f"Failed to read logs for archival: {e}")
+                    return 0
+
+            # Identify old entries (older than days_old)
+            cutoff_time = datetime.now() - timedelta(days=days_old)
+            old_entries = [entry for entry in all_entries if entry.timestamp < cutoff_time]
+            new_entries = [entry for entry in all_entries if entry.timestamp >= cutoff_time]
+
+            if not old_entries:
+                logger.info(f"No audit entries older than {days_old} days to archive")
+                return 0
+
+            # Archive old entries to Supabase (immutable table)
+            archived_count = 0
+            try:
+                supabase = get_supabase_client()
+                for entry in old_entries:
+                    entry_dict = entry.to_dict()
+                    archive_record = {
+                        "archived_from": "audit_log.json",
+                        "event_data": entry_dict,
+                        "created_at": entry.timestamp.isoformat(),
+                    }
+
+                    # Insert with upsert to handle duplicates idempotently
+                    try:
+                        await asyncio.to_thread(supabase.table("audit_archive").upsert(archive_record).execute)
+                        archived_count += 1
+                    except Exception as e:
+                        # Log but continue (don't block on one failed archive)
+                        logger.warning(f"Failed to archive single entry to Supabase: {e}")
+
+                logger.info(f"Archived {archived_count}/{len(old_entries)} entries to audit_archive table")
+            except Exception as e:
+                logger.error(f"Failed to archive to Supabase: {e}")
+                # Fallback: don't delete from local file if Supabase fails
+                return 0
+
+            # Delete old entries from active log (keep only new entries)
+            if archived_count > 0:
+                self._save_logs(new_entries)
+                logger.info(
+                    f"Removed {archived_count} archived entries from active audit log "
+                    f"({len(new_entries)} entries remain)"
+                )
+
+            return archived_count
+
+        except Exception as e:
+            logger.error(f"Audit log archival failed: {e}")
+            return 0
+
+    async def audit_archival_job(self, interval_days: int = 30) -> None:
+        """Background job for periodic audit log archival.
+
+        Runs indefinitely, archiving logs monthly (or at specified interval).
+
+        Args:
+            interval_days: Interval between archival runs (default: 30 days)
+        """
+        import asyncio
+
+        logger.info(f"Starting audit archival background job (interval: {interval_days} days)")
+
+        try:
+            while True:
+                try:
+                    # Run archival
+                    archived_count = await self.archive_old_audit_logs(days_old=interval_days)
+                    logger.info(f"Audit archival job completed: {archived_count} entries archived")
+
+                    # Sleep until next run (interval_days * 86400 seconds)
+                    await asyncio.sleep(interval_days * 86400)
+
+                except Exception as e:
+                    logger.error(f"Error in audit archival job: {e}")
+                    # Sleep briefly and retry to avoid tight loop on errors
+                    await asyncio.sleep(300)  # 5 minutes before retry
+
+        except asyncio.CancelledError:
+            logger.info("Audit archival job cancelled")
+            raise
