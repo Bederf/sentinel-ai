@@ -14,6 +14,7 @@ Dependency map:
 from __future__ import annotations
 import json
 import logging
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -137,6 +138,7 @@ class DecisionMomentAggregator:
         Assemble a DecisionMomentPayload.
         Never raises — always returns a payload with honest null fields where data is missing.
         """
+        t0 = time.perf_counter()
         triggered_at = datetime.now(timezone.utc)
 
         # Load building profile (graceful degradation if missing)
@@ -194,7 +196,7 @@ class DecisionMomentAggregator:
             active_posture, posture_weights, urgency_score, urgency_components, profile_configured
         )
 
-        return DecisionMomentPayload(
+        result = DecisionMomentPayload(
             building_id=building_id,
             triggered_at=triggered_at,
             trigger_reason=trigger_reason or fault_type,
@@ -218,3 +220,11 @@ class DecisionMomentAggregator:
                 else "Estimated impact pending cost model."
             ),
         )
+        elapsed_ms = (time.perf_counter() - t0) * 1000
+        logger.info(
+            "assemble() completed in %.1fms for %s (urgency=%.3f)",
+            elapsed_ms,
+            building_id,
+            urgency_score,
+        )
+        return result

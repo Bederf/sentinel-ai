@@ -16,6 +16,7 @@ in future, replace the INFO subscription with a pattern like "fault.resolved".
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import datetime
 
@@ -27,8 +28,13 @@ logger = logging.getLogger(__name__)
 _aggregator = DecisionMomentAggregator()
 
 
-async def _on_critical_event(event: SentinelEvent) -> None:
-    """Pre-warm the Decision Page cache when a CRITICAL event fires."""
+async def _assemble_and_cache(event: SentinelEvent) -> None:
+    """Inner coroutine — runs as background task, does not block the event bus publish loop.
+
+    assemble() is synchronous (CPU-bound, < 50ms on Jetson). Wrapping in
+    asyncio.create_task() releases the event bus handler immediately so other
+    subscribers can continue while the payload is being assembled.
+    """
     try:
         payload = _aggregator.assemble(
             building_id=event.site_id or "unknown",
@@ -46,6 +52,15 @@ async def _on_critical_event(event: SentinelEvent) -> None:
         )
     except Exception as e:
         logger.warning("Decision pre-warm failed: %s", e)
+
+
+async def _on_critical_event(event: SentinelEvent) -> None:
+    """Pre-warm the Decision Page cache when a CRITICAL event fires.
+
+    Fire-and-forget: spawns _assemble_and_cache as a background task so the
+    event bus publish loop is never blocked by the synchronous assemble() call.
+    """
+    asyncio.create_task(_assemble_and_cache(event))
 
 
 async def _on_fault_resolved(event: SentinelEvent) -> None:
