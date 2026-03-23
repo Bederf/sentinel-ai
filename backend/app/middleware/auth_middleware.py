@@ -23,10 +23,11 @@ Usage:
         ...
 """
 
+import asyncio
 import hashlib
 import logging
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import jwt as pyjwt
@@ -326,8 +327,8 @@ async def _validate_supabase_token(token: str) -> dict[str, Any] | None:
         return None
 
 
-def _validate_api_key(api_key: str) -> dict[str, Any] | None:
-    """Validate an API key against Supabase-backed store.
+async def _validate_api_key(api_key: str) -> dict[str, Any] | None:
+    """Validate an API key against Supabase-backed store (async, non-blocking).
 
     Returns AuthContext if valid, None if not found or expired.
     On Supabase error: returns None (fail-closed, no fallback).
@@ -341,8 +342,11 @@ def _validate_api_key(api_key: str) -> dict[str, Any] | None:
     key_hash = hashlib.sha256(api_key.encode()).hexdigest()
 
     try:
+        # Use async Supabase client to avoid blocking event loop
         client = get_supabase_client()
-        result = client.table("api_keys").select("*").eq("key_hash", key_hash).limit(1).execute()
+        result = await asyncio.to_thread(
+            lambda: client.table("api_keys").select("*").eq("key_hash", key_hash).limit(1).execute()
+        )
         rows = result.data or []
         if rows:
             record = rows[0]
@@ -351,15 +355,22 @@ def _validate_api_key(api_key: str) -> dict[str, Any] | None:
 
             expires_at = record.get("expires_at")
             if expires_at:
-                now = datetime.utcnow()
+                # Use UTC datetime consistently (Python best practice)
+                now = datetime.now(timezone.utc)
                 expires_dt = datetime.fromisoformat(expires_at.replace("Z", "+00:00"))
-                if now.replace(tzinfo=expires_dt.tzinfo) > expires_dt:
+                if now > expires_dt:
                     return None
 
+            # Validate role enum — log on failure instead of silent downgrade
             role_value = str(record.get("role", "auditor")).lower()
             try:
                 role = SentinelRole(role_value)
             except ValueError:
+                logger.warning(
+                    f"Invalid role '{role_value}' in API key {record.get('id')}: "
+                    f"not a valid SentinelRole enum. Downgrading to AUDITOR. "
+                    f"Check api_keys table role column for typos."
+                )
                 role = SentinelRole.AUDITOR
 
             key_info = {
@@ -370,13 +381,19 @@ def _validate_api_key(api_key: str) -> dict[str, Any] | None:
                 "is_active": True,
             }
 
-            # Non-blocking last_used update
+            # Non-blocking last_used update (runs in background thread)
             try:
-                client.table("api_keys").update({"last_used_at": datetime.utcnow().isoformat()}).eq(
-                    "id", record.get("id")
-                ).execute()
+                last_used = datetime.now(timezone.utc).isoformat()
+                await asyncio.to_thread(
+                    lambda: (
+                        client.table("api_keys")
+                        .update({"last_used_at": last_used})
+                        .eq("id", record.get("id"))
+                        .execute()
+                    )
+                )
             except Exception:
-                pass
+                pass  # Non-critical audit metric, safe to ignore
 
             return {**key_info, "key_hash": key_hash}
     except Exception as e:
@@ -503,7 +520,7 @@ async def _authenticate_request(request: Request) -> AuthContext | None:
     # Try API key
     api_key = _extract_api_key(request)
     if api_key:
-        key_info = _validate_api_key(api_key)
+        key_info = await _validate_api_key(api_key)
         if key_info:
             role = key_info["role"]
             is_bot = False
@@ -547,8 +564,11 @@ async def _authenticate_request(request: Request) -> AuthContext | None:
 def require_auth(level: AuthLevel = AuthLevel.AUTHENTICATED):
     """FastAPI dependency that requires authentication at a specific level.
 
-    In DEMO_MODE, creates a demo auth context instead of requiring real auth.
-    This preserves existing demo functionality.
+    Enforces role-based access control (RBAC) on all protected endpoints.
+
+    Note: DEMO_MODE bypasses are controlled at the startup level
+    (see startup/events.py validation), not at the per-endpoint level.
+    All endpoints using require_auth() enforce real authentication.
 
     Usage:
         @router.get("/api/equipment")
