@@ -5,10 +5,9 @@ Pytest configuration and fixtures for BMS Intelligence backend tests.
 import os
 import warnings
 
-# Enable demo mode before importing the app so the global auth middleware
-# allows requests without a real JWT token (localhost bypass).
-os.environ.setdefault("DEMO_MODE", "true")
-os.environ.setdefault("TESTING", "true")
+# Universal Engine: Tests run in production mode without TESTING/DEMO_MODE bypasses.
+# All test requests must include valid JWT tokens from the fixtures below.
+# This ensures tests validate the actual authentication code path.
 os.environ.setdefault("JWT_SECRET_KEY", "test-only-jwt-secret-for-ci-at-least-32-chars")
 warnings.filterwarnings(
     "ignore",
@@ -439,3 +438,77 @@ def disable_background_scheduler():
     with patch("app.services.background_scheduler.scheduler_service.start") as mock_start:
         with patch("app.services.background_scheduler.scheduler_service.stop") as mock_stop:
             yield mock_start, mock_stop
+
+
+# ============================================================================
+# Universal Engine: JWT Token Fixtures (replaces TESTING bypass)
+# ============================================================================
+
+
+@pytest.fixture
+def jwt_token_admin() -> str:
+    """Generate a valid JWT token for ADMIN role."""
+    import jwt
+    from datetime import datetime, timedelta, timezone
+
+    secret = os.environ.get("JWT_SECRET_KEY", "test-only-jwt-secret-for-ci-at-least-32-chars")
+    payload = {
+        "sub": "admin-test-user",
+        "email": "admin@test.sentinel.local",
+        "role": "admin",
+        "iat": datetime.now(timezone.utc),
+        "exp": datetime.now(timezone.utc) + timedelta(hours=1),
+    }
+    return jwt.encode(payload, secret, algorithm="HS256")
+
+
+@pytest.fixture
+def jwt_token_operator() -> str:
+    """Generate a valid JWT token for OPERATOR role."""
+    import jwt
+    from datetime import datetime, timedelta, timezone
+
+    secret = os.environ.get("JWT_SECRET_KEY", "test-only-jwt-secret-for-ci-at-least-32-chars")
+    payload = {
+        "sub": "operator-test-user",
+        "email": "operator@test.sentinel.local",
+        "role": "operator",
+        "iat": datetime.now(timezone.utc),
+        "exp": datetime.now(timezone.utc) + timedelta(hours=1),
+    }
+    return jwt.encode(payload, secret, algorithm="HS256")
+
+
+@pytest.fixture
+def jwt_token_auditor() -> str:
+    """Generate a valid JWT token for AUDITOR role."""
+    import jwt
+    from datetime import datetime, timedelta, timezone
+
+    secret = os.environ.get("JWT_SECRET_KEY", "test-only-jwt-secret-for-ci-at-least-32-chars")
+    payload = {
+        "sub": "auditor-test-user",
+        "email": "auditor@test.sentinel.local",
+        "role": "auditor",
+        "iat": datetime.now(timezone.utc),
+        "exp": datetime.now(timezone.utc) + timedelta(hours=1),
+    }
+    return jwt.encode(payload, secret, algorithm="HS256")
+
+
+@pytest.fixture
+def auth_headers_admin(jwt_token_admin: str) -> dict:
+    """HTTP headers with ADMIN JWT token."""
+    return {"Authorization": f"Bearer {jwt_token_admin}"}
+
+
+@pytest.fixture
+def auth_headers_operator(jwt_token_operator: str) -> dict:
+    """HTTP headers with OPERATOR JWT token."""
+    return {"Authorization": f"Bearer {jwt_token_operator}"}
+
+
+@pytest.fixture
+def auth_headers_auditor(jwt_token_auditor: str) -> dict:
+    """HTTP headers with AUDITOR JWT token."""
+    return {"Authorization": f"Bearer {jwt_token_auditor}"}

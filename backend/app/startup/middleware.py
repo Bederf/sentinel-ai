@@ -5,7 +5,6 @@ from main.py to improve maintainability and separation of concerns.
 """
 
 import hmac
-import os
 from collections import defaultdict
 from datetime import datetime, timedelta
 import logging
@@ -18,7 +17,6 @@ from slowapi.middleware import SlowAPIMiddleware
 
 from app.config.settings import settings
 from app.middleware.auth_middleware import _authenticate_request, _extract_ip_address
-from app.models.auth import AuthContext, SentinelRole
 from app.middleware.rate_limiter import limiter
 from app.middleware.audit_middleware import AuditMiddleware
 from app.middleware.security_logging import SecurityLoggingMiddleware
@@ -248,24 +246,9 @@ def register_middleware(app: FastAPI) -> None:
                     headers=_get_cors_headers(request),
                 )
 
-        # Testing bypass: when TESTING=true (test suite), grant OPERATOR access.
-        # This preserves test compatibility after v39.0 security hardening.
-        # Skip IP check — test clients report varying IPs across CI environments.
-        # Guard: bypass is disabled in live mode regardless of TESTING flag.
-        is_testing = os.environ.get("TESTING", "").lower() == "true" and not getattr(settings, "is_live_mode", False)
-        if is_testing:
-            source_ip = _extract_ip_address(request)
-            demo_ctx = AuthContext(
-                user_id="demo-operator",
-                role=SentinelRole.OPERATOR,
-                auth_method="demo_bypass",
-                source_ip=source_ip,
-                email="demo@sentinel.local",
-            )
-            request.state.auth = demo_ctx
-            return await call_next(request)
-
-        # Require real authentication
+        # Universal Engine: All requests require real authentication.
+        # Tests must provide JWT tokens or use service accounts (no magic TESTING bypass).
+        # This ensures tests run against the actual production code path.
         auth_ctx = await _authenticate_request(request)
         if auth_ctx is None:
             headers = {"WWW-Authenticate": "Bearer"}
