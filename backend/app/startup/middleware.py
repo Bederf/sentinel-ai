@@ -251,6 +251,14 @@ def register_middleware(app: FastAPI) -> None:
         # This ensures tests run against the actual production code path.
         auth_ctx = await _authenticate_request(request)
         if auth_ctx is None:
+            # Log missing JWT for debugging misconfigured clients, forgotten test paths, integration errors
+            source_ip = _extract_ip_address(request)
+            _logger.error(
+                f"Missing JWT authentication for {request.method} {path} from {source_ip}. "
+                f"Authorization header missing or invalid. This may indicate: "
+                f"(1) misconfigured client, (2) forgotten test path, (3) integration error. "
+                f"Add JWT token or X-Sentry-API-Key header."
+            )
             headers = {"WWW-Authenticate": "Bearer"}
             headers.update(_get_cors_headers(request))
             return JSONResponse(
