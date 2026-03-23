@@ -19,7 +19,7 @@ from typing import Any, Literal
 
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import JSONResponse, StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from app.services.decision_moment_aggregator import DecisionMomentAggregator
 
@@ -35,6 +35,17 @@ router = APIRouter(prefix="/api/decisions", tags=["decisions"])
 class TriggerRequest(BaseModel):
     trigger_type: Literal["none", "floor", "alert", "equipment"]
     context: dict[str, Any] = {}
+
+    @field_validator("context")
+    @classmethod
+    def validate_context(cls, v: dict, info) -> dict:
+        """Validate required context keys per trigger type."""
+        trigger_type = info.data.get("trigger_type")
+        if trigger_type == "alert" and "alert_type" not in v:
+            raise ValueError('alert trigger requires context["alert_type"]')
+        if trigger_type == "equipment" and "equipment_type" not in v:
+            raise ValueError('equipment trigger requires context["equipment_type"]')
+        return v
 
 
 class TriggerResponse(BaseModel):
@@ -177,12 +188,12 @@ async def resolve_trigger(site_id: str, req: TriggerRequest) -> TriggerResponse:
         result["energy"] = "summary"
 
     elif req.trigger_type == "alert":
-        alert_type = req.context.get("alert_type", "")
+        alert_type = req.context["alert_type"]
         if alert_type in _ALL_MODULES:
             result[alert_type] = "detailed"
 
     elif req.trigger_type == "equipment":
-        equipment_type = req.context.get("equipment_type", "").lower()
+        equipment_type = req.context["equipment_type"].lower()
         # Map equipment type codes to module names
         _type_to_module: dict[str, str] = {
             "chiller": "hvac",
