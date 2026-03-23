@@ -1,5 +1,7 @@
 # TODOdone2 — Verified completions (2026-03-23)
 
+- `TODO.md:P0` – `backend/app/services/municipal_pdf_extraction_service.py:65-80` now imports `MunicipalInvoiceOCRService` and routes fallback OCR through it, satisfying the municipal OCR dependency entry that used to sit at the top of `TODO.md`.
+- `TODO.md:P0` – `docs/02-architecture/document-retrieval-canonical-note.md:112-230` explicitly states that the Technician Intake, Service Sheet OCR, and Municipal Invoice Processing pipelines are upload workflows, not part of the Canonical Document RAG, covering the architecture boundary check entry.
 - `TODO.md:11` – Canonical names for Document RAG, Concept Search, Technician Intake, Service Sheet OCR, and Municipal Invoice Processing appear in `docs/02-architecture/document-retrieval-canonical-note.md:19-355`, so the naming publication is live.
 - `TODO.md:12` – `backend/app/services/hybrid_query_service.py:334-374` now calls `concept_document_search` instead of the old `doc_rag_service`, which confirms the retrieval path fix.
 - `TODO.md:242` – Phase 1 foundations (governance baseline + TOGAF artifacts) are documented in `docs/ai-governance/compliance-closure-report.md:38-58, 410-430`, showing the governance baseline, architecture board charter, and TOGAF evidence bundle as complete.

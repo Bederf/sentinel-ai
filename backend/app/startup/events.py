@@ -707,6 +707,13 @@ async def startup_event(app: FastAPI) -> None:
     except Exception as e:
         _logger.warning(f"Space sensor health monitor initialization failed: {e}")
 
+    # Focus room relay reconciliation (every 30 seconds)
+    try:
+        scheduler_service.add_focus_relay_reconcile_job(interval_seconds=30)
+        _logger.info("Focus relay reconcile initialized (30s interval)")
+    except Exception as e:
+        _logger.warning(f"Focus relay reconcile initialization failed: {e}")
+
     # Event Intelligence evaluation (every 2 minutes)
     # Converts raw telemetry into structured operational events (temp deviations,
     # energy spikes, sensor failures, comfort violations, ML anomalies).

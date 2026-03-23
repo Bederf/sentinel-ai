@@ -14,6 +14,9 @@ See: docs/02-architecture/hybrid-knowledge-layer.md
 from __future__ import annotations
 
 import logging
+import time
+import inspect
+from uuid import uuid4
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
@@ -57,6 +60,7 @@ class HybridContext:
 
     # Metadata
     sources_used: List[str] = field(default_factory=list)
+    retrieval_telemetry: Optional[Dict[str, Any]] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -77,6 +81,7 @@ class HybridContext:
             "decision_memory": self.decision_memory,
             "active_events": self.active_events,
             "sources_used": self.sources_used,
+            "retrievalTelemetry": self.retrieval_telemetry,
         }
 
     def format_for_prompt(self) -> str:
@@ -351,10 +356,51 @@ class HybridQueryService:
             if ctx.equipment_type:
                 search_query = f"{ctx.equipment_type} {search_query}"
 
-            results = await search_svc.search(
+            trace_id = str(uuid4())
+            retrieval_path = "canonical_doc_rag"
+            top_k_requested = 5
+            used_fallback: Optional[str] = None
+            fallback_reason: Optional[str] = None
+            started_at = time.perf_counter()
+            search_response = search_svc.search(
                 query=search_query,
                 site_id=self.site_id,
-                limit=5,
+                top_k=top_k_requested,
+            )
+            if inspect.isawaitable(search_response):
+                search_response = await search_response
+
+            # Canonical service may return either a payload dict with "results"
+            # or a list of hit dicts depending on integration point.
+            if isinstance(search_response, dict):
+                results = search_response.get("results") or []
+            elif isinstance(search_response, list):
+                results = search_response
+            else:
+                results = []
+            duration_ms = int((time.perf_counter() - started_at) * 1000)
+            hit_count = len(results or [])
+
+            telemetry: Dict[str, Any] = {
+                "trace_id": trace_id,
+                "retrieval_path": retrieval_path,
+                "query_time_ms": duration_ms,
+                "top_k_requested": top_k_requested,
+                "hit_count": hit_count,
+                "used_fallback": used_fallback,
+            }
+            if fallback_reason:
+                telemetry["fallback_reason"] = fallback_reason
+            ctx.retrieval_telemetry = telemetry
+            self._record_retrieval_telemetry(ctx.retrieval_telemetry)
+
+            logger.info(
+                "Canonical retrieval telemetry trace_id=%s path=%s duration_ms=%s hit_count=%s fallback=%s",
+                trace_id,
+                retrieval_path,
+                duration_ms,
+                hit_count,
+                used_fallback or "none",
             )
 
             if results:
@@ -374,6 +420,24 @@ class HybridQueryService:
             logger.debug("Concept document search service not available")
         except Exception as e:
             logger.debug("Document search failed for %s: %s", equipment_id, e)
+
+    @staticmethod
+    def _record_retrieval_telemetry(telemetry: Optional[Dict[str, Any]]) -> None:
+        """Best-effort metric emission for canonical retrieval telemetry."""
+        if not telemetry:
+            return
+
+        try:
+            from app.services.governance_metrics_collector import governance_metrics
+
+            governance_metrics.record_retrieval_telemetry(
+                retrieval_path=telemetry.get("retrieval_path"),
+                duration_ms=telemetry.get("query_time_ms"),
+                hit_count=telemetry.get("hit_count"),
+                used_fallback=telemetry.get("used_fallback"),
+            )
+        except Exception:
+            logger.debug("Failed to emit retrieval telemetry metrics", exc_info=True)
 
     # -------------------------------------------------------------------
     # Step 4a: Telemetry (operating data from equipment)

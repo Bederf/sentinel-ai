@@ -3,11 +3,13 @@
   "node_001": {
     "room_code": "FA2-1Q4-MR28",
     "site_id": "site-001",
+    "room_type": "meeting",
     "note": "Moved from MR25 to MR28 on 2026-03-13"
   },
   "node_002": {
     "room_code": "FA2-1Q4-MR28",
     "site_id": "site-001",
+    "room_type": "meeting",
     "note": "Active ESP32 node in MR28"
   }
 }

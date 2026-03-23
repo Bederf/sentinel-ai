@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Literal
+from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, Field
@@ -62,6 +62,74 @@ class ConceptDocumentActionRequest(BaseModel):
     document_id: str = Field(..., min_length=1)
     action: Literal["open", "download"]
     query: str | None = Field(default=None, max_length=500)
+
+
+class RetrievalTelemetry(BaseModel):
+    trace_id: str
+    retrieval_path: str
+    query_time_ms: int
+    top_k_requested: int
+    hit_count: int
+    used_fallback: str | None = None
+    fallback_reason: str | None = None
+
+
+class HybridContextRequest(BaseModel):
+    site_id: str = Field(..., min_length=1)
+    equipment_id: str | None = None
+    bacnet_ref: str | None = None
+    question: str | None = None
+    include_documents: bool = True
+    include_telemetry: bool = True
+    include_ml: bool = True
+    include_points: bool = True
+    include_decision_memory: bool = True
+    include_active_events: bool = True
+
+
+class HybridContextResponse(BaseModel):
+    success: bool
+    equipment_id: str | None = None
+    equipment_type: str | None = None
+    site_id: str
+    sources_used: list[str] = Field(default_factory=list)
+    retrievalTelemetry: RetrievalTelemetry | None = None
+    context: dict[str, Any] = Field(default_factory=dict)
+    prompt_context: str | None = None
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "success": True,
+                "equipment_id": "S002-CHILLER-B1-001",
+                "equipment_type": "Chiller",
+                "site_id": "site-002",
+                "sources_used": ["brick_graph", "document_rag", "telemetry", "ml_models"],
+                "retrievalTelemetry": {
+                    "trace_id": "f34df3e1-a694-4da5-8df9-365e668d618c",
+                    "retrieval_path": "canonical_doc_rag",
+                    "query_time_ms": 42,
+                    "top_k_requested": 5,
+                    "hit_count": 3,
+                    "used_fallback": None,
+                    "fallback_reason": None,
+                },
+                "context": {
+                    "equipment_id": "S002-CHILLER-B1-001",
+                    "site_id": "site-002",
+                    "retrievalTelemetry": {
+                        "trace_id": "f34df3e1-a694-4da5-8df9-365e668d618c",
+                        "retrieval_path": "canonical_doc_rag",
+                        "query_time_ms": 42,
+                        "top_k_requested": 5,
+                        "hit_count": 3,
+                        "used_fallback": None,
+                    },
+                },
+                "prompt_context": "Equipment: S002-CHILLER-B1-001 (Chiller)",
+            }
+        }
+    }
 
 
 def _assert_site_access(auth: AuthContext, site_id: str) -> None:
@@ -132,6 +200,45 @@ async def concept_search(
     )
 
     return ConceptSearchResponse.model_validate(response)
+
+
+@router.post("/hybrid-context", response_model=HybridContextResponse)
+async def hybrid_context(
+    payload: HybridContextRequest,
+    auth: AuthContext = Depends(require_auth(AuthLevel.AUTHENTICATED)),
+) -> HybridContextResponse:
+    """Get merged Brick + documents + telemetry + ML context with retrieval telemetry."""
+    _assert_site_access(auth, payload.site_id)
+    if not payload.equipment_id and not payload.bacnet_ref:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Provide either equipment_id or bacnet_ref.",
+        )
+
+    from app.services.hybrid_query_service import get_hybrid_query_service
+
+    svc = get_hybrid_query_service(payload.site_id)
+    ctx = await svc.query(
+        equipment_id=payload.equipment_id,
+        bacnet_ref=payload.bacnet_ref,
+        question=payload.question,
+        include_documents=payload.include_documents,
+        include_telemetry=payload.include_telemetry,
+        include_ml=payload.include_ml,
+        include_points=payload.include_points,
+        include_decision_memory=payload.include_decision_memory,
+        include_active_events=payload.include_active_events,
+    )
+    return HybridContextResponse(
+        success=True,
+        equipment_id=ctx.equipment_id,
+        equipment_type=ctx.equipment_type,
+        site_id=payload.site_id,
+        sources_used=ctx.sources_used,
+        retrievalTelemetry=ctx.retrieval_telemetry,
+        context=ctx.to_dict(),
+        prompt_context=ctx.format_for_prompt(),
+    )
 
 
 @router.post(

@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from typing import List, Optional, Dict, Any
 import re
 import logging
+import uuid
 
 logger = logging.getLogger(__name__)
 
@@ -105,21 +106,13 @@ class VectorDBService:
         chunk_records = []
         for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
             chunk_records.append(
-                {
-                    "document_id": document_id,
-                    "chunk_index": i,
-                    "content": chunk["content"],
-                    "content_length": len(chunk["content"]),
-                    "section_title": chunk.get("section"),
-                    "embedding": embedding,
-                    "equipment_type": document["equipment_type"],
-                    "document_type": document["document_type"],
-                    "site_id": document.get("site_id"),
-                    "manufacturer": document.get("manufacturer"),
-                    "model": document.get("model"),
-                    "keywords": document.get("keywords"),
-                    "failure_modes": document.get("failure_modes"),
-                }
+                self._build_chunk_record(
+                    document=document,
+                    document_id=document_id,
+                    chunk_index=i,
+                    chunk=chunk,
+                    embedding=embedding,
+                )
             )
 
         if chunk_records:
@@ -137,7 +130,7 @@ class VectorDBService:
         logger.info(f"Indexed document {document_id}: {len(chunk_records)} chunks")
         return len(chunk_records)
 
-    def _split_into_chunks(self, text: str, chunk_size: int = 500, overlap: int = 50) -> List[Dict[str, str]]:
+    def _split_into_chunks(self, text: str, chunk_size: int = 500, overlap: int = 50) -> List[Dict[str, Any]]:
         """Split text into overlapping chunks."""
         chunks = []
         words = text.split()
@@ -159,7 +152,7 @@ class VectorDBService:
                     section = stripped
                     break
 
-            chunks.append({"content": chunk_text, "section": section})
+            chunks.append({"content": chunk_text, "section": section, "page_number": None})
 
             i += chunk_size - overlap
 
@@ -358,26 +351,20 @@ class VectorDBService:
         # Store chunks with original content (no context header)
         chunk_records = []
         for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
-            heading_path = chunk.get("heading_path", [])
             chunk_records.append(
-                {
-                    "document_id": document_id,
-                    "chunk_index": i,
-                    "content": chunk["content"],
-                    "content_length": len(chunk["content"]),
-                    "section_title": chunk.get("section", ""),
-                    "embedding": embedding,
-                    "equipment_type": document["equipment_type"],
-                    "document_type": document["document_type"],
-                    "manufacturer": document.get("manufacturer"),
-                    "model": document.get("model"),
-                    "keywords": document.get("keywords"),
-                    "failure_modes": document.get("failure_modes"),
-                    "metadata": {
-                        "heading_path": heading_path,
-                        "context_enhanced": True,
+                self._build_chunk_record(
+                    document=document,
+                    document_id=document_id,
+                    chunk_index=i,
+                    chunk={
+                        **chunk,
+                        "metadata": {
+                            "heading_path": chunk.get("heading_path", []),
+                            "context_enhanced": True,
+                        },
                     },
-                }
+                    embedding=embedding,
+                )
             )
 
         if chunk_records:
@@ -393,6 +380,71 @@ class VectorDBService:
 
         logger.info(f"Indexed markdown document {document_id}: {len(chunk_records)} chunks (section-aware)")
         return len(chunk_records)
+
+    def _build_chunk_record(
+        self,
+        *,
+        document: Dict[str, Any],
+        document_id: str,
+        chunk_index: int,
+        chunk: Dict[str, Any],
+        embedding: Any,
+    ) -> Dict[str, Any]:
+        """Build a chunk record with stable citation grounding metadata."""
+        chunk_uuid = str(uuid.uuid4())
+        section_title = chunk.get("section")
+        page_number = chunk.get("page_number")
+        metadata = self._build_grounding_metadata(
+            document=document,
+            document_id=document_id,
+            chunk_id=chunk_uuid,
+            chunk_index=chunk_index,
+            section_title=section_title,
+            page_number=page_number,
+            existing_metadata=chunk.get("metadata") if isinstance(chunk.get("metadata"), dict) else None,
+        )
+
+        return {
+            "id": chunk_uuid,
+            "document_id": document_id,
+            "chunk_index": chunk_index,
+            "content": chunk["content"],
+            "content_length": len(chunk["content"]),
+            "section_title": section_title,
+            "page_number": page_number,
+            "embedding": embedding,
+            "equipment_type": document["equipment_type"],
+            "document_type": document["document_type"],
+            "site_id": document.get("site_id"),
+            "manufacturer": document.get("manufacturer"),
+            "model": document.get("model"),
+            "keywords": document.get("keywords"),
+            "failure_modes": document.get("failure_modes"),
+            "metadata": metadata,
+        }
+
+    def _build_grounding_metadata(
+        self,
+        *,
+        document: Dict[str, Any],
+        document_id: str,
+        chunk_id: str,
+        chunk_index: int,
+        section_title: Optional[str],
+        page_number: Optional[int],
+        existing_metadata: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        base_metadata: Dict[str, Any] = dict(existing_metadata or {})
+        base_metadata["grounding"] = {
+            "document_id": document_id,
+            "chunk_id": chunk_id,
+            "chunk_index": chunk_index,
+            "document_title": document.get("title"),
+            "section_title": section_title,
+            "page_number": page_number,
+            "source": document.get("source"),
+        }
+        return base_metadata
 
     def search(
         self,
@@ -435,7 +487,7 @@ class VectorDBService:
             },
         ).execute()
 
-        return result.data if result.data else []
+        return self._attach_grounding_metadata(result.data if result.data else [])
 
     def search_knowledge(
         self,
@@ -498,7 +550,7 @@ class VectorDBService:
             },
         ).execute()
 
-        return result.data if result.data else []
+        return self._attach_grounding_metadata(result.data if result.data else [])
 
     def add_knowledge(
         self,
@@ -576,6 +628,61 @@ class VectorDBService:
 
         result = query.limit(limit).order("created_at", desc=True).execute()
         return result.data if result.data else []
+
+    def _attach_grounding_metadata(self, results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Attach normalized grounding metadata for citation-ready responses."""
+        if not results:
+            return results
+
+        chunk_ids = [str(r.get("chunk_id") or r.get("id")) for r in results if r.get("chunk_id") or r.get("id")]
+        if not chunk_ids:
+            return results
+
+        try:
+            chunk_rows = (
+                self.client.table("document_chunks")
+                .select("id, document_id, chunk_index, section_title, page_number, metadata")
+                .in_("id", chunk_ids)
+                .execute()
+            )
+            chunk_map = {str(row["id"]): row for row in (chunk_rows.data or [])}
+        except Exception as exc:
+            logger.debug("Unable to enrich chunk grounding metadata: %s", exc)
+            return results
+
+        for result in results:
+            chunk_id = str(result.get("chunk_id") or result.get("id") or "")
+            if not chunk_id:
+                continue
+            row = chunk_map.get(chunk_id)
+            if not row:
+                continue
+
+            row_meta = row.get("metadata") if isinstance(row.get("metadata"), dict) else {}
+            grounding = row_meta.get("grounding") if isinstance(row_meta.get("grounding"), dict) else {}
+            section_title = row.get("section_title") or result.get("section_title")
+            page_number = row.get("page_number")
+            document_id = str(row.get("document_id") or result.get("document_id") or grounding.get("document_id") or "")
+
+            result["chunk_id"] = chunk_id
+            if document_id:
+                result["document_id"] = document_id
+            if section_title:
+                result["section_title"] = section_title
+            if page_number is not None:
+                result["page_number"] = page_number
+
+            result["grounding"] = {
+                "document_id": document_id or grounding.get("document_id"),
+                "chunk_id": chunk_id,
+                "chunk_index": row.get("chunk_index", grounding.get("chunk_index")),
+                "document_title": result.get("document_title") or grounding.get("document_title"),
+                "section_title": section_title or grounding.get("section_title"),
+                "page_number": page_number if page_number is not None else grounding.get("page_number"),
+                "source": result.get("source") or result.get("document_source") or grounding.get("source"),
+            }
+
+        return results
 
 
 def get_vector_db_service(supabase_client) -> VectorDBService:

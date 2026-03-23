@@ -81,9 +81,12 @@ def patch_repo(isolated_repo):
 
 
 @pytest.mark.asyncio
-async def test_dashboard_returns_200_empty(client, patch_repo):
+async def test_dashboard_returns_200_empty(client, patch_repo, auth_headers_operator):
     """Dashboard returns 200 with zero decisions."""
-    resp = await client.get("/api/parasite/aegis/dashboard?site_id=site-002")
+    resp = await client.get(
+        "/api/parasite/aegis/dashboard?site_id=site-002",
+        headers=auth_headers_operator,
+    )
     assert resp.status_code == 200
     data = resp.json()
     assert data["site_id"] == "site-002"

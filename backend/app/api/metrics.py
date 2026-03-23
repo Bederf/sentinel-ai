@@ -306,6 +306,31 @@ sentinel_ai_cost_by_route_total = Counter(
     registry=REGISTRY,
 )
 
+# 32. Retrieval latency histogram (canonical/hybrid retrieval paths)
+sentinel_retrieval_latency_seconds = Histogram(
+    "sentinel_retrieval_latency_seconds",
+    "Retrieval query latency by retrieval path and fallback mode",
+    labelnames=["retrieval_path", "fallback"],
+    buckets=[0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0],
+    registry=REGISTRY,
+)
+
+# 33. Retrieval hit counter
+sentinel_retrieval_hits_total = Counter(
+    "sentinel_retrieval_hits_total",
+    "Total retrieval hits returned by retrieval path and fallback mode",
+    labelnames=["retrieval_path", "fallback"],
+    registry=REGISTRY,
+)
+
+# 34. Retrieval fallback usage counter
+sentinel_retrieval_fallbacks_total = Counter(
+    "sentinel_retrieval_fallbacks_total",
+    "Total retrieval fallback activations by fallback type",
+    labelnames=["fallback"],
+    registry=REGISTRY,
+)
+
 
 _site_name_cache: dict[str, str] = {}
 

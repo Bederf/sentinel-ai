@@ -3034,6 +3034,36 @@ class BackgroundSchedulerService:
 
         await scan_due_ghost_bookings()
 
+    def add_focus_relay_reconcile_job(self, interval_seconds: int = 30):
+        """Periodically reconcile focus-room relay state for cooldown expiry."""
+        job_id = "space_focus_relay_reconcile"
+        if self.scheduler.get_job(job_id):
+            self.scheduler.remove_job(job_id)
+
+        self.scheduler.add_job(
+            func=self._run_focus_relay_reconcile,
+            trigger=IntervalTrigger(seconds=interval_seconds),
+            id=job_id,
+            name="Space Focus Relay Reconcile",
+            replace_existing=True,
+        )
+        logger.info("Added focus relay reconcile job (%ds interval)", interval_seconds)
+
+    def _run_focus_relay_reconcile(self):
+        """Run focus-room relay cooldown reconciliation."""
+        try:
+            from app.services.focus_room_relay_service import scan_all_focus_relays
+
+            result = scan_all_focus_relays()
+            if result.get("changed", 0) > 0:
+                logger.info(
+                    "Focus relay reconcile: scanned=%d changed=%d",
+                    result.get("scanned", 0),
+                    result.get("changed", 0),
+                )
+        except Exception as e:
+            logger.error("Focus relay reconcile failed: %s", e, exc_info=True)
+
     # ------------------------------------------------------------------
     # Database archival (Phase 4 — Supabase Performance Optimization)
     # ------------------------------------------------------------------

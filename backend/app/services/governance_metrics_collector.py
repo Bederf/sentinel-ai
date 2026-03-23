@@ -36,6 +36,11 @@ _VALID_ERROR_TYPES = {
     "module_inactive",
 }
 
+_VALID_RETRIEVAL_PATHS = {
+    "canonical_doc_rag",
+    "hybrid_context_rag",
+}
+
 
 def _normalise_route(source: str) -> str:
     """Map a source string to a bounded route category."""
@@ -49,6 +54,28 @@ def _normalise_route(source: str) -> str:
     for prefix in ("background", "optimization"):
         if lower.startswith(prefix):
             return prefix
+    return "other"
+
+
+def _normalise_retrieval_path(path: str | None) -> str:
+    if not path:
+        return "unknown"
+    lowered = str(path).strip().lower()
+    if lowered in _VALID_RETRIEVAL_PATHS:
+        return lowered
+    if "canonical" in lowered and "rag" in lowered:
+        return "canonical_doc_rag"
+    if "hybrid" in lowered and "rag" in lowered:
+        return "hybrid_context_rag"
+    return "unknown"
+
+
+def _normalise_fallback_label(fallback: str | None) -> str:
+    if not fallback:
+        return "none"
+    lowered = str(fallback).strip().lower()
+    if lowered in {"ocr_fallback", "retry"}:
+        return lowered
     return "other"
 
 
@@ -184,6 +211,47 @@ class GovernanceMetricsCollector:
             sentinel_ai_cost_by_route_total.labels(route=safe_route, site_id=safe_site).inc(safe_cost)
         except Exception:
             logger.debug("Failed to record AI usage metric", exc_info=True)
+
+    def record_retrieval_telemetry(
+        self,
+        *,
+        retrieval_path: str | None,
+        duration_ms: float | int | None,
+        hit_count: int | None,
+        used_fallback: str | None,
+    ) -> None:
+        """Emit canonical retrieval telemetry metrics.
+
+        Args:
+            retrieval_path: Retrieval strategy/path identifier.
+            duration_ms: End-to-end query duration in milliseconds.
+            hit_count: Number of results returned.
+            used_fallback: Fallback identifier when fallback path was used.
+        """
+        try:
+            from app.api.metrics import (
+                sentinel_retrieval_fallbacks_total,
+                sentinel_retrieval_hits_total,
+                sentinel_retrieval_latency_seconds,
+            )
+
+            safe_path = _normalise_retrieval_path(retrieval_path)
+            safe_fallback = _normalise_fallback_label(used_fallback)
+            duration_seconds = max(0.0, float(duration_ms or 0.0) / 1000.0)
+            safe_hit_count = max(0, int(hit_count or 0))
+
+            sentinel_retrieval_latency_seconds.labels(
+                retrieval_path=safe_path,
+                fallback=safe_fallback,
+            ).observe(duration_seconds)
+            sentinel_retrieval_hits_total.labels(
+                retrieval_path=safe_path,
+                fallback=safe_fallback,
+            ).inc(safe_hit_count)
+            if safe_fallback != "none":
+                sentinel_retrieval_fallbacks_total.labels(fallback=safe_fallback).inc()
+        except Exception:
+            logger.debug("Failed to record retrieval telemetry metrics", exc_info=True)
 
 
 # Module-level singleton

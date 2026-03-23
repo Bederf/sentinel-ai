@@ -15,7 +15,7 @@ from app.api import integration, concept
 from app.api import concept_rag
 from app.api import modules, health_config, service_records, preferences
 from app.api import solar, water, sustainability, contracts, pricing, municipal_billing
-from app.api import parts_orders, approval_workflow, delivery_tracking, approvals, parasite_decisions
+from app.api import parts_orders, approval_workflow, delivery_tracking, approvals, parasite_decisions, approval
 from app.api import security, compliance, notifications, consent
 from app.api import privacy
 from app.api import asset_health
@@ -104,6 +104,9 @@ def register_operations_routers(app: FastAPI) -> None:
 
     # Niagara equipment control approvals (Phase 68-02)
     app.include_router(approvals.router, tags=["approvals"])
+
+    # Phase 170: Control actuation loop — supervised execution
+    app.include_router(approval.router, tags=["approval-execute"])
 
     # PARASITE decisions visibility (Phase 80-05)
     app.include_router(parasite_decisions.router)

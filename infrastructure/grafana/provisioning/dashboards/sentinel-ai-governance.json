@@ -293,6 +293,78 @@
         "mode": "markdown",
         "content": "## POPIA Monthly Evidence\n\nGenerated on-demand via API:\n\n`GET /api/governance/popia-evidence`\n\nCovers: consent metrics, retention enforcement, DSR completion, access control audit.\n\nEvidence packs stored in `popia_evidence_packs.json` (24-month FIFO)."
       }
+    },
+    {
+      "id": 16,
+      "title": "Canonical Document RAG Retrieval Telemetry",
+      "type": "row",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 49 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "id": 17,
+      "title": "Retrieval Latency (p95/p99)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 50 },
+      "datasource": { "type": "prometheus", "uid": "ef6rbinrkeu4gd" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le, retrieval_path, fallback) (rate(sentinel_retrieval_latency_seconds_bucket[5m])))",
+          "legendFormat": "p95 {{retrieval_path}}/{{fallback}}"
+        },
+        {
+          "refId": "B",
+          "expr": "histogram_quantile(0.99, sum by (le, retrieval_path, fallback) (rate(sentinel_retrieval_latency_seconds_bucket[5m])))",
+          "legendFormat": "p99 {{retrieval_path}}/{{fallback}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "stacking": { "mode": "none" }
+          }
+        }
+      }
+    },
+    {
+      "id": 18,
+      "title": "Retrieval Hits/sec",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 50 },
+      "datasource": { "type": "prometheus", "uid": "ef6rbinrkeu4gd" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (retrieval_path, fallback) (rate(sentinel_retrieval_hits_total[1m]))",
+          "legendFormat": "{{retrieval_path}}/{{fallback}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        }
+      }
+    },
+    {
+      "id": 19,
+      "title": "Fallback Rate",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 50 },
+      "datasource": { "type": "prometheus", "uid": "ef6rbinrkeu4gd" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (fallback) (rate(sentinel_retrieval_fallbacks_total[5m]))",
+          "legendFormat": "{{fallback}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        }
+      }
     }
   ],
   "refresh": "30s",

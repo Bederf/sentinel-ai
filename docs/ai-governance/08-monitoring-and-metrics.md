@@ -145,6 +145,22 @@ Recommended panels for the SENTINEL AI Governance dashboard:
 - **Description:** 95th percentile time from recommendation to approval decision. Long latency indicates approval workflow bottlenecks.
 - **Note:** Full latency histogram will be added in Phase 2 when real service hooks are wired.
 
+### Canonical Retrieval Latency P95/P99 (Time Series)
+
+- **P95 Query:** `histogram_quantile(0.95, sum by (le, retrieval_path, fallback) (rate(sentinel_retrieval_latency_seconds_bucket[5m])))`
+- **P99 Query:** `histogram_quantile(0.99, sum by (le, retrieval_path, fallback) (rate(sentinel_retrieval_latency_seconds_bucket[5m])))`
+- **Description:** Latency for canonical/hybrid retrieval paths segmented by fallback mode. Track `canonical_doc_rag` without fallback as the baseline.
+
+### Canonical Retrieval Hits/sec (Time Series)
+
+- **Query:** `sum by (retrieval_path, fallback) (rate(sentinel_retrieval_hits_total[1m]))`
+- **Description:** Throughput of retrieved hits returned to callers by retrieval path and fallback label.
+
+### Canonical Retrieval Fallback Rate (Time Series / Stat)
+
+- **Query:** `sum by (fallback) (rate(sentinel_retrieval_fallbacks_total[5m]))`
+- **Description:** Fallback activation rate. Should remain near zero for stable canonical retrieval.
+
 ## Alert Rules
 
 Alert rules mapping metrics to runbooks for operational response:

@@ -23,6 +23,7 @@ class TestHybridContext:
             equipment_id="S002-CHILLER-B1-001",
             equipment_type="Chiller",
             site_id="site-002",
+            retrieval_telemetry={"trace_id": "trace-123", "retrieval_path": "canonical_doc_rag"},
         )
         d = ctx.to_dict()
         assert d["equipment_id"] == "S002-CHILLER-B1-001"
@@ -30,6 +31,7 @@ class TestHybridContext:
         assert d["site_id"] == "site-002"
         assert isinstance(d["documents"], list)
         assert isinstance(d["telemetry"], dict)
+        assert d["retrievalTelemetry"]["trace_id"] == "trace-123"
 
     def test_format_for_prompt_empty(self):
         ctx = HybridContext()
@@ -234,6 +236,43 @@ class TestHybridQueryService:
 
         assert ctx.telemetry.get("operating_data", {}).get("runtime_hours") == 12000
         assert "telemetry" in ctx.sources_used
+
+    @pytest.mark.asyncio
+    async def test_gather_document_context_records_retrieval_telemetry(self):
+        svc = HybridQueryService(site_id="site-002")
+        ctx = HybridContext(site_id="site-002", equipment_type="Generator")
+
+        mock_search_svc = MagicMock()
+        mock_search_svc.search.return_value = {
+            "results": [
+                {
+                    "title": "Generator Annual Inspection",
+                    "document_type": "report",
+                    "snippet": "Inspection completed.",
+                    "score": 0.91,
+                    "source": "concept",
+                }
+            ]
+        }
+
+        with patch(
+            "app.services.concept_document_search.get_concept_document_search_service",
+            return_value=mock_search_svc,
+        ):
+            with patch.object(svc, "_record_retrieval_telemetry") as mock_record:
+                await svc._gather_document_context(
+                    ctx=ctx,
+                    equipment_id="S002-GEN-B1-001",
+                    question="latest generator report",
+                )
+
+        assert ctx.retrieval_telemetry is not None
+        assert ctx.retrieval_telemetry["retrieval_path"] == "canonical_doc_rag"
+        assert ctx.retrieval_telemetry["top_k_requested"] == 5
+        assert ctx.retrieval_telemetry["hit_count"] == 1
+        assert "trace_id" in ctx.retrieval_telemetry
+        assert "document_rag" in ctx.sources_used
+        mock_record.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_bacnet_ref_resolution(self):

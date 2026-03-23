@@ -116,7 +116,7 @@ def parse_mqtt_presence_message(topic: str, payload: bytes | str | dict[str, Any
         room_code=room_code,
         sensor_id=raw_data.get("sensor_id") or node_id or room_code,
         occupied=occupied,
-        room_type=raw_data.get("room_type", "meeting"),
+        room_type=node_override.get("room_type") or raw_data.get("room_type", "meeting"),
         timestamp=parsed_timestamp,
         moving=bool(moving) if moving is not None else None,
         stationary=bool(stationary) if stationary is not None else None,

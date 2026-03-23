@@ -73,6 +73,15 @@ export {
   type ApprovalStatus,
 } from './approvals';
 export {
+  decisionApi,
+  type Decision,
+  type ExecutionState,
+  type ExecutionProgress,
+  type ExecutionEvent,
+  type ApprovalExecutionRequest,
+  type ApprovalExecutionResponse,
+} from './decision';
+export {
   peakDemandApi,
   type DemandForecastResponse,
   type DemandStatus,

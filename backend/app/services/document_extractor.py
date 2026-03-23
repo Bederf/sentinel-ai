@@ -1,12 +1,15 @@
 """Document text extraction service for multiple file types."""
 
 import logging
+import io
 from pathlib import Path
 from typing import Tuple
 
 from fastapi import UploadFile
 
 logger = logging.getLogger(__name__)
+
+PDF_LOW_TEXT_THRESHOLD = 200
 
 
 def extract_text_from_pdf(file_bytes: bytes) -> str:
@@ -40,6 +43,61 @@ def extract_text_from_pdf(file_bytes: bytes) -> str:
     except Exception as e:
         logger.error(f"Error extracting text from PDF: {e}")
         raise
+
+
+def _extract_text_from_pdf_ocr(file_bytes: bytes) -> str:
+    """OCR fallback for low-text or scanned PDFs.
+
+    Returns an empty string if OCR dependencies are unavailable or OCR fails.
+    """
+    try:
+        import fitz  # PyMuPDF
+        import pytesseract
+        from PIL import Image
+    except Exception as exc:
+        logger.debug("PDF OCR fallback unavailable: %s", exc)
+        return ""
+
+    text_parts: list[str] = []
+    try:
+        doc = fitz.open(stream=file_bytes, filetype="pdf")
+        for page in doc:
+            pix = page.get_pixmap(matrix=fitz.Matrix(2.0, 2.0), alpha=False)
+            image = Image.open(io.BytesIO(pix.tobytes("png")))
+            text_parts.append(pytesseract.image_to_string(image, lang="eng"))
+        return "\n\n".join(part.strip() for part in text_parts if part and part.strip())
+    except Exception as exc:
+        logger.info("PDF OCR fallback failed: %s", exc)
+        return ""
+
+
+def extract_text_from_pdf_with_fallback(file_bytes: bytes) -> tuple[str, dict]:
+    """Extract PDF text natively first, then OCR when native text is low."""
+    native_text = extract_text_from_pdf(file_bytes)
+    native_length = len(native_text.strip())
+
+    metadata = {
+        "file_type": ".pdf",
+        "native_text_length": native_length,
+        "low_text_threshold": PDF_LOW_TEXT_THRESHOLD,
+        "ocr_used": False,
+    }
+
+    if native_length >= PDF_LOW_TEXT_THRESHOLD:
+        metadata["extraction_mode"] = "native"
+        return native_text, metadata
+
+    ocr_text = _extract_text_from_pdf_ocr(file_bytes)
+    if ocr_text.strip():
+        metadata["ocr_used"] = True
+        metadata["extraction_mode"] = "ocr_fallback"
+        metadata["ocr_text_length"] = len(ocr_text.strip())
+        metadata["fallback_reason"] = "low_native_text_pdf"
+        return ocr_text, metadata
+
+    metadata["extraction_mode"] = "native_low_text_no_ocr"
+    metadata["fallback_reason"] = "ocr_unavailable_or_failed"
+    return native_text, metadata
 
 
 def extract_text_from_docx(file_bytes: bytes) -> str:
@@ -100,7 +158,7 @@ async def extract_text(file: UploadFile) -> Tuple[str, dict]:
     file_ext = Path(file.filename or "").suffix.lower()
 
     if file_ext == ".pdf":
-        text = extract_text_from_pdf(content)
+        text, pdf_meta = extract_text_from_pdf_with_fallback(content)
     elif file_ext == ".docx":
         text = extract_text_from_docx(content)
     elif file_ext == ".txt":
@@ -114,6 +172,8 @@ async def extract_text(file: UploadFile) -> Tuple[str, dict]:
         "size_bytes": len(content),
         "file_type": file_ext,
     }
+    if file_ext == ".pdf":
+        metadata.update(pdf_meta)
 
     logger.info(f"Extracted text from {file.filename}: {len(text)} characters")
 

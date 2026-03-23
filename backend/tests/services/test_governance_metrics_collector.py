@@ -11,6 +11,8 @@ from app.api.metrics import REGISTRY
 from app.services.governance_metrics_collector import (
     governance_metrics,
     _normalise_route,
+    _normalise_retrieval_path,
+    _normalise_fallback_label,
 )
 
 
@@ -125,6 +127,12 @@ class TestGovernanceMetricsCollector:
         governance_metrics.record_approval_latency(None, None, None)
         governance_metrics.record_approval_rejection(None, None)
         governance_metrics.record_ai_usage(None, None, None, None, None)
+        governance_metrics.record_retrieval_telemetry(
+            retrieval_path=None,
+            duration_ms=None,
+            hit_count=None,
+            used_fallback=None,
+        )
 
         # Empty strings
         governance_metrics.record_quality_gate_rule("", "")
@@ -161,6 +169,20 @@ class TestRouteNormalisation:
         assert _normalise_route(None) == "other"
 
 
+class TestRetrievalNormalisation:
+    def test_retrieval_path_normalisation(self):
+        assert _normalise_retrieval_path("canonical_doc_rag") == "canonical_doc_rag"
+        assert _normalise_retrieval_path("canonical-doc-rag") == "canonical_doc_rag"
+        assert _normalise_retrieval_path("hybrid_context_rag") == "hybrid_context_rag"
+        assert _normalise_retrieval_path("unknown") == "unknown"
+
+    def test_fallback_normalisation(self):
+        assert _normalise_fallback_label(None) == "none"
+        assert _normalise_fallback_label("ocr_fallback") == "ocr_fallback"
+        assert _normalise_fallback_label("retry") == "retry"
+        assert _normalise_fallback_label("custom") == "other"
+
+
 class TestMetricsEndpointIntegration:
     """Integration tests verifying new metrics appear in Prometheus output."""
 
@@ -176,6 +198,9 @@ class TestMetricsEndpointIntegration:
             # sentinel_approval_rejection_rate removed — uses sentinel_approval_decisions_total
             "sentinel_ai_tokens_by_route_total",
             "sentinel_ai_cost_by_route_total",
+            "sentinel_retrieval_latency_seconds",
+            "sentinel_retrieval_hits_total",
+            "sentinel_retrieval_fallbacks_total",
         ]
 
         for metric_name in expected_families:

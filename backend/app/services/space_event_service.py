@@ -117,6 +117,13 @@ async def process_occupancy_event(
             source=source,
             room_type="focus",
         )
+        # Keep focus-room relay/light state in sync with overstay + cooldown policy.
+        try:
+            from app.services.focus_room_relay_service import sync_focus_room_relay
+
+            result["focus_relay"] = sync_focus_room_relay(site_id=site_id, room_code=room_code, now=now)
+        except Exception as exc:
+            _logger.warning("Focus relay sync failed for %s: %s", room_code, exc)
         return result
 
     active_bookings = get_active_bookings_for_room(site_id, room_code, now)

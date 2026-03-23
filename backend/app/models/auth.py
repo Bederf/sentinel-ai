@@ -35,8 +35,9 @@ class SentinelRole(str, Enum):
     """
 
     ADMIN = "admin"  # Full platform administration
-    OPERATOR = "operator"  # BMS operations, device control, optimization
+    ENGINEER = "engineer"  # Control engineering, high-risk approvals (Phase 170-02)
     DEVELOPER = "developer"  # Development access, debugging, testing
+    OPERATOR = "operator"  # BMS operations, device control, optimization
     AUDITOR = "auditor"  # Read-only access for compliance review
     BOT_AGENT = "bot_agent"  # Restricted role for automated bot agents (Phase 120-03)
 
@@ -44,6 +45,7 @@ class SentinelRole(str, Enum):
 # Role hierarchy: higher roles inherit lower role permissions
 ROLE_HIERARCHY: Dict[SentinelRole, int] = {
     SentinelRole.ADMIN: 4,
+    SentinelRole.ENGINEER: 3,  # Can approve CRITICAL tier decisions (Phase 170-02)
     SentinelRole.DEVELOPER: 3,
     SentinelRole.OPERATOR: 2,
     SentinelRole.AUDITOR: 1,

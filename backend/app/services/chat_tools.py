@@ -3196,6 +3196,48 @@ CHAT_TOOLS = [
             },
             "required": [],
         },
+        "output_schema": {
+            "type": "object",
+            "properties": {
+                "success": {"type": "boolean"},
+                "equipment_id": {"type": ["string", "null"]},
+                "equipment_type": {"type": ["string", "null"]},
+                "site_id": {"type": "string"},
+                "sources_used": {"type": "array", "items": {"type": "string"}},
+                "retrievalTelemetry": {
+                    "type": ["object", "null"],
+                    "properties": {
+                        "trace_id": {"type": "string"},
+                        "retrieval_path": {"type": "string"},
+                        "query_time_ms": {"type": "integer"},
+                        "top_k_requested": {"type": "integer"},
+                        "hit_count": {"type": "integer"},
+                        "used_fallback": {"type": ["string", "null"]},
+                        "fallback_reason": {"type": ["string", "null"]},
+                    },
+                    "required": [
+                        "trace_id",
+                        "retrieval_path",
+                        "query_time_ms",
+                        "top_k_requested",
+                        "hit_count",
+                        "used_fallback",
+                    ],
+                },
+                "context": {"type": "object"},
+                "prompt_context": {"type": "string"},
+            },
+            "required": [
+                "success",
+                "equipment_id",
+                "equipment_type",
+                "site_id",
+                "sources_used",
+                "retrievalTelemetry",
+                "context",
+                "prompt_context",
+            ],
+        },
     },
     # ================================================================
     # Write/Action Tools — Operator+ only (role-gated)
@@ -4250,19 +4292,32 @@ def _format_doc_results(results: list[dict], query: str) -> dict[str, Any]:
         }
 
     formatted = []
+    citations: list[dict[str, Any]] = []
     for r in results:
+        grounding = r.get("grounding") if isinstance(r.get("grounding"), dict) else {}
+        citation = {
+            "document_id": grounding.get("document_id") or r.get("document_id"),
+            "chunk_id": grounding.get("chunk_id") or r.get("chunk_id") or r.get("id"),
+            "document_title": grounding.get("document_title") or r.get("document_title", "Unknown"),
+            "section_title": grounding.get("section_title") or r.get("section_title"),
+            "page_number": grounding.get("page_number") if grounding else r.get("page_number"),
+            "source": grounding.get("source") or r.get("source") or r.get("document_source"),
+        }
         formatted.append(
             {
                 "title": r.get("document_title", "Unknown"),
                 "content": r.get("content", "")[:1500],
                 "source": r.get("source", ""),
                 "relevance": round(r.get("similarity", r.get("hybrid_score", 0)), 3),
+                "citation": citation,
             }
         )
+        citations.append(citation)
 
     return {
         "success": True,
         "results": formatted,
+        "citations": citations,
         "count": len(formatted),
         "query": query,
     }
@@ -4360,6 +4415,7 @@ async def get_hybrid_context(
             "equipment_type": ctx.equipment_type,
             "site_id": effective_site,
             "sources_used": ctx.sources_used,
+            "retrievalTelemetry": ctx.retrieval_telemetry,
             "context": ctx.to_dict(),
             "prompt_context": ctx.format_for_prompt(),
         }

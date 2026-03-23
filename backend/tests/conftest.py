@@ -452,10 +452,16 @@ def jwt_token_admin() -> str:
     from datetime import datetime, timedelta, timezone
 
     secret = os.environ.get("JWT_SECRET_KEY", "test-only-jwt-secret-for-ci-at-least-32-chars")
+    import uuid
+
     payload = {
         "sub": "admin-test-user",
         "email": "admin@test.sentinel.local",
         "role": "admin",
+        "iss": "sentinel.bms",
+        "aud": "sentinel.bms",
+        "token_type": "access",
+        "jti": str(uuid.uuid4()),
         "iat": datetime.now(timezone.utc),
         "exp": datetime.now(timezone.utc) + timedelta(hours=1),
     }
@@ -469,10 +475,16 @@ def jwt_token_operator() -> str:
     from datetime import datetime, timedelta, timezone
 
     secret = os.environ.get("JWT_SECRET_KEY", "test-only-jwt-secret-for-ci-at-least-32-chars")
+    import uuid
+
     payload = {
         "sub": "operator-test-user",
         "email": "operator@test.sentinel.local",
         "role": "operator",
+        "iss": "sentinel.bms",
+        "aud": "sentinel.bms",
+        "token_type": "access",
+        "jti": str(uuid.uuid4()),
         "iat": datetime.now(timezone.utc),
         "exp": datetime.now(timezone.utc) + timedelta(hours=1),
     }
@@ -486,10 +498,39 @@ def jwt_token_auditor() -> str:
     from datetime import datetime, timedelta, timezone
 
     secret = os.environ.get("JWT_SECRET_KEY", "test-only-jwt-secret-for-ci-at-least-32-chars")
+    import uuid
+
     payload = {
         "sub": "auditor-test-user",
         "email": "auditor@test.sentinel.local",
         "role": "auditor",
+        "iss": "sentinel.bms",
+        "aud": "sentinel.bms",
+        "token_type": "access",
+        "jti": str(uuid.uuid4()),
+        "iat": datetime.now(timezone.utc),
+        "exp": datetime.now(timezone.utc) + timedelta(hours=1),
+    }
+    return jwt.encode(payload, secret, algorithm="HS256")
+
+
+@pytest.fixture
+def jwt_token_engineer() -> str:
+    """Generate a valid JWT token for ENGINEER role."""
+    import jwt
+    from datetime import datetime, timedelta, timezone
+
+    secret = os.environ.get("JWT_SECRET_KEY", "test-only-jwt-secret-for-ci-at-least-32-chars")
+    import uuid
+
+    payload = {
+        "sub": "engineer-test-user",
+        "email": "engineer@test.sentinel.local",
+        "role": "engineer",
+        "iss": "sentinel.bms",
+        "aud": "sentinel.bms",
+        "token_type": "access",
+        "jti": str(uuid.uuid4()),
         "iat": datetime.now(timezone.utc),
         "exp": datetime.now(timezone.utc) + timedelta(hours=1),
     }
@@ -512,3 +553,9 @@ def auth_headers_operator(jwt_token_operator: str) -> dict:
 def auth_headers_auditor(jwt_token_auditor: str) -> dict:
     """HTTP headers with AUDITOR JWT token."""
     return {"Authorization": f"Bearer {jwt_token_auditor}"}
+
+
+@pytest.fixture
+def auth_headers_engineer(jwt_token_engineer: str) -> dict:
+    """HTTP headers with ENGINEER JWT token."""
+    return {"Authorization": f"Bearer {jwt_token_engineer}"}

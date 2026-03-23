@@ -122,5 +122,13 @@
   "tests/services/test_trust_scoring.py::TestTrustHistoryPersistence::test_validation_runs_increment": true,
   "tests/services/test_trust_scoring.py::TestTrustHistoryPersistence::test_validation_error_resets_stability_days": true,
   "tests/services/test_trust_scoring.py::TestTrustHistoryPersistence::test_control_action_recording": true,
-  "tests/services/test_tier_routing_engine.py::TestTierRoutingEngine::test_tier_2_lock_for_high_critical_risk[critical-0.5-tier2]": true
+  "tests/services/test_tier_routing_engine.py::TestTierRoutingEngine::test_tier_2_lock_for_high_critical_risk[critical-0.5-tier2]": true,
+  "tests/api/test_aegis_dashboard.py::test_dashboard_returns_200_empty": true,
+  "tests/api/test_aegis_dashboard.py::test_dashboard_filters_by_execution_mode": true,
+  "tests/api/test_aegis_dashboard.py::test_dashboard_kpis_count_correctly": true,
+  "tests/api/test_aegis_dashboard.py::test_dashboard_ignores_non_aegis_decisions": true,
+  "tests/api/test_aegis_dashboard.py::test_dashboard_pending_only_pending": true,
+  "tests/api/test_aegis_dashboard.py::test_existing_endpoints_unaffected": true,
+  "tests/api/test_governance_metrics_api.py::TestApprovalLatencyEndpoint::test_approval_latency_endpoint": true,
+  "tests/api/test_governance_metrics_api.py::TestApprovalLatencyEndpoint::test_approval_latency_percentiles_structure": true
 }

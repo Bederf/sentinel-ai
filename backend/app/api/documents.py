@@ -96,6 +96,7 @@ TECHNICIAN_CATEGORIES = {
 }
 
 ALERT_OFFSETS_DAYS = (90, 30, 7)
+PDF_LOW_TEXT_NATIVE_THRESHOLD = 200
 
 # Retention defaults (policy scaffold). Can be moved to DB-backed policy table.
 RETENTION_RULE_DAYS = {
@@ -310,9 +311,19 @@ async def upload_document(
         )
 
     # Use scanner-extracted text for PDFs, fall back to extractor for other types
-    if scan_result.detected_type == "PDF" and scan_result.extracted_text.strip():
+    if (
+        scan_result.detected_type == "PDF"
+        and scan_result.extracted_text.strip()
+        and len(scan_result.extracted_text.strip()) >= PDF_LOW_TEXT_NATIVE_THRESHOLD
+    ):
         extracted_text = scan_result.extracted_text
-        metadata = {"size_bytes": len(file_content)}
+        metadata = {
+            "size_bytes": len(file_content),
+            "file_type": ".pdf",
+            "extraction_mode": "native_scanner",
+            "native_text_length": len(scan_result.extracted_text.strip()),
+            "ocr_used": False,
+        }
     else:
         # 3. Extract text (for non-PDF types or when scanner text is empty)
         try:

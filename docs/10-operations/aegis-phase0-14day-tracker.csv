@@ -12,4 +12,4 @@ day,date,site_id,data_mode,proposals_24h,approved_24h,rejected_24h,blocked_24h,a
 11,2026-03-20,site-002,simulation,0,0,0,0,,0,0,0,,,yes,no,no,Day 11 auto-collected by AEGIS evidence scheduler
 12,2026-03-21,site-001,simulation,0,0,0,0,,0,0,0,,,yes,no,no,Day 12 auto-collected by AEGIS evidence scheduler
 13,2026-03-21,site-002,simulation,0,0,0,0,,0,0,0,,,yes,no,no,Day 13 auto-collected by AEGIS evidence scheduler
-14,YYYY-MM-DD,site-002,simulation,,,,,,,,,,,,,
+14,2026-03-23,site-001,simulation,0,0,0,0,,0,0,0,,,yes,no,no,Day 14 auto-collected by AEGIS evidence scheduler

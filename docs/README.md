@@ -27,6 +27,7 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 ### 🏗️ Architecture
 - [System Overview](02-architecture/system-overview.md) - High-level architecture
 - [Document Retrieval Canonical Index](02-architecture/document-retrieval-canonical-note.md) - Canonical subsystem names and boundaries for retrieval/intake/OCR pipelines
+- [Concept→Canonical RAG Migration Checklist](02-architecture/concept-rag-convergence-migration-checklist.md) - ADR-005 execution checklist: deprecation flags, compatibility window, telemetry gates, cutover/rollback criteria
 - **[Frontend Navigation Architecture](02-architecture/frontend-navigation.md)** - Two-level navigation: minimal global sidebar (4 items) + scrollable module-gated building detail tabs (23 views)
 - [Architecture Repository (TOGAF)](architecture-repository/README.md) - TOGAF-aligned architecture principles, governance, landscapes, and roadmaps
 - [Module System](02-architecture/module-system.md) - Bolt-on module architecture, activation, cross-module integrations

@@ -391,6 +391,8 @@ class Settings(BaseSettings):
     focus_min_session_seconds: int = 180  # Discard sessions shorter than 3 min (noise)
     focus_extended_use_seconds: int = 7200  # Flag sessions longer than 2 hours
     focus_red_light_cooldown_seconds: int = 300  # Keep red light on for 5 minutes after overstay ends
+    focus_relay_enabled: bool = True  # Publish relay/light control for focus room overstay
+    focus_relay_topic_template: str = "sentinel/node/{node_id}/relay"
 
     # Cost alert threshold — sends Telegram alert when daily spend exceeds this (ZAR)
     cost_alert_daily_threshold_zar: float = 100.0
