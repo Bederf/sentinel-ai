@@ -354,26 +354,28 @@ class TestTestingBypass:
 
     @pytest.mark.asyncio
     async def test_testing_bypass_enabled_allows_access(self):
-        """When TESTING=true, requests are granted OPERATOR access."""
+        """When TESTING=true, bypass is now DISABLED — requests still require auth (Hardening Rite)."""
         transport = ASGITransport(app=app)
         with patch.dict(os.environ, {"TESTING": "true"}):
             async with AsyncClient(transport=transport, base_url="http://test") as c:
                 resp = await c.get("/api/buildings/site-002/equipment")
-                # Should not be 401 — TESTING bypass active
-                assert resp.status_code != 401
+                # Phase 168 removed TESTING bypass; all requests now require real JWT tokens
+                assert resp.status_code == 401
 
     @pytest.mark.asyncio
     async def test_testing_bypass_grants_operator_not_admin(self):
-        """TESTING bypass should grant OPERATOR role, not ADMIN.
+        """TESTING bypass is now DISABLED — no special role granted.
 
-        This limits blast radius — test bypass cannot access admin-only endpoints.
+        Phase 168 removed the TESTING=true bypass entirely as part of Universal Engine hardening.
+        All requests now require real JWT tokens regardless of TESTING env var.
         """
 
         transport = ASGITransport(app=app)
         with patch.dict(os.environ, {"TESTING": "true"}):
             async with AsyncClient(transport=transport, base_url="http://test") as c:
-                # Make a request and check what role was assigned
+                # Make a request and verify it fails with 401 (no bypass)
                 resp = await c.get("/api/buildings/site-002/equipment")
+                assert resp.status_code == 401, "TESTING bypass should be disabled in Phase 168"
                 # The TESTING bypass sets role=OPERATOR (line 234 in middleware.py)
                 # We can't directly inspect request.state from here, but we
                 # verify it by checking that admin-only endpoints are blocked
