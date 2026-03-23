@@ -229,6 +229,7 @@ export function ArcadeView({ siteId, onModuleDisplayChange }: ArcadeViewProps) {
     <div
       className="arcade-view"
       style={{
+        position: "relative",
         background: "var(--color-sentinel-bg-panel, #0a0a0f)",
         border: "1px solid var(--color-sentinel-border, rgba(255,255,255,0.08))",
         borderRadius: 8,

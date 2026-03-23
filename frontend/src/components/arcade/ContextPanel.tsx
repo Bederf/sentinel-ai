@@ -23,11 +23,11 @@ export function ContextPanel({
     <div
       data-slot="context-panel"
       style={{
-        position: "fixed",
+        position: "absolute",
         right: open ? 0 : "-320px",
         top: 0,
         width: "300px",
-        height: "100vh",
+        height: "100%",
         background: "var(--color-sentinel-bg-panel, #0a0a0f)",
         borderLeft: "1px solid var(--color-sentinel-border, rgba(255,255,255,0.08))",
         transition: "right 0.25s ease",
@@ -38,6 +38,7 @@ export function ContextPanel({
         flexDirection: "column",
         gap: 12,
         fontFamily: "system-ui, sans-serif",
+        overflowY: "auto",
       }}
       aria-hidden={!open}
     >

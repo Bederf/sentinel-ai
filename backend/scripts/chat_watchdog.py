@@ -7,7 +7,6 @@ deduplicates via hash, and appends new items to TODO-auto.md.
 
 import json
 import hashlib
-import os
 import re
 from datetime import datetime
 from pathlib import Path
@@ -31,7 +30,7 @@ def normalize_query(query: str) -> str:
     normalized = query.strip().lower()
 
     # Remove extra whitespace
-    normalized = re.sub(r'\s+', ' ', normalized)
+    normalized = re.sub(r"\s+", " ", normalized)
 
     return normalized
 
@@ -77,7 +76,7 @@ def load_existing_hashes(todo_path: Path) -> Set[str]:
         return set()
 
     existing_hashes = set()
-    hash_pattern = re.compile(r'hash:\s*([a-f0-9]{16})')
+    hash_pattern = re.compile(r"hash:\s*([a-f0-9]{16})")
 
     try:
         with open(todo_path, "r") as f:
@@ -100,9 +99,9 @@ def format_todo_entry(query: str, query_hash: str, timestamp: str) -> str:
 
     # Parse and format timestamp
     try:
-        dt = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+        dt = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
         date_str = dt.strftime("%Y-%m-%d")
-    except:
+    except Exception:
         date_str = timestamp[:10] if len(timestamp) >= 10 else "unknown"
 
     return f"- [ ] **[INVESTIGATE][P2]** {display_query} (first seen: {date_str}, hash: {query_hash})\n"
@@ -139,11 +138,7 @@ def main():
             continue
         seen_hashes.add(query_hash)
 
-        new_items.append({
-            "query": query,
-            "hash": query_hash,
-            "timestamp": timestamp
-        })
+        new_items.append({"query": query, "hash": query_hash, "timestamp": timestamp})
 
     print(f"Found {len(new_items)} non-trivial unique queries after filtering")
 
@@ -156,10 +151,7 @@ def main():
     existing_hashes = load_existing_hashes(todo_path)
 
     # Filter out items already in TODO-auto.md
-    truly_new_items = [
-        item for item in new_items
-        if item["hash"] not in existing_hashes
-    ]
+    truly_new_items = [item for item in new_items if item["hash"] not in existing_hashes]
 
     print(f"Found {len(truly_new_items)} new items not in TODO-auto.md")
 
@@ -170,11 +162,7 @@ def main():
     # Prepare new entries
     entries_text = ""
     for item in truly_new_items:
-        entries_text += format_todo_entry(
-            item["query"],
-            item["hash"],
-            item["timestamp"]
-        )
+        entries_text += format_todo_entry(item["query"], item["hash"], item["timestamp"])
 
     # Write to TODO-auto.md
     try:
