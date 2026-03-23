@@ -299,26 +299,47 @@ function App() {
     return () => clearInterval(healthInterval);
   }, []);
 
-  // Crisis state polling — pre-warms DecisionMomentPage when urgency > 0.7
+  // Crisis state polling — pre-warms DecisionMomentPage when urgency >= 0.70
+  const crisisPollAbortRef = useRef<AbortController | null>(null);
   useEffect(() => {
     if (!effectiveSiteId) return;
 
     const pollDecisions = async () => {
       try {
-        const resp = await fetch(`/api/decisions/current/${effectiveSiteId}`);
+        // Cancel previous in-flight request to prevent race conditions
+        if (crisisPollAbortRef.current) {
+          crisisPollAbortRef.current.abort();
+        }
+        crisisPollAbortRef.current = new AbortController();
+
+        const resp = await fetch(`/api/decisions/current/${encodeURIComponent(effectiveSiteId)}`, {
+          signal: crisisPollAbortRef.current.signal,
+        });
         if (!resp.ok) return; // 422 (no active fault) or network error — fail silently
-        const data = await resp.json();
-        const score = typeof data.urgency_score === "number" ? data.urgency_score : 0;
+        const json = await resp.json();
+        // Unwrap .data field to match ArcadeView pattern
+        const payload = json.data ?? json;
+        const score = typeof payload.urgency_score === "number" ? payload.urgency_score : 0;
         setCrisisUrgencyScore(score);
-        if (score > 0.7) setCrisisPayload(data as DecisionMomentPayload);
-      } catch {
+        // Use >= 0.70 threshold to match ArcadeView URGENCY_THRESHOLD
+        if (score >= 0.70) setCrisisPayload(payload as DecisionMomentPayload);
+      } catch (err) {
+        // Ignore abort errors (from race guard cancellation)
+        if (err instanceof Error && err.name === "AbortError") {
+          return;
+        }
         // Network unavailable — keep previous state, do not reset
       }
     };
 
     pollDecisions();
     const interval = setInterval(pollDecisions, 30000);
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      if (crisisPollAbortRef.current) {
+        crisisPollAbortRef.current.abort();
+      }
+    };
   }, [effectiveSiteId]);
 
   // Fetch and count unread alerts

@@ -108,6 +108,7 @@ export function ArcadeView({ siteId, onModuleDisplayChange }: ArcadeViewProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Trigger state
   const [selectedFloor, setSelectedFloor] = useState<string | null>(null);
@@ -151,8 +152,15 @@ export function ArcadeView({ siteId, onModuleDisplayChange }: ArcadeViewProps) {
 
   async function fetchPayload() {
     try {
+      // Cancel previous in-flight request to prevent race conditions
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      abortControllerRef.current = new AbortController();
+
       const response = await authorizedFetch(
-        `/api/decisions/current/${encodeURIComponent(siteId)}`
+        `/api/decisions/current/${encodeURIComponent(siteId)}`,
+        { signal: abortControllerRef.current.signal }
       );
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
@@ -162,6 +170,10 @@ export function ArcadeView({ siteId, onModuleDisplayChange }: ArcadeViewProps) {
       setPayload(data);
       setError(null);
     } catch (err) {
+      // Ignore abort errors (from race guard cancellation)
+      if (err instanceof Error && err.name === "AbortError") {
+        return;
+      }
       const msg = err instanceof Error ? err.message : "Unknown error";
       setError(msg);
       // Keep stale payload if we have one — graceful degradation.
