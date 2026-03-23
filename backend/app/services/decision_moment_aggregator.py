@@ -312,6 +312,12 @@ class DecisionMomentAggregator:
             "has_spatial_data": False,
             "floor_stack": [],
             "deployment_mode": profile.get("deployment_mode", "ghost") if profile else "ghost",
+            "dismiss_window_minutes": (
+                profile.get("crisis_logic", {}).get("dismiss_window_minutes", 30) if profile else 30
+            ),
+            "equipment_count": 0,
+            "active_risk_count": 0,
+            "health_pct": 100,
         }
         try:
             repo = get_site_3d_config_repository()
