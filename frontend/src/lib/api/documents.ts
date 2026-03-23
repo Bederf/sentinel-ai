@@ -25,6 +25,18 @@ export interface DocumentUploadResponse {
   storage_path: string;
 }
 
+export interface TechnicianDocumentUploadRequest {
+  file: File;
+  equipmentId: string;
+  documentName: string;
+  documentSubClass: string;
+  categoryDiscipline: string;
+  documentCreationDate: string;
+  triggerDate: string;
+  title?: string;
+  siteId?: string;
+}
+
 export const documentsApi = {
   /**
    * Upload a document for a specific building.
@@ -61,6 +73,41 @@ export const documentsApi = {
     if (!response.ok) {
       const error = await response.json().catch(() => ({ detail: 'Upload failed' }));
       throw new Error(error.detail || `Upload failed: ${response.status}`);
+    }
+
+    return response.json();
+  },
+
+  /**
+   * Upload a technician/compliance document with strict metadata validation.
+   *
+   * Identity and site are derived server-side from the authenticated user
+   * (siteId is optional and only used in explicit multi-site scenarios).
+   */
+  async uploadTechnicianDocument(payload: TechnicianDocumentUploadRequest): Promise<DocumentUploadResponse> {
+    const formData = new FormData();
+    formData.append('file', payload.file);
+    formData.append('equipment_id', payload.equipmentId);
+    formData.append('document_name', payload.documentName);
+    formData.append('document_sub_class', payload.documentSubClass);
+    formData.append('category_discipline', payload.categoryDiscipline);
+    formData.append('document_creation_date', payload.documentCreationDate);
+    formData.append('trigger_date', payload.triggerDate);
+    if (payload.title) {
+      formData.append('title', payload.title);
+    }
+    if (payload.siteId) {
+      formData.append('site_id', payload.siteId);
+    }
+
+    const response = await authorizedFetch(`${API_BASE_URL}/documents/technician/upload`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Technician upload failed' }));
+      throw new Error(error.detail || `Technician upload failed: ${response.status}`);
     }
 
     return response.json();

@@ -42,6 +42,7 @@ pytest-timeout>=2.1.0
 
 # Background Tasks
 apscheduler==3.10.4
+filelock>=3.13.0  # Concurrent archival safety (Phase 168-03)
 
 # Web Scraping (Equipment Lookup)
 aiohttp>=3.9.0

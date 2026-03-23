@@ -28,6 +28,7 @@ interface BuildingMetadata {
   has_spatial_data?: boolean;
   floor_stack?: unknown[];
   deployment_mode?: string;
+  dismiss_window_minutes?: number;
   equipment_count?: number | null;
   active_risk_count?: number | null;
   health_pct?: number | null;
@@ -56,17 +57,31 @@ export interface ArcadeViewProps {
 
 const POLL_INTERVAL_MS = 30_000;
 const URGENCY_THRESHOLD = 0.70;
-const SUPPRESS_MINUTES = 30;
 
 const DEFAULT_FLOOR_ORDER = ["R", "L2", "L1", "L0", "G", "B1"];
 
-// ─── Suppress helpers (localStorage) ─────────────────────────────────────────
+// ─── Suppress helpers (localStorage + config-driven) ──────────────────────────
 
-const suppressKey = (siteId: string) => `sentinel_crisis_suppress_${siteId}`;
+/**
+ * Extract suppress window from payload (default 30 min).
+ * Reads from payload.building_metadata.dismiss_window_minutes.
+ * This allows each site to have its own suppression policy.
+ */
+function getSuppressMinutes(payload: DecisionPayload | null): number {
+  return payload?.building_metadata?.dismiss_window_minutes ?? 30;
+}
 
+/**
+ * Key for localStorage — site-specific suppress window.
+ */
+const SUPPRESS_KEY = (siteId: string) => `sentinel_crisis_suppress_${siteId}`;
+
+/**
+ * Check if crisis is currently suppressed (has unexpired suppress window in localStorage).
+ */
 function isSuppressed(siteId: string): boolean {
   try {
-    const ts = localStorage.getItem(suppressKey(siteId));
+    const ts = localStorage.getItem(SUPPRESS_KEY(siteId));
     if (!ts) return false;
     return new Date() < new Date(ts);
   } catch {
@@ -74,10 +89,25 @@ function isSuppressed(siteId: string): boolean {
   }
 }
 
-function setSuppressed(siteId: string): void {
+/**
+ * Set suppress window in localStorage using config-driven duration (from payload).
+ * BLOCKER FIX: Duration comes from payload, not hardcoded constant.
+ */
+function setSuppressed(siteId: string, suppressMinutes: number): void {
   try {
-    const until = new Date(Date.now() + SUPPRESS_MINUTES * 60 * 1000);
-    localStorage.setItem(suppressKey(siteId), until.toISOString());
+    const until = new Date(Date.now() + suppressMinutes * 60 * 1000);
+    localStorage.setItem(SUPPRESS_KEY(siteId), until.toISOString());
+  } catch {
+    // localStorage unavailable — ignore
+  }
+}
+
+/**
+ * Clear suppress window (optional cleanup).
+ */
+function _clearSuppress(siteId: string): void {
+  try {
+    localStorage.removeItem(SUPPRESS_KEY(siteId));
   } catch {
     // localStorage unavailable — ignore
   }
@@ -118,14 +148,18 @@ export function ArcadeView({ siteId, onModuleDisplayChange }: ArcadeViewProps) {
   // ── Crisis handlers ──────────────────────────────────────────────────────
 
   const handleCrisisDismiss = () => {
-    setSuppressed(siteId);
+    // BLOCKER FIX: Read suppress window from payload, not hardcoded.
+    const suppressMinutes = getSuppressMinutes(payload);
+    setSuppressed(siteId, suppressMinutes);
     // Suppress is re-evaluated on next poll (every 30s) or re-render.
-    // Force re-render by re-fetching immediately so UI updates without waiting.
+    // Force re-fetch to refresh state and confirm suppress is active.
     fetchPayload();
   };
 
   const handleCrisisApprove = async () => {
-    setSuppressed(siteId);
+    // BLOCKER FIX: Read suppress window from payload, not hardcoded.
+    const suppressMinutes = getSuppressMinutes(payload);
+    setSuppressed(siteId, suppressMinutes);
     // Future: POST to /api/decisions/approve — Phase 168.
     fetchPayload();
   };

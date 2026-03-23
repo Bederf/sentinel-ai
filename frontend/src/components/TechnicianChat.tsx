@@ -28,8 +28,10 @@ import {
   FileText,
   Download,
   Building2,
+  Upload,
 } from 'lucide-react';
 import { authorizedFetch } from '../lib/api/client';
+import { documentsApi } from '../lib/api/documents';
 import {
   conceptDocumentsApi,
   type ConceptDocumentSearchResult,
@@ -181,6 +183,15 @@ export default function TechnicianChat({ siteId, siteLabel }: TechnicianChatProp
   const [activeFlowId, setActiveFlowId] = useState<string | null>(null);
   const [isOnlineMode, setIsOnlineMode] = useState(isOnline());
   const [conceptSearchEnabled, setConceptSearchEnabled] = useState(false);
+  const [showDocumentUpload, setShowDocumentUpload] = useState(false);
+  const [documentUploading, setDocumentUploading] = useState(false);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [equipmentId, setEquipmentId] = useState('');
+  const [documentName, setDocumentName] = useState('Air-Handler Unit (AHU) Major Service');
+  const [documentSubClass, setDocumentSubClass] = useState('HVAC');
+  const [categoryDiscipline, setCategoryDiscipline] = useState('Preventive Maintenance');
+  const [documentCreationDate, setDocumentCreationDate] = useState('');
+  const [triggerDate, setTriggerDate] = useState('');
   const [conceptSearch, setConceptSearch] = useState<ConceptSearchState>({
     status: 'idle',
     query: '',
@@ -191,6 +202,68 @@ export default function TechnicianChat({ siteId, siteLabel }: TechnicianChatProp
   });
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const technicianDocumentNames = [
+    'Roof Guarantee Certificate',
+    'Warranties',
+    'Air-Handler Unit (AHU) Major Service',
+    'Air-Handler Unit (AHU) Minor Service',
+    'Air-Handler Unit (AHU) Weekly Inspection',
+    'Cooling Tower (CT) Major Service',
+    'Cooling Tower (CT) Minor Service',
+    'Cooling Tower (CT) Weekly Inspection',
+    'Chiller Major Service',
+    'Chiller Minor Service',
+    'Chiller Weekly Inspection',
+    'Building Management System (BMS) Service',
+    'Distribution Boards (DB) Maintenance',
+    'Transformer Service',
+    'Fire Pump System Inspection',
+    'Generator Major Service',
+    'Generator Weekly Test',
+    'Lift Service',
+    'Solar PV Weekly Inspection',
+    'UPS Weekly Inspection',
+    'Waste Management Service',
+    'Certificate of Compliance (COC)',
+    'Earth Leakage Test',
+    'Plumbing Certificate of Compliance',
+    'Electrical Equipment Certificates',
+    'Portable Electrical Tool Inspection',
+    'Potable Water Test Results',
+    'Pressure Vessel Test Certificate',
+    'Spillage Incidents Report',
+    'Water Consumption Reports',
+    'Building Inspection Report',
+    'Occupational Hygiene Surveys',
+    'Waste disposal certificates',
+    'Audit Reports',
+    'BSI Audit certificate',
+  ];
+
+  const technicianSubClasses = [
+    'HVAC',
+    'Electrical',
+    'Fire',
+    'Plumbing',
+    'Lifts',
+    'Building Fabric',
+    'Power Factor Correction',
+    'UPS',
+    'Solar PV',
+    'General Facilities',
+  ];
+
+  const technicianCategories = [
+    'Preventive Maintenance',
+    'Corrective Maintenance',
+    'Compliance',
+    'Safety',
+    'Energy',
+    'Water',
+    'Testing & Commissioning',
+    'Incident & Repair',
+  ];
 
   // Generate unique message ID
   const generateId = () => `msg-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -567,6 +640,73 @@ export default function TechnicianChat({ siteId, siteLabel }: TechnicianChatProp
     void sendTechnicalMessage();
   };
 
+  const appendAssistantText = (content: string, type: Message['type'] = 'text') => {
+    const message: Message = {
+      id: generateId(),
+      role: 'assistant',
+      content,
+      timestamp: new Date(),
+      type,
+    };
+    setMessages((prev) => [...prev, message]);
+  };
+
+  const handleTechnicianDocumentUpload = async () => {
+    if (!uploadFile) {
+      appendAssistantText('Please select a file to upload.', 'error');
+      return;
+    }
+    if (!equipmentId.trim()) {
+      appendAssistantText('Equipment ID is required for technician document uploads.', 'error');
+      return;
+    }
+    if (!documentCreationDate || !triggerDate) {
+      appendAssistantText('Document creation date and trigger date are required.', 'error');
+      return;
+    }
+
+    setDocumentUploading(true);
+    try {
+      const response = await documentsApi.uploadTechnicianDocument({
+        file: uploadFile,
+        equipmentId: equipmentId.trim(),
+        documentName,
+        documentSubClass,
+        categoryDiscipline,
+        documentCreationDate,
+        triggerDate,
+        siteId,
+      });
+
+      const userMessage: Message = {
+        id: generateId(),
+        role: 'user',
+        content: `Uploaded: ${uploadFile.name}`,
+        timestamp: new Date(),
+        type: 'text',
+      };
+
+      const assistantMessage: Message = {
+        id: generateId(),
+        role: 'assistant',
+        content: `Technician document uploaded successfully. Document ID: ${response.document_id}`,
+        timestamp: new Date(),
+        type: 'text',
+      };
+      setMessages((prev) => [...prev, userMessage, assistantMessage]);
+      setUploadFile(null);
+      setEquipmentId('');
+      setDocumentCreationDate('');
+      setTriggerDate('');
+      setShowDocumentUpload(false);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Technician document upload failed';
+      appendAssistantText(msg, 'error');
+    } finally {
+      setDocumentUploading(false);
+    }
+  };
+
   // Handle Enter key
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -863,6 +1003,18 @@ export default function TechnicianChat({ siteId, siteLabel }: TechnicianChatProp
                 disabled={isTyping}
               />
             )}
+            {!conceptSearchEnabled && (
+              <button
+                type="button"
+                onClick={() => setShowDocumentUpload((prev) => !prev)}
+                disabled={isTyping || documentUploading}
+                className="flex-none p-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors"
+                aria-label="Upload technician document"
+                title="Upload technician document"
+              >
+                <Upload className="w-5 h-5" />
+              </button>
+            )}
           <input
             ref={inputRef}
             type="text"
@@ -882,6 +1034,90 @@ export default function TechnicianChat({ siteId, siteLabel }: TechnicianChatProp
             <Send className="w-5 h-5" />
           </button>
         </div>
+          {!conceptSearchEnabled && showDocumentUpload && (
+            <div className="mt-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 p-3 space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                Technician document upload
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                <input
+                  type="text"
+                  value={equipmentId}
+                  onChange={(e) => setEquipmentId(e.target.value)}
+                  placeholder="Equipment ID (required)"
+                  className="px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                />
+                <input
+                  type="file"
+                  accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp,.txt"
+                  onChange={(e) => setUploadFile(e.target.files?.[0] ?? null)}
+                  className="px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white file:mr-2 file:rounded file:border-0 file:bg-indigo-100 file:px-2 file:py-1 file:text-indigo-800"
+                />
+                <select
+                  value={documentName}
+                  onChange={(e) => setDocumentName(e.target.value)}
+                  className="px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                >
+                  {technicianDocumentNames.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={documentSubClass}
+                  onChange={(e) => setDocumentSubClass(e.target.value)}
+                  className="px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                >
+                  {technicianSubClasses.map((item) => (
+                    <option key={item} value={item}>
+                      {item}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={categoryDiscipline}
+                  onChange={(e) => setCategoryDiscipline(e.target.value)}
+                  className="px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                >
+                  {technicianCategories.map((item) => (
+                    <option key={item} value={item}>
+                      {item}
+                    </option>
+                  ))}
+                </select>
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="date"
+                    value={documentCreationDate}
+                    onChange={(e) => setDocumentCreationDate(e.target.value)}
+                    className="px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                    title="Document creation date"
+                  />
+                  <input
+                    type="date"
+                    value={triggerDate}
+                    onChange={(e) => setTriggerDate(e.target.value)}
+                    className="px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                    title="Trigger date"
+                  />
+                </div>
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Site and uploaded-by are derived from login and enforced server-side.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => void handleTechnicianDocumentUpload()}
+                  disabled={documentUploading}
+                  className="px-3 py-1.5 text-sm rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:bg-gray-400"
+                >
+                  {documentUploading ? 'Uploading...' : 'Upload document'}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </form>
     </div>

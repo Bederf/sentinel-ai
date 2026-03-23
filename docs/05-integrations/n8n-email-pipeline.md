@@ -58,6 +58,30 @@ X-Sentry-Secret: {your sentry_webhook_secret}
 
 These must match the values in SENTINEL's backend `.env` file.
 
+### 3.1 Required n8n Environment Variables (Security)
+
+Do not hardcode secrets directly in workflow JSON. Use n8n environment variables in header expressions:
+
+```
+X-Sentry-API-Key: ={{ $env.SENTRY_BOT_API_KEY }}
+X-Sentry-Secret: ={{ $env.SENTRY_WEBHOOK_SECRET }}
+```
+
+Recommended n8n env vars for this pipeline:
+
+```bash
+# n8n -> SENTINEL auth
+SENTRY_BOT_API_KEY=...
+SENTRY_WEBHOOK_SECRET=...
+
+# Optional base URL used by webhook-style workflow variant
+SENTINEL_BACKEND_URL=http://127.0.0.1:9095
+```
+
+Security note:
+- Keep these values out of repo files and workflow exports.
+- Rotate both secrets if they were previously committed in plaintext.
+
 ### 4. Enable in SENTINEL Backend
 
 ```bash

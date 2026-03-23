@@ -50,6 +50,8 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 - [Data Quality API](03-api-reference/data-quality-api.md) - Sensor health, gaps, ML training readiness (Phase 42-03)
 - [ML Predictions API](03-api-reference/ml-predictions-api.md) - LSTM forecasting, anomaly detection, maintenance recommendations (Phase 43)
 - [RAG API](03-api-reference/rag-api.md) - Vector search, knowledge base, document management (Phase 44-01)
+- [Technician Document Upload API](03-api-reference/technician-document-upload-api.md) - Login-derived site-bound technician uploads with controlled metadata and date validation
+- [Concept Evolution Connector API](03-api-reference/concept-evolution-connector-api.md) - Site-network document upload handoff endpoint for per-site Concept/internal network storage integration
 - [Local Chat API](03-api-reference/local-chat-api.md) - Natural language query endpoints (Phase 44-03)
 - [ML Retraining API](03-api-reference/ml-retraining-api.md) - Model retraining, performance monitoring, A/B testing (Phase 45-01)
 - [Fleet Learning API](03-api-reference/fleet-learning-api.md) - Cross-site patterns, global models, fine-tuning (Phase 45-02)
@@ -132,6 +134,7 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 - **[Contract Management Module](04-features/48-contract-management.md)** - Portfolio KPIs, SLA compliance tracking, budget variance analysis, profitability dashboard (Phase 48)
 - **[SLA Monitoring & Profitability](04-features/50-52-commercial-analytics.md)** - SLA compliance tracking, profitability dashboards, and risk-based pricing (Phases 50-52)
 - **[Municipal Billing Integration](04-features/49-municipal-billing.md)** - SA municipal invoice processing, cost tracking, tariff validation, variance detection, MCP tools for AI-powered workflows; NMD extraction for peak demand management (Phase 49, enhanced in Phase 081)
+- **[Technician Document Upload Rules Matrix](04-features/technician-document-rules-matrix.md)** - Controlled technician upload taxonomy, mandatory metadata, trigger-date/retention rules, login-derived site binding, and validation controls
 
 #### Plant Room Alerts
 - **[Plant Room Notification Pipeline](04-features/plant-room-notification-pipeline.md)** - Desigo BMS fault email ingestion, severity classification, Twilio WhatsApp delivery with alarm flood protection and rate limiting (Phase 146)

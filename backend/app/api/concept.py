@@ -4,10 +4,14 @@ Concept Evolution CAFM Integration API
 Exposes Concept job card and asset data for health/condition assessment.
 """
 
-from fastapi import APIRouter, HTTPException, Query
+import json
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from typing import Optional
 
 from app.services.concept_loader import concept_loader
+from app.services.simbiot_service import simbiot_service
+from app.middleware.auth_middleware import require_auth
+from app.models.auth import AuthContext, AuthLevel
 
 router = APIRouter(prefix="/api/concept", tags=["concept-cafm"])
 
@@ -22,6 +26,38 @@ async def get_integration_health():
         "data_source": "concept_evolution",
         "last_sync": "2026-01-29T00:00:00Z",  # Would be actual sync time
     }
+
+
+@router.post("/documents/upload")
+async def upload_concept_document(
+    file: UploadFile = File(...),
+    site_id: str = Form(...),
+    metadata_json: str = Form("{}"),
+    auth: AuthContext = Depends(require_auth(AuthLevel.AUTHENTICATED)),
+):
+    """Upload a document to site-network Concept storage."""
+    try:
+        metadata = json.loads(metadata_json or "{}")
+        if not isinstance(metadata, dict):
+            raise ValueError("metadata_json must be a JSON object")
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Invalid metadata_json: {exc}") from exc
+
+    payload = {
+        **metadata,
+        "uploaded_by_user_id": auth.user_id,
+    }
+    file_bytes = await file.read()
+    try:
+        result = await simbiot_service.upload_document(
+            file_bytes=file_bytes,
+            filename=file.filename or "upload.bin",
+            site_id=site_id,
+            metadata=payload,
+        )
+        return {"status": "ok", "site_id": site_id, "result": result}
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Concept upload failed: {exc}") from exc
 
 
 @router.get("/assets")
