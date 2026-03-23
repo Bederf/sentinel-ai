@@ -9,7 +9,7 @@ from typing import Dict, Any, Optional, List
 from datetime import datetime
 from dataclasses import dataclass, field
 
-from app.services.ollama_client import get_ollama_client
+from app.services.model_gateway import model_gateway
 from app.services.vector_db import get_vector_db_service
 from ml.explanations.templates import MAINTENANCE_RECOMMENDATION_TEMPLATE
 from ml.explanations.parser import ExplanationParser
@@ -121,7 +121,6 @@ class MaintenanceRecommender:
         Args:
             supabase_client: Supabase client for database access
         """
-        self.ollama = get_ollama_client()
         self.vector_db = get_vector_db_service(supabase_client)
         self._supabase_client = supabase_client
 
@@ -151,10 +150,8 @@ class MaintenanceRecommender:
             predictions.get("predictions", {}).get("failure_type", {}).get("predicted_failure", "Unknown")
         )
 
-        # Check if LLM is available
-        ollama_available = await self.ollama.is_available()
-
-        if ollama_available:
+        # Try LLM via model_gateway, fall back to rule-based
+        try:
             recommendation = await self._generate_llm_recommendation(
                 equipment_id=equipment_id,
                 equipment_type=equipment_type,
@@ -164,7 +161,7 @@ class MaintenanceRecommender:
                 maintenance_history=maintenance_history,
                 sensor_readings=sensor_readings,
             )
-        else:
+        except Exception:
             recommendation = self._generate_fallback_recommendation(
                 equipment_id=equipment_id,
                 equipment_type=equipment_type,
@@ -239,8 +236,12 @@ class MaintenanceRecommender:
             fleet_context=fleet_text,
         )
 
-        # Generate with LLM
-        raw_response = await self.ollama.generate(prompt, temperature=0.3)
+        # Generate with LLM via model_gateway
+        raw_response = await model_gateway.call(
+            task_class="medium",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=1536,
+        )
 
         # Parse response
         parsed = ExplanationParser.parse_recommendation(raw_response)

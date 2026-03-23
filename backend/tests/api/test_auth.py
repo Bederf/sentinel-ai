@@ -136,3 +136,92 @@ class TestRoleHierarchyBoundaries:
         # Both should be level 1
         assert bot_level == auditor_level
         assert bot_level == 1
+
+
+class TestAPIKeySuabaseValidation:
+    """Test Phase 168-01: API key validation from Supabase.
+
+    Gap 1 (HIGH): API key in-memory store not production-ready.
+    Control: AUTH-004 (API Key Storage and Rotation).
+    """
+
+    def test_api_key_from_supabase_valid(self):
+        """Valid API key from Supabase should return auth dict."""
+        from unittest.mock import patch, MagicMock
+        from app.repositories.api_keys_repository import get_api_keys_repository
+
+        with patch('app.repositories.api_keys_repository.get_supabase_client') as mock_supabase:
+            mock_client = MagicMock()
+            mock_supabase.return_value = mock_client
+
+            # Reset singleton
+            import app.repositories.api_keys_repository as repo_module
+            repo_module._api_keys_repository = None
+            repo = get_api_keys_repository()
+
+            test_key = "sent_sk_test_key_12345"
+
+            mock_query = MagicMock()
+            mock_query.eq.return_value.eq.return_value.single.return_value.execute.return_value.data = {
+                "id": "test-id-123",
+                "owner_role": 2,  # AUDITOR
+                "expires_at": None,
+            }
+            mock_client.table.return_value.select.return_value = mock_query
+
+            result = repo.validate_api_key(test_key)
+            assert result is not None
+            assert result["owner_role"] == 2
+            assert result["api_key_id"] == "test-id-123"
+
+    def test_api_key_from_supabase_expired(self):
+        """Expired API key should be rejected."""
+        from unittest.mock import patch, MagicMock
+        from datetime import datetime, timedelta
+        from app.repositories.api_keys_repository import get_api_keys_repository
+
+        with patch('app.repositories.api_keys_repository.get_supabase_client') as mock_supabase:
+            mock_client = MagicMock()
+            mock_supabase.return_value = mock_client
+
+            # Reset singleton
+            import app.repositories.api_keys_repository as repo_module
+            repo_module._api_keys_repository = None
+            repo = get_api_keys_repository()
+
+            # Set expiration to 1 hour ago
+            expired_time = (datetime.utcnow() - timedelta(hours=1)).isoformat()
+
+            mock_query = MagicMock()
+            mock_query.eq.return_value.eq.return_value.single.return_value.execute.return_value.data = {
+                "id": "test-id-456",
+                "owner_role": 2,
+                "expires_at": expired_time,
+            }
+            mock_client.table.return_value.select.return_value = mock_query
+
+            test_key = "sent_sk_expired_key_123"
+            result = repo.validate_api_key(test_key)
+            assert result is None
+
+    def test_api_key_from_supabase_not_found(self):
+        """Non-existent API key should return None."""
+        from unittest.mock import patch, MagicMock
+        from app.repositories.api_keys_repository import get_api_keys_repository
+
+        with patch('app.repositories.api_keys_repository.get_supabase_client') as mock_supabase:
+            mock_client = MagicMock()
+            mock_supabase.return_value = mock_client
+
+            # Reset singleton
+            import app.repositories.api_keys_repository as repo_module
+            repo_module._api_keys_repository = None
+            repo = get_api_keys_repository()
+
+            mock_query = MagicMock()
+            mock_query.eq.return_value.eq.return_value.single.return_value.execute.return_value.data = None
+            mock_client.table.return_value.select.return_value = mock_query
+
+            test_key = "sent_sk_nonexistent_789"
+            result = repo.validate_api_key(test_key)
+            assert result is None

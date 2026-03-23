@@ -46,6 +46,12 @@ def test_parse_generator_inspection_sheets():
     assert intent["year"] == 2024
 
 
+def test_parse_common_generator_typo():
+    intent = parse_query_intent("generagor sheets 2025")
+    assert intent["equipment"] == "generator"
+    assert intent["year"] == 2025
+
+
 def test_parse_pressure_vessel_certificate():
     intent = parse_query_intent("pressure vessel certificate")
     assert intent["document_type"] == "certificate"
@@ -246,9 +252,10 @@ def test_loads_tsv_export_and_normalises_site_scope(tmp_path):
     assert (
         response["results"][0]["open_url"]
         == "https://remsconcept.fnb.co.za/Evolution/!System/Documents/ConceptDocument/"
-        "ViewConceptDocumentItem.aspx?id=35999"
+        "ViewConceptDocumentItem.aspx?__referrer=%2FEvolution%2F!System%2FDocuments%2FConceptDocument%2F"
+        "ViewConceptDocumentItems.aspx&id=35999&PrimaryEntity=&PrimaryKeyId=-1"
     )
-    assert response["results"][0]["download_url"] is None
+    assert response["results"][0]["download_url"] is not None
     assert "generator" in response["results"][0]["match_reasons"]
 
 
@@ -349,5 +356,7 @@ def test_tsv_import_derives_normalized_metadata(tmp_path):
     assert result["normalized_year"] == 2023
     assert (
         result["concept_url"]
-        == "https://remsconcept.fnb.co.za/Evolution/!System/Documents/ConceptDocument/ViewConceptDocumentItem.aspx?id=12345"
+        == "https://remsconcept.fnb.co.za/Evolution/!System/Documents/ConceptDocument/"
+        "ViewConceptDocumentItem.aspx?__referrer=%2FEvolution%2F!System%2FDocuments%2FConceptDocument%2F"
+        "ViewConceptDocumentItems.aspx&id=12345&PrimaryEntity=&PrimaryKeyId=-1"
     )

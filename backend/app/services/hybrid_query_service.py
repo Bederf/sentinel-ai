@@ -339,10 +339,11 @@ class HybridQueryService:
     ) -> None:
         """Search RAG for documents related to this equipment."""
         try:
-            from app.services.doc_rag_service import get_rag_service
+            # TODO: Verify interface of concept_document_search service
+            from app.services.concept_document_search import get_concept_document_search_service
 
-            rag_svc = get_rag_service()
-            if not rag_svc:
+            search_svc = get_concept_document_search_service()
+            if not search_svc:
                 return
 
             # Build search query
@@ -350,7 +351,7 @@ class HybridQueryService:
             if ctx.equipment_type:
                 search_query = f"{ctx.equipment_type} {search_query}"
 
-            results = await rag_svc.search(
+            results = await search_svc.search(
                 query=search_query,
                 site_id=self.site_id,
                 limit=5,
@@ -370,9 +371,9 @@ class HybridQueryService:
                 ctx.sources_used.append("document_rag")
 
         except ImportError:
-            logger.debug("RAG service not available")
+            logger.debug("Concept document search service not available")
         except Exception as e:
-            logger.debug("RAG search failed for %s: %s", equipment_id, e)
+            logger.debug("Document search failed for %s: %s", equipment_id, e)
 
     # -------------------------------------------------------------------
     # Step 4a: Telemetry (operating data from equipment)

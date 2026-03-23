@@ -110,6 +110,79 @@ The following artifacts were created during the Phase 3 assurance cycle and form
 | 7 | EU AI Act Assurance Review | `docs/ai-governance/eu-ai-act-assurance-review.md` | 2026-02-23 | Compliance Lead |
 | 8 | Independent Audit Readiness Pack | `docs/ai-governance/independent-audit-readiness-pack.md` | 2026-02-23 | Compliance Lead |
 
+## Validated Evidence Manifest
+
+This section provides a normalized inventory of all evidence artifacts, validated against the independent audit readiness pack (v1.0.0) and FSR gap analysis (v3.1). Each entry includes concrete file path, owner role, validation note, and current status.
+
+### Present
+
+The following evidence artifacts are present and referenced in governance documentation:
+
+| # | Artifact | Path | Owner | Validation Note | Status |
+|---|----------|------|-------|----------------|--------|
+| 1 | AIMS Scope and System Boundaries | `docs/ai-governance/00-scope-and-system-boundaries.md` | Compliance Lead | Referenced in independent audit readiness pack v1.0.0 | present |
+| 2 | Risk Classification Register | `docs/ai-governance/01-risk-classification.md` | Compliance Lead | Referenced in independent audit readiness pack v1.0.0 | present |
+| 3 | ISO 42001 Control Mapping | `docs/ai-governance/02-control-mapping-iso42001.md` | Compliance Lead | Referenced in independent audit readiness pack v1.0.0 | present |
+| 4 | NIST AI RMF Control Mapping | `docs/ai-governance/03-control-mapping-nist-airmf.md` | Compliance Lead | Referenced in independent audit readiness pack v1.0.0 | present |
+| 5 | EU AI Act Readiness Assessment | `docs/ai-governance/04-eu-ai-act-readiness.md` | Compliance Lead | Referenced in independent audit readiness pack v1.0.0 | present |
+| 6 | Model and Data Governance | `docs/ai-governance/05-model-and-data-governance.md` | AI Engineering Lead | Referenced in independent audit readiness pack v1.0.0 | present |
+| 7 | Human Oversight and Approval | `docs/ai-governance/06-human-oversight-and-approval.md` | Operations Lead | Referenced in independent audit readiness pack v1.0.0 | present |
+| 8 | Incident and Rollback Procedures | `docs/ai-governance/07-incident-and-rollback.md` | Security Lead | Referenced in independent audit readiness pack v1.0.0 | present |
+| 9 | Monitoring and Metrics Specification | `docs/ai-governance/08-monitoring-and-metrics.md` | MLOps Lead | Referenced in independent audit readiness pack v1.0.0 | present |
+| 10 | AI Management Policy | `docs/ai-governance/ai-management-policy.md` | Compliance Lead | Referenced in independent audit readiness pack v1.0.0 | present |
+| 11 | Control Applicability Matrix | `docs/ai-governance/control-applicability-matrix.md` | Compliance Lead | Referenced in independent audit readiness pack v1.0.0 | present |
+| 12 | Management Review Template | `docs/ai-governance/management-review-template.md` | Architecture Lead | Referenced in independent audit readiness pack v1.0.0 | present |
+| 13 | CAPA Register | `docs/ai-governance/nonconformity-capa-register.md` | Compliance Lead | Referenced in independent audit readiness pack v1.0.0 | present |
+| 14 | AI Literacy Training Package | `docs/ai-governance/ai-literacy-training-package.md` | HR Lead | Referenced in independent audit readiness pack v1.0.0 | present |
+| 15 | Competence Training Register | `docs/ai-governance/competence-training-register.md` | HR Lead | Referenced in independent audit readiness pack v1.0.0 | present |
+| 16 | Live-Control Entry Criteria | `docs/ai-governance/live-control-entry-criteria.md` | AI Engineering Lead | Referenced in independent audit readiness pack v1.0.0 | present |
+| 17 | Residual Risk Disclosure | `docs/ai-governance/residual-risk-disclosure.md` | Operations Lead | Referenced in independent audit readiness pack v1.0.0 | present |
+| 18 | Retraining Policy | `docs/ai-governance/retraining-policy.md` | MLOps Lead | Referenced in independent audit readiness pack v1.0.0 | present |
+| 19 | Third-Party AI Risk Register | `docs/ai-governance/third-party-ai-risk-register.md` | Security Lead | Referenced in independent audit readiness pack v1.0.0 | present |
+| 20 | Fairness/Bias Baseline Assessment | `docs/ai-governance/fairness-bias-baseline.md` | ML Lead | Referenced in independent audit readiness pack v1.0.0 | present |
+| 21 | Stress Test Scenarios (3 scenarios) | `docs/ai-governance/stress-test-scenarios.md` | Security Lead | Referenced in independent audit readiness pack v1.0.0 | present |
+| 22 | Model Cards (6 models) | `docs/ai-governance/model-cards/` | AI Engineering Lead | Referenced in independent audit readiness pack v1.0.0 | present |
+| 23 | Data Sheets (3 datasets) | `docs/ai-governance/data-sheets/` | Data Governance Lead | Referenced in independent audit readiness pack v1.0.0 | present |
+| 24 | AI Provenance Utility | `backend/app/utils/ai_provenance.py` | Backend Lead | Referenced in independent audit readiness pack v1.0.0 | present |
+| 25 | AI Disclosure Badge (UI component) | `frontend/src/components/AIDisclosureBadge.tsx` | Frontend Lead | Referenced in independent audit readiness pack v1.0.0 | present |
+| 26 | Prometheus Metrics Endpoint | `backend/app/api/metrics.py` | Backend Lead | Referenced in independent audit readiness pack v1.0.0 | present |
+| 27 | Evidence Collection Index | `docs/ai-governance/evidence/README.md` | Compliance Lead | Referenced in independent audit readiness pack v1.0.0 | present |
+| 28 | Internal Audit Plan | `docs/ai-governance/internal-audit-plan.md` | Compliance Lead | Referenced in independent audit readiness pack v1.0.0 | present |
+| 29 | ISO 42001 Evidence Bundle | `docs/ai-governance/evidence/iso42001-evidence-bundle.md` | Compliance Lead | Referenced in independent audit readiness pack v1.0.0 | present |
+| 30 | TOGAF Governance Evidence Bundle | `docs/ai-governance/evidence/togaf-governance-evidence.md` | Architecture Lead | Referenced in independent audit readiness pack v1.0.0 | present |
+| 31 | Incident Tabletop Exercise Report | `docs/ai-governance/incident-tabletop-report.md` | Security Lead | Referenced in independent audit readiness pack v1.0.0 | present |
+| 32 | RCA Postmortem (Tabletop-001) | `docs/ai-governance/evidence/rca-postmortems/tabletop-001-bad-model.md` | Security Lead | Referenced in independent audit readiness pack v1.0.0 | present |
+| 33 | NIST Control-Effectiveness Review | `docs/ai-governance/nist-control-effectiveness-review.md` | ML Lead | Referenced in independent audit readiness pack v1.0.0 | present |
+| 34 | EU AI Act Assurance Review | `docs/ai-governance/eu-ai-act-assurance-review.md` | Compliance Lead | Referenced in independent audit readiness pack v1.0.0 | present |
+| 35 | Independent Audit Readiness Pack | `docs/ai-governance/independent-audit-readiness-pack.md` | Compliance Lead | Referenced in independent audit readiness pack v1.0.0 | present |
+| 36 | EU AI Act Compliance Register | `docs/compliance/eu-ai-act-compliance-register.md` | Compliance Lead | Referenced in independent audit readiness pack v1.0.0 | present |
+| 37 | EU AI Act Policy | `docs/compliance/eu-ai-act-policy.md` | Compliance Lead | Referenced in independent audit readiness pack v1.0.0 | present |
+| 38 | EU AI Act Prohibited Practices Checklist | `docs/compliance/eu-ai-act-prohibited-practices-checklist.md` | Product Lead | Referenced in independent audit readiness pack v1.0.0 | present |
+| 39 | Architecture Board Charter | `docs/architecture-repository/governance/architecture-board-charter.md` | Architecture Lead | Referenced in independent audit readiness pack v1.0.0 | present |
+| 40 | ADM Mapping (SENTINEL) | `docs/architecture-repository/governance/adm-mapping-sentinel.md` | Architecture Lead | Referenced in independent audit readiness pack v1.0.0 | present |
+| 41 | Architecture Capability Model | `docs/architecture-repository/governance/architecture-capability.md` | Architecture Lead | Referenced in independent audit readiness pack v1.0.0 | present |
+| 42 | Quality Gate Evaluator (14 metrics, 3 modes) | `backend/app/services/quality_gate_evaluator.py` | AI Engineering Lead | Referenced in independent audit readiness pack v1.0.0 | present |
+| 43 | Quality Gate Policy (42 threshold entries) | `backend/app/services/quality_gate_policy.py` | AI Engineering Lead | Referenced in independent audit readiness pack v1.0.0 | present |
+| 44 | Safety Interlocks | `backend/app/services/safety_interlocks.py` | AI Engineering Lead | Referenced in independent audit readiness pack v1.0.0 | present |
+| 45 | Optimisation Tier Router | `backend/app/services/optimization_tier_router.py` | AI Engineering Lead | Referenced in independent audit readiness pack v1.0.0 | present |
+| 46 | Approval Service | `backend/app/services/approval_service.py` | AI Engineering Lead | Referenced in independent audit readiness pack v1.0.0 | present |
+| 47 | AI Provenance Utility | `backend/app/utils/ai_provenance.py` | Backend Lead | Referenced in independent audit readiness pack v1.0.0 | present |
+| 48 | Prometheus Metrics Instrumentation | `backend/app/api/metrics.py` | Backend Lead | Referenced in independent audit readiness pack v1.0.0 | present |
+| 49 | Training evidence directory | `docs/ai-governance/evidence/training/` | HR Lead | Evidence directory defined in README | present |
+| 50 | Drift reports directory | `docs/ai-governance/evidence/drift-reports/` | MLOps Lead | Evidence directory defined in README | present |
+| 51 | Audit log samples directory | `docs/ai-governance/evidence/audit-logs-samples/` | Compliance Lead | Evidence directory defined in README | present |
+| 52 | RCA postmortems directory | `docs/ai-governance/evidence/rca-postmortems/` | Security Lead | Evidence directory defined in README | present |
+| 53 | Model cards directory | `docs/ai-governance/evidence/model-cards/` | AI Engineering Lead | Evidence directory defined in README | present |
+| 54 | Data sheets directory | `docs/ai-governance/evidence/data-sheets/` | Data Governance Lead | Evidence directory defined in README | present |
+
+### Stale
+
+No stale evidence identified as of 2026-03-20.
+
+### Missing
+
+No missing evidence identified as of 2026-03-20.
+
 ## Collection Schedule
 
 | Category | Frequency | Trigger | Owner | Review Forum |

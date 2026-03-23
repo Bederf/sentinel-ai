@@ -8,7 +8,7 @@ import logging
 from typing import Dict, Any, Optional
 from dataclasses import dataclass
 
-from app.services.ollama_client import get_ollama_client
+from app.services.model_gateway import model_gateway
 from app.services.vector_db import get_vector_db_service
 from ml.explanations.templates import get_equipment_specific_template, format_prediction_for_template
 from ml.explanations.parser import ExplanationParser
@@ -43,7 +43,6 @@ class ExplanationService:
         Args:
             supabase_client: Supabase client for vector DB access
         """
-        self.ollama = get_ollama_client()
         self.vector_db = get_vector_db_service(supabase_client)
         self._supabase_client = supabase_client
 
@@ -80,17 +79,16 @@ class ExplanationService:
         # Build the complete prompt
         prompt = template.format(**template_data)
 
-        # Generate explanation with LLM
-        ollama_available = await self.ollama.is_available()
+        # Generate explanation with LLM via model_gateway
         model_used = None
-
-        if ollama_available:
-            raw_explanation = await self.ollama.generate(
-                prompt,
-                temperature=0.3,  # Lower temperature for more consistent output
+        try:
+            raw_explanation = await model_gateway.call(
+                task_class="medium",
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=1536,
             )
-            model_used = self.ollama.model
-        else:
+            model_used = "gateway:medium"
+        except Exception:
             raw_explanation = self._generate_fallback_explanation(template_data, predictions)
 
         # Parse the explanation into structured format
@@ -108,7 +106,7 @@ class ExplanationService:
                 "rul_days": template_data.get("rul_days", "Unknown"),
             },
             context_sources=rag_context[:500] + "..." if len(rag_context) > 500 else rag_context,
-            llm_available=ollama_available,
+            llm_available=model_used is not None,
             model_used=model_used,
         )
 

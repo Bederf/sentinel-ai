@@ -3,10 +3,11 @@ WhatsApp Business API integration for SENTRY bot.
 Supports both Meta Cloud API and Twilio providers.
 """
 
+import hmac
 import httpx
 import os
-from typing import Optional, Dict, Any
 from datetime import datetime
+from typing import Any, Dict, Optional
 import logging
 
 logger = logging.getLogger(__name__)
@@ -158,8 +159,10 @@ class WhatsAppService:
             }
 
     def verify_webhook_token(self, token: str) -> bool:
-        """Verify webhook token for security."""
-        is_valid = token == self.webhook_token
+        """Verify webhook token for security using constant-time comparison."""
+        if not token or not self.webhook_token:
+            return False
+        is_valid = hmac.compare_digest(token, self.webhook_token)
         if not is_valid:
             logger.warning(f"Invalid webhook token attempted: {token[:10]}...")
         return is_valid

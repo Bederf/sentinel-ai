@@ -52,6 +52,7 @@ class ConceptSearchResponse(BaseModel):
     query: str
     building_id: str
     results: list[ConceptDocumentSearchResult]
+    total_matched: int = 0
     total_results: int
     weak_results: bool = False
 

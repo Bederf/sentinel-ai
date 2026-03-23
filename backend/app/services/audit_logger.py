@@ -15,11 +15,16 @@ import threading
 from pathlib import Path
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timezone
+from filelock import FileLock
 
 from app.models.audit_log import AuditLogEntry, AuditActionType, AuditResultType
 from app.services.encryption_service import get_encryption_service
 
 logger = logging.getLogger(__name__)
+
+# File lock for concurrent archival safety (Phase 168-03)
+ARCHIVAL_LOCK_PATH = "/tmp/sentinel_audit_archival.lock"
+_archival_lock = FileLock(ARCHIVAL_LOCK_PATH, timeout=60)
 
 # Structured audit logger for Loki/SIEM ingestion
 # Outputs JSON-structured audit events to Python logging (collected by Promtail)
@@ -565,11 +570,31 @@ class AuditLogger:
 
         Implements immutable audit trail archival for AUDIT-001 control.
 
+        Uses file lock to prevent concurrent archival calls from race conditions.
+        Only deletes active log entries if ALL archival succeeded (fail-safe).
+
         Args:
             days_old: Archive entries older than this many days (default: 30)
 
         Returns:
-            Number of entries archived
+            Number of entries archived (partial failure returns partial count)
+        """
+        import asyncio
+        from datetime import datetime, timedelta
+        from app.database.supabase_client import get_supabase_client
+
+        # Acquire lock to prevent concurrent archival (Phase 168-03)
+        with _archival_lock:
+            return await self._do_archive_old_audit_logs(days_old)
+
+    async def _do_archive_old_audit_logs(self, days_old: int = 30) -> int:
+        """Internal archival logic (called under lock).
+
+        Args:
+            days_old: Archive entries older than this many days
+
+        Returns:
+            Number of entries successfully archived
         """
         import asyncio
         from datetime import datetime, timedelta
@@ -602,6 +627,8 @@ class AuditLogger:
 
             # Archive old entries to Supabase (immutable table)
             archived_count = 0
+            failed_entries = []
+
             try:
                 supabase = get_supabase_client()
                 for entry in old_entries:
@@ -617,8 +644,9 @@ class AuditLogger:
                         await asyncio.to_thread(supabase.table("audit_archive").upsert(archive_record).execute)
                         archived_count += 1
                     except Exception as e:
-                        # Log but continue (don't block on one failed archive)
-                        logger.warning(f"Failed to archive single entry to Supabase: {e}")
+                        # Log and track failed entry
+                        logger.warning(f"Failed to archive entry {entry.id}: {e}")
+                        failed_entries.append(entry)
 
                 logger.info(f"Archived {archived_count}/{len(old_entries)} entries to audit_archive table")
             except Exception as e:
@@ -626,12 +654,19 @@ class AuditLogger:
                 # Fallback: don't delete from local file if Supabase fails
                 return 0
 
-            # Delete old entries from active log (keep only new entries)
-            if archived_count > 0:
+            # CRITICAL (Phase 168-03): Only delete if ALL succeeded
+            if len(failed_entries) == 0:
+                # All entries archived successfully; delete from active log
                 self._save_logs(new_entries)
                 logger.info(
                     f"Removed {archived_count} archived entries from active audit log "
                     f"({len(new_entries)} entries remain)"
+                )
+            else:
+                # Some failed; keep ALL old entries in active log for retry
+                logger.warning(
+                    f"Archival incomplete: {archived_count}/{len(old_entries)} succeeded. "
+                    f"Keeping {len(failed_entries)} failed entries in active log for retry."
                 )
 
             return archived_count

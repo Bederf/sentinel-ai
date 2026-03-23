@@ -8,8 +8,8 @@ day,date,site_id,data_mode,proposals_24h,approved_24h,rejected_24h,blocked_24h,a
 7,2026-03-15,site-002,simulation,0,0,0,0,,0,0,0,,,yes,no,no,Day 7 auto-collected by AEGIS evidence scheduler
 8,2026-03-19,site-001,simulation,0,0,0,0,,0,0,0,,,yes,no,no,Day 8 auto-collected by AEGIS evidence scheduler
 9,2026-03-19,site-002,simulation,0,0,0,0,,0,0,0,,,yes,no,no,Day 9 auto-collected by AEGIS evidence scheduler
-10,YYYY-MM-DD,site-002,simulation,,,,,,,,,,,,,
-11,YYYY-MM-DD,site-002,simulation,,,,,,,,,,,,,
-12,YYYY-MM-DD,site-002,simulation,,,,,,,,,,,,,
-13,YYYY-MM-DD,site-002,simulation,,,,,,,,,,,,,
+10,2026-03-20,site-001,simulation,0,0,0,0,,0,0,0,,,yes,no,no,Day 10 auto-collected by AEGIS evidence scheduler
+11,2026-03-20,site-002,simulation,0,0,0,0,,0,0,0,,,yes,no,no,Day 11 auto-collected by AEGIS evidence scheduler
+12,2026-03-21,site-001,simulation,0,0,0,0,,0,0,0,,,yes,no,no,Day 12 auto-collected by AEGIS evidence scheduler
+13,2026-03-21,site-002,simulation,0,0,0,0,,0,0,0,,,yes,no,no,Day 13 auto-collected by AEGIS evidence scheduler
 14,YYYY-MM-DD,site-002,simulation,,,,,,,,,,,,,

@@ -1,0 +1,4329 @@
+{
+  "discovery_id": "31b667f9",
+  "site_id": "site-002",
+  "created_at": "2026-03-21T17:59:39.311155",
+  "equipment_count": 66,
+  "total_points": 211,
+  "equipment": {
+    "S002-AHU-B1-001": {
+      "equipment_id": "S002-AHU-B1-001",
+      "equipment_type": "ahu",
+      "equipment_name": "Air Handling Unit (S002-AHU-B1-001)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "S002-AHU-B1-001.fan_speed_pct",
+          "standardized_name": "S002-AHU-B1-001/speed_sensor",
+          "point_type": "sensor",
+          "point_category": "speed",
+          "unit": "%",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2003,
+          "present_value": 0.0,
+          "writable": false
+        },
+        {
+          "original_name": "S002-AHU-B1-001.fan_status",
+          "standardized_name": "S002-AHU-B1-001/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 2004,
+          "present_value": 0,
+          "writable": false
+        },
+        {
+          "original_name": "S002-AHU-B1-001.health_score",
+          "standardized_name": "S002-AHU-B1-001/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2005,
+          "present_value": 85,
+          "writable": false
+        },
+        {
+          "original_name": "S002-AHU-B1-001.status",
+          "standardized_name": "S002-AHU-B1-001/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 2006,
+          "present_value": "normal",
+          "writable": false
+        },
+        {
+          "original_name": "S002-AHU-B1-001.supply_air_temp",
+          "standardized_name": "S002-AHU-B1-001/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2007,
+          "present_value": 6.5,
+          "writable": false
+        },
+        {
+          "original_name": "S002-AHU-B1-001.updated_at",
+          "standardized_name": "S002-AHU-B1-001/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2008,
+          "present_value": "2026-03-12T12:25:55.609959",
+          "writable": false
+        }
+      ],
+      "point_count": 6,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "ahu": 6
+        },
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "S002-AHU-B1-001",
+        "zone": {
+          "zone_id": "Zone-B1-001",
+          "floor": "B1",
+          "zone_letter": "001",
+          "zone_type": "open_office",
+          "site_id": "site-002"
+        }
+      },
+      "created_at": "2026-03-21T17:59:39.252116",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S002-AHU-L2-001": {
+      "equipment_id": "S002-AHU-L2-001",
+      "equipment_type": "ahu",
+      "equipment_name": "Air Handling Unit (S002-AHU-L2-001)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "S002-AHU-L2-001.health_score",
+          "standardized_name": "S002-AHU-L2-001/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2009,
+          "present_value": 45.0,
+          "writable": false
+        },
+        {
+          "original_name": "S002-AHU-L2-001.status",
+          "standardized_name": "S002-AHU-L2-001/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 2010,
+          "present_value": "degraded",
+          "writable": false
+        },
+        {
+          "original_name": "S002-AHU-L2-001.updated_at",
+          "standardized_name": "S002-AHU-L2-001/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2011,
+          "present_value": "2026-03-06T13:28:14.819845",
+          "writable": false
+        }
+      ],
+      "point_count": 3,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "ahu": 3
+        },
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "S002-AHU-L2-001",
+        "zone": {
+          "zone_id": "Zone-L2-001",
+          "floor": "L2",
+          "zone_letter": "001",
+          "zone_type": "open_office",
+          "site_id": "site-002"
+        }
+      },
+      "created_at": "2026-03-21T17:59:39.252149",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S002-AHU-R-001": {
+      "equipment_id": "S002-AHU-R-001",
+      "equipment_type": "ahu",
+      "equipment_name": "Air Handling Unit (S002-AHU-R-001)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "S002-AHU-R-001.health_score",
+          "standardized_name": "S002-AHU-R-001/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2012,
+          "present_value": 100.0,
+          "writable": false
+        },
+        {
+          "original_name": "S002-AHU-R-001.status",
+          "standardized_name": "S002-AHU-R-001/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 2013,
+          "present_value": "online",
+          "writable": false
+        },
+        {
+          "original_name": "S002-AHU-R-001.updated_at",
+          "standardized_name": "S002-AHU-R-001/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2014,
+          "present_value": "2026-03-06T13:28:15.055025",
+          "writable": false
+        }
+      ],
+      "point_count": 3,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "ahu": 3
+        },
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "S002-AHU-R-001",
+        "zone": {
+          "zone_id": "Zone-R-001",
+          "floor": "R",
+          "zone_letter": "001",
+          "zone_type": "open_office",
+          "site_id": "site-002"
+        }
+      },
+      "created_at": "2026-03-21T17:59:39.252176",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S002-UNKNOWN-B1-001": {
+      "equipment_id": "S002-UNKNOWN-B1-001",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (S002-UNKNOWN-B1-001)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "SITE002-WEATHER.outdoor_humidity",
+          "standardized_name": "SITE002-WEATHER/humidity_sensor",
+          "point_type": "sensor",
+          "point_category": "humidity",
+          "unit": "%",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 3751,
+          "present_value": 46.83823817047741,
+          "writable": false
+        },
+        {
+          "original_name": "SITE002-WEATHER.outdoor_temperature",
+          "standardized_name": "SITE002-WEATHER/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 3752,
+          "present_value": 6.014302746006724,
+          "writable": false
+        }
+      ],
+      "point_count": 2,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "SITE002-WEATHER",
+        "zone": {
+          "zone_id": "Zone-B1-001",
+          "floor": "B1",
+          "zone_letter": "001",
+          "zone_type": "open_office",
+          "site_id": "site-002"
+        }
+      },
+      "created_at": "2026-03-21T17:59:39.310874",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S002-CHILLER-B1-001": {
+      "equipment_id": "S002-CHILLER-B1-001",
+      "equipment_type": "chiller",
+      "equipment_name": "Chiller (S002-CHILLER-B1-001)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "S002-CHILLER-B1-001.compressor_status",
+          "standardized_name": "S002-CHILLER-B1-001/pressure_status",
+          "point_type": "status",
+          "point_category": "pressure",
+          "unit": "kPa",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 2018,
+          "present_value": 0,
+          "writable": false
+        },
+        {
+          "original_name": "S002-CHILLER-B1-001.cop",
+          "standardized_name": "S002-CHILLER-B1-001/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2019,
+          "present_value": 0,
+          "writable": false
+        },
+        {
+          "original_name": "S002-CHILLER-B1-001.health_score",
+          "standardized_name": "S002-CHILLER-B1-001/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2020,
+          "present_value": 94.24000000000319,
+          "writable": false
+        },
+        {
+          "original_name": "S002-CHILLER-B1-001.load_pct",
+          "standardized_name": "S002-CHILLER-B1-001/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2021,
+          "present_value": 0.0,
+          "writable": false
+        },
+        {
+          "original_name": "S002-CHILLER-B1-001.return_temp",
+          "standardized_name": "S002-CHILLER-B1-001/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2022,
+          "present_value": 13.5,
+          "writable": false
+        },
+        {
+          "original_name": "S002-CHILLER-B1-001.status",
+          "standardized_name": "S002-CHILLER-B1-001/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 2023,
+          "present_value": "online",
+          "writable": false
+        },
+        {
+          "original_name": "S002-CHILLER-B1-001.supply_temp",
+          "standardized_name": "S002-CHILLER-B1-001/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2024,
+          "present_value": 8.5,
+          "writable": false
+        },
+        {
+          "original_name": "S002-CHILLER-B1-001.updated_at",
+          "standardized_name": "S002-CHILLER-B1-001/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2025,
+          "present_value": "2026-03-12T12:25:55.622739",
+          "writable": false
+        }
+      ],
+      "point_count": 8,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "chiller": 8
+        },
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "S002-CHILLER-B1-001",
+        "zone": {
+          "zone_id": "Zone-B1-001",
+          "floor": "B1",
+          "zone_letter": "001",
+          "zone_type": "open_office",
+          "site_id": "site-002"
+        }
+      },
+      "created_at": "2026-03-21T17:59:39.252362",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S002-CHILLER-B1-002": {
+      "equipment_id": "S002-CHILLER-B1-002",
+      "equipment_type": "chiller",
+      "equipment_name": "Chiller (S002-CHILLER-B1-002)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "S002-CHILLER-B1-002.health_score",
+          "standardized_name": "S002-CHILLER-B1-002/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2026,
+          "present_value": 100.0,
+          "writable": false
+        },
+        {
+          "original_name": "S002-CHILLER-B1-002.status",
+          "standardized_name": "S002-CHILLER-B1-002/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 2027,
+          "present_value": "online",
+          "writable": false
+        },
+        {
+          "original_name": "S002-CHILLER-B1-002.updated_at",
+          "standardized_name": "S002-CHILLER-B1-002/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2028,
+          "present_value": "2026-03-06T13:28:14.842433",
+          "writable": false
+        }
+      ],
+      "point_count": 3,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "chiller": 3
+        },
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "S002-CHILLER-B1-002",
+        "zone": {
+          "zone_id": "Zone-B1-002",
+          "floor": "B1",
+          "zone_letter": "002",
+          "zone_type": "open_office",
+          "site_id": "site-002"
+        }
+      },
+      "created_at": "2026-03-21T17:59:39.252411",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S002-CT-B1-001": {
+      "equipment_id": "S002-CT-B1-001",
+      "equipment_type": "ct",
+      "equipment_name": "Cooling Tower (S002-CT-B1-001)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "S002-CT-B1-001.health_score",
+          "standardized_name": "S002-CT-B1-001/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2029,
+          "present_value": 100.0,
+          "writable": false
+        },
+        {
+          "original_name": "S002-CT-B1-001.status",
+          "standardized_name": "S002-CT-B1-001/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 2030,
+          "present_value": "online",
+          "writable": false
+        },
+        {
+          "original_name": "S002-CT-B1-001.updated_at",
+          "standardized_name": "S002-CT-B1-001/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2031,
+          "present_value": "2026-03-06T13:28:15.005478",
+          "writable": false
+        }
+      ],
+      "point_count": 3,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "ct": 3
+        },
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "S002-CT-B1-001",
+        "zone": {
+          "zone_id": "Zone-B1-001",
+          "floor": "B1",
+          "zone_letter": "001",
+          "zone_type": "open_office",
+          "site_id": "site-002"
+        }
+      },
+      "created_at": "2026-03-21T17:59:39.252472",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S002-CT-R-001": {
+      "equipment_id": "S002-CT-R-001",
+      "equipment_type": "ct",
+      "equipment_name": "Cooling Tower (S002-CT-R-001)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "S002-CT-R-001.health_score",
+          "standardized_name": "S002-CT-R-001/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2032,
+          "present_value": 100.0,
+          "writable": false
+        },
+        {
+          "original_name": "S002-CT-R-001.status",
+          "standardized_name": "S002-CT-R-001/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 2033,
+          "present_value": "online",
+          "writable": false
+        },
+        {
+          "original_name": "S002-CT-R-001.updated_at",
+          "standardized_name": "S002-CT-R-001/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2034,
+          "present_value": "2026-03-06T13:28:15.011006",
+          "writable": false
+        }
+      ],
+      "point_count": 3,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "ct": 3
+        },
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "S002-CT-R-001",
+        "zone": {
+          "zone_id": "Zone-R-001",
+          "floor": "R",
+          "zone_letter": "001",
+          "zone_type": "open_office",
+          "site_id": "site-002"
+        }
+      },
+      "created_at": "2026-03-21T17:59:39.252514",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S002-DALI-B1-001": {
+      "equipment_id": "S002-DALI-B1-001",
+      "equipment_type": "dali",
+      "equipment_name": "DALI Lighting Controller (S002-DALI-B1-001)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "S002-DALI-304.health_score",
+          "standardized_name": "S002-DALI-304/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2098,
+          "present_value": 99.72469999999086,
+          "writable": false
+        },
+        {
+          "original_name": "S002-DALI-304.status",
+          "standardized_name": "S002-DALI-304/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 2099,
+          "present_value": "online",
+          "writable": false
+        },
+        {
+          "original_name": "S002-DALI-304.updated_at",
+          "standardized_name": "S002-DALI-304/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2100,
+          "present_value": "2026-02-27T09:06:23.915985",
+          "writable": false
+        }
+      ],
+      "point_count": 3,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "dali": 3
+        },
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "S002-DALI-304",
+        "zone": {
+          "zone_id": "Zone-B1-001",
+          "floor": "B1",
+          "zone_letter": "001",
+          "zone_type": "lighting",
+          "site_id": "site-002"
+        }
+      },
+      "created_at": "2026-03-21T17:59:39.254633",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S002-DALI-B1-CTR": {
+      "equipment_id": "S002-DALI-B1-CTR",
+      "equipment_type": "dali",
+      "equipment_name": "DALI Lighting Controller (S002-DALI-B1-CTR)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "S002-DALI-B1-CTRL.health_score",
+          "standardized_name": "S002-DALI-B1-CTRL/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2101,
+          "present_value": 99.994,
+          "writable": false
+        },
+        {
+          "original_name": "S002-DALI-B1-CTRL.status",
+          "standardized_name": "S002-DALI-B1-CTRL/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 2102,
+          "present_value": "online",
+          "writable": false
+        },
+        {
+          "original_name": "S002-DALI-B1-CTRL.updated_at",
+          "standardized_name": "S002-DALI-B1-CTRL/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2103,
+          "present_value": "2026-03-06T13:28:15.093122",
+          "writable": false
+        }
+      ],
+      "point_count": 3,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "dali": 3
+        },
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "S002-DALI-B1-CTRL",
+        "zone": {
+          "zone_id": "Zone-B1-CTR",
+          "floor": "B1",
+          "zone_letter": "CTR",
+          "zone_type": "lighting",
+          "site_id": "site-002"
+        }
+      },
+      "created_at": "2026-03-21T17:59:39.254665",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S002-DALI-L1-A": {
+      "equipment_id": "S002-DALI-L1-A",
+      "equipment_type": "dali",
+      "equipment_name": "DALI Lighting Controller (S002-DALI-L1-A)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "S002-DALI-L1-A-SENS.health_score",
+          "standardized_name": "S002-DALI-L1-A-SENS/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2110,
+          "present_value": 99.99000000000001,
+          "writable": false
+        },
+        {
+          "original_name": "S002-DALI-L1-A-SENS.status",
+          "standardized_name": "S002-DALI-L1-A-SENS/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 2111,
+          "present_value": "online",
+          "writable": false
+        },
+        {
+          "original_name": "S002-DALI-L1-A-SENS.updated_at",
+          "standardized_name": "S002-DALI-L1-A-SENS/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2112,
+          "present_value": "2026-03-06T13:28:15.024295",
+          "writable": false
+        }
+      ],
+      "point_count": 3,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "dali": 3
+        },
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "S002-DALI-L1-A-SENS",
+        "zone": {
+          "zone_id": "Zone-L1-A",
+          "floor": "L1",
+          "zone_letter": "A",
+          "zone_type": "lighting",
+          "site_id": "site-002"
+        }
+      },
+      "created_at": "2026-03-21T17:59:39.254750",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S002-DALI-L1-CTR": {
+      "equipment_id": "S002-DALI-L1-CTR",
+      "equipment_type": "dali",
+      "equipment_name": "DALI Lighting Controller (S002-DALI-L1-CTR)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "S002-DALI-L1-CTRL.health_score",
+          "standardized_name": "S002-DALI-L1-CTRL/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2113,
+          "present_value": 99.994,
+          "writable": false
+        },
+        {
+          "original_name": "S002-DALI-L1-CTRL.status",
+          "standardized_name": "S002-DALI-L1-CTRL/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 2114,
+          "present_value": "online",
+          "writable": false
+        },
+        {
+          "original_name": "S002-DALI-L1-CTRL.updated_at",
+          "standardized_name": "S002-DALI-L1-CTRL/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2115,
+          "present_value": "2026-03-06T13:28:15.015473",
+          "writable": false
+        }
+      ],
+      "point_count": 3,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "dali": 3
+        },
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "S002-DALI-L1-CTRL",
+        "zone": {
+          "zone_id": "Zone-L1-CTR",
+          "floor": "L1",
+          "zone_letter": "CTR",
+          "zone_type": "lighting",
+          "site_id": "site-002"
+        }
+      },
+      "created_at": "2026-03-21T17:59:39.254775",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S002-DALI-L2-B": {
+      "equipment_id": "S002-DALI-L2-B",
+      "equipment_type": "dali",
+      "equipment_name": "DALI Lighting Controller (S002-DALI-L2-B)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "S002-DALI-L2-B-SENS.health_score",
+          "standardized_name": "S002-DALI-L2-B-SENS/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2122,
+          "present_value": 99.99000000000001,
+          "writable": false
+        },
+        {
+          "original_name": "S002-DALI-L2-B-SENS.status",
+          "standardized_name": "S002-DALI-L2-B-SENS/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 2123,
+          "present_value": "online",
+          "writable": false
+        },
+        {
+          "original_name": "S002-DALI-L2-B-SENS.updated_at",
+          "standardized_name": "S002-DALI-L2-B-SENS/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2124,
+          "present_value": "2026-03-06T13:28:15.032476",
+          "writable": false
+        }
+      ],
+      "point_count": 3,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "dali": 3
+        },
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "S002-DALI-L2-B-SENS",
+        "zone": {
+          "zone_id": "Zone-L2-B",
+          "floor": "L2",
+          "zone_letter": "B",
+          "zone_type": "lighting",
+          "site_id": "site-002"
+        }
+      },
+      "created_at": "2026-03-21T17:59:39.254854",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S002-FCU-B1-001": {
+      "equipment_id": "S002-FCU-B1-001",
+      "equipment_type": "fcu",
+      "equipment_name": "Fan Coil Unit (S002-FCU-B1-001)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "S002-FCU-381.health_score",
+          "standardized_name": "S002-FCU-381/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2233,
+          "present_value": 100.0,
+          "writable": false
+        },
+        {
+          "original_name": "S002-FCU-381.status",
+          "standardized_name": "S002-FCU-381/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 2234,
+          "present_value": "online",
+          "writable": false
+        },
+        {
+          "original_name": "S002-FCU-381.updated_at",
+          "standardized_name": "S002-FCU-381/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2235,
+          "present_value": "2026-02-28T03:03:14.230008",
+          "writable": false
+        }
+      ],
+      "point_count": 3,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "fcu": 3
+        },
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "S002-FCU-381",
+        "zone": {
+          "zone_id": "Zone-B1-001",
+          "floor": "B1",
+          "zone_letter": "001",
+          "zone_type": "open_office",
+          "site_id": "site-002"
+        }
+      },
+      "created_at": "2026-03-21T17:59:39.258230",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S002-FCU-L1-A": {
+      "equipment_id": "S002-FCU-L1-A",
+      "equipment_type": "fcu",
+      "equipment_name": "Fan Coil Unit (S002-FCU-L1-A)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "S002-FCU-L1-A.health_score",
+          "standardized_name": "S002-FCU-L1-A/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2236,
+          "present_value": 100.0,
+          "writable": false
+        },
+        {
+          "original_name": "S002-FCU-L1-A.status",
+          "standardized_name": "S002-FCU-L1-A/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 2237,
+          "present_value": "online",
+          "writable": false
+        },
+        {
+          "original_name": "S002-FCU-L1-A.updated_at",
+          "standardized_name": "S002-FCU-L1-A/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2238,
+          "present_value": "2026-02-28T00:22:38.038537",
+          "writable": false
+        }
+      ],
+      "point_count": 3,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "fcu": 3
+        },
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "S002-FCU-L1-A",
+        "zone": {
+          "zone_id": "Zone-L1-A",
+          "floor": "L1",
+          "zone_letter": "A",
+          "zone_type": "open_office",
+          "site_id": "site-002"
+        }
+      },
+      "created_at": "2026-03-21T17:59:39.258267",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S002-FCU-L1-B": {
+      "equipment_id": "S002-FCU-L1-B",
+      "equipment_type": "fcu",
+      "equipment_name": "Fan Coil Unit (S002-FCU-L1-B)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "S002-FCU-L1-B.health_score",
+          "standardized_name": "S002-FCU-L1-B/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2239,
+          "present_value": 100.0,
+          "writable": false
+        },
+        {
+          "original_name": "S002-FCU-L1-B.status",
+          "standardized_name": "S002-FCU-L1-B/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 2240,
+          "present_value": "online",
+          "writable": false
+        },
+        {
+          "original_name": "S002-FCU-L1-B.updated_at",
+          "standardized_name": "S002-FCU-L1-B/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2241,
+          "present_value": "2026-02-28T00:22:38.042298",
+          "writable": false
+        }
+      ],
+      "point_count": 3,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "fcu": 3
+        },
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "S002-FCU-L1-B",
+        "zone": {
+          "zone_id": "Zone-L1-B",
+          "floor": "L1",
+          "zone_letter": "B",
+          "zone_type": "open_office",
+          "site_id": "site-002"
+        }
+      },
+      "created_at": "2026-03-21T17:59:39.258297",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S002-FCU-L2-A": {
+      "equipment_id": "S002-FCU-L2-A",
+      "equipment_type": "fcu",
+      "equipment_name": "Fan Coil Unit (S002-FCU-L2-A)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "S002-FCU-L2-A.health_score",
+          "standardized_name": "S002-FCU-L2-A/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2242,
+          "present_value": 100.0,
+          "writable": false
+        },
+        {
+          "original_name": "S002-FCU-L2-A.status",
+          "standardized_name": "S002-FCU-L2-A/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 2243,
+          "present_value": "online",
+          "writable": false
+        },
+        {
+          "original_name": "S002-FCU-L2-A.updated_at",
+          "standardized_name": "S002-FCU-L2-A/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2244,
+          "present_value": "2026-02-28T00:22:38.045578",
+          "writable": false
+        }
+      ],
+      "point_count": 3,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "fcu": 3
+        },
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "S002-FCU-L2-A",
+        "zone": {
+          "zone_id": "Zone-L2-A",
+          "floor": "L2",
+          "zone_letter": "A",
+          "zone_type": "open_office",
+          "site_id": "site-002"
+        }
+      },
+      "created_at": "2026-03-21T17:59:39.258333",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S002-FCU-L2-B": {
+      "equipment_id": "S002-FCU-L2-B",
+      "equipment_type": "fcu",
+      "equipment_name": "Fan Coil Unit (S002-FCU-L2-B)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "S002-FCU-L2-B.fan_speed",
+          "standardized_name": "S002-FCU-L2-B/speed_sensor",
+          "point_type": "sensor",
+          "point_category": "speed",
+          "unit": "%",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2245,
+          "present_value": 0.0,
+          "writable": false
+        },
+        {
+          "original_name": "S002-FCU-L2-B.health_score",
+          "standardized_name": "S002-FCU-L2-B/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2246,
+          "present_value": 89.19999999999959,
+          "writable": false
+        },
+        {
+          "original_name": "S002-FCU-L2-B.room_temp",
+          "standardized_name": "S002-FCU-L2-B/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2247,
+          "present_value": 24.8,
+          "writable": false
+        },
+        {
+          "original_name": "S002-FCU-L2-B.status",
+          "standardized_name": "S002-FCU-L2-B/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 2248,
+          "present_value": "online",
+          "writable": false
+        },
+        {
+          "original_name": "S002-FCU-L2-B.updated_at",
+          "standardized_name": "S002-FCU-L2-B/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2249,
+          "present_value": "2026-03-12T12:25:55.629220",
+          "writable": false
+        },
+        {
+          "original_name": "S002-FCU-L2-B.valve_position",
+          "standardized_name": "S002-FCU-L2-B/valve_position_sensor",
+          "point_type": "sensor",
+          "point_category": "valve_position",
+          "unit": "%",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2250,
+          "present_value": 0.0,
+          "writable": false
+        }
+      ],
+      "point_count": 6,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "fcu": 6
+        },
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "S002-FCU-L2-B",
+        "zone": {
+          "zone_id": "Zone-L2-B",
+          "floor": "L2",
+          "zone_letter": "B",
+          "zone_type": "open_office",
+          "site_id": "site-002"
+        }
+      },
+      "created_at": "2026-03-21T17:59:39.258363",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S002-FCU-L2-D": {
+      "equipment_id": "S002-FCU-L2-D",
+      "equipment_type": "fcu",
+      "equipment_name": "Fan Coil Unit (S002-FCU-L2-D)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "S002-FCU-L2-D.health_score",
+          "standardized_name": "S002-FCU-L2-D/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2251,
+          "present_value": 100.0,
+          "writable": false
+        },
+        {
+          "original_name": "S002-FCU-L2-D.status",
+          "standardized_name": "S002-FCU-L2-D/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 2252,
+          "present_value": "online",
+          "writable": false
+        },
+        {
+          "original_name": "S002-FCU-L2-D.updated_at",
+          "standardized_name": "S002-FCU-L2-D/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2253,
+          "present_value": "2026-02-28T00:22:38.090510",
+          "writable": false
+        }
+      ],
+      "point_count": 3,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "fcu": 3
+        },
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "S002-FCU-L2-D",
+        "zone": {
+          "zone_id": "Zone-L2-D",
+          "floor": "L2",
+          "zone_letter": "D",
+          "zone_type": "open_office",
+          "site_id": "site-002"
+        }
+      },
+      "created_at": "2026-03-21T17:59:39.258389",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S002-GEN-B1-001": {
+      "equipment_id": "S002-GEN-B1-001",
+      "equipment_type": "gen",
+      "equipment_name": "Generator (S002-GEN-B1-001)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "S002-GEN-B1-001.health_score",
+          "standardized_name": "S002-GEN-B1-001/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2254,
+          "present_value": 99.99000000000001,
+          "writable": false
+        },
+        {
+          "original_name": "S002-GEN-B1-001.status",
+          "standardized_name": "S002-GEN-B1-001/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 2255,
+          "present_value": "online",
+          "writable": false
+        },
+        {
+          "original_name": "S002-GEN-B1-001.updated_at",
+          "standardized_name": "S002-GEN-B1-001/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2256,
+          "present_value": "2026-03-06T13:28:14.856377",
+          "writable": false
+        }
+      ],
+      "point_count": 3,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "gen": 3
+        },
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "S002-GEN-B1-001",
+        "zone": {
+          "zone_id": "Zone-B1-001",
+          "floor": "B1",
+          "zone_letter": "001",
+          "zone_type": "open_office",
+          "site_id": "site-002"
+        }
+      },
+      "created_at": "2026-03-21T17:59:39.258418",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S002-GEN-B1-002": {
+      "equipment_id": "S002-GEN-B1-002",
+      "equipment_type": "gen",
+      "equipment_name": "Generator (S002-GEN-B1-002)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "S002-GEN-B1-002.health_score",
+          "standardized_name": "S002-GEN-B1-002/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2257,
+          "present_value": 99.99000000000001,
+          "writable": false
+        },
+        {
+          "original_name": "S002-GEN-B1-002.status",
+          "standardized_name": "S002-GEN-B1-002/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 2258,
+          "present_value": "online",
+          "writable": false
+        },
+        {
+          "original_name": "S002-GEN-B1-002.updated_at",
+          "standardized_name": "S002-GEN-B1-002/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2259,
+          "present_value": "2026-03-06T13:28:14.824393",
+          "writable": false
+        }
+      ],
+      "point_count": 3,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "gen": 3
+        },
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "S002-GEN-B1-002",
+        "zone": {
+          "zone_id": "Zone-B1-002",
+          "floor": "B1",
+          "zone_letter": "002",
+          "zone_type": "open_office",
+          "site_id": "site-002"
+        }
+      },
+      "created_at": "2026-03-21T17:59:39.258445",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S002-UNKNOWN-R-001": {
+      "equipment_id": "S002-UNKNOWN-R-001",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (S002-UNKNOWN-R-001)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "S002-INV-R-001.health_score",
+          "standardized_name": "S002-INV-R-001/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2260,
+          "present_value": 100.0,
+          "writable": false
+        },
+        {
+          "original_name": "S002-INV-R-001.status",
+          "standardized_name": "S002-INV-R-001/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 2261,
+          "present_value": "online",
+          "writable": false
+        },
+        {
+          "original_name": "S002-INV-R-001.updated_at",
+          "standardized_name": "S002-INV-R-001/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2262,
+          "present_value": "2026-03-06T13:28:15.100754",
+          "writable": false
+        }
+      ],
+      "point_count": 3,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "S002-INV-R-001",
+        "zone": {
+          "zone_id": "Zone-R-001",
+          "floor": "R",
+          "zone_letter": "001",
+          "zone_type": "open_office",
+          "site_id": "site-002"
+        }
+      },
+      "created_at": "2026-03-21T17:59:39.258519",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S002-UNKNOWN-R-002": {
+      "equipment_id": "S002-UNKNOWN-R-002",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (S002-UNKNOWN-R-002)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "S002-INV-R-002.health_score",
+          "standardized_name": "S002-INV-R-002/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2263,
+          "present_value": 100.0,
+          "writable": false
+        },
+        {
+          "original_name": "S002-INV-R-002.status",
+          "standardized_name": "S002-INV-R-002/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 2264,
+          "present_value": "online",
+          "writable": false
+        },
+        {
+          "original_name": "S002-INV-R-002.updated_at",
+          "standardized_name": "S002-INV-R-002/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2265,
+          "present_value": "2026-03-06T13:28:15.073181",
+          "writable": false
+        }
+      ],
+      "point_count": 3,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "S002-INV-R-002",
+        "zone": {
+          "zone_id": "Zone-R-002",
+          "floor": "R",
+          "zone_letter": "002",
+          "zone_type": "open_office",
+          "site_id": "site-002"
+        }
+      },
+      "created_at": "2026-03-21T17:59:39.258594",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S002-UNKNOWN-R-003": {
+      "equipment_id": "S002-UNKNOWN-R-003",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (S002-UNKNOWN-R-003)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "S002-INV-R-003.health_score",
+          "standardized_name": "S002-INV-R-003/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2266,
+          "present_value": 100.0,
+          "writable": false
+        },
+        {
+          "original_name": "S002-INV-R-003.status",
+          "standardized_name": "S002-INV-R-003/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 2267,
+          "present_value": "online",
+          "writable": false
+        },
+        {
+          "original_name": "S002-INV-R-003.updated_at",
+          "standardized_name": "S002-INV-R-003/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2268,
+          "present_value": "2026-03-06T13:28:14.861005",
+          "writable": false
+        }
+      ],
+      "point_count": 3,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "S002-INV-R-003",
+        "zone": {
+          "zone_id": "Zone-R-003",
+          "floor": "R",
+          "zone_letter": "003",
+          "zone_type": "open_office",
+          "site_id": "site-002"
+        }
+      },
+      "created_at": "2026-03-21T17:59:39.258701",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S002-UNKNOWN-R-004": {
+      "equipment_id": "S002-UNKNOWN-R-004",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (S002-UNKNOWN-R-004)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "S002-INV-R-004.health_score",
+          "standardized_name": "S002-INV-R-004/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2269,
+          "present_value": 100.0,
+          "writable": false
+        },
+        {
+          "original_name": "S002-INV-R-004.status",
+          "standardized_name": "S002-INV-R-004/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 2270,
+          "present_value": "online",
+          "writable": false
+        },
+        {
+          "original_name": "S002-INV-R-004.updated_at",
+          "standardized_name": "S002-INV-R-004/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2271,
+          "present_value": "2026-03-06T13:28:14.992010",
+          "writable": false
+        }
+      ],
+      "point_count": 3,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "S002-INV-R-004",
+        "zone": {
+          "zone_id": "Zone-R-004",
+          "floor": "R",
+          "zone_letter": "004",
+          "zone_type": "open_office",
+          "site_id": "site-002"
+        }
+      },
+      "created_at": "2026-03-21T17:59:39.258799",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S002-UNKNOWN-G-001": {
+      "equipment_id": "S002-UNKNOWN-G-001",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (S002-UNKNOWN-G-001)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "S002-LTG-001.health_score",
+          "standardized_name": "S002-LTG-001/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2272,
+          "present_value": 99.99000000000001,
+          "writable": false
+        },
+        {
+          "original_name": "S002-LTG-001.status",
+          "standardized_name": "S002-LTG-001/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 2273,
+          "present_value": "online",
+          "writable": false
+        },
+        {
+          "original_name": "S002-LTG-001.updated_at",
+          "standardized_name": "S002-LTG-001/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2274,
+          "present_value": "2026-03-06T13:28:15.125933",
+          "writable": false
+        }
+      ],
+      "point_count": 3,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "S002-LTG-001",
+        "zone": {
+          "zone_id": "Zone-G-001",
+          "floor": "G",
+          "zone_letter": "001",
+          "zone_type": "open_office",
+          "site_id": "site-002"
+        }
+      },
+      "created_at": "2026-03-21T17:59:39.258890",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S002-UNKNOWN-G-021": {
+      "equipment_id": "S002-UNKNOWN-G-021",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (S002-UNKNOWN-G-021)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "S002-LTG-021.health_score",
+          "standardized_name": "S002-LTG-021/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2275,
+          "present_value": 99.99000000000001,
+          "writable": false
+        },
+        {
+          "original_name": "S002-LTG-021.status",
+          "standardized_name": "S002-LTG-021/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 2276,
+          "present_value": "online",
+          "writable": false
+        },
+        {
+          "original_name": "S002-LTG-021.updated_at",
+          "standardized_name": "S002-LTG-021/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2277,
+          "present_value": "2026-03-06T13:28:15.131047",
+          "writable": false
+        }
+      ],
+      "point_count": 3,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "S002-LTG-021",
+        "zone": {
+          "zone_id": "Zone-G-021",
+          "floor": "G",
+          "zone_letter": "021",
+          "zone_type": "open_office",
+          "site_id": "site-002"
+        }
+      },
+      "created_at": "2026-03-21T17:59:39.259015",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S002-UNKNOWN-G-041": {
+      "equipment_id": "S002-UNKNOWN-G-041",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (S002-UNKNOWN-G-041)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "S002-LTG-041.health_score",
+          "standardized_name": "S002-LTG-041/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2278,
+          "present_value": 99.99000000000001,
+          "writable": false
+        },
+        {
+          "original_name": "S002-LTG-041.status",
+          "standardized_name": "S002-LTG-041/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 2279,
+          "present_value": "online",
+          "writable": false
+        },
+        {
+          "original_name": "S002-LTG-041.updated_at",
+          "standardized_name": "S002-LTG-041/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2280,
+          "present_value": "2026-03-06T13:28:15.089804",
+          "writable": false
+        }
+      ],
+      "point_count": 3,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "S002-LTG-041",
+        "zone": {
+          "zone_id": "Zone-G-041",
+          "floor": "G",
+          "zone_letter": "041",
+          "zone_type": "open_office",
+          "site_id": "site-002"
+        }
+      },
+      "created_at": "2026-03-21T17:59:39.259141",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S002-UNKNOWN-G-061": {
+      "equipment_id": "S002-UNKNOWN-G-061",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (S002-UNKNOWN-G-061)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "S002-LTG-061.health_score",
+          "standardized_name": "S002-LTG-061/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2281,
+          "present_value": 99.99000000000001,
+          "writable": false
+        },
+        {
+          "original_name": "S002-LTG-061.status",
+          "standardized_name": "S002-LTG-061/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 2282,
+          "present_value": "online",
+          "writable": false
+        },
+        {
+          "original_name": "S002-LTG-061.updated_at",
+          "standardized_name": "S002-LTG-061/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2283,
+          "present_value": "2026-03-06T13:28:14.959394",
+          "writable": false
+        }
+      ],
+      "point_count": 3,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "S002-LTG-061",
+        "zone": {
+          "zone_id": "Zone-G-061",
+          "floor": "G",
+          "zone_letter": "061",
+          "zone_type": "open_office",
+          "site_id": "site-002"
+        }
+      },
+      "created_at": "2026-03-21T17:59:39.259233",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S002-UNKNOWN-G-081": {
+      "equipment_id": "S002-UNKNOWN-G-081",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (S002-UNKNOWN-G-081)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "S002-LTG-081.health_score",
+          "standardized_name": "S002-LTG-081/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2284,
+          "present_value": 99.99000000000001,
+          "writable": false
+        },
+        {
+          "original_name": "S002-LTG-081.status",
+          "standardized_name": "S002-LTG-081/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 2285,
+          "present_value": "online",
+          "writable": false
+        },
+        {
+          "original_name": "S002-LTG-081.updated_at",
+          "standardized_name": "S002-LTG-081/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2286,
+          "present_value": "2026-03-06T13:28:15.145833",
+          "writable": false
+        }
+      ],
+      "point_count": 3,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "S002-LTG-081",
+        "zone": {
+          "zone_id": "Zone-G-081",
+          "floor": "G",
+          "zone_letter": "081",
+          "zone_type": "open_office",
+          "site_id": "site-002"
+        }
+      },
+      "created_at": "2026-03-21T17:59:39.259329",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S002-UNKNOWN-G-101": {
+      "equipment_id": "S002-UNKNOWN-G-101",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (S002-UNKNOWN-G-101)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "S002-LTG-101.health_score",
+          "standardized_name": "S002-LTG-101/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2287,
+          "present_value": 99.99000000000001,
+          "writable": false
+        },
+        {
+          "original_name": "S002-LTG-101.status",
+          "standardized_name": "S002-LTG-101/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 2288,
+          "present_value": "online",
+          "writable": false
+        },
+        {
+          "original_name": "S002-LTG-101.updated_at",
+          "standardized_name": "S002-LTG-101/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2289,
+          "present_value": "2026-03-06T13:28:14.922429",
+          "writable": false
+        }
+      ],
+      "point_count": 3,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "S002-LTG-101",
+        "zone": {
+          "zone_id": "Zone-G-101",
+          "floor": "G",
+          "zone_letter": "101",
+          "zone_type": "open_office",
+          "site_id": "site-002"
+        }
+      },
+      "created_at": "2026-03-21T17:59:39.259422",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S002-UNKNOWN-G-121": {
+      "equipment_id": "S002-UNKNOWN-G-121",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (S002-UNKNOWN-G-121)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "S002-LTG-121.health_score",
+          "standardized_name": "S002-LTG-121/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2290,
+          "present_value": 99.99000000000001,
+          "writable": false
+        },
+        {
+          "original_name": "S002-LTG-121.status",
+          "standardized_name": "S002-LTG-121/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 2291,
+          "present_value": "online",
+          "writable": false
+        },
+        {
+          "original_name": "S002-LTG-121.updated_at",
+          "standardized_name": "S002-LTG-121/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2292,
+          "present_value": "2026-03-06T13:28:15.141055",
+          "writable": false
+        }
+      ],
+      "point_count": 3,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "S002-LTG-121",
+        "zone": {
+          "zone_id": "Zone-G-121",
+          "floor": "G",
+          "zone_letter": "121",
+          "zone_type": "open_office",
+          "site_id": "site-002"
+        }
+      },
+      "created_at": "2026-03-21T17:59:39.259598",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S002-UNKNOWN-G-141": {
+      "equipment_id": "S002-UNKNOWN-G-141",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (S002-UNKNOWN-G-141)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "S002-LTG-141.health_score",
+          "standardized_name": "S002-LTG-141/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2293,
+          "present_value": 99.99000000000001,
+          "writable": false
+        },
+        {
+          "original_name": "S002-LTG-141.status",
+          "standardized_name": "S002-LTG-141/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 2294,
+          "present_value": "online",
+          "writable": false
+        },
+        {
+          "original_name": "S002-LTG-141.updated_at",
+          "standardized_name": "S002-LTG-141/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2295,
+          "present_value": "2026-03-06T13:28:14.964343",
+          "writable": false
+        }
+      ],
+      "point_count": 3,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "S002-LTG-141",
+        "zone": {
+          "zone_id": "Zone-G-141",
+          "floor": "G",
+          "zone_letter": "141",
+          "zone_type": "open_office",
+          "site_id": "site-002"
+        }
+      },
+      "created_at": "2026-03-21T17:59:39.259746",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S002-UNKNOWN-G-161": {
+      "equipment_id": "S002-UNKNOWN-G-161",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (S002-UNKNOWN-G-161)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "S002-LTG-161.health_score",
+          "standardized_name": "S002-LTG-161/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2296,
+          "present_value": 99.99000000000001,
+          "writable": false
+        },
+        {
+          "original_name": "S002-LTG-161.status",
+          "standardized_name": "S002-LTG-161/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 2297,
+          "present_value": "online",
+          "writable": false
+        },
+        {
+          "original_name": "S002-LTG-161.updated_at",
+          "standardized_name": "S002-LTG-161/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2298,
+          "present_value": "2026-03-06T13:28:14.869262",
+          "writable": false
+        }
+      ],
+      "point_count": 3,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "S002-LTG-161",
+        "zone": {
+          "zone_id": "Zone-G-161",
+          "floor": "G",
+          "zone_letter": "161",
+          "zone_type": "open_office",
+          "site_id": "site-002"
+        }
+      },
+      "created_at": "2026-03-21T17:59:39.259813",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S002-UNKNOWN-G-181": {
+      "equipment_id": "S002-UNKNOWN-G-181",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (S002-UNKNOWN-G-181)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "S002-LTG-181.health_score",
+          "standardized_name": "S002-LTG-181/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2299,
+          "present_value": 99.99000000000001,
+          "writable": false
+        },
+        {
+          "original_name": "S002-LTG-181.status",
+          "standardized_name": "S002-LTG-181/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 2300,
+          "present_value": "online",
+          "writable": false
+        },
+        {
+          "original_name": "S002-LTG-181.updated_at",
+          "standardized_name": "S002-LTG-181/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2301,
+          "present_value": "2026-03-06T13:28:14.968377",
+          "writable": false
+        }
+      ],
+      "point_count": 3,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "S002-LTG-181",
+        "zone": {
+          "zone_id": "Zone-G-181",
+          "floor": "G",
+          "zone_letter": "181",
+          "zone_type": "open_office",
+          "site_id": "site-002"
+        }
+      },
+      "created_at": "2026-03-21T17:59:39.259874",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S002-UNKNOWN-G-201": {
+      "equipment_id": "S002-UNKNOWN-G-201",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (S002-UNKNOWN-G-201)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "S002-LTG-201.health_score",
+          "standardized_name": "S002-LTG-201/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2302,
+          "present_value": 99.99000000000001,
+          "writable": false
+        },
+        {
+          "original_name": "S002-LTG-201.status",
+          "standardized_name": "S002-LTG-201/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 2303,
+          "present_value": "online",
+          "writable": false
+        },
+        {
+          "original_name": "S002-LTG-201.updated_at",
+          "standardized_name": "S002-LTG-201/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2304,
+          "present_value": "2026-03-06T13:28:14.890059",
+          "writable": false
+        }
+      ],
+      "point_count": 3,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "S002-LTG-201",
+        "zone": {
+          "zone_id": "Zone-G-201",
+          "floor": "G",
+          "zone_letter": "201",
+          "zone_type": "open_office",
+          "site_id": "site-002"
+        }
+      },
+      "created_at": "2026-03-21T17:59:39.259951",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S002-UNKNOWN-G-221": {
+      "equipment_id": "S002-UNKNOWN-G-221",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (S002-UNKNOWN-G-221)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "S002-LTG-221.health_score",
+          "standardized_name": "S002-LTG-221/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2305,
+          "present_value": 99.99000000000001,
+          "writable": false
+        },
+        {
+          "original_name": "S002-LTG-221.status",
+          "standardized_name": "S002-LTG-221/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 2306,
+          "present_value": "online",
+          "writable": false
+        },
+        {
+          "original_name": "S002-LTG-221.updated_at",
+          "standardized_name": "S002-LTG-221/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2307,
+          "present_value": "2026-03-06T13:28:14.894628",
+          "writable": false
+        }
+      ],
+      "point_count": 3,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "S002-LTG-221",
+        "zone": {
+          "zone_id": "Zone-G-221",
+          "floor": "G",
+          "zone_letter": "221",
+          "zone_type": "open_office",
+          "site_id": "site-002"
+        }
+      },
+      "created_at": "2026-03-21T17:59:39.260068",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S002-UNKNOWN-G-241": {
+      "equipment_id": "S002-UNKNOWN-G-241",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (S002-UNKNOWN-G-241)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "S002-LTG-241.health_score",
+          "standardized_name": "S002-LTG-241/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2308,
+          "present_value": 99.99000000000001,
+          "writable": false
+        },
+        {
+          "original_name": "S002-LTG-241.status",
+          "standardized_name": "S002-LTG-241/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 2309,
+          "present_value": "online",
+          "writable": false
+        },
+        {
+          "original_name": "S002-LTG-241.updated_at",
+          "standardized_name": "S002-LTG-241/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2310,
+          "present_value": "2026-03-06T13:28:14.903821",
+          "writable": false
+        }
+      ],
+      "point_count": 3,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "S002-LTG-241",
+        "zone": {
+          "zone_id": "Zone-G-241",
+          "floor": "G",
+          "zone_letter": "241",
+          "zone_type": "open_office",
+          "site_id": "site-002"
+        }
+      },
+      "created_at": "2026-03-21T17:59:39.260161",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S002-UNKNOWN-G-261": {
+      "equipment_id": "S002-UNKNOWN-G-261",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (S002-UNKNOWN-G-261)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "S002-LTG-261.health_score",
+          "standardized_name": "S002-LTG-261/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2311,
+          "present_value": 99.99000000000001,
+          "writable": false
+        },
+        {
+          "original_name": "S002-LTG-261.status",
+          "standardized_name": "S002-LTG-261/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 2312,
+          "present_value": "online",
+          "writable": false
+        },
+        {
+          "original_name": "S002-LTG-261.updated_at",
+          "standardized_name": "S002-LTG-261/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2313,
+          "present_value": "2026-03-06T13:28:14.995548",
+          "writable": false
+        }
+      ],
+      "point_count": 3,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "S002-LTG-261",
+        "zone": {
+          "zone_id": "Zone-G-261",
+          "floor": "G",
+          "zone_letter": "261",
+          "zone_type": "open_office",
+          "site_id": "site-002"
+        }
+      },
+      "created_at": "2026-03-21T17:59:39.260226",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S002-UNKNOWN-G-281": {
+      "equipment_id": "S002-UNKNOWN-G-281",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (S002-UNKNOWN-G-281)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "S002-LTG-281.health_score",
+          "standardized_name": "S002-LTG-281/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2314,
+          "present_value": 99.99000000000001,
+          "writable": false
+        },
+        {
+          "original_name": "S002-LTG-281.status",
+          "standardized_name": "S002-LTG-281/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 2315,
+          "present_value": "online",
+          "writable": false
+        },
+        {
+          "original_name": "S002-LTG-281.updated_at",
+          "standardized_name": "S002-LTG-281/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2316,
+          "present_value": "2026-03-06T13:28:15.135769",
+          "writable": false
+        }
+      ],
+      "point_count": 3,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "S002-LTG-281",
+        "zone": {
+          "zone_id": "Zone-G-281",
+          "floor": "G",
+          "zone_letter": "281",
+          "zone_type": "open_office",
+          "site_id": "site-002"
+        }
+      },
+      "created_at": "2026-03-21T17:59:39.260284",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S002-UNKNOWN-G-301": {
+      "equipment_id": "S002-UNKNOWN-G-301",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (S002-UNKNOWN-G-301)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "S002-LTG-301.health_score",
+          "standardized_name": "S002-LTG-301/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2317,
+          "present_value": 99.99000000000001,
+          "writable": false
+        },
+        {
+          "original_name": "S002-LTG-301.status",
+          "standardized_name": "S002-LTG-301/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 2318,
+          "present_value": "online",
+          "writable": false
+        },
+        {
+          "original_name": "S002-LTG-301.updated_at",
+          "standardized_name": "S002-LTG-301/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2319,
+          "present_value": "2026-03-06T13:28:14.908218",
+          "writable": false
+        }
+      ],
+      "point_count": 3,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "S002-LTG-301",
+        "zone": {
+          "zone_id": "Zone-G-301",
+          "floor": "G",
+          "zone_letter": "301",
+          "zone_type": "open_office",
+          "site_id": "site-002"
+        }
+      },
+      "created_at": "2026-03-21T17:59:39.260342",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S002-UNKNOWN-G-321": {
+      "equipment_id": "S002-UNKNOWN-G-321",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (S002-UNKNOWN-G-321)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "S002-LTG-321.health_score",
+          "standardized_name": "S002-LTG-321/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2320,
+          "present_value": 99.99000000000001,
+          "writable": false
+        },
+        {
+          "original_name": "S002-LTG-321.status",
+          "standardized_name": "S002-LTG-321/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 2321,
+          "present_value": "online",
+          "writable": false
+        },
+        {
+          "original_name": "S002-LTG-321.updated_at",
+          "standardized_name": "S002-LTG-321/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2322,
+          "present_value": "2026-03-06T13:28:14.972789",
+          "writable": false
+        }
+      ],
+      "point_count": 3,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "S002-LTG-321",
+        "zone": {
+          "zone_id": "Zone-G-321",
+          "floor": "G",
+          "zone_letter": "321",
+          "zone_type": "open_office",
+          "site_id": "site-002"
+        }
+      },
+      "created_at": "2026-03-21T17:59:39.260420",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S002-UNKNOWN-G-341": {
+      "equipment_id": "S002-UNKNOWN-G-341",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (S002-UNKNOWN-G-341)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "S002-LTG-341.health_score",
+          "standardized_name": "S002-LTG-341/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2323,
+          "present_value": 99.99000000000001,
+          "writable": false
+        },
+        {
+          "original_name": "S002-LTG-341.status",
+          "standardized_name": "S002-LTG-341/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 2324,
+          "present_value": "online",
+          "writable": false
+        },
+        {
+          "original_name": "S002-LTG-341.updated_at",
+          "standardized_name": "S002-LTG-341/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2325,
+          "present_value": "2026-03-06T13:28:14.984693",
+          "writable": false
+        }
+      ],
+      "point_count": 3,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "S002-LTG-341",
+        "zone": {
+          "zone_id": "Zone-G-341",
+          "floor": "G",
+          "zone_letter": "341",
+          "zone_type": "open_office",
+          "site_id": "site-002"
+        }
+      },
+      "created_at": "2026-03-21T17:59:39.260508",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S002-UNKNOWN-G-361": {
+      "equipment_id": "S002-UNKNOWN-G-361",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (S002-UNKNOWN-G-361)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "S002-LTG-361.health_score",
+          "standardized_name": "S002-LTG-361/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2326,
+          "present_value": 99.99000000000001,
+          "writable": false
+        },
+        {
+          "original_name": "S002-LTG-361.status",
+          "standardized_name": "S002-LTG-361/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 2327,
+          "present_value": "online",
+          "writable": false
+        },
+        {
+          "original_name": "S002-LTG-361.updated_at",
+          "standardized_name": "S002-LTG-361/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2328,
+          "present_value": "2026-03-06T13:28:15.104823",
+          "writable": false
+        }
+      ],
+      "point_count": 3,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "S002-LTG-361",
+        "zone": {
+          "zone_id": "Zone-G-361",
+          "floor": "G",
+          "zone_letter": "361",
+          "zone_type": "open_office",
+          "site_id": "site-002"
+        }
+      },
+      "created_at": "2026-03-21T17:59:39.260623",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S002-UNKNOWN-G-381": {
+      "equipment_id": "S002-UNKNOWN-G-381",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (S002-UNKNOWN-G-381)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "S002-LTG-381.health_score",
+          "standardized_name": "S002-LTG-381/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2329,
+          "present_value": 99.99000000000001,
+          "writable": false
+        },
+        {
+          "original_name": "S002-LTG-381.status",
+          "standardized_name": "S002-LTG-381/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 2330,
+          "present_value": "online",
+          "writable": false
+        },
+        {
+          "original_name": "S002-LTG-381.updated_at",
+          "standardized_name": "S002-LTG-381/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2331,
+          "present_value": "2026-03-06T13:28:14.988451",
+          "writable": false
+        }
+      ],
+      "point_count": 3,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "S002-LTG-381",
+        "zone": {
+          "zone_id": "Zone-G-381",
+          "floor": "G",
+          "zone_letter": "381",
+          "zone_type": "open_office",
+          "site_id": "site-002"
+        }
+      },
+      "created_at": "2026-03-21T17:59:39.260690",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S002-LUM-B1-001": {
+      "equipment_id": "S002-LUM-B1-001",
+      "equipment_type": "lum",
+      "equipment_name": "Luminaire (S002-LUM-B1-001)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "S002-LUM-305-20.health_score",
+          "standardized_name": "S002-LUM-305-20/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 3649,
+          "present_value": 99.72469999999086,
+          "writable": false
+        },
+        {
+          "original_name": "S002-LUM-305-20.status",
+          "standardized_name": "S002-LUM-305-20/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 3650,
+          "present_value": "online",
+          "writable": false
+        },
+        {
+          "original_name": "S002-LUM-305-20.updated_at",
+          "standardized_name": "S002-LUM-305-20/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 3651,
+          "present_value": "2026-02-27T09:06:23.888598",
+          "writable": false
+        }
+      ],
+      "point_count": 3,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "lum": 3
+        },
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "S002-LUM-305-20",
+        "zone": {
+          "zone_id": "Zone-B1-001",
+          "floor": "B1",
+          "zone_letter": "001",
+          "zone_type": "lighting",
+          "site_id": "site-002"
+        }
+      },
+      "created_at": "2026-03-21T17:59:39.307079",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S002-MTR-B1-001": {
+      "equipment_id": "S002-MTR-B1-001",
+      "equipment_type": "meter",
+      "equipment_name": "Power Meter (S002-MTR-B1-001)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "S002-MTR-W-MAIN.health_score",
+          "standardized_name": "S002-MTR-W-MAIN/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 3664,
+          "present_value": 99.99600000000001,
+          "writable": false
+        },
+        {
+          "original_name": "S002-MTR-W-MAIN.status",
+          "standardized_name": "S002-MTR-W-MAIN/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 3665,
+          "present_value": "online",
+          "writable": false
+        },
+        {
+          "original_name": "S002-MTR-W-MAIN.updated_at",
+          "standardized_name": "S002-MTR-W-MAIN/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 3666,
+          "present_value": "2026-03-06T13:28:14.873195",
+          "writable": false
+        }
+      ],
+      "point_count": 3,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "meter": 3
+        },
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "S002-MTR-W-MAIN",
+        "zone": {
+          "zone_id": "Zone-B1-001",
+          "floor": "B1",
+          "zone_letter": "001",
+          "zone_type": "open_office",
+          "site_id": "site-002"
+        }
+      },
+      "created_at": "2026-03-21T17:59:39.308290",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S002-MTR-B1-MAI": {
+      "equipment_id": "S002-MTR-B1-MAI",
+      "equipment_type": "meter",
+      "equipment_name": "Power Meter (S002-MTR-B1-MAI)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "S002-MTR-B1-MAIN.health_score",
+          "standardized_name": "S002-MTR-B1-MAIN/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 3655,
+          "present_value": 99.99600000000001,
+          "writable": false
+        },
+        {
+          "original_name": "S002-MTR-B1-MAIN.status",
+          "standardized_name": "S002-MTR-B1-MAIN/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 3656,
+          "present_value": "online",
+          "writable": false
+        },
+        {
+          "original_name": "S002-MTR-B1-MAIN.updated_at",
+          "standardized_name": "S002-MTR-B1-MAIN/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 3657,
+          "present_value": "2026-03-06T13:28:14.936238",
+          "writable": false
+        }
+      ],
+      "point_count": 3,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "meter": 3
+        },
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "S002-MTR-B1-MAIN",
+        "zone": {
+          "zone_id": "Zone-B1-MAI",
+          "floor": "B1",
+          "zone_letter": "MAI",
+          "zone_type": "open_office",
+          "site_id": "site-002"
+        }
+      },
+      "created_at": "2026-03-21T17:59:39.307723",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S002-MTR-B1-WAT": {
+      "equipment_id": "S002-MTR-B1-WAT",
+      "equipment_type": "meter",
+      "equipment_name": "Power Meter (S002-MTR-B1-WAT)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "S002-MTR-B1-WATER.health_score",
+          "standardized_name": "S002-MTR-B1-WATER/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 3658,
+          "present_value": 100.0,
+          "writable": false
+        },
+        {
+          "original_name": "S002-MTR-B1-WATER.status",
+          "standardized_name": "S002-MTR-B1-WATER/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 3659,
+          "present_value": "online",
+          "writable": false
+        },
+        {
+          "original_name": "S002-MTR-B1-WATER.updated_at",
+          "standardized_name": "S002-MTR-B1-WATER/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 3660,
+          "present_value": "2026-02-27T09:06:20.924361",
+          "writable": false
+        }
+      ],
+      "point_count": 3,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "meter": 3
+        },
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "S002-MTR-B1-WATER",
+        "zone": {
+          "zone_id": "Zone-B1-WAT",
+          "floor": "B1",
+          "zone_letter": "WAT",
+          "zone_type": "open_office",
+          "site_id": "site-002"
+        }
+      },
+      "created_at": "2026-03-21T17:59:39.307813",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S002-MTR-R-SOL": {
+      "equipment_id": "S002-MTR-R-SOL",
+      "equipment_type": "meter",
+      "equipment_name": "Power Meter (S002-MTR-R-SOL)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "S002-MTR-R-SOLAR.health_score",
+          "standardized_name": "S002-MTR-R-SOLAR/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 3661,
+          "present_value": 99.99600000000001,
+          "writable": false
+        },
+        {
+          "original_name": "S002-MTR-R-SOLAR.status",
+          "standardized_name": "S002-MTR-R-SOLAR/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 3662,
+          "present_value": "online",
+          "writable": false
+        },
+        {
+          "original_name": "S002-MTR-R-SOLAR.updated_at",
+          "standardized_name": "S002-MTR-R-SOLAR/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 3663,
+          "present_value": "2026-03-06T13:28:14.941303",
+          "writable": false
+        }
+      ],
+      "point_count": 3,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "meter": 3
+        },
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "S002-MTR-R-SOLAR",
+        "zone": {
+          "zone_id": "Zone-R-SOL",
+          "floor": "R",
+          "zone_letter": "SOL",
+          "zone_type": "open_office",
+          "site_id": "site-002"
+        }
+      },
+      "created_at": "2026-03-21T17:59:39.307862",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S002-PUMP-B1-001": {
+      "equipment_id": "S002-PUMP-B1-001",
+      "equipment_type": "pump",
+      "equipment_name": "Pump (S002-PUMP-B1-001)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "S002-PUMP-B1-001.health_score",
+          "standardized_name": "S002-PUMP-B1-001/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 3667,
+          "present_value": 100.0,
+          "writable": false
+        },
+        {
+          "original_name": "S002-PUMP-B1-001.status",
+          "standardized_name": "S002-PUMP-B1-001/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 3668,
+          "present_value": "online",
+          "writable": false
+        },
+        {
+          "original_name": "S002-PUMP-B1-001.updated_at",
+          "standardized_name": "S002-PUMP-B1-001/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 3669,
+          "present_value": "2026-03-06T13:28:15.112818",
+          "writable": false
+        }
+      ],
+      "point_count": 3,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "pump": 3
+        },
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "S002-PUMP-B1-001",
+        "zone": {
+          "zone_id": "Zone-B1-001",
+          "floor": "B1",
+          "zone_letter": "001",
+          "zone_type": "open_office",
+          "site_id": "site-002"
+        }
+      },
+      "created_at": "2026-03-21T17:59:39.308349",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S002-PUMP-B1-CHW1": {
+      "equipment_id": "S002-PUMP-B1-CHW1",
+      "equipment_type": "pump",
+      "equipment_name": "Pump (S002-PUMP-B1-CHW1)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "S002-PUMP-B1-CHW1.health_score",
+          "standardized_name": "S002-PUMP-B1-CHW1/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 3670,
+          "present_value": 85,
+          "writable": false
+        },
+        {
+          "original_name": "S002-PUMP-B1-CHW1.status",
+          "standardized_name": "S002-PUMP-B1-CHW1/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 3671,
+          "present_value": "normal",
+          "writable": false
+        },
+        {
+          "original_name": "S002-PUMP-B1-CHW1.updated_at",
+          "standardized_name": "S002-PUMP-B1-CHW1/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 3672,
+          "present_value": "2026-03-06T13:28:15.117313",
+          "writable": false
+        }
+      ],
+      "point_count": 3,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "pump": 3
+        },
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "S002-PUMP-B1-CHW1",
+        "zone": {
+          "zone_id": "Zone-B1-CHW",
+          "floor": "B1",
+          "zone_letter": "CHW",
+          "zone_type": "open_office",
+          "site_id": "site-002"
+        }
+      },
+      "created_at": "2026-03-21T17:59:39.308407",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S002-PUMP-B1-CW1": {
+      "equipment_id": "S002-PUMP-B1-CW1",
+      "equipment_type": "pump",
+      "equipment_name": "Pump (S002-PUMP-B1-CW1)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "S002-PUMP-B1-CW1.health_score",
+          "standardized_name": "S002-PUMP-B1-CW1/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 3673,
+          "present_value": 85,
+          "writable": false
+        },
+        {
+          "original_name": "S002-PUMP-B1-CW1.status",
+          "standardized_name": "S002-PUMP-B1-CW1/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 3674,
+          "present_value": "normal",
+          "writable": false
+        },
+        {
+          "original_name": "S002-PUMP-B1-CW1.updated_at",
+          "standardized_name": "S002-PUMP-B1-CW1/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 3675,
+          "present_value": "2026-03-06T13:28:14.946174",
+          "writable": false
+        }
+      ],
+      "point_count": 3,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "pump": 3
+        },
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "S002-PUMP-B1-CW1",
+        "zone": {
+          "zone_id": "Zone-B1-CW1",
+          "floor": "B1",
+          "zone_letter": "CW1",
+          "zone_type": "open_office",
+          "site_id": "site-002"
+        }
+      },
+      "created_at": "2026-03-21T17:59:39.308453",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S002-UNKNOWN-L2-CO2": {
+      "equipment_id": "S002-UNKNOWN-L2-CO2",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (S002-UNKNOWN-L2-CO2)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "S002-SENSOR-L2-CO2.health_score",
+          "standardized_name": "S002-SENSOR-L2-CO2/co2_sensor",
+          "point_type": "sensor",
+          "point_category": "co2",
+          "unit": "ppm",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 3679,
+          "present_value": 100.0,
+          "writable": false
+        },
+        {
+          "original_name": "S002-SENSOR-L2-CO2.status",
+          "standardized_name": "S002-SENSOR-L2-CO2/co2_status",
+          "point_type": "status",
+          "point_category": "co2",
+          "unit": "ppm",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 3680,
+          "present_value": "online",
+          "writable": false
+        },
+        {
+          "original_name": "S002-SENSOR-L2-CO2.updated_at",
+          "standardized_name": "S002-SENSOR-L2-CO2/co2_sensor",
+          "point_type": "sensor",
+          "point_category": "co2",
+          "unit": "ppm",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 3681,
+          "present_value": "2026-03-06T13:28:15.161554",
+          "writable": false
+        }
+      ],
+      "point_count": 3,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "S002-SENSOR-L2-CO2",
+        "zone": {
+          "zone_id": "Zone-L2-CO2",
+          "floor": "L2",
+          "zone_letter": "CO2",
+          "zone_type": "open_office",
+          "site_id": "site-002"
+        }
+      },
+      "created_at": "2026-03-21T17:59:39.308747",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S002-UNKNOWN-L1-A": {
+      "equipment_id": "S002-UNKNOWN-L1-A",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (S002-UNKNOWN-L1-A)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "S002-UNKNOWN-L1-A.health_score",
+          "standardized_name": "S002-UNKNOWN-L1-A/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 3685,
+          "present_value": 84.99509999999984,
+          "writable": false
+        },
+        {
+          "original_name": "S002-UNKNOWN-L1-A.status",
+          "standardized_name": "S002-UNKNOWN-L1-A/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 3686,
+          "present_value": "online",
+          "writable": false
+        },
+        {
+          "original_name": "S002-UNKNOWN-L1-A.updated_at",
+          "standardized_name": "S002-UNKNOWN-L1-A/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 3687,
+          "present_value": "2026-02-27T09:28:36.613438",
+          "writable": false
+        }
+      ],
+      "point_count": 3,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "S002-UNKNOWN-L1-A",
+        "zone": {
+          "zone_id": "Zone-L1-A",
+          "floor": "L1",
+          "zone_letter": "A",
+          "zone_type": "open_office",
+          "site_id": "site-002"
+        }
+      },
+      "created_at": "2026-03-21T17:59:39.308923",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S002-UNKNOWN-L2-B": {
+      "equipment_id": "S002-UNKNOWN-L2-B",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (S002-UNKNOWN-L2-B)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "S002-UNKNOWN-L2-B.health_score",
+          "standardized_name": "S002-UNKNOWN-L2-B/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 3688,
+          "present_value": 84.99479999999983,
+          "writable": false
+        },
+        {
+          "original_name": "S002-UNKNOWN-L2-B.status",
+          "standardized_name": "S002-UNKNOWN-L2-B/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 3689,
+          "present_value": "online",
+          "writable": false
+        },
+        {
+          "original_name": "S002-UNKNOWN-L2-B.updated_at",
+          "standardized_name": "S002-UNKNOWN-L2-B/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 3690,
+          "present_value": "2026-02-27T09:28:36.621301",
+          "writable": false
+        }
+      ],
+      "point_count": 3,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "S002-UNKNOWN-L2-B",
+        "zone": {
+          "zone_id": "Zone-L2-B",
+          "floor": "L2",
+          "zone_letter": "B",
+          "zone_type": "open_office",
+          "site_id": "site-002"
+        }
+      },
+      "created_at": "2026-03-21T17:59:39.309038",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S002-UPS-B1-001": {
+      "equipment_id": "S002-UPS-B1-001",
+      "equipment_type": "ups",
+      "equipment_name": "UPS (S002-UPS-B1-001)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "S002-UPS-B1-001.health_score",
+          "standardized_name": "S002-UPS-B1-001/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 3691,
+          "present_value": 99.98400000000001,
+          "writable": false
+        },
+        {
+          "original_name": "S002-UPS-B1-001.status",
+          "standardized_name": "S002-UPS-B1-001/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 3692,
+          "present_value": "online",
+          "writable": false
+        },
+        {
+          "original_name": "S002-UPS-B1-001.updated_at",
+          "standardized_name": "S002-UPS-B1-001/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 3693,
+          "present_value": "2026-03-06T13:28:14.976876",
+          "writable": false
+        }
+      ],
+      "point_count": 3,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "ups": 3
+        },
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "S002-UPS-B1-001",
+        "zone": {
+          "zone_id": "Zone-B1-001",
+          "floor": "B1",
+          "zone_letter": "001",
+          "zone_type": "open_office",
+          "site_id": "site-002"
+        }
+      },
+      "created_at": "2026-03-21T17:59:39.309087",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S002-VAV-B1-001": {
+      "equipment_id": "S002-VAV-B1-001",
+      "equipment_type": "vav",
+      "equipment_name": "Variable Air Volume Box (S002-VAV-B1-001)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "S002-VAV-205.health_score",
+          "standardized_name": "S002-VAV-205/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 3715,
+          "present_value": 85,
+          "writable": false
+        },
+        {
+          "original_name": "S002-VAV-205.status",
+          "standardized_name": "S002-VAV-205/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 3716,
+          "present_value": "normal",
+          "writable": false
+        },
+        {
+          "original_name": "S002-VAV-205.updated_at",
+          "standardized_name": "S002-VAV-205/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 3717,
+          "present_value": "2026-03-06T13:28:15.154132",
+          "writable": false
+        }
+      ],
+      "point_count": 3,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "vav": 3
+        },
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "S002-VAV-205",
+        "zone": {
+          "zone_id": "Zone-B1-001",
+          "floor": "B1",
+          "zone_letter": "001",
+          "zone_type": "open_office",
+          "site_id": "site-002"
+        }
+      },
+      "created_at": "2026-03-21T17:59:39.310028",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S002-VAV-L0-A": {
+      "equipment_id": "S002-VAV-L0-A",
+      "equipment_type": "vav",
+      "equipment_name": "Variable Air Volume Box (S002-VAV-L0-A)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "S002-VAV-L0-A.health_score",
+          "standardized_name": "S002-VAV-L0-A/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 3718,
+          "present_value": 100.0,
+          "writable": false
+        },
+        {
+          "original_name": "S002-VAV-L0-A.status",
+          "standardized_name": "S002-VAV-L0-A/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 3719,
+          "present_value": "online",
+          "writable": false
+        },
+        {
+          "original_name": "S002-VAV-L0-A.updated_at",
+          "standardized_name": "S002-VAV-L0-A/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 3720,
+          "present_value": "2026-02-28T00:22:38.379267",
+          "writable": false
+        }
+      ],
+      "point_count": 3,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "vav": 3
+        },
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "S002-VAV-L0-A",
+        "zone": {
+          "zone_id": "Zone-L0-A",
+          "floor": "L0",
+          "zone_letter": "A",
+          "zone_type": "open_office",
+          "site_id": "site-002"
+        }
+      },
+      "created_at": "2026-03-21T17:59:39.310076",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S002-VAV-L1-A": {
+      "equipment_id": "S002-VAV-L1-A",
+      "equipment_type": "vav",
+      "equipment_name": "Variable Air Volume Box (S002-VAV-L1-A)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "S002-VAV-L1-A.airflow_lps",
+          "standardized_name": "S002-VAV-L1-A/flow_sensor",
+          "point_type": "sensor",
+          "point_category": "flow",
+          "unit": "L/s",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 3721,
+          "present_value": 0,
+          "writable": false
+        },
+        {
+          "original_name": "S002-VAV-L1-A.damper_position",
+          "standardized_name": "S002-VAV-L1-A/valve_position_sensor",
+          "point_type": "sensor",
+          "point_category": "valve_position",
+          "unit": "%",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 3722,
+          "present_value": 0.0,
+          "writable": false
+        },
+        {
+          "original_name": "S002-VAV-L1-A.health_score",
+          "standardized_name": "S002-VAV-L1-A/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 3723,
+          "present_value": 91.35999999999967,
+          "writable": false
+        },
+        {
+          "original_name": "S002-VAV-L1-A.status",
+          "standardized_name": "S002-VAV-L1-A/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 3724,
+          "present_value": "online",
+          "writable": false
+        },
+        {
+          "original_name": "S002-VAV-L1-A.updated_at",
+          "standardized_name": "S002-VAV-L1-A/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 3725,
+          "present_value": "2026-03-12T12:25:55.636884",
+          "writable": false
+        },
+        {
+          "original_name": "S002-VAV-L1-A.zone_temp",
+          "standardized_name": "S002-VAV-L1-A/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 3726,
+          "present_value": 25.1,
+          "writable": false
+        }
+      ],
+      "point_count": 6,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "vav": 6
+        },
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "S002-VAV-L1-A",
+        "zone": {
+          "zone_id": "Zone-L1-A",
+          "floor": "L1",
+          "zone_letter": "A",
+          "zone_type": "open_office",
+          "site_id": "site-002"
+        }
+      },
+      "created_at": "2026-03-21T17:59:39.310123",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S002-VAV-L1-B": {
+      "equipment_id": "S002-VAV-L1-B",
+      "equipment_type": "vav",
+      "equipment_name": "Variable Air Volume Box (S002-VAV-L1-B)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "S002-VAV-L1-B.health_score",
+          "standardized_name": "S002-VAV-L1-B/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 3727,
+          "present_value": 100.0,
+          "writable": false
+        },
+        {
+          "original_name": "S002-VAV-L1-B.status",
+          "standardized_name": "S002-VAV-L1-B/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 3728,
+          "present_value": "online",
+          "writable": false
+        },
+        {
+          "original_name": "S002-VAV-L1-B.updated_at",
+          "standardized_name": "S002-VAV-L1-B/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 3729,
+          "present_value": "2026-02-28T00:22:38.391658",
+          "writable": false
+        }
+      ],
+      "point_count": 3,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "vav": 3
+        },
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "S002-VAV-L1-B",
+        "zone": {
+          "zone_id": "Zone-L1-B",
+          "floor": "L1",
+          "zone_letter": "B",
+          "zone_type": "open_office",
+          "site_id": "site-002"
+        }
+      },
+      "created_at": "2026-03-21T17:59:39.310162",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S002-VAV-L2-A": {
+      "equipment_id": "S002-VAV-L2-A",
+      "equipment_type": "vav",
+      "equipment_name": "Variable Air Volume Box (S002-VAV-L2-A)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "S002-VAV-L2-A.health_score",
+          "standardized_name": "S002-VAV-L2-A/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 3730,
+          "present_value": 100.0,
+          "writable": false
+        },
+        {
+          "original_name": "S002-VAV-L2-A.status",
+          "standardized_name": "S002-VAV-L2-A/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 3731,
+          "present_value": "online",
+          "writable": false
+        },
+        {
+          "original_name": "S002-VAV-L2-A.updated_at",
+          "standardized_name": "S002-VAV-L2-A/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 3732,
+          "present_value": "2026-02-28T00:22:38.396149",
+          "writable": false
+        }
+      ],
+      "point_count": 3,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "vav": 3
+        },
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "S002-VAV-L2-A",
+        "zone": {
+          "zone_id": "Zone-L2-A",
+          "floor": "L2",
+          "zone_letter": "A",
+          "zone_type": "open_office",
+          "site_id": "site-002"
+        }
+      },
+      "created_at": "2026-03-21T17:59:39.310201",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S002-VAV-L2-C": {
+      "equipment_id": "S002-VAV-L2-C",
+      "equipment_type": "vav",
+      "equipment_name": "Variable Air Volume Box (S002-VAV-L2-C)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "S002-VAV-L2-C.health_score",
+          "standardized_name": "S002-VAV-L2-C/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 3733,
+          "present_value": 100.0,
+          "writable": false
+        },
+        {
+          "original_name": "S002-VAV-L2-C.status",
+          "standardized_name": "S002-VAV-L2-C/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 3734,
+          "present_value": "online",
+          "writable": false
+        },
+        {
+          "original_name": "S002-VAV-L2-C.updated_at",
+          "standardized_name": "S002-VAV-L2-C/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 3735,
+          "present_value": "2026-02-28T00:22:38.400288",
+          "writable": false
+        }
+      ],
+      "point_count": 3,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "vav": 3
+        },
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "S002-VAV-L2-C",
+        "zone": {
+          "zone_id": "Zone-L2-C",
+          "floor": "L2",
+          "zone_letter": "C",
+          "zone_type": "open_office",
+          "site_id": "site-002"
+        }
+      },
+      "created_at": "2026-03-21T17:59:39.310251",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S002-VAV-L2-D": {
+      "equipment_id": "S002-VAV-L2-D",
+      "equipment_type": "vav",
+      "equipment_name": "Variable Air Volume Box (S002-VAV-L2-D)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "S002-VAV-L2-D.health_score",
+          "standardized_name": "S002-VAV-L2-D/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 3736,
+          "present_value": 100.0,
+          "writable": false
+        },
+        {
+          "original_name": "S002-VAV-L2-D.status",
+          "standardized_name": "S002-VAV-L2-D/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 3737,
+          "present_value": "online",
+          "writable": false
+        },
+        {
+          "original_name": "S002-VAV-L2-D.updated_at",
+          "standardized_name": "S002-VAV-L2-D/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 3738,
+          "present_value": "2026-02-28T00:22:38.404719",
+          "writable": false
+        }
+      ],
+      "point_count": 3,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "vav": 3
+        },
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "S002-VAV-L2-D",
+        "zone": {
+          "zone_id": "Zone-L2-D",
+          "floor": "L2",
+          "zone_letter": "D",
+          "zone_type": "open_office",
+          "site_id": "site-002"
+        }
+      },
+      "created_at": "2026-03-21T17:59:39.310291",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S002-UNKNOWN-L1-001": {
+      "equipment_id": "S002-UNKNOWN-L1-001",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (S002-UNKNOWN-L1-001)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "S002-ZONE-L1-001.health_score",
+          "standardized_name": "S002-ZONE-L1-001/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 3745,
+          "present_value": 100.0,
+          "writable": false
+        },
+        {
+          "original_name": "S002-ZONE-L1-001.status",
+          "standardized_name": "S002-ZONE-L1-001/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 3746,
+          "present_value": "online",
+          "writable": false
+        },
+        {
+          "original_name": "S002-ZONE-L1-001.updated_at",
+          "standardized_name": "S002-ZONE-L1-001/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 3747,
+          "present_value": "2026-03-06T13:28:15.165567",
+          "writable": false
+        }
+      ],
+      "point_count": 3,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "S002-ZONE-L1-001",
+        "zone": {
+          "zone_id": "Zone-L1-001",
+          "floor": "L1",
+          "zone_letter": "001",
+          "zone_type": "open_office",
+          "site_id": "site-002"
+        }
+      },
+      "created_at": "2026-03-21T17:59:39.310664",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S002-UNKNOWN-L2-001": {
+      "equipment_id": "S002-UNKNOWN-L2-001",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (S002-UNKNOWN-L2-001)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "S002-ZONE-L2-001.health_score",
+          "standardized_name": "S002-ZONE-L2-001/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 3748,
+          "present_value": 100.0,
+          "writable": false
+        },
+        {
+          "original_name": "S002-ZONE-L2-001.status",
+          "standardized_name": "S002-ZONE-L2-001/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 3749,
+          "present_value": "online",
+          "writable": false
+        },
+        {
+          "original_name": "S002-ZONE-L2-001.updated_at",
+          "standardized_name": "S002-ZONE-L2-001/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 3750,
+          "present_value": "2026-03-06T13:28:15.170368",
+          "writable": false
+        }
+      ],
+      "point_count": 3,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "S002-ZONE-L2-001",
+        "zone": {
+          "zone_id": "Zone-L2-001",
+          "floor": "L2",
+          "zone_letter": "001",
+          "zone_type": "open_office",
+          "site_id": "site-002"
+        }
+      },
+      "created_at": "2026-03-21T17:59:39.310750",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    }
+  }
+}

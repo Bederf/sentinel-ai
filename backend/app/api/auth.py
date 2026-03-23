@@ -1098,16 +1098,8 @@ async def revoke_api_key(request: Request, api_key_id: str):
         result = query.execute()
         if not result.data:
             raise HTTPException(status_code=404, detail="API key not found")
-        # Best-effort cache invalidation in auth middleware by hash
+        # No cache to invalidate (removed in Phase 168-01)
         row = result.data[0]
-        key_hash = row.get("key_hash")
-        if key_hash:
-            try:
-                from app.middleware.auth_middleware import _API_KEY_CACHE
-
-                _API_KEY_CACHE.pop(key_hash, None)
-            except Exception:
-                pass
 
         # Log API key revocation (Phase 65-04)
         try:

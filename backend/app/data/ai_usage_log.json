@@ -72,7 +72,364 @@
       }
     },
     "2026-03-18": {},
-    "2026-03-19": {}
+    "2026-03-19": {},
+    "2026-03-20": {},
+    "2026-03-21": {},
+    "2026-03-22": {}
   },
-  "usd_zar_rate": 18.5
+  "usd_zar_rate": 18.5,
+  "escalations": [
+    {
+      "event": "escalation_triggered",
+      "timestamp": "2026-03-21T12:15:05.577174Z",
+      "from_class": "chat_ai",
+      "to_class": "heavy",
+      "reason": "multi-system reasoning required",
+      "mode": "api",
+      "resolved_model": "claude-sonnet-4-20250514",
+      "session_id": "",
+      "provider": "anthropic"
+    },
+    {
+      "event": "escalation_triggered",
+      "timestamp": "2026-03-21T12:15:05.582136Z",
+      "from_class": "chat_ai",
+      "to_class": "heavy",
+      "reason": "technical depth required",
+      "mode": "api",
+      "resolved_model": "claude-sonnet-4-20250514",
+      "session_id": "",
+      "provider": "anthropic"
+    },
+    {
+      "event": "escalation_triggered",
+      "timestamp": "2026-03-21T12:27:29.878983Z",
+      "from_class": "chat_ai",
+      "to_class": "heavy",
+      "reason": "multi-system reasoning required",
+      "mode": "api",
+      "resolved_model": "claude-sonnet-4-20250514",
+      "session_id": "",
+      "provider": "anthropic"
+    },
+    {
+      "event": "escalation_triggered",
+      "timestamp": "2026-03-21T12:27:29.889060Z",
+      "from_class": "chat_ai",
+      "to_class": "heavy",
+      "reason": "technical depth required",
+      "mode": "api",
+      "resolved_model": "claude-sonnet-4-20250514",
+      "session_id": "",
+      "provider": "anthropic"
+    },
+    {
+      "event": "escalation_triggered",
+      "timestamp": "2026-03-21T12:27:39.104092Z",
+      "from_class": "chat_ai",
+      "to_class": "heavy",
+      "reason": "multi-system reasoning required",
+      "mode": "api",
+      "resolved_model": "claude-sonnet-4-20250514",
+      "session_id": "",
+      "provider": "anthropic"
+    },
+    {
+      "event": "escalation_triggered",
+      "timestamp": "2026-03-21T12:27:39.114396Z",
+      "from_class": "chat_ai",
+      "to_class": "heavy",
+      "reason": "technical depth required",
+      "mode": "api",
+      "resolved_model": "claude-sonnet-4-20250514",
+      "session_id": "",
+      "provider": "anthropic"
+    },
+    {
+      "event": "escalation_triggered",
+      "timestamp": "2026-03-21T12:30:03.687373Z",
+      "from_class": "chat_ai",
+      "to_class": "heavy",
+      "reason": "multi-system reasoning required",
+      "mode": "api",
+      "resolved_model": "claude-sonnet-4-20250514",
+      "session_id": "",
+      "provider": "anthropic"
+    },
+    {
+      "event": "escalation_triggered",
+      "timestamp": "2026-03-21T12:30:03.694712Z",
+      "from_class": "chat_ai",
+      "to_class": "heavy",
+      "reason": "technical depth required",
+      "mode": "api",
+      "resolved_model": "claude-sonnet-4-20250514",
+      "session_id": "",
+      "provider": "anthropic"
+    },
+    {
+      "event": "escalation_triggered",
+      "timestamp": "2026-03-21T14:26:02.987381Z",
+      "from_class": "chat_ai",
+      "to_class": "heavy",
+      "reason": "multi-system reasoning required",
+      "mode": "api",
+      "resolved_model": "claude-sonnet-4-20250514",
+      "session_id": "",
+      "provider": "anthropic"
+    },
+    {
+      "event": "escalation_triggered",
+      "timestamp": "2026-03-21T14:26:02.995957Z",
+      "from_class": "chat_ai",
+      "to_class": "heavy",
+      "reason": "technical depth required",
+      "mode": "api",
+      "resolved_model": "claude-sonnet-4-20250514",
+      "session_id": "",
+      "provider": "anthropic"
+    },
+    {
+      "event": "escalation_triggered",
+      "timestamp": "2026-03-21T14:35:31.255762Z",
+      "from_class": "chat_ai",
+      "to_class": "heavy",
+      "reason": "multi-system reasoning required",
+      "mode": "api",
+      "resolved_model": "claude-sonnet-4-20250514",
+      "session_id": "",
+      "provider": "anthropic"
+    },
+    {
+      "event": "escalation_triggered",
+      "timestamp": "2026-03-21T14:35:31.262116Z",
+      "from_class": "chat_ai",
+      "to_class": "heavy",
+      "reason": "technical depth required",
+      "mode": "api",
+      "resolved_model": "claude-sonnet-4-20250514",
+      "session_id": "",
+      "provider": "anthropic"
+    },
+    {
+      "event": "escalation_triggered",
+      "timestamp": "2026-03-21T15:17:10.435357Z",
+      "from_class": "chat_ai",
+      "to_class": "heavy",
+      "reason": "multi-system reasoning required",
+      "mode": "api",
+      "resolved_model": "claude-sonnet-4-20250514",
+      "session_id": "",
+      "provider": "anthropic"
+    },
+    {
+      "event": "escalation_triggered",
+      "timestamp": "2026-03-21T15:17:10.527891Z",
+      "from_class": "chat_ai",
+      "to_class": "heavy",
+      "reason": "technical depth required",
+      "mode": "api",
+      "resolved_model": "claude-sonnet-4-20250514",
+      "session_id": "",
+      "provider": "anthropic"
+    },
+    {
+      "event": "escalation_triggered",
+      "timestamp": "2026-03-21T17:19:58.908799Z",
+      "from_class": "chat_ai",
+      "to_class": "heavy",
+      "reason": "multi-system reasoning required",
+      "mode": "api",
+      "resolved_model": "claude-sonnet-4-20250514",
+      "session_id": "",
+      "provider": "anthropic"
+    },
+    {
+      "event": "escalation_triggered",
+      "timestamp": "2026-03-21T17:19:58.912458Z",
+      "from_class": "chat_ai",
+      "to_class": "heavy",
+      "reason": "technical depth required",
+      "mode": "api",
+      "resolved_model": "claude-sonnet-4-20250514",
+      "session_id": "",
+      "provider": "anthropic"
+    },
+    {
+      "event": "escalation_triggered",
+      "timestamp": "2026-03-21T17:22:08.245569Z",
+      "from_class": "chat_ai",
+      "to_class": "heavy",
+      "reason": "multi-system reasoning required",
+      "mode": "api",
+      "resolved_model": "claude-sonnet-4-20250514",
+      "session_id": "",
+      "provider": "anthropic"
+    },
+    {
+      "event": "escalation_triggered",
+      "timestamp": "2026-03-21T17:22:08.252876Z",
+      "from_class": "chat_ai",
+      "to_class": "heavy",
+      "reason": "technical depth required",
+      "mode": "api",
+      "resolved_model": "claude-sonnet-4-20250514",
+      "session_id": "",
+      "provider": "anthropic"
+    },
+    {
+      "event": "escalation_triggered",
+      "timestamp": "2026-03-21T17:26:31.516406Z",
+      "from_class": "chat_ai",
+      "to_class": "heavy",
+      "reason": "multi-system reasoning required",
+      "mode": "api",
+      "resolved_model": "claude-sonnet-4-20250514",
+      "session_id": "",
+      "provider": "anthropic"
+    },
+    {
+      "event": "escalation_triggered",
+      "timestamp": "2026-03-21T17:26:31.522291Z",
+      "from_class": "chat_ai",
+      "to_class": "heavy",
+      "reason": "technical depth required",
+      "mode": "api",
+      "resolved_model": "claude-sonnet-4-20250514",
+      "session_id": "",
+      "provider": "anthropic"
+    },
+    {
+      "event": "escalation_triggered",
+      "timestamp": "2026-03-21T17:49:00.970946Z",
+      "from_class": "chat_ai",
+      "to_class": "heavy",
+      "reason": "multi-system reasoning required",
+      "mode": "api",
+      "resolved_model": "claude-sonnet-4-20250514",
+      "session_id": "",
+      "provider": "anthropic"
+    },
+    {
+      "event": "escalation_triggered",
+      "timestamp": "2026-03-21T17:49:00.978373Z",
+      "from_class": "chat_ai",
+      "to_class": "heavy",
+      "reason": "technical depth required",
+      "mode": "api",
+      "resolved_model": "claude-sonnet-4-20250514",
+      "session_id": "",
+      "provider": "anthropic"
+    },
+    {
+      "event": "escalation_triggered",
+      "timestamp": "2026-03-21T17:51:11.272933Z",
+      "from_class": "chat_ai",
+      "to_class": "heavy",
+      "reason": "multi-system reasoning required",
+      "mode": "api",
+      "resolved_model": "claude-sonnet-4-20250514",
+      "session_id": "",
+      "provider": "anthropic"
+    },
+    {
+      "event": "escalation_triggered",
+      "timestamp": "2026-03-21T17:51:11.280521Z",
+      "from_class": "chat_ai",
+      "to_class": "heavy",
+      "reason": "technical depth required",
+      "mode": "api",
+      "resolved_model": "claude-sonnet-4-20250514",
+      "session_id": "",
+      "provider": "anthropic"
+    },
+    {
+      "event": "escalation_triggered",
+      "timestamp": "2026-03-21T17:53:18.520421Z",
+      "from_class": "chat_ai",
+      "to_class": "heavy",
+      "reason": "multi-system reasoning required",
+      "mode": "api",
+      "resolved_model": "claude-sonnet-4-20250514",
+      "session_id": "",
+      "provider": "anthropic"
+    },
+    {
+      "event": "escalation_triggered",
+      "timestamp": "2026-03-21T17:53:18.528530Z",
+      "from_class": "chat_ai",
+      "to_class": "heavy",
+      "reason": "technical depth required",
+      "mode": "api",
+      "resolved_model": "claude-sonnet-4-20250514",
+      "session_id": "",
+      "provider": "anthropic"
+    },
+    {
+      "event": "escalation_triggered",
+      "timestamp": "2026-03-21T18:06:40.390294Z",
+      "from_class": "chat_ai",
+      "to_class": "heavy",
+      "reason": "multi-system reasoning required",
+      "mode": "api",
+      "resolved_model": "claude-sonnet-4-20250514",
+      "session_id": "",
+      "provider": "anthropic"
+    },
+    {
+      "event": "escalation_triggered",
+      "timestamp": "2026-03-21T18:06:40.395773Z",
+      "from_class": "chat_ai",
+      "to_class": "heavy",
+      "reason": "technical depth required",
+      "mode": "api",
+      "resolved_model": "claude-sonnet-4-20250514",
+      "session_id": "",
+      "provider": "anthropic"
+    },
+    {
+      "event": "escalation_triggered",
+      "timestamp": "2026-03-21T18:08:42.581596Z",
+      "from_class": "chat_ai",
+      "to_class": "heavy",
+      "reason": "multi-system reasoning required",
+      "mode": "api",
+      "resolved_model": "claude-sonnet-4-20250514",
+      "session_id": "",
+      "provider": "anthropic"
+    },
+    {
+      "event": "escalation_triggered",
+      "timestamp": "2026-03-21T18:08:42.588795Z",
+      "from_class": "chat_ai",
+      "to_class": "heavy",
+      "reason": "technical depth required",
+      "mode": "api",
+      "resolved_model": "claude-sonnet-4-20250514",
+      "session_id": "",
+      "provider": "anthropic"
+    },
+    {
+      "event": "escalation_triggered",
+      "timestamp": "2026-03-21T18:59:12.832197Z",
+      "from_class": "chat_ai",
+      "to_class": "heavy",
+      "reason": "multi-system reasoning required",
+      "mode": "api",
+      "resolved_model": "claude-sonnet-4-20250514",
+      "session_id": "",
+      "provider": "anthropic"
+    },
+    {
+      "event": "escalation_triggered",
+      "timestamp": "2026-03-21T18:59:12.837984Z",
+      "from_class": "chat_ai",
+      "to_class": "heavy",
+      "reason": "technical depth required",
+      "mode": "api",
+      "resolved_model": "claude-sonnet-4-20250514",
+      "session_id": "",
+      "provider": "anthropic"
+    }
+  ]
 }

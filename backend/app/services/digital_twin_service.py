@@ -144,9 +144,7 @@ class DigitalTwinService:
             Extracted config with equipment, floors, zones
         """
         try:
-            from app.services.claude_service import ClaudeService
-
-            claude = ClaudeService()
+            from app.services.model_gateway import model_gateway
 
             # Prepare extraction prompt
             prompt = self._build_extraction_prompt(site_name, floors_count, was_sanitized)
@@ -156,15 +154,34 @@ class DigitalTwinService:
 
             image_b64 = base64.b64encode(image_bytes).decode("utf-8")
 
-            # Call Claude with vision capability
-            response = await claude.call_claude_vision(prompt=prompt, image_base64=image_b64)
+            # Call gateway with vision capability (heavy task class → sonnet with vision support)
+            response = await model_gateway.call(
+                task_class="heavy",
+                messages=[
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "image",
+                                "source": {
+                                    "type": "base64",
+                                    "media_type": "image/png",
+                                    "data": image_b64,
+                                },
+                            },
+                            {"type": "text", "text": prompt},
+                        ],
+                    }
+                ],
+                max_tokens=4096,
+            )
 
             # Parse response as JSON
             extracted = self._parse_extraction_response(response, site_code)
 
             return extracted
         except Exception as e:
-            logger.error(f"Claude vision extraction failed: {e}")
+            logger.error(f"Vision extraction failed: {e}")
             # Return demo config for testing
             return self._generate_demo_config(site_code, site_name, floors_count)
 

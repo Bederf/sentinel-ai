@@ -13,13 +13,10 @@ from app.services.maintenance_recommender import (
 
 @pytest.fixture
 def mock_ollama():
-    """Mock Ollama client."""
-    with patch("app.services.maintenance_recommender.get_ollama_client") as mock:
-        client = AsyncMock()
-        client.is_available = AsyncMock(return_value=False)
-        client.generate = AsyncMock(return_value="No LLM response")
-        mock.return_value = client
-        yield client
+    """Mock model gateway — raises by default so service falls back to rule-based (Phase 163)."""
+    with patch("app.services.model_gateway.model_gateway.call", new_callable=AsyncMock) as mock:
+        mock.side_effect = Exception("LLM unavailable in test")
+        yield mock
 
 
 @pytest.fixture
@@ -207,9 +204,9 @@ class TestMaintenanceRecommender:
     @pytest.mark.asyncio
     async def test_generate_with_llm_available(self, recommender, mock_ollama):
         """Test recommendation generation when LLM is available."""
-        mock_ollama.is_available = AsyncMock(return_value=True)
-        mock_ollama.generate = AsyncMock(
-            return_value="""
+        # Override fixture default: make gateway succeed with a structured response
+        mock_ollama.side_effect = None
+        mock_ollama.return_value = """
 ### IMMEDIATE_ACTIONS
 - Check refrigerant levels immediately
 - Inspect compressor contacts
@@ -229,7 +226,6 @@ class TestMaintenanceRecommender:
 ### ESTIMATED_DOWNTIME
 2-4 hours
 """
-        )
 
         predictions = {
             "overall_risk": {"risk_level": "high"},

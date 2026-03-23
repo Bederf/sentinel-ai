@@ -75,6 +75,8 @@ class MunicipalPdfExtractionService:
             if isinstance(result, dict):
                 result.setdefault("confidence", result.get("confidence", 0.0))
                 return result
+        except ImportError as exc:
+            logger.warning("OCR fallback disabled: MunicipalInvoiceOCRService not available (%s)", exc)
         except Exception as exc:
             logger.info("OCR fallback unavailable: %s", exc)
         return None

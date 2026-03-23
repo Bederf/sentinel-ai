@@ -59,6 +59,16 @@ STOP_WORDS = {
     "with",
 }
 
+# Query-side typo corrections for high-frequency technician misspellings.
+# Applied to user input only (not indexed document text).
+QUERY_TYPO_CORRECTIONS = {
+    "generagor": "generator",
+    "genrator": "generator",
+    "genreator": "generator",
+    "inspecion": "inspection",
+    "sertificate": "certificate",
+}
+
 DOCUMENT_TYPE_SYNONYMS = {
     "service sheet": {"service", "sheet", "service sheet", "service sheets"},
     "job card": {"job", "card", "job card", "job cards"},
@@ -252,7 +262,7 @@ class QueryHints:
 
 
 def parse_query_intent(query: str) -> dict[str, Any]:
-    lowered = query.lower()
+    lowered = _normalise_query_typos(query.lower())
     tokens = _token_list(lowered)
     token_set = set(tokens)
     year = _extract_year_from_text(lowered)
@@ -283,6 +293,13 @@ def parse_query_intent(query: str) -> dict[str, Any]:
         "frequency": frequency,
         "keywords": keywords,
     }
+
+
+def _normalise_query_typos(text: str) -> str:
+    normalized = text
+    for typo, corrected in QUERY_TYPO_CORRECTIONS.items():
+        normalized = re.sub(rf"\b{re.escape(typo)}\b", corrected, normalized)
+    return normalized
 
 
 def _extract_building(text: str) -> str | None:
@@ -489,6 +506,7 @@ class ConceptDocumentSearchService:
                 "query": query,
                 "building_id": building_id or site_id,
                 "results": [],
+                "total_matched": 0,
                 "total_results": 0,
                 "weak_results": False,
             }
@@ -519,6 +537,7 @@ class ConceptDocumentSearchService:
                 ranked_results.append(candidate)
 
         ranked_results.sort(key=lambda item: item["rank_key"], reverse=True)
+        total_matched = len(ranked_results)
         trimmed = ranked_results[:top_k]
         trimmed = self._rerank_with_ai(query, trimmed)
 
@@ -529,7 +548,7 @@ class ConceptDocumentSearchService:
             "query": query,
             "building_id": building_id or site_id,
             "results": [item["payload"] for item in trimmed],
-            "total_results": len(trimmed),
+            "total_results": total_matched,
             "weak_results": weak_results,
         }
 
@@ -572,8 +591,8 @@ class ConceptDocumentSearchService:
         return documents
 
     def _parse_query(self, query: str) -> QueryHints:
-        lowered = query.lower()
-        tokens = set(_token_list(query))
+        lowered = _normalise_query_typos(query.lower())
+        tokens = set(_token_list(lowered))
         years = {int(year) for year in re.findall(r"\b(20\d{2})\b", lowered)}
         document_types = {
             doc_type

@@ -183,6 +183,159 @@ class TestAuditLogRotation:
             assert len(remaining) == 10, f"Expected 10 entries preserved after failed archival, got {len(remaining)}"
 
     @pytest.mark.asyncio
+    async def test_archival_partial_failure_preserves_active(self, audit_logger):
+        """If archival fails partway, failed entries stay in active log for retry.
+
+        Scenario: 10 old entries, upsert succeeds for first 5, fails for 6-10.
+        Expected: archived_count=5, all 10 entries remain in active log (none deleted).
+        Control: AUDIT-001 (Immutable Audit Trail) — fail-safe on partial failure
+        Phase: 168-03 (Audit Archival Race Condition & Partial Failure Fix)
+        """
+        # Create 10 old entries (31 days ago)
+        old_entries = await self._create_audit_entries(audit_logger, count=10, days_old=31)
+        audit_logger._save_logs(old_entries)
+
+        # Mock Supabase to fail on entries 6-10 (after first 5 succeed)
+        mock_supabase = MagicMock()
+        mock_table = MagicMock()
+        mock_upsert = MagicMock()
+
+        call_count = [0]
+
+        def side_effect(*args, **kwargs):
+            call_count[0] += 1
+            if call_count[0] > 5:
+                # Fail on 6th upsert and onwards
+                raise ConnectionError("Supabase connection lost during archival")
+            return MagicMock()
+
+        mock_upsert.execute = MagicMock(side_effect=side_effect)
+        mock_table.upsert = MagicMock(return_value=mock_upsert)
+        mock_supabase.table = MagicMock(return_value=mock_table)
+
+        with patch(
+            "app.database.supabase_client.get_supabase_client",
+            return_value=mock_supabase,
+        ):
+            # Run archival
+            archived_count = await audit_logger.archive_old_audit_logs(days_old=30)
+
+        # Verify: 5 succeeded
+        assert archived_count == 5, f"Expected 5 archived entries, got {archived_count}"
+
+        # Verify: active log still has all 10 entries (none deleted on partial failure)
+        with open(audit_logger.log_file, "r") as f:
+            data = json.load(f)
+            remaining = data.get("entries", [])
+            assert len(remaining) == 10, (
+                f"Expected 10 entries preserved in active log after partial failure, "
+                f"got {len(remaining)} (5 failed, so all must stay for retry)"
+            )
+
+    @pytest.mark.asyncio
+    async def test_archival_idempotent_on_retry(self, audit_logger):
+        """Archival is idempotent on retry after transient failure.
+
+        Scenario: Retry archival on same entries after transient failure.
+        Expected: Both runs succeed, no duplicates, no loss.
+        Control: AUDIT-001 (Immutable Audit Trail) — idempotent archival
+        Phase: 168-03 (Audit Archival Race Condition & Partial Failure Fix)
+        """
+        # Create 10 old entries (31 days ago)
+        old_entries = await self._create_audit_entries(audit_logger, count=10, days_old=31)
+        audit_logger._save_logs(old_entries)
+
+        # Mock Supabase with successful upsert (idempotent)
+        mock_supabase = MagicMock()
+        mock_table = MagicMock()
+        mock_upsert = MagicMock()
+        mock_table.upsert = MagicMock(return_value=mock_upsert)
+        mock_upsert.execute = MagicMock()
+        mock_supabase.table = MagicMock(return_value=mock_table)
+
+        with patch(
+            "app.database.supabase_client.get_supabase_client",
+            return_value=mock_supabase,
+        ):
+            # First archival (all succeed)
+            count1 = await audit_logger.archive_old_audit_logs(days_old=30)
+            assert count1 == 10, f"First archival should succeed with 10 entries, got {count1}"
+
+            # Verify entries were deleted from active log
+            with open(audit_logger.log_file, "r") as f:
+                data = json.load(f)
+                remaining = data.get("entries", [])
+                assert len(remaining) == 0, f"After successful archival, active log should be empty, got {len(remaining)}"
+
+            # Simulate restart without archival completing (reload from backup)
+            # Re-add entries to active log (as if archival had failed partway)
+            audit_logger._save_logs(old_entries)
+
+            # Retry archival (upserts are idempotent, should succeed)
+            count2 = await audit_logger.archive_old_audit_logs(days_old=30)
+            assert count2 == 10, f"Second archival retry should succeed with 10 entries, got {count2}"
+
+            # Verify: Supabase was called twice per entry (idempotent upsert)
+            # Total calls: 10 (first run) + 10 (second run) = 20
+            assert mock_table.upsert.call_count == 20, (
+                f"Upsert should be called 20 times (10 + 10 retry), got {mock_table.upsert.call_count}"
+            )
+
+    @pytest.mark.asyncio
+    async def test_concurrent_archival_safe_with_lock(self, audit_logger):
+        """Concurrent archival calls are serialized by file lock (only one runs at a time).
+
+        Scenario: Two concurrent archival tasks started simultaneously.
+        Expected: Lock ensures only one executes; second waits and finds no old entries.
+        Control: AUDIT-001 (Immutable Audit Trail) — concurrent safety
+        Phase: 168-03 (Audit Archival Race Condition & Partial Failure Fix)
+        """
+        import asyncio
+
+        # Create 10 old entries (31 days ago)
+        old_entries = await self._create_audit_entries(audit_logger, count=10, days_old=31)
+        audit_logger._save_logs(old_entries)
+
+        # Mock Supabase with successful upsert
+        mock_supabase = MagicMock()
+        mock_table = MagicMock()
+        mock_upsert = MagicMock()
+        mock_table.upsert = MagicMock(return_value=mock_upsert)
+        mock_upsert.execute = MagicMock()
+        mock_supabase.table = MagicMock(return_value=mock_table)
+
+        call_order = []
+
+        def track_upsert(*args, **kwargs):
+            call_order.append("upsert")
+            return MagicMock()
+
+        mock_upsert.execute = MagicMock(side_effect=track_upsert)
+
+        with patch(
+            "app.database.supabase_client.get_supabase_client",
+            return_value=mock_supabase,
+        ):
+            # Run two concurrent archival calls
+            count1_task = asyncio.create_task(audit_logger.archive_old_audit_logs(days_old=30))
+            count2_task = asyncio.create_task(audit_logger.archive_old_audit_logs(days_old=30))
+
+            count1 = await count1_task
+            count2 = await count2_task
+
+        # Verify results
+        # First call: archives 10 entries
+        # Second call: finds 0 old entries (first already deleted them)
+        assert count1 == 10, f"First archival should succeed with 10 entries, got {count1}"
+        assert count2 == 0, f"Second archival should find 0 entries (already archived), got {count2}"
+
+        # Verify final active log is empty (only first archival deleted entries)
+        with open(audit_logger.log_file, "r") as f:
+            data = json.load(f)
+            remaining = data.get("entries", [])
+            assert len(remaining) == 0, f"Active log should be empty after concurrent archival, got {len(remaining)}"
+
+    @pytest.mark.asyncio
     async def test_audit_archival_background_job_scheduling(self, audit_logger):
         """Test background job creation for periodic archival.
 

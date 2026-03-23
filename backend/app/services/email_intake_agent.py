@@ -19,10 +19,8 @@ import time
 from dataclasses import dataclass
 from typing import Any, Optional
 
-import httpx
-
 from app.config.settings import settings
-from app.services.ai_usage_tracker import usage_tracker
+from app.services.model_gateway import model_gateway
 from app.services.issue_classifier import (
     CALL_LOG_TAXONOMY,
     DISCIPLINE_TO_CATEGORY,
@@ -108,10 +106,6 @@ class EmailIntakeAgent:
     """AI agent for classifying FM emails and generating replies."""
 
     def __init__(self):
-        self._api_key = settings.openai_api_key
-        self._base_url = (settings.openai_base_url or "https://api.openai.com/v1").rstrip("/")
-        # Use configured model — not hardcoded — so it picks up env overrides
-        self._model = settings.openai_model or "gpt-4.1-nano"
         self._timeout = settings.email_intake_agent_timeout_seconds
 
     async def classify_and_reply(
@@ -286,125 +280,17 @@ Respond with ONLY a JSON object (no markdown, no explanation):
     # ------------------------------------------------------------------
 
     async def _call_llm(self, prompt: str) -> tuple[str, str]:
-        """Claude → OpenAI → raise. Returns (response_text, model_name)."""
-        # Try Claude first
-        claude_model = settings.claude_model or "claude-haiku-4-5-20251001"
+        """Call model_gateway with task_class=light. Returns (response_text, model_name)."""
         try:
-            text = await self._call_claude(prompt)
-            return text, f"claude:{claude_model}"
+            text = await model_gateway.call(
+                task_class="light",
+                messages=[{"role": "user", "content": prompt}],
+                system="You are a JSON-only facilities management email triage agent. Respond with valid JSON only.",
+                max_tokens=1000,
+            )
+            return text, "gateway:light"
         except Exception as exc:
-            logger.error(
-                "Claude call failed (model=%s): %s — trying OpenAI fallback",
-                claude_model,
-                exc,
-            )
-
-        # Try OpenAI fallback
-        if self._api_key:
-            try:
-                text = await self._call_openai(prompt)
-                return text, self._model
-            except Exception as exc:
-                raise RuntimeError(f"All LLM providers failed. Last error: {exc}") from exc
-
-        raise RuntimeError("All LLM providers failed. No OpenAI API key configured.")
-
-    async def _call_openai(self, prompt: str) -> str:
-        """Call OpenAI chat completions API."""
-        url = f"{self._base_url}/chat/completions"
-        headers = {
-            "Authorization": f"Bearer {self._api_key}",
-            "Content-Type": "application/json",
-        }
-        payload = {
-            "model": self._model,
-            "messages": [
-                {
-                    "role": "system",
-                    "content": "You are a JSON-only facilities management "
-                    "email triage agent. Respond with valid JSON only.",
-                },
-                {"role": "user", "content": prompt},
-            ],
-            "temperature": 0.1,
-            "max_tokens": 1000,
-        }
-
-        async with httpx.AsyncClient(timeout=float(self._timeout)) as client:
-            response = await client.post(url, headers=headers, json=payload)
-            response.raise_for_status()
-
-        body = response.json()
-        choices = body.get("choices", [])
-        if not choices:
-            raise RuntimeError("OpenAI returned no choices")
-
-        content = choices[0].get("message", {}).get("content", "")
-        if not content:
-            raise RuntimeError("OpenAI returned empty content")
-
-        try:
-            usage = body.get("usage", {})
-            usage_tracker.record(
-                provider="openai",
-                model=self._model,
-                input_tokens=usage.get("prompt_tokens", 0),
-                output_tokens=usage.get("completion_tokens", 0),
-                source="email_intake",
-            )
-        except Exception:
-            pass  # Never break email intake for tracking
-
-        logger.info("Agent LLM response from %s (%d chars)", self._model, len(content))
-        return content
-
-    async def _call_claude(self, prompt: str) -> str:
-        """Call Claude via Anthropic API as fallback."""
-        api_key = settings.anthropic_api_key
-        if not api_key:
-            raise RuntimeError("ANTHROPIC_API_KEY not configured")
-
-        claude_model = settings.claude_model or "claude-haiku-4-5-20251001"
-        url = "https://api.anthropic.com/v1/messages"
-        headers = {
-            "x-api-key": api_key,
-            "anthropic-version": "2023-06-01",
-            "content-type": "application/json",
-        }
-        payload = {
-            "model": claude_model,
-            "max_tokens": 1000,
-            "messages": [{"role": "user", "content": prompt}],
-            "system": "You are a JSON-only facilities management email triage agent. Respond with valid JSON only.",
-        }
-
-        async with httpx.AsyncClient(timeout=float(self._timeout)) as client:
-            response = await client.post(url, headers=headers, json=payload)
-            response.raise_for_status()
-
-        body = response.json()
-        content_blocks = body.get("content", [])
-        text = ""
-        for block in content_blocks:
-            if isinstance(block, dict) and block.get("type") == "text":
-                text += block.get("text", "")
-        if not text:
-            raise RuntimeError("Claude returned empty content")
-
-        try:
-            usage = body.get("usage", {})
-            usage_tracker.record(
-                provider="anthropic",
-                model=claude_model,
-                input_tokens=usage.get("input_tokens", 0),
-                output_tokens=usage.get("output_tokens", 0),
-                source="email_intake",
-            )
-        except Exception:
-            pass  # Never break email intake for tracking
-
-        logger.info("Agent LLM response from Claude/%s (%d chars)", claude_model, len(text))
-        return text
+            raise RuntimeError(f"Gateway LLM call failed: {exc}") from exc
 
     # ------------------------------------------------------------------
     # Response parsing

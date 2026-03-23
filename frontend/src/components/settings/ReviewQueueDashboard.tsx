@@ -376,7 +376,7 @@ export function ReviewQueueDashboard({
                         <AlertTriangle
                           className="inline ml-1 h-3 w-3"
                           style={{ color: "var(--color-sentinel-amber)" }}
-                          title="Validation errors"
+                          aria-label="Validation errors"
                         />
                       )}
                     </td>

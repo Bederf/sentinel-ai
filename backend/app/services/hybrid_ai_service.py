@@ -4,6 +4,7 @@ Provider hierarchy (configured via AI_CLOUD_PROVIDER):
   - anthropic: Claude (tool support via native API)
   - openai:    GPT-4.1 (tool support, tiered: nano for Tier 1, mini for Tier 2)
   - zai:       Z.ai GLM (NO tool support — advisory only)
+  - xiaomi:    Xiaomi MiMo (NO tool support — advisory only)
 
 Fallback chain: primary → next available cloud provider.
 Ollama local inference retained but disabled on CPU-only VPS.
@@ -23,6 +24,7 @@ from app.config.settings import settings
 from app.services.claude_service import claude_service
 from app.services.openai_service import openai_service
 from app.services.zai_service import zai_service
+from app.services.xiaomi_service import xiaomi_service
 from app.services.popia_consent_guard import should_allow_cloud_processing
 
 # Add sentry tools to path for rate limit tracker
@@ -95,7 +97,7 @@ class HybridAIService:
     def get_active_cloud_provider(self) -> str:
         """Return configured cloud provider."""
         provider = (settings.ai_cloud_provider or "anthropic").strip().lower()
-        return provider if provider in {"anthropic", "openai", "zai"} else "anthropic"
+        return provider if provider in {"anthropic", "openai", "zai", "xiaomi"} else "anthropic"
 
     def get_active_cloud_model(self, tier: int = 2) -> str:
         """Return configured cloud model for active provider.
@@ -107,6 +109,8 @@ class HybridAIService:
             return openai_service.get_model_for_tier(tier)
         if provider == "zai":
             return settings.zai_model
+        if provider == "xiaomi":
+            return settings.xiaomi_model
         return settings.claude_model
 
     def is_cloud_configured(self) -> bool:
@@ -116,6 +120,8 @@ class HybridAIService:
             return openai_service.is_configured()
         if provider == "zai":
             return zai_service.is_configured()
+        if provider == "xiaomi":
+            return xiaomi_service.is_configured()
         return claude_service.is_configured()
 
     def provider_supports_tools(self, provider: str | None = None) -> bool:
@@ -138,7 +144,7 @@ class HybridAIService:
     def _get_fallback_providers(self, primary: str) -> list[str]:
         """Return ordered fallback providers (excluding the primary)."""
         # Prefer tool-capable providers first, then advisory-only
-        all_providers = ["openai", "anthropic", "zai"]
+        all_providers = ["openai", "anthropic", "zai", "xiaomi"]
         return [p for p in all_providers if p != primary]
 
     def classify_task(self, message: str) -> dict[str, Any]:
@@ -152,7 +158,7 @@ class HybridAIService:
         cloud_provider = self.get_active_cloud_provider()
 
         # Cost estimates per provider per request
-        cost_map = {"anthropic": 0.0105, "openai": 0.002, "zai": 0.0035}
+        cost_map = {"anthropic": 0.0105, "openai": 0.002, "zai": 0.0035, "xiaomi": 0.002}
         cloud_cost = cost_map.get(cloud_provider, 0.005)
 
         if "equipment health" in message_lower:
@@ -349,6 +355,12 @@ class HybridAIService:
                 yield chunk
         elif provider == "zai":
             async for chunk in zai_service.stream_response(
+                messages,
+                include_site_context=include_site_context,
+            ):
+                yield chunk
+        elif provider == "xiaomi":
+            async for chunk in xiaomi_service.stream_response(
                 messages,
                 include_site_context=include_site_context,
             ):

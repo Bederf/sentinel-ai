@@ -106,7 +106,7 @@ async def search_documents(
     equipment_type: Optional[str] = Query(None, description="Filter by equipment type"),
     document_type: Optional[str] = Query(None, description="Filter by document type"),
     n_results: int = Query(5, ge=1, le=20, description="Number of results"),
-    similarity_threshold: float = Query(0.5, ge=0.0, le=1.0, description="Minimum similarity score"),
+    similarity_threshold: float = Query(0.7, ge=0.0, le=1.0, description="Minimum similarity score"),
     auth: AuthContext = Depends(require_role(1)),
 ):
     """Search documents by semantic similarity. Requires AUDITOR (level 1)."""

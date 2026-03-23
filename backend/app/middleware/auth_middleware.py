@@ -82,43 +82,6 @@ def sanitize_email(email: str) -> str:
 
 
 # =============================================================================
-# API Key Store (in-memory for MVP, move to Supabase for production)
-# =============================================================================
-
-# Demo API keys for development/testing
-# In production, these would be stored in Supabase with hashed keys
-_API_KEY_STORE: dict[str, dict[str, Any]] = {}
-_API_KEY_CACHE: dict[str, tuple[datetime, dict[str, Any]]] = {}
-_API_KEY_CACHE_TTL_SECONDS = 300
-
-
-def register_api_key(
-    key_hash: str,
-    owner: str,
-    role: SentinelRole,
-    scopes: list[str] | None = None,
-    description: str = "",
-) -> None:
-    """Register an API key in the in-memory store.
-
-    Args:
-        key_hash: SHA-256 hash of the API key
-        owner: Human owner identifier
-        role: Role assigned to this key
-        scopes: API scopes granted
-        description: Purpose of this key
-    """
-    _API_KEY_STORE[key_hash] = {
-        "owner": owner,
-        "role": role,
-        "scopes": scopes or [],
-        "description": description,
-        "created_at": datetime.utcnow().isoformat(),
-        "is_active": True,
-    }
-
-
-# =============================================================================
 # JWT Token Creation (Phase 65-02: Access + Refresh Tokens)
 # =============================================================================
 
@@ -364,7 +327,10 @@ async def _validate_supabase_token(token: str) -> dict[str, Any] | None:
 
 
 def _validate_api_key(api_key: str) -> dict[str, Any] | None:
-    """Validate an API key against database (with short in-memory cache).
+    """Validate an API key against Supabase-backed store.
+
+    Returns AuthContext if valid, None if not found or expired.
+    On Supabase error: returns None (fail-closed, no fallback).
 
     Args:
         api_key: Plaintext API key
@@ -373,17 +339,7 @@ def _validate_api_key(api_key: str) -> dict[str, Any] | None:
         Key info dict or None if invalid
     """
     key_hash = hashlib.sha256(api_key.encode()).hexdigest()
-    now = datetime.utcnow()
 
-    # 5-minute in-memory cache to reduce DB hits
-    cached = _API_KEY_CACHE.get(key_hash)
-    if cached:
-        expires_at, cached_value = cached
-        if now < expires_at:
-            return {**cached_value, "key_hash": key_hash}
-        _API_KEY_CACHE.pop(key_hash, None)
-
-    # Primary source: database
     try:
         client = get_supabase_client()
         result = client.table("api_keys").select("*").eq("key_hash", key_hash).limit(1).execute()
@@ -395,6 +351,7 @@ def _validate_api_key(api_key: str) -> dict[str, Any] | None:
 
             expires_at = record.get("expires_at")
             if expires_at:
+                now = datetime.utcnow()
                 expires_dt = datetime.fromisoformat(expires_at.replace("Z", "+00:00"))
                 if now.replace(tzinfo=expires_dt.tzinfo) > expires_dt:
                     return None
@@ -412,25 +369,19 @@ def _validate_api_key(api_key: str) -> dict[str, Any] | None:
                 "description": f"api_key:{record.get('key_prefix', '')}",
                 "is_active": True,
             }
-            _API_KEY_CACHE[key_hash] = (
-                now + timedelta(seconds=_API_KEY_CACHE_TTL_SECONDS),
-                key_info,
-            )
 
             # Non-blocking last_used update
             try:
-                client.table("api_keys").update({"last_used_at": now.isoformat()}).eq("id", record.get("id")).execute()
+                client.table("api_keys").update({"last_used_at": datetime.utcnow().isoformat()}).eq(
+                    "id", record.get("id")
+                ).execute()
             except Exception:
                 pass
 
             return {**key_info, "key_hash": key_hash}
     except Exception as e:
-        logger.debug(f"DB API key validation failed, falling back to in-memory store: {e}")
-
-    # Backward compatibility: fallback to legacy in-memory store
-    key_info = _API_KEY_STORE.get(key_hash)
-    if key_info and key_info.get("is_active", False):
-        return {**key_info, "key_hash": key_hash}
+        logger.error(f"API key validation failed: {e}")
+        return None  # Fail-closed: invalid on any error
 
     return None
 

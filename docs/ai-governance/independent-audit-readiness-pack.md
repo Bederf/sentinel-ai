@@ -1,6 +1,6 @@
 ---
 title: "Independent Audit Readiness Pack"
-version: "1.0.0"
+version: "1.1.0"
 date: "2026-02-23"
 status: "Draft"
 owner: "Compliance Lead"
@@ -436,6 +436,24 @@ The following ranges are indicative for AI governance audits in the South Africa
 
 ---
 
+## 8. Submission-Ready Evidence Manifest
+
+The validated evidence manifest is finalized and ready for submission to external auditors. The manifest includes 54 evidence artifacts across governance documents, model cards, data sheets, code-level controls, and evidence directories.
+
+**Primary reference:** [`docs/ai-governance/evidence/README.md`](evidence/README.md) -- Validated Evidence Manifest section.
+
+**Status:** Submission-ready pending external audit report. All artifacts are present and validated against independent audit readiness pack v1.0.0.
+
+**Key artifact categories:**
+- **Governance documents:** 35 artifacts (AIMS scope, risk registers, control mappings, policies, templates)
+- **Model documentation:** 6 model cards, 3 data sheets
+- **Code-level controls:** 7 critical AI safety and governance components
+- **Evidence directories:** 6 structured directories for ongoing evidence collection
+
+**Auditor note:** The evidence manifest is maintained in the repository and will be provided as part of the audit engagement package. The manifest is version-controlled and updated quarterly.
+
+---
+
 ## Cross-References
 
 - Unified Compliance Programme: [`/opt/bms-intelligence/compliance.md`](/opt/bms-intelligence/compliance.md)
@@ -456,3 +474,4 @@ The following ranges are indicative for AI governance audits in the South Africa
 | Version | Date | Author | Change |
 |---------|------|--------|--------|
 | 1.0.0 | 2026-02-23 | SENTINEL Governance Team | Initial audit readiness pack with 7 sections, 48 evidence artifacts inventoried |
+| 1.1.0 | 2026-03-20 | SENTINEL Governance Team | Added Section 8: Submission-Ready Evidence Manifest; updated version |

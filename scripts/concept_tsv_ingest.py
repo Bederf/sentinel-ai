@@ -3,7 +3,7 @@
 Utility to ingest a Concept export TSV through SENTINEL's document RAG service.
 
 Each row is normalized (document_type, equipment_type, discipline, year) and sent
-to `/api/rag/documents` so Technician Chat can search against the Concept documents.
+to `/api/concept-rag/documents` so Technician Chat can search against the Concept documents.
 """
 
 from __future__ import annotations
