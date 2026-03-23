@@ -361,17 +361,27 @@ async def _validate_api_key(api_key: str) -> dict[str, Any] | None:
                 if now > expires_dt:
                     return None
 
-            # Validate role enum — log on failure instead of silent downgrade
-            role_value = str(record.get("role", "auditor")).lower()
-            try:
-                role = SentinelRole(role_value)
-            except ValueError:
+            # Validate role enum — map integer owner_role to SentinelRole
+            # Migration schema uses INTEGER: 1=auditor, 2=operator, 3=developer, 4=(unused), 5=admin
+            owner_role_int = record.get("owner_role")
+            if owner_role_int is None:
                 logger.warning(
-                    f"Invalid role '{role_value}' in API key {record.get('id')}: "
-                    f"not a valid SentinelRole enum. Downgrading to AUDITOR. "
-                    f"Check api_keys table role column for typos."
+                    f"Missing owner_role in API key {record.get('id')}. Check api_keys table for missing role data."
                 )
                 role = SentinelRole.AUDITOR
+            else:
+                role_map = {
+                    1: SentinelRole.AUDITOR,
+                    2: SentinelRole.OPERATOR,
+                    3: SentinelRole.DEVELOPER,
+                    5: SentinelRole.ADMIN,
+                }
+                role = role_map.get(owner_role_int, SentinelRole.AUDITOR)
+                if owner_role_int not in role_map:
+                    logger.warning(
+                        f"Unknown owner_role {owner_role_int} in API key {record.get('id')}. "
+                        f"Defaulting to AUDITOR. Valid values: 1=auditor, 2=operator, 3=developer, 5=admin."
+                    )
 
             key_info = {
                 "owner": record.get("owner", "unknown"),
