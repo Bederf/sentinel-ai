@@ -9,22 +9,22 @@ file-based logging. Structured logs are collected by Promtail and
 shipped to Loki for centralised aggregation and SIEM alerting.
 """
 
+import asyncio
 import json
 import logging
 import threading
 from pathlib import Path
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timezone
-from filelock import FileLock
 
 from app.models.audit_log import AuditLogEntry, AuditActionType, AuditResultType
 from app.services.encryption_service import get_encryption_service
 
 logger = logging.getLogger(__name__)
 
-# File lock for concurrent archival safety (Phase 168-03)
-ARCHIVAL_LOCK_PATH = "/tmp/sentinel_audit_archival.lock"
-_archival_lock = FileLock(ARCHIVAL_LOCK_PATH, timeout=60)
+# Async mutex lock for concurrent audit archival protection (Phase 168-03)
+# Ensures only one archival process runs at a time across async tasks
+_AUDIT_ARCHIVAL_LOCK = asyncio.Lock()
 
 # Structured audit logger for Loki/SIEM ingestion
 # Outputs JSON-structured audit events to Python logging (collected by Promtail)
@@ -570,8 +570,9 @@ class AuditLogger:
 
         Implements immutable audit trail archival for AUDIT-001 control.
 
-        Uses file lock to prevent concurrent archival calls from race conditions.
-        Only deletes active log entries if ALL archival succeeded (fail-safe).
+        Protected by asyncio.Lock to prevent concurrent archival corruption.
+        Only deletes from active log entries that were successfully archived.
+        Fail-safe: if any entries fail, keeps them for retry.
 
         Args:
             days_old: Archive entries older than this many days (default: 30)
@@ -579,16 +580,18 @@ class AuditLogger:
         Returns:
             Number of entries archived (partial failure returns partial count)
         """
-        import asyncio
-        from datetime import datetime, timedelta
-        from app.database.supabase_client import get_supabase_client
-
-        # Acquire lock to prevent concurrent archival (Phase 168-03)
-        with _archival_lock:
+        # Acquire asyncio lock to prevent concurrent archival (Phase 168-03)
+        async with _AUDIT_ARCHIVAL_LOCK:
             return await self._do_archive_old_audit_logs(days_old)
 
     async def _do_archive_old_audit_logs(self, days_old: int = 30) -> int:
-        """Internal archival logic (called under lock).
+        """Internal archival logic (called under _AUDIT_ARCHIVAL_LOCK).
+
+        Implements atomic delete: only deletes entries that were successfully archived.
+        Three cases:
+        1. All succeeded: delete all old entries from active log
+        2. Partial success: delete only the succeeded entries, keep failed ones for retry
+        3. Total failure: delete nothing, keep all for retry
 
         Args:
             days_old: Archive entries older than this many days
@@ -626,8 +629,8 @@ class AuditLogger:
                 return 0
 
             # Archive old entries to Supabase (immutable table)
-            archived_count = 0
-            failed_entries = []
+            # Track which entries were successfully archived by ID
+            successfully_archived_ids = set()
 
             try:
                 supabase = get_supabase_client()
@@ -642,31 +645,47 @@ class AuditLogger:
                     # Insert with upsert to handle duplicates idempotently
                     try:
                         await asyncio.to_thread(supabase.table("audit_archive").upsert(archive_record).execute)
-                        archived_count += 1
+                        successfully_archived_ids.add(entry.id)
                     except Exception as e:
-                        # Log and track failed entry
+                        # Log failure but continue attempting others
                         logger.warning(f"Failed to archive entry {entry.id}: {e}")
-                        failed_entries.append(entry)
 
-                logger.info(f"Archived {archived_count}/{len(old_entries)} entries to audit_archive table")
+                logger.info(
+                    f"Archived {len(successfully_archived_ids)}/{len(old_entries)} entries to audit_archive table"
+                )
             except Exception as e:
-                logger.error(f"Failed to archive to Supabase: {e}")
-                # Fallback: don't delete from local file if Supabase fails
+                logger.error(f"Failed to initialize Supabase client: {e}")
+                # Fallback: don't delete from local file if Supabase fails completely
                 return 0
 
-            # CRITICAL (Phase 168-03): Only delete if ALL succeeded
-            if len(failed_entries) == 0:
-                # All entries archived successfully; delete from active log
+            # ATOMIC DELETE (Phase 168-03): Only delete entries that were successfully archived
+            archived_count = len(successfully_archived_ids)
+
+            if archived_count == len(old_entries):
+                # Case 1: All entries archived successfully
+                # Safe to delete all old entries from active log
                 self._save_logs(new_entries)
                 logger.info(
                     f"Removed {archived_count} archived entries from active audit log "
                     f"({len(new_entries)} entries remain)"
                 )
-            else:
-                # Some failed; keep ALL old entries in active log for retry
+            elif archived_count > 0:
+                # Case 2: Partial success
+                # Delete only the entries that were successfully archived
+                # Keep the failed ones for automatic retry
+                entries_to_keep = [e for e in all_entries if e.id not in successfully_archived_ids]
+                self._save_logs(entries_to_keep)
                 logger.warning(
-                    f"Archival incomplete: {archived_count}/{len(old_entries)} succeeded. "
-                    f"Keeping {len(failed_entries)} failed entries in active log for retry."
+                    f"Partial archival: {archived_count}/{len(old_entries)} succeeded. "
+                    f"Deleted only the archived entries. "
+                    f"Keeping {len(old_entries) - archived_count} failed entries in active log for retry."
+                )
+            else:
+                # Case 3: Total failure
+                # All entries failed to archive; don't delete anything
+                logger.error(
+                    f"Archival completely failed for {len(old_entries)} entries. "
+                    f"Active log unchanged; will retry on next archival run."
                 )
 
             return archived_count
