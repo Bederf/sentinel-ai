@@ -157,7 +157,8 @@ export function ArcadeView({ siteId, onModuleDisplayChange }: ArcadeViewProps) {
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
       }
-      const data: DecisionPayload = await response.json();
+      const json = await response.json();
+      const data: DecisionPayload = json.data ?? json;
       setPayload(data);
       setError(null);
     } catch (err) {

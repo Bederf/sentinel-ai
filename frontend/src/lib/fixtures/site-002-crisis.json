@@ -26,7 +26,10 @@
     "floor_stack_order": ["R", "L2", "L1", "L0", "G", "B1"],
     "has_spatial_data": false,
     "floor_stack": [],
-    "deployment_mode": "supervised"
+    "deployment_mode": "supervised",
+    "equipment_count": 83,
+    "active_risk_count": 1,
+    "health_pct": 68
   },
   "active_incident_map": {
     "B1": {"stack_index": 5, "svg_y_pct": 91.7, "affected": true}
