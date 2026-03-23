@@ -688,6 +688,18 @@ async def startup_event(app: FastAPI) -> None:
     # Database archival (daily) - removes resolved alerts/predictions older than 90 days
     scheduler_service.add_db_archival_job(interval_seconds=86400)
 
+    # Audit log archival (monthly) - archives and deletes audit logs older than 30 days
+    # Implements AUDIT-001 control: immutable audit trail with atomic delete on success
+    # Protected by asyncio mutex to prevent concurrent archival races (Phase 168-03)
+    try:
+        from app.services.audit_logger import AuditLogger
+
+        audit_logger = AuditLogger()
+        asyncio.create_task(audit_logger.audit_archival_job(interval_days=30))
+        _logger.info("✅ Audit log archival job initialized (30-day interval, runs monthly)")
+    except Exception as e:
+        _logger.warning(f"⚠️ Audit archival job initialization failed: {e}")
+
     # Space Occupancy POC — sensor health monitor (every 60 seconds)
     try:
         scheduler_service.add_space_sensor_health_job(interval_seconds=60, site_id="FLN02")
