@@ -64,4 +64,78 @@ describe('decisionSurface', () => {
     expect(surface.behavior.showApproval).toBe(false)
     expect(surface.action.expectedOutcome).toContain('executes and reports')
   })
+
+  it('advisory mode guide renders all four sections for CHILLER decision', () => {
+    const surface = buildDecisionSurface({
+      building_id: 'site-002',
+      primary_asset_id: 'S002-CHILLER-B1-001',
+      alert_text: 'Chiller leaving-water temperature rising',
+      recommended_action: 'Adjust chilled-water setpoint down 2 degrees',
+      time_to_discomfort: 15,
+      building_metadata: { deployment_mode: 'advisory' },
+    })
+
+    expect(surface.behavior.showInstructions).toBe(true)
+    expect(surface.action.bmsGuide).not.toBeNull()
+
+    const guide = surface.action.bmsGuide
+    // Section 1: Navigation path includes Desigo CC, Site-002, and Chillers
+    expect(guide?.navigationPath).toContain('Desigo CC')
+    expect(guide?.navigationPath).toContain('Site-002')
+    expect(guide?.navigationPath).toContain('Chillers')
+    expect(guide?.assetId).toBe('S002-CHILLER-B1-001')
+
+    // Section 2: Command contains equipment-specific instruction
+    expect(guide?.command).toContain('chilled-water setpoint')
+    expect(guide?.command).toContain('S002-CHILLER-B1-001')
+
+    // Section 3: Verification includes primary metric
+    expect(guide?.verification).toContain('chilled-water')
+    expect(guide?.verification).toContain('temperature')
+    expect(surface.time.label).toBe('Time to Discomfort')
+  })
+
+  it('advisory mode handles missing BMS guide gracefully', () => {
+    const surface = buildDecisionSurface({
+      building_id: 'site-002',
+      alert_text: 'System-wide condition detected',
+      recommended_action: 'Review telemetry and confirm status',
+      building_metadata: { deployment_mode: 'advisory' },
+    })
+
+    expect(surface.behavior.showInstructions).toBe(true)
+    expect(surface.action.bmsGuide).toBeNull()
+    expect(surface.action.operatorPrompt).toBe('Execute this now in the BMS using the mapped navigation path below.')
+    expect(surface.action.expectedOutcome).toContain('operator applies')
+  })
+
+  it('advisory mode differs from supervised mode rendering', () => {
+    const input = {
+      building_id: 'site-002',
+      primary_asset_id: 'S002-AHU-G-001',
+      alert_text: 'Supply-air temperature alarm',
+      recommended_action: 'Open AHU controls and adjust damper position',
+      time_to_discomfort: 8,
+    }
+
+    const advisoryMode = buildDecisionSurface({
+      ...input,
+      building_metadata: { deployment_mode: 'advisory' },
+    })
+
+    const supervisedMode = buildDecisionSurface({
+      ...input,
+      building_metadata: { deployment_mode: 'supervised' },
+    })
+
+    // Advisory mode shows instructions
+    expect(advisoryMode.behavior.showInstructions).toBe(true)
+    expect(advisoryMode.behavior.showApproval).toBe(false)
+    expect(advisoryMode.action.bmsGuide).not.toBeNull()
+
+    // Supervised mode requires approval
+    expect(supervisedMode.behavior.showInstructions).toBe(false)
+    expect(supervisedMode.behavior.showApproval).toBe(true)
+    expect(supervisedMode.action.operatorPrompt).toBe('[HOLD TO APPROVE]')
+  })
 })
