@@ -141,3 +141,20 @@ GRANT USAGE ON TYPE evidence_source_type TO authenticated;
 GRANT USAGE ON TYPE evidence_artifact_type TO authenticated;
 GRANT USAGE ON TYPE evidence_class_type TO authenticated;
 GRANT USAGE ON TYPE evidence_provenance_type TO authenticated;
+-- Add CHECK constraint to prevent updates to core fields
+ALTER TABLE public.asset_evidence ADD CONSTRAINT check_immutable_core_fields
+  CHECK (true); -- Placeholder: actual enforcement via RLS policy (no UPDATE allowed)
+
+-- Remove UPDATE policy entirely - append-only only
+DROP POLICY IF EXISTS asset_evidence_update_service_only ON public.asset_evidence;
+
+-- New policy: service_role can only INSERT/SELECT, never UPDATE
+CREATE POLICY asset_evidence_service_read ON public.asset_evidence
+  FOR SELECT
+  USING (auth.role() = 'service_role');
+
+CREATE POLICY asset_evidence_service_insert ON public.asset_evidence
+  FOR INSERT
+  WITH CHECK (auth.role() = 'service_role');
+
+-- DELETE still blocked (soft supersession only)

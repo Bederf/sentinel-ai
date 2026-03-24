@@ -314,6 +314,7 @@ class AssetEvidenceService:
 
         except Exception as e:
             # Non-blocking: log failure but return None
+            EvidenceErrorTracker.record_failure("upload", str(e))
             logger.error(f"Failed to create upload evidence: {e}", exc_info=True)
             return None
 
@@ -378,6 +379,7 @@ class AssetEvidenceService:
 
         except Exception as e:
             # Non-blocking: log failure but return None
+            EvidenceErrorTracker.record_failure("feedback", str(e))
             logger.error(f"Failed to create feedback evidence: {e}", exc_info=True)
             return None
 
@@ -434,6 +436,7 @@ class AssetEvidenceService:
 
         except Exception as e:
             # Non-blocking: log failure but return None
+            EvidenceErrorTracker.record_failure("telemetry", str(e))
             logger.error(f"Failed to create telemetry evidence: {e}", exc_info=True)
             return None
 
@@ -482,3 +485,54 @@ class AssetEvidenceService:
         except Exception as e:
             logger.error(f"Failed to retrieve site evidence: {e}")
             return []
+
+
+# ============================================================================
+# Error Tracking & Metrics
+# ============================================================================
+
+
+class EvidenceErrorTracker:
+    """
+    Track non-blocking failures in evidence creation.
+
+    Ensures silent failures become visible via metrics.
+    """
+
+    # In-memory counters (will be replaced with Prometheus metrics)
+    _failures = {
+        "upload": 0,
+        "feedback": 0,
+        "telemetry": 0,
+    }
+
+    @classmethod
+    def record_failure(cls, source_type: str, reason: str):
+        """
+        Record evidence creation failure for visibility.
+
+        Args:
+            source_type: upload, feedback, or telemetry
+            reason: Failure reason (logged, not exposed)
+        """
+        if source_type in cls._failures:
+            cls._failures[source_type] += 1
+
+        logger.error(
+            "Evidence creation failure",
+            extra={
+                "source_type": source_type,
+                "reason": reason,
+                "failure_count_total": cls._failures.get(source_type, 0),
+            },
+        )
+
+    @classmethod
+    def get_failure_counts(cls) -> dict:
+        """Get current failure counts by source."""
+        return cls._failures.copy()
+
+    @classmethod
+    def reset(cls):
+        """Reset counters (testing only)."""
+        cls._failures = {"upload": 0, "feedback": 0, "telemetry": 0}
