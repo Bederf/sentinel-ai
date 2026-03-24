@@ -26,6 +26,8 @@ class WhatsAppService:
         self.provider = provider
         self.enabled = False
 
+        from app.config.settings import settings
+
         if provider == "meta":
             self.phone_id = os.getenv("WHATSAPP_PHONE_ID", "")
             self.api_token = os.getenv("WHATSAPP_API_TOKEN", "")
@@ -44,9 +46,13 @@ class WhatsAppService:
                 logger.warning("WhatsApp Meta credentials not fully configured")
 
         elif provider == "twilio":
-            self.account_sid = os.getenv("TWILIO_ACCOUNT_SID", "")
-            self.auth_token = os.getenv("TWILIO_AUTH_TOKEN", "")
-            self.twilio_whatsapp = os.getenv("TWILIO_WHATSAPP_FROM", os.getenv("TWILIO_WHATSAPP_NUMBER", ""))
+            self.account_sid = os.getenv("TWILIO_ACCOUNT_SID", "") or settings.twilio_account_sid
+            self.auth_token = os.getenv("TWILIO_AUTH_TOKEN", "") or settings.twilio_auth_token
+            self.twilio_whatsapp = (
+                os.getenv("TWILIO_WHATSAPP_FROM", "")
+                or settings.twilio_whatsapp_from
+                or os.getenv("TWILIO_WHATSAPP_NUMBER", "")
+            )
             self.webhook_token = os.getenv("WHATSAPP_WEBHOOK_TOKEN", "")
             if self.webhook_token in ("", "secret"):
                 logger.warning(
@@ -188,12 +194,14 @@ def get_whatsapp_service(provider: Optional[str] = None) -> WhatsAppService:
     """
     global _whatsapp_service
     if _whatsapp_service is None:
+        from app.config.settings import settings
+
         if provider:
             resolved = provider
         else:
             resolved = os.getenv("WHATSAPP_PROVIDER", "")
             if not resolved:
-                if os.getenv("TWILIO_ACCOUNT_SID"):
+                if os.getenv("TWILIO_ACCOUNT_SID") or settings.twilio_account_sid:
                     resolved = "twilio"
                 else:
                     resolved = "meta"

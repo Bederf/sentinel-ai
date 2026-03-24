@@ -2,14 +2,14 @@
  * DecisionMomentPage — Crisis State Full-page View (Phase 164)
  *
  * Renders a single-page decision context when urgency is elevated.
- * Sections: THE VOICE, THE WHERE + THE TIME, THE WHY, THE NEXT.
+ * Sections: CAUSE, IMPACT, TIME, ACTION.
  */
 
 import { useEffect, useState } from "react";
 import { CheckCircle, AlertTriangle, XCircle, X } from "lucide-react";
 import { Card, Button } from "@tremor/react";
 import { UrgencyBar } from "../components/crisis/UrgencyBar";
-import { TimeCountdown } from "../components/crisis/TimeCountdown";
+import { buildDecisionSurface } from "../lib/decisionSurface";
 
 export interface DecisionMomentPayload {
   building_id: string;
@@ -18,18 +18,21 @@ export interface DecisionMomentPayload {
   urgency_score: number;
   urgency_components: Record<string, number>;
   alert_text: string;
-  primary_asset_id: string;
+  primary_asset_id: string | null;
   affected_zone_ids: string[];
   affected_mesh_ids: string[];
   reasoning_summary: string;
   active_posture: string;
   posture_weights: Record<string, number>;
   time_to_discomfort: number | null;
-  time_confidence: string;
+  time_confidence: string | number | null;
   recommended_action: string;
   action_validation_state: string;
   requires_module: string | null;
-  estimated_impact: string;
+  estimated_impact: string | Record<string, unknown>;
+  building_metadata?: {
+    deployment_mode?: "ghost" | "advisory" | "supervised" | "autonomous";
+  };
 }
 
 interface DecisionMomentPageProps {
@@ -121,6 +124,7 @@ export function DecisionMomentPage({ payload, onDismiss, siteId: _siteId }: Deci
 
   const hasDefaultWeights =
     payload.reasoning_summary?.toLowerCase().includes("default weights");
+  const surface = buildDecisionSurface(payload);
 
   return (
     <div
@@ -177,7 +181,7 @@ export function DecisionMomentPage({ payload, onDismiss, siteId: _siteId }: Deci
           </div>
         )}
 
-        {/* THE VOICE */}
+        {/* CAUSE */}
         <Card
           className="p-0 overflow-hidden"
           style={{
@@ -193,21 +197,49 @@ export function DecisionMomentPage({ payload, onDismiss, siteId: _siteId }: Deci
               color: "var(--color-sentinel-text-disabled)",
             }}
           >
-            The Voice
+            Cause
           </div>
-          <div className="px-4 py-4">
+          <div className="px-4 py-4 flex flex-col gap-4">
             <p
               className="text-lg font-semibold leading-snug"
               style={{ color: "var(--color-sentinel-text-primary)" }}
             >
-              {payload.alert_text}
+              {surface.cause}
             </p>
+            <div className="flex flex-wrap items-center gap-2">
+              {payload.primary_asset_id && (
+                <span
+                  className="text-xs px-2 py-0.5 rounded font-mono"
+                  style={{
+                    background: "var(--color-sentinel-bg-secondary)",
+                    color: "var(--color-sentinel-text-secondary)",
+                    border: "1px solid var(--color-sentinel-border)",
+                  }}
+                >
+                  {payload.primary_asset_id}
+                </span>
+              )}
+              <span
+                className="text-xs px-2 py-0.5 rounded"
+                style={{
+                  background: "var(--color-sentinel-bg-secondary)",
+                  color: urgencyColor,
+                  border: `1px solid ${urgencyBorderColor}`,
+                }}
+              >
+                {surface.modeLabel} Mode
+              </span>
+            </div>
+            <p className="text-sm leading-relaxed" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+              {payload.reasoning_summary}
+            </p>
+            {payload.affected_zone_ids.length > 0 && <ZoneChips zoneIds={payload.affected_zone_ids} />}
           </div>
         </Card>
 
-        {/* THE WHERE + THE TIME */}
+        {/* IMPACT + TIME */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* The Where */}
+          {/* Impact */}
           <Card
             className="p-0 overflow-hidden"
             style={{
@@ -217,32 +249,46 @@ export function DecisionMomentPage({ payload, onDismiss, siteId: _siteId }: Deci
           >
             <div
               className="px-4 py-2 text-xs font-semibold uppercase tracking-widest"
-              style={{
+            style={{
                 background: "var(--color-sentinel-bg-secondary)",
                 borderBottom: "1px solid var(--color-sentinel-border)",
                 color: "var(--color-sentinel-text-disabled)",
               }}
             >
-              The Where
+              Impact
             </div>
-            <div className="px-4 py-4 flex flex-col gap-2">
-              <span
-                className="text-sm font-mono font-semibold"
-                style={{ color: "var(--color-sentinel-text-primary)" }}
-              >
-                {payload.primary_asset_id}
-              </span>
-              {payload.affected_zone_ids.length > 0 ? (
-                <ZoneChips zoneIds={payload.affected_zone_ids} />
-              ) : (
-                <span className="text-xs" style={{ color: "var(--color-sentinel-text-disabled)" }}>
-                  No zone data
-                </span>
-              )}
+            <div className="px-4 py-4 flex flex-col gap-4">
+              <p className="text-sm leading-relaxed" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                {surface.impact}
+              </p>
+              <p className="text-sm leading-relaxed" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                {surface.action.tradeoff}
+              </p>
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-1.5">
+                  <ActionValidationIcon state={payload.action_validation_state} />
+                  <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                    {payload.action_validation_state}
+                  </span>
+                </div>
+                {payload.requires_module && (
+                  <span
+                    className="text-xs px-2 py-0.5 rounded"
+                    style={{
+                      background: "var(--color-sentinel-bg-secondary)",
+                      color: "var(--color-sentinel-text-disabled)",
+                      border: "1px solid var(--color-sentinel-border)",
+                    }}
+                  >
+                    Requires: {payload.requires_module}
+                  </span>
+                )}
+              </div>
+              <UrgencyBar score={payload.urgency_score} />
             </div>
           </Card>
 
-          {/* The Time */}
+          {/* Time */}
           <Card
             className="p-0 overflow-hidden"
             style={{
@@ -258,18 +304,29 @@ export function DecisionMomentPage({ payload, onDismiss, siteId: _siteId }: Deci
                 color: "var(--color-sentinel-text-disabled)",
               }}
             >
-              The Time
+              Time
             </div>
-            <div className="px-4 py-4">
-              <TimeCountdown
-                minutes={payload.time_to_discomfort}
-                confidence={payload.time_confidence}
-              />
+            <div className="px-4 py-4 flex flex-col gap-3">
+              <span
+                className="text-xs font-semibold uppercase tracking-widest"
+                style={{ color: urgencyColor }}
+              >
+                {surface.time.label}
+              </span>
+              <span
+                className="text-3xl font-semibold tabular-nums"
+                style={{ color: "var(--color-sentinel-text-primary)" }}
+              >
+                {surface.time.value}
+              </span>
+              <span className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                {surface.time.detail}
+              </span>
             </div>
           </Card>
         </div>
 
-        {/* THE WHY */}
+        {/* ACTION */}
         <Card
           className="p-0 overflow-hidden"
           style={{
@@ -285,75 +342,78 @@ export function DecisionMomentPage({ payload, onDismiss, siteId: _siteId }: Deci
               color: "var(--color-sentinel-text-disabled)",
             }}
           >
-            The Why
-          </div>
-          <div className="px-4 py-4 flex flex-col gap-4">
-            <p className="text-sm leading-relaxed" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-              {payload.reasoning_summary}
-            </p>
-            <UrgencyBar score={payload.urgency_score} />
-          </div>
-        </Card>
-
-        {/* THE NEXT */}
-        <Card
-          className="p-0 overflow-hidden"
-          style={{
-            background: "var(--color-sentinel-bg-panel)",
-            border: "1px solid var(--color-sentinel-border)",
-          }}
-        >
-          <div
-            className="px-4 py-2 text-xs font-semibold uppercase tracking-widest"
-            style={{
-              background: "var(--color-sentinel-bg-secondary)",
-              borderBottom: "1px solid var(--color-sentinel-border)",
-              color: "var(--color-sentinel-text-disabled)",
-            }}
-          >
-            The Next
+            Action
           </div>
           <div className="px-4 py-4 flex flex-col gap-3">
-            {/* Recommended action button */}
             <div>
               <Button
                 size="sm"
                 color={score >= 0.8 ? "red" : score >= 0.6 ? "amber" : "blue"}
                 variant="secondary"
               >
-                {payload.recommended_action}
+                {surface.action.summary}
               </Button>
             </div>
-
-            {/* Validation row */}
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex items-center gap-1.5">
-                <ActionValidationIcon state={payload.action_validation_state} />
-                <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                  {payload.action_validation_state}
-                </span>
-              </div>
-              {payload.requires_module && (
-                <span
-                  className="text-xs px-2 py-0.5 rounded"
-                  style={{
-                    background: "var(--color-sentinel-bg-secondary)",
-                    color: "var(--color-sentinel-text-disabled)",
-                    border: "1px solid var(--color-sentinel-border)",
-                  }}
-                >
-                  Requires: {payload.requires_module}
-                </span>
-              )}
-            </div>
-
-            {/* Impact */}
-            <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-              {payload.estimated_impact}
+            <p className="text-sm font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>
+              {surface.action.operatorPrompt}
             </p>
+            <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+              {surface.action.expectedOutcome}
+            </p>
+
+            {surface.behavior.showInstructions && surface.action.bmsGuide && (
+              <div
+                className="rounded p-3 flex flex-col gap-2"
+                style={{
+                  background: "var(--color-sentinel-bg-secondary)",
+                  border: "1px solid var(--color-sentinel-border)",
+                }}
+              >
+                <span
+                  className="text-xs font-semibold uppercase tracking-widest"
+                  style={{ color: "var(--color-sentinel-text-disabled)" }}
+                >
+                  BMS Execution Path
+                </span>
+                <p className="text-sm font-mono" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                  {surface.action.bmsGuide.navigationPath.join(" -> ")}
+                </p>
+                <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                  {surface.action.bmsGuide.command}
+                </p>
+                <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                  {surface.action.bmsGuide.verification}
+                </p>
+              </div>
+            )}
+
+            {surface.behavior.showApproval && (
+              <div
+                className="rounded px-3 py-2 text-sm font-semibold"
+                style={{
+                  background: "rgba(245, 158, 11, 0.12)",
+                  border: "1px solid rgba(245, 158, 11, 0.35)",
+                  color: "var(--color-sentinel-amber)",
+                }}
+              >
+                [HOLD TO APPROVE]
+              </div>
+            )}
+
+            {surface.behavior.showResultOnly && (
+              <div
+                className="rounded px-3 py-2 text-sm"
+                style={{
+                  background: "var(--color-sentinel-bg-secondary)",
+                  border: "1px solid var(--color-sentinel-border)",
+                  color: "var(--color-sentinel-text-secondary)",
+                }}
+              >
+                {surface.action.expectedOutcome}
+              </div>
+            )}
           </div>
         </Card>
-
       </div>
     </div>
   );

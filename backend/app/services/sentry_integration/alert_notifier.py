@@ -48,7 +48,11 @@ class AlertNotifier:
     """Send BMS alerts via sentry CLI."""
 
     def __init__(self):
-        self.fm_chat_id = (os.getenv("SENTRY_FM_CHAT_ID", "") or "").strip()
+        self.fm_chat_id = (
+            (os.getenv("SENTRY_FM_CHAT_ID", "") or "").strip()
+            or str(getattr(settings, "sentry_fm_chat_id", "") or "").strip()
+            or str(getattr(settings, "telegram_alert_chat_id", "") or "").strip()
+        )
         self._cli_command = get_sentry_bot_cli()
         # Track last alert time per equipment+severity to prevent spam
         self._last_alerts: Dict[str, datetime] = {}

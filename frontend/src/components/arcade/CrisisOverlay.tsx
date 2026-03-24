@@ -6,6 +6,8 @@
  * NOT position:fixed — fills its parent container.
  */
 
+import { buildDecisionSurface } from "@/lib/decisionSurface";
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface CrisisOverlayProps {
@@ -38,7 +40,17 @@ export function CrisisOverlay({
   onDismiss,
   onApprove,
 }: CrisisOverlayProps) {
-  const isSupervised = deploymentMode === "supervised";
+  const surface = buildDecisionSurface({
+    alert_text: alertText,
+    reasoning_summary: reasoningSummary,
+    recommended_action: recommendedAction,
+    time_to_discomfort: timeToDiscomfort,
+    building_metadata: {
+      deployment_mode: deploymentMode as "ghost" | "advisory" | "supervised" | "autonomous",
+    },
+  });
+  const isSupervised = surface.behavior.showApproval;
+  const canDismiss = deploymentMode !== "autonomous";
 
   return (
     <div
@@ -76,7 +88,7 @@ export function CrisisOverlay({
         </span>
       </div>
 
-      {/* Panel 1 — VOICE */}
+      {/* Panel 1 — CAUSE */}
       <div
         style={{
           background: "var(--color-sentinel-bg-panel, #0a0a0f)",
@@ -94,7 +106,7 @@ export function CrisisOverlay({
             marginBottom: 4,
           }}
         >
-          VOICE
+          CAUSE
         </div>
         <div
           style={{
@@ -104,11 +116,11 @@ export function CrisisOverlay({
             lineHeight: 1.4,
           }}
         >
-          {alertText || "Alert condition detected."}
+          {surface.cause}
         </div>
       </div>
 
-      {/* Panel 2 — WHERE + TIME */}
+      {/* Panel 2 — IMPACT */}
       <div
         style={{
           background: "var(--color-sentinel-bg-panel, #0a0a0f)",
@@ -126,27 +138,21 @@ export function CrisisOverlay({
             marginBottom: 4,
           }}
         >
-          WHERE + TIME
+          IMPACT
         </div>
         <div
           style={{
             fontSize: 13,
             color: "#e2e8f0",
+            lineHeight: 1.5,
           }}
         >
-          {affectedFloor ? (
-            <>
-              <span style={{ fontWeight: 600 }}>{affectedFloor}</span>
-              {" · "}
-              <span>{timeLabel(timeToDiscomfort)}</span>
-            </>
-          ) : (
-            <span>{timeLabel(timeToDiscomfort)}</span>
-          )}
+          <div>{surface.impact}</div>
+          <div style={{ color: "#94a3b8", marginTop: 6 }}>{surface.action.tradeoff}</div>
         </div>
       </div>
 
-      {/* Panel 3 — WHY */}
+      {/* Panel 3 — TIME */}
       <div
         style={{
           background: "var(--color-sentinel-bg-panel, #0a0a0f)",
@@ -164,20 +170,27 @@ export function CrisisOverlay({
             marginBottom: 4,
           }}
         >
-          WHY
+          TIME
         </div>
         <div
           style={{
-            fontSize: 12,
-            color: "#cbd5e1",
-            lineHeight: 1.5,
+            display: "flex",
+            flexDirection: "column",
+            gap: 4,
           }}
         >
-          {reasoningSummary || "No reasoning available."}
+          <span style={{ fontSize: 12, color: "#94a3b8" }}>{surface.time.label}</span>
+          <span style={{ fontSize: 20, fontWeight: 700, color: "#f8fafc" }}>
+            {timeLabel(timeToDiscomfort)}
+          </span>
+          <span style={{ fontSize: 12, color: "#cbd5e1" }}>{surface.time.detail}</span>
+          {affectedFloor && (
+            <span style={{ fontSize: 12, color: "#94a3b8" }}>Affected floor: {affectedFloor}</span>
+          )}
         </div>
       </div>
 
-      {/* Panel 4 — NEXT */}
+      {/* Panel 4 — ACTION */}
       <div
         style={{
           background: "var(--color-sentinel-bg-panel, #0a0a0f)",
@@ -194,7 +207,7 @@ export function CrisisOverlay({
             marginBottom: 6,
           }}
         >
-          NEXT
+          ACTION
         </div>
         <div
           style={{
@@ -204,7 +217,16 @@ export function CrisisOverlay({
             marginBottom: 10,
           }}
         >
-          {recommendedAction || "Monitor conditions."}
+          <div>{surface.action.summary}</div>
+          <div style={{ marginTop: 6, color: "#f8fafc", fontWeight: 600 }}>
+            {surface.action.operatorPrompt}
+          </div>
+          <div style={{ marginTop: 6 }}>{surface.action.expectedOutcome}</div>
+          {surface.behavior.showInstructions && surface.action.bmsGuide && (
+            <div style={{ marginTop: 8, color: "#94a3b8" }}>
+              {surface.action.bmsGuide.navigationPath.join(" -> ")}
+            </div>
+          )}
         </div>
 
         {/* Action buttons */}
@@ -225,24 +247,26 @@ export function CrisisOverlay({
                 textTransform: "uppercase",
               }}
             >
-              APPROVE
+              HOLD TO APPROVE
             </button>
           )}
-          <button
-            onClick={onDismiss}
-            style={{
-              background: "rgba(255,255,255,0.06)",
-              color: "var(--color-sentinel-text-secondary, #94a3b8)",
-              border: "1px solid var(--color-sentinel-border, rgba(255,255,255,0.08))",
-              borderRadius: 4,
-              padding: "6px 14px",
-              fontSize: 12,
-              fontWeight: 500,
-              cursor: "pointer",
-            }}
-          >
-            Dismiss
-          </button>
+          {canDismiss && (
+            <button
+              onClick={onDismiss}
+              style={{
+                background: "rgba(255,255,255,0.06)",
+                color: "var(--color-sentinel-text-secondary, #94a3b8)",
+                border: "1px solid var(--color-sentinel-border, rgba(255,255,255,0.08))",
+                borderRadius: 4,
+                padding: "6px 14px",
+                fontSize: 12,
+                fontWeight: 500,
+                cursor: "pointer",
+              }}
+            >
+              Dismiss
+            </button>
+          )}
         </div>
       </div>
     </div>

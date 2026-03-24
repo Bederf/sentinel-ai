@@ -122,6 +122,21 @@ async def process_occupancy_event(
             from app.services.focus_room_relay_service import sync_focus_room_relay
 
             result["focus_relay"] = sync_focus_room_relay(site_id=site_id, room_code=room_code, now=now)
+            # Notify concierge/operator only on relay OFF->ON transition (time-up).
+            relay_result = result["focus_relay"] if isinstance(result["focus_relay"], dict) else {}
+            if relay_result.get("success") and relay_result.get("changed") and relay_result.get("relay_on"):
+                from app.config.settings import settings
+                from app.services.focus_room_notifier import send_focus_overstay_alert
+
+                cooldown_minutes = max(1, int((settings.focus_red_light_cooldown_seconds or 300) / 60))
+                asyncio.create_task(
+                    send_focus_overstay_alert(
+                        site_id=site_id,
+                        room_code=room_code,
+                        max_allowed_minutes=max(1, int((settings.focus_extended_use_seconds or 7200) / 60)),
+                        cooldown_minutes=cooldown_minutes,
+                    )
+                )
         except Exception as exc:
             _logger.warning("Focus relay sync failed for %s: %s", room_code, exc)
         return result

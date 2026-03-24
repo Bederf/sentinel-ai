@@ -28,6 +28,14 @@ export interface Decision {
   tier: number // 1 (MEDIUM), 2 (HIGH), 3 (CRITICAL)
   status: 'pending' | 'approved' | 'rejected' | 'executed'
   created_at: string
+  mode?: 'advisory' | 'supervised' | 'autonomous'
+  cause?: string
+  impact?: string
+  tradeoff?: string
+  time_metric_label?: string
+  time_metric_value?: string
+  action_summary?: string
+  expected_outcome?: string
 }
 
 /**

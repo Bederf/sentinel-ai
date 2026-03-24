@@ -78,7 +78,7 @@ class NotificationService:
                 "errors": {ChannelType: error_message},
             }
         """
-        result = {
+        result: dict = {
             "success": True,
             "channels_sent": [],
             "channels_failed": [],
@@ -169,7 +169,7 @@ class NotificationService:
         Returns:
             {"success": bool, "recipients_notified": int, "errors": [...]}
         """
-        result = {"success": False, "recipients_notified": 0, "errors": []}
+        result: dict = {"success": False, "recipients_notified": 0, "errors": []}
 
         # Try per-technician routing first
         try:
@@ -190,8 +190,12 @@ class NotificationService:
                         result["recipients_notified"] += 1
                     else:
                         result["errors"].extend(tech_result.get("errors", {}).values())
-                result["success"] = result["recipients_notified"] > 0
-                return result
+                # If no per-technician channel succeeded, fall through to
+                # default provider routing (telegram_alert_chat_id /
+                # twilio_whatsapp_to) instead of returning hard-fail.
+                if result["recipients_notified"] > 0:
+                    result["success"] = True
+                    return result
         except Exception as e:
             logger.warning(f"Technician lookup failed, falling back to direct send: {e}")
 

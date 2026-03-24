@@ -71,7 +71,8 @@ async def verify_telemetry_change_async(
                     # Push to SSE stream
                     try:
                         await event_stream.emit(
-                            event_type="DECISION_VERIFIED",
+                            event_type="COMMAND_VERIFIED",
+                            correlation_id=correlation_id,
                             payload={
                                 "decision_id": decision_id,
                                 "verification_time": verification_time,
@@ -111,7 +112,8 @@ async def verify_telemetry_change_async(
         # Push timeout to SSE stream
         try:
             await event_stream.emit(
-                event_type="DECISION_TIMEOUT",
+                event_type="COMMAND_TIMEOUT",
+                correlation_id=correlation_id,
                 payload={"decision_id": decision_id},
             )
         except Exception as e:
@@ -142,19 +144,60 @@ async def get_point_value(
     """
     Get current point value from telemetry.
 
-    Stub for now. Will be wired to actual telemetry service.
+    Queries device manager or telemetry cache for latest point value.
 
     Args:
-        device_id: Device ID
-        point: Point name
+        device_id: Device ID (e.g., S002-FCU-L1-A)
+        point: Point name (e.g., setpoint, temperature)
         site_id: Site ID
 
     Returns:
         Current point value or None if not found
 
     Raises:
-        Exception on service errors (caller catches)
+        Exception on service errors (caller catches and logs)
     """
-    # TODO: Wire to actual TelemetryService.get_point_value()
-    # For now, return None to simulate "no data yet"
-    return None
+    from app.services.device_manager import DeviceManager
+    from app.database.client import get_supabase_client
+
+    try:
+        # Try device manager first (in-memory, cached)
+        device_manager = DeviceManager()
+        device = device_manager.get_device(device_id)
+
+        if device:
+            # Check if point exists in device's current state
+            points = device.get("points", {})
+            if isinstance(points, dict) and point in points:
+                value = points[point].get("value")
+                if value is not None:
+                    return float(value)
+
+        # Fallback: query Supabase for latest point value
+        supabase = await get_supabase_client()
+        result = (
+            await supabase.table("device_telemetry")
+            .select("value")
+            .eq("device_id", device_id)
+            .eq("point_name", point)
+            .order("timestamp", desc=True)
+            .limit(1)
+            .execute()
+        )
+
+        if result.data and len(result.data) > 0:
+            return float(result.data[0].get("value"))
+
+        # No value found
+        return None
+
+    except Exception as e:
+        logger.error(
+            f"Error querying point value for {device_id}.{point}: {str(e)}",
+            extra={
+                "device_id": device_id,
+                "point": point,
+                "site_id": site_id,
+            },
+        )
+        raise

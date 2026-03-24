@@ -63,6 +63,13 @@ export function DecisionMoment({
 
   const tierColor = getTierColor()
   const tierLabel = ['', 'MEDIUM', 'HIGH', 'CRITICAL'][decision.tier] || `TIER-${decision.tier}`
+  const cause = decision.cause ?? 'Device control action requires operator review before execution.'
+  const impact = decision.impact ?? 'Outcome will be confirmed once the command is verified against live telemetry.'
+  const tradeoff = decision.tradeoff ?? 'Prioritises safe execution over speed to prevent accidental or unsafe writes.'
+  const timeMetricLabel = decision.time_metric_label ?? 'Time to Constraint Breach'
+  const timeMetricValue = decision.time_metric_value ?? 'Pending'
+  const actionSummary = decision.action_summary ?? `${decision.point} -> ${String(decision.command_value)}`
+  const expectedOutcome = decision.expected_outcome ?? 'After approval, SENTINEL dispatches the command and waits for verification feedback.'
 
   // Calculate age at render time (memoized)
   // eslint-disable react-hooks/purity -- Date.now() is safe inside useMemo
@@ -108,59 +115,72 @@ export function DecisionMoment({
 
       {/* Decision Details */}
       <div className="bg-white dark:bg-gray-900 rounded-lg p-4 space-y-3">
-        <div className="grid grid-cols-2 gap-4">
-          {/* Device */}
+        <div className="grid gap-4 md:grid-cols-2">
           <div>
             <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">
-              Device
-            </p>
-            <p className="text-sm font-mono text-gray-900 dark:text-white mt-1">
-              {decision.device_id}
-            </p>
-          </div>
-
-          {/* Point */}
-          <div>
-            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">
-              Control Point
-            </p>
-            <p className="text-sm font-mono text-gray-900 dark:text-white mt-1">
-              {decision.point}
-            </p>
-          </div>
-
-          {/* Command Value */}
-          <div>
-            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">
-              Desired Value
-            </p>
-            <div className="flex items-center gap-2 mt-1">
-              <Zap className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-              <p className="text-sm font-mono text-gray-900 dark:text-white">
-                {typeof decision.command_value === 'boolean'
-                  ? decision.command_value
-                    ? 'ON'
-                    : 'OFF'
-                  : decision.command_value}
-              </p>
-            </div>
-          </div>
-
-          {/* Created */}
-          <div>
-            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">
-              Age
+              Cause
             </p>
             <p className="text-sm text-gray-900 dark:text-white mt-1">
-              {ageSeconds < 60
-                ? `${ageSeconds}s ago`
-                : `${Math.floor(ageSeconds / 60)}m ago`}
+              {cause}
             </p>
+          </div>
+
+          <div>
+            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">
+              Impact
+            </p>
+            <p className="text-sm text-gray-900 dark:text-white mt-1">
+              {impact}
+            </p>
+          </div>
+
+          <div>
+            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">
+              Time
+            </p>
+            <p className="text-sm text-gray-900 dark:text-white mt-1">
+              <span className="font-semibold">{timeMetricLabel}:</span> {timeMetricValue}
+            </p>
+          </div>
+
+          <div>
+            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">
+              Action
+            </p>
+            <div className="flex items-start gap-2 mt-1">
+              <Zap className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+              <p className="text-sm text-gray-900 dark:text-white">{actionSummary}</p>
+            </div>
           </div>
         </div>
 
         {/* Divider */}
         <div className="border-t border-gray-200 dark:border-gray-700" />
+
+        <div className="space-y-1">
+          <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">
+            Trade-Off
+          </p>
+          <p className="text-sm text-gray-900 dark:text-white">
+            {tradeoff}
+          </p>
+          <p className="text-sm text-gray-600 dark:text-gray-300">
+            {expectedOutcome}
+          </p>
+        </div>
+
+        <div className="flex items-center justify-between gap-4 text-sm text-gray-900 dark:text-white">
+          <div>
+            <span className="font-semibold">Age:</span>{' '}
+            {ageSeconds < 60 ? `${ageSeconds}s ago` : `${Math.floor(ageSeconds / 60)}m ago`}
+          </div>
+          <div>
+            <span className="font-semibold">Point:</span> <span className="font-mono">{decision.point}</span>
+          </div>
+          <div>
+            <span className="font-semibold">Device:</span> <span className="font-mono">{decision.device_id}</span>
+          </div>
+        </div>
 
         {/* Decision ID (for audit) */}
         <div className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
@@ -175,6 +195,9 @@ export function DecisionMoment({
 
       {/* Approval Action */}
       <div className="space-y-3">
+        <div className="rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-sm font-semibold text-orange-800 dark:border-orange-800 dark:bg-orange-950 dark:text-orange-100">
+          [HOLD TO APPROVE]
+        </div>
         <ApproveButton
           decision_id={decision.id}
           site_id={site_id}
@@ -212,12 +235,10 @@ export function DecisionMoment({
         <div className="flex items-start gap-2">
           <Clock className="w-4 h-4 flex-shrink-0 mt-0.5" />
           <div>
-            <p className="font-semibold">When you approve:</p>
-            <ol className="list-decimal list-inside space-y-0.5 mt-1">
-              <li>Command is dispatched immediately to the building management system</li>
-              <li>Telemetry is monitored for 30 seconds to verify the change was applied</li>
-              <li>Status updates will appear below as verification completes</li>
-            </ol>
+            <p className="font-semibold">Supervised execution keeps instructions off this card.</p>
+            <p className="mt-1">
+              Operators see cause, impact, time metric, and trade-off here, then use hold-to-approve to trigger the verified control workflow.
+            </p>
           </div>
         </div>
       </div>

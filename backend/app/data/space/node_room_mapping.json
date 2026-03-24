@@ -1,10 +1,10 @@
 {
   "_comment": "Server-side override: maps MQTT node_id to room_code. Avoids reflashing ESP32 when moving nodes.",
   "node_001": {
-    "room_code": "FA2-1Q4-MR28",
+    "room_code": "FA2-1Q4-FR24",
     "site_id": "site-001",
-    "room_type": "meeting",
-    "note": "Moved from MR25 to MR28 on 2026-03-13"
+    "room_type": "focus",
+    "note": "Focus room FR24 node with backend-controlled LED output"
   },
   "node_002": {
     "room_code": "FA2-1Q4-MR28",

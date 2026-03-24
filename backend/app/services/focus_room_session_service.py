@@ -222,26 +222,26 @@ def get_focus_room_analytics(
 
 def _get_min_session_seconds() -> int:
     try:
-        from app.config.settings import get_settings
+        from app.config.settings import settings
 
-        return get_settings().focus_min_session_seconds
+        return settings.focus_min_session_seconds
     except Exception:
         return DEFAULT_MIN_SESSION_SECONDS
 
 
 def _get_extended_use_seconds() -> int:
     try:
-        from app.config.settings import get_settings
+        from app.config.settings import settings
 
-        return get_settings().focus_extended_use_seconds
+        return settings.focus_extended_use_seconds
     except Exception:
         return DEFAULT_EXTENDED_USE_SECONDS
 
 
 def _get_red_light_cooldown_seconds() -> int:
     try:
-        from app.config.settings import get_settings
+        from app.config.settings import settings
 
-        return get_settings().focus_red_light_cooldown_seconds
+        return settings.focus_red_light_cooldown_seconds
     except Exception:
         return DEFAULT_RED_LIGHT_COOLDOWN_SECONDS

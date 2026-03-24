@@ -21,9 +21,16 @@ export type DecisionMomentPayload = {
   triggered_at: string;
   urgency_score: number;
   alert_text: string;
-  primary_asset_id: string;
+  reasoning_summary?: string;
+  primary_asset_id: string | null;
   affected_zone_ids: string[];
   renderer_hint: "quiet" | "crisis";
+  time_to_discomfort?: number | null;
+  time_confidence?: string | number | null;
+  estimated_impact?: unknown;
+  active_posture?: string;
+  posture_weights?: Record<string, number>;
+  urgency_components?: Record<string, number>;
   building_metadata: {
     floors_count: number;
     floor_labels: Record<string, string>;

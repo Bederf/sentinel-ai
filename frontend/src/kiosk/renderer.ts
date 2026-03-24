@@ -6,6 +6,7 @@
  */
 
 import type { DecisionMomentPayload } from "./connection";
+import { buildDecisionSurface } from "../lib/decisionSurface";
 
 const SVG_W = 400;
 const SVG_H = 600;
@@ -59,12 +60,13 @@ export function renderQuiet(payload: DecisionMomentPayload | null): string {
 
 /** Crisis mode: Floor Stack — high-contrast incident overlay. */
 export function renderCrisis(payload: DecisionMomentPayload): string {
+  const surface = buildDecisionSurface(payload);
   const stackOrder = payload.building_metadata.floor_stack_order;
   const labels = payload.building_metadata.floor_labels;
   const incMap = payload.active_incident_map;
   const hasSpatialData = payload.building_metadata.has_spatial_data;
   const floorStack = payload.building_metadata.floor_stack;
-  const isSupervisedMode = payload.building_metadata.deployment_mode === "supervised";
+  const isSupervisedMode = surface.behavior.showApproval;
 
   const floorH = Math.max(40, Math.floor((SVG_H - 80 - stackOrder.length * FLOOR_GAP) / stackOrder.length));
 
@@ -117,7 +119,7 @@ export function renderCrisis(payload: DecisionMomentPayload): string {
                text-sm tracking-widest uppercase border border-red-400 transition-colors"
         data-action="${payload.recommended_action}"
         data-building="${payload.building_id}">
-        APPROVE — ${payload.recommended_action}
+        HOLD TO APPROVE
       </button>
     </div>` : "";
 
@@ -128,8 +130,31 @@ export function renderCrisis(payload: DecisionMomentPayload): string {
         class="border border-red-900 rounded">
         ${rects}
       </svg>
-      <div class="max-w-sm text-center text-amber-300 text-sm leading-relaxed px-4">
-        ${payload.alert_text}
+      <div class="max-w-xl w-full grid grid-cols-1 gap-3 text-left">
+        <div class="border border-slate-800 rounded p-3 bg-slate-950/80">
+          <div class="text-[10px] tracking-widest uppercase text-slate-400 mb-1">Cause</div>
+          <div class="text-amber-300 text-sm leading-relaxed">${surface.cause}</div>
+        </div>
+        <div class="border border-slate-800 rounded p-3 bg-slate-950/80">
+          <div class="text-[10px] tracking-widest uppercase text-slate-400 mb-1">Impact</div>
+          <div class="text-slate-100 text-sm leading-relaxed">${surface.impact}</div>
+          <div class="text-slate-400 text-xs leading-relaxed mt-2">${surface.action.tradeoff}</div>
+        </div>
+        <div class="border border-slate-800 rounded p-3 bg-slate-950/80">
+          <div class="text-[10px] tracking-widest uppercase text-slate-400 mb-1">Time</div>
+          <div class="text-slate-400 text-xs">${surface.time.label}</div>
+          <div class="text-white text-xl font-bold mt-1">${surface.time.value}</div>
+          <div class="text-slate-400 text-xs mt-1">${surface.time.detail}</div>
+        </div>
+        <div class="border border-slate-800 rounded p-3 bg-slate-950/80">
+          <div class="text-[10px] tracking-widest uppercase text-slate-400 mb-1">Action</div>
+          <div class="text-slate-100 text-sm leading-relaxed">${surface.action.summary}</div>
+          <div class="text-white text-sm font-semibold mt-2">${surface.action.operatorPrompt}</div>
+          <div class="text-slate-400 text-xs leading-relaxed mt-2">${surface.action.expectedOutcome}</div>
+          ${surface.behavior.showInstructions && surface.action.bmsGuide ? `
+            <div class="text-slate-500 text-[11px] leading-relaxed mt-2">${surface.action.bmsGuide.navigationPath.join(' -> ')}</div>
+          ` : ''}
+        </div>
       </div>
       ${approveBtn}
     </div>`;
