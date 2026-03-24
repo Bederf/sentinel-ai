@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import { CheckCircle, AlertTriangle, XCircle, X } from "lucide-react";
 import { Card, Button } from "@tremor/react";
 import { UrgencyBar } from "../components/crisis/UrgencyBar";
+import { AdvisoryModeGuide } from "../components/AdvisoryModeGuide";
 import { buildDecisionSurface } from "../lib/decisionSurface";
 
 export interface DecisionMomentPayload {
@@ -361,29 +362,13 @@ export function DecisionMomentPage({ payload, onDismiss, siteId: _siteId }: Deci
               {surface.action.expectedOutcome}
             </p>
 
-            {surface.behavior.showInstructions && surface.action.bmsGuide && (
-              <div
-                className="rounded p-3 flex flex-col gap-2"
-                style={{
-                  background: "var(--color-sentinel-bg-secondary)",
-                  border: "1px solid var(--color-sentinel-border)",
-                }}
-              >
-                <span
-                  className="text-xs font-semibold uppercase tracking-widest"
-                  style={{ color: "var(--color-sentinel-text-disabled)" }}
-                >
-                  BMS Execution Path
-                </span>
-                <p className="text-sm font-mono" style={{ color: "var(--color-sentinel-text-primary)" }}>
-                  {surface.action.bmsGuide.navigationPath.join(" -> ")}
-                </p>
-                <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                  {surface.action.bmsGuide.command}
-                </p>
-                <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                  {surface.action.bmsGuide.verification}
-                </p>
+            {surface.behavior.showInstructions && (
+              <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                <AdvisoryModeGuide
+                  bmsGuide={surface.action.bmsGuide}
+                  _actionSummary={surface.action.summary}
+                  primaryMetric={surface.time.label}
+                />
               </div>
             )}
 
