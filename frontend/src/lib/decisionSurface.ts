@@ -1,3 +1,6 @@
+import { getBmsNavigationRoot } from '../config/bmsNavigationMap'
+import { getEquipmentInstructions } from '../config/equipmentTypeMap'
+
 export type DeploymentMode = 'ghost' | 'advisory' | 'supervised' | 'autonomous'
 
 export interface DecisionSurfaceInput {
@@ -155,53 +158,13 @@ function inferTradeoff(input: DecisionSurfaceInput): string {
 }
 
 function inferCommand(assetType: string | null, actionSummary: string, assetId: string | null): string {
-  const lowerAction = actionSummary.toLowerCase()
-
-  if (assetType === 'CHILLER' && (lowerAction.includes('backup chiller') || lowerAction.includes('switch to backup'))) {
-    return `Enable the standby chiller sequence for ${assetId ?? 'the affected chiller'} and transfer load to the backup machine.`
-  }
-
-  if (assetType === 'CHILLER' && lowerAction.includes('setpoint')) {
-    return `Adjust the chilled-water setpoint for ${assetId ?? 'the active chiller'} to the recommended target and confirm the point writes successfully.`
-  }
-
-  if (assetType === 'AHU') {
-    return `Open the AHU controls for ${assetId ?? 'the affected AHU'} and apply the recommended supply-air, damper, or fan adjustment.`
-  }
-
-  if (assetType === 'FCU' || assetType === 'VAV') {
-    return `Open the zone controls for ${assetId ?? 'the affected terminal unit'} and apply the recommended comfort correction.`
-  }
-
-  if (assetType === 'PUMP') {
-    return `Command the affected pump sequence for ${assetId ?? 'the pump'} and confirm the duty or enable state changes as intended.`
-  }
-
-  if (assetType === 'UPS' || assetType === 'GEN') {
-    return `Open the critical power controls for ${assetId ?? 'the asset'} and apply the recommended operating mode or transfer command.`
-  }
-
-  if (assetType === 'DALI' || assetType === 'LUM') {
-    return `Open the lighting controls for ${assetId ?? 'the circuit'} and apply the recommended scene or level override.`
-  }
-
-  return `Open the control page for ${assetId ?? 'the affected asset'} and apply the recommended action exactly as shown.`
+  const instructions = getEquipmentInstructions(assetType)
+  return instructions.commandTemplate(assetId ?? 'the affected asset', actionSummary)
 }
 
 function inferVerification(assetType: string | null, primaryMetricLabel: string): string {
-  if (assetType === 'CHILLER') {
-    return `Verify chilled-water temperatures stabilise, the active alarm clears, and ${primaryMetricLabel.toLowerCase()} extends rather than contracts.`
-  }
-
-  if (assetType === 'AHU' || assetType === 'FCU' || assetType === 'VAV') {
-    return `Verify zone conditions move back toward target and ${primaryMetricLabel.toLowerCase()} improves on the next telemetry refresh.`
-  }
-
-  if (assetType === 'UPS' || assetType === 'GEN') {
-    return `Verify the power asset remains available and no new transfer or battery alarms appear after the change.`
-  }
-
-  return `Verify the commanded point holds, the recommendation outcome appears in telemetry, and ${primaryMetricLabel.toLowerCase()} does not worsen.`
+  const instructions = getEquipmentInstructions(assetType)
+  return instructions.verificationTemplate('the equipment', primaryMetricLabel)
 }
 
 export function buildBmsExecutionGuide(input: DecisionSurfaceInput): BmsExecutionGuide | null {
@@ -212,9 +175,7 @@ export function buildBmsExecutionGuide(input: DecisionSurfaceInput): BmsExecutio
 
   const parsed = parseAsset(assetId)
   const locationLabel = expandZone(parsed.zone)
-  const navigationRoot = parsed.site === 'S002'
-    ? ['Desigo CC', 'Site-002', 'Plant Controls']
-    : ['BMS', 'Operations', 'Asset Controls']
+  const navigationRoot = getBmsNavigationRoot(parsed.site)
 
   const navigationPath = parsed.type === 'CHILLER'
     ? [...navigationRoot, locationLabel, 'Chillers', assetId]
