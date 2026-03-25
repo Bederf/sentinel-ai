@@ -90,7 +90,10 @@ export interface CockpitSeverityInterpretation {
   riskScore: number | null
   riskBand: CockpitRiskBand | null
   thresholdReason: string | null
-  policySource: 'default' | 'settings'
+  policySource: string | null
+  healthScore: number | null
+  healthState: 'stable' | 'watch' | 'degraded' | null
+  healthTrend: 'improving' | 'flat' | 'declining' | null
 }
 
 export interface CockpitState {

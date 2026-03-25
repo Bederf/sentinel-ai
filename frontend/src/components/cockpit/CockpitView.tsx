@@ -269,6 +269,12 @@ function CockpitStatusBar({
       <CockpitStatusPill>Mode: {state.site.mode}</CockpitStatusPill>
       <CockpitStatusPill>Confidence: {state.decision.confidence}</CockpitStatusPill>
       <CockpitStatusPill>Risk band: {state.severity.riskBand ?? 'low'}</CockpitStatusPill>
+      {state.severity.healthScore !== null && (
+        <CockpitStatusPill>
+          Health: {state.severity.healthScore}% · {state.severity.healthState ?? 'stable'} · {state.severity.healthTrend ?? 'flat'}
+        </CockpitStatusPill>
+      )}
+      {state.severity.policySource && <CockpitStatusPill>Policy: {state.severity.policySource}</CockpitStatusPill>}
       {state.severity.thresholdReason && <CockpitStatusPill>{state.severity.thresholdReason}</CockpitStatusPill>}
     </div>
   )

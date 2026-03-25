@@ -15,6 +15,17 @@ const summary = {
 function buildActivePayload(): CockpitDecisionPayload {
   return {
     building_id: 'site-002',
+    risk: {
+      score: 0.86,
+      band: 'critical',
+      reason: 'Thermal drift is above the configured critical threshold.',
+      policy_source: 'global.settings',
+    },
+    health: {
+      score: 0.83,
+      state: 'stable',
+      trend: 'declining',
+    },
     alert_text: 'Cooling resilience is degrading across the executive zone.',
     reasoning_summary: 'Thermal runway and occupancy load are converging on the boardroom cluster.',
     active_posture: 'comfort_priority',
@@ -41,6 +52,11 @@ it('maps active intelligence payloads into a cockpit state', () => {
   expect(state.decision.operatorPrompt).toBe('[HOLD TO APPROVE]')
   expect(state.evidence.refs).toContain('asset:S002-CHILLER-B1-001')
   expect(state.severity.riskBand).toBe('critical')
+  expect(state.severity.thresholdReason).toBe('Thermal drift is above the configured critical threshold.')
+  expect(state.severity.policySource).toBe('global.settings')
+  expect(state.severity.healthScore).toBe(83)
+  expect(state.severity.healthState).toBe('stable')
+  expect(state.severity.healthTrend).toBe('declining')
   expect(state.visualTwin.focusFloorId).toBe('L2')
   expect(state.visualTwin.motionProfile).toBe('alert')
   expect(state.visualTwin.zoneSignals[0]?.zoneId).toBe('Zone-L2-Boardroom')
@@ -48,18 +64,40 @@ it('maps active intelligence payloads into a cockpit state', () => {
   expect(state.visualTwin.floors.find((floor) => floor.id === 'L2')?.level).toBe('critical')
 })
 
-it('uses threshold policy instead of hardcoded urgency bands', () => {
+it('uses backend-resolved risk semantics before frontend threshold fallback', () => {
+  const payload = buildActivePayload()
+  payload.risk = {
+    score: 0.86,
+    band: 'medium',
+    reason: 'Backend policy resolved this as medium risk for the current rollout.',
+    policy_source: 'site-002.office.default',
+  }
+
+  const state = mapCockpitState(summary, payload)
+
+  expect(state.severity.riskBand).toBe('medium')
+  expect(state.primaryMetric.tone).toBe('warning')
+  expect(state.severity.thresholdReason).toBe('Backend policy resolved this as medium risk for the current rollout.')
+  expect(state.severity.policySource).toBe('site-002.office.default')
+})
+
+it('uses threshold policy instead of hardcoded urgency bands when backend risk is absent', () => {
   const customPolicy: CockpitThresholdPolicy = {
     health: { healthy: 80, warning: 60, critical: 0 },
     risk: { medium: 40, high: 70, critical: 90 },
     source: 'settings',
   }
 
-  const state = mapCockpitState(summary, buildActivePayload(), customPolicy)
+  const payload = buildActivePayload()
+  payload.risk = null
+  payload.health = null
+
+  const state = mapCockpitState(summary, payload, customPolicy)
 
   expect(state.severity.riskBand).toBe('high')
   expect(state.primaryMetric.tone).toBe('elevated')
   expect(state.severity.thresholdReason).toContain('high threshold of 70')
+  expect(state.severity.policySource).toBe('settings')
   expect(state.visualTwin.floors.find((floor) => floor.id === 'L2')?.level).toBe('approaching')
 })
 
@@ -73,4 +111,5 @@ it('produces a stable quiet-state cockpit when there is no active payload', () =
   expect(state.visualTwin.motionProfile).toBe('calm')
   expect(state.visualTwin.zoneSignals).toHaveLength(0)
   expect(state.visualTwin.floors.every((floor) => floor.level === 'stable')).toBe(true)
+  expect(state.severity.healthScore).not.toBeNull()
 })

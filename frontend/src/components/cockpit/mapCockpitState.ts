@@ -3,6 +3,17 @@ import type { CockpitState, CockpitTwinRiskLevel } from './types'
 import { DEFAULT_COCKPIT_THRESHOLD_POLICY, type CockpitThresholdPolicy } from './thresholdPolicy'
 
 export interface CockpitDecisionPayload {
+  risk?: {
+    score?: number | null
+    band?: CockpitState['severity']['riskBand'] | null
+    reason?: string | null
+    policy_source?: string | null
+  } | null
+  health?: {
+    score?: number | null
+    state?: CockpitState['severity']['healthState'] | null
+    trend?: CockpitState['severity']['healthTrend'] | null
+  } | null
   building_id: string
   alert_text?: string | null
   reasoning_summary?: string | null
@@ -67,6 +78,27 @@ function clamp01(value: number): number {
 
 function toPercent(score: number): number {
   return Math.round(clamp01(score) * 100)
+}
+
+function normalizedRiskScore(payload: CockpitDecisionPayload): number {
+  return clamp01(payload.risk?.score ?? payload.urgency_score ?? 0)
+}
+
+function fallbackHealthScore(riskScore: number): number {
+  return clamp01(1 - (riskScore * 0.2))
+}
+
+function fallbackHealthState(score: number, thresholds: CockpitThresholdPolicy['health']): CockpitState['severity']['healthState'] {
+  const percent = toPercent(score)
+  if (percent >= thresholds.healthy) return 'stable'
+  if (percent >= thresholds.warning) return 'watch'
+  return 'degraded'
+}
+
+function fallbackHealthTrend(riskScore: number): CockpitState['severity']['healthTrend'] {
+  if (riskScore >= 0.55) return 'declining'
+  if (riskScore <= 0.2) return 'improving'
+  return 'flat'
 }
 
 function extractFloorCode(value: string | null | undefined): string | null {
@@ -372,15 +404,20 @@ function buildActiveCondition(surface: DecisionSurface, resolvedPayload: Cockpit
 }
 
 function buildSeverityState(
-  urgencyScore: number,
+  resolvedPayload: CockpitDecisionPayload,
+  riskScore: number,
   riskBand: CockpitState['severity']['riskBand'],
   policy: CockpitThresholdPolicy,
 ): CockpitState['severity'] {
+  const healthScore = clamp01(resolvedPayload.health?.score ?? fallbackHealthScore(riskScore))
   return {
-    riskScore: toPercent(urgencyScore),
+    riskScore: toPercent(riskScore),
     riskBand,
-    thresholdReason: buildThresholdReason(urgencyScore, riskBand, policy.risk),
-    policySource: policy.source,
+    thresholdReason: resolvedPayload.risk?.reason ?? buildThresholdReason(riskScore, riskBand, policy.risk),
+    policySource: resolvedPayload.risk?.policy_source ?? policy.source,
+    healthScore: toPercent(healthScore),
+    healthState: resolvedPayload.health?.state ?? fallbackHealthState(healthScore, policy.health),
+    healthTrend: resolvedPayload.health?.trend ?? fallbackHealthTrend(riskScore),
   }
 }
 
@@ -391,8 +428,8 @@ export function mapCockpitState(
 ): CockpitState {
   const resolvedPayload = payload ?? buildFallbackPayload(summary)
   const surface = buildDecisionSurface(resolvedPayload)
-  const urgencyScore = resolvedPayload.urgency_score ?? 0
-  const riskBand = riskBandFromScore(urgencyScore, policy.risk)
+  const urgencyScore = normalizedRiskScore(resolvedPayload)
+  const riskBand = resolvedPayload.risk?.band ?? riskBandFromScore(urgencyScore, policy.risk)
   const tone = getTone(riskBand)
   const evidenceStrength = getEvidenceStrength(urgencyScore)
   const confidenceLabel = surface.time.detail
@@ -405,7 +442,7 @@ export function mapCockpitState(
     decision: buildDecisionState(surface, confidenceLabel),
     visualTwin: buildVisualTwin(resolvedPayload, surface, urgencyScore, policy),
     evidence: buildEvidence(summary, payload, resolvedPayload, evidenceStrength),
-    severity: buildSeverityState(urgencyScore, riskBand, policy),
+    severity: buildSeverityState(resolvedPayload, urgencyScore, riskBand, policy),
     emergingRisks: buildEmergingRisks(payload, resolvedPayload, surface),
   }
 }

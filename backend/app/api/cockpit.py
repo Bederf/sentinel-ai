@@ -18,10 +18,12 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 
 from fastapi import APIRouter
 from pydantic import BaseModel
+
+from app.api.settings import load_settings
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/cockpit", tags=["cockpit"])
@@ -30,6 +32,35 @@ router = APIRouter(prefix="/api/cockpit", tags=["cockpit"])
 # ---------------------------------------------------------------------------
 # CockpitDecisionPayload — Final contract (locked between v1 and v2)
 # ---------------------------------------------------------------------------
+
+
+class CockpitRiskResolution(BaseModel):
+    """Backend-resolved risk semantics for cockpit rendering."""
+
+    score: float
+    """0-1 resolved risk score."""
+
+    band: Literal["low", "medium", "high", "critical"]
+    """Resolved risk band from threshold policy."""
+
+    reason: str
+    """Explainable reason for the current risk interpretation."""
+
+    policy_source: str
+    """Threshold policy source used for this interpretation."""
+
+
+class CockpitHealthResolution(BaseModel):
+    """Backend-resolved health semantics for cockpit rendering."""
+
+    score: float
+    """0-1 health score."""
+
+    state: Literal["stable", "watch", "degraded"]
+    """Simple health state for the current contract slice."""
+
+    trend: Literal["improving", "flat", "declining"]
+    """Simple health trend for the current contract slice."""
 
 
 class CockpitDecisionPayload(BaseModel):
@@ -81,6 +112,110 @@ class CockpitDecisionPayload(BaseModel):
     building_metadata: Optional[dict[str, Any]] = None
     """Site config: {'deployment_mode': 'advisory', ...}."""
 
+    risk: Optional[CockpitRiskResolution] = None
+    """Backend-resolved cockpit risk interpretation."""
+
+    health: Optional[CockpitHealthResolution] = None
+    """Backend-resolved cockpit health summary."""
+
+
+def _clamp01(value: float) -> float:
+    return max(0.0, min(1.0, value))
+
+
+def _resolve_threshold_policy_source() -> tuple[dict[str, int], dict[str, int], str]:
+    """Load threshold settings for cockpit interpretation."""
+
+    defaults = (
+        {"healthy": 80, "warning": 60, "critical": 0},
+        {"medium": 31, "high": 61, "critical": 81},
+        "global.default",
+    )
+
+    try:
+        settings = load_settings()
+        return (
+            settings.get("healthThresholds", defaults[0]),
+            settings.get("riskThresholds", defaults[1]),
+            "global.settings",
+        )
+    except Exception:
+        logger.exception("Failed to load cockpit threshold policy; using defaults")
+        return defaults
+
+
+def _risk_band_from_score(score: float, thresholds: dict[str, int]) -> Literal["low", "medium", "high", "critical"]:
+    score_percent = round(_clamp01(score) * 100)
+    if score_percent >= thresholds["critical"]:
+        return "critical"
+    if score_percent >= thresholds["high"]:
+        return "high"
+    if score_percent >= thresholds["medium"]:
+        return "medium"
+    return "low"
+
+
+def _build_risk_reason(
+    payload: CockpitDecisionPayload,
+    score: float,
+    band: Literal["low", "medium", "high", "critical"],
+    thresholds: dict[str, int],
+) -> str:
+    score_percent = round(_clamp01(score) * 100)
+    if payload.reasoning_summary:
+        return payload.reasoning_summary
+    if band == "critical":
+        return f"Resolved risk {score_percent} is above the critical threshold of {thresholds['critical']}."
+    if band == "high":
+        return f"Resolved risk {score_percent} is above the high threshold of {thresholds['high']}."
+    if band == "medium":
+        return f"Resolved risk {score_percent} is above the medium threshold of {thresholds['medium']}."
+    return f"Resolved risk {score_percent} remains below the medium threshold of {thresholds['medium']}."
+
+
+def _resolve_health_state(score: float, thresholds: dict[str, int]) -> Literal["stable", "watch", "degraded"]:
+    score_percent = round(_clamp01(score) * 100)
+    if score_percent >= thresholds["healthy"]:
+        return "stable"
+    if score_percent >= thresholds["warning"]:
+        return "watch"
+    return "degraded"
+
+
+def _resolve_health_trend(urgency_score: float) -> Literal["improving", "flat", "declining"]:
+    if urgency_score >= 0.55:
+        return "declining"
+    if urgency_score <= 0.2:
+        return "improving"
+    return "flat"
+
+
+def _attach_resolved_contract(payload: CockpitDecisionPayload) -> CockpitDecisionPayload:
+    """
+    Attach backend-resolved risk and health semantics to the cockpit payload.
+
+    This is the first narrow contract step. It still uses current stub sourcing and
+    urgency-derived values, but moves interpretation ownership into the backend.
+    """
+
+    health_thresholds, risk_thresholds, policy_source = _resolve_threshold_policy_source()
+    urgency_score = _clamp01(payload.urgency_score or 0.0)
+    health_score = _clamp01(1.0 - (urgency_score * 0.2))
+    risk_band = _risk_band_from_score(urgency_score, risk_thresholds)
+
+    payload.risk = CockpitRiskResolution(
+        score=urgency_score,
+        band=risk_band,
+        reason=_build_risk_reason(payload, urgency_score, risk_band, risk_thresholds),
+        policy_source=policy_source,
+    )
+    payload.health = CockpitHealthResolution(
+        score=health_score,
+        state=_resolve_health_state(health_score, health_thresholds),
+        trend=_resolve_health_trend(urgency_score),
+    )
+    return payload
+
 
 # ---------------------------------------------------------------------------
 # Site fixture logic (v1: deterministic stub)
@@ -100,31 +235,33 @@ def _build_stub_payload_for_site(site_id: str) -> Optional[CockpitDecisionPayloa
 
     if site_id == "S002":
         # Fairlands: active advisory decision (one stub recommendation)
-        return CockpitDecisionPayload(
-            building_id="S002",
-            alert_text="Zone B1-001 is drifting toward discomfort.",
-            reasoning_summary=(
-                "Pressure drop is 18% above baseline while flow stays flat. "
-                "Check the valve before comfort starts slipping."
-            ),
-            active_posture="advisory",
-            time_to_discomfort=240,  # 4 hours
-            time_confidence="declining",
-            estimated_impact="Comfort margin is tightening and energy waste is rising.",
-            recommended_action=(
-                "Inspect and clean the Zone B1-001 valve now. If fouling remains, schedule water treatment."
-            ),
-            urgency_score=0.62,
-            urgency_components={
-                "comfort": 0.25,
-                "asset_risk": 0.20,
-                "cost": 0.17,
-            },
-            affected_zone_ids=["Zone-B1-001"],
-            primary_asset_id="S002-VAV-101",
-            building_metadata={
-                "deployment_mode": "advisory",
-            },
+        return _attach_resolved_contract(
+            CockpitDecisionPayload(
+                building_id="S002",
+                alert_text="Zone B1-001 is drifting toward discomfort.",
+                reasoning_summary=(
+                    "Pressure drop is 18% above baseline while flow stays flat. "
+                    "Check the valve before comfort starts slipping."
+                ),
+                active_posture="advisory",
+                time_to_discomfort=240,  # 4 hours
+                time_confidence="declining",
+                estimated_impact="Comfort margin is tightening and energy waste is rising.",
+                recommended_action=(
+                    "Inspect and clean the Zone B1-001 valve now. If fouling remains, schedule water treatment."
+                ),
+                urgency_score=0.62,
+                urgency_components={
+                    "comfort": 0.25,
+                    "asset_risk": 0.20,
+                    "cost": 0.17,
+                },
+                affected_zone_ids=["Zone-B1-001"],
+                primary_asset_id="S002-VAV-101",
+                building_metadata={
+                    "deployment_mode": "advisory",
+                },
+            )
         )
 
     # All other sites: calm building (no active decision, null payload)
