@@ -8,6 +8,10 @@ const DEFAULT_RISK_THRESHOLDS: RiskThresholds = {
   critical: 81,
 };
 
+function getErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
 export function useRiskThresholds() {
   const [thresholds, setThresholds] = useState<RiskThresholds>(DEFAULT_RISK_THRESHOLDS);
   const [loading, setLoading] = useState(true);
@@ -36,9 +40,9 @@ export function useRiskThresholds() {
       setThresholds(updated);
       setError(null);
       return true;
-    } catch (err: any) {
+    } catch (err) {
       console.error("Failed to update risk thresholds:", err);
-      setError(err.message || "Failed to update risk thresholds");
+      setError(getErrorMessage(err, "Failed to update risk thresholds"));
       return false;
     }
   };

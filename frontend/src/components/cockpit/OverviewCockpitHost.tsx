@@ -24,17 +24,7 @@ function formatFreshness(lastUpdatedAt: number | null): string {
   return `Updated ${Math.floor(ageSeconds / 60)}m ago`
 }
 
-export function OverviewCockpitHost({
-  siteId,
-  siteName,
-  activeAlerts,
-  predictionsCount,
-  equipmentCount,
-  posture,
-  onModuleDisplayChange: _onModuleDisplayChange,
-}: OverviewCockpitHostProps) {
-  const [payload, setPayload] = useState<CockpitDecisionPayload | null>(null)
-  const [lastUpdatedAt, setLastUpdatedAt] = useState<number | null>(null)
+function useCockpitThresholdPolicy() {
   const [thresholdPolicy, setThresholdPolicy] = useState<CockpitThresholdPolicy>(DEFAULT_COCKPIT_THRESHOLD_POLICY)
 
   useEffect(() => {
@@ -42,17 +32,9 @@ export function OverviewCockpitHost({
 
     async function loadThresholdPolicy() {
       try {
-        const [health, risk] = await Promise.all([
-          api.getHealthThresholds(),
-          api.getRiskThresholds(),
-        ])
-
+        const [health, risk] = await Promise.all([api.getHealthThresholds(), api.getRiskThresholds()])
         if (mounted) {
-          setThresholdPolicy({
-            health,
-            risk,
-            source: 'settings',
-          })
+          setThresholdPolicy({ health, risk, source: 'settings' })
         }
       } catch {
         if (mounted) {
@@ -68,6 +50,13 @@ export function OverviewCockpitHost({
     }
   }, [])
 
+  return thresholdPolicy
+}
+
+function useCockpitDecisionPayload(siteId: string) {
+  const [payload, setPayload] = useState<CockpitDecisionPayload | null>(null)
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<number | null>(null)
+
   useEffect(() => {
     let mounted = true
     let timer: ReturnType<typeof setInterval> | null = null
@@ -75,7 +64,7 @@ export function OverviewCockpitHost({
 
     async function load() {
       try {
-        if (controller) controller.abort()
+        controller?.abort()
         controller = new AbortController()
 
         const response = await authorizedFetch(`/api/cockpit/decision/${encodeURIComponent(siteId)}`, {
@@ -92,7 +81,6 @@ export function OverviewCockpitHost({
 
         const json = await response.json()
         if (mounted) {
-          // Cockpit endpoint returns {payload: null | CockpitDecisionPayload, site_id, fetched_at}
           setPayload(json.payload as CockpitDecisionPayload | null)
           setLastUpdatedAt(Date.now())
         }
@@ -100,7 +88,6 @@ export function OverviewCockpitHost({
         if (error instanceof Error && error.name === 'AbortError') {
           return
         }
-        // On network error, leave payload unchanged; let freshness indicator show age
       }
     }
 
@@ -109,28 +96,48 @@ export function OverviewCockpitHost({
 
     return () => {
       mounted = false
-      if (controller) controller.abort()
+      controller?.abort()
       if (timer) clearInterval(timer)
     }
   }, [siteId])
 
-  const state = useMemo(
-    () =>
-      mapCockpitState(
-        {
-          siteId,
-          siteName,
-          posture,
-          activeAlerts,
-          predictionsCount,
-          equipmentCount,
-          dataFreshnessLabel: formatFreshness(lastUpdatedAt),
-        },
-        payload,
-        thresholdPolicy,
-      ),
-    [siteId, siteName, posture, activeAlerts, predictionsCount, equipmentCount, lastUpdatedAt, payload, thresholdPolicy],
-  )
+  return { payload, lastUpdatedAt }
+}
+
+function buildCockpitSummary(
+  props: OverviewCockpitHostProps,
+  lastUpdatedAt: number | null,
+) {
+  return {
+    siteId: props.siteId,
+    siteName: props.siteName,
+    posture: props.posture,
+    activeAlerts: props.activeAlerts,
+    predictionsCount: props.predictionsCount,
+    equipmentCount: props.equipmentCount,
+    dataFreshnessLabel: formatFreshness(lastUpdatedAt),
+  }
+}
+
+export function OverviewCockpitHost({
+  siteId,
+  siteName,
+  activeAlerts,
+  predictionsCount,
+  equipmentCount,
+  posture,
+  onModuleDisplayChange: _onModuleDisplayChange,
+}: OverviewCockpitHostProps) {
+  const thresholdPolicy = useCockpitThresholdPolicy()
+  const { payload, lastUpdatedAt } = useCockpitDecisionPayload(siteId)
+
+  const state = useMemo(() => {
+    const summary = buildCockpitSummary(
+      { siteId, siteName, posture, activeAlerts, predictionsCount, equipmentCount },
+      lastUpdatedAt,
+    )
+    return mapCockpitState(summary, payload, thresholdPolicy)
+  }, [siteId, siteName, posture, activeAlerts, predictionsCount, equipmentCount, lastUpdatedAt, payload, thresholdPolicy])
 
   return (
     <CockpitView

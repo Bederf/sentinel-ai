@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useMemo, useRef, useState, type MutableRefObject } from 'react'
 import { Canvas, useFrame, type ThreeEvent } from '@react-three/fiber'
 import { Html, PerspectiveCamera } from '@react-three/drei'
 import * as THREE from 'three'
@@ -51,6 +51,107 @@ function buildSignalPosition(floor: CockpitTwinFloor | undefined, slot: number) 
   return new THREE.Vector3(laneX, (floor?.elevation ?? 0) + FLOOR_HEIGHT * 0.95, laneZ)
 }
 
+function buildFloorAnimationState(
+  floor: CockpitTwinFloor,
+  motionProfile: CockpitState['visualTwin']['motionProfile'],
+  isFocus: boolean,
+  elapsedTime: number,
+) {
+  if (motionProfile === 'calm' || floor.level === 'stable') {
+    return {
+      pulse: 1,
+      spreadX: 1,
+      spreadZ: 1,
+      spreadOpacity: 0,
+      emissiveIntensity: isFocus ? 0.18 : 0.08,
+    }
+  }
+
+  const isCritical = floor.level === 'critical'
+  const speed = isCritical ? 4.2 : 1.9
+  const strength = isCritical ? 0.16 : 0.045
+  const wave = Math.sin(elapsedTime * speed)
+
+  return {
+    pulse: 1 + wave * floor.spread * strength,
+    spreadX: 1 + floor.spread * (isCritical ? 0.36 : 0.12),
+    spreadZ: 1 + floor.spread * (isCritical ? 0.42 : 0.16),
+    spreadOpacity: isCritical ? 0.18 + floor.spread * 0.34 : 0.05 + floor.spread * 0.08,
+    emissiveIntensity: isCritical
+      ? 0.42 + floor.intensity * (isFocus ? 1.45 : 0.72)
+      : 0.2 + floor.intensity * (isFocus ? 0.65 : 0.28),
+  }
+}
+
+function applyFloorAnimation(
+  mesh: THREE.Mesh | null,
+  spread: THREE.Mesh | null,
+  edgeRef: THREE.Color,
+  animation: ReturnType<typeof buildFloorAnimationState>,
+) {
+  if (mesh) {
+    mesh.scale.set(1, animation.pulse, 1)
+    const material = mesh.material as THREE.MeshStandardMaterial
+    material.emissive.copy(edgeRef)
+    material.emissiveIntensity = animation.emissiveIntensity
+  }
+
+  if (spread) {
+    spread.scale.set(animation.spreadX, 1, animation.spreadZ)
+    const material = spread.material as THREE.MeshBasicMaterial
+    material.opacity = animation.spreadOpacity
+  }
+}
+
+function FloorMesh({
+  meshRef,
+  coreRef,
+}: {
+  meshRef: MutableRefObject<THREE.Mesh | null>
+  coreRef: THREE.Color
+}) {
+  return (
+    <mesh
+      ref={(node) => {
+        meshRef.current = node
+      }}
+    >
+      <boxGeometry args={[FLOOR_WIDTH, FLOOR_HEIGHT, FLOOR_DEPTH]} />
+      <meshStandardMaterial color={coreRef} metalness={0.18} roughness={0.32} />
+    </mesh>
+  )
+}
+
+function FloorSpread({
+  spreadRef,
+  edgeRef,
+}: {
+  spreadRef: MutableRefObject<THREE.Mesh | null>
+  edgeRef: THREE.Color
+}) {
+  return (
+    <mesh
+      ref={(node) => {
+        spreadRef.current = node
+      }}
+      position={[0, FLOOR_HEIGHT * 0.62, 0]}
+    >
+      <boxGeometry args={[FLOOR_WIDTH * 1.04, 0.08, FLOOR_DEPTH * 1.05]} />
+      <meshBasicMaterial color={edgeRef} transparent opacity={0.1} />
+    </mesh>
+  )
+}
+
+function FloorLabel({ label }: { label: string }) {
+  return (
+    <Html position={[-FLOOR_WIDTH / 2 - 1.1, FLOOR_HEIGHT * 0.35, 0]} center>
+      <div className="rounded-full border border-slate-700/70 bg-slate-950/90 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-300 shadow-lg">
+        {label}
+      </div>
+    </Html>
+  )
+}
+
 function FloorMass({
   floor,
   isFocus,
@@ -66,72 +167,109 @@ function FloorMass({
   const spreadRef = useRef<THREE.Mesh | null>(null)
 
   useFrame(({ clock }) => {
-    const t = clock.getElapsedTime()
-    const body = meshRef.current
-    const spread = spreadRef.current
-    const isStable = motionProfile === 'calm' || floor.level === 'stable'
-
-    let pulse = 1
-    let spreadX = 1
-    let spreadZ = 1
-    let spreadOpacity = 0
-    let emissiveIntensity = isFocus ? 0.18 : 0.08
-
-    if (!isStable) {
-      const isCritical = floor.level === 'critical'
-      const speed = isCritical ? 4.2 : 1.9
-      const strength = isCritical ? 0.16 : 0.045
-      const wave = Math.sin(t * speed)
-      pulse = 1 + wave * floor.spread * strength
-      spreadX = 1 + floor.spread * (isCritical ? 0.36 : 0.12)
-      spreadZ = 1 + floor.spread * (isCritical ? 0.42 : 0.16)
-      spreadOpacity = isCritical ? 0.18 + floor.spread * 0.34 : 0.05 + floor.spread * 0.08
-      emissiveIntensity = isCritical
-        ? 0.42 + floor.intensity * (isFocus ? 1.45 : 0.72)
-        : 0.2 + floor.intensity * (isFocus ? 0.65 : 0.28)
-    }
-
-    if (body) {
-      body.scale.set(1, pulse, 1)
-      const material = body.material as THREE.MeshStandardMaterial
-      material.emissive.copy(edgeRef)
-      material.emissiveIntensity = emissiveIntensity
-    }
-
-    if (spread) {
-      spread.scale.set(spreadX, 1, spreadZ)
-      const material = spread.material as THREE.MeshBasicMaterial
-      material.opacity = spreadOpacity
-    }
+    const animation = buildFloorAnimationState(floor, motionProfile, isFocus, clock.getElapsedTime())
+    applyFloorAnimation(meshRef.current, spreadRef.current, edgeRef, animation)
   })
 
   return (
     <group position={[0, floor.elevation, 0]}>
-      <mesh
-        ref={(node) => {
-          meshRef.current = node
-        }}
-      >
-        <boxGeometry args={[FLOOR_WIDTH, FLOOR_HEIGHT, FLOOR_DEPTH]} />
-        <meshStandardMaterial color={coreRef} metalness={0.18} roughness={0.32} />
-      </mesh>
-
-      <mesh
-        ref={(node) => {
-          spreadRef.current = node
-        }}
-        position={[0, FLOOR_HEIGHT * 0.62, 0]}
-      >
-        <boxGeometry args={[FLOOR_WIDTH * 1.04, 0.08, FLOOR_DEPTH * 1.05]} />
-        <meshBasicMaterial color={edgeRef} transparent opacity={0.1} />
-      </mesh>
-
-      <Html position={[-FLOOR_WIDTH / 2 - 1.1, FLOOR_HEIGHT * 0.35, 0]} center>
-        <div className="rounded-full border border-slate-700/70 bg-slate-950/90 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-300 shadow-lg">
-          {floor.label}
-        </div>
-      </Html>
+      <FloorMesh meshRef={meshRef} coreRef={coreRef} />
+      <FloorSpread spreadRef={spreadRef} edgeRef={edgeRef} />
+      <FloorLabel label={floor.label} />
     </group>
+  )
+}
+
+function buildZoneAnimationState(
+  signal: CockpitTwinZoneSignal,
+  selected: boolean,
+  elapsedTime: number,
+) {
+  const isCritical = signal.level === 'critical'
+  const speed = isCritical ? 4.8 : 2
+  const wave = (Math.sin(elapsedTime * speed) + 1) / 2
+
+  return {
+    orbScale: isCritical
+      ? 0.96 + wave * (signal.isPrimary ? 1.1 : 0.55) + (selected ? 0.18 : 0)
+      : 0.94 + wave * (signal.isPrimary ? 0.36 : 0.18) + (selected ? 0.08 : 0),
+    ringScale: isCritical
+      ? 1.24 + wave * (signal.isPrimary ? 1.9 : 1.15)
+      : 1.08 + wave * (signal.isPrimary ? 0.62 : 0.34),
+    ringOpacity: isCritical ? 0.28 + wave * 0.34 : 0.08 + wave * 0.12,
+    emissiveIntensity: isCritical
+      ? 0.75 + signal.weight * 1.8 + (selected ? 0.48 : 0)
+      : 0.28 + signal.weight * 0.82 + (selected ? 0.22 : 0),
+  }
+}
+
+function applyZoneAnimation(
+  orb: THREE.Mesh | null,
+  ring: THREE.Mesh | null,
+  orbColor: THREE.Color,
+  animation: ReturnType<typeof buildZoneAnimationState>,
+) {
+  if (orb) {
+    orb.scale.setScalar(animation.orbScale)
+    const material = orb.material as THREE.MeshStandardMaterial
+    material.emissive.copy(orbColor)
+    material.emissiveIntensity = animation.emissiveIntensity
+  }
+
+  if (ring) {
+    ring.scale.set(animation.ringScale, animation.ringScale, animation.ringScale)
+    const material = ring.material as THREE.MeshBasicMaterial
+    material.opacity = animation.ringOpacity
+  }
+}
+
+function ZoneOrb({
+  orbRef,
+  signal,
+  orbColor,
+  onPointerEnter,
+  onPointerLeave,
+  onClick,
+}: {
+  orbRef: MutableRefObject<THREE.Mesh | null>
+  signal: CockpitTwinZoneSignal
+  orbColor: THREE.Color
+  onPointerEnter: (event: ThreeEvent<PointerEvent>) => void
+  onPointerLeave: (event: ThreeEvent<PointerEvent>) => void
+  onClick: (event: ThreeEvent<MouseEvent>) => void
+}) {
+  return (
+    <mesh
+      ref={(node) => {
+        orbRef.current = node
+      }}
+      onPointerEnter={onPointerEnter}
+      onPointerLeave={onPointerLeave}
+      onClick={onClick}
+    >
+      <sphereGeometry args={[signal.isPrimary ? 0.33 : 0.22, 24, 24]} />
+      <meshStandardMaterial color={orbColor} emissive={orbColor} emissiveIntensity={1} />
+    </mesh>
+  )
+}
+
+function ZoneRing({
+  ringRef,
+  ringColor,
+}: {
+  ringRef: MutableRefObject<THREE.Mesh | null>
+  ringColor: THREE.Color
+}) {
+  return (
+    <mesh
+      ref={(node) => {
+        ringRef.current = node
+      }}
+      rotation={[-Math.PI / 2, 0, 0]}
+    >
+      <ringGeometry args={[0.38, 0.52, 48]} />
+      <meshBasicMaterial color={ringColor} transparent opacity={0.24} side={THREE.DoubleSide} />
+    </mesh>
   )
 }
 
@@ -156,33 +294,8 @@ function ZoneSignal({
   const position = useMemo(() => buildSignalPosition(floor, signal.slot), [floor, signal.slot])
 
   useFrame(({ clock }) => {
-    const t = clock.getElapsedTime()
-    const orb = orbRef.current
-    const ring = ringRef.current
-    const isCritical = signal.level === 'critical'
-    const speed = isCritical ? 4.8 : 2
-    const wave = (Math.sin(t * speed) + 1) / 2
-
-    if (orb) {
-      const scale = isCritical
-        ? 0.96 + wave * (signal.isPrimary ? 1.1 : 0.55) + (selected ? 0.18 : 0)
-        : 0.94 + wave * (signal.isPrimary ? 0.36 : 0.18) + (selected ? 0.08 : 0)
-      orb.scale.setScalar(scale)
-      const material = orb.material as THREE.MeshStandardMaterial
-      material.emissive.copy(orbColor)
-      material.emissiveIntensity = isCritical
-        ? 0.75 + signal.weight * 1.8 + (selected ? 0.48 : 0)
-        : 0.28 + signal.weight * 0.82 + (selected ? 0.22 : 0)
-    }
-
-    if (ring) {
-      const ringScale = isCritical
-        ? 1.24 + wave * (signal.isPrimary ? 1.9 : 1.15)
-        : 1.08 + wave * (signal.isPrimary ? 0.62 : 0.34)
-      ring.scale.set(ringScale, ringScale, ringScale)
-      const material = ring.material as THREE.MeshBasicMaterial
-      material.opacity = isCritical ? 0.28 + wave * 0.34 : 0.08 + wave * 0.12
-    }
+    const animation = buildZoneAnimationState(signal, selected, clock.getElapsedTime())
+    applyZoneAnimation(orbRef.current, ringRef.current, orbColor, animation)
   })
 
   const handlePointerEnter = (event: ThreeEvent<PointerEvent>) => {
@@ -202,26 +315,15 @@ function ZoneSignal({
 
   return (
     <group position={position}>
-      <mesh
-        ref={(node) => {
-          orbRef.current = node
-        }}
+      <ZoneOrb
+        orbRef={orbRef}
+        signal={signal}
+        orbColor={orbColor}
         onPointerEnter={handlePointerEnter}
         onPointerLeave={handlePointerLeave}
         onClick={handleClick}
-      >
-        <sphereGeometry args={[signal.isPrimary ? 0.33 : 0.22, 24, 24]} />
-        <meshStandardMaterial color={orbColor} emissive={orbColor} emissiveIntensity={1} />
-      </mesh>
-      <mesh
-        ref={(node) => {
-          ringRef.current = node
-        }}
-        rotation={[-Math.PI / 2, 0, 0]}
-      >
-        <ringGeometry args={[0.38, 0.52, 48]} />
-        <meshBasicMaterial color={ringColor} transparent opacity={0.24} side={THREE.DoubleSide} />
-      </mesh>
+      />
+      <ZoneRing ringRef={ringRef} ringColor={ringColor} />
     </group>
   )
 }

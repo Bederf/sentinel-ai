@@ -32,6 +32,10 @@ export interface CockpitSiteSummary {
   dataFreshnessLabel: string
 }
 
+type DecisionSurface = ReturnType<typeof buildDecisionSurface>
+
+const DEFAULT_FLOOR_ORDER = ['R', 'L2', 'L1', 'L0', 'G', 'B1']
+
 function getTone(riskBand: CockpitState['severity']['riskBand']): CockpitState['primaryMetric']['tone'] {
   if (riskBand === 'critical') return 'critical'
   if (riskBand === 'high') return 'elevated'
@@ -57,10 +61,12 @@ function formatPostureLabel(posture: string | null | undefined): string {
   return posture.replace(/_/g, ' ')
 }
 
-const DEFAULT_FLOOR_ORDER = ['R', 'L2', 'L1', 'L0', 'G', 'B1']
-
 function clamp01(value: number): number {
   return Math.max(0, Math.min(1, value))
+}
+
+function toPercent(score: number): number {
+  return Math.round(clamp01(score) * 100)
 }
 
 function extractFloorCode(value: string | null | undefined): string | null {
@@ -77,10 +83,6 @@ function formatFloorLabel(floorId: string, customLabels?: Record<string, string>
   if (floorId.startsWith('B')) return `Basement ${floorId.slice(1)}`
   if (floorId.startsWith('L')) return `Level ${floorId.slice(1)}`
   return floorId
-}
-
-function toPercent(score: number): number {
-  return Math.round(clamp01(score) * 100)
 }
 
 function riskBandFromScore(
@@ -102,6 +104,12 @@ function riskLevelFromBand(riskBand: CockpitState['severity']['riskBand']): Cock
   return 'stable'
 }
 
+function motionProfileFromRiskBand(riskBand: CockpitState['severity']['riskBand']): CockpitState['visualTwin']['motionProfile'] {
+  if (riskBand === 'critical') return 'alert'
+  if (riskBand === 'high' || riskBand === 'medium') return 'watch'
+  return 'calm'
+}
+
 function buildThresholdReason(
   score: number,
   riskBand: CockpitState['severity']['riskBand'],
@@ -109,84 +117,85 @@ function buildThresholdReason(
 ): string {
   const riskScore = toPercent(score)
 
-  if (riskBand === 'critical') {
-    return `Risk ${riskScore} is at or above the critical threshold of ${thresholds.critical}`
-  }
-
-  if (riskBand === 'high') {
-    return `Risk ${riskScore} is at or above the high threshold of ${thresholds.high}`
-  }
-
-  if (riskBand === 'medium') {
-    return `Risk ${riskScore} is at or above the medium threshold of ${thresholds.medium}`
-  }
-
+  if (riskBand === 'critical') return `Risk ${riskScore} is at or above the critical threshold of ${thresholds.critical}`
+  if (riskBand === 'high') return `Risk ${riskScore} is at or above the high threshold of ${thresholds.high}`
+  if (riskBand === 'medium') return `Risk ${riskScore} is at or above the medium threshold of ${thresholds.medium}`
   return `Risk ${riskScore} is below the medium threshold of ${thresholds.medium}`
 }
 
-function motionProfileFromRiskBand(riskBand: CockpitState['severity']['riskBand']): CockpitState['visualTwin']['motionProfile'] {
-  if (riskBand === 'critical') return 'alert'
-  if (riskBand === 'high' || riskBand === 'medium') return 'watch'
-  return 'calm'
+function resolveFocusFloorId(payload: CockpitDecisionPayload): string | null {
+  return (
+    extractFloorCode(payload.affected_zone_ids?.[0] ?? null)
+    ?? extractFloorCode(payload.primary_asset_id ?? null)
+    ?? null
+  )
 }
 
-function buildVisualTwin(
-  resolvedPayload: CockpitDecisionPayload,
-  surface: ReturnType<typeof buildDecisionSurface>,
-  urgencyScore: number,
-  policy: CockpitThresholdPolicy,
-): CockpitState['visualTwin'] {
-  const floorLabels = resolvedPayload.building_metadata?.floor_labels ?? null
-  const configuredOrder = resolvedPayload.building_metadata?.floor_stack_order ?? []
-  const focusFloorId =
-    extractFloorCode(resolvedPayload.affected_zone_ids?.[0] ?? null)
-    ?? extractFloorCode(resolvedPayload.primary_asset_id ?? null)
-    ?? null
-
+function buildFloorOrder(configuredOrder: string[], focusFloorId: string | null): string[] {
   const floorOrder = [...configuredOrder]
+
   for (const fallback of DEFAULT_FLOOR_ORDER) {
     if (!floorOrder.includes(fallback)) {
       floorOrder.push(fallback)
     }
   }
+
   if (focusFloorId && !floorOrder.includes(focusFloorId)) {
     floorOrder.unshift(focusFloorId)
   }
 
+  return floorOrder
+}
+
+function buildTwinFloors(
+  floorOrder: string[],
+  focusFloorId: string | null,
+  urgencyScore: number,
+  floorLabels: Record<string, string> | null | undefined,
+  policy: CockpitThresholdPolicy,
+) {
   const anchorIndex = focusFloorId ? floorOrder.indexOf(focusFloorId) : -1
-  const floors = floorOrder.map((floorId, index) => {
+
+  return floorOrder.map((floorId, index) => {
     const distance = anchorIndex >= 0 ? Math.abs(index - anchorIndex) : Number.POSITIVE_INFINITY
     const spread = anchorIndex >= 0 ? clamp01(urgencyScore - distance * 0.22) : 0
-    const intensity = anchorIndex >= 0
-      ? clamp01(0.18 + spread * 0.82)
-      : 0.16
-    const level = anchorIndex >= 0
-      ? riskLevelFromBand(riskBandFromScore(index === anchorIndex ? urgencyScore : spread * 0.9, policy.risk))
-      : 'stable'
+    const riskScore = index === anchorIndex ? urgencyScore : spread * 0.9
+    const level = anchorIndex >= 0 ? riskLevelFromBand(riskBandFromScore(riskScore, policy.risk)) : 'stable'
 
     return {
       id: floorId,
       label: formatFloorLabel(floorId, floorLabels),
       meshId: `floor:${floorId}`,
       level,
-      intensity,
+      intensity: anchorIndex >= 0 ? clamp01(0.18 + spread * 0.82) : 0.16,
       spread,
       elevation: (floorOrder.length - index - 1) * 2.25,
     }
   })
+}
 
-  const sourceSignals = (resolvedPayload.affected_zone_ids ?? []).length > 0
-    ? (resolvedPayload.affected_zone_ids ?? [])
-    : resolvedPayload.primary_asset_id
-      ? [resolvedPayload.primary_asset_id]
+function buildZoneSignals(
+  payload: CockpitDecisionPayload,
+  focusFloorId: string | null,
+  floorOrder: string[],
+  urgencyScore: number,
+  policy: CockpitThresholdPolicy,
+  actionLabel: string,
+) {
+  const sourceSignals = (payload.affected_zone_ids ?? []).length > 0
+    ? (payload.affected_zone_ids ?? [])
+    : payload.primary_asset_id
+      ? [payload.primary_asset_id]
       : []
 
   const floorSlots = new Map<string, number>()
-  const zoneSignals = sourceSignals.map((sourceId, index) => {
-    const floorId = extractFloorCode(sourceId) ?? focusFloorId ?? floorOrder[Math.min(index, floorOrder.length - 1)] ?? 'L0'
+
+  return sourceSignals.map((sourceId, index) => {
+    const fallbackFloor = floorOrder[Math.min(index, floorOrder.length - 1)] ?? 'L0'
+    const floorId = extractFloorCode(sourceId) ?? focusFloorId ?? fallbackFloor
     const slot = floorSlots.get(floorId) ?? 0
-    floorSlots.set(floorId, slot + 1)
     const weight = clamp01(urgencyScore - index * 0.12)
+    floorSlots.set(floorId, slot + 1)
 
     return {
       zoneId: sourceId,
@@ -197,9 +206,23 @@ function buildVisualTwin(
       weight,
       slot,
       isPrimary: index === 0,
-      actionLabel: surface.action.summary,
+      actionLabel,
     }
   })
+}
+
+function buildVisualTwin(
+  payload: CockpitDecisionPayload,
+  surface: DecisionSurface,
+  urgencyScore: number,
+  policy: CockpitThresholdPolicy,
+): CockpitState['visualTwin'] {
+  const floorLabels = payload.building_metadata?.floor_labels ?? null
+  const configuredOrder = payload.building_metadata?.floor_stack_order ?? []
+  const focusFloorId = resolveFocusFloorId(payload)
+  const floorOrder = buildFloorOrder(configuredOrder, focusFloorId)
+  const floors = buildTwinFloors(floorOrder, focusFloorId, urgencyScore, floorLabels, policy)
+  const zoneSignals = buildZoneSignals(payload, focusFloorId, floorOrder, urgencyScore, policy, surface.action.summary)
 
   return {
     headline: surface.time.value === 'Unknown'
@@ -234,6 +257,133 @@ function buildFallbackPayload(summary: CockpitSiteSummary): CockpitDecisionPaylo
   }
 }
 
+function buildEvidence(
+  summary: CockpitSiteSummary,
+  payload: CockpitDecisionPayload | null | undefined,
+  resolvedPayload: CockpitDecisionPayload,
+  evidenceStrength: CockpitState['evidence']['strength'],
+): CockpitState['evidence'] {
+  return {
+    strength: evidenceStrength,
+    summary: payload
+      ? `Built from live site signals and ${summary.dataFreshnessLabel.toLowerCase()}.`
+      : 'Built from live site signals and current watch rules.',
+    refs: [
+      ...(resolvedPayload.primary_asset_id ? [`asset:${resolvedPayload.primary_asset_id}`] : []),
+      ...(resolvedPayload.affected_zone_ids ?? []).slice(0, 2).map((zoneId) => `zone:${zoneId}`),
+      ...Object.keys(resolvedPayload.urgency_components ?? {}).slice(0, 3).map((key) => `signal:${key}`),
+    ],
+  }
+}
+
+function buildEmergingRisks(
+  payload: CockpitDecisionPayload | null | undefined,
+  resolvedPayload: CockpitDecisionPayload,
+  surface: DecisionSurface,
+): CockpitState['emergingRisks'] {
+  if (!payload) {
+    return [
+      {
+        id: 'risk-watch',
+        title: 'No active breach forecast',
+        detail: 'Keep watching for the next drift window.',
+      },
+      {
+        id: 'risk-evidence',
+        title: 'Keep telemetry fresh',
+        detail: 'If telemetry freshness drops, trust the twin less before escalating action.',
+      },
+    ]
+  }
+
+  return [
+    {
+      id: 'risk-horizon',
+      title: `${surface.time.label} is still the main risk clock`,
+      detail: `If nothing changes, the next breach window is still set by ${surface.time.label.toLowerCase()}.`,
+    },
+    {
+      id: 'risk-spread',
+      title: 'Watch nearby zones next',
+      detail: resolvedPayload.affected_zone_ids && resolvedPayload.affected_zone_ids.length > 0
+        ? `Watch ${resolvedPayload.affected_zone_ids.slice(0, 2).join(', ')} for spillover or recovery drift.`
+        : 'Watch neighboring zones and dependent systems for spillover or recovery drift.',
+    },
+  ]
+}
+
+function buildSiteState(summary: CockpitSiteSummary, resolvedPayload: CockpitDecisionPayload, surface: DecisionSurface) {
+  return {
+    id: summary.siteId,
+    name: summary.siteName,
+    posture: formatPostureLabel(resolvedPayload.active_posture ?? summary.posture),
+    mode: surface.mode,
+    dataFreshnessLabel: summary.dataFreshnessLabel,
+  }
+}
+
+function buildSitePulse(
+  summary: CockpitSiteSummary,
+  payload: CockpitDecisionPayload | null | undefined,
+  tone: CockpitState['sitePulse']['tone'],
+  urgencyScore: number,
+  evidenceStrength: CockpitState['sitePulse']['evidenceStrength'],
+) {
+  return {
+    tone,
+    attentionScore: urgencyScore,
+    activeConditionCount: Math.max(summary.activeAlerts, payload ? 1 : 0),
+    emergingRiskCount: Math.max(summary.predictionsCount, 0),
+    evidenceStrength,
+  }
+}
+
+function buildPrimaryMetric(surface: DecisionSurface, tone: CockpitState['primaryMetric']['tone'], confidenceLabel: string) {
+  return {
+    tone,
+    label: 'Time to Comfort Breach',
+    value: surface.time.value === 'Unknown' ? 'Stable' : surface.time.value,
+    detail: confidenceLabel,
+  }
+}
+
+function buildDecisionState(surface: DecisionSurface, confidenceLabel: string) {
+  return {
+    mode: surface.mode,
+    impact: surface.impact,
+    summary: surface.action.summary,
+    command: surface.action.bmsGuide?.command ?? surface.action.operatorPrompt,
+    operatorPrompt: surface.action.operatorPrompt,
+    expectedOutcome: surface.action.expectedOutcome,
+    tradeoff: surface.action.tradeoff,
+    confidence: confidenceLabel,
+    verification: surface.action.bmsGuide?.verification ?? surface.action.expectedOutcome,
+    navigationPath: surface.action.bmsGuide?.navigationPath ?? [],
+  }
+}
+
+function buildActiveCondition(surface: DecisionSurface, resolvedPayload: CockpitDecisionPayload, confidenceLabel: string) {
+  return {
+    summary: surface.cause,
+    rationale: resolvedPayload.reasoning_summary?.trim()
+      || 'Live signals are steady. Keep watching for the next drift window.',
+    confidenceLabel,
+  }
+}
+
+function buildSeverityState(
+  urgencyScore: number,
+  riskBand: CockpitState['severity']['riskBand'],
+  policy: CockpitThresholdPolicy,
+): CockpitState['severity'] {
+  return {
+    riskScore: toPercent(urgencyScore),
+    riskBand,
+    thresholdReason: buildThresholdReason(urgencyScore, riskBand, policy.risk),
+    policySource: policy.source,
+  }
+}
+
 export function mapCockpitState(
   summary: CockpitSiteSummary,
   payload?: CockpitDecisionPayload | null,
@@ -245,94 +395,17 @@ export function mapCockpitState(
   const riskBand = riskBandFromScore(urgencyScore, policy.risk)
   const tone = getTone(riskBand)
   const evidenceStrength = getEvidenceStrength(urgencyScore)
-  const primaryMetricValue = surface.time.value === 'Unknown' ? 'Stable' : surface.time.value
   const confidenceLabel = surface.time.detail
-  const visualTwin = buildVisualTwin(resolvedPayload, surface, urgencyScore, policy)
-  const primaryMetricLabel = 'Time to Comfort Breach'
 
   return {
-    site: {
-      id: summary.siteId,
-      name: summary.siteName,
-      posture: formatPostureLabel(resolvedPayload.active_posture ?? summary.posture),
-      mode: surface.mode,
-      dataFreshnessLabel: summary.dataFreshnessLabel,
-    },
-    sitePulse: {
-      tone,
-      attentionScore: urgencyScore,
-      activeConditionCount: Math.max(summary.activeAlerts, payload ? 1 : 0),
-      emergingRiskCount: Math.max(summary.predictionsCount, 0),
-      evidenceStrength,
-    },
-    primaryMetric: {
-      tone,
-      label: primaryMetricLabel,
-      value: primaryMetricValue,
-      detail: confidenceLabel,
-    },
-    activeCondition: {
-      summary: surface.cause,
-      rationale: resolvedPayload.reasoning_summary?.trim()
-        || 'Live signals are steady. Keep watching for the next drift window.',
-      confidenceLabel,
-    },
-    decision: {
-      mode: surface.mode,
-      impact: surface.impact,
-      summary: surface.action.summary,
-      command: surface.action.bmsGuide?.command ?? surface.action.operatorPrompt,
-      operatorPrompt: surface.action.operatorPrompt,
-      expectedOutcome: surface.action.expectedOutcome,
-      tradeoff: surface.action.tradeoff,
-      confidence: confidenceLabel,
-      verification: surface.action.bmsGuide?.verification ?? surface.action.expectedOutcome,
-      navigationPath: surface.action.bmsGuide?.navigationPath ?? [],
-    },
-    visualTwin,
-    evidence: {
-      strength: evidenceStrength,
-      summary: payload
-        ? `Built from live site signals and ${summary.dataFreshnessLabel.toLowerCase()}.`
-        : 'Built from live site signals and current watch rules.',
-      refs: [
-        ...(resolvedPayload.primary_asset_id ? [`asset:${resolvedPayload.primary_asset_id}`] : []),
-        ...(resolvedPayload.affected_zone_ids ?? []).slice(0, 2).map((zoneId) => `zone:${zoneId}`),
-        ...Object.keys(resolvedPayload.urgency_components ?? {}).slice(0, 3).map((key) => `signal:${key}`),
-      ],
-    },
-    severity: {
-      riskScore: toPercent(urgencyScore),
-      riskBand,
-      thresholdReason: buildThresholdReason(urgencyScore, riskBand, policy.risk),
-      policySource: policy.source,
-    },
-    emergingRisks: payload
-      ? [
-          {
-            id: 'risk-horizon',
-            title: `${surface.time.label} is still the main risk clock`,
-            detail: `If nothing changes, the next breach window is still set by ${surface.time.label.toLowerCase()}.`,
-          },
-          {
-            id: 'risk-spread',
-            title: 'Watch nearby zones next',
-            detail: resolvedPayload.affected_zone_ids && resolvedPayload.affected_zone_ids.length > 0
-              ? `Watch ${resolvedPayload.affected_zone_ids.slice(0, 2).join(', ')} for spillover or recovery drift.`
-              : 'Watch neighboring zones and dependent systems for spillover or recovery drift.',
-          },
-        ]
-      : [
-          {
-            id: 'risk-watch',
-            title: 'No active breach forecast',
-            detail: 'Keep watching for the next drift window.',
-          },
-          {
-            id: 'risk-evidence',
-            title: 'Keep telemetry fresh',
-            detail: 'If telemetry freshness drops, trust the twin less before escalating action.',
-          },
-        ],
+    site: buildSiteState(summary, resolvedPayload, surface),
+    sitePulse: buildSitePulse(summary, payload, tone, urgencyScore, evidenceStrength),
+    primaryMetric: buildPrimaryMetric(surface, tone, confidenceLabel),
+    activeCondition: buildActiveCondition(surface, resolvedPayload, confidenceLabel),
+    decision: buildDecisionState(surface, confidenceLabel),
+    visualTwin: buildVisualTwin(resolvedPayload, surface, urgencyScore, policy),
+    evidence: buildEvidence(summary, payload, resolvedPayload, evidenceStrength),
+    severity: buildSeverityState(urgencyScore, riskBand, policy),
+    emergingRisks: buildEmergingRisks(payload, resolvedPayload, surface),
   }
 }
