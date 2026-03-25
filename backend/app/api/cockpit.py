@@ -17,13 +17,13 @@ GET /api/cockpit/decision/{site_id}
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
-from typing import Any, Literal, Optional
+from datetime import UTC, datetime
+from typing import Any, Literal
 
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from app.api.settings import load_settings
+from app.services.cockpit_policy_resolution import resolve_cockpit_contract
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/cockpit", tags=["cockpit"])
@@ -49,6 +49,18 @@ class CockpitRiskResolution(BaseModel):
     policy_source: str
     """Threshold policy source used for this interpretation."""
 
+    policy_level: Literal["site_asset_criticality", "site_asset", "site", "posture", "system"]
+    """Resolution layer that produced the active policy."""
+
+    constraint_type: Literal["comfort", "asset", "cost", "compliance"]
+    """Primary operational constraint driving risk interpretation."""
+
+    time_to_constraint_breach_min: int | None = None
+    """Minutes until the active constraint is expected to breach."""
+
+    affected_scope: dict[str, Any]
+    """Resolved impact scope for zones, assets, and estimated occupants."""
+
 
 class CockpitHealthResolution(BaseModel):
     """Backend-resolved health semantics for cockpit rendering."""
@@ -56,11 +68,20 @@ class CockpitHealthResolution(BaseModel):
     score: float
     """0-1 health score."""
 
-    state: Literal["stable", "watch", "degraded"]
+    state: Literal["healthy", "stable", "watch", "degraded", "critical"]
     """Simple health state for the current contract slice."""
 
-    trend: Literal["improving", "flat", "declining"]
+    trend: Literal["improving", "flat", "declining", "volatile"]
     """Simple health trend for the current contract slice."""
+
+    reason: str
+    """Explainable reason for the current health interpretation."""
+
+    asset_class: str
+    """Resolved asset class for the health interpretation."""
+
+    criticality: Literal["low", "medium", "high", "mission_critical"]
+    """Resolved asset criticality used for health interpretation."""
 
 
 class CockpitDecisionPayload(BaseModel):
@@ -76,143 +97,90 @@ class CockpitDecisionPayload(BaseModel):
     building_id: str
     """Site ID (e.g., S002)."""
 
-    alert_text: Optional[str] = None
+    alert_text: str | None = None
     """Plain-language alert summary (null = no active alert)."""
 
-    reasoning_summary: Optional[str] = None
+    reasoning_summary: str | None = None
     """Why SENTINEL made this decision (diagnostic context for operator)."""
 
-    active_posture: Optional[str] = None
+    active_posture: str | None = None
     """Deployment posture: 'advisory', 'supervised', 'autonomous', 'ghost'."""
 
-    time_to_discomfort: Optional[int] = None
+    time_to_discomfort: int | None = None
     """Minutes until comfort threshold breached (null = not computed)."""
 
-    time_confidence: Optional[str | int] = None
+    time_confidence: str | int | None = None
     """Confidence label: 'stable', 'declining', 'critical' or score 0-1."""
 
-    estimated_impact: Optional[Any] = None
+    estimated_impact: Any | None = None
     """Projected impact of inaction (cost, energy, comfort, compliance)."""
 
-    recommended_action: Optional[str] = None
+    recommended_action: str | None = None
     """Operator-facing action prompt (null = monitor only)."""
 
-    urgency_score: Optional[float] = None
+    urgency_score: float | None = None
     """0-1 urgency score interpreted by frontend threshold policy."""
 
-    urgency_components: Optional[dict[str, float]] = None
+    urgency_components: dict[str, float] | None = None
     """Decomposed urgency: {'comfort': 0.1, 'asset_risk': 0.2, 'cost': 0.3}, etc."""
 
-    affected_zone_ids: Optional[list[str]] = None
+    affected_zone_ids: list[str] | None = None
     """Zone IDs with active conditions (null = site-wide, [] = no zones)."""
 
-    primary_asset_id: Optional[str] = None
+    primary_asset_id: str | None = None
     """Equipment ID if decision is equipment-centric (null = site-level)."""
 
-    building_metadata: Optional[dict[str, Any]] = None
+    building_metadata: dict[str, Any] | None = None
     """Site config: {'deployment_mode': 'advisory', ...}."""
 
-    risk: Optional[CockpitRiskResolution] = None
+    risk: CockpitRiskResolution | None = None
     """Backend-resolved cockpit risk interpretation."""
 
-    health: Optional[CockpitHealthResolution] = None
+    health: CockpitHealthResolution | None = None
     """Backend-resolved cockpit health summary."""
-
-
-def _clamp01(value: float) -> float:
-    return max(0.0, min(1.0, value))
-
-
-def _resolve_threshold_policy_source() -> tuple[dict[str, int], dict[str, int], str]:
-    """Load threshold settings for cockpit interpretation."""
-
-    defaults = (
-        {"healthy": 80, "warning": 60, "critical": 0},
-        {"medium": 31, "high": 61, "critical": 81},
-        "global.default",
-    )
-
-    try:
-        settings = load_settings()
-        return (
-            settings.get("healthThresholds", defaults[0]),
-            settings.get("riskThresholds", defaults[1]),
-            "global.settings",
-        )
-    except Exception:
-        logger.exception("Failed to load cockpit threshold policy; using defaults")
-        return defaults
-
-
-def _risk_band_from_score(score: float, thresholds: dict[str, int]) -> Literal["low", "medium", "high", "critical"]:
-    score_percent = round(_clamp01(score) * 100)
-    if score_percent >= thresholds["critical"]:
-        return "critical"
-    if score_percent >= thresholds["high"]:
-        return "high"
-    if score_percent >= thresholds["medium"]:
-        return "medium"
-    return "low"
-
-
-def _build_risk_reason(
-    payload: CockpitDecisionPayload,
-    score: float,
-    band: Literal["low", "medium", "high", "critical"],
-    thresholds: dict[str, int],
-) -> str:
-    score_percent = round(_clamp01(score) * 100)
-    if payload.reasoning_summary:
-        return payload.reasoning_summary
-    if band == "critical":
-        return f"Resolved risk {score_percent} is above the critical threshold of {thresholds['critical']}."
-    if band == "high":
-        return f"Resolved risk {score_percent} is above the high threshold of {thresholds['high']}."
-    if band == "medium":
-        return f"Resolved risk {score_percent} is above the medium threshold of {thresholds['medium']}."
-    return f"Resolved risk {score_percent} remains below the medium threshold of {thresholds['medium']}."
-
-
-def _resolve_health_state(score: float, thresholds: dict[str, int]) -> Literal["stable", "watch", "degraded"]:
-    score_percent = round(_clamp01(score) * 100)
-    if score_percent >= thresholds["healthy"]:
-        return "stable"
-    if score_percent >= thresholds["warning"]:
-        return "watch"
-    return "degraded"
-
-
-def _resolve_health_trend(urgency_score: float) -> Literal["improving", "flat", "declining"]:
-    if urgency_score >= 0.55:
-        return "declining"
-    if urgency_score <= 0.2:
-        return "improving"
-    return "flat"
 
 
 def _attach_resolved_contract(payload: CockpitDecisionPayload) -> CockpitDecisionPayload:
     """
     Attach backend-resolved risk and health semantics to the cockpit payload.
 
-    This is the first narrow contract step. It still uses current stub sourcing and
-    urgency-derived values, but moves interpretation ownership into the backend.
+    This keeps stub sourcing in place while moving richer policy and health meaning
+    into the backend contract.
     """
 
-    health_thresholds, risk_thresholds, policy_source = _resolve_threshold_policy_source()
-    urgency_score = _clamp01(payload.urgency_score or 0.0)
-    health_score = _clamp01(1.0 - (urgency_score * 0.2))
-    risk_band = _risk_band_from_score(urgency_score, risk_thresholds)
+    resolved = resolve_cockpit_contract(
+        site_id=payload.building_id,
+        primary_asset_id=payload.primary_asset_id,
+        affected_zone_ids=payload.affected_zone_ids,
+        active_posture=payload.active_posture,
+        urgency_score=payload.urgency_score or 0.0,
+        time_to_constraint_breach_min=payload.time_to_discomfort,
+        time_confidence=payload.time_confidence,
+        reasoning_summary=payload.reasoning_summary,
+        urgency_components=payload.urgency_components,
+    )
 
     payload.risk = CockpitRiskResolution(
-        score=urgency_score,
-        band=risk_band,
-        reason=_build_risk_reason(payload, urgency_score, risk_band, risk_thresholds),
-        policy_source=policy_source,
+        score=resolved.risk.score,
+        band=resolved.risk.band,
+        reason=resolved.risk.reason,
+        policy_source=resolved.risk.policy_source,
+        policy_level=resolved.risk.policy_level,
+        constraint_type=resolved.risk.constraint_type,
+        time_to_constraint_breach_min=resolved.risk.time_to_constraint_breach_min,
+        affected_scope={
+            "zones": resolved.risk.affected_scope.zones,
+            "assets": resolved.risk.affected_scope.assets,
+            "occupants_estimate": resolved.risk.affected_scope.occupants_estimate,
+        },
     )
     payload.health = CockpitHealthResolution(
-        score=health_score,
-        state=_resolve_health_state(health_score, health_thresholds),
-        trend=_resolve_health_trend(urgency_score),
+        score=resolved.health.score,
+        state=resolved.health.state,
+        trend=resolved.health.trend,
+        reason=resolved.health.reason,
+        asset_class=resolved.health.asset_class,
+        criticality=resolved.health.criticality,
     )
     return payload
 
@@ -222,7 +190,7 @@ def _attach_resolved_contract(payload: CockpitDecisionPayload) -> CockpitDecisio
 # ---------------------------------------------------------------------------
 
 
-def _build_stub_payload_for_site(site_id: str) -> Optional[CockpitDecisionPayload]:
+def _build_stub_payload_for_site(site_id: str) -> CockpitDecisionPayload | None:
     """
     v1 site-aware stub logic.
 
@@ -238,26 +206,26 @@ def _build_stub_payload_for_site(site_id: str) -> Optional[CockpitDecisionPayloa
         return _attach_resolved_contract(
             CockpitDecisionPayload(
                 building_id="S002",
-                alert_text="Zone B1-001 is drifting toward discomfort.",
+                alert_text="Executive boardroom cooling resilience is slipping.",
                 reasoning_summary=(
-                    "Pressure drop is 18% above baseline while flow stays flat. "
-                    "Check the valve before comfort starts slipping."
+                    "Compressor load is rising while boardroom thermal drift accelerates. "
+                    "Start standby cooling before the next occupied meeting window."
                 ),
-                active_posture="advisory",
-                time_to_discomfort=240,  # 4 hours
+                active_posture="comfort_priority",
+                time_to_discomfort=12,
                 time_confidence="declining",
-                estimated_impact="Comfort margin is tightening and energy waste is rising.",
-                recommended_action=(
-                    "Inspect and clean the Zone B1-001 valve now. If fouling remains, schedule water treatment."
+                estimated_impact=(
+                    "Boardroom comfort will breach during the next occupied window and plant stress is rising."
                 ),
-                urgency_score=0.62,
+                recommended_action="Start standby chiller and inspect the lead compressor train.",
+                urgency_score=0.78,
                 urgency_components={
-                    "comfort": 0.25,
-                    "asset_risk": 0.20,
-                    "cost": 0.17,
+                    "comfort": 0.42,
+                    "asset_risk": 0.24,
+                    "cost": 0.12,
                 },
-                affected_zone_ids=["Zone-B1-001"],
-                primary_asset_id="S002-VAV-101",
+                affected_zone_ids=["Zone-L4-Boardroom-A", "Zone-L4-Boardroom-B"],
+                primary_asset_id="S002-CHILLER-B1-001",
                 building_metadata={
                     "deployment_mode": "advisory",
                 },
@@ -313,5 +281,5 @@ async def get_cockpit_decision(site_id: str) -> dict[str, Any]:
     return {
         "payload": payload,
         "site_id": site_id,
-        "fetched_at": datetime.now(timezone.utc).isoformat(),
+        "fetched_at": datetime.now(UTC).isoformat(),
     }

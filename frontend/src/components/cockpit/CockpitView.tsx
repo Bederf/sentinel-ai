@@ -77,6 +77,10 @@ function CockpitStatusPill({ children }: CockpitStatusPillProps) {
   return <span className="rounded-full border border-slate-800 px-3 py-1">{children}</span>
 }
 
+function formatLabel(value: string) {
+  return value.replace(/_/g, ' ')
+}
+
 function useEntranceAnimation(
   rootRef: RefObject<HTMLElement | null>,
   voiceRef: RefObject<HTMLDivElement | null>,
@@ -269,12 +273,35 @@ function CockpitStatusBar({
       <CockpitStatusPill>Mode: {state.site.mode}</CockpitStatusPill>
       <CockpitStatusPill>Confidence: {state.decision.confidence}</CockpitStatusPill>
       <CockpitStatusPill>Risk band: {state.severity.riskBand ?? 'low'}</CockpitStatusPill>
+      {state.severity.constraintType && (
+        <CockpitStatusPill>
+          Constraint: {formatLabel(state.severity.constraintType)}
+          {state.severity.timeToConstraintBreachMin !== null ? ` · ${state.severity.timeToConstraintBreachMin} min` : ''}
+        </CockpitStatusPill>
+      )}
+      {state.severity.policyLevel && (
+        <CockpitStatusPill>Policy level: {formatLabel(state.severity.policyLevel)}</CockpitStatusPill>
+      )}
+      {state.severity.affectedScope && (
+        <CockpitStatusPill>
+          Scope: {state.severity.affectedScope.zones.length} zones
+          {state.severity.affectedScope.occupantsEstimate !== null
+            ? ` · ~${state.severity.affectedScope.occupantsEstimate} occupants`
+            : ''}
+        </CockpitStatusPill>
+      )}
       {state.severity.healthScore !== null && (
         <CockpitStatusPill>
           Health: {state.severity.healthScore}% · {state.severity.healthState ?? 'stable'} · {state.severity.healthTrend ?? 'flat'}
         </CockpitStatusPill>
       )}
+      {state.severity.assetClass && state.severity.criticality && (
+        <CockpitStatusPill>
+          Asset: {formatLabel(state.severity.assetClass)} · {formatLabel(state.severity.criticality)}
+        </CockpitStatusPill>
+      )}
       {state.severity.policySource && <CockpitStatusPill>Policy: {state.severity.policySource}</CockpitStatusPill>}
+      {state.severity.healthReason && <CockpitStatusPill>Health: {state.severity.healthReason}</CockpitStatusPill>}
       {state.severity.thresholdReason && <CockpitStatusPill>{state.severity.thresholdReason}</CockpitStatusPill>}
     </div>
   )

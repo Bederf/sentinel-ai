@@ -8,11 +8,22 @@ export interface CockpitDecisionPayload {
     band?: CockpitState['severity']['riskBand'] | null
     reason?: string | null
     policy_source?: string | null
+    policy_level?: CockpitState['severity']['policyLevel'] | null
+    constraint_type?: CockpitState['severity']['constraintType'] | null
+    time_to_constraint_breach_min?: number | null
+    affected_scope?: {
+      zones?: string[] | null
+      assets?: string[] | null
+      occupants_estimate?: number | null
+    } | null
   } | null
   health?: {
     score?: number | null
     state?: CockpitState['severity']['healthState'] | null
     trend?: CockpitState['severity']['healthTrend'] | null
+    reason?: string | null
+    asset_class?: string | null
+    criticality?: CockpitState['severity']['criticality'] | null
   } | null
   building_id: string
   alert_text?: string | null
@@ -90,15 +101,39 @@ function fallbackHealthScore(riskScore: number): number {
 
 function fallbackHealthState(score: number, thresholds: CockpitThresholdPolicy['health']): CockpitState['severity']['healthState'] {
   const percent = toPercent(score)
+  if (percent >= Math.min(100, thresholds.healthy + 10)) return 'healthy'
   if (percent >= thresholds.healthy) return 'stable'
   if (percent >= thresholds.warning) return 'watch'
-  return 'degraded'
+  if (percent >= Math.max(thresholds.critical, thresholds.warning - 20)) return 'degraded'
+  return 'critical'
 }
 
 function fallbackHealthTrend(riskScore: number): CockpitState['severity']['healthTrend'] {
+  if (riskScore >= 0.75) return 'volatile'
   if (riskScore >= 0.55) return 'declining'
   if (riskScore <= 0.2) return 'improving'
   return 'flat'
+}
+
+function resolveAffectedScope(payload: CockpitDecisionPayload): CockpitState['severity']['affectedScope'] {
+  const riskScope = payload.risk?.affected_scope
+  if (riskScope) {
+    return {
+      zones: [...(riskScope.zones ?? [])],
+      assets: [...(riskScope.assets ?? [])],
+      occupantsEstimate: riskScope.occupants_estimate ?? null,
+    }
+  }
+
+  const assets = payload.primary_asset_id ? [payload.primary_asset_id] : []
+  const zones = [...(payload.affected_zone_ids ?? [])]
+  if (assets.length === 0 && zones.length === 0) return null
+
+  return {
+    zones,
+    assets,
+    occupantsEstimate: null,
+  }
 }
 
 function extractFloorCode(value: string | null | undefined): string | null {
@@ -295,14 +330,16 @@ function buildEvidence(
   resolvedPayload: CockpitDecisionPayload,
   evidenceStrength: CockpitState['evidence']['strength'],
 ): CockpitState['evidence'] {
+  const affectedScope = resolveAffectedScope(resolvedPayload)
+
   return {
     strength: evidenceStrength,
     summary: payload
       ? `Built from live site signals and ${summary.dataFreshnessLabel.toLowerCase()}.`
       : 'Built from live site signals and current watch rules.',
     refs: [
-      ...(resolvedPayload.primary_asset_id ? [`asset:${resolvedPayload.primary_asset_id}`] : []),
-      ...(resolvedPayload.affected_zone_ids ?? []).slice(0, 2).map((zoneId) => `zone:${zoneId}`),
+      ...(affectedScope?.assets ?? []).slice(0, 2).map((assetId) => `asset:${assetId}`),
+      ...(affectedScope?.zones ?? []).slice(0, 2).map((zoneId) => `zone:${zoneId}`),
       ...Object.keys(resolvedPayload.urgency_components ?? {}).slice(0, 3).map((key) => `signal:${key}`),
     ],
   }
@@ -328,17 +365,25 @@ function buildEmergingRisks(
     ]
   }
 
+  const affectedScope = resolveAffectedScope(resolvedPayload)
+  const constraintType = resolvedPayload.risk?.constraint_type ?? 'comfort'
+  const breachMinutes = resolvedPayload.risk?.time_to_constraint_breach_min
+
   return [
     {
       id: 'risk-horizon',
-      title: `${surface.time.label} is still the main risk clock`,
-      detail: `If nothing changes, the next breach window is still set by ${surface.time.label.toLowerCase()}.`,
+      title: breachMinutes !== null && breachMinutes !== undefined
+        ? `${constraintType} risk will tighten within ${breachMinutes} minutes`
+        : `${surface.time.label} is still the main risk clock`,
+      detail: breachMinutes !== null && breachMinutes !== undefined
+        ? `The active ${constraintType} policy still projects a breach window within ${breachMinutes} minutes.`
+        : `If nothing changes, the next breach window is still set by ${surface.time.label.toLowerCase()}.`,
     },
     {
       id: 'risk-spread',
       title: 'Watch nearby zones next',
-      detail: resolvedPayload.affected_zone_ids && resolvedPayload.affected_zone_ids.length > 0
-        ? `Watch ${resolvedPayload.affected_zone_ids.slice(0, 2).join(', ')} for spillover or recovery drift.`
+      detail: affectedScope && affectedScope.zones.length > 0
+        ? `Watch ${affectedScope.zones.slice(0, 2).join(', ')} for spillover or recovery drift.`
         : 'Watch neighboring zones and dependent systems for spillover or recovery drift.',
     },
   ]
@@ -410,14 +455,22 @@ function buildSeverityState(
   policy: CockpitThresholdPolicy,
 ): CockpitState['severity'] {
   const healthScore = clamp01(resolvedPayload.health?.score ?? fallbackHealthScore(riskScore))
+  const affectedScope = resolveAffectedScope(resolvedPayload)
   return {
     riskScore: toPercent(riskScore),
     riskBand,
     thresholdReason: resolvedPayload.risk?.reason ?? buildThresholdReason(riskScore, riskBand, policy.risk),
     policySource: resolvedPayload.risk?.policy_source ?? policy.source,
+    policyLevel: resolvedPayload.risk?.policy_level ?? null,
+    constraintType: resolvedPayload.risk?.constraint_type ?? null,
+    timeToConstraintBreachMin: resolvedPayload.risk?.time_to_constraint_breach_min ?? resolvedPayload.time_to_discomfort ?? null,
+    affectedScope,
     healthScore: toPercent(healthScore),
     healthState: resolvedPayload.health?.state ?? fallbackHealthState(healthScore, policy.health),
     healthTrend: resolvedPayload.health?.trend ?? fallbackHealthTrend(riskScore),
+    healthReason: resolvedPayload.health?.reason ?? resolvedPayload.reasoning_summary ?? null,
+    assetClass: resolvedPayload.health?.asset_class ?? null,
+    criticality: resolvedPayload.health?.criticality ?? null,
   }
 }
 

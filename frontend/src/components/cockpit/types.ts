@@ -85,15 +85,33 @@ export interface CockpitRiskItem {
 }
 
 export type CockpitRiskBand = 'low' | 'medium' | 'high' | 'critical'
+export type CockpitPolicyLevel = 'site_asset_criticality' | 'site_asset' | 'site' | 'posture' | 'system'
+export type CockpitConstraintType = 'comfort' | 'asset' | 'cost' | 'compliance'
+export type CockpitHealthState = 'healthy' | 'stable' | 'watch' | 'degraded' | 'critical'
+export type CockpitHealthTrend = 'improving' | 'flat' | 'declining' | 'volatile'
+export type CockpitCriticality = 'low' | 'medium' | 'high' | 'mission_critical'
+
+export interface CockpitAffectedScope {
+  zones: string[]
+  assets: string[]
+  occupantsEstimate: number | null
+}
 
 export interface CockpitSeverityInterpretation {
   riskScore: number | null
   riskBand: CockpitRiskBand | null
   thresholdReason: string | null
   policySource: string | null
+  policyLevel: CockpitPolicyLevel | null
+  constraintType: CockpitConstraintType | null
+  timeToConstraintBreachMin: number | null
+  affectedScope: CockpitAffectedScope | null
   healthScore: number | null
-  healthState: 'stable' | 'watch' | 'degraded' | null
-  healthTrend: 'improving' | 'flat' | 'declining' | null
+  healthState: CockpitHealthState | null
+  healthTrend: CockpitHealthTrend | null
+  healthReason: string | null
+  assetClass: string | null
+  criticality: CockpitCriticality | null
 }
 
 export interface CockpitState {

@@ -20,11 +20,22 @@ function buildActivePayload(): CockpitDecisionPayload {
       band: 'critical',
       reason: 'Thermal drift is above the configured critical threshold.',
       policy_source: 'global.settings',
+      policy_level: 'site_asset_criticality',
+      constraint_type: 'comfort',
+      time_to_constraint_breach_min: 12,
+      affected_scope: {
+        zones: ['Zone-L2-Boardroom'],
+        assets: ['S002-CHILLER-B1-001'],
+        occupants_estimate: 18,
+      },
     },
     health: {
       score: 0.83,
       state: 'stable',
       trend: 'declining',
+      reason: 'Compressor loading remains elevated against the comfort posture.',
+      asset_class: 'chiller',
+      criticality: 'high',
     },
     alert_text: 'Cooling resilience is degrading across the executive zone.',
     reasoning_summary: 'Thermal runway and occupancy load are converging on the boardroom cluster.',
@@ -54,9 +65,20 @@ it('maps active intelligence payloads into a cockpit state', () => {
   expect(state.severity.riskBand).toBe('critical')
   expect(state.severity.thresholdReason).toBe('Thermal drift is above the configured critical threshold.')
   expect(state.severity.policySource).toBe('global.settings')
+  expect(state.severity.policyLevel).toBe('site_asset_criticality')
+  expect(state.severity.constraintType).toBe('comfort')
+  expect(state.severity.timeToConstraintBreachMin).toBe(12)
+  expect(state.severity.affectedScope).toEqual({
+    zones: ['Zone-L2-Boardroom'],
+    assets: ['S002-CHILLER-B1-001'],
+    occupantsEstimate: 18,
+  })
   expect(state.severity.healthScore).toBe(83)
   expect(state.severity.healthState).toBe('stable')
   expect(state.severity.healthTrend).toBe('declining')
+  expect(state.severity.healthReason).toBe('Compressor loading remains elevated against the comfort posture.')
+  expect(state.severity.assetClass).toBe('chiller')
+  expect(state.severity.criticality).toBe('high')
   expect(state.visualTwin.focusFloorId).toBe('L2')
   expect(state.visualTwin.motionProfile).toBe('alert')
   expect(state.visualTwin.zoneSignals[0]?.zoneId).toBe('Zone-L2-Boardroom')
@@ -71,6 +93,14 @@ it('uses backend-resolved risk semantics before frontend threshold fallback', ()
     band: 'medium',
     reason: 'Backend policy resolved this as medium risk for the current rollout.',
     policy_source: 'site-002.office.default',
+    policy_level: 'site',
+    constraint_type: 'comfort',
+    time_to_constraint_breach_min: 22,
+    affected_scope: {
+      zones: ['Zone-L2-Boardroom'],
+      assets: ['S002-CHILLER-B1-001'],
+      occupants_estimate: 18,
+    },
   }
 
   const state = mapCockpitState(summary, payload)
@@ -79,6 +109,8 @@ it('uses backend-resolved risk semantics before frontend threshold fallback', ()
   expect(state.primaryMetric.tone).toBe('warning')
   expect(state.severity.thresholdReason).toBe('Backend policy resolved this as medium risk for the current rollout.')
   expect(state.severity.policySource).toBe('site-002.office.default')
+  expect(state.severity.policyLevel).toBe('site')
+  expect(state.severity.timeToConstraintBreachMin).toBe(22)
 })
 
 it('uses threshold policy instead of hardcoded urgency bands when backend risk is absent', () => {
@@ -98,6 +130,8 @@ it('uses threshold policy instead of hardcoded urgency bands when backend risk i
   expect(state.primaryMetric.tone).toBe('elevated')
   expect(state.severity.thresholdReason).toContain('high threshold of 70')
   expect(state.severity.policySource).toBe('settings')
+  expect(state.severity.policyLevel).toBeNull()
+  expect(state.severity.constraintType).toBeNull()
   expect(state.visualTwin.floors.find((floor) => floor.id === 'L2')?.level).toBe('approaching')
 })
 
@@ -112,4 +146,5 @@ it('produces a stable quiet-state cockpit when there is no active payload', () =
   expect(state.visualTwin.zoneSignals).toHaveLength(0)
   expect(state.visualTwin.floors.every((floor) => floor.level === 'stable')).toBe(true)
   expect(state.severity.healthScore).not.toBeNull()
+  expect(state.severity.affectedScope).toBeNull()
 })
