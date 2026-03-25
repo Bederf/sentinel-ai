@@ -19,6 +19,9 @@ const DEFAULT_RATE_LIMIT_COOLDOWN_MS = 30000;
 const DEFAULT_GET_CACHE_TTL_MS = 30000;
 const SITES_CACHE_KEY = "sentinel_cached_sites";
 
+export type ApiPrimitive = string | number | boolean | null;
+export type ApiValue = ApiPrimitive | ApiValue[] | { [key: string]: ApiValue };
+
 // Re-export solar configuration API/types for legacy imports.
 export type {
   SolarPlant,
@@ -136,6 +139,79 @@ function notifyAuthExpired(): void {
   window.dispatchEvent(new Event(AUTH_EXPIRED_EVENT));
 }
 
+function buildJsonAuthHeaders(token: string | null, headers?: HeadersInit): HeadersInit {
+  return {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...headers,
+  };
+}
+
+async function performAuthorizedFetch(
+  url: string,
+  options?: RequestInit,
+  tokenOverride?: string | null
+): Promise<Response> {
+  const token = tokenOverride ?? getAccessToken();
+  return performFetchWithLimits(url, {
+    ...options,
+    headers: buildJsonAuthHeaders(token, options?.headers),
+  });
+}
+
+function isSafeRequestMethod(method?: string): boolean {
+  const requestMethod = (method || "GET").toUpperCase();
+  return requestMethod === "GET" || requestMethod === "HEAD" || requestMethod === "OPTIONS";
+}
+
+function getCachedGetResponse(dedupeKey: string): Response | null {
+  const cachedEntry = cachedGetResponses.get(dedupeKey);
+  if (!cachedEntry || cachedEntry.expiresAt <= Date.now()) {
+    return null;
+  }
+  return cachedEntry.response.clone();
+}
+
+function applyRateLimitCooldown(bucket: string, response: Response): void {
+  if (response.status !== 429) return;
+  const retryAfterMs = getRetryAfterMs(response) ?? DEFAULT_RATE_LIMIT_COOLDOWN_MS;
+  rateLimitedUntilByBucket.set(bucket, Date.now() + retryAfterMs);
+}
+
+async function retryUnauthorizedRequest(url: string, options?: RequestInit): Promise<Response | null> {
+  const refreshedToken = await tryRefreshAccessToken();
+  if (!refreshedToken) {
+    clearAuthStorage();
+    notifyAuthExpired();
+    return null;
+  }
+
+  return performAuthorizedFetch(url, options, refreshedToken);
+}
+
+async function retryRateLimitedSafeRequest(
+  response: Response,
+  url: string,
+  options: RequestInit | undefined,
+  allowRetry: boolean,
+  rateLimitRetryCount: number
+): Promise<Response | null> {
+  if (
+    response.status !== 429 ||
+    !isSafeRequestMethod(options?.method) ||
+    rateLimitRetryCount >= MAX_RATE_LIMIT_RETRIES
+  ) {
+    return null;
+  }
+
+  const retryAfterMs = getRetryAfterMs(response);
+  const fallbackDelayMs = BASE_RATE_LIMIT_DELAY_MS * (2 ** rateLimitRetryCount);
+  const jitterMs = Math.floor(Math.random() * 200);
+  await sleep((retryAfterMs ?? fallbackDelayMs) + jitterMs);
+
+  return fetchWithAuthRetry(url, options, allowRetry, rateLimitRetryCount + 1);
+}
+
 async function tryRefreshAccessToken(): Promise<string | null> {
   const refreshToken = getRefreshToken();
   if (!refreshToken) return null;
@@ -170,90 +246,49 @@ async function fetchWithAuthRetry(
   allowRetry: boolean = true,
   rateLimitRetryCount: number = 0
 ): Promise<Response> {
-  const token = getAccessToken();
-  const response = await performFetchWithLimits(url, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...options?.headers,
-    },
-  });
+  const response = await performAuthorizedFetch(url, options);
 
   const isRefreshEndpoint = url.includes("/api/auth/refresh");
   if (response.status === 401 && allowRetry && !isRefreshEndpoint) {
-    const refreshedToken = await tryRefreshAccessToken();
-    if (refreshedToken) {
-      return performFetchWithLimits(url, {
-        ...options,
-        headers: {
-          "Content-Type": "application/json",
-          ...(refreshedToken ? { Authorization: `Bearer ${refreshedToken}` } : {}),
-          ...options?.headers,
-        },
-      });
+    const refreshedResponse = await retryUnauthorizedRequest(url, options);
+    if (refreshedResponse) {
+      return refreshedResponse;
     }
-
-    clearAuthStorage();
-    notifyAuthExpired();
   }
 
-  const requestMethod = (options?.method || "GET").toUpperCase();
-  const isSafeMethod = requestMethod === "GET" || requestMethod === "HEAD" || requestMethod === "OPTIONS";
-  if (
-    response.status === 429 &&
-    isSafeMethod &&
-    rateLimitRetryCount < MAX_RATE_LIMIT_RETRIES
-  ) {
-    const retryAfterMs = getRetryAfterMs(response);
-    const fallbackDelayMs = BASE_RATE_LIMIT_DELAY_MS * (2 ** rateLimitRetryCount);
-    const jitterMs = Math.floor(Math.random() * 200);
-    await sleep((retryAfterMs ?? fallbackDelayMs) + jitterMs);
-
-    return fetchWithAuthRetry(url, options, allowRetry, rateLimitRetryCount + 1);
+  const retriedRateLimitedResponse = await retryRateLimitedSafeRequest(
+    response,
+    url,
+    options,
+    allowRetry,
+    rateLimitRetryCount
+  );
+  if (retriedRateLimitedResponse) {
+    return retriedRateLimitedResponse;
   }
 
   return response;
 }
 
-export async function authorizedFetch(
-  endpoint: string,
-  options?: RequestInit,
-  absoluteUrl: boolean = false
-): Promise<Response> {
+function getAuthorizedRequestContext(endpoint: string, options?: RequestInit, absoluteUrl?: boolean) {
   const url = absoluteUrl ? endpoint : `${API_BASE_URL}${endpoint}`;
-  const bucket = getRateLimitBucket(url);
   const method = (options?.method || "GET").toUpperCase();
   const canDeduplicateGet = method === "GET" && (!options?.body || options.body === undefined);
-  const dedupeKey = `${method}:${url}`;
+  return {
+    bucket: getRateLimitBucket(url),
+    canDeduplicateGet,
+    dedupeKey: `${method}:${url}`,
+    url,
+  };
+}
 
-  if (canDeduplicateGet) {
-    const cachedEntry = cachedGetResponses.get(dedupeKey);
-    if (cachedEntry && cachedEntry.expiresAt > Date.now()) {
-      return cachedEntry.response.clone();
-    }
-  }
+async function fetchWithoutGetDedup(bucket: string, url: string, options?: RequestInit): Promise<Response> {
+  const response = await fetchWithAuthRetry(url, options, true);
+  applyRateLimitCooldown(bucket, response);
+  return response;
+}
 
-  const rateLimitedUntil = rateLimitedUntilByBucket.get(bucket);
-  if (rateLimitedUntil && rateLimitedUntil > Date.now()) {
-    if (canDeduplicateGet) {
-      const cachedEntry = cachedGetResponses.get(dedupeKey);
-      if (cachedEntry && cachedEntry.expiresAt > Date.now()) {
-        return cachedEntry.response.clone();
-      }
-    }
-    return createClientRateLimitResponse(bucket);
-  }
-
-  if (!canDeduplicateGet) {
-    const response = await fetchWithAuthRetry(url, options, true);
-    if (response.status === 429) {
-      const retryAfterMs = getRetryAfterMs(response) ?? DEFAULT_RATE_LIMIT_COOLDOWN_MS;
-      rateLimitedUntilByBucket.set(bucket, Date.now() + retryAfterMs);
-    }
-    return response;
-  }
-
+async function fetchWithGetDedup(bucket: string, dedupeKey: string, url: string, options?: RequestInit): Promise<Response> {
   const existing = inFlightGetRequests.get(dedupeKey);
   if (existing) {
     return existing.then((response) => response.clone());
@@ -264,13 +299,9 @@ export async function authorizedFetch(
 
   try {
     const response = await requestPromise;
+    applyRateLimitCooldown(bucket, response);
     if (response.status === 429) {
-      const retryAfterMs = getRetryAfterMs(response) ?? DEFAULT_RATE_LIMIT_COOLDOWN_MS;
-      rateLimitedUntilByBucket.set(bucket, Date.now() + retryAfterMs);
-      const cachedEntry = cachedGetResponses.get(dedupeKey);
-      if (cachedEntry && cachedEntry.expiresAt > Date.now()) {
-        return cachedEntry.response.clone();
-      }
+      return getCachedGetResponse(dedupeKey) ?? response;
     }
     if (response.ok) {
       cachedGetResponses.set(dedupeKey, {
@@ -282,6 +313,40 @@ export async function authorizedFetch(
   } finally {
     inFlightGetRequests.delete(dedupeKey);
   }
+}
+
+export async function authorizedFetch(
+  endpoint: string,
+  options?: RequestInit,
+  absoluteUrl: boolean = false
+): Promise<Response> {
+  const { bucket, canDeduplicateGet, dedupeKey, url } = getAuthorizedRequestContext(
+    endpoint,
+    options,
+    absoluteUrl
+  );
+
+  if (canDeduplicateGet) {
+    const cachedResponse = getCachedGetResponse(dedupeKey);
+    if (cachedResponse) {
+      return cachedResponse;
+    }
+  }
+
+  const rateLimitedUntil = rateLimitedUntilByBucket.get(bucket);
+  if (rateLimitedUntil && rateLimitedUntil > Date.now()) {
+    const cachedResponse = canDeduplicateGet ? getCachedGetResponse(dedupeKey) : null;
+    if (cachedResponse) {
+      return cachedResponse;
+    }
+    return createClientRateLimitResponse(bucket);
+  }
+
+  if (!canDeduplicateGet) {
+    return fetchWithoutGetDedup(bucket, url, options);
+  }
+
+  return fetchWithGetDedup(bucket, dedupeKey, url, options);
 }
 
 // ============= Response Interfaces =============
@@ -378,7 +443,12 @@ export interface BuildingEquipmentItem {
   location: string;
   site_id: string;
   site_name: string;
-  details: Record<string, any>;
+  details: Record<string, unknown> & {
+    install_date?: string;
+    last_service?: string;
+    manufacturer?: string;
+    model?: string;
+  };
   controllable: boolean;
   health_factors?: {
     age?: HealthFactor;
@@ -613,6 +683,7 @@ export interface DevicePoint {
   current_value?: number | boolean; // Actual current value from device adapter
   writable: boolean;
   priority?: number;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metadata?: Record<string, any>;
 }
 
@@ -629,7 +700,7 @@ export interface Device {
   manufacturer?: string;
   model?: string;
   points: Record<string, DevicePoint>;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   // Status properties
   status?: "online" | "offline" | "maintenance";
   safety_status?: "safe" | "warning" | "critical" | "unknown";
@@ -676,7 +747,9 @@ export interface AuditEntry {
   device_name: string;
   action: string;
   point: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   old_value: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   new_value: any;
   user: string;
   success: boolean;
@@ -691,12 +764,16 @@ export interface AuditLogEntryResponse {
   user: string;
   device_id?: string;
   point_name?: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   old_value?: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   new_value?: any;
   result: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   safety_validation?: Record<string, any>;
   error_message?: string;
   correlation_id?: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metadata: Record<string, any>;
 }
 
@@ -706,7 +783,7 @@ export interface DeviceSafetyStatus {
   device_name: string;
   overall_status: 'safe' | 'warning' | 'blocked' | 'alarm' | 'unknown';
   point_statuses: Record<string, {
-    value: any;
+    value: unknown;
     allowed: boolean;
     warnings: string[];
     alarms: string[];
@@ -1073,9 +1150,9 @@ export interface SafetyRule {
   trigger_device_id?: string;
   trigger_device_type?: string;
   trigger_point?: string;
-  trigger_value?: any;
+  trigger_value?: unknown;
   action?: string;
-  action_value?: any;
+  action_value?: unknown;
   min_value?: number;
   max_value?: number;
   validation_logic?: string;
@@ -1092,8 +1169,8 @@ export interface SafetyRulesResponse {
 export interface Settings {
   healthThresholds: HealthThresholds;
   riskThresholds: RiskThresholds;
-  notifications: Record<string, any>;
-  display: Record<string, any>;
+  notifications: Record<string, unknown>;
+  display: Record<string, unknown>;
 }
 
 // Energy data point interface
@@ -1235,6 +1312,53 @@ async function fetchApi<T>(
   return response.json();
 }
 
+function emitSseEventData(eventDataLines: string[], onChunk: (chunk: string) => void): string[] {
+  if (eventDataLines.length === 0) {
+    return eventDataLines;
+  }
+
+  onChunk(eventDataLines.join("\n"));
+  return [];
+}
+
+async function streamSseBody(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  onChunk: (chunk: string) => void
+): Promise<void> {
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let eventDataLines: string[] = [];
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || "";
+
+    for (const line of lines) {
+      if (line.startsWith("data: ")) {
+        const data = line.slice(6);
+        if (data === "[DONE]") {
+          return;
+        }
+        eventDataLines.push(data);
+      } else if (line === "") {
+        eventDataLines = emitSseEventData(eventDataLines, onChunk);
+      }
+    }
+  }
+
+  eventDataLines = emitSseEventData(eventDataLines, onChunk);
+  if (buffer.startsWith("data: ")) {
+    const data = buffer.slice(6);
+    if (data && data !== "[DONE]") {
+      onChunk(data);
+    }
+  }
+}
+
 /**
  * Stream chat response using Server-Sent Events
  *
@@ -1279,56 +1403,8 @@ export async function streamChat(
   }
 
   const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = ""; // Buffer for incomplete lines across chunk boundaries
-  let eventDataLines: string[] = []; // Collect data lines for current SSE event
-
   try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      // Decode the chunk and append to buffer
-      buffer += decoder.decode(value, { stream: true });
-
-      // Process complete lines from buffer
-      const lines = buffer.split("\n");
-      // Keep the last (potentially incomplete) line in the buffer
-      buffer = lines.pop() || "";
-
-      for (const line of lines) {
-        if (line.startsWith("data: ")) {
-          const data = line.slice(6); // Remove "data: " prefix
-
-          // Check for completion sentinel
-          if (data === "[DONE]") {
-            return;
-          }
-
-          // Collect data line for this event
-          // SSE spec: consecutive "data:" lines are joined with newlines
-          eventDataLines.push(data);
-        } else if (line === "" && eventDataLines.length > 0) {
-          // Empty line marks end of SSE event
-          // Join all collected data lines with newlines and emit
-          const eventData = eventDataLines.join("\n");
-          onChunk(eventData);
-          eventDataLines = [];
-        }
-      }
-    }
-
-    // Process any remaining data
-    if (eventDataLines.length > 0) {
-      const eventData = eventDataLines.join("\n");
-      onChunk(eventData);
-    }
-    if (buffer.startsWith("data: ")) {
-      const data = buffer.slice(6);
-      if (data && data !== "[DONE]") {
-        onChunk(data);
-      }
-    }
+    await streamSseBody(reader, onChunk);
   } finally {
     reader.releaseLock();
   }
@@ -1820,9 +1896,9 @@ export const api = {
    */
   async analyzeOptimization(
     siteId: string,
-    currentConditions?: Record<string, any>
-  ): Promise<{ recommendation: OptimizationRecommendation; validation: any }> {
-    const body: Record<string, any> = { site_id: siteId };
+    currentConditions?: Record<string, unknown>
+  ): Promise<{ recommendation: OptimizationRecommendation; validation: Record<string, unknown> }> {
+    const body: Record<string, unknown> = { site_id: siteId };
     if (currentConditions) {
       body.current_conditions = currentConditions;
     }
@@ -1842,7 +1918,7 @@ export const api = {
     siteId: string,
     recommendationId: string,
     setpointsToApply: Array<{ device_id?: string; equipment_id?: string; point_name?: string; point?: string; value: number }>
-  ): Promise<{ success: boolean; results: any[] }> {
+  ): Promise<{ success: boolean; results: Array<Record<string, ApiValue>> }> {
     // Validate setpoints array is not empty
     if (!setpointsToApply || setpointsToApply.length === 0) {
       throw new Error("Cannot approve optimization: no setpoints to apply");
@@ -1915,7 +1991,7 @@ export const api = {
   async startPrecooling(
     siteId: string,
     scenarioId?: string
-  ): Promise<{ success: boolean; status: string; started_at: string; actions: any[]; message: string }> {
+  ): Promise<{ success: boolean; status: string; started_at: string; actions: Array<Record<string, ApiValue>>; message: string }> {
     return fetchApi(`/api/optimization/precooling/${siteId}/start`, {
       method: "POST",
       body: JSON.stringify({ scenario_id: scenarioId }),
@@ -1936,7 +2012,7 @@ export const api = {
    * Get pre-cooling status for a site
    * @param siteId - Site ID
    */
-  async getPrecoolingStatus(siteId: string): Promise<{ status: string; started_at?: string; actions?: any[] }> {
+  async getPrecoolingStatus(siteId: string): Promise<{ status: string; started_at?: string; actions?: Array<Record<string, ApiValue>> }> {
     try {
       return await fetchApi(`/api/optimization/precooling/${siteId}/status`);
     } catch (error) {
@@ -2223,7 +2299,10 @@ export const api = {
       id: entry.id,
       timestamp: typeof entry.timestamp === 'string' ? entry.timestamp : new Date(entry.timestamp).toISOString(),
       device_id: entry.device_id || "unknown",
-      device_name: entry.metadata?.device_name || entry.device_id || "Unknown Device",
+      device_name:
+        typeof entry.metadata?.device_name === "string"
+          ? entry.metadata.device_name
+          : entry.device_id || "Unknown Device",
       action: entry.action,
       point: entry.point_name || "",
       old_value: entry.old_value,
@@ -2428,7 +2507,7 @@ export const api = {
     limit?: number;
     device_id?: string;
     status?: string;
-  }): Promise<{ data: any[] }> {
+  }): Promise<{ data: AutonomousDecisionRecord[] }> {
     const queryParams = new URLSearchParams();
     if (params?.limit) queryParams.append("limit", params.limit.toString());
     if (params?.device_id) queryParams.append("device_id", params.device_id);
@@ -2441,6 +2520,7 @@ export const api = {
    * Get current boundary status
    * @param deviceId - Optional specific device ID
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async getBoundaryStatus(deviceId?: string): Promise<{ data: any }> {
     const url = deviceId
       ? `/api/autonomous/boundaries?device_id=${deviceId}`
@@ -2452,7 +2532,7 @@ export const api = {
   /**
    * Get escalation alerts
    */
-  async getEscalationAlerts(): Promise<{ data: any[] }> {
+  async getEscalationAlerts(): Promise<{ data: EscalationAlertRecord[] }> {
     return fetchApi(`/api/autonomous/escalation/status`);
   },
 
@@ -2482,7 +2562,7 @@ export const api = {
   async emergencyStop(): Promise<{
     success: boolean;
     emergency_id: string;
-    actions_taken: any[];
+    actions_taken: Array<Record<string, unknown>>;
     response_time_seconds: number;
     devices_affected: number;
     message: string;
@@ -2500,7 +2580,7 @@ export const api = {
   async testEscalation(
     deviceId: string,
     escalationLevel: number
-  ): Promise<{ success: boolean; escalation_event: any; notifications_sent: any }> {
+  ): Promise<{ success: boolean; escalation_event: EscalationAlertRecord; notifications_sent: Record<string, unknown> }> {
     return fetchApi(`/api/safety/escalation/test`, {
       method: "POST",
       body: JSON.stringify({
@@ -2517,7 +2597,7 @@ export const api = {
    */
   async updateBoundary(
     deviceId: string,
-    config: any
+    config: Record<string, unknown>
   ): Promise<{ success: boolean; message: string; cancelled_decisions?: number; mode?: string }> {
     return fetchApi(`/api/autonomous/boundaries/update`, {
       method: "POST",
@@ -2557,7 +2637,7 @@ export const api = {
     faultCode: string,
     model?: string,
     equipmentType?: string
-  ): Promise<any> {
+  ): Promise<Record<string, ApiValue>> {
     const params = new URLSearchParams();
     params.append("manufacturer", manufacturer);
     params.append("fault_code", faultCode);
@@ -2578,7 +2658,7 @@ export const api = {
     partDescription?: string,
     manufacturer?: string,
     includeAlternatives: boolean = true
-  ): Promise<any[]> {
+  ): Promise<Array<Record<string, ApiValue>>> {
     const params = new URLSearchParams();
     if (partNumber) params.append("part_number", partNumber);
     if (partDescription) params.append("part_description", partDescription);
@@ -2597,7 +2677,7 @@ export const api = {
     query: string,
     manufacturer?: string,
     model?: string
-  ): Promise<any> {
+  ): Promise<Record<string, ApiValue>> {
     const params = new URLSearchParams();
     params.append("query", query);
     if (manufacturer) params.append("manufacturer", manufacturer);
@@ -2680,8 +2760,8 @@ export interface ChecklistItem {
   name: string;
   description: string;
   status: 'pass' | 'fail' | 'warning' | 'not_checked';
-  value?: any;
-  threshold?: any;
+  value?: unknown;
+  threshold?: unknown;
   details?: string;
 }
 
@@ -2765,7 +2845,7 @@ export interface FormatDetectionResult {
   confidence: number;
   suggested_mappings: Record<string, string>;
   row_count: number;
-  sample_data?: Array<Record<string, any>>;
+  sample_data?: Array<Record<string, unknown>>;
 }
 
 export interface ColumnMapping {
@@ -3550,7 +3630,7 @@ export interface InspectionTaskItem {
   completed_date?: string;
   estimated_duration_minutes: number;
   actual_duration_minutes?: number;
-  checklist_data?: any;  // Template and responses
+  checklist_data?: unknown;  // Template and responses
   deficiencies_found?: number;
   completion_notes?: string;
   created_at: string;
@@ -3593,11 +3673,157 @@ export interface InspectionPhotoAttachment {
 export interface InspectionSubmissionRequest {
   equipment_id: string;
   template_id: string;
-  checklist_responses: Record<string, any>;
+  checklist_responses: Record<string, unknown>;
   photos: InspectionPhotoAttachment[];
   duration_minutes: number;
   notes?: string;
   submitted_by?: string;
+}
+
+const EMBEDDED_CHECKLIST_TEMPLATES: Record<string, ChecklistTemplateItem> = {
+  chiller_weekly: {
+    template_id: "chiller_weekly",
+    equipment_type: "chiller",
+    template_name: "Weekly Chiller Inspection",
+    inspection_type: "routine",
+    estimated_duration_minutes: 30,
+    checklist_items: [
+      {
+        category: "Compressor",
+        item_id: "compressor_condition",
+        question: "Compressor operating condition",
+        item_type: "checklist",
+        options: [
+          { label: "Normal", value: "ok" },
+          { label: "Abnormal noise/vibration", value: "warning" },
+          { label: "Not operating", value: "critical" },
+        ],
+        required: true,
+        photos_required: false,
+      },
+      {
+        category: "Refrigerant",
+        item_id: "refrigerant_pressure",
+        question: "Refrigerant pressure (bar)",
+        item_type: "measurement",
+        parameter_name: "refrigerant_pressure",
+        unit: "bar",
+        tolerance_min: 8,
+        tolerance_max: 15,
+        required: true,
+        photos_required: false,
+      },
+      {
+        category: "Oil System",
+        item_id: "oil_level",
+        question: "Oil level condition",
+        item_type: "checklist",
+        options: [
+          { label: "Normal", value: "ok" },
+          { label: "Low", value: "warning" },
+          { label: "Critical", value: "critical" },
+        ],
+        required: true,
+        photos_required: false,
+      },
+    ],
+  },
+  ahu_weekly: {
+    template_id: "ahu_weekly",
+    equipment_type: "ahu",
+    template_name: "Weekly AHU Inspection",
+    inspection_type: "routine",
+    estimated_duration_minutes: 25,
+    checklist_items: [
+      {
+        category: "Filters",
+        item_id: "filter_condition",
+        question: "Filter condition",
+        item_type: "checklist",
+        options: [
+          { label: "Clean", value: "ok" },
+          { label: "Moderately dirty", value: "warning" },
+          { label: "Blocked/Replace required", value: "critical" },
+        ],
+        required: true,
+        photos_required: true,
+      },
+      {
+        category: "Fan",
+        item_id: "fan_vibration",
+        question: "Fan vibration (mm/s)",
+        item_type: "measurement",
+        parameter_name: "fan_vibration",
+        unit: "mm/s",
+        tolerance_min: 0,
+        tolerance_max: 4.5,
+        required: true,
+        photos_required: false,
+      },
+    ],
+  },
+  generator_weekly: {
+    template_id: "generator_weekly",
+    equipment_type: "generator",
+    template_name: "Weekly Generator Inspection",
+    inspection_type: "routine",
+    estimated_duration_minutes: 35,
+    checklist_items: [
+      {
+        category: "Engine",
+        item_id: "engine_oil_level",
+        question: "Engine oil level",
+        item_type: "checklist",
+        options: [
+          { label: "Full", value: "ok" },
+          { label: "Low - top up required", value: "warning" },
+          { label: "Critical - do not start", value: "critical" },
+        ],
+        required: true,
+        photos_required: false,
+      },
+      {
+        category: "Fuel",
+        item_id: "fuel_level_percent",
+        question: "Fuel tank level (%)",
+        item_type: "measurement",
+        parameter_name: "fuel_level_percent",
+        unit: "%",
+        tolerance_min: 25,
+        tolerance_max: 100,
+        required: true,
+        photos_required: false,
+      },
+    ],
+  },
+};
+
+function buildGenericChecklistTemplate(
+  equipmentType: string,
+  inspectionType: string
+): ChecklistTemplateItem {
+  return {
+    template_id: `${equipmentType}_generic`,
+    equipment_type: equipmentType,
+    template_name: `${equipmentType.charAt(0).toUpperCase() + equipmentType.slice(1)} Inspection`,
+    inspection_type: inspectionType,
+    estimated_duration_minutes: 20,
+    checklist_items: [
+      {
+        category: "General",
+        item_id: "general_condition",
+        question: "Overall equipment condition",
+        item_type: "checklist",
+        options: [
+          { label: "Good", value: "ok" },
+          { label: "Fair - monitor", value: "warning" },
+          { label: "Poor - attention needed", value: "critical" },
+        ],
+        required: true,
+        photos_required: false,
+      },
+    ],
+  };
 }
 
 // Inspection history response with trending
@@ -3662,156 +3888,7 @@ export const inspectionApi = {
    * @param inspectionType - Inspection type (default: routine)
    */
   getChecklistTemplate: async (equipmentType: string, inspectionType: string = 'routine'): Promise<ChecklistTemplateItem> => {
-    // Embedded templates for offline/fast access
-    // In production, could fetch from backend: /api/inspection/templates/{type}
-    const templates: Record<string, ChecklistTemplateItem> = {
-      'chiller_weekly': {
-        template_id: 'chiller_weekly',
-        equipment_type: 'chiller',
-        template_name: 'Weekly Chiller Inspection',
-        inspection_type: 'routine',
-        estimated_duration_minutes: 30,
-        checklist_items: [
-          {
-            category: 'Compressor',
-            item_id: 'compressor_condition',
-            question: 'Compressor operating condition',
-            item_type: 'checklist',
-            options: [
-              { label: 'Normal', value: 'ok' },
-              { label: 'Abnormal noise/vibration', value: 'warning' },
-              { label: 'Not operating', value: 'critical' }
-            ],
-            required: true,
-            photos_required: false
-          },
-          {
-            category: 'Refrigerant',
-            item_id: 'refrigerant_pressure',
-            question: 'Refrigerant pressure (bar)',
-            item_type: 'measurement',
-            parameter_name: 'refrigerant_pressure',
-            unit: 'bar',
-            tolerance_min: 8,
-            tolerance_max: 15,
-            required: true,
-            photos_required: false
-          },
-          {
-            category: 'Oil System',
-            item_id: 'oil_level',
-            question: 'Oil level condition',
-            item_type: 'checklist',
-            options: [
-              { label: 'Normal', value: 'ok' },
-              { label: 'Low', value: 'warning' },
-              { label: 'Critical', value: 'critical' }
-            ],
-            required: true,
-            photos_required: false
-          }
-        ]
-      },
-      'ahu_weekly': {
-        template_id: 'ahu_weekly',
-        equipment_type: 'ahu',
-        template_name: 'Weekly AHU Inspection',
-        inspection_type: 'routine',
-        estimated_duration_minutes: 25,
-        checklist_items: [
-          {
-            category: 'Filters',
-            item_id: 'filter_condition',
-            question: 'Filter condition',
-            item_type: 'checklist',
-            options: [
-              { label: 'Clean', value: 'ok' },
-              { label: 'Moderately dirty', value: 'warning' },
-              { label: 'Blocked/Replace required', value: 'critical' }
-            ],
-            required: true,
-            photos_required: true
-          },
-          {
-            category: 'Fan',
-            item_id: 'fan_vibration',
-            question: 'Fan vibration (mm/s)',
-            item_type: 'measurement',
-            parameter_name: 'fan_vibration',
-            unit: 'mm/s',
-            tolerance_min: 0,
-            tolerance_max: 4.5,
-            required: true,
-            photos_required: false
-          }
-        ]
-      },
-      'generator_weekly': {
-        template_id: 'generator_weekly',
-        equipment_type: 'generator',
-        template_name: 'Weekly Generator Inspection',
-        inspection_type: 'routine',
-        estimated_duration_minutes: 35,
-        checklist_items: [
-          {
-            category: 'Engine',
-            item_id: 'engine_oil_level',
-            question: 'Engine oil level',
-            item_type: 'checklist',
-            options: [
-              { label: 'Full', value: 'ok' },
-              { label: 'Low - top up required', value: 'warning' },
-              { label: 'Critical - do not start', value: 'critical' }
-            ],
-            required: true,
-            photos_required: false
-          },
-          {
-            category: 'Fuel',
-            item_id: 'fuel_level_percent',
-            question: 'Fuel tank level (%)',
-            item_type: 'measurement',
-            parameter_name: 'fuel_level_percent',
-            unit: '%',
-            tolerance_min: 25,
-            tolerance_max: 100,
-            required: true,
-            photos_required: false
-          }
-        ]
-      }
-    };
-
-    const key = `${equipmentType}_weekly`;
-    const template = templates[key];
-
-    if (!template) {
-      // Return a generic template if specific one not found
-      return {
-        template_id: `${equipmentType}_generic`,
-        equipment_type: equipmentType,
-        template_name: `${equipmentType.charAt(0).toUpperCase() + equipmentType.slice(1)} Inspection`,
-        inspection_type: inspectionType,
-        estimated_duration_minutes: 20,
-        checklist_items: [
-          {
-            category: 'General',
-            item_id: 'general_condition',
-            question: 'Overall equipment condition',
-            item_type: 'checklist',
-            options: [
-              { label: 'Good', value: 'ok' },
-              { label: 'Fair - monitor', value: 'warning' },
-              { label: 'Poor - attention needed', value: 'critical' }
-            ],
-            required: true,
-            photos_required: false
-          }
-        ]
-      };
-    }
-
-    return template;
+    return EMBEDDED_CHECKLIST_TEMPLATES[`${equipmentType}_weekly`] ?? buildGenericChecklistTemplate(equipmentType, inspectionType);
   },
 
   /**
@@ -4148,6 +4225,67 @@ export interface OccupancyRecommendation {
   detail: string;
 }
 
+interface AutonomousDecisionRecord {
+  id: string;
+  timestamp: string;
+  device_id: string;
+  device_name: string;
+  point_name: string;
+  current_value: number;
+  target_value: number;
+  status: string;
+  decision_rationale: string;
+  execution_time_ms: number;
+  safety_score: number;
+  escalation_level: number;
+}
+
+interface EscalationAlertRecord {
+  id: string;
+  escalation_level: number;
+  device_id: string;
+  device_name: string;
+  point_name: string;
+  current_value: number;
+  boundary_value: number;
+  approach_percentage: number;
+  timestamp: string;
+  message: string;
+  acknowledged: boolean;
+}
+
+interface SecurityEventRecord {
+  access_point_id?: string;
+  card_id?: string;
+  event_id: string;
+  location?: string;
+  person_name?: string;
+  status?: string;
+  timestamp: string;
+}
+
+interface SecurityOccupancyRecommendationRecord {
+  action?: string;
+  description?: string;
+  estimated_savings?: string;
+  module?: string;
+  type?: string;
+  zone?: string;
+}
+
+interface SecurityAnomalyRecord {
+  type: string;
+  severity: "critical" | "warning" | "info";
+  badge_event?: {
+    person_name: string;
+    department?: string;
+    timestamp: string;
+  };
+  recommendation: string;
+  energy_impact?: string;
+  detected_at: string;
+}
+
 // ============= Security API Client =============
 
 export const securityApi = {
@@ -4201,10 +4339,10 @@ export const securityApi = {
     if (params?.after_hours) searchParams.set("after_hours", "true");
     const qs = searchParams.toString();
     try {
-      const response = await fetchApi<{ events: any[]; event_count: number }>(
+      const response = await fetchApi<{ events: SecurityEventRecord[]; event_count: number }>(
         `/api/security/events${qs ? `?${qs}` : ""}`
       );
-      const mapped: BadgeEvent[] = (response.events || []).map((event: any) => ({
+      const mapped: BadgeEvent[] = (response.events || []).map((event) => ({
         event_id: event.event_id,
         door_id: event.access_point_id || "unknown",
         zone_id: event.location || "unknown",
@@ -4327,7 +4465,7 @@ export const securityApi = {
   getOccupancyRecommendations: async (site: string) => {
     try {
       const response = await fetchApi<{
-        recommendations: Array<Record<string, any>>;
+        recommendations: SecurityOccupancyRecommendationRecord[];
         recommendation_count?: number;
         current_occupancy?: number;
         by_zone?: Record<string, number>;
@@ -4355,7 +4493,7 @@ export const securityApi = {
   /** Get detected security anomalies (24h default) */
   getAnomalies: async (site: string, daysBack = 1) => {
     try {
-      return await fetchApi<{ anomalies: any[]; anomaly_count: number }>(
+      return await fetchApi<{ anomalies: SecurityAnomalyRecord[]; anomaly_count: number }>(
         `/api/security/events/anomalies?site=${encodeURIComponent(site)}&days_back=${daysBack}`
       );
     } catch (_error) {
@@ -4441,20 +4579,20 @@ export const workflowApi = {
     const params = new URLSearchParams();
     if (equipmentId) params.set("equipment_id", equipmentId);
     const qs = params.toString();
-    return fetchApi<{ count: number; triggers: any[] }>(
+    return fetchApi<{ count: number; triggers: Array<Record<string, ApiValue>> }>(
       `/api/workflow/triggers/history${qs ? `?${qs}` : ""}`
     );
   },
 
   /** Get pending inspections for equipment */
   getPendingInspections: (equipmentId: string) =>
-    fetchApi<{ equipment_id: string; count: number; inspections: any[] }>(
+    fetchApi<{ equipment_id: string; count: number; inspections: Array<Record<string, ApiValue>> }>(
       `/api/workflow/triggers/inspections/${equipmentId}`
     ),
 
   /** Get pending work orders for equipment */
   getPendingWorkOrders: (equipmentId: string) =>
-    fetchApi<{ equipment_id: string; count: number; work_orders: any[] }>(
+    fetchApi<{ equipment_id: string; count: number; work_orders: Array<Record<string, ApiValue>> }>(
       `/api/workflow/triggers/work-orders/${equipmentId}`
     ),
 };
@@ -4501,7 +4639,7 @@ export interface FeedbackSessionStatus {
 export interface FeedbackItemResult {
   item_key: string;
   item_type: string;
-  value: any;
+  value: ApiValue;
   unit: string | null;
   baseline_value: number | null;
   deviation_percent: number | null;
@@ -4516,9 +4654,9 @@ export interface FeedbackCompletionResult {
   health_score_change: number;
   items_collected: number;
   feedback_summary: {
-    readings: any[];
-    attachments: any[];
-    observations: any[];
+    readings: Array<Record<string, ApiValue>>;
+    attachments: Array<Record<string, ApiValue>>;
+    observations: Array<Record<string, ApiValue>>;
     impact_counts: {
       positive: number;
       neutral: number;
@@ -4538,7 +4676,7 @@ export interface FeedbackTemplate {
   required_items: string[];
   optional_items: string[];
   prompts: Record<string, string>;
-  validation_rules: Record<string, any>;
+  validation_rules: Record<string, unknown>;
 }
 
 export const serviceFeedbackApi = {
@@ -4558,7 +4696,7 @@ export const serviceFeedbackApi = {
     fetchApi<FeedbackSessionStatus>(`/api/service-feedback/session/${sessionId}`),
 
   /** Submit a reading/measurement */
-  submitReading: (sessionId: string, itemKey: string, value: any, unit?: string, notes?: string) =>
+  submitReading: (sessionId: string, itemKey: string, value: unknown, unit?: string, notes?: string) =>
     fetchApi<FeedbackItemResult>(`/api/service-feedback/session/${sessionId}/reading`, {
       method: "POST",
       body: JSON.stringify({ item_key: itemKey, value, unit, notes }),
@@ -4587,14 +4725,14 @@ export const serviceFeedbackApi = {
     fetchApi<{
       equipment_types: string[];
       count: number;
-      templates: Record<string, any>;
+      templates: Record<string, unknown>;
     }>("/api/service-feedback/templates"),
 
   /** Get health impact rules */
   getHealthImpactRules: () =>
     fetchApi<{
       description: string;
-      impact_levels: Record<string, any>;
+      impact_levels: Record<string, unknown>;
       score_bounds: { min_change: number; max_change: number };
       health_status_thresholds: Record<string, string>;
     }>("/api/service-feedback/health-impact-rules"),
