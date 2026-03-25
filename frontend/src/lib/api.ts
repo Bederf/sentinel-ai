@@ -1042,6 +1042,12 @@ export interface HealthThresholds {
   critical: number;
 }
 
+export interface RiskThresholds {
+  medium: number;
+  high: number;
+  critical: number;
+}
+
 // Safety rule interface
 export interface SafetyRule {
   id: string;
@@ -1085,6 +1091,7 @@ export interface SafetyRulesResponse {
 // Settings interface
 export interface Settings {
   healthThresholds: HealthThresholds;
+  riskThresholds: RiskThresholds;
   notifications: Record<string, any>;
   display: Record<string, any>;
 }
@@ -2276,6 +2283,24 @@ export const api = {
    */
   async updateHealthThresholds(thresholds: HealthThresholds): Promise<HealthThresholds> {
     return fetchApi<HealthThresholds>("/api/settings/health-thresholds", {
+      method: "PUT",
+      body: JSON.stringify(thresholds),
+    });
+  },
+
+  /**
+   * Get risk score thresholds
+   */
+  async getRiskThresholds(): Promise<RiskThresholds> {
+    return fetchApi<RiskThresholds>("/api/settings/risk-thresholds");
+  },
+
+  /**
+   * Update risk score thresholds
+   * @param thresholds - Threshold values to update
+   */
+  async updateRiskThresholds(thresholds: RiskThresholds): Promise<RiskThresholds> {
+    return fetchApi<RiskThresholds>("/api/settings/risk-thresholds", {
       method: "PUT",
       body: JSON.stringify(thresholds),
     });

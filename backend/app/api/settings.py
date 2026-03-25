@@ -30,6 +30,7 @@ def load_settings() -> Dict[str, Any]:
         # Create default settings if file doesn't exist
         default_settings = {
             "healthThresholds": {"healthy": 90, "warning": 70, "critical": 0},
+            "riskThresholds": {"medium": 31, "high": 61, "critical": 81},
             "notifications": {},
             "display": {},
         }
@@ -91,6 +92,27 @@ async def update_all_settings(
         if "healthy" in thresholds and "warning" in thresholds:
             if thresholds["healthy"] <= thresholds["warning"]:
                 raise HTTPException(status_code=400, detail="healthy threshold must be greater than warning threshold")
+
+    if "riskThresholds" in settings_data:
+        thresholds = settings_data["riskThresholds"]
+        if not isinstance(thresholds, dict):
+            raise HTTPException(status_code=400, detail="riskThresholds must be an object")
+
+        for key in ["medium", "high", "critical"]:
+            if key in thresholds and not isinstance(thresholds[key], (int, float)):
+                raise HTTPException(status_code=400, detail=f"{key} risk threshold must be a number")
+
+        for key in ["medium", "high", "critical"]:
+            if key in thresholds:
+                value = thresholds[key]
+                if not (0 <= value <= 100):
+                    raise HTTPException(status_code=400, detail=f"{key} risk threshold must be between 0 and 100")
+
+        if "high" in thresholds and "medium" in thresholds and thresholds["high"] <= thresholds["medium"]:
+            raise HTTPException(status_code=400, detail="high risk threshold must be greater than medium threshold")
+
+        if "critical" in thresholds and "high" in thresholds and thresholds["critical"] <= thresholds["high"]:
+            raise HTTPException(status_code=400, detail="critical risk threshold must be greater than high threshold")
 
     # Merge with existing settings
     current_settings = load_settings()
@@ -242,6 +264,50 @@ async def update_health_thresholds(
     # Audit: CONFIG_CHANGE
     source_ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else None)
     audit_config_change("settings.health-thresholds", user=auth.user_id, source_ip=source_ip)
+
+    return thresholds
+
+
+@router.get("/settings/risk-thresholds")
+async def get_risk_thresholds(auth: AuthContext = Depends(require_role(1))) -> Dict[str, int]:
+    """Get risk score thresholds. Requires AUDITOR (level 1)."""
+    settings_data = load_settings()
+    return settings_data.get("riskThresholds", {"medium": 31, "high": 61, "critical": 81})
+
+
+@router.put("/settings/risk-thresholds")
+async def update_risk_thresholds(
+    thresholds: Dict[str, int],
+    request: Request,
+    auth: AuthContext = Depends(require_role(4)),
+) -> Dict[str, int]:
+    """Update risk score thresholds. Requires ADMIN (level 4)."""
+    required_fields = ["medium", "high", "critical"]
+    for field in required_fields:
+        if field not in thresholds:
+            raise HTTPException(status_code=400, detail=f"Missing required field: {field}")
+
+    for field in required_fields:
+        if not isinstance(thresholds[field], (int, float)):
+            raise HTTPException(status_code=400, detail=f"{field} must be a number")
+
+    for field in required_fields:
+        value = thresholds[field]
+        if not (0 <= value <= 100):
+            raise HTTPException(status_code=400, detail=f"{field} must be between 0 and 100")
+
+    if thresholds["high"] <= thresholds["medium"]:
+        raise HTTPException(status_code=400, detail="high threshold must be greater than medium threshold")
+
+    if thresholds["critical"] <= thresholds["high"]:
+        raise HTTPException(status_code=400, detail="critical threshold must be greater than high threshold")
+
+    current_settings = load_settings()
+    current_settings["riskThresholds"] = thresholds
+    save_settings(current_settings)
+
+    source_ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else None)
+    audit_config_change("settings.risk-thresholds", user=auth.user_id, source_ip=source_ip)
 
     return thresholds
 

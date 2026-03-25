@@ -1,10 +1,12 @@
 import { useState, useCallback, useEffect, memo } from "react";
 import { Settings as SettingsIcon, Bell, Monitor, Shield, Lock, Unlock, Zap, Gauge, Play, Square, Brain } from "lucide-react";
 import { useHealthThresholds } from "../hooks/useHealthThresholds";
+import { useRiskThresholds } from "../hooks/useRiskThresholds";
 import { useGlassTheme } from "../hooks/useGlassTheme";
 import { GLASS_PRESETS } from "../lib/settings";
 import { AUTH_EXPIRED_EVENT } from "../lib/api";
 import { ThresholdEditor } from "./ThresholdEditor";
+import { RiskThresholdEditor } from "./RiskThresholdEditor";
 import { SafetyRulesEditor } from "./SafetyRulesEditor";
 import { PasswordModal } from "./PasswordModal";
 import { NotificationSettings } from "./NotificationSettings";
@@ -91,7 +93,18 @@ const ADDON_TOGGLE_CARDS: FeatureToggleCard[] = [
 ];
 
 export const Settings = memo(function Settings({ siteId, onError, onNavigate }: SettingsProps) {
-  const { thresholds, loading, error, updateThresholds } = useHealthThresholds();
+  const {
+    thresholds: healthThresholds,
+    loading: healthThresholdLoading,
+    error: healthThresholdError,
+    updateThresholds: updateHealthThresholds,
+  } = useHealthThresholds();
+  const {
+    thresholds: riskThresholds,
+    loading: riskThresholdLoading,
+    error: riskThresholdError,
+    updateThresholds: updateRiskThresholds,
+  } = useRiskThresholds();
   const { data: buildings = [] } = useBuildingsList();
   const { isModuleActive, activateModule, deactivateModule, setSite: setModuleSite } = useModules();
   const [selectedSiteId, setSelectedSiteId] = useState<string | null>(siteId || null);
@@ -229,7 +242,7 @@ export const Settings = memo(function Settings({ siteId, onError, onNavigate }: 
     warning: number;
     critical: number;
   }) => {
-    const success = await updateThresholds(newThresholds);
+    const success = await updateHealthThresholds(newThresholds);
     if (success) {
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
@@ -238,11 +251,27 @@ export const Settings = memo(function Settings({ siteId, onError, onNavigate }: 
     }
   };
 
+  const handleSaveRiskThresholds = async (newThresholds: {
+    medium: number;
+    high: number;
+    critical: number;
+  }) => {
+    const success = await updateRiskThresholds(newThresholds);
+    if (success) {
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+    } else {
+      onError?.("Failed to update risk thresholds");
+    }
+  };
+
   const handleSiteChange = useCallback((nextSiteId: string | null) => {
     if (!nextSiteId) return;
     setSelectedSiteId(nextSiteId);
     setStoredSelectedSite(nextSiteId);
   }, []);
+
+  const loading = healthThresholdLoading || riskThresholdLoading;
 
   if (loading) {
     return (
@@ -405,7 +434,7 @@ export const Settings = memo(function Settings({ siteId, onError, onNavigate }: 
           </div>
 
           <div className="p-4">
-            {error ? (
+            {healthThresholdError ? (
               <div
                 className="p-4 rounded-md text-center"
                 style={{
@@ -417,10 +446,58 @@ export const Settings = memo(function Settings({ siteId, onError, onNavigate }: 
               </div>
             ) : (
               <ThresholdEditor
-                healthy={thresholds.healthy}
-                warning={thresholds.warning}
-                critical={thresholds.critical}
+                healthy={healthThresholds.healthy}
+                warning={healthThresholds.warning}
+                critical={healthThresholds.critical}
                 onSave={handleSaveThresholds}
+              />
+            )}
+          </div>
+        </div>
+
+        <div className="glass-panel overflow-hidden">
+          <div className="p-4 border-b" style={{ borderColor: "var(--color-sentinel-border)" }}>
+            <div className="flex items-center gap-3">
+              <div
+                className="p-2 rounded"
+                style={{
+                  background: "rgba(249, 115, 22, 0.15)",
+                  color: "#f97316",
+                }}
+              >
+                <Gauge className="h-5 w-5" />
+              </div>
+              <div>
+                <h2
+                  className="text-lg font-semibold"
+                  style={{ color: "var(--color-sentinel-text-primary)" }}
+                >
+                  Cockpit Risk Thresholds
+                </h2>
+                <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                  Configure how cockpit and heat map severity bands interpret risk scores
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-4">
+            {riskThresholdError ? (
+              <div
+                className="rounded-md p-4 text-center"
+                style={{
+                  background: "rgba(220, 38, 38, 0.15)",
+                  border: "1px solid rgba(220, 38, 38, 0.3)",
+                }}
+              >
+                <p style={{ color: "var(--color-sentinel-red)" }}>Failed to load risk thresholds</p>
+              </div>
+            ) : (
+              <RiskThresholdEditor
+                medium={riskThresholds.medium}
+                high={riskThresholds.high}
+                critical={riskThresholds.critical}
+                onSave={handleSaveRiskThresholds}
               />
             )}
           </div>

@@ -20,6 +20,14 @@ class HealthThresholdsUpdate(BaseModel):
     critical: int
 
 
+class RiskThresholdsUpdate(BaseModel):
+    """Risk threshold update model."""
+
+    medium: int
+    high: int
+    critical: int
+
+
 class SettingUpdate(BaseModel):
     """Generic setting update model."""
 
@@ -169,6 +177,80 @@ async def update_health_thresholds(thresholds: HealthThresholdsUpdate) -> Dict[s
     except Exception as e:
         logger.error(f"Error updating health thresholds: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to update health thresholds: {str(e)}")
+
+
+@router.get("/settings/risk-thresholds")
+async def get_risk_thresholds() -> Dict[str, int]:
+    """Get risk score thresholds from database.
+
+    Returns: {medium: 31, high: 61, critical: 81}
+    """
+    try:
+        supabase = get_supabase_client()
+        result = supabase.table("system_settings").select("value").eq("key", "risk_thresholds").execute()
+
+        if result.data:
+            return result.data[0]["value"]
+
+        logger.warning("Risk thresholds not found in database, using defaults")
+        return {"medium": 31, "high": 61, "critical": 81}
+
+    except Exception as e:
+        logger.error(f"Error loading risk thresholds: {e}")
+        return {"medium": 31, "high": 61, "critical": 81}
+
+
+@router.put("/settings/risk-thresholds")
+async def update_risk_thresholds(thresholds: RiskThresholdsUpdate) -> Dict[str, int]:
+    """Update risk score thresholds in database."""
+    for field in ["medium", "high", "critical"]:
+        value = getattr(thresholds, field)
+        if not (0 <= value <= 100):
+            raise HTTPException(status_code=400, detail=f"{field} must be between 0 and 100, got {value}")
+
+    if thresholds.high <= thresholds.medium:
+        raise HTTPException(
+            status_code=400,
+            detail=f"high threshold ({thresholds.high}) must be greater than medium threshold ({thresholds.medium})",
+        )
+
+    if thresholds.critical <= thresholds.high:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"critical threshold ({thresholds.critical}) must be greater than high threshold ({thresholds.high})"
+            ),
+        )
+
+    try:
+        supabase = get_supabase_client()
+
+        (
+            supabase.table("system_settings")
+            .upsert(
+                {
+                    "key": "risk_thresholds",
+                    "value": {
+                        "medium": thresholds.medium,
+                        "high": thresholds.high,
+                        "critical": thresholds.critical,
+                    },
+                    "category": "risk",
+                    "description": "Risk score thresholds for cockpit severity interpretation (0-100 scale)",
+                    "data_type": "object",
+                    "is_public": True,
+                },
+                on_conflict="key",
+            )
+            .execute()
+        )
+
+        logger.info(f"Updated risk thresholds: {thresholds.dict()}")
+        return {"medium": thresholds.medium, "high": thresholds.high, "critical": thresholds.critical}
+
+    except Exception as e:
+        logger.error(f"Error updating risk thresholds: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to update risk thresholds: {str(e)}")
 
 
 @router.get("/settings/alert-intervals")
