@@ -717,37 +717,57 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
                 >
                   {site.type.replace("_", " ")}
                 </div>
-                {/* Bridge status badge */}
-                {site.bridge_data_source && site.bridge_data_source !== "none" && (
+                {/* Data valve badge - shows if data is flowing and from where */}
+                {(site.bridge_data_source && site.bridge_data_source !== "none") || sentinelEnabled === false ? (
                   <div
                     className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium"
                     title={
-                      site.bridge_connected
-                        ? `Data source: ${site.bridge_data_source}${site.bridge_last_sync ? ` (last sync: ${new Date(site.bridge_last_sync).toLocaleTimeString()})` : ""}`
-                        : `${site.bridge_data_source} ${site.bridge_sync_error ? `- ${site.bridge_sync_error}` : "- not connected"}`
+                      sentinelEnabled === false
+                        ? "Data valve closed - no data flowing"
+                        : site.bridge_connected
+                        ? `Data flowing from ${site.bridge_data_source}${site.bridge_last_sync ? ` (last sync: ${new Date(site.bridge_last_sync).toLocaleTimeString()})` : ""}`
+                        : `Data valve open, source: ${site.bridge_data_source} ${site.bridge_sync_error ? `- ${site.bridge_sync_error}` : "- not connected"}`
                     }
                     style={{
-                      background: site.bridge_connected
-                        ? "rgba(16, 185, 129, 0.15)"
-                        : "rgba(239, 68, 68, 0.15)",
-                      color: site.bridge_connected
-                        ? "var(--color-sentinel-green)"
-                        : "var(--color-sentinel-red)",
-                      border: `1px solid ${site.bridge_connected ? "rgba(16, 185, 129, 0.3)" : "rgba(239, 68, 68, 0.3)"}`,
+                      background:
+                        sentinelEnabled === false
+                          ? "rgba(107, 114, 128, 0.15)" // Gray when closed
+                          : site.bridge_connected
+                          ? "rgba(16, 185, 129, 0.15)" // Green when connected
+                          : "rgba(239, 68, 68, 0.15)", // Red when open but not connected
+                      color:
+                        sentinelEnabled === false
+                          ? "var(--color-sentinel-text-secondary)"
+                          : site.bridge_connected
+                          ? "var(--color-sentinel-green)"
+                          : "var(--color-sentinel-red)",
+                      border: `1px solid ${
+                        sentinelEnabled === false
+                          ? "rgba(107, 114, 128, 0.3)"
+                          : site.bridge_connected
+                          ? "rgba(16, 185, 129, 0.3)"
+                          : "rgba(239, 68, 68, 0.3)"
+                      }`,
                     }}
                   >
                     <Wifi className="h-3 w-3" />
-                    <span>{site.bridge_data_source === "simbiot" ? "SIMBIOT" : "SIM"}</span>
-                    <div
-                      className="w-1.5 h-1.5 rounded-full"
-                      style={{
-                        background: site.bridge_connected
-                          ? "var(--color-sentinel-green)"
-                          : "var(--color-sentinel-red)",
-                      }}
-                    />
+                    {sentinelEnabled === false ? (
+                      <span>Valve Closed</span>
+                    ) : (
+                      <>
+                        <span>{site.bridge_data_source === "simbiot" ? "SIMBIOT" : "SIM"}</span>
+                        <div
+                          className="w-1.5 h-1.5 rounded-full"
+                          style={{
+                            background: site.bridge_connected
+                              ? "var(--color-sentinel-green)"
+                              : "var(--color-sentinel-red)",
+                          }}
+                        />
+                      </>
+                    )}
                   </div>
-                )}
+                ) : null}
               </div>
               <div className="flex flex-wrap items-center gap-4" style={{ color: "var(--color-sentinel-text-secondary)" }}>
                 <div className="flex items-center gap-1.5">

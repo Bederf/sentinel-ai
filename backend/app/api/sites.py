@@ -1115,8 +1115,13 @@ async def toggle_site_processing(
 # NOTE: This MUST come after the specific routes above
 
 
-def _get_bridge_status() -> dict:
-    """Get bridge ingestion status (SIMBIOT connection, data source, sync time)."""
+def _get_bridge_status(sentinel_enabled: bool = True) -> dict:
+    """Get bridge ingestion status (SIMBIOT connection, data source, sync time).
+
+    Bridge status is tied to sentinel_processing_enabled (the data valve).
+    When valve is CLOSED (sentinel_enabled=False), no data flows (bridge_data_source="none").
+    When valve is OPEN (sentinel_enabled=True), data flows from configured source.
+    """
     try:
         from app.services.simbiot_service import simbiot_service
 
@@ -1125,6 +1130,16 @@ def _get_bridge_status() -> dict:
         bridge_last_sync = None
         bridge_sync_error = None
 
+        # Valve closed: no data flows
+        if not sentinel_enabled:
+            return {
+                "bridge_connected": False,
+                "bridge_data_source": "none",
+                "bridge_last_sync": None,
+                "bridge_sync_error": None,
+            }
+
+        # Valve open: check data source
         # Check SIMBIOT bridge status
         if settings.site002_source_enabled:
             try:
@@ -1155,9 +1170,9 @@ def _get_bridge_status() -> dict:
         logger.warning(f"Error getting bridge status: {e}")
         return {
             "bridge_connected": False,
-            "bridge_data_source": "none",
+            "bridge_data_source": "none" if not sentinel_enabled else "error",
             "bridge_last_sync": None,
-            "bridge_sync_error": str(e)[:100],
+            "bridge_sync_error": str(e)[:100] if sentinel_enabled else None,
         }
 
 
@@ -1168,8 +1183,12 @@ async def get_site(
 ) -> SiteResponse:
     """Get a single site by ID."""
 
-    # Get bridge status
-    bridge_status = _get_bridge_status()
+    # Load processing state first to determine sentinel_enabled for bridge status
+    processing_state = _load_processing_state()
+    sentinel_enabled = processing_state.get(site_id, True)  # Default to enabled
+
+    # Get bridge status with sentinel state (valve open/closed)
+    bridge_status = _get_bridge_status(sentinel_enabled=sentinel_enabled)
 
     # Try Supabase first
     site, success = get_site_from_supabase(site_id)
@@ -1177,7 +1196,6 @@ async def get_site(
     if success:
         if site:
             # Merge persisted processing state (JSON is authoritative for toggle)
-            processing_state = _load_processing_state()
             if site_id in processing_state:
                 site["sentinel_processing_enabled"] = processing_state[site_id]
             status = calculate_site_status_from_equipment(site.get("equipment_status"))
@@ -1199,7 +1217,6 @@ async def get_site(
         raise HTTPException(status_code=404, detail=f"Site {site_id} not found")
 
     # Merge persisted processing state from JSON fallback
-    processing_state = _load_processing_state()
     if site_id in processing_state:
         site["sentinel_processing_enabled"] = processing_state[site_id]
 

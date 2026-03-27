@@ -255,7 +255,7 @@ class TestScoreSignalPair:
         # location: exact(wildcard match) 1.0 * 0.30 = 0.30
         # entity: 2/3 * 0.25 ≈ 0.167
         # time: (1 - 26/60) * 0.20 ≈ 0.113
-        # type: 0.85 * 0.15 = 0.1275
+        # signal_type: 0.85 * 0.15 = 0.1275
         # severity: 0.75 * 0.10 = 0.075
         # total ≈ 0.783
         assert result.score > 0.70, f"Expected > 0.70, got {result.score}"

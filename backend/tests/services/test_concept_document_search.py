@@ -371,8 +371,7 @@ def test_tsv_import_derives_normalized_metadata(tmp_path):
     assert result["normalized_discipline"] == "electrical"
     assert result["normalized_year"] == 2023
     assert (
-        result["concept_url"]
-        == "https://remsconcept.fnb.co.za/Evolution/!System/Documents/ConceptDocument/"
+        result["concept_url"] == "https://remsconcept.fnb.co.za/Evolution/!System/Documents/ConceptDocument/"
         "ViewConceptDocumentItem.aspx?__referrer=%2FEvolution%2F!System%2FDocuments%2FConceptDocument%2F"
         "ViewConceptDocumentItems.aspx&id=12345&PrimaryEntity=&PrimaryKeyId=-1"
     )

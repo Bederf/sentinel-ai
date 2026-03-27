@@ -22,9 +22,12 @@ _compiled_graph = None
 
 
 def _summarize_state(state: SentinelAgentState) -> str:
+    evidence_total = sum(
+        len((state.get("evidence_bundle") or {}).get(key, [])) for key in ("hybrid", "brick", "docs", "memory")
+    )
     return (
         f"messages={len(state.get('messages', []))}, "
-        f"evidence={sum(len((state.get('evidence_bundle') or {}).get(key, [])) for key in ('hybrid', 'brick', 'docs', 'memory'))}, "
+        f"evidence={evidence_total}, "
         f"todos={len(state.get('todos', []))}, "
         f"files={len(state.get('files', {}))}, "
         f"errors={len(state.get('errors', []))}"

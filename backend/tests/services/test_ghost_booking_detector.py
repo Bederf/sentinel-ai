@@ -497,7 +497,7 @@ class TestAPIPayload:
             room_code="FA1-1Q1-MR1",
             sensor_id="LD2410C-MR-01",
             occupied=True,
-            count=5,  # type: ignore[call-arg]  — extra field, silently ignored
+            count=5,  # type: ignore[call-arg]
         )
         assert req.occupied is True
         assert not hasattr(req, "count")
