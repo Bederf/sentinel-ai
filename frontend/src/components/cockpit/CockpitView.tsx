@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useRef, type MutableRefObject, type ReactNode, type RefObject } from 'react'
+import { useLayoutEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode, type RefObject } from 'react'
 import gsap from 'gsap'
 import type { CockpitRenderMode, CockpitState } from './types'
 
@@ -133,12 +133,16 @@ function CockpitHero({
   state,
   isWall,
   emphasisTone,
+  onFullscreenClick,
+  isFullscreen,
 }: {
   voiceRef: MutableRefObject<HTMLDivElement | null>
   voice: ReturnType<typeof buildVoice>
   state: CockpitState
   isWall: boolean
   emphasisTone: string
+  onFullscreenClick: () => void
+  isFullscreen: boolean
 }) {
   return (
     <div
@@ -149,10 +153,33 @@ function CockpitHero({
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="text-[11px] uppercase tracking-[0.28em] text-slate-500">Sentinel Cockpit</div>
-        <div className="flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-[0.22em] text-slate-400">
-          <span>{state.site.name}</span>
-          <span className="text-slate-600">/</span>
-          <span>{state.site.mode}</span>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-[0.22em] text-slate-400">
+            <span>{state.site.name}</span>
+            <span className="text-slate-600">/</span>
+            <span>{state.site.mode}</span>
+          </div>
+          <button
+            onClick={onFullscreenClick}
+            className="ml-2 rounded p-1.5 hover:bg-slate-800/50 transition-colors"
+            title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+            aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+          >
+            {isFullscreen ? (
+              <svg className="h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            ) : (
+              <svg className="h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 8V4m0 0h4m-4 0l5 5m11-5v4m0-4h-4m4 0l-5 5M4 20v-4m0 4h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5"
+                />
+              </svg>
+            )}
+          </button>
         </div>
       </div>
 
@@ -313,6 +340,7 @@ export function CockpitView({ state, renderMode, spatialCanvas }: CockpitViewPro
   const twinRef = useRef<HTMLDivElement | null>(null)
   const decisionRef = useRef<HTMLElement | null>(null)
   const statusRef = useRef<HTMLDivElement | null>(null)
+  const [isFullscreen, setIsFullscreen] = useState(false)
 
   const voice = useMemo(() => buildVoice(state), [state])
   const emphasisTone = toneClass(state.primaryMetric.tone)
@@ -321,10 +349,31 @@ export function CockpitView({ state, renderMode, spatialCanvas }: CockpitViewPro
   useEntranceAnimation(rootRef, voiceRef, twinRef, decisionRef, statusRef)
   useRefreshAnimation(voiceRef, decisionRef, state, voice)
 
+  const handleFullscreen = () => {
+    const elem = rootRef.current
+    if (!elem) return
+
+    if (!isFullscreen) {
+      if (elem.requestFullscreen) {
+        elem.requestFullscreen().catch(() => setIsFullscreen(true))
+      } else {
+        setIsFullscreen(true)
+      }
+      setIsFullscreen(true)
+    } else {
+      if (document.fullscreenElement) {
+        document.exitFullscreen()
+      }
+      setIsFullscreen(false)
+    }
+  }
+
   return (
     <section
       ref={rootRef}
-      className="rounded-[28px] border border-slate-800/80 bg-slate-950/95 p-4 md:p-6"
+      className={`rounded-[28px] border border-slate-800/80 bg-slate-950/95 p-4 md:p-6 ${
+        isFullscreen ? 'fixed inset-0 z-50 rounded-none' : ''
+      }`}
       data-render-mode={renderMode}
       data-site-id={state.site.id}
     >
@@ -334,6 +383,8 @@ export function CockpitView({ state, renderMode, spatialCanvas }: CockpitViewPro
         state={state}
         isWall={isWall}
         emphasisTone={emphasisTone}
+        onFullscreenClick={handleFullscreen}
+        isFullscreen={isFullscreen}
       />
 
       <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
