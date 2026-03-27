@@ -66,21 +66,40 @@ class BackupService:
 
         # Scan backup directory
         if BACKUP_DIR.exists():
-            backup_sets = [
-                d
-                for d in BACKUP_DIR.rglob("*")
-                if d.is_dir() and d.name not in {"daily", "manual"} and (d / "backup.env").exists()
-            ]
-            backup_files = [f for f in BACKUP_DIR.rglob("*") if f.is_file()]
-            status["file_count"] = len(backup_sets)
-            status["total_size_mb"] = round(sum(f.stat().st_size for f in backup_files) / (1024 * 1024), 2)
+            try:
+                backup_sets = [
+                    d
+                    for d in BACKUP_DIR.rglob("*")
+                    if d.is_dir() and d.name not in {"daily", "manual"} and (d / "backup.env").exists()
+                ]
+                backup_files = [f for f in BACKUP_DIR.rglob("*") if f.is_file()]
+                status["file_count"] = len(backup_sets)
 
-            if backup_sets:
-                newest = max(d.stat().st_mtime for d in backup_sets)
-                last_dt = datetime.fromtimestamp(newest)
-                status["last_backup"] = last_dt.isoformat()
-                age_hours = (datetime.now() - last_dt).total_seconds() / 3600
-                status["last_backup_age_hours"] = round(age_hours, 1)
+                # Calculate total size safely, skipping inaccessible files
+                total_size = 0.0
+                for f in backup_files:
+                    try:
+                        total_size += f.stat().st_size
+                    except (OSError, PermissionError):
+                        pass
+                status["total_size_mb"] = round(total_size / (1024 * 1024), 2) if total_size > 0 else 0.0
+
+                # Get newest backup timestamp safely
+                if backup_sets:
+                    mtimes = []
+                    for d in backup_sets:
+                        try:
+                            mtimes.append(d.stat().st_mtime)
+                        except (OSError, PermissionError):
+                            pass
+                    if mtimes:
+                        newest = max(mtimes)
+                        last_dt = datetime.fromtimestamp(newest)
+                        status["last_backup"] = last_dt.isoformat()
+                        age_hours = (datetime.now() - last_dt).total_seconds() / 3600
+                        status["last_backup_age_hours"] = round(age_hours, 1)
+            except Exception as e:
+                logger.warning(f"Error scanning backup directory: {e}")
 
         return status
 
