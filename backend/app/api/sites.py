@@ -1159,6 +1159,7 @@ def _get_bridge_status(sentinel_enabled: bool = True) -> dict:
             # Check if simulation is being used as data source
             if settings.ingestion_mode == "simulation":
                 bridge_data_source = "simulation"
+                bridge_connected = True  # Simulation IS connected (data flows)
 
         return {
             "bridge_connected": bridge_connected,
