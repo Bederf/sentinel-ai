@@ -1122,27 +1122,27 @@ def _get_bridge_status(sentinel_enabled: bool = True) -> dict:
     When valve is CLOSED (sentinel_enabled=False), no data flows (bridge_data_source="none").
     When valve is OPEN (sentinel_enabled=True), data flows from configured source.
     """
-    try:
-        from app.services.simbiot_service import simbiot_service
+    # Valve closed: no data flows (fast path, no service calls)
+    if not sentinel_enabled:
+        return {
+            "bridge_connected": False,
+            "bridge_data_source": "none",
+            "bridge_last_sync": None,
+            "bridge_sync_error": None,
+        }
 
+    # Valve open: check data source (only when needed)
+    try:
         bridge_connected = False
         bridge_data_source = "none"
         bridge_last_sync = None
         bridge_sync_error = None
 
-        # Valve closed: no data flows
-        if not sentinel_enabled:
-            return {
-                "bridge_connected": False,
-                "bridge_data_source": "none",
-                "bridge_last_sync": None,
-                "bridge_sync_error": None,
-            }
-
-        # Valve open: check data source
-        # Check SIMBIOT bridge status
+        # Check SIMBIOT bridge status only if enabled
         if settings.site002_source_enabled:
             try:
+                from app.services.simbiot_service import simbiot_service
+
                 simbiot_status = simbiot_service.status
                 if isinstance(simbiot_status, dict):
                     bridge_connected = simbiot_status.get("enabled", False)
@@ -1170,9 +1170,9 @@ def _get_bridge_status(sentinel_enabled: bool = True) -> dict:
         logger.warning(f"Error getting bridge status: {e}")
         return {
             "bridge_connected": False,
-            "bridge_data_source": "none" if not sentinel_enabled else "error",
+            "bridge_data_source": "error",
             "bridge_last_sync": None,
-            "bridge_sync_error": str(e)[:100] if sentinel_enabled else None,
+            "bridge_sync_error": str(e)[:100],
         }
 
 

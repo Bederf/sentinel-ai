@@ -496,10 +496,10 @@
   {
     "site_id": "site-001",
     "date": "2024-01-28",
-    "grid_kwh": 286.85,
+    "grid_kwh": 285.65,
     "hvac_kwh": 0.0,
-    "lighting_kwh": 60.55,
-    "other_kwh": 226.3,
+    "lighting_kwh": 60.45,
+    "other_kwh": 225.2,
     "solar_generation_kwh": 22620.0,
     "solar_export_kwh": 0.0,
     "water_liters": 1500.0,
@@ -509,7 +509,7 @@
     "peak_occupancy_count": 2,
     "scope1_kg_co2": 176.88,
     "scope2_kg_co2": 0.0,
-    "scope3_kg_co2": 4.29,
+    "scope3_kg_co2": 4.27,
     "source": "simulation"
   },
   {
