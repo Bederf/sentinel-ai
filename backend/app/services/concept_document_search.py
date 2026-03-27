@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import calendar
 import csv
 import json
 import logging
@@ -719,19 +718,6 @@ class ConceptDocumentSearchService:
             )
         )
         combined_tokens = title_tokens | path_tokens | content_tokens
-        combined_text = " ".join(
-            [
-                document.title,
-                document.file_name,
-                document.path,
-                document.file_path,
-                document.metadata_text,
-                document.cleaned_text[:2000],
-                document.extracted_text[:2000],
-                " ".join(document.tags),
-            ]
-        ).lower()
-
         lexical_title = _overlap_score(hints.tokens, title_tokens)
         lexical_path = _overlap_score(hints.tokens, path_tokens)
         lexical_content = _overlap_score(hints.tokens, content_tokens)

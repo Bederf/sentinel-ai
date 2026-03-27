@@ -19,9 +19,14 @@ Boundary with Canonical Model:
 - CanonicalSentinelPoint: "What SENTINEL understands" (normalized, validated)
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass
-from typing import Any, Optional, Dict
+from typing import TYPE_CHECKING, Any, Dict, Optional
 from datetime import datetime
+
+if TYPE_CHECKING:
+    from app.services.simbiot.bms_adapter import BmsConnectionStatus, BmsPointValue
 
 
 @dataclass(frozen=True)

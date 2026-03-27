@@ -16,7 +16,7 @@
  */
 
 import { Building2, Cpu, AlertTriangle, MapPin, Shield, Clock, ShieldOff } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useSiteSummary } from "@/hooks/useSiteSummary";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import api, { type Site, type OptimizationRecommendation, type BuildingEquipmentItem, createWorkOrder } from '@/lib/api';
@@ -126,6 +126,11 @@ export function SiteCard({ site, onClick, showSafetyStatus = true, showOptimizat
   const [processingEnabled, setProcessingEnabled] = useState(site.sentinel_processing_enabled !== false);
   const [processingLoading, setProcessingLoading] = useState(false);
 
+  // Keep switch state aligned with latest site payload after refetch/navigation.
+  useEffect(() => {
+    setProcessingEnabled(site.sentinel_processing_enabled !== false);
+  }, [site.id, site.sentinel_processing_enabled]);
+
   const handleProcessingToggle = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (processingLoading) return;
@@ -138,8 +143,9 @@ export function SiteCard({ site, onClick, showSafetyStatus = true, showOptimizat
     try {
       const result = await api.toggleSiteProcessing(site.id, newEnabled);
       setProcessingEnabled(result.sentinel_processing_enabled);
-      // Invalidate sites query so list refreshes
+      // Invalidate both legacy and current list keys.
       queryClient.invalidateQueries({ queryKey: ['sites'] });
+      queryClient.invalidateQueries({ queryKey: ['buildings-list'] });
     } catch (error) {
       console.error("Failed to toggle SENTINEL processing:", error);
       // Rollback on error

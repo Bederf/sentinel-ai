@@ -33,7 +33,8 @@ Subject: Team work space - Fairlands 2
 
 Good day
 
-We are arranging a team work in office day and would like to find out if there is available work desk space available at Fairlands 2.
+We are arranging a team work in office day and would like to find out
+if there is available work desk space available at Fairlands 2.
 
 Team size: 13
 Preferred day: Mondays

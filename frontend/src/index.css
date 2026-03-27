@@ -1062,3 +1062,8 @@
 .animate-slide-in-right {
   animation: slide-in-right 0.3s ease-out;
 }
+
+/* Concierge map: match browser-tuned Cytoscape selectbox alignment */
+.concierge-cytoscape-map canvas[data-id="layer0-selectbox"] {
+  top: 1px;
+}

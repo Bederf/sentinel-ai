@@ -224,7 +224,7 @@ class TestScoreSignalPair:
         # location: wildcard = 1.0 * 0.30 = 0.30
         # entity: 1/3 * 0.25 ≈ 0.083
         # time: (1 - 29/60) * 0.20 ≈ 0.103
-        # type: 0.95 * 0.15 = 0.1425
+        # signal_type: 0.95 * 0.15 = 0.1425
         # severity: 0.75 * 0.10 = 0.075
         # total ≈ 0.703
         assert result.above_threshold, f"Expected above threshold, got {result.score}"

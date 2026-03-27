@@ -612,7 +612,7 @@ async def get_simulation_status(task_id: str):
             resolved_task_id, live_orchestrator = _find_live_site_orchestrator(requested_site_id)
             if resolved_task_id:
                 task_id = resolved_task_id
-                logger.debug(f"Resolved site to live orchestrator: %s", task_id)
+                logger.debug("Resolved site to live orchestrator: %s", task_id)
             else:
                 resolved_task_id, _task_data = _select_site_task(requested_site_id)
                 if resolved_task_id:

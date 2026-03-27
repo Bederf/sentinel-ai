@@ -64,7 +64,10 @@ class TelegramDocumentIntakeService:
         except ValueError:
             await sender.send_text(
                 chat_id,
-                "Your Telegram account is not linked to a building site yet. Please contact an administrator before filing documents.",
+                (
+                    "Your Telegram account is not linked to a building site yet. "
+                    "Please contact an administrator before filing documents."
+                ),
             )
             return False
 

@@ -149,6 +149,11 @@ interface SiteDetailData {
   status?: "normal" | "warning" | "critical";
   optimization_enabled?: boolean;
   sentinel_processing_enabled?: boolean;
+  // Bridge ingestion status
+  bridge_connected?: boolean;
+  bridge_data_source?: "simbiot" | "simulation" | "none";
+  bridge_last_sync?: string | null;
+  bridge_sync_error?: string | null;
 }
 
 // Extended equipment interface for local state (combines API response with local fields)
@@ -712,6 +717,37 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
                 >
                   {site.type.replace("_", " ")}
                 </div>
+                {/* Bridge status badge */}
+                {site.bridge_data_source && site.bridge_data_source !== "none" && (
+                  <div
+                    className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium"
+                    title={
+                      site.bridge_connected
+                        ? `Data source: ${site.bridge_data_source}${site.bridge_last_sync ? ` (last sync: ${new Date(site.bridge_last_sync).toLocaleTimeString()})` : ""}`
+                        : `${site.bridge_data_source} ${site.bridge_sync_error ? `- ${site.bridge_sync_error}` : "- not connected"}`
+                    }
+                    style={{
+                      background: site.bridge_connected
+                        ? "rgba(16, 185, 129, 0.15)"
+                        : "rgba(239, 68, 68, 0.15)",
+                      color: site.bridge_connected
+                        ? "var(--color-sentinel-green)"
+                        : "var(--color-sentinel-red)",
+                      border: `1px solid ${site.bridge_connected ? "rgba(16, 185, 129, 0.3)" : "rgba(239, 68, 68, 0.3)"}`,
+                    }}
+                  >
+                    <Wifi className="h-3 w-3" />
+                    <span>{site.bridge_data_source === "simbiot" ? "SIMBIOT" : "SIM"}</span>
+                    <div
+                      className="w-1.5 h-1.5 rounded-full"
+                      style={{
+                        background: site.bridge_connected
+                          ? "var(--color-sentinel-green)"
+                          : "var(--color-sentinel-red)",
+                      }}
+                    />
+                  </div>
+                )}
               </div>
               <div className="flex flex-wrap items-center gap-4" style={{ color: "var(--color-sentinel-text-secondary)" }}>
                 <div className="flex items-center gap-1.5">

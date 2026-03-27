@@ -1300,7 +1300,10 @@ class LifecycleOrchestrator:
                 )
                 if booking_summary["generated_bookings"]:
                     logger.info(
-                        "[SPACE BOOKINGS] %s day=%s generated=%s saved=%s alerts=%s notified=%s intake_emails=%s intelligence_signals=%s",
+                        (
+                            "[SPACE BOOKINGS] %s day=%s generated=%s saved=%s "
+                            "alerts=%s notified=%s intake_emails=%s intelligence_signals=%s"
+                        ),
                         self.site_id,
                         self.simulated_time.date().isoformat(),
                         booking_summary["generated_bookings"],

@@ -610,6 +610,11 @@ export interface Site {
   optimization_history?: OptimizationHistoryEntry[];
   // SENTINEL processing toggle (Phase 125)
   sentinel_processing_enabled?: boolean;
+  // Bridge ingestion status
+  bridge_connected?: boolean;
+  bridge_data_source?: "simbiot" | "simulation" | "none";
+  bridge_last_sync?: string | null;
+  bridge_sync_error?: string | null;
 }
 
 // Equipment interface

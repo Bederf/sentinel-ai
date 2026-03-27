@@ -1,6 +1,6 @@
 """Concept document ingestion endpoints."""
 
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel

@@ -203,10 +203,16 @@ def test_loads_tsv_export_and_normalises_site_scope(tmp_path):
                 "REMS",
                 "Electrical",
                 "Monthly generator service sheet",
-                r"Operations Compliance GMR_ELECTRICAL: \\BMS-RBPADMZCEPT\E$\DMS\FNB REMS Buildings\Operations Compliance GMR\ELECTRICAL",
+                (
+                    r"Operations Compliance GMR_ELECTRICAL: \\BMS-RBPADMZCEPT\E$\DMS"
+                    r"\FNB REMS Buildings\Operations Compliance GMR\ELECTRICAL"
+                ),
                 "2023/12/20 09:30",
                 "",
-                r"\\BMS-RBPADMZCEPT\E$\DMS\FNB REMS Buildings\Operations Compliance GMR\ELECTRICAL\00\000003\generator-service-2023.pdf",
+                (
+                    r"\\BMS-RBPADMZCEPT\E$\DMS\FNB REMS Buildings\Operations Compliance GMR"
+                    r"\ELECTRICAL\00\000003\generator-service-2023.pdf"
+                ),
                 "35999",
                 "generator service 2023.pdf",
                 "",
@@ -342,8 +348,18 @@ def test_monthly_inspection_plumbing_february(tmp_path):
 def test_tsv_import_derives_normalized_metadata(tmp_path):
     index_path = tmp_path / "concept_export.tsv"
     index_path.write_text(
-        "site_id\tBuilding\tDocument Sub Class\tDocument Ref.\tTitle\tAuthor\tCategory\tSubject\tRepository Description\tCreated Date\tExpiry Date\tActual Path\tConcept Document Id\tFilename\n"
-        "001\tFairlands\tOperations Compliance GMR_ELECTRICAL\tFairlands generator service 2023\tGenerator Service Sheet 2023\tREMS\tService\tGenerator service summary\tOperations Compliance GMR_ELECTRICAL: \\BMS-RBPADMZCEPT\\E$\\DMS\\FNB REMS Buildings\\Operations Compliance GMR\\ELECTRICAL\t2023/05/18 10:00\t2024/05/18 00:00\t\\BMS-RBPADMZCEPT\\E$\\DMS\\FNB REMS Buildings\\Operations Compliance GMR\\ELECTRICAL\\01\\000001\\service-sheet.pdf\t12345\tGenerator Service Sheet 2023.pdf\n"
+        (
+            "site_id\tBuilding\tDocument Sub Class\tDocument Ref.\tTitle\tAuthor\tCategory\tSubject\t"
+            "Repository Description\tCreated Date\tExpiry Date\tActual Path\tConcept Document Id\tFilename\n"
+        )
+        + (
+            "001\tFairlands\tOperations Compliance GMR_ELECTRICAL\tFairlands generator service 2023\t"
+            "Generator Service Sheet 2023\tREMS\tService\tGenerator service summary\t"
+            "Operations Compliance GMR_ELECTRICAL: \\BMS-RBPADMZCEPT\\E$\\DMS\\FNB REMS Buildings\\"
+            "Operations Compliance GMR\\ELECTRICAL\t2023/05/18 10:00\t2024/05/18 00:00\t"
+            "\\BMS-RBPADMZCEPT\\E$\\DMS\\FNB REMS Buildings\\Operations Compliance GMR\\ELECTRICAL\\01\\000001\\"
+            "service-sheet.pdf\t12345\tGenerator Service Sheet 2023.pdf\n"
+        )
     )
 
     service = ConceptDocumentSearchService(index_path=index_path)

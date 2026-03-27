@@ -13,7 +13,7 @@ import hashlib
 import logging
 import re
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime
 from email.utils import getaddresses, parsedate_to_datetime
 from typing import Optional
 from zoneinfo import ZoneInfo

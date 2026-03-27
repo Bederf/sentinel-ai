@@ -92,7 +92,6 @@ class SimulationBmsAdapter(BmsAdapter):
         return devices
 
     async def discover_points(self, device_id: str) -> list[BmsPointDescriptor]:
-        store = self._require_store()
         latest_points, equipment_state, state_values, command_overrides = self._device_snapshot(device_id)
         point_ids = set(latest_points.keys())
         point_ids.update(state_values.keys())

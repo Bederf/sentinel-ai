@@ -451,6 +451,11 @@ class SiteResponse(SiteBase):
     control_note: Optional[str] = None
     equipment_status: Optional[EquipmentStatusBreakdown] = None
     sentinel_processing_enabled: bool = True
+    # Bridge ingestion status
+    bridge_connected: bool = False
+    bridge_data_source: str = "none"  # "simbiot" | "simulation" | "none"
+    bridge_last_sync: Optional[str] = None  # ISO timestamp
+    bridge_sync_error: Optional[str] = None  # Error message if applicable
 
 
 class SiteListResponse(BaseModel):
@@ -1110,12 +1115,61 @@ async def toggle_site_processing(
 # NOTE: This MUST come after the specific routes above
 
 
+def _get_bridge_status() -> dict:
+    """Get bridge ingestion status (SIMBIOT connection, data source, sync time)."""
+    try:
+        from app.services.simbiot_service import simbiot_service
+
+        bridge_connected = False
+        bridge_data_source = "none"
+        bridge_last_sync = None
+        bridge_sync_error = None
+
+        # Check SIMBIOT bridge status
+        if settings.site002_source_enabled:
+            try:
+                simbiot_status = simbiot_service.status
+                if isinstance(simbiot_status, dict):
+                    bridge_connected = simbiot_status.get("enabled", False)
+                    if not bridge_connected:
+                        bridge_sync_error = simbiot_status.get("reason", "not initialized")
+            except Exception as e:
+                logger.warning(f"Failed to get SIMBIOT status: {e}")
+                bridge_sync_error = str(e)[:100]
+
+            # If SIMBIOT is enabled, mark data source as SIMBIOT
+            if bridge_connected or settings.site002_source_enabled:
+                bridge_data_source = "simbiot"
+        else:
+            # Check if simulation is being used as data source
+            if settings.ingestion_mode == "simulation":
+                bridge_data_source = "simulation"
+
+        return {
+            "bridge_connected": bridge_connected,
+            "bridge_data_source": bridge_data_source,
+            "bridge_last_sync": bridge_last_sync,
+            "bridge_sync_error": bridge_sync_error,
+        }
+    except Exception as e:
+        logger.warning(f"Error getting bridge status: {e}")
+        return {
+            "bridge_connected": False,
+            "bridge_data_source": "none",
+            "bridge_last_sync": None,
+            "bridge_sync_error": str(e)[:100],
+        }
+
+
 @router.get("/sites/{site_id}", response_model=SiteResponse)
 async def get_site(
     site_id: str,
     auth: AuthContext = Depends(require_site_access("site_id")),
 ) -> SiteResponse:
     """Get a single site by ID."""
+
+    # Get bridge status
+    bridge_status = _get_bridge_status()
 
     # Try Supabase first
     site, success = get_site_from_supabase(site_id)
@@ -1131,6 +1185,7 @@ async def get_site(
                 **site,
                 location=site.get("address", ""),
                 status=status,
+                **bridge_status,
             )
         else:
             raise HTTPException(status_code=404, detail=f"Site {site_id} not found")
@@ -1175,6 +1230,7 @@ async def get_site(
         alert_count=alert_count,
         location=site.get("address", ""),
         status=status,
+        **bridge_status,
     )
 
 

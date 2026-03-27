@@ -83,7 +83,8 @@ function getRoomDisplayName(room: ConciergeRoom): string {
 function roomLabelWithOptionalCount(room: ConciergeRoom): string {
   const baseLabel = getRoomDisplayName(room);
   if (room.signal_count > 0 && room.signal_count <= 9) {
-    return `${baseLabel}\n${room.signal_count}`;
+    // Keep count visually separate so labels like "L3-MR1" don't read as "L3-MR14".
+    return `${baseLabel}\n(${room.signal_count})`;
   }
   return baseLabel;
 }
@@ -181,6 +182,16 @@ function buildSignalCategories(room: ConciergeRoom): SignalCategory[] {
     if (severityDelta !== 0) return severityDelta;
     return right.signals.length - left.signals.length;
   });
+}
+
+function pickPrimarySignalId(room: ConciergeRoom): string | null {
+  if (!room.signals.length) return null;
+  const ranked = [...room.signals].sort((left, right) => {
+    const severityDelta = severityRank(right.severity) - severityRank(left.severity);
+    if (severityDelta !== 0) return severityDelta;
+    return new Date(right.created_at).getTime() - new Date(left.created_at).getTime();
+  });
+  return ranked[0]?.id ?? null;
 }
 
 function buildDefaultRoomPositions(rooms: ConciergeRoom[], dims: CanvasDims): RoomPositions {
@@ -387,7 +398,7 @@ function getCyStylesheet(): any[] {
         "text-wrap": "wrap",
         // Keep labels constrained to the circle diameter so they don't explode visually.
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        "text-max-width": (ele: any) => Math.max(40, sizeFromSignalCount(ele.data("signal_count")) * 0.9),
+        "text-max-width": (ele: any) => Math.max(34, sizeFromSignalCount(ele.data("signal_count")) * 0.78),
         "text-margin-y": 0,
         "font-weight": 700,
         "z-index": 5,
@@ -575,7 +586,7 @@ function useConciergeGraph(
       cy.nodes("node.room").forEach((node) => {
         const size = node.width();
         // Keep labels inside the circle; avoid explosive scaling on large viewports.
-        const fontSize = Math.min(16, Math.max(10, size * 0.28));
+        const fontSize = Math.min(14, Math.max(8, size * 0.22));
         node.style("font-size", `${fontSize}px`);
       });
     };
@@ -585,7 +596,18 @@ function useConciergeGraph(
 
     cy.on("tap", "node.room", (evt) => {
       const rd = evt.target.data("_room") as ConciergeRoom | undefined;
-      if (rd) onRoomToggle(rd);
+      if (!rd) return;
+
+      // First tap expands the room context; second tap drills into top signal.
+      if (expandedRoomId === rd.room_id) {
+        const primarySignalId = pickPrimarySignalId(rd);
+        if (primarySignalId) {
+          onSignalSelect(rd, primarySignalId);
+          return;
+        }
+      }
+
+      onRoomToggle(rd);
     });
     cy.on("tap", "node.category", (evt) => {
       const room = evt.target.data("_room") as ConciergeRoom | undefined;
@@ -837,5 +859,5 @@ export function ConciergeMap({ siteId, onSignalSelect }: ConciergeMapProps) {
     );
   }
 
-  return <div ref={containerRef} className="w-full h-full" style={{ background: "#0d1117" }} />;
+  return <div ref={containerRef} className="w-full h-full concierge-cytoscape-map" style={{ background: "#0d1117" }} />;
 }

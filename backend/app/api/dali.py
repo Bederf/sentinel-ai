@@ -15,7 +15,6 @@ Physics-based simulation includes:
 """
 
 import math
-import random
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Query

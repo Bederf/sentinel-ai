@@ -76,7 +76,22 @@
     "2026-03-20": {},
     "2026-03-21": {},
     "2026-03-22": {},
-    "2026-03-23": {}
+    "2026-03-23": {},
+    "2026-03-27": {
+      "telegram/message": {
+        "provider": "telegram",
+        "model": "message",
+        "calls": 1,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cache_read_tokens": 0,
+        "cache_creation_tokens": 0,
+        "cost_usd": 0.0,
+        "sources": {
+          "alert": 1
+        }
+      }
+    }
   },
   "usd_zar_rate": 18.5,
   "escalations": [

@@ -3,7 +3,6 @@
 import logging
 from typing import Any, Dict, List, Optional
 
-from app.config.settings import settings
 from app.models.recommendation import Recommendation, RecommendationStatus
 from app.services.cache_service import cache
 

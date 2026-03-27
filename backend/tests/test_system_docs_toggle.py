@@ -9,8 +9,6 @@ Test cases:
 
 from __future__ import annotations
 
-import pytest
-
 from app.services.chat_tools import get_chat_tools, _SYSTEM_DOCS_GATED_TOOLS
 
 

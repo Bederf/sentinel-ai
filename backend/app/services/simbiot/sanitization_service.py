@@ -22,8 +22,8 @@ Boundary Definition:
 
 import re
 import logging
-from typing import Optional, Dict, List
 from datetime import datetime
+from typing import Dict
 
 from app.models.simbiot.raw_source_record import RawSourceRecord
 from app.models.simbiot.sanitized_record import SanitizedIntermediateRecord
@@ -51,8 +51,12 @@ class SanitizationService:
         """
         # Create sanitized record with basic provenance
         # Initialize with empty values that will be filled by transformation methods
+        source_record_id = (
+            f"{raw_record.source_system}_{raw_record.site_id}_"
+            f"{raw_record.original_point_name}_{datetime.now().timestamp()}"
+        )
         sanitized = SanitizedIntermediateRecord(
-            source_record_id=f"{raw_record.source_system}_{raw_record.site_id}_{raw_record.original_point_name}_{datetime.now().timestamp()}",  # Unique ID
+            source_record_id=source_record_id,  # Unique ID
             source_system=raw_record.source_system,
             site_id=raw_record.site_id,
             sanitized_name="",  # Will be set by _clean_point_name
