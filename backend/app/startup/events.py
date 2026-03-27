@@ -252,6 +252,25 @@ async def startup_event(app: FastAPI) -> None:
     register_decision_subscribers()
     _logger.info("Decision moment subscribers registered")
 
+    # Pre-warm decision cache for site-002 at startup (no cold-start 422 errors)
+    try:
+        from app.api.decisions import cache_decision_payload
+        from app.services.decision_moment_aggregator import DecisionMomentAggregator
+
+        aggregator = DecisionMomentAggregator()
+        payload = aggregator.assemble(
+            building_id="site-002",
+            asset_id="S002-CHILLER-B1-001",
+            severity="critical",
+            fault_type="chiller_fault",
+            trigger_reason="startup",
+            current_hour=datetime.now().hour,
+        )
+        cache_decision_payload("site-002", payload.to_dict())
+        _logger.info("✅ Decision cache pre-warmed for site-002")
+    except Exception as e:
+        _logger.warning(f"⚠️ Decision cache pre-warm failed (non-fatal): {e}")
+
     # Background notification tasks (escalation checker, digest scheduler)
     from app.services.notification_tasks import start_notification_tasks
 
