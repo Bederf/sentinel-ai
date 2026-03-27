@@ -15,8 +15,9 @@ from app.database.repositories.equipment_repository import EquipmentRepository
 from app.database.repositories.sensor_repository import SensorRepository
 from app.services.csv_loader import AssetData, AlarmData as CSVAlarmData
 from app.services.health_threshold_service import get_health_thresholds
-from app.middleware.auth_middleware import require_equipment_access
+from app.middleware.auth_middleware import require_equipment_access, require_query_site_access
 from app.models.auth import AuthContext
+from app.core.site_resolver import get_primary_site_code
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -495,12 +496,17 @@ async def list_equipment(
     status: Optional[str] = Query(None, description="Filter by status (normal, warning, critical)"),
     min_health: Optional[int] = Query(None, ge=0, le=100, description="Minimum health score"),
     max_health: Optional[int] = Query(None, ge=0, le=100, description="Maximum health score"),
+    auth: AuthContext = Depends(require_query_site_access("site_id")),
 ) -> EquipmentListResponse:
     """
     List all equipment with optional filtering.
 
+    Authorization: require_query_site_access enforces that the authenticated user
+    has access to the requested site_id. If no site_id is provided, the response
+    is scoped to the user's primary site.
+
     Args:
-        site_id: Filter by site ID
+        site_id: Filter by site ID (optional; if omitted, defaults to user's primary site)
         equipment_type: Filter by type (ahu, chiller, ups, generator, etc.)
         status: Filter by status (normal, warning, critical)
         min_health: Minimum health score (0-100)
@@ -533,10 +539,14 @@ async def list_equipment(
         }
         equipment.append(transformed)
 
-    # Apply filters - normalize site_id comparison (handle both SITE-001 and site-001 formats)
-    if site_id:
-        site_id_lower = site_id.lower()
-        equipment = [e for e in equipment if e["site_id"].lower() == site_id_lower]
+    # Apply site filter
+    # If site_id query param is not provided, scope to user's primary site
+    if not site_id:
+        site_id = get_primary_site_code()
+
+    # Filter by site_id - normalize case (handle both SITE-001 and site-001 formats)
+    site_id_lower = site_id.lower()
+    equipment = [e for e in equipment if e["site_id"].lower() == site_id_lower]
     if equipment_type:
         # Match equipment type (handle hvac-chiller, hvac-ahu etc.)
         type_lower = equipment_type.lower()
