@@ -69,8 +69,10 @@ import { SecurityIntelligenceCard } from "./intelligence/SecurityIntelligenceCar
 import CardLibrary from "./CardLibrary";
 import { DEFAULT_KPI_CARDS, DEFAULT_SECTIONS } from "../lib/cardDefinitions";
 import { ArcadeView } from "./arcade/ArcadeView";
+import { OverviewCockpitHost } from "./cockpit/OverviewCockpitHost";
 import { BUILDING_TAB_ITEMS } from "../lib/navigation";
 import type { BuildingTabId } from "../lib/navigation";
+import { phaseAllows, PHASE_LABELS, PHASE_COLORS, PHASE_DESCRIPTIONS, ALL_PHASES, type OnboardingPhase } from "../lib/onboardingPhase";
 import { setStoredSelectedSite } from "../lib/siteSelection";
 
 // ─── Lazy-loaded tab components ─────────────────────────────────────
@@ -149,6 +151,13 @@ interface SiteDetailData {
   status?: "normal" | "warning" | "critical";
   optimization_enabled?: boolean;
   sentinel_processing_enabled?: boolean;
+  // Last phase transition record (from phase_transition_log)
+  last_phase_transition?: {
+    to_phase: string;
+    changed_by: string;
+    created_at: string;
+    reason?: string | null;
+  } | null;
   // Bridge ingestion status
   bridge_connected?: boolean;
   bridge_data_source?: "simbiot" | "simulation" | "none";
@@ -194,6 +203,8 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
   const [savingNotes, setSavingNotes] = useState(false);
   const [discovering, setDiscovering] = useState(false);
   const [metadataTab, setMetadataTab] = useState<"info" | "network" | "device" | "operating" | "notes">("info");
+  const [sitePhase, setSitePhase] = useState<OnboardingPhase>("shadow");
+  const [phaseUpdating, setPhaseUpdating] = useState(false);
 
   // Prediction detail modal
   const [selectedPrediction, setSelectedPrediction] = useState<Prediction | null>(null);
@@ -280,6 +291,7 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
           address: siteData.address || siteData.location || "",
           location: siteData.location,
         } as SiteDetailData);
+        setSitePhase((siteData.onboarding_phase as OnboardingPhase) ?? "shadow");
 
         // When SENTINEL is off, don't pull any BMS data
         if (siteData.sentinel_processing_enabled === false) {
@@ -768,6 +780,57 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
                     )}
                   </div>
                 ) : null}
+
+                {/* Onboarding phase badge + admin selector */}
+                <div className="flex items-center gap-2">
+                  <div
+                    className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium"
+                    style={{
+                      backgroundColor: `${PHASE_COLORS[sitePhase]}22`,
+                      color: PHASE_COLORS[sitePhase],
+                      border: `1px solid ${PHASE_COLORS[sitePhase]}44`,
+                    }}
+                    title={PHASE_DESCRIPTIONS[sitePhase]}
+                  >
+                    {PHASE_LABELS[sitePhase]}
+                  </div>
+                  {site?.last_phase_transition && (
+                    <span
+                      title={`Phase set to ${site.last_phase_transition.to_phase} by ${site.last_phase_transition.changed_by} on ${new Date(site.last_phase_transition.created_at).toLocaleDateString("en-ZA")}`}
+                      className="cursor-help"
+                    >
+                      ℹ
+                    </span>
+                  )}
+                  <select
+                    value={sitePhase}
+                    disabled={phaseUpdating}
+                    onChange={async (e) => {
+                      const newPhase = e.target.value as OnboardingPhase;
+                      setPhaseUpdating(true);
+                      try {
+                        await api.updateSitePhase(siteId, newPhase);
+                        setSitePhase(newPhase);
+                      } catch {
+                        // revert on error
+                      } finally {
+                        setPhaseUpdating(false);
+                      }
+                    }}
+                    className="text-xs rounded px-1 py-0.5 border"
+                    style={{
+                      background: "var(--color-sentinel-bg-secondary)",
+                      color: "var(--color-sentinel-text-secondary)",
+                      borderColor: "var(--color-sentinel-border)",
+                      opacity: phaseUpdating ? 0.5 : 1,
+                    }}
+                    title="Advance SENTINEL onboarding phase"
+                  >
+                    {ALL_PHASES.map((p) => (
+                      <option key={p} value={p}>{PHASE_LABELS[p]}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
               <div className="flex flex-wrap items-center gap-4" style={{ color: "var(--color-sentinel-text-secondary)" }}>
                 <div className="flex items-center gap-1.5">
@@ -977,8 +1040,9 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
             .filter((tab) => {
               // Hide tabs that require a module add-on (e.g., simulation)
               if (tab.requiredModule && !isModuleActive(tab.requiredModule)) return false;
-              // Controls tab: only show if ANY control add-on is active
+              // Controls tab: only show if ANY control add-on is active AND phase permits
               if (tab.id === "controls") {
+                if (!phaseAllows(sitePhase, "approve_reject")) return false;
                 const CONTROL_MODULES = [
                   'hvac_control', 'energy_control', 'lighting_control',
                   'solar_control', 'water_control', 'security_control',
@@ -1024,6 +1088,18 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
       <>
       {/* ArcadeView — spatial intelligence interface */}
       <ArcadeView siteId={siteId} onModuleDisplayChange={handleModuleDisplayChange} />
+      {/* Sentinel Cockpit — decision intelligence with fullscreen support */}
+      {sentinelEnabled && site && (
+        <div className="mb-6">
+          <OverviewCockpitHost
+            siteId={siteId}
+            siteName={site.name}
+            activeAlerts={alerts.length}
+            predictionsCount={predictions.length}
+            equipmentCount={equipment.length}
+          />
+        </div>
+      )}
       {/* Overview Tab — original Equipment/Alerts/Energy/Predictions tabs + summary panels */}
       <div
         className="rounded-md overflow-hidden mb-6"

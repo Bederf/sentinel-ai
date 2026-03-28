@@ -610,6 +610,15 @@ export interface Site {
   optimization_history?: OptimizationHistoryEntry[];
   // SENTINEL processing toggle (Phase 125)
   sentinel_processing_enabled?: boolean;
+  // Onboarding phase — trust-building model
+  onboarding_phase?: "shadow" | "advisory" | "supervised" | "auto";
+  // Last phase transition record (from phase_transition_log)
+  last_phase_transition?: {
+    to_phase: string;
+    changed_by: string;
+    created_at: string;
+    reason?: string | null;
+  } | null;
   // Bridge ingestion status
   bridge_connected?: boolean;
   bridge_data_source?: "simbiot" | "simulation" | "none";
@@ -1533,8 +1542,8 @@ export const api = {
    * @param alertId - ID of the alert to acknowledge
    * @param acknowledgedBy - Name of the person acknowledging (defaults to "operator")
    */
-  async acknowledgeAlert(alertId: string, acknowledgedBy: string = "operator"): Promise<{ status: string; alert_id: string }> {
-    return fetchApi<{ status: string; alert_id: string }>(`/api/alerts/${alertId}/acknowledge`, {
+  async acknowledgeAlert(alertId: string, acknowledgedBy: string = "operator"): Promise<{ status: string; alert_id: string; work_order_created: boolean; work_order_id: string | null }> {
+    return fetchApi<{ status: string; alert_id: string; work_order_created: boolean; work_order_id: string | null }>(`/api/alerts/${alertId}/acknowledge`, {
       method: "POST",
       body: JSON.stringify({ acknowledged_by: acknowledgedBy }),
     });
@@ -1985,6 +1994,16 @@ export const api = {
     return fetchApi(`/api/sites/${siteId}/processing`, {
       method: "POST",
       body: JSON.stringify({ enabled }),
+    });
+  },
+
+  async updateSitePhase(
+    siteId: string,
+    phase: "shadow" | "advisory" | "supervised" | "auto"
+  ): Promise<{ site_id: string; onboarding_phase: string }> {
+    return fetchApi(`/api/sites/${siteId}/phase`, {
+      method: "PATCH",
+      body: JSON.stringify({ phase }),
     });
   },
 
