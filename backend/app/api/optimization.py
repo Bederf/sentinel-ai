@@ -1,31 +1,31 @@
 """Optimization API endpoints for HVAC load shedding and AI optimization."""
 
+import calendar
 import json
 import logging
-import calendar
-from datetime import datetime, timedelta, date
+from datetime import date, datetime, timedelta
 from pathlib import Path
-from typing import Dict, List, Optional, Any
+from typing import Any
 
-from fastapi import APIRouter, HTTPException, Body, Request
+from fastapi import APIRouter, Body, HTTPException, Request
 from pydantic import BaseModel
 
-from app.middleware.rate_limiter import limiter
-from app.services.ai_optimizer import get_ai_optimizer
-from app.services.device_abstraction import device_manager
-from app.services.audit_logger import AuditLogger
-from app.services.eskomsepush_service import eskomsepush_service
-from app.services.mv_verification_service import get_mv_verification_service
-from app.models.audit_log import AuditResultType
-from app.models.optimization import (
-    OptimizationStatus,
-    OptimizationHistoryEntry,
-)
-from app.models.module_registry import ModuleType
-from app.database.repositories import SiteRepository
 from app.config.settings import settings
-from app.services.optimization_tier_router import get_tier_router
+from app.database.repositories import SiteRepository
+from app.middleware.rate_limiter import limiter
+from app.models.audit_log import AuditResultType
+from app.models.module_registry import ModuleType
+from app.models.optimization import (
+    OptimizationHistoryEntry,
+    OptimizationStatus,
+)
+from app.services.ai_optimizer import get_ai_optimizer
+from app.services.audit_logger import AuditLogger
+from app.services.device_abstraction import device_manager
+from app.services.eskomsepush_service import eskomsepush_service
 from app.services.module_registry_service import module_registry
+from app.services.mv_verification_service import get_mv_verification_service
+from app.services.optimization_tier_router import get_tier_router
 from app.services.profile_service import get_profile_service
 from app.utils.ai_provenance import attach_ai_provenance, get_ml_provenance
 
@@ -54,8 +54,8 @@ class EskomStatusResponse(BaseModel):
 
     current_stage: int
     updated_at: str
-    next_stages: List[LoadSheddingStage]
-    area_schedules: Dict[str, List[LoadSheddingStage]]
+    next_stages: list[LoadSheddingStage]
+    area_schedules: dict[str, list[LoadSheddingStage]]
     source: str = "eskomsepush"  # "eskomsepush" or "simulated"
 
 
@@ -65,8 +65,8 @@ class SiteScheduleResponse(BaseModel):
     site_id: str
     site_name: str
     current_stage: int
-    schedules: List[LoadSheddingStage]
-    next_outage: Optional[LoadSheddingStage]
+    schedules: list[LoadSheddingStage]
+    next_outage: LoadSheddingStage | None
     area_name: str = ""
     source: str = "eskomsepush"
 
@@ -89,7 +89,7 @@ def get_site_name(site_id: str) -> str:
 
 
 @router.get("/optimization/scenarios")
-async def get_optimization_scenarios(site_id: Optional[str] = None) -> List[Dict[str, Any]]:
+async def get_optimization_scenarios(site_id: str | None = None) -> list[dict[str, Any]]:
     """
     Get load shedding optimization scenarios.
 
@@ -150,7 +150,7 @@ async def get_eskom_status():
                 )
 
             # Build area schedules from area events
-            area_schedules: Dict[str, List[LoadSheddingStage]] = {}
+            area_schedules: dict[str, list[LoadSheddingStage]] = {}
             if combined.area_events:
                 area_key = combined.area_name or "default"
                 area_schedules[area_key] = [
@@ -204,7 +204,7 @@ async def get_site_eskom_status(site_id: str):
             current_stage = combined.eskom.stage
 
             # Convert area events to LoadSheddingStage list
-            schedules: List[LoadSheddingStage] = []
+            schedules: list[LoadSheddingStage] = []
             if current_stage > 0 and combined.area_events:
                 for event in combined.area_events:
                     schedules.append(
@@ -286,7 +286,7 @@ async def search_eskomsepush_areas(text: str):
         return {"areas": areas, "count": len(areas)}
     except Exception as e:
         logger.error(f"EskomSePush area search error: {e}")
-        raise HTTPException(status_code=502, detail=f"EskomSePush API error: {str(e)}")
+        raise HTTPException(status_code=502, detail=f"EskomSePush API error: {e!s}")
 
 
 @router.get("/optimization/eskomsepush/allowance")
@@ -299,7 +299,7 @@ async def get_eskomsepush_allowance():
         return await eskomsepush_service.get_allowance()
     except Exception as e:
         logger.error(f"EskomSePush allowance check error: {e}")
-        raise HTTPException(status_code=502, detail=f"EskomSePush API error: {str(e)}")
+        raise HTTPException(status_code=502, detail=f"EskomSePush API error: {e!s}")
 
 
 @router.get("/optimization/thermal-runway")
@@ -375,9 +375,9 @@ class AnalyzeRequest(BaseModel):
     """Request model for analyze endpoint."""
 
     site_id: str
-    current_conditions: Optional[Dict[str, Any]] = None
-    weather_forecast: Optional[Dict[str, Any]] = None
-    energy_prices: Optional[Dict[str, Any]] = None
+    current_conditions: dict[str, Any] | None = None
+    weather_forecast: dict[str, Any] | None = None
+    energy_prices: dict[str, Any] | None = None
 
 
 class LoadSheddingAnalyzeRequest(BaseModel):
@@ -385,7 +385,7 @@ class LoadSheddingAnalyzeRequest(BaseModel):
 
     site_id: str
     load_shedding_stage: int  # 1-4, higher = more severe
-    current_conditions: Optional[Dict[str, Any]] = None
+    current_conditions: dict[str, Any] | None = None
 
 
 class ApproveRequest(BaseModel):
@@ -393,7 +393,7 @@ class ApproveRequest(BaseModel):
 
     recommendation_id: str
     site_id: str
-    setpoints_to_apply: List[Dict[str, Any]]
+    setpoints_to_apply: list[dict[str, Any]]
 
 
 class ToggleRequest(BaseModel):
@@ -456,7 +456,7 @@ def load_sites():
     return []
 
 
-def save_sites(sites: List[Dict[str, Any]]):
+def save_sites(sites: list[dict[str, Any]]):
     """Save sites to Supabase, with fallback to legacy JSON file."""
     # Try Supabase first
     if not settings.use_json_storage:
@@ -485,7 +485,7 @@ def save_sites(sites: List[Dict[str, Any]]):
 
 
 @router.post("/optimization/analyze")
-async def analyze_optimization(request: AnalyzeRequest) -> Dict[str, Any]:
+async def analyze_optimization(request: AnalyzeRequest) -> dict[str, Any]:
     """
     Analyze building conditions and generate multi-system optimization recommendations.
 
@@ -529,9 +529,11 @@ async def analyze_optimization(request: AnalyzeRequest) -> Dict[str, Any]:
         # Check if site is in automatic mode (auto-apply without human approval)
         site_mode = "supervised"
         site_settings = {}
+        site_phase = "shadow"
         if site:
             site_settings = site.get("optimization_settings") or {}
             site_mode = site_settings.get("mode", "supervised")
+            site_phase = site.get("onboarding_phase") or "shadow"
         controls_module_active = _controls_module_active(request.site_id)
 
         # --- Tier Routing (Phase 82-02) ---
@@ -577,18 +579,28 @@ async def analyze_optimization(request: AnalyzeRequest) -> Dict[str, Any]:
         execution_summary = {"attempted": 0, "succeeded": 0, "failed": 0}
 
         # Determine which recommendations to auto-apply
+        from app.models.onboarding_phase import phase_allows
+
+        phase_permits_auto = phase_allows(site_phase, "auto_apply")
+
         if controls_module_active:
             if settings.optimization_routing_enforced:
                 # ENFORCE MODE: routing determines which recommendations get auto-applied
-                # Only auto-apply if: routing says auto_execute AND validation passes
+                # Only auto-apply if: routing says auto_execute AND validation passes AND phase permits
                 should_auto_apply = (
                     validation["allowed"]
                     and recommendations_list
                     and any(d.action == "auto_execute" for d in routing_decisions)
+                    and phase_permits_auto
                 )
             else:
-                # SHADOW MODE: existing behavior — auto-apply if site is in automatic mode
-                should_auto_apply = site_mode == "automatic" and validation["allowed"] and bool(recommendations_list)
+                # SHADOW MODE: existing behavior — auto-apply if site is in automatic mode AND phase permits
+                should_auto_apply = (
+                    site_mode == "automatic"
+                    and validation["allowed"]
+                    and bool(recommendations_list)
+                    and phase_permits_auto
+                )
         else:
             should_auto_apply = False
             if site_mode == "automatic":
@@ -596,6 +608,14 @@ async def analyze_optimization(request: AnalyzeRequest) -> Dict[str, Any]:
                     "Skipping auto-apply for site %s because control module is inactive",
                     request.site_id,
                 )
+
+        # SENTINEL SAFETY GATE — Phase 1 remediation
+        # Optimization path auto-execution disabled pending ApprovalService integration.
+        # Direct device_manager.write_device_value() bypasses SafetyEngine, QualityGateEvaluator,
+        # and COV verification. All optimization recommendations remain advisory until Phase 2
+        # wires this path through ApprovalService.auto_execute_recommendation().
+        # See: architecture remediation Phase 1, dual-router audit finding 2026-03-28
+        should_auto_apply = False  # TODO-PHASE2: remove when optimization routes through ApprovalService
 
         if should_auto_apply:
             logger.info(f"Auto-applying recommendations for site {request.site_id}")
@@ -821,7 +841,7 @@ async def analyze_optimization(request: AnalyzeRequest) -> Dict[str, Any]:
 
 
 @router.post("/optimization/analyze-load-shedding")
-async def analyze_load_shedding(request: LoadSheddingAnalyzeRequest) -> Dict[str, Any]:
+async def analyze_load_shedding(request: LoadSheddingAnalyzeRequest) -> dict[str, Any]:
     """
     Analyze building optimization with load shedding stage awareness.
 
@@ -886,7 +906,7 @@ async def analyze_load_shedding(request: LoadSheddingAnalyzeRequest) -> Dict[str
 
 
 @router.post("/optimization/approve")
-async def approve_optimization(request: Request, body: ApproveRequest = Body(...)) -> Dict[str, Any]:
+async def approve_optimization(request: Request, body: ApproveRequest = Body(...)) -> dict[str, Any]:
     """
     Apply approved optimization recommendations to building systems.
 
@@ -1215,7 +1235,7 @@ def _count_total_weekdays(year: int, month: int) -> int:
     return sum(1 for d in range(1, days_in_month + 1) if date(year, month, d).weekday() < 5)
 
 
-def _estimate_operating_hours(year: int, month: int) -> Dict[str, Any]:
+def _estimate_operating_hours(year: int, month: int) -> dict[str, Any]:
     """Estimate operating hours for a month with SA TOU breakdown."""
     weekdays = _count_total_weekdays(year, month)
     hours_per_day = 10  # 07:00-17:00
@@ -1248,7 +1268,7 @@ def _estimate_operating_hours(year: int, month: int) -> Dict[str, Any]:
     }
 
 
-def calculate_monthly_savings(optimization_history: Optional[List[Dict[str, Any]]]) -> Dict[str, Any]:
+def calculate_monthly_savings(optimization_history: list[dict[str, Any]] | None) -> dict[str, Any]:
     """Calculate current-month savings using schedule-aware operating hours."""
     now = datetime.now()
     operating = _estimate_operating_hours(now.year, now.month)
@@ -1296,7 +1316,7 @@ def calculate_monthly_savings(optimization_history: Optional[List[Dict[str, Any]
 
 @router.get("/optimization/status/{site_id}")
 @limiter.limit("60/minute")
-async def get_optimization_status(site_id: str, request: Request) -> Dict[str, Any]:
+async def get_optimization_status(site_id: str, request: Request) -> dict[str, Any]:
     """
     Get optimization status for a specific site.
 
@@ -1357,7 +1377,7 @@ async def get_optimization_status(site_id: str, request: Request) -> Dict[str, A
 
 
 @router.post("/optimization/toggle/{site_id}")
-async def toggle_optimization(site_id: str, request: ToggleRequest) -> Dict[str, Any]:
+async def toggle_optimization(site_id: str, request: ToggleRequest) -> dict[str, Any]:
     """
     Enable or disable optimization for a specific site.
 
@@ -1422,19 +1442,19 @@ async def toggle_optimization(site_id: str, request: ToggleRequest) -> Dict[str,
 # ============================================================================
 
 # In-memory precooling state per site
-_precooling_state: Dict[str, Dict[str, Any]] = {}
+_precooling_state: dict[str, dict[str, Any]] = {}
 
 
 class PrecoolingRequest(BaseModel):
     """Request model for starting precooling."""
 
-    scenario_id: Optional[str] = None
+    scenario_id: str | None = None
 
 
 @router.post("/optimization/precooling/{site_id}/start")
 async def start_precooling(
     site_id: str, request: PrecoolingRequest = Body(default=PrecoolingRequest())
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Start pre-cooling sequence for a site before a load shedding event.
 
@@ -1602,7 +1622,7 @@ async def start_precooling(
 
 
 @router.post("/optimization/precooling/{site_id}/stop")
-async def stop_precooling(site_id: str) -> Dict[str, Any]:
+async def stop_precooling(site_id: str) -> dict[str, Any]:
     """Stop pre-cooling for a site and revert setpoints to normal values."""
     if not _controls_module_active(site_id):
         _raise_controls_module_required(site_id)
@@ -1694,7 +1714,7 @@ async def stop_precooling(site_id: str) -> Dict[str, Any]:
 
 
 @router.get("/optimization/precooling/{site_id}/status")
-async def get_precooling_status(site_id: str) -> Dict[str, Any]:
+async def get_precooling_status(site_id: str) -> dict[str, Any]:
     """Get pre-cooling status for a site."""
     existing = _precooling_state.get(site_id)
     if not existing:
@@ -1726,7 +1746,7 @@ class ZoneOverrideRequest(BaseModel):
 
 
 @router.get("/optimization/profiles")
-async def list_profiles() -> Dict[str, Any]:
+async def list_profiles() -> dict[str, Any]:
     """
     List all available optimization profiles.
 
@@ -1749,7 +1769,7 @@ async def list_profiles() -> Dict[str, Any]:
 
 @limiter.limit("30/minute")
 @router.get("/optimization/settings/{site_id}")
-async def get_profile_settings(request: Request, site_id: str) -> Dict[str, Any]:
+async def get_profile_settings(request: Request, site_id: str) -> dict[str, Any]:
     """
     Get site's current profile configuration.
 
@@ -1779,7 +1799,7 @@ async def get_profile_settings(request: Request, site_id: str) -> Dict[str, Any]
 @router.put("/optimization/settings/{site_id}")
 async def update_profile_settings(
     request: Request, site_id: str, config_request: ProfileUpdateRequest
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Update site profile configuration.
 
@@ -1841,7 +1861,7 @@ async def update_profile_settings(
 
 
 @router.post("/optimization/settings/{site_id}/zone-override")
-async def add_zone_override(site_id: str, request: ZoneOverrideRequest) -> Dict[str, Any]:
+async def add_zone_override(site_id: str, request: ZoneOverrideRequest) -> dict[str, Any]:
     """
     Add or update a zone profile override.
 
@@ -1892,7 +1912,7 @@ async def add_zone_override(site_id: str, request: ZoneOverrideRequest) -> Dict[
 
 
 @router.delete("/optimization/settings/{site_id}/zone-override/{zone_id}")
-async def remove_zone_override(site_id: str, zone_id: str) -> Dict[str, Any]:
+async def remove_zone_override(site_id: str, zone_id: str) -> dict[str, Any]:
     """
     Remove a zone profile override.
 
@@ -1935,7 +1955,7 @@ async def remove_zone_override(site_id: str, zone_id: str) -> Dict[str, Any]:
 
 @router.get("/optimization/mv/summary/{site_id}")
 @limiter.limit("30/minute")
-async def get_mv_summary(site_id: str, request: Request) -> Dict[str, Any]:
+async def get_mv_summary(site_id: str, request: Request) -> dict[str, Any]:
     """Get M&V verification summary for a site."""
     try:
         mv_service = get_mv_verification_service()
@@ -1948,7 +1968,7 @@ async def get_mv_summary(site_id: str, request: Request) -> Dict[str, Any]:
 
 @router.post("/optimization/mv/verify")
 @limiter.limit("10/minute")
-async def run_mv_verifications(request: Request) -> Dict[str, Any]:
+async def run_mv_verifications(request: Request) -> dict[str, Any]:
     """Trigger pending M&V verifications."""
     try:
         mv_service = get_mv_verification_service()
