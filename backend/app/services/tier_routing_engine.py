@@ -176,7 +176,7 @@ class TierRoutingEngine:
         elif confidence_score < tier3_threshold:
             tier = TierLevel.TIER2.value
             tier_num = 2
-            action = "require_approval"
+            action = "supervised"
             reason = (
                 f"Confidence {confidence_score:.2f} meets Tier 2 ({tier2_threshold:.2f}) "
                 f"but below Tier 3 ({tier3_threshold:.2f}) - requires operator approval"
@@ -234,6 +234,7 @@ class TierRoutingEngine:
             "actor": "auto_tier3" if tier_num == 3 else ("human_tier2" if tier_num == 2 else "system"),
             "point_name": _point,
             "control_point": _point,
+            "routing_source": "recommendation_graph",
             "target_value": recommendation.get("action", {}).get("value"),
             "contributing_factors": {
                 "confidence": confidence_score,
