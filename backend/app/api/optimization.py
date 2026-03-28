@@ -23,6 +23,7 @@ from app.models.optimization import (
     OptimizationStatus,
 )
 from app.services.ai_optimizer import get_ai_optimizer
+from app.services.approval_service import get_approval_service
 from app.services.audit_logger import AuditLogger
 from app.services.device_abstraction import device_manager
 from app.services.eskomsepush_service import eskomsepush_service
@@ -30,6 +31,7 @@ from app.services.module_registry_service import module_registry
 from app.services.mv_verification_service import get_mv_verification_service
 from app.services.optimization_tier_router import get_tier_router
 from app.services.profile_service import get_profile_service
+from app.services.routing_adapters import optimization_routing_to_tier_result
 from app.utils.ai_provenance import attach_ai_provenance, get_ml_provenance
 
 logger = logging.getLogger(__name__)
@@ -618,119 +620,95 @@ async def analyze_optimization(request: AnalyzeRequest) -> dict[str, Any]:
         auto_apply_results = []
         execution_summary = {"attempted": 0, "succeeded": 0, "failed": 0}
 
-        # Determine which recommendations to auto-apply
+        # Determine which recommendations are eligible for auto-apply
         from app.models.onboarding_phase import phase_allows
 
         phase_permits_auto = phase_allows(site_phase, "auto_apply")
 
-        if controls_module_active:
-            if settings.optimization_routing_enforced:
-                # ENFORCE MODE: routing determines which recommendations get auto-applied
-                # Only auto-apply if: routing says auto_execute AND validation passes AND phase permits
-                should_auto_apply = (
-                    validation["allowed"]
-                    and recommendations_list
-                    and any(d.action == "auto_execute" for d in routing_decisions)
-                    and phase_permits_auto
-                )
-            else:
-                # SHADOW MODE: existing behavior — auto-apply if site is in automatic mode AND phase permits
-                should_auto_apply = (
-                    site_mode == "automatic"
-                    and validation["allowed"]
-                    and bool(recommendations_list)
-                    and phase_permits_auto
-                )
-        else:
-            should_auto_apply = False
-            if site_mode == "automatic":
-                logger.info(
-                    "Skipping auto-apply for site %s because control module is inactive",
-                    request.site_id,
-                )
+        # G3+G4: Route eligible Tier 3 decisions through ApprovalService.
+        # Tier 2 decisions rest in the recommendations table (persisted in G1) and
+        # await human approval — no further action is required here.
+        # Tier 1 / blocked / advisory decisions are logged only.
+        approval_service = get_approval_service()
+        for idx, rec_item in enumerate(recommendations_list):
+            if idx >= len(routing_decisions):
+                break
+            decision = routing_decisions[idx]
 
-        # SENTINEL SAFETY GATE — Phase 1 remediation
-        # Optimization path auto-execution disabled pending ApprovalService integration.
-        # Direct device_manager.write_device_value() bypasses SafetyEngine, QualityGateEvaluator,
-        # and COV verification. All optimization recommendations remain advisory until Phase 2
-        # wires this path through ApprovalService.auto_execute_recommendation().
-        # See: architecture remediation Phase 1, dual-router audit finding 2026-03-28
-        should_auto_apply = False  # TODO-PHASE2: remove when optimization routes through ApprovalService
+            tier_result = optimization_routing_to_tier_result(
+                decision,
+                rec_item.get("_recommendation_id", ""),
+                rec_item.get("_correlation_id", ""),
+            )
 
-        if should_auto_apply:
-            logger.info(f"Auto-applying recommendations for site {request.site_id}")
-            audit_logger = AuditLogger()
-
-            for idx, rec_item in enumerate(recommendations_list):
-                # In enforce mode, skip recommendations not routed to auto_execute
-                if settings.optimization_routing_enforced:
-                    if idx < len(routing_decisions) and routing_decisions[idx].action != "auto_execute":
-                        continue
-
-                device_id = rec_item.get("equipment_id")
-                point_name = rec_item.get("point_name")
-                value = rec_item.get("recommended_value")
-
-                if not all([device_id, point_name, value is not None]):
-                    auto_apply_results.append(
-                        {
-                            "device_id": device_id,
-                            "success": False,
-                            "error": "Missing required fields",
-                        }
+            if tier_result.action == "auto_execute":
+                # Only auto-execute when validation, phase, and controls module permit
+                if not (controls_module_active and validation["allowed"] and phase_permits_auto):
+                    logger.info(
+                        "Skipping auto_execute for site %s (controls_active=%s, validation=%s, phase=%s)",
+                        request.site_id,
+                        controls_module_active,
+                        validation["allowed"],
+                        phase_permits_auto,
                     )
                     execution_summary["attempted"] += 1
                     execution_summary["failed"] += 1
+                    auto_apply_results.append(
+                        {
+                            "recommendation_id": tier_result.correlation_id,
+                            "success": False,
+                            "error": "Execution blocked by validation/phase/module gate",
+                        }
+                    )
                     continue
 
                 execution_summary["attempted"] += 1
                 try:
-                    success = await device_manager.write_device_value(
-                        device_id=device_id,
-                        point_name=point_name,
-                        value=value,
-                        user="SENTINEL",
+                    result = await approval_service.auto_execute_recommendation(
+                        rec_item["_recommendation_id"],
+                        tier_result,
                     )
                     auto_apply_results.append(
                         {
-                            "device_id": device_id,
-                            "point_name": point_name,
-                            "success": bool(success),
-                            "value": value,
+                            "recommendation_id": rec_item["_recommendation_id"],
+                            "success": result.success,
+                            "status": result.status,
                         }
                     )
-                    if success:
+                    if result.success:
                         execution_summary["succeeded"] += 1
-                        audit_logger.log_control_action(
-                            device_id=device_id,
-                            point_name=point_name,
-                            user="SENTINEL",
-                            old_value=rec_item.get("current_value"),
-                            new_value=value,
-                            result=AuditResultType.SUCCESS,
-                            metadata={
-                                "source": "sentinel_auto_optimization",
-                                "confidence": recommendation.confidence,
-                                "routing_action": routing_decisions[idx].action
-                                if idx < len(routing_decisions)
-                                else "unknown",
-                            },
-                        )
                     else:
                         execution_summary["failed"] += 1
+                        logger.warning(
+                            "auto_execute_recommendation failed for rec=%s: %s",
+                            rec_item["_recommendation_id"],
+                            result.error_message,
+                        )
                 except Exception as apply_err:
-                    logger.error(f"Auto-apply failed for {device_id}/{point_name}: {apply_err}")
+                    logger.error(
+                        "auto_execute_recommendation raised for rec=%s: %s",
+                        rec_item.get("_recommendation_id"),
+                        apply_err,
+                    )
                     auto_apply_results.append(
                         {
-                            "device_id": device_id,
+                            "recommendation_id": rec_item.get("_recommendation_id"),
                             "success": False,
                             "error": str(apply_err),
                         }
                     )
                     execution_summary["failed"] += 1
 
-            audit_logger.flush()
-            auto_applied = all(r.get("success") for r in auto_apply_results) and len(auto_apply_results) > 0
+            elif tier_result.action == "supervised":
+                # Tier 2 — recommendation already persisted in G1; awaits human approval
+                logger.info(
+                    "Tier 2 recommendation %s queued for human approval (site=%s)",
+                    rec_item.get("_recommendation_id"),
+                    request.site_id,
+                )
+            # Tier 1 / advisory / blocked: no execution action needed
+
+        auto_applied = all(r.get("success") for r in auto_apply_results) and len(auto_apply_results) > 0
 
         # Record M&V verification task for auto-applied recommendations
         # Only create M&V tasks for setpoints that were actually executed successfully

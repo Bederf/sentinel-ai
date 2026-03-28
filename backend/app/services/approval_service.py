@@ -1258,6 +1258,9 @@ class ApprovalService:
             )
 
             # Log to parasite_decisions as success
+            # routing_source: propagate from recommendation.source so that
+            # optimization_api-originated decisions are distinguishable from
+            # recommendation_graph decisions in the parasite_decisions table.
             parasite_repo = ParasiteDecisionRepository()
             await parasite_repo.record_decision(
                 {
@@ -1282,6 +1285,7 @@ class ApprovalService:
                     "gate_snapshot_id": getattr(gate_result, "snapshot_id", None),
                     "safety_result": "allowed",
                     "confidence_score": routing_result.confidence_score,
+                    "routing_source": recommendation.source or "optimization_api",
                 }
             )
 
