@@ -538,7 +538,7 @@ async def analyze_optimization(request: AnalyzeRequest) -> dict[str, Any]:
 
         # --- Tier Routing (Phase 82-02) ---
         # Compute routing decisions per recommendation via the tier router.
-        tier_router = get_tier_router(settings)
+        tier_router = get_tier_router()  # use cached singleton; thresholds now read from settings at init
         control_tier = tier_router.resolve_control_tier(
             site_profile=site,
             optimization_settings=type("_Opts", (), {"mode": site_mode})(),

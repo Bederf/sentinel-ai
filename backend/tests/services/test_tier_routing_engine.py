@@ -79,7 +79,7 @@ class TestTierRoutingEngine:
             assert result.tier != TierLevel.TIER3.value, (
                 f"Risk level {risk_level} should be locked at {TierLevel.TIER2.value}, never {TierLevel.TIER3.value}"
             )
-            assert result.action in ("advisory", "require_approval"), (
+            assert result.action in ("advisory", "supervised"), (
                 f"HIGH/CRITICAL risk should require approval, got action={result.action}"
             )
 

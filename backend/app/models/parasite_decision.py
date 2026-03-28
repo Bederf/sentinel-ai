@@ -295,6 +295,8 @@ class ParasiteDecision:
             "contributing_factors": self.contributing_factors,
             "decision_details": self.decision_details,
             "rejection_category": self.rejection_category,
+            # Routing provenance
+            "routing_source": self.routing_source,
         }
         # Strip None values for cleaner storage
         return {k: v for k, v in d.items() if v is not None}
@@ -348,6 +350,7 @@ class ParasiteDecision:
             contributing_factors=data.get("contributing_factors"),
             decision_details=data.get("decision_details"),
             rejection_category=data.get("rejection_category"),
+            routing_source=data.get("routing_source"),
         )
 
     @classmethod
