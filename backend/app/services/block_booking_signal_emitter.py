@@ -64,7 +64,18 @@ async def emit_block_booking_signals(site_id: str) -> list[dict]:
     Returns:
         List of emitted signal dicts.
     """
+    from app.models.onboarding_phase import get_site_phase, phase_allows
     from app.services.block_booking_detector.booking_store import get_booking_store
+
+    # Phase gate: shadow sites must not emit advisory signals
+    _site_phase = await get_site_phase(site_id)
+    if not phase_allows(_site_phase, "emit_signal"):
+        logger.debug(
+            "emit_block_booking_signals: site %s in phase %s — skipped",
+            site_id,
+            _site_phase,
+        )
+        return []
 
     store = get_booking_store()
     emitted: list[dict] = []

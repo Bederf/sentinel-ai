@@ -413,6 +413,28 @@ async def emit_email_signal(
 
     source_module, signal_type, severity = _classify_email(subject, thread_context)
     room_id, location_ref, site_id = await _resolve_room_context(subject, thread_context)
+
+    # Phase gate: shadow sites must not emit advisory signals
+    from app.models.onboarding_phase import get_site_phase, phase_allows
+
+    _site_phase = await get_site_phase(site_id or "")
+    if not phase_allows(_site_phase, "emit_signal"):
+        logger.debug(
+            "emit_email_signal: site %s in phase %s — skipped",
+            site_id,
+            _site_phase,
+        )
+        return {
+            "signal_id": None,
+            "source_module": source_module,
+            "signal_type": signal_type,
+            "severity": severity,
+            "location_ref": location_ref,
+            "thread_id": _thread_id_from_references(message_id, in_reply_to, references),
+            "status": "phase_gate_skipped",
+            "reason": f"site in phase {_site_phase}",
+        }
+
     thread_id = _thread_id_from_references(message_id, in_reply_to, references)
     stored_signal_type, signal_type_variant = _normalise_signal_type_for_storage(signal_type)
     persisted_site_id, logical_site_id = _coerce_site_uuid(site_id)
