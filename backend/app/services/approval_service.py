@@ -1319,6 +1319,23 @@ class ApprovalService:
 
         except Exception as e:
             logger.error(f"Tier 3 auto-execute: Error executing {recommendation_id}: {str(e)}")
+            # Invariant 2 guard: prevent stranded "pending" records on unhandled exception.
+            # Fetch and mark failed so the record is never left in PENDING indefinitely.
+            try:
+                _stuck_rec = await self.recommendations_repo.get_by_id(recommendation_id)
+                if _stuck_rec and _stuck_rec.status == RecommendationStatus.PENDING:
+                    _stuck_rec.status = RecommendationStatus.FAILED
+                    await self.recommendations_repo.upsert(_stuck_rec)
+                    logger.info(
+                        "Tier 3 auto-execute: marked recommendation %s as FAILED after exception",
+                        recommendation_id,
+                    )
+            except Exception as _mark_err:
+                logger.warning(
+                    "Tier 3 auto-execute: could not mark recommendation %s as FAILED: %s",
+                    recommendation_id,
+                    _mark_err,
+                )
             return ApprovalResult(
                 success=False,
                 recommendation_id=recommendation_id,

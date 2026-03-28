@@ -10,7 +10,7 @@ Tests cover:
 """
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from app.models.recommendation import Recommendation, RecommendationStatus
 from app.services.approval_service import ApprovalService
@@ -52,19 +52,28 @@ class TestApprovalExecution:
         # Setup mocks
         approval_service.recommendations_repo.get_by_id.return_value = mock_recommendation
         approval_service._validate_safety = AsyncMock(return_value={"is_safe": True})
-        # Mock read_device_value to return objects with .value attribute
+        # Mock read_device_value for original value capture (rollback)
         original_reading = MagicMock()
         original_reading.value = 18.0
-        cov_reading = MagicMock()
-        cov_reading.value = 20.0
-        approval_service.device_manager.read_device_value = AsyncMock(side_effect=[original_reading, cov_reading])
-        approval_service.device_manager.write_device_value = AsyncMock(return_value=True)
+        approval_service.device_manager.read_device_value = AsyncMock(return_value=original_reading)
         approval_service.audit_repo.log_action.return_value = None
 
-        # Execute approval
-        result = await approval_service.execute_approval(
-            recommendation_id="rec-123", approved_by="technician@site-002", approval_notes="Urgent - peak demand"
-        )
+        # execute_approval now routes through execution_service.execute_command —
+        # patch it at the module where it is imported (approval_service does a
+        # local `from app.services.execution_service import execute_command`).
+        exec_result = {
+            "success": True,
+            "verified": True,
+            "actual_value": 20.0,
+            "expected_value": 20.0,
+            "error": None,
+            "correlation_id": "test-corr",
+        }
+        with patch("app.services.execution_service.execute_command", new=AsyncMock(return_value=exec_result)):
+            # Execute approval
+            result = await approval_service.execute_approval(
+                recommendation_id="rec-123", approved_by="technician@site-002", approval_notes="Urgent - peak demand"
+            )
 
         # Verify result
         assert result.success is True
@@ -77,7 +86,6 @@ class TestApprovalExecution:
         # Verify method calls
         approval_service.recommendations_repo.get_by_id.assert_called_once_with("rec-123")
         approval_service._validate_safety.assert_called_once()
-        approval_service.device_manager.write_device_value.assert_called_once()
         approval_service.audit_repo.log_action.assert_called_once()
 
     @pytest.mark.asyncio
@@ -129,14 +137,24 @@ class TestApprovalExecution:
         approval_service._validate_safety = AsyncMock(return_value={"is_safe": True})
         original_reading = MagicMock()
         original_reading.value = 18.0
-        cov_reading = MagicMock()
-        cov_reading.value = 15.0  # Clear mismatch — wrote 20.0 but read 15.0 (outside 5% tolerance)
-        approval_service.device_manager.read_device_value = AsyncMock(side_effect=[original_reading, cov_reading])
-        approval_service.device_manager.write_device_value = AsyncMock(return_value=True)
+        approval_service.device_manager.read_device_value = AsyncMock(return_value=original_reading)
         approval_service.audit_repo.log_action.return_value = None
 
-        # Execute approval
-        result = await approval_service.execute_approval(recommendation_id="rec-123", approved_by="technician@site-002")
+        # execute_approval now routes through execution_service.execute_command.
+        # Simulate a write-success but COV mismatch (wrote 20.0, read back 15.0).
+        exec_result = {
+            "success": True,
+            "verified": False,  # COV mismatch
+            "actual_value": 15.0,
+            "expected_value": 20.0,
+            "error": None,
+            "correlation_id": "test-corr",
+        }
+        with patch("app.services.execution_service.execute_command", new=AsyncMock(return_value=exec_result)):
+            # Execute approval
+            result = await approval_service.execute_approval(
+                recommendation_id="rec-123", approved_by="technician@site-002"
+            )
 
         # Verify result
         assert result.success is True  # Still succeeds
