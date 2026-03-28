@@ -1066,7 +1066,7 @@ class ApprovalService:
                 equipment_id=equipment_id,
                 control_point=control_point,
                 target_value=target_value,
-                source="advisory",
+                source="auto_execute",
                 correlation_id=routing_result.correlation_id,
                 decision_id=routing_result.decision_id,
             )
