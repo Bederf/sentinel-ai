@@ -211,6 +211,9 @@ class ParasiteDecision:
     decision_details: Optional[Dict[str, Any]] = None
     rejection_category: Optional[str] = None  # RejectionCategory value
 
+    # --- Routing provenance ---
+    routing_source: Optional[str] = None  # recommendation_graph | optimization_api
+
     def __post_init__(self):
         """Normalize point_name / control_point."""
         # point_name is canonical; control_point is deprecated alias
