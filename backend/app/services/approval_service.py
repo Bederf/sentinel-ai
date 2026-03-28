@@ -271,30 +271,30 @@ class ApprovalService:
                 }
                 cov_verified = False
             else:
-                # Execute write to device via adapter (BACnet, Modbus, or simulated)
+                # Execute write via unified execution pipeline (write → verify → audit)
+                from app.services.execution_service import execute_command
+
                 logger.info(f"Writing to device {equipment_id}: {control_point} = {target_value}")
-                write_result = await self._execute_device_write(
-                    equipment_id=equipment_id, point_name=control_point, target_value=target_value
+                exec_result = await execute_command(
+                    site_id=recommendation.site_id or "",
+                    equipment_id=equipment_id,
+                    control_point=control_point,
+                    target_value=target_value,
+                    source="advisory",
+                    correlation_id=getattr(recommendation, "correlation_id", "") or "",
                 )
 
-                if not write_result.get("success", False):
-                    logger.error(f"Device write failed: {write_result.get('error')}")
+                write_result = {"success": exec_result["success"]}
+                if not exec_result["success"]:
+                    logger.error(f"Device write failed: {exec_result.get('error')}")
                     return ApprovalResult(
                         success=False,
                         recommendation_id=recommendation_id,
                         status="failed",
-                        error_message=f"Device write failed: {write_result.get('error')}",
+                        error_message=f"Device write failed: {exec_result.get('error')}",
                     )
 
-                # Verify COV feedback (confirm device accepted the change)
-                cov_verified = False
-                try:
-                    cov_verified = await self._verify_cov_feedback(
-                        equipment_id=equipment_id, point_name=control_point, expected_value=target_value
-                    )
-                except Exception as e:
-                    logger.warning(f"COV feedback verification not available: {e}, proceeding with approval")
-
+                cov_verified = exec_result["verified"]
                 if not cov_verified:
                     logger.warning(f"COV feedback verification failed for {equipment_id}.{control_point}")
 
@@ -1057,10 +1057,18 @@ class ApprovalService:
                 logger.warning(f"Could not read current value for rollback: {e}")
                 original_value = None
 
-            # Execute write to Niagara device
+            # Execute write via unified execution pipeline (write → verify → audit)
+            from app.services.execution_service import execute_command
+
             logger.info(f"Tier 3 auto-execute: Writing to device {equipment_id}: {control_point} = {target_value}")
-            write_result = await self._execute_device_write(
-                equipment_id=equipment_id, point_name=control_point, target_value=target_value
+            exec_result = await execute_command(
+                site_id=recommendation.site_id or "",
+                equipment_id=equipment_id,
+                control_point=control_point,
+                target_value=target_value,
+                source="advisory",
+                correlation_id=routing_result.correlation_id,
+                decision_id=routing_result.decision_id,
             )
 
             emit_decision_event(
@@ -1070,17 +1078,17 @@ class ApprovalService:
                 recommendation_id=recommendation_id,
                 equipment_code=equipment_id,
                 tier="tier3",
-                status="success" if write_result["success"] else "failed",
+                status="success" if exec_result["success"] else "failed",
                 details={
                     "control_point": control_point,
                     "target_value": target_value,
                     "original_value": original_value,
-                    "error": write_result.get("error", ""),
+                    "error": exec_result.get("error", ""),
                 },
             )
 
-            if not write_result["success"]:
-                logger.error(f"Tier 3 auto-execute: Device write failed: {write_result.get('error')}")
+            if not exec_result["success"]:
+                logger.error(f"Tier 3 auto-execute: Device write failed: {exec_result.get('error')}")
                 parasite_repo = ParasiteDecisionRepository()
                 await parasite_repo.record_decision(
                     {
@@ -1091,7 +1099,7 @@ class ApprovalService:
                         "tier": "tier3",
                         "decision_type": "tier3_auto_execute",
                         "write_status": "failed",
-                        "failure_reason": f"Device write failed: {write_result.get('error')}",
+                        "failure_reason": f"Device write failed: {exec_result.get('error')}",
                         "equipment_code": equipment_id,
                         "point_name": control_point,
                         "control_point": control_point,
@@ -1110,18 +1118,16 @@ class ApprovalService:
                     success=False,
                     recommendation_id=recommendation_id,
                     status="failed",
-                    error_message=f"Device write failed: {write_result.get('error')}",
+                    error_message=f"Device write failed: {exec_result.get('error')}",
                 )
 
-            # COV verification via dedicated service
-            cov_monitor = get_cov_monitor_service()
-            cov_result = await cov_monitor.verify_write(
-                equipment_id=equipment_id, point_name=control_point, expected_value=target_value
-            )
+            # Unpack COV result from execution pipeline for downstream use
+            cov_verified_flag = exec_result["verified"]
+            actual_value_read = exec_result["actual_value"]
 
             logger.info(
                 f"Tier 3 auto-execute: COV verification result for {equipment_id}.{control_point}: "
-                f"verified={cov_result.verified}, actual={cov_result.actual_value}"
+                f"verified={cov_verified_flag}, actual={actual_value_read}"
             )
 
             emit_decision_event(
@@ -1131,26 +1137,36 @@ class ApprovalService:
                 recommendation_id=recommendation_id,
                 equipment_code=equipment_id,
                 tier="tier3",
-                status="verified" if cov_result.verified else "failed",
+                status="verified" if cov_verified_flag else "failed",
                 details={
-                    "expected_value": str(cov_result.expected_value),
-                    "actual_value": str(cov_result.actual_value),
+                    "expected_value": str(target_value),
+                    "actual_value": str(actual_value_read),
                     "control_point": control_point,
                 },
             )
 
             # Auto-rollback on COV failure if enabled
             auto_rolled_back = False
-            if not cov_result.verified:
+            if not cov_verified_flag:
                 if settings.parasite_auto_rollback_enabled:
                     logger.warning(
                         f"Tier 3 auto-execute: COV verification failed for {equipment_id}.{control_point}, "
                         f"initiating auto-rollback"
                     )
+                    # Build a minimal COVVerificationResult for the rollback helper
+                    from app.services.cov_monitor_service import COVVerificationResult as _CVR
+
+                    _cov_for_rollback = _CVR(
+                        verified=False,
+                        actual_value=actual_value_read,
+                        expected_value=target_value,
+                        read_success=actual_value_read is not None,
+                        elapsed_seconds=0.0,
+                    )
                     auto_rolled_back = await self._auto_rollback(
                         recommendation=recommendation,
                         original_value=original_value,
-                        cov_result=cov_result,
+                        cov_result=_cov_for_rollback,
                         decision_id=routing_result.decision_id,
                     )
 
@@ -1162,8 +1178,8 @@ class ApprovalService:
                             status="rolled_back",
                             error_message=(
                                 "COV verification failed, auto-rollback initiated:"
-                                f" expected={cov_result.expected_value},"
-                                f" actual={cov_result.actual_value}"
+                                f" expected={target_value},"
+                                f" actual={actual_value_read}"
                             ),
                             cov_verified=False,
                         )
@@ -1177,6 +1193,7 @@ class ApprovalService:
                         )
 
             # Schedule outcome measurement for 10-minute learning window
+            cov_monitor = get_cov_monitor_service()
             await cov_monitor.schedule_outcome_measurement(
                 decision_id=routing_result.decision_id,
                 equipment_id=equipment_id,
@@ -1197,8 +1214,8 @@ class ApprovalService:
             recommendation.executed_at = datetime.utcnow()
             recommendation.execution_result = {
                 "success": True,
-                "device_write": write_result,
-                "cov_verified": cov_result.verified,
+                "device_write": {"success": True},
+                "cov_verified": cov_verified_flag,
                 "original_value": original_value,
                 "target_value": target_value,
                 "control_point": control_point,
@@ -1218,7 +1235,7 @@ class ApprovalService:
                 approval_notes=f"Tier 3 auto-execute (confidence: {routing_result.confidence_score})",
                 change_description=f"{control_point} = {target_value}",
                 execution_status="success",
-                cov_verified=cov_result.verified,
+                cov_verified=cov_verified_flag,
                 correlation_id=routing_result.correlation_id,
                 decision_id=routing_result.decision_id,
             )
@@ -1228,8 +1245,8 @@ class ApprovalService:
                 successful=True,
                 outcome_status=RecommendationStatus.AUTO_EXECUTED.value,
                 actual_impact={
-                    "cov_verified": cov_result.verified,
-                    "device_write": write_result,
+                    "cov_verified": cov_verified_flag,
+                    "device_write": {"success": True},
                     "target_value": target_value,
                 },
                 metadata={
@@ -1241,7 +1258,6 @@ class ApprovalService:
             )
 
             # Log to parasite_decisions as success
-            cov_latency_ms = int(cov_result.elapsed_seconds * 1000) if cov_result.elapsed_seconds else None
             parasite_repo = ParasiteDecisionRepository()
             await parasite_repo.record_decision(
                 {
@@ -1252,14 +1268,13 @@ class ApprovalService:
                     "tier": "tier3",
                     "decision_type": "tier3_auto_execute",
                     "write_status": "success",
-                    "cov_verified": cov_result.verified,
-                    "cov_latency_ms": cov_latency_ms,
+                    "cov_verified": cov_verified_flag,
                     "equipment_code": equipment_id,
                     "point_name": control_point,
                     "control_point": control_point,
                     "target_value": target_value,
                     "original_value": original_value,
-                    "actual_value": cov_result.actual_value,
+                    "actual_value": actual_value_read,
                     "actor": "auto_tier3",
                     "mode": mode,
                     "gate_status": gate_result.overall.value if gate_result else None,
@@ -1282,7 +1297,7 @@ class ApprovalService:
                     "control_point": control_point,
                     "target_value": target_value,
                     "original_value": original_value,
-                    "cov_verified": cov_result.verified,
+                    "cov_verified": cov_verified_flag,
                     "confidence_score": routing_result.confidence_score,
                 },
             )
@@ -1294,7 +1309,7 @@ class ApprovalService:
                 recommendation_id=recommendation_id,
                 status="auto_executed",
                 executed_at=recommendation.executed_at,
-                cov_verified=cov_result.verified,
+                cov_verified=cov_verified_flag,
                 execution_result=recommendation.execution_result,
             )
 
