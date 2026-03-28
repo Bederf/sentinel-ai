@@ -6,12 +6,15 @@ import logging
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 from fastapi import APIRouter, Body, HTTPException, Request
 from pydantic import BaseModel
 
 from app.config.settings import settings
 from app.database.repositories import SiteRepository
+from app.database.repositories.recommendation_repository import RecommendationRepository
+from app.models.recommendation import Recommendation, RecommendationStatus
 from app.middleware.rate_limiter import limiter
 from app.models.audit_log import AuditResultType
 from app.models.module_registry import ModuleType
@@ -546,10 +549,47 @@ async def analyze_optimization(request: AnalyzeRequest) -> dict[str, Any]:
 
         routing_decisions = []
         recommendations_list = rec_dict.get("recommendations", [])
+        _rec_repo = RecommendationRepository()
         for rec_item in recommendations_list:
             system = rec_item.get("system", rec_item.get("equipment_type", "HVAC"))
             point = rec_item.get("point_name", rec_item.get("setpoint", ""))
             confidence = rec_item.get("confidence", recommendation.confidence)
+
+            # G1: Persist Recommendation record before routing so that downstream
+            # steps (G2 approval, G3 execution) can fetch a stable rec.id from DB.
+            # Defaulted fields:
+            #   action_type  — not available on rec_item dict; defaulted to ""
+            #   risk_level   — not available pre-routing; defaulted to MEDIUM
+            #   reason       — narrative is on the parent recommendation, not per-item
+            #   profile      — carried from parent recommendation object
+            _correlation_id = rec_item.get("correlation_id") or str(uuid4())
+            _rec_obj = Recommendation(
+                site_id=request.site_id,
+                source="optimization_api",
+                status=RecommendationStatus.PENDING,
+                target_equipment=rec_item.get("equipment_code", rec_item.get("equipment", "")),
+                action={
+                    "point": point,
+                    "value": rec_item.get("value", rec_item.get("setpoint_value", None)),
+                },
+                confidence=str(confidence) if not isinstance(confidence, str) else confidence,
+                profile=recommendation.profile or "",
+                correlation_id=_correlation_id,
+            )
+            try:
+                _rec_obj = await _rec_repo.create(_rec_obj)
+            except Exception as _persist_err:
+                logger.warning(
+                    "G1: Failed to persist Recommendation before routing (site=%s): %s — "
+                    "continuing with in-memory id=%s",
+                    request.site_id,
+                    _persist_err,
+                    _rec_obj.id,
+                )
+            # rec.id is now stable and available for G2/G3 downstream steps
+            rec_item["_recommendation_id"] = _rec_obj.id
+            rec_item["_correlation_id"] = _correlation_id
+
             decision = tier_router.route_recommendation(
                 confidence=confidence,
                 system=system,
