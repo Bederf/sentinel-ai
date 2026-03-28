@@ -83,6 +83,7 @@ Files that sit at real control boundaries. Any PR touching these requires explic
 | `api/auth.py` | Login / token issuance | HIGH | AUTH-001, AUTH-003 |
 | `api/remote_commands.py` | Role extraction | HIGH | AUTH-002 (C-1 fixed 2026-03-22) |
 | `api/autonomous.py` | Autonomous decisions | HIGH | APPROVAL-001, POLICY-002 (C-2 fixed 2026-03-22) |
+| `api/optimization.py` | Optimization auto-execute path | HIGH | APPROVAL-001, SAFETY-003 (Phase 2 gap — safety gate active, ApprovalService integration pending) |
 | `api/metrics.py` | Prometheus exposure | MEDIUM | MONITORING-001 (GAP — unauthenticated) |
 | `startup/middleware.py` | TESTING bypass | MEDIUM | AUTH-006 (M-1 fixed 2026-03-22) |
 | `integrations/whatsapp_service.py` | Token comparison | MEDIUM | AUTH-005 (M-2 fixed 2026-03-22) |
@@ -99,7 +100,8 @@ Gaps are controls that exist in policy but lack code enforcement or test proof.
 | **HIGH** | API key in-memory store not production-ready | `middleware/auth_middleware.py` | Supabase migration with hashed keys + rotation | ISO-A.7.1 | Move `_API_KEY_STORE` to `api_keys` table |
 | **HIGH** | Demo mode bypass not startup-gated for production | `middleware/auth_middleware.py` | Startup check: DEMO_MODE=true + prod domain → fail | FSR 4.7 | Add startup validation in `main.py` |
 | **HIGH** | Approval endpoint role not proven in tests | `api/approval_workflow.py` | Test: viewer POSTs approve → 403 | ISO-A.10.1 | Add integration test |
-| **HIGH** | Tier 2 lock for HIGH/CRITICAL not tested | `services/tier_routing_engine.py` | Test: RISK_HIGH + confidence=0.9 → tier=TIER_2 (never TIER_3) | NIST-MP-3.5 | Add parametrised test |
+| ~~**HIGH**~~ CLOSED | ~~Tier 2 lock for HIGH/CRITICAL not tested~~ | `services/tier_routing_engine.py` | Fixed 2026-03-28: parametrised test added (`test_tier_2_lock_for_high_critical_risk`) — 4 cases, HIGH/CRITICAL never reach TIER_3 | NIST-MP-3.5 | See commit dual-router-04 |
+| **HIGH** | Optimization API path not routed through ApprovalService | `api/optimization.py` | Phase 2 pending: `should_auto_apply = False` safety gate closes direct writes; must wire through `ApprovalService.auto_execute_recommendation()` | APPROVAL-001, SAFETY-003 | Wire optimization path through ApprovalService (Phase 2) |
 | **HIGH** | Safety rules enforcement not proven on device writes | `repositories/safety_rules_repository.py` | Integration test: temp > 45°C approval → BLOCKED | ISO-A.6.2 | Add end-to-end safety test |
 | **MEDIUM** | `/metrics` endpoint unauthenticated | `api/metrics.py` | AuthLevel.AUDITOR guard or rate limit | NIST-MS-2.8 | `require_auth(AuthLevel.AUDITOR)` or scrape token |
 | **MEDIUM** | Audit log has no rotation / archival | `services/audit_logger.py` | Monthly archival to immutable storage | ISO-A.8.2 | Implement log rotation + 12-month retention |
@@ -108,6 +110,16 @@ Gaps are controls that exist in policy but lack code enforcement or test proof.
 | **MEDIUM** | BOT_AGENT rejected from control endpoints not tested | `models/auth.py` | Test: bot agent POSTs approval → 403 | Phase 120-03 | Add role boundary test |
 
 ---
+
+## D. Recently Fixed (2026-03-28)
+
+| Finding | File | Fix |
+|---------|------|-----|
+| CRITICAL: Ungated device write path in optimization API | `api/optimization.py` | `should_auto_apply = False` safety gate closes direct `device_manager.write_device_value()` calls that bypassed SafetyEngine, QualityGateEvaluator, and COV verification. Phase 2 TODO marked for ApprovalService integration. |
+| HIGH: Optimization router thresholds hardcoded | `services/optimization_tier_router.py` | Constructor now reads `optimization_tier_block_min`, `optimization_tier2_min`, `optimization_tier3_min` from app settings; no longer uses incorrect `parasite_` namespace. |
+| HIGH: Singleton reinit on every request | `services/optimization_tier_router.py` | `get_tier_router()` called without `settings` arg; factory condition no longer re-creates instance on each API request. |
+| HIGH: routing_source missing from from_dict() | `models/parasite_decision.py` | `from_dict()` now extracts `routing_source` from data dict; DB reads no longer silently NULL the field. |
+| HIGH: Tier 2 lock for HIGH/CRITICAL not tested | `services/tier_routing_engine.py` | Parametrised test `test_tier_2_lock_for_high_critical_risk` added — 4 risk/confidence combos, HIGH/CRITICAL never reach TIER_3. |
 
 ## D. Recently Fixed (2026-03-22)
 
