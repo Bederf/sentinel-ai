@@ -5,7 +5,7 @@ import logging
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Literal
+from typing import Any, Dict, List, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -384,6 +384,7 @@ def db_to_site_dict(
         "control_enabled": db_building.get("control_enabled") or False,
         "control_note": db_building.get("control_note"),
         "sentinel_processing_enabled": db_building.get("sentinel_processing_enabled", True) is not False,
+        "onboarding_phase": db_building.get("onboarding_phase") or "shadow",
         "equipment_count": total_assets,  # Total assets from Supabase only
         "alert_count": alert_count,
         "active_alerts": alert_count,
@@ -451,6 +452,8 @@ class SiteResponse(SiteBase):
     control_note: Optional[str] = None
     equipment_status: Optional[EquipmentStatusBreakdown] = None
     sentinel_processing_enabled: bool = True
+    onboarding_phase: str = "shadow"
+    last_phase_transition: Optional[dict] = None  # most recent phase_transition_log row
     # Bridge ingestion status
     bridge_connected: bool = False
     bridge_data_source: str = "none"  # "simbiot" | "simulation" | "none"
@@ -607,11 +610,15 @@ async def list_sites(
     if success and sites:
         # Merge persisted processing state (JSON is authoritative for toggle)
         processing_state = _load_processing_state()
+        phase_state = _load_phase_state()
         result = []
         for site in sites:
             site_id = site.get("id", "")
+            code = site.get("code", "")
             if site_id in processing_state:
                 site["sentinel_processing_enabled"] = processing_state[site_id]
+            if code in phase_state:
+                site["onboarding_phase"] = phase_state[code]
             status = calculate_site_status_from_equipment(site.get("equipment_status"))
             result.append(
                 SiteResponse(
@@ -1111,6 +1118,104 @@ async def toggle_site_processing(
     return ProcessingToggleResponse(site_id=site_id, sentinel_processing_enabled=enabled)
 
 
+# ============= Onboarding Phase Endpoint =============
+
+
+class PhaseUpdateRequest(BaseModel):
+    phase: Literal["shadow", "advisory", "supervised", "auto"]
+    reason: Optional[str] = None
+    changed_by: Optional[str] = None  # user email; defaults to "system" if omitted
+
+
+class PhaseUpdateResponse(BaseModel):
+    site_id: str
+    onboarding_phase: str
+
+
+_ONBOARDING_PHASE_FILE = DATA_DIR / "onboarding_phase_state.json"
+
+
+def _load_phase_state() -> dict:
+    if _ONBOARDING_PHASE_FILE.exists():
+        try:
+            return json.loads(_ONBOARDING_PHASE_FILE.read_text())
+        except Exception:
+            pass
+    return {}
+
+
+def _save_phase_state(state: dict) -> None:
+    _ONBOARDING_PHASE_FILE.write_text(json.dumps(state, indent=2))
+
+
+@router.patch("/sites/{site_id}/phase", response_model=PhaseUpdateResponse)
+async def update_site_phase(site_id: str, request: PhaseUpdateRequest) -> PhaseUpdateResponse:
+    """Set the onboarding phase for a site.
+
+    Progresses SENTINEL's trust-building model:
+      shadow → advisory → supervised → auto
+    """
+    phase = request.phase
+    supabase_ok = False
+
+    previous_phase: str | None = None
+    try:
+        from app.database.supabase_client import get_supabase_client
+
+        client = get_supabase_client()
+
+        # Capture current phase for audit log
+        current_row = client.table("sites").select("onboarding_phase").eq("code", site_id).limit(1).execute()
+        if current_row.data:
+            previous_phase = current_row.data[0].get("onboarding_phase") or "shadow"
+
+        client.table("sites").update({"onboarding_phase": phase}).eq("code", site_id).execute()
+        supabase_ok = True
+        logger.info(f"Onboarding phase set to '{phase}' for {site_id} (Supabase)")
+
+        # Write phase transition to dedicated immutable log table
+        try:
+            client.table("phase_transition_log").insert(
+                {
+                    "site_id": site_id,
+                    "from_phase": previous_phase,
+                    "to_phase": phase,
+                    "changed_by": request.changed_by
+                    if hasattr(request, "changed_by") and request.changed_by
+                    else "system",
+                    "reason": request.reason if hasattr(request, "reason") else None,
+                }
+            ).execute()
+        except Exception as audit_err:
+            logger.warning(f"Phase transition log insert failed for {site_id}: {audit_err}")
+    except Exception as e:
+        logger.warning(f"Supabase phase update failed for {site_id}: {e}")
+
+    # JSON fallback
+    state = _load_phase_state()
+    state[site_id] = phase
+    _save_phase_state(state)
+
+    # Patch sites.json fallback
+    if settings.use_json_storage:
+        try:
+            sites_file = SITES_DIR.parent / "sites.json"
+            if sites_file.exists():
+                sites = json.loads(sites_file.read_text())
+                for s in sites:
+                    if s.get("code") == site_id:
+                        s["onboarding_phase"] = phase
+                        break
+                sites_file.write_text(json.dumps(sites, indent=2))
+        except Exception as e:
+            logger.warning(f"sites.json phase fallback failed: {e}")
+
+    if not supabase_ok:
+        logger.info(f"Onboarding phase set to '{phase}' for {site_id} (JSON fallback only)")
+
+    return PhaseUpdateResponse(site_id=site_id, onboarding_phase=phase)
+
+
 # ============= Get Single Site Endpoint =============
 # NOTE: This MUST come after the specific routes above
 
@@ -1200,10 +1305,30 @@ async def get_site(
             if site_id in processing_state:
                 site["sentinel_processing_enabled"] = processing_state[site_id]
             status = calculate_site_status_from_equipment(site.get("equipment_status"))
+
+            # Fetch most recent phase transition for audit visibility
+            last_phase_transition = None
+            try:
+                from app.database.supabase_client import get_supabase_client
+
+                client = get_supabase_client()
+                transition_result = (
+                    client.table("phase_transition_log")
+                    .select("to_phase,changed_by,created_at,reason")
+                    .eq("site_id", site_id)
+                    .order("created_at", desc=True)
+                    .limit(1)
+                    .execute()
+                )
+                last_phase_transition = transition_result.data[0] if transition_result.data else None
+            except Exception as e:
+                logger.debug(f"Could not fetch last phase transition for {site_id}: {e}")
+
             return SiteResponse(
                 **site,
                 location=site.get("address", ""),
                 status=status,
+                last_phase_transition=last_phase_transition,
                 **bridge_status,
             )
         else:
