@@ -437,6 +437,18 @@ class TestBuildSignalRow:
 
 
 class TestEmitEmailSignal:
+    """Pre-173-02 tests. Phase gate mocked to 'advisory' so these exercise the full emit path."""
+
+    @pytest.fixture(autouse=True)
+    def mock_phase_advisory(self):
+        """Ensure emit_email_signal sees advisory phase in all pre-gate tests."""
+        with patch(
+            "app.models.onboarding_phase.get_site_phase",
+            new_callable=AsyncMock,
+            return_value="advisory",
+        ):
+            yield
+
     @pytest.mark.asyncio
     async def test_emit_email_signal_success(self):
         from app.services.signal_emitter import emit_email_signal

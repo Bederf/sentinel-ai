@@ -146,7 +146,12 @@ async def test_ghost_booking_signal_format():
 
 
 @pytest.mark.asyncio
-async def test_block_booking_signal_format():
+@patch(
+    "app.models.onboarding_phase.get_site_phase",
+    new_callable=AsyncMock,
+    return_value="advisory",
+)
+async def test_block_booking_signal_format(_mock_phase):
     """booking_conflict signal has correct fields."""
     from datetime import date
 

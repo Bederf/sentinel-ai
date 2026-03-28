@@ -128,6 +128,16 @@ class TestReplayEmails:
 
 
 class TestReplayBookings:
+    @pytest.fixture(autouse=True)
+    def mock_phase_advisory(self):
+        """Phase gate mocked advisory so replay tests exercise full emit path."""
+        with patch(
+            "app.models.onboarding_phase.get_site_phase",
+            new_callable=AsyncMock,
+            return_value="advisory",
+        ):
+            yield
+
     @pytest.mark.asyncio
     async def test_replay_bookings_calls_both_emitters(self):
         from app.services.signal_replay_tool import _replay_bookings
