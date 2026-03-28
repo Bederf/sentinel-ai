@@ -70,16 +70,14 @@ class OptimizationTierRouter:
         Args:
             settings: A pydantic Settings instance. If None, uses defaults.
         """
-        if settings is not None:
-            self._block_min = getattr(settings, "optimization_tier_block_min", 0.30)
-            self._tier2_min = getattr(settings, "optimization_tier2_min", 0.60)
-            self._tier3_min = getattr(settings, "optimization_tier3_min", 0.85)
-            self._fcu_cap = getattr(settings, "optimization_fcu_confidence_cap", 0.45)
-        else:
-            self._block_min = 0.30
-            self._tier2_min = 0.60
-            self._tier3_min = 0.85
-            self._fcu_cap = 0.45
+        from app.config.settings import settings as _app_settings
+
+        _s = settings if settings is not None else _app_settings
+        self._block_min = getattr(_s, "optimization_tier_block_min", 0.30)
+        self._tier2_min = getattr(_s, "optimization_tier2_min", 0.60)
+        self._tier3_min = getattr(_s, "optimization_tier3_min", 0.85)
+        self._fcu_cap = getattr(_s, "optimization_fcu_confidence_cap", 0.45)
+        # TODO: evaluate whether _fcu_cap belongs in model_thresholds table per equipment type
 
     # ------------------------------------------------------------------
     # Core routing
