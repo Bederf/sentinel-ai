@@ -149,10 +149,17 @@ export function renderCrisis(payload: DecisionMomentPayload): string {
         <div class="border border-slate-800 rounded p-3 bg-slate-950/80">
           <div class="text-[10px] tracking-widest uppercase text-slate-400 mb-1">Action</div>
           <div class="text-slate-100 text-sm leading-relaxed">${surface.action.summary}</div>
-          <div class="text-white text-sm font-semibold mt-2">${surface.action.operatorPrompt}</div>
+          ${!surface.behavior.showResultOnly ? `
+            <div class="text-white text-sm font-semibold mt-2">${surface.action.operatorPrompt}</div>
+          ` : ''}
           <div class="text-slate-400 text-xs leading-relaxed mt-2">${surface.action.expectedOutcome}</div>
           ${surface.behavior.showInstructions && surface.action.bmsGuide ? `
             <div class="text-slate-500 text-[11px] leading-relaxed mt-2">${surface.action.bmsGuide.navigationPath.join(' -> ')}</div>
+          ` : ''}
+          ${surface.behavior.showResultOnly ? `
+            <div class="${surface.mode === 'autonomous' ? 'text-emerald-400' : 'text-slate-500'} text-[10px] uppercase tracking-widest mt-3">
+              ${surface.mode === 'autonomous' ? 'SENTINEL executed — verifying' : 'Ghost mode — observe only'}
+            </div>
           ` : ''}
         </div>
       </div>

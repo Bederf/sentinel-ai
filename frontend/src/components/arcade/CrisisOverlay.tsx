@@ -218,13 +218,23 @@ export function CrisisOverlay({
           }}
         >
           <div>{surface.action.summary}</div>
-          <div style={{ marginTop: 6, color: "#f8fafc", fontWeight: 600 }}>
-            {surface.action.operatorPrompt}
-          </div>
+          {!surface.behavior.showResultOnly && (
+            <div style={{ marginTop: 6, color: "#f8fafc", fontWeight: 600 }}>
+              {surface.action.operatorPrompt}
+            </div>
+          )}
           <div style={{ marginTop: 6 }}>{surface.action.expectedOutcome}</div>
           {surface.behavior.showInstructions && surface.action.bmsGuide && (
             <div style={{ marginTop: 8, color: "#94a3b8" }}>
               {surface.action.bmsGuide.navigationPath.join(" -> ")}
+            </div>
+          )}
+          {surface.behavior.showResultOnly && (
+            <div style={{ marginTop: 8, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.08em",
+              color: surface.mode === "autonomous" ? "#6ee7b7" : "#94a3b8" }}>
+              {surface.mode === "autonomous"
+                ? "SENTINEL executed — verifying result"
+                : "Ghost mode — observe only, no write from this surface"}
             </div>
           )}
         </div>
