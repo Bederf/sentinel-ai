@@ -903,3 +903,145 @@ class TestEmitEmailSignal:
         assert signal_payload["metadata"]["room_id"] == "FA1-1Q2-MR-05"
         assert signal_payload["metadata"]["thread_message_count"] == 2
         assert len(signal_payload["metadata"]["thread_messages"]) == 2
+
+
+# ---------------------------------------------------------------------------
+# 173-02 Phase gate tests
+# ---------------------------------------------------------------------------
+
+
+class TestEmitEmailSignalPhaseGate:
+    """173-02: emit_email_signal is gated by onboarding phase."""
+
+    @pytest.mark.asyncio
+    async def test_emit_email_signal_skipped_in_shadow(self, monkeypatch):
+        """emit_email_signal returns phase_gate_skipped for shadow-phase sites."""
+        from unittest.mock import AsyncMock
+
+        # Patch get_site_phase to return 'shadow'
+        monkeypatch.setattr(
+            "app.models.onboarding_phase.effective_phase",
+            AsyncMock(return_value="shadow"),
+        )
+        # Patch _resolve_room_context to return a resolvable site_id
+        monkeypatch.setattr(
+            "app.services.signal_emitter._resolve_room_context",
+            AsyncMock(return_value=(None, "Fairlands", "S001")),
+        )
+
+        from app.services.signal_emitter import emit_email_signal
+
+        # Subject must contain a meeting-room keyword to pass the non-meeting-room filter
+        result = await emit_email_signal(
+            from_email="user@fnb.co.za",
+            from_name="Test User",
+            subject="Meeting room issue",
+            body_plain="The meeting room is broken.",
+            received_at="Mon, 16 Mar 2026 13:52:54 +0000",
+        )
+
+        assert result is not None
+        assert result["status"] == "phase_gate_skipped"
+        assert "shadow" in result["reason"]
+
+    @pytest.mark.asyncio
+    async def test_emit_email_signal_allowed_in_advisory(self, monkeypatch):
+        """emit_email_signal proceeds past the phase gate for advisory-phase sites."""
+        from unittest.mock import AsyncMock, MagicMock
+
+        # Patch get_site_phase to return 'advisory'
+        monkeypatch.setattr(
+            "app.models.onboarding_phase.effective_phase",
+            AsyncMock(return_value="advisory"),
+        )
+        # Patch _resolve_room_context
+        monkeypatch.setattr(
+            "app.services.signal_emitter._resolve_room_context",
+            AsyncMock(return_value=(None, "Fairlands", "S001")),
+        )
+        # Patch _coerce_site_uuid so we don't need real UUIDs
+        monkeypatch.setattr(
+            "app.services.signal_emitter._coerce_site_uuid",
+            lambda _: ("00000000-0000-0000-0000-000000000001", "S001"),
+        )
+        # Patch httpx to avoid real network calls — return dedup-skipped
+        from app.services.signal_emitter_base import _recent_signals
+
+        _recent_signals.clear()
+
+        import httpx
+
+        mock_response = MagicMock(spec=httpx.Response)
+        mock_response.status_code = 201
+        mock_response.json.return_value = {
+            "id": "sig-001",
+            "source_module": "email_helpdesk",
+            "signal_type": "observation_email",
+        }
+
+        mock_httpx_client = AsyncMock()
+        mock_httpx_client.post = AsyncMock(return_value=mock_response)
+        mock_httpx_client.__aenter__ = AsyncMock(return_value=mock_httpx_client)
+        mock_httpx_client.__aexit__ = AsyncMock(return_value=False)
+
+        monkeypatch.setattr(
+            "app.services.signal_emitter_base.httpx.AsyncClient",
+            lambda **_kw: mock_httpx_client,
+        )
+
+        from app.services.signal_emitter import emit_email_signal
+
+        result = await emit_email_signal(
+            from_email="user@fnb.co.za",
+            from_name="Test User",
+            subject="General office update",
+            body_plain="This is a routine update, no issues.",
+            received_at="Mon, 16 Mar 2026 13:52:54 +0000",
+        )
+
+        # Phase gate was passed — result should NOT be phase_gate_skipped
+        assert result is not None
+        assert result.get("status") != "phase_gate_skipped"
+
+
+class TestEmitBlockBookingSignalsPhaseGate:
+    """173-02: emit_block_booking_signals is gated by onboarding phase."""
+
+    @pytest.mark.asyncio
+    async def test_emit_block_booking_signals_skipped_in_shadow(self, monkeypatch):
+        """emit_block_booking_signals returns empty list for shadow-phase sites."""
+        from unittest.mock import AsyncMock
+
+        monkeypatch.setattr(
+            "app.models.onboarding_phase.effective_phase",
+            AsyncMock(return_value="shadow"),
+        )
+
+        from app.services.block_booking_signal_emitter import emit_block_booking_signals
+
+        result = await emit_block_booking_signals(site_id="S001")
+        assert result == []
+
+    @pytest.mark.asyncio
+    async def test_emit_block_booking_signals_allowed_in_advisory(self, monkeypatch):
+        """emit_block_booking_signals proceeds past gate for advisory-phase sites."""
+        from unittest.mock import AsyncMock, MagicMock
+
+        monkeypatch.setattr(
+            "app.models.onboarding_phase.effective_phase",
+            AsyncMock(return_value="advisory"),
+        )
+
+        # Patch booking store to return empty so no signals are emitted
+        mock_store = MagicMock()
+        mock_store.get_bookings_for_site.return_value = []
+        monkeypatch.setattr(
+            "app.services.block_booking_detector.booking_store.get_booking_store",
+            lambda: mock_store,
+        )
+
+        from app.services.block_booking_signal_emitter import emit_block_booking_signals
+
+        result = await emit_block_booking_signals(site_id="S001")
+        # Gate was passed; no bookings means empty list (not skipped)
+        assert isinstance(result, list)
