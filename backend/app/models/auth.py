@@ -71,7 +71,7 @@ class AuthContext:
 
     user_id: str
     role: SentinelRole
-    auth_method: str  # "bearer_token", "api_key", "demo_mode"
+    auth_method: str  # "bearer_token", "api_key"
     source_ip: str
     email: Optional[str] = None
     scopes: List[str] = field(default_factory=list)

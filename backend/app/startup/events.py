@@ -58,21 +58,7 @@ async def startup_event(app: FastAPI) -> None:
 
     # === Security startup checks ===
 
-    # DEMO_MODE production safety validation (AUTH-006, Phase 168-01)
-    # Fail-closed: reject DEMO_MODE=true in production environments
-    if settings.demo_mode and settings.is_live_mode:
-        raise RuntimeError(
-            f"FATAL: DEMO_MODE=true with is_live_mode={settings.is_live_mode}. "
-            "Demo mode must not run in production. Set DEMO_MODE=false."
-        )
-    _logger.info(f"Auth configuration: demo_mode={settings.demo_mode} | is_live_mode={settings.is_live_mode}")
-
-    # DEMO_MODE deprecation warning
-    if settings.demo_mode:
-        _logger.warning(
-            "DEMO_MODE is set but no longer grants auth bypasses. "
-            "All requests require valid JWT tokens. Consider removing DEMO_MODE from your .env."
-        )
+    _logger.info(f"Auth configuration: is_live_mode={settings.is_live_mode}")
 
     # Require JWT secret (C-2: Secure JWT signing)
     if not settings.jwt_secret_key and not settings.supabase_key:
@@ -117,14 +103,12 @@ async def startup_event(app: FastAPI) -> None:
             "║  SOLAR_CONNECTOR_MODE = live                            ║\n"
             "║  MODBUS_BESS_IP       = %-30s  ║\n"
             "║  AEGIS WRITE GATE     = %-30s  ║\n"
-            "║  DEMO_MODE            = %-30s  ║\n"
             "║                                                        ║\n"
             "║  Real hardware reads are ACTIVE.                       ║\n"
             "║  Kill switch: POST /api/dispatch-optimizer/kill-switch  ║\n"
             "╚══════════════════════════════════════════════════════════╝",
             settings.modbus_bess_ip or "(not set)",
             "OPEN" if settings.aegis_bess_writer_enabled else "CLOSED",
-            str(settings.demo_mode),
         )
 
     # === EDGE MODE BANNER ===
@@ -157,10 +141,9 @@ async def startup_event(app: FastAPI) -> None:
         )
 
     _logger.info(
-        "Runtime config loaded: version=%s environment=%s demo_mode=%s config_checksum=%s",
+        "Runtime config loaded: version=%s environment=%s config_checksum=%s",
         settings.app_version,
         settings.environment,
-        settings.demo_mode,
         settings.config_checksum,
     )
     if settings.is_live_mode and not settings.sentry_webhook_secret:
@@ -526,6 +509,16 @@ async def startup_event(app: FastAPI) -> None:
     if not _aegis_any_started:
         _logger.info("AEGIS dispatch cycle SKIPPED — no sites with active solar module")
 
+    # Phase E: BESS dispatch consumer — drains pending bess_dispatch recommendations
+    try:
+        from app.core.site_resolver import get_registered_site_ids as _bess_site_ids_fn
+
+        for _site_id in _bess_site_ids_fn() or []:
+            scheduler_service.add_bess_dispatch_job(interval_seconds=60, site_id=_site_id)
+        _logger.info("✅ BESS dispatch consumer initialized (60s interval, DRY_RUN by default)")
+    except Exception as e:
+        _logger.warning(f"⚠️ BESS dispatch consumer initialization failed: {e}")
+
     # Phase 130: Occupancy-driven HVAC + lighting control loop
     if settings.occupancy_poll_enabled:
         _occ_site_ids = _get_site_ids()
@@ -654,6 +647,32 @@ async def startup_event(app: FastAPI) -> None:
             if not _get_site_ids():
                 _logger.info("No registered buildings — skipping simulation deactivation")
 
+            # Re-queue the best in-progress task per site so the queue processor
+            # resumes from the checkpoint on next tick (crash recovery path).
+            for _sim_site_id in _get_site_ids():
+                store = get_simulation_store(_sim_site_id)
+                all_tasks = store.get_all_tasks()
+
+                best_task_id = None
+                best_days = 0
+                for task_id, task_data in all_tasks.items():
+                    if (
+                        task_data.get("status") == "stopped"
+                        and task_data.get("state_snapshot")
+                        and (task_data.get("days_completed") or 0) > best_days
+                    ):
+                        best_days = task_data["days_completed"]
+                        best_task_id = task_id
+
+                if best_task_id:
+                    store.update_task_progress(best_task_id, {"status": "queued"})
+                    _logger.info(
+                        "Re-queued simulation %s for %s (checkpoint day %d/365)",
+                        best_task_id,
+                        _sim_site_id,
+                        best_days,
+                    )
+
         except Exception as e:
             _logger.error(f"Failed to deactivate simulations on startup: {e}")
 
@@ -698,8 +717,28 @@ async def startup_event(app: FastAPI) -> None:
         else:
             _logger.info("Site 002 data source disabled — simulation engine inactive")
 
+    # Sync ML model registry JSON → ml_models Supabase table (best-effort)
+    try:
+        from app.services.ml_registry_sync import sync_registry_to_db
+        import concurrent.futures as _cf
+
+        _cf.ThreadPoolExecutor(max_workers=1).submit(sync_registry_to_db)
+        _logger.info("ML registry sync queued (background)")
+    except Exception as e:
+        _logger.warning(f"ML registry sync skipped: {e}")
+
     # System health snapshot job (every 5 minutes)
     scheduler_service.add_health_snapshot_job(interval_seconds=300)
+
+    # Autoencoder anomaly detection on real equipment_sensor_readings data (30 min)
+    try:
+        from app.core.site_resolver import get_registered_site_ids as _anomaly_site_ids_fn
+
+        for _site_id in _anomaly_site_ids_fn() or []:
+            scheduler_service.add_anomaly_detection_job(interval_seconds=1800, site_id=_site_id)
+        _logger.info("✅ Anomaly detection jobs initialized (30 min interval)")
+    except Exception as e:
+        _logger.warning(f"⚠️ Anomaly detection job initialization failed: {e}")
 
     # Error auto-resolution job (daily) - resolves errors if component healthy for 24+ hours
     scheduler_service.add_error_auto_resolve_job(interval_seconds=86400)
