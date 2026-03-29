@@ -1,6 +1,12 @@
 import { useLayoutEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode, type RefObject } from 'react'
 import gsap from 'gsap'
 import type { CockpitRenderMode, CockpitState } from './types'
+import { useToneTransition } from './useToneTransition'
+import { useAmbientDrift } from './useAmbientDrift'
+import { useUrgencyPulse } from './useUrgencyPulse'
+import { SupervisedConfirmBar } from './useHoldToConfirm'
+import { useDecisionRowEntrance } from './useDecisionRowEntrance'
+import { motionReduced } from './motionPreference'
 
 interface CockpitViewProps {
   state: CockpitState
@@ -64,7 +70,7 @@ function SectionRow({
   emphasis?: boolean
 }) {
   return (
-    <div className="border-t border-slate-800 py-3 first:border-t-0 first:pt-0">
+    <div className="border-t border-slate-800 py-3 first:border-t-0 first:pt-0" data-decision-row>
       <div className="text-[11px] uppercase tracking-[0.22em] text-slate-500">{label}</div>
       <div className={`mt-2 text-sm leading-relaxed ${emphasis ? 'font-medium text-white' : 'text-slate-300'}`}>
         {value}
@@ -91,6 +97,14 @@ function useEntranceAnimation(
   useLayoutEffect(() => {
     if (!rootRef.current) return
 
+    if (motionReduced()) {
+      gsap.set([voiceRef.current, twinRef.current, decisionRef.current, statusRef.current], {
+        autoAlpha: 1,
+        y: 0,
+      })
+      return
+    }
+
     const ctx = gsap.context(() => {
       gsap.set([voiceRef.current, twinRef.current, decisionRef.current, statusRef.current], {
         autoAlpha: 0,
@@ -114,6 +128,7 @@ function useRefreshAnimation(
   voice: ReturnType<typeof buildVoice>,
 ) {
   useLayoutEffect(() => {
+    if (motionReduced()) return
     if (!voiceRef.current || !decisionRef.current) return
 
     const timeline = gsap.timeline({ defaults: { duration: 0.42, ease: 'power2.out' } })
@@ -127,23 +142,27 @@ function useRefreshAnimation(
   }, [decisionRef, state.decision.summary, state.primaryMetric.value, state.site.mode, voice.headline, voiceRef])
 }
 
-function CockpitHero({
-  voiceRef,
-  voice,
-  state,
-  isWall,
-  emphasisTone,
-  onFullscreenClick,
-  isFullscreen,
-}: {
+interface CockpitHeroProps {
   voiceRef: MutableRefObject<HTMLDivElement | null>
+  metricValueRef: MutableRefObject<HTMLDivElement | null>
   voice: ReturnType<typeof buildVoice>
   state: CockpitState
   isWall: boolean
   emphasisTone: string
   onFullscreenClick: () => void
   isFullscreen: boolean
-}) {
+}
+
+function CockpitHero({
+  voiceRef,
+  metricValueRef,
+  voice,
+  state,
+  isWall,
+  emphasisTone,
+  onFullscreenClick,
+  isFullscreen,
+}: CockpitHeroProps) {
   return (
     <div
       ref={(node) => {
@@ -197,7 +216,10 @@ function CockpitHero({
           <div className="text-[11px] uppercase tracking-[0.22em] text-slate-500">
             {state.primaryMetric.label}
           </div>
-          <div className={`mt-2 text-3xl font-semibold ${emphasisTone}`}>
+          <div
+            ref={(node) => { metricValueRef.current = node }}
+            className={`mt-2 text-3xl font-semibold ${emphasisTone}`}
+          >
             {state.primaryMetric.value}
           </div>
           <div className="mt-1 text-sm text-slate-400">{state.primaryMetric.detail}</div>
@@ -207,19 +229,26 @@ function CockpitHero({
   )
 }
 
-function CockpitDecisionPanel({
-  decisionRef,
-  state,
-  emphasisTone,
-}: {
+interface CockpitDecisionPanelProps {
   decisionRef: MutableRefObject<HTMLElement | null>
+  badgeRef: MutableRefObject<HTMLElement | null>
+  decisionRowsRef: MutableRefObject<HTMLElement | null>
   state: CockpitState
   emphasisTone: string
-}) {
+}
+
+function CockpitDecisionPanel({
+  decisionRef,
+  badgeRef,
+  decisionRowsRef,
+  state,
+  emphasisTone,
+}: CockpitDecisionPanelProps) {
   return (
     <aside
       ref={(node) => {
         decisionRef.current = node
+        decisionRowsRef.current = node
       }}
       className="rounded-[24px] border border-slate-800/80 bg-slate-900/70 px-5 py-5"
     >
@@ -228,9 +257,12 @@ function CockpitDecisionPanel({
           <div className="text-[11px] uppercase tracking-[0.22em] text-slate-500">Decision</div>
           <div className="mt-1 text-sm text-slate-300">{state.site.posture}</div>
         </div>
-        <div className={`rounded-full border border-slate-800 px-3 py-1 text-[11px] uppercase tracking-[0.18em] ${emphasisTone}`}>
+        <span
+          ref={(node) => { badgeRef.current = node }}
+          className={`rounded-full border border-slate-800 px-3 py-1 text-[11px] uppercase tracking-[0.18em] ${emphasisTone}`}
+        >
           {state.site.mode}
-        </div>
+        </span>
       </div>
 
       <SectionRow label="Cause" value={state.activeCondition.summary} emphasis />
@@ -263,11 +295,7 @@ function CockpitDecisionModeState({ state }: { state: CockpitState }) {
   }
 
   if (state.site.mode === 'supervised') {
-    return (
-      <div className="mt-4 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-4 text-sm font-semibold text-amber-200">
-        Hold to confirm before SENTINEL executes the control path.
-      </div>
-    )
+    return <SupervisedConfirmBar onConfirm={() => { /* operator confirmed — handled by parent */ }} />
   }
 
   if (state.site.mode === 'autonomous') {
@@ -299,15 +327,14 @@ function CockpitStatusBar({
       <CockpitStatusPill>{state.site.dataFreshnessLabel}</CockpitStatusPill>
       <CockpitStatusPill>Mode: {state.site.mode}</CockpitStatusPill>
       <CockpitStatusPill>Confidence: {state.decision.confidence}</CockpitStatusPill>
-      <CockpitStatusPill>Risk band: {state.severity.riskBand ?? 'low'}</CockpitStatusPill>
+      {state.severity.riskBand && (
+        <CockpitStatusPill>Risk band: {state.severity.riskBand}</CockpitStatusPill>
+      )}
       {state.severity.constraintType && (
         <CockpitStatusPill>
           Constraint: {formatLabel(state.severity.constraintType)}
           {state.severity.timeToConstraintBreachMin !== null ? ` · ${state.severity.timeToConstraintBreachMin} min` : ''}
         </CockpitStatusPill>
-      )}
-      {state.severity.policyLevel && (
-        <CockpitStatusPill>Policy level: {formatLabel(state.severity.policyLevel)}</CockpitStatusPill>
       )}
       {state.severity.affectedScope && (
         <CockpitStatusPill>
@@ -327,9 +354,6 @@ function CockpitStatusBar({
           Asset: {formatLabel(state.severity.assetClass)} · {formatLabel(state.severity.criticality)}
         </CockpitStatusPill>
       )}
-      {state.severity.policySource && <CockpitStatusPill>Policy: {state.severity.policySource}</CockpitStatusPill>}
-      {state.severity.healthReason && <CockpitStatusPill>Health: {state.severity.healthReason}</CockpitStatusPill>}
-      {state.severity.thresholdReason && <CockpitStatusPill>{state.severity.thresholdReason}</CockpitStatusPill>}
     </div>
   )
 }
@@ -340,6 +364,9 @@ export function CockpitView({ state, renderMode, spatialCanvas }: CockpitViewPro
   const twinRef = useRef<HTMLDivElement | null>(null)
   const decisionRef = useRef<HTMLElement | null>(null)
   const statusRef = useRef<HTMLDivElement | null>(null)
+  const metricValueRef = useRef<HTMLDivElement | null>(null)
+  const badgeRef = useRef<HTMLElement | null>(null)
+  const decisionRowsRef = useRef<HTMLElement | null>(null)
   const [isFullscreen, setIsFullscreen] = useState(false)
 
   const voice = useMemo(() => buildVoice(state), [state])
@@ -348,6 +375,10 @@ export function CockpitView({ state, renderMode, spatialCanvas }: CockpitViewPro
 
   useEntranceAnimation(rootRef, voiceRef, twinRef, decisionRef, statusRef)
   useRefreshAnimation(voiceRef, decisionRef, state, voice)
+  useToneTransition(metricValueRef, badgeRef, state.primaryMetric.tone)
+  useAmbientDrift(twinRef, state.primaryMetric.tone)
+  useUrgencyPulse(metricValueRef, state.primaryMetric.tone)
+  useDecisionRowEntrance(decisionRowsRef, true)
 
   const handleFullscreen = () => {
     const elem = rootRef.current
@@ -379,6 +410,7 @@ export function CockpitView({ state, renderMode, spatialCanvas }: CockpitViewPro
     >
       <CockpitHero
         voiceRef={voiceRef}
+        metricValueRef={metricValueRef}
         voice={voice}
         state={state}
         isWall={isWall}
@@ -391,7 +423,13 @@ export function CockpitView({ state, renderMode, spatialCanvas }: CockpitViewPro
         <div ref={twinRef} className="min-h-[460px]">
           {spatialCanvas}
         </div>
-        <CockpitDecisionPanel decisionRef={decisionRef} state={state} emphasisTone={emphasisTone} />
+        <CockpitDecisionPanel
+          decisionRef={decisionRef}
+          badgeRef={badgeRef}
+          decisionRowsRef={decisionRowsRef}
+          state={state}
+          emphasisTone={emphasisTone}
+        />
       </div>
 
       <CockpitStatusBar statusRef={statusRef} state={state} />
