@@ -1139,8 +1139,8 @@ def _load_phase_state() -> dict:
     if _ONBOARDING_PHASE_FILE.exists():
         try:
             return json.loads(_ONBOARDING_PHASE_FILE.read_text())
-        except Exception:
-            pass
+        except (json.JSONDecodeError, OSError) as e:
+            logger.warning("Failed to load phase state from %s: %s", _ONBOARDING_PHASE_FILE, e)
     return {}
 
 
@@ -1191,9 +1191,16 @@ async def update_site_phase(site_id: str, request: PhaseUpdateRequest) -> PhaseU
     except Exception as e:
         logger.warning(f"Supabase phase update failed for {site_id}: {e}")
 
-    # JSON fallback
+    # JSON fallback — persist phase and last transition for offline visibility
     state = _load_phase_state()
     state[site_id] = phase
+    state[f"{site_id}:last_transition"] = {
+        "to_phase": phase,
+        "from_phase": previous_phase,
+        "changed_by": request.changed_by or "system",
+        "created_at": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat(),
+        "reason": request.reason,
+    }
     _save_phase_state(state)
 
     # Patch sites.json fallback
@@ -1366,6 +1373,10 @@ async def get_site(
             "status",
         )
     }
+    # Populate last_phase_transition from JSON phase state (Supabase unavailable path)
+    phase_state = _load_phase_state()
+    json_last_transition = phase_state.get(f"{site_id}:last_transition")
+
     return SiteResponse(
         **site_clean,
         equipment_count=asset_counts["total_assets"],
@@ -1373,6 +1384,7 @@ async def get_site(
         alert_count=alert_count,
         location=site.get("address", ""),
         status=status,
+        last_phase_transition=json_last_transition,
         **bridge_status,
     )
 

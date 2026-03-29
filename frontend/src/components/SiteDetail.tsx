@@ -794,14 +794,18 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
                   >
                     {PHASE_LABELS[sitePhase]}
                   </div>
-                  {site?.last_phase_transition && (
-                    <span
-                      title={`Phase set to ${site.last_phase_transition.to_phase} by ${site.last_phase_transition.changed_by} on ${new Date(site.last_phase_transition.created_at).toLocaleDateString("en-ZA")}`}
-                      className="cursor-help"
-                    >
-                      ℹ
-                    </span>
-                  )}
+                  {site?.last_phase_transition && (() => {
+                    const d = new Date(site.last_phase_transition.created_at);
+                    const dateStr = isNaN(d.getTime()) ? "unknown date" : d.toLocaleDateString("en-ZA");
+                    return (
+                      <span
+                        title={`Phase set to ${site.last_phase_transition.to_phase} by ${site.last_phase_transition.changed_by} on ${dateStr}`}
+                        className="cursor-help"
+                      >
+                        ℹ
+                      </span>
+                    );
+                  })()}
                   <select
                     value={sitePhase}
                     disabled={phaseUpdating}
