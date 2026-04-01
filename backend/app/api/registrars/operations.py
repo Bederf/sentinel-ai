@@ -6,17 +6,18 @@ Registers routers for work orders, maintenance, inspection, and workflow operati
 
 from fastapi import FastAPI
 
+from app.config.settings import settings
 from app.api import work_orders, inspection, service_feedback, checklists, inspection_recommendations
 from app.api import workflow, baselines, condition
 from app.api import remote_ops, remote_commands, dispatch
-from app.api import alerts, stats, audit, safety, autonomous, simulation
-from app.api import complaints, sentry_webhooks, whatsapp_webhooks, lifecycle_simulation, simulation_analytics
+from app.api import alerts, stats, audit, safety, autonomous
+from app.api import complaints, sentry_webhooks, whatsapp_webhooks
 from app.api import integration, concept
 from app.api import concept_rag
 from app.api import modules, health_config, service_records, preferences
-from app.api import solar, water, sustainability, contracts, pricing, municipal_billing
+from app.api import water, sustainability, contracts, pricing, municipal_billing
 from app.api import parts_orders, approval_workflow, delivery_tracking, approvals, parasite_decisions, approval
-from app.api import security, compliance, notifications, consent
+from app.api import compliance, notifications, consent
 from app.api import privacy
 from app.api import asset_health
 from app.api import health_rating
@@ -43,7 +44,7 @@ from app.api import review_queue
 from app.api import ai_usage
 from app.api import decisions
 from app.api import technicians as technicians_api
-from app.config.settings import settings
+from app.api import reception
 
 
 def register_operations_routers(app: FastAPI) -> None:
@@ -73,11 +74,6 @@ def register_operations_routers(app: FastAPI) -> None:
     app.include_router(audit.router, tags=["audit"])
     app.include_router(safety.router, tags=["safety"])
     app.include_router(autonomous.router, tags=["autonomous"])
-
-    # Simulation and testing
-    app.include_router(simulation.router, prefix="/api", tags=["simulation"])
-    app.include_router(lifecycle_simulation.router, tags=["lifecycle-simulation"])
-    app.include_router(simulation_analytics.router, tags=["simulation-analytics"])
 
     # Integrations
     app.include_router(integration.router)
@@ -117,13 +113,10 @@ def register_operations_routers(app: FastAPI) -> None:
     app.include_router(municipal_billing.router)
 
     # Sustainability and utilities
-    app.include_router(solar.router, prefix="/api", tags=["solar"])
     app.include_router(water.router, prefix="/api", tags=["water"])
     app.include_router(sustainability.router, prefix="/api", tags=["sustainability"])
 
     # Security module (Phase 27)
-    app.include_router(security.router, tags=["security"])
-
     # Compliance module (Phase 28)
     app.include_router(compliance.router, tags=["compliance"])
 
@@ -213,6 +206,9 @@ def register_operations_routers(app: FastAPI) -> None:
         app.include_router(plant_alerts_router, tags=["plant-alerts"])
 
     app.include_router(concept_rag.router)
+
+    # Visitor Management — Reception API (Phase 176)
+    app.include_router(reception.router, prefix="/api", tags=["reception"])
 
     # Decision Moment API — Crisis State page (Phase 164)
     app.include_router(decisions.router, tags=["decisions"])
