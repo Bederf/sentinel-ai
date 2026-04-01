@@ -9,22 +9,23 @@ SENTINEL Integration Philosophy:
 - Rapid client onboarding when they have C•CURE licenses
 
 Integration Options:
-1. Demo Mode (default) - Uses ccure_demo_data.json
+1. Local seeded mode - Uses ccure_seed_data.json when explicitly enabled
 2. Live Mode - victor Web Service API (requires Partner Program license)
 
 Usage:
-    adapter = CCureAdapter(demo_mode=True)
+    adapter = CCureAdapter(seeded_mode=False)
     await adapter.connect()
     events = await adapter.get_badge_events(since=datetime.now() - timedelta(hours=24))
 """
 
-from typing import Dict, List, Optional
-from datetime import datetime
 import json
 import logging
+from datetime import datetime
 from pathlib import Path
+from uuid import UUID
 
 from app.models.security import CCureController, CCurePersonnel
+from app.models.visit import Visit
 
 logger = logging.getLogger(__name__)
 
@@ -32,32 +33,32 @@ logger = logging.getLogger(__name__)
 class CCureAdapter:
     """C•CURE 9000 integration adapter.
 
-    Phase 58.2: Demo mode with mock data
+    Phase 58.2: Local seeded mode with sample data
     Phase 58.3: Live mode with victor Web Service API
     """
 
     def __init__(
         self,
-        api_url: Optional[str] = None,
-        license_guid: Optional[str] = None,
-        username: Optional[str] = None,
-        password: Optional[str] = None,
-        demo_mode: bool = True,
+        api_url: str | None = None,
+        license_guid: str | None = None,
+        username: str | None = None,
+        password: str | None = None,
+        seeded_mode: bool = False,
     ):
         self.api_url = api_url
         self.license_guid = license_guid
         self.username = username
         self.password = password
-        self.demo_mode = demo_mode
-        self._demo_data = None
+        self.seeded_mode = seeded_mode
+        self._seed_data = None
         self._token = None
         self._connected = False
 
     async def connect(self) -> bool:
         """Establish connection to C•CURE system."""
-        if self.demo_mode:
-            logger.info("CCureAdapter: Using DEMO MODE (Partner license required for live API)")
-            self._demo_data = self._load_demo_data()
+        if self.seeded_mode:
+            logger.info("CCureAdapter: Using local seeded mode (Partner license required for live API)")
+            self._seed_data = self._load_seed_data()
             self._connected = True
             return True
         else:
@@ -73,17 +74,17 @@ class CCureAdapter:
         # API calls are stateless
         self._connected = False
 
-    def _load_demo_data(self) -> Dict:
-        """Load demo data from ccure_demo_data.json."""
-        demo_file = Path(__file__).parent.parent.parent / "data" / "ccure_demo_data.json"
-        with open(demo_file, "r") as f:
+    def _load_seed_data(self) -> dict:
+        """Load seeded data from ccure_seed_data.json."""
+        seed_file = Path(__file__).parent.parent.parent / "data" / "ccure_seed_data.json"
+        with open(seed_file) as f:
             return json.load(f)
 
     async def get_badge_events(
         self,
-        since: Optional[datetime] = None,
+        since: datetime | None = None,
         limit: int = 50,
-    ) -> List[Dict]:
+    ) -> list[dict]:
         """Fetch badge events from C•CURE.
 
         Args:
@@ -93,8 +94,8 @@ class CCureAdapter:
         Returns:
             List of badge events with SENTINEL-normalized format
         """
-        if self.demo_mode:
-            events = self._demo_data.get("badge_events", [])
+        if self.seeded_mode:
+            events = self._seed_data.get("badge_events", [])
 
             # Filter by timestamp if provided
             if since:
@@ -107,7 +108,7 @@ class CCureAdapter:
             # Headers: {"Authorization": f"Bearer {self._token}"}
             pass
 
-    async def get_door_status(self, door_id: str) -> Dict:
+    async def get_door_status(self, door_id: str) -> dict:
         """Get door/reader status from C•CURE.
 
         Args:
@@ -116,22 +117,22 @@ class CCureAdapter:
         Returns:
             Door status dict with keys: door_id, name, status, reader_status, last_event
         """
-        if self.demo_mode:
-            doors = {d["door_id"]: d for d in self._demo_data.get("doors", [])}
+        if self.seeded_mode:
+            doors = {d["door_id"]: d for d in self._seed_data.get("doors", [])}
             return doors.get(door_id, {})
         else:
             # TODO Phase 58.3: Implement victor API call
             # GET {api_url}/api/doors/{door_id}/status
             pass
 
-    async def get_controllers(self) -> List[CCureController]:
+    async def get_controllers(self) -> list[CCureController]:
         """Get all iSTAR controllers and their health status.
 
         Returns:
             List of CCureController objects with tamper status, online/offline
         """
-        if self.demo_mode:
-            controllers_data = self._demo_data.get("controllers", [])
+        if self.seeded_mode:
+            controllers_data = self._seed_data.get("controllers", [])
             return [
                 CCureController(
                     controller_id=c["controller_id"],
@@ -152,7 +153,7 @@ class CCureAdapter:
             # GET {api_url}/api/controllers
             pass
 
-    async def get_occupancy(self, zone_id: str) -> Dict:
+    async def get_occupancy(self, zone_id: str) -> dict:
         """Get real-time occupancy from C•CURE anti-passback zones.
 
         Args:
@@ -161,15 +162,15 @@ class CCureAdapter:
         Returns:
             Dict with keys: zone_id, current_count, max_occupancy, anti_passback_enabled
         """
-        if self.demo_mode:
-            zones = {z["zone_id"]: z for z in self._demo_data.get("zones", [])}
+        if self.seeded_mode:
+            zones = {z["zone_id"]: z for z in self._seed_data.get("zones", [])}
             return zones.get(zone_id, {})
         else:
             # TODO Phase 58.3: Implement victor API call
             # GET {api_url}/api/zones/{zone_id}/occupancy
             pass
 
-    async def get_personnel(self, badge_id: str) -> Optional[CCurePersonnel]:
+    async def get_personnel(self, badge_id: str) -> CCurePersonnel | None:
         """Lookup personnel details by badge ID.
 
         Args:
@@ -178,8 +179,8 @@ class CCureAdapter:
         Returns:
             CCurePersonnel object or None if not found
         """
-        if self.demo_mode:
-            personnel_list = self._demo_data.get("personnel", [])
+        if self.seeded_mode:
+            personnel_list = self._seed_data.get("personnel", [])
             for p in personnel_list:
                 if p["badge_id"] == badge_id:
                     return CCurePersonnel(**p)
@@ -188,3 +189,66 @@ class CCureAdapter:
             # TODO Phase 58.3: Implement victor API call
             # GET {api_url}/api/personnel?badge_id={badge_id}
             pass
+
+    # -------------------------------------------------------------------------
+    # Visit access management — Phase 176-03
+    # -------------------------------------------------------------------------
+
+    def issue_visitor_access(self, visit: "Visit") -> dict:
+        """Issue visitor access to C-CURE.
+
+        Args:
+            visit: Visit model with visitor details and meeting window.
+
+        Returns:
+            dict with keys: success (bool), card_id (str|None), message (str)
+        """
+        # Access group mapping: building_id -> C-CURE access group
+        access_groups = {
+            "site-001": "VISITOR_FAIRLANDS",
+            "site-002": "VISITOR_SANDTON",
+            "site-003": "VISITOR_CENTURION",
+            "site-004": "VISITOR_UMHLANGA",
+        }
+        group = access_groups.get(visit.building_id, "VISITOR_DEFAULT")
+
+        # Build access payload (used in live mode; logged in demo mode)
+        _payload = {
+            "person_name": visit.visitor_name or visit.visitor_email,
+            "email": visit.visitor_email,
+            "access_group": group,
+            "valid_until": visit.meeting_end.isoformat(),
+            "building": visit.building_id,
+        }
+        logger.debug(f"[CCureAdapter] Visit access payload: {_payload}")
+
+        if self.seeded_mode:
+            # Demo mode: return simulated badge
+            card_id = f"VIS-{visit.id.hex[:8].upper()}"
+            logger.info(f"[CCureAdapter] Demo access issued: card_id={card_id}, group={group}")
+            return {"success": True, "card_id": card_id, "message": "Demo access issued"}
+
+        # Live mode: call C-CURE victor Web Service API
+        # POST {api_url}/Access/GrantAccess
+        # TODO Phase 58.3: Implement live API call with self._token auth
+        logger.warning("[CCureAdapter] Live visit access not implemented — requires Partner license")
+        return {"success": False, "card_id": None, "message": "Live C-CURE API not implemented"}
+
+    def revoke_visitor_access(self, visit_id: "UUID") -> dict:
+        """Revoke visitor access from C-CURE.
+
+        Args:
+            visit_id: UUID of the visit whose access should be revoked.
+
+        Returns:
+            dict with keys: success (bool), message (str)
+        """
+        if self.seeded_mode:
+            logger.info(f"[CCureAdapter] Demo access revoked for visit_id={visit_id}")
+            return {"success": True, "message": "Demo access revoked"}
+
+        # Live mode: call C-CURE victor Web Service API
+        # POST {api_url}/Access/RevokeAccess
+        # TODO Phase 58.3: Implement live API call with self._token auth
+        logger.warning("[CCureAdapter] Live visit revoke not implemented — requires Partner license")
+        return {"success": False, "message": "Live C-CURE API not implemented"}
