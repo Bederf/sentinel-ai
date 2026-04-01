@@ -73,15 +73,38 @@ class VisitNotificationService:
 
         return None
 
+    async def _send_whatsapp(self, host_mobile: str, message: str) -> bool:
+        """Send a WhatsApp message. Returns True on success."""
+        try:
+            result = await self.whatsapp.send_text_message(host_mobile, message)
+            return result.get("success", False)
+        except Exception as e:
+            logger.error(f"[VisitNotification] WhatsApp send failed: {e}")
+            return False
+
     def notify_host_arrival(self, visit: "Visit") -> bool:
         """Send WhatsApp notification to host when visitor scans at reception.
 
-        Args:
-            visit: The Visit model for the arriving visitor.
-
-        Returns:
-            True if notification was sent successfully, False otherwise.
+        This is a sync wrapper. Use _notify_host_arrival_async for async contexts.
         """
+        import asyncio
+
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            # No running loop — create a new one (sync context)
+            import concurrent.futures
+
+            with concurrent.futures.ThreadPoolExecutor() as pool:
+                future = pool.submit(asyncio.run, self._notify_host_arrival_async(visit))
+                return future.result()
+        else:
+            # Running loop exists — schedule as background task
+            loop.create_task(self._notify_host_arrival_async(visit))
+            return True
+
+    async def _notify_host_arrival_async(self, visit: "Visit") -> bool:
+        """Async implementation of host arrival notification."""
         host_mobile = self._get_host_mobile(visit.host_email, visit.host_mobile)
         if not host_mobile:
             logger.warning(
@@ -100,30 +123,34 @@ class VisitNotificationService:
             f"Reply YES to approve or NO to deny."
         )
 
-        try:
-            import asyncio
-
-            # WhatsAppService.send_text_message is async
-            result = asyncio.get_event_loop().run_until_complete(self.whatsapp.send_text_message(host_mobile, message))
-            success = result.get("success", False)
-            logger.info(
-                f"[VisitNotification] Arrival notification {'sent' if success else 'failed'} "
-                f"to {host_mobile} for visit {visit.id}"
-            )
-            return success
-        except Exception as e:
-            logger.error(f"[VisitNotification] Failed to send arrival notification: {e}")
-            return False
+        success = await self._send_whatsapp(host_mobile, message)
+        logger.info(
+            f"[VisitNotification] Arrival notification {'sent' if success else 'failed'} "
+            f"to {host_mobile} for visit {visit.id}"
+        )
+        return success
 
     def notify_access_issued(self, visit: "Visit") -> bool:
-        """Send optional WhatsApp notification that access card was issued.
+        """Send WhatsApp notification that access card was issued.
 
-        Args:
-            visit: The Visit model for the visitor who received a card.
-
-        Returns:
-            True if notification was sent successfully, False otherwise.
+        This is a sync wrapper. Use _notify_access_issued_async for async contexts.
         """
+        import asyncio
+
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            import concurrent.futures
+
+            with concurrent.futures.ThreadPoolExecutor() as pool:
+                future = pool.submit(asyncio.run, self._notify_access_issued_async(visit))
+                return future.result()
+        else:
+            loop.create_task(self._notify_access_issued_async(visit))
+            return True
+
+    async def _notify_access_issued_async(self, visit: "Visit") -> bool:
+        """Async implementation of access issued notification."""
         host_mobile = self._get_host_mobile(visit.host_email, visit.host_mobile)
         if not host_mobile:
             logger.warning(
@@ -137,16 +164,9 @@ class VisitNotificationService:
 
         message = f"\u2705 Access approved.\n\nCard issued to {visitor_display} at {building_name}."
 
-        try:
-            import asyncio
-
-            result = asyncio.get_event_loop().run_until_complete(self.whatsapp.send_text_message(host_mobile, message))
-            success = result.get("success", False)
-            logger.info(
-                f"[VisitNotification] Access issued notification {'sent' if success else 'failed'} "
-                f"to {host_mobile} for visit {visit.id}"
-            )
-            return success
-        except Exception as e:
-            logger.error(f"[VisitNotification] Failed to send access issued notification: {e}")
-            return False
+        success = await self._send_whatsapp(host_mobile, message)
+        logger.info(
+            f"[VisitNotification] Access issued notification {'sent' if success else 'failed'} "
+            f"to {host_mobile} for visit {visit.id}"
+        )
+        return success

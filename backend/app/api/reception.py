@@ -12,12 +12,13 @@ Tags: reception
 from __future__ import annotations
 
 import logging
-from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, status
 
 from app.api.visit_service import VisitService
 from app.models.visit import VisitStatus
+from app.services.visit_notification_service import get_notification_service
+from app.services.visit_policy_engine import VisitPolicyEngine
 from app.schemas.visit import (
     IssueCardRequest,
     IssueCardResponse,
@@ -75,7 +76,7 @@ def scan_visit(request: ScanRequest) -> ScanResponse:
     """Scan a visitor's QR code or enter their PIN at reception.
 
     Accepts EITHER a token UUID OR a 6-digit PIN.
-    Validates the time window and transitions CREATED -> ARRIVED.
+    Validates via policy engine (time window, expiry, status) before transition.
     """
     if request.token is None and request.pin is None:
         raise HTTPException(
@@ -88,26 +89,22 @@ def scan_visit(request: ScanRequest) -> ScanResponse:
             detail="Provide only 'token' OR 'pin', not both",
         )
 
-    service = VisitService()
+    # Enforce policy BEFORE any state transition
+    policy = VisitPolicyEngine()
+    result = policy.check_scan_policy(token=request.token, pin=request.pin)
 
-    # Determine lookup method from which field was provided
-    visit = service.scan_visit(token=request.token, pin=request.pin)
-    if visit is None:
+    if not result.allowed:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Visit not found",
+            status_code=result.status_code,
+            detail=result.reason,
         )
 
-    # Check time window
-    time_window_valid = service.is_within_time_window(visit)
-    if not time_window_valid:
-        # Expired — still return visit info but flag the window
-        logger.info("Visit %s scanned outside valid time window", visit.token)
+    visit = result.visit
+    time_window_valid = visit.status != VisitStatus.EXPIRED
 
     # Transition CREATED -> ARRIVED on first scan
-    updated_visit = service.arrive_visit(visit)
-
     service_layer = VisitService()
+    updated_visit = service_layer.arrive_visit(visit)
     building_name = service_layer.get_building_name(updated_visit.building_id)
 
     return ScanResponse(
@@ -152,6 +149,13 @@ def register_visit(request: RegisterRequest) -> RegisterResponse:
         vehicle=request.vehicle,
         id_number=request.id_number,
     )
+
+    # Notify host once visitor has completed reception registration.
+    try:
+        notification_service = get_notification_service()
+        notification_service.notify_host_arrival(updated)
+    except Exception as exc:
+        logger.warning("Host notification failed for visit %s: %s", updated.id, exc)
 
     return RegisterResponse(
         visit=_visit_to_response(updated),

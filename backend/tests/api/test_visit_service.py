@@ -417,47 +417,77 @@ class TestReceptionAPI:
         """scan_visit route function returns visit for valid token."""
         arrived = sample_visit.model_copy(update={"status": VisitStatus.ARRIVED})
         mock_service = MagicMock()
-        mock_service.scan_visit.return_value = sample_visit
-        mock_service.is_within_time_window.return_value = True
         mock_service.arrive_visit.return_value = arrived
         mock_service.get_building_name.return_value = "Fairlands Head Office"
 
-        with patch("app.api.reception.VisitService", return_value=mock_service):
+        from app.services.visit_policy_engine import PolicyResult
+
+        mock_policy = MagicMock()
+        mock_policy.check_scan_policy.return_value = PolicyResult(
+            allowed=True,
+            reason="",
+            status_code=200,
+            visit=sample_visit,
+        )
+
+        with (
+            patch("app.api.reception.VisitService", return_value=mock_service),
+            patch("app.api.reception.VisitPolicyEngine", return_value=mock_policy),
+        ):
             from app.api.reception import scan_visit
             from app.schemas.visit import ScanRequest
 
             request = ScanRequest(token=sample_visit.token)
             response = scan_visit(request)
 
-        mock_service.scan_visit.assert_called_once()
+        mock_policy.check_scan_policy.assert_called_once()
         assert response.visit.token == sample_visit.token
         assert response.visit.status == VisitStatus.ARRIVED.value
         assert response.time_window_valid is True
 
     def test_scan_with_pin_returns_visit(self, sample_visit: Visit) -> None:
         """scan_visit route function returns visit for valid PIN."""
+        arrived = sample_visit.model_copy(update={"status": VisitStatus.ARRIVED})
         mock_service = MagicMock()
-        mock_service.scan_visit.return_value = sample_visit
-        mock_service.is_within_time_window.return_value = True
-        mock_service.arrive_visit.return_value = sample_visit
+        mock_service.arrive_visit.return_value = arrived
         mock_service.get_building_name.return_value = "Fairlands Head Office"
 
-        with patch("app.api.reception.VisitService", return_value=mock_service):
+        from app.services.visit_policy_engine import PolicyResult
+
+        mock_policy = MagicMock()
+        mock_policy.check_scan_policy.return_value = PolicyResult(
+            allowed=True,
+            reason="",
+            status_code=200,
+            visit=sample_visit,
+        )
+
+        with (
+            patch("app.api.reception.VisitService", return_value=mock_service),
+            patch("app.api.reception.VisitPolicyEngine", return_value=mock_policy),
+        ):
             from app.api.reception import scan_visit
             from app.schemas.visit import ScanRequest
 
             request = ScanRequest(pin=sample_visit.pin)
             response = scan_visit(request)
 
-        mock_service.scan_visit.assert_called_once()
+        mock_policy.check_scan_policy.assert_called_once()
         assert response.visit.token == sample_visit.token
 
     def test_scan_not_found_returns_404(self) -> None:
         """scan_visit raises HTTPException 404 for unknown token."""
-        mock_service = MagicMock()
-        mock_service.scan_visit.return_value = None
+        from app.services.visit_policy_engine import PolicyResult
 
-        with patch("app.api.reception.VisitService", return_value=mock_service):
+        mock_policy = MagicMock()
+        mock_policy.check_scan_policy.return_value = PolicyResult(
+            allowed=False,
+            reason="visit not found",
+            status_code=404,
+            visit=None,
+        )
+
+        with patch("app.api.reception.VisitPolicyEngine", return_value=mock_policy):
             from fastapi import HTTPException
 
             from app.api.reception import scan_visit

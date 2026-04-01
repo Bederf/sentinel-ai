@@ -106,3 +106,4 @@ class VisitAuditLogger:
             self._with_lock(_append)
         except Exception as e:
             logger.error("Failed to write visit audit event: %s", e)
+            raise  # Surface failure — audit writes must not be silently swallowed

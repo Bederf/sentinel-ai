@@ -17,9 +17,13 @@ POST /whatsapp/visit/reply
 
 from __future__ import annotations
 
+import base64
+import hashlib
+import hmac
 import logging
+import os
 
-from fastapi import APIRouter, Form, Response
+from fastapi import APIRouter, Form, Header, HTTPException, Request, Response
 from twilio.twiml import TwiML
 
 from app.database.repositories.visit_repository import VisitRepository
@@ -42,17 +46,44 @@ def _get_audit_logger() -> VisitAuditLogger:
     return _audit_logger
 
 
+def _verify_twilio_signature(request_url: str, params: dict[str, str], signature: str | None) -> bool:
+    """Verify Twilio HMAC-SHA1 signature on incoming webhook requests."""
+    auth_token = os.getenv("TWILIO_AUTH_TOKEN", "")
+    if not auth_token:
+        # No token configured — skip verification (dev/demo mode)
+        return True
+    if not signature:
+        return False
+    payload = request_url + "".join(f"{key}{params[key]}" for key in sorted(params))
+    digest = hmac.new(auth_token.encode("utf-8"), payload.encode("utf-8"), hashlib.sha1).digest()
+    expected = base64.b64encode(digest).decode("utf-8")
+    return hmac.compare_digest(expected, signature)
+
+
 @router.post("/reply")
 async def handle_visit_reply(
+    request: Request,
     Body: str = Form(...),
     From: str = Form(...),
+    X_Twilio_Signature: str | None = Header(default=None, alias="X-Twilio-Signature"),
 ) -> Response:
     """Handle YES/NO WhatsApp reply from host.
 
     Twilio sends Form data:
     - Body: message text ("YES" or "NO")
     - From: sender mobile number
+
+    Protected by Twilio HMAC-SHA1 signature verification.
     """
+    # Step 0: verify Twilio signature
+    form_data = await request.form()
+    params = {k: v for k, v in form_data.items() if isinstance(v, str)}
+    public_base = os.getenv("PUBLIC_BASE_URL", "").rstrip("/")
+    request_url = f"{public_base}/api/whatsapp/whatsapp/visit/reply" if public_base else str(request.url)
+    if not _verify_twilio_signature(request_url, params, X_Twilio_Signature):
+        logger.warning("[WhatsApp Visit] Invalid Twilio signature — rejecting request")
+        raise HTTPException(status_code=403, detail="Invalid Twilio signature")
+
     # Step 1: parse
     decision = Body.strip().upper()
     if decision not in ("YES", "NO"):
@@ -72,47 +103,60 @@ async def handle_visit_reply(
     host_email = host.get("email", "")
     logger.info(f"[WhatsApp Visit] Reply routed to host: {host.get('name')} <{host_email}>")
 
-    # Step 3: find most recent active visit for this host
+    # Step 3: find most recent active visit for this host — ATOMIC UPDATE
+    # Use a conditional update: only succeeds if visit is in expected status range.
+    # This eliminates the read-then-write race condition.
     repo = VisitRepository()
-    visits = repo.list_active_visits()
+    eligible_statuses = [VisitStatus.REGISTERED.value, VisitStatus.ARRIVED.value, VisitStatus.CREATED.value]
 
-    # Find visits where host_email matches and status is REGISTERED or ARRIVED
-    host_visits = [
-        v
-        for v in visits
-        if v.host_email.lower() == host_email.lower()
-        and v.status in (VisitStatus.REGISTERED, VisitStatus.ARRIVED, VisitStatus.CREATED)
-    ]
-    # Sort by created_at descending, take most recent
-    host_visits.sort(key=lambda v: v.created_at, reverse=True)
-    visit = host_visits[0] if host_visits else None
+    # Try to atomically claim this visit by updating with a status filter
+    visit = None
+    for _attempt in range(3):  # up to 3 attempts to find an eligible visit
+        visits = repo.list_active_visits()
+        host_visits = [
+            v for v in visits if v.host_email.lower() == host_email.lower() and v.status in eligible_statuses
+        ]
+        if not host_visits:
+            break
+        # Pick the most recent by created_at
+        host_visits.sort(key=lambda v: v.created_at, reverse=True)
+        candidate = host_visits[0]
+
+        # Atomic conditional update — only succeeds if status hasn't changed
+        new_status = VisitStatus.APPROVED.value if decision == "YES" else VisitStatus.DENIED.value
+        updated = repo.update_visit_with_status_check(
+            candidate.id,
+            new_status,
+            candidate.status,
+        )
+        if updated is not None:
+            visit = updated
+            break
+        # Status changed concurrently — retry with remaining visits (remove the one we just tried)
+        eligible_statuses = [s for s in eligible_statuses if s != candidate.status.value]
+    else:
+        # Exhausted all attempts
+        pass
 
     if not visit:
-        logger.warning(f"[WhatsApp Visit] No active visit found for host {host_email}")
+        logger.warning(f"[WhatsApp Visit] No eligible visit found for host {host_email}")
         return _twiml_response("No pending visitor found for your name. Contact reception.")
 
-    # Steps 4/5: update status
+    # Step 4/5: log audit
     audit = _get_audit_logger()
-    if decision == "YES":
-        repo.update_visit(visit.id, {"status": VisitStatus.APPROVED.value})
-        audit.log_event(
-            VisitEventType.APPROVE,
-            visit_id=str(visit.id),
-            details={"host": host_email, "host_name": host.get("name"), "from": from_number},
-        )
-        logger.info(f"[WhatsApp Visit] Visit {visit.id} APPROVED by {host_email}")
-        return _twiml_response(f"\u2705 Approved. Your visitor ({visit.visitor_name or 'guest'}) has been cleared.")
-    else:  # NO
-        repo.update_visit(visit.id, {"status": VisitStatus.DENIED.value})
-        audit.log_event(
-            VisitEventType.DENY,
-            visit_id=str(visit.id),
-            details={"host": host_email, "host_name": host.get("name"), "from": from_number},
-        )
-        logger.info(f"[WhatsApp Visit] Visit {visit.id} DENIED by {host_email}")
-        return _twiml_response(
-            f"\u274c Access denied. Your visitor ({visit.visitor_name or 'guest'}) will not be admitted."
-        )
+    audit.log_event(
+        VisitEventType.APPROVE if decision == "YES" else VisitEventType.DENY,
+        visit_id=str(visit.id),
+        details={"host": host_email, "host_name": host.get("name"), "from": from_number},
+    )
+    logger.info(f"[WhatsApp Visit] Visit {visit.id} {decision} by {host_email}")
+
+    msg = (
+        f"\u2705 Approved. Your visitor ({visit.visitor_name or 'guest'}) has been cleared."
+        if decision == "YES"
+        else f"\u274c Access denied. Your visitor ({visit.visitor_name or 'guest'}) will not be admitted."
+    )
+    return _twiml_response(msg)
 
 
 def _normalise_mobile(mobile: str) -> str:

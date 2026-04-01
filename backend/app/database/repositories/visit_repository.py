@@ -193,6 +193,35 @@ class VisitRepository:
 
         return self._with_lock(_update)
 
+    def update_visit_with_status_check(
+        self,
+        id: UUID,
+        new_status: str,
+        expected_status: str,
+    ) -> Optional[Visit]:
+        """Atomically update visit status only if currently in expected_status.
+
+        This prevents race conditions where two concurrent replies both read
+        the same visit and try to update it.
+        Returns the updated Visit, or None if visit not found or status changed.
+        """
+
+        def _update():
+            store = self._read_store()
+            for i, v in enumerate(store["visits"]):
+                if v["id"] == str(id):
+                    if v["status"] != expected_status:
+                        # Status changed — another thread got there first
+                        return None
+                    v["status"] = new_status
+                    v["updated_at"] = datetime.now(timezone.utc).isoformat()
+                    store["visits"][i] = v
+                    self._write_store(store)
+                    return _deserialize_visit(v)
+            return None
+
+        return self._with_lock(_update)
+
     def list_visits_by_building(self, building_id: str, status: Optional[VisitStatus] = None) -> list[Visit]:
         """List all visits for a building, optionally filtered by status."""
 
