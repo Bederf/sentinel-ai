@@ -1,0 +1,295 @@
+name,object_type,instance,units,present_value,description,min_value,max_value,writable
+STC/G/UNK-01/Unknown,analogInput,1000,,84.99509999999984,,,,False
+STC/G/UNK-01/Status,analogInput,1001,,online,,,,False
+STC/G/UNK-01/UnknownSensor,analogInput,1002,,2026-02-27T09:28:36.613438,,,,False
+STC/G/FCU-01/Unknown,analogInput,1003,,100.0,,,,False
+STC/G/FCU-01/Status,analogInput,1004,,online,,,,False
+STC/G/FCU-01/UnknownSensor,analogInput,1005,,2026-02-28T00:22:38.038537,,,,False
+STC/G/CT-01/Unknown,analogInput,1006,,100.0,,,,False
+STC/G/CT-01/Status,analogInput,1007,,online,,,,False
+STC/G/CT-01/UnknownSensor,analogInput,1008,,2026-03-06T13:28:15.005478,,,,False
+STC/G/UNK-01/Unknown,analogInput,1009,,100.0,,,,False
+STC/G/UNK-01/Status,analogInput,1010,,online,,,,False
+STC/G/UNK-01/UnknownSensor,analogInput,1011,,2026-03-06T13:28:15.170368,,,,False
+STC/G/UNK-01/Unknown,analogInput,1012,,100.0,,,,False
+STC/G/UNK-01/Status,analogInput,1013,,online,,,,False
+STC/G/UNK-01/UnknownSensor,analogInput,1014,,2026-03-06T13:28:15.165567,,,,False
+STC/G/UNK-201/Unknown,analogInput,1015,,99.99000000000001,,,,False
+STC/G/UNK-201/Status,analogInput,1016,,online,,,,False
+STC/G/UNK-201/UnknownSensor,analogInput,1017,,2026-03-06T13:28:14.890059,,,,False
+STC/G/UNK-301/Unknown,analogInput,1018,,99.99000000000001,,,,False
+STC/G/UNK-301/Status,analogInput,1019,,online,,,,False
+STC/G/UNK-301/UnknownSensor,analogInput,1020,,2026-03-06T13:28:14.908218,,,,False
+STC/G/FCU-01/Unknown,analogInput,1021,,100.0,,,,False
+STC/G/FCU-01/Status,analogInput,1022,,online,,,,False
+STC/G/FCU-01/UnknownSensor,analogInput,1023,,2026-02-28T03:03:14.230008,,,,False
+STC/G/FCU-02/Unknown,analogInput,1024,,100.0,,,,False
+STC/G/FCU-02/Status,analogInput,1025,,online,,,,False
+STC/G/FCU-02/UnknownSensor,analogInput,1026,,2026-02-28T00:22:38.042298,,,,False
+STC/G/UNK-CO2/Co2,analogInput,1027,partsPerMillion,100.0,,,,False
+STC/G/UNK-CO2/Co2Status,analogInput,1028,partsPerMillion,online,,,,False
+STC/G/UNK-CO2/Co2Sensor,analogInput,1029,partsPerMillion,2026-03-06T13:28:15.161554,,,,False
+STC/G/UNK-161/Unknown,analogInput,1030,,99.99000000000001,,,,False
+STC/G/UNK-161/Status,analogInput,1031,,online,,,,False
+STC/G/UNK-161/UnknownSensor,analogInput,1032,,2026-03-06T13:28:14.869262,,,,False
+STC/G/VAV-01/Unknown,analogInput,1033,,100.0,,,,False
+STC/G/VAV-01/Status,analogInput,1034,,online,,,,False
+STC/G/VAV-01/UnknownSensor,analogInput,1035,,2026-02-28T00:22:38.396149,,,,False
+STC/G/CT-01/Unknown,analogInput,1036,,100.0,,,,False
+STC/G/CT-01/Status,analogInput,1037,,online,,,,False
+STC/G/CT-01/UnknownSensor,analogInput,1038,,2026-03-06T13:28:15.011006,,,,False
+STC/G/FCU-01/Unknown,analogInput,1039,,100.0,,,,False
+STC/G/FCU-01/Status,analogInput,1040,,online,,,,False
+STC/G/FCU-01/UnknownSensor,analogInput,1041,,2026-02-28T00:22:38.045578,,,,False
+STC/G/UPS-01/Unknown,analogInput,1042,,99.98400000000001,,,,False
+STC/G/UPS-01/Status,analogInput,1043,,online,,,,False
+STC/G/UPS-01/UnknownSensor,analogInput,1044,,2026-03-06T13:28:14.976876,,,,False
+STC/G/LUM-01/Unknown,analogInput,1045,,99.72469999999086,,,,False
+STC/G/LUM-01/Status,analogInput,1046,,online,,,,False
+STC/G/LUM-01/UnknownSensor,analogInput,1047,,2026-02-27T09:06:23.888598,,,,False
+STC/G/UNK-01/Humidity,analogInput,1048,percent,46.83823817047741,,,,False
+STC/G/UNK-01/Temperature,analogInput,1049,degC,6.014302746006724,,,,False
+STC/G/CH-01/Pressure,analogInput,1050,kPa,0,,,,False
+STC/G/CH-01/Unknown,analogInput,1051,,0,,,,False
+STC/G/CH-01/UnknownSensor,analogInput,1052,,2026-03-12T12:25:55.622739,,,,False
+STC/G/CH-01/Temperature,analogInput,1053,degC,13.5,,,,False
+STC/G/CH-01/Status,analogInput,1054,,online,,,,False
+STC/G/CH-01/TemperatureSensor,analogInput,1055,degC,8.5,,,,False
+STC/G/UNK-02/Unknown,analogInput,1056,,100.0,,,,False
+STC/G/UNK-02/Status,analogInput,1057,,online,,,,False
+STC/G/UNK-02/UnknownSensor,analogInput,1058,,2026-03-06T13:28:15.073181,,,,False
+STC/G/VAV-01/Unknown,analogInput,1059,,100.0,,,,False
+STC/G/VAV-01/Status,analogInput,1060,,online,,,,False
+STC/G/VAV-01/UnknownSensor,analogInput,1061,,2026-02-28T00:22:38.379267,,,,False
+STC/G/UNK-02/Unknown,analogInput,1062,,84.99479999999983,,,,False
+STC/G/UNK-02/Status,analogInput,1063,,online,,,,False
+STC/G/UNK-02/UnknownSensor,analogInput,1064,,2026-02-27T09:28:36.621301,,,,False
+STC/G/VAV-04/Unknown,analogInput,1065,,100.0,,,,False
+STC/G/VAV-04/Status,analogInput,1066,,online,,,,False
+STC/G/VAV-04/UnknownSensor,analogInput,1067,,2026-02-28T00:22:38.404719,,,,False
+STC/G/UNK-381/Unknown,analogInput,1068,,99.99000000000001,,,,False
+STC/G/UNK-381/Status,analogInput,1069,,online,,,,False
+STC/G/UNK-381/UnknownSensor,analogInput,1070,,2026-03-06T13:28:14.988451,,,,False
+STC/G/VAV-01/Unknown,analogInput,1071,,85,,,,False
+STC/G/VAV-01/Status,analogInput,1072,,normal,,,,False
+STC/G/VAV-01/UnknownSensor,analogInput,1073,,2026-03-06T13:28:15.154132,,,,False
+STC/G/UNK-03/Unknown,analogInput,1074,,100.0,,,,False
+STC/G/UNK-03/Status,analogInput,1075,,online,,,,False
+STC/G/UNK-03/UnknownSensor,analogInput,1076,,2026-03-06T13:28:14.861005,,,,False
+STC/G/DAL-01/Unknown,analogInput,1077,,99.72469999999086,,,,False
+STC/G/DAL-01/Status,analogInput,1078,,online,,,,False
+STC/G/DAL-01/UnknownSensor,analogInput,1079,,2026-02-27T09:06:23.915985,,,,False
+STC/G/UNK-81/Unknown,analogInput,1080,,99.99000000000001,,,,False
+STC/G/UNK-81/Status,analogInput,1081,,online,,,,False
+STC/G/UNK-81/UnknownSensor,analogInput,1082,,2026-03-06T13:28:15.145833,,,,False
+STC/G/UNK-321/Unknown,analogInput,1083,,99.99000000000001,,,,False
+STC/G/UNK-321/Status,analogInput,1084,,online,,,,False
+STC/G/UNK-321/UnknownSensor,analogInput,1085,,2026-03-06T13:28:14.972789,,,,False
+STC/G/AHU-01/Unknown,analogInput,1086,,45.0,,,,False
+STC/G/AHU-01/Status,analogInput,1087,,degraded,,,,False
+STC/G/AHU-01/UnknownSensor,analogInput,1088,,2026-03-06T13:28:14.819845,,,,False
+STC/G/VAV-01/Flow,analogInput,1089,litersPerSecond,0,,,,False
+STC/G/VAV-01/ValvePosition,analogInput,1090,percent,0.0,,,,False
+STC/G/VAV-01/Unknown,analogInput,1091,,91.35999999999967,,,,False
+STC/G/VAV-01/Status,analogInput,1092,,online,,,,False
+STC/G/VAV-01/UnknownSensor,analogInput,1093,,2026-03-12T12:25:55.636884,,,,False
+STC/G/VAV-01/Temperature,analogInput,1094,degC,25.1,,,,False
+STC/G/VAV-02/Unknown,analogInput,1095,,100.0,,,,False
+STC/G/VAV-02/Status,analogInput,1096,,online,,,,False
+STC/G/VAV-02/UnknownSensor,analogInput,1097,,2026-02-28T00:22:38.391658,,,,False
+STC/G/UNK-61/Unknown,analogInput,1098,,99.99000000000001,,,,False
+STC/G/UNK-61/Status,analogInput,1099,,online,,,,False
+STC/G/UNK-61/UnknownSensor,analogInput,1100,,2026-03-06T13:28:14.959394,,,,False
+STC/G/UNK-261/Unknown,analogInput,1101,,99.99000000000001,,,,False
+STC/G/UNK-261/Status,analogInput,1102,,online,,,,False
+STC/G/UNK-261/UnknownSensor,analogInput,1103,,2026-03-06T13:28:14.995548,,,,False
+STC/G/DAL-CTR/Unknown,analogInput,1104,,99.994,,,,False
+STC/G/DAL-CTR/Status,analogInput,1105,,online,,,,False
+STC/G/DAL-CTR/UnknownSensor,analogInput,1106,,2026-03-06T13:28:15.093122,,,,False
+STC/G/UNK-01/Unknown,analogInput,1107,,99.99000000000001,,,,False
+STC/G/UNK-01/Status,analogInput,1108,,online,,,,False
+STC/G/UNK-01/UnknownSensor,analogInput,1109,,2026-03-06T13:28:15.125933,,,,False
+STC/G/VAV-03/Unknown,analogInput,1110,,100.0,,,,False
+STC/G/VAV-03/Status,analogInput,1111,,online,,,,False
+STC/G/VAV-03/UnknownSensor,analogInput,1112,,2026-02-28T00:22:38.400288,,,,False
+STC/G/AHU-01/Speed,analogInput,1113,percent,0.0,,,,False
+STC/G/AHU-01/Status,analogInput,1114,,0,,,,False
+STC/G/AHU-01/Unknown,analogInput,1115,,85,,,,False
+STC/G/AHU-01/StatusStatus,analogInput,1116,,normal,,,,False
+STC/G/AHU-01/Temperature,analogInput,1117,degC,6.5,,,,False
+STC/G/AHU-01/UnknownSensor,analogInput,1118,,2026-03-12T12:25:55.609959,,,,False
+STC/G/GEN-02/Unknown,analogInput,1119,,99.99000000000001,,,,False
+STC/G/GEN-02/Status,analogInput,1120,,online,,,,False
+STC/G/GEN-02/UnknownSensor,analogInput,1121,,2026-03-06T13:28:14.824393,,,,False
+STC/G/PUM-CW1/Unknown,analogInput,1122,,85,,,,False
+STC/G/PUM-CW1/Status,analogInput,1123,,normal,,,,False
+STC/G/PUM-CW1/UnknownSensor,analogInput,1124,,2026-03-06T13:28:14.946174,,,,False
+STC/G/UNK-04/Unknown,analogInput,1125,,100.0,,,,False
+STC/G/UNK-04/Status,analogInput,1126,,online,,,,False
+STC/G/UNK-04/UnknownSensor,analogInput,1127,,2026-03-06T13:28:14.992010,,,,False
+STC/G/MET-WAT/Unknown,analogInput,1128,,100.0,,,,False
+STC/G/MET-WAT/Status,analogInput,1129,,online,,,,False
+STC/G/MET-WAT/UnknownSensor,analogInput,1130,,2026-02-27T09:06:20.924361,,,,False
+STC/G/MET-MAI/Unknown,analogInput,1131,,99.99600000000001,,,,False
+STC/G/MET-MAI/Status,analogInput,1132,,online,,,,False
+STC/G/MET-MAI/UnknownSensor,analogInput,1133,,2026-03-06T13:28:14.936238,,,,False
+STC/G/FCU-02/Speed,analogInput,1134,percent,0.0,,,,False
+STC/G/FCU-02/Unknown,analogInput,1135,,89.19999999999959,,,,False
+STC/G/FCU-02/Temperature,analogInput,1136,degC,24.8,,,,False
+STC/G/FCU-02/Status,analogInput,1137,,online,,,,False
+STC/G/FCU-02/UnknownSensor,analogInput,1138,,2026-03-12T12:25:55.629220,,,,False
+STC/G/FCU-02/ValvePosition,analogInput,1139,percent,0.0,,,,False
+STC/G/FCU-04/Unknown,analogInput,1140,,100.0,,,,False
+STC/G/FCU-04/Status,analogInput,1141,,online,,,,False
+STC/G/FCU-04/UnknownSensor,analogInput,1142,,2026-02-28T00:22:38.090510,,,,False
+STC/G/UNK-01/Unknown,analogInput,1143,,100.0,,,,False
+STC/G/UNK-01/Status,analogInput,1144,,online,,,,False
+STC/G/UNK-01/UnknownSensor,analogInput,1145,,2026-03-06T13:28:15.100754,,,,False
+STC/G/UNK-341/Unknown,analogInput,1146,,99.99000000000001,,,,False
+STC/G/UNK-341/Status,analogInput,1147,,online,,,,False
+STC/G/UNK-341/UnknownSensor,analogInput,1148,,2026-03-06T13:28:14.984693,,,,False
+STC/G/UNK-181/Unknown,analogInput,1149,,99.99000000000001,,,,False
+STC/G/UNK-181/Status,analogInput,1150,,online,,,,False
+STC/G/UNK-181/UnknownSensor,analogInput,1151,,2026-03-06T13:28:14.968377,,,,False
+STC/G/UNK-121/Unknown,analogInput,1152,,99.99000000000001,,,,False
+STC/G/UNK-121/Status,analogInput,1153,,online,,,,False
+STC/G/UNK-121/UnknownSensor,analogInput,1154,,2026-03-06T13:28:15.141055,,,,False
+STC/G/UNK-101/Unknown,analogInput,1155,,99.99000000000001,,,,False
+STC/G/UNK-101/Status,analogInput,1156,,online,,,,False
+STC/G/UNK-101/UnknownSensor,analogInput,1157,,2026-03-06T13:28:14.922429,,,,False
+STC/G/MET-SOL/Unknown,analogInput,1158,,99.99600000000001,,,,False
+STC/G/MET-SOL/Status,analogInput,1159,,online,,,,False
+STC/G/MET-SOL/UnknownSensor,analogInput,1160,,2026-03-06T13:28:14.941303,,,,False
+STC/G/PUM-01/Unknown,analogInput,1161,,100.0,,,,False
+STC/G/PUM-01/Status,analogInput,1162,,online,,,,False
+STC/G/PUM-01/UnknownSensor,analogInput,1163,,2026-03-06T13:28:15.112818,,,,False
+STC/G/DAL-CTR/Unknown,analogInput,1164,,99.994,,,,False
+STC/G/DAL-CTR/Status,analogInput,1165,,online,,,,False
+STC/G/DAL-CTR/UnknownSensor,analogInput,1166,,2026-03-06T13:28:15.015473,,,,False
+STC/G/CH-02/Unknown,analogInput,1167,,100.0,,,,False
+STC/G/CH-02/Status,analogInput,1168,,online,,,,False
+STC/G/CH-02/UnknownSensor,analogInput,1169,,2026-03-06T13:28:14.842433,,,,False
+STC/G/GEN-01/Unknown,analogInput,1170,,99.99000000000001,,,,False
+STC/G/GEN-01/Status,analogInput,1171,,online,,,,False
+STC/G/GEN-01/UnknownSensor,analogInput,1172,,2026-03-06T13:28:14.856377,,,,False
+STC/G/UNK-361/Unknown,analogInput,1173,,99.99000000000001,,,,False
+STC/G/UNK-361/Status,analogInput,1174,,online,,,,False
+STC/G/UNK-361/UnknownSensor,analogInput,1175,,2026-03-06T13:28:15.104823,,,,False
+STC/G/UNK-41/Unknown,analogInput,1176,,99.99000000000001,,,,False
+STC/G/UNK-41/Status,analogInput,1177,,online,,,,False
+STC/G/UNK-41/UnknownSensor,analogInput,1178,,2026-03-06T13:28:15.089804,,,,False
+STC/G/UNK-241/Unknown,analogInput,1179,,99.99000000000001,,,,False
+STC/G/UNK-241/Status,analogInput,1180,,online,,,,False
+STC/G/UNK-241/UnknownSensor,analogInput,1181,,2026-03-06T13:28:14.903821,,,,False
+STC/G/PUM-CHW1/Unknown,analogInput,1182,,85,,,,False
+STC/G/PUM-CHW1/Status,analogInput,1183,,normal,,,,False
+STC/G/PUM-CHW1/UnknownSensor,analogInput,1184,,2026-03-06T13:28:15.117313,,,,False
+STC/G/UNK-281/Unknown,analogInput,1185,,99.99000000000001,,,,False
+STC/G/UNK-281/Status,analogInput,1186,,online,,,,False
+STC/G/UNK-281/UnknownSensor,analogInput,1187,,2026-03-06T13:28:15.135769,,,,False
+STC/G/AHU-01/Unknown,analogInput,1188,,100.0,,,,False
+STC/G/AHU-01/Status,analogInput,1189,,online,,,,False
+STC/G/AHU-01/UnknownSensor,analogInput,1190,,2026-03-06T13:28:15.055025,,,,False
+STC/G/DAL-02/Unknown,analogInput,1191,,99.99000000000001,,,,False
+STC/G/DAL-02/Status,analogInput,1192,,online,,,,False
+STC/G/DAL-02/UnknownSensor,analogInput,1193,,2026-03-06T13:28:15.032476,,,,False
+STC/G/UNK-141/Unknown,analogInput,1194,,99.99000000000001,,,,False
+STC/G/UNK-141/Status,analogInput,1195,,online,,,,False
+STC/G/UNK-141/UnknownSensor,analogInput,1196,,2026-03-06T13:28:14.964343,,,,False
+STC/G/DAL-01/Unknown,analogInput,1197,,99.99000000000001,,,,False
+STC/G/DAL-01/Status,analogInput,1198,,online,,,,False
+STC/G/DAL-01/UnknownSensor,analogInput,1199,,2026-03-06T13:28:15.024295,,,,False
+STC/G/MET-01/Unknown,analogInput,1200,,99.99600000000001,,,,False
+STC/G/MET-01/Status,analogInput,1201,,online,,,,False
+STC/G/MET-01/UnknownSensor,analogInput,1202,,2026-03-06T13:28:14.873195,,,,False
+STC/G/UNK-21/Unknown,analogInput,1203,,99.99000000000001,,,,False
+STC/G/UNK-21/Status,analogInput,1204,,online,,,,False
+STC/G/UNK-21/UnknownSensor,analogInput,1205,,2026-03-06T13:28:15.131047,,,,False
+STC/G/UNK-221/Unknown,analogInput,1206,,99.99000000000001,,,,False
+STC/G/UNK-221/Status,analogInput,1207,,online,,,,False
+STC/G/UNK-221/UnknownSensor,analogInput,1208,,2026-03-06T13:28:14.894628,,,,False
+STC/L1/DIFF-A01/AirflowCfm,analogInput,1209,cubicFeetPerMinute,200,Diffuser airflow rate,50,400,False
+STC/L1/DIFF-A01/DamperPosition,analogValue,1210,percent,50,Diffuser damper position,0,100,True
+STC/L1/DIFF-A01/RoomTemp,analogInput,1211,degC,22.5,Zone temperature,16,32,False
+STC/L1/DIFF-A01/Occupancy,binaryInput,1212,,1,Zone occupancy status,,,False
+STC/L1/DIFF-A01/Co2Level,analogInput,1213,partsPerMillion,650,Zone CO2 level,400,2000,False
+STC/L1/DIFF-A02/AirflowCfm,analogInput,1214,cubicFeetPerMinute,200,Diffuser airflow rate,50,400,False
+STC/L1/DIFF-A02/DamperPosition,analogValue,1215,percent,50,Diffuser damper position,0,100,True
+STC/L1/DIFF-A02/RoomTemp,analogInput,1216,degC,22.5,Zone temperature,16,32,False
+STC/L1/DIFF-A02/Occupancy,binaryInput,1217,,1,Zone occupancy status,,,False
+STC/L1/DIFF-A02/Co2Level,analogInput,1218,partsPerMillion,650,Zone CO2 level,400,2000,False
+STC/L1/DIFF-A01/AirflowCfm,analogInput,1219,cubicFeetPerMinute,200,Diffuser airflow rate,50,400,False
+STC/L1/DIFF-A01/DamperPosition,analogValue,1220,percent,50,Diffuser damper position,0,100,True
+STC/L1/DIFF-A01/RoomTemp,analogInput,1221,degC,22.5,Zone temperature,16,32,False
+STC/L1/DIFF-A01/Occupancy,binaryInput,1222,,1,Zone occupancy status,,,False
+STC/L1/DIFF-A01/Co2Level,analogInput,1223,partsPerMillion,650,Zone CO2 level,400,2000,False
+STC/L1/DIFF-A02/AirflowCfm,analogInput,1224,cubicFeetPerMinute,200,Diffuser airflow rate,50,400,False
+STC/L1/DIFF-A02/DamperPosition,analogValue,1225,percent,50,Diffuser damper position,0,100,True
+STC/L1/DIFF-A02/RoomTemp,analogInput,1226,degC,22.5,Zone temperature,16,32,False
+STC/L1/DIFF-A02/Occupancy,binaryInput,1227,,1,Zone occupancy status,,,False
+STC/L1/DIFF-A02/Co2Level,analogInput,1228,partsPerMillion,650,Zone CO2 level,400,2000,False
+STC/L1/DIFF-D01/AirflowCfm,analogInput,1229,cubicFeetPerMinute,200,Diffuser airflow rate,50,400,False
+STC/L1/DIFF-D01/DamperPosition,analogValue,1230,percent,50,Diffuser damper position,0,100,True
+STC/L1/DIFF-D01/RoomTemp,analogInput,1231,degC,22.5,Zone temperature,16,32,False
+STC/L1/DIFF-D01/Occupancy,binaryInput,1232,,1,Zone occupancy status,,,False
+STC/L1/DIFF-D01/Co2Level,analogInput,1233,partsPerMillion,650,Zone CO2 level,400,2000,False
+STC/L1/DIFF-D02/AirflowCfm,analogInput,1234,cubicFeetPerMinute,200,Diffuser airflow rate,50,400,False
+STC/L1/DIFF-D02/DamperPosition,analogValue,1235,percent,50,Diffuser damper position,0,100,True
+STC/L1/DIFF-D02/RoomTemp,analogInput,1236,degC,22.5,Zone temperature,16,32,False
+STC/L1/DIFF-D02/Occupancy,binaryInput,1237,,1,Zone occupancy status,,,False
+STC/L1/DIFF-D02/Co2Level,analogInput,1238,partsPerMillion,650,Zone CO2 level,400,2000,False
+STC/L1/DIFF-D03/AirflowCfm,analogInput,1239,cubicFeetPerMinute,200,Diffuser airflow rate,50,400,False
+STC/L1/DIFF-D03/DamperPosition,analogValue,1240,percent,50,Diffuser damper position,0,100,True
+STC/L1/DIFF-D03/RoomTemp,analogInput,1241,degC,22.5,Zone temperature,16,32,False
+STC/L1/DIFF-D03/Occupancy,binaryInput,1242,,1,Zone occupancy status,,,False
+STC/L1/DIFF-D03/Co2Level,analogInput,1243,partsPerMillion,650,Zone CO2 level,400,2000,False
+STC/L1/DIFF-101/AirflowCfm,analogInput,1244,cubicFeetPerMinute,200,Diffuser airflow rate,50,400,False
+STC/L1/DIFF-101/DamperPosition,analogValue,1245,percent,50,Diffuser damper position,0,100,True
+STC/L1/DIFF-101/RoomTemp,analogInput,1246,degC,22.5,Zone temperature,16,32,False
+STC/L1/DIFF-101/Occupancy,binaryInput,1247,,1,Zone occupancy status,,,False
+STC/L1/DIFF-101/Co2Level,analogInput,1248,partsPerMillion,650,Zone CO2 level,400,2000,False
+STC/L1/DIFF-102/AirflowCfm,analogInput,1249,cubicFeetPerMinute,200,Diffuser airflow rate,50,400,False
+STC/L1/DIFF-102/DamperPosition,analogValue,1250,percent,50,Diffuser damper position,0,100,True
+STC/L1/DIFF-102/RoomTemp,analogInput,1251,degC,22.5,Zone temperature,16,32,False
+STC/L1/DIFF-102/Occupancy,binaryInput,1252,,1,Zone occupancy status,,,False
+STC/L1/DIFF-102/Co2Level,analogInput,1253,partsPerMillion,650,Zone CO2 level,400,2000,False
+STC/L1/DIFF-103/AirflowCfm,analogInput,1254,cubicFeetPerMinute,200,Diffuser airflow rate,50,400,False
+STC/L1/DIFF-103/DamperPosition,analogValue,1255,percent,50,Diffuser damper position,0,100,True
+STC/L1/DIFF-103/RoomTemp,analogInput,1256,degC,22.5,Zone temperature,16,32,False
+STC/L1/DIFF-103/Occupancy,binaryInput,1257,,1,Zone occupancy status,,,False
+STC/L1/DIFF-103/Co2Level,analogInput,1258,partsPerMillion,650,Zone CO2 level,400,2000,False
+STC/L1/DIFF-A01/AirflowCfm,analogInput,1259,cubicFeetPerMinute,200,Diffuser airflow rate,50,400,False
+STC/L1/DIFF-A01/DamperPosition,analogValue,1260,percent,50,Diffuser damper position,0,100,True
+STC/L1/DIFF-A01/RoomTemp,analogInput,1261,degC,22.5,Zone temperature,16,32,False
+STC/L1/DIFF-A01/Occupancy,binaryInput,1262,,1,Zone occupancy status,,,False
+STC/L1/DIFF-A01/Co2Level,analogInput,1263,partsPerMillion,650,Zone CO2 level,400,2000,False
+STC/L1/DIFF-A02/AirflowCfm,analogInput,1264,cubicFeetPerMinute,200,Diffuser airflow rate,50,400,False
+STC/L1/DIFF-A02/DamperPosition,analogValue,1265,percent,50,Diffuser damper position,0,100,True
+STC/L1/DIFF-A02/RoomTemp,analogInput,1266,degC,22.5,Zone temperature,16,32,False
+STC/L1/DIFF-A02/Occupancy,binaryInput,1267,,1,Zone occupancy status,,,False
+STC/L1/DIFF-A02/Co2Level,analogInput,1268,partsPerMillion,650,Zone CO2 level,400,2000,False
+STC/L1/DIFF-B01/AirflowCfm,analogInput,1269,cubicFeetPerMinute,200,Diffuser airflow rate,50,400,False
+STC/L1/DIFF-B01/DamperPosition,analogValue,1270,percent,50,Diffuser damper position,0,100,True
+STC/L1/DIFF-B01/RoomTemp,analogInput,1271,degC,22.5,Zone temperature,16,32,False
+STC/L1/DIFF-B01/Occupancy,binaryInput,1272,,1,Zone occupancy status,,,False
+STC/L1/DIFF-B01/Co2Level,analogInput,1273,partsPerMillion,650,Zone CO2 level,400,2000,False
+STC/L1/DIFF-B02/AirflowCfm,analogInput,1274,cubicFeetPerMinute,200,Diffuser airflow rate,50,400,False
+STC/L1/DIFF-B02/DamperPosition,analogValue,1275,percent,50,Diffuser damper position,0,100,True
+STC/L1/DIFF-B02/RoomTemp,analogInput,1276,degC,22.5,Zone temperature,16,32,False
+STC/L1/DIFF-B02/Occupancy,binaryInput,1277,,1,Zone occupancy status,,,False
+STC/L1/DIFF-B02/Co2Level,analogInput,1278,partsPerMillion,650,Zone CO2 level,400,2000,False
+STC/L1/DIFF-C01/AirflowCfm,analogInput,1279,cubicFeetPerMinute,200,Diffuser airflow rate,50,400,False
+STC/L1/DIFF-C01/DamperPosition,analogValue,1280,percent,50,Diffuser damper position,0,100,True
+STC/L1/DIFF-C01/RoomTemp,analogInput,1281,degC,22.5,Zone temperature,16,32,False
+STC/L1/DIFF-C01/Occupancy,binaryInput,1282,,1,Zone occupancy status,,,False
+STC/L1/DIFF-C01/Co2Level,analogInput,1283,partsPerMillion,650,Zone CO2 level,400,2000,False
+STC/L1/DIFF-C02/AirflowCfm,analogInput,1284,cubicFeetPerMinute,200,Diffuser airflow rate,50,400,False
+STC/L1/DIFF-C02/DamperPosition,analogValue,1285,percent,50,Diffuser damper position,0,100,True
+STC/L1/DIFF-C02/RoomTemp,analogInput,1286,degC,22.5,Zone temperature,16,32,False
+STC/L1/DIFF-C02/Occupancy,binaryInput,1287,,1,Zone occupancy status,,,False
+STC/L1/DIFF-C02/Co2Level,analogInput,1288,partsPerMillion,650,Zone CO2 level,400,2000,False
+STC/L1/DIFF-C03/AirflowCfm,analogInput,1289,cubicFeetPerMinute,200,Diffuser airflow rate,50,400,False
+STC/L1/DIFF-C03/DamperPosition,analogValue,1290,percent,50,Diffuser damper position,0,100,True
+STC/L1/DIFF-C03/RoomTemp,analogInput,1291,degC,22.5,Zone temperature,16,32,False
+STC/L1/DIFF-C03/Occupancy,binaryInput,1292,,1,Zone occupancy status,,,False
+STC/L1/DIFF-C03/Co2Level,analogInput,1293,partsPerMillion,650,Zone CO2 level,400,2000,False

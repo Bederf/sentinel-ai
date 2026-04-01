@@ -1,0 +1,32 @@
+[
+  {
+    "room_id": "FA2-1Q1-MR-01",
+    "site_id": "S001",
+    "active": true,
+    "name": "Fairlands Meeting Room 1"
+  },
+  {
+    "room_id": "FA2-1Q1-MR-02",
+    "site_id": "S001",
+    "active": true,
+    "name": "Fairlands Meeting Room 2"
+  },
+  {
+    "room_id": "FA2-1Q1-MR-03",
+    "site_id": "S001",
+    "active": true,
+    "name": "Fairlands Meeting Room 3"
+  },
+  {
+    "room_id": "FA2-1Q1-PR-01",
+    "site_id": "S001",
+    "active": true,
+    "name": "Fairlands Private Room 1"
+  },
+  {
+    "room_id": "FA1-1Q2-MR-05",
+    "site_id": "S001",
+    "active": true,
+    "name": "Fairlands Meeting Room 5"
+  }
+]
