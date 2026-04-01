@@ -189,12 +189,15 @@ class VisitPolicyEngine:
         """Check whether reception can issue an access card to a visitor.
 
         Rules:
-        1. If status != REGISTERED → REJECT "visitor not registered" (400)
+        1. If status not in (REGISTERED, APPROVED) → REJECT "visitor not registered" (400)
+           NOTE: REGISTERED = visitor has registered at reception (name/photo captured).
+           NOTE: APPROVED = host has approved via WhatsApp reply.
+           Either state means the visitor is cleared for card issuance.
         2. If status == DENIED → REJECT "host denied" (403)
         3. If status == EXPIRED → REJECT "visit expired" (410)
         4. ALLOW
         """
-        if visit.status != VisitStatus.REGISTERED:
+        if visit.status not in (VisitStatus.REGISTERED, VisitStatus.APPROVED):
             return PolicyResult(
                 allowed=False,
                 reason="visitor not registered",
