@@ -197,3 +197,18 @@ class ActiveDirectoryService:
     def get_host_by_email(self, email: str) -> dict | None:
         """Alias for get_host_details — look up host by email address."""
         return self.get_host_details(email)
+
+
+# ---------------------------------------------------------------------------
+# Module-level singleton (lazy init, matches pattern in other services)
+# ---------------------------------------------------------------------------
+
+_ad_service: ActiveDirectoryService | None = None
+
+
+def get_active_directory_service() -> ActiveDirectoryService:
+    """Return a shared ActiveDirectoryService singleton."""
+    global _ad_service
+    if _ad_service is None:
+        _ad_service = ActiveDirectoryService()
+    return _ad_service

@@ -19,8 +19,8 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Form
-from twilio.twiml import MessagingResponse
+from fastapi import APIRouter, Form, Response
+from twilio.twiml import TwiML
 
 from app.database.repositories.visit_repository import VisitRepository
 from app.models.visit import VisitStatus
@@ -46,7 +46,7 @@ def _get_audit_logger() -> VisitAuditLogger:
 async def handle_visit_reply(
     Body: str = Form(...),
     From: str = Form(...),
-) -> MessagingResponse:
+) -> Response:
     """Handle YES/NO WhatsApp reply from host.
 
     Twilio sends Form data:
@@ -120,8 +120,11 @@ def _normalise_mobile(mobile: str) -> str:
     return mobile.replace("whatsapp:", "").replace(" ", "").strip()
 
 
-def _twiml_response(message: str) -> MessagingResponse:
+def _twiml_response(message: str) -> Response:
     """Build a TwiML messaging response with the given text."""
-    response = MessagingResponse()
+    response = TwiML()
     response.message(body=message)
-    return response
+    return Response(
+        content=str(response),
+        media_type="application/xml",
+    )
