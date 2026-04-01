@@ -8,7 +8,7 @@ import asyncio
 import logging
 import os
 from contextlib import asynccontextmanager
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from fastapi import FastAPI
 
@@ -40,8 +40,8 @@ def _parse_task_timestamp(value: object) -> datetime | None:
     except (TypeError, ValueError):
         return None
     if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=timezone.utc)
-    return parsed.astimezone(timezone.utc)
+        parsed = parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
 
 
 def _task_is_recoverable(task: dict) -> bool:
@@ -54,7 +54,7 @@ def _task_is_recoverable(task: dict) -> bool:
     if not valid:
         return False
     latest = max(valid)
-    return latest >= (datetime.now(timezone.utc) - _SIMULATION_RECOVERY_WINDOW)
+    return latest >= (datetime.now(UTC) - _SIMULATION_RECOVERY_WINDOW)
 
 
 async def startup_event(app: FastAPI) -> None:
@@ -204,7 +204,7 @@ async def startup_event(app: FastAPI) -> None:
     try:
         await asyncio.wait_for(devices_startup(), timeout=15.0)
         _logger.info("✅ Device manager initialized successfully")
-    except asyncio.TimeoutError:
+    except TimeoutError:
         _logger.warning("⏱️ Device manager initialization timed out - continuing without it")
     except Exception as e:
         _logger.error(f"❌ Device manager initialization failed: {e}")
@@ -370,10 +370,11 @@ async def startup_event(app: FastAPI) -> None:
 
     # Initialize bounded autonomy system (Phase 9)
     # Autonomous decision engine with safety boundaries and escalation management
+    import asyncio as aio  # Local import to avoid scoping issues
+
     from app.services.autonomous_decision_engine import autonomous_decision_engine
     from app.services.escalation_engine import escalation_engine
     from app.services.safety_boundary_service import safety_boundary_service
-    import asyncio as aio  # Local import to avoid scoping issues
 
     try:
         # Wrap with timeout to prevent startup hang (10 second limit)
@@ -387,7 +388,7 @@ async def startup_event(app: FastAPI) -> None:
         if not safety_boundary_service._initialized:
             await aio.wait_for(safety_boundary_service.initialize(), timeout=5.0)
             _logger.info("Safety boundary service initialized successfully")
-    except aio.TimeoutError:
+    except TimeoutError:
         _logger.warning("⏱️ Autonomous system initialization timed out - continuing without full initialization")
     except Exception as e:
         _logger.error(f"Failed to initialize autonomous system: {e}")
@@ -402,6 +403,36 @@ async def startup_event(app: FastAPI) -> None:
     if hasattr(scheduler_service, "add_outlook_polling_job"):
         scheduler_service.add_outlook_polling_job(interval_minutes=5)
         _logger.info("Outlook calendar polling job initialized (every 5 minutes)")
+
+    # Phase 177: Graph webhook subscription renewal
+    if hasattr(scheduler_service, "add_graph_subscription_renewal_job"):
+        scheduler_service.add_graph_subscription_renewal_job(interval_hours=1)
+        _logger.info("Graph subscription renewal job initialized (every 1 hour)")
+
+    # Phase 177: Ensure Graph subscription exists on startup
+    try:
+        from app.services.graph_subscription_service import graph_subscription_service
+
+        async def _ensure_graph_subscription():
+            sub = await graph_subscription_service.get_or_create_subscription()
+            if sub:
+                _logger.info(
+                    "Graph subscription active: id=%s expires=%s", sub.subscription_id, sub.expiration_datetime
+                )
+            else:
+                _logger.warning(
+                    "Graph subscription not created — set GRAPH_WEBHOOK_URL, "
+                    "OUTLOOK_CLIENT_ID, OUTLOOK_CLIENT_SECRET, OUTLOOK_TENANT_ID"
+                )
+
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            loop.run_until_complete(_ensure_graph_subscription())
+        finally:
+            loop.close()
+    except Exception as e:
+        _logger.warning("Graph subscription startup check failed: %s", e)
 
     # ML background training jobs — gated by ML_BACKGROUND_TRAINING_ENABLED
     # Disabled by default: training is CPU-intensive and starves the API on constrained VPS
@@ -628,6 +659,7 @@ async def startup_event(app: FastAPI) -> None:
         """
         try:
             from datetime import datetime, timedelta
+
             from app.services.simulation_store import get_simulation_store
 
             for _sim_site_id in _get_site_ids():
@@ -735,8 +767,9 @@ async def startup_event(app: FastAPI) -> None:
 
     # Sync ML model registry JSON → ml_models Supabase table (best-effort)
     try:
-        from app.services.ml_registry_sync import sync_registry_to_db
         import concurrent.futures as _cf
+
+        from app.services.ml_registry_sync import sync_registry_to_db
 
         _cf.ThreadPoolExecutor(max_workers=1).submit(sync_registry_to_db)
         _logger.info("ML registry sync queued (background)")

@@ -52,6 +52,8 @@ class Visit(BaseModel):
     host_name: str | None = None
     host_mobile: str | None = None
     building_id: str
+    meeting_subject: str | None = None  # Subject of the meeting (from calendar event)
+
     meeting_start: datetime
     meeting_end: datetime
     status: VisitStatus
@@ -76,6 +78,7 @@ class Visit(BaseModel):
             "host_name": self.host_name,
             "host_mobile": self.host_mobile,
             "building_id": self.building_id,
+            "meeting_subject": self.meeting_subject,
             "meeting_start": self.meeting_start.isoformat(),
             "meeting_end": self.meeting_end.isoformat(),
             "status": self.status,

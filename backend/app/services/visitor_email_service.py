@@ -48,11 +48,35 @@ def _smtp_config() -> dict:
     }
 
 
-def _build_html_email(visit: Visit, building_name: str, host_name: str) -> str:
+def _build_html_email(
+    visit: Visit, building_name: str, host_name: str, meeting_subject: str | None, building_address: str, map_link: str
+) -> str:
     """Build the HTML body for a visitor confirmation email."""
     date_str = visit.meeting_start.strftime("%A %d %B %Y")
     time_str = visit.meeting_start.strftime("%H:%M")
     end_time_str = visit.meeting_end.strftime("%H:%M")
+
+    # Subject row (only shown if subject is available)
+    subject_row = ""
+    if meeting_subject:
+        subject_row = (
+            f"<tr>"
+            f'<td style="padding:8px 0;color:#555;font-size:14px">Meeting</td>'
+            f'<td style="padding:8px 0;font-weight:600">{meeting_subject}</td>'
+            f"</tr>"
+        )
+
+    # Map link row
+    map_row = ""
+    if map_link:
+        map_row = (
+            f"<tr>"
+            f'<td style="padding:8px 0;color:#555;font-size:14px">Map</td>'
+            f'<td style="padding:8px 0;font-weight:600">'
+            f'<a href="{map_link}" style="color:#1a73e8;text-decoration:none">{map_link}</a>'
+            f"</td>"
+            f"</tr>"
+        )
 
     # PIN display box
     pin_display = (
@@ -86,8 +110,11 @@ def _build_html_email(visit: Visit, building_name: str, host_name: str) -> str:
     <table style="width:100%;border-collapse:collapse;margin-bottom:16px">
       <tr>
         <td style="padding:8px 0;color:#555;font-size:14px">Building</td>
-        <td style="padding:8px 0;font-weight:600">{building_name}</td>
+        <td style="padding:8px 0;font-weight:600">
+          {building_name}{f" — {building_address}" if building_address else ""}
+        </td>
       </tr>
+      {subject_row}
       <tr>
         <td style="padding:8px 0;color:#555;font-size:14px">Date</td>
         <td style="padding:8px 0;font-weight:600">{date_str}</td>
@@ -100,6 +127,7 @@ def _build_html_email(visit: Visit, building_name: str, host_name: str) -> str:
         <td style="padding:8px 0;color:#555;font-size:14px">Host</td>
         <td style="padding:8px 0;font-weight:600">{host_name}</td>
       </tr>
+      {map_row}
     </table>
 
     <p style="font-size:13px;color:#555;margin-bottom:8px">
@@ -119,17 +147,24 @@ def _build_html_email(visit: Visit, building_name: str, host_name: str) -> str:
     return html
 
 
-def _build_plain_email(visit: Visit, building_name: str, host_name: str) -> str:
+def _build_plain_email(
+    visit: Visit, building_name: str, host_name: str, meeting_subject: str | None, map_link: str
+) -> str:
     """Build the plain-text body for a visitor confirmation email."""
     date_str = visit.meeting_start.strftime("%A %d %B %Y")
     time_str = visit.meeting_start.strftime("%H:%M")
     end_time_str = visit.meeting_end.strftime("%H:%M")
 
+    subject_line = f"Meeting: {meeting_subject}\n" if meeting_subject else ""
+    map_line = f"Map: {map_link}\n" if map_link else ""
+
     return (
         f"You are expected at {building_name}.\n\n"
         f"Host: {host_name}\n"
+        f"{subject_line}"
         f"Date: {date_str}\n"
         f"Time: {time_str} - {end_time_str}\n"
+        f"{map_line}"
         f"\n"
         f"Your QR code and PIN are in the HTML version of this email.\n"
         f"Present them at reception on arrival.\n\n"
@@ -158,7 +193,7 @@ class VisitorEmailService:
 
     def _get_host_name(self, visit: Visit) -> str:
         """Return the host name, trying AD lookup if email is available."""
-        if visit.host_name:
+        if visit.host_name and visit.host_name != visit.host_email:
             return visit.host_name
         try:
             from app.services.active_directory_service import ActiveDirectoryService
@@ -170,6 +205,27 @@ class VisitorEmailService:
         except Exception:
             pass
         return visit.host_email
+
+    def _get_building_address(self, building_id: str) -> str:
+        """Return the outlook_location_string as the building address, or empty string."""
+        try:
+            maps = self._building_map_repo.list_building_maps()
+            for bm in maps:
+                if bm.site_id == building_id:
+                    return bm.outlook_location_string
+        except Exception:
+            pass
+        return ""
+
+    def _get_map_link(self, building_id: str, building_name: str) -> str:
+        """Construct a map search URL for the building.
+
+        Uses a Google Maps search URL with the building name as the query.
+        """
+        import urllib.parse
+
+        query = urllib.parse.quote(building_name)
+        return f"https://maps.google.com/?q={query}"
 
     def send_visitor_confirmation(self, visit: Visit) -> bool:
         """Send a confirmation email to the visitor.
@@ -184,22 +240,28 @@ class VisitorEmailService:
 
         building_name = self._get_building_name(visit.building_id)
         host_name = self._get_host_name(visit)
+        meeting_subject = visit.meeting_subject
+        building_address = self._get_building_address(visit.building_id)
+        map_link = self._get_map_link(visit.building_id, building_name)
 
         subject = f"Your visit to {building_name} on {visit.meeting_start.strftime('%d %b')}"
-        body_html = _build_html_email(visit, building_name, host_name)
-        body_plain = _build_plain_email(visit, building_name, host_name)
+        body_html = _build_html_email(visit, building_name, host_name, meeting_subject, building_address, map_link)
+        body_plain = _build_plain_email(visit, building_name, host_name, meeting_subject, map_link)
 
         # Dev mode: log and skip sending
         if self._config["dev_log"]:
             logger.info(
-                "[DEV EMAIL] To: %s | Subject: %s | Host: %s | Building: %s | Date: %s %s-%s | PIN: %s",
+                "[DEV EMAIL] To: %s | Subject: %s | Host: %s | Building: %s | "
+                "Meeting: %s | Date: %s %s-%s | Map: %s | PIN: %s",
                 to_email,
                 subject,
                 host_name,
                 building_name,
+                meeting_subject or "N/A",
                 visit.meeting_start.strftime("%Y-%m-%d"),
                 visit.meeting_start.strftime("%H:%M"),
                 visit.meeting_end.strftime("%H:%M"),
+                map_link,
                 visit.pin,
             )
             return True

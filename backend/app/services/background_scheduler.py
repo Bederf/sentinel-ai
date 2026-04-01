@@ -9,13 +9,14 @@ Handles periodic background tasks such as:
 
 import asyncio
 import logging
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
+
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
-from app.services.audit_logger import AuditLogger
 from app.services.ai_optimizer import get_ai_optimizer
+from app.services.audit_logger import AuditLogger
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +30,7 @@ class BackgroundSchedulerService:
     def __new__(cls):
         """Ensure singleton pattern."""
         if cls._instance is None:
-            cls._instance = super(BackgroundSchedulerService, cls).__new__(cls)
+            cls._instance = super().__new__(cls)
         return cls._instance
 
     def __init__(self):
@@ -92,8 +93,9 @@ class BackgroundSchedulerService:
         try:
             # Import here to avoid circular imports
             import random
-            from app.models.audit_log import AuditResultType as ART
+
             from app.database.repositories.equipment_repository import EquipmentRepository
+            from app.models.audit_log import AuditResultType as ART
 
             logger.debug("Generating periodic demo audit data...")
 
@@ -628,16 +630,16 @@ class BackgroundSchedulerService:
         Returns:
             (created_count, deduped_count)
         """
-        from app.services.health_threshold_service import get_health_thresholds
-        from app.services.lifecycle_orchestrator import get_effective_now
         import app.services.lifecycle_orchestrator as _orch_mod
         from app.database.supabase_client import get_supabase_client
-        from app.services.equipment_alert_service import get_equipment_alert_service
         from app.models.recommendation import (
             ActionRiskLevel,
             Recommendation,
             RecommendationStatus,
         )
+        from app.services.equipment_alert_service import get_equipment_alert_service
+        from app.services.health_threshold_service import get_health_thresholds
+        from app.services.lifecycle_orchestrator import get_effective_now
 
         thresholds = get_health_thresholds()
         t_healthy = thresholds.get("healthy", 90)
@@ -862,6 +864,7 @@ class BackgroundSchedulerService:
         """
         try:
             import asyncio
+
             from app.services.prediction_generator import get_prediction_generator
 
             logger.info("Running scheduled prediction generation...")
@@ -1018,17 +1021,18 @@ class BackgroundSchedulerService:
         Uses real data: health scores, install dates, service history, alerts, predictions.
         """
         try:
+            import uuid
+            from datetime import datetime, timedelta
+
             from app.database.supabase_client import get_supabase_client
-            from app.services.maintenance_recommender import get_maintenance_recommender
-            from app.services.module_registry_service import ModuleRegistryService
             from app.models.module_registry import (
                 AIRecommendation,
                 ModuleType,
-                RecommendationType,
                 RecommendationPriority,
+                RecommendationType,
             )
-            import uuid
-            from datetime import datetime, timedelta
+            from app.services.maintenance_recommender import get_maintenance_recommender
+            from app.services.module_registry_service import ModuleRegistryService
 
             logger.info("Running scheduled AI recommendation generation...")
 
@@ -1036,8 +1040,8 @@ class BackgroundSchedulerService:
             # Equipment belonging to non-automatic sites is skipped
             automatic_site_ids: set[str] = set()
             try:
-                from app.services.site_mode_policy_service import SiteModePolicyService
                 from app.core.site_resolver import get_registered_site_ids
+                from app.services.site_mode_policy_service import SiteModePolicyService
 
                 policy_service = SiteModePolicyService()
                 for sid in get_registered_site_ids():
@@ -1350,6 +1354,7 @@ class BackgroundSchedulerService:
         """
         try:
             import asyncio
+
             from app.services.demand_aware_coordinator import get_demand_aware_coordinator
 
             logger.debug("Running demand-aware coordination evaluation...")
@@ -1877,15 +1882,14 @@ class BackgroundSchedulerService:
         The building simulation is independent of SENTINEL's database.
         """
         try:
-            from app.services.simulation_store import get_simulation_store
-            from app.services.simulation_orchestrator import (
-                create_orchestrator,
-                register_simulation,
-                get_simulation_by_task_id,
-            )
-
             # Check all registered building stores for queued tasks
             from app.core.site_resolver import get_registered_site_ids
+            from app.services.simulation_orchestrator import (
+                create_orchestrator,
+                get_simulation_by_task_id,
+                register_simulation,
+            )
+            from app.services.simulation_store import get_simulation_store
 
             site_ids = get_registered_site_ids()
             if not site_ids:
@@ -1965,10 +1969,11 @@ class BackgroundSchedulerService:
             scenario: Scenario name (fault_day, sentinel_annual, etc)
             duration_minutes: Simulation duration in real minutes
         """
-        from app.services.simulation_store import get_simulation_store
-        from app.services.simulation_orchestrator import unregister_simulation
-        from app.services.lifecycle_orchestrator import ALL_SCENARIOS
         from datetime import datetime
+
+        from app.services.lifecycle_orchestrator import ALL_SCENARIOS
+        from app.services.simulation_orchestrator import unregister_simulation
+        from app.services.simulation_store import get_simulation_store
 
         _fallback_site = "unknown"
         try:
@@ -2234,9 +2239,9 @@ class BackgroundSchedulerService:
     def _run_mip_dispatch_optimize(self):
         """Run MIP dispatch optimization for all registered sites."""
         try:
-            from app.services.mip_dispatch_optimizer import get_mip_dispatch_optimizer
-            from app.services.load_forecast_service import get_load_forecast_service
             from app.core.site_resolver import get_registered_site_ids
+            from app.services.load_forecast_service import get_load_forecast_service
+            from app.services.mip_dispatch_optimizer import get_mip_dispatch_optimizer
 
             site_ids = get_registered_site_ids()
             if not site_ids:
@@ -2312,8 +2317,8 @@ class BackgroundSchedulerService:
     def _run_load_forecast(self):
         """Refresh 15-min load forecast for all registered sites."""
         try:
-            from app.services.load_forecast_service import get_load_forecast_service
             from app.core.site_resolver import get_registered_site_ids
+            from app.services.load_forecast_service import get_load_forecast_service
 
             service = get_load_forecast_service()
             site_ids = get_registered_site_ids()
@@ -2507,7 +2512,7 @@ class BackgroundSchedulerService:
         5. Append row to tracker CSV
         """
         import csv
-        from datetime import datetime, timezone, timedelta
+        from datetime import datetime, timedelta
 
         tracker_path = Path(__file__).parent.parent.parent.parent / (
             "docs/10-operations/aegis-phase0-14day-tracker.csv"
@@ -2516,7 +2521,7 @@ class BackgroundSchedulerService:
         # 1. Read tracker to determine current day number
         current_day = 1
         if tracker_path.exists():
-            with open(tracker_path, "r") as f:
+            with open(tracker_path) as f:
                 reader = csv.DictReader(f)
                 for row in reader:
                     date_val = row.get("date", "")
@@ -2527,7 +2532,7 @@ class BackgroundSchedulerService:
             logger.info("AEGIS Phase 0A: all 14 days collected, evidence complete")
             return
 
-        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        today = datetime.now(UTC).strftime("%Y-%m-%d")
 
         # 2. Query AEGIS dashboard KPIs
         from app.database.repositories.parasite_decision_repository import (
@@ -2547,7 +2552,7 @@ class BackgroundSchedulerService:
 
         try:
             # Get all decisions from last 24h for this site
-            cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+            cutoff = datetime.now(UTC) - timedelta(hours=24)
             recent = await repo.get_decisions_by_site(
                 site_id=site_id,
                 since=cutoff.isoformat(),
@@ -2577,7 +2582,7 @@ class BackgroundSchedulerService:
                             from dateutil.parser import parse as parse_dt
 
                             created_dt = parse_dt(created)
-                            if (datetime.now(timezone.utc) - created_dt).total_seconds() > 1800:
+                            if (datetime.now(UTC) - created_dt).total_seconds() > 1800:
                                 pending_over_30m += 1
                         except Exception:
                             pass
@@ -2625,9 +2630,9 @@ class BackgroundSchedulerService:
             if decisions_log.exists():
                 import json as _json
 
-                cutoff_24h = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
+                cutoff_24h = (datetime.now(UTC) - timedelta(hours=24)).isoformat()
                 tripwire_events = []
-                with open(decisions_log, "r") as f:
+                with open(decisions_log) as f:
                     for line in f:
                         line = line.strip()
                         if not line:
@@ -2651,7 +2656,7 @@ class BackgroundSchedulerService:
                             from dateutil.parser import parse as parse_dt
 
                             evt_dt = parse_dt(evt["timestamp"])
-                            age = (datetime.now(timezone.utc) - evt_dt).total_seconds() / 60
+                            age = (datetime.now(UTC) - evt_dt).total_seconds() / 60
                             oldest_age = max(oldest_age, age)
                         except Exception:
                             pass
@@ -2684,7 +2689,7 @@ class BackgroundSchedulerService:
 
         # 5. Write tracker — replace placeholder row or append
         if tracker_path.exists():
-            with open(tracker_path, "r") as f:
+            with open(tracker_path) as f:
                 lines = f.readlines()
 
             header = lines[0] if lines else ""
@@ -3154,6 +3159,7 @@ class BackgroundSchedulerService:
         """Run the Outlook calendar poll (sync wrapper for async service)."""
         try:
             import asyncio
+
             from app.services.outlook_calendar_service import OutlookCalendarService
 
             outlook_svc = OutlookCalendarService()
@@ -3173,6 +3179,57 @@ class BackgroundSchedulerService:
 
         except Exception as e:
             logger.error("Outlook calendar poll failed: %s", e, exc_info=True)
+
+    # ------------------------------------------------------------------
+    # Graph subscription renewal (Phase 177)
+    # ------------------------------------------------------------------
+
+    def add_graph_subscription_renewal_job(self, interval_hours: int = 1):
+        """
+        Add a periodic job to renew the Graph webhook subscription before expiry.
+
+        Graph subscriptions expire after 3 days. We renew at the 24-hour mark
+        to stay well within the renewal window.
+
+        Args:
+            interval_hours: How often to check and renew (default: 1 hour)
+        """
+        job_id = "graph_subscription_renewal"
+        if self.scheduler.get_job(job_id):
+            self.scheduler.remove_job(job_id)
+
+        self.scheduler.add_job(
+            func=self._run_graph_subscription_renewal,
+            trigger=IntervalTrigger(hours=interval_hours),
+            id=job_id,
+            name="Graph Subscription Renewal",
+            replace_existing=True,
+        )
+        logger.info("Added Graph subscription renewal job (every %d hour(s))", interval_hours)
+
+    def _run_graph_subscription_renewal(self):
+        """Run the Graph subscription renewal (sync wrapper for async service)."""
+        try:
+            import asyncio
+
+            from app.services.graph_subscription_service import graph_subscription_service
+
+            async def _renew():
+                renewed = await graph_subscription_service.renew_subscription_if_needed()
+                if renewed:
+                    logger.info("Graph subscription renewal: success")
+                else:
+                    logger.debug("Graph subscription renewal: skipped or failed")
+
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                loop.run_until_complete(_renew())
+            finally:
+                loop.close()
+
+        except Exception as e:
+            logger.error("Graph subscription renewal failed: %s", e, exc_info=True)
 
 
 # Global scheduler instance
