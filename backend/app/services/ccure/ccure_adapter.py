@@ -20,12 +20,42 @@ Usage:
 
 import json
 import logging
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from uuid import UUID
 
-from app.models.security import CCureController, CCurePersonnel
 from app.models.visit import Visit
+
+
+@dataclass
+class CCureController:
+    """Represents an iSTAR controller in C•CURE."""
+
+    controller_id: str
+    name: str
+    model: str
+    firmware: str
+    encryption_mode: str
+    tamper_status: str
+    last_seen: datetime
+    ip_address: str
+    reader_count: int
+    status: str
+
+
+@dataclass
+class CCurePersonnel:
+    """Represents a personnel record in C•CURE."""
+
+    badge_id: str
+    first_name: str
+    last_name: str
+    email: str
+    title: str
+    department: str
+    access_level: str
+
 
 logger = logging.getLogger(__name__)
 
@@ -75,8 +105,11 @@ class CCureAdapter:
         self._connected = False
 
     def _load_seed_data(self) -> dict:
-        """Load seeded data from ccure_seed_data.json."""
+        """Load seeded data from ccure_seed_data.json. Returns empty dict if absent."""
         seed_file = Path(__file__).parent.parent.parent / "data" / "ccure_seed_data.json"
+        if not seed_file.exists():
+            logger.warning("CCureAdapter: seed data file not found at %s", seed_file)
+            return {}
         with open(seed_file) as f:
             return json.load(f)
 
@@ -131,7 +164,7 @@ class CCureAdapter:
         Returns:
             List of CCureController objects with tamper status, online/offline
         """
-        if self.seeded_mode:
+        if self.seeded_mode and self._seed_data:
             controllers_data = self._seed_data.get("controllers", [])
             return [
                 CCureController(
@@ -151,7 +184,7 @@ class CCureAdapter:
         else:
             # TODO Phase 58.3: Implement victor API call
             # GET {api_url}/api/controllers
-            pass
+            return []
 
     async def get_occupancy(self, zone_id: str) -> dict:
         """Get real-time occupancy from C•CURE anti-passback zones.
