@@ -113,9 +113,25 @@ async def process_graph_event(change_type: str, event_id: str) -> None:
 
 
 async def _fetch_graph_event(event_id: str) -> dict | None:
-    """Fetch a single event from Microsoft Graph by ID."""
-    token = _acquire_token()
+    """Fetch a single event from Microsoft Graph by ID.
+
+    Raises:
+        TokenAuthError: caller should not retry (credentials problem)
+        TokenError: caller should retry later (rate-limit or transient)
+    """
+    try:
+        token = _acquire_token()
+    except TokenAuthError:
+        # Credentials are invalid — don't retry, don't spam the log
+        logger.error("[GraphEvent] Token auth error for event %s — credentials must be fixed", event_id)
+        return None
+    except TokenError:
+        # Rate-limit or transient MSAL error — log at ERROR (unlike warning for 404)
+        logger.error("[GraphEvent] Token acquisition failed for event %s — will retry on next webhook", event_id)
+        return None
+
     if not token:
+        # Missing config — no point retrying
         return None
 
     import httpx
@@ -133,15 +149,42 @@ async def _fetch_graph_event(event_id: str) -> dict | None:
             response.raise_for_status()
             return response.json()
     except httpx.HTTPStatusError as exc:
-        logger.error("[GraphEvent] HTTP error fetching event %s: %s", event_id, exc.response.status_code)
+        status = exc.response.status_code
+        if status == 401:
+            # Token may have expired between acquire and use — log ERROR
+            logger.error("[GraphEvent] 401 fetching event %s — token may be expired", event_id)
+        elif status == 429:
+            # Rate-limited — log ERROR so it surfaces in monitoring
+            logger.error("[GraphEvent] 429 rate-limited fetching event %s — will retry on next webhook", event_id)
+        else:
+            logger.error("[GraphEvent] HTTP error fetching event %s: %s", event_id, status)
         return None
     except Exception as exc:
         logger.error("[GraphEvent] Error fetching event %s: %s", event_id, exc)
         return None
 
 
+class TokenError(Exception):
+    """Raised when token acquisition fails in a way that should trigger retry."""
+
+    pass
+
+
+class TokenAuthError(TokenError):
+    """Raised when token acquisition fails due to invalid credentials (401)."""
+
+    pass
+
+
 def _acquire_token() -> str | None:
-    """Acquire a Microsoft Graph access token using client credentials flow."""
+    """Acquire a Microsoft Graph access token using client credentials flow.
+
+    Returns:
+        str: valid access token
+        None: non-retryable failure (missing config, import error)
+        Raises TokenAuthError: for 401 credential errors
+        Raises TokenError: for 429 rate-limit or other retryable errors
+    """
     import os
 
     client_id = os.getenv("OUTLOOK_CLIENT_ID", "").strip()
@@ -162,7 +205,18 @@ def _acquire_token() -> str | None:
         client_credential=client_secret,
     )
     result = app.acquire_token_for_client(scopes=["https://graph.microsoft.com/.default"])
-    return result.get("access_token")
+
+    # Check for error response before assuming success
+    if "access_token" not in result:
+        error = result.get("error", "unknown")
+        error_desc = result.get("error_description", "no description")
+        if error == "invalid_client":
+            # 401 — credentials are wrong or app is not authorized
+            raise TokenAuthError(f"Graph API auth failed ({error}): {error_desc}")
+        # 429 rate-limit or other MSAL error — log at ERROR and signal retry
+        raise TokenError(f"Graph API token error ({error}): {error_desc}")
+
+    return result["access_token"]
 
 
 # ---------------------------------------------------------------------------
@@ -206,8 +260,9 @@ def _handle_event_created(
         pin=pin,
         visitor_email=visitor_email,
         host_email=host_email,
-        host_name=subject,  # Fallback; AD service can update later
+        host_name=host_email,  # Will be enriched by AD lookup in email service
         building_id=building_id,
+        meeting_subject=subject,
         meeting_start=meeting_start,
         meeting_end=meeting_end,
         status=VisitStatus.CREATED,
@@ -253,7 +308,7 @@ def _handle_event_updated(
 
     updates: dict = {
         "host_email": host_email,
-        "host_name": subject,
+        "meeting_subject": subject,
         "building_id": building_id,
         "meeting_start": meeting_start.isoformat(),
         "meeting_end": meeting_end.isoformat(),
