@@ -29,7 +29,7 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 - [Document Retrieval Canonical Index](02-architecture/document-retrieval-canonical-note.md) - Canonical subsystem names and boundaries for retrieval/intake/OCR pipelines
 - [Concept→Canonical RAG Migration Checklist](02-architecture/concept-rag-convergence-migration-checklist.md) - ADR-005 execution checklist: deprecation flags, compatibility window, telemetry gates, cutover/rollback criteria
 - **[Frontend Navigation Architecture](02-architecture/frontend-navigation.md)** - Two-level navigation: minimal global sidebar (4 items) + scrollable module-gated building detail tabs (23 views)
-- [Architecture Repository (TOGAF)](architecture-repository/README.md) - TOGAF-aligned architecture principles, governance, landscapes, and roadmaps
+- [Architecture Repository (TOGAF)](02-architecture/architecture-repository/README.md) - TOGAF-aligned architecture principles, governance, landscapes, and roadmaps
 - [Module System](02-architecture/module-system.md) - Bolt-on module architecture, activation, cross-module integrations
 - [Module Connectivity & Cross-System Integration](02-architecture/module-connectivity.md) - How modules interconnect, integration patterns, multi-module behaviors, upsell value
 - [Profile-Based Optimization Architecture](02-architecture/profile-based-optimization.md) - Three optimization profiles (SWEAT ASSETS, COMFORT, COST) with multi-objective scoring and feedback loop (Phase 72)
@@ -67,6 +67,7 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 - **[Asset Health API](03-api-reference/asset-health-api.md)** - Combined equipment health scores + baseline status + deviation tracking per site/equipment (Phase 109A)
 - [System Health API](03-api-reference/system-health-api.md) - Unified health snapshots, diagnostics, and system error logs
 - **[Security API](03-api-reference/security-api.md)** - Access control events, visitor management, zone occupancy, cameras, occupancy trends, cross-module recommendations (Phases 27, 58, 69)
+- **[Visitor Management API](03-api-reference/visitor-management-api.md)** - Reception endpoints (scan, register, issue-card), WhatsApp YES/NO webhook, VisitStatus lifecycle, BuildingMap (Phase 176)
 - **[Privacy & Consent API](03-api-reference/privacy-api.md)** - POPIA consent, cross-border gating, data subject requests (DSR), and retention automation endpoints
 - **[RLM Runner & Orchestration API](03-api-reference/rlm-api.md)** - Evidence analysis submission, result polling, audit trace, health check — runner direct and backend orchestration (Phase 113)
 - **[ServiceNow API](03-api-reference/servicenow-api.md)** - Read-only ITSM endpoints for incidents, work orders, table queries, schema, history, and aggregates (Phase 138)
@@ -152,6 +153,7 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 - [42 - Data Collection & Storage](04-features/42-data-collection-storage.md) - InfluxDB integration
 - [43 - ML Model Development](04-features/43-ml-model-development.md) - LSTM and Autoencoder models
 - [18 - Fault Code Database](04-features/18-fault-code-database.md) - Equipment fault diagnosis
+- **[176: Visitor Management](04-features/176-visitor-management.md)** - Deterministic visitor identity (Outlook→QR→scan→register→WhatsApp→C-CURE), 8-state lifecycle, Twilio HMAC-verified webhook, policy engine, audit log (Phase 176)
 
 ### 🏢 BMS Concepts
 - [BMS Fundamentals](05-bms-concepts/bms-fundamentals.md) - BMS domain knowledge
@@ -165,13 +167,13 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 
 ### 🔒 Security & Governance
 - **[Security Documentation Suite](09-security/README.md)** - Complete security policy suite for FSR supplier onboarding
-- **[AI Governance Pack](ai-governance/README.md)** - ISO 42001, NIST AI RMF, and EU AI Act operational mapping with evidence structure
-- **[EU AI Act Compliance Register](compliance/eu-ai-act-compliance-register.md)** - AI feature inventory, risk class, obligations, owners, and evidence tracker
-- **[EU AI Act Policy](compliance/eu-ai-act-policy.md)** - Mandatory AI governance controls for EU AI Act alignment
-- **[EU AI Act Internal Audit 2026 Q2](compliance/eu-ai-act-internal-audit-2026Q2.md)** - Internal assurance checklist and findings tracker
-- **[POPIA Compliance Register](compliance/popia-compliance-register.md)** - POPIA pass/fail controls, evidence, and remediation tracking
-- **[POPIA Data Subject Rights Workflow](compliance/popia-data-subject-rights-workflow.md)** - Request lifecycle, SLA tracking, and workflow states
-- **[POPIA Retention Enforcement](compliance/popia-retention-enforcement.md)** - Automated retention enforcement and run evidence
+- **[AI Governance Pack](09-security/ai-governance/README.md)** - ISO 42001, NIST AI RMF, and EU AI Act operational mapping with evidence structure
+- **[EU AI Act Compliance Register](09-security/compliance/eu-ai-act-compliance-register.md)** - AI feature inventory, risk class, obligations, owners, and evidence tracker
+- **[EU AI Act Policy](09-security/compliance/eu-ai-act-policy.md)** - Mandatory AI governance controls for EU AI Act alignment
+- **[EU AI Act Internal Audit 2026 Q2](09-security/compliance/eu-ai-act-internal-audit-2026Q2.md)** - Internal assurance checklist and findings tracker
+- **[POPIA Compliance Register](09-security/compliance/popia-compliance-register.md)** - POPIA pass/fail controls, evidence, and remediation tracking
+- **[POPIA Data Subject Rights Workflow](09-security/compliance/popia-data-subject-rights-workflow.md)** - Request lifecycle, SLA tracking, and workflow states
+- **[POPIA Retention Enforcement](09-security/compliance/popia-retention-enforcement.md)** - Automated retention enforcement and run evidence
 - **[Asset Lifecycle Policy](09-security/asset-lifecycle-policy.md)** - Formal lifecycle controls for infrastructure, application, and data assets
 - **[Vulnerability Disclosure Policy](09-security/vulnerability-disclosure-policy.md)** - Coordinated disclosure process and reporter safe-harbor
 - **[BCP/DR Exercise Report 2026 Q1](09-security/dr-exercise-report-2026Q1.md)** - Tabletop + restore test evidence capture template
@@ -198,6 +200,7 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 - **[Workflow Triggers & Automation](05-integrations/workflow-triggers.md)** - 5 automated triggers for ML → Inspection → Repair → Validation (Phase 53-02)
 - [AEGIS Site-002 Discovery](05-integrations/aegis-site-002-discovery.md) - Site-level BESS control boundaries, interfaces, and pre-live confirmation points
 - **[ServiceNow Integration](05-integrations/servicenow-integration.md)** - Read-only ITSM client with auto-discovery, 10 API endpoints, 4 chat tools, config-ready (Phase 138)
+- **[Visitor Management Integrations](05-integrations/visitor-management-integrations.md)** - Outlook (Graph API), WhatsApp (Twilio), Active Directory (JSON), C-CURE, SMTP — full visitor lifecycle integration (Phase 176)
 
 ### 📦 Modules
 - [Module Registry](13-modules/module-registry.md) - Bolt-on module system architecture
