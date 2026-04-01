@@ -17,12 +17,16 @@ from app.integrations.whatsapp_service import get_whatsapp_service
 from app.security.prompt_guard import score_prompt
 from app.security.webhook_auth import verify_whatsapp_webhook as verify_whatsapp_signature
 from app.services.popia_consent_guard import evaluate_ingress_processing_consent
+from app.api.whatsapp_visit_webhook import router as visit_reply_router
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/whatsapp", tags=["whatsapp"])
 
 whatsapp_service = get_whatsapp_service()
 whatsapp_handler = get_whatsapp_handler()
+
+# Mount Phase 176-03 visit reply router at /whatsapp/visit/reply
+router.include_router(visit_reply_router)
 
 
 def _parse_approval_command(content: str) -> dict[str, str]:
