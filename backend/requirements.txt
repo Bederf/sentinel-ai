@@ -105,3 +105,14 @@ paho-mqtt>=1.6.1               # Eclipse Paho MQTT client for ESP32/Modbus-MQTT 
 # MCP Server & Schema Validation
 jsonschema>=4.20.0             # JSON Schema validation for MCP tool inputs
 email-validator>=2.0.0         # Email address validation (Pydantic[email] runtime dep)
+
+# Visitor Management QR Codes (Phase 176)
+qrcode[pil]>=7.4.0             # QR code generation (with Pillow for image output)
+segno>=1.5.0                   # QR code library with SVG/artistic support for demo variants
+qrcode-artistic>=1.0.0         # Artistic QR code generation (background images)
+
+# Twilio WhatsApp Integration (Phase 176)
+twilio>=8.0.0                  # WhatsApp webhook responses for visit confirmation
+
+# Microsoft Authentication (Phase 176 — Outlook/Graph API)
+msal>=1.26.0                   # Microsoft Authentication Library for Outlook calendar service
