@@ -3125,6 +3125,55 @@ class BackgroundSchedulerService:
         except Exception as e:
             logger.error("AI cost report email failed: %s", e, exc_info=True)
 
+    # ------------------------------------------------------------------
+    # Outlook calendar polling (Phase 176)
+    # ------------------------------------------------------------------
+
+    def add_outlook_polling_job(self, interval_minutes: int = 5):
+        """
+        Add a job to poll Outlook for external-attendee calendar events.
+
+        Args:
+            interval_minutes: How often to poll (default: 5 minutes)
+        """
+        job_id = "outlook_calendar_poll"
+        if self.scheduler.get_job(job_id):
+            self.scheduler.remove_job(job_id)
+            logger.info("Removed existing Outlook polling job")
+
+        self.scheduler.add_job(
+            func=self._run_outlook_calendar_poll,
+            trigger=IntervalTrigger(minutes=interval_minutes),
+            id=job_id,
+            name="Outlook Calendar Poll — External Attendees",
+            replace_existing=True,
+        )
+        logger.info("Added Outlook calendar polling job (%d min interval)", interval_minutes)
+
+    def _run_outlook_calendar_poll(self):
+        """Run the Outlook calendar poll (sync wrapper for async service)."""
+        try:
+            import asyncio
+            from app.services.outlook_calendar_service import OutlookCalendarService
+
+            outlook_svc = OutlookCalendarService()
+
+            # Run the async poll in a new event loop (APScheduler uses threads)
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                visits = loop.run_until_complete(outlook_svc.poll_new_external_attendee_events())
+                if visits:
+                    logger.info(
+                        "Outlook poll: created %d visit(s)",
+                        len(visits),
+                    )
+            finally:
+                loop.close()
+
+        except Exception as e:
+            logger.error("Outlook calendar poll failed: %s", e, exc_info=True)
+
 
 # Global scheduler instance
 scheduler_service = BackgroundSchedulerService()

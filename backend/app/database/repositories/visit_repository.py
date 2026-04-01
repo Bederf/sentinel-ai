@@ -10,7 +10,6 @@ import json
 import logging
 import shutil
 import tempfile
-import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -23,7 +22,7 @@ from app.models.visit import BuildingMap, Visit, VisitStatus
 logger = logging.getLogger(__name__)
 
 # JSON store paths
-DATA_DIR = Path(__file__).parent.parent.parent.parent / "data"
+DATA_DIR = Path(__file__).parent.parent.parent / "data"
 VISIT_STORE_PATH = DATA_DIR / "visit_store.json"
 BUILDING_MAP_STORE_PATH = DATA_DIR / "building_map_store.json"
 VISIT_LOCK_PATH = DATA_DIR / "visit_store.lock"
@@ -108,6 +107,7 @@ class VisitRepository:
 
     def create_visit(self, visit: Visit) -> Visit:
         """Persist a new visit to the store."""
+
         def _create():
             store = self._read_store()
             # Ensure no duplicate token or pin
@@ -125,6 +125,7 @@ class VisitRepository:
 
     def get_visit_by_id(self, id: UUID) -> Optional[Visit]:
         """Retrieve a visit by its primary id."""
+
         def _get():
             store = self._read_store()
             for v in store["visits"]:
@@ -136,6 +137,7 @@ class VisitRepository:
 
     def get_visit_by_token(self, token: UUID) -> Optional[Visit]:
         """Retrieve a visit by its QR token (primary lookup key)."""
+
         def _get():
             store = self._read_store()
             for v in store["visits"]:
@@ -147,6 +149,7 @@ class VisitRepository:
 
     def get_visit_by_pin(self, pin: str) -> Optional[Visit]:
         """Retrieve a visit by its 6-digit PIN (scan fallback)."""
+
         def _get():
             store = self._read_store()
             for v in store["visits"]:
@@ -158,15 +161,28 @@ class VisitRepository:
 
     def update_visit(self, id: UUID, updates: dict) -> Optional[Visit]:
         """Update a visit by id, applying partial updates from updates dict."""
+
         def _update():
             store = self._read_store()
             for i, v in enumerate(store["visits"]):
                 if v["id"] == str(id):
                     # Merge updates, protecting id/token/pin
-                    for key in ["visitor_email", "visitor_name", "host_email", "host_name",
-                                "host_mobile", "building_id", "meeting_start", "meeting_end",
-                                "status", "visitor_photo", "visitor_vehicle", "visitor_id_number",
-                                "access_card_id", "qr_code"]:
+                    for key in [
+                        "visitor_email",
+                        "visitor_name",
+                        "host_email",
+                        "host_name",
+                        "host_mobile",
+                        "building_id",
+                        "meeting_start",
+                        "meeting_end",
+                        "status",
+                        "visitor_photo",
+                        "visitor_vehicle",
+                        "visitor_id_number",
+                        "access_card_id",
+                        "qr_code",
+                    ]:
                         if key in updates:
                             v[key] = updates[key]
                     v["updated_at"] = datetime.now(timezone.utc).isoformat()
@@ -177,10 +193,9 @@ class VisitRepository:
 
         return self._with_lock(_update)
 
-    def list_visits_by_building(
-        self, building_id: str, status: Optional[VisitStatus] = None
-    ) -> list[Visit]:
+    def list_visits_by_building(self, building_id: str, status: Optional[VisitStatus] = None) -> list[Visit]:
         """List all visits for a building, optionally filtered by status."""
+
         def _list():
             store = self._read_store()
             visits = []
@@ -246,14 +261,14 @@ class BuildingMapRepository:
 
     def create_building_map(self, mapping: BuildingMap) -> BuildingMap:
         """Persist a new building map entry."""
+
         def _create():
             store = self._read_store()
             # Check for duplicate outlook_location_string
             existing = {bm["outlook_location_string"] for bm in store["building_maps"]}
             if mapping.outlook_location_string in existing:
                 raise ValueError(
-                    f"BuildingMap with outlook_location_string "
-                    f"'{mapping.outlook_location_string}' already exists"
+                    f"BuildingMap with outlook_location_string '{mapping.outlook_location_string}' already exists"
                 )
             store["building_maps"].append(_serialize_building_map(mapping))
             self._write_store(store)
@@ -261,10 +276,9 @@ class BuildingMapRepository:
 
         return self._with_lock(_create)
 
-    def get_building_map_by_outlook_location(
-        self, location: str
-    ) -> Optional[BuildingMap]:
+    def get_building_map_by_outlook_location(self, location: str) -> Optional[BuildingMap]:
         """Resolve an Outlook location string to a BuildingMap (case-insensitive)."""
+
         def _get():
             store = self._read_store()
             loc_lower = location.lower()
@@ -277,6 +291,7 @@ class BuildingMapRepository:
 
     def list_building_maps(self) -> list[BuildingMap]:
         """List all building map entries."""
+
         def _list():
             store = self._read_store()
             return [_deserialize_building_map(bm) for bm in store["building_maps"]]

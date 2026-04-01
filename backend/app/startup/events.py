@@ -7,6 +7,7 @@ to improve maintainability and separation of concerns.
 import asyncio
 import logging
 import os
+from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 
 from fastapi import FastAPI
@@ -18,6 +19,16 @@ from app.services.simbiot_service import simbiot_service  # SIMBIOT Concept Evol
 
 _logger = logging.getLogger("sentinel.startup")
 _SIMULATION_RECOVERY_WINDOW = timedelta(minutes=30)
+
+
+@asynccontextmanager
+async def app_lifespan(app: FastAPI):
+    """Lifespan adapter used by FastAPI app factory."""
+    await startup_event(app)
+    try:
+        yield
+    finally:
+        await shutdown_event(app)
 
 
 def _parse_task_timestamp(value: object) -> datetime | None:
@@ -386,6 +397,11 @@ async def startup_event(app: FastAPI) -> None:
     # This background job ensures notifications are sent promptly even if Sentry bot polling is delayed
     if hasattr(scheduler_service, "add_sentry_notification_job"):
         scheduler_service.add_sentry_notification_job(interval_seconds=30)  # 30 seconds
+
+    # Phase 176: Outlook calendar polling — creates Visit records from external-attendee events
+    if hasattr(scheduler_service, "add_outlook_polling_job"):
+        scheduler_service.add_outlook_polling_job(interval_minutes=5)
+        _logger.info("Outlook calendar polling job initialized (every 5 minutes)")
 
     # ML background training jobs — gated by ML_BACKGROUND_TRAINING_ENABLED
     # Disabled by default: training is CPU-intensive and starves the API on constrained VPS

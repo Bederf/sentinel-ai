@@ -16,12 +16,12 @@ import json
 import logging
 import os
 from pathlib import Path
-from typing import Optional
+from typing import ClassVar
 
 logger = logging.getLogger(__name__)
 
 # Path to host directory JSON
-DATA_DIR = Path(__file__).parent.parent.parent / "data"
+DATA_DIR = Path(__file__).parent.parent / "data"
 HOST_DIRECTORY_PATH = DATA_DIR / "host_directory.json"
 
 
@@ -31,7 +31,7 @@ class ActiveDirectoryService:
     Follows the same pattern as technicians_whatsapp.json for consistency.
     """
 
-    DEFAULT_INTERNAL_DOMAINS: set[str] = {
+    DEFAULT_INTERNAL_DOMAINS: ClassVar[set[str]] = {
         "fnb.co.za",
         "sentinel.bms",
     }
@@ -55,16 +55,16 @@ class ActiveDirectoryService:
             )
             return []
         try:
-            with open(HOST_DIRECTORY_PATH, "r") as f:
+            with open(HOST_DIRECTORY_PATH) as f:
                 data = json.load(f)
             return data.get("hosts", [])
-        except (json.JSONDecodeError, IOError) as exc:
+        except (OSError, json.JSONDecodeError) as exc:
             logger.error("Failed to load host directory: %s", exc)
             return []
 
     def _load_internal_domains(self) -> set[str]:
         extra = os.getenv("INTERNAL_EMAIL_DOMAINS", "")
-        domains = set(d.strip().lower() for d in extra.split(",") if d.strip())
+        domains = {d.strip().lower() for d in extra.split(",") if d.strip()}
         return self.DEFAULT_INTERNAL_DOMAINS | domains
 
     def _build_mobile_index(self) -> dict[str, dict]:
@@ -119,7 +119,7 @@ class ActiveDirectoryService:
     # Public API
     # ------------------------------------------------------------------
 
-    def get_host_details(self, email: str) -> Optional[dict]:
+    def get_host_details(self, email: str) -> dict | None:
         """Return host details dict for the given email address.
 
         Returns:
@@ -145,7 +145,7 @@ class ActiveDirectoryService:
             "email": host.get("email"),
         }
 
-    def get_host_by_name(self, name: str) -> Optional[dict]:
+    def get_host_by_name(self, name: str) -> dict | None:
         """Return the first host matching the given name (case-insensitive)."""
         if not name:
             return None
@@ -168,7 +168,7 @@ class ActiveDirectoryService:
         domain = email.split("@")[1].lower()
         return domain in self._internal_domains
 
-    def get_host_by_mobile(self, mobile: str) -> Optional[dict]:
+    def get_host_by_mobile(self, mobile: str) -> dict | None:
         """Reverse look up a host record by mobile number.
 
         Handles SA formats: +27XXXXXXXXX, 0XXXXXXXXX, whatsapp:+27XXXXXXXXX.
@@ -194,6 +194,6 @@ class ActiveDirectoryService:
             "department": host.get("department"),
         }
 
-    def get_host_by_email(self, email: str) -> Optional[dict]:
+    def get_host_by_email(self, email: str) -> dict | None:
         """Alias for get_host_details — look up host by email address."""
         return self.get_host_details(email)
