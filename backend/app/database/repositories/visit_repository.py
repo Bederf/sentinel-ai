@@ -10,9 +10,8 @@ import json
 import logging
 import shutil
 import tempfile
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Optional
 from uuid import UUID
 
 from filelock import FileLock
@@ -83,9 +82,9 @@ class VisitRepository:
         if not VISIT_STORE_PATH.exists():
             return {"visits": []}
         try:
-            with open(VISIT_STORE_PATH, "r") as f:
+            with open(VISIT_STORE_PATH) as f:
                 return json.load(f)
-        except (json.JSONDecodeError, IOError) as exc:
+        except (OSError, json.JSONDecodeError) as exc:
             logger.warning("Failed to read visit store: %s", exc)
             return {"visits": []}
 
@@ -123,7 +122,7 @@ class VisitRepository:
 
         return self._with_lock(_create)
 
-    def get_visit_by_id(self, id: UUID) -> Optional[Visit]:
+    def get_visit_by_id(self, id: UUID) -> Visit | None:
         """Retrieve a visit by its primary id."""
 
         def _get():
@@ -135,7 +134,7 @@ class VisitRepository:
 
         return self._with_lock(_get)
 
-    def get_visit_by_token(self, token: UUID) -> Optional[Visit]:
+    def get_visit_by_token(self, token: UUID) -> Visit | None:
         """Retrieve a visit by its QR token (primary lookup key)."""
 
         def _get():
@@ -147,7 +146,7 @@ class VisitRepository:
 
         return self._with_lock(_get)
 
-    def get_visit_by_pin(self, pin: str) -> Optional[Visit]:
+    def get_visit_by_pin(self, pin: str) -> Visit | None:
         """Retrieve a visit by its 6-digit PIN (scan fallback)."""
 
         def _get():
@@ -159,7 +158,19 @@ class VisitRepository:
 
         return self._with_lock(_get)
 
-    def update_visit(self, id: UUID, updates: dict) -> Optional[Visit]:
+    def get_visit_by_external_event_id(self, external_event_id: str) -> Visit | None:
+        """Retrieve a visit by its Graph/Outlook external event ID (idempotency key)."""
+
+        def _get():
+            store = self._read_store()
+            for v in store["visits"]:
+                if v.get("external_event_id") == external_event_id:
+                    return _deserialize_visit(v)
+            return None
+
+        return self._with_lock(_get)
+
+    def update_visit(self, id: UUID, updates: dict) -> Visit | None:
         """Update a visit by id, applying partial updates from updates dict."""
 
         def _update():
@@ -182,10 +193,11 @@ class VisitRepository:
                         "visitor_id_number",
                         "access_card_id",
                         "qr_code",
+                        "external_event_id",
                     ]:
                         if key in updates:
                             v[key] = updates[key]
-                    v["updated_at"] = datetime.now(timezone.utc).isoformat()
+                    v["updated_at"] = datetime.now(UTC).isoformat()
                     store["visits"][i] = v
                     self._write_store(store)
                     return _deserialize_visit(v)
@@ -198,7 +210,7 @@ class VisitRepository:
         id: UUID,
         new_status: str,
         expected_status: str,
-    ) -> Optional[Visit]:
+    ) -> Visit | None:
         """Atomically update visit status only if currently in expected_status.
 
         This prevents race conditions where two concurrent replies both read
@@ -214,7 +226,7 @@ class VisitRepository:
                         # Status changed — another thread got there first
                         return None
                     v["status"] = new_status
-                    v["updated_at"] = datetime.now(timezone.utc).isoformat()
+                    v["updated_at"] = datetime.now(UTC).isoformat()
                     store["visits"][i] = v
                     self._write_store(store)
                     return _deserialize_visit(v)
@@ -222,16 +234,49 @@ class VisitRepository:
 
         return self._with_lock(_update)
 
-    def list_visits_by_building(self, building_id: str, status: Optional[VisitStatus] = None) -> list[Visit]:
+    def update_visit_by_external_event_id(self, external_event_id: str, updates: dict) -> Visit | None:
+        """Update a visit by external_event_id, applying partial updates from updates dict."""
+
+        def _update():
+            store = self._read_store()
+            for i, v in enumerate(store["visits"]):
+                if v.get("external_event_id") == external_event_id:
+                    for key in [
+                        "visitor_email",
+                        "visitor_name",
+                        "host_email",
+                        "host_name",
+                        "host_mobile",
+                        "building_id",
+                        "meeting_start",
+                        "meeting_end",
+                        "status",
+                        "visitor_photo",
+                        "visitor_vehicle",
+                        "visitor_id_number",
+                        "access_card_id",
+                        "qr_code",
+                        "external_event_id",
+                    ]:
+                        if key in updates:
+                            v[key] = updates[key]
+                    v["updated_at"] = datetime.now(UTC).isoformat()
+                    store["visits"][i] = v
+                    self._write_store(store)
+                    return _deserialize_visit(v)
+            return None
+
+        return self._with_lock(_update)
+
+    def list_visits_by_building(self, building_id: str, status: VisitStatus | None = None) -> list[Visit]:
         """List all visits for a building, optionally filtered by status."""
 
         def _list():
             store = self._read_store()
             visits = []
             for v in store["visits"]:
-                if v["building_id"] == building_id:
-                    if status is None or v["status"] == status.value:
-                        visits.append(_deserialize_visit(v))
+                if v["building_id"] == building_id and (status is None or v["status"] == status.value):
+                    visits.append(_deserialize_visit(v))
             return visits
 
         return self._with_lock(_list)
@@ -268,9 +313,9 @@ class BuildingMapRepository:
         if not BUILDING_MAP_STORE_PATH.exists():
             return {"building_maps": []}
         try:
-            with open(BUILDING_MAP_STORE_PATH, "r") as f:
+            with open(BUILDING_MAP_STORE_PATH) as f:
                 return json.load(f)
-        except (json.JSONDecodeError, IOError) as exc:
+        except (OSError, json.JSONDecodeError) as exc:
             logger.warning("Failed to read building map store: %s", exc)
             return {"building_maps": []}
 
@@ -305,7 +350,7 @@ class BuildingMapRepository:
 
         return self._with_lock(_create)
 
-    def get_building_map_by_outlook_location(self, location: str) -> Optional[BuildingMap]:
+    def get_building_map_by_outlook_location(self, location: str) -> BuildingMap | None:
         """Resolve an Outlook location string to a BuildingMap (case-insensitive)."""
 
         def _get():

@@ -10,7 +10,6 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
@@ -48,21 +47,22 @@ class Visit(BaseModel):
     token: UUID  # Primary lookup key — QR payload
     pin: str  # 6-digit zero-padded fallback
     visitor_email: str
-    visitor_name: Optional[str] = None
+    visitor_name: str | None = None
     host_email: str
-    host_name: Optional[str] = None
-    host_mobile: Optional[str] = None
+    host_name: str | None = None
+    host_mobile: str | None = None
     building_id: str
     meeting_start: datetime
     meeting_end: datetime
     status: VisitStatus
-    visitor_photo: Optional[str] = None  # base64 encoded
-    visitor_vehicle: Optional[str] = None
-    visitor_id_number: Optional[str] = None
-    access_card_id: Optional[str] = None
-    qr_code: Optional[str] = None  # base64 PNG
+    visitor_photo: str | None = None  # base64 encoded
+    visitor_vehicle: str | None = None
+    visitor_id_number: str | None = None
+    access_card_id: str | None = None
+    qr_code: str | None = None  # base64 PNG
     created_at: datetime
     updated_at: datetime
+    external_event_id: str | None = None  # Graph event ID for idempotency
 
     def dict(self, *args, **kwargs):
         """Pydantic v1-style dict export for backward compatibility."""
@@ -86,6 +86,7 @@ class Visit(BaseModel):
             "qr_code": self.qr_code,
             "created_at": self.created_at.isoformat(),
             "updated_at": self.updated_at.isoformat(),
+            "external_event_id": self.external_event_id,
         }
 
 

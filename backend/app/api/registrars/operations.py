@@ -6,45 +6,78 @@ Registers routers for work orders, maintenance, inspection, and workflow operati
 
 from fastapi import FastAPI
 
-from app.config.settings import settings
-from app.api import work_orders, inspection, service_feedback, checklists, inspection_recommendations
-from app.api import workflow, baselines, condition
-from app.api import remote_ops, remote_commands, dispatch
-from app.api import alerts, stats, audit, safety, autonomous
-from app.api import complaints, sentry_webhooks, whatsapp_webhooks
-from app.api import integration, concept
-from app.api import concept_rag
-from app.api import modules, health_config, service_records, preferences
-from app.api import water, sustainability, contracts, pricing, municipal_billing
-from app.api import parts_orders, approval_workflow, delivery_tracking, approvals, parasite_decisions, approval
-from app.api import compliance, notifications, consent
-from app.api import privacy
-from app.api import asset_health
-from app.api import health_rating
-from app.api import cafm_integration
-from app.api import capex
-from app.api import sentry_email
-from app.api import security_health
-from app.api import servicenow
-from app.api import event_bus_monitor
-from app.api import n8n
-from app.api import notification_router
-from app.api import alert_routing, alert_muting
-from app.api import event_intelligence
-from app.api import control_policy
-from app.api import decision_memory
-from app.api import block_bookings
-from app.api import space
-from app.api import correlation
-from app.api import concierge
-from app.api import signal_replay
-from app.api import semantic_classification
-from app.api import trust_scoring
-from app.api import review_queue
-from app.api import ai_usage
-from app.api import decisions
+from app.api import (
+    ai_usage,
+    alert_muting,
+    alert_routing,
+    alerts,
+    approval,
+    approval_workflow,
+    approvals,
+    asset_health,
+    audit,
+    autonomous,
+    baselines,
+    block_bookings,
+    cafm_integration,
+    capex,
+    checklists,
+    complaints,
+    compliance,
+    concept,
+    concept_rag,
+    concierge,
+    condition,
+    consent,
+    contracts,
+    control_policy,
+    correlation,
+    decision_memory,
+    decisions,
+    delivery_tracking,
+    dispatch,
+    event_bus_monitor,
+    event_intelligence,
+    graph_webhook_endpoint,
+    health_config,
+    health_rating,
+    inspection,
+    inspection_recommendations,
+    integration,
+    modules,
+    municipal_billing,
+    n8n,
+    notification_router,
+    notifications,
+    parasite_decisions,
+    parts_orders,
+    preferences,
+    pricing,
+    privacy,
+    reception,
+    remote_commands,
+    remote_ops,
+    review_queue,
+    safety,
+    security_health,
+    semantic_classification,
+    sentry_email,
+    sentry_webhooks,
+    service_feedback,
+    service_records,
+    servicenow,
+    signal_replay,
+    space,
+    stats,
+    sustainability,
+    trust_scoring,
+    water,
+    whatsapp_webhooks,
+    work_orders,
+    workflow,
+)
 from app.api import technicians as technicians_api
-from app.api import reception
+from app.config.settings import settings
 
 
 def register_operations_routers(app: FastAPI) -> None:
@@ -80,6 +113,7 @@ def register_operations_routers(app: FastAPI) -> None:
     app.include_router(concept.router, tags=["concept-cafm"])
     app.include_router(sentry_webhooks.router, tags=["sentry"])
     app.include_router(whatsapp_webhooks.router, tags=["whatsapp"])
+    app.include_router(graph_webhook_endpoint.router, tags=["graph_webhook"])
 
     # Module registry and configuration
     app.include_router(modules.router, prefix="/api", tags=["modules"])
