@@ -61,8 +61,10 @@ from app.api import (
     safety,
     security_health,
     semantic_classification,
+    email_intake,
     sentry_email,
     sentry_webhooks,
+    visitor_intake,
     service_feedback,
     service_records,
     servicenow,
@@ -169,6 +171,9 @@ def register_operations_routers(app: FastAPI) -> None:
     # Email intake pipeline (Phase 131)
     app.include_router(sentry_email.router, tags=["sentry-email"])
 
+    # Email cluster heatmap (Phase 177)
+    app.include_router(email_intake.router, tags=["email-intake"])
+
     # Security health check (Phase 137-09)
     app.include_router(security_health.router, tags=["security-health"])
 
@@ -243,6 +248,9 @@ def register_operations_routers(app: FastAPI) -> None:
 
     # Visitor Management — Reception API (Phase 176)
     app.include_router(reception.router, prefix="/api", tags=["reception"])
+
+    # Visitor Intake — n8n IMAP pipeline (Phase 178)
+    app.include_router(visitor_intake.router, prefix="/api", tags=["visitor_intake"])
 
     # Decision Moment API — Crisis State page (Phase 164)
     app.include_router(decisions.router, tags=["decisions"])
