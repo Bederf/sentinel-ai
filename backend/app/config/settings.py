@@ -7,7 +7,7 @@ from typing import Any
 
 from enum import StrEnum
 
-from pydantic import ConfigDict, Field, field_validator
+from pydantic import AliasChoices, ConfigDict, Field, field_validator
 from pydantic_settings import BaseSettings
 import re
 import base64
@@ -89,6 +89,7 @@ class Settings(BaseSettings):
         "http://localhost:8080",
         "https://localhost:8080",
         "https://bms.aimthelaw.co.za",
+        "https://sentinel-ai.co.za",
     ]
 
     # Backend URL (for external service health checks)
@@ -163,8 +164,8 @@ class Settings(BaseSettings):
     sentry_bot_cli: str = Field(default="sentry", validation_alias="SENTRY_BOT_CLI")
 
     # SIMBIOT Concept Evolution (FSI Public API) credentials
-    simbiot_api_key: str = ""
-    simbiot_api_url: str = ""
+    simbiot_api_key: str = Field(default="", validation_alias=AliasChoices("SIMBIOT_API_KEY", "BRIDGE_API_TOKEN"))
+    simbiot_api_url: str = Field(default="", validation_alias=AliasChoices("SIMBIOT_API_URL", "BRIDGE_BASE_URL"))
     simbiot_username: str = ""
     simbiot_password: str = ""
 
@@ -347,6 +348,12 @@ class Settings(BaseSettings):
     # Edge mode: disables ML training, simulation queue, and AEGIS evidence jobs
     # for resource-constrained deployments (Jetson, lightweight VPS)
     edge_mode: bool = False
+
+    # Sentinel island mode: enforce remote-backed data paths only (no local fallback)
+    sentinel_island_mode: bool = Field(default=False, validation_alias="SENTINEL_ISLAND_MODE")
+
+    # Advisory kernel routing switch for chat investigation mode
+    sentinel_advisory_kernel_enabled: bool = Field(default=False, validation_alias="SENTINEL_ADVISORY_KERNEL_ENABLED")
 
     # ML Background Training (retraining, drift detection, feedback retraining)
     # Disable on resource-constrained VPS — models are pre-trained and stable
