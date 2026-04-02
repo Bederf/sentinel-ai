@@ -1,0 +1,15 @@
+# Cloudflare Pages configuration — SENTINEL BMS Intelligence Frontend
+# https://developers.cloudflare.com/pages/configuration/builds/
+
+[build]
+command = "cd frontend && npm run build"
+output_directory = "frontend/dist"
+
+[build.environment]
+NODE_VERSION = "20"
+
+# Redirects: none needed — SPA handles routing via React Router
+# Headers: security headers applied via Cloudflare Dashboard or _headers file
+
+# Caching: vite hashes asset filenames, optimal cache forever for immutable assets
+# Custom headers can be added via _headers file in the frontend/dist/ prebuild step
