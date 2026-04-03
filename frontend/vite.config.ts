@@ -14,7 +14,7 @@ export default defineConfig({
   server: {
     port: 9096,
     host: '0.0.0.0',
-    allowedHosts: ['bms.aimthelaw.co.za', 'bms.aimthelaw.com', 'sentinel-ai.co.za', 'localhost'],
+    allowedHosts: ['bms.aimthelaw.co.za', 'bms.aimthelaw.com', 'sentinel-ai.co.za', 'bms.sentinel-ai.co.za', 'localhost'],
     proxy: {
       '/api': {
         target: 'http://localhost:9095',

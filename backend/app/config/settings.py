@@ -90,6 +90,7 @@ class Settings(BaseSettings):
         "https://localhost:8080",
         "https://bms.aimthelaw.co.za",
         "https://sentinel-ai.co.za",
+        "https://bms.sentinel-ai.co.za",
     ]
 
     # Backend URL (for external service health checks)
