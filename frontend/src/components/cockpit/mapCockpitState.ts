@@ -73,13 +73,11 @@ function getEvidenceStrength(score: number): 'strong' | 'moderate' | 'limited' {
 
 function formatPostureLabel(posture: string | null | undefined): string {
   if (!posture) return 'Watch mode'
-
   const normalized = posture.trim().toLowerCase()
   if (normalized === 'comfort_priority') return 'Comfort first'
   if (normalized === 'energy_priority') return 'Energy first'
   if (normalized === 'asset_priority') return 'Asset protection'
   if (normalized === 'adaptive_intelligence') return 'Watch mode'
-
   return posture.replace(/_/g, ' ')
 }
 
@@ -124,16 +122,10 @@ function resolveAffectedScope(payload: CockpitDecisionPayload): CockpitState['se
       occupantsEstimate: riskScope.occupants_estimate ?? null,
     }
   }
-
   const assets = payload.primary_asset_id ? [payload.primary_asset_id] : []
   const zones = [...(payload.affected_zone_ids ?? [])]
   if (assets.length === 0 && zones.length === 0) return null
-
-  return {
-    zones,
-    assets,
-    occupantsEstimate: null,
-  }
+  return { zones, assets, occupantsEstimate: null }
 }
 
 function extractFloorCode(value: string | null | undefined): string | null {
@@ -157,7 +149,6 @@ function riskBandFromScore(
   thresholds: CockpitThresholdPolicy['risk'],
 ): CockpitState['severity']['riskBand'] {
   const riskScore = toPercent(score)
-
   if (riskScore >= thresholds.critical) return 'critical'
   if (riskScore >= thresholds.high) return 'high'
   if (riskScore >= thresholds.medium) return 'medium'
@@ -171,9 +162,15 @@ function riskLevelFromBand(riskBand: CockpitState['severity']['riskBand']): Cock
   return 'stable'
 }
 
-function motionProfileFromRiskBand(riskBand: CockpitState['severity']['riskBand']): CockpitState['visualTwin']['motionProfile'] {
+function motionProfileFromRiskBand(
+  riskBand: CockpitState['severity']['riskBand'],
+  urgencyScore: number,
+): CockpitState['visualTwin']['motionProfile'] {
   if (riskBand === 'critical') return 'alert'
   if (riskBand === 'high' || riskBand === 'medium') return 'watch'
+  // 'low' band: calm only if genuinely near-zero urgency.
+  // Any meaningful urgency (>0.05) keeps 'watch' so the twin shows ambient life.
+  if (urgencyScore > 0.05) return 'watch'
   return 'calm'
 }
 
@@ -183,7 +180,6 @@ function buildThresholdReason(
   thresholds: CockpitThresholdPolicy['risk'],
 ): string {
   const riskScore = toPercent(score)
-
   if (riskBand === 'critical') return `Risk ${riskScore} is at or above the critical threshold of ${thresholds.critical}`
   if (riskBand === 'high') return `Risk ${riskScore} is at or above the high threshold of ${thresholds.high}`
   if (riskBand === 'medium') return `Risk ${riskScore} is at or above the medium threshold of ${thresholds.medium}`
@@ -200,17 +196,10 @@ function resolveFocusFloorId(payload: CockpitDecisionPayload): string | null {
 
 function buildFloorOrder(configuredOrder: string[], focusFloorId: string | null): string[] {
   const floorOrder = [...configuredOrder]
-
   for (const fallback of DEFAULT_FLOOR_ORDER) {
-    if (!floorOrder.includes(fallback)) {
-      floorOrder.push(fallback)
-    }
+    if (!floorOrder.includes(fallback)) floorOrder.push(fallback)
   }
-
-  if (focusFloorId && !floorOrder.includes(focusFloorId)) {
-    floorOrder.unshift(focusFloorId)
-  }
-
+  if (focusFloorId && !floorOrder.includes(focusFloorId)) floorOrder.unshift(focusFloorId)
   return floorOrder
 }
 
@@ -222,13 +211,11 @@ function buildTwinFloors(
   policy: CockpitThresholdPolicy,
 ) {
   const anchorIndex = focusFloorId ? floorOrder.indexOf(focusFloorId) : -1
-
   return floorOrder.map((floorId, index) => {
     const distance = anchorIndex >= 0 ? Math.abs(index - anchorIndex) : Number.POSITIVE_INFINITY
     const spread = anchorIndex >= 0 ? clamp01(urgencyScore - distance * 0.22) : 0
     const riskScore = index === anchorIndex ? urgencyScore : spread * 0.9
     const level = anchorIndex >= 0 ? riskLevelFromBand(riskBandFromScore(riskScore, policy.risk)) : 'stable'
-
     return {
       id: floorId,
       label: formatFloorLabel(floorId, floorLabels),
@@ -256,14 +243,12 @@ function buildZoneSignals(
       : []
 
   const floorSlots = new Map<string, number>()
-
   return sourceSignals.map((sourceId, index) => {
     const fallbackFloor = floorOrder[Math.min(index, floorOrder.length - 1)] ?? 'L0'
     const floorId = extractFloorCode(sourceId) ?? focusFloorId ?? fallbackFloor
     const slot = floorSlots.get(floorId) ?? 0
     const weight = clamp01(urgencyScore - index * 0.12)
     floorSlots.set(floorId, slot + 1)
-
     return {
       zoneId: sourceId,
       label: sourceId.replace(/^Zone-/, '').replace(/-/g, ' '),
@@ -290,6 +275,7 @@ function buildVisualTwin(
   const floorOrder = buildFloorOrder(configuredOrder, focusFloorId)
   const floors = buildTwinFloors(floorOrder, focusFloorId, urgencyScore, floorLabels, policy)
   const zoneSignals = buildZoneSignals(payload, focusFloorId, floorOrder, urgencyScore, policy, surface.action.summary)
+  const riskBand = payload.risk?.band ?? riskBandFromScore(urgencyScore, policy.risk)
 
   return {
     headline: surface.time.value === 'Unknown'
@@ -297,7 +283,7 @@ function buildVisualTwin(
       : `${zoneSignals[0]?.label ?? 'This area'} will breach in ${surface.time.value}`,
     activeLabel: zoneSignals[0]?.label ?? surface.cause,
     modeLabel: surface.presentation.statusLabel,
-    motionProfile: motionProfileFromRiskBand(riskBandFromScore(urgencyScore, policy.risk)),
+    motionProfile: motionProfileFromRiskBand(riskBand, urgencyScore),
     focusFloorId,
     floors,
     zoneSignals,
@@ -308,14 +294,16 @@ function buildFallbackPayload(summary: CockpitSiteSummary): CockpitDecisionPaylo
   return {
     building_id: summary.siteId,
     alert_text: 'No comfort risk for the next 30 minutes.',
-    reasoning_summary: 'Live signals are steady. Keep watching for the next drift or breach window.',
+    reasoning_summary: 'Live signals are steady. Keep watching for the next drift window.',
     active_posture: summary.posture ?? 'adaptive_intelligence',
     time_to_discomfort: null,
     time_confidence: 'steady',
     estimated_impact: 'No immediate comfort, uptime, or compliance impact.',
     recommended_action: 'No action needed. Keep watching the site.',
-    urgency_score: 0.18,
-    urgency_components: { comfort: 0.06, asset_risk: 0.06, cost: 0.06 },
+    // Genuine stable state — near-zero urgency so motionProfile resolves to 'calm'
+    // and floors render ambient breathe only (not drift/pulse).
+    urgency_score: 0.03,
+    urgency_components: { comfort: 0.01, asset_risk: 0.01, cost: 0.01 },
     affected_zone_ids: [],
     primary_asset_id: null,
     building_metadata: {
@@ -331,7 +319,6 @@ function buildEvidence(
   evidenceStrength: CockpitState['evidence']['strength'],
 ): CockpitState['evidence'] {
   const affectedScope = resolveAffectedScope(resolvedPayload)
-
   return {
     strength: evidenceStrength,
     summary: payload
@@ -352,16 +339,8 @@ function buildEmergingRisks(
 ): CockpitState['emergingRisks'] {
   if (!payload) {
     return [
-      {
-        id: 'risk-watch',
-        title: 'No active breach forecast',
-        detail: 'Keep watching for the next drift window.',
-      },
-      {
-        id: 'risk-evidence',
-        title: 'Keep telemetry fresh',
-        detail: 'If telemetry freshness drops, trust the twin less before escalating action.',
-      },
+      { id: 'risk-watch', title: 'No active breach forecast', detail: 'Keep watching for the next drift window.' },
+      { id: 'risk-evidence', title: 'Keep telemetry fresh', detail: 'If telemetry freshness drops, trust the twin less before escalating action.' },
     ]
   }
 

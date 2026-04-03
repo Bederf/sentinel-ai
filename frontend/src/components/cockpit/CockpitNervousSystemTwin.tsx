@@ -14,35 +14,15 @@ const FLOOR_HEIGHT = 0.58
 
 function riskPalette(level: CockpitTwinRiskLevel) {
   if (level === 'critical') {
-    return {
-      base: '#7f1d1d',
-      edge: '#ef4444',
-      glow: '#f87171',
-      text: 'text-red-300',
-    }
+    return { base: '#7f1d1d', edge: '#ef4444', glow: '#f87171', text: 'text-red-300' }
   }
   if (level === 'approaching') {
-    return {
-      base: '#7c2d12',
-      edge: '#f97316',
-      glow: '#fb923c',
-      text: 'text-orange-300',
-    }
+    return { base: '#7c2d12', edge: '#f97316', glow: '#fb923c', text: 'text-orange-300' }
   }
   if (level === 'drift') {
-    return {
-      base: '#92400e',
-      edge: '#fbbf24',
-      glow: '#fde68a',
-      text: 'text-amber-300',
-    }
+    return { base: '#92400e', edge: '#fbbf24', glow: '#fde68a', text: 'text-amber-300' }
   }
-  return {
-    base: '#0f3b66',
-    edge: '#38bdf8',
-    glow: '#7dd3fc',
-    text: 'text-sky-300',
-  }
+  return { base: '#0f3b66', edge: '#38bdf8', glow: '#7dd3fc', text: 'text-sky-300' }
 }
 
 function buildSignalPosition(floor: CockpitTwinFloor | undefined, slot: number) {
@@ -57,13 +37,28 @@ function buildFloorAnimationState(
   isFocus: boolean,
   elapsedTime: number,
 ) {
-  if (motionProfile === 'calm' || floor.level === 'stable') {
+  // 'calm' = stable state. Brief says "Calm must feel alive" — gentle ambient breathe, no pulsing.
+  // Only freeze completely if floor level is explicitly stable AND motion is calm.
+  if (motionProfile === 'calm' && floor.level === 'stable') {
+    const ambientWave = Math.sin(elapsedTime * 0.4) // very slow, ~15s cycle
     return {
-      pulse: 1,
+      pulse: 1 + ambientWave * 0.008, // barely perceptible scale breathe
       spreadX: 1,
       spreadZ: 1,
-      spreadOpacity: 0,
-      emissiveIntensity: isFocus ? 0.18 : 0.08,
+      spreadOpacity: 0.02 + ambientWave * 0.015, // faint living glow
+      emissiveIntensity: (isFocus ? 0.18 : 0.08) + ambientWave * 0.04,
+    }
+  }
+
+  // 'calm' but floor has non-stable risk level — show mild drift
+  if (motionProfile === 'calm') {
+    const wave = Math.sin(elapsedTime * 0.9)
+    return {
+      pulse: 1 + wave * floor.spread * 0.025,
+      spreadX: 1 + floor.spread * 0.06,
+      spreadZ: 1 + floor.spread * 0.08,
+      spreadOpacity: 0.03 + floor.spread * 0.04,
+      emissiveIntensity: isFocus ? 0.22 : 0.12,
     }
   }
 
@@ -111,11 +106,7 @@ function FloorMesh({
   coreRef: THREE.Color
 }) {
   return (
-    <mesh
-      ref={(node) => {
-        meshRef.current = node
-      }}
-    >
+    <mesh ref={(node) => { meshRef.current = node }}>
       <boxGeometry args={[FLOOR_WIDTH, FLOOR_HEIGHT, FLOOR_DEPTH]} />
       <meshStandardMaterial color={coreRef} metalness={0.18} roughness={0.32} />
     </mesh>
@@ -131,9 +122,7 @@ function FloorSpread({
 }) {
   return (
     <mesh
-      ref={(node) => {
-        spreadRef.current = node
-      }}
+      ref={(node) => { spreadRef.current = node }}
       position={[0, FLOOR_HEIGHT * 0.62, 0]}
     >
       <boxGeometry args={[FLOOR_WIDTH * 1.04, 0.08, FLOOR_DEPTH * 1.05]} />
@@ -240,9 +229,7 @@ function ZoneOrb({
 }) {
   return (
     <mesh
-      ref={(node) => {
-        orbRef.current = node
-      }}
+      ref={(node) => { orbRef.current = node }}
       onPointerEnter={onPointerEnter}
       onPointerLeave={onPointerLeave}
       onClick={onClick}
@@ -262,9 +249,7 @@ function ZoneRing({
 }) {
   return (
     <mesh
-      ref={(node) => {
-        ringRef.current = node
-      }}
+      ref={(node) => { ringRef.current = node }}
       rotation={[-Math.PI / 2, 0, 0]}
     >
       <ringGeometry args={[0.38, 0.52, 48]} />
