@@ -1,5 +1,4 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type MutableRefObject, type RefObject } from 'react'
-import { motion } from 'framer-motion'
 import gsap from 'gsap'
 import type { CockpitState } from './types'
 
@@ -59,16 +58,13 @@ const SIGNAL_STATUS_STYLES: Record<SignalStatus, { text: string; border: string;
   inferred: { text: 'text-violet-200', border: 'border-violet-500/30', bg: 'bg-violet-500/5' },
 }
 
-const FRAMER_EASE: [number, number, number, number] = [0.4, 0, 0.2, 1]
 const DEGRADE_STATUSES = new Set<SignalStatus>(['stale', 'offline', 'inferred'])
 
 function usePrefersReducedMotion() {
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false)
 
   useEffect(() => {
-    if (typeof window === 'undefined' || typeof window.matchMedia === 'undefined') {
-      return
-    }
+    if (typeof window === 'undefined' || typeof window.matchMedia === 'undefined') return
     const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)')
     const update = () => setPrefersReducedMotion(mediaQuery.matches)
     update()
@@ -184,115 +180,85 @@ function useGsapTwinMotion(
   useLayoutEffect(() => {
     if (!heroRef.current) return
 
-    const cleanSignalTweens = () => {
-      signalRefs.current.forEach((el) => {
-        if (el) {
-          gsap.killTweensOf(el)
+    // Wrap in gsap.context scoped to heroRef — all tweens auto-cleaned on revert()
+    const ctx = gsap.context(() => {
+      const cleanSignalTweens = () => {
+        signalRefs.current.forEach((el) => { if (el) gsap.killTweensOf(el) })
+      }
+
+      if (reducedMotion) {
+        if (confidenceRef.current) confidenceRef.current.style.width = `${state.confidence}%`
+        const target = tabButtons.current[activeTab]
+        if (underlineRef.current && tabsRef.current && target) {
+          const containerRect = tabsRef.current.getBoundingClientRect()
+          const targetRect = target.getBoundingClientRect()
+          gsap.set(underlineRef.current, {
+            width: targetRect.width,
+            x: targetRect.left - containerRect.left,
+          })
         }
-      })
-    }
-
-    const stop = () => {
-      gsap.killTweensOf(confidenceRef.current)
-      gsap.killTweensOf(underlineRef.current)
-      cleanSignalTweens()
-    }
-
-    if (reducedMotion) {
-      if (confidenceRef.current) {
-        confidenceRef.current.style.width = `${state.confidence}%`
+        cleanSignalTweens()
+        return
       }
-      const target = tabButtons.current[activeTab]
-      if (underlineRef.current && tabsRef.current && target) {
-        const containerRect = tabsRef.current.getBoundingClientRect()
-        const targetRect = target.getBoundingClientRect()
-        gsap.set(underlineRef.current, {
-          width: targetRect.width,
-          x: targetRect.left - containerRect.left,
-        })
-      }
-      stop()
-      return
-    }
 
-  const heroEase = gsap.parseEase('power3.out')
-  const power2Ease = gsap.parseEase('power2.out')
-  const sineEase = gsap.parseEase('sine.inOut')
+      if (!glowRef.current || !confidenceRef.current) return
 
-    if (!glowRef.current || !confidenceRef.current) {
-      return
-    }
+      const power2Ease = gsap.parseEase('power2.out')
+      const sineEase = gsap.parseEase('sine.inOut')
 
-    const timeline = gsap.timeline()
-    timeline
+      // Hero entrance — GSAP owns this, no Framer conflict
+      gsap.timeline()
         .fromTo(
           heroRef.current,
           { opacity: 0, y: 18 },
-          {
-            opacity: 1,
-            y: 0,
-            duration: 0.8,
-            ease: heroEase,
-          },
+          { opacity: 1, y: 0, duration: 0.8, ease: 'power3.out' },
         )
         .to(
           glowRef.current,
-          {
-            opacity: 0.45,
-            duration: 1.4,
-            repeat: -1,
-            yoyo: true,
-            ease: sineEase,
-          },
+          { opacity: 0.45, duration: 1.4, repeat: -1, yoyo: true, ease: sineEase },
           0,
         )
         .to(
           confidenceRef.current,
-          {
-            width: `${state.confidence}%`,
-            duration: 0.9,
-            ease: power2Ease,
-          },
+          { width: `${state.confidence}%`, duration: 0.9, ease: power2Ease },
           0.2,
         )
 
-    const targetButton = tabButtons.current[activeTab]
-    if (targetButton && underlineRef.current && tabsRef.current) {
-      const containerRect = tabsRef.current.getBoundingClientRect()
-      const targetRect = targetButton.getBoundingClientRect()
-      gsap.to(underlineRef.current, {
-        width: targetRect.width,
-        x: targetRect.left - containerRect.left,
-        duration: 0.55,
-        ease: power2Ease,
+      const targetButton = tabButtons.current[activeTab]
+      if (targetButton && underlineRef.current && tabsRef.current) {
+        const containerRect = tabsRef.current.getBoundingClientRect()
+        const targetRect = targetButton.getBoundingClientRect()
+        gsap.to(underlineRef.current, {
+          width: targetRect.width,
+          x: targetRect.left - containerRect.left,
+          duration: 0.55,
+          ease: power2Ease,
+        })
+      }
+
+      if (countdownRef.current) {
+        gsap.fromTo(
+          countdownRef.current,
+          { opacity: 0, y: 6 },
+          { opacity: 1, y: 0, duration: 0.4, ease: 'power2.out' },
+        )
+      }
+
+      signalEntries.forEach(([, status], index) => {
+        if (!DEGRADE_STATUSES.has(status)) return
+        const el = signalRefs.current[index]
+        if (!el) return
+        gsap.to(el, {
+          boxShadow: '0 0 20px rgba(245,158,11,0.45)',
+          duration: 1.6,
+          repeat: -1,
+          yoyo: true,
+          ease: 'sine.inOut',
+        })
       })
-    }
+    }, heroRef)
 
-    if (countdownRef.current) {
-      gsap.fromTo(
-        countdownRef.current,
-        { opacity: 0, y: 6 },
-        { opacity: 1, y: 0, duration: 0.4, ease: 'power2.out' },
-      )
-    }
-
-    signalEntries.forEach(([, status], index) => {
-      if (!DEGRADE_STATUSES.has(status)) return
-      const el = signalRefs.current[index]
-      if (!el) return
-      gsap.to(el, {
-        boxShadow: '0 0 20px rgba(245,158,11,0.45)',
-        duration: 1.6,
-        repeat: -1,
-        yoyo: true,
-        ease: 'sine.inOut',
-      })
-    })
-
-    return () => {
-      timeline.kill()
-      stop()
-    }
+    return () => ctx.revert()
   }, [
     state,
     signalEntries,
@@ -325,17 +291,13 @@ export const SentinelCockpitTwin = ({ state }: SentinelCockpitTwinProps) => {
   const signalRefs = useRef<(HTMLDivElement | null)[]>([])
   const tabButtons = useRef<Record<TwinMode, HTMLButtonElement | null>>({} as Record<TwinMode, HTMLButtonElement | null>)
 
-  useEffect(() => {
-    setActiveTab(state.mode)
-  }, [state.mode])
+  useEffect(() => { setActiveTab(state.mode) }, [state.mode])
 
   const signalEntries = useMemo(() => {
     const entries: [keyof TwinState['signals'], SignalStatus][] = []
     SIGNAL_ORDER.forEach((key) => {
       const value = state.signals[key]
-      if (typeof value !== 'undefined') {
-        entries.push([key, value])
-      }
+      if (typeof value !== 'undefined') entries.push([key, value])
     })
     return entries
   }, [state.signals])
@@ -345,18 +307,10 @@ export const SentinelCockpitTwin = ({ state }: SentinelCockpitTwinProps) => {
   }, [signalEntries])
 
   useGsapTwinMotion(
-    state,
-    signalEntries,
-    heroRef,
-    heroGlowRef,
-    tabsRef,
-    underlineRef,
-    tabButtons,
-    signalRefs,
-    countdownRef,
-    confidenceBarRef,
-    activeTab,
-    reducedMotion,
+    state, signalEntries,
+    heroRef, heroGlowRef, tabsRef, underlineRef,
+    tabButtons, signalRefs, countdownRef, confidenceBarRef,
+    activeTab, reducedMotion,
   )
 
   const statusToneClass = STATUS_TONE_CLASSES[state.status]
@@ -379,11 +333,10 @@ export const SentinelCockpitTwin = ({ state }: SentinelCockpitTwinProps) => {
         </div>
       </div>
 
-      <motion.div
+      {/* Plain div — GSAP owns entrance animation, no Framer conflict */}
+      <div
         ref={heroRef}
-        initial={reducedMotion ? undefined : { opacity: 0, y: 18 }}
-        animate={reducedMotion ? undefined : { opacity: 1, y: 0 }}
-      transition={{ duration: 0.8, ease: FRAMER_EASE }}
+        style={{ opacity: 0 }}
         className="relative rounded-3xl border border-white/10 bg-[radial-gradient(circle_at_top,rgba(15,23,42,0.9),rgba(2,6,23,0.95))] p-5 shadow-[0_40px_90px_rgba(2,6,23,0.6)]"
       >
         <div ref={heroGlowRef} className="pointer-events-none absolute inset-0 rounded-3xl bg-gradient-to-br from-sky-500/10 to-transparent opacity-20 blur-3xl" />
@@ -426,15 +379,13 @@ export const SentinelCockpitTwin = ({ state }: SentinelCockpitTwinProps) => {
             <span className="text-xs uppercase tracking-[0.4em] text-slate-500">Reasoning-ready</span>
           </div>
         </div>
-      </motion.div>
+      </div>
 
       <div className="relative mt-5 flex flex-wrap items-center gap-3" ref={tabsRef}>
         {TABS.map((tab) => (
           <button
             key={tab.id}
-            ref={(el) => {
-              tabButtons.current[tab.id] = el
-            }}
+            ref={(el) => { tabButtons.current[tab.id] = el }}
             type="button"
             onClick={() => setActiveTab(tab.id)}
             className={`rounded-full border px-4 py-2 text-[9px] uppercase tracking-[0.4em] transition ${
@@ -463,9 +414,7 @@ export const SentinelCockpitTwin = ({ state }: SentinelCockpitTwinProps) => {
               key={key}
               label={SIGNAL_LABELS[key]}
               status={status}
-              onMount={(el) => {
-                signalRefs.current[index] = el
-              }}
+              onMount={(el) => { signalRefs.current[index] = el }}
             />
           ))}
         </div>

@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode, type RefObject } from 'react'
+import { useCallback, useLayoutEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode, type RefObject } from 'react'
 import gsap from 'gsap'
 import type { CockpitRenderMode, CockpitState } from './types'
 import { useToneTransition } from './useToneTransition'
@@ -12,6 +12,8 @@ interface CockpitViewProps {
   state: CockpitState
   renderMode: CockpitRenderMode
   spatialCanvas: ReactNode
+  /** Optional: called when operator holds to confirm in supervised mode. */
+  onApprove?: () => void
 }
 
 interface CockpitStatusPillProps {
@@ -83,10 +85,6 @@ function CockpitStatusPill({ children }: CockpitStatusPillProps) {
   return <span className="rounded-full border border-slate-800 px-3 py-1">{children}</span>
 }
 
-function formatLabel(value: string) {
-  return value.replace(/_/g, ' ')
-}
-
 function useEntranceAnimation(
   rootRef: RefObject<HTMLElement | null>,
   voiceRef: RefObject<HTMLDivElement | null>,
@@ -99,18 +97,15 @@ function useEntranceAnimation(
 
     if (motionReduced()) {
       gsap.set([voiceRef.current, twinRef.current, decisionRef.current, statusRef.current], {
-        autoAlpha: 1,
-        y: 0,
+        autoAlpha: 1, y: 0,
       })
       return
     }
 
     const ctx = gsap.context(() => {
       gsap.set([voiceRef.current, twinRef.current, decisionRef.current, statusRef.current], {
-        autoAlpha: 0,
-        y: 18,
+        autoAlpha: 0, y: 18,
       })
-
       gsap.timeline({ defaults: { duration: 0.72, ease: 'power3.out' } })
         .to(voiceRef.current, { autoAlpha: 1, y: 0 })
         .to([twinRef.current, decisionRef.current], { autoAlpha: 1, y: 0, stagger: 0.08 }, '-=0.32')
@@ -136,9 +131,7 @@ function useRefreshAnimation(
       .fromTo(voiceRef.current, { y: 10, autoAlpha: 0.88 }, { y: 0, autoAlpha: 1, clearProps: 'transform,opacity' })
       .fromTo(decisionRef.current, { y: 10, autoAlpha: 0.92 }, { y: 0, autoAlpha: 1, clearProps: 'transform,opacity' }, '-=0.24')
 
-    return () => {
-      timeline.kill()
-    }
+    return () => { timeline.kill() }
   }, [decisionRef, state.decision.summary, state.primaryMetric.value, state.site.mode, voice.headline, voiceRef])
 }
 
@@ -154,20 +147,11 @@ interface CockpitHeroProps {
 }
 
 function CockpitHero({
-  voiceRef,
-  metricValueRef,
-  voice,
-  state,
-  isWall,
-  emphasisTone,
-  onFullscreenClick,
-  isFullscreen,
+  voiceRef, metricValueRef, voice, state, isWall, emphasisTone, onFullscreenClick, isFullscreen,
 }: CockpitHeroProps) {
   return (
     <div
-      ref={(node) => {
-        voiceRef.current = node
-      }}
+      ref={(node) => { voiceRef.current = node }}
       className="border-b border-slate-800/80 pb-5"
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -190,12 +174,8 @@ function CockpitHero({
               </svg>
             ) : (
               <svg className="h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 8V4m0 0h4m-4 0l5 5m11-5v4m0-4h-4m4 0l-5 5M4 20v-4m0 4h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5"
-                />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M4 8V4m0 0h4m-4 0l5 5m11-5v4m0-4h-4m4 0l-5 5M4 20v-4m0 4h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5" />
               </svg>
             )}
           </button>
@@ -211,7 +191,6 @@ function CockpitHero({
             {voice.supporting}
           </p>
         </div>
-
         <div className="rounded-2xl border border-slate-800/80 bg-slate-900/60 px-4 py-3">
           <div className="text-[11px] uppercase tracking-[0.22em] text-slate-500">
             {state.primaryMetric.label}
@@ -235,14 +214,11 @@ interface CockpitDecisionPanelProps {
   decisionRowsRef: MutableRefObject<HTMLElement | null>
   state: CockpitState
   emphasisTone: string
+  onApprove?: () => void
 }
 
 function CockpitDecisionPanel({
-  decisionRef,
-  badgeRef,
-  decisionRowsRef,
-  state,
-  emphasisTone,
+  decisionRef, badgeRef, decisionRowsRef, state, emphasisTone, onApprove,
 }: CockpitDecisionPanelProps) {
   return (
     <aside
@@ -271,12 +247,18 @@ function CockpitDecisionPanel({
       <SectionRow label="Action" value={state.decision.summary} emphasis />
       <SectionRow label="Trade-Off" value={state.decision.tradeoff} />
       <SectionRow label="Confidence" value={state.decision.confidence} />
-      <CockpitDecisionModeState state={state} />
+      <CockpitDecisionModeState state={state} onApprove={onApprove} />
     </aside>
   )
 }
 
-function CockpitDecisionModeState({ state }: { state: CockpitState }) {
+function CockpitDecisionModeState({
+  state,
+  onApprove,
+}: {
+  state: CockpitState
+  onApprove?: () => void
+}) {
   if (state.site.mode === 'advisory') {
     return (
       <details className="mt-4 rounded-2xl border border-slate-800/80 bg-slate-950/40 px-4 py-3">
@@ -295,7 +277,16 @@ function CockpitDecisionModeState({ state }: { state: CockpitState }) {
   }
 
   if (state.site.mode === 'supervised') {
-    return <SupervisedConfirmBar onConfirm={() => { /* operator confirmed — handled by parent */ }} />
+    return (
+      <SupervisedConfirmBar
+        onConfirm={onApprove ?? (() => {
+          // Fallback: dispatch event on root so host can wire API call without prop-drilling
+          document
+            .querySelector('[data-cockpit-root]')
+            ?.dispatchEvent(new CustomEvent('sentinel:approve', { bubbles: true, detail: { siteId: state.site.id } }))
+        })}
+      />
+    )
   }
 
   if (state.site.mode === 'autonomous') {
@@ -310,6 +301,7 @@ function CockpitDecisionModeState({ state }: { state: CockpitState }) {
   return null
 }
 
+/** Footer: 3 chips max — Mode | Confidence | Signal freshness */
 function CockpitStatusBar({
   statusRef,
   state,
@@ -317,48 +309,25 @@ function CockpitStatusBar({
   statusRef: MutableRefObject<HTMLDivElement | null>
   state: CockpitState
 }) {
+  const signalLabel = state.severity.riskBand === 'critical' || state.severity.riskBand === 'high'
+    ? 'Signal: degraded'
+    : state.severity.riskBand === 'medium'
+    ? 'Signal: watch'
+    : 'Signal: live'
+
   return (
     <div
-      ref={(node) => {
-        statusRef.current = node
-      }}
+      ref={(node) => { statusRef.current = node }}
       className="mt-5 flex flex-wrap items-center gap-2 border-t border-slate-800/80 pt-4 text-xs text-slate-400"
     >
-      <CockpitStatusPill>{state.site.dataFreshnessLabel}</CockpitStatusPill>
       <CockpitStatusPill>Mode: {state.site.mode}</CockpitStatusPill>
       <CockpitStatusPill>Confidence: {state.decision.confidence}</CockpitStatusPill>
-      {state.severity.riskBand && (
-        <CockpitStatusPill>Risk band: {state.severity.riskBand}</CockpitStatusPill>
-      )}
-      {state.severity.constraintType && (
-        <CockpitStatusPill>
-          Constraint: {formatLabel(state.severity.constraintType)}
-          {state.severity.timeToConstraintBreachMin !== null ? ` · ${state.severity.timeToConstraintBreachMin} min` : ''}
-        </CockpitStatusPill>
-      )}
-      {state.severity.affectedScope && (
-        <CockpitStatusPill>
-          Scope: {state.severity.affectedScope.zones.length} zones
-          {state.severity.affectedScope.occupantsEstimate !== null
-            ? ` · ~${state.severity.affectedScope.occupantsEstimate} occupants`
-            : ''}
-        </CockpitStatusPill>
-      )}
-      {state.severity.healthScore !== null && (
-        <CockpitStatusPill>
-          Health: {state.severity.healthScore}% · {state.severity.healthState ?? 'stable'} · {state.severity.healthTrend ?? 'flat'}
-        </CockpitStatusPill>
-      )}
-      {state.severity.assetClass && state.severity.criticality && (
-        <CockpitStatusPill>
-          Asset: {formatLabel(state.severity.assetClass)} · {formatLabel(state.severity.criticality)}
-        </CockpitStatusPill>
-      )}
+      <CockpitStatusPill>{signalLabel}</CockpitStatusPill>
     </div>
   )
 }
 
-export function CockpitView({ state, renderMode, spatialCanvas }: CockpitViewProps) {
+export function CockpitView({ state, renderMode, spatialCanvas, onApprove }: CockpitViewProps) {
   const rootRef = useRef<HTMLElement | null>(null)
   const voiceRef = useRef<HTMLDivElement | null>(null)
   const twinRef = useRef<HTMLDivElement | null>(null)
@@ -380,33 +349,27 @@ export function CockpitView({ state, renderMode, spatialCanvas }: CockpitViewPro
   useUrgencyPulse(metricValueRef, state.primaryMetric.tone)
   useDecisionRowEntrance(decisionRowsRef, true)
 
-  const handleFullscreen = () => {
+  const handleFullscreen = useCallback(() => {
     const elem = rootRef.current
     if (!elem) return
-
     if (!isFullscreen) {
-      if (elem.requestFullscreen) {
-        elem.requestFullscreen().catch(() => setIsFullscreen(true))
-      } else {
-        setIsFullscreen(true)
-      }
+      elem.requestFullscreen?.().catch(() => setIsFullscreen(true))
       setIsFullscreen(true)
     } else {
-      if (document.fullscreenElement) {
-        document.exitFullscreen()
-      }
+      if (document.fullscreenElement) document.exitFullscreen()
       setIsFullscreen(false)
     }
-  }
+  }, [isFullscreen])
 
   return (
     <section
       ref={rootRef}
+      data-cockpit-root
+      data-render-mode={renderMode}
+      data-site-id={state.site.id}
       className={`rounded-[28px] border border-slate-800/80 bg-slate-950/95 p-4 md:p-6 ${
         isFullscreen ? 'fixed inset-0 z-50 rounded-none' : ''
       }`}
-      data-render-mode={renderMode}
-      data-site-id={state.site.id}
     >
       <CockpitHero
         voiceRef={voiceRef}
@@ -429,6 +392,7 @@ export function CockpitView({ state, renderMode, spatialCanvas }: CockpitViewPro
           decisionRowsRef={decisionRowsRef}
           state={state}
           emphasisTone={emphasisTone}
+          onApprove={onApprove}
         />
       </div>
 
