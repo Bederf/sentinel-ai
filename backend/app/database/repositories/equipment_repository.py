@@ -13,7 +13,7 @@ class EquipmentRepository:
     """Repository for equipment database operations."""
 
     # Column selection constants to avoid SELECT * overhead
-    _LIST_COLUMNS = "id, code, name, status, health_score, type, site_id, location"
+    _LIST_COLUMNS = "id, code, name, status, health_score, type, site_id, location, operating_data"
     _DETAIL_COLUMNS = (
         "id, code, name, status, health_score, type, site_id, "
         "manufacturer, model, install_date, commissioning_date, "

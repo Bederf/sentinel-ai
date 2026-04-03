@@ -18,28 +18,55 @@ import json
 import logging
 import shutil
 from pathlib import Path
-from typing import List, Optional
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from app.middleware.auth_middleware import require_site_access, require_role
-from app.models.auth import AuthContext, SentinelRole
-
 from app.core.site_resolver import get_registered_sites
-from app.services.site_loader import get_site_loader
+from app.middleware.auth_middleware import require_role, require_site_access
+from app.models.auth import AuthContext, SentinelRole
 from app.services.device_abstraction import device_manager
+from app.services.site_loader import get_site_loader
 
 logger = logging.getLogger(__name__)
 
 
 def _building_to_site(site_id: str) -> str:
-    """Map a friendly building name to its site code using registered sites."""
+    """Map user-facing site identifiers to canonical site code.
+
+    Supports:
+    - exact code match (e.g. S002)
+    - friendly name match
+    - legacy "site-002" form -> "S002" when available
+    """
     sites = get_registered_sites()
+    normalized_input = (site_id or "").strip()
+    lowered_input = normalized_input.lower()
+
+    # 1) Exact code match first.
     for site in sites:
-        if site.get("name", "").lower() == site_id.lower():
-            return site.get("code", site_id)
-    return site_id
+        code = str(site.get("code", "")).strip()
+        if code and code.lower() == lowered_input:
+            return code
+
+    # 2) Friendly display/name match.
+    for site in sites:
+        if str(site.get("name", "")).strip().lower() == lowered_input:
+            return str(site.get("code", normalized_input)).strip() or normalized_input
+
+    # 3) Convert site-002 style aliases when registry uses S002 codes.
+    import re
+
+    m = re.fullmatch(r"site-(\d+)", lowered_input)
+    if m:
+        s_code = f"S{m.group(1).zfill(3)}"
+        for site in sites:
+            code = str(site.get("code", "")).strip()
+            if code.lower() == s_code.lower():
+                return code
+
+    return normalized_input
 
 
 def _normalize_device_id(device_id: str) -> str:
@@ -135,40 +162,41 @@ class BuildingCreate(BaseModel):
 
     id: str
     name: str
-    display_name: Optional[str] = None
-    address: Optional[str] = ""
+    display_name: str | None = None
+    address: str | None = ""
     timezone: str = "Africa/Johannesburg"
-    floors: List[str] = []
+    floors: list[str] = []
     features: dict = {}
 
 
 class BuildingUpdate(BaseModel):
     """Request model for updating a building."""
 
-    name: Optional[str] = None
-    display_name: Optional[str] = None
-    address: Optional[str] = None
-    timezone: Optional[str] = None
-    floors: Optional[List[str]] = None
-    features: Optional[dict] = None
+    name: str | None = None
+    display_name: str | None = None
+    address: str | None = None
+    timezone: str | None = None
+    floors: list[str] | None = None
+    features: dict | None = None
 
 
 class BuildingConfigUpdate(BaseModel):
     """Request model for updating building configuration from Settings UI."""
 
-    name: Optional[str] = None
-    display_name: Optional[str] = None
-    address: Optional[str] = None
-    building_type: Optional[str] = None  # commercial_office, retail, industrial, mixed_use
-    floors: Optional[List[str]] = None
-    sqm: Optional[int] = None
-    occupancy_capacity: Optional[int] = None
-    total_desks: Optional[int] = None
-    parking_bays: Optional[int] = None
-    optimization_profile: Optional[str] = None  # cost_saving, comfort, balanced
-    control_tier: Optional[str] = None  # human_in_loop, supervised, automatic
-    features: Optional[dict] = None
-    contacts: Optional[dict] = None
+    name: str | None = None
+    display_name: str | None = None
+    address: str | None = None
+    building_type: str | None = None  # commercial_office, retail, industrial, mixed_use
+    floors: list[str] | None = None
+    sqm: int | None = None
+    occupancy_capacity: int | None = None
+    total_desks: int | None = None
+    parking_bays: int | None = None
+    optimization_profile: str | None = None  # cost_saving, comfort, balanced
+    sentinel_operating_mode: Literal["comfort", "cost_saving", "asset_preservation"] | None = None
+    control_tier: str | None = None  # human_in_loop, supervised, automatic
+    features: dict | None = None
+    contacts: dict | None = None
 
 
 @router.get("")
@@ -250,21 +278,71 @@ async def get_site(site_id: str, auth: AuthContext = Depends(require_site_access
     # Map site_id to site code for JSON lookup
     site_code = _building_to_site(site_id)
 
+    building_file = DATA_PATH / site_code / "building.json"
+    if building_file.exists():
+        with open(building_file, encoding="utf-8") as handle:
+            result = json.load(handle)
+        result["id"] = site_code
+
+        desks_file = DATA_PATH / site_code / "desks.json"
+        zones_file = DATA_PATH / site_code / "zones.json"
+        registry_file = DATA_PATH / "_registry.json"
+
+        desk_count = 0
+        zone_count = 0
+        is_active = False
+
+        if desks_file.exists():
+            with open(desks_file, encoding="utf-8") as handle:
+                desks_data = json.load(handle)
+            desk_count = len(desks_data if isinstance(desks_data, list) else desks_data.get("desks", []))
+
+        if zones_file.exists():
+            with open(zones_file, encoding="utf-8") as handle:
+                zones_data = json.load(handle)
+            zone_count = len(zones_data if isinstance(zones_data, list) else zones_data.get("zones", []))
+
+        if registry_file.exists():
+            with open(registry_file, encoding="utf-8") as handle:
+                registry = json.load(handle)
+            is_active = site_code in registry.get("active_sites", [])
+
+        result["desk_count"] = desk_count
+        result["zone_count"] = zone_count
+        result["is_active"] = is_active
+        return result
+
     loader = get_site_loader()
     building = loader.get_site(site_code)
+    if building:
+        desks = loader.get_desks(site_code)
+        zones = loader.get_zones(site_code)
+        result = building.to_dict()
+        result["desk_count"] = len(desks)
+        result["zone_count"] = len(zones)
+        result["is_active"] = site_code in loader.get_active_site_ids()
+        return result
 
-    if not building:
-        raise HTTPException(status_code=404, detail=f"Building '{site_id}' (site '{site_code}') not found")
+    # Fallback: return minimal data from sites.json if available
+    # This prevents 404 for registered but not-yet-fully-onboarded sites (e.g. site-002)
+    from app.core.site_resolver import get_registered_sites
 
-    desks = loader.get_desks(site_code)
-    zones = loader.get_zones(site_code)
+    sites = get_registered_sites()
+    site_entry = next((s for s in sites if s.get("code") == site_code), None)
+    if site_entry:
+        return {
+            "id": site_code,
+            "code": site_code,
+            "name": site_entry.get("name", f"Site {site_code}"),
+            "region": site_entry.get("region"),
+            "type": site_entry.get("type"),
+            "address": site_entry.get("address"),
+            "desk_count": 0,
+            "zone_count": 0,
+            "is_active": False,
+        }
 
-    result = building.to_dict()
-    result["desk_count"] = len(desks)
-    result["zone_count"] = len(zones)
-    result["is_active"] = site_code in loader.get_active_site_ids()
-
-    return result
+    raise HTTPException(status_code=404, detail=f"Building '{site_id}' (site '{site_code}') not found")
 
 
 @router.put("/{site_id}/config")
@@ -289,7 +367,7 @@ async def update_building_config(
         raise HTTPException(status_code=404, detail=f"Building config for '{site_id}' not found")
 
     # Load current config
-    with open(building_file, "r") as f:
+    with open(building_file) as f:
         building_data = json.load(f)
 
     # Track changes for audit
@@ -335,6 +413,12 @@ async def update_building_config(
             "new": config.optimization_profile,
         }
         optimization["active_profile"] = config.optimization_profile
+    if config.sentinel_operating_mode is not None:
+        changes["optimization.sentinel_operating_mode"] = {
+            "old": optimization.get("sentinel_operating_mode"),
+            "new": config.sentinel_operating_mode,
+        }
+        optimization["sentinel_operating_mode"] = config.sentinel_operating_mode
     if config.control_tier is not None:
         changes["optimization.control_tier"] = {
             "old": optimization.get("control_tier"),
@@ -441,7 +525,7 @@ async def create_building(building: BuildingCreate) -> dict:
 
 @router.post("/{site_id}/desks")
 async def upload_desks(
-    site_id: str, desks: List[dict], auth: AuthContext = Depends(require_site_access("site_id"))
+    site_id: str, desks: list[dict], auth: AuthContext = Depends(require_site_access("site_id"))
 ) -> dict:
     """
     Upload/replace desk data for a building.
@@ -476,7 +560,7 @@ async def upload_desks(
 
 @router.post("/{site_id}/zones")
 async def upload_zones(
-    site_id: str, zones: List[dict], auth: AuthContext = Depends(require_site_access("site_id"))
+    site_id: str, zones: list[dict], auth: AuthContext = Depends(require_site_access("site_id"))
 ) -> dict:
     """
     Upload/replace zone data for a building.
@@ -654,7 +738,7 @@ async def delete_building(
 
 
 @router.get("/{site_id}/desks")
-async def get_building_desks(site_id: str, auth: AuthContext = Depends(require_site_access("site_id"))) -> List[dict]:
+async def get_building_desks(site_id: str, auth: AuthContext = Depends(require_site_access("site_id"))) -> list[dict]:
     """Get all desks for a building. Maps friendly names to site codes."""
     site_code = _building_to_site(site_id)
 
@@ -666,7 +750,7 @@ async def get_building_desks(site_id: str, auth: AuthContext = Depends(require_s
 
 
 @router.get("/{site_id}/zones")
-async def get_site_zones(site_id: str, auth: AuthContext = Depends(require_site_access("site_id"))) -> List[dict]:
+async def get_site_zones(site_id: str, auth: AuthContext = Depends(require_site_access("site_id"))) -> list[dict]:
     """Get all zones for a building. Maps friendly names to site codes."""
     site_code = _building_to_site(site_id)
 
@@ -972,6 +1056,43 @@ async def get_site_equipment(site_id: str, auth: AuthContext = Depends(require_s
                     elif health < 80:
                         status = "warning"
 
+                operating_data = eq.get("operating_data", {}) or {}
+                capability_sync = operating_data.get("capability_sync", {}) if isinstance(operating_data, dict) else {}
+                synced_controllable = capability_sync.get("controllable")
+                inferred_controllable = _is_device_controllable(eq.get("code", eq.get("id", "")), eq.get("points", {}))
+                is_simulated_sync = (
+                    capability_sync.get("vendor") == "simulation"
+                    and capability_sync.get("writable_point_count", 0) == 0
+                )
+                controllable_by_type = eq_type in (
+                    "fcu",
+                    "vav",
+                    "ahu",
+                    "chiller",
+                    "pump",
+                    "split",
+                    "ct",
+                    "dali",
+                    "lum",
+                    "gen",
+                    "ups",
+                    "bess",
+                    "inv",
+                )
+                # Determine effective controllable status:
+                # - Simulation sync (no real BMS): use type-based override when device_manager has no writable points
+                # - Real BMS sync: trust synced_controllable if available, else fall back to device_manager
+                if is_simulated_sync:
+                    if not inferred_controllable and controllable_by_type:
+                        # Simulation sync found no real writable points — fall back to type-based assumption.
+                        # Real BMS sync should override this when connectivity is available.
+                        inferred_controllable = True
+                    effective_controllable = inferred_controllable
+                else:
+                    effective_controllable = (
+                        bool(synced_controllable) if isinstance(synced_controllable, bool) else inferred_controllable
+                    )
+
                 equipment_list.append(
                     {
                         "id": eq.get("code", eq.get("id")),
@@ -990,7 +1111,12 @@ async def get_site_equipment(site_id: str, auth: AuthContext = Depends(require_s
                             "model": eq.get("model"),
                             "metadata": eq.get("metadata", {}),
                         },
-                        "controllable": _is_device_controllable(eq.get("code", eq.get("id", "")), eq.get("points", {})),
+                        "controllable": effective_controllable,
+                        "control_state": (
+                            "synced_capability"
+                            if isinstance(synced_controllable, bool)
+                            else ("inferred_writable" if inferred_controllable else "read_only")
+                        ),
                     }
                 )
 
