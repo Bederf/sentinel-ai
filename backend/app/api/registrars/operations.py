@@ -38,6 +38,7 @@ from app.api import (
     dispatch,
     event_bus_monitor,
     event_intelligence,
+    google_calendar_webhook_endpoint,
     graph_webhook_endpoint,
     health_config,
     health_rating,
@@ -116,6 +117,7 @@ def register_operations_routers(app: FastAPI) -> None:
     app.include_router(sentry_webhooks.router, tags=["sentry"])
     app.include_router(whatsapp_webhooks.router, tags=["whatsapp"])
     app.include_router(graph_webhook_endpoint.router, tags=["graph_webhook"])
+    app.include_router(google_calendar_webhook_endpoint.router, tags=["google_calendar_webhook"])
 
     # Module registry and configuration
     app.include_router(modules.router, prefix="/api", tags=["modules"])
@@ -250,7 +252,7 @@ def register_operations_routers(app: FastAPI) -> None:
     app.include_router(reception.router, prefix="/api", tags=["reception"])
 
     # Visitor Intake — n8n IMAP pipeline (Phase 178)
-    app.include_router(visitor_intake.router, prefix="/api", tags=["visitor_intake"])
+    app.include_router(visitor_intake.router, tags=["visitor_intake"])
 
     # Decision Moment API — Crisis State page (Phase 164)
     app.include_router(decisions.router, tags=["decisions"])

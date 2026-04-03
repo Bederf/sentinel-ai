@@ -2,9 +2,9 @@
 title: "Visitor Management API"
 type: "api"
 status: "approved"
-version: "1.0.0"
+version: "1.3.0"
 created: "2026-04-01"
-updated: "2026-04-01"
+updated: "2026-04-03"
 tags: ["visitor-management", "api", "reception", "access-control"]
 related: ["../04-features/176-visitor-management.md", "../05-integrations/visitor-management-integrations.md"]
 domain: "api"
@@ -175,13 +175,88 @@ Body=YES&From=whatsapp:+27821234567
 
 ---
 
+## POST /api/visits/rsvp
+
+Handle visitor RSVP (accept/decline) to a calendar invite. Used by n8n when a `METHOD:REPLY` iTip is received, and by the Google Calendar webhook when a visitor accepts/declines.
+
+**Auth:** `X-Sentry-API-Key` header (sentry bot API key)
+
+### Request
+
+```json
+{
+  "external_event_id": "gcal-jo9janvjg81oje3koc5npr4cko",
+  "response": "accepted",
+  "visitor_email": "visitor@example.com"
+}
+```
+
+`external_event_id` format:
+- Google Calendar: `gcal-{eventId}`
+- Microsoft Graph: `{eventId}` (raw Graph event ID)
+- IMAP/ICS (n8n): `n8n-ics-{UID}`
+
+### Response 200 (accepted)
+
+```json
+{
+  "success": true,
+  "visit_id": "uuid",
+  "status": "created",
+  "qr_code": "data:image/png;base64,...",
+  "message": "Visit accepted — confirmation email will be sent"
+}
+```
+
+### Response 200 (declined)
+
+```json
+{
+  "success": true,
+  "visit_id": "uuid",
+  "status": "cancelled",
+  "qr_code": null,
+  "message": "Visit declined"
+}
+```
+
+### Error Responses
+
+| Code | Condition |
+|------|-----------|
+| 400 | Invalid response value (must be 'accepted' or 'declined') |
+| 403 | Visitor email does not match pending visit |
+| 404 | No pending visit found for external_event_id |
+
+---
+
+## GET /api/visits/qr/{token}
+
+Serve the QR code PNG for a visit token. No auth — token is the secret.
+
+**Auth:** None (token is secret)
+
+### Response 200
+
+`image/png` — raw PNG bytes
+
+### Error Responses
+
+| Code | Condition |
+|------|-----------|
+| 400 | Invalid token format |
+| 404 | Visit not found or has no QR code |
+
+---
+
 ## Data Model
 
 ### VisitStatus (enum)
 
 | Value | Meaning |
 |-------|---------|
-| `created` | QR/PIN sent, waiting for arrival |
+| `pending` | Invite received, visitor has not yet accepted |
+| `created` | Visitor accepted, QR/PIN sent, waiting for arrival |
 | `arrived` | Visitor scanned at reception |
 | `registered` | Visitor details captured |
 | `approved` | Host approved via WhatsApp |

@@ -35,6 +35,7 @@ _PUBLIC_PATHS = {
     "/api/auth/register",
     "/api/auth/mfa/verify",
     "/api/auth/verify",
+    "/api/auth/verify-admin-pin",
     "/docs",
     "/openapi.json",
     "/redoc",
@@ -46,12 +47,17 @@ _PUBLIC_PATHS = {
     "/api/events/health",  # SSE health check
 }
 _PUBLIC_PREFIXES = (
+    "/api/visits/qr/",  # Visitor QR code images — token is the secret, no JWT needed
     "/api/sentry-webhooks",  # Telegram bot callbacks (authenticated via webhook secret)
+    "/api/sentry/email/",  # Sentry email intake (authenticated via X-Sentry-API-Key middleware)
+    "/api/emails/",  # Email cluster intake (authenticated via Bearer token in endpoint)
     "/api/whatsapp/",  # WhatsApp/Twilio webhooks (authenticated at webhook layer)
     "/api/mcp/sse",  # MCP SSE transport for Claude Desktop (authenticated at MCP layer)
     "/api/mcp/openai",  # MCP OpenAI endpoints for ChatGPT/M365 Copilot (authenticated at MCP layer)
     "/api/lifecycle/",  # Lifecycle simulation status endpoints (frontend health checks)
     "/api/recommendations/",  # Recommendations endpoints (can be public for UI)
+    "/api/webhooks/google/calendar",  # Google Calendar Pub/Sub push notifications (public — validated by channel ID)
+    "/api/webhooks/graph/events",  # Microsoft Graph webhook notifications (public — validated by clientState)
 )
 _PUBLIC_READ_PATHS = {
     "/api/block-bookings/alerts",
@@ -140,7 +146,7 @@ def register_exception_handlers(app: FastAPI) -> None:
         except Exception:
             pass  # Audit failure must not block the 429 response
 
-        headers = {"Retry-After": str(exc.retry_after)}
+        headers = {"Retry-After": "60"}
         headers.update(_get_cors_headers(request))
         return JSONResponse(
             status_code=429,

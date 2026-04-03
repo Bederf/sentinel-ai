@@ -67,7 +67,7 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 - **[Asset Health API](03-api-reference/asset-health-api.md)** - Combined equipment health scores + baseline status + deviation tracking per site/equipment (Phase 109A)
 - [System Health API](03-api-reference/system-health-api.md) - Unified health snapshots, diagnostics, and system error logs
 - **[Security API](03-api-reference/security-api.md)** - Access control events, visitor management, zone occupancy, cameras, occupancy trends, cross-module recommendations (Phases 27, 58, 69)
-- **[Visitor Management API](03-api-reference/visitor-management-api.md)** - Reception endpoints (scan, register, issue-card), WhatsApp YES/NO webhook, VisitStatus lifecycle, BuildingMap (Phase 176)
+- **[Visitor Management API](03-api-reference/visitor-management-api.md)** - Reception endpoints (scan, register, issue-card), WhatsApp YES/NO webhook, RSVP accept/decline, VisitStatus lifecycle, BuildingMap (Phase 176–178)
 - **[Privacy & Consent API](03-api-reference/privacy-api.md)** - POPIA consent, cross-border gating, data subject requests (DSR), and retention automation endpoints
 - **[RLM Runner & Orchestration API](03-api-reference/rlm-api.md)** - Evidence analysis submission, result polling, audit trace, health check — runner direct and backend orchestration (Phase 113)
 - **[ServiceNow API](03-api-reference/servicenow-api.md)** - Read-only ITSM endpoints for incidents, work orders, table queries, schema, history, and aggregates (Phase 138)
@@ -200,7 +200,7 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 - **[Workflow Triggers & Automation](05-integrations/workflow-triggers.md)** - 5 automated triggers for ML → Inspection → Repair → Validation (Phase 53-02)
 - [AEGIS Site-002 Discovery](05-integrations/aegis-site-002-discovery.md) - Site-level BESS control boundaries, interfaces, and pre-live confirmation points
 - **[ServiceNow Integration](05-integrations/servicenow-integration.md)** - Read-only ITSM client with auto-discovery, 10 API endpoints, 4 chat tools, config-ready (Phase 138)
-- **[Visitor Management Integrations](05-integrations/visitor-management-integrations.md)** - Outlook (Graph API), WhatsApp (Twilio), Active Directory (JSON), C-CURE, SMTP — full visitor lifecycle integration (Phase 176)
+- **[Visitor Management Integrations](05-integrations/visitor-management-integrations.md)** - Google Calendar (Pub/Sub webhook), Microsoft Graph (webhook), Email intake (n8n IMAP), WhatsApp (Twilio), Active Directory (JSON), C-CURE, SMTP — Accept-First visitor flow (Phase 178)
 
 ### 📦 Modules
 - [Module Registry](13-modules/module-registry.md) - Bolt-on module system architecture
