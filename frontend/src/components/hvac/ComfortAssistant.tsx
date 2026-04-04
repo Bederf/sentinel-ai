@@ -23,7 +23,7 @@ export function ComfortAssistant({ compact = true, onViewDetails }: ComfortAssis
   // Ultra-compact version - just a button that expands
   if (compact && !showFullPanel) {
     return (
-      <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+      <div className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
         <Flex justifyContent="between" alignItems="center">
           <Flex alignItems="center" className="gap-3">
             <div
@@ -37,7 +37,7 @@ export function ComfortAssistant({ compact = true, onViewDetails }: ComfortAssis
             </div>
             <div>
               <Text className="font-medium">Comfort Complaints</Text>
-              <Text className="text-xs text-gray-400">
+              <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
                 Too hot? Too cold? Report here
               </Text>
             </div>
@@ -71,8 +71,8 @@ export function ComfortAssistant({ compact = true, onViewDetails }: ComfortAssis
             className="flex items-center gap-1 px-2 py-1 rounded text-xs cursor-pointer hover:bg-white/10"
             onClick={() => setShowFullPanel(true)}
           >
-            <Cloud className="w-4 h-4 text-gray-400" />
-            <span className="text-gray-300">Stuffy</span>
+            <Cloud className="w-4 h-4" style={{ color: "var(--color-sentinel-text-secondary)" }} />
+            <span style={{ color: "var(--color-sentinel-text-primary)" }}>Stuffy</span>
           </div>
           <div
             className="flex items-center gap-1 px-2 py-1 rounded text-xs cursor-pointer hover:bg-white/10"

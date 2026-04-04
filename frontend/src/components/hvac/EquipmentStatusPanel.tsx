@@ -67,7 +67,7 @@ export function EquipmentStatusPanel({ siteId, compact = false, onEquipmentSelec
       case "off":
         return <AlertTriangle className="w-4 h-4 text-red-500" />;
       default:
-        return <Activity className="w-4 h-4 text-gray-400" />;
+        return <Activity className="w-4 h-4" style={{ color: "var(--color-sentinel-text-disabled)" }} />;
     }
   }
 
@@ -92,7 +92,7 @@ export function EquipmentStatusPanel({ siteId, compact = false, onEquipmentSelec
         <h3 className="font-medium text-lg" style={{ color: "var(--color-sentinel-text-primary)" }}>Equipment Status</h3>
         <div className="animate-pulse space-y-4 mt-4">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="h-32 bg-gray-200 rounded" />
+            <div key={i} className="h-32 rounded" style={{ background: "var(--color-sentinel-bg-secondary)" }} />
           ))}
         </div>
       </div>
@@ -140,7 +140,7 @@ export function EquipmentStatusPanel({ siteId, compact = false, onEquipmentSelec
           {getEquipmentIcon(eq.type)}
           <div>
             <Text className="font-medium">{eq.name}</Text>
-            <Text className="text-xs text-gray-400">{eq.location}</Text>
+            <Text className="text-xs" style={{ color: "var(--color-sentinel-text-disabled)" }}>{eq.location}</Text>
           </div>
         </Flex>
         <div className="flex items-center gap-2">
@@ -176,7 +176,7 @@ export function EquipmentStatusPanel({ siteId, compact = false, onEquipmentSelec
                 alignItems="center"
                 className="text-xs"
               >
-                <span className="text-gray-400 capitalize">
+                <span className="capitalize" style={{ color: "var(--color-sentinel-text-disabled)" }}>
                   {key.replace("_", " ")}
                 </span>
                 <Flex alignItems="center" className="gap-2">
@@ -197,7 +197,7 @@ export function EquipmentStatusPanel({ siteId, compact = false, onEquipmentSelec
                       }}
                     />
                   </div>
-                  <span className="text-gray-500 w-12">{factor.value}</span>
+                  <span className="w-12" style={{ color: "var(--color-sentinel-text-disabled)" }}>{factor.value}</span>
                 </Flex>
               </Flex>
             ))}
@@ -207,25 +207,25 @@ export function EquipmentStatusPanel({ siteId, compact = false, onEquipmentSelec
 
       {/* Equipment Info */}
       {!compact && (
-        <div className="space-y-2 text-xs text-gray-400">
+        <div className="space-y-2 text-xs" style={{ color: "var(--color-sentinel-text-disabled)" }}>
           <Flex justifyContent="between">
             <span>Manufacturer</span>
-            <span className="text-gray-300">{eq.manufacturer || "N/A"}</span>
+            <span style={{ color: "var(--color-sentinel-text-secondary)" }}>{eq.manufacturer || "N/A"}</span>
           </Flex>
           <Flex justifyContent="between">
             <span>Model</span>
-            <span className="text-gray-300">{eq.model || "N/A"}</span>
+            <span style={{ color: "var(--color-sentinel-text-secondary)" }}>{eq.model || "N/A"}</span>
           </Flex>
           <Flex justifyContent="between">
             <span>Capacity</span>
-            <span className="text-gray-300">{eq.capacity || "N/A"}</span>
+            <span style={{ color: "var(--color-sentinel-text-secondary)" }}>{eq.capacity || "N/A"}</span>
           </Flex>
           <Flex justifyContent="between" alignItems="center">
             <Flex alignItems="center" className="gap-1">
               <Wrench className="w-3 h-3" />
               <span>Last Service</span>
             </Flex>
-            <span className="text-gray-300">
+            <span style={{ color: "var(--color-sentinel-text-secondary)" }}>
               {eq.last_service
                 ? new Date(eq.last_service).toLocaleDateString()
                 : "N/A"}
@@ -236,7 +236,7 @@ export function EquipmentStatusPanel({ siteId, compact = false, onEquipmentSelec
               <Clock className="w-3 h-3" />
               <span>Installed</span>
             </Flex>
-            <span className="text-gray-300">
+            <span style={{ color: "var(--color-sentinel-text-secondary)" }}>
               {eq.install_date
                 ? new Date(eq.install_date).toLocaleDateString()
                 : "N/A"}

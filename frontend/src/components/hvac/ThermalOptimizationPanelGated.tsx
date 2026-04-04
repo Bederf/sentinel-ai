@@ -30,7 +30,7 @@ export function ThermalOptimizationPanelGated({
 
   return (
     <LockedFeatureOverlay
-      module="control"
+      module="hvac_control"
       featureName="Thermal Optimization"
       customMessage="Enable Controls module to let SENTINEL predict and prevent thermal runway through proactive pre-cooling — reduce peak demand by 15-20% and maintain optimal occupant comfort."
     >

@@ -55,7 +55,7 @@ export function ThermalOptimizationPanel({ siteId, compact = false }: ThermalOpt
     return (
       <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
         <h3 className="font-medium text-lg" style={{ color: "var(--color-sentinel-text-primary)" }}>Thermal Optimization</h3>
-        <div className="animate-pulse h-64 bg-gray-200 rounded mt-4" />
+        <div className="animate-pulse h-64 rounded mt-4" style={{ background: "var(--color-sentinel-bg-secondary)" }} />
       </div>
     );
   }
@@ -73,7 +73,7 @@ export function ThermalOptimizationPanel({ siteId, compact = false }: ThermalOpt
     return (
       <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
         <h3 className="font-medium text-lg" style={{ color: "var(--color-sentinel-text-primary)" }}>Thermal Optimization</h3>
-        <Text className="text-gray-500 mt-4">No thermal data available</Text>
+        <Text className="mt-4" style={{ color: "var(--color-sentinel-text-disabled)" }}>No thermal data available</Text>
       </div>
     );
   }
@@ -99,8 +99,8 @@ export function ThermalOptimizationPanel({ siteId, compact = false }: ThermalOpt
             className="p-3 rounded-lg"
             style={{ background: "var(--color-sentinel-bg-secondary)" }}
           >
-            <Text className="text-xs text-gray-400">Without Pre-cooling</Text>
-            <Text className="text-2xl font-bold text-gray-400">
+            <Text className="text-xs" style={{ color: "var(--color-sentinel-text-disabled)" }}>Without Pre-cooling</Text>
+            <Text className="text-2xl font-bold" style={{ color: "var(--color-sentinel-text-disabled)" }}>
               {metrics.runway_without} min
             </Text>
             <Text className="text-xs text-red-400">
@@ -148,7 +148,7 @@ export function ThermalOptimizationPanel({ siteId, compact = false }: ThermalOpt
             style={{ background: "var(--color-sentinel-bg-secondary)" }}
           >
             <Thermometer className="w-6 h-6 mx-auto mb-2" style={{ color: "var(--color-sentinel-blue)" }} />
-            <Text className="text-xs text-gray-400">Current Temp</Text>
+            <Text className="text-xs" style={{ color: "var(--color-sentinel-text-disabled)" }}>Current Temp</Text>
             <Text className="text-2xl font-bold">{current_conditions.avg_temperature}°C</Text>
           </div>
           <div
@@ -156,8 +156,8 @@ export function ThermalOptimizationPanel({ siteId, compact = false }: ThermalOpt
             style={{ background: "var(--color-sentinel-bg-secondary)" }}
           >
             <Clock className="w-6 h-6 mx-auto mb-2" style={{ color: "var(--color-sentinel-amber)" }} />
-            <Text className="text-xs text-gray-400">Runway (No Pre-cool)</Text>
-            <Text className="text-2xl font-bold text-gray-400">{metrics.runway_without} min</Text>
+            <Text className="text-xs" style={{ color: "var(--color-sentinel-text-disabled)" }}>Runway (No Pre-cool)</Text>
+            <Text className="text-2xl font-bold" style={{ color: "var(--color-sentinel-text-disabled)" }}>{metrics.runway_without} min</Text>
           </div>
           <div
             className="p-4 rounded-lg text-center border border-blue-500/30"

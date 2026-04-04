@@ -128,7 +128,6 @@ export function HVACDashboard({
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState(0);
   const [comparison, setComparison] = useState<ComparisonSummary | null>(null);
-  const [comparisonLoading, setComparisonLoading] = useState(true);
 
   // Use ref to track if component is mounted
   const mountedRef = useRef(true);
@@ -167,11 +166,9 @@ export function HVACDashboard({
   // Fetch energy comparison for HVAC value card (re-polls with overview)
   useEffect(() => {
     let cancelled = false;
-    setComparisonLoading(true);
     fetchEnergyComparisonSummary(siteId)
       .then((data) => { if (mountedRef.current && !cancelled) setComparison(data); })
-      .catch(() => {})
-      .finally(() => { if (mountedRef.current && !cancelled) setComparisonLoading(false); });
+      .catch(() => {});
     return () => { cancelled = true; };
   }, [siteId]);
 
@@ -261,7 +258,7 @@ export function HVACDashboard({
             sentinel={{ label: "With SENTINEL AI", value: 0, unit: "kWh" }}
             savingsPercent={0}
             period="Monthly"
-            collecting={comparisonLoading}
+            collecting={!comparison}
           />
         )}
 

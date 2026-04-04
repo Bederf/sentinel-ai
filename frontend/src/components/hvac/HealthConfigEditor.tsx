@@ -148,8 +148,8 @@ export function HealthConfigEditor({ onConfigChange }: HealthConfigEditorProps) 
       <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
         <h3 className="font-medium text-lg" style={{ color: "var(--color-sentinel-text-primary)" }}>Health Calculation Configuration</h3>
         <div className="animate-pulse space-y-4 mt-4">
-          <div className="h-32 bg-gray-200 rounded" />
-          <div className="h-32 bg-gray-200 rounded" />
+          <div className="h-32 rounded" style={{ background: "var(--color-sentinel-bg-secondary)" }} />
+          <div className="h-32 rounded" style={{ background: "var(--color-sentinel-bg-secondary)" }} />
         </div>
       </div>
     );
@@ -268,7 +268,7 @@ export function HealthConfigEditor({ onConfigChange }: HealthConfigEditorProps) 
                         color: "var(--color-sentinel-text-primary)",
                       }}
                     />
-                    <Text className="text-xs text-gray-400 mt-1">
+                    <Text className="text-xs mt-1" style={{ color: "var(--color-sentinel-text-disabled)" }}>
                       Typical lifespan for this equipment type
                     </Text>
                   </div>
@@ -294,7 +294,7 @@ export function HealthConfigEditor({ onConfigChange }: HealthConfigEditorProps) 
                         color: "var(--color-sentinel-text-primary)",
                       }}
                     />
-                    <Text className="text-xs text-gray-400 mt-1">
+                    <Text className="text-xs mt-1" style={{ color: "var(--color-sentinel-text-disabled)" }}>
                       Recommended service frequency
                     </Text>
                   </div>

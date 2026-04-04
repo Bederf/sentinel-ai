@@ -90,7 +90,7 @@ export function ZoneOverviewPanel({ siteId, compact = false, onZoneSelect }: Zon
         <h3 className="font-medium text-lg" style={{ color: "var(--color-sentinel-text-primary)" }}>Zone Overview</h3>
         <div className="animate-pulse space-y-4 mt-4">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="h-24 bg-gray-200 rounded" />
+            <div key={i} className="h-24 rounded" style={{ background: "var(--color-sentinel-bg-secondary)" }} />
           ))}
         </div>
       </div>
@@ -135,7 +135,7 @@ export function ZoneOverviewPanel({ siteId, compact = false, onZoneSelect }: Zon
       {Object.entries(zonesByFloor).map(([floor, floorZones]) => (
         <div key={floor}>
           {!compact && (
-            <Text className="font-medium text-sm mb-2 text-gray-400">Floor {floor}</Text>
+            <Text className="font-medium text-sm mb-2" style={{ color: "var(--color-sentinel-text-disabled)" }}>Floor {floor}</Text>
           )}
           <Grid className={`grid ${compact ? 'grid-cols-2' : 'grid-cols-3'} gap-3`}>
             {floorZones.map((zone) => (
@@ -149,7 +149,7 @@ export function ZoneOverviewPanel({ siteId, compact = false, onZoneSelect }: Zon
                 <Flex justifyContent="between" alignItems="start" className="mb-3">
                   <div>
                     <span className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>{zone.zone_name}</span>
-                    <p className="text-xs text-gray-400">
+                    <p className="text-xs" style={{ color: "var(--color-sentinel-text-disabled)" }}>
                       {zone.fcu_id || zone.ahu_id || "No FCU"}
                     </p>
                   </div>
@@ -167,7 +167,7 @@ export function ZoneOverviewPanel({ siteId, compact = false, onZoneSelect }: Zon
                     >
                       {zone.current_temp.toFixed(1)}
                     </span>
-                    <span className="text-gray-400">°C</span>
+                    <span style={{ color: "var(--color-sentinel-text-disabled)" }}>°C</span>
                   </Flex>
 
                   {/* Deviation indicator */}
@@ -243,7 +243,7 @@ export function ZoneOverviewPanel({ siteId, compact = false, onZoneSelect }: Zon
 
                 {/* Equipment Info */}
                 {!compact && (
-                  <Flex className="mt-3 gap-4 text-xs text-gray-400">
+                  <Flex className="mt-3 gap-4 text-xs" style={{ color: "var(--color-sentinel-text-disabled)" }}>
                     {zone.fcu_id && (
                       <Flex alignItems="center" className="gap-1">
                         <Fan className="w-3 h-3" />

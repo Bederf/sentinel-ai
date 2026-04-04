@@ -120,7 +120,7 @@ export function ChillerControlPanel({ siteId, compact = false, onChillerChange }
         <h3 className="font-medium text-lg" style={{ color: "var(--color-sentinel-text-primary)" }}>Chiller Control</h3>
         <div className="animate-pulse space-y-4 mt-4">
           {[1, 2].map((i) => (
-            <div key={i} className="h-40 bg-gray-200 rounded" />
+            <div key={i} className="h-40 rounded" style={{ background: "var(--color-sentinel-bg-secondary)" }} />
           ))}
         </div>
       </div>
@@ -140,7 +140,7 @@ export function ChillerControlPanel({ siteId, compact = false, onChillerChange }
     return (
       <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
         <h3 className="font-medium text-lg" style={{ color: "var(--color-sentinel-text-primary)" }}>Chiller Control</h3>
-        <p className="text-gray-500 mt-4">No chillers found</p>
+        <p className="mt-4" style={{ color: "var(--color-sentinel-text-disabled)" }}>No chillers found</p>
       </div>
     );
   }
@@ -195,7 +195,7 @@ export function ChillerControlPanel({ siteId, compact = false, onChillerChange }
                     />
                     <Text className="font-medium text-lg">{chiller.name}</Text>
                   </Flex>
-                  <Text className="text-xs text-gray-400">{chiller.location}</Text>
+                  <Text className="text-xs" style={{ color: "var(--color-sentinel-text-disabled)" }}>{chiller.location}</Text>
                 </div>
                 <Badge color={getHealthColor(chiller.calculated_health || chiller.health_score)}>
                   Health: {(chiller.calculated_health || chiller.health_score).toFixed(0)}%
@@ -229,7 +229,7 @@ export function ChillerControlPanel({ siteId, compact = false, onChillerChange }
                         <Text className="font-medium">
                           {chiller.is_running ? "RUNNING" : "STOPPED"}
                         </Text>
-                        <Text className="text-xs text-gray-400">
+                        <Text className="text-xs" style={{ color: "var(--color-sentinel-text-disabled)" }}>
                           {chiller.manufacturer} {chiller.model}
                         </Text>
                       </div>
@@ -301,7 +301,7 @@ export function ChillerControlPanel({ siteId, compact = false, onChillerChange }
                         }%, var(--color-sentinel-border) 100%)`,
                       }}
                     />
-                    <Flex justifyContent="between" className="text-xs text-gray-500 mt-1">
+                    <Flex justifyContent="between" className="text-xs mt-1" style={{ color: "var(--color-sentinel-text-disabled)" }}>
                       <span>{SETPOINT_MIN}°C</span>
                       <span className="font-medium text-base" style={{ color: "var(--color-sentinel-cyan)" }}>
                         {currentSetpoint.toFixed(1)}°C
@@ -336,7 +336,7 @@ export function ChillerControlPanel({ siteId, compact = false, onChillerChange }
                   {/* Current Temps */}
                   <Flex justifyContent="between" className="mt-3 text-xs">
                     <div>
-                      <Text className="text-gray-500">Supply</Text>
+                      <Text style={{ color: "var(--color-sentinel-text-disabled)" }}>Supply</Text>
                       <Text
                         className="font-medium"
                         style={{
@@ -349,20 +349,20 @@ export function ChillerControlPanel({ siteId, compact = false, onChillerChange }
                       </Text>
                     </div>
                     <div>
-                      <Text className="text-gray-500">Return</Text>
-                      <Text className="font-medium text-gray-300">
+                      <Text style={{ color: "var(--color-sentinel-text-disabled)" }}>Return</Text>
+                      <Text className="font-medium" style={{ color: "var(--color-sentinel-text-secondary)" }}>
                         {metadata.chw_return_temp?.toFixed(1) ?? "--"}°C
                       </Text>
                     </div>
                     <div>
-                      <Text className="text-gray-500">Load</Text>
-                      <Text className="font-medium text-gray-300">
+                      <Text style={{ color: "var(--color-sentinel-text-disabled)" }}>Load</Text>
+                      <Text className="font-medium" style={{ color: "var(--color-sentinel-text-secondary)" }}>
                         {metadata.load_percent ?? "--"}%
                       </Text>
                     </div>
                     <div>
-                      <Text className="text-gray-500">Power</Text>
-                      <Text className="font-medium text-gray-300">
+                      <Text style={{ color: "var(--color-sentinel-text-disabled)" }}>Power</Text>
+                      <Text className="font-medium" style={{ color: "var(--color-sentinel-text-secondary)" }}>
                         {metadata.power_kw ?? "--"} kW
                       </Text>
                     </div>
@@ -374,24 +374,24 @@ export function ChillerControlPanel({ siteId, compact = false, onChillerChange }
               {/* Equipment Info */}
               {!compact && (
                 <div className="space-y-2 text-xs">
-                  <Flex justifyContent="between" className="text-gray-400">
+                  <Flex justifyContent="between" style={{ color: "var(--color-sentinel-text-disabled)" }}>
                     <span>Capacity</span>
-                    <span className="text-gray-300">{chiller.capacity || "660 kW"}</span>
+                    <span style={{ color: "var(--color-sentinel-text-secondary)" }}>{chiller.capacity || "660 kW"}</span>
                   </Flex>
-                  <Flex justifyContent="between" className="text-gray-400">
+                  <Flex justifyContent="between" style={{ color: "var(--color-sentinel-text-disabled)" }}>
                     <Flex alignItems="center" className="gap-1">
                       <Clock className="w-3 h-3" />
                       <span>Installed</span>
                     </Flex>
-                    <span className="text-gray-300">
+                    <span style={{ color: "var(--color-sentinel-text-secondary)" }}>
                       {chiller.install_date
                         ? new Date(chiller.install_date).toLocaleDateString()
                         : "N/A"}
                     </span>
                   </Flex>
-                  <Flex justifyContent="between" className="text-gray-400">
+                  <Flex justifyContent="between" style={{ color: "var(--color-sentinel-text-disabled)" }}>
                     <span>Last Service</span>
-                    <span className="text-gray-300">
+                    <span style={{ color: "var(--color-sentinel-text-secondary)" }}>
                       {chiller.last_service
                         ? new Date(chiller.last_service).toLocaleDateString()
                         : "N/A"}
