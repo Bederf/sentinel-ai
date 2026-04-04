@@ -4,44 +4,38 @@ Cockpit Decision API (Phase 172-05).
 GET /api/cockpit/decision/{site_id}
   Returns site-aware CockpitDecisionPayload for decision surface rendering.
 
+  v1: Deterministic stub logic (site-aware fixtures, no real intelligence sourcing)
+  v2: Real intelligence integration (recommendations, urgency, posture, asset context)
+
+  Response shape is locked and final. Internal sourcing will change v1→v2, not shape.
+  Supports deployment modes: ghost, advisory, supervised, autonomous.
+  Supports calm buildings (no active decision).
+
+  Target: < 200ms latency, all nullable fields present.
+
 POST /api/cockpit/decision/approve/{site_id}
-  Records operator approval of a cockpit-guided action (Tier 2 supervised mode).
+  Operator approval endpoint for supervised-mode actions.
 
-  v1: Stub — logs approval attempt, returns 202.
-  v2: Routes through ApprovalService with BOLA gate and full audit trail.
+  v1: Stub — logs attempt, returns 202 Accepted with audit envelope.
+  v2: Will validate site access, fetch active recommendation, route through
+      ApprovalService, persist parasite_decision row, return execution confirmation.
 
-Response shapes are locked and final.
+  Returns 202 (not 200) — action is accepted and queued, not yet executed.
 """
 
 from __future__ import annotations
 
 import logging
-from collections import defaultdict
 from datetime import UTC, datetime
 from typing import Any, Literal
-from uuid import uuid4
 
-from fastapi import APIRouter, Depends, Request, status
-from pydantic import BaseModel, Field
+from fastapi import APIRouter
+from pydantic import BaseModel
 
-from app.middleware.auth_middleware import AuthContext, require_site_access
-from app.schemas.cockpit import (
-    CockpitActionAudit,
-    CockpitIssue,
-    CockpitSourceStatus,
-    CockpitActionType,
-)
-from app.services.approval_service import get_approval_service
 from app.services.cockpit_policy_resolution import resolve_cockpit_contract
-from app.services.cockpit_issue_fusion import CockpitIssueFusionService
-from app.services.recommendation_service import get_recommendation_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/cockpit", tags=["cockpit"])
-cockpit_issue_service = CockpitIssueFusionService()
-_ISSUE_STORE: dict[str, list[CockpitIssue]] = defaultdict(list)
-_AUDIT_LOG_STORE: dict[str, list[CockpitActionAudit]] = defaultdict(list)
-_ISSUE_SITE_LOOKUP: dict[str, str] = {}
 
 
 # ---------------------------------------------------------------------------
@@ -154,128 +148,6 @@ class CockpitDecisionPayload(BaseModel):
     health: CockpitHealthResolution | None = None
     """Backend-resolved cockpit health summary."""
 
-    issues: list[CockpitIssue] = Field(default_factory=list)
-    selected_issue_id: str | None = None
-    source_health: list[CockpitSourceStatus] = Field(default_factory=list)
-
-
-class CockpitActionRequest(BaseModel):
-    """Compatibility action request model for cockpit issue actions."""
-
-    action: CockpitActionType
-    actor_id: str
-    actor_label: str
-    actor_type: Literal["user", "system"] = "user"
-    assign_to: str | None = None
-    assign_team: str | None = None
-    work_order_title: str | None = None
-    notes: str | None = None
-    evidence_refs: list[str] = Field(default_factory=list)
-
-
-class CockpitApprovalResponse(BaseModel):
-    """Response contract for POST /api/cockpit/decision/approve/{site_id}."""
-
-    accepted: bool = True
-    site_id: str
-    accepted_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
-    recommendation_id: str | None = None
-    execution_id: str | None = None
-    status: str
-
-
-def _cache_site_issues(site_id: str, issues: list[CockpitIssue]) -> None:
-    _ISSUE_STORE[site_id] = list(issues)
-    for issue in issues:
-        _ISSUE_SITE_LOOKUP[issue.id] = site_id
-
-
-def _available_actions(status: str) -> list[str]:
-    if status == "new":
-        return ["acknowledge", "assign"]
-    if status in {"triaged", "in_progress"}:
-        return ["assign", "create_work_order", "escalate"]
-    return []
-
-
-def _apply_action(issue: CockpitIssue, request: CockpitActionRequest) -> tuple[str, str, str]:
-    status_before = issue.status
-    if request.action == "acknowledge":
-        issue.status = "triaged"
-        issue.updated_at = datetime.now(UTC)
-        return "accepted", issue.status, "Issue acknowledged"
-    if request.action == "assign":
-        if not request.assign_to and not request.assign_team:
-            return "rejected", status_before, "assign_to or assign_team required"
-        issue.owner = request.assign_to
-        if request.assign_team:
-            issue.owner_team = request.assign_team
-        issue.status = "triaged"
-        issue.updated_at = datetime.now(UTC)
-        return "accepted", issue.status, "Issue assigned"
-    if request.action == "create_work_order":
-        if issue.status not in {"triaged", "in_progress"}:
-            return "rejected", status_before, "Issue must be triaged or in_progress before work order creation"
-        issue.status = "in_progress"
-        issue.updated_at = datetime.now(UTC)
-        return "accepted", issue.status, "Work order created"
-    if request.action == "escalate":
-        issue.status = "in_progress"
-        issue.updated_at = datetime.now(UTC)
-        return "accepted", issue.status, "Issue escalated"
-    return "rejected", status_before, "Unsupported action"
-
-
-def _record_audit(
-    issue: CockpitIssue,
-    request: CockpitActionRequest,
-    result: str,
-    status_before: str,
-    status_after: str,
-    message: str,
-) -> CockpitActionAudit:
-    audit = CockpitActionAudit(
-        id=str(uuid4()),
-        issue_id=issue.id,
-        action=request.action,
-        actor_type=request.actor_type,
-        actor_id=request.actor_id,
-        actor_label=request.actor_label,
-        occurred_at=datetime.now(UTC),
-        outcome="success" if result == "accepted" else "rejected",
-        status_before=status_before,
-        status_after=status_after,
-        notes=message,
-        evidence_refs=request.evidence_refs,
-        work_order_id=str(uuid4()) if request.action == "create_work_order" and result == "accepted" else None,
-    )
-    site_id = _ISSUE_SITE_LOOKUP.get(issue.id)
-    if site_id:
-        _AUDIT_LOG_STORE[site_id].append(audit)
-    return audit
-
-
-def _build_cockpit_payload(site_id: str) -> CockpitDecisionPayload | None:
-    issues, statuses, _audit, selected_issue_id = cockpit_issue_service.aggregate(site_id, local_audit_entries=[])
-    if not issues:
-        return None
-    cached_issues = {issue.id: issue for issue in _ISSUE_STORE.get(site_id, [])}
-    merged_issues = [cached_issues.get(issue.id, issue) for issue in issues]
-    _cache_site_issues(site_id, merged_issues)
-    selected_issue = next((issue for issue in merged_issues if issue.id == selected_issue_id), merged_issues[0])
-    return CockpitDecisionPayload(
-        building_id=site_id,
-        alert_text=selected_issue.title,
-        reasoning_summary=selected_issue.cause_hypothesis or selected_issue.summary,
-        active_posture="advisory",
-        recommended_action=selected_issue.recommended_action,
-        primary_asset_id=(selected_issue.location.asset_ids or [None])[0],
-        affected_zone_ids=selected_issue.location.zone_ids or None,
-        issues=merged_issues,
-        selected_issue_id=selected_issue.id,
-        source_health=statuses,
-    )
-
 
 def _attach_resolved_contract(payload: CockpitDecisionPayload) -> CockpitDecisionPayload:
     """
@@ -343,17 +215,16 @@ def _build_stub_payload_for_site(site_id: str) -> CockpitDecisionPayload | None:
         return _attach_resolved_contract(
             CockpitDecisionPayload(
                 building_id="S002",
-                alert_text="Chiller plant load is rising. Upward pressure detected through L0 and L1.",
+                alert_text="Executive boardroom cooling resilience is slipping.",
                 reasoning_summary=(
-                    "Chiller cycling margin is tightening around the plant transition. "
-                    "Load propagation is moving upward through the mechanical riser into Level 1. "
-                    "Start standby chiller before the next occupied peak window."
+                    "Compressor load is rising while boardroom thermal drift accelerates. "
+                    "Start standby cooling before the next occupied meeting window."
                 ),
-                active_posture="adaptive_intelligence",
+                active_posture="comfort_priority",
                 time_to_discomfort=12,
                 time_confidence="declining",
                 estimated_impact=(
-                    "Comfort will degrade in L0 and L1 occupied zones if chiller cycling continues unchecked."
+                    "Boardroom comfort will breach during the next occupied window and plant stress is rising."
                 ),
                 recommended_action="Start standby chiller and inspect the lead compressor train.",
                 urgency_score=0.78,
@@ -362,25 +233,10 @@ def _build_stub_payload_for_site(site_id: str) -> CockpitDecisionPayload | None:
                     "asset_risk": 0.24,
                     "cost": 0.12,
                 },
-                affected_zone_ids=[
-                    "Zone-B1-ChillerPlant",
-                    "Zone-L0-MechanicalRiser",
-                    "Zone-L1-CeilingVoid",
-                ],
+                affected_zone_ids=["Zone-L4-Boardroom-A", "Zone-L4-Boardroom-B"],
                 primary_asset_id="S002-CHILLER-B1-001",
                 building_metadata={
-                    "deployment_mode": "shadow",
-                    "floor_stack_order": ["B1", "L0", "L1", "L2", "L3", "L4", "L5", "R"],
-                    "floor_labels": {
-                        "B1": "Basement",
-                        "L0": "Ground",
-                        "L1": "Level 1",
-                        "L2": "Level 2",
-                        "L3": "Level 3",
-                        "L4": "Level 4",
-                        "L5": "Level 5",
-                        "R":  "Roof",
-                    },
+                    "deployment_mode": "advisory",
                 },
             )
         )
@@ -429,7 +285,7 @@ async def get_cockpit_decision(site_id: str) -> dict[str, Any]:
 
     # Site existence not validated in v1 (no database query).
     # v2 will validate against buildings table.
-    payload = _build_cockpit_payload(site_id)
+    payload = _build_stub_payload_for_site(site_id)
 
     return {
         "payload": payload,
@@ -438,90 +294,54 @@ async def get_cockpit_decision(site_id: str) -> dict[str, Any]:
     }
 
 
-@router.post("/decision/approve/{site_id}", status_code=status.HTTP_202_ACCEPTED)
-async def approve_cockpit_decision(
-    request: Request,
-    site_id: str,
-    auth: AuthContext = Depends(require_site_access("site_id")),
-) -> CockpitApprovalResponse:
+@router.post("/decision/approve/{site_id}", status_code=202)
+async def approve_cockpit_decision(site_id: str) -> dict[str, Any]:
     """
-    Acknowledge and record operator approval of a cockpit-guided action.
+    Operator approval for supervised-mode cockpit action.
 
-    BOLA gate: require_site_access validates the operator has access to site_id
-    before any read or write occurs.
+    Returns 202 Accepted — action is received and logged, not yet executed.
+    The frontend hold-to-confirm gesture calls this endpoint on completion.
 
-    v2 flow:
-        1. BOLA gate (require_site_access)
-        2. Fetch the most recent PENDING recommendation for site_id
-        3. Route through ApprovalService.approve_recommendation()
-           with routing_source="cockpit_approval"
-        4. Return 202 with execution_id for frontend polling
+    v1 behavior (stub):
+        - Logs the approval attempt with site_id and timestamp
+        - Returns 202 with audit envelope
+        - No database write, no BMS command issued
 
-    Error handling: catches all exceptions, logs at ERROR, returns 202 with
-    status="approval_failed". Never propagates a 500 to the cockpit UI.
+    v2 will replace stub body with:
+        - require_query_site_access() BOLA gate
+        - Fetch active Recommendation for site from Supabase
+        - Route through ApprovalService (same path as optimization approvals)
+        - Persist parasite_decision row with routing_source='cockpit_approval'
+        - Issue BMS command via control layer
+        - Return execution_id for frontend polling
+
+    Path Parameters:
+        site_id: Building identifier (e.g., S002)
+
+    Response shape (v1):
+        {
+            "accepted": true,
+            "site_id": string,
+            "accepted_at": ISO8601 datetime,
+            "status": "stub — no action executed",
+        }
     """
+
     accepted_at = datetime.now(UTC).isoformat()
-    user_id = getattr(auth, "user_id", None) or "unknown"
 
-    # Step 1: BOLA gate is fulfilled by require_site_access dependency above
-
-    # Step 2: Fetch the most recent PENDING recommendation for this site
-    recommendation_service = get_recommendation_service()
-    pending_recs = await recommendation_service.get_pending_recommendations(site_id, limit=1)
-    recommendation_id: str | None = None
-    execution_id: str | None = None
-    approval_status = "no_active_recommendation"
-
-    if pending_recs:
-        recommendation = pending_recs[0]
-        recommendation_id = recommendation.id
-
-        # Step 3: Route through ApprovalService
-        try:
-            approval_service = get_approval_service()
-            result = await approval_service.approve_recommendation(
-                rec_id=recommendation_id,
-                user_id=user_id,
-                reason="Operator approved via cockpit supervised confirm bar",
-            )
-            # Extract execution_id from execution_result if present
-            if result.execution_result:
-                execution_id = result.execution_result.get("correlation_id") or result.execution_result.get(
-                    "decision_id"
-                )
-            approval_status = result.status
-
-        except Exception as exc:  # noqa: BLE001
-            logger.error(
-                "Cockpit approval failed",
-                extra={
-                    "site_id": site_id,
-                    "recommendation_id": recommendation_id,
-                    "routing_source": "cockpit_approval",
-                    "status": "approval_failed",
-                    "accepted_at": accepted_at,
-                    "error": str(exc),
-                },
-            )
-            approval_status = "approval_failed"
-
-    # Step 4: INFO-level audit log for every call
     logger.info(
-        "Cockpit approval processed",
+        "Cockpit approval received",
         extra={
             "site_id": site_id,
-            "recommendation_id": recommendation_id,
-            "routing_source": "cockpit_approval",
-            "status": approval_status,
             "accepted_at": accepted_at,
+            "source": "cockpit_supervised_confirm",
+            "status": "stub_v1",
         },
     )
 
-    return CockpitApprovalResponse(
-        accepted=True,
-        site_id=site_id,
-        accepted_at=accepted_at,
-        recommendation_id=recommendation_id,
-        execution_id=execution_id,
-        status=approval_status,
-    )
+    return {
+        "accepted": True,
+        "site_id": site_id,
+        "accepted_at": accepted_at,
+        "status": "stub — no action executed",
+    }
