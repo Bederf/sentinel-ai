@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import api, { authorizedFetch } from '@/lib/api'
 import { CockpitView } from './CockpitView'
-import { CockpitNervousSystemTwin } from './CockpitNervousSystemTwin'
+import { CockpitBuildingThree } from './CockpitBuildingThree'
 import { mapCockpitState, type CockpitDecisionPayload } from './mapCockpitState'
 import { DEFAULT_COCKPIT_THRESHOLD_POLICY, type CockpitThresholdPolicy } from './thresholdPolicy'
 
@@ -44,10 +44,7 @@ function useCockpitThresholdPolicy() {
     }
 
     loadThresholdPolicy()
-
-    return () => {
-      mounted = false
-    }
+    return () => { mounted = false }
   }, [])
 
   return thresholdPolicy
@@ -85,9 +82,7 @@ function useCockpitDecisionPayload(siteId: string) {
           setLastUpdatedAt(Date.now())
         }
       } catch (error) {
-        if (error instanceof Error && error.name === 'AbortError') {
-          return
-        }
+        if (error instanceof Error && error.name === 'AbortError') return
       }
     }
 
@@ -139,11 +134,22 @@ export function OverviewCockpitHost({
     return mapCockpitState(summary, payload, thresholdPolicy)
   }, [siteId, siteName, posture, activeAlerts, predictionsCount, equipmentCount, lastUpdatedAt, payload, thresholdPolicy])
 
+  const handleApprove = useCallback(async () => {
+    try {
+      await authorizedFetch(`/api/cockpit/decision/approve/${encodeURIComponent(siteId)}`, {
+        method: 'POST',
+      })
+    } catch {
+      // Approval failure is silent — operator sees no state change; backend logs it
+    }
+  }, [siteId])
+
   return (
     <CockpitView
       state={state}
       renderMode="embedded"
-      spatialCanvas={<CockpitNervousSystemTwin state={state} />}
+      spatialCanvas={<CockpitBuildingThree state={state} />}
+      onApprove={handleApprove}
     />
   )
 }

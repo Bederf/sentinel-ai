@@ -12,7 +12,7 @@ interface CockpitViewProps {
   state: CockpitState
   renderMode: CockpitRenderMode
   spatialCanvas: ReactNode
-  /** Optional: called when operator holds to confirm in supervised mode. */
+  /** Called when operator completes hold-to-confirm in supervised mode. */
   onApprove?: () => void
 }
 
@@ -27,28 +27,24 @@ function buildVoice(state: CockpitState) {
       supporting: `No action needed at ${state.site.name}.`,
     }
   }
-
   if (state.primaryMetric.tone === 'critical') {
     return {
       headline: `${state.visualTwin.activeLabel} will breach comfort in ${state.primaryMetric.value}`,
       supporting: `Act now: ${state.decision.summary}`,
     }
   }
-
   if (state.primaryMetric.tone === 'warning') {
     return {
       headline: `${state.visualTwin.activeLabel} is drifting toward discomfort`,
       supporting: `${state.decision.summary} before ${state.primaryMetric.value}.`,
     }
   }
-
   if (state.primaryMetric.tone === 'elevated') {
     return {
       headline: `${state.visualTwin.activeLabel} needs intervention before comfort slips`,
       supporting: `${state.decision.summary} before ${state.primaryMetric.value}.`,
     }
   }
-
   return {
     headline: `No immediate comfort risk at ${state.site.name}`,
     supporting: 'No action needed. Keep watching for the next drift window.',
@@ -279,11 +275,14 @@ function CockpitDecisionModeState({
   if (state.site.mode === 'supervised') {
     return (
       <SupervisedConfirmBar
+        mode="supervised"
         onConfirm={onApprove ?? (() => {
-          // Fallback: dispatch event on root so host can wire API call without prop-drilling
           document
             .querySelector('[data-cockpit-root]')
-            ?.dispatchEvent(new CustomEvent('sentinel:approve', { bubbles: true, detail: { siteId: state.site.id } }))
+            ?.dispatchEvent(new CustomEvent('sentinel:approve', {
+              bubbles: true,
+              detail: { siteId: state.site.id },
+            }))
         })}
       />
     )
@@ -301,7 +300,7 @@ function CockpitDecisionModeState({
   return null
 }
 
-/** Footer: 3 chips max — Mode | Confidence | Signal freshness */
+/** Footer: 3 chips max — Mode | Confidence | Signal */
 function CockpitStatusBar({
   statusRef,
   state,
