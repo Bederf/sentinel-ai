@@ -138,7 +138,10 @@ class Settings(BaseSettings):
     # Site-002 data source — enables the simulation engine as a BMS data source
     # When False: SENTINEL starts clean with zero telemetry (SBC deployment ready)
     # When True: Loads reference devices and auto-starts lifecycle simulation
-    site002_source_enabled: bool = Field(default=False, validation_alias=AliasChoices("ENABLE_SITE002_SOURCE", "SITE002_SOURCE_ENABLED"))
+    site002_source_enabled: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("ENABLE_SITE002_SOURCE", "SITE002_SOURCE_ENABLED"),
+    )
 
     # Encryption at rest (Phase 1b FSR Compliance - Cryptography)
     encryption_enabled: bool = True
