@@ -1,13 +1,14 @@
-import { useEffect, useMemo, useState } from 'react'
-import api, { authorizedFetch } from '@/lib/api'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { authorizedFetch } from '@/lib/api'
+import type { HVACOverview } from '@/lib/hvacApi'
 import { CockpitView } from './CockpitView'
-import { CockpitNervousSystemTwin } from './CockpitNervousSystemTwin'
-import { mapCockpitState, type CockpitDecisionPayload } from './mapCockpitState'
-import { DEFAULT_COCKPIT_THRESHOLD_POLICY, type CockpitThresholdPolicy } from './thresholdPolicy'
+import { CockpitBuildingThree } from './CockpitBuildingThree'
+import { mapCockpitState, type BuildingStatePayload, type EnergyCentreTelemetry } from './mapCockpitState'
 
 interface OverviewCockpitHostProps {
   siteId: string
   siteName: string
+  onboardingPhase?: 'shadow' | 'advisory' | 'supervised' | 'auto'
   activeAlerts: number
   predictionsCount: number
   equipmentCount: number
@@ -24,37 +25,10 @@ function formatFreshness(lastUpdatedAt: number | null): string {
   return `Updated ${Math.floor(ageSeconds / 60)}m ago`
 }
 
-function useCockpitThresholdPolicy() {
-  const [thresholdPolicy, setThresholdPolicy] = useState<CockpitThresholdPolicy>(DEFAULT_COCKPIT_THRESHOLD_POLICY)
-
-  useEffect(() => {
-    let mounted = true
-
-    async function loadThresholdPolicy() {
-      try {
-        const [health, risk] = await Promise.all([api.getHealthThresholds(), api.getRiskThresholds()])
-        if (mounted) {
-          setThresholdPolicy({ health, risk, source: 'settings' })
-        }
-      } catch {
-        if (mounted) {
-          setThresholdPolicy(DEFAULT_COCKPIT_THRESHOLD_POLICY)
-        }
-      }
-    }
-
-    loadThresholdPolicy()
-
-    return () => {
-      mounted = false
-    }
-  }, [])
-
-  return thresholdPolicy
-}
-
-function useCockpitDecisionPayload(siteId: string) {
-  const [payload, setPayload] = useState<CockpitDecisionPayload | null>(null)
+function useBuildingStatePayload(siteId: string) {
+  const [payload, setPayload] = useState<BuildingStatePayload | null>(null)
+  const [hvacOverview, setHvacOverview] = useState<HVACOverview | null>(null)
+  const [energyTelemetry, setEnergyTelemetry] = useState<EnergyCentreTelemetry | null>(null)
   const [lastUpdatedAt, setLastUpdatedAt] = useState<number | null>(null)
 
   useEffect(() => {
@@ -67,21 +41,46 @@ function useCockpitDecisionPayload(siteId: string) {
         controller?.abort()
         controller = new AbortController()
 
-        const response = await authorizedFetch(`/api/cockpit/decision/${encodeURIComponent(siteId)}`, {
-          signal: controller.signal,
-        })
+        const [buildingStateRes, hvacRes, energyRes] = await Promise.all([
+          authorizedFetch(`/api/building-state/${encodeURIComponent(siteId)}`, {
+            signal: controller.signal,
+          }),
+          authorizedFetch(`/api/hvac/overview/${encodeURIComponent(siteId)}`, {
+            signal: controller.signal,
+          }),
+          authorizedFetch(`/api/energy-centre/power-summary/${encodeURIComponent(siteId)}`, {
+            signal: controller.signal,
+          }),
+        ])
 
-        if (!response.ok) {
+        if (!buildingStateRes.ok) {
           if (mounted) {
             setPayload(null)
+            setHvacOverview(null)
+            setEnergyTelemetry(null)
             setLastUpdatedAt(Date.now())
           }
           return
         }
 
-        const json = await response.json()
+        const json = await buildingStateRes.json()
+        const hvacJson = hvacRes.ok ? await hvacRes.json() : null
+        const energyJson = energyRes.ok ? await energyRes.json() : null
         if (mounted) {
-          setPayload(json.payload as CockpitDecisionPayload | null)
+          setPayload(json.payload as BuildingStatePayload | null)
+          setHvacOverview((hvacJson as HVACOverview | null) ?? null)
+          setEnergyTelemetry(
+            energyJson
+              ? {
+                  totalKw: Number(energyJson.total_power_kw ?? 0),
+                  hvacKw: 0,
+                  lightingKw: 0,
+                  powerKw: Number(energyJson.total_power_kw ?? 0),
+                  powerPercent: 0,
+                  timestamp: typeof energyJson.timestamp === 'string' ? energyJson.timestamp : undefined,
+                }
+              : null,
+          )
           setLastUpdatedAt(Date.now())
         }
       } catch (error) {
@@ -101,7 +100,7 @@ function useCockpitDecisionPayload(siteId: string) {
     }
   }, [siteId])
 
-  return { payload, lastUpdatedAt }
+  return { payload, hvacOverview, energyTelemetry, lastUpdatedAt }
 }
 
 function buildCockpitSummary(
@@ -111,6 +110,7 @@ function buildCockpitSummary(
   return {
     siteId: props.siteId,
     siteName: props.siteName,
+    onboardingPhase: props.onboardingPhase,
     posture: props.posture,
     activeAlerts: props.activeAlerts,
     predictionsCount: props.predictionsCount,
@@ -122,28 +122,39 @@ function buildCockpitSummary(
 export function OverviewCockpitHost({
   siteId,
   siteName,
+  onboardingPhase,
   activeAlerts,
   predictionsCount,
   equipmentCount,
   posture,
   onModuleDisplayChange: _onModuleDisplayChange,
 }: OverviewCockpitHostProps) {
-  const thresholdPolicy = useCockpitThresholdPolicy()
-  const { payload, lastUpdatedAt } = useCockpitDecisionPayload(siteId)
+  const { payload, hvacOverview, energyTelemetry, lastUpdatedAt } = useBuildingStatePayload(siteId)
+
+  const handleApprove = useCallback(async () => {
+    try {
+      await authorizedFetch(`/api/cockpit/decision/approve/${encodeURIComponent(siteId)}`, {
+        method: 'POST',
+      })
+    } catch {
+      // Approval failure is silent — operator sees no state change; backend logs it
+    }
+  }, [siteId])
 
   const state = useMemo(() => {
     const summary = buildCockpitSummary(
-      { siteId, siteName, posture, activeAlerts, predictionsCount, equipmentCount },
+      { siteId, siteName, onboardingPhase, posture, activeAlerts, predictionsCount, equipmentCount },
       lastUpdatedAt,
     )
-    return mapCockpitState(summary, payload, thresholdPolicy)
-  }, [siteId, siteName, posture, activeAlerts, predictionsCount, equipmentCount, lastUpdatedAt, payload, thresholdPolicy])
+    return mapCockpitState(summary, payload, hvacOverview, energyTelemetry)
+  }, [siteId, siteName, onboardingPhase, posture, activeAlerts, predictionsCount, equipmentCount, lastUpdatedAt, payload, hvacOverview, energyTelemetry])
 
   return (
     <CockpitView
       state={state}
       renderMode="embedded"
-      spatialCanvas={<CockpitNervousSystemTwin state={state} />}
+      spatialCanvas={<CockpitBuildingThree state={state} />}
+      onApprove={handleApprove}
     />
   )
 }

@@ -1,43 +1,71 @@
 /* eslint-disable react-refresh/only-export-components */
-import { useRef, useCallback } from 'react'
+import { useCallback, useRef } from 'react'
 import gsap from 'gsap'
 
-const HOLD_DURATION_S = 1.8  // seconds — long enough to be deliberate
+const HOLD_DURATIONS: Record<'advisory' | 'supervised', number> = {
+  advisory: 1.4,
+  supervised: 2.2,
+}
 
 export function useHoldToConfirm(
   progressRef: React.RefObject<HTMLElement | null>,
   onConfirm: () => void,
+  mode: 'advisory' | 'supervised' = 'advisory',
 ) {
-  const tweenRef = useRef<gsap.core.Tween | null>(null)
+  const tlRef = useRef<gsap.core.Timeline | null>(null)
   const confirmedRef = useRef(false)
 
   const onPressStart = useCallback(() => {
-    if (!progressRef.current) return
+    const el = progressRef.current
+    if (!el) return
     confirmedRef.current = false
 
-    // Linear fill — operator senses real time passing uniformly
-    tweenRef.current = gsap.to(progressRef.current, {
+    tlRef.current?.kill()
+
+    const totalDuration = HOLD_DURATIONS[mode]
+    const halfDuration = totalDuration / 2
+
+    gsap.set(el, { scaleX: 0, transformOrigin: 'left center' })
+
+    const tl = gsap.timeline()
+
+    // Fill from 0 → 1 over full duration
+    tl.to(el, {
       scaleX: 1,
-      duration: HOLD_DURATION_S,
+      duration: totalDuration,
       ease: 'none',
-      transformOrigin: 'left center',
-      onComplete: () => {
-        confirmedRef.current = true
-        onConfirm()
-      },
     })
-  }, [progressRef, onConfirm])
+
+    // At 50%: transition fill color to orange
+    tl.to(el, { backgroundColor: '#f97316', duration: halfDuration, ease: 'none' }, 0)
+
+    // At onComplete: red flash → green → call onConfirm
+    tl.call(() => {
+      gsap.set(el, { backgroundColor: '#ef4444' })
+    })
+    tl.call(() => {
+      gsap.delayedCall(0.12, () => {
+        gsap.set(el, { backgroundColor: '#10b981' })
+      })
+    })
+    tl.call(() => {
+      confirmedRef.current = true
+      onConfirm()
+    })
+
+    tlRef.current = tl
+  }, [mode, onConfirm, progressRef])
 
   const onPressEnd = useCallback(() => {
-    if (confirmedRef.current) return  // already confirmed — don't cancel
-    tweenRef.current?.kill()
+    if (confirmedRef.current) return
+    tlRef.current?.kill()
 
-    // Snap back — release is decisive, cancels clearly
-    if (progressRef.current) {
-      gsap.to(progressRef.current, {
+    const el = progressRef.current
+    if (el) {
+      gsap.to(el, {
         scaleX: 0,
-        duration: 0.22,
-        ease: 'power2.in',
+        duration: 0.32,
+        ease: 'back.out(1.4)',
         transformOrigin: 'left center',
       })
     }
@@ -47,15 +75,20 @@ export function useHoldToConfirm(
 }
 
 // SupervisedConfirmBar — drop-in replacement for the plain text supervised bar in CockpitView.tsx
-// Usage: <SupervisedConfirmBar onConfirm={handleConfirm} />
+// Usage: <SupervisedConfirmBar onConfirm={handleConfirm} mode="supervised" />
 
 interface SupervisedConfirmBarProps {
   onConfirm: () => void
+  mode: 'advisory' | 'supervised'
 }
 
-export function SupervisedConfirmBar({ onConfirm }: SupervisedConfirmBarProps) {
+export function SupervisedConfirmBar({ onConfirm, mode }: SupervisedConfirmBarProps) {
   const progressRef = useRef<HTMLDivElement | null>(null)
-  const { onPressStart, onPressEnd } = useHoldToConfirm(progressRef, onConfirm)
+  const { onPressStart, onPressEnd } = useHoldToConfirm(progressRef, onConfirm, mode)
+
+  const ariaLabel = mode === 'supervised'
+    ? 'Hold to approve SENTINEL action'
+    : 'Hold to confirm'
 
   return (
     <div
@@ -64,14 +97,14 @@ export function SupervisedConfirmBar({ onConfirm }: SupervisedConfirmBarProps) {
       onPointerUp={onPressEnd}
       onPointerLeave={onPressEnd}
       role="button"
-      aria-label="Hold to confirm SENTINEL execution"
+      aria-label={ariaLabel}
     >
       <div className="text-sm font-semibold text-amber-200">Hold to confirm</div>
       <div className="mt-3 h-[3px] overflow-hidden rounded-full bg-amber-500/20">
         <div
           ref={progressRef}
-          className="h-full rounded-full bg-amber-400"
-          style={{ transform: 'scaleX(0)', transformOrigin: 'left center' }}
+          className="h-full rounded-full"
+          style={{ transform: 'scaleX(0)', transformOrigin: 'left center', backgroundColor: '#f59e0b' }}
         />
       </div>
     </div>

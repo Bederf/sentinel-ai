@@ -17,18 +17,31 @@ export function useToneTransition(
     const color = TONE_COLORS[tone] ?? TONE_COLORS.normal
     const isEscalating = tone === 'warning' || tone === 'elevated' || tone === 'critical'
 
-    const targets = [metricRef.current, badgeRef.current].filter(Boolean)
-    if (!targets.length) return
+    if (!metricRef.current && !badgeRef.current) return
 
     if (motionReduced()) {
-      gsap.set(targets, { color })
+      if (metricRef.current) gsap.set(metricRef.current, { color })
+      if (badgeRef.current) gsap.set(badgeRef.current, { color })
       return
     }
 
-    gsap.to(targets, {
-      color,
-      duration: isEscalating ? 0.28 : 0.48,
-      ease: isEscalating ? 'power2.in' : 'power1.out',
-    })
+    // Kill previous tweens to prevent bleed-through on rapid state changes
+    if (metricRef.current) gsap.killTweensOf(metricRef.current)
+    if (badgeRef.current) gsap.killTweensOf(badgeRef.current)
+
+    const tl = gsap.timeline()
+
+    if (isEscalating && metricRef.current) {
+      // Scale pulse gives physical weight to escalation — scale 1 → 1.04 → 1
+      tl.to(metricRef.current, { scale: 1.04, duration: 0.38, ease: 'back.out(1.7)' }, 0)
+      tl.to(metricRef.current, { scale: 1, duration: 0.38, ease: 'back.out(1.7)' }, 0.38)
+    }
+
+    // Color transition runs in parallel with scale pulse
+    tl.to(
+      [metricRef.current, badgeRef.current].filter(Boolean),
+      { color, duration: isEscalating ? 0.28 : 0.48, ease: isEscalating ? 'power2.in' : 'power1.out' },
+      0,
+    )
   }, [tone, metricRef, badgeRef])
 }
