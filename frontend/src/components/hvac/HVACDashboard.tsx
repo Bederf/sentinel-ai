@@ -23,6 +23,7 @@ import {
   Activity,
   AlertTriangle,
   CheckCircle,
+  Brain,
 } from "lucide-react";
 import { hvacApi, type HVACOverview } from "../../lib/hvacApi";
 import { fetchEnergyComparisonSummary, calculateCarbonOffset } from "../../lib/api/energy";
@@ -127,6 +128,7 @@ export function HVACDashboard({
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState(0);
   const [comparison, setComparison] = useState<ComparisonSummary | null>(null);
+  const [comparisonLoading, setComparisonLoading] = useState(true);
 
   // Use ref to track if component is mounted
   const mountedRef = useRef(true);
@@ -162,11 +164,15 @@ export function HVACDashboard({
     };
   }, [siteId, enabledModules, onAIRecommendation]);
 
-  // Fetch energy comparison for HVAC value card
+  // Fetch energy comparison for HVAC value card (re-polls with overview)
   useEffect(() => {
+    let cancelled = false;
+    setComparisonLoading(true);
     fetchEnergyComparisonSummary(siteId)
-      .then((data) => { if (mountedRef.current) setComparison(data); })
-      .catch(() => {});
+      .then((data) => { if (mountedRef.current && !cancelled) setComparison(data); })
+      .catch(() => {})
+      .finally(() => { if (mountedRef.current && !cancelled) setComparisonLoading(false); });
+    return () => { cancelled = true; };
   }, [siteId]);
 
   if (loading) {
@@ -181,7 +187,13 @@ export function HVACDashboard({
             <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>Climate Control & Thermal Management</p>
           </div>
         </div>
-        <div className="animate-pulse h-96 bg-gray-100 dark:bg-gray-800 rounded" />
+        <div
+          className="animate-pulse h-96 rounded-lg"
+          style={{
+            background: "var(--color-sentinel-bg-secondary)",
+            border: "1px solid var(--color-sentinel-border)",
+          }}
+        />
       </div>
     );
   }
@@ -245,17 +257,17 @@ export function HVACDashboard({
           <SentinelValueCard
             title="HVAC Optimization Impact"
             icon={Wind}
-            baseline={{ label: "", value: 0, unit: "kWh" }}
-            sentinel={{ label: "", value: 0, unit: "kWh" }}
+            baseline={{ label: "Without SENTINEL", value: 0, unit: "kWh" }}
+            sentinel={{ label: "With SENTINEL AI", value: 0, unit: "kWh" }}
             savingsPercent={0}
             period="Monthly"
-            collecting
+            collecting={comparisonLoading}
           />
         )}
 
         {/* Status Cards — Grafana style (matching Lighting) */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+          <div className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
             <div className="flex items-center gap-2 mb-2">
               <Thermometer className="w-5 h-5" style={{ color: "#3B82F6" }} />
               <span className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>Zones</span>
@@ -266,7 +278,7 @@ export function HVACDashboard({
             </span>
           </div>
 
-          <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+          <div className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
             <div className="flex items-center gap-2 mb-2">
               <Activity className="w-5 h-5" style={{ color: "#06B6D4" }} />
               <span className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>Chillers</span>
@@ -277,7 +289,7 @@ export function HVACDashboard({
             <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>Running</span>
           </div>
 
-          <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+          <div className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
             <div className="flex items-center gap-2 mb-2">
               {overview.health_status === "healthy" ? (
                 <CheckCircle className="w-5 h-5" style={{ color: "#22C55E" }} />
@@ -292,7 +304,7 @@ export function HVACDashboard({
             </span>
           </div>
 
-          <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+          <div className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
             <div className="flex items-center gap-2 mb-2">
               <AlertTriangle className="w-5 h-5" style={{ color: "#F59E0B" }} />
               <span className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>Alerts</span>
@@ -304,9 +316,96 @@ export function HVACDashboard({
           </div>
         </div>
 
+        {/* SENTINEL Intelligence Summary */}
+        {overview.sentinel_intelligence && (
+          <div
+            className="rounded-lg p-4"
+            style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}
+          >
+            <div className="flex items-center gap-2 mb-2">
+              <Brain className="w-5 h-5" style={{ color: "#8B5CF6" }} />
+              <span className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                SENTINEL HVAC Intelligence
+              </span>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+              <div>
+                <span style={{ color: "var(--color-sentinel-text-secondary)" }}>Posture: </span>
+                <span className="capitalize" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                  {overview.sentinel_intelligence.building_posture}
+                </span>
+              </div>
+              <div>
+                <span style={{ color: "var(--color-sentinel-text-secondary)" }}>Guidance: </span>
+                <span className="capitalize" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                  {overview.sentinel_intelligence.operator_guidance.mode.replace("_", " ")}
+                </span>
+              </div>
+              <div>
+                <span style={{ color: "var(--color-sentinel-text-secondary)" }}>Primary Voice: </span>
+                <span className="capitalize" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                  {(overview.sentinel_intelligence.primary_narrative?.voice || "none").replace("_", " ")}
+                </span>
+              </div>
+            </div>
+            <div className="mt-2 text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+              {overview.sentinel_intelligence.operator_guidance.headline}
+            </div>
+            {overview.sentinel_intelligence.primary_narrative?.message && (
+              <div className="mt-1 text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                {overview.sentinel_intelligence.primary_narrative.message}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Raw Bridge Telemetry Summary */}
+        {overview.raw_telemetry && (
+          <div
+            className="rounded-lg p-4"
+            style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}
+          >
+            <div className="flex items-center gap-2 mb-2">
+              <Activity className="w-5 h-5" style={{ color: "#06B6D4" }} />
+              <span className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                Raw Bridge Telemetry
+              </span>
+              <span
+                className="text-xs px-2 py-0.5 rounded capitalize"
+                style={{
+                  background: overview.raw_telemetry.status === "live" ? "rgba(16,185,129,0.15)" : "rgba(245,158,11,0.15)",
+                  color: overview.raw_telemetry.status === "live" ? "var(--color-sentinel-green)" : "var(--color-sentinel-amber)",
+                }}
+              >
+                {overview.raw_telemetry.status}
+              </span>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+              <div style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                Zones:{" "}
+                <span style={{ color: "var(--color-sentinel-text-primary)" }}>
+                  {overview.raw_telemetry.zones_with_readings ?? 0}/{overview.raw_telemetry.zone_count ?? 0}
+                </span>
+              </div>
+              <div style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                HVAC Power:{" "}
+                <span style={{ color: "var(--color-sentinel-text-primary)" }}>
+                  {overview.raw_telemetry.power?.hvac_kw?.toFixed(2) ?? "0.00"} kW
+                </span>
+              </div>
+              <div style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                Equipment:{" "}
+                <span style={{ color: "var(--color-sentinel-text-primary)" }}>
+                  {overview.raw_telemetry.equipment_summary?.online ?? 0}/{overview.raw_telemetry.equipment_summary?.total ?? 0} online
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Alerts */}
         {overview.alerts.length > 0 && (
-          <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+          <div className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
             <h3 className="text-sm font-medium mb-3" style={{ color: "var(--color-sentinel-text-primary)" }}>Active Alerts</h3>
             <div className="space-y-2">
               {overview.alerts.slice(0, 5).map((alert, idx) => {
@@ -397,7 +496,15 @@ export function HVACDashboard({
 
       {/* Tabbed Views */}
       <TabGroup index={activeTab} onIndexChange={setActiveTab}>
-        <TabList className="mb-4 overflow-x-auto [&>*]:whitespace-nowrap">{tabs as unknown as React.ReactElement}</TabList>
+        <TabList
+          className="mb-4 overflow-x-auto [&>*]:whitespace-nowrap rounded-lg"
+          style={{
+            border: "1px solid var(--color-sentinel-border)",
+            background: "var(--color-sentinel-bg-panel)",
+          }}
+        >
+          {tabs as unknown as React.ReactElement}
+        </TabList>
         <TabPanels>{panels as unknown as React.ReactElement}</TabPanels>
       </TabGroup>
     </div>
