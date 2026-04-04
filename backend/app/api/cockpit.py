@@ -12,6 +12,15 @@ GET /api/cockpit/decision/{site_id}
   Supports calm buildings (no active decision).
 
   Target: < 200ms latency, all nullable fields present.
+
+POST /api/cockpit/decision/approve/{site_id}
+  Operator approval endpoint for supervised-mode actions.
+
+  v1: Stub — logs attempt, returns 202 Accepted with audit envelope.
+  v2: Will validate site access, fetch active recommendation, route through
+      ApprovalService, persist parasite_decision row, return execution confirmation.
+
+  Returns 202 (not 200) — action is accepted and queued, not yet executed.
 """
 
 from __future__ import annotations
@@ -238,7 +247,7 @@ def _build_stub_payload_for_site(site_id: str) -> CockpitDecisionPayload | None:
 
 
 # ---------------------------------------------------------------------------
-# Endpoint
+# Endpoints
 # ---------------------------------------------------------------------------
 
 
@@ -282,4 +291,57 @@ async def get_cockpit_decision(site_id: str) -> dict[str, Any]:
         "payload": payload,
         "site_id": site_id,
         "fetched_at": datetime.now(UTC).isoformat(),
+    }
+
+
+@router.post("/decision/approve/{site_id}", status_code=202)
+async def approve_cockpit_decision(site_id: str) -> dict[str, Any]:
+    """
+    Operator approval for supervised-mode cockpit action.
+
+    Returns 202 Accepted — action is received and logged, not yet executed.
+    The frontend hold-to-confirm gesture calls this endpoint on completion.
+
+    v1 behavior (stub):
+        - Logs the approval attempt with site_id and timestamp
+        - Returns 202 with audit envelope
+        - No database write, no BMS command issued
+
+    v2 will replace stub body with:
+        - require_query_site_access() BOLA gate
+        - Fetch active Recommendation for site from Supabase
+        - Route through ApprovalService (same path as optimization approvals)
+        - Persist parasite_decision row with routing_source='cockpit_approval'
+        - Issue BMS command via control layer
+        - Return execution_id for frontend polling
+
+    Path Parameters:
+        site_id: Building identifier (e.g., S002)
+
+    Response shape (v1):
+        {
+            "accepted": true,
+            "site_id": string,
+            "accepted_at": ISO8601 datetime,
+            "status": "stub — no action executed",
+        }
+    """
+
+    accepted_at = datetime.now(UTC).isoformat()
+
+    logger.info(
+        "Cockpit approval received",
+        extra={
+            "site_id": site_id,
+            "accepted_at": accepted_at,
+            "source": "cockpit_supervised_confirm",
+            "status": "stub_v1",
+        },
+    )
+
+    return {
+        "accepted": True,
+        "site_id": site_id,
+        "accepted_at": accepted_at,
+        "status": "stub — no action executed",
     }
