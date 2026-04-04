@@ -9,6 +9,97 @@
 /* Google Fonts - Inter, JetBrains Mono, Matrix Theme Fonts */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Share+Tech+Mono&family=Orbitron:wght@400;500;600;700;800;900&display=swap');
 
+/* Default SENTINEL theme tokens must exist as actual CSS variables at runtime.
+ * Tailwind v4's @theme block does not guarantee emission of custom app tokens
+ * unless they are consumed by generated utilities, so define the runtime source
+ * of truth explicitly on :root.
+ */
+:root {
+  --color-matrix-green: #00FF41;
+  --color-matrix-dark: #060E18;
+  --color-matrix-dark-light: #0a1420;
+  --color-matrix-green-dim: rgba(0, 255, 65, 0.2);
+  --color-matrix-green-glow: rgba(0, 255, 65, 0.5);
+
+  --color-sentinel-bg-canvas: #0d1117;
+  --color-sentinel-bg-primary: #161b22;
+  --color-sentinel-bg-secondary: #1c2128;
+  --color-sentinel-bg-panel: #21262d;
+  --color-sentinel-border: #30363d;
+  --color-sentinel-border-strong: #484f58;
+
+  --color-sentinel-text-primary: #e6edf3;
+  --color-sentinel-text-secondary: #8b949e;
+  --color-sentinel-text-disabled: #6e7681;
+  --color-sentinel-text-link: #58a6ff;
+
+  --color-sentinel-navy: #1A2B4C;
+  --color-sentinel-navy-light: #2a4a7a;
+  --color-sentinel-navy-dark: #0f1a2e;
+  --color-sentinel-amber: #F59E0B;
+  --color-sentinel-amber-light: #FBBF24;
+  --color-sentinel-amber-dark: #D97706;
+  --color-sentinel-green: #10B981;
+  --color-sentinel-green-light: #34D399;
+  --color-sentinel-red: #DC2626;
+  --color-sentinel-red-light: #EF4444;
+  --color-sentinel-blue: #3B82F6;
+  --color-sentinel-blue-light: #60A5FA;
+
+  --color-grafana-bg-canvas: var(--color-sentinel-bg-canvas);
+  --color-grafana-bg-primary: var(--color-sentinel-bg-primary);
+  --color-grafana-bg-secondary: var(--color-sentinel-bg-secondary);
+  --color-grafana-bg-panel: var(--color-sentinel-bg-panel);
+  --color-grafana-border: var(--color-sentinel-border);
+  --color-grafana-border-strong: var(--color-sentinel-border-strong);
+  --color-grafana-text-primary: var(--color-sentinel-text-primary);
+  --color-grafana-text-secondary: var(--color-sentinel-text-secondary);
+  --color-grafana-text-disabled: var(--color-sentinel-text-disabled);
+  --color-grafana-text-link: var(--color-sentinel-text-link);
+
+  --color-grafana-blue: var(--color-sentinel-blue);
+  --color-grafana-cyan: #22d3ee;
+  --color-grafana-green: var(--color-sentinel-green);
+  --color-grafana-yellow: var(--color-sentinel-amber);
+  --color-grafana-orange: var(--color-sentinel-amber);
+  --color-grafana-red: var(--color-sentinel-red);
+  --color-grafana-purple: #a78bfa;
+
+  --color-status-success: var(--color-sentinel-green);
+  --color-status-warning: var(--color-sentinel-amber);
+  --color-status-error: var(--color-sentinel-red);
+  --color-status-info: var(--color-sentinel-blue);
+
+  --color-risk-critical: var(--color-sentinel-red);
+  --color-risk-high: #F97316;
+  --color-risk-elevated: var(--color-sentinel-amber);
+  --color-risk-moderate: #EAB308;
+  --color-risk-low: var(--color-sentinel-green);
+
+  --color-chart-1: var(--color-sentinel-green);
+  --color-chart-2: var(--color-sentinel-amber);
+  --color-chart-3: var(--color-sentinel-blue);
+  --color-chart-4: #8B5CF6;
+  --color-chart-5: #EC4899;
+  --color-chart-6: #22d3ee;
+
+  --radius-panel: 6px;
+  --shadow-panel: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
+
+  --glass-bg: rgba(33, 38, 45, 0.65);
+  --glass-bg-light: rgba(33, 38, 45, 0.45);
+  --glass-bg-heavy: rgba(33, 38, 45, 0.85);
+  --glass-border: rgba(255, 255, 255, 0.12);
+  --glass-border-strong: rgba(255, 255, 255, 0.22);
+  --glass-highlight: rgba(255, 255, 255, 0.06);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.37);
+  --glass-shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.5);
+  --glass-blur: 12px;
+  --glass-blur-sm: 6px;
+  --glass-blur-lg: 20px;
+  --radius-glass: 12px;
+}
+
 @theme {
   /* Matrix Cyberpunk Theme Colors */
   --color-matrix-green: #00FF41;
@@ -516,6 +607,23 @@
   .tab-item-active {
     color: var(--color-sentinel-text-primary);
     border-bottom-color: var(--color-sentinel-amber);
+  }
+
+  /* Tremor Tab overrides — Grafana dark theme (Radix UI Tabs) */
+  .tremor-TabList-root button {
+    color: var(--color-sentinel-text-disabled) !important;
+    border-bottom: 2px solid transparent !important;
+    transition: color 0.15s ease, border-color 0.15s ease;
+  }
+  .tremor-TabList-root button:hover {
+    color: var(--color-sentinel-text-primary) !important;
+  }
+  .tremor-TabList-root button[data-state="active"] {
+    color: var(--color-sentinel-text-primary) !important;
+    border-bottom-color: var(--color-sentinel-amber) !important;
+  }
+  .tremor-TabList-root {
+    border-bottom: 1px solid var(--color-sentinel-border);
   }
 
   /* Loading skeleton */
