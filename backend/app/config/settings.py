@@ -138,7 +138,7 @@ class Settings(BaseSettings):
     # Site-002 data source — enables the simulation engine as a BMS data source
     # When False: SENTINEL starts clean with zero telemetry (SBC deployment ready)
     # When True: Loads reference devices and auto-starts lifecycle simulation
-    site002_source_enabled: bool = False  # env: ENABLE_SITE002_SOURCE
+    site002_source_enabled: bool = Field(default=False, validation_alias=AliasChoices("ENABLE_SITE002_SOURCE", "SITE002_SOURCE_ENABLED"))
 
     # Encryption at rest (Phase 1b FSR Compliance - Cryptography)
     encryption_enabled: bool = True
@@ -159,6 +159,10 @@ class Settings(BaseSettings):
 
     # Sentry webhook secret (required for Telegram bot integration)
     sentry_webhook_secret: str = ""
+
+    # Sentry operator password — required in request body for sensitive operations
+    # (equipment resets, work order creation, inspection results, call log escalation)
+    sentinel_operator_password: str = Field(default="", validation_alias="SENTINEL_OPERATOR_PASSWORD")
 
     # Sentry bot API key (for authenticated access to /api/sites/* endpoints)
     sentry_bot_api_key: str = Field(default="", validation_alias="SENTRY_BOT_API_KEY")
@@ -358,7 +362,7 @@ class Settings(BaseSettings):
 
     # ML Background Training (retraining, drift detection, feedback retraining)
     # Disable on resource-constrained VPS — models are pre-trained and stable
-    ml_background_training_enabled: bool = False
+    ml_background_training_enabled: bool = True
 
     # Block Booking Detection
     block_booking_enabled: bool = False  # Master switch

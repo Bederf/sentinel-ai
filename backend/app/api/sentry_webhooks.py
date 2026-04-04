@@ -146,6 +146,35 @@ def _require_sentry_secret(
         raise HTTPException(status_code=403, detail="Unauthorized")
 
 
+def _require_operator_password(
+    provided_password: Optional[str],
+    *,
+    endpoint_name: str,
+) -> None:
+    """Validate SENTINEL operator password for sensitive operations.
+
+    Falls back to allow if no password is configured (backward compatibility
+    in dev/simulation mode). Blocks in live mode if misconfigured.
+    """
+    configured_password = settings.sentinel_operator_password
+
+    # Backward-compatible fallback: allow env var
+    if not configured_password:
+        configured_password = (os.getenv("SENTINEL_OPERATOR_PASSWORD", "") or "").strip()
+
+    # If no password configured anywhere, decide based on live mode
+    if not configured_password:
+        if settings.is_live_mode:
+            logger.error("Missing SENTINEL_OPERATOR_PASSWORD in live mode for %s", endpoint_name)
+            raise HTTPException(status_code=503, detail="Sentry operator password not configured")
+        # Simulation mode: skip password check
+        return
+
+    # Validate password
+    if not provided_password or not hmac.compare_digest(provided_password, configured_password):
+        raise HTTPException(status_code=403, detail="Invalid operator password")
+
+
 def _extract_reply_text(content: Any) -> str:
     """Best-effort extraction of technician reply text from webhook payload."""
     if isinstance(content, str):
@@ -164,6 +193,7 @@ class EquipmentResetRequest(BaseModel):
     equipment_code: str = Field(..., description="Equipment code (e.g., S002-FCU-L1-A)")
     user_id: str = Field(..., description="User initiating the reset")
     reason: Optional[str] = Field(None, description="Reason for reset")
+    operator_password: Optional[str] = Field(None, description="SENTINEL operator password for sensitive operations")
 
 
 @router.post("/work-order/response", status_code=status.HTTP_200_OK, tags=["llm_touching"])
@@ -366,6 +396,7 @@ async def reset_equipment_fault(
         - predictions_resolved: int
     """
     _require_sentry_secret(x_sentry_secret, endpoint_name="equipment_reset")
+    _require_operator_password(request.operator_password, endpoint_name="equipment_reset")
 
     equipment_code = request.equipment_code
 
@@ -800,6 +831,7 @@ class SentryInspectionResultRequest(BaseModel):
     items: list[SentryInspectionItem] = Field(..., description="Checklist item results")
     ai_diagnosis: Optional[str] = Field(None, description="AI-curated diagnosis summary")
     recommendations: Optional[str] = Field(None, description="AI recommendations for FM")
+    operator_password: Optional[str] = Field(None, description="SENTINEL operator password for sensitive operations")
 
 
 @router.post("/inspection-result", status_code=status.HTTP_200_OK)
@@ -813,6 +845,7 @@ async def sentry_submit_inspection_result(
     inspection_measurements tables. Links to equipment and work order.
     """
     _require_sentry_secret(x_sentry_secret, endpoint_name="inspection_result")
+    _require_operator_password(req.operator_password, endpoint_name="inspection_result")
 
     from app.database.repositories.inspection_repository import InspectionRepository
 
@@ -982,6 +1015,7 @@ class SentryWorkOrderRequest(BaseModel):
     created_by: str = Field("SENTINEL", description="Creator identifier")
     telegram_user_id: Optional[str] = Field(None, description="Telegram user ID for audit provenance")
     assigned_to: Optional[str] = Field(None, description="Override auto-assignment: technician name")
+    operator_password: Optional[str] = Field(None, description="SENTINEL operator password for sensitive operations")
 
 
 @router.post("/create-work-order", status_code=status.HTTP_200_OK)
@@ -995,6 +1029,7 @@ async def sentry_create_work_order(
     Used by Sentry bot agents for inspection WOs, health-triggered WOs, etc.
     """
     _require_sentry_secret(x_sentry_secret, endpoint_name="create_work_order")
+    _require_operator_password(req.operator_password, endpoint_name="create_work_order")
 
     from app.database.repositories.work_order_repository import get_work_order_repository
     from app.database.repositories.technician_repository import get_technician_repository
@@ -1090,6 +1125,7 @@ class CallLogRequest(BaseModel):
     reporter_phone: str = Field("", description="Reporter mobile number (WhatsApp/SMS)")
     channel: str = Field("telegram", description="Source channel (telegram|whatsapp|mobile|email)")
     original_message: str = Field("", description="Raw message from user")
+    operator_password: Optional[str] = Field(None, description="SENTINEL operator password for sensitive operations")
 
 
 class CallLogEscalationRequest(BaseModel):
@@ -1101,6 +1137,7 @@ class CallLogEscalationRequest(BaseModel):
     reason: str = Field("", description="Why it was escalated")
     site_id: str = Field(..., description="Site identifier")
     timestamp: str = Field("", description="ISO timestamp of the complaint")
+    operator_password: Optional[str] = Field(None, description="SENTINEL operator password for sensitive operations")
 
 
 class CallLogLocationMemoryLookupResponse(BaseModel):
@@ -1135,6 +1172,7 @@ async def sentry_call_log(
     the WO reference for the user.
     """
     _require_sentry_secret(x_sentry_secret, endpoint_name="call_log")
+    _require_operator_password(req.operator_password, endpoint_name="call_log")
 
     try:
         from app.database.repositories.work_order_repository import WorkOrderRepository
@@ -1360,6 +1398,7 @@ async def sentry_call_log_escalate(
     logged as an anomaly and the supervisor is notified.
     """
     _require_sentry_secret(x_sentry_secret, endpoint_name="call_log_escalate")
+    _require_operator_password(req.operator_password, endpoint_name="call_log_escalate")
 
     logger.warning(
         f"[CALL_LOG_ESCALATION] Unmatched complaint from "
