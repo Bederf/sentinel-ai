@@ -40,6 +40,80 @@ from app.services.sentry_integration.work_order_notifier import work_order_notif
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/sentry", tags=["sentry"])
 
+
+async def _transcribe_voice_note(voice_file_id: str) -> Optional[str]:
+    """Download a Telegram voice note and transcribe it via ElevenLabs STT.
+
+    Args:
+        voice_file_id: Telegram file_id from the voice message
+
+    Returns:
+        Transcribed text, or None if transcription failed
+    """
+    if not settings.telegram_bot_token:
+        logger.warning("telegram_bot_token not configured — cannot download voice note")
+        return None
+
+    if not settings.elevenlabs_api_key:
+        logger.warning("elevenlabs_api_key not configured — cannot transcribe voice note")
+        return None
+
+    try:
+        # Step 1: Get file path from Telegram
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            file_resp = await client.get(
+                f"https://api.telegram.org/bot{settings.telegram_bot_token}/getFile",
+                params={"file_id": voice_file_id},
+            )
+        file_resp.raise_for_status()
+        file_data = file_resp.json()
+        if not file_data.get("ok"):
+            logger.warning(f"Telegram getFile failed: {file_data}")
+            return None
+
+        file_path = file_data["result"]["file_path"]
+
+        # Step 2: Download the audio file
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            audio_resp = await client.get(
+                f"https://api.telegram.org/file/bot{settings.telegram_bot_token}/{file_path}",
+            )
+        audio_resp.raise_for_status()
+        audio_bytes = audio_resp.content
+
+    except Exception as e:
+        logger.error(f"Failed to download voice note {voice_file_id}: {e}")
+        return None
+
+    # Step 3: Transcribe via ElevenLabs STT
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            stt_resp = await client.post(
+                "https://api.elevenlabs.io/v1/speech-to-text",
+                headers={
+                    "xi-api-key": settings.elevenlabs_api_key,
+                },
+                data={"model_id": "s2t_medium"},
+                files={"file": ("voice.ogg", audio_bytes, "audio/ogg")},
+                timeout=60.0,
+            )
+        stt_resp.raise_for_status()
+        result = stt_resp.json()
+        text = result.get("text", "").strip()
+        if text:
+            logger.info(f"ElevenLabs STT transcribed {len(text)} chars")
+            return text
+        logger.warning(f"ElevenLabs STT returned empty text for {voice_file_id}")
+        return None
+
+    except httpx.HTTPStatusError as e:
+        logger.error(f"ElevenLabs STT HTTP error {e.response.status_code}: {e.response.text[:200]}")
+        return None
+    except Exception as e:
+        logger.error(f"ElevenLabs STT failed: {e}")
+        return None
+
+
 # Equipment types blocked from remote reset (safety-critical)
 RESET_BLOCKED_TYPES = {"FIRE", "GEN"}
 
@@ -1373,6 +1447,8 @@ class TelegramMessagePayload(BaseModel):
     photo_file_id: Optional[str] = None
     has_document: bool = False
     document_file_id: Optional[str] = None
+    has_voice: bool = False
+    voice_file_id: Optional[str] = None
     message_id: Optional[int] = None
 
 
@@ -1423,7 +1499,18 @@ async def handle_telegram_message(
         }
 
     telegram_file_id = None
-    if payload.has_photo and payload.photo_file_id:
+    if payload.has_voice and payload.voice_file_id:
+        # Voice note: transcribe via ElevenLabs STT, then process as text
+        transcribed = await _transcribe_voice_note(payload.voice_file_id)
+        if transcribed:
+            payload.text = transcribed
+            logger.info(f"Voice note transcribed for user {payload.user_id}: {transcribed[:100]}")
+        else:
+            return {
+                "success": False,
+                "error": "Failed to transcribe voice note. Please try again or send a text message.",
+            }
+    elif payload.has_photo and payload.photo_file_id:
         telegram_file_id = payload.photo_file_id
     elif payload.has_document and payload.document_file_id:
         telegram_file_id = payload.document_file_id

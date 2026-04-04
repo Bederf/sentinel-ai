@@ -11,7 +11,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import type { FormEvent, KeyboardEvent } from "react";
-import { Send, MessageSquare, Bot, Mic, MicOff, Trash2, BookOpen } from "lucide-react";
+import { Send, MessageSquare, Bot, Mic, MicOff, Trash2, BookOpen, Volume2, VolumeX } from "lucide-react";
 import { ChatMessage } from "./ChatMessage";
 import { DocumentUpload } from "./DocumentUpload";
 import { BuildingSelector } from "./BuildingSelector";
@@ -35,15 +35,14 @@ export function Chat() {
   const [sites, setSites] = useState<Site[]>([]);
   const [selectedSiteId, setSelectedSiteId] = useState<string>("");
   const [includeSystemDocs, setIncludeSystemDocs] = useState(false);
+  const [voiceMode, setVoiceMode] = useState(false); // Auto-summarised voice playback
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const hasLoadedSitesRef = useRef(false);
 
-  // Voice chat hooks
-  const stt = useSpeechRecognition({
-    onResult: (text) => setInput(text),
-  });
+  // Speech-to-text and text-to-speech hooks
+  const stt = useSpeechRecognition();
   const tts = useTextToSpeech();
 
   // Fetch sites on mount
@@ -59,7 +58,10 @@ export function Chat() {
           if (parsedSites.length > 0) {
             const sorted = parsedSites.sort((a, b) => a.name.localeCompare(b.name));
             setSites(sorted);
-            const defaultSite = sorted[0];
+            const defaultSite =
+              sorted.find((site) => site.id === "site-002")
+              ?? sorted.find((site) => /sandton city office tower/i.test(site.name))
+              ?? sorted[0];
             if (defaultSite) {
               setSelectedSiteId(defaultSite.id);
             }
@@ -73,8 +75,11 @@ export function Chat() {
       try {
         const sitesData = await api.getSites();
         setSites(sitesData.sort((a, b) => a.name.localeCompare(b.name)));
-        // Default to first available site
-        const defaultSite = sitesData[0];
+        // Default to Sandton City Office Tower (site-002) when available.
+        const defaultSite =
+          sitesData.find((site) => site.id === "site-002")
+          ?? sitesData.find((site) => /sandton city office tower/i.test(site.name))
+          ?? sitesData[0];
         if (defaultSite) {
           setSelectedSiteId(defaultSite.id);
         }
@@ -91,7 +96,8 @@ export function Chat() {
   useEffect(() => {
     const checkTts = async () => {
       try {
-        const resp = await fetch("/api/chat/status");
+        const siteQuery = selectedSiteId ? `?site_id=${encodeURIComponent(selectedSiteId)}` : "";
+        const resp = await fetch(`/api/chat/status${siteQuery}`);
         if (resp.ok) {
           const data = await resp.json();
           tts.setAvailable(data.features?.tts === true);
@@ -101,12 +107,24 @@ export function Chat() {
       }
     };
     checkTts();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selectedSiteId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, streamingContent]);
+
+  // Auto-submit when speech recognition produces a final transcript
+  useEffect(() => {
+    console.log("[STT Effect] finalTranscript:", stt.finalTranscript, "isLoading:", isLoading);
+    if (!stt.finalTranscript || isLoading) return;
+    const text = stt.finalTranscript.trim();
+    console.log("[STT Effect] sending:", text);
+    stt.reset();
+    sendMessage(text);
+    // ESLint suppressed: we intentionally depend on finalTranscript and isLoading
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stt.finalTranscript, isLoading]);
 
   // No auto-greet — chat opens clean every time
 
@@ -143,8 +161,8 @@ export function Chat() {
     setIsLoading(true);
     setStreamingContent("");
 
+    let fullResponse = "";
     try {
-      let fullResponse = "";
 
       await streamChat(text, undefined, (chunk) => {
         fullResponse += chunk;
@@ -177,13 +195,31 @@ export function Chat() {
       setIsLoading(false);
       setStreamingContent("");
       inputRef.current?.focus();
+
+      // Auto-play summarised voice if voice mode is on
+      if (voiceMode && fullResponse && tts.isAvailable) {
+        try {
+          const { audio_url } = await api.voiceSummary(fullResponse);
+          // Play directly from data URI — no blob fetch needed
+          const audio = new Audio(audio_url);
+          await audio.play();
+        } catch {
+          // Voice summary failed — text is already shown, no action needed
+        }
+      }
     }
   };
 
-  // Handle form submission
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    await sendMessage(input.trim());
+  // Handle form submission — prefer speech transcript over typed input
+  const handleSubmit = async (e?: FormEvent) => {
+    e?.preventDefault();
+    // Speech recognition transcript takes priority over typed text
+    const text = stt.finalTranscript || input;
+    console.log("[handleSubmit] text:", text, "finalTranscript:", stt.finalTranscript);
+    if (!text.trim()) return;
+    // Clear transcript so the same text can't be re-sent on the next submit
+    stt.reset();
+    await sendMessage(text.trim());
   };
 
   // Handle clickable slash command buttons
@@ -431,6 +467,35 @@ export function Chat() {
               title={stt.isListening ? "Stop listening" : "Voice input"}
             >
               {stt.isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+            </button>
+          )}
+
+          {/* Voice mode toggle — auto-summarised voice playback */}
+          {tts.isAvailable && (
+            <button
+              type="button"
+              onClick={() => setVoiceMode((v) => !v)}
+              className="px-3 py-2 rounded flex items-center gap-1.5 transition-all hover:brightness-110 hover:scale-105"
+              style={{
+                background: voiceMode
+                  ? "rgba(255, 136, 0, 0.15)"
+                  : "var(--color-grafana-bg-panel)",
+                border: voiceMode
+                  ? "1px solid rgba(255,136,0,0.6)"
+                  : "1px solid var(--color-grafana-border)",
+                color: voiceMode
+                  ? "#ff8800"
+                  : "var(--color-grafana-text-secondary)",
+              }}
+              aria-label={voiceMode ? "Disable voice mode" : "Enable voice mode"}
+              title={
+                voiceMode
+                  ? "Voice mode on — AI responds with summarised voice"
+                  : "Voice mode off — enable to hear AI responses as summarised voice"
+              }
+            >
+              {voiceMode ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+              <span className="hidden sm:inline text-xs">Voice</span>
             </button>
           )}
 
