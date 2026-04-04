@@ -8,6 +8,8 @@
  * - Health configuration
  */
 
+import { authorizedFetch } from "@/lib/api/client";
+
 const API_BASE_URL = import.meta.env.VITE_API_URL || "";
 
 // ============= Zone Interfaces =============
@@ -97,6 +99,43 @@ export interface HVACAlert {
   equipment_id?: string;
 }
 
+export interface HVACSentinelGuidance {
+  headline: string;
+  mode: "none" | "watch" | "prepare" | "intervene_soon" | "act_now";
+}
+
+export interface HVACSentinelNarrative {
+  voice: string;
+  message: string;
+  action: string;
+  time_to_breach_min: number | null;
+}
+
+export interface HVACSentinelIntelligence {
+  building_posture: "calm" | "drifting" | "compensating" | "strained" | "critical";
+  operator_guidance: HVACSentinelGuidance;
+  primary_narrative: HVACSentinelNarrative | null;
+  secondary_tensions: Array<{ voice: string; message: string }>;
+}
+
+export interface HVACRawTelemetrySummary {
+  status: "live" | "unavailable";
+  timestamp?: string;
+  policy_stage?: string;
+  zones_with_readings?: number;
+  zone_count?: number;
+  power?: {
+    hvac_kw: number;
+    lighting_kw: number;
+    total_kw: number;
+  };
+  equipment_summary?: {
+    total?: number;
+    online?: number;
+    avg_health_score?: number;
+  };
+}
+
 export interface HVACOverview {
   site_id: string;
   timestamp: string;
@@ -111,6 +150,8 @@ export interface HVACOverview {
   health_status: "healthy" | "attention" | "critical";
   alerts: HVACAlert[];
   chillers_running: number;
+  raw_telemetry?: HVACRawTelemetrySummary | null;
+  sentinel_intelligence?: HVACSentinelIntelligence | null;
 }
 
 // ============= Thermal Runway Interfaces =============
@@ -204,12 +245,10 @@ export interface HVACSafetyLimits {
 
 async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`;
-  const token = localStorage.getItem("sentinel_token");
-  const response = await fetch(url, {
+  const response = await authorizedFetch(url, {
     ...options,
     headers: {
       "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...options?.headers,
     },
   });
