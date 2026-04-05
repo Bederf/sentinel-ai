@@ -36,6 +36,7 @@ from app.api import (
     decisions,
     delivery_tracking,
     dispatch,
+    document_sync,
     event_bus_monitor,
     event_intelligence,
     google_calendar_webhook_endpoint,
@@ -257,6 +258,9 @@ def register_operations_routers(app: FastAPI) -> None:
 
     # MRI Evolution connector — work-order sync (Phase 178-06)
     app.include_router(mri_connector.router, tags=["mri-connector"])
+
+    # Document sync router — Concept MRI documents + manual uploads (Phase 179)
+    app.include_router(document_sync.router, tags=["document-sync"])
 
     # Decision Moment API — Crisis State page (Phase 164)
     app.include_router(decisions.router, tags=["decisions"])

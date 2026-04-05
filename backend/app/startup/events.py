@@ -770,6 +770,37 @@ async def startup_event(app: FastAPI) -> None:
         else:
             _logger.info("Site 002 data source disabled — simulation engine inactive")
 
+    # Shadow mode bridge polling — runs when simulation engine is disabled.
+    # Polls the live bridge (10.99.0.1:8080) every 5 minutes and feeds data to
+    # SentinelMLFeeder so ML models stay current with real site telemetry.
+    if not settings.site002_source_enabled and not settings.edge_mode:
+        try:
+            scheduler_service.add_shadow_mode_polling_job(interval_seconds=300, site_id="site-002")
+            _logger.info("Shadow mode bridge polling initialized (5min interval)")
+        except Exception as e:
+            _logger.error(f"Shadow mode polling initialization failed: {e}", exc_info=True)
+
+        # Phase 179: Document MRI sync — polls Concept API every N hours (default 4)
+        try:
+            scheduler_service.add_document_mri_sync_job(
+                interval_hours=settings.document_sync_interval_hours,
+                site_id="site-002",
+            )
+            _logger.info(
+                "Document MRI sync job initialized (every %d hours)",
+                settings.document_sync_interval_hours,
+            )
+        except Exception as e:
+            _logger.error(f"Document MRI sync initialization failed: {e}", exc_info=True)
+
+    # Anomaly model weekly retraining — trains Isolation Forest on zone temp + HVAC power
+    # data every Sunday at 02:00. Works with as little as 72h of data (vs LSTM's 500h).
+    try:
+        scheduler_service.add_anomaly_weekly_retrain_job(interval_hours=168)
+        _logger.info("Anomaly weekly retrain job initialized (weekly at 02:00)")
+    except Exception as e:
+        _logger.error(f"Anomaly weekly retrain job initialization failed: {e}", exc_info=True)
+
     # Sync ML model registry JSON → ml_models Supabase table (best-effort)
     try:
         import concurrent.futures as _cf

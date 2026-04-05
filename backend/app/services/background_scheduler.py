@@ -3231,6 +3231,140 @@ class BackgroundSchedulerService:
         except Exception as e:
             logger.error("Graph subscription renewal failed: %s", e, exc_info=True)
 
+    # ── Shadow Mode Bridge Polling ─────────────────────────────────────────────
+
+    def add_shadow_mode_polling_job(self, interval_seconds: int = 300, site_id: str = "site-002"):
+        """
+        Add a periodic job to poll the site bridge and feed live data to ML pipeline.
+
+        Fetches per-zone temperature/CO2 readings and aggregated power/water telemetry
+        from the bridge, transforms them into equipment_states, and feeds
+        SentinelDataSync (Supabase writes + ML feeder accumulation).
+
+        This keeps ML models current during shadow mode operation when the simulation
+        engine is disabled (ENABLE_SITE002_SOURCE=false) but the bridge is live.
+
+        Args:
+            interval_seconds: How often to poll the bridge (default: 300s = 5 minutes)
+            site_id: Site to poll (default: site-002)
+        """
+        job_id = "shadow_mode_polling"
+        if self.scheduler.get_job(job_id):
+            self.scheduler.remove_job(job_id)
+            logger.info("Removed existing shadow mode polling job")
+
+        first_run = datetime.now() + timedelta(seconds=30)  # 30s warmup
+
+        self.scheduler.add_job(
+            func=self._run_shadow_mode_polling,
+            trigger=IntervalTrigger(seconds=interval_seconds),
+            id=job_id,
+            name="Shadow Mode Bridge Polling",
+            replace_existing=True,
+            next_run_time=first_run,
+            max_instances=1,
+        )
+        logger.info(
+            "Added shadow mode polling job: site=%s every %ds (first run at %s)",
+            site_id,
+            interval_seconds,
+            first_run.strftime("%H:%M:%S"),
+        )
+
+    def _run_shadow_mode_polling(self):
+        """Poll bridge and feed to ML pipeline. Runs synchronously via APScheduler."""
+        try:
+            import asyncio
+
+            from app.services.shadow_mode_polling import get_shadow_mode_polling_service
+
+            svc = get_shadow_mode_polling_service()
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                result = loop.run_until_complete(svc.poll())
+                if result.get("errors"):
+                    logger.warning(
+                        "[SHADOW] poll errors: %s",
+                        result["errors"],
+                    )
+                else:
+                    logger.debug(
+                        "[SHADOW] poll OK: states=%s ml_hours=%s",
+                        result.get("equipment_states", 0),
+                        result.get("ml_hours_ingested", "?"),
+                    )
+            finally:
+                loop.close()
+        except Exception as e:
+            logger.error("Shadow mode polling failed: %s", e, exc_info=True)
+
+    # ── Document MRI Sync ───────────────────────────────────────────────────────
+
+    def add_document_mri_sync_job(self, interval_hours: int = 4, site_id: str = "site-002"):
+        """
+        Add a periodic job to sync documents from MRI Concept API.
+
+        Fetches service reports and documents from the MRI Evolution documents
+        endpoint, normalises them to DocumentRecord, and upserts to the documents table.
+
+        Only runs when ENABLE_SITE002_SOURCE=false (shadow mode / bridge polling).
+
+        Args:
+            interval_hours: How often to sync (default: 4 hours)
+            site_id: Site to associate synced documents with (default: site-002)
+        """
+        job_id = "document_mri_sync"
+        if self.scheduler.get_job(job_id):
+            self.scheduler.remove_job(job_id)
+            logger.info("Removed existing document MRI sync job")
+
+        first_run = datetime.now() + timedelta(seconds=30)  # 30s warmup
+
+        self.scheduler.add_job(
+            func=self._run_document_mri_sync,
+            trigger=IntervalTrigger(hours=interval_hours),
+            id=job_id,
+            name="Document MRI Sync",
+            replace_existing=True,
+            next_run_time=first_run,
+            max_instances=1,
+        )
+        logger.info(
+            "Added document MRI sync job: site=%s every %dh (first run at %s)",
+            site_id,
+            interval_hours,
+            first_run.strftime("%H:%M:%S"),
+        )
+
+    def _run_document_mri_sync(self):
+        """Sync documents from MRI Concept API. Runs synchronously via APScheduler."""
+        try:
+            import asyncio
+
+            from app.services.document_adapter_mri import ConceptMRIAdapter
+
+            adapter = ConceptMRIAdapter()
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                result = loop.run_until_complete(adapter.run_sync(site_id="site-002"))
+                if result.get("errors"):
+                    logger.warning(
+                        "[DOC_MRI] sync errors: %s",
+                        result["errors"],
+                    )
+                else:
+                    logger.info(
+                        "[DOC_MRI] sync OK: ingested=%s updated=%s",
+                        result.get("ingested", 0),
+                        result.get("updated", 0),
+                    )
+            finally:
+                loop.close()
+        except Exception as e:
+            logger.error("Document MRI sync failed: %s", e, exc_info=True)
+
 
 # Global scheduler instance
 scheduler_service = BackgroundSchedulerService()
