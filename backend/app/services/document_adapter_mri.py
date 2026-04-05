@@ -109,12 +109,21 @@ class ConceptMRIAdapter(DocumentSourceAdapter):
         return mapping.get(raw_value or "", DocumentType.UNKNOWN)
 
     def _parse_date(self, value: str | None) -> date | None:
-        """Parse an ISO-format date string. Return None if unparseable."""
+        """Parse an ISO-format date or datetime string. Return None if unparseable."""
         if not value:
             return None
         try:
+            # Try pure date first (YYYY-MM-DD)
             return date.fromisoformat(value)
         except ValueError:
+            pass
+        try:
+            # Handle datetime strings (ISO format with time component)
+            from datetime import datetime
+
+            dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+            return dt.date()
+        except (ValueError, AttributeError):
             logger.warning("ConceptMRIAdapter: unparseable date '%s'", value)
             return None
 
