@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone, timedelta
-from uuid import UUID
 
 from app.models.maintenance_event import MaintenanceEvent
 from app.services.mri_evolution_client import MRIEvolutionClient
@@ -19,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 def _get_supabase():
     from app.database.supabase_client import get_supabase_client
+
     return get_supabase_client()
 
 
@@ -56,12 +56,7 @@ class MRIConnectorService:
 
     def _upsert(self, event: MaintenanceEvent) -> str:
         """Upsert MaintenanceEvent. Returns 'inserted' or 'updated'."""
-        existing = (
-            self.db.table("maintenance_events")
-            .select("id")
-            .eq("external_ref", event.external_ref)
-            .execute()
-        )
+        existing = self.db.table("maintenance_events").select("id").eq("external_ref", event.external_ref).execute()
 
         data = event.model_dump(exclude={"metadata"})
         data["metadata"] = event.metadata
@@ -70,9 +65,7 @@ class MRIConnectorService:
             data["site_id"] = str(data["site_id"])
 
         if existing.data:
-            self.db.table("maintenance_events").update(data).eq(
-                "external_ref", event.external_ref
-            ).execute()
+            self.db.table("maintenance_events").update(data).eq("external_ref", event.external_ref).execute()
             return "updated"
         else:
             self.db.table("maintenance_events").insert(data).execute()
@@ -85,9 +78,9 @@ class MRIConnectorService:
             return
 
         checks = [
-            ("respond",   event.assigned_at,   event.sla_respond_hours),
-            ("attend",    event.attended_at,    event.sla_attend_hours),
-            ("temp_fix",  event.temp_fixed_at,  event.sla_temp_fix_hours),
+            ("respond", event.assigned_at, event.sla_respond_hours),
+            ("attend", event.attended_at, event.sla_attend_hours),
+            ("temp_fix", event.temp_fixed_at, event.sla_temp_fix_hours),
         ]
 
         for breach_type, milestone_dt, threshold_hours in checks:
@@ -106,13 +99,15 @@ class MRIConnectorService:
                     .execute()
                 )
                 if result and result.data:
-                    self.db.table("sla_breach_events").insert({
-                        "maintenance_event_id": result.data["id"],
-                        "breach_type": breach_type,
-                        "breached_at": now.isoformat(),
-                        "sla_threshold_hours": threshold_hours,
-                        "actual_hours": round(actual_hours, 2),
-                    }).execute()
+                    self.db.table("sla_breach_events").insert(
+                        {
+                            "maintenance_event_id": result.data["id"],
+                            "breach_type": breach_type,
+                            "breached_at": now.isoformat(),
+                            "sla_threshold_hours": threshold_hours,
+                            "actual_hours": round(actual_hours, 2),
+                        }
+                    ).execute()
 
     def _publish_event(self, event_type: str, event: MaintenanceEvent) -> None:
         """
@@ -143,15 +138,16 @@ class MRIConnectorService:
             return datetime.fromisoformat(result.data[0]["last_successful_sync"])
         return None
 
-    def _update_sync_state(
-        self, site_id: str | None, ingested: int, updated: int, errors: int
-    ) -> None:
+    def _update_sync_state(self, site_id: str | None, ingested: int, updated: int, errors: int) -> None:
         now = datetime.now(timezone.utc).isoformat()
-        self.db.table("mri_connector_sync").upsert({
-            "site_id": site_id,
-            "last_successful_sync": now,
-            "last_sync_attempted": now,
-            "records_ingested": ingested,
-            "records_updated": updated,
-            "errors": errors,
-        }, on_conflict="site_id").execute()
+        self.db.table("mri_connector_sync").upsert(
+            {
+                "site_id": site_id,
+                "last_successful_sync": now,
+                "last_sync_attempted": now,
+                "records_ingested": ingested,
+                "records_updated": updated,
+                "errors": errors,
+            },
+            on_conflict="site_id",
+        ).execute()
