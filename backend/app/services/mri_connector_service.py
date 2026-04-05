@@ -11,6 +11,7 @@ import logging
 from datetime import datetime, timezone, timedelta
 
 from app.models.maintenance_event import MaintenanceEvent
+from app.services.event_bus import SentinelEvent, get_event_bus
 from app.services.mri_evolution_client import MRIEvolutionClient
 
 logger = logging.getLogger(__name__)
@@ -41,10 +42,10 @@ class MRIConnectorService:
                 result = self._upsert(event)
                 if result == "inserted":
                     ingested += 1
-                    self._publish_event("WorkOrderCreated", event)
+                    await self._publish_event("work_order.created", event)
                 else:
                     updated += 1
-                    self._publish_event("WorkOrderUpdated", event)
+                    await self._publish_event("work_order.updated", event)
                 self._check_sla_breach(event)
             except Exception as exc:
                 errors += 1
@@ -109,25 +110,18 @@ class MRIConnectorService:
                         }
                     ).execute()
 
-    def _publish_event(self, event_type: str, event: MaintenanceEvent) -> None:
-        """
-        Publish to SENTINEL Event Bus.
-
-        STUB -- replace with actual Event Bus publish call once the event bus
-        pattern is located in the codebase. Publish types: WorkOrderCreated,
-        WorkOrderUpdated.
-
-        TODO: Replace with actual Event Bus publish using:
-            from app.services.event_bus import get_event_bus
-            bus = get_event_bus()
-            await bus.emit(SentinelEvent(
+    async def _publish_event(self, event_type: str, event: MaintenanceEvent) -> None:
+        """Publish work order lifecycle events to the SENTINEL Event Bus."""
+        bus = get_event_bus()
+        await bus.emit(
+            SentinelEvent(
                 event_type=event_type,
                 source="mri_connector",
                 payload=event.model_dump(),
                 site_id=str(event.site_id) if event.site_id else None,
-            ))
-        """
-        logger.debug("Event bus stub: %s for %s", event_type, event.external_ref)
+                equipment_id=event.metadata.get("equipment_id"),
+            )
+        )
 
     def _get_last_sync(self, site_id: str | None) -> datetime | None:
         query = self.db.table("mri_connector_sync").select("last_successful_sync")
