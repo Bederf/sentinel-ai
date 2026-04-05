@@ -461,6 +461,11 @@ class Settings(BaseSettings):
     mri_evolution_password: str = ""
     mri_poll_interval_minutes: int = Field(default=15, validation_alias="MRI_POLL_INTERVAL_MINUTES")
 
+    # MRI Document Client — Concept API for service reports and documents (Phase 179)
+    mri_document_base_url: str = Field(default="", validation_alias="MRI_DOCUMENT_BASE_URL")
+    mri_document_api_key: str = Field(default="", validation_alias="MRI_DOCUMENT_API_KEY")
+    document_sync_interval_hours: int = Field(default=4, validation_alias="DOCUMENT_SYNC_INTERVAL_HOURS")
+
     # WhatsApp delivery — Twilio (primary) or n8n webhook (fallback)
     twilio_account_sid: str = ""  # Twilio Account SID (ACxxxx)
     twilio_auth_token: str = ""  # Twilio Auth Token
