@@ -1,3 +1,18 @@
+---
+title: "HVAC + DALI + SENTINEL AI Integration Documentation"
+type: "spec"
+status: "draft"
+version: "1.0.0"
+created: "2026-03-31"
+updated: "2026-03-31"
+tags: ["sentinel", "documentation"]
+related: []
+domain: "bms"
+audience: "all"
+complexity: "intermediate"
+estimated_read_time: 10
+---
+
 # HVAC + DALI + SENTINEL AI Integration Documentation
 
 **Complete research and implementation guide for building system coordination**
@@ -334,3 +349,9 @@ See also: [AI Recommendation Agent Spec](../08-ai-ml/ai-recommendation-agent-spe
 - **Audience**: Developers, integrators
 - **Covers**: MRI Concept Evolution -> Google Drive -> SENTINEL RAG pipeline, gws CLI integration, Thorium security scanning, document classification, folder ACL mapping
 - **Related**: [Hybrid Knowledge Layer](../02-architecture/hybrid-knowledge-layer.md), [Brick Ontology Layer](../02-architecture/brick-ontology-layer.md)
+
+### [Maintenance Intake Architecture](maintenance-intake-architecture.md)
+- **Status**: Draft
+- **Audience**: Developers, architects
+- **Covers**: Generic maintenance/work-order adapter layer — one `maintenance_events` table, one adapter per site (MRI Evolution, ServiceNow, CSV, etc.), source-agnostic SLA breach detection and P1-P4 priority normalisation
+- **Related**: [ServiceNow Integration](servicenow-integration.md), [Event Bus Architecture](../02-architecture/event-bus-architecture.md)
