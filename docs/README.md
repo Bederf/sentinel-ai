@@ -200,6 +200,7 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 - **[Workflow Triggers & Automation](05-integrations/workflow-triggers.md)** - 5 automated triggers for ML → Inspection → Repair → Validation (Phase 53-02)
 - [AEGIS Site-002 Discovery](05-integrations/aegis-site-002-discovery.md) - Site-level BESS control boundaries, interfaces, and pre-live confirmation points
 - **[ServiceNow Integration](05-integrations/servicenow-integration.md)** - Read-only ITSM client with auto-discovery, 10 API endpoints, 4 chat tools, config-ready (Phase 138)
+- **[Maintenance Intake Architecture](05-integrations/maintenance-intake-architecture.md)** - Generic maintenance/work-order adapter layer — one `maintenance_events` table, one adapter per site (MRI Evolution, ServiceNow, CSV, etc.), source-agnostic SLA breach detection and P1-P4 priority normalisation
 - **[Visitor Management Integrations](05-integrations/visitor-management-integrations.md)** - Google Calendar (Pub/Sub webhook), Microsoft Graph (webhook), Email intake (n8n IMAP), WhatsApp (Twilio), Active Directory (JSON), C-CURE, SMTP — Accept-First visitor flow (Phase 178)
 
 ### 📦 Modules
