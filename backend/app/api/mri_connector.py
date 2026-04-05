@@ -10,11 +10,11 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Request
 from pydantic import BaseModel, Field
 
 from app.middleware.auth_middleware import AuthLevel, require_auth
-from app.services.mri_connector_service import MRIConnectorService
+from app.services.maintenance_adapter_mri import MRIEvolutionAdapter
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/mri-connector", tags=["mri-connector"])
+router = APIRouter(prefix="/api/maintenance", tags=["maintenance"])
 
 
 class SyncResponse(BaseModel):
@@ -37,7 +37,7 @@ async def trigger_sync(
     auth=Depends(require_auth(AuthLevel.AUTHENTICATED)),
 ) -> SyncResponse:
     """Manually trigger a sync from MRI Evolution (auth required)."""
-    service = MRIConnectorService()
+    service = MRIEvolutionAdapter()
     result = await service.run_sync(site_id=site_id)
     errors = result.get("errors", 0)
     status = "completed" if errors == 0 else "completed_with_errors"
@@ -66,8 +66,8 @@ async def receive_webhook(request: Request) -> dict:
     task_id = data.get("TaskId", "")
     event_type = data.get("event_type", "updated")
 
-    service = MRIConnectorService()
-    event = service.client.normalise(data)
+    service = MRIEvolutionAdapter()
+    event = service.normalise(data)
     service._upsert(event)
     service._check_sla_breach(event)
 
@@ -83,7 +83,7 @@ async def sync_status(
     from app.database.supabase_client import get_supabase_client
 
     db = get_supabase_client()
-    query = db.table("mri_connector_sync").select("*")
+    query = db.table("maintenance_connector_sync").select("*")
     if site_id:
         query = query.eq("site_id", site_id)
     result = query.execute()
@@ -103,7 +103,7 @@ def start_scheduler() -> None:
         return
     _scheduler = AsyncIOScheduler()
     _scheduler.add_job(
-        MRIConnectorService().run_sync,
+        MRIEvolutionAdapter().run_sync,
         "interval",
         minutes=settings.mri_poll_interval_minutes,
         id="mri_evolution_poll",

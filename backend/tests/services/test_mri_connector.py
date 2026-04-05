@@ -6,6 +6,7 @@ Tests cover:
     - SLA breach detection (attend, respond, temp_fix)
     - Upsert deduplication (external_ref unique constraint)
 
+Tests target MaintenanceAdapter base class via MRIEvolutionAdapter subclass.
 All tests mock the Supabase client directly on the service instance.
 """
 
@@ -16,7 +17,7 @@ from uuid import uuid4
 import pytest
 
 from app.models.maintenance_event import MaintenanceEvent
-from app.services.mri_connector_service import MRIConnectorService
+from app.services.maintenance_adapter_mri import MRIEvolutionAdapter
 from app.services.mri_priority_map import PRIORITY_MAP, normalise_priority
 
 # ------------------------------------------------------------------
@@ -156,15 +157,12 @@ def _make_event(
 def _mock_db_for_sla_breach(breach_event_id: str | None = None):
     """
     Build a mock Supabase client for SLA breach tests.
-
     The _check_sla_breach method:
       1. Looks up maintenance_event_id via select + maybe_single + execute
       2. Inserts breach record into sla_breach_events
     """
     mock_db = MagicMock()
 
-    # Step 1 — select for maintenance_event_id lookup
-    # Chain: table().select().eq().maybe_single().execute() -> response with data={"id": ...}
     mock_select_resp = MagicMock()
     event_id = breach_event_id or str(uuid4())
     type(mock_select_resp).data = PropertyMock(return_value={"id": event_id})
@@ -172,7 +170,6 @@ def _mock_db_for_sla_breach(breach_event_id: str | None = None):
         mock_select_resp
     )
 
-    # Step 2 — insert into sla_breach_events
     mock_db.table.return_value.insert.return_value.execute.return_value = MagicMock()
 
     return mock_db
@@ -199,10 +196,10 @@ class TestSLABreachDetection:
         )
 
         mock_db = _mock_db_for_sla_breach()
-        service = MRIConnectorService.__new__(MRIConnectorService)
+        service = MRIEvolutionAdapter.__new__(MRIEvolutionAdapter)
         service.db = mock_db
 
-        with patch("app.services.mri_connector_service.datetime") as mock_dt:
+        with patch("app.services.maintenance_adapter_base.datetime") as mock_dt:
             mock_dt.now.return_value = _FIXED_NOW
             mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
             service._check_sla_breach(event)
@@ -215,32 +212,28 @@ class TestSLABreachDetection:
         assert breach_record["sla_threshold_hours"] == 1
 
     def test_no_breach_when_attended_before_attend_deadline(self):
-        """Attended at 10:30, deadline 11:00 -> 10:30 < 11:00, no breach.
+        """Attended at 08:30, deadline 09:00 -> 08:30 < 09:00, no breach.
 
         Relative to _FIXED_NOW=12:00:
-          created_at = 08:00, sla_respond_hours=4, assigned_at = 08:00
-            -> deadline = 12:00, compare_dt = 08:00 < 12:00 -> no respond breach.
-          sla_attend_hours=1, attended_at = 09:30
-            -> deadline = 09:00, compare_dt = 09:30 > 09:00 -> BREACH!
-
-        To get no breach we need attended_at << deadline.
-        Using attended_at = 08:00 + 0.5h = 08:30 with deadline 09:00:
-          08:30 < 09:00 -> no breach.
+          created_at = 08:00, sla_respond_hours=4 -> deadline = 12:00.
+          assigned_at = 08:00 -> 08:00 < 12:00 -> no respond breach.
+          sla_attend_hours=1, attended_at = 08:30 -> deadline = 09:00.
+          08:30 < 09:00 -> no attend breach.
         """
         created_4h_ago = _FIXED_NOW - timedelta(hours=4)
         event = _make_event(
             created_at_source=created_4h_ago,
-            sla_respond_hours=4,  # deadline = 12:00 == _FIXED_NOW -> compare_dt(_FIXED_NOW - 4h) < deadline
-            sla_attend_hours=1,  # deadline = 09:00
-            assigned_at=_FIXED_NOW - timedelta(hours=4),  # 08:00 < deadline 12:00 -> no respond breach
-            attended_at=_FIXED_NOW - timedelta(hours=3, minutes=30),  # 08:30 < deadline 09:00 -> no attend breach
+            sla_respond_hours=4,
+            sla_attend_hours=1,
+            assigned_at=_FIXED_NOW - timedelta(hours=4),
+            attended_at=_FIXED_NOW - timedelta(hours=3, minutes=30),
         )
 
         mock_db = _mock_db_for_sla_breach()
-        service = MRIConnectorService.__new__(MRIConnectorService)
+        service = MRIEvolutionAdapter.__new__(MRIEvolutionAdapter)
         service.db = mock_db
 
-        with patch("app.services.mri_connector_service.datetime") as mock_dt:
+        with patch("app.services.maintenance_adapter_base.datetime") as mock_dt:
             mock_dt.now.return_value = _FIXED_NOW
             mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
             service._check_sla_breach(event)
@@ -266,10 +259,10 @@ class TestSLABreachDetection:
         )
 
         mock_db = _mock_db_for_sla_breach()
-        service = MRIConnectorService.__new__(MRIConnectorService)
+        service = MRIEvolutionAdapter.__new__(MRIEvolutionAdapter)
         service.db = mock_db
 
-        with patch("app.services.mri_connector_service.datetime") as mock_dt:
+        with patch("app.services.maintenance_adapter_base.datetime") as mock_dt:
             mock_dt.now.return_value = _FIXED_NOW
             mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
             service._check_sla_breach(event)
@@ -293,14 +286,14 @@ class TestSLABreachDetection:
             sla_respond_hours=1,
             sla_attend_hours=2,
             assigned_at=None,
-            attended_at=_FIXED_NOW - timedelta(hours=1),  # 11:00
+            attended_at=_FIXED_NOW - timedelta(hours=1),
         )
 
         mock_db = _mock_db_for_sla_breach()
-        service = MRIConnectorService.__new__(MRIConnectorService)
+        service = MRIEvolutionAdapter.__new__(MRIEvolutionAdapter)
         service.db = mock_db
 
-        with patch("app.services.mri_connector_service.datetime") as mock_dt:
+        with patch("app.services.maintenance_adapter_base.datetime") as mock_dt:
             mock_dt.now.return_value = _FIXED_NOW
             mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
             service._check_sla_breach(event)
@@ -316,12 +309,11 @@ class TestSLABreachDetection:
         event = _make_event(created_at_source=None)
 
         mock_db = _mock_db_for_sla_breach()
-        service = MRIConnectorService.__new__(MRIConnectorService)
+        service = MRIEvolutionAdapter.__new__(MRIEvolutionAdapter)
         service.db = mock_db
 
         service._check_sla_breach(event)
 
-        # select (maintenance_events lookup) should never be called
         select_query = mock_db.table.return_value.select.return_value.eq.return_value
         select_calls = select_query.maybe_single.return_value.execute.call_args_list
         assert len(select_calls) == 0, "Should not query DB when created_at_source is None"
@@ -338,26 +330,18 @@ class TestUpsertDeduplication:
     def _build_upsert_mock(self, existing_data: list[dict] | None):
         """
         Build a mock Supabase client for _upsert tests.
-
         The _upsert method queries:
           table("maintenance_events").select("id").eq("external_ref", ...).execute()
-
         Uses PropertyMock on .data so that:
           - existing_data=None  -> existing.data is falsy (insert path)
           - existing_data=[{...}] -> existing.data is truthy (update path)
         """
         mock_db = MagicMock()
-
-        # Build the chained call chain for upsert select query
         mock_execute = MagicMock()
-        # PropertyMock on .data ensures truthiness reflects actual value, not MagicMock
         type(mock_execute).data = PropertyMock(return_value=existing_data)
         mock_db.table.return_value.select.return_value.eq.return_value.execute.return_value = mock_execute
-
-        # Stub update and insert chains
         mock_db.table.return_value.update.return_value.eq.return_value.execute.return_value = MagicMock()
         mock_db.table.return_value.insert.return_value.execute.return_value = MagicMock()
-
         return mock_db
 
     def test_insert_new_event_when_external_ref_not_found(self):
@@ -365,7 +349,7 @@ class TestUpsertDeduplication:
         event = _make_event(external_ref="FNBFW:99999", status="New")
 
         mock_db = self._build_upsert_mock(existing_data=None)
-        service = MRIConnectorService.__new__(MRIConnectorService)
+        service = MRIEvolutionAdapter.__new__(MRIEvolutionAdapter)
         service.db = mock_db
 
         result = service._upsert(event)
@@ -380,7 +364,7 @@ class TestUpsertDeduplication:
         event = _make_event(external_ref="FNBFW:30453", status="In Progress")
 
         mock_db = self._build_upsert_mock(existing_data=[{"id": existing_id}])
-        service = MRIConnectorService.__new__(MRIConnectorService)
+        service = MRIEvolutionAdapter.__new__(MRIEvolutionAdapter)
         service.db = mock_db
 
         result = service._upsert(event)
@@ -391,17 +375,15 @@ class TestUpsertDeduplication:
 
     def test_upsert_same_external_ref_different_status_only_one_record(self):
         """Re-upserting same external_ref with different status leaves exactly 1 record."""
-        # First upsert — external_ref not in DB -> insert
         event_v1 = _make_event(external_ref="FNBFW:30453", status="Open")
-        mock_db = self._build_upsert_mock(existing_data=None)
-        service = MRIConnectorService.__new__(MRIConnectorService)
-        service.db = mock_db
+        mock_db1 = self._build_upsert_mock(existing_data=None)
+        service = MRIEvolutionAdapter.__new__(MRIEvolutionAdapter)
+        service.db = mock_db1
 
         result1 = service._upsert(event_v1)
         assert result1 == "inserted"
-        assert mock_db.table.return_value.insert.call_count == 1
+        assert mock_db1.table.return_value.insert.call_count == 1
 
-        # Second upsert — same external_ref already exists -> update
         event_v2 = _make_event(external_ref="FNBFW:30453", status="In Progress")
         existing_id = str(uuid4())
         mock_db2 = self._build_upsert_mock(existing_data=[{"id": existing_id}])
@@ -416,7 +398,7 @@ class TestUpsertDeduplication:
         event = _make_event(external_ref="FNBFW:30453")
 
         mock_db = self._build_upsert_mock(existing_data=None)
-        service = MRIConnectorService.__new__(MRIConnectorService)
+        service = MRIEvolutionAdapter.__new__(MRIEvolutionAdapter)
         service.db = mock_db
 
         service._upsert(event)

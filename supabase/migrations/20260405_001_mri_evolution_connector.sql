@@ -44,15 +44,17 @@ CREATE TABLE IF NOT EXISTS sla_breach_events (
     notified BOOLEAN DEFAULT FALSE
 );
 
--- Connector sync state
-CREATE TABLE IF NOT EXISTS mri_connector_sync (
+-- Connector sync state (one row per adapter per site)
+CREATE TABLE IF NOT EXISTS maintenance_connector_sync (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    adapter_source TEXT NOT NULL,               -- e.g. 'mri_evolution', 'servicenow'
+    site_id UUID REFERENCES sites(id),
     last_successful_sync TIMESTAMPTZ,
     last_sync_attempted TIMESTAMPTZ,
     records_ingested INTEGER DEFAULT 0,
     records_updated INTEGER DEFAULT 0,
     errors INTEGER DEFAULT 0,
-    site_id UUID REFERENCES sites(id)
+    UNIQUE (adapter_source, site_id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_maintenance_events_site ON maintenance_events(site_id);
