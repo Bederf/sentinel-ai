@@ -19,9 +19,7 @@ class MaintenanceEvent(BaseModel):
     discipline: str | None = None
     problem: str | None = None
     priority_raw: str | None = None
-    priority_normalised: str | None = Field(
-        None, pattern=r"^(P1|P2|P3|P4)$"
-    )
+    priority_normalised: str | None = Field(None, pattern=r"^(P1|P2|P3|P4)$")
     sla_respond_hours: int | None = None
     sla_attend_hours: int | None = None
     sla_temp_fix_hours: int | None = None

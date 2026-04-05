@@ -10,19 +10,79 @@ P4 Routine:       Respond 4hr, Attend 24hr, Temp Fix 48hr, Resolve 15 work days
 from __future__ import annotations
 
 PRIORITY_MAP = {
-    "Very Critical": {"tier": "P1", "respond_hours": 1,  "attend_hours": 4,  "temp_fix_hours": 8,  "resolve_work_days": None},
-    "URGENT":        {"tier": "P1", "respond_hours": 1,  "attend_hours": 4,  "temp_fix_hours": 8,  "resolve_work_days": None},
-    "High":          {"tier": "P1", "respond_hours": 1,  "attend_hours": 4,  "temp_fix_hours": 8,  "resolve_work_days": None},
-    "Critical":      {"tier": "P2", "respond_hours": 2,  "attend_hours": 6,  "temp_fix_hours": 12, "resolve_work_days": 3},
-    "Non Critical":  {"tier": "P3", "respond_hours": 3,  "attend_hours": 8,  "temp_fix_hours": 16, "resolve_work_days": 6},
-    "Low":           {"tier": "P3", "respond_hours": 3,  "attend_hours": 8,  "temp_fix_hours": 16, "resolve_work_days": 6},
-    "Medium":        {"tier": "P3", "respond_hours": 3,  "attend_hours": 8,  "temp_fix_hours": 16, "resolve_work_days": 6},
-    "Routine":       {"tier": "P4", "respond_hours": 4,  "attend_hours": 24, "temp_fix_hours": 48, "resolve_work_days": 15},
-    "Planned":       {"tier": "P4", "respond_hours": 4,  "attend_hours": 24, "temp_fix_hours": 48, "resolve_work_days": 15},
+    "Very Critical": {
+        "tier": "P1",
+        "respond_hours": 1,
+        "attend_hours": 4,
+        "temp_fix_hours": 8,
+        "resolve_work_days": None,
+    },
+    "URGENT": {
+        "tier": "P1",
+        "respond_hours": 1,
+        "attend_hours": 4,
+        "temp_fix_hours": 8,
+        "resolve_work_days": None,
+    },
+    "High": {
+        "tier": "P1",
+        "respond_hours": 1,
+        "attend_hours": 4,
+        "temp_fix_hours": 8,
+        "resolve_work_days": None,
+    },
+    "Critical": {
+        "tier": "P2",
+        "respond_hours": 2,
+        "attend_hours": 6,
+        "temp_fix_hours": 12,
+        "resolve_work_days": 3,
+    },
+    "Non Critical": {
+        "tier": "P3",
+        "respond_hours": 3,
+        "attend_hours": 8,
+        "temp_fix_hours": 16,
+        "resolve_work_days": 6,
+    },
+    "Low": {
+        "tier": "P3",
+        "respond_hours": 3,
+        "attend_hours": 8,
+        "temp_fix_hours": 16,
+        "resolve_work_days": 6,
+    },
+    "Medium": {
+        "tier": "P3",
+        "respond_hours": 3,
+        "attend_hours": 8,
+        "temp_fix_hours": 16,
+        "resolve_work_days": 6,
+    },
+    "Routine": {
+        "tier": "P4",
+        "respond_hours": 4,
+        "attend_hours": 24,
+        "temp_fix_hours": 48,
+        "resolve_work_days": 15,
+    },
+    "Planned": {
+        "tier": "P4",
+        "respond_hours": 4,
+        "attend_hours": 24,
+        "temp_fix_hours": 48,
+        "resolve_work_days": 15,
+    },
 }
 
 # Fallback for unknown priorities
-_DEFAULT = {"tier": "P4", "respond_hours": 4, "attend_hours": 24, "temp_fix_hours": 48, "resolve_work_days": 15}
+_DEFAULT = {
+    "tier": "P4",
+    "respond_hours": 4,
+    "attend_hours": 24,
+    "temp_fix_hours": 48,
+    "resolve_work_days": 15,
+}
 
 
 def normalise_priority(raw: str | None) -> dict:
