@@ -20,6 +20,7 @@ from app.services.site_document_storage_policy_service import get_site_document_
 from app.services.document_extractor import extract_text
 from app.services.storage_service import get_storage_service
 from app.services.vector_db import get_vector_db_service
+from app.services.document_adapter_manual import ManualUploadAdapter
 
 logger = logging.getLogger(__name__)
 
@@ -579,6 +580,32 @@ async def upload_technician_document(
             ).eq("id", response["document_id"]).execute()
         except Exception as exc:
             logger.warning("Technician metadata update failed for %s: %s", response.get("document_id"), exc)
+
+    # Wire ManualUploadAdapter — creates DocumentRecord with source_system="manual_upload"
+    # B1 fix: _upsert gracefully no-ops if migration not applied (no 500)
+    # B4/B5 fix: _upsert only writes source_system, source_document_id, site_id
+    # existing upload_technician_document endpoint continues to own source/document_type
+    if response.get("document_id"):
+        try:
+            adapter = ManualUploadAdapter()
+            form_data = {
+                "equipment_id": equipment_id,
+                "document_name": document_name,
+                "document_sub_class": document_sub_class,
+                "category_discipline": category_discipline,
+                "document_creation_date": creation_date,
+                "trigger_date": trigger,
+                "title": title,
+                "uploaded_by_user_id": auth.user_id,
+            }
+            doc_record = adapter.normalise_upload(response, form_data, resolved_site_id)
+            await adapter._upsert(doc_record)  # fire-and-forget; no-op on migration-missing
+        except Exception as exc:
+            logger.warning(
+                "[manual_upload] _upsert failed for document_id=%s: %s",
+                response.get("document_id"),
+                exc,
+            )
 
     return {
         **response,
