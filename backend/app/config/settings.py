@@ -107,6 +107,9 @@ class Settings(BaseSettings):
     xiaomi_api_key: str = ""
     xiaomi_model: str = "mimo-v2-flash"
     xiaomi_base_url: str = "https://api.mimo.xiaomi.com/v1"
+    minimax_api_key: str = ""
+    minimax_model: str = "MiniMax-M2.5"
+    minimax_base_url: str = "https://api.minimax.io/anthropic"
     openai_api_key: str = ""
     openai_model: str = "gpt-4.1-nano"  # Tier 1: fast/cheap for routine queries
     openai_model_heavy: str = "gpt-4.1-mini"  # Tier 2: complex reasoning & diagnostics
@@ -450,6 +453,13 @@ class Settings(BaseSettings):
     desigo_sender_email: str = "noreply@fnb.co.za"  # Authorised Desigo sender address
     plant_site_id: str = "FLN02"  # Default site identifier for alarms
     plant_building_name: str = "Fairland 2"  # Default building name for alarms
+
+    # MRI Evolution Connector (Phase 178)
+    mri_evolution_base_url: str = Field(default="", validation_alias="MRI_EVOLUTION_BASE_URL")
+    mri_evolution_api_key: str = Field(default="", validation_alias="MRI_EVOLUTION_API_KEY")
+    mri_evolution_username: str = ""
+    mri_evolution_password: str = ""
+    mri_poll_interval_minutes: int = Field(default=15, validation_alias="MRI_POLL_INTERVAL_MINUTES")
 
     # WhatsApp delivery — Twilio (primary) or n8n webhook (fallback)
     twilio_account_sid: str = ""  # Twilio Account SID (ACxxxx)

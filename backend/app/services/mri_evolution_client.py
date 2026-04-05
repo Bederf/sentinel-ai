@@ -20,27 +20,28 @@ from app.services.mri_priority_map import normalise_priority
 
 # PROVISIONAL — update when vendor confirms API field names
 FIELD_MAP: dict[str, str] = {
-    "task_id":      "TaskId",
-    "problem":      "Problem",
+    "task_id": "TaskId",
+    "problem": "Problem",
     "task_created": "TaskCreated",
-    "building":     "Building",
-    "location":     "Location",
-    "discipline":   "Discipline",
-    "status":       "Status",
-    "completion":   "LevelOfCompletion",
-    "assigned_at":  "AssignedDate",
-    "attended_at":  "AttendedDate",
-    "temp_fixed_at":"TempFixDate",
-    "resolved_at":  "ResolvedDate",
-    "priority":     "Priority",
-    "sla_pct":      "SLAPercentage",
-    "days_open":    "DaysOpen",
+    "building": "Building",
+    "location": "Location",
+    "discipline": "Discipline",
+    "status": "Status",
+    "completion": "LevelOfCompletion",
+    "assigned_at": "AssignedDate",
+    "attended_at": "AttendedDate",
+    "temp_fixed_at": "TempFixDate",
+    "resolved_at": "ResolvedDate",
+    "priority": "Priority",
+    "sla_pct": "SLAPercentage",
+    "days_open": "DaysOpen",
 }
 
 
 def _get_settings():
     """Lazy import to avoid circular dependencies."""
-    from app.core.config import settings
+    from app.config.settings import settings
+
     return settings
 
 
@@ -49,10 +50,10 @@ class MRIEvolutionClient:
 
     def __init__(self) -> None:
         s = _get_settings()
-        self.base_url = s.MRI_EVOLUTION_BASE_URL
-        self.api_key = s.MRI_EVOLUTION_API_KEY
-        self.username = s.MRI_EVOLUTION_USERNAME
-        self.password = s.MRI_EVOLUTION_PASSWORD
+        self.base_url = s.mri_evolution_base_url
+        self.api_key = s.mri_evolution_api_key
+        self.username = s.mri_evolution_username
+        self.password = s.mri_evolution_password
         self._client: httpx.AsyncClient | None = None
 
     def _headers(self) -> dict[str, str]:
@@ -71,9 +72,7 @@ class MRIEvolutionClient:
             await self._client.aclose()
             self._client = None
 
-    async def fetch_delta(
-        self, since: datetime | None = None, site_filter: str | None = None
-    ) -> list[dict[str, Any]]:
+    async def fetch_delta(self, since: datetime | None = None, site_filter: str | None = None) -> list[dict[str, Any]]:
         """Pull job cards updated since last sync. Falls back to full pull."""
         params: dict[str, Any] = {}
         if since:
