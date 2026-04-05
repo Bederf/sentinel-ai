@@ -45,6 +45,7 @@ from app.api import (
     inspection,
     inspection_recommendations,
     integration,
+    mri_connector,
     modules,
     municipal_billing,
     n8n,
@@ -253,6 +254,9 @@ def register_operations_routers(app: FastAPI) -> None:
 
     # Visitor Intake — n8n IMAP pipeline (Phase 178)
     app.include_router(visitor_intake.router, tags=["visitor_intake"])
+
+    # MRI Evolution connector — work-order sync (Phase 178-06)
+    app.include_router(mri_connector.router, tags=["mri-connector"])
 
     # Decision Moment API — Crisis State page (Phase 164)
     app.include_router(decisions.router, tags=["decisions"])

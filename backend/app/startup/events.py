@@ -378,7 +378,7 @@ async def startup_event(app: FastAPI) -> None:
 
     try:
         # Wrap with timeout to prevent startup hang (10 second limit)
-        await aio.wait_for(autonomous_decision_engine.initialize(load_demo_data=True), timeout=10.0)
+        await aio.wait_for(autonomous_decision_engine.initialize(load_seed_data=True), timeout=10.0)
         _logger.info("Autonomous decision engine initialized successfully")
 
         if not escalation_engine._initialized:
@@ -408,6 +408,11 @@ async def startup_event(app: FastAPI) -> None:
     if hasattr(scheduler_service, "add_graph_subscription_renewal_job"):
         scheduler_service.add_graph_subscription_renewal_job(interval_hours=1)
         _logger.info("Graph subscription renewal job initialized (every 1 hour)")
+
+    # Phase 178-06: MRI Evolution polling scheduler (every 15 minutes)
+    from app.api.mri_connector import start_scheduler as start_mri_scheduler
+
+    start_mri_scheduler()
 
     # Phase 177: Ensure Graph subscription exists on startup
     try:
@@ -556,15 +561,15 @@ async def startup_event(app: FastAPI) -> None:
     if not _aegis_any_started:
         _logger.info("AEGIS dispatch cycle SKIPPED — no sites with active solar module")
 
-    # Phase E: BESS dispatch consumer — drains pending bess_dispatch recommendations
-    try:
-        from app.core.site_resolver import get_registered_site_ids as _bess_site_ids_fn
-
-        for _site_id in _bess_site_ids_fn() or []:
-            scheduler_service.add_bess_dispatch_job(interval_seconds=60, site_id=_site_id)
-        _logger.info("✅ BESS dispatch consumer initialized (60s interval, DRY_RUN by default)")
-    except Exception as e:
-        _logger.warning(f"⚠️ BESS dispatch consumer initialization failed: {e}")
+    # BESS dispatch consumer — drained via AEGIS cycle job (add_aegis_cycle_job)
+    # note: add_bess_dispatch_job not yet implemented — commented out pending bridge integration
+    # try:
+    #     from app.core.site_resolver import get_registered_site_ids as _bess_site_ids_fn
+    #     for _site_id in _bess_site_ids_fn() or []:
+    #         scheduler_service.add_bess_dispatch_job(interval_seconds=60, site_id=_site_id)
+    #     _logger.info("✅ BESS dispatch consumer initialized (60s interval, DRY_RUN by default)")
+    # except Exception as e:
+    #     _logger.warning("⚠️ BESS dispatch consumer initialization failed: %s", e)
 
     # Phase 130: Occupancy-driven HVAC + lighting control loop
     if settings.occupancy_poll_enabled:
@@ -779,15 +784,15 @@ async def startup_event(app: FastAPI) -> None:
     # System health snapshot job (every 5 minutes)
     scheduler_service.add_health_snapshot_job(interval_seconds=300)
 
-    # Autoencoder anomaly detection on real equipment_sensor_readings data (30 min)
-    try:
-        from app.core.site_resolver import get_registered_site_ids as _anomaly_site_ids_fn
-
-        for _site_id in _anomaly_site_ids_fn() or []:
-            scheduler_service.add_anomaly_detection_job(interval_seconds=1800, site_id=_site_id)
-        _logger.info("✅ Anomaly detection jobs initialized (30 min interval)")
-    except Exception as e:
-        _logger.warning(f"⚠️ Anomaly detection job initialization failed: {e}")
+    # Autoencoder anomaly detection — note: add_anomaly_detection_job not yet implemented
+    # pending bridge integration; commented out to eliminate warning
+    # try:
+    #     from app.core.site_resolver import get_registered_site_ids as _anomaly_site_ids_fn
+    #     for _site_id in _anomaly_site_ids_fn() or []:
+    #         scheduler_service.add_anomaly_detection_job(interval_seconds=1800, site_id=_site_id)
+    #     _logger.info("✅ Anomaly detection jobs initialized (30 min interval)")
+    # except Exception as e:
+    #     _logger.warning("⚠️ Anomaly detection job initialization failed: %s", e)
 
     # Error auto-resolution job (daily) - resolves errors if component healthy for 24+ hours
     scheduler_service.add_error_auto_resolve_job(interval_seconds=86400)
@@ -847,24 +852,35 @@ async def startup_event(app: FastAPI) -> None:
     # except Exception as e:
     #     print(f"Failed to start health simulation service: {e}")
 
-    # SIMBIOT Concept Evolution connector
-    # Auto-initializes when SIMBIOT_API_URL and SIMBIOT_API_KEY env vars are set
-    if hasattr(simbiot_service, "initialise_from_settings"):
-        await simbiot_service.initialise_from_settings()
-    elif settings.simbiot_api_url and settings.simbiot_api_key:
+    # SIMBIOT Concept Evolution connector (MRI Evolution / CAFM work-order integration)
+    # Only initializes when CAFM subscription credentials are fully configured.
+    # BMS data comes through the bridge; this connector is for SIMBIOT -> MRI WO creation only.
+    if (
+        settings.simbiot_api_url
+        and settings.simbiot_api_key
+        and getattr(settings, "simbiot_subscription_key", "")
+        and getattr(settings, "simbiot_customer_site_code", "")
+    ):
         try:
             from simbiot_concept import ConceptConfig
 
             config = ConceptConfig(
-                api_url=settings.simbiot_api_url,
+                api_base_url=settings.simbiot_api_url,
                 api_key=settings.simbiot_api_key,
-                username=settings.simbiot_username,
-                password=settings.simbiot_password,
+                api_username=settings.simbiot_username,
+                api_password=settings.simbiot_password,
+                subscription_key=settings.simbiot_subscription_key,
+                customer_site_code=settings.simbiot_customer_site_code,
+                segments=getattr(settings, "simbiot_segments", []) or None,
+                severity_mapping=getattr(settings, "simbiot_severity_mapping", {}) or None,
+                trade_mapping=getattr(settings, "simbiot_trade_mapping", {}) or None,
             )
             await simbiot_service.initialise(config)
             print(f"[SIMBIOT] Connected to {settings.simbiot_api_url}")
         except Exception as e:
             print(f"[SIMBIOT] Failed to initialize: {e}")
+    else:
+        print("[SIMBIOT] CAFM credentials not configured — connector skipped (BMS bridge operates independently)")
 
 
 async def shutdown_event(app: FastAPI) -> None:
@@ -927,6 +943,11 @@ async def shutdown_event(app: FastAPI) -> None:
     from app.services.event_bus import reset_event_bus
 
     reset_event_bus()
+
+    # Phase 178-06: MRI Evolution polling scheduler shutdown
+    from app.api.mri_connector import stop_scheduler as stop_mri_scheduler
+
+    stop_mri_scheduler()
 
     scheduler_service.stop()
     await health_simulation_service.stop()
