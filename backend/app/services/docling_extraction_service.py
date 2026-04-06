@@ -112,20 +112,35 @@ class DoclingExtractionService:
         """
         if not self.is_available:
             logger.warning("Docling unavailable — returning empty result")
-            return DoclingExtractionResult.empty("docling_not_installed")
+            result = DoclingExtractionResult.empty("docling_not_installed")
+            result.metadata["filename"] = filename
+            result.metadata["size_bytes"] = len(file_bytes)
+            return result
 
         file_ext = self._detect_file_type(filename)
         if not file_ext:
             logger.warning("Unsupported file type for docling: %s", filename)
-            return DoclingExtractionResult.empty(f"unsupported_file_type:{filename}")
+            result = DoclingExtractionResult.empty(f"unsupported_file_type:{filename}")
+            result.metadata["filename"] = filename
+            result.metadata["size_bytes"] = len(file_bytes)
+            return result
 
         try:
-            from io import BytesIO
+            import tempfile
 
             from docling.document_converter import DocumentConverter
 
-            converter = DocumentConverter()
-            result = converter.convert(BytesIO(file_bytes))
+            # Docling's convert() requires a Path or DocumentStream, not BytesIO.
+            # Write bytes to a temporary file to satisfy the API.
+            with tempfile.NamedTemporaryFile(suffix=file_ext, delete=False) as tmp:
+                tmp.write(file_bytes)
+                tmp_path = Path(tmp.name)
+
+            try:
+                converter = DocumentConverter()
+                result = converter.convert(tmp_path)
+            finally:
+                tmp_path.unlink(missing_ok=True)
 
             # Export full markdown
             raw_text = result.document.export_to_markdown()
@@ -174,7 +189,11 @@ class DoclingExtractionService:
 
         except Exception as e:
             logger.warning("Docling extraction failed for %s: %s", filename, e)
-            return DoclingExtractionResult.empty(f"extraction_error:{e}")
+            result = DoclingExtractionResult.empty(f"extraction_error:{e}")
+            result.metadata["filename"] = filename
+            result.metadata["file_type"] = file_ext
+            result.metadata["size_bytes"] = len(file_bytes)
+            return result
 
     async def extract_from_upload(self, file: UploadFile) -> DoclingExtractionResult:
         """Extract text and tables from an uploaded FastAPI file.
