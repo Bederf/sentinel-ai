@@ -62,6 +62,8 @@ ANALYSIS_TOOLS: frozenset[str] = frozenset(
         "query_servicenow_incidents",
         "query_servicenow_work_orders",
         "get_servicenow_incident_summary",
+        # Phase 183-01
+        "get_equipment_service_history",
     }
 )
 
