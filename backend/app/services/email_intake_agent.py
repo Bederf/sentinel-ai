@@ -17,10 +17,9 @@ import logging
 import re
 import time
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any
 
 from app.config.settings import settings
-from app.services.model_gateway import model_gateway
 from app.services.issue_classifier import (
     CALL_LOG_TAXONOMY,
     DISCIPLINE_TO_CATEGORY,
@@ -29,6 +28,7 @@ from app.services.issue_classifier import (
     extract_desk_from_message,
     extract_floor_from_message,
 )
+from app.services.model_gateway import model_gateway
 
 logger = logging.getLogger(__name__)
 
@@ -46,10 +46,10 @@ class AgentResult:
     sub_category: str  # "Power outlet not working"
     specialty: str  # "electrical"
     priority: str  # low|medium|high|critical
-    location_desk: Optional[str] = None  # "204"
-    location_floor: Optional[str] = None  # "L2"
-    location_area: Optional[str] = None
-    phone: Optional[str] = None
+    location_desk: str | None = None  # "204"
+    location_floor: str | None = None  # "L2"
+    location_area: str | None = None
+    phone: str | None = None
     issue_summary: str = ""  # "Broken power outlet at desk 204"
     completeness: float = 0.0  # 0.0-1.0
     action: str = "manual_review"  # auto_submit|request_info|manual_review
@@ -63,7 +63,7 @@ class AgentResult:
 # Prompt taxonomy reference (built once)
 # ---------------------------------------------------------------------------
 
-_TAXONOMY_REFERENCE: Optional[str] = None
+_TAXONOMY_REFERENCE: str | None = None
 
 
 def _build_taxonomy_reference() -> str:
@@ -111,21 +111,21 @@ class EmailIntakeAgent:
     async def classify_and_reply(
         self,
         *,
-        from_name: Optional[str],
+        from_name: str | None,
         from_email: str,
         subject: str,
-        body_plain: Optional[str],
-        site_id: Optional[str],
-        bms_context: Optional[dict[str, Any]],
+        body_plain: str | None,
+        site_id: str | None,
+        bms_context: dict[str, Any] | None,
     ) -> AgentResult:
         """Main entry point. Try LLM, fall back to keywords."""
         t0 = time.monotonic()
 
         prompt = self._build_prompt(
-            from_name=from_name,
-            from_email=from_email,
-            subject=subject,
-            body_plain=body_plain,
+            from_name=_esc_jinja(from_name) if from_name else None,
+            from_email=_esc_jinja(from_email),
+            subject=_esc_jinja(subject),
+            body_plain=_esc_jinja(body_plain) if body_plain else None,
             site_id=site_id,
             bms_context=bms_context,
         )
@@ -168,12 +168,12 @@ class EmailIntakeAgent:
     def _build_prompt(
         self,
         *,
-        from_name: Optional[str],
+        from_name: str | None,
         from_email: str,
         subject: str,
-        body_plain: Optional[str],
-        site_id: Optional[str],
-        bms_context: Optional[dict[str, Any]],
+        body_plain: str | None,
+        site_id: str | None,
+        bms_context: dict[str, Any] | None,
     ) -> str:
         taxonomy = _build_taxonomy_reference()
 
@@ -287,6 +287,7 @@ Respond with ONLY a JSON object (no markdown, no explanation):
                 messages=[{"role": "user", "content": prompt}],
                 system="You are a JSON-only facilities management email triage agent. Respond with valid JSON only.",
                 max_tokens=1000,
+                source="email_intake_agent",
             )
             return text, "gateway:light"
         except Exception as exc:
@@ -386,11 +387,11 @@ Respond with ONLY a JSON object (no markdown, no explanation):
     def _keyword_fallback(
         self,
         *,
-        from_name: Optional[str],
+        from_name: str | None,
         from_email: str,
         subject: str,
-        body_plain: Optional[str],
-        site_id: Optional[str],
+        body_plain: str | None,
+        site_id: str | None,
     ) -> AgentResult:
         """Existing keyword pipeline as fallback."""
         combined = f"{subject} {body_plain or ''}"
@@ -534,7 +535,7 @@ Respond with ONLY a JSON object (no markdown, no explanation):
             para = para.strip()
             if not para:
                 continue
-            escaped = _esc(para).replace("\n", "<br>")
+            escaped = _esc_html(para).replace("\n", "<br>")
             body_html += f"<p>{escaped}</p>"
 
         return (
@@ -561,11 +562,11 @@ Respond with ONLY a JSON object (no markdown, no explanation):
             'border-bottom:1px solid #e0f2fe;">'
             '<table width="100%" cellpadding="0" cellspacing="0"><tr>'
             f'<td style="font-size:14px;color:#1e3a5f;font-weight:600;">'
-            f"Reference: {_esc(ref)}</td>"
+            f"Reference: {_esc_html(ref)}</td>"
             f'<td align="right"><span style="display:inline-block;padding:3px 10px;'
             f"background:{badge_colour};color:#ffffff;border-radius:12px;"
             f'font-size:11px;font-weight:600;text-transform:uppercase;">'
-            f"{_esc(category)}</span></td>"
+            f"{_esc_html(category)}</span></td>"
             "</tr></table></td></tr>"
             # Body
             '<tr><td style="padding:24px;color:#374151;font-size:14px;line-height:1.6;">'
@@ -584,16 +585,24 @@ Respond with ONLY a JSON object (no markdown, no explanation):
         )
 
 
-def _esc(text: str) -> str:
+def _esc_html(text: str) -> str:
     """Minimal HTML escaping."""
     return str(text).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
+
+
+def _esc_jinja(s: str) -> str:
+    """
+    Escape Jinja2/template braces in user-supplied text to prevent
+    format-string injection when text is embedded in a prompt.
+    """
+    return s.replace("{", "{{").replace("}", "}}")
 
 
 # ---------------------------------------------------------------------------
 # Singleton
 # ---------------------------------------------------------------------------
 
-_agent: Optional[EmailIntakeAgent] = None
+_agent: EmailIntakeAgent | None = None
 
 
 def get_email_intake_agent() -> EmailIntakeAgent:
