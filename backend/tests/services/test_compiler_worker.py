@@ -200,17 +200,13 @@ class TestCompileKnowledgeEntry:
         assert result["confidence"] == "medium"
 
     def test_no_document_no_equipment(self, worker, mock_db):
-        """Both None yields safe defaults."""
+        """Both None → equipment_type unknown → returns None (entry will be skipped)."""
         queue_entry = {"id": "q-1", "document_id": None, "asset_id": None}
 
         result = worker._compile_knowledge_entry(None, None, queue_entry)
 
-        assert result["equipment_type"] is None
-        assert result["title"] == "Unknown — Document"
-        assert result["description"] == "[No OCR text available — see source document]"
-        assert result["confidence"] == "medium"
-        assert result["source_document_id"] is None
-        assert "equipment_id" not in result
+        # Returns None when equipment_type cannot be determined; caller skips the entry
+        assert result is None
 
     def test_description_truncated_at_500_chars(self, worker, mock_db):
         """Long OCR text is truncated to 500 characters."""
@@ -291,12 +287,14 @@ class TestPollAndProcess:
         assert result == 1
 
     def test_doc_not_found_marks_processed(self, worker, mock_db):
-        """Document not found → queue entry deleted, not retried."""
+        """Document not found but equipment found → entry processed (equipment_type known)."""
         queue_entry = {
             "id": "q-1",
             "document_id": "doc-missing",
             "asset_id": "eq-1",
         }
+
+        equip_data = {"id": "eq-1", "code": "S002-GEN-001", "type": "GENERATOR"}
 
         def table_side_effect(table_name):
             m = MagicMock()
@@ -305,23 +303,27 @@ class TestPollAndProcess:
                     _make_queue_result([queue_entry])
                 )
                 m.delete.return_value.in_.return_value.execute.return_value = MagicMock()
-            elif table_name == "documents" or table_name == "equipment":
+            elif table_name == "documents":
                 m.select.return_value.eq.return_value.execute.return_value = MagicMock(data=[])
+            elif table_name == "equipment":
+                m.select.return_value.eq.return_value.execute.return_value = MagicMock(data=[equip_data])
+            elif table_name == "equipment_knowledge":
+                m.upsert.return_value.execute.return_value = MagicMock()
             return m
 
         mock_db.table.side_effect = table_side_effect
 
         result = worker.poll_and_process()
 
-        # Should still return 1 — the entry was processed (entry deleted)
+        # Equipment type is known (from equipment record), so entry IS processed
         assert result == 1
 
     def test_equip_not_found_still_processes(self, worker, mock_db):
-        """Equipment not found but document found → processed without equipment FK."""
+        """Equipment not found but equipment_type determinable from fallback → processed."""
         queue_entry = {
             "id": "q-1",
             "document_id": "doc-1",
-            "asset_id": "eq-missing",
+            "asset_id": "S002-GENERATOR-001",
         }
 
         doc_result = MagicMock()
@@ -331,7 +333,7 @@ class TestPollAndProcess:
                 "equipment_description": "Parts replaced.",
                 "document_type": "Work Order",
                 "resolution_confidence": 0.75,
-                "asset_id": "eq-missing",
+                "asset_id": "S002-GENERATOR-001",
             }
         ]
 
@@ -345,6 +347,7 @@ class TestPollAndProcess:
             elif table_name == "documents":
                 m.select.return_value.eq.return_value.execute.return_value = doc_result
             elif table_name == "equipment":
+                # Equipment not found in DB — fallback parsing determines type from asset_id
                 m.select.return_value.eq.return_value.execute.return_value = MagicMock(data=[])
             elif table_name == "equipment_knowledge":
                 m.upsert.return_value.execute.return_value = MagicMock()
@@ -354,6 +357,8 @@ class TestPollAndProcess:
 
         result = worker.poll_and_process()
 
+        # Fallback parse "S002-GENERATOR-001" → parts = ["S002", "GENERATOR", "001"]
+        # → equipment_type = "GENERATOR" (parts[2]) → entry processed
         assert result == 1
         # equipment_id should not be in the upserted record
         upsert_call = mock_db.table.return_value.upsert.return_value

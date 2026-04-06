@@ -70,6 +70,16 @@ class CompilerWorker:
                     queue_entry=entry,
                 )
 
+                # equipment_type unknown — entry marked processed by returning None
+                if knowledge_record is None:
+                    processed_ids.append(entry_id)
+                    processed_count += 1
+                    logger.info(
+                        "[CompilerWorker] skipped entry %s (equipment_type unknown) — marked processed",
+                        entry_id,
+                    )
+                    continue
+
                 # Step 4: Upsert to equipment_knowledge
                 self._upsert_knowledge(knowledge_record)
 
@@ -87,16 +97,34 @@ class CompilerWorker:
                     entry_id,
                     exc,
                 )
-                # Leave entry unprocessed — will retry next cycle
-                # Do NOT add to processed_ids
+                # Reset processed_at so entry can be retried next cycle.
+                # The claim set processed_at but upsert/content fetch failed,
+                # so the entry must be unseated before retry.
+                try:
+                    self.db.table("compiler_queue").update({"processed_at": None}).eq("id", entry_id).execute()
+                except Exception:
+                    pass  # best-effort; entry is already stuck, log already emitted
 
         # Step 5: Delete successfully processed entries from queue
         if processed_ids:
-            self._delete_entries(processed_ids)
-            logger.info(
-                "[CompilerWorker] deleted %d queue entries after successful upsert",
-                len(processed_ids),
-            )
+            try:
+                self._delete_entries(processed_ids)
+                logger.info(
+                    "[CompilerWorker] deleted %d queue entries after successful upsert",
+                    len(processed_ids),
+                )
+            except Exception as exc:
+                # Delete failed but upsert succeeded — reset processed_at so entries retry
+                logger.warning(
+                    "[CompilerWorker] delete failed, unseating %d entries for retry: %s",
+                    len(processed_ids),
+                    exc,
+                )
+                for eid in processed_ids:
+                    try:
+                        self.db.table("compiler_queue").update({"processed_at": None}).eq("id", eid).execute()
+                    except Exception:
+                        pass  # best-effort; log already emitted
 
         return processed_count
 
@@ -222,7 +250,16 @@ class CompilerWorker:
 
         title = f"{equipment_code or 'Unknown'} — {document_type or 'Document'}"
 
-        # Build record
+        # Guard: equipment_type must be determinable — None means the record
+        # would be created but can never be retrieved (API queries by equipment_type).
+        # Return None; caller marks the entry processed so it is not retried forever.
+        if not equipment_type:
+            logger.warning(
+                "[CompilerWorker] cannot determine equipment_type for asset_id=%s — skipping entry",
+                queue_entry.get("asset_id"),
+            )
+            return None
+
         record: dict[str, Any] = {
             "equipment_type": equipment_type,
             "knowledge_type": "maintenance_record",

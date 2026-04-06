@@ -3396,11 +3396,17 @@ class BackgroundSchedulerService:
 def _run_compiler_worker_sync():
     """Sync wrapper — runs the async CompilerWorker in a new event loop."""
     import asyncio
+    import logging
 
     from app.services.compiler_worker import CompilerWorker
 
-    worker = CompilerWorker()
-    asyncio.run(worker.poll_and_process())
+    logger = logging.getLogger(__name__)
+    try:
+        worker = CompilerWorker()
+        asyncio.run(worker.poll_and_process())
+    except Exception as exc:
+        logger.critical("[CompilerWorker] sync runner failed: %s", exc, exc_info=True)
+        raise  # re-raise so APScheduler marks job as failed
 
 
 # Global scheduler instance
