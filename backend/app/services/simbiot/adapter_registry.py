@@ -58,13 +58,3 @@ def _register_default_adapters() -> None:
     from .bacnet_bms_adapter import BacnetBmsAdapter
 
     register_bms_adapter("bacnet", BacnetBmsAdapter)
-    try:
-        from .simulation_bms_adapter import SimulationBmsAdapter
-
-        register_bms_adapter("simulation", SimulationBmsAdapter)
-        register_bms_adapter("local_adapter", SimulationBmsAdapter)
-        _ADAPTER_ALIASES["simulation"] = "simulation"
-        _ADAPTER_ALIASES["simulated"] = "simulation"
-        _ADAPTER_ALIASES["local_adapter"] = "simulation"
-    except ImportError:
-        pass

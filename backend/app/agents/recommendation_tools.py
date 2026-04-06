@@ -109,29 +109,15 @@ async def get_pending_recommendations(site_id: str, limit: int = 5) -> List[Dict
 async def check_equipment_health(equipment_code: str) -> Dict[str, Any]:
     """Check current health score for equipment.
 
-    Wraps HealthSimulationService for equipment health lookup.
-
     Args:
         equipment_code: Equipment code (e.g., "S002-FCU-201")
 
     Returns:
         Dict with health_score (0-100), is_healthy (bool), details
     """
-    try:
-        from app.services.health_simulation_service import health_simulation_service
-
-        health = health_simulation_service.get_equipment_health(equipment_code)
-        if health:
-            score = health.get("health_score", 100)
-            return {
-                "health_score": score,
-                "is_healthy": score >= 50,
-                "details": health,
-            }
-    except Exception as e:
-        logger.warning(f"Failed to check equipment health for {equipment_code}: {e}")
-
-    # Fallback: assume healthy if we can't check
+    # Health simulation service removed — live telemetry drives health scoring
+    # via the ML pipeline. Return default healthy until health score is
+    # available from the ML service.
     return {"health_score": 100, "is_healthy": True, "details": {}}
 
 

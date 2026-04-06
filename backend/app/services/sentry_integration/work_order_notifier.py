@@ -14,14 +14,13 @@ from datetime import datetime
 from typing import Any
 
 from app.database.repositories.notification_repository import (
-    NotificationRepository,
     SYSTEM_NOTIFIER_TECHNICIAN_ID,
+    NotificationRepository,
 )
 from app.database.repositories.service_record_repository import ServiceRecordRepository
 from app.database.repositories.work_order_repository import get_work_order_repository
 from app.models.notification import ChannelType, NotificationDeliveryLog, NotificationStatus
 from app.models.service_record import ServiceStatus
-from app.services.health_simulation_service import health_simulation_service
 from app.services.ml_template_service import MLTemplateService
 from app.services.popia_consent_guard import evaluate_ingress_processing_consent
 
@@ -485,9 +484,13 @@ class WorkOrderNotifier:
 
                     if matched and matched.get("telegram_id"):
                         work_order_data["technician_id"] = matched["telegram_id"]
-                        logger.warning(f"[WO-NOTIFY] Resolved Telegram ID for {matched.get('name')}: {matched['telegram_id']}")
+                        logger.warning(
+                            f"[WO-NOTIFY] Resolved Telegram ID for {matched.get('name')}: {matched['telegram_id']}"
+                        )
                     elif matched:
-                        logger.warning(f"[WO-NOTIFY] No Telegram ID for {matched.get('name')} (email: {matched.get('email')})")
+                        logger.warning(
+                            f"[WO-NOTIFY] No Telegram ID for {matched.get('name')} (email: {matched.get('email')})"
+                        )
                 except Exception as e:
                     logger.warning(f"Could not look up Telegram ID: {e}")
 
@@ -574,8 +577,11 @@ class WorkOrderNotifier:
             # Skip if no Telegram ID, or if it's clearly an email (not a numeric Telegram chat ID)
             if not technician_id or "@" in technician_id:
                 # No valid Telegram ID — skip (email fallback still works)
-                logger.info("No Telegram ID for %s (technician_id=%r) — skipping Telegram send",
-                    work_order_data.get("technician_name"), technician_id)
+                logger.info(
+                    "No Telegram ID for %s (technician_id=%r) — skipping Telegram send",
+                    work_order_data.get("technician_name"),
+                    technician_id,
+                )
                 return False
 
             from app.services.sentry_integration.config import get_sentry_bot_cli
@@ -604,11 +610,19 @@ class WorkOrderNotifier:
             cli = get_sentry_bot_cli()
             result = await asyncio.to_thread(
                 subprocess.run,
-                [cli, "message", "send",
-                 "--channel", "telegram",
-                 "--account", "default",
-                 "--target", technician_id,
-                 "--message", msg],
+                [
+                    cli,
+                    "message",
+                    "send",
+                    "--channel",
+                    "telegram",
+                    "--account",
+                    "default",
+                    "--target",
+                    technician_id,
+                    "--message",
+                    msg,
+                ],
                 timeout=15,
                 capture_output=True,
             )
@@ -1276,17 +1290,8 @@ class WorkOrderNotifier:
             await self.repository.update(service_record["id"], {"status": ServiceStatus.COMPLETE.value})
             logger.info(f"Service record {service_record.get('code')} marked as complete")
 
-            # 2. Restore equipment health via health_simulation_service
+            # 2. Resolve active alerts for this equipment
             equipment_id = service_record.get("equipment_id")
-            if equipment_id:
-                result = await health_simulation_service.trigger_maintenance(equipment_id)
-                if "error" not in result:
-                    logger.info(
-                        f"Equipment {result.get('equipment_name')} health restored: "
-                        f"{result.get('old_health')}% -> {result.get('new_health')}%"
-                    )
-                else:
-                    logger.warning(f"Failed to restore equipment health: {result.get('error')}")
 
             # 3. Resolve active alerts for this equipment
             await self._resolve_equipment_alerts(equipment_id)

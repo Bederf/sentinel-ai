@@ -20,7 +20,6 @@ from typing import Any
 
 from app.database.repositories.water_cost_repository import WaterCostRepository
 from app.database.supabase_client import get_supabase_client
-from app.services.simulation_store import get_simulation_store
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +59,6 @@ class WaterConsumptionEngine:
         """
         self.site_id = site_id
         self.client = get_supabase_client()
-        self.sim_store = get_simulation_store(site_id)
         self.cost_repo = WaterCostRepository()
 
     def calculate_water_consumption(
@@ -259,7 +257,7 @@ async def update_simulation_water(
 ) -> tuple[dict[str, float], float]:
     """Public API for water consumption calculation.
 
-    Called hourly from lifecycle_orchestrator via thermal_simulation_engine.
+    Called hourly from the background scheduler.
 
     Args:
         site_id: Building/site ID

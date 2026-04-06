@@ -1,7 +1,7 @@
 """SENTINEL Alert Engine — equipment-type-aware safety boundary evaluator.
 
-Extracted from lifecycle_orchestrator._scan_safety_boundaries() to enforce the
-architecture rule: "SENTINEL does NOT simulate. It receives data and responds."
+Evaluates telemetry against equipment-type-specific safety boundaries to enforce
+the architecture rule: "SENTINEL does NOT simulate. It receives data and responds."
 
 The orchestrator produces telemetry. This engine consumes telemetry and returns
 safety violations. It does NOT own the alert queue, cooldown, or dashboard push —
