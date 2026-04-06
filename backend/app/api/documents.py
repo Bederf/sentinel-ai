@@ -21,6 +21,8 @@ from app.services.document_extractor import extract_text
 from app.services.storage_service import get_storage_service
 from app.services.vector_db import get_vector_db_service
 from app.services.document_adapter_manual import ManualUploadAdapter
+from app.services.asset_id_resolver import AssetIDResolver
+from app.services.llm_extraction_service import LLMExtractionService
 
 logger = logging.getLogger(__name__)
 
@@ -585,8 +587,41 @@ async def upload_technician_document(
     # B1 fix: _upsert gracefully no-ops if migration not applied (no 500)
     # B4/B5 fix: _upsert only writes source_system, source_document_id, site_id
     # existing upload_technician_document endpoint continues to own source/document_type
+    # Phase 181-03: LLM extraction BEFORE _upsert — equipment_description must be in DB
+    # before AssetIDResolver.resolve_and_apply() reads it (ordering constraint)
     if response.get("document_id"):
         try:
+            # Phase 181-03: Extract equipment_description via LLM BEFORE _upsert.
+            # upload_document() stored full_text in DB but didn't return it.
+            # Fetch it now so we can run LLM extraction before the adapter flow.
+            equipment_description: str | None = None
+            try:
+                doc_row = client.table("documents").select("full_text").eq("id", response["document_id"]).execute()
+                raw_text = ""
+                if doc_row.data:
+                    raw_text = doc_row.data[0].get("full_text") or ""
+                if raw_text and len(raw_text.strip()) > 50:
+                    extractor = LLMExtractionService(db=client, site_id=resolved_site_id)
+                    equipment_description = await extractor.extract_equipment_description(raw_text)
+                    logger.info(
+                        "[upload] LLM extracted equipment_description for doc=%s: %.50s",
+                        response["document_id"],
+                        equipment_description or "(empty)",
+                    )
+                else:
+                    logger.debug(
+                        "[upload] skipping LLM extraction for doc=%s: text_length=%d",
+                        response["document_id"],
+                        len(raw_text),
+                    )
+            except Exception as exc:
+                # Graceful degradation: LLM extraction failure must not fail the upload
+                logger.warning(
+                    "[upload] LLM extraction failed for document_id=%s: %s",
+                    response.get("document_id"),
+                    exc,
+                )
+
             adapter = ManualUploadAdapter()
             form_data = {
                 "equipment_id": equipment_id,
@@ -598,8 +633,31 @@ async def upload_technician_document(
                 "title": title,
                 "uploaded_by_user_id": auth.user_id,
             }
-            doc_record = adapter.normalise_upload(response, form_data, resolved_site_id)
+            doc_record = adapter.normalise_upload(response, form_data, resolved_site_id, equipment_description)
             await adapter._upsert(doc_record)  # fire-and-forget; no-op on migration-missing
+
+            # Wire AssetIDResolver — resolve equipment_description → asset_id
+            # Only invoke when equipment_description is non-empty (API sources set this;
+            # manual uploads have it as None and equipment_id is already validated canonical form)
+            if doc_record.equipment_description:
+                try:
+                    resolver = AssetIDResolver(db=adapter.db, site_id=resolved_site_id)
+                    result = await resolver.resolve_and_apply(response["document_id"])
+                    if result.needs_review:
+                        logger.info(
+                            "[upload] asset resolution needs review: doc=%s asset=%s method=%s confidence=%.2f",
+                            response["document_id"],
+                            result.asset_id,
+                            result.method.value,
+                            result.confidence,
+                        )
+                except Exception as exc:
+                    logger.warning(
+                        "[upload] asset resolution failed for document_id=%s: %s",
+                        response.get("document_id"),
+                        exc,
+                    )
+                    # Never fail the upload because of resolution failure
         except Exception as exc:
             logger.warning(
                 "[manual_upload] _upsert failed for document_id=%s: %s",

@@ -76,6 +76,38 @@ class DocumentSourceAdapter(ABC):
     def get_document_file(self, source_document_id: str) -> bytes:
         """Retrieve the raw file bytes for the given source_document_id."""
 
+    async def run_sync(self, site_id: str | None = None) -> dict:
+        """
+        Run a full sync cycle: fetch → normalise → upsert → update state.
+
+        Calls fetch_new_documents, upserts each record, then updates sync state.
+        Returns {"synced": N, "failed": M, "errors": [...]}.
+        """
+        last_sync = self._get_last_sync(site_id)
+        records = await self.fetch_new_documents(since=last_sync, site_id=site_id)
+
+        synced = failed = 0
+        errors: list[str] = []
+        for record in records:
+            try:
+                doc_id = await self._upsert(record)
+                if doc_id:
+                    synced += 1
+                else:
+                    failed += 1
+            except Exception as exc:
+                failed += 1
+                errors.append(str(exc))
+                logger.error(
+                    "[%s] run_sync: failed to upsert document %s: %s",
+                    self.source_system.value,
+                    record.source_document_id,
+                    exc,
+                )
+
+        self._update_sync_state(site_id, synced, failed, len(errors))
+        return {"synced": synced, "failed": failed, "errors": errors}
+
     # -------------------------------------------------------------------------
     # Helper methods (not abstract)
     # -------------------------------------------------------------------------
@@ -137,6 +169,17 @@ class DocumentSourceAdapter(ABC):
         # raw_file_path maps to source_file_path
         if record.raw_file_path:
             data["source_file_path"] = record.raw_file_path
+
+        # Phase 181-03: write equipment_description if the column exists.
+        # Protected by B1-style column guard: no-op if column missing (migration pending).
+        if record.equipment_description:
+            if await self._columns_exist("documents", "equipment_description"):
+                data["equipment_description"] = record.equipment_description
+            else:
+                logger.debug(
+                    "[%s] equipment_description column missing; write skipped (migration pending)",
+                    self.source_system.value,
+                )
 
         # Build keywords from available fields
         keywords: list[str] = []

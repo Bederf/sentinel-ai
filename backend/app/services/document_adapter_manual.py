@@ -116,11 +116,7 @@ class ManualUploadAdapter(DocumentSourceAdapter):
             )
             return []
 
-        query = (
-            self.db.table("documents")
-            .select("*")
-            .eq("source_system", self.source_system.value)
-        )
+        query = self.db.table("documents").select("*").eq("source_system", self.source_system.value)
         if site_id:
             query = query.eq("site_id", site_id)
         if since:
@@ -138,12 +134,7 @@ class ManualUploadAdapter(DocumentSourceAdapter):
 
         Uses source_file_path stored on the documents record to locate the file.
         """
-        doc_result = (
-            self.db.table("documents")
-            .select("source_file_path")
-            .eq("id", source_document_id)
-            .execute()
-        )
+        doc_result = self.db.table("documents").select("source_file_path").eq("id", source_document_id).execute()
         if not doc_result.data:
             raise FileNotFoundError(f"Document {source_document_id} not found")
 
@@ -162,6 +153,7 @@ class ManualUploadAdapter(DocumentSourceAdapter):
         upload_response: dict,
         form_data: dict,
         site_id: str,
+        equipment_description: str | None = None,
     ) -> DocumentRecord:
         """
         Map upload_technician_document response + Form data to a DocumentRecord.
@@ -172,11 +164,18 @@ class ManualUploadAdapter(DocumentSourceAdapter):
 
         B6 fix: document_name mapped via _DOCUMENT_NAME_TO_SOURCE — no ValueError.
 
+        Phase 181-03: equipment_description is the LLM-extracted free-text
+        description from OCR text. This is NOT the canonical asset_id —
+        asset_id comes from form_data.equipment_id. The equipment_description
+        feeds into AssetIDResolver.resolve_and_apply() for canonical resolution.
+
         Parameters:
             upload_response: dict with document_id, storage_path from upload_document
             form_data: dict with equipment_id, document_name, document_sub_class,
                        category_discipline, document_creation_date, trigger_date, title
             site_id: resolved site_id (not from form_data — prevents override)
+            equipment_description: LLM-extracted equipment description from OCR text.
+                Feeds into AssetIDResolver; must be in DB before resolve_and_apply() reads.
         """
         # Extract source_document_id from upload response
         source_document_id = upload_response.get("document_id") or ""
@@ -218,7 +217,7 @@ class ManualUploadAdapter(DocumentSourceAdapter):
             source_url=None,  # No external URL for manual uploads
             site_id=site_id,
             asset_id=form_data.get("equipment_id") or None,
-            equipment_description=None,
+            equipment_description=equipment_description,
             document_type=DocumentType(doc_source.value),  # mirrors DocumentSource
             sub_class=form_data.get("document_sub_class") or None,
             discipline=form_data.get("category_discipline") or None,
