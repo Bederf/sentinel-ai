@@ -3365,6 +3365,43 @@ class BackgroundSchedulerService:
         except Exception as e:
             logger.error("Document MRI sync failed: %s", e, exc_info=True)
 
+    # ── Compiler Worker ─────────────────────────────────────────────────────────
+
+    def add_compiler_worker_job(self, interval_minutes: int = 5):
+        """
+        Add periodic job to process compiler_queue entries.
+
+        Runs the CompilerWorker.poll_and_process() method every N minutes.
+        Each cycle processes up to 50 pending queue entries.
+
+        Args:
+            interval_minutes: How often to poll the queue (default: 5 minutes)
+        """
+        job_id = "compiler_worker"
+        if self.scheduler.get_job(job_id):
+            self.scheduler.remove_job(job_id)
+
+        self.scheduler.add_job(
+            _run_compiler_worker_sync,
+            "interval",
+            minutes=interval_minutes,
+            id=job_id,
+            replace_existing=True,
+            max_instances=1,
+        )
+        logger.info("compiler_worker job registered — interval=%s min", interval_minutes)
+
+
+# Sync wrapper — APScheduler passes sync functions to job executors
+def _run_compiler_worker_sync():
+    """Sync wrapper — runs the async CompilerWorker in a new event loop."""
+    import asyncio
+
+    from app.services.compiler_worker import CompilerWorker
+
+    worker = CompilerWorker()
+    asyncio.run(worker.poll_and_process())
+
 
 # Global scheduler instance
 scheduler_service = BackgroundSchedulerService()

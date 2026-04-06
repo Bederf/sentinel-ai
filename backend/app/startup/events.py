@@ -793,6 +793,13 @@ async def startup_event(app: FastAPI) -> None:
         except Exception as e:
             _logger.error(f"Document MRI sync initialization failed: {e}", exc_info=True)
 
+    # Phase 182-02: Compiler queue worker — processes pending compiler_queue entries (every 5 min)
+    try:
+        scheduler_service.add_compiler_worker_job(interval_minutes=5)
+        _logger.info("Compiler queue worker job initialized (5 min interval)")
+    except Exception as e:
+        _logger.error(f"Compiler worker job initialization failed: {e}", exc_info=True)
+
     # Anomaly model weekly retraining — trains Isolation Forest on zone temp + HVAC power
     # data every Sunday at 02:00. Works with as little as 72h of data (vs LSTM's 500h).
     try:
