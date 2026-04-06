@@ -14,17 +14,18 @@ import json
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from app.core.site_resolver import get_primary_site_code
 from app.database.repositories.module_access_repository import get_module_access_repository
+from app.database.supabase_client import get_supabase_client
 from app.models.auth import ROLE_HIERARCHY, SentinelRole
-from app.services.device_abstraction import device_manager
 from app.models.device import DeviceStatus
 from app.models.module_registry import ModuleType
+from app.services.chat_tools_service_history import get_equipment_service_history
+from app.services.device_abstraction import device_manager
 from app.services.health_threshold_service import get_health_thresholds
 from app.services.module_registry_service import module_registry
-from app.database.supabase_client import get_supabase_client
 
 logger = logging.getLogger(__name__)
 
@@ -1837,9 +1838,9 @@ async def discover_niagara_points(
         return {"success": False, "error": ip_reason}
 
     try:
-        from app.services.niagara.point_discovery import get_point_discovery_service
-        from app.services.niagara.point_classifier import get_point_classifier
         from app.services.niagara.mapping_service import get_mapping_service
+        from app.services.niagara.point_classifier import get_point_classifier
+        from app.services.niagara.point_discovery import get_point_discovery_service
 
         discovery_service = get_point_discovery_service()
         mapping_service = get_mapping_service()
@@ -2293,8 +2294,8 @@ async def get_security_status() -> dict[str, Any]:
         Structured security system status report
     """
     try:
-        from app.services.security_service import get_security_service
         from app.services.security_occupancy_service import get_security_occupancy_service
+        from app.services.security_service import get_security_service
 
         svc = get_security_service()
         occ_svc = get_security_occupancy_service()
@@ -2668,6 +2669,34 @@ CHAT_TOOLS = [
                 },
             },
             "required": [],
+        },
+    },
+    {
+        "name": "get_equipment_service_history",
+        "description": (
+            "Get maintenance and service records for a"
+            " specific piece of equipment. Returns service"
+            " history, repair records, and knowledge base"
+            " entries for the asset."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "asset_id": {
+                    "type": "string",
+                    "description": ("Equipment UUID (equipment.id from database)"),
+                },
+                "knowledge_type": {
+                    "type": "string",
+                    "description": ("Optional filter on knowledge type (e.g. 'service', 'repair')"),
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": ("Maximum number of records to return (default 10, max 50)"),
+                    "default": 10,
+                },
+            },
+            "required": ["asset_id"],
         },
     },
     {
@@ -3130,8 +3159,13 @@ CHAT_TOOLS = [
         "name": "search_system_documents",
         "description": (
             "Search SENTINEL platform documentation: architecture, security design, "
-            "compliance controls, onboarding instructions, building upload procedures, "
-            "and configuration guides. Only use when the user asks about how the "
+            "compliance controls, FSR gap analysis, ISO 42001 AI governance, EU AI Act, "
+            "NIST AI RMF, POPIA compliance, vulnerability management, penetration testing, "
+            "onboarding instructions, building upload procedures, and configuration guides. "
+            "For questions about SENTINEL's standards, compliance posture, or security "
+            "certifications: include keywords like 'FSR', 'ISO', 'NIST', 'POPIA', 'EU AI Act', "
+            "'gap analysis', 'control mapping', 'assessment scores' in your query to retrieve "
+            "the detailed compliance documents. Only use when the user asks about how the "
             "SENTINEL platform itself works, NOT for operational/equipment questions."
         ),
         "input_schema": {
@@ -3143,8 +3177,8 @@ CHAT_TOOLS = [
                 },
                 "n_results": {
                     "type": "integer",
-                    "description": "Maximum results to return (default: 5, max: 10)",
-                    "default": 5,
+                    "description": "Maximum results to return (default: 8, max: 10)",
+                    "default": 8,
                 },
             },
             "required": ["query"],
@@ -3542,7 +3576,7 @@ TOOL_ROLE_REQUIREMENTS: dict[str, SentinelRole] = {
 }
 
 
-def _has_required_role(user_role: Optional[SentinelRole], required_role: SentinelRole) -> bool:
+def _has_required_role(user_role: SentinelRole | None, required_role: SentinelRole) -> bool:
     """Check if user role meets the minimum required role."""
     if user_role is None:
         return False
@@ -3557,7 +3591,7 @@ def _has_required_role(user_role: Optional[SentinelRole], required_role: Sentine
     return user_level >= required_level
 
 
-def _filter_tools_by_role(tools: list[dict], user_role: Optional[SentinelRole]) -> list[dict]:
+def _filter_tools_by_role(tools: list[dict], user_role: SentinelRole | None) -> list[dict]:
     """Filter tool list by role requirements (no module check)."""
     result = []
     for tool in tools:
@@ -3575,8 +3609,8 @@ _SYSTEM_DOCS_GATED_TOOLS = {"search_system_documents"}
 def get_chat_tools(
     site_id: str | None = None,
     *,
-    user_email: Optional[str] = None,
-    user_role: Optional[SentinelRole] = None,
+    user_email: str | None = None,
+    user_role: SentinelRole | None = None,
     include_system_docs: bool = False,
 ) -> list[dict[str, Any]]:
     """Return chat tools filtered by active modules, user role, and system docs toggle.
@@ -3628,8 +3662,8 @@ def _is_tool_allowed_for_site(
     tool_name: str,
     site_id: str | None,
     *,
-    user_email: Optional[str] = None,
-    user_role: Optional[SentinelRole] = None,
+    user_email: str | None = None,
+    user_role: SentinelRole | None = None,
 ) -> bool:
     """Check whether a tool is allowed for the given site/module state."""
     if not site_id:
@@ -3675,6 +3709,7 @@ async def process_recommendation(
     """
     try:
         from langchain_core.messages import HumanMessage
+
         from app.agents import get_recommendation_graph
 
         agent = get_recommendation_graph()
@@ -4097,6 +4132,7 @@ async def create_work_order_chat(
     """
     try:
         import httpx
+
         from app.config.settings import settings
 
         reported_by = _user_email or "AI Chat (operator)"
@@ -4171,7 +4207,7 @@ async def create_work_order_chat(
     except Exception as e:
         logger.warning(f"Sentry WO API unreachable, falling back to in-memory: {e}")
 
-    # Fallback: in-memory work order service (for demo/offline scenarios)
+    # Fallback: in-memory work order service (for local/offline scenarios)
     try:
         from app.services.work_order_service import work_order_service
 
@@ -4395,9 +4431,15 @@ async def get_hybrid_context(
         }
 
     try:
+        from app.core.site_resolver import get_primary_site_code
         from app.services.hybrid_query_service import get_hybrid_query_service
 
-        effective_site = site_id or "site-002"
+        effective_site = site_id or get_primary_site_code()
+        if not effective_site:
+            return {
+                "success": False,
+                "error": "No registered site available. Provide site_id explicitly.",
+            }
         svc = get_hybrid_query_service(effective_site)
 
         ctx = await svc.query(
@@ -4616,6 +4658,7 @@ TOOL_HANDLERS = {
     "get_system_status": get_system_status,
     "get_optimization_recommendations": get_optimization_recommendations,
     "get_equipment_health": get_equipment_health,
+    "get_equipment_service_history": get_equipment_service_history,
     "get_alerts_and_anomalies": get_alerts_and_anomalies,
     "get_energy_analysis": get_energy_analysis,
     "get_system_methodology": get_system_methodology,
@@ -4657,8 +4700,8 @@ async def execute_tool(
     tool_name: str,
     tool_input: dict,
     site_id: str | None = None,
-    user_email: Optional[str] = None,
-    user_role: Optional[SentinelRole] = None,
+    user_email: str | None = None,
+    user_role: SentinelRole | None = None,
 ) -> dict[str, Any]:
     """
     Execute a tool by name with given input.
@@ -4742,7 +4785,7 @@ async def execute_tool(
 
     # --- Credential scanning on inputs (Gap 7: tool input scanning) ---
     try:
-        from app.security.credential_scanner import scan_tool_input, redact_credentials
+        from app.security.credential_scanner import redact_credentials, scan_tool_input
 
         findings = scan_tool_input(tool_name, tool_input)
         if findings:
@@ -4821,8 +4864,8 @@ async def execute_tool(
         _duration = _time.perf_counter() - _t0
         try:
             from app.api.metrics import (
-                sentinel_tool_calls_total,
                 sentinel_tool_call_duration_seconds,
+                sentinel_tool_calls_total,
             )
 
             sentinel_tool_calls_total.labels(tool_name=tool_name, outcome=_outcome).inc()
