@@ -58,6 +58,11 @@ pdfplumber==0.10.3
 PyPDF2==3.0.1  # PDF text extraction for document upload
 python-docx==1.1.0  # DOCX text extraction for document upload
 
+# Document OCR & Layout Analysis (Phase 181)
+# Docling: better scanned-PDF OCR, table extraction, key-value pair detection
+# Import: from docling.document_converter import DocumentConverter
+docling>=2.0
+
 # Image Processing & OCR (Core Infrastructure)
 # ⚠️  REQUIRES SYSTEM BINARY: tesseract-ocr
 # Used in: floor plan sanitization (Phase A), work order technician pipeline (Phase 41),
@@ -116,3 +121,6 @@ twilio>=8.0.0                  # WhatsApp webhook responses for visit confirmati
 
 # Microsoft Authentication (Phase 176 — Outlook/Graph API)
 msal>=1.26.0                   # Microsoft Authentication Library for Outlook calendar service
+
+# Fuzzy String Matching (Phase 180 — Asset ID Resolver)
+rapidfuzz>=3.6.0               # token_set_ratio for equipment description fuzzy matching
