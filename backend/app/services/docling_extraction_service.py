@@ -128,8 +128,6 @@ class DoclingExtractionService:
         try:
             import tempfile
 
-            from docling.document_converter import DocumentConverter
-
             # Docling's convert() requires a Path or DocumentStream, not BytesIO.
             # Write bytes to a temporary file to satisfy the API.
             with tempfile.NamedTemporaryFile(suffix=file_ext, delete=False) as tmp:
@@ -137,7 +135,7 @@ class DoclingExtractionService:
                 tmp_path = Path(tmp.name)
 
             try:
-                converter = DocumentConverter()
+                converter = self.converter
                 result = converter.convert(tmp_path)
             finally:
                 tmp_path.unlink(missing_ok=True)
