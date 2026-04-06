@@ -15,11 +15,21 @@ interface CockpitBuildingThreeProps {
 }
 
 const SLAB_HEIGHT = 0.28
-const BASE_WIDTH = 1.35
-const BASE_DEPTH = 1.05
+const BASE_WIDTH  = 1.35
+const BASE_DEPTH  = 1.05
+
+// Hard cap — twin represents a known building, not an infinite stack.
+// 10 floors covers any realistic FNB REMS site.
+const MAX_FLOORS = 10
+
+// Occupied floor IDs for Sandton City Office Tower.
+// ONLY these floors receive the amber intelligence glow (isManaged = true).
+// B1 has equipment (chillers/pumps) and R has equipment (cooling towers)
+// but neither is an occupied tenant space — they render as neutral host mass.
+const OCCUPIED_FLOOR_IDS = new Set(['L0', 'L1', 'L2'])
 
 function GridHelperMemo() {
-  const grid = useMemo(() => new THREE.GridHelper(48, 48, 0x334155, 0x0c1222), [])
+  const grid = useMemo(() => new THREE.GridHelper(18, 18, 0x334155, 0x0c1222), [])
   return <primitive object={grid} position={[0, 0, 0]} />
 }
 
@@ -116,7 +126,8 @@ function HostSlab({
   d: number
   h: number
 }) {
-  const pal = cockpitFloorPalette(tone, floor.intensity, floor.isManaged, floor.riskLevel)
+  // Force isManaged=false so host slabs always get neutral palette
+  const pal = cockpitFloorPalette(tone, floor.intensity, false, floor.riskLevel)
   return (
     <mesh position={[0, y, 0]} castShadow receiveShadow>
       <boxGeometry args={[w, h, d]} />
@@ -148,20 +159,24 @@ function BuildingStack({
   const breath = Math.max(0.12, Math.min(1, state.visualTwin.breathingIntensity || 0.2))
 
   const slabs: SlabInfo[] = useMemo(() => {
-    if (floors.length === 0) {
-      return Array.from({ length: 5 }).map((_, i) => ({
-        id: `default-${i}`,
-        intensity: 0.25,
-        isManaged: i >= 2,
-        riskLevel: 'stable',
-      }))
-    }
-    return floors.map((f) => ({
-      id: f.id,
-      intensity: f.intensity,
-      isManaged: Boolean(f.isManaged),
-      riskLevel: f.level,
-    }))
+    const source = floors.length === 0
+      ? Array.from({ length: 5 }).map((_, i) => ({
+          id: `default-${i}`,
+          intensity: 0.25,
+          isManaged: OCCUPIED_FLOOR_IDS.has(`L${i}`),
+          riskLevel: 'stable',
+        }))
+      : floors.map((f) => ({
+          id: f.id,
+          intensity: f.intensity,
+          // isManaged drives amber glow — only occupied tenant floors qualify.
+          // Equipment-only floors (B1, R) are host mass regardless of their
+          // risk level in the payload.
+          isManaged: OCCUPIED_FLOOR_IDS.has(f.id),
+          riskLevel: f.level,
+        }))
+    // Never render more than MAX_FLOORS slabs
+    return source.slice(0, MAX_FLOORS)
   }, [floors])
 
   const reversed = [...slabs].reverse()
@@ -247,9 +262,7 @@ function DriftPath({
 
   const lineWidth = Math.max(1.5, 2 + (state.visualTwin.flowPaths[0]?.intensity ?? 0.3) * 3)
 
-  if (!yRange) {
-    return null
-  }
+  if (!yRange) return null
 
   return (
     <Line
@@ -324,9 +337,8 @@ function ZoneMarkers({
       {signals.map((sig, index) => {
         const fi = floors.findIndex((f) => f.id === sig.floorId)
         const targetFloor = fi >= 0 ? floors[fi] : null
-        if (!targetFloor?.isManaged) {
-          return null
-        }
+        // Only render orbs on occupied floors
+        if (!targetFloor || !OCCUPIED_FLOOR_IDS.has(targetFloor.id)) return null
         const idx = fi
         const yRatio = n > 1 ? idx / Math.max(n - 1, 1) : 0.5
         const y = 0.2 + yRatio * Math.max(buildingHeight - 0.4, SLAB_HEIGHT * 2)
@@ -366,15 +378,9 @@ function CameraToolbar({
     'rounded-full border border-white/15 bg-slate-950/80 px-3 py-1.5 text-[10px] font-medium uppercase tracking-[0.14em] text-slate-200 backdrop-blur-sm transition hover:border-cyan-500/40 hover:text-white'
   return (
     <div className="pointer-events-auto absolute left-3 top-3 z-20 flex flex-wrap gap-2">
-      <button type="button" className={btn} onClick={onZoomOut}>
-        Zoom out
-      </button>
-      <button type="button" className={btn} onClick={onZoomIn}>
-        Zoom in
-      </button>
-      <button type="button" className={btn} onClick={onReset}>
-        Reset view
-      </button>
+      <button type="button" className={btn} onClick={onZoomOut}>Zoom out</button>
+      <button type="button" className={btn} onClick={onZoomIn}>Zoom in</button>
+      <button type="button" className={btn} onClick={onReset}>Reset view</button>
     </div>
   )
 }
@@ -407,7 +413,8 @@ function SceneR3F({
   const tone = cockpitToneKey(state)
   const { camera } = useThree()
 
-  const floorCount = Math.max(state.visualTwin.floors.length, 5)
+  // Apply MAX_FLOORS cap here too so buildingHeight is consistent
+  const floorCount = Math.min(Math.max(state.visualTwin.floors.length, 5), MAX_FLOORS)
   const buildingHeight = floorCount * SLAB_HEIGHT
   const yRange = useMemo(() => managedLocalYRange(state.visualTwin.floors), [state.visualTwin.floors])
 
@@ -426,12 +433,12 @@ function SceneR3F({
   const showFlow = !waiting && state.visualTwin.flowPaths.length > 0 && !calm
 
   const worldHalf = buildingHeight * modelScale * 0.5
-  const fogFar = Math.max(28, worldHalf * 5.5)
+  const fogFar = Math.max(18, worldHalf * 4.5)
 
   return (
     <>
       <color attach="background" args={['#020617']} />
-      <fog attach="fog" args={['#020617', 18, fogFar]} />
+      <fog attach="fog" args={['#020617', 12, fogFar]} />
 
       <ambientLight intensity={0.52} />
       <directionalLight position={[6, 14, 8]} intensity={1.3} castShadow shadow-mapSize-width={1024} shadow-mapSize-height={1024} />
@@ -440,7 +447,7 @@ function SceneR3F({
       <hemisphereLight args={['#0ea5e9', '#0b1120', 0.3]} />
 
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.02, 0]} receiveShadow>
-        <planeGeometry args={[56, 56]} />
+        <planeGeometry args={[32, 32]} />
         <meshStandardMaterial color="#020617" metalness={0.05} roughness={0.95} />
       </mesh>
 
@@ -458,8 +465,8 @@ function SceneR3F({
         makeDefault
         enableDamping
         dampingFactor={0.08}
-        minDistance={Math.max(2.2, worldHalf * 0.95)}
-        maxDistance={Math.max(12, worldHalf * 4.2)}
+        minDistance={Math.max(1.4, worldHalf * 0.7)}
+        maxDistance={Math.max(8, worldHalf * 3.2)}
         minPolarAngle={0.32}
         maxPolarAngle={Math.PI / 2 + 0.14}
         target={computedTarget}
@@ -477,18 +484,19 @@ function SceneR3F({
 
 export function CockpitBuildingThree({ state, className }: CockpitBuildingThreeProps) {
   const controlsRef = useRef<OrbitControlsImpl>(null)
-  const floorCount = Math.max(state.visualTwin.floors.length, 5)
+  // Apply MAX_FLOORS cap so modelScale and camera are sized for a known building
+  const floorCount = Math.min(Math.max(state.visualTwin.floors.length, 5), MAX_FLOORS)
   const buildingHeight = floorCount * SLAB_HEIGHT
 
   const modelScale = useMemo(
-    () => THREE.MathUtils.clamp(5.8 / Math.max(buildingHeight, 2.8), 1.75, 3.6),
+    () => THREE.MathUtils.clamp(4.2 / Math.max(buildingHeight, 2.8), 1.1, 2.2),
     [buildingHeight],
   )
 
   const layout = useMemo(() => {
     const wh = buildingHeight * modelScale * 0.5
     const target = new THREE.Vector3(0, wh, 0)
-    const cam = new THREE.Vector3(wh * 1.22, wh * 0.92, wh * 1.68)
+    const cam = new THREE.Vector3(wh * 1.05, wh * 0.78, wh * 1.45)
     return { computedTarget: target, defaultCam: cam }
   }, [buildingHeight, modelScale])
 
@@ -514,7 +522,7 @@ export function CockpitBuildingThree({ state, className }: CockpitBuildingThreeP
     oc.update()
   }, [computedTarget, defaultCam])
 
-  const viewportHeight = 'clamp(560px, 74vh, 920px)'
+  const viewportHeight = 'clamp(380px, 52vh, 580px)'
 
   return (
     <div className={`relative w-full ${className ?? ''}`} style={{ height: viewportHeight }}>
@@ -524,7 +532,7 @@ export function CockpitBuildingThree({ state, className }: CockpitBuildingThreeP
         style={{ width: '100%', height: '100%' }}
         shadows
         gl={{ antialias: true, alpha: false, powerPreference: 'high-performance' }}
-        camera={{ fov: 48, near: 0.1, far: 220, position: [defaultCam.x, defaultCam.y, defaultCam.z] }}
+        camera={{ fov: 42, near: 0.1, far: 180, position: [defaultCam.x, defaultCam.y, defaultCam.z] }}
         onDoubleClick={(e) => {
           e.preventDefault()
           reset()
