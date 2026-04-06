@@ -13,7 +13,15 @@ class EquipmentRepository:
     """Repository for equipment database operations."""
 
     # Column selection constants to avoid SELECT * overhead
-    _LIST_COLUMNS = "id, code, name, status, health_score, type, site_id, location, operating_data"
+    # _LIST_COLUMNS: used by API list endpoints (site overview, cards, etc.)
+    # Includes all profile fields needed by UI cards for meaningful metadata display
+    _LIST_COLUMNS = (
+        "id, code, name, status, health_score, type, site_id, location, "
+        "manufacturer, model, capacity, install_date, commissioning_date, "
+        "last_service, operating_data"
+    )
+    # _DETAIL_COLUMNS: used by detail endpoints (single equipment view)
+    # Already comprehensive; preserved unchanged
     _DETAIL_COLUMNS = (
         "id, code, name, status, health_score, type, site_id, "
         "manufacturer, model, install_date, commissioning_date, "
