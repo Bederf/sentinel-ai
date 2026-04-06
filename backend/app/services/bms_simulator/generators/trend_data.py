@@ -7,17 +7,17 @@ Applies diurnal patterns, weekend variation, and degradation curves.
 
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import numpy as np
 import pandas as pd
 
 from ..models import (
-    SimulationConfig,
     POINT_VALUE_RANGES,
+    SimulationConfig,
 )
-from ..patterns.diurnal import DiurnalPattern, DiurnalConfig
 from ..patterns.degradation import DegradationPattern
+from ..patterns.diurnal import DiurnalConfig, DiurnalPattern
 from .point_list import PointListExporter
 
 
@@ -64,7 +64,7 @@ class TrendDataGenerator:
         "vav": ["damper_position"],
     }
 
-    def __init__(self, config: Optional[SimulationConfig] = None):
+    def __init__(self, config: SimulationConfig | None = None):
         """
         Initialize the trend data generator.
 
@@ -92,7 +92,7 @@ class TrendDataGenerator:
 
     def generate_device_trends(
         self,
-        device: Dict[str, Any],
+        device: dict[str, Any],
         timestamps: np.ndarray,
     ) -> pd.DataFrame:
         """
@@ -145,10 +145,10 @@ class TrendDataGenerator:
     def _generate_point_values(
         self,
         point_name: str,
-        point_def: Dict[str, Any],
+        point_def: dict[str, Any],
         timestamps: np.ndarray,
         device_type: str,
-        degradation_factors: Optional[np.ndarray] = None,
+        degradation_factors: np.ndarray | None = None,
     ) -> np.ndarray:
         """
         Generate values for a single point.
@@ -246,7 +246,7 @@ class TrendDataGenerator:
 
     def _generate_multistate_values(
         self,
-        point_def: Dict[str, Any],
+        point_def: dict[str, Any],
         timestamps: np.ndarray,
     ) -> np.ndarray:
         """Generate multistate values (e.g., fan speed low/med/high)."""
@@ -279,10 +279,10 @@ class TrendDataGenerator:
 
     def generate_all_trends(
         self,
-        site_id: Optional[str] = None,
+        site_id: str | None = None,
         include_diffusers: bool = True,
         output_format: str = "csv",
-    ) -> List[str]:
+    ) -> list[str]:
         """
         Generate trend data for all devices in a site.
 
@@ -338,8 +338,8 @@ class TrendDataGenerator:
     def generate_equipment_trends(
         self,
         equipment_id: str,
-        days: Optional[int] = None,
-        output_path: Optional[Path] = None,
+        days: int | None = None,
+        output_path: Path | None = None,
     ) -> str:
         """
         Generate trend data for a specific equipment.
@@ -389,7 +389,7 @@ class TrendDataGenerator:
     def export_chiller_telemetry_format(
         self,
         device_id: str,
-        output_path: Optional[Path] = None,
+        output_path: Path | None = None,
     ) -> str:
         """
         Export chiller trend data in the existing chiller_telemetry.csv format.

@@ -3,7 +3,7 @@
 Exposes SENTINEL AI control metrics in Prometheus text exposition format
 for scraping by Prometheus/Victoria Metrics.
 
-Phase 114-05: Creates the endpoint structure with static/demo values.
+Phase 114-05: Creates the endpoint structure with static baseline values.
 Real metric collection hooks into existing services will be wired in
 Phase 2 (Control Implementation) per compliance.md roadmap.
 """
@@ -498,62 +498,6 @@ sentinel_info.info(
 )
 
 # ---------------------------------------------------------------------------
-# Seed demo values (only when DEMO_MODE=true).
-# In production, metrics start at 0 and increment from real service events.
-# Phase 115-01: Real instrumentation wired into services.
-# ---------------------------------------------------------------------------
-_DEMO_SEEDED = False
-
-
-def _seed_demo_values() -> None:
-    """Populate counters with representative demo data (idempotent)."""
-    global _DEMO_SEEDED
-    if _DEMO_SEEDED:
-        return
-    _DEMO_SEEDED = True
-
-    from app.core.site_resolver import get_primary_site_code
-
-    _site = get_primary_site_code() or "unknown"
-
-    # Quality gate evaluations
-    sentinel_quality_gate_evaluations_total.labels(site_id=_site, status="pass").inc(142)
-    sentinel_quality_gate_evaluations_total.labels(site_id=_site, status="warn").inc(18)
-    sentinel_quality_gate_evaluations_total.labels(site_id=_site, status="fail").inc(3)
-
-    # Enforcement gauge — normal is active
-    sentinel_quality_gate_enforcement.labels(site_id=_site, enforcement="normal").set(1)
-    sentinel_quality_gate_enforcement.labels(site_id=_site, enforcement="cap_confidence").set(0)
-    sentinel_quality_gate_enforcement.labels(site_id=_site, enforcement="suppress_tier3").set(0)
-    sentinel_quality_gate_enforcement.labels(site_id=_site, enforcement="block_writes").set(0)
-
-    # Recommendations
-    sentinel_recommendations_total.labels(site_id=_site, tier="tier1", action="auto_execute").inc(87)
-    sentinel_recommendations_total.labels(site_id=_site, tier="tier2", action="pending_approval").inc(34)
-    sentinel_recommendations_total.labels(site_id=_site, tier="tier3", action="advisory").inc(12)
-    sentinel_recommendations_total.labels(site_id=_site, tier="tier3", action="blocked").inc(2)
-
-    # Approvals
-    sentinel_approval_decisions_total.labels(site_id=_site, decision="approved").inc(31)
-    sentinel_approval_decisions_total.labels(site_id=_site, decision="rejected").inc(2)
-    sentinel_approval_decisions_total.labels(site_id=_site, decision="expired").inc(1)
-
-    # Safety — zero violations (healthy state)
-    sentinel_safety_violations_total.labels(site_id=_site, severity="warning").inc(0)
-    sentinel_safety_violations_total.labels(site_id=_site, severity="block").inc(0)
-    sentinel_safety_violations_total.labels(site_id=_site, severity="alarm").inc(0)
-
-    # Drift — no active alerts
-    sentinel_model_drift_alerts.labels(site_id=_site, model_type="AHU").set(0)
-    sentinel_model_drift_alerts.labels(site_id=_site, model_type="CHILLER").set(0)
-    sentinel_model_drift_alerts.labels(site_id=_site, model_type="FCU").set(0)
-
-    # Rollbacks — zero
-    sentinel_rollback_total.labels(site_id=_site, equipment_type="CHILLER").inc(0)
-    sentinel_rollback_total.labels(site_id=_site, equipment_type="AHU").inc(0)
-
-
-# ---------------------------------------------------------------------------
 # IP allowlist — restrict /metrics to local / Docker networks
 # ---------------------------------------------------------------------------
 _ALLOWED_NETWORKS = [
@@ -604,10 +548,6 @@ async def prometheus_metrics(
     """
     # Authentication check is done via require_auth dependency above
     # client_ip check removed - role-based access now the primary control
-
-    # Seed demo values on first request (only in DEMO_MODE)
-    if settings.demo_mode:
-        _seed_demo_values()
 
     # Collect live FM metrics from Supabase (media wall dashboard)
     try:

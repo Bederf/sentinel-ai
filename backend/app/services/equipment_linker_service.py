@@ -10,7 +10,6 @@ import logging
 import re
 from dataclasses import dataclass
 from difflib import SequenceMatcher
-from typing import List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +47,7 @@ class EquipmentMatch:
     """A detected equipment reference in text."""
 
     equipment_code: str
-    equipment_id: Optional[str]  # UUID from equipment table
+    equipment_id: str | None  # UUID from equipment table
     confidence: float
     detection_method: str  # regex, fuzzy, context
     matched_text: str
@@ -61,8 +60,8 @@ class EquipmentLinkerService:
         self,
         text: str,
         site_id: str,
-        equipment_inventory: Optional[List[dict]] = None,
-    ) -> List[EquipmentMatch]:
+        equipment_inventory: list[dict] | None = None,
+    ) -> list[EquipmentMatch]:
         """Detect equipment codes in text using 3-tier strategy.
 
         Args:
@@ -76,7 +75,7 @@ class EquipmentLinkerService:
 
         inventory = equipment_inventory or self._load_inventory(site_id)
         inventory_codes = {eq.get("code", ""): eq for eq in inventory}
-        matches: List[EquipmentMatch] = []
+        matches: list[EquipmentMatch] = []
         seen_codes: set = set()
 
         # Tier 1: Regex — exact code patterns
@@ -174,10 +173,10 @@ class EquipmentLinkerService:
 
     def link_to_equipment(
         self,
-        matches: List[EquipmentMatch],
+        matches: list[EquipmentMatch],
         document_id: str,
         site_id: str,
-    ) -> List[dict]:
+    ) -> list[dict]:
         """Store equipment-document links in Supabase.
 
         Args:
@@ -219,7 +218,7 @@ class EquipmentLinkerService:
 
         return []
 
-    def _load_inventory(self, site_id: str) -> List[dict]:
+    def _load_inventory(self, site_id: str) -> list[dict]:
         """Load equipment inventory for a site from Supabase."""
         try:
             from app.database.supabase_client import get_supabase_client
@@ -233,7 +232,7 @@ class EquipmentLinkerService:
 
 
 # Singleton
-_linker: Optional[EquipmentLinkerService] = None
+_linker: EquipmentLinkerService | None = None
 
 
 def get_equipment_linker() -> EquipmentLinkerService:

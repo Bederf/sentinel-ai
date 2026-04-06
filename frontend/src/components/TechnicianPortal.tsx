@@ -62,7 +62,7 @@ export default function TechnicianPortal(): ReactElement {
     } catch (err) {
       console.error('Failed to load dashboard:', err)
       setError('Failed to load dashboard data')
-      // Set mock data for demo
+      // Set mock data for local fallback mode
       setData({
         assignedOrders: 5,
         pendingApprovals: 2,

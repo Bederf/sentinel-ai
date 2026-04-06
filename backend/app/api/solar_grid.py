@@ -197,7 +197,7 @@ async def get_load_shedding_stage(request: Request):
 @router.get("/solar/grid/frequency-trend")
 async def get_frequency_trend(
     request: Request,
-    window: str = Query("1h", regex="^(5m|1h|24h)$"),
+    window: str = Query("1h", pattern="^(5m|1h|24h)$"),
 ):
     """Get frequency trend over a time window with band overlays.
 
@@ -272,7 +272,7 @@ async def get_frequency_trend(
 @router.get("/solar/grid/voltage-trend")
 async def get_voltage_trend(
     request: Request,
-    window: str = Query("1h", regex="^(5m|1h|24h)$"),
+    window: str = Query("1h", pattern="^(5m|1h|24h)$"),
 ):
     """Get voltage trend over a time window with band overlays.
 

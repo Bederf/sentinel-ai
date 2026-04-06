@@ -3,7 +3,7 @@
 import logging
 from datetime import date, datetime
 from pathlib import Path
-from typing import Optional, List
+from typing import Any, Optional, List
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
@@ -309,13 +309,35 @@ async def get_dispute_pack(invoice_id: str):
 
 @router.get("/tariffs")
 async def list_tariff_schedules(
+    site_id: Optional[str] = None,
     municipality: Optional[str] = None,
     utility_type: Optional[str] = None,
     active_date: Optional[str] = None,
 ):
     svc = TariffScheduleService()
     active = datetime.fromisoformat(active_date).date() if active_date else None
-    tariffs = svc.list_tariffs(municipality, utility_type, active)
+    site_to_municipality = {
+        "site-002": "City Power Johannesburg",
+    }
+    scoped_municipality = municipality or (site_to_municipality.get(site_id.lower()) if site_id else None)
+    raw_tariffs = svc.list_tariffs(scoped_municipality, utility_type, active)
+
+    def _flatten_tariff_row(row: dict[str, Any]) -> dict[str, Any]:
+        tariff_data = row.get("tariff_data") if isinstance(row.get("tariff_data"), dict) else {}
+        return {
+            "municipality": row.get("municipality") or tariff_data.get("utility") or "City Power Johannesburg",
+            "tariff_name": row.get("tariff_name") or tariff_data.get("tariff_name") or "LPU-TOU",
+            "effective_date": row.get("effective_date") or tariff_data.get("effective_date"),
+            "utility_type": row.get("utility_type") or "electricity",
+            "energy_charge_c_kwh": row.get("energy_charge_c_kwh") or tariff_data.get("energy_charge_c_kwh"),
+            "demand_charge_r_kva": row.get("demand_charge_r_kva") or tariff_data.get("demand_charge_r_kva"),
+            "service_charge_r_month": row.get("service_charge_r_month") or tariff_data.get("service_charge_r_month"),
+            "network_charge_c_kwh": row.get("network_charge_c_kwh") or tariff_data.get("network_charge_c_kwh"),
+            "time_bands": row.get("time_bands") or tariff_data.get("time_bands"),
+        }
+
+    tariffs = [_flatten_tariff_row(row) for row in raw_tariffs]
+
     return {"tariffs": tariffs}
 
 

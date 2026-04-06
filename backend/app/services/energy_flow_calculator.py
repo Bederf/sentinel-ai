@@ -8,7 +8,7 @@ Used by the Digital Twin 3D visualisation for animated flow paths.
 import logging
 import re
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +41,7 @@ class EnergyFlow:
     direction: str  # "forward" or "reverse"
     color: str
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "from_equipment": self.from_equipment,
             "to_equipment": self.to_equipment,
@@ -52,13 +52,13 @@ class EnergyFlow:
         }
 
 
-def _extract_type(equipment: Dict[str, Any]) -> str:
+def _extract_type(equipment: dict[str, Any]) -> str:
     """Extract normalised equipment type from an equipment dict."""
     raw = equipment.get("equipment_type") or equipment.get("type") or equipment.get("device_type") or "unknown"
     return raw.lower().strip()
 
 
-def _extract_zone(equipment: Dict[str, Any]) -> str:
+def _extract_zone(equipment: dict[str, Any]) -> str:
     """Extract a zone/floor identifier from equipment code or metadata."""
     code = equipment.get("code") or equipment.get("id") or ""
     # Pattern: S002-FCU-L2-B  →  L2
@@ -69,7 +69,7 @@ def _extract_zone(equipment: Dict[str, Any]) -> str:
     return (equipment.get("floor") or equipment.get("zone") or "").upper()
 
 
-def _get_power_kw(equipment: Dict[str, Any]) -> float:
+def _get_power_kw(equipment: dict[str, Any]) -> float:
     """Best-effort extraction of current power draw in kW."""
     # Check points dict for power-related readings
     points = equipment.get("points") or {}
@@ -94,7 +94,7 @@ def _get_power_kw(equipment: Dict[str, Any]) -> float:
 
     # Estimate from equipment type
     etype = _extract_type(equipment)
-    defaults: Dict[str, float] = {
+    defaults: dict[str, float] = {
         "chiller": 120.0,
         "ahu": 22.0,
         "fcu": 3.5,
@@ -115,12 +115,12 @@ def _get_power_kw(equipment: Dict[str, Any]) -> float:
 class EnergyFlowCalculator:
     """Calculates energy flow connections between equipment for 3D visualisation."""
 
-    def get_hvac_chain(self, equipment_list: List[Dict[str, Any]]) -> List[Tuple[str, str, str]]:
+    def get_hvac_chain(self, equipment_list: list[dict[str, Any]]) -> list[tuple[str, str, str]]:
         """Infer HVAC connections from equipment types and zones.
 
         Returns list of (from_id, to_id, flow_type) tuples.
         """
-        connections: List[Tuple[str, str, str]] = []
+        connections: list[tuple[str, str, str]] = []
 
         # Group by type
         chillers = [e for e in equipment_list if _extract_type(e) in HVAC_PLANT_TYPES]
@@ -159,12 +159,12 @@ class EnergyFlowCalculator:
 
         return connections
 
-    def get_electrical_chain(self, equipment_list: List[Dict[str, Any]]) -> List[Tuple[str, str, str]]:
+    def get_electrical_chain(self, equipment_list: list[dict[str, Any]]) -> list[tuple[str, str, str]]:
         """Infer electrical distribution connections.
 
         Returns list of (from_id, to_id, flow_type) tuples.
         """
-        connections: List[Tuple[str, str, str]] = []
+        connections: list[tuple[str, str, str]] = []
 
         sources = [e for e in equipment_list if _extract_type(e) in ELECTRICAL_SOURCE_TYPES]
         distributors = [e for e in equipment_list if _extract_type(e) in ELECTRICAL_DIST_TYPES]
@@ -212,9 +212,9 @@ class EnergyFlowCalculator:
     async def calculate_flows(
         self,
         site_id: str,
-        equipment_list: Optional[List[Dict[str, Any]]] = None,
-        timestamp: Optional[str] = None,
-    ) -> List[EnergyFlow]:
+        equipment_list: list[dict[str, Any]] | None = None,
+        timestamp: str | None = None,
+    ) -> list[EnergyFlow]:
         """Calculate all energy flows for a site.
 
         Args:
@@ -231,7 +231,7 @@ class EnergyFlowCalculator:
         if not equipment_list:
             return []
 
-        flows: List[EnergyFlow] = []
+        flows: list[EnergyFlow] = []
 
         # HVAC chain
         hvac_connections = self.get_hvac_chain(equipment_list)
@@ -270,7 +270,7 @@ class EnergyFlowCalculator:
 
         return flows
 
-    async def _load_equipment(self, site_id: str) -> List[Dict[str, Any]]:
+    async def _load_equipment(self, site_id: str) -> list[dict[str, Any]]:
         """Load equipment from repository with 3-tier fallback."""
         try:
             from app.database.repositories.equipment_repository import EquipmentRepository
@@ -287,14 +287,14 @@ class EnergyFlowCalculator:
             logger.error(f"JSON equipment fallback also failed: {e2}")
             return []
 
-    def _load_equipment_json(self, site_id: str) -> List[Dict[str, Any]]:
+    def _load_equipment_json(self, site_id: str) -> list[dict[str, Any]]:
         """Load equipment from JSON fallback files."""
         import json
         from pathlib import Path
 
         data_dir = Path(__file__).parent.parent / "data" / "sites" / site_id / "equipment"
         if not data_dir.exists():
-            # Try site-002 as default demo
+            # Try site-002 as default seeded site
             data_dir = Path(__file__).parent.parent / "data" / "sites" / "site-002" / "equipment"
 
         if not data_dir.exists():
@@ -316,7 +316,7 @@ class EnergyFlowCalculator:
         self,
         site_id: str,
         timestamp: str,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get equipment state at a specific historical timestamp.
 
         Uses 3-tier fallback: Supabase time-series -> simulation state -> current state.
@@ -347,7 +347,7 @@ class EnergyFlowCalculator:
 
 
 # ── Singleton ───────────────────────────────────────────────────────
-_instance: Optional[EnergyFlowCalculator] = None
+_instance: EnergyFlowCalculator | None = None
 
 
 def get_energy_flow_calculator() -> EnergyFlowCalculator:

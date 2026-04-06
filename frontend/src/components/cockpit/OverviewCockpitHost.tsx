@@ -4,6 +4,7 @@ import type { HVACOverview } from '@/lib/hvacApi'
 import { CockpitView } from './CockpitView'
 import { CockpitBuildingThree } from './CockpitBuildingThree'
 import { mapCockpitState, type BuildingStatePayload, type EnergyCentreTelemetry } from './mapCockpitState'
+import type { CockpitTwinZoneSignal, ModelReadiness } from './types'
 
 interface OverviewCockpitHostProps {
   siteId: string
@@ -130,6 +131,42 @@ export function OverviewCockpitHost({
   onModuleDisplayChange: _onModuleDisplayChange,
 }: OverviewCockpitHostProps) {
   const { payload, hvacOverview, energyTelemetry, lastUpdatedAt } = useBuildingStatePayload(siteId)
+  const [selectedZone, setSelectedZone] = useState<CockpitTwinZoneSignal | null>(null)
+  const [modelReadiness, setModelReadiness] = useState<ModelReadiness | null>(null)
+
+  // Poll ML model readiness for shadow training progress
+  useEffect(() => {
+    let mounted = true
+    let timer: ReturnType<typeof setInterval> | null = null
+
+    async function loadReadiness() {
+      try {
+        const res = await authorizedFetch(`/api/ml/model-readiness/${encodeURIComponent(siteId)}`)
+        if (res.ok && mounted) {
+          const data = await res.json()
+          setModelReadiness({
+            siteId: data.site_id,
+            trainingEnabled: data.training_enabled,
+            ready: data.ready,
+            activeModelCount: data.active_model_count,
+            equipmentTypesCovered: data.equipment_types_covered,
+            lastTrainingAt: data.last_training_at,
+            message: data.message,
+          })
+        }
+      } catch {
+        // Readiness failures are silent — cockpit continues showing telemetry
+      }
+    }
+
+    loadReadiness()
+    timer = setInterval(loadReadiness, POLL_INTERVAL_MS)
+
+    return () => {
+      mounted = false
+      if (timer) clearInterval(timer)
+    }
+  }, [siteId])
 
   const handleApprove = useCallback(async () => {
     try {
@@ -140,6 +177,19 @@ export function OverviewCockpitHost({
       // Approval failure is silent — operator sees no state change; backend logs it
     }
   }, [siteId])
+
+  const handleAdvancePhase = useCallback(async () => {
+    const nextPhase = onboardingPhase === 'shadow' ? 'advisory' : onboardingPhase === 'advisory' ? 'supervised' : 'auto'
+    try {
+      await authorizedFetch(`/api/sites/${encodeURIComponent(siteId)}/phase`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phase: nextPhase }),
+      })
+    } catch {
+      // Phase advance failures are silent
+    }
+  }, [siteId, onboardingPhase])
 
   const state = useMemo(() => {
     const summary = buildCockpitSummary(
@@ -153,8 +203,12 @@ export function OverviewCockpitHost({
     <CockpitView
       state={state}
       renderMode="embedded"
-      spatialCanvas={<CockpitBuildingThree state={state} />}
+      spatialCanvas={<CockpitBuildingThree state={state} onZoneSelect={setSelectedZone} />}
       onApprove={handleApprove}
+      selectedZone={selectedZone}
+      onZoneClose={() => setSelectedZone(null)}
+      modelReadiness={modelReadiness}
+      onAdvancePhase={handleAdvancePhase}
     />
   )
 }

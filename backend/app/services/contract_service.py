@@ -15,10 +15,9 @@ Usage:
     svc.approve_contract(contract_id, approved_by="admin@example.com")
 """
 
-from datetime import datetime
-from typing import Any, Dict, List, Optional
-
 import logging
+from datetime import datetime
+from typing import Any
 
 from app.models.contract import (
     AssetContractCreate,
@@ -90,7 +89,7 @@ class ContractManagementService:
     # Organization Methods
     # ========================================================================
 
-    def create_organization(self, data: OrganizationCreate) -> Optional[Dict[str, Any]]:
+    def create_organization(self, data: OrganizationCreate) -> dict[str, Any] | None:
         """
         Create a new organization after validating unique code.
 
@@ -116,7 +115,7 @@ class ContractManagementService:
             logger.error(f"Error creating organization: {e}")
             return None
 
-    def get_organizations(self, tier: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_organizations(self, tier: str | None = None) -> list[dict[str, Any]]:
         """
         List organizations with optional tier filter.
 
@@ -129,7 +128,7 @@ class ContractManagementService:
         self._ensure_repos()
         return self._org_repo.get_all(tier=tier)
 
-    def get_organization(self, org_id: str) -> Optional[Dict[str, Any]]:
+    def get_organization(self, org_id: str) -> dict[str, Any] | None:
         """Get a single organization by ID."""
         self._ensure_repos()
         return self._org_repo.get_by_id(org_id)
@@ -138,7 +137,7 @@ class ContractManagementService:
     # Contract Lifecycle Methods
     # ========================================================================
 
-    def create_contract(self, data: ContractCreate) -> Optional[Dict[str, Any]]:
+    def create_contract(self, data: ContractCreate) -> dict[str, Any] | None:
         """
         Create a new contract with status=draft.
 
@@ -176,7 +175,7 @@ class ContractManagementService:
             logger.error(f"Error creating contract: {e}")
             return None
 
-    def approve_contract(self, contract_id: str, approved_by: str) -> Optional[Dict[str, Any]]:
+    def approve_contract(self, contract_id: str, approved_by: str) -> dict[str, Any] | None:
         """
         Transition contract from draft/pending_approval to active.
 
@@ -213,7 +212,7 @@ class ContractManagementService:
             logger.error(f"Error approving contract {contract_id}: {e}")
             return None
 
-    def suspend_contract(self, contract_id: str, reason: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    def suspend_contract(self, contract_id: str, reason: str | None = None) -> dict[str, Any] | None:
         """
         Transition contract from active to suspended.
 
@@ -235,7 +234,7 @@ class ContractManagementService:
                 logger.warning(f"Cannot suspend contract in status '{contract.get('status')}'")
                 return None
 
-            update_data: Dict[str, Any] = {
+            update_data: dict[str, Any] = {
                 "status": ContractStatus.SUSPENDED.value,
             }
             if reason:
@@ -249,7 +248,7 @@ class ContractManagementService:
             logger.error(f"Error suspending contract {contract_id}: {e}")
             return None
 
-    def expire_contract(self, contract_id: str) -> Optional[Dict[str, Any]]:
+    def expire_contract(self, contract_id: str) -> dict[str, Any] | None:
         """
         Transition contract from active to expired.
 
@@ -281,7 +280,7 @@ class ContractManagementService:
             logger.error(f"Error expiring contract {contract_id}: {e}")
             return None
 
-    def get_contract_summary(self, contract_id: str) -> Optional[Dict[str, Any]]:
+    def get_contract_summary(self, contract_id: str) -> dict[str, Any] | None:
         """
         Get comprehensive contract summary including org, SLAs, and budget.
 
@@ -320,8 +319,8 @@ class ContractManagementService:
             return None
 
     def get_contracts(
-        self, site_id: Optional[str] = None, organization_id: Optional[str] = None, status: Optional[str] = None
-    ) -> List[Dict[str, Any]]:
+        self, site_id: str | None = None, organization_id: str | None = None, status: str | None = None
+    ) -> list[dict[str, Any]]:
         """List contracts with optional filters."""
         self._ensure_repos()
         return self._contract_repo.get_all(
@@ -330,7 +329,7 @@ class ContractManagementService:
             status=status,
         )
 
-    def get_active_contracts(self) -> List[Dict[str, Any]]:
+    def get_active_contracts(self) -> list[dict[str, Any]]:
         """Get all active contracts."""
         self._ensure_repos()
         return self._contract_repo.get_active()
@@ -339,7 +338,7 @@ class ContractManagementService:
     # SLA Methods
     # ========================================================================
 
-    def set_sla_terms(self, contract_id: str, terms: List[SLATermCreate]) -> List[Dict[str, Any]]:
+    def set_sla_terms(self, contract_id: str, terms: list[SLATermCreate]) -> list[dict[str, Any]]:
         """
         Replace all SLA terms for a contract.
 
@@ -373,7 +372,7 @@ class ContractManagementService:
             logger.error(f"Error setting SLA terms for {contract_id}: {e}")
             return []
 
-    def get_sla_terms(self, contract_id: str) -> List[Dict[str, Any]]:
+    def get_sla_terms(self, contract_id: str) -> list[dict[str, Any]]:
         """Get current SLA terms for a contract."""
         self._ensure_repos()
         return self._sla_repo.get_by_contract(contract_id)
@@ -384,7 +383,7 @@ class ContractManagementService:
 
     def assign_equipment_to_contract(
         self, contract_id: str, equipment_id: str, data: AssetContractCreate
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """
         Link equipment to a contract via the asset_contracts table.
 
@@ -420,7 +419,7 @@ class ContractManagementService:
             logger.error(f"Error assigning equipment {equipment_id} to contract {contract_id}: {e}")
             return None
 
-    def get_contract_equipment(self, contract_id: str) -> List[Dict[str, Any]]:
+    def get_contract_equipment(self, contract_id: str) -> list[dict[str, Any]]:
         """
         List all equipment assigned to a contract.
 
@@ -456,7 +455,7 @@ class ContractManagementService:
     # Budget Methods
     # ========================================================================
 
-    def set_budget(self, contract_id: str, data: BudgetCreate) -> Optional[Dict[str, Any]]:
+    def set_budget(self, contract_id: str, data: BudgetCreate) -> dict[str, Any] | None:
         """
         Create a budget entry for a contract period.
 
@@ -478,7 +477,7 @@ class ContractManagementService:
             logger.error(f"Error setting budget for {contract_id}: {e}")
             return None
 
-    def get_budget_variance(self, contract_id: str, year: int) -> Optional[Dict[str, Any]]:
+    def get_budget_variance(self, contract_id: str, year: int) -> dict[str, Any] | None:
         """
         Get budget vs actual variance for a contract year.
 
@@ -496,7 +495,7 @@ class ContractManagementService:
     # Condition Assessment Methods
     # ========================================================================
 
-    def record_assessment(self, data: ConditionAssessmentCreate) -> Optional[Dict[str, Any]]:
+    def record_assessment(self, data: ConditionAssessmentCreate) -> dict[str, Any] | None:
         """
         Record a condition assessment for equipment or building.
 
@@ -521,7 +520,7 @@ class ContractManagementService:
             logger.error(f"Error recording assessment: {e}")
             return None
 
-    def get_equipment_condition(self, equipment_id: str) -> Optional[Dict[str, Any]]:
+    def get_equipment_condition(self, equipment_id: str) -> dict[str, Any] | None:
         """
         Get the latest condition assessment for equipment.
 
@@ -539,7 +538,7 @@ class ContractManagementService:
 # Singleton Factory
 # ============================================================================
 
-_service: Optional[ContractManagementService] = None
+_service: ContractManagementService | None = None
 
 
 def get_contract_service() -> ContractManagementService:

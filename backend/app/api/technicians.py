@@ -43,7 +43,7 @@ class TechnicianCreate(BaseModel):
     email: str
     phone: str
     specialties: List[str] = ["general"]
-    site_id: str = "site-002"
+    site_id: Optional[str] = None
     telegram_id: Optional[str] = None
 
 
@@ -54,6 +54,7 @@ class TechnicianUpdate(BaseModel):
     active: Optional[bool] = None
     telegram_id: Optional[str] = None
     specialties: Optional[List[str]] = None
+    site_id: Optional[str] = None
 
 
 @router.get("")
@@ -87,12 +88,18 @@ async def create_technician(
         if spec not in valid_ids:
             raise HTTPException(status_code=422, detail=f"Invalid specialty: {spec}. Valid: {sorted(valid_ids)}")
 
+    from app.core.site_resolver import get_primary_site_code
+
+    resolved_site_id = body.site_id or get_primary_site_code()
+    if not resolved_site_id:
+        raise HTTPException(status_code=422, detail="site_id is required when no registered primary site exists")
+
     tech = await repo.create_technician(
         name=body.name,
         email=body.email,
         phone=body.phone,
         specialties=body.specialties,
-        site_id=body.site_id,
+        site_id=resolved_site_id,
         telegram_id=body.telegram_id,
     )
 
@@ -127,7 +134,7 @@ async def update_technician(
     repo = get_technician_repository()
 
     # Update base fields
-    updates = {k: v for k, v in body.model_dump().items() if v is not None and k != "specialties"}
+    updates = {k: v for k, v in body.model_dump().items() if v is not None and k not in {"specialties", "site_id"}}
     if updates:
         result = await repo.update_technician(tech_id, updates)
         if not result:
@@ -139,8 +146,9 @@ async def update_technician(
         for spec in body.specialties:
             if spec not in valid_ids:
                 raise HTTPException(status_code=422, detail=f"Invalid specialty: {spec}")
-        # Use site-002 as default — in multi-site, this should come from the request
-        await repo.update_specialties(tech_id, "site-002", body.specialties)
+        if not body.site_id:
+            raise HTTPException(status_code=422, detail="site_id is required when updating specialties")
+        await repo.update_specialties(tech_id, body.site_id, body.specialties)
 
     return {"status": "updated", "tech_id": tech_id}
 

@@ -26,27 +26,27 @@ from app.database.repositories.equipment_repository import EquipmentRepository
 from app.database.repositories.prediction_repository import PredictionRepository
 from app.database.repositories.work_order_repository import get_work_order_repository
 from app.services.building_schedule import (
-    SiteSchedule,
     BuildingState,
     ChilledWaterModel,
     HVACMode,
     ScheduleState,
+    SiteSchedule,
 )
 from app.services.cost_validation_engine import get_cost_validation_engine
 from app.services.device_control_service import get_device_control_service
+from app.services.equipment_json_loader import load_site_equipment
 from app.services.feedback_collection_service import (
     FeedbackItemType,
     get_feedback_collection_service,
 )
-from app.services.power_meter_validation_engine import get_power_meter_validation_engine
 from app.services.occupancy_profile_service import calculate_building_occupancy_percent, calculate_zone_occupancy
+from app.services.power_meter_validation_engine import get_power_meter_validation_engine
+from app.services.seasonal_modeler import SeasonalModeler
+from app.services.sentinel_alert_engine import AlertContext, SentinelAlertEngine
+from app.services.sentinel_data_sync import get_sentinel_data_sync
+from app.services.simulation_persistence import get_simulation_persistence
 from app.services.site_capacity_service import get_site_capacity_service
 from app.services.site_holiday_service import get_site_holiday_service
-from app.services.seasonal_modeler import SeasonalModeler
-from app.services.equipment_json_loader import load_site_equipment
-from app.services.sentinel_alert_engine import SentinelAlertEngine, AlertContext
-from app.services.simulation_persistence import get_simulation_persistence
-from app.services.sentinel_data_sync import get_sentinel_data_sync
 from app.services.sustainability_metrics_collector import SustainabilityMetricsCollector
 from app.services.thermal_simulation_engine import update_simulation_temperatures
 
@@ -122,6 +122,7 @@ class ScenarioConfig:
 
     name: str
     description: str
+    demo_mode: bool = False
     fault_probability: float = 0.3  # 30% chance of fault during day
     fault_hour: int | None = None  # Specific hour for fault (None = random)
     fault_equipment_type: str | None = None  # Specific type to fault
@@ -130,9 +131,6 @@ class ScenarioConfig:
     optimization_enabled: bool = True
     sentry_notifications: bool = True
     operation_mode: OperationMode | None = None
-    # Enable continuous AI recommendations (lower thresholds, BESS arbitrage)
-    # and building operation mode for demos
-    demo_mode: bool = False
 
 
 # Active scenarios — only sentinel_annual is exposed in /api/lifecycle/scenarios
@@ -150,7 +148,6 @@ SCENARIOS = {
         auto_repair=True,
         repair_delay_hours=4,
         optimization_enabled=True,
-        demo_mode=True,
     ),
 }
 
@@ -201,6 +198,7 @@ ARCHIVED_SCENARIOS = {
     "grant_hvac_only_7day": ScenarioConfig(
         name="Grant Demo: HVAC Only (7 days)",
         description="7-day HVAC baseline for Grant demo - AC runs all day",
+        demo_mode=False,
         operation_mode=OperationMode.HVAC_ONLY,
         fault_probability=0.0,
         optimization_enabled=False,
@@ -208,6 +206,7 @@ ARCHIVED_SCENARIOS = {
     "grant_hvac_dali_7day": ScenarioConfig(
         name="Grant Demo: HVAC + DALI (7 days)",
         description="7-day reactive occupancy control for Grant demo",
+        demo_mode=False,
         operation_mode=OperationMode.HVAC_DALI,
         fault_probability=0.0,
         optimization_enabled=False,
@@ -215,6 +214,7 @@ ARCHIVED_SCENARIOS = {
     "grant_hvac_dali_ai_7day": ScenarioConfig(
         name="Grant Demo: HVAC + DALI + Sentinel AI (7 days)",
         description="7-day predictive AI control for Grant demo",
+        demo_mode=False,
         operation_mode=OperationMode.HVAC_DALI_SENTINEL,
         fault_probability=0.0,
         optimization_enabled=True,
@@ -2373,42 +2373,6 @@ class LifecycleOrchestrator:
             controllable_equipment, context, occupancy_percent, daylight_factor, current_hour
         )
 
-        if self.current_scenario and self.current_scenario.demo_mode:
-            if current_hour in [7, 8, 9, 18, 19]:
-                recommendations.append(
-                    {
-                        "equipment": f"{self.site_prefix}-BESS-001",
-                        "control_point": "discharge_power",
-                        "target_value": 500,
-                        "reason": "Peak tariff arbitrage - discharge BESS to grid",
-                        "description": "Discharge 500kW during peak hours to reduce grid purchase",
-                        "savings": 15,
-                    }
-                )
-            elif current_hour in [0, 1, 2, 3, 4, 5]:
-                recommendations.append(
-                    {
-                        "equipment": f"{self.site_prefix}-BESS-001",
-                        "control_point": "charge_power",
-                        "target_value": 300,
-                        "reason": "Off-peak charging - cheap grid power",
-                        "description": "Charge 300kW during off-peak hours",
-                        "savings": 12,
-                    }
-                )
-
-            if random.random() < 0.05:
-                recommendations.append(
-                    {
-                        "equipment": f"{self.site_prefix}-GEN-B1-001",
-                        "control_point": "start",
-                        "target_value": 1,
-                        "reason": "Load shedding event from grid operator",
-                        "description": "Start backup generator due to grid demand response",
-                        "savings": 8,
-                    }
-                )
-
         return {
             "context": context,
             "occupancy_percent": occupancy_percent,
@@ -3431,6 +3395,18 @@ class LifecycleOrchestrator:
 
         wo_id = f"WO-SIM-{code}-{self.days_simulated * 24 + simulated_hour}"
 
+        # Look up the latest active prediction for this equipment to link the WO
+        prediction_id = None
+        try:
+            from app.database.repositories.prediction_repository import get_prediction_repository
+
+            pred_repo = get_prediction_repository()
+            preds = await pred_repo.get_by_equipment_code(code, status="active", limit=1)
+            if preds:
+                prediction_id = preds[0].get("id")
+        except Exception:
+            pass  # Prediction linkage is best-effort — WO is created regardless
+
         try:
             self.work_order_repo.create(
                 {
@@ -3447,6 +3423,7 @@ class LifecycleOrchestrator:
                     "status": "assigned" if technician_name else "scheduled",
                     "assigned_to": technician_name,
                     "created_by": "SENTINEL_HEALTH_MONITOR",
+                    "prediction_id": prediction_id,
                 }
             )
         except Exception as e:
@@ -3703,9 +3680,7 @@ class LifecycleOrchestrator:
                 vp = readings["valve_position"]
                 if vp < 5:
                     fan_target = 0
-                elif vp < 20:
-                    fan_target = 1  # low
-                elif vp < 50:
+                elif vp < 20 or vp < 50:
                     fan_target = 1  # low
                 elif vp < 80:
                     fan_target = 2  # medium

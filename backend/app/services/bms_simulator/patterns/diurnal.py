@@ -8,9 +8,9 @@ Includes:
 - Weekend vs weekday variation
 """
 
-import numpy as np
-from typing import Optional, Tuple
 from dataclasses import dataclass
+
+import numpy as np
 
 
 @dataclass
@@ -31,7 +31,7 @@ class DiurnalPattern:
     def __init__(
         self,
         seed: int = 42,
-        config: Optional[DiurnalConfig] = None,
+        config: DiurnalConfig | None = None,
     ):
         """
         Initialize the diurnal pattern generator.
@@ -46,7 +46,7 @@ class DiurnalPattern:
     def generate(
         self,
         base_value: float,
-        value_range: Tuple[float, float],
+        value_range: tuple[float, float],
         timestamps: np.ndarray,
         pattern_type: str = "temperature",
     ) -> np.ndarray:

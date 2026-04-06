@@ -11,9 +11,9 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from app.models.iaq import (
     IAQAlert,
@@ -88,7 +88,7 @@ def _score_status(score: float) -> str:
     return "unhealthy"
 
 
-def _score_co2(ppm: Optional[float]) -> Tuple[float, str]:
+def _score_co2(ppm: float | None) -> tuple[float, str]:
     """Score CO2 level. Lower is better."""
     if ppm is None:
         return 75.0, "No sensor"
@@ -105,7 +105,7 @@ def _score_co2(ppm: Optional[float]) -> Tuple[float, str]:
     return round(score, 1), f"{ppm:.0f} ppm"
 
 
-def _score_humidity(rh: Optional[float]) -> Tuple[float, str]:
+def _score_humidity(rh: float | None) -> tuple[float, str]:
     """Score humidity. Optimal range 40-55%."""
     if rh is None:
         return 75.0, "No sensor"
@@ -124,7 +124,7 @@ def _score_humidity(rh: Optional[float]) -> Tuple[float, str]:
     return round(score, 1), f"{rh:.1f}%"
 
 
-def _score_temperature(temp: Optional[float], setpoint: Optional[float]) -> Tuple[float, str]:
+def _score_temperature(temp: float | None, setpoint: float | None) -> tuple[float, str]:
     """Score temperature deviation from setpoint."""
     if temp is None or setpoint is None:
         return 75.0, "No sensor"
@@ -142,7 +142,7 @@ def _score_temperature(temp: Optional[float], setpoint: Optional[float]) -> Tupl
     return round(score, 1), f"{deviation:.1f}C deviation"
 
 
-def _score_voc(ppb: Optional[float]) -> Tuple[float, str]:
+def _score_voc(ppb: float | None) -> tuple[float, str]:
     """Score VOC level. Lower is better."""
     if ppb is None:
         return 75.0, "No sensor"
@@ -159,7 +159,7 @@ def _score_voc(ppb: Optional[float]) -> Tuple[float, str]:
     return round(score, 1), f"{ppb:.0f} ppb"
 
 
-def _score_pm25(ugm3: Optional[float]) -> Tuple[float, str]:
+def _score_pm25(ugm3: float | None) -> tuple[float, str]:
     """Score PM2.5 level. Lower is better."""
     if ugm3 is None:
         return 75.0, "No sensor"
@@ -181,9 +181,9 @@ def _score_pm25(ugm3: Optional[float]) -> Tuple[float, str]:
 # ---------------------------------------------------------------------------
 
 
-def _generate_alerts(zone: Dict[str, Any]) -> List[IAQAlert]:
+def _generate_alerts(zone: dict[str, Any]) -> list[IAQAlert]:
     """Generate IAQ alerts for a zone based on thresholds."""
-    alerts: List[IAQAlert] = []
+    alerts: list[IAQAlert] = []
     zone_id = zone.get("zone_id", "")
     zone_name = zone.get("zone_name", zone_id)
     floor = zone.get("floor", "")
@@ -351,7 +351,7 @@ def _generate_alerts(zone: Dict[str, Any]) -> List[IAQAlert]:
 # ---------------------------------------------------------------------------
 
 
-def score_zone(zone: Dict[str, Any]) -> IAQZoneScore:
+def score_zone(zone: dict[str, Any]) -> IAQZoneScore:
     """Calculate IAQ score for a single zone."""
     co2 = zone.get("co2_ppm")
     humidity = zone.get("humidity")
@@ -458,7 +458,7 @@ class IAQService:
                 self._zone_repo = None
         return self._zone_repo
 
-    def _load_zones_json(self, site_id: str) -> List[Dict[str, Any]]:
+    def _load_zones_json(self, site_id: str) -> list[dict[str, Any]]:
         """Load zones from JSON fallback."""
         zones_path = DATA_DIR / "hvac_zones.json"
         if not zones_path.exists():
@@ -467,7 +467,7 @@ class IAQService:
             all_zones = json.load(f)
         return [z for z in all_zones if z.get("site_id") == site_id]
 
-    def get_zones(self, site_id: str) -> List[Dict[str, Any]]:
+    def get_zones(self, site_id: str) -> list[dict[str, Any]]:
         """Get zone data from Supabase or JSON fallback."""
         if self.zone_repo:
             try:
@@ -483,7 +483,7 @@ class IAQService:
         zones = self.get_zones(site_id)
         scored_zones = [score_zone(z) for z in zones]
 
-        all_alerts: List[IAQAlert] = []
+        all_alerts: list[IAQAlert] = []
         for z in zones:
             all_alerts.extend(_generate_alerts(z))
 
@@ -507,7 +507,7 @@ class IAQService:
             alerts=all_alerts,
         )
 
-    def get_zone_iaq(self, site_id: str, zone_id: str) -> Optional[IAQZoneScore]:
+    def get_zone_iaq(self, site_id: str, zone_id: str) -> IAQZoneScore | None:
         """Get IAQ score for a specific zone."""
         zones = self.get_zones(site_id)
         for z in zones:
@@ -515,10 +515,10 @@ class IAQService:
                 return score_zone(z)
         return None
 
-    def get_alerts(self, site_id: str) -> List[IAQAlert]:
+    def get_alerts(self, site_id: str) -> list[IAQAlert]:
         """Get all active IAQ alerts for a site."""
         zones = self.get_zones(site_id)
-        alerts: List[IAQAlert] = []
+        alerts: list[IAQAlert] = []
         for z in zones:
             alerts.extend(_generate_alerts(z))
         return alerts
@@ -532,7 +532,7 @@ class IAQService:
             return self._well_report(site_id, overview, zones)
         return self._esg_report(site_id, overview, zones)
 
-    def _well_report(self, site_id: str, overview: IAQSiteOverview, zones: List[IAQZoneScore]) -> IAQComplianceReport:
+    def _well_report(self, site_id: str, overview: IAQSiteOverview, zones: list[IAQZoneScore]) -> IAQComplianceReport:
         """WELL Building Standard compliance report.
 
         WELL v2 Air concept thresholds:
@@ -569,7 +569,7 @@ class IAQService:
             else:
                 non_compliant += 1
 
-        recommendations: List[str] = []
+        recommendations: list[str] = []
         if co2_values and max(co2_values) > CO2_GOOD:
             recommendations.append(f"Increase ventilation in zones with CO2 > {CO2_GOOD} ppm")
         if humidity_values:
@@ -583,7 +583,7 @@ class IAQService:
         return IAQComplianceReport(
             site_id=site_id,
             report_type="well",
-            generated_at=datetime.now(timezone.utc).isoformat(),
+            generated_at=datetime.now(UTC).isoformat(),
             overall_score=overview.avg_iaq_score,
             zones_compliant=compliant,
             zones_non_compliant=non_compliant,
@@ -598,12 +598,12 @@ class IAQService:
             recommendations=recommendations,
         )
 
-    def _esg_report(self, site_id: str, overview: IAQSiteOverview, zones: List[IAQZoneScore]) -> IAQComplianceReport:
+    def _esg_report(self, site_id: str, overview: IAQSiteOverview, zones: list[IAQZoneScore]) -> IAQComplianceReport:
         """ESG sustainability compliance report for IAQ."""
         compliant = sum(1 for z in zones if z.iaq_score >= 70)
         non_compliant = len(zones) - compliant
 
-        recommendations: List[str] = []
+        recommendations: list[str] = []
         if overview.zones_poor + overview.zones_unhealthy > 0:
             recommendations.append(
                 f"{overview.zones_poor + overview.zones_unhealthy} zones below 'good' threshold — review ventilation"
@@ -611,14 +611,14 @@ class IAQService:
         if overview.avg_iaq_score < 80:
             recommendations.append("Overall IAQ below ESG target of 80 — consider HVAC optimization")
 
-        alert_counts: Dict[str, int] = {}
+        alert_counts: dict[str, int] = {}
         for a in overview.alerts:
             alert_counts[a.alert_type] = alert_counts.get(a.alert_type, 0) + 1
 
         return IAQComplianceReport(
             site_id=site_id,
             report_type="esg",
-            generated_at=datetime.now(timezone.utc).isoformat(),
+            generated_at=datetime.now(UTC).isoformat(),
             overall_score=overview.avg_iaq_score,
             zones_compliant=compliant,
             zones_non_compliant=non_compliant,
@@ -639,7 +639,7 @@ class IAQService:
 # Singleton
 # ---------------------------------------------------------------------------
 
-_iaq_service: Optional[IAQService] = None
+_iaq_service: IAQService | None = None
 
 
 def get_iaq_service() -> IAQService:

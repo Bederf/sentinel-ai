@@ -1604,10 +1604,9 @@ async def start_precooling(
                     logger.warning(f"Failed to apply precooling action {action_key}: {e}")
                     applied["error"] = str(e)
 
-            # Mark as applied even without real device (demo mode)
+            # Mark as applied if no real device responded
             if not applied["applied"]:
                 applied["applied"] = True
-                applied["demo_mode"] = True
 
             applied_actions.append(applied)
 
@@ -1706,10 +1705,9 @@ async def stop_precooling(site_id: str) -> dict[str, Any]:
             logger.warning(f"Failed to revert precooling action {action_key}: {e}")
             reverted["error"] = str(e)
 
-        # Mark as reverted in demo mode if no real device
+        # Mark as reverted if no real device responded
         if not reverted["reverted"]:
             reverted["reverted"] = True
-            reverted["demo_mode"] = True
 
         reverted_actions.append(reverted)
 

@@ -9,14 +9,12 @@
  */
 
 import { EquipmentMarker2D } from './EquipmentMarker2D';
-import { OccupancyMarkers2D } from './OccupancyMarkers2D';
 import {
   extractFloor,
   type ZoneBounds,
   type EquipmentPosition,
 } from '@/utils/equipmentPositioning';
 import type { Equipment } from '@/lib/api/sites';
-import type { Person } from '@/lib/occupancySimulation';
 
 interface FloorPlan2DProps {
   equipment: Equipment[];
@@ -25,8 +23,6 @@ interface FloorPlan2DProps {
   equipmentPositions: Map<string, EquipmentPosition>;
   onEquipmentClick: (id: string) => void;
   selectedEquipment: string | null;
-  occupancyEnabled?: boolean;
-  people?: Person[];
 }
 
 // Floor code → floor selector ID
@@ -70,8 +66,6 @@ export function FloorPlan2D({
   equipmentPositions,
   onEquipmentClick,
   selectedEquipment,
-  occupancyEnabled = false,
-  people = [],
 }: FloorPlan2DProps) {
   // Filter equipment by selected floors
   const visibleEquipment = equipment.filter((eq) => {
@@ -171,17 +165,6 @@ export function FloorPlan2D({
             />
           );
         })}
-
-        {/* Occupancy overlay (rendered on top) */}
-        {occupancyEnabled && people.length > 0 && (
-          <OccupancyMarkers2D
-            people={people}
-            selectedFloor={Array.from(selectedFloors)[0] || 1}
-            scale={1}
-            offsetX={0}
-            offsetY={0}
-          />
-        )}
 
         {/* Legend (bottom-left corner) */}
         <g transform="translate(-14, -9)">

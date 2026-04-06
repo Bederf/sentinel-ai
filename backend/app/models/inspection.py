@@ -8,7 +8,7 @@ from datetime import datetime
 from enum import Enum
 from typing import List, Optional, Dict, Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 # ============================================================================
@@ -111,12 +111,8 @@ class InspectionScheduleCreate(InspectionScheduleBase):
 class InspectionSchedule(InspectionScheduleBase):
     """Model for inspection schedule record."""
 
-    id: str = Field(..., description="Schedule ID")
-    created_at: datetime
-    updated_at: datetime
-
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "id": "123e4567-e89b-12d3-a456-426614174000",
                 "equipment_id": "generator-001",
@@ -130,6 +126,11 @@ class InspectionSchedule(InspectionScheduleBase):
                 "created_by": "system",
             }
         }
+    )
+
+    id: str = Field(..., description="Schedule ID")
+    created_at: datetime
+    updated_at: datetime
 
 
 # ============================================================================
@@ -218,12 +219,8 @@ class InspectionTaskCreate(InspectionTaskBase):
 class InspectionTask(InspectionTaskBase):
     """Model for inspection task record."""
 
-    id: str = Field(..., description="Task ID")
-    created_at: datetime
-    updated_at: datetime
-
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "id": "123e4567-e89b-12d3-a456-426614174001",
                 "schedule_id": "123e4567-e89b-12d3-a456-426614174000",
@@ -238,6 +235,11 @@ class InspectionTask(InspectionTaskBase):
                 "estimated_duration_minutes": 90,
             }
         }
+    )
+
+    id: str = Field(..., description="Task ID")
+    created_at: datetime
+    updated_at: datetime
 
 
 # ============================================================================
@@ -281,13 +283,8 @@ class InspectionResultCreate(InspectionResultBase):
 class InspectionResult(InspectionResultBase):
     """Model for inspection result record."""
 
-    id: str = Field(..., description="Result ID")
-    equipment_id: str = Field(..., description="Equipment inspected")
-    created_at: datetime
-    updated_at: datetime
-
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "id": "123e4567-e89b-12d3-a456-426614174002",
                 "task_id": "123e4567-e89b-12d3-a456-426614174001",
@@ -310,6 +307,12 @@ class InspectionResult(InspectionResultBase):
                 "general_notes": "Generator running well except for oil leak",
             }
         }
+    )
+
+    id: str = Field(..., description="Result ID")
+    equipment_id: str = Field(..., description="Equipment inspected")
+    created_at: datetime
+    updated_at: datetime
 
 
 # ============================================================================
@@ -360,14 +363,8 @@ class InspectionDeficiencyCreate(InspectionDeficiencyBase):
 class InspectionDeficiency(InspectionDeficiencyBase):
     """Model for inspection deficiency record."""
 
-    id: str = Field(..., description="Deficiency ID")
-    reported_by: str = Field(..., description="Who reported the deficiency")
-    reported_date: datetime
-    created_at: datetime
-    updated_at: datetime
-
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "id": "123e4567-e89b-12d3-a456-426614174003",
                 "result_id": "123e4567-e89b-12d3-a456-426614174002",
@@ -386,6 +383,13 @@ class InspectionDeficiency(InspectionDeficiencyBase):
                 "reported_date": "2026-03-01T10:30:00Z",
             }
         }
+    )
+
+    id: str = Field(..., description="Deficiency ID")
+    reported_by: str = Field(..., description="Who reported the deficiency")
+    reported_date: datetime
+    created_at: datetime
+    updated_at: datetime
 
 
 # ============================================================================
@@ -426,11 +430,8 @@ class InspectionMeasurementCreate(InspectionMeasurementBase):
 class InspectionMeasurement(InspectionMeasurementBase):
     """Model for inspection measurement record."""
 
-    id: str = Field(..., description="Measurement ID")
-    created_at: datetime
-
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "id": "123e4567-e89b-12d3-a456-426614174004",
                 "result_id": "123e4567-e89b-12d3-a456-426614174002",
@@ -447,6 +448,10 @@ class InspectionMeasurement(InspectionMeasurementBase):
                 "deviation_status": "normal",
             }
         }
+    )
+
+    id: str = Field(..., description="Measurement ID")
+    created_at: datetime
 
 
 # ============================================================================
@@ -551,17 +556,8 @@ class InspectionPhoto(BaseModel):
 class InspectionSubmission(BaseModel):
     """Mobile inspection submission request."""
 
-    equipment_id: str = Field(..., description="Equipment being inspected")
-    template_id: str = Field(..., description="Checklist template ID")
-    checklist_responses: Dict[str, Any] = Field(..., description="Item ID to response mapping")
-    photos: List[InspectionPhoto] = Field(default_factory=list, description="Photo attachments")
-    duration_minutes: int = Field(default=15, description="Actual inspection duration")
-    notes: Optional[str] = Field(None, description="General inspection notes")
-    submitted_by: str = Field(default="technician", description="Who submitted the inspection")
-    submitted_at: Optional[datetime] = Field(None, description="Submission timestamp")
-
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "equipment_id": "S002-CHILLER-B1-001",
                 "template_id": "chiller_weekly",
@@ -582,6 +578,16 @@ class InspectionSubmission(BaseModel):
                 "submitted_by": "John Smith",
             }
         }
+    )
+
+    equipment_id: str = Field(..., description="Equipment being inspected")
+    template_id: str = Field(..., description="Checklist template ID")
+    checklist_responses: Dict[str, Any] = Field(..., description="Item ID to response mapping")
+    photos: List[InspectionPhoto] = Field(default_factory=list, description="Photo attachments")
+    duration_minutes: int = Field(default=15, description="Actual inspection duration")
+    notes: Optional[str] = Field(None, description="General inspection notes")
+    submitted_by: str = Field(default="technician", description="Who submitted the inspection")
+    submitted_at: Optional[datetime] = Field(None, description="Submission timestamp")
 
 
 class InspectionScheduleSummary(BaseModel):

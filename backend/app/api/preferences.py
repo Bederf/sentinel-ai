@@ -54,7 +54,7 @@ def get_user_id(x_user_id: Optional[str] = None) -> str:
     """Get user ID from header or generate default."""
     if x_user_id:
         return x_user_id
-    # Default user for demo/development
+    # Default local user when an upstream identity header is unavailable
     return "default-user"
 
 

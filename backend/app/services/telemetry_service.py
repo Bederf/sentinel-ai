@@ -6,11 +6,10 @@ Phase 170-03: Control Actuation Loop — Verification
 
 import asyncio
 import logging
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
-from app.services.audit_logger import AuditLogger
 from app.middleware.event_stream import event_stream
+from app.services.audit_logger import AuditLogger
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +63,7 @@ async def verify_telemetry_change_async(
                             "correlation_id": correlation_id,
                             "decision_id": decision_id,
                             "verification_time_seconds": verification_time,
-                            "timestamp": datetime.now(timezone.utc).isoformat(),
+                            "timestamp": datetime.now(UTC).isoformat(),
                         }
                     )
 
@@ -79,7 +78,7 @@ async def verify_telemetry_change_async(
                             },
                         )
                     except Exception as e:
-                        logger.warning(f"Failed to emit SSE event for {decision_id}: {str(e)}")
+                        logger.warning(f"Failed to emit SSE event for {decision_id}: {e!s}")
 
                     return True
 
@@ -92,10 +91,10 @@ async def verify_telemetry_change_async(
                         "decision_id": decision_id,
                         "error": str(e),
                         "attempt": attempt + 1,
-                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "timestamp": datetime.now(UTC).isoformat(),
                     }
                 )
-                logger.warning(f"Error during telemetry polling (attempt {attempt + 1}): {str(e)}")
+                logger.warning(f"Error during telemetry polling (attempt {attempt + 1}): {e!s}")
                 # Continue to next attempt
 
         # Timeout after 30s
@@ -105,7 +104,7 @@ async def verify_telemetry_change_async(
                 "correlation_id": correlation_id,
                 "decision_id": decision_id,
                 "message": "Telemetry did not confirm change within 30s",
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
         )
 
@@ -117,12 +116,12 @@ async def verify_telemetry_change_async(
                 payload={"decision_id": decision_id},
             )
         except Exception as e:
-            logger.warning(f"Failed to emit timeout SSE event for {decision_id}: {str(e)}")
+            logger.warning(f"Failed to emit timeout SSE event for {decision_id}: {e!s}")
 
         return False
 
     except Exception as e:
-        logger.error(f"Critical error in verify_telemetry_change_async: {str(e)}")
+        logger.error(f"Critical error in verify_telemetry_change_async: {e!s}")
         # Log critical error but don't raise
         await audit_logger.record_event(
             {
@@ -130,7 +129,7 @@ async def verify_telemetry_change_async(
                 "correlation_id": correlation_id,
                 "decision_id": decision_id,
                 "error": str(e),
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
         )
         return False
@@ -140,7 +139,7 @@ async def get_point_value(
     device_id: str,
     point: str,
     site_id: str,
-) -> Optional[float]:
+) -> float | None:
     """
     Get current point value from telemetry.
 
@@ -157,8 +156,8 @@ async def get_point_value(
     Raises:
         Exception on service errors (caller catches and logs)
     """
-    from app.services.device_manager import DeviceManager
     from app.database.client import get_supabase_client
+    from app.services.device_manager import DeviceManager
 
     try:
         # Try device manager first (in-memory, cached)
@@ -193,7 +192,7 @@ async def get_point_value(
 
     except Exception as e:
         logger.error(
-            f"Error querying point value for {device_id}.{point}: {str(e)}",
+            f"Error querying point value for {device_id}.{point}: {e!s}",
             extra={
                 "device_id": device_id,
                 "point": point,

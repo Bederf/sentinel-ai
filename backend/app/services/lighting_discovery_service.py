@@ -19,7 +19,6 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import IntEnum
-from typing import Optional
 
 import httpx
 
@@ -49,12 +48,12 @@ class LightingDeviceInfo:
     dali_address: int
     device_type: int
     device_type_name: str = ""
-    gtin: Optional[str] = None
-    firmware_version: Optional[str] = None
-    hardware_version: Optional[str] = None
-    serial_number: Optional[str] = None
-    manufacturer: Optional[str] = None
-    operating_hours: Optional[int] = None
+    gtin: str | None = None
+    firmware_version: str | None = None
+    hardware_version: str | None = None
+    serial_number: str | None = None
+    manufacturer: str | None = None
+    operating_hours: int | None = None
     lamp_failure: bool = False
     lamp_power_on: bool = False
     min_level: int = 1
@@ -98,15 +97,15 @@ class LightingGatewayInfo:
     """DALI gateway/controller information."""
 
     ip_address: str
-    mac_address: Optional[str] = None
-    firmware_version: Optional[str] = None
-    model: Optional[str] = None
-    manufacturer: Optional[str] = None
+    mac_address: str | None = None
+    firmware_version: str | None = None
+    model: str | None = None
+    manufacturer: str | None = None
     dali_lines: int = 1
     devices_per_line: dict = field(default_factory=dict)
     total_devices: int = 0
     online: bool = False
-    last_poll: Optional[str] = None
+    last_poll: str | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -158,9 +157,9 @@ class LightingDiscoveryService:
         self,
         gateway_ip: str,
         gateway_type: str = "generic",
-        username: Optional[str] = None,
-        password: Optional[str] = None,
-        port: Optional[int] = None,
+        username: str | None = None,
+        password: str | None = None,
+        port: int | None = None,
         timeout: float = 10.0,
     ):
         """Initialize DALI discovery service.
@@ -185,7 +184,7 @@ class LightingDiscoveryService:
 
         self.base_url = f"http://{gateway_ip}:{self.port}"
 
-    async def _request(self, endpoint: str, method: str = "GET", **kwargs) -> Optional[dict]:
+    async def _request(self, endpoint: str, method: str = "GET", **kwargs) -> dict | None:
         """Make HTTP request to gateway.
 
         Args:
@@ -214,7 +213,7 @@ class LightingDiscoveryService:
             logger.error(f"Error querying DALI gateway: {e}")
             return None
 
-    async def get_gateway_info(self) -> Optional[LightingGatewayInfo]:
+    async def get_gateway_info(self) -> LightingGatewayInfo | None:
         """Get gateway/controller information.
 
         Returns:
@@ -292,7 +291,7 @@ class LightingDiscoveryService:
 
         return devices
 
-    async def get_device_info(self, dali_line: int, dali_address: int) -> Optional[LightingDeviceInfo]:
+    async def get_device_info(self, dali_line: int, dali_address: int) -> LightingDeviceInfo | None:
         """Get detailed info for a specific DALI device.
 
         Args:
@@ -312,8 +311,8 @@ class LightingDiscoveryService:
         return self._parse_device_info(data, dali_line, dali_address)
 
     def _parse_device_info(
-        self, data: dict, dali_line: int, dali_address: Optional[int] = None
-    ) -> Optional[LightingDeviceInfo]:
+        self, data: dict, dali_line: int, dali_address: int | None = None
+    ) -> LightingDeviceInfo | None:
         """Parse device info from gateway response.
 
         Args:
@@ -343,7 +342,7 @@ class LightingDiscoveryService:
         )
 
     async def discover_and_save(
-        self, equipment_code: str, dali_line: int = 1, dali_address: Optional[int] = None
+        self, equipment_code: str, dali_line: int = 1, dali_address: int | None = None
     ) -> dict:
         """Discover device info and save to equipment metadata.
 
@@ -429,9 +428,9 @@ class LightingDiscoveryService:
         return result
 
 
-# Simulated discovery for demo/testing when gateway not available
+# Simulated discovery for local testing when gateway not available
 class SimulatedLightingDiscovery:
-    """Simulated DALI discovery for demo mode."""
+    """Simulated DALI discovery for local mode."""
 
     # Sample device data for common DALI products
     SAMPLE_DEVICES = {

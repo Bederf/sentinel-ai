@@ -105,13 +105,16 @@ def get_space_setting(key: str) -> Any:
 
 
 @router.get("/settings/space")
-async def get_space_settings(auth: AuthContext = Depends(require_role(1))) -> Dict[str, Any]:
+async def get_space_settings(
+    site_id: Optional[str] = Query(None, description="Optional site scope for concierge users"),
+    auth: AuthContext = Depends(require_role(1)),
+) -> Dict[str, Any]:
     """Get all space optimization settings including concierge list.
 
     Requires AUDITOR (level 1).
     """
     settings_data = _load_space_settings()
-    concierges = list_concierges()
+    concierges = list_concierges(site_id=site_id)
     settings_data["concierges"] = [asdict(c) for c in concierges]
     return settings_data
 

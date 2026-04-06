@@ -23,14 +23,14 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from app.models.outcome import Outcome
 from app.models.audit_log import AuditResultType
+from app.models.outcome import Outcome
 
 logger = logging.getLogger(__name__)
 
-# Storage for pending verifications (JSON file in demo mode)
+# Storage for pending verifications (JSON file in local mode)
 DATA_DIR = Path(__file__).parent.parent / "data"
 MV_FILE = DATA_DIR / "mv_verifications.json"
 
@@ -64,25 +64,25 @@ class VerificationTask:
     status: str = "pending"  # pending, verified, failed, rolled_back
     predicted_savings_kwh: float = 0.0
     predicted_savings_zar: float = 0.0
-    baseline_power_kw: Optional[float] = None
-    recommendation_systems: List[str] = field(default_factory=list)
-    setpoints_applied: List[Dict[str, Any]] = field(default_factory=list)
+    baseline_power_kw: float | None = None
+    recommendation_systems: list[str] = field(default_factory=list)
+    setpoints_applied: list[dict[str, Any]] = field(default_factory=list)
     # Filled after verification
-    actual_power_kw: Optional[float] = None
-    actual_savings_kwh: Optional[float] = None
-    actual_savings_zar: Optional[float] = None
-    accuracy: Optional[float] = None
-    variance_pct: Optional[float] = None
-    comfort_violations: List[Dict[str, Any]] = field(default_factory=list)
-    verified_at: Optional[str] = None
+    actual_power_kw: float | None = None
+    actual_savings_kwh: float | None = None
+    actual_savings_zar: float | None = None
+    accuracy: float | None = None
+    variance_pct: float | None = None
+    comfort_violations: list[dict[str, Any]] = field(default_factory=list)
+    verified_at: str | None = None
     rollback_recommended: bool = False
     notes: str = ""
     # Routing metadata (Phase 82-03): populated when routing is active
-    routing_tier: Optional[str] = None
-    control_tier: Optional[str] = None
-    effective_confidence: Optional[float] = None
+    routing_tier: str | None = None
+    control_tier: str | None = None
+    effective_confidence: float | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
             "site_id": self.site_id,
@@ -111,7 +111,7 @@ class VerificationTask:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "VerificationTask":
+    def from_dict(cls, data: dict[str, Any]) -> "VerificationTask":
         return cls(
             id=data.get("id", ""),
             site_id=data.get("site_id", ""),
@@ -154,8 +154,8 @@ class MVVerificationService:
     def __init__(self):
         if self._initialized:
             return
-        self._tasks: List[VerificationTask] = []
-        self._outcomes: List[Outcome] = []
+        self._tasks: list[VerificationTask] = []
+        self._outcomes: list[Outcome] = []
         self._load()
         self._initialized = True
 
@@ -189,10 +189,10 @@ class MVVerificationService:
         self,
         site_id: str,
         recommendation_id: str,
-        projected_savings: Dict[str, Any],
-        setpoints_applied: List[Dict[str, Any]],
-        recommendation_systems: Optional[List[str]] = None,
-        routing_metadata: Optional[Dict[str, Any]] = None,
+        projected_savings: dict[str, Any],
+        setpoints_applied: list[dict[str, Any]],
+        recommendation_systems: list[str] | None = None,
+        routing_metadata: dict[str, Any] | None = None,
     ) -> VerificationTask:
         """Record a verification task when a recommendation is applied.
 
@@ -266,7 +266,7 @@ class MVVerificationService:
         )
         return task
 
-    async def run_pending_verifications(self) -> List[VerificationTask]:
+    async def run_pending_verifications(self) -> list[VerificationTask]:
         """Check and verify any tasks whose measurement window has elapsed.
 
         This should be called periodically (e.g., every 15 minutes) by a
@@ -311,9 +311,9 @@ class MVVerificationService:
         Reads actual energy data from energy centre meters and compares
         to the predicted savings from the recommendation.
         """
-        from app.services.energy_centre_service import get_energy_centre_service
-        from app.services.device_abstraction import device_manager
         from app.services.audit_logger import AuditLogger
+        from app.services.device_abstraction import device_manager
+        from app.services.energy_centre_service import get_energy_centre_service
 
         now = datetime.now()
         task.verified_at = now.isoformat()
@@ -418,6 +418,7 @@ class MVVerificationService:
         ingestion_mode_str = None
         try:
             import uuid
+
             from app.config.settings import settings
             from app.services.quality_gate_evaluator import QualityGateEvaluator
 
@@ -522,7 +523,7 @@ class MVVerificationService:
         except Exception as e:
             logger.warning(f"M&V: Failed to write audit log: {e}")
 
-    def get_verification_summary(self, site_id: str) -> Dict[str, Any]:
+    def get_verification_summary(self, site_id: str) -> dict[str, Any]:
         """Get M&V summary for a site.
 
         Returns:
@@ -563,7 +564,7 @@ class MVVerificationService:
 
 
 # Singleton accessor
-_mv_service: Optional[MVVerificationService] = None
+_mv_service: MVVerificationService | None = None
 
 
 def get_mv_verification_service() -> MVVerificationService:

@@ -149,7 +149,7 @@ async def get_capex_portfolio(
 
     # Filter by building code prefix if site_id maps to one
     # Concept assets use building codes like GW-JHB-001, CM-PTA-001, SC-JHB-001
-    site_assets = assets  # Default: all assets (demo mode)
+    site_assets = assets  # Default: all assets (no site filter applied)
 
     equipment_list = []
     for asset in site_assets:

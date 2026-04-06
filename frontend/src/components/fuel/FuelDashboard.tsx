@@ -12,6 +12,7 @@ import { Card, Title, Text, Badge, Flex, Table, TableHead, TableRow, TableHeader
 import { FuelTankCard } from './FuelTankCard';
 import { FuelTrendChart } from './FuelTrendChart';
 import { fuelApi } from '../../lib/api';
+import { authorizedFetch } from '@/lib/api/client';
 import type { FuelTank, FuelEvent, GeneratorRuntimeSession, RefillRecord } from '../../lib/api';
 
 interface FuelDashboardProps {
@@ -74,6 +75,14 @@ export function FuelDashboard({ siteId }: FuelDashboardProps) {
   const [refills, setRefills] = useState<RefillRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [bridgeTelemetry, setBridgeTelemetry] = useState<{
+    status: 'live' | 'unavailable';
+    zones_with_readings?: number;
+    zone_count?: number;
+    power?: { hvac_kw?: number; lighting_kw?: number; total_kw?: number };
+  } | null>(null);
+  const [sentinelGuidance, setSentinelGuidance] = useState<string | null>(null);
+  const [sentinelPosture, setSentinelPosture] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -100,6 +109,50 @@ export function FuelDashboard({ siteId }: FuelDashboardProps) {
     const interval = setInterval(fetchData, POLL_INTERVAL_MS);
     return () => clearInterval(interval);
   }, [fetchData]);
+
+  useEffect(() => {
+    if (!siteId) return;
+    const siteIdForTelemetry = siteId;
+    let mounted = true;
+    async function loadTelemetrySummary() {
+      try {
+        const [rawTelemetryResp, stateResp] = await Promise.all([
+          authorizedFetch(`/api/sites/${encodeURIComponent(siteIdForTelemetry)}/telemetry`).catch(() => null),
+          authorizedFetch(`/api/building-state/${encodeURIComponent(siteIdForTelemetry)}`).catch(() => null),
+        ]);
+        if (!mounted) return;
+        if (rawTelemetryResp && rawTelemetryResp.ok) {
+          const raw = await rawTelemetryResp.json();
+          setBridgeTelemetry({
+            status: 'live',
+            zones_with_readings: raw?.zones_with_readings ?? 0,
+            zone_count: raw?.zone_count ?? 0,
+            power: raw?.power ?? {},
+          });
+        } else {
+          setBridgeTelemetry({ status: 'unavailable' });
+        }
+        if (stateResp && stateResp.ok) {
+          const state = await stateResp.json();
+          setSentinelGuidance(state?.payload?.operator_guidance?.headline || null);
+          setSentinelPosture(state?.payload?.building_posture || null);
+        } else {
+          setSentinelGuidance(null);
+          setSentinelPosture(null);
+        }
+      } catch {
+        if (mounted) {
+          setBridgeTelemetry({ status: 'unavailable' });
+          setSentinelGuidance(null);
+          setSentinelPosture(null);
+        }
+      }
+    }
+    loadTelemetrySummary();
+    return () => {
+      mounted = false;
+    };
+  }, [siteId]);
 
   if (loading) {
     return (
@@ -147,6 +200,23 @@ export function FuelDashboard({ siteId }: FuelDashboardProps) {
         <Title>Fuel Monitoring</Title>
         <Text className="text-xs text-gray-400">Auto-refresh every 30s</Text>
       </Flex>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Card>
+          <div className="flex items-center justify-between mb-2">
+            <Text className="text-sm font-semibold">Raw Bridge Telemetry</Text>
+            <Badge color={bridgeTelemetry?.status === 'live' ? 'green' : 'amber'} size="sm">
+              {bridgeTelemetry?.status === 'live' ? 'Live' : 'Unavailable'}
+            </Badge>
+          </div>
+          <Text className="text-xs text-gray-500">Zones: {bridgeTelemetry?.zones_with_readings ?? 0}/{bridgeTelemetry?.zone_count ?? 0}</Text>
+        </Card>
+        <Card>
+          <Text className="text-sm font-semibold mb-2">SENTINEL Fuel Interpretation</Text>
+          <Text className="text-xs text-gray-500">Posture: {sentinelPosture || 'unknown'}</Text>
+          <Text className="text-xs text-gray-500 mt-1">{sentinelGuidance || 'No active guidance yet.'}</Text>
+        </Card>
+      </div>
 
       {/* Summary Stats Row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">

@@ -30,9 +30,9 @@ import logging
 import math
 import random
 from dataclasses import dataclass, field
-from datetime import datetime, date, timezone, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
-from typing import Dict, List, Optional, Any
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +52,7 @@ class SolarPosition:
     air_mass: float
     ghi_wm2: float  # Global Horizontal Irradiance (clear sky)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "hour": self.hour,
             "declination_deg": round(self.declination_deg, 2),
@@ -75,7 +75,7 @@ class HourlyGeneration:
     clear_sky_kw: float = 0.0
     cloud_factor: float = 1.0  # 1.0 = clear, 0.0 = fully overcast
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "hour": self.hour,
             "generation_kw": round(self.generation_kw, 0),
@@ -95,7 +95,7 @@ class DailyTotal:
     clear_sky_kwh: float
     cloud_factor: float  # average for the day
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "date": self.date,
             "expected_kwh": round(self.expected_kwh, 0),
@@ -115,7 +115,7 @@ class ForecastAccuracy:
     bias_pct: float  # Systematic over/under prediction
     peak_capacity_kw: float = 0.0  # For RMSE % calculation
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "site_id": self.site_id,
             "period_days": self.period_days,
@@ -135,12 +135,12 @@ class GenerationForecast:
     site_id: str
     generated_at: str  # ISO timestamp
     model: str  # persistence / clear_sky / historical / weighted_ensemble
-    hourly: List[HourlyGeneration] = field(default_factory=list)
-    daily_totals: List[DailyTotal] = field(default_factory=list)
-    accuracy_7d: Optional[ForecastAccuracy] = None
+    hourly: list[HourlyGeneration] = field(default_factory=list)
+    daily_totals: list[DailyTotal] = field(default_factory=list)
+    accuracy_7d: ForecastAccuracy | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
-        result: Dict[str, Any] = {
+    def to_dict(self) -> dict[str, Any]:
+        result: dict[str, Any] = {
             "site_id": self.site_id,
             "generated_at": self.generated_at,
             "model": self.model,
@@ -280,13 +280,13 @@ class SolarForecastService:
     SYSTEM_LOSSES = 0.95  # Cable, mismatch, inverter clipping
 
     def __init__(self):
-        self._site_configs: Dict[str, Dict] = {}
-        self._persistence_cache: Dict[str, List[float]] = {}  # site_id -> 24h actuals
-        self._historical_cache: Dict[str, List[List[float]]] = {}  # site_id -> weeks of 24h data
+        self._site_configs: dict[str, dict] = {}
+        self._persistence_cache: dict[str, list[float]] = {}  # site_id -> 24h actuals
+        self._historical_cache: dict[str, list[list[float]]] = {}  # site_id -> weeks of 24h data
         self._geometry = SolarGeometry()
         # ML model state (34-08)
-        self._ml_models: Dict[str, "_GradientBoostingModel"] = {}  # site_id -> model
-        self._ml_accuracy: Dict[str, Dict[str, float]] = {}  # site_id -> accuracy metrics
+        self._ml_models: dict[str, _GradientBoostingModel] = {}  # site_id -> model
+        self._ml_accuracy: dict[str, dict[str, float]] = {}  # site_id -> accuracy metrics
         self._load_site_configs()
         self._seed_demo_data()
         self._train_ml_models()
@@ -318,8 +318,8 @@ class SolarForecastService:
             except Exception as e:
                 logger.error("Failed to load solar config %s: %s", config_path, e)
 
-    def _seed_demo_data(self) -> None:
-        """Seed persistence and historical cache with realistic demo data."""
+    def _seed_data(self) -> None:
+        """Seed persistence and historical cache with realistic local data."""
         for site_id, config in self._site_configs.items():
             lat = config["latitude"]
             lng = config["longitude"]
@@ -346,7 +346,7 @@ class SolarForecastService:
         capacity_kwp: float,
         target_date: date,
         cloud_seed: int = 0,
-    ) -> List[float]:
+    ) -> list[float]:
         """Generate a realistic 24-hour generation profile in kW.
 
         Returns list of 24 values (index 0 = midnight, 23 = 11pm) in SAST.
@@ -430,17 +430,17 @@ class SolarForecastService:
             # Return empty forecast for unknown site
             return GenerationForecast(
                 site_id=site_id,
-                generated_at=datetime.now(timezone.utc).isoformat(),
+                generated_at=datetime.now(UTC).isoformat(),
                 model=model,
             )
 
         lat = config["latitude"]
         lng = config["longitude"]
         capacity = config["capacity_kwp"]
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         sast_now = now + timedelta(hours=2)
-        hourly_entries: List[HourlyGeneration] = []
-        daily_kwh: Dict[str, Dict[str, float]] = {}  # date -> {expected, clear_sky}
+        hourly_entries: list[HourlyGeneration] = []
+        daily_kwh: dict[str, dict[str, float]] = {}  # date -> {expected, clear_sky}
 
         for offset in range(hours_ahead):
             forecast_dt = sast_now + timedelta(hours=offset)
@@ -518,8 +518,8 @@ class SolarForecastService:
     def get_clear_sky_profile(
         self,
         site_id: str,
-        target_date: Optional[date] = None,
-    ) -> List[HourlyGeneration]:
+        target_date: date | None = None,
+    ) -> list[HourlyGeneration]:
         """Get theoretical maximum generation profile for a given date.
 
         Returns 24 hourly values representing perfect clear-sky conditions.
@@ -566,7 +566,7 @@ class SolarForecastService:
     ) -> ForecastAccuracy:
         """Calculate forecast accuracy metrics (RMSE, MAE, bias) vs simulated actuals.
 
-        For demo, generates realistic accuracy metrics based on model characteristics.
+        Generates realistic accuracy metrics based on model characteristics.
         In production, this would compare stored forecasts vs metered generation.
         """
         config = self._site_configs.get(site_id)
@@ -601,7 +601,7 @@ class SolarForecastService:
         """Store today's actual generation for use as tomorrow's persistence forecast.
 
         In production, called at end of day with metered data.
-        For demo, regenerates with today's date as seed.
+        Regenerates with today's date as seed.
         """
         config = self._site_configs.get(site_id)
         if not config:
@@ -618,7 +618,7 @@ class SolarForecastService:
         self._persistence_cache[site_id] = profile
         logger.info("Updated persistence model for %s with %d hours", site_id, len(profile))
 
-    def is_cloudy_forecast(self, site_id: str, target_date: Optional[date] = None) -> bool:
+    def is_cloudy_forecast(self, site_id: str, target_date: date | None = None) -> bool:
         """Quick check: is tomorrow's forecast cloudy (< 50% of clear-sky)?
 
         Used by arbitrage engine to decide overnight BESS charging strategy.
@@ -776,7 +776,7 @@ class SolarForecastService:
             except Exception as e:
                 logger.error("Failed to train ML model for %s: %s", site_id, e)
 
-    def _train_site_model(self, site_id: str, config: Dict) -> Optional["_GradientBoostingModel"]:
+    def _train_site_model(self, site_id: str, config: dict) -> Optional["_GradientBoostingModel"]:
         """Train ML model for a single site on 90 days of synthetic data.
 
         Features: hour_of_day, day_of_year, cloud_cover, temperature, yesterday_gen
@@ -788,8 +788,8 @@ class SolarForecastService:
         today = date.today()
 
         # Generate 90 days of training data
-        features_list: List[List[float]] = []
-        targets: List[float] = []
+        features_list: list[list[float]] = []
+        targets: list[float] = []
 
         for day_offset in range(90, 0, -1):
             d = today - timedelta(days=day_offset)
@@ -862,7 +862,7 @@ class SolarForecastService:
             return True
         return False
 
-    def get_ml_forecast(self, site_id: str, hours_ahead: int = 24) -> List[HourlyGeneration]:
+    def get_ml_forecast(self, site_id: str, hours_ahead: int = 24) -> list[HourlyGeneration]:
         """Get ML-only forecast for a site.
 
         Returns hourly generation predictions using only the gradient boosting model.
@@ -874,10 +874,10 @@ class SolarForecastService:
         lat = config["latitude"]
         lng = config["longitude"]
         capacity = config["capacity_kwp"]
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         sast_now = now + timedelta(hours=2)
 
-        result: List[HourlyGeneration] = []
+        result: list[HourlyGeneration] = []
         for offset in range(hours_ahead):
             forecast_dt = sast_now + timedelta(hours=offset)
             forecast_hour = forecast_dt.hour
@@ -902,7 +902,7 @@ class SolarForecastService:
 
         return result
 
-    def get_ml_accuracy(self, site_id: str) -> Optional[Dict[str, Any]]:
+    def get_ml_accuracy(self, site_id: str) -> dict[str, Any] | None:
         """Get ML model accuracy metrics for a site."""
         return self._ml_accuracy.get(site_id)
 
@@ -928,10 +928,10 @@ class _GradientBoostingModel:
         self.n_estimators = n_estimators
         self.learning_rate = learning_rate
         self.capacity_kwp = capacity_kwp
-        self._trees: List[Dict[str, Any]] = []
+        self._trees: list[dict[str, Any]] = []
         self._base_prediction: float = 0.0
 
-    def fit(self, features: List[List[float]], targets: List[float]) -> None:
+    def fit(self, features: list[list[float]], targets: list[float]) -> None:
         """Train the model using gradient boosting on decision stumps."""
         n = len(targets)
         if n == 0:
@@ -956,7 +956,7 @@ class _GradientBoostingModel:
                 pred = self._predict_stump(best_stump, features[i])
                 residuals[i] -= self.learning_rate * pred
 
-    def predict(self, features: List[float]) -> float:
+    def predict(self, features: list[float]) -> float:
         """Predict generation for a single feature vector."""
         prediction = self._base_prediction
         for tree in self._trees:
@@ -966,9 +966,9 @@ class _GradientBoostingModel:
 
     def _find_best_stump(
         self,
-        features: List[List[float]],
-        residuals: List[float],
-    ) -> Optional[Dict[str, Any]]:
+        features: list[list[float]],
+        residuals: list[float],
+    ) -> dict[str, Any] | None:
         """Find the best single-feature split that minimises MSE of residuals."""
         n = len(features)
         if n < 4:
@@ -1021,7 +1021,7 @@ class _GradientBoostingModel:
         return best_stump
 
     @staticmethod
-    def _predict_stump(stump: Dict[str, Any], features: List[float]) -> float:
+    def _predict_stump(stump: dict[str, Any], features: list[float]) -> float:
         """Predict using a single decision stump."""
         if features[stump["feature"]] <= stump["threshold"]:
             return stump["left_value"]
@@ -1030,7 +1030,7 @@ class _GradientBoostingModel:
 
 # === Singleton ===
 
-_solar_forecast_service: Optional[SolarForecastService] = None
+_solar_forecast_service: SolarForecastService | None = None
 
 
 def get_solar_forecast_service() -> SolarForecastService:

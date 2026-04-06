@@ -25,6 +25,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from app.middleware.rate_limiter import limiter
 
+from app.config.settings import settings
 from app.api.dependencies.module_access import require_active_module
 from app.models.module_registry import ModuleType
 from app.models.solar import BESSContainer
@@ -119,7 +120,10 @@ async def get_bess_status(request: Request, site_id: str):
     svc = get_solar_ingestion_service()
     bess = await svc.get_bess_status(site_id)
 
-    # Fallback to mock data for demo mode when no device connected
+    if not bess and settings.sentinel_island_mode:
+        raise HTTPException(status_code=404, detail=f"BESS telemetry unavailable for live site '{site_id}'")
+
+    # Fallback to mock data for local simulator/dev mode when no device connected
     if not bess:
         # Try to load BESS config from site configs
         sites = svc.get_registered_sites()

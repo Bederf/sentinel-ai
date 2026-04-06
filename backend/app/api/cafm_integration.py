@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/cafm")
 
-# In-memory connector instance (demo mode)
+# In-memory connector instance (local mode)
 _connector: CAFMConnector | None = None
 
 

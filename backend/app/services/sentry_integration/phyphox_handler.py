@@ -9,7 +9,7 @@ Reference: backend/app/services/sentry_integration/ocr_correction_handler.py
 """
 
 import logging
-from typing import Dict, Any, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -45,9 +45,9 @@ class PhyphoxHandler:
         file_data: bytes,
         filename: str,
         equipment_id: str,
-        service_record_id: Optional[str] = None,
+        service_record_id: str | None = None,
         measurement_type: str = "vibration",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Process phyphox screenshot or export file.
 
@@ -96,7 +96,7 @@ class PhyphoxHandler:
 
         return result
 
-    async def _detect_anomalies(self, data: Dict[str, Any], measurement_type: str) -> Dict[str, Any]:
+    async def _detect_anomalies(self, data: dict[str, Any], measurement_type: str) -> dict[str, Any]:
         """Run anomaly detection on extracted data."""
         anomalies = {"detected": [], "severity": "normal", "confidence": 0.0}
 
@@ -159,7 +159,7 @@ class PhyphoxHandler:
         return anomalies
 
     def get_technician_instructions(
-        self, measurement_type: str = "vibration", equipment_type: Optional[str] = None
+        self, measurement_type: str = "vibration", equipment_type: str | None = None
     ) -> str:
         """
         Get instructions to send to technician via Sentry.
@@ -269,7 +269,7 @@ Supported types: vibration, audio, multi"""
 
 
 # Singleton instance
-_handler_instance: Optional[PhyphoxHandler] = None
+_handler_instance: PhyphoxHandler | None = None
 
 
 def get_phyphox_handler() -> PhyphoxHandler:

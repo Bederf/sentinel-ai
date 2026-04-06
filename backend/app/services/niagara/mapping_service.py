@@ -19,7 +19,7 @@ import re
 from collections import Counter
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from app.services.niagara.point_classifier import (
     ClassifiedPoint,
@@ -42,9 +42,9 @@ class EquipmentMapping:
         equipment_type: str,
         equipment_name: str = "",
         site_id: str = "",
-        points: Optional[List[Dict[str, Any]]] = None,
+        points: list[dict[str, Any]] | None = None,
         confidence: str = "medium",
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ):
         self.equipment_id = equipment_id
         self.equipment_type = equipment_type
@@ -55,10 +55,10 @@ class EquipmentMapping:
         self.metadata = metadata or {}
         self.created_at = datetime.utcnow().isoformat()
         self.approved = False
-        self.approved_at: Optional[str] = None
-        self.approved_by: Optional[str] = None
+        self.approved_at: str | None = None
+        self.approved_by: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "equipment_id": self.equipment_id,
             "equipment_type": self.equipment_type,
@@ -80,14 +80,14 @@ class MappingValidationResult:
 
     def __init__(self):
         self.valid = True
-        self.orphan_points: List[str] = []
-        self.duplicate_points: List[str] = []
-        self.missing_typical_points: Dict[str, List[str]] = {}
-        self.low_confidence_points: List[str] = []
-        self.warnings: List[str] = []
-        self.errors: List[str] = []
+        self.orphan_points: list[str] = []
+        self.duplicate_points: list[str] = []
+        self.missing_typical_points: dict[str, list[str]] = {}
+        self.low_confidence_points: list[str] = []
+        self.warnings: list[str] = []
+        self.errors: list[str] = []
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "valid": self.valid,
             "orphan_points": self.orphan_points,
@@ -118,14 +118,14 @@ class PointMappingService:
     """
 
     def __init__(self):
-        self._mapping_cache: Dict[str, Dict[str, EquipmentMapping]] = {}
-        self._mapping_history: Dict[str, List[Dict[str, Any]]] = {}
+        self._mapping_cache: dict[str, dict[str, EquipmentMapping]] = {}
+        self._mapping_history: dict[str, list[dict[str, Any]]] = {}
 
     def map_points_to_equipment(
         self,
-        classified_points: List[ClassifiedPoint],
+        classified_points: list[ClassifiedPoint],
         site_id: str,
-    ) -> Dict[str, EquipmentMapping]:
+    ) -> dict[str, EquipmentMapping]:
         """Group classified points into equipment entities with v2.0 naming conversion.
 
         Uses equipment_id extracted during classification to group points.
@@ -146,8 +146,8 @@ class PointMappingService:
         zone_service = get_zone_mapping_service()
 
         # Step 1: Group points by equipment ID
-        groups: Dict[str, List[ClassifiedPoint]] = {}
-        orphans: List[ClassifiedPoint] = []
+        groups: dict[str, list[ClassifiedPoint]] = {}
+        orphans: list[ClassifiedPoint] = []
 
         for cp in classified_points:
             if cp.equipment_id:
@@ -165,7 +165,7 @@ class PointMappingService:
         )
 
         # Step 2: Generate equipment mappings with v2.0 naming conversion
-        mappings: Dict[str, EquipmentMapping] = {}
+        mappings: dict[str, EquipmentMapping] = {}
 
         for bms_equip_id, points in groups.items():
             # Infer equipment type from majority vote
@@ -208,7 +208,7 @@ class PointMappingService:
     def _generate_equipment_mapping(
         self,
         equipment_id: str,
-        points: List[ClassifiedPoint],
+        points: list[ClassifiedPoint],
         site_id: str,
     ) -> EquipmentMapping:
         """Generate an equipment mapping from a group of classified points.
@@ -314,7 +314,7 @@ class PointMappingService:
         type_label = type_names.get(equipment_type, equipment_type.replace("_", " ").title())
         return f"{type_label} ({equipment_id})"
 
-    def generate_equipment_model(self, mapping: EquipmentMapping) -> Dict[str, Any]:
+    def generate_equipment_model(self, mapping: EquipmentMapping) -> dict[str, Any]:
         """Generate a DeviceInterface-compatible equipment configuration.
 
         Creates a JSON structure that can be loaded by the device manager
@@ -399,8 +399,8 @@ class PointMappingService:
 
     def validate_mappings(
         self,
-        mappings: Dict[str, EquipmentMapping],
-        haystack_tags: Optional[Dict[str, Any]] = None,
+        mappings: dict[str, EquipmentMapping],
+        haystack_tags: dict[str, Any] | None = None,
     ) -> MappingValidationResult:
         """Validate point mappings for completeness and correctness.
 
@@ -426,7 +426,7 @@ class PointMappingService:
         equipment_patterns = haystack_tags.get("equipment_patterns", {})
 
         # Track all point names for duplicate detection
-        all_point_names: Dict[str, str] = {}  # name -> equipment_id
+        all_point_names: dict[str, str] = {}  # name -> equipment_id
 
         for equip_id, mapping in mappings.items():
             # Check for UNASSIGNED (orphan) group
@@ -482,9 +482,9 @@ class PointMappingService:
     def save_mappings(
         self,
         discovery_id: str,
-        mappings: Dict[str, EquipmentMapping],
+        mappings: dict[str, EquipmentMapping],
         site_id: str = "",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Save mappings with dual-write (JSON primary, Supabase optional).
 
         Args:
@@ -527,9 +527,9 @@ class PointMappingService:
     def _save_to_json(
         self,
         discovery_id: str,
-        mappings: Dict[str, EquipmentMapping],
+        mappings: dict[str, EquipmentMapping],
         site_id: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Save mappings to JSON file."""
         try:
             save_dir = DATA_DIR / "mappings"
@@ -559,8 +559,8 @@ class PointMappingService:
     def _save_to_supabase(
         self,
         discovery_id: str,
-        mappings: Dict[str, EquipmentMapping],
-    ) -> Dict[str, Any]:
+        mappings: dict[str, EquipmentMapping],
+    ) -> dict[str, Any]:
         """Save equipment to Supabase buildings and equipment tables.
 
         Creates or finds the building record, then creates equipment records
@@ -654,7 +654,7 @@ class PointMappingService:
             logger.error("Supabase save failed: %s", e)
             return {"success": False, "reason": str(e)}
 
-    def _load_building_json(self, site_id: str) -> Optional[Dict[str, Any]]:
+    def _load_building_json(self, site_id: str) -> dict[str, Any] | None:
         """Load building.json for a site."""
         try:
             filepath = SITES_DIR / site_id / "building.json"
@@ -666,7 +666,7 @@ class PointMappingService:
             logger.warning("Failed to load building.json for %s: %s", site_id, e)
             return None
 
-    def get_mappings(self, discovery_id: str) -> Optional[Dict[str, EquipmentMapping]]:
+    def get_mappings(self, discovery_id: str) -> dict[str, EquipmentMapping] | None:
         """Get cached mappings for a discovery."""
         if discovery_id in self._mapping_cache:
             return self._mapping_cache[discovery_id]
@@ -674,7 +674,7 @@ class PointMappingService:
         # Try loading from JSON
         return self._load_from_json(discovery_id)
 
-    def _load_from_json(self, discovery_id: str) -> Optional[Dict[str, EquipmentMapping]]:
+    def _load_from_json(self, discovery_id: str) -> dict[str, EquipmentMapping] | None:
         """Load mappings from JSON file."""
         try:
             filepath = DATA_DIR / "mappings" / f"mapping_{discovery_id}.json"
@@ -684,7 +684,7 @@ class PointMappingService:
             with open(filepath) as f:
                 data = json.load(f)
 
-            mappings: Dict[str, EquipmentMapping] = {}
+            mappings: dict[str, EquipmentMapping] = {}
             for eid, edata in data.get("equipment", {}).items():
                 mapping = EquipmentMapping(
                     equipment_id=edata.get("equipment_id", eid),
@@ -712,10 +712,10 @@ class PointMappingService:
         self,
         discovery_id: str,
         point_name: str,
-        new_equipment_id: Optional[str] = None,
-        new_point_type: Optional[str] = None,
-        new_equipment_type: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        new_equipment_id: str | None = None,
+        new_point_type: str | None = None,
+        new_equipment_type: str | None = None,
+    ) -> dict[str, Any]:
         """Apply manual correction to a point classification.
 
         Args:
@@ -793,9 +793,9 @@ class PointMappingService:
 
     def _find_point_reference(
         self,
-        mappings: Dict[str, EquipmentMapping],
+        mappings: dict[str, EquipmentMapping],
         point_reference: str,
-    ) -> tuple[Optional[str], Optional[Dict[str, Any]]]:
+    ) -> tuple[str | None, dict[str, Any] | None]:
         """Resolve a manual correction reference to a concrete mapped point.
 
         Supports:
@@ -817,7 +817,7 @@ class PointMappingService:
         full_ref_norm = self._normalize_match_key(point_reference)
         equipment_type_hint = self._infer_equipment_type_hint(equip_hint)
 
-        best_match: tuple[int, Optional[str], Optional[Dict[str, Any]]] = (0, None, None)
+        best_match: tuple[int, str | None, dict[str, Any] | None] = (0, None, None)
 
         for eid, mapping in mappings.items():
             for point in mapping.points:
@@ -840,7 +840,7 @@ class PointMappingService:
     def _score_point_reference_match(
         self,
         mapping: EquipmentMapping,
-        point: Dict[str, Any],
+        point: dict[str, Any],
         full_ref_norm: str,
         equip_hint: str,
         point_hint_norm: str,
@@ -909,7 +909,7 @@ class PointMappingService:
         self,
         discovery_id: str,
         approved_by: str = "system",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Approve all equipment mappings for activation.
 
         Args:
@@ -977,7 +977,7 @@ class PointMappingService:
 
     def _save_equipment_models(
         self,
-        models: List[Dict[str, Any]],
+        models: list[dict[str, Any]],
         site_id: str,
     ) -> bool:
         """Save equipment models to the buildings directory."""
@@ -1003,9 +1003,9 @@ class PointMappingService:
 
     def generate_zones_file(
         self,
-        equipment_models: List[Dict[str, Any]],
+        equipment_models: list[dict[str, Any]],
         site_id: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Auto-generate zones.json from discovered equipment.
 
         Parses equipment location metadata and creates zone definitions
@@ -1058,11 +1058,11 @@ class PointMappingService:
                 "error": str(e),
             }
 
-    def get_mapping_history(self, discovery_id: str) -> List[Dict[str, Any]]:
+    def get_mapping_history(self, discovery_id: str) -> list[dict[str, Any]]:
         """Get the change history for a mapping set."""
         return self._mapping_history.get(discovery_id, [])
 
-    def _load_haystack_tags(self) -> Dict[str, Any]:
+    def _load_haystack_tags(self) -> dict[str, Any]:
         """Load Haystack tags for validation."""
         try:
             with open(DATA_DIR / "haystack_tags.json") as f:
@@ -1075,7 +1075,7 @@ class PointMappingService:
 # Singleton factory
 # ---------------------------------------------------------------------------
 
-_mapping_service: Optional[PointMappingService] = None
+_mapping_service: PointMappingService | None = None
 
 
 def get_mapping_service() -> PointMappingService:

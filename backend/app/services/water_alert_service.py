@@ -10,12 +10,13 @@ Implements multiple leak detection strategies:
 import logging
 import uuid
 from datetime import datetime, timedelta
-from typing import List, Optional, Dict, Any
 from statistics import mean, stdev
+from typing import Any
 
-from app.models.water_meter import WaterAlert, AlertType, AlertSeverity, AlertStatus
-from app.database.repositories.water_consumption_repository import WaterConsumptionRepository
 from pydantic import BaseModel
+
+from app.database.repositories.water_consumption_repository import WaterConsumptionRepository
+from app.models.water_meter import AlertSeverity, AlertStatus, AlertType, WaterAlert
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +27,7 @@ class WaterAlertNotificationSettings(BaseModel):
     enabled: bool = True
     notify_critical: bool = True
     notify_warning: bool = True
-    notify_channels: List[str] = ["sentry"]
+    notify_channels: list[str] = ["sentry"]
     technician_group: str = "water_maintenance"
     escalate_after_hours: int = 2
 
@@ -79,8 +80,8 @@ class WaterAlertService:
         night_flow_hours_start: int = 2,
         night_flow_hours_end: int = 4,
         night_occupancy_max: int = 0,  # Building should be empty at night
-        work_order_service: Optional[Any] = None,
-        technician_repository: Optional[Any] = None,
+        work_order_service: Any | None = None,
+        technician_repository: Any | None = None,
     ):
         """Initialize alert service with detection thresholds."""
         self.continuous_flow_threshold_lpm = continuous_flow_threshold_lpm
@@ -110,7 +111,7 @@ class WaterAlertService:
         meter_id: str,
         current_flow_rate: float,
         timestamp: datetime,
-    ) -> Optional[WaterAlert]:
+    ) -> WaterAlert | None:
         """Check for continuous flow during off-hours.
 
         Detects leaks where water flows continuously during times when
@@ -181,7 +182,7 @@ class WaterAlertService:
         meter_id: str,
         current_flow_rate: float,
         timestamp: datetime,
-    ) -> Optional[WaterAlert]:
+    ) -> WaterAlert | None:
         """Check for statistical anomaly using z-score analysis.
 
         Compares current flow to 7-day baseline. Z-score > 3.0 indicates
@@ -252,7 +253,7 @@ class WaterAlertService:
         meter_id: str,
         current_flow_rate: float,
         timestamp: datetime,
-    ) -> Optional[WaterAlert]:
+    ) -> WaterAlert | None:
         """Check for sudden flow spike.
 
         Detects rapid increases in flow rate (>200% from 15-minute average).
@@ -337,7 +338,7 @@ class WaterAlertService:
         zone_id: str,
         current_flow: float,
         timestamp: datetime,
-    ) -> Optional[WaterAlert]:
+    ) -> WaterAlert | None:
         """Check for unauthorized water usage at night using occupancy context.
 
         Detects flow during night hours when the zone occupancy is below threshold.
@@ -387,7 +388,7 @@ class WaterAlertService:
             ),
         )
 
-    def calculate_statistical_baseline(self, flows: List[float]) -> Dict[str, float]:
+    def calculate_statistical_baseline(self, flows: list[float]) -> dict[str, float]:
         """Calculate statistical baseline metrics from flow data.
 
         Args:
@@ -433,7 +434,7 @@ class WaterAlertService:
         current_flow: float,
         lookback_hours: int = 24,
         sensitivity: float = 2.0,
-    ) -> Optional[WaterAlert]:
+    ) -> WaterAlert | None:
         """Check for zone-based statistical anomaly.
 
         Detects abnormal flow by comparing current flow to historical baseline
@@ -513,7 +514,7 @@ class WaterAlertService:
         meter_id: str,
         current_flow_rate: float,
         timestamp: datetime,
-    ) -> List[WaterAlert]:
+    ) -> list[WaterAlert]:
         """Run all leak detection algorithms.
 
         Args:
@@ -561,11 +562,11 @@ class WaterAlertService:
     def get_leak_alerts(
         self,
         site: str,
-        severity: Optional[str] = None,
-        start_date: Optional[datetime] = None,
-        end_date: Optional[datetime] = None,
-        status: Optional[str] = None,
-    ) -> List[WaterAlert]:
+        severity: str | None = None,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
+        status: str | None = None,
+    ) -> list[WaterAlert]:
         """Get leak alerts for a site.
 
         Args:
@@ -587,7 +588,7 @@ class WaterAlertService:
         )
         return [WaterAlert.from_dict(r) for r in records]
 
-    def get_active_alerts(self, site: str) -> List[WaterAlert]:
+    def get_active_alerts(self, site: str) -> list[WaterAlert]:
         """Get all active (unresolved) alerts.
 
         Args:
@@ -623,7 +624,7 @@ class WaterAlertService:
 
     # === Work order integration ===
 
-    async def create_work_order_from_alert(self, alert: WaterAlert) -> Optional[Dict]:
+    async def create_work_order_from_alert(self, alert: WaterAlert) -> dict | None:
         """Create work order from water alert.
 
         Args:
@@ -692,9 +693,9 @@ class WaterAlertService:
         self,
         alert_id: str,
         acknowledged_by: str,
-        notes: Optional[str] = None,
-        work_order_id: Optional[str] = None,
-    ) -> Dict:
+        notes: str | None = None,
+        work_order_id: str | None = None,
+    ) -> dict:
         """Mark alert as acknowledged.
 
         Args:
@@ -740,8 +741,8 @@ class WaterAlertService:
         self,
         alert: WaterAlert,
         work_order_id: str,
-        technician_id: Optional[str] = None,
-    ) -> Dict:
+        technician_id: str | None = None,
+    ) -> dict:
         """Notify Sentry bot of water leak alert.
 
         Args:
@@ -856,7 +857,7 @@ class WaterAlertService:
 
 
 # Singleton instance
-_water_alert_service: Optional[WaterAlertService] = None
+_water_alert_service: WaterAlertService | None = None
 
 
 def get_water_alert_service() -> WaterAlertService:

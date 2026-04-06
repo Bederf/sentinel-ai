@@ -228,7 +228,7 @@ class FleetAggregator:
         if failure_type:
             patterns = [p for p in patterns if p["failure_type"] == failure_type]
 
-        # In demo mode, return all matches (in production, exclude site-specific data)
+        # In local mode, return all matches (in production, exclude site-specific data)
         return patterns
 
     def get_risk_distribution(self) -> Dict[str, Any]:
@@ -344,7 +344,7 @@ class FleetAggregator:
         """
         benchmarks = self.get_benchmarks(equipment_type)
 
-        # Calculate percentile (simple demo calculation)
+        # Calculate percentile (simple local fallback calculation)
         percentile = min(100, (site_health / 100) * 100)
 
         # Determine status

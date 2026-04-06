@@ -24,8 +24,8 @@ import logging
 import random
 import statistics
 from dataclasses import dataclass, field
-from datetime import datetime, timezone, timedelta
-from typing import Dict, List, Optional, Any
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from app.services.solar_ingestion_service import get_solar_ingestion_service
 
@@ -77,7 +77,7 @@ class InverterDegradation:
     annual_loss_kwh: float
     annual_loss_zar: float
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "inverter_id": self.inverter_id,
             "name": self.name,
@@ -102,12 +102,12 @@ class DegradationReport:
     site_id: str
     timestamp: str
     fleet_average_degradation: float
-    worst_inverter: Optional[InverterDegradation]
+    worst_inverter: InverterDegradation | None
     inverters_above_threshold: int
     total_inverters: int
-    inverters: List[InverterDegradation] = field(default_factory=list)
+    inverters: list[InverterDegradation] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "site_id": self.site_id,
             "timestamp": self.timestamp,
@@ -130,7 +130,7 @@ class MonthlyHealthPoint:
     operating_hours: float
     degradation_cumulative_pct: float
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "month": self.month,
             "performance_ratio": round(self.performance_ratio, 4),
@@ -148,9 +148,9 @@ class HealthTimeline:
     site_id: str
     inverter_id: str
     months_requested: int
-    data: List[MonthlyHealthPoint] = field(default_factory=list)
+    data: list[MonthlyHealthPoint] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "site_id": self.site_id,
             "inverter_id": self.inverter_id,
@@ -172,7 +172,7 @@ class EOLPrediction:
     years_remaining: float
     confidence: str  # low (< 2y data), medium (2-5y), high (> 5y)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "inverter_id": self.inverter_id,
             "degradation_rate_pct_year": round(self.degradation_rate_pct_year, 2),
@@ -196,7 +196,7 @@ class BESSRackHealth:
     cell_imbalance_mv: float
     status: str  # normal, warning, alarm
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "rack_id": self.rack_id,
             "soc_pct": round(self.soc_pct, 1),
@@ -224,10 +224,10 @@ class BESSHealthReport:
     max_temp_c: float
     estimated_replacement_year: int
     calendar_age_years: float
-    alerts: List[str] = field(default_factory=list)
-    racks: List[BESSRackHealth] = field(default_factory=list)
+    alerts: list[str] = field(default_factory=list)
+    racks: list[BESSRackHealth] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "site_id": self.site_id,
             "container_id": self.container_id,
@@ -262,7 +262,7 @@ class BESSReplacementPrediction:
     replacement_year: int  # earlier of the two
     years_remaining: float
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "site_id": self.site_id,
             "container_id": self.container_id,
@@ -288,7 +288,7 @@ class MonthlyCycleData:
     equivalent_full_cycles: float
     avg_temp_c: float
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "month": self.month,
             "cycle_count": self.cycle_count,
@@ -306,15 +306,15 @@ class WarrantyPackage:
     equipment_id: str
     equipment_type: str  # inverter or bess
     generated_at: str
-    equipment_details: Dict[str, Any]
-    installation_info: Dict[str, Any]
-    operating_history: Dict[str, Any]
-    degradation_evidence: Dict[str, Any]
-    environmental_conditions: Dict[str, Any]
-    fault_log: List[Dict[str, Any]]
-    conclusion: Dict[str, Any]
+    equipment_details: dict[str, Any]
+    installation_info: dict[str, Any]
+    operating_history: dict[str, Any]
+    degradation_evidence: dict[str, Any]
+    environmental_conditions: dict[str, Any]
+    fault_log: list[dict[str, Any]]
+    conclusion: dict[str, Any]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "site_id": self.site_id,
             "equipment_id": self.equipment_id,
@@ -343,14 +343,14 @@ class SolarHealthService:
 
     def __init__(self):
         self._ingestion = get_solar_ingestion_service()
-        # Demo simulation: per-inverter degradation rates (seeded)
-        self._inverter_degradation: Dict[str, float] = {}
-        self._inverter_pr: Dict[str, float] = {}
-        self._bess_demo_data: Dict[str, Dict[str, Any]] = {}
-        self._seed_demo_data()
+        # Seeded per-inverter degradation rates for local analysis
+        self._inverter_degradation: dict[str, float] = {}
+        self._inverter_pr: dict[str, float] = {}
+        self._bess_seed_data: dict[str, dict[str, Any]] = {}
+        self._seed_data()
 
-    def _seed_demo_data(self) -> None:
-        """Seed realistic demo degradation data.
+    def _seed_data(self) -> None:
+        """Seed realistic degradation data for local analysis.
 
         Sets inverter H03 with accelerated degradation (1.2%/year)
         and BESS at 94% SoH with 850 cycles. Rack 4 has higher cell
@@ -380,7 +380,7 @@ class SolarHealthService:
                         current_pr = COMMISSIONING_PR - pr_loss
                         self._inverter_pr[inv_id] = round(max(0.60, current_pr + rng.uniform(-0.01, 0.01)), 4)
 
-            # BESS demo data
+            # BESS seeded data
             bess_cfg = config.get("bess", {})
             if bess_cfg:
                 rack_count = bess_cfg.get("rack_count", 6)
@@ -410,7 +410,7 @@ class SolarHealthService:
                         }
                     )
 
-                self._bess_demo_data[site_id] = {
+                self._bess_seed_data[site_id] = {
                     "soh_pct": 94.0,
                     "cycles_completed": 850,
                     "commissioning_date": "2024-03-15",
@@ -429,8 +429,8 @@ class SolarHealthService:
     # === Panel / Inverter Degradation ===
 
     async def calculate_degradation_rate(
-        self, site_id: str, inverter_id: Optional[str] = None
-    ) -> Optional[DegradationReport]:
+        self, site_id: str, inverter_id: str | None = None
+    ) -> DegradationReport | None:
         """Calculate degradation rates for all inverters at a site.
 
         Compares current PR to commissioning baseline PR.
@@ -449,19 +449,19 @@ class SolarHealthService:
         if not site_reg:
             return None
 
-        inv_plant_map: Dict[str, str] = {}  # inv_id -> commissioning_date
+        inv_plant_map: dict[str, str] = {}  # inv_id -> commissioning_date
         for plant in site_reg.config.get("plants", []):
             comm_date = plant.get("commissioning_date", "2024-03-15")
             for inv_cfg in plant.get("inverters", []):
                 inv_plant_map[inv_cfg["id"]] = comm_date
 
-        degradation_list: List[InverterDegradation] = []
+        degradation_list: list[InverterDegradation] = []
 
         for inv in inverters:
             comm_date = inv_plant_map.get(inv.inverter_id, "2024-03-15")
             years = self._years_since(comm_date)
 
-            # Use demo degradation rate or calculate from PR
+            # Use seeded degradation rate or calculate from PR
             deg_rate = self._inverter_degradation.get(inv.inverter_id, 0.6)
             current_pr = self._inverter_pr.get(inv.inverter_id, 0.82)
 
@@ -514,7 +514,7 @@ class SolarHealthService:
 
         return DegradationReport(
             site_id=site_id,
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
             fleet_average_degradation=fleet_avg,
             worst_inverter=worst,
             inverters_above_threshold=above_threshold,
@@ -522,11 +522,11 @@ class SolarHealthService:
             inverters=degradation_list,
         )
 
-    async def get_health_timeline(self, site_id: str, inverter_id: str, months: int = 12) -> Optional[HealthTimeline]:
+    async def get_health_timeline(self, site_id: str, inverter_id: str, months: int = 12) -> HealthTimeline | None:
         """Generate monthly health timeline for an inverter.
 
         Returns PR trend, efficiency, fault count, operating hours per month.
-        For demo: generates synthetic but realistic monthly data.
+        Generates synthetic but realistic monthly data for local seeded mode.
         """
         inv_list = await self._ingestion.get_inverters(site_id)
         inv = next((i for i in inv_list if i.inverter_id == inverter_id), None)
@@ -537,7 +537,7 @@ class SolarHealthService:
         deg_rate = self._inverter_degradation.get(inverter_id, 0.6)
         current_pr = self._inverter_pr.get(inverter_id, 0.82)
 
-        data: List[MonthlyHealthPoint] = []
+        data: list[MonthlyHealthPoint] = []
         now = datetime.now()
 
         for i in range(months - 1, -1, -1):  # oldest first
@@ -584,7 +584,7 @@ class SolarHealthService:
             data=data,
         )
 
-    async def predict_end_of_life(self, site_id: str, inverter_id: str) -> Optional[EOLPrediction]:
+    async def predict_end_of_life(self, site_id: str, inverter_id: str) -> EOLPrediction | None:
         """Predict when an inverter's PR drops below economic threshold.
 
         Uses linear extrapolation. ML models improve this in future.
@@ -623,7 +623,7 @@ class SolarHealthService:
 
     # === BESS State-of-Health ===
 
-    async def get_bess_health(self, site_id: str) -> Optional[BESSHealthReport]:
+    async def get_bess_health(self, site_id: str) -> BESSHealthReport | None:
         """Comprehensive BESS health report with rack-level detail.
 
         Monitors: SoH, cycle count, cell imbalance, temperature distribution,
@@ -633,18 +633,18 @@ class SolarHealthService:
         if not bess:
             return None
 
-        demo = self._bess_demo_data.get(site_id, {})
-        soh = demo.get("soh_pct", bess.soh_pct)
-        cycles = demo.get("cycles_completed", bess.cycles_count)
-        comm_date = demo.get("commissioning_date", "2024-03-15")
+        seeded = self._bess_seed_data.get(site_id, {})
+        soh = seeded.get("soh_pct", bess.soh_pct)
+        cycles = seeded.get("cycles_completed", bess.cycles_count)
+        comm_date = seeded.get("commissioning_date", "2024-03-15")
         calendar_age = self._years_since(comm_date)
 
         # Build rack health data
-        rack_health: List[BESSRackHealth] = []
-        all_temps: List[float] = []
+        rack_health: list[BESSRackHealth] = []
+        all_temps: list[float] = []
         max_imbalance = 0.0
 
-        for rack_data in demo.get("racks", []):
+        for rack_data in seeded.get("racks", []):
             imbalance = rack_data["cell_imbalance_mv"]
             max_imbalance = max(max_imbalance, imbalance)
             all_temps.append(rack_data["temp_c"])
@@ -679,7 +679,7 @@ class SolarHealthService:
         replacement_year = replacement.replacement_year if replacement else 2039
 
         # Generate alerts
-        alerts: List[str] = []
+        alerts: list[str] = []
         for rack in rack_health:
             if rack.status == "alarm":
                 alerts.append(
@@ -701,7 +701,7 @@ class SolarHealthService:
         return BESSHealthReport(
             site_id=site_id,
             container_id=bess.container_id,
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
             soh_pct=soh,
             cycles_completed=cycles,
             warranty_cycles=BESS_WARRANTY_CYCLES,
@@ -715,7 +715,7 @@ class SolarHealthService:
             racks=rack_health,
         )
 
-    async def predict_bess_replacement(self, site_id: str) -> Optional[BESSReplacementPrediction]:
+    async def predict_bess_replacement(self, site_id: str) -> BESSReplacementPrediction | None:
         """Predict when BESS needs replacement.
 
         Based on cycle count rate and SoH decline, predicts when:
@@ -734,10 +734,10 @@ class SolarHealthService:
         if not bess:
             return None
 
-        demo = self._bess_demo_data.get(site_id, {})
-        soh = demo.get("soh_pct", bess.soh_pct)
-        cycles = demo.get("cycles_completed", bess.cycles_count)
-        comm_date = demo.get("commissioning_date", "2024-03-15")
+        seeded = self._bess_seed_data.get(site_id, {})
+        soh = seeded.get("soh_pct", bess.soh_pct)
+        cycles = seeded.get("cycles_completed", bess.cycles_count)
+        comm_date = seeded.get("commissioning_date", "2024-03-15")
         calendar_age = self._years_since(comm_date)
 
         # LFP aging model: calendar + cycle degradation
@@ -813,7 +813,7 @@ class SolarHealthService:
             years_remaining=years_remaining,
         )
 
-    async def get_bess_cycle_history(self, site_id: str, months: int = 12) -> List[MonthlyCycleData]:
+    async def get_bess_cycle_history(self, site_id: str, months: int = 12) -> list[MonthlyCycleData]:
         """Get monthly BESS cycle history.
 
         Returns cycle count, average DoD, equivalent full cycles per month.
@@ -822,12 +822,12 @@ class SolarHealthService:
         if not bess:
             return []
 
-        demo = self._bess_demo_data.get(site_id, {})
-        _total_cycles = demo.get("cycles_completed", bess.cycles_count)
+        seeded = self._bess_seed_data.get(site_id, {})
+        _total_cycles = seeded.get("cycles_completed", bess.cycles_count)
 
         rng = random.Random(hash(f"{site_id}-bess-cycles"))
         now = datetime.now()
-        result: List[MonthlyCycleData] = []
+        result: list[MonthlyCycleData] = []
 
         for i in range(months - 1, -1, -1):
             month_date = now - timedelta(days=30 * i)
@@ -861,7 +861,7 @@ class SolarHealthService:
 
     # === Warranty Evidence ===
 
-    async def generate_warranty_evidence(self, site_id: str, equipment_id: str) -> Optional[WarrantyPackage]:
+    async def generate_warranty_evidence(self, site_id: str, equipment_id: str) -> WarrantyPackage | None:
         """Generate structured warranty evidence package.
 
         Collects: equipment details, installation date, operating history,
@@ -872,7 +872,7 @@ class SolarHealthService:
         is_inverter = "INV" in equipment_id.upper()
         is_bess = "BESS" in equipment_id.upper()
 
-        now_iso = datetime.now(timezone.utc).isoformat()
+        now_iso = datetime.now(UTC).isoformat()
 
         if is_inverter:
             return await self._generate_inverter_warranty(site_id, equipment_id, now_iso)
@@ -883,7 +883,7 @@ class SolarHealthService:
 
     async def _generate_inverter_warranty(
         self, site_id: str, inverter_id: str, timestamp: str
-    ) -> Optional[WarrantyPackage]:
+    ) -> WarrantyPackage | None:
         """Build warranty evidence for an inverter."""
         inv_list = await self._ingestion.get_inverters(site_id)
         inv = next((i for i in inv_list if i.inverter_id == inverter_id), None)
@@ -1002,16 +1002,16 @@ class SolarHealthService:
 
     async def _generate_bess_warranty(
         self, site_id: str, equipment_id: str, timestamp: str
-    ) -> Optional[WarrantyPackage]:
+    ) -> WarrantyPackage | None:
         """Build warranty evidence for a BESS container."""
         bess = await self._ingestion.get_bess_status(site_id)
         if not bess:
             return None
 
-        demo = self._bess_demo_data.get(site_id, {})
-        soh = demo.get("soh_pct", bess.soh_pct)
-        cycles = demo.get("cycles_completed", bess.cycles_count)
-        comm_date = demo.get("commissioning_date", "2024-03-15")
+        seeded = self._bess_seed_data.get(site_id, {})
+        soh = seeded.get("soh_pct", bess.soh_pct)
+        cycles = seeded.get("cycles_completed", bess.cycles_count)
+        comm_date = seeded.get("commissioning_date", "2024-03-15")
         years = self._years_since(comm_date)
 
         # Expected SoH decline for LFP: ~1-2%/year calendar, ~0.01% per cycle
@@ -1053,7 +1053,7 @@ class SolarHealthService:
                 "soh_worse_than_expected": exceeds_spec,
                 "warranty_threshold_pct": BESS_SOH_WARRANTY_THRESHOLD,
                 "cell_imbalance_max_mv": max(
-                    r["cell_imbalance_mv"] for r in demo.get("racks", [{"cell_imbalance_mv": 20}])
+                    r["cell_imbalance_mv"] for r in seeded.get("racks", [{"cell_imbalance_mv": 20}])
                 ),
                 "cell_imbalance_threshold_mv": BESS_CELL_IMBALANCE_ALARM,
             },
@@ -1083,7 +1083,7 @@ class SolarHealthService:
                         else "SoH within expected parameters. "
                     )
                     + f"Rack 4 cell imbalance "
-                    f"({max(r['cell_imbalance_mv'] for r in demo.get('racks', [{'cell_imbalance_mv': 20}])):.0f}"
+                    f"({max(r['cell_imbalance_mv'] for r in seeded.get('racks', [{'cell_imbalance_mv': 20}])):.0f}"
                     f"mV) requires monitoring."
                 ),
                 "estimated_replacement_year": (await self.predict_bess_replacement(site_id)).replacement_year
@@ -1094,7 +1094,7 @@ class SolarHealthService:
 
     # === Fleet Health Overview ===
 
-    async def get_fleet_health(self, site_id: str) -> Optional[Dict[str, Any]]:
+    async def get_fleet_health(self, site_id: str) -> dict[str, Any] | None:
         """High-level fleet health overview for the API.
 
         Combines degradation summary, BESS SoH, and prioritised issues.
@@ -1105,7 +1105,7 @@ class SolarHealthService:
         if not degradation:
             return None
 
-        issues: List[Dict[str, Any]] = []
+        issues: list[dict[str, Any]] = []
 
         # Flag accelerated degradation
         for inv in degradation.inverters:
@@ -1175,7 +1175,7 @@ class SolarHealthService:
 
 # === Singleton ===
 
-_solar_health_service: Optional[SolarHealthService] = None
+_solar_health_service: SolarHealthService | None = None
 
 
 def get_solar_health_service() -> SolarHealthService:

@@ -9,7 +9,6 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional
 
 import psycopg2.extras
 
@@ -28,7 +27,7 @@ class CandidateSignal:
     location_ref: str
     created_at: datetime
     metadata: dict
-    raw_content: Optional[str] = None
+    raw_content: str | None = None
 
 
 def get_candidates(

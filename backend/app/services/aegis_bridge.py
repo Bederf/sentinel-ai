@@ -14,11 +14,14 @@ import hashlib
 import json
 import logging
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 from app.config.settings import settings
+from app.database.repositories.parasite_decision_repository import (
+    get_parasite_decision_repository,
+)
 from app.database.repositories.recommendation_repository import RecommendationRepository
 from app.models.recommendation import (
     ActionRiskLevel,
@@ -26,14 +29,11 @@ from app.models.recommendation import (
     RecommendationStatus,
 )
 from app.services.bess_dispatch_engine import BESSState, get_bess_dispatch_engine
+from app.services.decision_event_logger import emit_decision_event
 from app.services.solar_arbitrage_engine import (
     DispatchAction,
     DispatchActionType,
     get_solar_arbitrage_engine,
-)
-from app.services.decision_event_logger import emit_decision_event
-from app.database.repositories.parasite_decision_repository import (
-    get_parasite_decision_repository,
 )
 from app.services.tier_routing_engine import TierRoutingEngine
 
@@ -49,7 +49,7 @@ DATA_DIR = Path(__file__).parent.parent / "data"
 
 def _score_confidence(
     dispatch_command,
-    context: Optional[Dict] = None,
+    context: dict | None = None,
 ) -> float:
     """Score confidence for BESS dispatch. Returns value in [0.70, 0.79].
 
@@ -122,7 +122,7 @@ async def create_dispatch_recommendation(
     dispatch_action: DispatchAction,
     dispatch_command,
     bess_state: BESSState,
-    context: Optional[Dict] = None,
+    context: dict | None = None,
 ) -> Recommendation:
     """Convert a validated dispatch command into a Recommendation for the pipeline."""
 
@@ -187,8 +187,8 @@ def _build_contributing_factors(
     dispatch_command,
     bess_state: BESSState,
     recommendation: Recommendation,
-    context: Optional[Dict] = None,
-) -> Dict[str, Any]:
+    context: dict | None = None,
+) -> dict[str, Any]:
     """Build contributing_factors dict for parasite_decisions record.
 
     Includes structured audit fields required for Phase 1 compliance review:
@@ -212,7 +212,7 @@ def _build_contributing_factors(
         block_reason_code = "AEGIS_WRITE_BLOCKED"
 
     # Dispatch window: from now for duration_minutes
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     dispatch_window_start = now.isoformat()
     dispatch_window_end = (now + timedelta(minutes=dispatch_command.duration_minutes)).isoformat()
 
@@ -284,7 +284,7 @@ def _build_contributing_factors(
 
 
 def _check_tripwire_gate_fail(
-    rec_dict: Dict[str, Any],
+    rec_dict: dict[str, Any],
     routing_result,
     site_id: str,
 ) -> None:
@@ -314,7 +314,7 @@ def _check_tripwire_gate_fail(
 
 
 async def _check_tripwire_repeated_hash(
-    rec_dict: Dict[str, Any],
+    rec_dict: dict[str, Any],
     routing_result,
     site_id: str,
 ) -> None:
@@ -329,7 +329,7 @@ async def _check_tripwire_repeated_hash(
         return
 
     repo = get_parasite_decision_repository()
-    one_hour_ago = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+    one_hour_ago = (datetime.now(UTC) - timedelta(hours=1)).isoformat()
     recent = await repo.get_decisions_since(one_hour_ago)
 
     # Count decisions with the same command_hash that were NOT approved
@@ -368,8 +368,8 @@ async def _check_tripwire_repeated_hash(
 
 async def run_aegis_cycle(
     site_id: str,
-    context: Optional[Dict] = None,
-) -> Optional[Dict]:
+    context: dict | None = None,
+) -> dict | None:
     """Run one AEGIS dispatch cycle: arbitrage -> validate -> route -> persist.
 
     Called by solar_dispatch_service or scheduler.
@@ -393,7 +393,7 @@ async def run_aegis_cycle(
 
         # 2. Get dispatch action from arbitrage engine
         engine = get_solar_arbitrage_engine()
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         dispatch_action = engine.get_realtime_dispatch_action(
             site_id=site_id,

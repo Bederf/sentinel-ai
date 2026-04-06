@@ -5,13 +5,13 @@ actionable, human-readable explanations for maintenance technicians.
 """
 
 import logging
-from typing import Dict, Any, Optional
 from dataclasses import dataclass
+from typing import Any
 
 from app.services.model_gateway import model_gateway
 from app.services.vector_db import get_vector_db_service
-from ml.explanations.templates import get_equipment_specific_template, format_prediction_for_template
 from ml.explanations.parser import ExplanationParser
+from ml.explanations.templates import format_prediction_for_template, get_equipment_specific_template
 
 logger = logging.getLogger(__name__)
 
@@ -23,11 +23,11 @@ class ExplanationResult:
     equipment_id: str
     equipment_type: str
     raw_explanation: str
-    parsed: Dict[str, Any]
-    prediction_summary: Dict[str, Any]
+    parsed: dict[str, Any]
+    prediction_summary: dict[str, Any]
     context_sources: str
     llm_available: bool
-    model_used: Optional[str] = None
+    model_used: str | None = None
 
 
 class ExplanationService:
@@ -47,7 +47,7 @@ class ExplanationService:
         self._supabase_client = supabase_client
 
     async def explain_prediction(
-        self, equipment_id: str, predictions: Dict[str, Any], equipment_info: Optional[Dict[str, Any]] = None
+        self, equipment_id: str, predictions: dict[str, Any], equipment_info: dict[str, Any] | None = None
     ) -> ExplanationResult:
         """Generate a comprehensive explanation for equipment predictions.
 
@@ -86,6 +86,7 @@ class ExplanationService:
                 task_class="medium",
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=1536,
+                source="prediction_explanation",
             )
             model_used = "gateway:medium"
         except Exception:
@@ -110,7 +111,7 @@ class ExplanationService:
             model_used=model_used,
         )
 
-    async def _get_rag_context(self, equipment_type: str, predictions: Dict[str, Any]) -> str:
+    async def _get_rag_context(self, equipment_type: str, predictions: dict[str, Any]) -> str:
         """Retrieve relevant documentation context via RAG.
 
         Args:
@@ -179,7 +180,7 @@ class ExplanationService:
 
         return "\n\n".join(context_parts)
 
-    def _generate_fallback_explanation(self, template_data: Dict[str, Any], predictions: Dict[str, Any]) -> str:
+    def _generate_fallback_explanation(self, template_data: dict[str, Any], predictions: dict[str, Any]) -> str:
         """Generate a basic explanation when LLM is not available.
 
         Args:
@@ -224,7 +225,7 @@ For detailed analysis, ensure Ollama service is running.
 """
         return explanation
 
-    async def get_quick_summary(self, equipment_id: str, predictions: Dict[str, Any]) -> Dict[str, Any]:
+    async def get_quick_summary(self, equipment_id: str, predictions: dict[str, Any]) -> dict[str, Any]:
         """Get a quick summary without full LLM generation.
 
         Args:

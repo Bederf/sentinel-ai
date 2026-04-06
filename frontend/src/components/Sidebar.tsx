@@ -55,7 +55,7 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", userRole,
   const isAdmin = userRole === 'admin';
   const isDemoUser = userEmail ? isRestrictedDemoUser(userEmail) : false;
 
-  // Build the full nav item list: base + admin (if admin/demo) + conditional add-ons
+  // Build the full nav item list: base + admin/profile-driven add-ons + conditional add-ons
   const allNavItems = useMemo(() => {
     // Base items — filter out any with requiredModule that isn't active
     const items: NavItem[] = BASE_NAV_ITEMS.filter(item => {
@@ -195,7 +195,6 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", userRole,
     maintenance: "\uD83D\uDD27",
     financial: "\uD83D\uDCB0",
     compliance: "\uD83C\uDF3F",
-    simulation: "\u25B6\uFE0F",
     fleet_ml: "\uD83E\uDDE0",
   };
 

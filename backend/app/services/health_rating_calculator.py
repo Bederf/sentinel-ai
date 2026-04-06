@@ -20,7 +20,6 @@ HARD RULES:
 
 import logging
 from datetime import datetime, timedelta
-from typing import Optional
 
 from app.models.health_rating import (
     HealthComponentBreakdown,
@@ -58,7 +57,7 @@ class HealthRatingCalculator:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def calculate_baseline_alignment(deviation_percent: Optional[float]) -> float:
+    def calculate_baseline_alignment(deviation_percent: float | None) -> float:
         """Score from baseline deviation.
 
         Args:
@@ -78,7 +77,7 @@ class HealthRatingCalculator:
 
     @staticmethod
     def calculate_service_compliance(
-        days_since_last_service: Optional[int],
+        days_since_last_service: int | None,
         service_interval_days: int,
     ) -> float:
         """Score from service schedule adherence.
@@ -102,10 +101,10 @@ class HealthRatingCalculator:
 
     @staticmethod
     def calculate_runtime_age(
-        age_years: Optional[float],
+        age_years: float | None,
         expected_life_years: float,
-        runtime_hours: Optional[float] = None,
-        runtime_critical_hours: Optional[float] = None,
+        runtime_hours: float | None = None,
+        runtime_critical_hours: float | None = None,
     ) -> float:
         """Score from age and runtime hours relative to expected life.
 
@@ -153,7 +152,7 @@ class HealthRatingCalculator:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def calculate_trend_momentum(slope_per_day: Optional[float]) -> float:
+    def calculate_trend_momentum(slope_per_day: float | None) -> float:
         """Score from the slope of the health score trend.
 
         Slope is in health-score-points per day. Positive slope means
@@ -325,7 +324,7 @@ class HealthRatingCalculator:
     # Data Gathering Helpers (with try/except per source)
     # ------------------------------------------------------------------
 
-    async def _get_baseline_deviation(self, equipment_id: str) -> Optional[float]:
+    async def _get_baseline_deviation(self, equipment_id: str) -> float | None:
         """Get max deviation % from baseline_comparisons table."""
         try:
             from app.database.repositories.baseline_repository import BaselineRepository
@@ -342,7 +341,7 @@ class HealthRatingCalculator:
             logger.debug(f"Could not get baseline deviation for {equipment_id}: {e}")
         return None
 
-    async def _get_days_since_service(self, equipment_id: str) -> Optional[int]:
+    async def _get_days_since_service(self, equipment_id: str) -> int | None:
         """Get days since last service record."""
         try:
             from app.database.repositories.service_record_repository import (
@@ -406,7 +405,7 @@ class HealthRatingCalculator:
             logger.debug(f"Could not get fault counts for {equipment_id}: {e}")
         return 0, 0
 
-    async def _get_trend_slope(self, equipment_id: str) -> Optional[float]:
+    async def _get_trend_slope(self, equipment_id: str) -> float | None:
         """Get the health score trend slope (points per day)."""
         try:
             from app.services.element_trend_service import ElementTrendService

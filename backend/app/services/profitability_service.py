@@ -8,17 +8,17 @@ Phase 51: Profitability Dashboards & Analytics
 
 import logging
 from datetime import date
-from typing import Any, Dict, List, Optional
+from typing import Any
 
+from app.database.repositories.budget_repository import BudgetRepository
+from app.database.repositories.contract_repository import ContractRepository
+from app.database.repositories.sla_repository import get_sla_repository
 from app.models.contract import (
     ContractProfitabilityDetail,
     LossLeaderAnalysis,
     PortfolioMetrics,
     ProfitabilityTrend,
 )
-from app.database.repositories.contract_repository import ContractRepository
-from app.database.repositories.budget_repository import BudgetRepository
-from app.database.repositories.sla_repository import get_sla_repository
 
 logger = logging.getLogger(__name__)
 
@@ -183,7 +183,7 @@ class ProfitabilityService:
             cost_per_asset_zar=cost_per_asset,
         )
 
-    def identify_loss_leaders(self, period_start: date, period_end: date) -> List[LossLeaderAnalysis]:
+    def identify_loss_leaders(self, period_start: date, period_end: date) -> list[LossLeaderAnalysis]:
         """
         Identify contracts with negative margins and analyze root causes.
 
@@ -228,7 +228,7 @@ class ProfitabilityService:
         # Sort by loss amount descending
         return sorted(loss_leaders, key=lambda x: x.loss_amount_zar, reverse=True)
 
-    def calculate_profitability_trends(self, contract_id: str, months: int = 12) -> List[ProfitabilityTrend]:
+    def calculate_profitability_trends(self, contract_id: str, months: int = 12) -> list[ProfitabilityTrend]:
         """
         Calculate monthly profitability trends for a contract.
 
@@ -290,9 +290,9 @@ class ProfitabilityService:
         self,
         contract_id: str,
         equipment_id: str,
-        period_start: Optional[date] = None,
-        period_end: Optional[date] = None,
-    ) -> Dict[str, Any]:
+        period_start: date | None = None,
+        period_end: date | None = None,
+    ) -> dict[str, Any]:
         """
         Calculate ROI for a specific asset within a contract.
 
@@ -354,8 +354,8 @@ class ProfitabilityService:
         }
 
     def calculate_contract_asset_roi_list(
-        self, contract_id: str, period_start: date, period_end: date, limit: Optional[int] = None
-    ) -> List[Dict[str, Any]]:
+        self, contract_id: str, period_start: date, period_end: date, limit: int | None = None
+    ) -> list[dict[str, Any]]:
         """
         Calculate ROI for all assets in a contract.
 
@@ -412,7 +412,7 @@ class ProfitabilityService:
 
     def generate_contract_report(
         self, contract_id: str, period_start: date, period_end: date, asset_limit: int = 15
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Generate a profitability report for a contract.
 
@@ -483,7 +483,7 @@ class ProfitabilityService:
             logger.warning(f"Error getting clawbacks for contract {contract_id}: {e}")
             return 0.0
 
-    def _get_contract_costs(self, contract_id: str, period_start: date, period_end: date) -> Dict[str, float]:
+    def _get_contract_costs(self, contract_id: str, period_start: date, period_end: date) -> dict[str, float]:
         """
         Get cost breakdown for a contract in a period.
 
@@ -510,7 +510,7 @@ class ProfitabilityService:
 
         return costs
 
-    def _calculate_mom_change(self, contract_id: str, current_start: date, current_end: date) -> Optional[float]:
+    def _calculate_mom_change(self, contract_id: str, current_start: date, current_end: date) -> float | None:
         """Calculate month-over-month margin percentage change."""
         try:
             contract = self.contract_repo.get_by_id(contract_id)
@@ -542,7 +542,7 @@ class ProfitabilityService:
         except Exception:
             return None
 
-    def _analyze_loss_causes(self, profitability: ContractProfitabilityDetail) -> List[str]:
+    def _analyze_loss_causes(self, profitability: ContractProfitabilityDetail) -> list[str]:
         """Analyze root causes of contract losses."""
         causes = []
 
@@ -573,7 +573,7 @@ class ProfitabilityService:
 
         return causes
 
-    def _generate_recommendation(self, root_causes: List[str]) -> str:
+    def _generate_recommendation(self, root_causes: list[str]) -> str:
         """Generate actionable recommendation based on root causes."""
         recommendations = {
             "high_labor_costs": (

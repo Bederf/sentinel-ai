@@ -30,7 +30,7 @@ export function ForecastActualChart({ siteId }: ForecastActualChartProps) {
       setData(result);
       setError(null);
     } catch (_e) {
-      // Fallback to demo data
+      // Fallback to seeded data
       const demoData: ForecastWithActual = {
         site_id: siteId,
         model: "ensemble_48h",

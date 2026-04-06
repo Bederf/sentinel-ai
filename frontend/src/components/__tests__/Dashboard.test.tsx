@@ -341,6 +341,38 @@ describe('Dashboard', () => {
       });
     });
 
+    it('should allow hiding a site card and restoring all hidden cards', async () => {
+      const sites = [
+        createMockSite({ id: 'site-001', name: 'Building A' }),
+        createMockSite({ id: 'site-002', name: 'Building B' }),
+      ];
+      const stats = createMockDashboardStats();
+
+      vi.mocked(api.getStats).mockResolvedValue(stats);
+      vi.mocked(api.getPredictions).mockResolvedValue({ predictions: [] });
+      vi.mocked(api.getEnergy).mockResolvedValue({ data: [] });
+      vi.mocked(useBuildingsList).mockReturnValue({ data: sites } as any);
+
+      render(<Dashboard onViewChange={vi.fn()} />, { wrapper: createTestWrapper() });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('site-card-site-001')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByLabelText('Hide Building A from dashboard'));
+
+      await waitFor(() => {
+        expect(screen.queryByTestId('site-card-site-001')).not.toBeInTheDocument();
+        expect(screen.getByText('1 hidden')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByRole('button', { name: /show all/i }));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('site-card-site-001')).toBeInTheDocument();
+      });
+    });
+
     it('should navigate to site detail when site card clicked', async () => {
       const sites = [createMockSite({ id: 'site-002', name: 'Test Site' })];
       const stats = createMockDashboardStats();

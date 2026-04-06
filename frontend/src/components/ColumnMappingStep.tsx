@@ -1,6 +1,6 @@
 // ColumnMappingStep.tsx
 import { useState, useEffect } from 'react';
-import { Button, Card, Callout, Select, SelectItem, Table, TableBody, TableCell, TableHead, TableRow, Text, Title } from '@tremor/react';
+import { Button, Card, Callout, Table, TableBody, TableCell, TableHead, TableRow, Text, Title } from '@tremor/react';
 import { CheckCircle2, XCircle } from 'lucide-react';
 import type { ColumnMapping } from '@/lib/api';
 
@@ -127,9 +127,10 @@ export function ColumnMappingStep({ siteId: _siteId, formatDetection, onNext, on
                     <span className="font-mono text-sm">{source}</span>
                   </TableCell>
                   <TableCell>
-                    <Select
+                    <select
                       value={mapping?.target_field || 'ignore'}
-                      onValueChange={(value) => {
+                      onChange={(event) => {
+                        const value = event.target.value;
                         setMappings({
                           ...mappings,
                           [source]: {
@@ -139,21 +140,29 @@ export function ColumnMappingStep({ siteId: _siteId, formatDetection, onNext, on
                           }
                         });
                       }}
-                      className="w-48"
+                      className="w-48 rounded-md appearance-none cursor-pointer px-3 py-2 text-sm transition-colors focus:outline-none focus:ring-0"
+                      style={{
+                        background: "var(--color-grafana-bg-secondary)",
+                        border: "1px solid var(--color-grafana-border)",
+                        color: "var(--color-grafana-text-primary)",
+                        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)",
+                        outline: "none",
+                      }}
+                      aria-label={`Map ${source} field`}
                     >
                       {SENTINEL_FIELDS.map(field => (
-                        <SelectItem key={field.value} value={field.value}>
-                          {field.label}
-                          {field.required && <span className="text-red-500 ml-1">*</span>}
-                        </SelectItem>
+                        <option key={field.value} value={field.value}>
+                          {field.required ? `${field.label} *` : field.label}
+                        </option>
                       ))}
-                    </Select>
+                    </select>
                   </TableCell>
                   <TableCell>
                     {mapping?.target_field && mapping?.target_field !== 'ignore' && (
-                      <Select
+                      <select
                         value={mapping?.transform_type || 'none'}
-                        onValueChange={(value) => {
+                        onChange={(event) => {
+                          const value = event.target.value;
                           setMappings({
                             ...mappings,
                             [source]: {
@@ -162,14 +171,22 @@ export function ColumnMappingStep({ siteId: _siteId, formatDetection, onNext, on
                             }
                           });
                         }}
-                        className="w-36"
+                        className="w-36 rounded-md appearance-none cursor-pointer px-3 py-2 text-sm transition-colors focus:outline-none focus:ring-0"
+                        style={{
+                          background: "var(--color-grafana-bg-secondary)",
+                          border: "1px solid var(--color-grafana-border)",
+                          color: "var(--color-grafana-text-primary)",
+                          boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)",
+                          outline: "none",
+                        }}
+                        aria-label={`Select transform for ${source}`}
                       >
                         {TRANSFORM_TYPES.map(type => (
-                          <SelectItem key={type.value} value={type.value}>
+                          <option key={type.value} value={type.value}>
                             {type.label}
-                          </SelectItem>
+                          </option>
                         ))}
-                      </Select>
+                      </select>
                     )}
                   </TableCell>
                   <TableCell>

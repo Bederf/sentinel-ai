@@ -15,14 +15,14 @@ import logging
 import os
 import re
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional
 
 from app.models.complaint import (
-    Desk,
-    HVACZone,
     ComfortComplaint,
     ComplaintDiagnosis,
+    Desk,
+    HVACZone,
 )
+from app.services.zone_assessment_service import get_zone_assessment_service
 from app.services.cross_system_analyzer import get_cross_system_analyzer
 
 logger = logging.getLogger(__name__)
@@ -38,10 +38,10 @@ class ComfortComplaintHandler:
     """
 
     def __init__(self):
-        self._desks: Dict[str, Desk] = {}
-        self._zones: Dict[str, HVACZone] = {}
-        self._complaints: Dict[str, ComfortComplaint] = {}
-        self._desk_id_map: Dict[str, str] = {}  # Normalized ID -> full ID
+        self._desks: dict[str, Desk] = {}
+        self._zones: dict[str, HVACZone] = {}
+        self._complaints: dict[str, ComfortComplaint] = {}
+        self._desk_id_map: dict[str, str] = {}  # Normalized ID -> full ID
         self._load_data()
 
     def _load_data(self):
@@ -138,7 +138,7 @@ class ComfortComplaintHandler:
         no_hyphen = full_id.replace("-", "").lower()
         self._desk_id_map[no_hyphen] = full_id
 
-    def _normalize_desk_id(self, desk_id: str) -> Optional[str]:
+    def _normalize_desk_id(self, desk_id: str) -> str | None:
         """
         Normalize desk ID to handle various input formats.
 
@@ -174,7 +174,7 @@ class ComfortComplaintHandler:
 
         return None
 
-    def get_desk(self, desk_id: str) -> Optional[Desk]:
+    def get_desk(self, desk_id: str) -> Desk | None:
         """
         Get desk by ID with flexible matching.
 
@@ -185,11 +185,11 @@ class ComfortComplaintHandler:
             return self._desks.get(normalized_id)
         return None
 
-    def get_zone(self, zone_id: str) -> Optional[HVACZone]:
+    def get_zone(self, zone_id: str) -> HVACZone | None:
         """Get HVAC zone by ID."""
         return self._zones.get(zone_id)
 
-    def lookup_desk_bms(self, desk_id: str) -> Dict:
+    def lookup_desk_bms(self, desk_id: str) -> dict:
         """
         The killer feature: desk_id -> zone -> FCU -> sensors -> current readings.
 
@@ -244,18 +244,20 @@ class ComfortComplaintHandler:
         self,
         desk_id: str,
         complaint_type: str,
-        user_name: Optional[str] = None,
-        description: Optional[str] = None,
+        user_name: str | None = None,
+        description: str | None = None,
     ) -> ComplaintDiagnosis:
         """
         Main entry point for complaint handling.
 
         1. Lookup desk -> zone mapping
-        2. Get zone context (HVAC status, occupancy, lighting)
-        3. Use CrossSystemAnalyzer for diagnosis
-        4. Enhance with desk-specific context
-        5. Log complaint for pattern tracking
-        6. Return structured diagnosis with suggestions
+        2. ZoneAssessmentService produces full zone assessment:
+           - All equipment in zone (health, alerts, predictions)
+           - VAV live readings (BMS telemetry)
+           - Contextual factors (solar, occupancy, outdoor temp, etc.)
+           - Recommendations gated by control module + phase
+        3. Log complaint for pattern tracking
+        4. Return structured diagnosis with suggestions
         """
         # 1. Parse and lookup desk
         desk = self.get_desk(desk_id)
@@ -309,111 +311,112 @@ class ComfortComplaintHandler:
         )
         self._complaints[complaint.complaint_id] = complaint
 
-        # 4. Use CrossSystemAnalyzer for diagnosis
-        analyzer = get_cross_system_analyzer()
-        comfort_diagnosis = analyzer.analyze_comfort_complaint(
+        # 4. ZoneAssessmentService: full zone assessment
+        assessor = get_zone_assessment_service()
+        assessment = assessor.assess_zone(
             zone_id=desk.zone_id,
             complaint_type=complaint_type,
             desk_id=desk.desk_id,
+            site_id=zone.site_id if hasattr(zone, "site_id") else None,
         )
 
-        # 5. Enhance with desk-specific context
-        enhanced_suggestions = list(comfort_diagnosis.suggestions)
-        enhanced_root_cause = comfort_diagnosis.root_cause
-        enhanced_confidence = comfort_diagnosis.confidence
+        # 5. Convert ZoneAssessment -> ComplaintDiagnosis for backward compatibility
+        diagnosis_parts = []
 
-        # Check time of day for solar context
-        current_hour = datetime.now().hour
+        # Zone temperature summary
+        delta = assessment.zone_temp - assessment.zone_setpoint
+        delta_str = f"+{delta:.1f}C above" if delta > 0 else f"{delta:.1f}C below" if delta < 0 else "at setpoint"
+        diagnosis_parts.append(
+            f"Zone {assessment.zone_id}: {assessment.zone_temp}°C "
+            f"(setpoint {assessment.zone_setpoint}°C, {delta_str}). "
+            f"Status: {assessment.zone_status}."
+        )
 
-        # Near window + too_hot + time of day + orientation = solar heat gain analysis
-        if desk.near_window and complaint_type == "too_hot":
-            orientation = (desk.orientation or "").upper()
-            solar_issue = False
-            solar_direction = ""
+        # Equipment summary
+        if assessment.equipment_statuses:
+            eq_lines = []
+            for eq in assessment.equipment_statuses:
+                health = f"{eq.health_score}%"
+                issues = []
+                if eq.alerts:
+                    issues.append(f"{len(eq.alerts)} alert(s)")
+                if eq.predictions:
+                    issues.append(f"{len(eq.predictions)} prediction(s)")
+                issue_str = f" — {', '.join(issues)}" if issues else ""
+                eq_lines.append(f"{eq.name}: {eq.status} ({health}){issue_str}")
+            diagnosis_parts.append("Equipment: " + "; ".join(eq_lines))
 
-            # Morning sun (E, NE, SE) - 6am to 11am
-            if orientation in ("E", "NE", "SE") and 6 <= current_hour <= 11:
-                solar_issue = True
-                solar_direction = "morning sun (east-facing)"
-            # Afternoon sun (W, NW, SW) - 12pm to 6pm
-            elif orientation in ("W", "NW", "SW") and 12 <= current_hour <= 18:
-                solar_issue = True
-                solar_direction = "afternoon sun (west-facing)"
-            # North-facing gets sun most of day in Southern Hemisphere
-            elif orientation == "N" and 9 <= current_hour <= 16:
-                solar_issue = True
-                solar_direction = "direct sun (north-facing)"
-            # Fallback if no orientation specified
-            elif not orientation and 12 <= current_hour <= 18:
-                solar_issue = True
-                solar_direction = "afternoon sun (orientation unknown)"
+        # VAV summary
+        if assessment.vav:
+            vav_parts = []
+            if assessment.vav.damper_position is not None:
+                vav_parts.append(f"damper {assessment.vav.damper_position:.0f}%")
+            if assessment.vav.airflow_actual is not None:
+                vav_parts.append(f"airflow {assessment.vav.airflow_actual:.0f} L/s")
+            if assessment.vav.discharge_temp is not None:
+                vav_parts.append(f"discharge {assessment.vav.discharge_temp:.1f}°C")
+            if assessment.vav.reheat_valve is not None:
+                vav_parts.append(f"reheat {assessment.vav.reheat_valve:.0f}%")
+            if vav_parts:
+                diagnosis_parts.append(f"VAV {assessment.vav.vav_id}: {', '.join(vav_parts)}")
 
-            if solar_issue and "solar" not in enhanced_root_cause.lower():
-                enhanced_root_cause = (
-                    f"Solar heat gain likely - desk near {solar_direction} window. {enhanced_root_cause}"
-                )
-                enhanced_confidence = "high"
-                # Use actual BMS controls: FCU setpoint and zone lighting
-                enhanced_suggestions.insert(0, f"Lower FCU {zone.fcu_id} setpoint to {zone.setpoint - 2}°C")
+        # Outdoor temp
+        if assessment.outdoor_temp is not None:
+            extreme = " (extreme heat)" if assessment.outdoor_extreme else ""
+            diagnosis_parts.append(f"Outdoor temp: {assessment.outdoor_temp:.0f}°C{extreme}.")
 
-                # If we have DALI info, be specific about which luminaires to dim
-                if desk.luminaire_ids:
-                    lum_list = ", ".join(desk.luminaire_ids[:3])
-                    enhanced_suggestions.insert(1, f"Dim luminaires {lum_list} to 40% to reduce heat load")
-                elif desk.dali_controller:
-                    enhanced_suggestions.insert(1, f"Dim zone lighting via {desk.dali_controller} to 40%")
-                else:
-                    enhanced_suggestions.insert(1, "Dim zone lighting to 40% to reduce heat load")
+        # Contextual factors
+        if assessment.solar_factor:
+            sf_map = {
+                "morning_sun": "Morning sun (east-facing windows) heating area",
+                "afternoon_sun": "Afternoon sun (west-facing windows) heating area",
+                "north_facing": "Direct sunlight (north-facing) — HVAC unable to fully offset",
+            }
+            diagnosis_parts.append(sf_map.get(assessment.solar_factor, assessment.solar_factor))
 
-        # Under diffuser + too_cold = direct airflow
-        if desk.near_diffuser and complaint_type == "too_cold":
-            enhanced_root_cause = (
-                f"Direct airflow from diffuser {desk.near_diffuser}. Desk is directly under supply air outlet."
-            )
-            enhanced_confidence = "high"
-            enhanced_suggestions = [
-                f"Reduce VAV {zone.vav_id} airflow to desk area",
-                f"Raise FCU {zone.fcu_id} setpoint by 1°C (current: {zone.setpoint}°C)",
-                "Dispatch technician to adjust diffuser direction",
-            ]
+        if assessment.low_occupancy:
+            diagnosis_parts.append(f"Low zone occupancy ({assessment.occupancy_pct:.0f}%)")
 
-        # Near printer + too_hot = heat source
-        if desk.near_printer and complaint_type == "too_hot":
-            if "printer" not in enhanced_root_cause.lower():
-                enhanced_root_cause = f"Heat source detected - desk is near printer/copier. {enhanced_root_cause}"
-                enhanced_suggestions.insert(0, f"Increase VAV {zone.vav_id} airflow to dissipate printer heat")
-                enhanced_suggestions.insert(1, f"Lower FCU {zone.fcu_id} setpoint by 1°C")
+        if assessment.high_lighting_load:
+            diagnosis_parts.append(f"High lighting heat load ({assessment.lighting_level:.0f}%)")
 
-        # Near window + too_cold = cold radiant loss / drafts
-        if desk.near_window and complaint_type == "too_cold":
-            orientation = (desk.orientation or "").upper()
-            if "window" not in enhanced_root_cause.lower():
-                enhanced_root_cause = (
-                    f"Cold radiant loss from nearby {orientation}-facing window. {enhanced_root_cause}"
-                )
-                enhanced_suggestions.insert(0, "Check window seals for drafts")
-                enhanced_suggestions.insert(1, f"Raise FCU {zone.fcu_id} setpoint by 1°C (current: {zone.setpoint}°C)")
-                enhanced_confidence = "medium"
+        # Build final diagnosis text
+        diagnosis = " | ".join(diagnosis_parts) if diagnosis_parts else "No issues detected."
 
-        # Check if zone has fault
-        needs_dispatch = zone.status == "fault"
-        if needs_dispatch:
-            enhanced_root_cause = f"HVAC FAULT DETECTED in zone. {enhanced_root_cause}"
-            enhanced_suggestions.insert(0, "Dispatch technician - FCU fault detected")
+        # Build suggestions from ZoneAssessment recommendations
+        suggestions: list[str] = []
+        needs_dispatch = assessment.status == "equipment_fault" or assessment.has_critical_equipment_issues
+
+        for rec in assessment.recommendations:
+            action_text = rec.action
+            if rec.can_auto_adjust:
+                action_text += " [auto]"
+            elif rec.can_supervised_adjust:
+                action_text += " [approval required]"
+            suggestions.append(action_text)
+
+        # Add root cause context if no recommendations
+        if not suggestions and assessment.root_causes:
+            for cause in assessment.root_causes:
+                suggestions.append(cause)
+
+        # Status message based on assessment result
+        if assessment.status == "no_issues":
+            suggestions.append("All systems operating within parameters. No action required.")
 
         return ComplaintDiagnosis(
             complaint_id=complaint.complaint_id,
             desk=desk,
             zone=zone,
-            diagnosis=f"{comfort_diagnosis.hvac_analysis} | {comfort_diagnosis.lighting_analysis}",
-            root_cause=enhanced_root_cause,
-            confidence=enhanced_confidence,
-            suggestions=enhanced_suggestions,
+            diagnosis=diagnosis,
+            root_cause="; ".join(assessment.root_causes) if assessment.root_causes else assessment.status,
+            confidence=assessment.confidence,
+            suggestions=suggestions,
             auto_action_taken=None,
             needs_dispatch=needs_dispatch,
         )
 
-    def get_zone_context(self, zone_id: str) -> Dict:
+    def get_zone_context(self, zone_id: str) -> dict:
         """Get combined HVAC + DALI context for a zone."""
         zone = self.get_zone(zone_id)
         if not zone:
@@ -433,8 +436,8 @@ class ComfortComplaintHandler:
         }
 
     def get_complaint_history(
-        self, desk_id: Optional[str] = None, zone_id: Optional[str] = None
-    ) -> List[ComfortComplaint]:
+        self, desk_id: str | None = None, zone_id: str | None = None
+    ) -> list[ComfortComplaint]:
         """Get complaint history for pattern analysis."""
         complaints = list(self._complaints.values())
 
@@ -456,8 +459,8 @@ class ComfortComplaintHandler:
         self,
         desk_id: str,
         days: int = 7,
-        complaint_types: Optional[List[str]] = None,
-    ) -> Dict:
+        complaint_types: list[str] | None = None,
+    ) -> dict:
         """
         Summarize recent complaints for a desk - used by agent for escalation logic.
 
@@ -479,24 +482,24 @@ class ComfortComplaintHandler:
             "escalation_recommended": len(recent) >= 3,
         }
 
-    def get_recent_complaints(self, hours: int = 24) -> List[ComfortComplaint]:
+    def get_recent_complaints(self, hours: int = 24) -> list[ComfortComplaint]:
         """Get recent complaints across all zones."""
         cutoff = datetime.now() - timedelta(hours=hours)
         recent = [c for c in self._complaints.values() if c.timestamp >= cutoff]
         recent.sort(key=lambda c: c.timestamp, reverse=True)
         return recent
 
-    def get_all_desks(self) -> List[Desk]:
+    def get_all_desks(self) -> list[Desk]:
         """Get all desks."""
         return list(self._desks.values())
 
-    def get_all_zones(self) -> List[HVACZone]:
+    def get_all_zones(self) -> list[HVACZone]:
         """Get all HVAC zones."""
         return list(self._zones.values())
 
 
 # Singleton pattern
-_handler: Optional[ComfortComplaintHandler] = None
+_handler: ComfortComplaintHandler | None = None
 
 
 def get_complaint_handler() -> ComfortComplaintHandler:

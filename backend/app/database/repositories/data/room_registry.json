@@ -1,5 +1,47 @@
 [
   {
+    "room_id": "L0-MR01",
+    "site_id": "site-002",
+    "active": true,
+    "name": "L0 Meeting Room 1",
+    "floor": "L0"
+  },
+  {
+    "room_id": "L0-MR02",
+    "site_id": "site-002",
+    "active": true,
+    "name": "L0 Meeting Room 2",
+    "floor": "L0"
+  },
+  {
+    "room_id": "L1-MR01",
+    "site_id": "site-002",
+    "active": true,
+    "name": "L1 Meeting Room 1",
+    "floor": "L1"
+  },
+  {
+    "room_id": "L1-MR02",
+    "site_id": "site-002",
+    "active": true,
+    "name": "L1 Meeting Room 2",
+    "floor": "L1"
+  },
+  {
+    "room_id": "L2-MR01",
+    "site_id": "site-002",
+    "active": true,
+    "name": "L2 Meeting Room 1",
+    "floor": "L2"
+  },
+  {
+    "room_id": "L2-MR02",
+    "site_id": "site-002",
+    "active": true,
+    "name": "L2 Meeting Room 2",
+    "floor": "L2"
+  },
+  {
     "room_id": "FA2-1Q1-MR-01",
     "site_id": "S001",
     "active": true,

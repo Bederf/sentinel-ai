@@ -257,23 +257,24 @@ class TestMLAnomaly:
     @pytest.mark.asyncio
     async def test_ml_anomaly_high_score(self, service):
         """High anomaly score triggers pattern_anomaly event."""
-        telemetry = {"anomaly_score": 0.85, "supply_temp": 20.0}
+        telemetry = {"anomaly_score": 0.95, "supply_temp": 20.0}
         events = await service.evaluate_equipment("S002-CHILLER-B1-001", "site-002", telemetry)
 
         anomaly_events = [e for e in events if e.event_type == OperationalEventType.PATTERN_ANOMALY]
         assert len(anomaly_events) == 1
         assert anomaly_events[0].severity == EventSeverity.CRITICAL
-        assert anomaly_events[0].actual_value == 0.85
+        assert anomaly_events[0].actual_value == 0.95
 
     @pytest.mark.asyncio
     async def test_ml_anomaly_moderate_score(self, service):
-        """Moderate anomaly score (0.5 < score <= 0.8) triggers HIGH event."""
-        telemetry = {"anomaly_score": 0.65}
+        """Score above dynamic threshold triggers PATTERN_ANOMALY event."""
+        telemetry = {"anomaly_score": 0.88}
         events = await service.evaluate_equipment("S002-CHILLER-B1-001", "site-002", telemetry)
 
         anomaly_events = [e for e in events if e.event_type == OperationalEventType.PATTERN_ANOMALY]
         assert len(anomaly_events) == 1
-        assert anomaly_events[0].severity == EventSeverity.HIGH
+        # Score 0.88 > 0.8 → CRITICAL (severity uses 0.8 as the high/critical boundary)
+        assert anomaly_events[0].severity == EventSeverity.CRITICAL
 
     @pytest.mark.asyncio
     async def test_ml_anomaly_below_threshold(self, service):

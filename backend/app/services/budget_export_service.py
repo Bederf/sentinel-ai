@@ -8,10 +8,10 @@ from __future__ import annotations
 
 import csv
 import io
-from typing import Dict, Any, List
+from typing import Any
 
 
-def export_budget_report_csv(report: Dict[str, Any]) -> bytes:
+def export_budget_report_csv(report: dict[str, Any]) -> bytes:
     output = io.StringIO()
     writer = csv.writer(output)
 
@@ -64,8 +64,8 @@ def export_budget_report_csv(report: Dict[str, Any]) -> bytes:
     return output.getvalue().encode("utf-8")
 
 
-def export_budget_report_pdf(report: Dict[str, Any]) -> bytes:
-    lines: List[str] = []
+def export_budget_report_pdf(report: dict[str, Any]) -> bytes:
+    lines: list[str] = []
     lines.append("SENTINEL Budget Report")
     lines.append("")
     lines.append(f"Contract ID: {report.get('contract_id')}")
@@ -110,7 +110,7 @@ def export_budget_report_pdf(report: Dict[str, Any]) -> bytes:
     return _generate_simple_pdf(lines)
 
 
-def _generate_simple_pdf(lines: List[str]) -> bytes:
+def _generate_simple_pdf(lines: list[str]) -> bytes:
     def escape_pdf_text(text: str) -> str:
         return text.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
 

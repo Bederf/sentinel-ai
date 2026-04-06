@@ -1,40 +1,37 @@
-import { useEffect, useState, useRef, useCallback, useMemo } from "react";
+import { useEffect, useState, useRef, useCallback, useMemo, Suspense, lazy } from "react";
 import { Routes, Route, useParams, useNavigate } from "react-router-dom";
 import { Clock, Wifi, WifiOff, Bell, X, LogOut } from "lucide-react";
 import { Toaster, toast } from "sonner";
 import { formatTime } from "./lib/timeFormat";
 import api, { AUTH_EXPIRED_EVENT, isExpectedApiError, type Alert, type AuthUser } from "./lib/api";
-import { SimulationTimeIndicator } from "./components/SimulationTimeIndicator";
 import { useRecommendationToasts, RecommendationCard } from "./components/RecommendationToast";
 import { useBuildingsList } from "./hooks/useBuildingsList";
 import { SITE_SELECTION_CHANGED_EVENT, getStoredSelectedSite } from "./lib/siteSelection";
 
 // Security: Prevent console logging in production (Phase 75-07)
 import { initializeSecurityProtections } from "./lib/api/security-utils";
-import { Chat } from "./components/Chat";
-import { Dashboard } from "./components/Dashboard";
-import { ControlAuditTrail } from "./components/ControlAuditTrail";
-import { Settings } from "./components/Settings";
 import { Sidebar } from "./components/Sidebar";
 import { SplashScreen } from "./components/SplashScreen";
 import { EmailEntry } from "./components/EmailEntry";
 import { AlertFeed } from "./components/AlertFeed";
 import { CalendarPicker } from "./components/CalendarPicker";
-import SystemHealthPage from "./components/SystemHealthPage";
-import { AssetWorkflowDashboard } from "./components/AssetWorkflowDashboard";
-import { SimbiotPage } from "./components/SimbiotPage";
-import { FleetInsights } from "./components/FleetInsights";
-import { ESGPage } from "./components/sustainability/ESGPage";
-import { ContractManagementPage } from "./pages/ContractManagementPage";
-import { IntelligencePage } from "./components/intelligence/IntelligencePage";
-import { DecisionMomentPage, type DecisionMomentPayload } from "./pages/DecisionMomentPage";
-import { SiteDetail } from "./components/SiteDetail";
 import { ModuleProvider } from "./contexts/ModuleContext";
 import { useModules } from "./contexts/ModuleHooks";
 import { ThemeProvider } from "./contexts/ThemeContext";
-import { SimulationProvider } from "./contexts/SimulationContext";
 import { type View, VIEW_TITLES, ALL_NAV_ITEMS } from "./lib/navigation";
 import { canAccessView, getDefaultView } from "./lib/access-control";
+
+const Chat = lazy(() => import("./components/Chat").then(m => ({ default: m.Chat })));
+const Dashboard = lazy(() => import("./components/Dashboard").then(m => ({ default: m.Dashboard })));
+const ControlAuditTrail = lazy(() => import("./components/ControlAuditTrail").then(m => ({ default: m.ControlAuditTrail })));
+const Settings = lazy(() => import("./components/Settings").then(m => ({ default: m.Settings })));
+const SystemHealthPage = lazy(() => import("./components/SystemHealthPage"));
+const AssetWorkflowDashboard = lazy(() => import("./components/AssetWorkflowDashboard").then(m => ({ default: m.AssetWorkflowDashboard })));
+const SimbiotPage = lazy(() => import("./components/SimbiotPage").then(m => ({ default: m.SimbiotPage })));
+const FleetInsights = lazy(() => import("./components/FleetInsights").then(m => ({ default: m.FleetInsights })));
+const ESGPage = lazy(() => import("./components/sustainability/ESGPage").then(m => ({ default: m.ESGPage })));
+const ContractManagementPage = lazy(() => import("./pages/ContractManagementPage").then(m => ({ default: m.ContractManagementPage })));
+const SiteDetail = lazy(() => import("./components/SiteDetail").then(m => ({ default: m.SiteDetail })));
 
 interface HealthStatus {
   status: string;
@@ -51,6 +48,16 @@ function BuildingRoute() {
   if (!siteId) return null;
   return (
     <SiteDetail siteId={siteId} onBack={() => navigate("/")} defaultMainTab="overview" />
+  );
+}
+
+function RouteLoading() {
+  return (
+    <div className="h-full flex items-center justify-center">
+      <div className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+        Loading view...
+      </div>
+    </div>
   );
 }
 
@@ -105,7 +112,8 @@ function App() {
     () => buildings.find((building) => building.id === selectedSiteId) || null,
     [buildings, selectedSiteId]
   );
-  const effectiveSiteId = selectedSiteId || primarySiteId || "";
+  // Only use a selected site if it is present in the currently accessible buildings.
+  const effectiveSiteId = selectedSite?.id || primarySiteId || "";
   const effectiveSiteName = selectedSite?.name || primarySiteName || undefined;
   // Auto-landing: if user only has one site with space module, go straight there
   const [autoSelectSiteId, setAutoSelectSiteId] = useState<string | null>(null);
@@ -143,10 +151,11 @@ function App() {
     if (buildings.length === 0) return;
 
     const storedSiteId = getStoredSelectedSite();
-    const preferredSiteId = storedSiteId || selectedSiteId;
+    // Reject site-001 — it is a future/inactive site
+    const preferredSiteId = (storedSiteId && storedSiteId !== "site-001") ? storedSiteId : selectedSiteId;
     const validSiteId = preferredSiteId && buildings.some((building) => building.id === preferredSiteId)
       ? preferredSiteId
-      : buildings[0]?.id || null;
+      : buildings.find(b => b.id !== "site-001")?.id || null;
 
     if (validSiteId !== selectedSiteId) {
       setSelectedSiteId(validSiteId);
@@ -157,6 +166,8 @@ function App() {
     const handleSiteSelectionChanged = (event: Event) => {
       const customEvent = event as CustomEvent<{ siteId?: string | null }>;
       const nextSiteId = customEvent.detail?.siteId || getStoredSelectedSite();
+      // Reject site-001 — it is a future/inactive site
+      if (nextSiteId === "site-001") return;
       setSelectedSiteId(nextSiteId || null);
     };
 
@@ -178,8 +189,6 @@ function App() {
   const [showCalendar, setShowCalendar] = useState(false);
   const [unreadAlertCount, setUnreadAlertCount] = useState(0);
   const [lastViewedAlertTime, setLastViewedAlertTime] = useState<Date | null>(null);
-  const [simulationRunning, setSimulationRunning] = useState(false);
-  const [demoTaskId, setDemoTaskId] = useState<string | null>(null);
   const alertsPanelRef = useRef<HTMLDivElement | null>(null);
   const calendarButtonRef = useRef<HTMLDivElement | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -195,39 +204,9 @@ function App() {
     return () => clearInterval(timer);
   }, []);
 
-  // Monitor simulation status
-  useEffect(() => {
-    const checkSimulationStatus = async () => {
-      try {
-        // Use demo_task_id if available (Grant's 365-day simulation), otherwise fall back to primary site
-        if (!demoTaskId && !primarySiteId) {
-          setSimulationRunning(false);
-          return;
-        }
-        const statusEndpoint = demoTaskId
-          ? `/api/lifecycle/status/${demoTaskId}`
-          : `/api/lifecycle/status/${primarySiteId}`;
-
-        const response = await fetch(statusEndpoint);
-        const data = await response.json();
-        setSimulationRunning(data.running === true);
-      } catch (_error) {
-        // Fail silently - simulation might not be running
-        setSimulationRunning(false);
-      }
-    };
-
-    // Check on mount and every 5 seconds
-    checkSimulationStatus();
-    const interval = setInterval(checkSimulationStatus, 5000);
-    return () => clearInterval(interval);
-  }, [demoTaskId, primarySiteId]);
-
   // AI Recommendation card state
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- RecommendationData type not exported from RecommendationToast
   const [selectedRec, setSelectedRec] = useState<any>(null);
-  const [crisisUrgencyScore, setCrisisUrgencyScore] = useState(0);
-  const [crisisPayload, setCrisisPayload] = useState<DecisionMomentPayload | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleShowRecCard = useCallback((rec: any) => setSelectedRec(rec), []);
   const handleApproveRec = useCallback(async (id: string) => {
@@ -249,7 +228,7 @@ function App() {
   const siteId = currentUser ? effectiveSiteId : '';
   useRecommendationToasts(siteId, handleShowRecCard);
 
-  // Initialize devices from simulation on login
+  // Initialize devices from the connected site on login
   useEffect(() => {
     if (!currentUser) return;
 
@@ -298,49 +277,6 @@ function App() {
     const healthInterval = setInterval(checkHealth, 30000);
     return () => clearInterval(healthInterval);
   }, []);
-
-  // Crisis state polling — pre-warms DecisionMomentPage when urgency >= 0.70
-  const crisisPollAbortRef = useRef<AbortController | null>(null);
-  useEffect(() => {
-    if (!effectiveSiteId) return;
-
-    const pollDecisions = async () => {
-      try {
-        // Cancel previous in-flight request to prevent race conditions
-        if (crisisPollAbortRef.current) {
-          crisisPollAbortRef.current.abort();
-        }
-        crisisPollAbortRef.current = new AbortController();
-
-        const resp = await fetch(`/api/decisions/current/${encodeURIComponent(effectiveSiteId)}`, {
-          signal: crisisPollAbortRef.current.signal,
-        });
-        if (!resp.ok) return; // 422 (no active fault) or network error — fail silently
-        const json = await resp.json();
-        // Unwrap .data field to match ArcadeView pattern
-        const payload = json.data ?? json;
-        const score = typeof payload.urgency_score === "number" ? payload.urgency_score : 0;
-        setCrisisUrgencyScore(score);
-        // Use >= 0.70 threshold to match ArcadeView URGENCY_THRESHOLD
-        if (score >= 0.70) setCrisisPayload(payload as DecisionMomentPayload);
-      } catch (err) {
-        // Ignore abort errors (from race guard cancellation)
-        if (err instanceof Error && err.name === "AbortError") {
-          return;
-        }
-        // Network unavailable — keep previous state, do not reset
-      }
-    };
-
-    pollDecisions();
-    const interval = setInterval(pollDecisions, 30000);
-    return () => {
-      clearInterval(interval);
-      if (crisisPollAbortRef.current) {
-        crisisPollAbortRef.current.abort();
-      }
-    };
-  }, [effectiveSiteId]);
 
   // Fetch and count unread alerts
   useEffect(() => {
@@ -409,7 +345,10 @@ function App() {
     const deviceId = alert.device_id || alert.equipment_id;
     if (deviceId && alert.site_id) {
       sessionStorage.setItem("sentinel_selected_equipment", deviceId);
-      sessionStorage.setItem("sentinel_selected_site", alert.site_id);
+      // Only persist site if it's active (not site-001 which is a future/inactive site)
+      if (alert.site_id !== "site-001") {
+        sessionStorage.setItem("sentinel_selected_site", alert.site_id);
+      }
       sessionStorage.setItem("sentinel_alert_context", JSON.stringify({
         message: alert.message,
         severity: alert.severity,
@@ -482,7 +421,7 @@ function App() {
       const allViewIds = ALL_NAV_ITEMS.map(item => item.id);
       if (!canAccessView(currentUser.email, view, allViewIds)) {
         const defaultView = getDefaultView(currentUser.email);
-        toast.warning(`Access to ${view} is not available in your demo configuration`);
+        toast.warning(`Access to ${view} is not available in your assigned access profile`);
         if (view !== defaultView) {
           setCurrentView(defaultView);
         }
@@ -531,44 +470,6 @@ function App() {
 
   const handleEmailEntrySuccess = useCallback((user: AuthUser) => {
     setCurrentUser(user);
-
-    // Auto-start demo simulation — only if none is already running
-    if ((user as any).demo_auto_start === true) {
-      const scenario = (user as any).demo_scenario;
-      const isAnnual = (scenario || '').includes('annual');
-
-      // Demo simulation needs a site ID — resolve from buildings or skip
-      const resolveDemoSite = async () => {
-        try {
-          const sitesResp = await api.getSites();
-          return sitesResp[0]?.id || null;
-        } catch { return null; }
-      };
-
-      resolveDemoSite().then(demoSiteId => {
-        if (!demoSiteId) return;
-        fetch(`/api/lifecycle/status/${demoSiteId}`)
-          .then(res => res.json())
-          .then(status => {
-            if (status.running) {
-              toast.success(`Simulation in progress: Day ${status.days_simulated || 0}/365`);
-            } else {
-              fetch('/api/lifecycle/start', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ scenario, duration_minutes: isAnnual ? 480 : 24 })
-              })
-                .then(res => res.json())
-                .then(data => {
-                  if (data.task_id) setDemoTaskId(data.task_id);
-                  toast.success(`Simulation started: ${scenario} (365 days → 8 hours)`);
-                })
-                .catch(err => console.error('Failed to start simulation:', err));
-            }
-          })
-          .catch(err => console.error('Failed to check simulation status:', err));
-      });
-    }
   }, []);
 
   // Show splash screen on initial load
@@ -581,28 +482,11 @@ function App() {
     return <EmailEntry onSuccess={handleEmailEntrySuccess} />;
   }
 
-  // Crisis gate — collapses to full-page Crisis State when urgency > 0.7
-  if (crisisUrgencyScore > 0.7 && crisisPayload) {
-    return (
-      <SimulationProvider siteId={effectiveSiteId || undefined}>
-      <ThemeProvider>
-      <ModuleProvider initialSiteId={effectiveSiteId || undefined} initialSiteName={effectiveSiteName}>
-        <DecisionMomentPage
-          payload={crisisPayload}
-          onDismiss={() => { setCrisisUrgencyScore(0); setCrisisPayload(null); }}
-        />
-      </ModuleProvider>
-      </ThemeProvider>
-      </SimulationProvider>
-    );
-  }
-
   return (
-    <SimulationProvider siteId={effectiveSiteId || undefined}>
     <ThemeProvider>
     <ModuleProvider initialSiteId={effectiveSiteId || undefined} initialSiteName={effectiveSiteName}>
     <Routes>
-      <Route path="/buildings/:siteId" element={<BuildingRoute />} />
+      <Route path="/buildings/:siteId" element={<Suspense fallback={<RouteLoading />}><BuildingRoute /></Suspense>} />
       <Route path="*" element={
     <div
       className="h-screen flex"
@@ -616,9 +500,6 @@ function App() {
         userRole={currentUser?.role}
         userEmail={currentUser?.email}
       />
-
-      {/* Simulation Time Indicator - Shows when simulation is running */}
-      <SimulationTimeIndicator simulationRunning={simulationRunning} siteId={effectiveSiteId} />
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0">
@@ -908,6 +789,7 @@ function App() {
           style={{ background: "var(--color-sentinel-bg-canvas)" }}
         >
           <ViewGuard currentView={currentView} userRole={currentUser?.role} onRedirect={handleViewChange}>
+          <Suspense fallback={<RouteLoading />}>
           {currentView === "dashboard" ? (
             <Dashboard
               key={viewRefreshKey}
@@ -948,10 +830,6 @@ function App() {
             </div>
           ) : currentView === "fleet-ml" ? (
             <FleetInsights />
-          ) : currentView === "intelligence" ? (
-            <div className="h-full">
-              <IntelligencePage siteId={effectiveSiteId || undefined} />
-            </div>
           ) : (
             <div className="h-full flex items-center justify-center">
               <div className="text-center">
@@ -959,6 +837,7 @@ function App() {
               </div>
             </div>
           )}
+          </Suspense>
           </ViewGuard>
         </main>
       </div>
@@ -989,7 +868,6 @@ function App() {
     </Routes>
     </ModuleProvider>
     </ThemeProvider>
-    </SimulationProvider>
   );
 }
 

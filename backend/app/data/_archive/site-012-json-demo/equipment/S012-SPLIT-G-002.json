@@ -1,0 +1,67 @@
+{
+  "id": "S012-SPLIT-G-002",
+  "name": "Office Split Unit 1",
+  "device_type": "hvac",
+  "equipment_type": "split",
+  "site_id": "site-012",
+  "protocol": "mock",
+  "status": "online",
+  "health_score": 88,
+  "device_location": {
+    "building": "Canal Walk Tech Store",
+    "floor": "G",
+    "zone": "Office",
+    "room": "Office Area",
+    "zone_type": "executive",
+    "description": "Main office AC"
+  },
+  "equipment": {
+    "manufacturer": "Daikin",
+    "model": "FTXM25R",
+    "serial_number": "SPL002-2024",
+    "installation_year": 2024,
+    "capacity_kw": 2.5
+  },
+  "points": {
+    "room_temp": {
+      "point_name": "Room Temperature",
+      "point_type": "sensor",
+      "unit": "degC",
+      "writable": false,
+      "current_value": 23.0,
+      "min_value": 16.0,
+      "max_value": 28.0
+    },
+    "setpoint_temp": {
+      "point_name": "Temperature Setpoint",
+      "point_type": "control",
+      "unit": "degC",
+      "writable": true,
+      "current_value": 22.0,
+      "min_value": 18.0,
+      "max_value": 26.0
+    },
+    "power": {
+      "point_name": "Unit On/Off",
+      "point_type": "control",
+      "writable": true,
+      "current_value": 1,
+      "values": {
+        "0": "Off",
+        "1": "On"
+      }
+    },
+    "mode": {
+      "point_name": "Operating Mode",
+      "point_type": "control",
+      "writable": true,
+      "current_value": 1,
+      "values": {
+        "0": "Off",
+        "1": "Cool",
+        "2": "Heat",
+        "3": "Auto"
+      }
+    }
+  }
+}

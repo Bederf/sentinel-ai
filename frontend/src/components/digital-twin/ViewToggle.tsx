@@ -3,7 +3,7 @@
  *
  * Floating button in top-right corner allowing users to switch between:
  * - 2D: SVG floor plan (fast navigation, clear overview)
- * - 3D: Three.js 3D visualization (immersive, demo-friendly)
+ * - 3D: Three.js 3D visualization (immersive, presentation-friendly)
  *
  * Styling: Dark theme matching existing SENTINEL UI
  */

@@ -89,17 +89,6 @@ vi.mock('@/hooks/useServerEvents', () => ({
   useServerEvents: () => {},
 }));
 
-// Mock sub-tab components to avoid their own fetch/render issues
-vi.mock('../system/AIPerformanceTab', () => ({
-  AIPerformanceTab: () =>
-    React.createElement('div', { 'data-testid': 'ai-performance-tab' }, 'AI Performance Tab'),
-}));
-
-vi.mock('../system/ModelHealthTab', () => ({
-  ModelHealthTab: () =>
-    React.createElement('div', { 'data-testid': 'model-health-tab' }, 'Model Health Tab'),
-}));
-
 import { authorizedFetch } from '@/lib/api/client';
 
 // Helper: Setup mocks for both API endpoints

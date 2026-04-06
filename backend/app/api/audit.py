@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 from app.middleware.rate_limiter import limiter
 from app.services.audit_logger import AuditLogger
 from app.models.audit_log import AuditActionType, AuditResultType, AuditLogEntry
+from app.config.settings import settings
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/audit", tags=["audit"])
@@ -124,7 +125,7 @@ async def get_audit_logs(
         # Convert to response models
         entries = [AuditLogEntryResponse.from_entry(log) for log in logs]
 
-        # For demo, estimate total count (in production would use database count)
+        # Estimate total count from the current page window when a full count is unavailable
         total_count = len(logs) + (page_size if has_more else 0)
 
         return AuditLogsResponse(
@@ -191,10 +192,10 @@ async def get_audit_stats() -> AuditStatsResponse:
         raise HTTPException(status_code=500, detail=f"Failed to get audit stats: {str(e)}")
 
 
-@router.get("/demo-data")
-async def generate_demo_audit_data() -> dict:
+@router.get("/seed-data")
+async def generate_seed_audit_data() -> dict:
     """
-    Generate demo audit data for testing and demonstration.
+    Generate seeded audit data for non-production testing.
 
     Creates 50-100 historical audit log entries with variety:
     - Successful device controls
@@ -207,12 +208,18 @@ async def generate_demo_audit_data() -> dict:
         from datetime import timedelta
         import random
 
-        logger.info("Generating demo audit data...")
+        if settings.sentinel_island_mode:
+            raise HTTPException(
+                status_code=404,
+                detail="Synthetic audit seeding is disabled on production island instances",
+            )
 
-        # Clear existing demo data before regenerating
+        logger.info("Generating seeded audit data...")
+
+        # Clear existing seeded data before regenerating
         audit_logger.clear()
 
-        # Demo devices - real equipment codes from Sandton City (site-002)
+        # Seed devices - real equipment codes from Sandton City (site-002)
         # Covers all equipment types for comprehensive audit trail
         demo_devices = [
             # HVAC - Chillers
@@ -363,7 +370,7 @@ async def generate_demo_audit_data() -> dict:
                     entry_metadata["source"] = "sentinel_auto_optimization"
                     entry_metadata["confidence"] = round(random.uniform(0.72, 0.95), 2)
 
-                # Log the demo entry
+                # Log the seeded entry
                 audit_logger.log_control_action(
                     device_id=device_id,
                     point_name=point_name,
@@ -380,14 +387,14 @@ async def generate_demo_audit_data() -> dict:
         # Force flush to disk
         audit_logger.flush()
 
-        logger.info(f"Generated {entries_created} demo audit entries")
+        logger.info(f"Generated {entries_created} seeded audit entries")
 
         return {
             "status": "success",
             "entries_created": entries_created,
-            "message": f"Generated {entries_created} demo audit log entries spanning last 7 days",
+            "message": f"Generated {entries_created} seeded audit log entries spanning last 7 days",
         }
 
     except Exception as e:
-        logger.error(f"Failed to generate demo audit data: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to generate demo audit data: {str(e)}")
+        logger.error(f"Failed to generate seeded audit data: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate seeded audit data: {str(e)}")

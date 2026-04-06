@@ -1,3 +1,18 @@
+---
+title: "Thermal Simulation Engine"
+type: "spec"
+status: "draft"
+version: "1.0.0"
+created: "2026-03-31"
+updated: "2026-03-31"
+tags: ["sentinel", "documentation"]
+related: []
+domain: "bms"
+audience: "all"
+complexity: "intermediate"
+estimated_read_time: 10
+---
+
 # Thermal Simulation Engine
 
 **Status:** ✅ Phase 5.5 (Temperature + Power) | **Date:** 2026-02-18 | **Files:** `backend/app/services/thermal_simulation_engine.py` (510 lines)

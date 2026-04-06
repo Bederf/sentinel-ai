@@ -110,7 +110,7 @@ export function ControlTest() {
           <div className="space-y-8">
             {/* Device selection */}
             <div
-              className="rounded-md overflow-hidden"
+              className="rounded-lg overflow-hidden"
               style={{
                 background: "var(--color-sentinel-bg-panel)",
                 border: "1px solid var(--color-sentinel-border)",
@@ -170,7 +170,7 @@ export function ControlTest() {
 
             {/* Device Control Hook Status */}
             <div
-              className="rounded-md overflow-hidden"
+              className="rounded-lg overflow-hidden"
               style={{
                 background: "var(--color-sentinel-bg-panel)",
                 border: "1px solid var(--color-sentinel-border)",
@@ -227,7 +227,7 @@ export function ControlTest() {
 
         {/* Control Log */}
         <div
-          className="mt-8 rounded-md overflow-hidden"
+          className="mt-8 rounded-lg overflow-hidden"
           style={{
             background: "var(--color-sentinel-bg-panel)",
             border: "1px solid var(--color-sentinel-border)",
@@ -275,7 +275,7 @@ export function ControlTest() {
 
         {/* Verification checklist */}
         <div
-          className="mt-8 rounded-md overflow-hidden"
+          className="mt-8 rounded-lg overflow-hidden"
           style={{
             background: "var(--color-sentinel-bg-panel)",
             border: "1px solid var(--color-sentinel-border)",

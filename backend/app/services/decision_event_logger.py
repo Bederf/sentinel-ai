@@ -19,8 +19,8 @@ Pipeline stages:
 
 import json
 import logging
-from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 # Dedicated logger for Promtail/Loki ingestion of decision events
 decision_logger = logging.getLogger("sentinel.decisions")
@@ -38,7 +38,7 @@ def emit_decision_event(
     site_id: str = "",
     tier: str = "",
     status: str = "",
-    details: Optional[Dict[str, Any]] = None,
+    details: dict[str, Any] | None = None,
 ) -> None:
     """Emit a structured JSON event for a pipeline stage.
 
@@ -55,7 +55,7 @@ def emit_decision_event(
     """
     try:
         event = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "stage": stage,
             "correlation_id": correlation_id,
             "decision_id": decision_id,

@@ -9,7 +9,7 @@ import json
 import logging
 from datetime import date, datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 from zoneinfo import ZoneInfo
 
 from app.database.supabase_client import get_supabase_client
@@ -267,7 +267,7 @@ class BookingStore:
         site_id: str,
         organiser_email: str,
         room_name: str,
-        start_time: Optional[datetime] = None,
+        start_time: datetime | None = None,
     ) -> bool:
         """Remove a booking (used for cancellation handling). Returns True if removed."""
         if self.client:
@@ -341,7 +341,7 @@ class BookingStore:
 
         return self._get_open_alerts_json(site_id)
 
-    def get_alert_by_id(self, alert_id: str) -> Optional[BlockBookingAlert]:
+    def get_alert_by_id(self, alert_id: str) -> BlockBookingAlert | None:
         """Get a single alert by ID."""
         if self.client:
             try:
@@ -352,7 +352,7 @@ class BookingStore:
                 logger.error("BookingStore.get_alert_by_id Supabase failed: %s", exc)
         return self._get_alert_by_id_json(alert_id)
 
-    def dismiss_alert(self, alert_id: str, dismissed_by: str) -> Optional[BlockBookingAlert]:
+    def dismiss_alert(self, alert_id: str, dismissed_by: str) -> BlockBookingAlert | None:
         """Mark an alert as dismissed."""
         now = _now_iso()
         if self.client:
@@ -481,7 +481,7 @@ class BookingStore:
         site_id: str,
         organiser_email: str,
         room_name: str,
-        start_time: Optional[datetime],
+        start_time: datetime | None,
     ) -> bool:
         records = self._load_json(BOOKINGS_JSON)
         original_len = len(records)
@@ -523,14 +523,14 @@ class BookingStore:
         alerts = self._load_json(ALERTS_JSON)
         return [_dict_to_alert(a) for a in alerts if a.get("site_id") == site_id and not a.get("dismissed", False)]
 
-    def _get_alert_by_id_json(self, alert_id: str) -> Optional[BlockBookingAlert]:
+    def _get_alert_by_id_json(self, alert_id: str) -> BlockBookingAlert | None:
         alerts = self._load_json(ALERTS_JSON)
         for a in alerts:
             if a.get("id") == alert_id:
                 return _dict_to_alert(a)
         return None
 
-    def _dismiss_alert_json(self, alert_id: str, dismissed_by: str, now: str) -> Optional[BlockBookingAlert]:
+    def _dismiss_alert_json(self, alert_id: str, dismissed_by: str, now: str) -> BlockBookingAlert | None:
         alerts = self._load_json(ALERTS_JSON)
         for a in alerts:
             if a.get("id") == alert_id:
@@ -572,7 +572,7 @@ class BookingStore:
 
 
 # Module-level singleton
-_store: Optional[BookingStore] = None
+_store: BookingStore | None = None
 
 
 def get_booking_store() -> BookingStore:

@@ -9,19 +9,19 @@ import csv
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Type
+from typing import Any
 
 from ..models import (
-    VendorType,
-    SimulationConfig,
+    HOSPITAL_DIFFUSER_CONFIG,
     RICKARD_DIFFUSER_TEMPLATE,
     SITE_CODE_MAP,
-    HOSPITAL_DIFFUSER_CONFIG,
+    SimulationConfig,
+    VendorType,
 )
 from ..vendors.base import VendorAdapter
-from ..vendors.siemens_desigo import SiemensDesigoAdapter
 from ..vendors.niagara import NiagaraAdapter
 from ..vendors.rickard import RickardAdapter
+from ..vendors.siemens_desigo import SiemensDesigoAdapter
 
 
 class PointListExporter:
@@ -33,13 +33,13 @@ class PointListExporter:
     OUTPUT_DIR = DATA_DIR / "bms_simulator" / "exports"
 
     # Vendor adapter mapping
-    VENDOR_ADAPTERS: Dict[VendorType, Type[VendorAdapter]] = {
+    VENDOR_ADAPTERS: dict[VendorType, type[VendorAdapter]] = {
         VendorType.SIEMENS_DESIGO: SiemensDesigoAdapter,
         VendorType.NIAGARA: NiagaraAdapter,
         VendorType.RICKARD: RickardAdapter,
     }
 
-    def __init__(self, config: Optional[SimulationConfig] = None):
+    def __init__(self, config: SimulationConfig | None = None):
         """
         Initialize the point list exporter.
 
@@ -48,14 +48,14 @@ class PointListExporter:
         """
         self.config = config or SimulationConfig()
         self.adapter = self._get_adapter(VendorType(self.config.vendor))
-        self._devices_cache: Optional[List[Dict]] = None
+        self._devices_cache: list[dict] | None = None
 
     def _get_adapter(self, vendor: VendorType) -> VendorAdapter:
         """Get the vendor adapter instance."""
         adapter_class = self.VENDOR_ADAPTERS.get(vendor, SiemensDesigoAdapter)
         return adapter_class()
 
-    def _load_devices_from_buildings(self, equipment_path: Path) -> List[Dict[str, Any]]:
+    def _load_devices_from_buildings(self, equipment_path: Path) -> list[dict[str, Any]]:
         """
         Load devices from individual JSON files in a buildings/site/equipment directory.
 
@@ -68,17 +68,17 @@ class PointListExporter:
         devices = []
         for json_file in equipment_path.glob("*.json"):
             try:
-                with open(json_file, "r") as f:
+                with open(json_file) as f:
                     device = json.load(f)
                     # Convert equipment_type to hvac_type for consistency
                     if "equipment_type" in device and "hvac_type" not in device:
                         device["hvac_type"] = device["equipment_type"]
                     devices.append(device)
-            except (json.JSONDecodeError, IOError) as e:
+            except (OSError, json.JSONDecodeError) as e:
                 print(f"Warning: Could not load {json_file}: {e}")
         return devices
 
-    def load_devices(self, site_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    def load_devices(self, site_id: str | None = None) -> list[dict[str, Any]]:
         """
         Load devices from reference_devices.json and/or buildings directory.
 
@@ -103,7 +103,7 @@ class PointListExporter:
                     return devices
 
         # Fall back to reference_devices.json
-        with open(self.REFERENCE_DEVICES_PATH, "r") as f:
+        with open(self.REFERENCE_DEVICES_PATH) as f:
             all_devices = json.load(f)
 
         if site_id:
@@ -116,7 +116,7 @@ class PointListExporter:
 
         return devices
 
-    def generate_diffusers(self, site_id: str = "site-002") -> List[Dict[str, Any]]:
+    def generate_diffusers(self, site_id: str = "site-002") -> list[dict[str, Any]]:
         """
         Generate Rickard VAV diffuser equipment linked to existing VAVs.
 
@@ -213,7 +213,7 @@ class PointListExporter:
 
         return diffusers
 
-    def _generate_hospital_diffusers(self, site_id: str) -> List[Dict[str, Any]]:
+    def _generate_hospital_diffusers(self, site_id: str) -> list[dict[str, Any]]:
         """
         Generate Rickard diffusers for hospital sites using predefined configuration.
 
@@ -353,9 +353,9 @@ class PointListExporter:
 
     def export_point_list(
         self,
-        site_id: Optional[str] = None,
+        site_id: str | None = None,
         include_diffusers: bool = True,
-        output_path: Optional[Path] = None,
+        output_path: Path | None = None,
     ) -> str:
         """
         Export point list as vendor-formatted CSV.
@@ -409,7 +409,7 @@ class PointListExporter:
 
         return str(output_path)
 
-    def _write_csv(self, points: List[Dict[str, Any]], output_path: Path) -> None:
+    def _write_csv(self, points: list[dict[str, Any]], output_path: Path) -> None:
         """
         Write points to CSV file.
 
@@ -448,7 +448,7 @@ class PointListExporter:
             writer.writeheader()
             writer.writerows(points)
 
-    def get_point_summary(self, site_id: Optional[str] = None) -> Dict[str, Any]:
+    def get_point_summary(self, site_id: str | None = None) -> dict[str, Any]:
         """
         Get summary statistics of points by device type.
 

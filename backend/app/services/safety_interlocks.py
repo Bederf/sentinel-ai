@@ -4,14 +4,14 @@ This service provides safety rule evaluation and validation for device control
 operations to prevent unsafe operations (e.g., overheating, pressure extremes).
 """
 
-import logging
 import json
-from pathlib import Path
-from typing import Dict, Any, List, Optional
+import logging
 from datetime import datetime
+from pathlib import Path
+from typing import Any
 
-from app.models.safety_rules import SafetyRule, RuleSeverity, TemperatureRangeRule
 from app.models.device import Device, DeviceType
+from app.models.safety_rules import RuleSeverity, SafetyRule, TemperatureRangeRule
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +24,7 @@ class SafetyEngine:
     """Engine for evaluating safety rules."""
 
     def __init__(self):
-        self.rules: Dict[str, SafetyRule] = {}
+        self.rules: dict[str, SafetyRule] = {}
         self._initialized = False
         self._repository = None
 
@@ -37,7 +37,7 @@ class SafetyEngine:
             self._repository = SafetyRulesRepository()
         return self._repository
 
-    async def initialize(self, rules_data: Optional[List[Dict[str, Any]]] = None) -> None:
+    async def initialize(self, rules_data: list[dict[str, Any]] | None = None) -> None:
         """Initialize safety engine with rules."""
         if self._initialized and self.rules:
             return
@@ -61,8 +61,8 @@ class SafetyEngine:
             rules_data = self.repository.get_all()
 
             if not rules_data:
-                logger.info("No rules found in repository, creating demo rules")
-                await self.create_demo_rules()
+                logger.info("No rules found in repository, creating seeded rules")
+                await self.create_seed_rules()
                 return
 
             for rule_data in rules_data:
@@ -78,8 +78,8 @@ class SafetyEngine:
         """Load safety rules from JSON file (fallback)."""
         try:
             if not SAFETY_RULES_FILE.exists():
-                logger.info("No safety rules file found, creating demo rules")
-                await self.create_demo_rules()
+                logger.info("No safety rules file found, creating seeded rules")
+                await self.create_seed_rules()
                 return
 
             with open(SAFETY_RULES_FILE) as f:
@@ -91,8 +91,8 @@ class SafetyEngine:
             logger.info(f"Loaded {len(rules_data)} safety rules from {SAFETY_RULES_FILE}")
         except Exception as e:
             logger.error(f"Failed to load safety rules from file: {e}")
-            # Create demo rules as fallback
-            await self.create_demo_rules()
+            # Create seeded rules as fallback
+            await self.create_seed_rules()
 
     async def save_rules_to_file(self) -> bool:
         """Save safety rules to storage (repository and JSON file)."""
@@ -109,9 +109,9 @@ class SafetyEngine:
             logger.error(f"Failed to save safety rules: {e}")
             return False
 
-    async def create_demo_rules(self) -> None:
-        """Create demo safety rules for testing."""
-        demo_rules = [
+    async def create_seed_rules(self) -> None:
+        """Create seeded safety rules for local validation."""
+        seed_rules = [
             # HVAC temperature rules
             {
                 "id": "temp_hvac_safe_range",
@@ -210,14 +210,14 @@ class SafetyEngine:
             },
         ]
 
-        for rule_data in demo_rules:
+        for rule_data in seed_rules:
             await self.add_rule(rule_data)
 
-        # Save demo rules to file
+        # Save seeded rules to file
         await self.save_rules_to_file()
-        logger.info(f"Created {len(demo_rules)} demo safety rules")
+        logger.info(f"Created {len(seed_rules)} seeded safety rules")
 
-    async def add_rule(self, rule_data: Dict[str, Any]) -> SafetyRule:
+    async def add_rule(self, rule_data: dict[str, Any]) -> SafetyRule:
         """Add a safety rule."""
         rule = SafetyRule.from_dict(rule_data)
         self.rules[rule.id] = rule
@@ -232,11 +232,11 @@ class SafetyEngine:
             return True
         return False
 
-    async def get_rule(self, rule_id: str) -> Optional[SafetyRule]:
+    async def get_rule(self, rule_id: str) -> SafetyRule | None:
         """Get a safety rule by ID."""
         return self.rules.get(rule_id)
 
-    async def list_rules(self, filter_dict: Optional[Dict[str, Any]] = None) -> List[SafetyRule]:
+    async def list_rules(self, filter_dict: dict[str, Any] | None = None) -> list[SafetyRule]:
         """List safety rules with optional filtering."""
         rules = list(self.rules.values())
 
@@ -255,7 +255,7 @@ class SafetyEngine:
 
         return rules
 
-    async def get_rules_for_device(self, device: Device, point_name: Optional[str] = None) -> List[SafetyRule]:
+    async def get_rules_for_device(self, device: Device, point_name: str | None = None) -> list[SafetyRule]:
         """Get safety rules applicable to a specific device (and optionally point).
 
         When a specific rule exists for a point (rule.point_name matches point_name),
@@ -323,7 +323,7 @@ class SafetyEngine:
 
         return applicable_rules
 
-    async def validate_control(self, device: Device, point_name: str, value: Any) -> Dict[str, Any]:
+    async def validate_control(self, device: Device, point_name: str, value: Any) -> dict[str, Any]:
         """
         Validate a control action against safety rules.
 
@@ -470,7 +470,7 @@ class SafetyEngine:
             "timestamp": datetime.now().isoformat(),
         }
 
-    async def get_device_safety_status(self, device: Device) -> Dict[str, Any]:
+    async def get_device_safety_status(self, device: Device) -> dict[str, Any]:
         """
         Get current safety status for a device.
 
@@ -484,12 +484,12 @@ class SafetyEngine:
                 - last_check: Timestamp
                 - details: Detailed status per point
         """
-        # For demo, check all points on the device
+        # In local mode, check all points on the device
         point_statuses = {}
 
         for point_name, point in device.points.items():
             # Get current value (would read from device in real implementation)
-            # For demo, use default value or random value
+            # In local mode, use default value or random value
             current_value = point.default_value or 0
 
             # Validate current value

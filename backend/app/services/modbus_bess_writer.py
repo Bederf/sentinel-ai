@@ -26,9 +26,9 @@ import logging
 import time
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Any
+from typing import Any
 
 from app.config.settings import settings
 from app.services.bess_dispatch_engine import (
@@ -62,8 +62,8 @@ class WriteResult:
     register_value: int  # Scaled value written to register
     verified: bool = False  # True if read-back matched
     aegis_blocked: bool = False
-    demo_mode: bool = False
-    error: Optional[str] = None
+    local_only: bool = False
+    error: str | None = None
     timestamp: str = ""
     write_latency_ms: float = 0.0
     # Audit-friendly fields (Sprint 0 hardening)
@@ -74,7 +74,7 @@ class WriteResult:
     who: str = "sentinel"  # Who initiated (sentinel / operator / test)
     end_timestamp: str = ""  # When the write completed
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "success": self.success,
             "register": self.register,
@@ -82,7 +82,7 @@ class WriteResult:
             "register_value": self.register_value,
             "verified": self.verified,
             "aegis_blocked": self.aegis_blocked,
-            "demo_mode": self.demo_mode,
+            "local_only": self.local_only,
             "error": self.error,
             "timestamp": self.timestamp,
             "write_latency_ms": round(self.write_latency_ms, 2),
@@ -110,13 +110,13 @@ class ModbusBESSWriter:
     def __init__(self):
         self._client = None
         self._last_command_time: float = 0.0
-        self._write_history: List[WriteResult] = []
+        self._write_history: list[WriteResult] = []
         self._connected = False
 
     @property
     def _is_demo(self) -> bool:
         """True when no real Modbus TCP target is configured."""
-        return settings.demo_mode or not settings.modbus_bess_ip
+        return not settings.modbus_bess_ip
 
     @property
     def _aegis_enabled(self) -> bool:
@@ -126,7 +126,7 @@ class ModbusBESSWriter:
     async def _ensure_connected(self) -> bool:
         """Establish Modbus TCP connection if needed.
 
-        Returns True if connected (or demo mode), False on failure.
+        Returns True if connected (or local-only mode), False on failure.
         """
         if self._is_demo:
             return True
@@ -265,7 +265,7 @@ class ModbusBESSWriter:
                 value_kw=0.0,
                 register_value=0,
                 error=f"Command was blocked: {command.error_message}",
-                timestamp=datetime.now(timezone.utc).isoformat(),
+                timestamp=datetime.now(UTC).isoformat(),
                 who=who,
                 reason=command.reason,
             )
@@ -308,7 +308,7 @@ class ModbusBESSWriter:
         Returns:
             WriteResult
         """
-        timestamp = datetime.now(timezone.utc).isoformat()
+        timestamp = datetime.now(UTC).isoformat()
         correlation_id = str(uuid.uuid4())[:12]
         requested_kw = power_kw
 
@@ -334,14 +334,14 @@ class ModbusBESSWriter:
                 value_kw=power_kw,
                 register_value=register_value,
                 aegis_blocked=True,
-                demo_mode=self._is_demo,
+                local_only=self._is_demo,
                 timestamp=timestamp,
                 correlation_id=correlation_id,
                 requested_kw=requested_kw,
                 clamped_kw=clamped_kw,
                 reason=reason or label,
                 who=who,
-                end_timestamp=datetime.now(timezone.utc).isoformat(),
+                end_timestamp=datetime.now(UTC).isoformat(),
             )
             logger.info(
                 "AEGIS blocked: %s %.1f kW -> register %d (gate closed) [%s]",
@@ -354,25 +354,50 @@ class ModbusBESSWriter:
             self._write_history.append(result)
             return result
 
-        # 2. Demo mode — log only, no TCP
+        # 2. No target configured
         if self._is_demo:
+            if settings.sentinel_island_mode:
+                result = WriteResult(
+                    success=False,
+                    register=register,
+                    value_kw=power_kw,
+                    register_value=register_value,
+                    verified=False,
+                    local_only=False,
+                    error="modbus_bess_ip not configured",
+                    timestamp=timestamp,
+                    correlation_id=correlation_id,
+                    requested_kw=requested_kw,
+                    clamped_kw=clamped_kw,
+                    reason=reason or label,
+                    who=who,
+                    end_timestamp=datetime.now(UTC).isoformat(),
+                )
+                logger.error(
+                    "Rejected BESS write without configured Modbus target in SENTINEL_ISLAND_MODE [%s]",
+                    correlation_id,
+                )
+                self._audit_log(result, label)
+                self._write_history.append(result)
+                return result
+
             result = WriteResult(
                 success=True,
                 register=register,
                 value_kw=power_kw,
                 register_value=register_value,
                 verified=True,
-                demo_mode=True,
+                local_only=self._is_demo,
                 timestamp=timestamp,
                 correlation_id=correlation_id,
                 requested_kw=requested_kw,
                 clamped_kw=clamped_kw,
                 reason=reason or label,
                 who=who,
-                end_timestamp=datetime.now(timezone.utc).isoformat(),
+                end_timestamp=datetime.now(UTC).isoformat(),
             )
             logger.info(
-                "DEMO write: %s %.1f kW -> register %d (value=%d) [%s]",
+                "Local-only BESS write: %s %.1f kW -> register %d (value=%d) [%s]",
                 label,
                 power_kw,
                 register,
@@ -400,7 +425,7 @@ class ModbusBESSWriter:
                     clamped_kw=clamped_kw,
                     reason=reason or label,
                     who=who,
-                    end_timestamp=datetime.now(timezone.utc).isoformat(),
+                    end_timestamp=datetime.now(UTC).isoformat(),
                 )
                 self._audit_log(result, label)
                 self._write_history.append(result)
@@ -432,7 +457,7 @@ class ModbusBESSWriter:
                     clamped_kw=clamped_kw,
                     reason=reason or label,
                     who=who,
-                    end_timestamp=datetime.now(timezone.utc).isoformat(),
+                    end_timestamp=datetime.now(UTC).isoformat(),
                 )
                 self._audit_log(result, label)
                 self._write_history.append(result)
@@ -443,7 +468,7 @@ class ModbusBESSWriter:
             if settings.modbus_write_verify:
                 verified = await self._verify_write(register, register_value)
 
-            end_ts = datetime.now(timezone.utc).isoformat()
+            end_ts = datetime.now(UTC).isoformat()
             result = WriteResult(
                 success=True,
                 register=register,
@@ -488,7 +513,7 @@ class ModbusBESSWriter:
                 clamped_kw=clamped_kw,
                 reason=reason or label,
                 who=who,
-                end_timestamp=datetime.now(timezone.utc).isoformat(),
+                end_timestamp=datetime.now(UTC).isoformat(),
             )
             logger.error("Modbus write failed: %s [%s]", e, correlation_id)
             self._audit_log(result, label)
@@ -525,7 +550,7 @@ class ModbusBESSWriter:
             logger.warning("Read-back verification error: %s", e)
             return False
 
-    async def check_watchdog(self) -> Optional[WriteResult]:
+    async def check_watchdog(self) -> WriteResult | None:
         """Check watchdog timer and send idle if no command received within timeout.
 
         Should be called periodically (e.g., every minute).
@@ -545,7 +570,7 @@ class ModbusBESSWriter:
             return result
         return None
 
-    def get_write_history(self, limit: int = 20) -> List[Dict[str, Any]]:
+    def get_write_history(self, limit: int = 20) -> list[dict[str, Any]]:
         """Get recent write history for diagnostics."""
         return [w.to_dict() for w in self._write_history[-limit:]]
 
@@ -577,7 +602,7 @@ async def execute_dispatch_with_write(
     reason: str = "mip_optimized",
     load_shedding_stage: int = 0,
     who: str = "sentinel",
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Validate dispatch through BESSDispatchEngine, then route to ModbusBESSWriter.
 
     This is the unified entry point that combines constraint validation
@@ -620,7 +645,7 @@ async def execute_dispatch_with_write(
 
 # === Singleton ===
 
-_modbus_bess_writer: Optional[ModbusBESSWriter] = None
+_modbus_bess_writer: ModbusBESSWriter | None = None
 
 
 def get_modbus_bess_writer() -> ModbusBESSWriter:

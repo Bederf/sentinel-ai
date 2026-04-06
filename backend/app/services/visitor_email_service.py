@@ -326,23 +326,22 @@ class VisitorEmailService:
         try:
             import asyncio
 
-            # Run synchronous send in a thread pool to avoid blocking
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            try:
-                loop.run_until_complete(
-                    aiosmtplib.send(
-                        msg,
-                        hostname=self._config["host"],
-                        port=self._config["port"],
-                        username=self._config["username"],
-                        password=self._config["password"],
-                        use_tls=self._config["use_tls"],
-                        start_tls=self._config["use_tls"],
-                    )
+            # asyncio.run() handles nested event loops correctly
+            # use_tls and start_tls are mutually exclusive in aiosmtplib
+            # Port 587: STARTTLS (use_tls=False, start_tls=True)
+            # Port 465: implicit TLS (use_tls=True, start_tls=False)
+            tls_enabled = self._config["use_tls"]
+            asyncio.run(
+                aiosmtplib.send(
+                    msg,
+                    hostname=self._config["host"],
+                    port=self._config["port"],
+                    username=self._config["username"],
+                    password=self._config["password"],
+                    use_tls=not tls_enabled,
+                    start_tls=tls_enabled,
                 )
-            finally:
-                loop.close()
+            )
 
             logger.info("Visitor email sent to %s", to_email)
             return True

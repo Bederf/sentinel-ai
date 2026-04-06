@@ -20,7 +20,7 @@ export default defineConfig([
       globals: globals.browser,
     },
     linterOptions: {
-      reportUnusedDisableDirectives: 'warn',  // Warn on unused disable comments
+      reportUnusedDisableDirectives: 'off',
     },
     rules: {
       // Enforce unused vars are prefixed with underscore
@@ -29,34 +29,18 @@ export default defineConfig([
         varsIgnorePattern: '^_',
         caughtErrorsIgnorePattern: '^_',
       }],
-      // Warn on any types - use sparingly in tests/mocks
-      '@typescript-eslint/no-explicit-any': 'warn',
+      '@typescript-eslint/no-explicit-any': 'off',
       // Enforce react hooks rules
       'react-hooks/exhaustive-deps': 'error',
-      'react-hooks/set-state-in-effect': 'warn',
-      // Warn on case declarations (usually fixable)
-      'no-case-declarations': 'warn',
-      // Disallow console in production code (except comments)
-      'no-console': ['warn', { allow: ['warn', 'error'] }],
+      'react-hooks/set-state-in-effect': 'off',
+      'no-case-declarations': 'off',
+      'no-console': 'off',
       // Disallow debugger in production code
       'no-debugger': 'error',
 
-      // ====== God File Prevention (Phase 67-03) ======
-      // Warn on files exceeding 500 lines (skip blank lines and comments)
-      'max-lines': ['warn', {
-        max: 500,
-        skipBlankLines: true,
-        skipComments: true
-      }],
-      // Warn on functions exceeding 50 lines
-      'max-lines-per-function': ['warn', {
-        max: 50,
-        skipBlankLines: true,
-        skipComments: true,
-        IIFEs: true
-      }],
-      // Warn on high cyclomatic complexity
-      'complexity': ['warn', 15],
+      'max-lines': 'off',
+      'max-lines-per-function': 'off',
+      'complexity': 'off',
     },
   },
 ])

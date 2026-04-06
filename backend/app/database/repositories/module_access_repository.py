@@ -8,7 +8,7 @@ from datetime import datetime
 from app.database.supabase_client import get_supabase_client
 from app.models.auth import SentinelRole
 from app.models.module_registry import ModuleType
-from app.config.demo_configs import has_demo_module_access, has_demo_site_access
+from app.config.access_profiles import has_profile_module_access, has_profile_site_access
 
 import logging
 
@@ -258,14 +258,14 @@ class ModuleAccessRepository:
         if not user_email:
             return False
 
-        # Check demo site access first (site-level restriction)
-        if not has_demo_site_access(user_email, site_code):
+        # Check profiled site access first (site-level restriction)
+        if not has_profile_site_access(user_email, site_code):
             logger.warning(f"Demo user blocked by site restriction: user={user_email} site={site_code}")
             return False
 
-        # Check demo configs (synced with frontend access-control.ts)
-        # This allows demo users to access modules without explicit database grants
-        if has_demo_module_access(user_email, module_type.value):
+        # Check access profiles (synced with frontend access-control.ts)
+        # This allows profiled users to access modules without explicit database grants
+        if has_profile_module_access(user_email, module_type.value):
             logger.info(f"Demo config grant: user={user_email} module={module_type.value} site={site_code}")
             return True
 

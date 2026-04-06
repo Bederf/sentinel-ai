@@ -15,8 +15,9 @@ before activation.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Any, Iterable
+from typing import Any
 
 from app.models.module_registry import ModuleType
 from app.services.module_registry_service import module_registry

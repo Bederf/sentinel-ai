@@ -8,11 +8,11 @@ Provides validation and business logic for:
 """
 
 import logging
-from typing import List, Dict, Optional, Tuple, Any
 from decimal import Decimal
+from typing import Any
 
-from app.database.repositories.zone_repository import ZoneRepository
 from app.database.repositories.desk_repository import DeskRepository
+from app.database.repositories.zone_repository import ZoneRepository
 from app.database.supabase_client import get_supabase_client
 
 logger = logging.getLogger(__name__)
@@ -27,7 +27,7 @@ class ZoneIngestionService:
         self.desk_repo = DeskRepository()
         self.client = get_supabase_client()
 
-    def get_site_uuid(self, site_code: str) -> Optional[str]:
+    def get_site_uuid(self, site_code: str) -> str | None:
         """Convert building code to UUID.
 
         Args:
@@ -42,7 +42,7 @@ class ZoneIngestionService:
             return response.data[0]["id"]
         return None
 
-    async def ingest_zones(self, site_id: str, zones: List[Dict[str, Any]]) -> Dict[str, Any]:
+    async def ingest_zones(self, site_id: str, zones: list[dict[str, Any]]) -> dict[str, Any]:
         """Ingest zone configuration for a building.
 
         Each building can have a unique zone structure. This method validates
@@ -127,7 +127,7 @@ class ZoneIngestionService:
         logger.info(f"Ingested {len(zones)} zones for building {site_id}")
         return {"status": "success", "zones_created": len(zones)}
 
-    async def ingest_desks(self, site_id: str, desks: List[Dict[str, Any]]) -> Dict[str, Any]:
+    async def ingest_desks(self, site_id: str, desks: list[dict[str, Any]]) -> dict[str, Any]:
         """Ingest desk configuration for a building.
 
         Validation:
@@ -223,7 +223,7 @@ class ZoneIngestionService:
         logger.info(f"Ingested {len(desks)} desks for building {site_id}")
         return {"status": "success", "desks_created": len(desks)}
 
-    async def calculate_zone_centroid(self, site_id: str, zone_id: str) -> Optional[Dict[str, float]]:
+    async def calculate_zone_centroid(self, site_id: str, zone_id: str) -> dict[str, float] | None:
         """Calculate zone centroid from desk positions.
 
         The centroid is the average X, Z position of all desks in a zone.
@@ -254,7 +254,7 @@ class ZoneIngestionService:
 
         return {"x": round(avg_x, 2), "z": round(avg_z, 2)}
 
-    def get_all_zone_centroids(self, site_id: str) -> Dict[str, Dict[str, float]]:
+    def get_all_zone_centroids(self, site_id: str) -> dict[str, dict[str, float]]:
         """Get centroids for all zones in a building.
 
         Efficient operation: loads all desks once, calculates centroids for
@@ -287,7 +287,7 @@ class ZoneIngestionService:
         logger.info(f"Calculated {len(centroids)} zone centroids for building {site_id}")
         return centroids
 
-    async def validate_zone_structure(self, site_id: str) -> Tuple[bool, List[str]]:
+    async def validate_zone_structure(self, site_id: str) -> tuple[bool, list[str]]:
         """Validate zone and desk structure for a building.
 
         Checks:

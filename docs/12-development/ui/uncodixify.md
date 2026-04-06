@@ -1,3 +1,18 @@
+---
+title: "uncodixify.md — UI Generation Rules for AI Systems"
+type: "guide"
+status: "draft"
+version: "1.0.0"
+created: "2026-03-31"
+updated: "2026-03-31"
+tags: ["sentinel", "documentation"]
+related: []
+domain: "bms"
+audience: "all"
+complexity: "intermediate"
+estimated_read_time: 10
+---
+
 # uncodixify.md — UI Generation Rules for AI Systems
 
 > **Purpose:** This file defines strict UI generation rules for AI systems. Its job is to prevent the typical AI-generated dashboard aesthetic and force the model to generate interfaces that look like professional software products — Grafana, Linear, GitHub, Vercel — not Codixify template dumps.

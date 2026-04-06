@@ -1156,7 +1156,7 @@ async def acknowledge_work_order_alert(
         alert_svc = get_water_alert_service()
 
         # In production, would retrieve alert linked to work order
-        # For demo, create acknowledgment
+        # Create a local acknowledgment placeholder
         result = await alert_svc.acknowledge_alert(
             alert_id=f"alert-{work_order_id}",
             acknowledged_by=acknowledged_by,

@@ -67,15 +67,25 @@ class BackupService:
         # Scan backup directory
         if BACKUP_DIR.exists():
             try:
-                backup_sets = [
-                    d
-                    for d in BACKUP_DIR.rglob("*")
-                    if d.is_dir() and d.name not in {"daily", "manual"} and (d / "backup.env").exists()
-                ]
-                backup_files = [f for f in BACKUP_DIR.rglob("*") if f.is_file()]
+                backup_sets = []
+                backup_files = []
+                for d in BACKUP_DIR.rglob("*"):
+                    try:
+                        if d.is_dir() and d.name not in {"daily", "manual"}:
+                            env_file = d / "backup.env"
+                            try:
+                                if env_file.exists():
+                                    backup_sets.append(d)
+                            except (OSError, PermissionError):
+                                pass
+                        elif d.is_file():
+                            backup_files.append(d)
+                    except (OSError, PermissionError):
+                        continue
+
                 status["file_count"] = len(backup_sets)
 
-                # Calculate total size safely, skipping inaccessible files
+                # Calculate total size safely
                 total_size = 0.0
                 for f in backup_files:
                     try:
@@ -84,7 +94,7 @@ class BackupService:
                         pass
                 status["total_size_mb"] = round(total_size / (1024 * 1024), 2) if total_size > 0 else 0.0
 
-                # Get newest backup timestamp safely
+                # Get newest backup timestamp
                 if backup_sets:
                     mtimes = []
                     for d in backup_sets:

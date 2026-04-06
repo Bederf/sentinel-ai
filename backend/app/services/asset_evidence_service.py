@@ -9,19 +9,18 @@ Classification, normalization, and intake methods for evidence from multiple sou
 Non-blocking pattern: evidence creation failures do not block upload/feedback operations.
 """
 
-from typing import Optional, List
+import logging
 from datetime import datetime
 from uuid import UUID
-import logging
 
+from backend.app.database.repositories.asset_evidence_repository import AssetEvidenceRepository
 from backend.app.models.asset_evidence import (
-    CreateAssetEvidenceInput,
-    SourceType,
     ArtifactType,
+    CreateAssetEvidenceInput,
     EvidenceClass,
     ProvenanceType,
+    SourceType,
 )
-from backend.app.database.repositories.asset_evidence_repository import AssetEvidenceRepository
 
 logger = logging.getLogger(__name__)
 
@@ -60,8 +59,8 @@ class EvidenceClassifier:
     def classify(
         source_type: SourceType,
         artifact_type: ArtifactType,
-        category: Optional[str] = None,
-        metadata: Optional[dict] = None,
+        category: str | None = None,
+        metadata: dict | None = None,
     ) -> EvidenceClass:
         """
         Classify evidence based on source, artifact type, and optional category.
@@ -254,10 +253,10 @@ class AssetEvidenceService:
         document_id: UUID,
         upload_metadata: dict,
         uploader_user_id: UUID,
-        uploader_user_email: Optional[str] = None,
+        uploader_user_email: str | None = None,
         confidence_score: float = 1.0,
-        raw_payload: Optional[dict] = None,
-    ) -> Optional[UUID]:
+        raw_payload: dict | None = None,
+    ) -> UUID | None:
         """
         Create evidence record from technician document upload.
 
@@ -324,9 +323,9 @@ class AssetEvidenceService:
         equipment_id: UUID,
         feedback_data: dict,
         feedback_author_id: UUID,
-        feedback_author_email: Optional[str] = None,
+        feedback_author_email: str | None = None,
         confidence_score: float = 0.95,
-    ) -> Optional[UUID]:
+    ) -> UUID | None:
         """
         Create evidence record from service feedback completion.
 
@@ -389,7 +388,7 @@ class AssetEvidenceService:
         equipment_id: UUID,
         telemetry_data: dict,
         confidence_score: float = 0.8,
-    ) -> Optional[UUID]:
+    ) -> UUID | None:
         """
         Create evidence record from telemetry data.
 
@@ -445,7 +444,7 @@ class AssetEvidenceService:
         equipment_id: UUID,
         active_only: bool = True,
         limit: int = 100,
-    ) -> List:
+    ) -> list:
         """
         Retrieve all evidence for an equipment.
 
@@ -468,7 +467,7 @@ class AssetEvidenceService:
         site_id: UUID,
         active_only: bool = True,
         limit: int = 100,
-    ) -> List:
+    ) -> list:
         """
         Retrieve all evidence for a site.
 

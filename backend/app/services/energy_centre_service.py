@@ -4,20 +4,20 @@ Combines MV/LV switchgear, ATS, transformers, power metering, PFC, and UPS
 into a unified SCADA-style view for the energy centre.
 """
 
-from typing import Dict, List, Optional
-from datetime import datetime
 import json
 import logging
+from datetime import datetime
 from pathlib import Path
 
+from app.config.settings import settings
 from app.models.energy_centre import (
-    EnergyCentre,
     ATSUnit,
-    MVIncomer,
-    Transformer,
+    EnergyCentre,
     LVSwitchboard,
-    PowerMeter,
+    MVIncomer,
     PFCBank,
+    PowerMeter,
+    Transformer,
     UPSSystem,
 )
 from app.services.generator_service import get_generator_service
@@ -29,20 +29,23 @@ class EnergyCentreService:
     """Service for energy centre monitoring."""
 
     def __init__(self):
-        self._centres: Dict[str, EnergyCentre] = {}
-        self._mv_incomers: Dict[str, MVIncomer] = {}
-        self._transformers: Dict[str, Transformer] = {}
-        self._switchboards: Dict[str, LVSwitchboard] = {}
-        self._ats_units: Dict[str, ATSUnit] = {}
-        self._meters: Dict[str, PowerMeter] = {}
-        self._pfc_banks: Dict[str, PFCBank] = {}
-        self._ups_systems: Dict[str, UPSSystem] = {}
-        self._feeders: Dict[str, dict] = {}
-        self._scada_config: Dict = {}
-        self._load_mock_data()
+        self._centres: dict[str, EnergyCentre] = {}
+        self._mv_incomers: dict[str, MVIncomer] = {}
+        self._transformers: dict[str, Transformer] = {}
+        self._switchboards: dict[str, LVSwitchboard] = {}
+        self._ats_units: dict[str, ATSUnit] = {}
+        self._meters: dict[str, PowerMeter] = {}
+        self._pfc_banks: dict[str, PFCBank] = {}
+        self._ups_systems: dict[str, UPSSystem] = {}
+        self._feeders: dict[str, dict] = {}
+        self._scada_config: dict = {}
+        if settings.sentinel_island_mode:
+            logger.info("EnergyCentreService: skipping local seeded data in SENTINEL_ISLAND_MODE")
+        else:
+            self._load_seed_data()
 
-    def _load_mock_data(self):
-        """Load energy centre data from JSON."""
+    def _load_seed_data(self):
+        """Load local seeded energy centre data from JSON."""
         data_paths = [
             Path(__file__).parent.parent / "data" / "sites" / "sandton" / "energy_centre.json",
         ]
@@ -124,31 +127,31 @@ class EnergyCentreService:
 
     # === Energy Centre ===
 
-    def get_centres(self, site_id: Optional[str] = None) -> List[EnergyCentre]:
+    def get_centres(self, site_id: str | None = None) -> list[EnergyCentre]:
         """Get all energy centres."""
         centres = list(self._centres.values())
         if site_id:
             centres = [c for c in centres if c.site_id == site_id]
         return centres
 
-    def get_centre(self, centre_id: str) -> Optional[EnergyCentre]:
+    def get_centre(self, centre_id: str) -> EnergyCentre | None:
         """Get single energy centre."""
         return self._centres.get(centre_id)
 
     # === ATS ===
 
-    def get_ats_units(self, site_id: Optional[str] = None) -> List[ATSUnit]:
+    def get_ats_units(self, site_id: str | None = None) -> list[ATSUnit]:
         """Get all ATS units."""
         units = list(self._ats_units.values())
         if site_id:
             units = [u for u in units if u.site_id == site_id]
         return units
 
-    def get_ats(self, ats_id: str) -> Optional[ATSUnit]:
+    def get_ats(self, ats_id: str) -> ATSUnit | None:
         """Get single ATS unit."""
         return self._ats_units.get(ats_id)
 
-    def get_ats_status(self, ats_id: str) -> Optional[Dict]:
+    def get_ats_status(self, ats_id: str) -> dict | None:
         """Get detailed ATS status with transfer history."""
         ats = self._ats_units.get(ats_id)
         if not ats:
@@ -185,46 +188,46 @@ class EnergyCentreService:
 
     # === MV Switchgear ===
 
-    def get_mv_incomers(self, site_id: Optional[str] = None) -> List[MVIncomer]:
+    def get_mv_incomers(self, site_id: str | None = None) -> list[MVIncomer]:
         """Get all MV incomers."""
         incomers = list(self._mv_incomers.values())
         if site_id:
             incomers = [i for i in incomers if i.site_id == site_id]
         return incomers
 
-    def get_mv_incomer(self, incomer_id: str) -> Optional[MVIncomer]:
+    def get_mv_incomer(self, incomer_id: str) -> MVIncomer | None:
         """Get single MV incomer."""
         return self._mv_incomers.get(incomer_id)
 
     # === Transformers ===
 
-    def get_transformers(self, site_id: Optional[str] = None) -> List[Transformer]:
+    def get_transformers(self, site_id: str | None = None) -> list[Transformer]:
         """Get all transformers."""
         transformers = list(self._transformers.values())
         if site_id:
             transformers = [t for t in transformers if t.site_id == site_id]
         return transformers
 
-    def get_transformer(self, transformer_id: str) -> Optional[Transformer]:
+    def get_transformer(self, transformer_id: str) -> Transformer | None:
         """Get single transformer."""
         return self._transformers.get(transformer_id)
 
     # === LV Switchboards ===
 
-    def get_switchboards(self, site_id: Optional[str] = None) -> List[LVSwitchboard]:
+    def get_switchboards(self, site_id: str | None = None) -> list[LVSwitchboard]:
         """Get all LV switchboards."""
         switchboards = list(self._switchboards.values())
         if site_id:
             switchboards = [s for s in switchboards if s.site_id == site_id]
         return switchboards
 
-    def get_switchboard(self, switchboard_id: str) -> Optional[LVSwitchboard]:
+    def get_switchboard(self, switchboard_id: str) -> LVSwitchboard | None:
         """Get single switchboard."""
         return self._switchboards.get(switchboard_id)
 
     # === Power Meters ===
 
-    def get_meters(self, site_id: Optional[str] = None, meter_type: Optional[str] = None) -> List[PowerMeter]:
+    def get_meters(self, site_id: str | None = None, meter_type: str | None = None) -> list[PowerMeter]:
         """Get all power meters."""
         meters = list(self._meters.values())
         if site_id:
@@ -233,11 +236,11 @@ class EnergyCentreService:
             meters = [m for m in meters if m.meter_type == meter_type]
         return meters
 
-    def get_meter(self, meter_id: str) -> Optional[PowerMeter]:
+    def get_meter(self, meter_id: str) -> PowerMeter | None:
         """Get single power meter."""
         return self._meters.get(meter_id)
 
-    def get_power_summary(self, site_id: str) -> Dict:
+    def get_power_summary(self, site_id: str) -> dict:
         """Get power summary from all meters at a site."""
         meters = self.get_meters(site_id=site_id)
         main_meter = next((m for m in meters if m.meter_type == "main"), None)
@@ -258,31 +261,31 @@ class EnergyCentreService:
 
     # === PFC ===
 
-    def get_pfc_banks(self, site_id: Optional[str] = None) -> List[PFCBank]:
+    def get_pfc_banks(self, site_id: str | None = None) -> list[PFCBank]:
         """Get all PFC banks."""
         banks = list(self._pfc_banks.values())
         if site_id:
             banks = [b for b in banks if b.site_id == site_id]
         return banks
 
-    def get_pfc(self, pfc_id: str) -> Optional[PFCBank]:
+    def get_pfc(self, pfc_id: str) -> PFCBank | None:
         """Get single PFC bank."""
         return self._pfc_banks.get(pfc_id)
 
     # === UPS ===
 
-    def get_ups_systems(self, site_id: Optional[str] = None) -> List[UPSSystem]:
+    def get_ups_systems(self, site_id: str | None = None) -> list[UPSSystem]:
         """Get all UPS systems."""
         systems = list(self._ups_systems.values())
         if site_id:
             systems = [s for s in systems if s.site_id == site_id]
         return systems
 
-    def get_ups(self, ups_id: str) -> Optional[UPSSystem]:
+    def get_ups(self, ups_id: str) -> UPSSystem | None:
         """Get single UPS system."""
         return self._ups_systems.get(ups_id)
 
-    def get_ups_summary(self, site_id: str) -> Dict:
+    def get_ups_summary(self, site_id: str) -> dict:
         """Get UPS summary for a site."""
         systems = self.get_ups_systems(site_id=site_id)
 
@@ -310,13 +313,13 @@ class EnergyCentreService:
 
     # === Feeders ===
 
-    def get_feeders(self, site_id: Optional[str] = None) -> List[Dict]:
+    def get_feeders(self, site_id: str | None = None) -> list[dict]:
         """Get all distribution feeders."""
         return list(self._feeders.values())
 
     # === SCADA Overview ===
 
-    def get_scada_overview(self, site_id: str) -> Dict:
+    def get_scada_overview(self, site_id: str) -> dict:
         """Get complete SCADA overview for energy centre."""
         centre = next((c for c in self._centres.values() if c.site_id == site_id), None)
 
@@ -391,7 +394,7 @@ class EnergyCentreService:
 
     # === Single-Line Diagram Data ===
 
-    def get_sld_data(self, site_id: str) -> Dict:
+    def get_sld_data(self, site_id: str) -> dict:
         """Get data formatted for single-line diagram visualization."""
         overview = self.get_scada_overview(site_id)
 
@@ -404,7 +407,7 @@ class EnergyCentreService:
             "status": overview["status"],
         }
 
-    def _build_sld_nodes(self, site_id: str) -> List[Dict]:
+    def _build_sld_nodes(self, site_id: str) -> list[dict]:
         """Build nodes for SLD visualization."""
         nodes = []
 
@@ -488,7 +491,7 @@ class EnergyCentreService:
 
         return nodes
 
-    def _build_sld_connections(self, site_id: str) -> List[Dict]:
+    def _build_sld_connections(self, site_id: str) -> list[dict]:
         """Build connections for SLD visualization."""
         connections = []
 
@@ -549,7 +552,7 @@ class EnergyCentreService:
 
 
 # Singleton instance
-_energy_centre_service: Optional[EnergyCentreService] = None
+_energy_centre_service: EnergyCentreService | None = None
 
 
 def get_energy_centre_service() -> EnergyCentreService:

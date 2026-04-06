@@ -12,12 +12,12 @@ Handles the conversation flow AFTER technician replies "done":
 6. Repeats until all items collected
 """
 
-import requests
 import json
 import os
-from typing import Dict, Any, Optional, List
 from enum import Enum
+from typing import Any
 
+import requests
 
 BMS_API_URL = os.getenv("SENTINEL_API_URL", "http://localhost:9095")  # SENTINEL BMS Backend
 SENTRY_SECRET = (os.getenv("SENTRY_WEBHOOK_SECRET", "") or "").strip()
@@ -46,9 +46,9 @@ class WOConversationHandler:
     def __init__(self, service_record_code: str, telegram_user_id: str):
         self.service_record_code = service_record_code
         self.telegram_user_id = telegram_user_id
-        self.collected_items: List[str] = []
+        self.collected_items: list[str] = []
 
-    def handle_initial_done(self) -> Optional[str]:
+    def handle_initial_done(self) -> str | None:
         """Handle technician's "done" reply - get first prompt.
 
         Returns:
@@ -86,7 +86,7 @@ class WOConversationHandler:
             print(f"❌ Error handling 'done': {e}")
             return None
 
-    def handle_file_reply(self, file_info: Dict[str, Any], message_type: str) -> Optional[str]:
+    def handle_file_reply(self, file_info: dict[str, Any], message_type: str) -> str | None:
         """Handle file/photo/audio reply from technician.
 
         Args:
@@ -147,7 +147,7 @@ class WOConversationHandler:
             print(f"❌ Error handling file reply: {e}")
             return None
 
-    def get_collection_status(self) -> Optional[Dict[str, Any]]:
+    def get_collection_status(self) -> dict[str, Any] | None:
         """Get current collection status.
 
         Returns:

@@ -5,7 +5,7 @@ and equipment placement data for 3D visualization.
 """
 
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from app.database.repositories.site_3d_config_repository import (
     get_site_3d_config_repository,
@@ -30,7 +30,7 @@ class Site3DConfigService:
         self.repository = get_site_3d_config_repository()
         self.zone_service = get_zone_mapping_service()
 
-    def validate_building_structure(self, structure: Dict[str, Any]) -> Tuple[bool, Optional[str]]:
+    def validate_building_structure(self, structure: dict[str, Any]) -> tuple[bool, str | None]:
         """Validate building structure definition.
 
         Args:
@@ -69,9 +69,9 @@ class Site3DConfigService:
 
     def validate_equipment_positions(
         self,
-        positions: List[Dict[str, Any]],
-        structure: Dict[str, Any],
-    ) -> Tuple[bool, Optional[str]]:
+        positions: list[dict[str, Any]],
+        structure: dict[str, Any],
+    ) -> tuple[bool, str | None]:
         """Validate equipment positions against building structure.
 
         Args:
@@ -96,7 +96,7 @@ class Site3DConfigService:
 
         return True, None
 
-    def _validate_floor(self, floor: Dict[str, Any]) -> Tuple[bool, Optional[str]]:
+    def _validate_floor(self, floor: dict[str, Any]) -> tuple[bool, str | None]:
         """Validate single floor definition.
 
         Args:
@@ -139,9 +139,9 @@ class Site3DConfigService:
 
     def _validate_position(
         self,
-        position: Dict[str, Any],
-        floor_lookup: Dict[str, Dict[str, Any]],
-    ) -> Tuple[bool, Optional[str]]:
+        position: dict[str, Any],
+        floor_lookup: dict[str, dict[str, Any]],
+    ) -> tuple[bool, str | None]:
         """Validate single equipment position.
 
         Args:
@@ -187,8 +187,8 @@ class Site3DConfigService:
 
     def _check_equipment_collisions(
         self,
-        positions: List[Dict[str, Any]],
-    ) -> Optional[str]:
+        positions: list[dict[str, Any]],
+    ) -> str | None:
         """Check for equipment spacing violations.
 
         Args:
@@ -198,7 +198,7 @@ class Site3DConfigService:
             Error message if collision found, None otherwise
         """
         # Group by floor
-        by_floor: Dict[str, List[Dict[str, Any]]] = {}
+        by_floor: dict[str, list[dict[str, Any]]] = {}
         for pos in positions:
             floor = pos.get("floor")
             if floor not in by_floor:
@@ -224,7 +224,7 @@ class Site3DConfigService:
         return None
 
     @staticmethod
-    def _calculate_distance(p1: Tuple[float, float], p2: Tuple[float, float]) -> float:
+    def _calculate_distance(p1: tuple[float, float], p2: tuple[float, float]) -> float:
         """Calculate Euclidean distance between two points.
 
         Args:
@@ -240,10 +240,10 @@ class Site3DConfigService:
 
     def infer_zones_from_positions(
         self,
-        positions: List[Dict[str, Any]],
-        equipment_map: Dict[str, Dict[str, Any]],
+        positions: list[dict[str, Any]],
+        equipment_map: dict[str, dict[str, Any]],
         site_id: str,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Auto-infer zones from equipment positions.
 
         Groups equipment by floor, then infers zones using ZoneMappingService.
@@ -259,7 +259,7 @@ class Site3DConfigService:
         zones = []
 
         # Group equipment by floor
-        by_floor: Dict[str, List[str]] = {}
+        by_floor: dict[str, list[str]] = {}
         for pos in positions:
             floor = pos.get("floor")
             equipment_id = pos.get("equipment_id")
@@ -286,10 +286,10 @@ class Site3DConfigService:
     def generate_viewer_data(
         self,
         site_id: str,
-        structure: Dict[str, Any],
-        positions: List[Dict[str, Any]],
-        equipment_map: Dict[str, Dict[str, Any]],
-    ) -> Dict[str, Any]:
+        structure: dict[str, Any],
+        positions: list[dict[str, Any]],
+        equipment_map: dict[str, dict[str, Any]],
+    ) -> dict[str, Any]:
         """Generate data formatted for 3D viewer display.
 
         Args:
@@ -302,7 +302,7 @@ class Site3DConfigService:
             Viewer-ready data structure
         """
         # Group equipment by floor
-        equipment_by_floor: Dict[str, List[Dict[str, Any]]] = {}
+        equipment_by_floor: dict[str, list[dict[str, Any]]] = {}
         for pos in positions:
             floor = pos.get("floor")
             equipment_id = pos.get("equipment_id")
@@ -347,7 +347,7 @@ class Site3DConfigService:
             },
         }
 
-    def export_config_for_import(self, config: Dict[str, Any]) -> Dict[str, Any]:
+    def export_config_for_import(self, config: dict[str, Any]) -> dict[str, Any]:
         """Export configuration in standardized format for import/sharing.
 
         Args:
@@ -369,8 +369,8 @@ class Site3DConfigService:
     def import_config_from_dict(
         self,
         site_id: str,
-        import_data: Dict[str, Any],
-    ) -> Tuple[bool, Optional[str]]:
+        import_data: dict[str, Any],
+    ) -> tuple[bool, str | None]:
         """Import configuration from standardized format.
 
         Args:
@@ -414,11 +414,11 @@ class Site3DConfigService:
             return True, None
 
         except Exception as e:
-            return False, f"Import failed: {str(e)}"
+            return False, f"Import failed: {e!s}"
 
 
 # Singleton instance
-_site_3d_config_service: Optional[Site3DConfigService] = None
+_site_3d_config_service: Site3DConfigService | None = None
 
 
 def get_site_3d_config_service() -> Site3DConfigService:

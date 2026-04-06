@@ -604,18 +604,9 @@ async def get_critical_unresolved_deficiencies(
 async def get_inspection_overview(equipment_id: str, current_user: User = Depends(get_current_user)):
     """Get inspection overview for equipment."""
     # This would use the view v_inspection_overview
-    # For now, return mock data
-    return InspectionOverviewResponse(
-        equipment_id=equipment_id,
-        equipment_name="Generator 001",
-        equipment_type="generator",
-        active_schedules=2,
-        scheduled_tasks=3,
-        in_progress_tasks=1,
-        overdue_tasks=0,
-        completed_last_30_days=4,
-        open_deficiencies=2,
-        critical_deficiencies=1,
+    raise HTTPException(
+        status_code=status.HTTP_501_NOT_IMPLEMENTED,
+        detail="Inspection overview is not backed by a live data source on this instance",
     )
 
 

@@ -20,10 +20,9 @@ Boundary Definition:
 - Next Stage: Semantic classification and validation
 """
 
-import re
 import logging
+import re
 from datetime import datetime
-from typing import Dict
 
 from app.models.simbiot.raw_source_record import RawSourceRecord
 from app.models.simbiot.sanitized_record import SanitizedIntermediateRecord
@@ -248,7 +247,7 @@ class SanitizationService:
 
         return False
 
-    def get_metrics(self) -> Dict[str, int]:
+    def get_metrics(self) -> dict[str, int]:
         """Get sanitization metrics."""
         return {
             "sanitized_count": self.sanitized_count,

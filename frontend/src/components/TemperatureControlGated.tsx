@@ -69,7 +69,7 @@ export function TemperatureControlGated({
 
   return (
     <LockedFeatureOverlay
-      module="control"
+      module="hvac_control"
       featureName={`${label} Control`}
       customMessage={`Enable Controls module to let SENTINEL automatically adjust ${label.toLowerCase()} and maintain optimal comfort while reducing energy costs.`}
     >

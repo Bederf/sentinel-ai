@@ -50,7 +50,7 @@ class SignalResolutionRequest(BaseModel):
 
 
 def _load_fixture_signals() -> list[dict]:
-    """Load demo-mode signal fixtures from JSON file."""
+    """Load local signal fixtures from JSON file."""
     try:
         with open(_FIXTURE_PATH) as f:
             return json.load(f)
@@ -138,20 +138,44 @@ def _signal_summary(signal: dict) -> dict:
     }
 
 
+async def _resolve_site_uuid(client, site_id: str) -> str | None:
+    """Resolve a site code (S001, site-001) to its Supabase UUID."""
+    # Try exact match first, then with 'site-' prefix normalisation
+    normalized_prefixed = f"site-{site_id[1:]}" if site_id.upper().startswith("S") and site_id[1:].isdigit() else None
+    for code in (site_id, site_id.lower(), normalized_prefixed):
+        if not code:
+            continue
+        try:
+            r = client.table("sites").select("id").eq("code", code).limit(1).execute()
+            if r.data:
+                return r.data[0]["id"]
+        except Exception:
+            pass
+    return None
+
+
 async def _get_signals_for_site(site_id: str) -> list[dict]:
-    """Fetch signals for a site. Supabase first, fixture fallback."""
+    """Fetch active signals for a specific site. Supabase first, fixture fallback."""
     from app.database.supabase_client import get_supabase_client
 
     client = get_supabase_client()
     if client:
         try:
-            result = client.table("signal").select("*").eq("resolution_state", "active").execute()
-            if result.data:
-                return result.data
+            site_uuid = await _resolve_site_uuid(client, site_id)
+            if site_uuid:
+                result = (
+                    client.table("signal")
+                    .select("*")
+                    .eq("resolution_state", "active")
+                    .eq("site_id", site_uuid)
+                    .execute()
+                )
+                if result.data:
+                    return result.data
         except Exception as e:
             logger.warning("Supabase signal query failed, falling back to fixtures: %s", e)
 
-    # Demo mode / fallback
+    # Demo mode / fallback: fixture is keyed to S001 Fairlands rooms
     return _load_fixture_signals()
 
 
@@ -403,7 +427,7 @@ async def get_dashboard_by_email(person_email: str) -> dict[str, Any]:
                 # Fetch dashboard cards
 
                 # get_cards_for_person requires a psycopg2 connection — skip
-                # in demo mode and use the rooms endpoint instead
+                # in local fallback mode and use the rooms endpoint instead
                 cards_result = (
                     client.table("dashboard_card")
                     .select("*")
@@ -442,7 +466,7 @@ async def get_dashboard_by_email(person_email: str) -> dict[str, Any]:
         rooms_affected = list({_signal_room_id(s) for s in signals if _signal_room_id(s)})
         cards.append(
             {
-                "card_id": f"demo-card-{signal_type}",
+                "card_id": f"local-card-{signal_type}",
                 "signal_type": signal_type,
                 "title": f"{signal_type.replace('_', ' ').title()} ({len(signals)} signals)",
                 "severity": _highest_severity(signals),

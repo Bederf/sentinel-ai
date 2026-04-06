@@ -10,7 +10,6 @@ Uses Claude's multimodal vision capabilities to:
 
 import base64
 import logging
-from typing import Optional
 from dataclasses import dataclass
 
 import anthropic
@@ -26,9 +25,9 @@ class IdentifiedComponent:
     """A component identified in an image."""
 
     name: str
-    manufacturer: Optional[str] = None
-    model: Optional[str] = None
-    condition: Optional[str] = None
+    manufacturer: str | None = None
+    model: str | None = None
+    condition: str | None = None
     confidence: float = 0.0
 
 
@@ -38,22 +37,22 @@ class DetectedIssue:
 
     type: str
     severity: str  # low, medium, high, critical
-    location: Optional[str] = None
-    recommendation: Optional[str] = None
+    location: str | None = None
+    recommendation: str | None = None
 
 
 @dataclass
 class ModelPlateInfo:
     """Information extracted from equipment model plate."""
 
-    manufacturer: Optional[str] = None
-    model: Optional[str] = None
-    serial: Optional[str] = None
-    year: Optional[str] = None
-    refrigerant: Optional[str] = None
-    capacity: Optional[str] = None
-    voltage: Optional[str] = None
-    raw_text: Optional[str] = None
+    manufacturer: str | None = None
+    model: str | None = None
+    serial: str | None = None
+    year: str | None = None
+    refrigerant: str | None = None
+    capacity: str | None = None
+    voltage: str | None = None
+    raw_text: str | None = None
 
 
 class VisionService:
@@ -106,7 +105,7 @@ class VisionService:
             logger.error(f"Vision API error: {e}")
             raise
 
-    def analyze_image(self, image_data: bytes, media_type: str = "image/jpeg", prompt: Optional[str] = None) -> dict:
+    def analyze_image(self, image_data: bytes, media_type: str = "image/jpeg", prompt: str | None = None) -> dict:
         """
         General image analysis.
 
@@ -127,7 +126,7 @@ Be specific about manufacturers, models, and conditions if visible."""
         return {"analysis": analysis, "success": True}
 
     def identify_component(
-        self, image_data: bytes, media_type: str = "image/jpeg", context: Optional[str] = None
+        self, image_data: bytes, media_type: str = "image/jpeg", context: str | None = None
     ) -> dict:
         """
         Identify equipment component from image.
@@ -225,7 +224,7 @@ If any field is not visible, use null. Only output valid JSON, no markdown."""
             return {"success": True, "raw_text": response, "parse_error": True}
 
     def diagnose_damage(
-        self, image_data: bytes, media_type: str = "image/jpeg", equipment_context: Optional[str] = None
+        self, image_data: bytes, media_type: str = "image/jpeg", equipment_context: str | None = None
     ) -> dict:
         """
         Assess visible damage or wear in equipment image.
@@ -276,7 +275,7 @@ If no issues are visible, return an empty issues array. Only output valid JSON."
             return {"success": True, "issues": [], "notes": response, "parse_error": True}
 
     def read_error_display(
-        self, image_data: bytes, media_type: str = "image/jpeg", manufacturer: Optional[str] = None
+        self, image_data: bytes, media_type: str = "image/jpeg", manufacturer: str | None = None
     ) -> dict:
         """
         Extract fault codes from equipment error display screen.
@@ -330,7 +329,7 @@ Only output valid JSON, no markdown formatting."""
 
 
 # Singleton instance
-_vision_service: Optional[VisionService] = None
+_vision_service: VisionService | None = None
 
 
 def get_vision_service() -> VisionService:

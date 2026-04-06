@@ -1,13 +1,21 @@
 /**
- * ZONE CONFIGURATION FOR OCCUPANCY SIMULATION
+ * Zone configuration for occupancy visualization.
  *
  * Defines the building's spatial layout with coordinates,
- * capacities, and zone types used for occupancy visualization.
- *
- * This is the user's custom zone configuration from the Grant DALI simulation.
+ * capacities, and zone types used for live occupancy overlays.
  */
 
-import type { ZoneConfig } from './occupancySimulation';
+export interface ZoneConfig {
+  id: string
+  name: string
+  x: number
+  y: number
+  w: number
+  h: number
+  maxOccupancy: number
+  type: 'entry' | 'office' | 'meeting' | 'common' | 'utility' | 'corridor'
+  floor: number
+}
 
 // Define zones with pixel coordinates (scale: 1px ≈ 0.5cm)
 export const OCCUPANCY_ZONES: ZoneConfig[] = [
@@ -169,7 +177,7 @@ export function getTotalCapacity(): number {
 /**
  * Occupancy patterns per zone type across the day
  * Values are fractions of maxOccupancy (0-1)
- * Based on Grant DALI simulation patterns
+ * Based on historical occupancy patterns
  */
 export const OCCUPANCY_CURVES: Record<ZoneConfig['type'], number[]> = {
   office: [0, 0, 0.05, 0.3, 0.7, 0.9, 0.95, 0.5, 0.85, 0.9, 0.85, 0.7, 0.4, 0.15, 0.05, 0, 0, 0],
@@ -195,7 +203,7 @@ export function getOccupancyForZone(zone: ZoneConfig, timeIndex: number): number
 }
 
 /**
- * Time labels for 18-hour simulation day
+ * Time labels for 18-hour day window
  * Format: "HH:MM"
  */
 export const TIME_LABELS = [

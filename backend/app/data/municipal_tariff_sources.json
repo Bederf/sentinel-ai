@@ -28,6 +28,15 @@
       "notes": "Eskom Standard Tariffs summary (FY2026)"
     },
     {
+      "key": "city_power_johannesburg_2025_26",
+      "municipality": "City Power Johannesburg",
+      "tariff_name": "LPU-TOU (Large Power User - Time of Use)",
+      "utility_type": "electricity",
+      "effective_date": "2025-07-01",
+      "source_url": "https://www.citypower.co.za/business/Pages/Tariffs.aspx",
+      "notes": "City Power tariff source page; structured rates are populated from verified city_power_2025_26.json."
+    },
+    {
       "key": "coj_consolidated_tariffs_2025_26",
       "municipality": "City of Johannesburg",
       "tariff_name": "Consolidated Tariffs 2025/26",

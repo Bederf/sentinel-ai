@@ -4,7 +4,7 @@
  * Go/No-Go panel showing commissioning gate status.
  * Shows PASS/FAIL badge, gate grid with icons, consecutive pass days,
  * and promotion readiness.
- * Muted message when commissioning is null (SIMULATION mode).
+ * Muted message when commissioning is unavailable.
  */
 
 import { CheckCircle, XCircle, Shield } from 'lucide-react';
@@ -45,7 +45,7 @@ export function CommissioningGatePanel({ commissioning }: CommissioningGatePanel
           className="text-sm"
           style={{ color: 'var(--color-sentinel-text-disabled)' }}
         >
-          Not applicable in SIMULATION mode. Switch to SHADOW_LIVE to begin commissioning.
+          Commissioning data is not available yet. Configure live ingestion to begin.
         </p>
       </div>
     );

@@ -38,6 +38,7 @@ class VisitService:
         host_mobile: Optional[str] = None,
         visitor_name: Optional[str] = None,
         visitor_vehicle: Optional[str] = None,
+        status: VisitStatus = VisitStatus.CREATED,
     ) -> Visit:
         """Create a new visit with token, PIN, and QR code."""
         visit, _ = self._token_service.create_visit_token(
@@ -50,6 +51,7 @@ class VisitService:
             meeting_end=meeting_end,
             visitor_name=visitor_name,
             visitor_vehicle=visitor_vehicle,
+            status=status,
         )
         return visit
 

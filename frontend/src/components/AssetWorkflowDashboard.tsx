@@ -20,6 +20,7 @@ import {
   workflowApi,
   type WorkflowEquipmentItem,
   type WorkflowState,
+  type WorkflowOnboardAssetRequest,
   type Site,
 } from '@/lib/api';
 import { useModules } from '@/contexts/ModuleHooks';
@@ -68,6 +69,28 @@ function getStateIcon(state: string) {
 
 type MaintenanceTab = 'equipment' | 'tech-chat';
 
+const PRIORITY_EQUIPMENT_KEYWORDS = [
+  'GEN',
+  'GENERATOR',
+  'AHU',
+  'FCU',
+  'CHILLER',
+  'PUMP',
+  'UPS',
+  'BESS',
+  'INVERTER',
+  'BOILER',
+  'COOLING_TOWER',
+  'CT',
+];
+
+function isPriorityEquipmentType(type: string): boolean {
+  const normalized = type.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  return PRIORITY_EQUIPMENT_KEYWORDS.some((keyword) =>
+    normalized.includes(keyword.replace(/[^A-Z0-9]/g, ''))
+  );
+}
+
 export function AssetWorkflowDashboard() {
   const { isModuleActive } = useModules();
   const maintenanceActive = isModuleActive('maintenance');
@@ -79,10 +102,49 @@ export function AssetWorkflowDashboard() {
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [onboardingOpen, setOnboardingOpen] = useState(false);
+  const [onboardingSubmitting, setOnboardingSubmitting] = useState(false);
+  const [onboardingError, setOnboardingError] = useState<string | null>(null);
+  const [onboardingNotes, setOnboardingNotes] = useState('');
+  const [serviceSheetRef, setServiceSheetRef] = useState('');
+  const [photoLinks, setPhotoLinks] = useState('');
+  const [assetAgeYears, setAssetAgeYears] = useState('');
+  const [serialNumber, setSerialNumber] = useState('');
+  const [manufacturer, setManufacturer] = useState('');
+  const [model, setModel] = useState('');
   const [sites, setSites] = useState<Site[]>([]);
   const [selectedSiteId, setSelectedSiteId] = useState<string>('');
   const [loadingSites, setLoadingSites] = useState(true);
   const selectedSite = sites.find((site) => site.id === selectedSiteId) ?? null;
+  const priorityEquipment = equipment.filter((eq) => isPriorityEquipmentType(eq.type));
+  const selectedEquipmentItem = selectedEquipment
+    ? priorityEquipment.find((eq) => eq.equipment_id === selectedEquipment) ?? null
+    : null;
+
+  const handleEquipmentSelect = useCallback(async (equipmentId: string) => {
+    setSelectedEquipment(equipmentId);
+    setError(null);
+
+    // Fast path: use cached state from dashboard payload.
+    const cached = workflowStates[equipmentId];
+    if (cached) {
+      setWorkflowState(cached);
+      return;
+    }
+
+    // Fallback: fetch workflow status directly so card click always opens detail.
+    try {
+      setLoading(true);
+      const freshState = await workflowApi.getWorkflowStatus(equipmentId);
+      setWorkflowState(freshState);
+    } catch (err) {
+      console.error('Failed to fetch workflow state for equipment:', equipmentId, err);
+      setWorkflowState(null);
+      setError('Failed to load selected equipment workflow');
+    } finally {
+      setLoading(false);
+    }
+  }, [workflowStates]);
 
   // Fetch equipment list and workflow states from API
   const fetchDashboardData = useCallback(async () => {
@@ -99,15 +161,86 @@ export function AssetWorkflowDashboard() {
     }
   }, [selectedSiteId]);
 
+  const handleOnboardAsset = useCallback(async () => {
+    if (!selectedEquipment || !selectedSiteId || !selectedSite) return;
+
+    try {
+      setOnboardingSubmitting(true);
+      setOnboardingError(null);
+
+      const storedUser = localStorage.getItem('sentinel_user');
+      let capturedBy = 'operator';
+      if (storedUser) {
+        try {
+          const parsed = JSON.parse(storedUser);
+          capturedBy = parsed?.full_name || parsed?.email || capturedBy;
+        } catch {
+          // ignore parse issues and keep fallback
+        }
+      }
+
+      const payload: WorkflowOnboardAssetRequest = {
+        site_id: selectedSiteId,
+        site_name: selectedSite.name,
+        site_address: (selectedSite as Site & { address?: string }).address || 'N/A',
+        captured_by: capturedBy,
+        notes: onboardingNotes || undefined,
+        equipment: [
+          {
+            equipment_id: selectedEquipment,
+            name: selectedEquipmentItem?.name || selectedEquipment,
+            type: selectedEquipmentItem?.type || 'unknown',
+            serial_number: serialNumber || null,
+            manufacturer: manufacturer || null,
+            model: model || null,
+            age_years: assetAgeYears ? Number(assetAgeYears) : null,
+            service_sheet_ref: serviceSheetRef || null,
+            photo_links: photoLinks
+              ? photoLinks.split(',').map((item) => item.trim()).filter(Boolean)
+              : [],
+          },
+        ],
+      };
+
+      await workflowApi.onboardAsset(payload);
+      await fetchDashboardData();
+      await handleEquipmentSelect(selectedEquipment);
+      setOnboardingOpen(false);
+    } catch (err) {
+      console.error('Failed to onboard asset:', err);
+      setOnboardingError('Failed to onboard asset. Please verify required fields and try again.');
+    } finally {
+      setOnboardingSubmitting(false);
+    }
+  }, [
+    selectedEquipment,
+    selectedEquipmentItem,
+    selectedSiteId,
+    selectedSite,
+    onboardingNotes,
+    serialNumber,
+    manufacturer,
+    model,
+    assetAgeYears,
+    serviceSheetRef,
+    photoLinks,
+    fetchDashboardData,
+    handleEquipmentSelect,
+  ]);
+
   // Fetch sites on mount
   useEffect(() => {
     const fetchSites = async () => {
       try {
         const sitesData = await api.getSites();
         setSites(sitesData);
-        // Auto-select first site if available and no site selected yet
+        // Prefer Sandton City Office Tower (site-002) as default selection.
         if (sitesData.length > 0) {
-          setSelectedSiteId(sitesData[0].id);
+          const preferredSite =
+            sitesData.find((site) => site.id === 'site-002')
+            ?? sitesData.find((site) => /sandton city office tower/i.test(site.name))
+            ?? sitesData[0];
+          setSelectedSiteId(preferredSite.id);
         }
       } catch (err) {
         console.error('Failed to fetch sites:', err);
@@ -125,18 +258,13 @@ export function AssetWorkflowDashboard() {
     }
   }, [selectedSiteId, fetchDashboardData, loadingSites]);
 
-  // When equipment is selected, get its workflow state from the cached data
+  // Keep selected equipment in sync when dashboard payload refreshes.
   useEffect(() => {
     if (selectedEquipment) {
-      setLoading(true);
-      // Use cached workflow state from initial fetch
       const state = workflowStates[selectedEquipment];
       if (state) {
         setWorkflowState(state);
-      } else {
-        setWorkflowState(null);
       }
-      setLoading(false);
     }
   }, [selectedEquipment, workflowStates]);
 
@@ -235,7 +363,7 @@ export function AssetWorkflowDashboard() {
       {/* Error State */}
       {error && (
         <div
-          className="rounded-md p-4 mb-6 flex items-center gap-3"
+          className="rounded-lg p-4 mb-6 flex items-center gap-3"
           style={{
             background: 'rgba(220, 38, 38, 0.1)',
             border: '1px solid rgba(220, 38, 38, 0.3)',
@@ -248,7 +376,7 @@ export function AssetWorkflowDashboard() {
 
       {/* Building Selector */}
       <div
-        className="rounded-md overflow-hidden mb-4"
+        className="rounded-lg overflow-hidden mb-4"
         style={{
           background: 'var(--color-sentinel-bg-panel)',
           border: '1px solid var(--color-sentinel-border)',
@@ -283,7 +411,7 @@ export function AssetWorkflowDashboard() {
                   color: 'var(--color-sentinel-text-secondary)',
                 }}
               >
-                {equipment.length} equipment
+                {priorityEquipment.length} priority equipment
               </span>
             </div>
           </div>
@@ -291,8 +419,133 @@ export function AssetWorkflowDashboard() {
       </div>
 
       {/* Equipment Fleet Panel */}
+      {selectedEquipment && !loading && workflowState && (
+        <div className="mb-6">
+          <EquipmentWorkflowDetail
+            workflowState={workflowState}
+            onBack={() => setSelectedEquipment(null)}
+            maintenanceActive={maintenanceActive}
+          />
+        </div>
+      )}
+      {selectedEquipment && !loading && !workflowState && (
+        <div
+          className="rounded-lg overflow-hidden p-4 mb-6 flex flex-col gap-4"
+          style={{
+            background: 'rgba(245, 158, 11, 0.08)',
+            border: '1px solid rgba(245, 158, 11, 0.3)',
+          }}
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h4 className="text-sm font-medium" style={{ color: 'var(--color-sentinel-amber)' }}>
+                Equipment not onboarded yet
+              </h4>
+              <p className="text-xs mt-1" style={{ color: 'var(--color-sentinel-text-secondary)' }}>
+                {selectedEquipmentItem?.name || selectedEquipment} exists in BMS telemetry, but has no workflow baseline yet.
+                Onboard it to capture asset metadata and initialize health scoring.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setOnboardingOpen((value) => !value)}
+                className="px-3 py-1.5 text-xs rounded transition-colors"
+                style={{
+                  background: 'rgba(59, 130, 246, 0.2)',
+                  border: '1px solid rgba(59, 130, 246, 0.45)',
+                  color: 'var(--color-sentinel-blue)',
+                }}
+              >
+                {onboardingOpen ? 'Hide Onboard Form' : 'Onboard Asset'}
+              </button>
+              <button
+                onClick={() => {
+                  if (selectedEquipment) void handleEquipmentSelect(selectedEquipment);
+                }}
+                className="px-3 py-1.5 text-xs rounded transition-colors"
+                style={{
+                  background: 'var(--color-sentinel-bg-secondary)',
+                  border: '1px solid var(--color-sentinel-border)',
+                  color: 'var(--color-sentinel-text-primary)',
+                }}
+              >
+                Retry
+              </button>
+            </div>
+          </div>
+
+          {onboardingOpen && (
+            <div
+              className="rounded-lg p-4 grid grid-cols-1 md:grid-cols-2 gap-3"
+              style={{
+                background: 'var(--color-sentinel-bg-panel)',
+                border: '1px solid var(--color-sentinel-border)',
+              }}
+            >
+              <div>
+                <label className="text-xs" style={{ color: 'var(--color-sentinel-text-secondary)' }}>Serial Number</label>
+                <input value={serialNumber} onChange={(e) => setSerialNumber(e.target.value)} className="w-full mt-1 rounded-lg px-3 py-2 text-sm" style={{ background: 'var(--color-sentinel-bg-secondary)', border: '1px solid var(--color-sentinel-border)', color: 'var(--color-sentinel-text-primary)' }} />
+              </div>
+              <div>
+                <label className="text-xs" style={{ color: 'var(--color-sentinel-text-secondary)' }}>Asset Age (years)</label>
+                <input value={assetAgeYears} onChange={(e) => setAssetAgeYears(e.target.value)} type="number" min="0" className="w-full mt-1 rounded-lg px-3 py-2 text-sm" style={{ background: 'var(--color-sentinel-bg-secondary)', border: '1px solid var(--color-sentinel-border)', color: 'var(--color-sentinel-text-primary)' }} />
+              </div>
+              <div>
+                <label className="text-xs" style={{ color: 'var(--color-sentinel-text-secondary)' }}>Make / Manufacturer</label>
+                <input value={manufacturer} onChange={(e) => setManufacturer(e.target.value)} className="w-full mt-1 rounded-lg px-3 py-2 text-sm" style={{ background: 'var(--color-sentinel-bg-secondary)', border: '1px solid var(--color-sentinel-border)', color: 'var(--color-sentinel-text-primary)' }} />
+              </div>
+              <div>
+                <label className="text-xs" style={{ color: 'var(--color-sentinel-text-secondary)' }}>Model</label>
+                <input value={model} onChange={(e) => setModel(e.target.value)} className="w-full mt-1 rounded-lg px-3 py-2 text-sm" style={{ background: 'var(--color-sentinel-bg-secondary)', border: '1px solid var(--color-sentinel-border)', color: 'var(--color-sentinel-text-primary)' }} />
+              </div>
+              <div>
+                <label className="text-xs" style={{ color: 'var(--color-sentinel-text-secondary)' }}>Service Sheet Reference / URL</label>
+                <input value={serviceSheetRef} onChange={(e) => setServiceSheetRef(e.target.value)} className="w-full mt-1 rounded-lg px-3 py-2 text-sm" style={{ background: 'var(--color-sentinel-bg-secondary)', border: '1px solid var(--color-sentinel-border)', color: 'var(--color-sentinel-text-primary)' }} />
+              </div>
+              <div>
+                <label className="text-xs" style={{ color: 'var(--color-sentinel-text-secondary)' }}>Photos (comma-separated URLs)</label>
+                <input value={photoLinks} onChange={(e) => setPhotoLinks(e.target.value)} className="w-full mt-1 rounded-lg px-3 py-2 text-sm" style={{ background: 'var(--color-sentinel-bg-secondary)', border: '1px solid var(--color-sentinel-border)', color: 'var(--color-sentinel-text-primary)' }} />
+              </div>
+              <div className="md:col-span-2">
+                <label className="text-xs" style={{ color: 'var(--color-sentinel-text-secondary)' }}>Notes</label>
+                <textarea value={onboardingNotes} onChange={(e) => setOnboardingNotes(e.target.value)} rows={3} className="w-full mt-1 rounded-lg px-3 py-2 text-sm" style={{ background: 'var(--color-sentinel-bg-secondary)', border: '1px solid var(--color-sentinel-border)', color: 'var(--color-sentinel-text-primary)' }} />
+              </div>
+              {onboardingError && (
+                <div className="md:col-span-2 text-xs" style={{ color: 'var(--color-sentinel-red)' }}>
+                  {onboardingError}
+                </div>
+              )}
+              <div className="md:col-span-2 flex justify-end gap-2">
+                <button
+                  onClick={() => setOnboardingOpen(false)}
+                  className="px-3 py-2 text-xs rounded-lg transition-colors"
+                  style={{
+                    background: 'var(--color-sentinel-bg-secondary)',
+                    border: '1px solid var(--color-sentinel-border)',
+                    color: 'var(--color-sentinel-text-primary)',
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => void handleOnboardAsset()}
+                  disabled={onboardingSubmitting}
+                  className="px-3 py-2 text-xs rounded-lg transition-colors disabled:opacity-60"
+                  style={{
+                    background: 'rgba(16, 185, 129, 0.2)',
+                    border: '1px solid rgba(16, 185, 129, 0.45)',
+                    color: 'var(--color-sentinel-green)',
+                  }}
+                >
+                  {onboardingSubmitting ? 'Onboarding...' : 'Submit Onboarding'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
       <div
-        className="rounded-md overflow-hidden mb-6"
+        className="rounded-lg overflow-hidden mb-6"
         style={{
           background: 'var(--color-sentinel-bg-panel)',
           border: '1px solid var(--color-sentinel-border)',
@@ -317,7 +570,7 @@ export function AssetWorkflowDashboard() {
                 color: 'var(--color-sentinel-text-secondary)',
               }}
             >
-              {equipment.length} total
+              {priorityEquipment.length} priority
             </span>
           </div>
           <span
@@ -327,32 +580,36 @@ export function AssetWorkflowDashboard() {
               color: 'var(--color-sentinel-green)',
             }}
           >
-            {equipment.filter(e => e.current_state === 'healthy').length} healthy
+            {priorityEquipment.filter(e => e.current_state === 'healthy').length} healthy
           </span>
         </div>
 
         {/* Equipment Grid */}
         <div className="p-4">
-          {equipment.length === 0 ? (
+          {priorityEquipment.length === 0 ? (
             <div className="text-center py-8">
               <Activity
                 className="h-8 w-8 mx-auto mb-3"
                 style={{ color: 'var(--color-sentinel-text-disabled)' }}
               />
               <p style={{ color: 'var(--color-sentinel-text-secondary)' }}>
-                No equipment found. Equipment will appear here once added to the system.
+                No priority plant found for this site yet.
               </p>
             </div>
           ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {equipment.map((eq) => {
+            {priorityEquipment.map((eq) => {
               const StateIcon = getStateIcon(eq.current_state);
               const isSelected = selectedEquipment === eq.equipment_id;
               return (
-                <div
+                <button
                   key={eq.equipment_id}
-                  className="p-4 rounded-md cursor-pointer transition-all"
+                  type="button"
+                  className="p-4 rounded-lg cursor-pointer transition-all"
+                  aria-label={`Open workflow details for ${eq.name} (${eq.equipment_id})`}
                   style={{
+                    width: '100%',
+                    textAlign: 'left',
                     background: isSelected
                       ? 'var(--color-sentinel-bg-secondary)'
                       : 'var(--color-sentinel-bg-primary)',
@@ -366,7 +623,9 @@ export function AssetWorkflowDashboard() {
                   onMouseLeave={(e) => {
                     if (!isSelected) e.currentTarget.style.borderColor = '';
                   }}
-                  onClick={() => setSelectedEquipment(eq.equipment_id)}
+                  onClick={() => {
+                    void handleEquipmentSelect(eq.equipment_id);
+                  }}
                 >
                   <div className="flex items-center justify-between">
                     <div className="min-w-0">
@@ -390,6 +649,18 @@ export function AssetWorkflowDashboard() {
                       </span>
                     </div>
                     <div className="flex items-center gap-2 ml-3 shrink-0">
+                      {isSelected && (
+                        <span
+                          className="text-[10px] px-2 py-1 rounded-full uppercase tracking-wide"
+                          style={{
+                            background: 'rgba(59, 130, 246, 0.15)',
+                            color: 'var(--color-sentinel-blue)',
+                            border: '1px solid rgba(59, 130, 246, 0.35)',
+                          }}
+                        >
+                          Selected
+                        </span>
+                      )}
                       <span
                         className="text-xs px-2 py-1 rounded-full font-medium flex items-center gap-1.5"
                         style={{
@@ -406,7 +677,7 @@ export function AssetWorkflowDashboard() {
                       />
                     </div>
                   </div>
-                </div>
+                </button>
               );
             })}
           </div>
@@ -430,14 +701,6 @@ export function AssetWorkflowDashboard() {
         </div>
       )}
 
-      {/* Selected Equipment Detail */}
-      {selectedEquipment && !loading && workflowState && (
-        <EquipmentWorkflowDetail
-          workflowState={workflowState}
-          onBack={() => setSelectedEquipment(null)}
-          maintenanceActive={maintenanceActive}
-        />
-      )}
       </div>
       )}
     </div>
@@ -460,7 +723,7 @@ function EquipmentWorkflowDetail({
     <div className="space-y-4">
       {/* Header Panel */}
       <div
-        className="rounded-md overflow-hidden"
+        className="rounded-lg overflow-hidden"
         style={{
           background: 'var(--color-sentinel-bg-panel)',
           border: '1px solid var(--color-sentinel-border)',
@@ -548,7 +811,7 @@ function EquipmentWorkflowDetail({
       {/* Workflow Timeline — maintenance only */}
       {maintenanceActive && (
       <div
-        className="rounded-md overflow-hidden"
+        className="rounded-lg overflow-hidden"
         style={{
           background: 'var(--color-sentinel-bg-panel)',
           border: '1px solid var(--color-sentinel-border)',
@@ -624,7 +887,7 @@ function EquipmentWorkflowDetail({
       {/* ML Prediction */}
       {workflowState.ml_prediction && workflowState.ml_prediction.failure_probability > 0.1 && (
         <div
-          className="rounded-md overflow-hidden"
+          className="rounded-lg overflow-hidden"
           style={{
             background: workflowState.ml_prediction.failure_probability > 0.5
               ? 'linear-gradient(135deg, rgba(220, 38, 38, 0.12) 0%, var(--color-sentinel-bg-panel) 100%)'
@@ -713,7 +976,7 @@ function EquipmentWorkflowDetail({
       {/* Recent Inspection — maintenance only */}
       {maintenanceActive && workflowState.inspection_status && (
         <div
-          className="rounded-md overflow-hidden"
+          className="rounded-lg overflow-hidden"
           style={{
             background: 'var(--color-sentinel-bg-panel)',
             border: '1px solid var(--color-sentinel-border)',
@@ -803,7 +1066,7 @@ function EquipmentWorkflowDetail({
       {/* Active Repairs - Service Feedback — maintenance only */}
       {maintenanceActive && workflowState.active_repairs && workflowState.active_repairs.length > 0 && (
         <div
-          className="rounded-md overflow-hidden"
+          className="rounded-lg overflow-hidden"
           style={{
             background: 'var(--color-sentinel-bg-panel)',
             border: '1px solid var(--color-sentinel-border)',
@@ -830,7 +1093,7 @@ function EquipmentWorkflowDetail({
             {workflowState.active_repairs.map((repair) => (
               <div
                 key={repair.id}
-                className="p-3 rounded-md flex items-center justify-between"
+                className="p-3 rounded-lg flex items-center justify-between"
                 style={{
                   background: 'var(--color-sentinel-bg-secondary)',
                   border: '1px solid var(--color-sentinel-border)',
@@ -891,7 +1154,7 @@ function EquipmentWorkflowDetail({
       {/* Deviation Warning */}
       {workflowState.baseline_summary.deviation_detected && (
         <div
-          className="rounded-md overflow-hidden p-4 flex items-start gap-3"
+          className="rounded-lg overflow-hidden p-4 flex items-start gap-3"
           style={{
             background: 'rgba(245, 158, 11, 0.1)',
             border: '1px solid rgba(245, 158, 11, 0.3)',
@@ -934,7 +1197,7 @@ function StatCard({
 }) {
   return (
     <div
-      className="rounded-md p-4"
+      className="rounded-lg p-4"
       style={{
         background: 'var(--color-sentinel-bg-panel)',
         border: '1px solid var(--color-sentinel-border)',

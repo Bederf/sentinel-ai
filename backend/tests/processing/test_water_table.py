@@ -3,6 +3,7 @@
 Verifies that the processor produces the same results as the original
 inline logic that lived in WaterAggregationService before the refactor.
 """
+
 from __future__ import annotations
 
 from datetime import date
@@ -11,10 +12,10 @@ import pytest
 
 from app.processing.water_table import WaterTableProcessor
 
-
 # ---------------------------------------------------------------------------
 # Fixtures — deterministic fake records
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture()
 def two_meter_zone_records():
@@ -22,7 +23,7 @@ def two_meter_zone_records():
     return [
         {"meter_id": "M1", "zone_id": "Z1", "zone_name": "Zone One", "volume_liters": 100.0, "flow_rate_lpm": 5.0},
         {"meter_id": "M1", "zone_id": "Z1", "zone_name": "Zone One", "volume_liters": 120.0, "flow_rate_lpm": 6.0},
-        {"meter_id": "M2", "zone_id": "Z1", "zone_name": "Zone One", "volume_liters": 50.0,  "flow_rate_lpm": 2.5},
+        {"meter_id": "M2", "zone_id": "Z1", "zone_name": "Zone One", "volume_liters": 50.0, "flow_rate_lpm": 2.5},
     ]
 
 
@@ -43,11 +44,10 @@ def multi_zone_site_records():
 # aggregate_zone_records
 # ---------------------------------------------------------------------------
 
+
 class TestAggregateZoneRecords:
     def test_empty_returns_zero_totals(self):
-        result = WaterTableProcessor.aggregate_zone_records(
-            "Z1", [], date(2026, 1, 1), date(2026, 1, 31)
-        )
+        result = WaterTableProcessor.aggregate_zone_records("Z1", [], date(2026, 1, 1), date(2026, 1, 31))
         assert result["total_liters"] == 0
         assert result["meter_count"] == 0
         assert result["meters"] == []
@@ -105,6 +105,7 @@ class TestAggregateZoneRecords:
 # aggregate_floor_records
 # ---------------------------------------------------------------------------
 
+
 class TestAggregateFloorRecords:
     def test_filters_to_l1_only(self, multi_zone_site_records):
         result = WaterTableProcessor.aggregate_floor_records(
@@ -141,6 +142,7 @@ class TestAggregateFloorRecords:
 # rank_top_zones
 # ---------------------------------------------------------------------------
 
+
 class TestRankTopZones:
     def test_ranked_by_volume_desc(self, multi_zone_site_records):
         result = WaterTableProcessor.rank_top_zones(multi_zone_site_records, limit=10, days=30)
@@ -165,7 +167,7 @@ class TestRankTopZones:
     def test_rows_without_zone_id_ignored(self):
         records = [
             {"meter_id": "M1", "zone_id": None, "volume_liters": 999.0, "flow_rate_lpm": 1.0},
-            {"meter_id": "M1", "zone_id": "Z1", "volume_liters": 50.0,  "flow_rate_lpm": 1.0},
+            {"meter_id": "M1", "zone_id": "Z1", "volume_liters": 50.0, "flow_rate_lpm": 1.0},
         ]
         result = WaterTableProcessor.rank_top_zones(records, limit=10, days=30)
         assert len(result) == 1
@@ -176,6 +178,7 @@ class TestRankTopZones:
 # build_zone_trend
 # ---------------------------------------------------------------------------
 
+
 class TestBuildZoneTrend:
     def test_empty_returns_zero_trend(self):
         result = WaterTableProcessor.build_zone_trend("Z1", [], 7)
@@ -185,9 +188,27 @@ class TestBuildZoneTrend:
 
     def test_groups_by_date(self):
         records = [
-            {"timestamp": "2026-01-01T08:00:00", "zone_id": "Z1", "zone_name": "Z", "volume_liters": 10.0, "flow_rate_lpm": 1.0},
-            {"timestamp": "2026-01-01T14:00:00", "zone_id": "Z1", "zone_name": "Z", "volume_liters": 12.0, "flow_rate_lpm": 1.2},
-            {"timestamp": "2026-01-02T09:00:00", "zone_id": "Z1", "zone_name": "Z", "volume_liters": 8.0,  "flow_rate_lpm": 0.8},
+            {
+                "timestamp": "2026-01-01T08:00:00",
+                "zone_id": "Z1",
+                "zone_name": "Z",
+                "volume_liters": 10.0,
+                "flow_rate_lpm": 1.0,
+            },
+            {
+                "timestamp": "2026-01-01T14:00:00",
+                "zone_id": "Z1",
+                "zone_name": "Z",
+                "volume_liters": 12.0,
+                "flow_rate_lpm": 1.2,
+            },
+            {
+                "timestamp": "2026-01-02T09:00:00",
+                "zone_id": "Z1",
+                "zone_name": "Z",
+                "volume_liters": 8.0,
+                "flow_rate_lpm": 0.8,
+            },
         ]
         result = WaterTableProcessor.build_zone_trend("Z1", records, 7)
         dates = [d["date"] for d in result["data"]]
@@ -197,9 +218,27 @@ class TestBuildZoneTrend:
 
     def test_data_sorted_ascending(self):
         records = [
-            {"timestamp": "2026-01-03T08:00:00", "zone_id": "Z1", "zone_name": "Z", "volume_liters": 5.0, "flow_rate_lpm": 1.0},
-            {"timestamp": "2026-01-01T08:00:00", "zone_id": "Z1", "zone_name": "Z", "volume_liters": 10.0, "flow_rate_lpm": 1.0},
-            {"timestamp": "2026-01-02T08:00:00", "zone_id": "Z1", "zone_name": "Z", "volume_liters": 8.0,  "flow_rate_lpm": 1.0},
+            {
+                "timestamp": "2026-01-03T08:00:00",
+                "zone_id": "Z1",
+                "zone_name": "Z",
+                "volume_liters": 5.0,
+                "flow_rate_lpm": 1.0,
+            },
+            {
+                "timestamp": "2026-01-01T08:00:00",
+                "zone_id": "Z1",
+                "zone_name": "Z",
+                "volume_liters": 10.0,
+                "flow_rate_lpm": 1.0,
+            },
+            {
+                "timestamp": "2026-01-02T08:00:00",
+                "zone_id": "Z1",
+                "zone_name": "Z",
+                "volume_liters": 8.0,
+                "flow_rate_lpm": 1.0,
+            },
         ]
         result = WaterTableProcessor.build_zone_trend("Z1", records, 7)
         dates = [d["date"] for d in result["data"]]
@@ -207,8 +246,20 @@ class TestBuildZoneTrend:
 
     def test_average_daily_liters(self):
         records = [
-            {"timestamp": "2026-01-01T08:00:00", "zone_id": "Z1", "zone_name": "Z", "volume_liters": 10.0, "flow_rate_lpm": 1.0},
-            {"timestamp": "2026-01-02T08:00:00", "zone_id": "Z1", "zone_name": "Z", "volume_liters": 20.0, "flow_rate_lpm": 1.0},
+            {
+                "timestamp": "2026-01-01T08:00:00",
+                "zone_id": "Z1",
+                "zone_name": "Z",
+                "volume_liters": 10.0,
+                "flow_rate_lpm": 1.0,
+            },
+            {
+                "timestamp": "2026-01-02T08:00:00",
+                "zone_id": "Z1",
+                "zone_name": "Z",
+                "volume_liters": 20.0,
+                "flow_rate_lpm": 1.0,
+            },
         ]
         result = WaterTableProcessor.build_zone_trend("Z1", records, 7)
         assert result["average_daily_liters"] == pytest.approx(15.0, abs=0.01)
@@ -218,11 +269,14 @@ class TestBuildZoneTrend:
 # compare_zone_vs_building
 # ---------------------------------------------------------------------------
 
+
 class TestCompareZoneVsBuilding:
     def test_above_threshold(self):
         # Zone avg = 20 L/day, building avg = 10 L/day → 100% above
         result = WaterTableProcessor.compare_zone_vs_building(
-            "Z1", "Zone One", "S1",
+            "Z1",
+            "Zone One",
+            "S1",
             zone_liters=200.0,
             building_volumes=[0.0, 100.0],  # max-min = 100 over 10 days
             days=10,
@@ -232,7 +286,9 @@ class TestCompareZoneVsBuilding:
 
     def test_below_threshold(self):
         result = WaterTableProcessor.compare_zone_vs_building(
-            "Z1", "Zone One", "S1",
+            "Z1",
+            "Zone One",
+            "S1",
             zone_liters=5.0,
             building_volumes=[0.0, 1000.0],
             days=10,
@@ -242,7 +298,9 @@ class TestCompareZoneVsBuilding:
     def test_at_average(self):
         # Zone = 100 L in 10 days = 10 L/day; building also 100 L → same
         result = WaterTableProcessor.compare_zone_vs_building(
-            "Z1", "Zone One", "S1",
+            "Z1",
+            "Zone One",
+            "S1",
             zone_liters=100.0,
             building_volumes=[0.0, 100.0],
             days=10,
@@ -251,7 +309,9 @@ class TestCompareZoneVsBuilding:
 
     def test_empty_building_volumes(self):
         result = WaterTableProcessor.compare_zone_vs_building(
-            "Z1", "Zone One", "S1",
+            "Z1",
+            "Zone One",
+            "S1",
             zone_liters=50.0,
             building_volumes=[],
             days=10,
@@ -264,20 +324,24 @@ class TestCompareZoneVsBuilding:
 # zone_is_on_floor
 # ---------------------------------------------------------------------------
 
+
 class TestZoneIsOnFloor:
-    @pytest.mark.parametrize("zone_id,floor,expected", [
-        ("50",    "L0",      True),
-        ("50",    "001-099", True),
-        ("99",    "L0",      True),
-        ("100",   "L0",      False),
-        ("100",   "L1",      True),
-        ("199",   "L1",      True),
-        ("200",   "L1",      False),
-        ("200",   "L2",      True),
-        ("L1-A",  "L1",      True),
-        ("L2-B",  "L1",      False),
-        (None,    "L1",      False),
-        ("abc",   "L1",      False),
-    ])
+    @pytest.mark.parametrize(
+        "zone_id,floor,expected",
+        [
+            ("50", "L0", True),
+            ("50", "001-099", True),
+            ("99", "L0", True),
+            ("100", "L0", False),
+            ("100", "L1", True),
+            ("199", "L1", True),
+            ("200", "L1", False),
+            ("200", "L2", True),
+            ("L1-A", "L1", True),
+            ("L2-B", "L1", False),
+            (None, "L1", False),
+            ("abc", "L1", False),
+        ],
+    )
     def test_floor_classification(self, zone_id, floor, expected):
         assert WaterTableProcessor.zone_is_on_floor(zone_id, floor) is expected

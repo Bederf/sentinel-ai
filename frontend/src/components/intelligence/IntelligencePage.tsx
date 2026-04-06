@@ -6,12 +6,29 @@
  * live building context only.
  */
 
-import { useMemo } from "react";
-import { Building2, Radar, ShieldAlert } from "lucide-react";
-import { ConciergeDashboardPage } from "./ConciergeDashboardPage";
+import { Suspense, lazy, useMemo } from "react";
+import { Building2, Lock, Radar, ShieldAlert } from "lucide-react";
 import { BuildingSelector } from "../BuildingSelector";
 import { useBuildingsList } from "../../hooks/useBuildingsList";
 import { setStoredSelectedSite } from "../../lib/siteSelection";
+import { phaseAllows, PHASE_LABELS } from "../../lib/onboardingPhase";
+
+const ConciergeDashboardPage = lazy(() =>
+  import("./ConciergeDashboardPage").then((module) => ({ default: module.ConciergeDashboardPage })),
+);
+
+function ConciergeLoadingState() {
+  return (
+    <div className="flex h-full items-center justify-center">
+      <div
+        className="text-sm"
+        style={{ color: "var(--color-grafana-text-secondary)" }}
+      >
+        Loading concierge intelligence...
+      </div>
+    </div>
+  );
+}
 
 export function IntelligencePage({ siteId }: { siteId?: string }) {
   const { data: buildings = [] } = useBuildingsList();
@@ -87,11 +104,39 @@ export function IntelligencePage({ siteId }: { siteId?: string }) {
         </div>
 
         <div className="min-h-0 flex-1">
-          <ConciergeDashboardPage
-            siteId={selectedSiteId || undefined}
-            siteLabel={selectedBuilding?.name}
-            showHeader={false}
-          />
+          {phaseAllows(selectedBuilding?.onboarding_phase, "concierge_dashboard") ? (
+            <Suspense fallback={<ConciergeLoadingState />}>
+              <ConciergeDashboardPage
+                siteId={selectedSiteId || undefined}
+                siteLabel={selectedBuilding?.name}
+                showHeader={false}
+              />
+            </Suspense>
+          ) : (
+            <div className="flex h-full items-center justify-center">
+              <div className="flex flex-col items-center gap-3 text-center">
+                <Lock
+                  className="h-8 w-8"
+                  style={{ color: "var(--color-grafana-text-disabled)" }}
+                />
+                <p
+                  className="text-sm font-medium"
+                  style={{ color: "var(--color-grafana-text-secondary)" }}
+                >
+                  Concierge dashboard requires advisory phase or above.
+                </p>
+                <p
+                  className="text-xs"
+                  style={{ color: "var(--color-grafana-text-disabled)" }}
+                >
+                  Current phase:{" "}
+                  <span style={{ color: "var(--color-grafana-text-secondary)" }}>
+                    {PHASE_LABELS[selectedBuilding?.onboarding_phase ?? "shadow"]}
+                  </span>
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       </section>
     </div>

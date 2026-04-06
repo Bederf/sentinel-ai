@@ -15,17 +15,17 @@ import json
 import logging
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict, List, Optional, Any
+from typing import Any, Optional
 
 from app.models.data_quality import (
-    DataQualityLevel,
-    DataGap,
-    SensorHealth,
-    EquipmentDataQuality,
     BuildingDataQualityReport,
+    DataGap,
+    DataQualityLevel,
+    EquipmentDataQuality,
+    SensorHealth,
     TrainingReadiness,
 )
-from app.services.influxdb_service import get_influxdb_service, InfluxDBService
+from app.services.influxdb_service import InfluxDBService, get_influxdb_service
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +44,7 @@ class DataQualityService:
     EXPECTED_READINGS_PER_DAY = 1440
 
     # Sensor types tracked per equipment type
-    EQUIPMENT_SENSORS: Dict[str, List[str]] = {
+    EQUIPMENT_SENSORS: dict[str, list[str]] = {
         "chiller": [
             "temperature",
             "chw_supply_temp",
@@ -80,16 +80,16 @@ class DataQualityService:
     # Default sensors for unknown equipment types
     DEFAULT_SENSORS = ["temperature", "current", "power"]
 
-    def __init__(self, influxdb_service: Optional[InfluxDBService] = None):
+    def __init__(self, influxdb_service: InfluxDBService | None = None):
         """Initialize the data quality service.
 
         Args:
             influxdb_service: InfluxDB service instance (default: singleton)
         """
         self._influxdb = influxdb_service or get_influxdb_service()
-        self._equipment_cache: Dict[str, Any] = {}
+        self._equipment_cache: dict[str, Any] = {}
         self._cache_ttl = timedelta(minutes=5)
-        self._cache_timestamps: Dict[str, datetime] = {}
+        self._cache_timestamps: dict[str, datetime] = {}
 
     def get_equipment_quality(
         self,
@@ -113,7 +113,7 @@ class DataQualityService:
         sensor_types = self.EQUIPMENT_SENSORS.get(equipment_type.lower(), self.DEFAULT_SENSORS)
 
         start = datetime.utcnow() - timedelta(hours=lookback_hours)
-        sensor_health_list: List[SensorHealth] = []
+        sensor_health_list: list[SensorHealth] = []
 
         total_expected = 0
         total_actual = 0
@@ -215,9 +215,9 @@ class DataQualityService:
         self,
         equipment_id: str,
         sensor_type: str,
-        readings: List[Any],
+        readings: list[Any],
         gap_threshold_minutes: int = 5,
-    ) -> List[DataGap]:
+    ) -> list[DataGap]:
         """Detect data gaps in sensor readings.
 
         A gap is detected when the interval between consecutive readings
@@ -235,7 +235,7 @@ class DataQualityService:
         if len(readings) < 2:
             return []
 
-        gaps: List[DataGap] = []
+        gaps: list[DataGap] = []
         threshold = timedelta(minutes=gap_threshold_minutes)
 
         # Sort readings by timestamp
@@ -283,7 +283,7 @@ class DataQualityService:
         equipment_id: str,
         equipment_type: str = "unknown",
         lookback_hours: int = 24,
-    ) -> List[DataGap]:
+    ) -> list[DataGap]:
         """Get all data gaps for an equipment.
 
         Args:
@@ -300,7 +300,7 @@ class DataQualityService:
             lookback_hours=lookback_hours,
         )
 
-        all_gaps: List[DataGap] = []
+        all_gaps: list[DataGap] = []
         for sensor_health in quality.sensor_health:
             all_gaps.extend(sensor_health.gaps)
 
@@ -312,7 +312,7 @@ class DataQualityService:
         self,
         site_id: str,
         site_name: str = "",
-        equipment_list: Optional[List[Dict[str, str]]] = None,
+        equipment_list: list[dict[str, str]] | None = None,
     ) -> BuildingDataQualityReport:
         """Generate a daily data quality report for a building.
 
@@ -328,7 +328,7 @@ class DataQualityService:
         if equipment_list is None:
             equipment_list = self._load_equipment_for_site(site_id)
 
-        equipment_quality_list: List[EquipmentDataQuality] = []
+        equipment_quality_list: list[EquipmentDataQuality] = []
         total_score = 0.0
 
         for eq in equipment_list:
@@ -361,14 +361,14 @@ class DataQualityService:
         )
 
     # Mode-specific training readiness thresholds (Phase 109-03)
-    MODE_TRAINING_THRESHOLDS: Dict[str, Dict[str, Any]] = {
+    MODE_TRAINING_THRESHOLDS: dict[str, dict[str, Any]] = {
         "live_control": {"min_quality": 0.85, "min_days": 180, "min_equipment": 5},
         "shadow_live": {"min_quality": 0.75, "min_days": 120, "min_equipment": 3},
         "simulation": {"min_quality": 0.50, "min_days": 30, "min_equipment": 1},
     }
 
     # Mode-specific mock days of data (Phase 109-03: replaces hardcoded 30)
-    MODE_MOCK_DAYS: Dict[str, int] = {
+    MODE_MOCK_DAYS: dict[str, int] = {
         "live_control": 200,
         "shadow_live": 90,
         "simulation": 30,
@@ -380,7 +380,7 @@ class DataQualityService:
         minimum_equipment: int = 5,
         minimum_days: int = 30,
         minimum_quality_score: float = 80.0,
-        mode: Optional[str] = None,
+        mode: str | None = None,
     ) -> TrainingReadiness:
         """Check if sufficient data exists to train ML models.
 
@@ -446,9 +446,9 @@ class DataQualityService:
         days_of_data = self.MODE_MOCK_DAYS.get(resolved_mode, 30)
 
         # Determine readiness
-        issues: List[str] = []
-        recommendations: List[str] = []
-        gaps: List[str] = []
+        issues: list[str] = []
+        recommendations: list[str] = []
+        gaps: list[str] = []
 
         if total_equipment < minimum_equipment:
             issues.append(f"Insufficient equipment: {total_equipment}/{minimum_equipment} required")
@@ -513,7 +513,7 @@ class DataQualityService:
 
         return (eq_score * 0.3) + (quality_score * 0.4) + (days_score * 0.3)
 
-    def _load_equipment_for_site(self, site_id: str) -> List[Dict[str, str]]:
+    def _load_equipment_for_site(self, site_id: str) -> list[dict[str, str]]:
         """Load equipment list for a building from equipment.json.
 
         Args:
@@ -524,7 +524,7 @@ class DataQualityService:
         """
         try:
             equipment_path = Path(__file__).parent.parent / "data" / "equipment.json"
-            with open(equipment_path, "r") as f:
+            with open(equipment_path) as f:
                 all_equipment = json.load(f)
 
             # Filter by site_id (site_id in equipment.json)
@@ -537,7 +537,7 @@ class DataQualityService:
             logger.warning(f"Failed to load equipment for building {site_id}: {e}")
             return []
 
-    def _load_equipment_by_type(self, equipment_type: str) -> List[Dict[str, str]]:
+    def _load_equipment_by_type(self, equipment_type: str) -> list[dict[str, str]]:
         """Load all equipment of a specific type.
 
         Args:
@@ -548,7 +548,7 @@ class DataQualityService:
         """
         try:
             equipment_path = Path(__file__).parent.parent / "data" / "equipment.json"
-            with open(equipment_path, "r") as f:
+            with open(equipment_path) as f:
                 all_equipment = json.load(f)
 
             return [

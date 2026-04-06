@@ -10,14 +10,25 @@ from pathlib import Path
 from typing import Any, Dict
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import BaseModel
 
 from app.models.auth import AuthContext
+from app.middleware.auth_middleware import require_site_access
 from app.security.audit_events import audit_config_change
 from app.security.pipeline import require_role
+from app.services.site_ai_policy_service import get_site_ai_policy, set_site_ai_policy
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+class SiteAiPolicyUpdate(BaseModel):
+    """Site-scoped AI policy update payload."""
+
+    chat_local_ai_only: bool
+    allow_tool_calling: bool
+    show_recommendations_in_shadow: bool
+
+
 
 # Path to settings data file
 DATA_DIR = Path(__file__).parent.parent / "data"
@@ -348,35 +359,24 @@ async def toggle_ml_training(
     }
 
 
-@router.get("/settings/simulation")
-async def get_simulation_settings(auth: AuthContext = Depends(require_role(1))) -> Dict[str, Any]:
-    """Get simulation auto-start settings. Requires AUDITOR (level 1)."""
-    settings_data = load_settings()
-    return {
-        "stopped": settings_data.get("simulationStopped", False),
-    }
+@router.get("/settings/ai-policy/{site_id}")
+async def get_site_ai_policy_settings(
+    site_id: str,
+    auth: AuthContext = Depends(require_site_access("site_id")),
+) -> Dict[str, Any]:
+    """Get site-scoped AI runtime policy. Requires site access."""
+    return get_site_ai_policy(site_id)
 
 
-@router.put("/settings/simulation")
-async def update_simulation_settings(
-    body: Dict[str, Any],
+@router.put("/settings/ai-policy/{site_id}")
+async def update_site_ai_policy_settings(
+    site_id: str,
+    payload: SiteAiPolicyUpdate,
     request: Request,
     auth: AuthContext = Depends(require_role(4)),
 ) -> Dict[str, Any]:
-    """Update simulation stopped state. Requires ADMIN (level 4).
-
-    When simulationStopped=true, the simulation will NOT auto-start on service restart.
-    """
-    stopped = bool(body.get("stopped", False))
-
-    current_settings = load_settings()
-    current_settings["simulationStopped"] = stopped
-    save_settings(current_settings)
-
+    """Update site-scoped AI runtime policy. Requires ADMIN."""
+    stored = set_site_ai_policy(site_id, payload.model_dump())
     source_ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else None)
-    audit_config_change("settings.simulation", user=auth.user_id, source_ip=source_ip)
-
-    return {
-        "stopped": stopped,
-        "message": "Simulation will " + ("not auto-start" if stopped else "auto-start") + " on next service restart.",
-    }
+    audit_config_change(f"settings.ai-policy.{site_id}", user=auth.user_id, source_ip=source_ip)
+    return stored

@@ -12,7 +12,7 @@ import logging
 import os
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +23,7 @@ _DATABASE_URL = os.getenv(
 )
 
 
-def _parse_model_row(model_id: str, entry: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+def _parse_model_row(model_id: str, entry: dict[str, Any]) -> dict[str, Any] | None:
     """Map a registry.json entry to an ml_models table row."""
     metrics = entry.get("metrics") or {}
     metadata = entry.get("metadata") or {}
@@ -35,11 +35,7 @@ def _parse_model_row(model_id: str, entry: Dict[str, Any]) -> Optional[Dict[str,
     r2_avg = metrics.get("r_squared_avg") or metrics.get("r2_avg") or metrics.get("r2")
 
     # Feature names — stored as list in metadata under several keys
-    feature_names = (
-        metadata.get("feature_names")
-        or metadata.get("feature_cols")
-        or []
-    )
+    feature_names = metadata.get("feature_names") or metadata.get("feature_cols") or []
 
     registered_at = entry.get("registered_at") or metadata.get("trained_at")
     if registered_at and isinstance(registered_at, str):
@@ -68,7 +64,7 @@ def _parse_model_row(model_id: str, entry: Dict[str, Any]) -> Optional[Dict[str,
     }
 
 
-def sync_registry_to_db(registry_path: Path = _REGISTRY_PATH) -> Dict[str, int]:
+def sync_registry_to_db(registry_path: Path = _REGISTRY_PATH) -> dict[str, int]:
     """
     Upsert all models from registry.json into the ml_models table.
 

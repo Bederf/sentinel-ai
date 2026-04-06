@@ -2,7 +2,7 @@
 
 Supports:
   - Modbus TCP register reads (holding registers)
-  - Simulated data for demo (bell-curve solar, TOU BESS dispatch)
+  - Simulated data for local seeded mode (bell-curve solar, TOU BESS dispatch)
 
 Register maps sourced from Huawei SUN2000-100KTL-M2 Modbus Interface Definition.
 """
@@ -10,18 +10,17 @@ Register maps sourced from Huawei SUN2000-100KTL-M2 Modbus Interface Definition.
 import logging
 import math
 import random
-from datetime import datetime, timezone
-from typing import Dict, List, Optional
+from datetime import UTC, datetime
 
 from app.models.solar import (
-    SolarInverter,
-    SolarString,
     BESSContainer,
+    ConnectorStatus,
+    DataSource,
     GridMeter,
     NormalisedReading,
-    ConnectorStatus,
     QualityFlag,
-    DataSource,
+    SolarInverter,
+    SolarString,
 )
 from app.services.solar_connector_base import SolarConnector
 
@@ -29,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 
 # === Huawei SUN2000 Modbus Register Map (Holding Registers) ===
-HUAWEI_SUN2000_REGISTERS: Dict[str, tuple] = {
+HUAWEI_SUN2000_REGISTERS: dict[str, tuple] = {
     # (address, count, type, scale_factor, unit)
     "model": (30000, 15, "str", 1, ""),
     "serial": (30015, 10, "str", 1, ""),
@@ -53,7 +52,7 @@ HUAWEI_SUN2000_REGISTERS: Dict[str, tuple] = {
 }
 
 # === Huawei LUNA2000 BESS Registers ===
-HUAWEI_LUNA2000_REGISTERS: Dict[str, tuple] = {
+HUAWEI_LUNA2000_REGISTERS: dict[str, tuple] = {
     "soc": (37004, 1, "u16", 10, "%"),
     "soh": (37760, 1, "u16", 10, "%"),
     "charge_power": (37001, 2, "i32", 1000, "kW"),
@@ -111,7 +110,7 @@ def _bess_mode_for_hour(hour: float) -> str:
 
 
 class SimulatedHuaweiConnector(SolarConnector):
-    """Generates realistic Huawei SUN2000 + LUNA2000 data for demo.
+    """Generates realistic Huawei SUN2000 + LUNA2000 data for local seeded mode.
 
     Solar power follows a bell curve for JHB latitude.  BESS follows
     TOU dispatch.  Temperature correlates with ambient + load.
@@ -120,21 +119,21 @@ class SimulatedHuaweiConnector(SolarConnector):
 
     def __init__(
         self,
-        inverters: List[Dict],
-        bess: Optional[Dict] = None,
-        meters: Optional[List[Dict]] = None,
+        inverters: list[dict],
+        bess: dict | None = None,
+        meters: list[dict] | None = None,
     ):
         super().__init__(manufacturer="huawei", protocol="modbus_tcp")
         self._inverter_configs = {inv["id"]: inv for inv in inverters}
         self._bess_config = bess
         self._meter_configs = {m["meter_id"]: m for m in (meters or [])}
-        self._inverter_state: Dict[str, SolarInverter] = {}
-        self._bess_state: Optional[BESSContainer] = None
+        self._inverter_state: dict[str, SolarInverter] = {}
+        self._bess_state: BESSContainer | None = None
 
     async def connect(self) -> bool:
         self._status = ConnectorStatus(
             connected=True,
-            last_poll=datetime.now(timezone.utc).isoformat(),
+            last_poll=datetime.now(UTC).isoformat(),
             error_count=0,
         )
         logger.info(f"Huawei simulated connector online — {len(self._inverter_configs)} inverters")
@@ -144,12 +143,12 @@ class SimulatedHuaweiConnector(SolarConnector):
         self._status.connected = False
         logger.info("Huawei simulated connector disconnected")
 
-    async def read_inverter(self, inverter_id: str) -> Optional[SolarInverter]:
+    async def read_inverter(self, inverter_id: str) -> SolarInverter | None:
         cfg = self._inverter_configs.get(inverter_id)
         if not cfg:
             return None
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         # SAST = UTC+2
         sast_hour = (now.hour + 2) % 24 + now.minute / 60.0
         solar_factor = _solar_power_factor(sast_hour)
@@ -208,12 +207,12 @@ class SimulatedHuaweiConnector(SolarConnector):
         self._inverter_state[inverter_id] = inv
         return inv
 
-    async def read_all_strings(self, inverter_id: str) -> List[SolarString]:
+    async def read_all_strings(self, inverter_id: str) -> list[SolarString]:
         cfg = self._inverter_configs.get(inverter_id)
         if not cfg:
             return []
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         sast_hour = (now.hour + 2) % 24 + now.minute / 60.0
         solar_factor = _solar_power_factor(sast_hour)
 
@@ -255,11 +254,11 @@ class SimulatedHuaweiConnector(SolarConnector):
                 )
         return strings
 
-    async def read_bess(self, container_id: str) -> Optional[BESSContainer]:
+    async def read_bess(self, container_id: str) -> BESSContainer | None:
         if not self._bess_config:
             return None
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         sast_hour = (now.hour + 2) % 24 + now.minute / 60.0
         mode = _bess_mode_for_hour(sast_hour)
 
@@ -309,12 +308,12 @@ class SimulatedHuaweiConnector(SolarConnector):
         self._bess_state = container
         return container
 
-    async def read_meter(self, meter_id: str) -> Optional[GridMeter]:
+    async def read_meter(self, meter_id: str) -> GridMeter | None:
         cfg = self._meter_configs.get(meter_id)
         if not cfg:
             return None
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         sast_hour = (now.hour + 2) % 24 + now.minute / 60.0
         solar_factor = _solar_power_factor(sast_hour)
 
@@ -350,9 +349,9 @@ class SimulatedHuaweiConnector(SolarConnector):
             daily_export_kwh=round(export_kw * max(0, sast_hour - 9) * 0.3, 0),
         )
 
-    async def get_normalised_readings(self) -> List[NormalisedReading]:
-        readings: List[NormalisedReading] = []
-        now = datetime.now(timezone.utc).isoformat()
+    async def get_normalised_readings(self) -> list[NormalisedReading]:
+        readings: list[NormalisedReading] = []
+        now = datetime.now(UTC).isoformat()
 
         # Inverter readings
         for inv_id in self._inverter_configs:
@@ -475,9 +474,9 @@ class RealHuaweiConnector(SolarConnector):
 
     def __init__(
         self,
-        inverters: List[Dict],
-        bess: Optional[Dict] = None,
-        meters: Optional[List[Dict]] = None,
+        inverters: list[dict],
+        bess: dict | None = None,
+        meters: list[dict] | None = None,
     ):
         super().__init__(manufacturer="huawei", protocol="modbus_tcp")
         self._inverter_configs = {inv["id"]: inv for inv in inverters}
@@ -507,7 +506,7 @@ class RealHuaweiConnector(SolarConnector):
             connected = await self._client.connect()
             self._status = ConnectorStatus(
                 connected=connected,
-                last_poll=datetime.now(timezone.utc).isoformat(),
+                last_poll=datetime.now(UTC).isoformat(),
                 error_count=0 if connected else 1,
             )
             if connected:
@@ -528,7 +527,7 @@ class RealHuaweiConnector(SolarConnector):
         self._status.connected = False
         logger.info("RealHuaweiConnector disconnected")
 
-    async def _read_registers(self, address: int, count: int, unit_id: int = 1) -> Optional[List[int]]:
+    async def _read_registers(self, address: int, count: int, unit_id: int = 1) -> list[int] | None:
         """Read holding registers from Modbus device."""
         if not self._client or not self._status.connected:
             return None
@@ -549,7 +548,7 @@ class RealHuaweiConnector(SolarConnector):
             return None
 
     @staticmethod
-    def _decode_register(raw: List[int], reg_type: str, scale: float) -> Optional[float]:
+    def _decode_register(raw: list[int], reg_type: str, scale: float) -> float | None:
         """Decode raw register values based on type and scale.
 
         Handles: u16, i16, u32, i32, str (returns None for str type).
@@ -580,7 +579,7 @@ class RealHuaweiConnector(SolarConnector):
         return value / scale if scale != 0 else float(value)
 
     @staticmethod
-    def _decode_string(raw: List[int], count: int) -> str:
+    def _decode_string(raw: list[int], count: int) -> str:
         """Decode Modbus registers as ASCII string."""
         if not raw:
             return ""
@@ -590,14 +589,14 @@ class RealHuaweiConnector(SolarConnector):
             chars.append(chr(reg & 0xFF))
         return "".join(chars).rstrip("\x00").strip()
 
-    async def read_inverter(self, inverter_id: str) -> Optional[SolarInverter]:
+    async def read_inverter(self, inverter_id: str) -> SolarInverter | None:
         """Read inverter state from real Modbus registers."""
         cfg = self._inverter_configs.get(inverter_id)
         if not cfg:
             return None
 
         unit_id = cfg.get("unit_id", 1)
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Read key registers
         reads = {}
@@ -643,7 +642,7 @@ class RealHuaweiConnector(SolarConnector):
             last_poll=now.isoformat(),
         )
 
-    async def read_all_strings(self, inverter_id: str) -> List[SolarString]:
+    async def read_all_strings(self, inverter_id: str) -> list[SolarString]:
         """Read PV string data from real Modbus registers.
 
         Only PV1/PV2 registers are defined in the map; returns available strings.
@@ -686,7 +685,7 @@ class RealHuaweiConnector(SolarConnector):
 
         return strings
 
-    async def read_bess(self, container_id: str) -> Optional[BESSContainer]:
+    async def read_bess(self, container_id: str) -> BESSContainer | None:
         """Read BESS state from real LUNA2000 Modbus registers."""
         if not self._bess_config:
             return None
@@ -694,7 +693,7 @@ class RealHuaweiConnector(SolarConnector):
         from app.config.settings import settings
 
         unit_id = settings.modbus_bess_unit_id
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         cfg = self._bess_config
 
         reads = {}
@@ -742,7 +741,7 @@ class RealHuaweiConnector(SolarConnector):
             last_poll=now.isoformat(),
         )
 
-    async def read_meter(self, meter_id: str) -> Optional[GridMeter]:
+    async def read_meter(self, meter_id: str) -> GridMeter | None:
         """Read grid meter — not yet implemented for real Modbus.
 
         Returns None; grid meters typically use Schneider PM8000
@@ -750,10 +749,10 @@ class RealHuaweiConnector(SolarConnector):
         """
         return None
 
-    async def get_normalised_readings(self) -> List[NormalisedReading]:
+    async def get_normalised_readings(self) -> list[NormalisedReading]:
         """Poll all registered equipment and return normalised readings."""
-        readings: List[NormalisedReading] = []
-        now = datetime.now(timezone.utc).isoformat()
+        readings: list[NormalisedReading] = []
+        now = datetime.now(UTC).isoformat()
 
         for inv_id in self._inverter_configs:
             inv = await self.read_inverter(inv_id)

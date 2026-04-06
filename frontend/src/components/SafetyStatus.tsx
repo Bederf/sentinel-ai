@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Title, Text, Badge, Button, Grid, Select, SelectItem } from '@tremor/react';
+import { Card, Title, Text, Badge, Button, Grid } from '@tremor/react';
 import { SafetyIndicator } from './SafetyIndicator';
 import type { SafetyStatus } from './SafetyIndicator';
 import api from '@/lib/api';
@@ -142,17 +142,25 @@ export const SafetyStatusPanel: React.FC<SafetyStatusPanelProps> = ({
         </div>
 
         <div className="flex items-center gap-3">
-          <Select
+          <select
             value={filterStatus}
-            onValueChange={setFilterStatus}
-            className="min-w-[120px]"
+            onChange={(event) => setFilterStatus(event.target.value)}
+            className="min-w-[120px] rounded-md appearance-none cursor-pointer px-3 py-2 text-sm transition-colors focus:outline-none focus:ring-0"
+            style={{
+              background: "var(--color-grafana-bg-secondary)",
+              border: "1px solid var(--color-grafana-border)",
+              color: "var(--color-grafana-text-primary)",
+              boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)",
+              outline: "none",
+            }}
+            aria-label="Filter safety status"
           >
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="safe">Safe Only</SelectItem>
-            <SelectItem value="warning">Warnings</SelectItem>
-            <SelectItem value="blocked">Blocked</SelectItem>
-            <SelectItem value="alarm">Alarms</SelectItem>
-          </Select>
+            <option value="all">All Status</option>
+            <option value="safe">Safe Only</option>
+            <option value="warning">Warnings</option>
+            <option value="blocked">Blocked</option>
+            <option value="alarm">Alarms</option>
+          </select>
 
           <Button
             size="xs"

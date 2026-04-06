@@ -12,7 +12,6 @@ Supports both direct BACnet/IP and Niagara gateway queries.
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional
 
 from app.database.repositories.equipment_metadata_repository import EquipmentMetadataRepository
 
@@ -50,11 +49,11 @@ class BACnetDeviceInfo:
     model_name: str = ""
     firmware_version: str = ""
     application_version: str = ""
-    serial_number: Optional[str] = None
+    serial_number: str | None = None
     location: str = ""
     description: str = ""
     ip_address: str = ""
-    mac_address: Optional[str] = None
+    mac_address: str | None = None
     network_number: int = 0
     max_apdu_length: int = 1476
     protocol_version: int = 1
@@ -108,10 +107,10 @@ class BACnetDiscoveryService:
     def __init__(
         self,
         use_niagara: bool = True,
-        niagara_host: Optional[str] = None,
+        niagara_host: str | None = None,
         niagara_port: int = 80,
-        niagara_username: Optional[str] = None,
-        niagara_password: Optional[str] = None,
+        niagara_username: str | None = None,
+        niagara_password: str | None = None,
         timeout: float = 10.0,
     ):
         """Initialize BACnet discovery service.
@@ -131,7 +130,7 @@ class BACnetDiscoveryService:
         self.niagara_password = niagara_password
         self.timeout = timeout
 
-    async def discover_device(self, device_id: int, ip_address: Optional[str] = None) -> Optional[BACnetDeviceInfo]:
+    async def discover_device(self, device_id: int, ip_address: str | None = None) -> BACnetDeviceInfo | None:
         """Discover a BACnet device by ID.
 
         Args:
@@ -148,7 +147,7 @@ class BACnetDiscoveryService:
             logger.warning("Direct BACnet/IP discovery not implemented - use Niagara gateway")
             return None
 
-    async def _discover_via_niagara(self, device_id: int) -> Optional[BACnetDeviceInfo]:
+    async def _discover_via_niagara(self, device_id: int) -> BACnetDeviceInfo | None:
         """Discover device via Niagara oBIX API.
 
         Args:
@@ -185,7 +184,7 @@ class BACnetDiscoveryService:
             logger.error(f"Niagara discovery error: {e}")
             return None
 
-    async def discover_and_save(self, equipment_code: str, device_id: int, ip_address: Optional[str] = None) -> dict:
+    async def discover_and_save(self, equipment_code: str, device_id: int, ip_address: str | None = None) -> dict:
         """Discover BACnet device and save to equipment metadata.
 
         Args:
@@ -249,7 +248,7 @@ class BACnetDiscoveryService:
 
 
 class SimulatedBACnetDiscovery:
-    """Simulated BACnet discovery for demo mode."""
+    """Simulated BACnet discovery for local mode."""
 
     # Sample device profiles by equipment type
     DEVICE_PROFILES = {
@@ -292,7 +291,7 @@ class SimulatedBACnetDiscovery:
 
     @classmethod
     def generate_device_info(
-        cls, equipment_code: str, equipment_type: str = "default", device_id: Optional[int] = None
+        cls, equipment_code: str, equipment_type: str = "default", device_id: int | None = None
     ) -> dict:
         """Generate simulated BACnet device info.
 

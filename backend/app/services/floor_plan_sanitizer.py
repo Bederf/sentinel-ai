@@ -15,7 +15,6 @@ Approach: Geometric Abstraction (Tier 1 Security)
 """
 
 import logging
-from typing import Dict, Optional, Tuple
 
 import cv2
 import numpy as np
@@ -45,7 +44,7 @@ class FloorPlanSanitizer:
         image_path_or_bytes: str | bytes,
         remove_text: bool = True,
         return_lookup: bool = True,
-    ) -> Tuple[bytes, Optional[Dict]]:
+    ) -> tuple[bytes, dict | None]:
         """
         Sanitize floor plan image by removing identifying information.
 
@@ -218,7 +217,7 @@ class FloorPlanSanitizer:
             logger.warning(f"Text detection failed: {e}")
             return np.zeros_like(gray)
 
-    def _extract_text_regions(self, gray: np.ndarray) -> Dict[str, Dict]:
+    def _extract_text_regions(self, gray: np.ndarray) -> dict[str, dict]:
         """Extract text and its positions for lookup table."""
         if not self.ocr_installed:
             logger.debug("OCR not available, returning empty lookup")
@@ -257,7 +256,7 @@ class FloorPlanSanitizer:
             logger.warning(f"Text extraction for lookup failed: {e}")
             return {}
 
-    def reidentify_equipment_config(self, extracted_config: Dict, lookup_table: Optional[Dict]) -> Dict:
+    def reidentify_equipment_config(self, extracted_config: dict, lookup_table: dict | None) -> dict:
         """
         Re-apply identifying information to extracted config after API response.
 
@@ -307,7 +306,7 @@ class FloorPlanSanitizer:
             logger.warning(f"Re-identification failed: {e}")
             return extracted_config
 
-    def _find_closest_text_region(self, position: Tuple[int, int], lookup_table: Dict) -> Optional[Dict]:
+    def _find_closest_text_region(self, position: tuple[int, int], lookup_table: dict) -> dict | None:
         """Find closest text region to given position."""
         closest = None
         min_distance = float("inf")
@@ -332,7 +331,7 @@ class FloorPlanSanitizer:
 
         return closest
 
-    def build_room_lookup_from_floor_plan(self, image_path_or_bytes: str | bytes) -> Dict[str, Dict]:
+    def build_room_lookup_from_floor_plan(self, image_path_or_bytes: str | bytes) -> dict[str, dict]:
         """
         Build lookup table from floor plan that stays on-device.
 

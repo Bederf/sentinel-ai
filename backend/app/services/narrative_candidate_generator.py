@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import UTC, datetime
-from typing import Iterable
 
 from app.schemas.cockpit import CockpitIssue, CockpitSourceStatus
 from app.services.building_state_models import NarrativeCandidate, NarrativeLocation, PropagationDirection, Voice
@@ -48,9 +48,8 @@ def _mode_adjusted_hvac_voice(issue: CockpitIssue, operating_mode: SentinelOpera
 def _voice_from_issue(issue: CockpitIssue, operating_mode: SentinelOperatingMode) -> Voice:
     asset_type = _extract_asset_type(issue)
     is_hvac_asset = asset_type in {"CHILLER", "AHU", "FCU", "VAV", "PUMP", "CT"}
-    should_apply_mode_bias = (
-        issue.issue_category not in {"thermal", "energy", "stability", "occupant"}
-        and (issue.subsystem == "hvac" or is_hvac_asset)
+    should_apply_mode_bias = issue.issue_category not in {"thermal", "energy", "stability", "occupant"} and (
+        issue.subsystem == "hvac" or is_hvac_asset
     )
     if should_apply_mode_bias:
         return _mode_adjusted_hvac_voice(issue, operating_mode)
@@ -199,7 +198,9 @@ def _candidate_from_issue(issue: CockpitIssue, operating_mode: SentinelOperating
         ),
         action=action,
         time_to_constraint_breach_min=_time_to_breach_from_issue(issue),
-        affected_occupants_est=len(affected_zones) * 12 if affected_zones else (8 if issue.source == "tech" and affected_zones else None),
+        affected_occupants_est=len(affected_zones) * 12
+        if affected_zones
+        else (8 if issue.source == "tech" and affected_zones else None),
         system_criticality=_criticality_from_issue(issue),
         propagation_risk=_propagation_risk_from_issue(issue),
         resolved=issue.status == "resolved",

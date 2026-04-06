@@ -8,7 +8,7 @@ import json
 import logging
 from datetime import date
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -18,11 +18,11 @@ logger = logging.getLogger(__name__)
 _FINANCIALS_PATH = Path(__file__).parent.parent / "data" / "equipment_type_financials.json"
 _CONCEPT_CSV_PATH = Path(__file__).parent.parent / "data" / "concept_assets.csv"
 
-_type_financials: Dict[str, Any] = {}
-_concept_assets: List[Dict[str, Any]] = []
+_type_financials: dict[str, Any] = {}
+_concept_assets: list[dict[str, Any]] = []
 
 
-def _load_type_financials() -> Dict[str, Any]:
+def _load_type_financials() -> dict[str, Any]:
     """Load equipment type financial defaults (cached after first call)."""
     global _type_financials
     if _type_financials:
@@ -43,7 +43,7 @@ def _load_type_financials() -> Dict[str, Any]:
     return _type_financials
 
 
-def _load_concept_assets() -> List[Dict[str, Any]]:
+def _load_concept_assets() -> list[dict[str, Any]]:
     """Load Concept Evolution asset data from CSV."""
     global _concept_assets
     if _concept_assets:
@@ -60,20 +60,20 @@ def _load_concept_assets() -> List[Dict[str, Any]]:
     return _concept_assets
 
 
-def get_defaults() -> Dict[str, Any]:
+def get_defaults() -> dict[str, Any]:
     """Return financial analysis defaults."""
     financials = _load_type_financials()
     return financials.get("_defaults", {})
 
 
-def get_type_financials(equipment_type: str) -> Optional[Dict[str, Any]]:
+def get_type_financials(equipment_type: str) -> dict[str, Any] | None:
     """Return financial profile for an equipment type (case-insensitive)."""
     financials = _load_type_financials()
     key = equipment_type.lower().replace(" ", "_")
     return financials.get(key)
 
 
-def get_concept_asset(asset_code: str) -> Optional[Dict[str, Any]]:
+def get_concept_asset(asset_code: str) -> dict[str, Any] | None:
     """Look up a Concept Evolution asset by code."""
     assets = _load_concept_assets()
     for a in assets:
@@ -88,7 +88,7 @@ def get_concept_asset(asset_code: str) -> Optional[Dict[str, Any]]:
 
 
 def calculate_npv(
-    cash_flows: List[float],
+    cash_flows: list[float],
     discount_rate: float,
 ) -> float:
     """Calculate Net Present Value of a series of cash flows.
@@ -117,7 +117,7 @@ def calculate_tco(
     horizon_years: int,
     discount_rate: float,
     residual_value: float = 0.0,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Calculate Total Cost of Ownership over a time horizon.
 
     Returns:
@@ -166,7 +166,7 @@ def calculate_failure_probability(
     age_years: float,
     expected_life_years: float,
     health_score: float,
-    condition_score: Optional[float] = None,
+    condition_score: float | None = None,
 ) -> float:
     """Estimate probability of failure in next year.
 
@@ -208,15 +208,15 @@ def analyze_replace_vs_repair(
     equipment_type: str,
     age_years: float,
     health_score: float,
-    replacement_cost_zar: Optional[float] = None,
-    repair_cost_zar: Optional[float] = None,
-    annual_maintenance_zar: Optional[float] = None,
-    condition_score: Optional[float] = None,
-    discount_rate: Optional[float] = None,
-    horizon_years: Optional[int] = None,
-    maintenance_escalation: Optional[float] = None,
-    concept_asset_code: Optional[str] = None,
-) -> Dict[str, Any]:
+    replacement_cost_zar: float | None = None,
+    repair_cost_zar: float | None = None,
+    annual_maintenance_zar: float | None = None,
+    condition_score: float | None = None,
+    discount_rate: float | None = None,
+    horizon_years: int | None = None,
+    maintenance_escalation: float | None = None,
+    concept_asset_code: str | None = None,
+) -> dict[str, Any]:
     """Analyze replace-vs-repair decision for equipment.
 
     Calculates NPV for both options, recommends action with confidence.
@@ -360,10 +360,10 @@ def analyze_replace_vs_repair(
 
 def analyze_portfolio(
     site_id: str,
-    equipment_list: List[Dict[str, Any]],
-    discount_rate: Optional[float] = None,
-    horizon_years: Optional[int] = None,
-) -> Dict[str, Any]:
+    equipment_list: list[dict[str, Any]],
+    discount_rate: float | None = None,
+    horizon_years: int | None = None,
+) -> dict[str, Any]:
     """Analyze all equipment for a site, return prioritized CapEx plan.
 
     Args:
@@ -433,12 +433,12 @@ def run_scenario(
     equipment_type: str,
     age_years: float,
     health_score: float,
-    scenarios: List[Dict[str, Any]],
-    base_replacement_cost_zar: Optional[float] = None,
-    base_repair_cost_zar: Optional[float] = None,
-    base_annual_maintenance_zar: Optional[float] = None,
-    condition_score: Optional[float] = None,
-) -> Dict[str, Any]:
+    scenarios: list[dict[str, Any]],
+    base_replacement_cost_zar: float | None = None,
+    base_repair_cost_zar: float | None = None,
+    base_annual_maintenance_zar: float | None = None,
+    condition_score: float | None = None,
+) -> dict[str, Any]:
     """Run what-if scenario analysis with multiple parameter sets.
 
     Args:
@@ -492,7 +492,7 @@ def run_scenario(
 # --------------------------------------------------------------------------- #
 
 
-def _float(record: Optional[Dict], key: str) -> Optional[float]:
+def _float(record: dict | None, key: str) -> float | None:
     """Safely extract a float from a dict."""
     if not record:
         return None
@@ -548,9 +548,9 @@ def _calculate_confidence(
 
 
 def _build_budget_forecast(
-    replace_candidates: List[Dict[str, Any]],
+    replace_candidates: list[dict[str, Any]],
     horizon_years: int,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Build year-by-year CapEx budget forecast based on urgency.
 
     Prioritizes by failure probability and NPV advantage.

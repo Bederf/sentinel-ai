@@ -12,19 +12,19 @@ Key capabilities:
 - Work order integration for response/resolution time tracking
 """
 
+import logging
 from datetime import date, datetime, timedelta
 from decimal import Decimal
-from typing import Any, Dict, List, Optional
-import logging
+from typing import Any
 
 from app.models.contract import (
+    PenaltyType,
     SLABreachEvent,
     SLABreachSeverity,
     SLAComplianceStatus,
     SLAMetricType,
     SLAPerformanceWithCompliance,
     SLATerm,
-    PenaltyType,
 )
 
 logger = logging.getLogger(__name__)
@@ -146,7 +146,7 @@ class SLAComplianceService:
         metric_type: SLAMetricType,
         target: Decimal,
         actual: Decimal,
-    ) -> Optional[SLABreachEvent]:
+    ) -> SLABreachEvent | None:
         """
         Detect if SLA breach occurred for a single metric reading.
 
@@ -221,7 +221,7 @@ class SLAComplianceService:
     # Private Helper Methods
     # ========================================================================
 
-    def _get_sla_term(self, sla_term_id: str) -> Optional[SLATerm]:
+    def _get_sla_term(self, sla_term_id: str) -> SLATerm | None:
         """Get SLA term from repository."""
         try:
             sla_repo = self.get_sla_repository()
@@ -251,7 +251,7 @@ class SLAComplianceService:
         """
         Calculate actual performance value for the period.
 
-        For demo purposes, generates realistic values.
+        Generates realistic values for local fallback mode.
         In production, would query work order repository.
         """
         # Demo implementation - return realistic values
@@ -372,11 +372,11 @@ class SLAComplianceService:
         actual_value: Decimal,
         period_start: date,
         period_end: date,
-    ) -> List[SLABreachEvent]:
+    ) -> list[SLABreachEvent]:
         """
         Detect all breaches for a period.
 
-        For demo, returns 0-2 breaches based on compliance status.
+        In local fallback mode, returns 0-2 breaches based on compliance status.
         In production, would analyze individual incidents/work orders.
         """
         breaches = []
@@ -428,7 +428,7 @@ class SLAComplianceService:
         multiplier = multipliers.get(breach.breach_severity, Decimal("1"))
         return Decimal(str(base_amount)) * multiplier
 
-    def _serialize_breach(self, breach: SLABreachEvent) -> Dict[str, Any]:
+    def _serialize_breach(self, breach: SLABreachEvent) -> dict[str, Any]:
         """Convert breach event to dictionary for JSON storage."""
         return {
             "id": breach.id,
@@ -461,7 +461,7 @@ class SLAComplianceService:
 # Singleton Factory
 # ============================================================================
 
-_sla_compliance_service_instance: Optional[SLAComplianceService] = None
+_sla_compliance_service_instance: SLAComplianceService | None = None
 
 
 def get_sla_compliance_service() -> SLAComplianceService:

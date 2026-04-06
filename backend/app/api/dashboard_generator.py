@@ -117,7 +117,7 @@ async def preview_dashboard(
     """Preview dashboard for a given equipment list.
 
     Same as generate but adds ``preview: true`` to the response.
-    Used by the BMS Connection Wizard to show what dashboards will look
+    Used by the SIMBIOT connection wizard to show what dashboards will look
     like before committing.
     """
     try:

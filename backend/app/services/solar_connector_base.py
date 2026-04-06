@@ -4,20 +4,19 @@ All manufacturer connectors (Huawei, Schneider, SMA, etc.) extend this base clas
 Each returns normalised dataclass models regardless of underlying protocol (Modbus TCP,
 cloud API, BACnet, etc.).
 
-The simulated variants generate realistic demo data following Johannesburg solar curves.
+The simulated variants generate realistic local seeded data following Johannesburg solar curves.
 """
 
 import logging
 from abc import ABC, abstractmethod
-from typing import List, Optional
 
 from app.models.solar import (
-    SolarInverter,
-    SolarString,
     BESSContainer,
+    ConnectorStatus,
     GridMeter,
     NormalisedReading,
-    ConnectorStatus,
+    SolarInverter,
+    SolarString,
 )
 
 logger = logging.getLogger(__name__)
@@ -54,27 +53,27 @@ class SolarConnector(ABC):
     # --- reads ---
 
     @abstractmethod
-    async def read_inverter(self, inverter_id: str) -> Optional[SolarInverter]:
+    async def read_inverter(self, inverter_id: str) -> SolarInverter | None:
         """Read current state of a single inverter."""
         ...
 
     @abstractmethod
-    async def read_all_strings(self, inverter_id: str) -> List[SolarString]:
+    async def read_all_strings(self, inverter_id: str) -> list[SolarString]:
         """Read all PV strings attached to an inverter."""
         ...
 
     @abstractmethod
-    async def read_bess(self, container_id: str) -> Optional[BESSContainer]:
+    async def read_bess(self, container_id: str) -> BESSContainer | None:
         """Read current BESS container state (SOC, mode, power, alarms)."""
         ...
 
     @abstractmethod
-    async def read_meter(self, meter_id: str) -> Optional[GridMeter]:
+    async def read_meter(self, meter_id: str) -> GridMeter | None:
         """Read grid meter readings (import/export, PF, THD)."""
         ...
 
     @abstractmethod
-    async def get_normalised_readings(self) -> List[NormalisedReading]:
+    async def get_normalised_readings(self) -> list[NormalisedReading]:
         """Poll all registered equipment and return normalised readings."""
         ...
 

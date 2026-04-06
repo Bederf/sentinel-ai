@@ -49,7 +49,7 @@ export interface EmissionsSnapshot {
   other_kg_co2?: number;
   solar_offset_kg_co2?: number;
   net_scope2_kg_co2?: number;
-  data_source?: 'estimated' | 'measured' | 'simulation';
+  data_source?: 'estimated' | 'measured';
 }
 
 export interface EmissionsHistory {

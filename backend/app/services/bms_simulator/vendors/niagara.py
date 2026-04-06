@@ -6,7 +6,7 @@ Pattern: slot:/{DeviceName}/Points/{PointName}
 Example: slot:/Chiller_01/Points/ChwSupplyTemp
 """
 
-from typing import Any, Dict
+from typing import Any
 
 from .base import VendorAdapter
 
@@ -101,11 +101,11 @@ class NiagaraAdapter(VendorAdapter):
 
     def format_point_for_export(
         self,
-        device: Dict[str, Any],
+        device: dict[str, Any],
         point_name: str,
-        point_def: Dict[str, Any],
+        point_def: dict[str, Any],
         instance_base: int,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Format a point for CSV export in Niagara format.
 
@@ -159,7 +159,7 @@ class NiagaraAdapter(VendorAdapter):
             "facets": self._get_facets(point_def),
         }
 
-    def _get_facets(self, point_def: Dict[str, Any]) -> str:
+    def _get_facets(self, point_def: dict[str, Any]) -> str:
         """Generate Niagara facets string for the point."""
         facets = []
 

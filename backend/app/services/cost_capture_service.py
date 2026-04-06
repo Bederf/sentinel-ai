@@ -12,7 +12,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from datetime import date, timedelta
-from typing import Dict, Any, Optional
+from typing import Any
 
 from app.database.repositories.budget_repository import BudgetRepository
 from app.database.repositories.contract_repository import ContractRepository
@@ -34,7 +34,7 @@ class CostCaptureSummary:
     callout_actual_zar: float
     consumables_actual_zar: float
     total_actual_zar: float
-    budget_id: Optional[str]
+    budget_id: str | None
 
 
 class CostCaptureService:
@@ -44,9 +44,9 @@ class CostCaptureService:
 
     def __init__(
         self,
-        budget_repo: Optional[BudgetRepository] = None,
-        contract_repo: Optional[ContractRepository] = None,
-        work_order_repo: Optional[WorkOrderRepository] = None,
+        budget_repo: BudgetRepository | None = None,
+        contract_repo: ContractRepository | None = None,
+        work_order_repo: WorkOrderRepository | None = None,
     ):
         self.budget_repo = budget_repo or BudgetRepository()
         self.contract_repo = contract_repo or ContractRepository()
@@ -141,7 +141,7 @@ class CostCaptureService:
 
     def _get_or_create_budget(
         self, contract_id: str, contract_code: str, year: int, month: int
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         budgets = self.budget_repo.get_by_contract(contract_id, year=year)
         for budget in budgets:
             if budget.get("budget_month") == month and budget.get("equipment_type") is None:
@@ -172,7 +172,7 @@ class CostCaptureService:
         return next_month - timedelta(days=1)
 
 
-_service: Optional[CostCaptureService] = None
+_service: CostCaptureService | None = None
 
 
 def get_cost_capture_service() -> CostCaptureService:

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import hmac
-from typing import Optional
 
 from app.config.settings import settings
 
@@ -19,7 +18,7 @@ def get_sentry_webhook_secret() -> str:
     return (settings.sentry_webhook_secret or "").strip()
 
 
-def is_sentry_secret_valid(provided_secret: Optional[str]) -> bool:
+def is_sentry_secret_valid(provided_secret: str | None) -> bool:
     """Validate a provided secret against configured Sentry secret."""
     configured_secret = get_sentry_webhook_secret()
     if not configured_secret or not provided_secret:

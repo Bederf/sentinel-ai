@@ -9,7 +9,7 @@
  */
 
 import { useState, useEffect, useRef } from "react";
-import { Badge, Flex, Grid, Button, Text } from "@tremor/react";
+import { Flex, Grid, Button, Text } from "@tremor/react";
 import { Thermometer, AlertTriangle, Fan, Settings } from "lucide-react";
 import { hvacApi, type HVACZone } from "../../lib/hvacApi";
 import TemperatureControl from "../TemperatureControl";
@@ -84,6 +84,35 @@ export function ZoneOverviewPanel({ siteId, compact = false, onZoneSelect }: Zon
     return "var(--color-sentinel-red)";
   }
 
+  function getChipStyle(kind: "green" | "amber" | "red" | "gray") {
+    switch (kind) {
+      case "green":
+        return {
+          background: "rgba(34, 197, 94, 0.14)",
+          color: "var(--color-sentinel-green)",
+          border: "1px solid rgba(34, 197, 94, 0.30)",
+        };
+      case "amber":
+        return {
+          background: "rgba(245, 158, 11, 0.14)",
+          color: "var(--color-sentinel-amber)",
+          border: "1px solid rgba(245, 158, 11, 0.30)",
+        };
+      case "red":
+        return {
+          background: "rgba(239, 68, 68, 0.14)",
+          color: "var(--color-sentinel-red)",
+          border: "1px solid rgba(239, 68, 68, 0.30)",
+        };
+      default:
+        return {
+          background: "rgba(148, 163, 184, 0.14)",
+          color: "var(--color-sentinel-text-secondary)",
+          border: "1px solid rgba(148, 163, 184, 0.28)",
+        };
+    }
+  }
+
   if (loading) {
     return (
       <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
@@ -126,8 +155,12 @@ export function ZoneOverviewPanel({ siteId, compact = false, onZoneSelect }: Zon
             <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>{zones.length} zones configured</p>
           </div>
           <div className="flex gap-2">
-            <Badge color="green">{zones.filter(z => z.status === "running").length} Running</Badge>
-            <Badge color="red">{zones.filter(z => z.status === "fault").length} Fault</Badge>
+            <span className="text-xs px-2 py-0.5 rounded capitalize" style={getChipStyle("green")}>
+              {zones.filter(z => z.status === "running").length} Running
+            </span>
+            <span className="text-xs px-2 py-0.5 rounded capitalize" style={getChipStyle("red")}>
+              {zones.filter(z => z.status === "fault").length} Fault
+            </span>
           </div>
         </Flex>
       )}
@@ -153,9 +186,12 @@ export function ZoneOverviewPanel({ siteId, compact = false, onZoneSelect }: Zon
                       {zone.fcu_id || zone.ahu_id || "No FCU"}
                     </p>
                   </div>
-                  <Badge color={getStatusColor(zone.status)} size="xs">
+                  <span
+                    className="text-xs px-2 py-0.5 rounded capitalize"
+                    style={getChipStyle(getStatusColor(zone.status))}
+                  >
                     {zone.status}
-                  </Badge>
+                  </span>
                 </Flex>
 
                 {/* Temperature Display */}
@@ -249,12 +285,12 @@ export function ZoneOverviewPanel({ siteId, compact = false, onZoneSelect }: Zon
                         <Fan className="w-3 h-3" />
                         <span>{zone.fcu_id}</span>
                         {zone.fcu_health !== undefined && zone.fcu_health !== null && (
-                          <Badge
-                            color={zone.fcu_health >= 80 ? "green" : zone.fcu_health >= 60 ? "amber" : "red"}
-                            size="xs"
+                          <span
+                            className="text-xs px-2 py-0.5 rounded"
+                            style={getChipStyle(zone.fcu_health >= 80 ? "green" : zone.fcu_health >= 60 ? "amber" : "red")}
                           >
                             {zone.fcu_health}%
-                          </Badge>
+                          </span>
                         )}
                       </Flex>
                     )}

@@ -10,7 +10,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { ArrowLeft } from "lucide-react";
-import type { ConciergeSignalDetail } from "../../lib/api";
+import type { ConciergeRoom, ConciergeSignalDetail, ConciergeSignalSummary } from "../../lib/api";
 import { conciergeApi } from "../../lib/api";
 
 // ---- Severity badge colours ----
@@ -73,10 +73,6 @@ type ThreadMessage = {
   body_plain?: string;
 };
 
-function stringList(value: unknown): string[] {
-  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string" && item.length > 0) : [];
-}
-
 function threadMessages(detail: ConciergeSignalDetail): ThreadMessage[] {
   const raw = detail.metadata?.thread_messages;
   if (!Array.isArray(raw)) return [];
@@ -86,10 +82,6 @@ function threadMessages(detail: ConciergeSignalDetail): ThreadMessage[] {
     const rightTime = right.sent_at ? new Date(right.sent_at).getTime() : Number.MAX_SAFE_INTEGER;
     return leftTime - rightTime;
   });
-}
-
-function metadataStringList(detail: ConciergeSignalDetail, key: string): string[] {
-  return stringList(detail.metadata?.[key]);
 }
 
 function metadataString(detail: ConciergeSignalDetail, key: string): string | null {
@@ -167,26 +159,6 @@ function GhostBookingSummary({ detail }: { detail: ConciergeSignalDetail }) {
       </div>
     </>
   );
-}
-
-function uniqueStrings(values: Array<string | null | undefined>): string[] {
-  const seen = new Set<string>();
-  const result: string[] = [];
-  for (const value of values) {
-    if (!value) continue;
-    const normalized = value.trim();
-    if (!normalized) continue;
-    const key = normalized.toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    result.push(normalized);
-  }
-  return result;
-}
-
-function formatPerson(name?: string | null, email?: string | null): string | null {
-  const parts = [name, email].filter((value): value is string => Boolean(value && value.trim()));
-  return parts.length ? parts.join(" ") : null;
 }
 
 function MetadataGrid({ detail }: { detail: ConciergeSignalDetail }) {
@@ -511,8 +483,35 @@ interface SignalDrillDownProps {
   siteId: string;
   roomId: string;
   signalId: string;
+  room?: ConciergeRoom;
+  onSignalSelect?: (signalId: string) => void;
   onBack: () => void;
   onResolved?: () => void;
+}
+
+type CategoryKey = "info" | "block" | "ghost";
+
+function categoryFromSignalType(signalType: string): CategoryKey {
+  if (signalType === "booking_conflict") return "block";
+  if (signalType === "no_show_pattern" || signalType === "booking_no_show") return "ghost";
+  return "info";
+}
+
+function categoryLabel(category: CategoryKey): string {
+  if (category === "block") return "Block";
+  if (category === "ghost") return "Ghost";
+  return "Info";
+}
+
+function categoryOrder(category: CategoryKey): number {
+  if (category === "block") return 0;
+  if (category === "ghost") return 1;
+  return 2;
+}
+
+function getSignalTimestamp(signal: ConciergeSignalSummary): number {
+  const ts = new Date(signal.created_at).getTime();
+  return Number.isFinite(ts) ? ts : 0;
 }
 
 // ---- Subcomponents ----
@@ -531,7 +530,7 @@ function SeverityBadge({ severity }: { severity: string }) {
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <h4 className="text-[10px] uppercase tracking-wider text-gray-500 mb-2 mt-4">
+    <h4 className="text-[10px] uppercase tracking-wider mb-2 mt-4" style={{ color: "var(--color-sentinel-text-secondary)" }}>
       {children}
     </h4>
   );
@@ -629,7 +628,7 @@ function ClusterInfo({ cluster }: { cluster: NonNullable<ConciergeSignalDetail["
 
 // ---- Main component ----
 
-export function SignalDrillDown({ siteId, roomId, signalId, onBack, onResolved }: SignalDrillDownProps) {
+export function SignalDrillDown({ siteId, roomId, signalId, room, onSignalSelect, onBack, onResolved }: SignalDrillDownProps) {
   const [detail, setDetail] = useState<ConciergeSignalDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -668,36 +667,54 @@ export function SignalDrillDown({ siteId, roomId, signalId, onBack, onResolved }
     }
   }, [processing, siteId, roomId, signalId, onBack, onResolved]);
 
+  const categorySignals = new Map<CategoryKey, ConciergeSignalSummary[]>();
+  for (const signal of room?.signals || []) {
+    const key = categoryFromSignalType(signal.signal_type);
+    const existing = categorySignals.get(key);
+    if (existing) {
+      existing.push(signal);
+    } else {
+      categorySignals.set(key, [signal]);
+    }
+  }
+
+  const categoryTabs = Array.from(categorySignals.entries())
+    .map(([key, signals]) => ({ key, signals }))
+    .sort((left, right) => categoryOrder(left.key) - categoryOrder(right.key));
+
+  const activeCategory = detail ? categoryFromSignalType(detail.signal_type) : null;
+
   return (
     <div
       className="absolute top-0 right-0 h-full w-[380px] max-w-full flex flex-col z-30 animate-slide-in-right"
       style={{
-        background: "#0d1117",
-        borderLeft: "1px solid rgba(255,255,255,0.08)",
+        background: "var(--color-sentinel-bg-canvas)",
+        borderLeft: "1px solid var(--color-sentinel-border)",
       }}
     >
       {/* Header */}
       <div
         className="flex items-center gap-2 px-4 py-3 flex-shrink-0"
-        style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}
+        style={{ borderBottom: "1px solid var(--color-sentinel-border)" }}
       >
         <button
           onClick={onBack}
-          className="p-1 rounded hover:bg-gray-800 transition-colors text-gray-500 hover:text-gray-300"
+          className="p-1 rounded-lg transition-colors"
+          style={{ background: "var(--color-sentinel-bg-secondary)", color: "var(--color-sentinel-text-secondary)" }}
           aria-label="Back to room"
         >
           <ArrowLeft size={16} />
         </button>
         <div className="flex-1 min-w-0">
           <span className="text-xs text-gray-100 font-medium truncate block">{typeLabel}</span>
-          <span className="text-[10px] text-gray-500">{compactRoomId(roomId)}</span>
+          <span className="text-[10px]" style={{ color: "var(--color-sentinel-text-secondary)" }}>{compactRoomId(roomId)}</span>
         </div>
         {detail && (
           <button
             type="button"
             onClick={() => void handleResolve()}
             disabled={processing}
-            className="px-2.5 py-1 text-[10px] font-semibold uppercase tracking-widest rounded border transition-colors"
+            className="px-2.5 py-1 text-[10px] font-semibold uppercase tracking-widest rounded-lg border transition-colors"
             style={{
               background: processing ? "rgba(34,197,94,0.22)" : "rgba(34,197,94,0.12)",
               color: "#22c55e",
@@ -711,6 +728,34 @@ export function SignalDrillDown({ siteId, roomId, signalId, onBack, onResolved }
         )}
         {detail && <SeverityBadge severity={detail.severity} />}
       </div>
+      {categoryTabs.length > 0 && (
+        <div
+          className="px-4 py-2.5 flex items-center gap-2 flex-wrap"
+          style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}
+        >
+          {categoryTabs.map((tab) => {
+            const isActive = activeCategory === tab.key;
+            const latestSignal = [...tab.signals].sort((a, b) => getSignalTimestamp(b) - getSignalTimestamp(a))[0];
+            return (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => {
+                  if (latestSignal) onSignalSelect?.(latestSignal.id);
+                }}
+                className="px-2.5 py-1 text-[10px] rounded-full border transition-colors uppercase tracking-wider font-medium"
+                style={{
+                  background: isActive ? "rgba(59,130,246,0.22)" : "rgba(148,163,184,0.10)",
+                  borderColor: isActive ? "rgba(59,130,246,0.55)" : "rgba(148,163,184,0.25)",
+                  color: isActive ? "#93c5fd" : "#cbd5e1",
+                }}
+              >
+                {categoryLabel(tab.key)} ({tab.signals.length})
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* Body */}
       <div className="flex-1 overflow-y-auto px-4 py-3">
@@ -737,10 +782,10 @@ export function SignalDrillDown({ siteId, roomId, signalId, onBack, onResolved }
                 </div>
               )}
               {/* Full summary */}
-              <p className="text-sm text-gray-200 leading-relaxed">{detail.summary}</p>
+              <p className="text-sm leading-relaxed" style={{ color: "var(--color-sentinel-text-primary)" }}>{detail.summary}</p>
 
               {/* Confidence + time */}
-              <div className="flex items-center gap-3 mt-3 text-[10px] text-gray-500">
+              <div className="flex items-center gap-3 mt-3 text-[10px]" style={{ color: "var(--color-sentinel-text-secondary)" }}>
                 <span>Confidence: {(detail.confidence * 100).toFixed(0)}%</span>
                 <span>{relativeTime(detail.created_at)}</span>
               </div>

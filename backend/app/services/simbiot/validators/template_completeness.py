@@ -6,8 +6,6 @@ Scores how completely a classified equipment matches expected critical/important
 
 from __future__ import annotations
 
-from typing import List
-
 
 class TemplateCompletenessCalculator:
     """Calculates how completely an equipment matches expected template."""
@@ -15,7 +13,7 @@ class TemplateCompletenessCalculator:
     def calculate_completeness(
         self,
         equipment_type: str,
-        classified_points: List[dict],
+        classified_points: list[dict],
         expected_template: dict,
     ) -> float:
         """Calculate completeness score (0.0 to 1.0).
@@ -49,7 +47,7 @@ class TemplateCompletenessCalculator:
         self,
         equipment_type: str,
         completeness_score: float,
-        present_tags: List[str],
+        present_tags: list[str],
         expected_template: dict,
     ) -> dict:
         """Generate human-readable completeness report."""

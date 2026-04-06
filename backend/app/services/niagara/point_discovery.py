@@ -16,7 +16,7 @@ import re
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from app.services.niagara.bacnet_client import (
     BACnetException,
@@ -103,7 +103,7 @@ class DiscoveryResult:
         discovery_id: str,
         device_ip: str,
         site_id: str,
-        device_id: Optional[int] = None,
+        device_id: int | None = None,
     ):
         self.discovery_id = discovery_id
         self.device_ip = device_ip
@@ -111,13 +111,13 @@ class DiscoveryResult:
         self.device_id = device_id
         self.status = "pending"  # pending, discovering, classifying, complete, error
         self.started_at = datetime.utcnow().isoformat()
-        self.completed_at: Optional[str] = None
-        self.raw_points: List[Dict[str, Any]] = []
-        self.classified_points: List[Dict[str, Any]] = []
-        self.summary: Dict[str, Any] = {}
-        self.error: Optional[str] = None
+        self.completed_at: str | None = None
+        self.raw_points: list[dict[str, Any]] = []
+        self.classified_points: list[dict[str, Any]] = []
+        self.summary: dict[str, Any] = {}
+        self.error: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "discovery_id": self.discovery_id,
             "device_ip": self.device_ip,
@@ -151,12 +151,12 @@ class PointDiscoveryService:
 
     def __init__(
         self,
-        bacnet_client: Optional[NiagaraBACnetClient] = None,
-        classifier: Optional[PointClassifier] = None,
+        bacnet_client: NiagaraBACnetClient | None = None,
+        classifier: PointClassifier | None = None,
     ):
         self._bacnet_client = bacnet_client
         self._classifier = classifier or get_point_classifier()
-        self._discovery_cache: Dict[str, DiscoveryResult] = {}
+        self._discovery_cache: dict[str, DiscoveryResult] = {}
 
     def _get_bacnet_client(self) -> NiagaraBACnetClient:
         """Get the BACnet client, creating if needed."""
@@ -168,9 +168,9 @@ class PointDiscoveryService:
         self,
         device_ip: str,
         site_id: str,
-        device_bacnet_id: Optional[int] = None,
-        bms_vendor: Optional[str] = None,
-        adapter_type: Optional[str] = None,
+        device_bacnet_id: int | None = None,
+        bms_vendor: str | None = None,
+        adapter_type: str | None = None,
     ) -> DiscoveryResult:
         """Run full point discovery and classification workflow.
 
@@ -202,7 +202,7 @@ class PointDiscoveryService:
         )
 
         try:
-            # Phase 1: Discover points (BACnet -> Simulation -> JSON fallback)
+            # Phase 1: Discover points (adapter route -> JSON fallback)
             result.status = "discovering"
             raw_points = await self._discover_points(device_ip, site_id, device_bacnet_id, adapter_type, bms_vendor)
             result.raw_points = [p if isinstance(p, dict) else p.to_dict() for p in raw_points]
@@ -337,7 +337,7 @@ class PointDiscoveryService:
 
         return result
 
-    def _parse_csv_export(self, csv_content: str) -> List[Dict[str, Any]]:
+    def _parse_csv_export(self, csv_content: str) -> list[dict[str, Any]]:
         """Parse a Desigo/Niagara BACnet CSV export into point dicts.
 
         Handles the standard format:
@@ -427,7 +427,7 @@ class PointDiscoveryService:
         return "", name
 
     @staticmethod
-    def _extract_lighting_summary(classified: list) -> Dict[str, Any]:
+    def _extract_lighting_summary(classified: list) -> dict[str, Any]:
         """Extract lighting-specific statistics from classified points.
 
         Returns:
@@ -485,17 +485,17 @@ class PointDiscoveryService:
         self,
         device_ip: str,
         site_id: str,
-        device_bacnet_id: Optional[int] = None,
-        adapter_type: Optional[str] = None,
-        bms_vendor: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
-        """Discover points using 3-tier routing: selected adapter -> simulation -> JSON fallback.
+        device_bacnet_id: int | None = None,
+        adapter_type: str | None = None,
+        bms_vendor: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Discover points using adapter routing with JSON fallback.
 
         Args:
-            device_ip: Device IP address (or 'simulation' for simulation-only)
-            site_id: SENTINEL site ID for simulation/fallback lookup
+            device_ip: Device IP address
+            site_id: SENTINEL site ID for fallback lookup
             device_bacnet_id: BACnet device ID (if provided, tries BACnet first)
-            adapter_type: Explicit adapter selection ('bacnet', 'simulation', ...)
+            adapter_type: Explicit adapter selection ('bacnet', ...)
             bms_vendor: Optional vendor/source alias resolved by the adapter registry
 
         Returns:
@@ -507,12 +507,7 @@ class PointDiscoveryService:
             device_ip=device_ip,
         )
 
-        should_try_selected_adapter = (
-            selected_adapter == "simulation"
-            or adapter_type is not None
-            or bms_vendor is not None
-            or device_bacnet_id is not None
-        )
+        should_try_selected_adapter = adapter_type is not None or bms_vendor is not None or device_bacnet_id is not None
 
         # Tier 1: Try the selected adapter first when it was explicitly
         # requested or when sufficient live connection context is present.
@@ -533,20 +528,8 @@ class PointDiscoveryService:
                 )
                 return adapter_points
 
-        # Tier 2: Fall back to the simulation-backed adapter when the selected
-        # live adapter is unavailable or yields no data.
-        if selected_adapter != "simulation":
-            sim_points = await self._load_simulation_points(site_id)
-            if sim_points:
-                logger.info(
-                    "Loaded %d points from simulation adapter for site %s",
-                    len(sim_points),
-                    site_id,
-                )
-                return sim_points
-
-        # Tier 3: Fall back to static JSON files
-        json_points = self._load_demo_points(site_id)
+        # Tier 2: Fall back to static JSON files
+        json_points = self._load_seed_points(site_id)
         if json_points:
             logger.info(
                 "Loaded %d points from JSON fallback for site %s",
@@ -555,16 +538,16 @@ class PointDiscoveryService:
             )
             return json_points
 
-        raise BACnetException(f"No points found for {device_ip} (site {site_id}): all tiers exhausted")
+        raise BACnetException(f"No points found for {device_ip} (site {site_id}): adapter and fallback exhausted")
 
     async def _load_adapter_points(
         self,
         adapter_type: str,
         site_id: str,
         device_ip: str,
-        device_bacnet_id: Optional[int] = None,
-        bms_vendor: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+        device_bacnet_id: int | None = None,
+        bms_vendor: str | None = None,
+    ) -> list[dict[str, Any]]:
         """Load points through the canonical SIMBIOT adapter boundary."""
         adapter = create_bms_adapter(
             adapter_type=adapter_type,
@@ -574,7 +557,7 @@ class PointDiscoveryService:
         config = BmsConnectionConfig(
             site_id=site_id,
             source_type=adapter_type,
-            host=None if device_ip == "simulation" else device_ip,
+            host=device_ip,
             metadata={
                 "bms_vendor": bms_vendor,
                 "commissioning": True,
@@ -598,7 +581,7 @@ class PointDiscoveryService:
                 logger.info("No %s adapter devices selected for site %s", adapter_type, site_id)
                 return []
 
-            points: List[Dict[str, Any]] = []
+            points: list[dict[str, Any]] = []
             instance_counter = 2000
             for device in target_devices:
                 device_points = await adapter.discover_points(device.device_id)
@@ -626,7 +609,7 @@ class PointDiscoveryService:
         self,
         client: NiagaraBACnetClient,
         device_id: int,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Discover points from a live BACnet device.
 
         Handles large point lists by reading metadata in batches.
@@ -645,7 +628,7 @@ class PointDiscoveryService:
         )
 
         # Read detailed metadata in batches
-        detailed_points: List[Dict[str, Any]] = []
+        detailed_points: list[dict[str, Any]] = []
 
         for i in range(0, len(raw_points), BATCH_SIZE):
             batch = raw_points[i : i + BATCH_SIZE]
@@ -732,12 +715,12 @@ class PointDiscoveryService:
 
         return detailed_points
 
-    def _load_demo_points(self, site_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    def _load_seed_points(self, site_id: str | None = None) -> list[dict[str, Any]]:
         """Load points from static JSON equipment files (Tier 3 fallback).
 
         Args:
             site_id: Site ID to load equipment files from (e.g., 'site-002').
-                     If None, falls back to haystack_tags.json demo points.
+                     If None, falls back to haystack_tags.json seed points.
 
         Returns:
             List of point dicts with name, description, object_type, etc.
@@ -770,12 +753,12 @@ class PointDiscoveryService:
         # Fallback to haystack_tags.json
         return self._load_from_haystack_tags()
 
-    def _load_points_from_equipment_dir(self, equipment_dir: Path, demo_site_id: str) -> List[Dict[str, Any]]:
-        """Extract demo points from a building's equipment files.
+    def _load_points_from_equipment_dir(self, equipment_dir: Path, site_id: str) -> list[dict[str, Any]]:
+        """Extract seed points from a building's equipment files.
 
         Args:
             equipment_dir: Path to equipment directory
-            demo_site_id: ID of the demo building for logging
+            site_id: ID of the site for logging
 
         Returns:
             List of point dicts ready for classification
@@ -820,49 +803,27 @@ class PointDiscoveryService:
 
         return points
 
-    def _load_from_haystack_tags(self) -> List[Dict[str, Any]]:
-        """Load demo points from haystack_tags.json (legacy fallback)."""
+    def _load_from_haystack_tags(self) -> list[dict[str, Any]]:
+        """Load seed points from haystack_tags.json (legacy fallback)."""
         try:
             tags_path = DATA_DIR / "haystack_tags.json"
             with open(tags_path) as f:
                 data = json.load(f)
-            demo_points = data.get("demo_points", [])
-            logger.info("Loaded %d demo points from haystack_tags.json", len(demo_points))
-            return demo_points
+            seed_points = data.get("seed_points", data.get("demo_points", []))
+            logger.info("Loaded %d seed points from haystack_tags.json", len(seed_points))
+            return seed_points
         except (FileNotFoundError, json.JSONDecodeError) as e:
-            logger.error("Failed to load demo points from haystack_tags.json: %s", e)
+            logger.error("Failed to load seed points from haystack_tags.json: %s", e)
             return []
-
-    async def _load_simulation_points(self, site_id: str) -> List[Dict[str, Any]]:
-        """Load points from the simulation-backed BMS adapter.
-
-        The lifecycle simulation is exposed to SENTINEL as a BMS source via
-        SimulationBmsAdapter. Discovery must use that adapter boundary rather
-        than reaching into simulator internals or Supabase state directly.
-
-        Args:
-            site_id: SENTINEL site ID (e.g., 'site-002')
-
-        Returns:
-            List of point dicts, or empty list if the simulation adapter has no data.
-        """
-        return await self._load_adapter_points(
-            adapter_type="simulation",
-            site_id=site_id,
-            device_ip="simulation",
-        )
 
     def _select_target_devices(
         self,
         adapter_type: str,
-        devices: List[BmsDeviceDescriptor],
+        devices: list[BmsDeviceDescriptor],
         device_ip: str,
-        device_bacnet_id: Optional[int],
-    ) -> List[BmsDeviceDescriptor]:
+        device_bacnet_id: int | None,
+    ) -> list[BmsDeviceDescriptor]:
         """Select the device set to discover for an adapter invocation."""
-        if adapter_type == "simulation":
-            return devices
-
         if device_bacnet_id is not None:
             matching = [device for device in devices if device.device_id == str(device_bacnet_id)]
             if matching:
@@ -891,7 +852,7 @@ class PointDiscoveryService:
         normalized_host = host.lower()
         return address.startswith(normalized_host) or normalized_host in address
 
-    async def _safe_adapter_read(self, adapter, device_id: str, point_id: str) -> Optional[BmsPointValue]:
+    async def _safe_adapter_read(self, adapter, device_id: str, point_id: str) -> BmsPointValue | None:
         try:
             return await adapter.read_point(device_id, point_id)
         except Exception:
@@ -902,9 +863,9 @@ class PointDiscoveryService:
         adapter_type: str,
         device: BmsDeviceDescriptor,
         point: BmsPointDescriptor,
-        reading: Optional[BmsPointValue],
+        reading: BmsPointValue | None,
         instance_counter: int,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         point_name = point.point_name or point.point_id
         description = (
             point.metadata.get("description") or f"{device.display_name} - {point_name.replace('_', ' ').title()}"
@@ -913,11 +874,7 @@ class PointDiscoveryService:
         instance = point.metadata.get("instance", instance_counter)
         value = reading.value if reading else None
         unit = point.unit or (reading.unit if reading else None) or ""
-
-        if adapter_type == "simulation":
-            name = f"{device.device_id}.{point.point_id}"
-        else:
-            name = point_name
+        name = point_name
 
         return {
             "name": name,
@@ -932,16 +889,16 @@ class PointDiscoveryService:
             "_point_type": _infer_point_type(point_name),
         }
 
-    def _classify_discovered_points(self, points: List[Dict[str, Any]]) -> List[ClassifiedPoint]:
+    def _classify_discovered_points(self, points: list[dict[str, Any]]) -> list[ClassifiedPoint]:
         """Classify all discovered points using the point classifier."""
         return self._classifier.classify_points(points)
 
     def _apply_module_policy(
         self,
         site_id: str,
-        raw_points: List[Dict[str, Any]],
-        classified_points: List[ClassifiedPoint],
-    ) -> tuple[List[Dict[str, Any]], List[ClassifiedPoint], int]:
+        raw_points: list[dict[str, Any]],
+        classified_points: list[ClassifiedPoint],
+    ) -> tuple[list[dict[str, Any]], list[ClassifiedPoint], int]:
         """Filter discovered points against the site's explicit module policy."""
         filtered_classified, dropped_points = filter_classified_points_for_site(site_id, classified_points)
         if not dropped_points:
@@ -953,7 +910,7 @@ class PointDiscoveryService:
         ]
         return filtered_raw, filtered_classified, dropped_points
 
-    def get_discovery_result(self, discovery_id: str) -> Optional[DiscoveryResult]:
+    def get_discovery_result(self, discovery_id: str) -> DiscoveryResult | None:
         """Get a cached discovery result by ID.
 
         Args:
@@ -969,7 +926,7 @@ class PointDiscoveryService:
         # Try loading from file
         return self._load_discovery_result(discovery_id)
 
-    def list_discoveries(self) -> List[Dict[str, Any]]:
+    def list_discoveries(self) -> list[dict[str, Any]]:
         """List all cached discovery results (metadata only)."""
         results = []
         for result in self._discovery_cache.values():
@@ -998,7 +955,7 @@ class PointDiscoveryService:
         except Exception as e:
             logger.warning("Failed to save discovery result: %s", e)
 
-    def _load_discovery_result(self, discovery_id: str) -> Optional[DiscoveryResult]:
+    def _load_discovery_result(self, discovery_id: str) -> DiscoveryResult | None:
         """Load a discovery result from JSON file."""
         try:
             filepath = DATA_DIR / "discoveries" / f"discovery_{discovery_id}.json"
@@ -1036,7 +993,7 @@ class PointDiscoveryService:
 # Singleton factory
 # ---------------------------------------------------------------------------
 
-_discovery_service: Optional[PointDiscoveryService] = None
+_discovery_service: PointDiscoveryService | None = None
 
 
 def get_point_discovery_service() -> PointDiscoveryService:

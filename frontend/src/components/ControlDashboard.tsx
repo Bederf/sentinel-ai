@@ -39,9 +39,11 @@ import { PageLoading } from "./PageLoading";
 import { RecentActions } from "./RecentActions";
 import { PredictionDetail } from "./PredictionDetail";
 import { BuildingSelector } from "./BuildingSelector";
+import { authorizedFetch } from '@/lib/api/client';
 
 interface ControlDashboardProps {
   onError?: (error: string) => void;
+  siteId?: string;
 }
 
 interface AlertContext {
@@ -66,11 +68,19 @@ function mapSafetyStatusToDeviceStatus(
   return "unknown";
 }
 
-export function ControlDashboard({ onError }: ControlDashboardProps) {
+export function ControlDashboard({ onError, siteId: propSiteId }: ControlDashboardProps) {
   const [devices, setDevices] = useState<Device[]>([]);
   const [sites, setSites] = useState<Site[]>([]);
   const [predictions, setPredictions] = useState<Prediction[]>([]);
-  const [selectedSiteId, setSelectedSiteId] = useState<string | null>(null);
+  const [selectedSiteId, setSelectedSiteId] = useState<string | null>(propSiteId || null);
+  const [bridgeTelemetry, setBridgeTelemetry] = useState<{
+    status: "live" | "unavailable";
+    zones_with_readings?: number;
+    zone_count?: number;
+    power?: { hvac_kw?: number; lighting_kw?: number; total_kw?: number };
+  } | null>(null);
+  const [sentinelGuidance, setSentinelGuidance] = useState<string | null>(null);
+  const [sentinelPosture, setSentinelPosture] = useState<string | null>(null);
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
   const [selectedPrediction, setSelectedPrediction] = useState<Prediction | null>(null);
   const [isPredictionDetailOpen, setIsPredictionDetailOpen] = useState(false);
@@ -81,6 +91,12 @@ export function ControlDashboard({ onError }: ControlDashboardProps) {
   const [pendingEquipmentSelection, setPendingEquipmentSelection] = useState<string | null>(null);
   const [alertContext, setAlertContext] = useState<AlertContext | null>(null);
   const safetyLoadedDeviceIdsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (propSiteId) {
+      setSelectedSiteId(propSiteId);
+    }
+  }, [propSiteId]);
 
   // Check for pre-selected equipment from Dashboard/Alert navigation
   useEffect(() => {
@@ -134,7 +150,11 @@ export function ControlDashboard({ onError }: ControlDashboardProps) {
         const sitesWithDevices = sites.filter(site => siteIdsWithDevices.has(site.id));
         if (sitesWithDevices.length > 0) {
           const sortedSitesWithDevices = sitesWithDevices.sort((a, b) => a.name.localeCompare(b.name));
-          setSelectedSiteId(sortedSitesWithDevices[0]?.id || null);
+          const preferredSite =
+            sortedSitesWithDevices.find((site) => site.id === "site-002")
+            ?? sortedSitesWithDevices.find((site) => /sandton city office tower/i.test(site.name))
+            ?? sortedSitesWithDevices[0];
+          setSelectedSiteId(preferredSite?.id || null);
         } else {
           setSelectedSiteId(null);
         }
@@ -177,7 +197,11 @@ export function ControlDashboard({ onError }: ControlDashboardProps) {
           const sitesWithDevices = sitesData.filter(site => siteIdsWithDevices.has(site.id));
           if (sitesWithDevices.length > 0) {
             const sortedSitesWithDevices = sitesWithDevices.sort((a, b) => a.name.localeCompare(b.name));
-            setSelectedSiteId(sortedSitesWithDevices[0].id);
+            const preferredSite =
+              sortedSitesWithDevices.find((site) => site.id === "site-002")
+              ?? sortedSitesWithDevices.find((site) => /sandton city office tower/i.test(site.name))
+              ?? sortedSitesWithDevices[0];
+            setSelectedSiteId(preferredSite.id);
           }
         }
       } catch (error) {
@@ -191,6 +215,50 @@ export function ControlDashboard({ onError }: ControlDashboardProps) {
     loadDevices();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshDevices]);
+
+  useEffect(() => {
+    if (!selectedSiteId) return;
+    const siteIdForTelemetry = selectedSiteId;
+    let mounted = true;
+    async function loadTelemetrySummary() {
+      try {
+        const [rawTelemetryResp, stateResp] = await Promise.all([
+          authorizedFetch(`/api/sites/${encodeURIComponent(siteIdForTelemetry)}/telemetry`).catch(() => null),
+          authorizedFetch(`/api/building-state/${encodeURIComponent(siteIdForTelemetry)}`).catch(() => null),
+        ]);
+        if (!mounted) return;
+        if (rawTelemetryResp && rawTelemetryResp.ok) {
+          const raw = await rawTelemetryResp.json();
+          setBridgeTelemetry({
+            status: "live",
+            zones_with_readings: raw?.zones_with_readings ?? 0,
+            zone_count: raw?.zone_count ?? 0,
+            power: raw?.power ?? {},
+          });
+        } else {
+          setBridgeTelemetry({ status: "unavailable" });
+        }
+        if (stateResp && stateResp.ok) {
+          const state = await stateResp.json();
+          setSentinelGuidance(state?.payload?.operator_guidance?.headline || null);
+          setSentinelPosture(state?.payload?.building_posture || null);
+        } else {
+          setSentinelGuidance(null);
+          setSentinelPosture(null);
+        }
+      } catch {
+        if (mounted) {
+          setBridgeTelemetry({ status: "unavailable" });
+          setSentinelGuidance(null);
+          setSentinelPosture(null);
+        }
+      }
+    }
+    loadTelemetrySummary();
+    return () => {
+      mounted = false;
+    };
+  }, [selectedSiteId]);
 
   // Lazily fetch safety statuses only for the currently selected site
   useEffect(() => {
@@ -377,6 +445,35 @@ export function ControlDashboard({ onError }: ControlDashboardProps) {
             </h1>
             <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
               Building Management Control Centre
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex-none px-4 md:px-6 pb-3">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-sm font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                Raw Bridge Telemetry
+              </h2>
+              <span className="text-xs px-2 py-1 rounded" style={{ background: bridgeTelemetry?.status === "live" ? "rgba(16,185,129,0.15)" : "rgba(245,158,11,0.15)", color: bridgeTelemetry?.status === "live" ? "#10B981" : "#F59E0B" }}>
+                {bridgeTelemetry?.status === "live" ? "Live" : "Unavailable"}
+              </span>
+            </div>
+            <p className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+              Zones: {bridgeTelemetry?.zones_with_readings ?? 0}/{bridgeTelemetry?.zone_count ?? 0}
+            </p>
+          </div>
+          <div className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+            <h2 className="text-sm font-semibold mb-2" style={{ color: "var(--color-sentinel-text-primary)" }}>
+              SENTINEL Controls Interpretation
+            </h2>
+            <p className="text-xs capitalize" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+              Posture: <span style={{ color: "var(--color-sentinel-text-primary)" }}>{sentinelPosture || "unknown"}</span>
+            </p>
+            <p className="text-xs mt-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+              {sentinelGuidance || "No active guidance yet."}
             </p>
           </div>
         </div>

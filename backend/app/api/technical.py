@@ -8,7 +8,7 @@ from typing import Any, Literal
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, Field
 
-from app.config.demo_configs import get_demo_config_for_email, has_demo_site_access
+from app.config.access_profiles import get_access_profile_for_email, has_profile_site_access
 from app.database.repositories.user_site_access_repository import UserSiteAccessRepository
 from app.middleware.auth_middleware import require_auth, AuthLevel
 from app.models.auth import AuthContext, SentinelRole
@@ -140,9 +140,9 @@ def _assert_site_access(auth: AuthContext, site_id: str) -> None:
     if not email:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User email missing for site access check")
 
-    demo_config = get_demo_config_for_email(email)
-    if demo_config:
-        if not has_demo_site_access(email, site_id):
+    access_profile = get_access_profile_for_email(email)
+    if access_profile:
+        if not has_profile_site_access(email, site_id):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN, detail=f"You do not have access to site {site_id}"
             )

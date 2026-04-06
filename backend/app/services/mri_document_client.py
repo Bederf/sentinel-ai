@@ -100,14 +100,24 @@ class MRIDocumentClient:
                 client = await self._get_client()
                 try:
                     response = await client.get(f"{self.base_url}/documents", params=params)
+                except httpx.TimeoutException:
+                    logger.warning("[MRIDocumentClient] Retry timed out — returning []")
+                    return []
                 except httpx.HTTPStatusError as retry_err:
                     if retry_err.response.status_code in (500, 503):
                         logger.error(
                             "[MRIDocumentClient] Server error %s on retry — returning []",
                             retry_err.response.status_code,
                         )
-                        return []
-                    raise
+                    else:
+                        logger.warning(
+                            "[MRIDocumentClient] Retry failed with %s — returning []",
+                            retry_err.response.status_code,
+                        )
+                    return []
+                except Exception as retry_err:
+                    logger.warning("[MRIDocumentClient] Retry unexpected error — returning []: %s", retry_err)
+                    return []
             elif e.response.status_code in (500, 503):
                 logger.error("[MRIDocumentClient] Server error %s — returning []", e.response.status_code)
                 return []

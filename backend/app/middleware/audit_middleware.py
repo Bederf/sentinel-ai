@@ -119,7 +119,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
         correlation_id = str(uuid.uuid4())
         request.state.correlation_id = correlation_id
 
-        # Extract user from request (demo: hardcoded, production: from auth)
+        # Extract user from request (local fallback vs production auth)
         user = self._extract_user(request)
 
         # Skip audit for non-control endpoints

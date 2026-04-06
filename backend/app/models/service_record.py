@@ -1,6 +1,6 @@
 """Service record models for Phase 41 ML Engineer Knowledge Capture."""
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from enum import Enum
@@ -43,6 +43,8 @@ class SourceType(str, Enum):
 class ServiceReading(BaseModel):
     """Reading extracted from service sheet."""
 
+    model_config = ConfigDict(from_attributes=True)
+
     id: Optional[str] = None
     reading_type: str  # hour_meter, battery_voltage, oil_level, etc.
     value: str
@@ -51,12 +53,11 @@ class ServiceReading(BaseModel):
     source: SourceType = SourceType.MANUAL
     confidence: Optional[float] = Field(None, ge=0, le=1)
 
-    class Config:
-        from_attributes = True
-
 
 class ServiceAttachment(BaseModel):
     """Photo, audio, or document from service visit."""
+
+    model_config = ConfigDict(from_attributes=True)
 
     id: Optional[str] = None
     attachment_type: AttachmentType
@@ -68,12 +69,11 @@ class ServiceAttachment(BaseModel):
     analysis_status: Optional[str] = "pending"
     created_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
-
 
 class ServiceObservation(BaseModel):
     """Technician observation (voice or text)."""
+
+    model_config = ConfigDict(from_attributes=True)
 
     id: Optional[str] = None
     observation_type: str  # voice_note or text
@@ -85,12 +85,11 @@ class ServiceObservation(BaseModel):
     issue_flags: Optional[List[str]] = None
     created_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
-
 
 class DiagnosticContext(BaseModel):
     """Context from original alert/diagnosis - passed to data collection."""
+
+    model_config = ConfigDict(from_attributes=True)
 
     fault_type: Optional[str] = None  # e.g., "fcu_valve_stuck"
     fault_code: Optional[str] = None  # e.g., "E04"
@@ -104,12 +103,11 @@ class DiagnosticContext(BaseModel):
     parts_required: List[str] = Field(default_factory=list)
     severity: Optional[str] = None  # critical, warning, info
 
-    class Config:
-        from_attributes = True
-
 
 class ServiceRecord(BaseModel):
     """Main service record for a service visit."""
+
+    model_config = ConfigDict(from_attributes=True)
 
     id: Optional[str] = None
     code: str
@@ -132,19 +130,15 @@ class ServiceRecord(BaseModel):
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
-
 
 class ServiceRecordDetail(ServiceRecord):
     """Service record with related data."""
 
+    model_config = ConfigDict(from_attributes=True)
+
     readings: List[ServiceReading] = Field(default_factory=list)
     attachments: List[ServiceAttachment] = Field(default_factory=list)
     observations: List[ServiceObservation] = Field(default_factory=list)
-
-    class Config:
-        from_attributes = True
 
 
 class ServiceRecordCreate(BaseModel):

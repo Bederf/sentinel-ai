@@ -8,12 +8,12 @@ from __future__ import annotations
 
 import logging
 from datetime import date, datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from app.database.repositories.energy_consumption_repository import EnergyConsumptionRepository
+from app.database.repositories.municipal_demand_repository import MunicipalDemandRepository
 from app.database.repositories.municipal_invoice_repository import MunicipalInvoiceRepository
 from app.database.repositories.water_consumption_repository import WaterConsumptionRepository
-from app.database.repositories.municipal_demand_repository import MunicipalDemandRepository
 from app.services.tariff_schedule_service import TariffScheduleService
 
 logger = logging.getLogger(__name__)
@@ -43,10 +43,10 @@ class MunicipalReconciliationService:
 
     def reconcile_invoice(
         self,
-        parsed_data: Dict[str, Any],
+        parsed_data: dict[str, Any],
         site_id: str,
-        invoice_id: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        invoice_id: str | None = None,
+    ) -> dict[str, Any]:
         """Reconcile parsed invoice data with BMS data."""
         utility_type = parsed_data.get("utility_type", "electricity")
         period_start = self._parse_date(parsed_data.get("billing_period_start"))
@@ -121,8 +121,8 @@ class MunicipalReconciliationService:
         site_id: str,
         period_start: date,
         period_end: date,
-        current_tariff: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        current_tariff: str | None = None,
+    ) -> dict[str, Any]:
         bms_data = self._fetch_bms_consumption(
             site_id=site_id,
             utility_type="electricity",
@@ -179,8 +179,8 @@ class MunicipalReconciliationService:
         site_id: str,
         period_start: date,
         period_end: date,
-        meter_id: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        meter_id: str | None = None,
+    ) -> dict[str, Any]:
         bms_data = self._fetch_bms_consumption(
             site_id=site_id,
             utility_type="electricity",
@@ -197,9 +197,9 @@ class MunicipalReconciliationService:
 
     def generate_dispute_pack(
         self,
-        invoice: Dict[str, Any],
-        reconciliation: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        invoice: dict[str, Any],
+        reconciliation: dict[str, Any],
+    ) -> dict[str, Any]:
         billing_period = None
         if invoice.get("billing_period_start") and invoice.get("billing_period_end"):
             billing_period = f"{invoice['billing_period_start']} to {invoice['billing_period_end']}"
@@ -242,7 +242,7 @@ class MunicipalReconciliationService:
         }
         return dispute_pack
 
-    def get_portfolio_metrics(self, period: str) -> Dict[str, Any]:
+    def get_portfolio_metrics(self, period: str) -> dict[str, Any]:
         invoices = self.invoice_repo.list_invoices()
         period_start = None
         period_end = None
@@ -279,11 +279,11 @@ class MunicipalReconciliationService:
         self,
         site_id: str,
         utility_type: str,
-        period_start: Optional[date],
-        period_end: Optional[date],
-        meter_id: Optional[str] = None,
-        tou_breakdown: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        period_start: date | None,
+        period_end: date | None,
+        meter_id: str | None = None,
+        tou_breakdown: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         if utility_type == "water":
             return self._fetch_water_consumption(site_id, period_start, period_end)
 
@@ -299,11 +299,11 @@ class MunicipalReconciliationService:
         self,
         site_id: str,
         utility_type: str,
-        period_start: Optional[date],
-        period_end: Optional[date],
-        meter_id: Optional[str] = None,
-        tou_breakdown: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        period_start: date | None,
+        period_end: date | None,
+        meter_id: str | None = None,
+        tou_breakdown: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """Public wrapper for BMS consumption retrieval."""
         return self._fetch_bms_consumption(
             site_id=site_id,
@@ -317,11 +317,11 @@ class MunicipalReconciliationService:
     def _fetch_energy_consumption(
         self,
         site_id: str,
-        period_start: Optional[date],
-        period_end: Optional[date],
-        meter_id: Optional[str] = None,
-        tou_breakdown: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        period_start: date | None,
+        period_end: date | None,
+        meter_id: str | None = None,
+        tou_breakdown: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         total_kwh = 0.0
         if period_start and period_end:
             if self.energy_repo:
@@ -329,7 +329,7 @@ class MunicipalReconciliationService:
                 total_kwh = sum(float(r.get("total_kwh") or 0.0) for r in records)
 
         peak_demand_kw = 0.0
-        peak_windows: List[Dict[str, Any]] = []
+        peak_windows: list[dict[str, Any]] = []
         if self._demand_repo and period_start and period_end:
             demand_rows = self._demand_repo.get_by_site(site_id, period_start, period_end, meter_id)
             if demand_rows:
@@ -370,9 +370,9 @@ class MunicipalReconciliationService:
     def _fetch_water_consumption(
         self,
         site_id: str,
-        period_start: Optional[date],
-        period_end: Optional[date],
-    ) -> Dict[str, Any]:
+        period_start: date | None,
+        period_end: date | None,
+    ) -> dict[str, Any]:
         if not period_start or not period_end:
             return {"total_kl": 0.0, "total_kwh": 0.0, "by_band": {}}
 
@@ -394,8 +394,8 @@ class MunicipalReconciliationService:
     def _suggest_staggering(
         self,
         peak_demand_kw: float,
-        peak_windows: List[Dict[str, Any]],
-    ) -> List[Dict[str, Any]]:
+        peak_windows: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
         if peak_demand_kw <= 0 or not peak_windows:
             return []
 
@@ -410,7 +410,7 @@ class MunicipalReconciliationService:
         ]
 
     @staticmethod
-    def _parse_date(value: Any) -> Optional[date]:
+    def _parse_date(value: Any) -> date | None:
         if not value:
             return None
         if isinstance(value, date):

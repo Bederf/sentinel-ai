@@ -22,7 +22,6 @@ import logging
 import re
 from datetime import datetime
 from email.utils import parseaddr
-from typing import Optional
 
 from app.models.booking_record import BookingRecord
 from app.services.block_booking_detector.site_resolver import resolve_site_id_for_room
@@ -63,7 +62,7 @@ def _hash_email(raw: str) -> str:
     return hashlib.sha256(raw.encode("utf-8", errors="replace")).hexdigest()
 
 
-def _parse_datetime(value: str) -> Optional[datetime]:
+def _parse_datetime(value: str) -> datetime | None:
     """Try multiple datetime formats to parse a value string."""
     value = value.strip().rstrip(".")
     # Remove timezone names like "South Africa", "(UTC)", "(SAST)"
@@ -78,7 +77,7 @@ def _parse_datetime(value: str) -> Optional[datetime]:
     return None
 
 
-def _parse_rs_datetime(body: str) -> tuple[Optional[datetime], Optional[datetime]]:
+def _parse_rs_datetime(body: str) -> tuple[datetime | None, datetime | None]:
     """Parse Resource Scheduler date/time format.
 
     "Friday, 27 March 2026 from 8:00 AM until 5:00 PM South Africa"
@@ -114,7 +113,7 @@ def _parse_rs_datetime(body: str) -> tuple[Optional[datetime], Optional[datetime
     return start_dt, end_dt
 
 
-def _extract_field(body: str, label: str) -> Optional[str]:
+def _extract_field(body: str, label: str) -> str | None:
     """Extract a labelled field value from the email body.
 
     Matches patterns like:
@@ -128,7 +127,7 @@ def _extract_field(body: str, label: str) -> Optional[str]:
     return None
 
 
-def _extract_room_code(location: str) -> Optional[str]:
+def _extract_room_code(location: str) -> str | None:
     """Extract room code from Resource Scheduler location string.
 
     "Fairland 1(WB); GR Floor Meeting Rooms; FA1-GRQ1-TR-01" -> "FA1-GRQ1-TR-01"
@@ -143,7 +142,7 @@ def _extract_room_code(location: str) -> Optional[str]:
     return None
 
 
-def _extract_site_from_room_code(room_code: str) -> Optional[str]:
+def _extract_site_from_room_code(room_code: str) -> str | None:
     """Extract site prefix from room code: FA1-GRQ1-TR-01 -> FA1."""
     match = re.match(r"(FA\d+)", room_code, re.IGNORECASE)
     return match.group(1).upper() if match else None
@@ -191,7 +190,7 @@ def is_cancellation(raw_email: str) -> bool:
     return bool(_CANCEL_PATTERNS.search(subject))
 
 
-def extract_cancelled_room(raw_email: str, site_id: str) -> Optional[dict]:
+def extract_cancelled_room(raw_email: str, site_id: str) -> dict | None:
     """Extract organiser + room from a cancellation email for removal lookup."""
     try:
         msg = email.message_from_string(raw_email)
@@ -264,7 +263,7 @@ def _get_body(msg: email.message.Message) -> str:
 def parse_booking_confirmation(
     raw_email: str,
     site_id: str = "",
-) -> Optional[BookingRecord]:
+) -> BookingRecord | None:
     """Parse a room booking confirmation email.
 
     Supports Resource Scheduler (FNB) and Outlook formats.
@@ -296,7 +295,7 @@ def _parse_resource_scheduler(
     raw_email: str,
     body: str,
     site_id: str,
-) -> Optional[BookingRecord]:
+) -> BookingRecord | None:
     """Parse Resource Scheduler booking notification."""
 
     # Organiser from Meeting Contact field
@@ -346,7 +345,7 @@ def _parse_resource_scheduler(
 def parse_ics_booking(
     ics_data: str,
     site_id: str = "",
-) -> Optional[BookingRecord]:
+) -> BookingRecord | None:
     """Parse an iCalendar (.ics) VEVENT into a BookingRecord.
 
     Extracts ORGANIZER, LOCATION, DTSTART, DTEND, SUMMARY from the first VEVENT.
@@ -461,7 +460,7 @@ def _parse_outlook(
     msg: email.message.Message,
     body: str,
     site_id: str,
-) -> Optional[BookingRecord]:
+) -> BookingRecord | None:
     """Parse Outlook calendar booking confirmation (legacy path)."""
 
     # Organiser from From: header

@@ -19,6 +19,7 @@ from uuid import uuid4
 import httpx
 
 from app.config.settings import settings
+from app.database.supabase_client import get_supabase_client
 from app.security.document_scanner import validate_and_scan_upload
 
 logger = logging.getLogger(__name__)
@@ -63,6 +64,8 @@ class ConceptRawDocumentService:
         telegram_user_id: str,
         telegram_chat_id: str,
         received_at: str,
+        equipment_id: str | None = None,
+        work_order_id: str | None = None,
         notes: str | None = None,
     ) -> dict[str, Any]:
         downloaded = await self._download_telegram_file(telegram_file_id)
@@ -112,6 +115,8 @@ class ConceptRawDocumentService:
             "telegram_file_path": downloaded.telegram_file_path,
             "telegram_user_id": telegram_user_id,
             "telegram_chat_id": telegram_chat_id,
+            "equipment_id": equipment_id,
+            "work_order_id": work_order_id,
             "received_at": received_at,
             "saved_at": datetime.utcnow().isoformat() + "Z",
             "file_name": file_name,
@@ -125,6 +130,17 @@ class ConceptRawDocumentService:
             "storage_mode": "filesystem",
         }
         self._append_index_record(record)
+        supabase_document_id = self._persist_supabase_document_row(
+            title=f"{self._title(document_type)} - {self._title(equipment_type)}",
+            site_id=site_id,
+            file_name=file_name,
+            stored_path=str(stored_path),
+            equipment_id=equipment_id,
+            work_order_id=work_order_id,
+            equipment_type=equipment_type,
+            document_type=document_type,
+            notes=notes or "",
+        )
 
         logger.info(
             "Saved raw Concept intake document %s for site=%s equipment_type=%s document_type=%s",
@@ -137,6 +153,7 @@ class ConceptRawDocumentService:
         return {
             "status": "saved",
             "concept_document_id": concept_document_id,
+            "supabase_document_id": supabase_document_id,
             "site_id": site_id,
             "site_name": site_name,
             "concept_path": concept_path,
@@ -146,6 +163,45 @@ class ConceptRawDocumentService:
             "scan_trust_level": scan_result.trust_level,
             "stored_path": str(stored_path),
         }
+
+    def _persist_supabase_document_row(
+        self,
+        *,
+        title: str,
+        site_id: str,
+        file_name: str,
+        stored_path: str,
+        equipment_id: str | None,
+        work_order_id: str | None,
+        equipment_type: str,
+        document_type: str,
+        notes: str,
+    ) -> str | None:
+        """Persist Telegram intake metadata into documents table for equipment linkage."""
+        try:
+            client = get_supabase_client()
+            payload = {
+                "site_id": site_id,
+                "title": title,
+                "document_type": "service_report",
+                "source": "telegram_sentry",
+                "storage_path": stored_path,
+                "indexing_status": "embedded",
+                "keywords": [
+                    f"equipment_type:{equipment_type}",
+                    f"document_type:{document_type}",
+                    f"equipment_id:{equipment_id or ''}",
+                    f"work_order_id:{work_order_id or ''}",
+                    f"file_name:{file_name}",
+                    f"notes:{notes}" if notes else "notes:",
+                ],
+            }
+            result = client.table("documents").insert(payload).execute()
+            if result.data:
+                return result.data[0].get("id")
+        except Exception as exc:
+            logger.warning("Failed to persist telegram intake document row in Supabase: %s", exc)
+        return None
 
     async def _download_telegram_file(self, telegram_file_id: str) -> DownloadedTelegramFile:
         token = (settings.telegram_bot_token or "").strip()

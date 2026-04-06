@@ -195,8 +195,8 @@ class GovernanceMetricsCollector:
         """
         try:
             from app.api.metrics import (
-                sentinel_ai_tokens_by_route_total,
                 sentinel_ai_cost_by_route_total,
+                sentinel_ai_tokens_by_route_total,
             )
 
             safe_route = _normalise_route(route)

@@ -1,18 +1,17 @@
 /**
- * SIMBIOT Page — BMS Connection Wizard + Data Source Control
+ * SIMBIOT Page — Site Connection Wizard + Data Source Control
  *
  * Admin-only page with two sub-tabs:
- * 1. Connection Wizard — onboard new BMS data sources
- * 2. Data Source — lifecycle simulator driver for Site 002 (dev/demo only)
+ * 1. Connection Wizard — onboard new site data sources through SIMBIOT
+ * 2. Data Source — local source controls for non-production instances
  */
 
 import { useEffect, useState } from "react";
 import api, { type Site } from '@/lib/api';
 import { BMSConnectionWizard } from "./BMSConnectionWizard";
-import { DataSourceTab } from "./system/DataSourceTab";
-import { Loader2, Plug, Database } from "lucide-react";
+import { Loader2, Plug } from "lucide-react";
 
-type SimbiotTab = "wizard" | "data-source";
+type SimbiotTab = "wizard";
 
 export function SimbiotPage() {
   const [sites, setSites] = useState<Site[]>([]);
@@ -26,7 +25,13 @@ export function SimbiotPage() {
       .getSites()
       .then((data) => {
         setSites(data);
-        if (data.length > 0) setSelectedSiteId(data[0].id);
+        if (data.length > 0) {
+          const preferredSite =
+            data.find((site) => site.id === "site-002")
+            ?? data.find((site) => /sandton city office tower/i.test(site.name))
+            ?? data[0];
+          setSelectedSiteId(preferredSite.id);
+        }
         setLoading(false);
       })
       .catch(() => setLoading(false));
@@ -45,7 +50,6 @@ export function SimbiotPage() {
 
   const tabs: { id: SimbiotTab; label: string; icon: typeof Plug }[] = [
     { id: "wizard", label: "Connection Wizard", icon: Plug },
-    { id: "data-source", label: "Data Source", icon: Database },
   ];
 
   return (
@@ -56,10 +60,10 @@ export function SimbiotPage() {
       <div className="p-4 md:p-6 lg:p-8 space-y-6">
         {/* Sub-tab navigation */}
         <div
-          className="flex overflow-x-auto scrollbar-hide gap-1 rounded-md p-1"
+          className="flex overflow-x-auto scrollbar-hide gap-1 rounded-lg p-1"
           style={{
             background: "var(--color-sentinel-bg-secondary)",
-            border: "1px solid var(--glass-border)",
+            border: "1px solid var(--color-sentinel-border)",
           }}
         >
           {tabs.map((tab) => {
@@ -73,7 +77,7 @@ export function SimbiotPage() {
                 style={{
                   background: isActive ? "var(--color-sentinel-bg-panel)" : "transparent",
                   color: isActive ? "var(--color-sentinel-text-primary)" : "var(--color-sentinel-text-secondary)",
-                  border: isActive ? "1px solid var(--glass-border)" : "1px solid transparent",
+                  border: isActive ? "1px solid var(--color-sentinel-border)" : "1px solid transparent",
                 }}
               >
                 <Icon className="h-4 w-4" />
@@ -94,9 +98,6 @@ export function SimbiotPage() {
           />
         )}
 
-        {activeTab === "data-source" && (
-          <DataSourceTab siteId={selectedSiteId || undefined} />
-        )}
       </div>
     </div>
   );

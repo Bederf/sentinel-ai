@@ -11,7 +11,7 @@ Powered by contextual analysis of findings, health score changes, and keyword de
 import logging
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, Optional, Any
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -29,12 +29,12 @@ class InspectionAnalysisResult:
     """Result of inspection analysis with recommendation."""
 
     decision: InspectionDecision
-    severity: Optional[str] = None  # high, medium, low
-    reason: Optional[str] = None  # Human-readable explanation
-    parts_needed: Optional[list] = None  # Recommended parts
+    severity: str | None = None  # high, medium, low
+    reason: str | None = None  # Human-readable explanation
+    parts_needed: list | None = None  # Recommended parts
     confidence: float = 0.8  # Confidence in recommendation (0-1)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for storage/API response."""
         return {
             "decision": self.decision.value,

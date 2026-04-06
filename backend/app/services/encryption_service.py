@@ -21,7 +21,7 @@ Environment Variables:
 
 import logging
 import os
-from typing import Any, Dict, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +33,7 @@ class EncryptionService:
     Automatically falls back to plaintext if encryption is disabled.
     """
 
-    def __init__(self, encryption_key: Optional[str] = None, enabled: bool = True):
+    def __init__(self, encryption_key: str | None = None, enabled: bool = True):
         """Initialize encryption service.
 
         Args:
@@ -114,7 +114,7 @@ class EncryptionService:
             # Return original if decryption fails (might be plaintext from fallback)
             return encrypted_data
 
-    def encrypt_dict(self, data: Dict[str, Any], fields_to_encrypt: Optional[list] = None) -> Dict[str, Any]:
+    def encrypt_dict(self, data: dict[str, Any], fields_to_encrypt: list | None = None) -> dict[str, Any]:
         """Encrypt specific fields in a dictionary.
 
         Args:
@@ -142,7 +142,7 @@ class EncryptionService:
 
         return encrypted
 
-    def decrypt_dict(self, data: Dict[str, Any], fields_to_decrypt: Optional[list] = None) -> Dict[str, Any]:
+    def decrypt_dict(self, data: dict[str, Any], fields_to_decrypt: list | None = None) -> dict[str, Any]:
         """Decrypt specific fields in a dictionary.
 
         Args:
@@ -188,10 +188,10 @@ class EncryptionService:
 
 
 # Global singleton instance
-_encryption_service: Optional[EncryptionService] = None
+_encryption_service: EncryptionService | None = None
 
 
-def get_encryption_service(encryption_key: Optional[str] = None, enabled: Optional[bool] = None) -> EncryptionService:
+def get_encryption_service(encryption_key: str | None = None, enabled: bool | None = None) -> EncryptionService:
     """Get or create global encryption service instance.
 
     Args:

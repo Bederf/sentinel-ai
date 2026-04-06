@@ -20,6 +20,18 @@ Best practices for using Claude Code and development tools effectively.
 
 ## Claude Code Workflow
 
+### Nexus vs RAG decision precedence
+
+Use a two-layer context model for agent work:
+
+- **Nexus (Obsidian control context)**: current truth, active decisions, execution constraints.
+- **RAG (`docs/` indexed knowledge)**: deep reference, implementation detail, historical context.
+
+If Nexus and RAG disagree, **Nexus wins for current execution decisions**.
+
+Promotion rule: move information from RAG into Nexus only when it changes runtime behavior,
+active policy, safety gates, or current execution decisions.
+
 ### Reading Files
 
 **GOOD: Read files before modifying**

@@ -6,16 +6,16 @@ generates responses via the model gateway.
 """
 
 import logging
-from typing import Any, Dict, Optional
+from typing import Any
 
+from app.database.repositories.alert_repository import AlertRepository
+from app.database.repositories.equipment_repository import EquipmentRepository
 from app.services.model_gateway import model_gateway
 from app.services.rag_service import get_rag_service
-from app.database.repositories.equipment_repository import EquipmentRepository
-from app.database.repositories.alert_repository import AlertRepository
-from ml.conversation.intent import IntentClassifier, Intent, ClassifiedQuery
+from ml.conversation.intent import ClassifiedQuery, Intent, IntentClassifier
 from ml.conversation.prompts import (
-    SYSTEM_PROMPT,
     INTENT_PROMPTS,
+    SYSTEM_PROMPT,
 )
 
 logger = logging.getLogger(__name__)
@@ -29,7 +29,7 @@ class QueryHandler:
         self.equipment_repo = EquipmentRepository()
         self.alert_repo = AlertRepository()
 
-    async def handle_query(self, query: str) -> Dict[str, Any]:
+    async def handle_query(self, query: str) -> dict[str, Any]:
         """Process a natural language query end-to-end.
 
         1. Classify intent and extract entities
@@ -67,6 +67,7 @@ class QueryHandler:
                 task_class="medium",
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=1024,
+                source="local_chat_query_handler",
             )
             model_used = "gateway:medium"
         except Exception:
@@ -84,9 +85,9 @@ class QueryHandler:
             "llm_available": model_used is not None,
         }
 
-    async def _gather_context(self, classified: ClassifiedQuery) -> Dict[str, Any]:
+    async def _gather_context(self, classified: ClassifiedQuery) -> dict[str, Any]:
         """Gather relevant context based on intent and entities."""
-        context: Dict[str, Any] = {}
+        context: dict[str, Any] = {}
 
         # Get equipment data if IDs are present
         equipment_id = classified.equipment_ids[0] if classified.equipment_ids else None
@@ -123,11 +124,11 @@ class QueryHandler:
 
     async def _get_prediction_context(
         self,
-        equipment_id: Optional[str],
+        equipment_id: str | None,
         classified: ClassifiedQuery,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Gather prediction-specific context."""
-        ctx: Dict[str, Any] = {}
+        ctx: dict[str, Any] = {}
         if not equipment_id:
             return ctx
 
@@ -142,11 +143,11 @@ class QueryHandler:
 
     async def _get_maintenance_context(
         self,
-        equipment_id: Optional[str],
+        equipment_id: str | None,
         classified: ClassifiedQuery,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Gather maintenance-specific context."""
-        ctx: Dict[str, Any] = {}
+        ctx: dict[str, Any] = {}
         if not equipment_id:
             return ctx
 
@@ -156,9 +157,9 @@ class QueryHandler:
             ctx["rul_days"] = equipment.get("rul_days", "Unknown")
         return ctx
 
-    def _get_comparison_context(self, classified: ClassifiedQuery) -> Dict[str, Any]:
+    def _get_comparison_context(self, classified: ClassifiedQuery) -> dict[str, Any]:
         """Gather context for equipment comparison."""
-        ctx: Dict[str, Any] = {}
+        ctx: dict[str, Any] = {}
         if len(classified.equipment_ids) >= 2:
             eq_a = self.equipment_repo.get_by_id(classified.equipment_ids[0])
             eq_b = self.equipment_repo.get_by_id(classified.equipment_ids[1])
@@ -170,17 +171,17 @@ class QueryHandler:
 
     def _get_anomaly_context(
         self,
-        equipment_id: Optional[str],
+        equipment_id: str | None,
         classified: ClassifiedQuery,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Gather anomaly-specific context."""
-        ctx: Dict[str, Any] = {}
+        ctx: dict[str, Any] = {}
         if equipment_id:
             alerts = self.alert_repo.get_active_by_equipment(equipment_id)
             ctx["anomaly_alerts"] = alerts or []
         return ctx
 
-    def _build_prompt(self, classified: ClassifiedQuery, context: Dict[str, Any]) -> str:
+    def _build_prompt(self, classified: ClassifiedQuery, context: dict[str, Any]) -> str:
         """Build the appropriate prompt template with context."""
         template = INTENT_PROMPTS.get(classified.intent.value, INTENT_PROMPTS["general_query"])
 
@@ -246,7 +247,7 @@ class QueryHandler:
             f"equipment to the best of your ability."
         )
 
-    def _generate_offline_response(self, classified: ClassifiedQuery, context: Dict[str, Any]) -> str:
+    def _generate_offline_response(self, classified: ClassifiedQuery, context: dict[str, Any]) -> str:
         """Generate a response when Ollama is not available."""
         equipment = context.get("equipment", {})
         equipment_id = classified.equipment_ids[0] if classified.equipment_ids else None
@@ -277,7 +278,7 @@ class QueryHandler:
 
         return "\n".join(parts)
 
-    def _format_sensor_readings(self, equipment: Dict[str, Any]) -> str:
+    def _format_sensor_readings(self, equipment: dict[str, Any]) -> str:
         """Format equipment sensor readings for prompt context."""
         if not equipment:
             return "No sensor readings available"
@@ -300,7 +301,7 @@ class QueryHandler:
             )
         return "\n".join(lines)
 
-    def _format_equipment_summary(self, equipment: Dict[str, Any]) -> str:
+    def _format_equipment_summary(self, equipment: dict[str, Any]) -> str:
         """Format equipment details for comparison prompt."""
         if not equipment:
             return "No data available"
@@ -311,7 +312,7 @@ class QueryHandler:
 
 
 # Singleton
-_query_handler: Optional[QueryHandler] = None
+_query_handler: QueryHandler | None = None
 
 
 def get_query_handler() -> QueryHandler:

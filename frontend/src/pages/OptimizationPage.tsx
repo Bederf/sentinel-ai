@@ -22,7 +22,6 @@ import {
   Clock,
   CheckCircle,
 } from "lucide-react";
-import { useSimulation } from "@/contexts/SimulationContext";
 import { useModules } from "@/contexts/ModuleHooks";
 import { TabGroup, TabList, Tab, TabPanels, TabPanel } from "@tremor/react";
 import api from '@/lib/api';
@@ -36,8 +35,6 @@ import { ProfileSettings } from "../components/optimization/ProfileSettings";
 import { RecommendationsDashboard } from "../components/optimization/RecommendationsDashboard";
 import { RecommendationHistory } from "../components/optimization/RecommendationHistory";
 import { PowerMeterValidationCard, CostValidationCard } from "../components/validation";
-import { EnergyComparisonPanel } from "../components/EnergyComparisonPanel";
-import { ActualVsSentinelEnergyCard } from "../components/ActualVsSentinelEnergyCard";
 import { ROISummaryCard } from "../components/ROISummaryCard";
 
 // Sentinel-styled Badge component
@@ -121,8 +118,6 @@ interface OptimizationPageProps {
 }
 
 export function OptimizationPage({ onError }: OptimizationPageProps) {
-  // Get simulation context for live HVAC metrics
-  const { running: isSimulationRunning, hvacLoadPercent, ambientTemp, simulatedHour, daysSimulated } = useSimulation();
   const { isModuleActive } = useModules();
 
   // State
@@ -147,7 +142,10 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
   useEffect(() => {
     api.getSites().then((sitesData) => {
       setSites(sitesData);
-      const defaultSite = sitesData[0];
+      const defaultSite =
+        sitesData.find((site) => site.id === "site-002")
+        ?? sitesData.find((site) => /sandton city office tower/i.test(site.name))
+        ?? sitesData[0];
       if (defaultSite) setSelectedSiteId(defaultSite.id);
     }).catch(() => {});
   }, []);
@@ -293,7 +291,7 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
     return (
       <div className="h-full overflow-y-auto p-4 md:p-6" style={{ background: "var(--color-sentinel-bg-canvas)" }}>
         <div
-          className="rounded-md p-8 text-center"
+          className="rounded-lg p-8 text-center"
           style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}
         >
           <div
@@ -380,7 +378,7 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
       </div>
 
       {/* Load Shedding Optimization */}
-      <div className="rounded-md p-4 mb-6" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+      <div className="rounded-lg p-4 mb-6" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded" style={{ background: "rgba(59, 130, 246, 0.15)" }}>
@@ -391,24 +389,21 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
                 Load Shedding Optimization
               </h3>
               <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                {isSimulationRunning
-                  ? `Live HVAC ${hvacLoadPercent?.toFixed(0)}% load • Hour ${simulatedHour}:00 (Day ${daysSimulated}/365) • ${ambientTemp?.toFixed(1)}°C`
-                  : 'Optimize building comfort and energy use during outages'
-                }
+                Optimize building comfort and energy use during outages
               </span>
             </div>
           </div>
-          <SentinelBadge variant={isSimulationRunning ? "info" : "success"} size="sm">
-            {isSimulationRunning ? "Live" : "Monitoring"}
+          <SentinelBadge variant="success" size="sm">
+            Monitoring
           </SentinelBadge>
         </div>
-        <OptimizationPanelGated compact={false} />
+        <OptimizationPanelGated siteId={selectedSiteId} compact={false} />
       </div>
 
       {/* Metrics Grid - KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <div
-          className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}
+          className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}
         >
           <div className="flex items-center justify-between">
             <div>
@@ -416,36 +411,32 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
                 className="text-xs mb-1"
                 style={{ color: "var(--color-sentinel-text-secondary)" }}
               >
-                {isSimulationRunning ? "Live HVAC Load" : "Energy Savings"}
+                Energy Savings
               </div>
               <div
                 className="text-2xl font-semibold"
                 style={{ color: "var(--color-sentinel-text-primary)" }}
               >
-                {isSimulationRunning ? `${hvacLoadPercent?.toFixed(0)}%` : `${kpis.energySavings}%`}
+                {`${kpis.energySavings}%`}
               </div>
               <div
                 className="text-sm"
-                style={{ color: isSimulationRunning ? "var(--color-sentinel-blue)" : "var(--color-sentinel-green)" }}
+                style={{ color: "var(--color-sentinel-green)" }}
               >
-                {isSimulationRunning ? "Current load" : "avg. across sites"}
+                avg. across sites
               </div>
             </div>
             <div
               className="h-10 w-10 rounded flex items-center justify-center"
-              style={{ background: isSimulationRunning ? "rgba(59, 130, 246, 0.15)" : "rgba(16, 185, 129, 0.15)" }}
+              style={{ background: "rgba(16, 185, 129, 0.15)" }}
             >
-              {isSimulationRunning ? (
-                <Zap className="h-5 w-5" style={{ color: "var(--color-sentinel-blue)" }} />
-              ) : (
-                <TrendingDown className="h-5 w-5" style={{ color: "var(--color-sentinel-green)" }} />
-              )}
+              <TrendingDown className="h-5 w-5" style={{ color: "var(--color-sentinel-green)" }} />
             </div>
           </div>
         </div>
 
         <div
-          className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}
+          className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}
         >
           <div className="flex items-center justify-between">
             <div>
@@ -453,36 +444,32 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
                 className="text-xs mb-1"
                 style={{ color: "var(--color-sentinel-text-secondary)" }}
               >
-                {isSimulationRunning ? "Ambient Temperature" : "Comfort Extension"}
+                Comfort Extension
               </div>
               <div
                 className="text-2xl font-semibold"
                 style={{ color: "var(--color-sentinel-text-primary)" }}
               >
-                {isSimulationRunning ? `${ambientTemp?.toFixed(1)}°C` : `${kpis.comfortExtension} min`}
+                {`${kpis.comfortExtension} min`}
               </div>
               <div
                 className="text-sm"
-                style={{ color: isSimulationRunning ? "var(--color-sentinel-amber)" : "var(--color-sentinel-green)" }}
+                style={{ color: "var(--color-sentinel-green)" }}
               >
-                {isSimulationRunning ? "Current temp" : "avg. extension"}
+                avg. extension
               </div>
             </div>
             <div
               className="h-10 w-10 rounded flex items-center justify-center"
-              style={{ background: isSimulationRunning ? "rgba(245, 158, 11, 0.15)" : "rgba(59, 130, 246, 0.15)" }}
+              style={{ background: "rgba(59, 130, 246, 0.15)" }}
             >
-              {isSimulationRunning ? (
-                <Thermometer className="h-5 w-5" style={{ color: "var(--color-sentinel-amber)" }} />
-              ) : (
-                <Thermometer className="h-5 w-5" style={{ color: "var(--color-sentinel-blue)" }} />
-              )}
+              <Thermometer className="h-5 w-5" style={{ color: "var(--color-sentinel-blue)" }} />
             </div>
           </div>
         </div>
 
         <div
-          className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}
+          className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}
         >
           <div className="flex items-center justify-between">
             <div>
@@ -515,7 +502,7 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
         </div>
 
         <div
-          className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}
+          className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}
         >
           <div className="flex items-center justify-between">
             <div>
@@ -552,7 +539,7 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
       <div className={`grid grid-cols-1 ${isModuleActive('fleet_ml') ? 'lg:grid-cols-2' : ''} gap-6 pb-6`}>
         {/* Scenario Comparison — cross-building comparison, requires Fleet ML */}
         {isModuleActive('fleet_ml') && (
-        <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+        <div className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
           <div className="flex items-center gap-3 mb-4">
             <div className="p-2 rounded" style={{ background: "rgba(245, 158, 11, 0.15)" }}>
               <BarChart className="h-5 w-5" style={{ color: "var(--color-sentinel-amber)" }} />
@@ -610,7 +597,7 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
         )}
 
         {/* Action History */}
-        <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+        <div className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
           <div className="flex items-center gap-3 mb-4">
             <div className="p-2 rounded" style={{ background: "rgba(16, 185, 129, 0.15)" }}>
               <Clock className="h-5 w-5" style={{ color: "var(--color-sentinel-green)" }} />
@@ -684,7 +671,7 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
             onClick={() => setShowConfirmModal(false)}
           />
           <div
-            className="relative z-10 rounded-md p-6"
+            className="relative z-10 rounded-lg p-6"
             style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}
           >
             <div className="mb-4">
@@ -742,19 +729,11 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
 
           <TabPanel>
             <div className="space-y-6">
-              {/* Energy Impact Comparison */}
-              <EnergyComparisonPanel siteId={selectedSiteId} />
-
-              {/* Actual vs SENTINEL Energy */}
-              <div className="rounded-md overflow-hidden" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
-                <ActualVsSentinelEnergyCard siteId={selectedSiteId} />
-              </div>
-
               {/* Validation Metrics */}
               <div>
                 <h3 className="font-medium text-sm mb-2" style={{ color: "var(--color-sentinel-text-primary)" }}>Energy &amp; Cost Validation</h3>
                 <p className="text-xs mb-4" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                  Real-time validation of simulated energy consumption and costs against meter readings and invoices.
+                  Real-time validation of measured energy consumption and costs against meter readings and invoices.
                 </p>
               </div>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

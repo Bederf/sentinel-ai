@@ -8,7 +8,7 @@ that confirms autonomous actions worked and learns from results.
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from app.config.settings import settings
 from app.database.repositories.parasite_decision_repository import (
@@ -28,7 +28,7 @@ class COVVerificationResult:
     expected_value: Any  # What we expected
     read_success: bool  # Did the read itself succeed?
     elapsed_seconds: float  # Time taken to verify
-    error: Optional[str] = None  # Error message if read failed
+    error: str | None = None  # Error message if read failed
 
 
 @dataclass
@@ -37,12 +37,12 @@ class OutcomeMeasurement:
 
     decision_id: str
     equipment_id: str
-    expected_outcome: Dict  # What we predicted would happen
-    actual_outcome: Dict  # What actually happened
+    expected_outcome: dict  # What we predicted would happen
+    actual_outcome: dict  # What actually happened
     matched: bool  # Did outcome match prediction?
     measurement_window_minutes: int
     measured_at: str  # ISO timestamp
-    contributing_metrics: Dict = field(default_factory=dict)  # Individual metric comparisons
+    contributing_metrics: dict = field(default_factory=dict)  # Individual metric comparisons
 
 
 class COVMonitorService:
@@ -56,7 +56,7 @@ class COVMonitorService:
         """Initialize COVMonitorService."""
         self._instance = None
         self.parasite_repo = get_parasite_decision_repository()
-        self._pending_measurements: Dict[str, Dict] = {}
+        self._pending_measurements: dict[str, dict] = {}
         self._verification_stats = {
             "total_attempts": 0,
             "successful_verifications": 0,
@@ -78,7 +78,7 @@ class COVMonitorService:
         point_name: str,
         expected_value: Any,
         decision_id: str,
-        timeout_seconds: Optional[int] = None,
+        timeout_seconds: int | None = None,
     ) -> COVVerificationResult:
         """Verify device write took effect via read-back confirmation.
 
@@ -198,8 +198,8 @@ class COVMonitorService:
         self,
         decision_id: str,
         equipment_id: str,
-        expected_outcome: Dict,
-        window_minutes: Optional[int] = None,
+        expected_outcome: dict,
+        window_minutes: int | None = None,
     ) -> None:
         """Schedule outcome measurement for future execution.
 
@@ -237,7 +237,7 @@ class COVMonitorService:
         except Exception as e:
             logger.error(f"Error scheduling outcome measurement: {e}")
 
-    async def check_pending_measurements(self) -> List[Dict]:
+    async def check_pending_measurements(self) -> list[dict]:
         """Process completed outcome measurements.
 
         Called periodically by background scheduler. For each pending measurement
@@ -320,7 +320,7 @@ class COVMonitorService:
         """Get number of pending outcome measurements."""
         return len(self._pending_measurements)
 
-    async def get_verification_stats(self) -> Dict:
+    async def get_verification_stats(self) -> dict:
         """Get COV verification success/failure rates."""
         total = self._verification_stats["total_attempts"]
         successful = self._verification_stats["successful_verifications"]
@@ -364,7 +364,7 @@ class COVMonitorService:
         return str(expected).lower() == str(actual).lower()
 
     @staticmethod
-    def build_expected_outcome(action_type: str, target_value: Any, original_value: Any) -> Dict:
+    def build_expected_outcome(action_type: str, target_value: Any, original_value: Any) -> dict:
         """Build expected outcome based on action type.
 
         Generates outcome prediction template based on the type of control action,
@@ -399,7 +399,7 @@ class COVMonitorService:
                 "tolerance_percent": 10.0,
             }
 
-    async def _read_equipment_outcome(self, equipment_id: str, expected_outcome: Dict) -> Dict:
+    async def _read_equipment_outcome(self, equipment_id: str, expected_outcome: dict) -> dict:
         """Read equipment state to measure outcome.
 
         Simplified implementation: reads key measurement points from equipment.
@@ -434,7 +434,7 @@ class COVMonitorService:
         return actual_outcome
 
     @staticmethod
-    def _outcome_matches_prediction(expected_outcome: Dict, actual_outcome: Dict) -> bool:
+    def _outcome_matches_prediction(expected_outcome: dict, actual_outcome: dict) -> bool:
         """Determine if measured outcome matches prediction.
 
         Compares expected vs actual values with tolerances defined in expected_outcome.
@@ -470,7 +470,7 @@ class COVMonitorService:
             return False
 
     @staticmethod
-    def _calculate_contributing_metrics(expected_outcome: Dict, actual_outcome: Dict) -> Dict:
+    def _calculate_contributing_metrics(expected_outcome: dict, actual_outcome: dict) -> dict:
         """Calculate individual metric comparisons.
 
         Provides granular metrics for understanding which measurements matched
@@ -510,7 +510,7 @@ class COVMonitorService:
 
 
 # Singleton pattern
-_instance: Optional[COVMonitorService] = None
+_instance: COVMonitorService | None = None
 
 
 def get_cov_monitor_service() -> COVMonitorService:

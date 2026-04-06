@@ -77,10 +77,10 @@ function SignalCard({
   return (
     <button
       onClick={onSelect}
-      className="w-full text-left px-3 py-2.5 rounded border transition-colors hover:border-gray-600"
+      className="w-full text-left px-3 py-2.5 rounded-lg border transition-colors"
       style={{
-        background: "rgba(255,255,255,0.02)",
-        borderColor: "rgba(255,255,255,0.06)",
+        background: "var(--color-sentinel-bg-secondary)",
+        borderColor: "var(--color-sentinel-border)",
       }}
     >
       <div className="flex items-start gap-2">
@@ -105,9 +105,9 @@ function SignalCard({
             )}
           </div>
           {/* Summary text */}
-          <p className="text-xs text-gray-300 line-clamp-2">{signal.summary}</p>
+          <p className="text-xs line-clamp-2" style={{ color: "var(--color-sentinel-text-primary)" }}>{signal.summary}</p>
           {/* Footer — when */}
-          <p className="text-[10px] text-gray-500 mt-1">
+          <p className="text-[10px] mt-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>
             {relativeTime(signal.created_at)}
           </p>
         </div>
@@ -143,17 +143,17 @@ export function RoomDetailPanel({ siteId, room, onClose, onSignalSelect }: RoomD
     <div
       className="absolute top-0 right-0 h-full w-[380px] max-w-full flex flex-col z-30 animate-slide-in-right"
       style={{
-        background: "#0d1117",
-        borderLeft: "1px solid rgba(255,255,255,0.08)",
+        background: "var(--color-sentinel-bg-canvas)",
+        borderLeft: "1px solid var(--color-sentinel-border)",
       }}
     >
       {/* Header */}
       <div
         className="flex items-center justify-between px-4 py-3 flex-shrink-0"
-        style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}
+        style={{ borderBottom: "1px solid var(--color-sentinel-border)" }}
       >
         <div className="min-w-0">
-          <h3 className="text-sm font-semibold text-gray-100 truncate">
+          <h3 className="text-sm font-semibold truncate" style={{ color: "var(--color-sentinel-text-primary)" }}>
             {room.friendly_name || room.room_id}
           </h3>
           <div className="flex items-center gap-2 mt-0.5">
@@ -163,12 +163,13 @@ export function RoomDetailPanel({ siteId, room, onClose, onSignalSelect }: RoomD
             >
               {room.signal_count} signal{room.signal_count !== 1 ? "s" : ""}
             </span>
-            <span className="text-[10px] text-gray-500">{latestTime}</span>
+            <span className="text-[10px]" style={{ color: "var(--color-sentinel-text-secondary)" }}>{latestTime}</span>
           </div>
         </div>
         <button
           onClick={onClose}
-          className="p-1.5 rounded hover:bg-gray-800 transition-colors text-gray-500 hover:text-gray-300"
+          className="p-1.5 rounded-lg transition-colors"
+          style={{ color: "var(--color-sentinel-text-secondary)", background: "var(--color-sentinel-bg-secondary)" }}
           aria-label="Close panel"
         >
           <X size={16} />
@@ -182,7 +183,7 @@ export function RoomDetailPanel({ siteId, room, onClose, onSignalSelect }: RoomD
             <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
           </div>
         ) : signals.length === 0 ? (
-          <p className="text-xs text-gray-500 text-center py-8">No signals for this room</p>
+          <p className="text-xs text-center py-8" style={{ color: "var(--color-sentinel-text-secondary)" }}>No signals for this room</p>
         ) : (
           signals.map((signal) => (
             <SignalCard

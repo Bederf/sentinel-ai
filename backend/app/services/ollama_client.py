@@ -8,11 +8,12 @@ which uses Anthropic Claude for generation.
 The OllamaClient class is preserved for future GPU-equipped deployments.
 """
 
-import httpx
-import os
 import json
 import logging
-from typing import Optional, AsyncIterator
+import os
+from collections.abc import AsyncIterator
+
+import httpx
 
 from app.config.settings import settings
 
@@ -41,7 +42,7 @@ class CloudLLMClient:
         return self._client
 
     async def generate(
-        self, prompt: str, model: Optional[str] = None, temperature: float = 0.7, max_tokens: int = 1024
+        self, prompt: str, model: str | None = None, temperature: float = 0.7, max_tokens: int = 1024
     ) -> str:
         """Generate completion via Claude (non-streaming)."""
         try:
@@ -80,7 +81,7 @@ class CloudLLMClient:
             raise RuntimeError("Both Claude and Z.ai are unavailable") from zai_err
 
     async def generate_stream(
-        self, prompt: str, model: Optional[str] = None, temperature: float = 0.7
+        self, prompt: str, model: str | None = None, temperature: float = 0.7
     ) -> AsyncIterator[str]:
         """Generate completion with streaming via Claude."""
         client = self._get_client()
@@ -93,7 +94,7 @@ class CloudLLMClient:
             for text in stream.text_stream:
                 yield text
 
-    async def chat(self, messages: list, model: Optional[str] = None, temperature: float = 0.7) -> str:
+    async def chat(self, messages: list, model: str | None = None, temperature: float = 0.7) -> str:
         """Chat completion with message history via Claude."""
         client = self._get_client()
         # Convert from OpenAI-style messages to Anthropic format
@@ -125,12 +126,12 @@ class CloudLLMClient:
 class OllamaClient:
     """Client for local Ollama API — preserved for future GPU deployments."""
 
-    def __init__(self, base_url: Optional[str] = None):
+    def __init__(self, base_url: str | None = None):
         self.base_url = base_url or os.getenv("OLLAMA_URL", "http://127.0.0.1:11434")
         self.default_model = os.getenv("OLLAMA_MODEL", "phi3:mini")
 
     async def generate(
-        self, prompt: str, model: Optional[str] = None, temperature: float = 0.7, max_tokens: int = 2048
+        self, prompt: str, model: str | None = None, temperature: float = 0.7, max_tokens: int = 2048
     ) -> str:
         """Generate completion (non-streaming)."""
         model = model or self.default_model
@@ -148,23 +149,22 @@ class OllamaClient:
             return response.json()["response"]
 
     async def generate_stream(
-        self, prompt: str, model: Optional[str] = None, temperature: float = 0.7
+        self, prompt: str, model: str | None = None, temperature: float = 0.7
     ) -> AsyncIterator[str]:
         """Generate completion with streaming."""
         model = model or self.default_model
-        async with httpx.AsyncClient(timeout=120) as client:
-            async with client.stream(
-                "POST",
-                f"{self.base_url}/api/generate",
-                json={"model": model, "prompt": prompt, "stream": True, "options": {"temperature": temperature}},
-            ) as response:
-                async for line in response.aiter_lines():
-                    if line:
-                        data = json.loads(line)
-                        if "response" in data:
-                            yield data["response"]
+        async with httpx.AsyncClient(timeout=120) as client, client.stream(
+            "POST",
+            f"{self.base_url}/api/generate",
+            json={"model": model, "prompt": prompt, "stream": True, "options": {"temperature": temperature}},
+        ) as response:
+            async for line in response.aiter_lines():
+                if line:
+                    data = json.loads(line)
+                    if "response" in data:
+                        yield data["response"]
 
-    async def chat(self, messages: list, model: Optional[str] = None, temperature: float = 0.7) -> str:
+    async def chat(self, messages: list, model: str | None = None, temperature: float = 0.7) -> str:
         """Chat completion with message history."""
         model = model or self.default_model
         async with httpx.AsyncClient(timeout=120) as client:

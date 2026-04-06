@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "description": "Remote operations configuration - authorization matrix, safety guardrails, and demo users",
+  "description": "Remote operations configuration - authorization matrix, safety guardrails, and profiled users",
 
   "command_authorization": {
     "status_check": {

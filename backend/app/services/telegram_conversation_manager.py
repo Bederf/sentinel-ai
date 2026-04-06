@@ -9,7 +9,6 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional
 
 from app.services.telegram_intent_classifier import TelegramIntent
 
@@ -27,9 +26,9 @@ class ConversationSession:
     flow: str  # "client_complaint", "technician_report", "wo_update", "ad_hoc_fault"
     current_step: int = 0
     answers: dict[str, str] = field(default_factory=dict)
-    equipment_id: Optional[str] = None
-    checklist_type: Optional[str] = None  # "ahu_weekly", "fcu_weekly", etc.
-    wo_id: Optional[str] = None
+    equipment_id: str | None = None
+    checklist_type: str | None = None  # "ahu_weekly", "fcu_weekly", etc.
+    wo_id: str | None = None
     wo_codes: list[str] = field(default_factory=list)  # WOs created during flow
     started_at: datetime = field(default_factory=datetime.utcnow)
     last_activity: datetime = field(default_factory=datetime.utcnow)
@@ -50,7 +49,7 @@ class TelegramConversationManager:
     def __init__(self) -> None:
         self._sessions: dict[str, ConversationSession] = {}
 
-    def get_session(self, chat_id: str) -> Optional[ConversationSession]:
+    def get_session(self, chat_id: str) -> ConversationSession | None:
         """Get active session for a chat, or None if expired/missing."""
         session = self._sessions.get(chat_id)
         if session and session.is_expired():
@@ -64,7 +63,7 @@ class TelegramConversationManager:
         chat_id: str,
         intent: TelegramIntent,
         flow: str,
-        equipment_id: Optional[str] = None,
+        equipment_id: str | None = None,
     ) -> ConversationSession:
         """Create a new session, replacing any existing one."""
         session = ConversationSession(
@@ -102,7 +101,7 @@ class TelegramConversationManager:
 # Singleton accessor
 # ---------------------------------------------------------------------------
 
-_manager_instance: Optional[TelegramConversationManager] = None
+_manager_instance: TelegramConversationManager | None = None
 
 
 def get_conversation_manager() -> TelegramConversationManager:

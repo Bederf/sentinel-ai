@@ -7,10 +7,9 @@ Used for health/condition assessment and predictive maintenance.
 
 import csv
 import logging
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
-from dataclasses import dataclass
 
 from app.services.health_threshold_service import get_health_thresholds
 
@@ -27,9 +26,9 @@ class ConceptJobCard:
     task_ref: str
     priority: str  # P1, P2, P3, P4
     status: str
-    logged_date: Optional[datetime]
-    target_date: Optional[datetime]
-    completed_date: Optional[datetime]
+    logged_date: datetime | None
+    target_date: datetime | None
+    completed_date: datetime | None
     sla_met: bool
     site_code: str
     site_name: str
@@ -57,7 +56,7 @@ class ConceptJobCard:
     ppm_ref: str
     compliance_type: str
     tech_notes: str
-    customer_feedback: Optional[int]
+    customer_feedback: int | None
 
     @property
     def priority_level(self) -> str:
@@ -102,14 +101,14 @@ class ConceptAsset:
     site_name: str
     location_code: str
     location_desc: str
-    install_date: Optional[datetime]
-    warranty_expiry: Optional[datetime]
+    install_date: datetime | None
+    warranty_expiry: datetime | None
     expected_life_years: int
     criticality: str
     condition: str
     condition_score: int
-    last_service_date: Optional[datetime]
-    next_service_date: Optional[datetime]
+    last_service_date: datetime | None
+    next_service_date: datetime | None
     ppm_frequency: str
     replacement_cost: float
     annual_maint_cost: float
@@ -144,7 +143,7 @@ class ConceptAsset:
         return self.condition_score
 
 
-def parse_datetime(value: str) -> Optional[datetime]:
+def parse_datetime(value: str) -> datetime | None:
     """Parse datetime from various formats."""
     if not value or value.strip() == "":
         return None
@@ -190,8 +189,8 @@ class ConceptDataLoader:
     """Load and query Concept Evolution CAFM data."""
 
     def __init__(self):
-        self._job_cards: Optional[list[ConceptJobCard]] = None
-        self._assets: Optional[list[ConceptAsset]] = None
+        self._job_cards: list[ConceptJobCard] | None = None
+        self._assets: list[ConceptAsset] | None = None
 
     def _load_job_cards(self) -> list[ConceptJobCard]:
         """Load job cards from CSV."""
@@ -309,7 +308,7 @@ class ConceptDataLoader:
             self._assets = self._load_assets()
         return self._assets
 
-    def get_asset(self, asset_code: str) -> Optional[ConceptAsset]:
+    def get_asset(self, asset_code: str) -> ConceptAsset | None:
         """Get asset by code."""
         for asset in self.assets:
             if asset.asset_code == asset_code:

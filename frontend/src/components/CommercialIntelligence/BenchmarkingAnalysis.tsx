@@ -19,8 +19,6 @@ import {
   Button,
   Flex,
   Grid,
-  Select,
-  SelectItem,
   Metric,
 } from '@tremor/react'
 import { DocumentDownloadIcon } from '@heroicons/react/24/solid'
@@ -186,23 +184,47 @@ export function BenchmarkingAnalysis() {
         <Flex className="gap-4 mb-6">
           <div className="flex-1">
             <Text className="text-sm text-gray-600 mb-2">Equipment Type</Text>
-            <Select value={selectedEquipmentType} onValueChange={setSelectedEquipmentType}>
-              <SelectItem value="CHILLER">CHILLER</SelectItem>
-              <SelectItem value="AHU">AHU</SelectItem>
-              <SelectItem value="FCU">FCU</SelectItem>
-              <SelectItem value="PUMP">PUMP</SelectItem>
-              <SelectItem value="GENERATOR">GENERATOR</SelectItem>
-              <SelectItem value="UPS">UPS</SelectItem>
-            </Select>
+            <select
+              value={selectedEquipmentType}
+              onChange={(event) => setSelectedEquipmentType(event.target.value)}
+              className="w-full rounded-md appearance-none cursor-pointer px-3 py-2 text-sm transition-colors focus:outline-none focus:ring-0"
+              style={{
+                background: "var(--color-grafana-bg-secondary)",
+                border: "1px solid var(--color-grafana-border)",
+                color: "var(--color-grafana-text-primary)",
+                boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)",
+                outline: "none",
+              }}
+              aria-label="Select equipment type"
+            >
+              <option value="CHILLER">CHILLER</option>
+              <option value="AHU">AHU</option>
+              <option value="FCU">FCU</option>
+              <option value="PUMP">PUMP</option>
+              <option value="GENERATOR">GENERATOR</option>
+              <option value="UPS">UPS</option>
+            </select>
           </div>
           <div className="flex-1">
             <Text className="text-sm text-gray-600 mb-2">SLA Tier</Text>
-            <Select value={selectedSlaTier} onValueChange={(val) => setSelectedSlaTier(val as any)}>
-              <SelectItem value="basic">Basic</SelectItem>
-              <SelectItem value="standard">Standard</SelectItem>
-              <SelectItem value="premium">Premium</SelectItem>
-              <SelectItem value="enterprise">Enterprise</SelectItem>
-            </Select>
+            <select
+              value={selectedSlaTier}
+              onChange={(event) => setSelectedSlaTier(event.target.value as typeof selectedSlaTier)}
+              className="w-full rounded-md appearance-none cursor-pointer px-3 py-2 text-sm transition-colors focus:outline-none focus:ring-0"
+              style={{
+                background: "var(--color-grafana-bg-secondary)",
+                border: "1px solid var(--color-grafana-border)",
+                color: "var(--color-grafana-text-primary)",
+                boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)",
+                outline: "none",
+              }}
+              aria-label="Select SLA tier"
+            >
+              <option value="basic">Basic</option>
+              <option value="standard">Standard</option>
+              <option value="premium">Premium</option>
+              <option value="enterprise">Enterprise</option>
+            </select>
           </div>
         </Flex>
 

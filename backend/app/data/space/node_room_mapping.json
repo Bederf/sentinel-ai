@@ -1,15 +1,32 @@
 {
-  "_comment": "Server-side override: maps MQTT node_id to room_code. Avoids reflashing ESP32 when moving nodes.",
+  "_meta": {
+    "description": "Server-side node to room/site mapping overrides for space MQTT ingest",
+    "updated_by": "assistant",
+    "updated_at": "2026-04-01T00:00:00Z"
+  },
   "node_001": {
-    "room_code": "FA2-1Q4-FR24",
     "site_id": "site-001",
-    "room_type": "focus",
-    "note": "Focus room FR24 node with backend-controlled LED output"
+    "room_code": "FA2-1Q4-MR27",
+    "room_type": "meeting"
   },
   "node_002": {
-    "room_code": "FA2-1Q4-MR28",
     "site_id": "site-001",
-    "room_type": "meeting",
-    "note": "Active ESP32 node in MR28"
+    "room_code": "FA2-1Q4-FR25",
+    "room_type": "focus"
+  },
+  "fr-l0": {
+    "site_id": "site-002",
+    "room_code": "FR-L0",
+    "room_type": "focus"
+  },
+  "fr-l1": {
+    "site_id": "site-002",
+    "room_code": "FR-L1",
+    "room_type": "focus"
+  },
+  "fr-l2": {
+    "site_id": "site-002",
+    "room_code": "FR-L2",
+    "room_type": "focus"
   }
 }

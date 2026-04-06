@@ -9,7 +9,7 @@ from enum import Enum
 from typing import Optional
 from datetime import datetime
 from uuid import UUID
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 # ============================================================================
@@ -73,6 +73,8 @@ class ProvenanceType(str, Enum):
 class CreateAssetEvidenceInput(BaseModel):
     """Input model for creating new asset evidence."""
 
+    model_config = ConfigDict(use_enum_values=False)
+
     site_id: UUID
     equipment_id: UUID
     source_type: SourceType
@@ -89,12 +91,11 @@ class CreateAssetEvidenceInput(BaseModel):
     provenance_uri: str
     uploader_user_id: Optional[UUID] = None
 
-    class Config:
-        use_enum_values = False  # Keep enums as objects, not strings
-
 
 class AssetEvidence(BaseModel):
     """Complete asset evidence record (from database)."""
+
+    model_config = ConfigDict(from_attributes=True, use_enum_values=False)
 
     evidence_id: UUID
     site_id: UUID
@@ -116,13 +117,11 @@ class AssetEvidence(BaseModel):
     created_at: datetime
     supersedes_evidence_id: Optional[UUID] = None
 
-    class Config:
-        from_attributes = True
-        use_enum_values = False
-
 
 class AssetEvidenceFilter(BaseModel):
     """Filter model for flexible evidence querying."""
+
+    model_config = ConfigDict(use_enum_values=False)
 
     site_id: Optional[UUID] = None
     equipment_id: Optional[UUID] = None
@@ -132,28 +131,33 @@ class AssetEvidenceFilter(BaseModel):
     end_date: Optional[datetime] = None
     active_only: bool = True  # supersedes_evidence_id IS NULL
 
-    class Config:
-        use_enum_values = False
-
 
 class AssetEvidencePatch(BaseModel):
     """Patch model for rare service_role updates (immutability exceptions)."""
+
+    model_config = ConfigDict(use_enum_values=False)
 
     confidence_score: Optional[float] = Field(None, ge=0.0, le=1.0)
     assessment_relevance: Optional[bool] = None
     normalized_payload: Optional[dict] = None
     supersedes_evidence_id: Optional[UUID] = None
 
-    class Config:
-        use_enum_values = False
-
 
 class AssetEvidenceSupersession(BaseModel):
     """Model for tracking evidence supersession chains."""
+
+    model_config = ConfigDict(use_enum_values=False)
 
     old_evidence_id: UUID
     new_evidence_id: UUID
     reason: Optional[str] = None
 
-    class Config:
-        use_enum_values = False
+
+def __getattr__(name: str):
+    """Backward-compatible lazy export for legacy service imports."""
+
+    if name == "AssetEvidenceService":
+        from backend.app.services.asset_evidence_service import AssetEvidenceService
+
+        return AssetEvidenceService
+    raise AttributeError(name)

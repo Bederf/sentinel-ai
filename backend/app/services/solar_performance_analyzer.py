@@ -13,8 +13,7 @@ Pattern follows solar_performance_service.py thresholds and energy models.
 import logging
 import statistics
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
-from typing import Dict, List, Optional
+from datetime import UTC, datetime, timedelta
 
 from app.models.solar import SolarInverter
 
@@ -76,14 +75,14 @@ class PerformanceBaseline:
     string_current_balance_7d_avg: float = 1.03
 
     # Timestamps
-    baseline_start: Optional[str] = None
-    last_updated: Optional[str] = None
+    baseline_start: str | None = None
+    last_updated: str | None = None
 
     # Historical data (last 7 days)
-    historical_efficiency: List[float] = field(default_factory=list)
-    historical_availability: List[float] = field(default_factory=list)
+    historical_efficiency: list[float] = field(default_factory=list)
+    historical_availability: list[float] = field(default_factory=list)
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         return {
             "inverter_id": self.inverter_id,
             "inverter_type": self.inverter_type,
@@ -129,7 +128,7 @@ class PeerComparisonReport:
     estimated_loss_kwh_day: float = 0.0
     estimated_loss_zar_day: float = 0.0
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         return {
             "inverter_id": self.inverter_id,
             "inverter_type": self.inverter_type,
@@ -187,7 +186,7 @@ class SoilingAnalysis:
     estimated_gain_kwh_day: float = 0.0
     estimated_gain_zar_day: float = 0.0
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         return {
             "site_id": self.site_id,
             "plant_id": self.plant_id,
@@ -214,9 +213,9 @@ class SolarPerformanceAnalyzer:
 
     def __init__(self):
         """Initialize performance analyzer."""
-        self._baselines: Dict[str, PerformanceBaseline] = {}
-        self._peer_baselines: Dict[str, Dict] = {}  # inverter_type -> baseline dict
-        self._soiling_history: Dict[str, List[SoilingAnalysis]] = {}
+        self._baselines: dict[str, PerformanceBaseline] = {}
+        self._peer_baselines: dict[str, dict] = {}  # inverter_type -> baseline dict
+        self._soiling_history: dict[str, list[SoilingAnalysis]] = {}
 
     def calculate_efficiency(
         self,
@@ -363,7 +362,7 @@ class SolarPerformanceAnalyzer:
     def compare_to_peers(
         self,
         inverter: SolarInverter,
-        peer_inverters: List[SolarInverter],
+        peer_inverters: list[SolarInverter],
         current_efficiency: float = 0.90,
         current_availability: float = 0.99,
         current_temp_rise_c: float = 15.0,
@@ -491,7 +490,7 @@ class SolarPerformanceAnalyzer:
                 inverter_id=inverter_id,
                 inverter_type=inverter_type,
                 capacity_kva=capacity_kva,
-                baseline_start=datetime.now(timezone.utc).isoformat(),
+                baseline_start=datetime.now(UTC).isoformat(),
             )
 
         baseline = self._baselines[inverter_id]
@@ -510,7 +509,7 @@ class SolarPerformanceAnalyzer:
             baseline.efficiency_7d_avg = statistics.mean(baseline.historical_efficiency)
             baseline.availability_7d_avg = statistics.mean(baseline.historical_availability)
 
-        baseline.last_updated = datetime.now(timezone.utc).isoformat()
+        baseline.last_updated = datetime.now(UTC).isoformat()
 
         # Update peer baseline cache
         type_key = f"{inverter_type}_{capacity_kva}"
@@ -642,7 +641,7 @@ class SolarPerformanceAnalyzer:
         analysis = SoilingAnalysis(
             site_id=site_id,
             plant_id=plant_id,
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
             clear_sky_generation_kwh=clear_sky_kwh,
             actual_generation_kwh=actual_generation_kwh,
             soiling_loss_pct=soiling_loss_pct,
@@ -660,7 +659,7 @@ class SolarPerformanceAnalyzer:
         self._soiling_history[site_id].append(analysis)
 
         # Keep only last 30 days
-        cutoff_date = datetime.now(timezone.utc) - timedelta(days=30)
+        cutoff_date = datetime.now(UTC) - timedelta(days=30)
         self._soiling_history[site_id] = [
             a for a in self._soiling_history[site_id] if datetime.fromisoformat(a.timestamp) > cutoff_date
         ]
@@ -671,8 +670,8 @@ class SolarPerformanceAnalyzer:
         self,
         site_id: str,
         current_pr: float,
-        last_year_pr: Optional[float] = None,
-    ) -> Dict:
+        last_year_pr: float | None = None,
+    ) -> dict:
         """
         Track annual performance degradation.
 
@@ -706,7 +705,7 @@ class SolarPerformanceAnalyzer:
 
 # === Singleton accessor ===
 
-_performance_analyzer: Optional[SolarPerformanceAnalyzer] = None
+_performance_analyzer: SolarPerformanceAnalyzer | None = None
 
 
 def get_solar_performance_analyzer() -> SolarPerformanceAnalyzer:

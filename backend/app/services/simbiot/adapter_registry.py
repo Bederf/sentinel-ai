@@ -2,17 +2,13 @@
 
 from __future__ import annotations
 
-from typing import Type
-
 from .bms_adapter import BmsAdapter
 from .policy_enforced_bms_adapter import PolicyEnforcedBmsAdapter
 
-_BMS_ADAPTERS: dict[str, Type[BmsAdapter]] = {}
+_BMS_ADAPTERS: dict[str, type[BmsAdapter]] = {}
 
 # Vendor/source aliases map onto concrete adapter implementations.
 _ADAPTER_ALIASES: dict[str, str] = {
-    "simulation": "simulation",
-    "simulated": "simulation",
     "bacnet": "bacnet",
     "niagara": "bacnet",
     "desigo": "bacnet",
@@ -25,7 +21,7 @@ _ADAPTER_ALIASES: dict[str, str] = {
 }
 
 
-def register_bms_adapter(adapter_type: str, adapter_cls: Type[BmsAdapter]) -> None:
+def register_bms_adapter(adapter_type: str, adapter_cls: type[BmsAdapter]) -> None:
     """Register a concrete BMS adapter implementation."""
     _BMS_ADAPTERS[adapter_type.lower()] = adapter_cls
 
@@ -36,7 +32,7 @@ def resolve_bms_adapter_type(
     device_ip: str | None = None,
 ) -> str:
     """Resolve a requested adapter or vendor to a concrete adapter type."""
-    requested = adapter_type or bms_vendor or ("simulation" if device_ip == "simulation" else "bacnet")
+    requested = adapter_type or bms_vendor or "bacnet"
     return _ADAPTER_ALIASES.get(requested.lower(), requested.lower())
 
 
@@ -60,7 +56,15 @@ def _register_default_adapters() -> None:
         return
 
     from .bacnet_bms_adapter import BacnetBmsAdapter
-    from .simulation_bms_adapter import SimulationBmsAdapter
 
     register_bms_adapter("bacnet", BacnetBmsAdapter)
-    register_bms_adapter("simulation", SimulationBmsAdapter)
+    try:
+        from .simulation_bms_adapter import SimulationBmsAdapter
+
+        register_bms_adapter("simulation", SimulationBmsAdapter)
+        register_bms_adapter("local_adapter", SimulationBmsAdapter)
+        _ADAPTER_ALIASES["simulation"] = "simulation"
+        _ADAPTER_ALIASES["simulated"] = "simulation"
+        _ADAPTER_ALIASES["local_adapter"] = "simulation"
+    except ImportError:
+        pass

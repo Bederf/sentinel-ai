@@ -10,9 +10,8 @@ Protects against adversarial prompts attempting to:
 Created: 2026-02-04
 """
 
-import re
 import logging
-from typing import List, Tuple, Optional
+import re
 from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
@@ -170,7 +169,7 @@ class PromptInjectionDetector:
         self.low_patterns = [(re.compile(p), d) for p, d in self.LOW_PATTERNS]
         self.bms_patterns = [(re.compile(p), d) for p, d in self.BMS_PATTERNS]
 
-    def detect(self, query: str) -> Tuple[bool, List[PromptInjection]]:
+    def detect(self, query: str) -> tuple[bool, list[PromptInjection]]:
         """
         Detect prompt injection attempts in a user query.
 
@@ -337,7 +336,7 @@ class PromptInjectionDetector:
 prompt_injection_detector = PromptInjectionDetector()
 
 
-def check_query_safety(query: str) -> Tuple[bool, str, List[PromptInjection]]:
+def check_query_safety(query: str) -> tuple[bool, str, list[PromptInjection]]:
     """
     Check if a query is safe to send to AI.
 
@@ -379,7 +378,7 @@ def check_query_safety(query: str) -> Tuple[bool, str, List[PromptInjection]]:
     return True, "", []
 
 
-def validate_and_sanitize_query(query: str) -> Tuple[bool, str, Optional[str]]:
+def validate_and_sanitize_query(query: str) -> tuple[bool, str, str | None]:
     """
     Validate a query and return safe version or rejection message.
 

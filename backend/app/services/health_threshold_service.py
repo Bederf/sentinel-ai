@@ -10,7 +10,6 @@ Phase: Health Score Threshold Consistency Fix
 
 import logging
 from datetime import datetime, timedelta
-from typing import Dict, Optional
 
 from app.database.supabase_client import get_supabase_client
 
@@ -27,10 +26,10 @@ class HealthThresholdService:
     """Centralized service for health score thresholds."""
 
     def __init__(self):
-        self._cache: Optional[Dict[str, any]] = None
-        self._cache_expiry: Optional[datetime] = None
+        self._cache: dict[str, any] | None = None
+        self._cache_expiry: datetime | None = None
 
-    def get_thresholds(self, force_refresh: bool = False) -> Dict[str, int]:
+    def get_thresholds(self, force_refresh: bool = False) -> dict[str, int]:
         """
         Get current health score thresholds.
 
@@ -113,7 +112,7 @@ class HealthThresholdService:
             return False
         return datetime.now() < self._cache_expiry
 
-    def _load_from_supabase(self) -> Optional[Dict[str, int]]:
+    def _load_from_supabase(self) -> dict[str, int] | None:
         """Load thresholds from Supabase system_settings."""
         try:
             supabase = get_supabase_client()
@@ -133,7 +132,7 @@ class HealthThresholdService:
 
         return None
 
-    def _load_from_json(self) -> Optional[Dict[str, int]]:
+    def _load_from_json(self) -> dict[str, int] | None:
         """Load thresholds from JSON settings file."""
         try:
             from app.api.settings import load_settings
@@ -161,7 +160,7 @@ class HealthThresholdService:
 # Singleton Instance
 # ============================================================================
 
-_service_instance: Optional[HealthThresholdService] = None
+_service_instance: HealthThresholdService | None = None
 
 
 def get_health_threshold_service() -> HealthThresholdService:
@@ -177,7 +176,7 @@ def get_health_threshold_service() -> HealthThresholdService:
 # ============================================================================
 
 
-def get_health_thresholds(force_refresh: bool = False) -> Dict[str, int]:
+def get_health_thresholds(force_refresh: bool = False) -> dict[str, int]:
     """
     Get current health score thresholds.
 

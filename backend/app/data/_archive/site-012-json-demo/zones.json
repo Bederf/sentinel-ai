@@ -1,0 +1,82 @@
+[
+  {
+    "zone_id": "G-ZONE-A",
+    "name": "Main Shop Floor - Zone A",
+    "floor": "G",
+    "zone_type": "retail",
+    "sqm": 150,
+    "occupancy_capacity": 20,
+    "setpoint_temp": 22.0,
+    "equipment_ids": [
+      "S012-FCU-G-A",
+      "S012-FCU-G-B"
+    ],
+    "served_by_ahu": "S012-AHU-G-001"
+  },
+  {
+    "zone_id": "G-ZONE-B",
+    "name": "Product Displays - Zone B",
+    "floor": "G",
+    "zone_type": "retail",
+    "sqm": 100,
+    "occupancy_capacity": 15,
+    "setpoint_temp": 22.0,
+    "equipment_ids": [
+      "S012-FCU-G-C"
+    ],
+    "served_by_ahu": "S012-AHU-G-002"
+  },
+  {
+    "zone_id": "G-ZONE-C",
+    "name": "Customer Service - Zone C",
+    "floor": "G",
+    "zone_type": "retail",
+    "sqm": 80,
+    "occupancy_capacity": 10,
+    "setpoint_temp": 22.0,
+    "equipment_ids": [
+      "S012-FCU-G-D"
+    ],
+    "served_by_ahu": "S012-AHU-G-002"
+  },
+  {
+    "zone_id": "G-ZONE-D",
+    "name": "Storage/Warehouse - Zone D",
+    "floor": "G",
+    "zone_type": "warehouse",
+    "sqm": 80,
+    "occupancy_capacity": 3,
+    "setpoint_temp": 24.0,
+    "equipment_ids": [
+      "S012-FCU-G-E"
+    ],
+    "served_by_ahu": "S012-AHU-G-003"
+  },
+  {
+    "zone_id": "G-ZONE-E",
+    "name": "Staff Room - Zone E",
+    "floor": "G",
+    "zone_type": "open_office",
+    "sqm": 20,
+    "occupancy_capacity": 5,
+    "setpoint_temp": 22.0,
+    "equipment_ids": [
+      "S012-SPLIT-G-001"
+    ],
+    "served_by_ahu": null
+  },
+  {
+    "zone_id": "G-ZONE-F",
+    "name": "Office - Zone F",
+    "floor": "G",
+    "zone_type": "executive",
+    "sqm": 20,
+    "occupancy_capacity": 2,
+    "setpoint_temp": 21.5,
+    "equipment_ids": [
+      "S012-SPLIT-G-002",
+      "S012-SPLIT-G-003"
+    ],
+    "served_by_ahu": null
+  }
+]

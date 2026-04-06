@@ -9,6 +9,7 @@ import logging
 import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
+import re
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -52,13 +53,19 @@ def _prune_expired(mutes: list) -> list:
 
 @router.get("")
 async def list_active_mutes(
+    site_id: str | None = None,
     auth: AuthContext = Depends(require_role(SentinelRole.ADMIN, SentinelRole.OPERATOR)),
 ) -> dict:
     """List all active (non-expired) equipment mutes."""
     mutes = _load_mutes()
     active = _prune_expired(mutes)
+    if site_id:
+        site_token = site_id.upper().replace("SITE-", "S")
+        digits_match = re.search(r"(\d+)$", site_token)
+        site_code = f"S{int(digits_match.group(1)):03d}" if digits_match else site_token
+        active = [m for m in active if str(m.get("equipment_code", "")).upper().startswith(f"{site_code}-")]
     if len(active) != len(mutes):
-        _save_mutes(active)
+        _save_mutes(_prune_expired(mutes))
     return {"mutes": active, "count": len(active)}
 
 

@@ -8,13 +8,13 @@ import re
 import subprocess
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 from uuid import uuid4
 
 from app.config.settings import settings
 from app.database.repositories.notification_repository import (
-    NotificationRepository,
     SYSTEM_NOTIFIER_TECHNICIAN_ID,
+    NotificationRepository,
 )
 from app.models.notification import ChannelType, NotificationDeliveryLog, NotificationStatus
 from app.services.sentry_integration.config import get_sentry_bot_cli
@@ -32,11 +32,11 @@ SETTINGS_FILE = Path(__file__).parent.parent.parent / "data" / "settings.json"
 logger = logging.getLogger(__name__)
 
 
-def _load_notification_settings() -> Dict[str, Any]:
+def _load_notification_settings() -> dict[str, Any]:
     """Load notification settings from settings.json."""
     try:
         if SETTINGS_FILE.exists():
-            with open(SETTINGS_FILE, "r") as f:
+            with open(SETTINGS_FILE) as f:
                 settings = json.load(f)
             return settings.get("notifications", {})
     except Exception:
@@ -55,7 +55,7 @@ class AlertNotifier:
         )
         self._cli_command = get_sentry_bot_cli()
         # Track last alert time per equipment+severity to prevent spam
-        self._last_alerts: Dict[str, datetime] = {}
+        self._last_alerts: dict[str, datetime] = {}
         self._notification_repo = NotificationRepository()
 
     @property
@@ -73,7 +73,7 @@ class AlertNotifier:
         """
         return re.sub(r"[;&|`$(){}[\]<>!#\\]", "", text)
 
-    def format_alert_message(self, alert: Dict[str, Any]) -> str:
+    def format_alert_message(self, alert: dict[str, Any]) -> str:
         """Format alert for Telegram with configurable command buttons."""
         severity_emoji = {"critical": "🚨", "warning": "⚠️", "info": "ℹ️"}
 
@@ -136,12 +136,12 @@ class AlertNotifier:
 
         return message
 
-    async def send_alert(self, alert: Dict[str, Any]) -> bool:
+    async def send_alert(self, alert: dict[str, Any]) -> bool:
         """Send alert to FM team via sentry CLI (async wrapper)."""
         return self.send_alert_sync(alert)
 
     @staticmethod
-    def _title_from_alert(alert: Dict[str, Any]) -> str:
+    def _title_from_alert(alert: dict[str, Any]) -> str:
         severity = str(alert.get("severity", "info")).upper()
         equipment_code = alert.get("equipment_code", "UNKNOWN")
         return f"{severity} ALERT - {equipment_code}"
@@ -149,12 +149,12 @@ class AlertNotifier:
     def _log_delivery(
         self,
         *,
-        alert: Dict[str, Any],
+        alert: dict[str, Any],
         message: str,
         status: NotificationStatus,
         error_code: str | None = None,
         error_message: str | None = None,
-        provider_response: Dict[str, Any] | None = None,
+        provider_response: dict[str, Any] | None = None,
     ) -> None:
         """Persist alert send attempt into notification delivery log."""
         delivery_log = NotificationDeliveryLog(
@@ -194,7 +194,7 @@ class AlertNotifier:
             logger.warning("SENTRY_FM_CHAT_ID is not configured; skipping FM Telegram alert")
         return False
 
-    def _should_send_alert(self, alert: Dict[str, Any]) -> bool:
+    def _should_send_alert(self, alert: dict[str, Any]) -> bool:
         """Check if alert should be sent (cooldown/dedup check).
 
         Allows immediate send if:
@@ -263,7 +263,7 @@ class AlertNotifier:
                 return False
             return True
 
-    def send_alert_sync(self, alert: Dict[str, Any]) -> bool:
+    def send_alert_sync(self, alert: dict[str, Any]) -> bool:
         """Send alert via sentry CLI.
 
         Phase 58-04 H-5: Message is sanitised before passing to subprocess

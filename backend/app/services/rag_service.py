@@ -1,7 +1,7 @@
 """RAG (Retrieval-Augmented Generation) service combining vector search with LLM."""
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from app.security.trust_levels import get_allowed_trust_levels, wrap_rag_chunk
 from app.services.model_gateway import model_gateway
@@ -61,10 +61,10 @@ Keep the language practical and technical but accessible to field technicians.""
     async def get_context(
         self,
         query: str,
-        equipment_type: Optional[str] = None,
+        equipment_type: str | None = None,
         n_results: int = 5,
         use_hybrid: bool = True,
-        user_role: Optional[str] = None,
+        user_role: str | None = None,
         endpoint_type: str = "chat",
     ) -> str:
         """Retrieve relevant context for a query with trust-level filtering.
@@ -89,7 +89,7 @@ Keep the language practical and technical but accessible to field technicians.""
             return "No relevant documentation found."
 
         # Apply trust level filtering if user_role is provided
-        allowed_levels: Optional[List[str]] = None
+        allowed_levels: list[str] | None = None
         if user_role:
             allowed_levels = get_allowed_trust_levels(user_role, endpoint_type)
 
@@ -127,11 +127,11 @@ Keep the language practical and technical but accessible to field technicians.""
     async def query(
         self,
         query: str,
-        equipment_type: Optional[str] = None,
+        equipment_type: str | None = None,
         use_hybrid: bool = True,
         use_local_llm: bool = True,
-        user_role: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        user_role: str | None = None,
+    ) -> dict[str, Any]:
         """Query the RAG system and generate response."""
         # Get relevant context (with trust-level filtering if user_role provided)
         context = await self.get_context(query, equipment_type, use_hybrid=use_hybrid, user_role=user_role)
@@ -145,6 +145,7 @@ Keep the language practical and technical but accessible to field technicians.""
                 response = await model_gateway.call(
                     task_class="heavy",
                     messages=[{"role": "user", "content": prompt}],
+                    source="rag_query",
                 )
                 llm_used = "model_gateway"
             except Exception as e:
@@ -167,7 +168,7 @@ Keep the language practical and technical but accessible to field technicians.""
             "llm_used": llm_used,
         }
 
-    async def explain_prediction(self, equipment_id: str, prediction: Dict[str, Any]) -> Dict[str, Any]:
+    async def explain_prediction(self, equipment_id: str, prediction: dict[str, Any]) -> dict[str, Any]:
         """Generate natural language explanation for a prediction."""
         equipment_type = prediction.get("equipment_type", "unknown")
 
@@ -221,6 +222,7 @@ Keep the language practical and technical but accessible to field technicians.""
             explanation = await model_gateway.call(
                 task_class="heavy",
                 messages=[{"role": "user", "content": prompt}],
+                source="rag_explain_prediction",
             )
             llm_available = True
         except Exception as e:
@@ -248,7 +250,7 @@ Keep the language practical and technical but accessible to field technicians.""
             "llm_available": llm_available,
         }
 
-    def _log_query(self, query: str, equipment_type: Optional[str], context_word_count: int):
+    def _log_query(self, query: str, equipment_type: str | None, context_word_count: int):
         """Log RAG query for analytics (non-blocking)."""
         try:
             self._supabase_client.table("rag_queries").insert(

@@ -85,8 +85,11 @@ export function SecurityDashboard() {
       try {
         const sitesData = await api.getSites();
         setSites(sitesData.sort((a, b) => a.name.localeCompare(b.name)));
-        // Default to first available site
-        const defaultSite = sitesData[0];
+        // Default to Sandton City Office Tower (site-002) when available.
+        const defaultSite =
+          sitesData.find((site) => site.id === "site-002")
+          ?? sitesData.find((site) => /sandton city office tower/i.test(site.name))
+          ?? sitesData[0];
         if (defaultSite) {
           setSelectedSiteId(defaultSite.id);
         }

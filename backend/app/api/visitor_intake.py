@@ -2,7 +2,8 @@
 
 POST /api/visits/internal
   Called by n8n workflow when a calendar invite is received in the info@ inbox.
-  Creates a Visit, generates token + PIN + QR, sends confirmation email to visitor.
+  Creates a Visit, generates token + PIN + QR, returns visit data to n8n.
+  n8n then sends the visitor confirmation email via its own SMTP node.
 
 Auth: X-Sentry-API-Key (matches SENTRY_BOT_API_KEY env var)
 """
@@ -11,12 +12,16 @@ from __future__ import annotations
 
 import logging
 
+import base64
+
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import Response
 from pydantic import BaseModel, EmailStr, Field
 
 from app.api.visit_service import VisitService
 from app.middleware.auth_middleware import require_auth
 from app.models.auth import AuthContext, AuthLevel
+from app.models.visit import VisitStatus
 
 logger = logging.getLogger(__name__)
 
@@ -50,11 +55,16 @@ class VisitIntakeResponse(BaseModel):
     visit_id: str
     token: str
     pin: str
+    qr_code: str | None
     visitor_email: str
     host_email: str
+    host_name: str | None
     building_id: str
     meeting_subject: str | None
+    meeting_start: str | None
+    meeting_end: str | None
     message: str
+    email_already_sent: bool = False  # True when idempotency matched — n8n should skip email
 
 
 @router.post("/internal", response_model=VisitIntakeResponse)
@@ -101,14 +111,22 @@ async def create_visit_from_intake(
                 visit_id=str(existing.id),
                 token=str(existing.token),
                 pin=existing.pin,
+                qr_code=existing.qr_code,
                 visitor_email=existing.visitor_email,
                 host_email=existing.host_email,
+                host_name=existing.host_name,
                 building_id=existing.building_id,
                 meeting_subject=existing.meeting_subject,
+                meeting_start=existing.meeting_start.isoformat() if existing.meeting_start else None,
+                meeting_end=existing.meeting_end.isoformat() if existing.meeting_end else None,
                 message="Visit already exists for this event",
+                email_already_sent=True,
             )
 
-    # Create visit
+    # Create visit with CREATED status — QR sent immediately.
+    # Accept-First cannot work via IMAP: visitor replies go to the organizer's inbox,
+    # not to info@. The Google Calendar / Graph webhook paths (Phase 177/178) handle
+    # Accept-First correctly because they watch the organizer's calendar directly.
     try:
         visit = service.create_visit(
             visitor_email=request.visitor_email,
@@ -118,6 +136,7 @@ async def create_visit_from_intake(
             meeting_end=meeting_end,
             host_name=request.host_name,
             host_mobile=request.host_mobile,
+            status=VisitStatus.CREATED,
         )
     except Exception as exc:
         logger.error("[VisitorIntake] Failed to create visit: %s", exc)
@@ -149,9 +168,148 @@ async def create_visit_from_intake(
         visit_id=str(visit.id),
         token=str(visit.token),
         pin=visit.pin,
+        qr_code=visit.qr_code,
         visitor_email=visit.visitor_email,
         host_email=visit.host_email,
+        host_name=request.host_name,
         building_id=visit.building_id,
         meeting_subject=visit.meeting_subject,
-        message="Visit created — confirmation email will be sent to visitor",
+        meeting_start=meeting_start.isoformat(),
+        meeting_end=meeting_end.isoformat(),
+        message="Visit created — n8n will send confirmation email to visitor",
     )
+
+
+@router.get("/qr/{token}", include_in_schema=True)
+async def get_visit_qr(token: str) -> Response:
+    """Serve the QR code PNG for a visit token.
+
+    No auth required — token is the secret. Used in visitor confirmation emails
+    so email clients can display the QR image via a real URL.
+    """
+    from app.database.repositories.visit_repository import VisitRepository
+    from uuid import UUID
+
+    try:
+        uid = UUID(token)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid token format")
+
+    repo = VisitRepository()
+    visit = repo.get_visit_by_token(uid)
+    if visit is None or not visit.qr_code:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Visit not found")
+
+    png_bytes = base64.b64decode(visit.qr_code)
+    return Response(content=png_bytes, media_type="image/png")
+
+
+class RSVPRequest(BaseModel):
+    """Visitor RSVP response to a calendar invite."""
+
+    external_event_id: str = Field(description="Google Calendar UID — links to the pending visit")
+    response: str = Field(description="'accepted' or 'declined'")
+    visitor_email: EmailStr = Field(description="Visitor email (must match the pending visit)")
+
+
+class RSVPResponse(BaseModel):
+    """Response after RSVP processing."""
+
+    success: bool
+    visit_id: str | None
+    status: str | None
+    qr_code: str | None
+    message: str
+
+
+@router.post("/rsvp", response_model=RSVPResponse)
+async def handle_rsvp(
+    request: RSVPRequest,
+    _auth: AuthContext = Depends(require_auth(AuthLevel.AUTHENTICATED)),
+) -> RSVPResponse:
+    """Handle visitor RSVP (accept/decline) to a calendar invite.
+
+    When a visitor accepts:
+      - Updates visit status to CREATED
+      - Returns QR code data for n8n to send the confirmation email
+
+    When a visitor declines:
+      - Updates visit status to CANCELLED
+      - No QR code returned
+
+    Idempotent: if visit is already in final state, returns current state.
+    """
+    from app.database.repositories.visit_repository import VisitRepository
+
+    repo = VisitRepository()
+
+    # Find the pending visit by external_event_id
+    visit = repo.get_visit_by_external_event_id(request.external_event_id)
+
+    if visit is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No pending visit found for external_event_id={request.external_event_id}",
+        )
+
+    # Verify visitor email matches
+    if visit.visitor_email.lower() != request.visitor_email.lower():
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Visitor email does not match the pending visit",
+        )
+
+    response = request.response.lower()
+
+    if response == "accepted":
+        if visit.status in (VisitStatus.CREATED, VisitStatus.ARRIVED, VisitStatus.REGISTERED,
+                           VisitStatus.APPROVED, VisitStatus.ACTIVE):
+            # Already accepted — return current state (idempotent)
+            return RSVPResponse(
+                success=True,
+                visit_id=str(visit.id),
+                status=visit.status.value if hasattr(visit.status, 'value') else visit.status,
+                qr_code=visit.qr_code,
+                message="Visit already accepted",
+            )
+
+        # Update to CREATED — this triggers QR email in n8n
+        updated = repo.update_visit(visit.id, {"status": VisitStatus.CREATED})
+        logger.info(
+            "[RSVP] Visit %s ACCEPTED by %s", visit.id, request.visitor_email
+        )
+        return RSVPResponse(
+            success=True,
+            visit_id=str(updated.id),
+            status=updated.status.value if hasattr(updated.status, 'value') else updated.status,
+            qr_code=updated.qr_code,
+            message="Visit accepted — confirmation email will be sent",
+        )
+
+    elif response == "declined":
+        if visit.status == VisitStatus.CANCELLED:
+            return RSVPResponse(
+                success=True,
+                visit_id=str(visit.id),
+                status=visit.status.value if hasattr(visit.status, 'value') else visit.status,
+                qr_code=None,
+                message="Visit already declined",
+            )
+
+        updated = repo.update_visit(visit.id, {"status": VisitStatus.CANCELLED})
+        logger.info(
+            "[RSVP] Visit %s DECLINED by %s", visit.id, request.visitor_email
+        )
+        return RSVPResponse(
+            success=True,
+            visit_id=str(updated.id),
+            status=updated.status.value if hasattr(updated.status, 'value') else updated.status,
+            qr_code=None,
+            message="Visit declined",
+        )
+
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid response '{request.response}' — must be 'accepted' or 'declined'",
+        )

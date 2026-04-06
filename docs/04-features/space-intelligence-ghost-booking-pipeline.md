@@ -1,8 +1,23 @@
+---
+title: "Ghost Booking Detection Pipeline"
+type: "spec"
+status: "draft"
+version: "1.0.0"
+created: "2026-03-31"
+updated: "2026-03-31"
+tags: ["sentinel", "documentation"]
+related: []
+domain: "bms"
+audience: "all"
+complexity: "intermediate"
+estimated_read_time: 10
+---
+
 # Ghost Booking Detection Pipeline
 
 > Detects unoccupied meeting rooms during active bookings and notifies the floor concierge via WhatsApp and email.
 
-**Version:** 1.0 | **Last Updated:** 2026-03-13
+**Version:** 1.1 | **Last Updated:** 2026-03-28
 
 ---
 
@@ -22,7 +37,7 @@ OccupancyStore (JSON persistence)
     │
     ▼ (every 60s via BackgroundScheduler)
 GhostRoomMonitor.scan_due_ghost_bookings()
-    │ for each active booking past grace period
+    │ for each active booking in a due ghost-check window
     ▼
 GhostBookingDetector.detect_ghost_booking()
     │ checks: sensor data exists → sensor alive → occupied_minutes == 0
@@ -51,7 +66,22 @@ GhostRoomNotifier.send_ghost_booking_alert()
 
 ### Grace Period
 - Default: **5 minutes** after booking start time
-- Configurable via Space Settings API (`grace_period_minutes`)
+- Configurable via Space Settings API (`ghost_booking_grace_minutes`)
+
+### Hourly Re-Evaluation For Long Bookings
+- Ghost detection does not only run once at booking start
+- For a long booking, SENTINEL opens a fresh ghost-check window at each hour boundary plus the configured grace period
+- Example: `09:00-11:00` with `5` minute grace
+  - first ghost window: `09:05`
+  - second ghost window: `10:05`
+- Within the same hour window, SENTINEL does not send duplicate fresh alerts for the same booking
+- A fresh hourly alert resets the reminder cycle for that new hour window
+
+### Booking Cancellation Behavior
+- If the booking is cancelled after a ghost alert is sent, ghost processing stops for that booking
+- No reminder is sent for a cancelled booking
+- No hourly re-alert is sent for a cancelled booking
+- If the room is booked again later, that new booking is treated as a new lifecycle with its own grace window
 
 ### Sensor Liveness
 - Uses `received_at` (server clock), not `timestamp` (device clock)
@@ -73,8 +103,9 @@ GhostRoomNotifier.send_ghost_booking_alert()
 - Includes: full booking details, organiser contact info, action steps
 
 ### Reminder
-- If concierge hasn't responded after 15 minutes (`concierge_response_window`), a reminder is sent
+- If concierge hasn't responded after 15 minutes (`concierge_response_window_minutes`), a reminder is sent
 - Same channels (WhatsApp + email), prefixed with "REMINDER:"
+- Reminder timing is relative to the most recent fresh ghost alert for that booking window
 
 ## Radar Sensor (HLK-LD2410C)
 
@@ -147,9 +178,10 @@ Server-side override in `backend/app/data/space/node_room_mapping.json`:
 ```json
 {
   "node_001": {
-    "room_code": "FA2-1Q4-MR28",
+    "room_code": "FA2-1Q4-MR27",
     "site_id": "site-001",
-    "note": "Moved from MR25 to MR28 on 2026-03-13"
+    "room_type": "meeting",
+    "note": "Meeting room MR27 node; uses live ghost-booking flow"
   }
 }
 ```

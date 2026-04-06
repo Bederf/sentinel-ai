@@ -2,12 +2,14 @@ import { Monitor } from "lucide-react";
 import type { View } from "../../lib/navigation";
 import { ThemeSwitcher } from "../ThemeSwitcher";
 import { AiCostTracker } from "./AiCostTracker";
+import { AiRuntimePolicySettings } from "./AiRuntimePolicySettings";
 import { AlertMuting } from "./AlertMuting";
 import { AlertRoutingRules } from "./AlertRoutingRules";
 import { BuildingConfigEditor } from "./BuildingConfigEditor";
 import { ChannelStatusDashboard } from "./ChannelStatusDashboard";
 import { GlassThemeControls } from "./GlassThemeControls";
 import { HolidayCalendar } from "./HolidayCalendar";
+import { OnboardingPhaseSettings } from "./OnboardingPhaseSettings";
 import { ModuleAccessSections } from "./SettingsModuleSections";
 import {
   SettingsHeader,
@@ -18,7 +20,7 @@ import {
 } from "./SettingsCoreSections";
 import { NotificationSettingsPanel } from "./NotificationSettingsPanel";
 import { OperatingScheduleEditor } from "./OperatingScheduleEditor";
-import { SimulationControlsPanel } from "./SimulationControlsPanel";
+import { SimbiotBridgeSettings } from "./SimbiotBridgeSettings";
 import { SpaceOptimizationSettings } from "./SpaceOptimizationSettings";
 import { SystemHealthDashboard } from "./SystemHealthDashboard";
 import { TariffManager } from "./TariffManager";
@@ -32,8 +34,8 @@ interface SettingsPageViewProps {
 }
 
 function DisplaySettingsSection({
-  controller,
-  onError,
+  controller: _controller,
+  onError: _onError,
 }: {
   controller: ReturnType<typeof useSettingsController>;
   onError?: (error: string) => void;
@@ -66,7 +68,6 @@ function DisplaySettingsSection({
           <GlassThemeControls />
         </div>
       </div>
-      <SimulationControlsPanel readOnly={false} selectedSiteId={controller.selectedSiteId} onError={onError} />
     </>
   );
 }
@@ -79,25 +80,81 @@ function SettingsSections({
   return (
     <div className="space-y-6 max-w-4xl">
       <SystemHealthDashboard onError={onError} onNavigate={onNavigate} />
-      <AiCostTracker onError={onError} />
+      <AiCostTracker onError={onError} siteId={controller.selectedSiteId ?? undefined} />
+      <AiRuntimePolicySettings
+        siteId={controller.selectedSiteId ?? undefined}
+        currentUserRole={controller.currentUserRole}
+        readOnly={controller.readOnly}
+        onError={onError}
+        onSuccess={controller.handleSuccess}
+      />
       <ThresholdSettingsSection controller={controller} onError={onError} />
       <NotificationSettingsPanel
         currentUserEmail={controller.currentUserEmail}
         hasAuthenticatedSession={controller.hasSessionToken}
+        siteId={controller.selectedSiteId ?? undefined}
         onError={onError}
         onSuccess={controller.handleSuccess}
       />
-      <ChannelStatusDashboard onError={onError} />
-      <AlertRoutingRules onError={onError} onSuccess={controller.handleSuccess} readOnly={controller.readOnly} />
-      <AlertMuting onError={onError} onSuccess={controller.handleSuccess} readOnly={controller.readOnly} />
-      <TechnicianRegistry onError={onError} onSuccess={controller.handleSuccess} readOnly={controller.readOnly} />
+      <ChannelStatusDashboard onError={onError} siteId={controller.selectedSiteId ?? undefined} />
+      <AlertRoutingRules
+        siteId={controller.selectedSiteId ?? undefined}
+        onError={onError}
+        onSuccess={controller.handleSuccess}
+        readOnly={controller.readOnly}
+      />
+      <AlertMuting
+        siteId={controller.selectedSiteId ?? undefined}
+        onError={onError}
+        onSuccess={controller.handleSuccess}
+        readOnly={controller.readOnly}
+      />
+      <TechnicianRegistry
+        siteId={controller.selectedSiteId ?? undefined}
+        onError={onError}
+        onSuccess={controller.handleSuccess}
+        readOnly={controller.readOnly}
+      />
+      <OnboardingPhaseSettings
+        selectedSiteId={controller.selectedSiteId ?? undefined}
+        sites={controller.buildings}
+        currentUserRole={controller.currentUserRole}
+        onError={onError}
+        onSuccess={controller.handleSuccess}
+      />
+      <SimbiotBridgeSettings
+        siteId={controller.selectedSiteId ?? undefined}
+        readOnly={controller.readOnly}
+        onError={onError}
+        onSuccess={controller.handleSuccess}
+      />
       {controller.isModuleActive("space_optimization") ? (
-        <SpaceOptimizationSettings onError={onError} onSuccess={controller.handleSuccess} readOnly={controller.readOnly} />
+        <SpaceOptimizationSettings
+          siteId={controller.selectedSiteId ?? undefined}
+          onError={onError}
+          onSuccess={controller.handleSuccess}
+          readOnly={controller.readOnly}
+        />
       ) : null}
-      <BuildingConfigEditor onError={onError} onSuccess={controller.handleSuccess} readOnly={controller.readOnly} />
-      <OperatingScheduleEditor onError={onError} onSuccess={controller.handleSuccess} readOnly={controller.readOnly} />
-      <HolidayCalendar onError={onError} onSuccess={controller.handleSuccess} readOnly={controller.readOnly} />
-      <TariffManager onError={onError} readOnly={controller.readOnly} />
+      <BuildingConfigEditor
+        siteId={controller.selectedSiteId ?? undefined}
+        onError={onError}
+        onSuccess={controller.handleSuccess}
+        readOnly={controller.readOnly}
+      />
+      <OperatingScheduleEditor
+        siteId={controller.selectedSiteId ?? undefined}
+        onError={onError}
+        onSuccess={controller.handleSuccess}
+        readOnly={controller.readOnly}
+      />
+      <HolidayCalendar
+        siteId={controller.selectedSiteId ?? undefined}
+        onError={onError}
+        onSuccess={controller.handleSuccess}
+        readOnly={controller.readOnly}
+      />
+      <TariffManager siteId={controller.selectedSiteId ?? undefined} onError={onError} readOnly={controller.readOnly} />
       <ModuleAccessSections controller={controller} onError={onError} />
       <DisplaySettingsSection controller={controller} onError={onError} />
     </div>

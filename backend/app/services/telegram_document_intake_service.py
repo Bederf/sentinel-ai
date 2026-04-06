@@ -6,9 +6,10 @@ import logging
 from datetime import datetime
 from typing import Any
 
-from app.database.repositories.telegram_document_intake_repository import get_telegram_document_intake_repository
+from app.database.repositories.service_record_repository import ServiceRecordRepository
 from app.database.repositories.site_repository import SiteRepository
 from app.database.repositories.technician_repository import get_technician_repository
+from app.database.repositories.telegram_document_intake_repository import get_telegram_document_intake_repository
 from app.services.concept_raw_document_service import get_concept_raw_document_service
 from app.services.telegram_conversation_manager import get_conversation_manager
 from app.services.telegram_intent_classifier import TelegramIntent
@@ -45,6 +46,7 @@ class TelegramDocumentIntakeService:
 
     def __init__(self) -> None:
         self._site_repository = SiteRepository()
+        self._service_record_repository = ServiceRecordRepository()
         self._technician_repository = get_technician_repository()
         self._intake_repository = get_telegram_document_intake_repository()
         self._concept_service = get_concept_raw_document_service()
@@ -209,6 +211,7 @@ class TelegramDocumentIntakeService:
             await sender.send_text(chat_id, "Saving raw file to Concept...")
 
             try:
+                active_service_record = await self._resolve_active_service_record(chat_id)
                 result = await self._concept_service.save_telegram_document(
                     site_id=str(session.answers["site_id"]),
                     site_name=str(session.answers["site_name"]),
@@ -218,6 +221,8 @@ class TelegramDocumentIntakeService:
                     telegram_user_id=telegram_user_id,
                     telegram_chat_id=chat_id,
                     received_at=str(session.answers["received_at"]),
+                    equipment_id=(active_service_record or {}).get("equipment_id"),
+                    work_order_id=(active_service_record or {}).get("work_order_id"),
                     notes=str(session.answers.get("notes") or ""),
                 )
             except Exception as exc:
@@ -252,6 +257,9 @@ class TelegramDocumentIntakeService:
                     "file_hash": result.get("file_hash"),
                     "scan_detected_type": result.get("scan_detected_type"),
                     "scan_trust_level": result.get("scan_trust_level"),
+                    "equipment_id": (active_service_record or {}).get("equipment_id"),
+                    "work_order_id": (active_service_record or {}).get("work_order_id"),
+                    "supabase_document_id": result.get("supabase_document_id"),
                 },
             )
             manager.end_session(chat_id)
@@ -285,6 +293,22 @@ class TelegramDocumentIntakeService:
             raise ValueError(f"Site {site_id} could not be resolved")
 
         return site_id, site_name
+
+    async def _resolve_active_service_record(self, chat_id: str) -> dict[str, Any] | None:
+        """Resolve the latest active service record for this Telegram chat."""
+        try:
+            records = await self._service_record_repository.list({"telegram_chat_id": chat_id})
+        except Exception as exc:
+            logger.warning("Unable to query service records for chat %s: %s", chat_id, exc)
+            return None
+
+        active_statuses = {"notified", "in_progress", "data_collection", "complete"}
+        active_records = [row for row in records if str(row.get("status") or "") in active_statuses]
+        if not active_records:
+            return None
+
+        active_records.sort(key=lambda row: str(row.get("updated_at") or row.get("created_at") or ""), reverse=True)
+        return active_records[0]
 
     def _equipment_keyboard(self) -> InlineKeyboard:
         rows = []

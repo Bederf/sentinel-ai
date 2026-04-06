@@ -13,7 +13,7 @@ import logging
 from datetime import datetime
 
 from app.config.settings import settings
-from app.core.site_resolver import get_registered_site_ids
+from app.core.site_resolver import get_connected_site_ids
 from app.services import occupancy_store
 from app.services.focus_room_session_service import describe_focus_session_state
 from app.services.space_mqtt_listener import get_node_room_mapping
@@ -122,7 +122,7 @@ def scan_all_focus_relays(now: datetime | None = None) -> dict[str, int]:
     scanned = 0
     changed = 0
 
-    site_ids = set(get_registered_site_ids())
+    site_ids = set(get_connected_site_ids())
     for node_id, node in mapping.items():
         room_type = (node.get("room_type") or "meeting").lower()
         if room_type != "focus":

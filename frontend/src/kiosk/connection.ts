@@ -1,3 +1,5 @@
+import { buildCurrentDecisionUrl } from "@/lib/decisions";
+
 /**
  * Kiosk Connection Manager — Phase 165.
  *
@@ -139,10 +141,9 @@ export function startConnection(
   async function poll(): Promise<void> {
     if (stopped || usingSSE) return;
     try {
-      const res = await fetch(
-        `/api/decisions/current/${encodeURIComponent(buildingId)}`,
-        { headers: { Accept: "application/json" } },
-      );
+      const res = await fetch(buildCurrentDecisionUrl(buildingId), {
+        headers: { Accept: "application/json" },
+      });
       if (res.status === 422) {
         onUpdate(null); // no active fault — quiet state
       } else if (res.ok) {

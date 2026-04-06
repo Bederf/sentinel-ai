@@ -3,19 +3,20 @@
 Verifies that monthly aggregation, learning-curve calculation, and seasonal
 rollup match the original logic in SolarAnnualAggregator before the refactor.
 """
+
 from __future__ import annotations
 
 from datetime import datetime
 
 import pytest
 
-from app.processing.solar_table import SolarTableProcessor, _SEASON_MAP
+from app.processing.solar_table import _SEASON_MAP, SolarTableProcessor
 from app.services.solar_annual_aggregator import HourlySnapshot, MonthSummary
-
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _snapshot(hour: int, month: int, day_of_year: int, **kwargs) -> HourlySnapshot:
     """Build a minimal HourlySnapshot with sensible defaults."""
@@ -42,8 +43,7 @@ def _snapshot(hour: int, month: int, day_of_year: int, **kwargs) -> HourlySnapsh
 
 def _month_summary(month: int, **kwargs) -> MonthSummary:
     defaults = dict(
-        month_name=["Jan","Feb","Mar","Apr","May","Jun",
-                    "Jul","Aug","Sep","Oct","Nov","Dec"][month - 1],
+        month_name=["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][month - 1],
         season=_SEASON_MAP[month],
         solar_generated_kwh=1000.0,
         bess_charged_kwh=200.0,
@@ -67,6 +67,7 @@ def _month_summary(month: int, **kwargs) -> MonthSummary:
 # ---------------------------------------------------------------------------
 # aggregate_months
 # ---------------------------------------------------------------------------
+
 
 class TestAggregateMonths:
     def test_empty_input_returns_empty(self):
@@ -92,7 +93,7 @@ class TestAggregateMonths:
         assert result[0].season == "winter"
 
     def test_multiple_months_aggregated_separately(self):
-        jan = [_snapshot(h, month=1, day_of_year=h + 1,  solar_gen_kw=8.0) for h in range(24)]
+        jan = [_snapshot(h, month=1, day_of_year=h + 1, solar_gen_kw=8.0) for h in range(24)]
         feb = [_snapshot(h, month=2, day_of_year=h + 32, solar_gen_kw=9.0) for h in range(24)]
         result = SolarTableProcessor.aggregate_months(jan + feb)
         assert len(result) == 2
@@ -102,7 +103,7 @@ class TestAggregateMonths:
     def test_peak_demand_is_max(self):
         snapshots = [
             _snapshot(0, month=6, day_of_year=152, grid_import_kw=10.0, site_load_kw=20.0),
-            _snapshot(1, month=6, day_of_year=152, grid_import_kw=5.0,  site_load_kw=15.0),
+            _snapshot(1, month=6, day_of_year=152, grid_import_kw=5.0, site_load_kw=15.0),
         ]
         result = SolarTableProcessor.aggregate_months(snapshots)
         # peak = max(10+20, 5+15) = 30
@@ -125,6 +126,7 @@ class TestAggregateMonths:
 # ---------------------------------------------------------------------------
 # calculate_learning_curve
 # ---------------------------------------------------------------------------
+
 
 class TestCalculateLearningCurve:
     def test_length_matches_monthly_data(self):
@@ -165,6 +167,7 @@ class TestCalculateLearningCurve:
 # ---------------------------------------------------------------------------
 # aggregate_seasons
 # ---------------------------------------------------------------------------
+
 
 class TestAggregateSeasons:
     def test_returns_four_seasons_for_full_year(self):
@@ -209,11 +212,10 @@ class TestAggregateSeasons:
 # _calculate_standard_ems_cost
 # ---------------------------------------------------------------------------
 
+
 class TestCalculateStandardEmsCost:
     def test_cost_positive_for_nonzero_import(self):
-        cost = SolarTableProcessor._calculate_standard_ems_cost(
-            month=1, grid_import_kwh=1000.0, peak_demand_kw=50.0
-        )
+        cost = SolarTableProcessor._calculate_standard_ems_cost(month=1, grid_import_kwh=1000.0, peak_demand_kw=50.0)
         assert cost > 0
 
     def test_winter_cost_higher_than_summer_for_same_load(self):
@@ -228,7 +230,5 @@ class TestCalculateStandardEmsCost:
 
     def test_zero_import_still_has_demand_charge(self):
         """Even with no energy, demand charge applies."""
-        cost = SolarTableProcessor._calculate_standard_ems_cost(
-            month=3, grid_import_kwh=0.0, peak_demand_kw=100.0
-        )
+        cost = SolarTableProcessor._calculate_standard_ems_cost(month=3, grid_import_kwh=0.0, peak_demand_kw=100.0)
         assert cost > 0

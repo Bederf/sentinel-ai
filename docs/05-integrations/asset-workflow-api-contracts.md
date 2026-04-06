@@ -1,3 +1,18 @@
+---
+title: "SENTINEL Workflow Integration - API Contracts"
+type: "spec"
+status: "draft"
+version: "1.0.0"
+created: "2026-03-31"
+updated: "2026-03-31"
+tags: ["sentinel", "documentation"]
+related: []
+domain: "bms"
+audience: "all"
+complexity: "intermediate"
+estimated_read_time: 10
+---
+
 # SENTINEL Workflow Integration - API Contracts
 
 **Date:** 2026-02-08
@@ -58,7 +73,7 @@ All endpoints return errors in this format:
 
 **Endpoint:** `POST /api/workflow/onboard-asset`
 
-**Description:** Onboard a new asset via SIMBIOT and capture initial baseline
+**Description:** Onboard a new asset, persist onboarding metadata, and attempt initial baseline capture
 
 **Request Body:**
 ```json
@@ -105,6 +120,15 @@ All endpoints return errors in this format:
 }
 ```
 
+**Persistence behavior (current):**
+- Writes onboarding metadata to `equipment.operating_data.onboarding`:
+  - `onboarded`, `onboarded_at`, `captured_by`, `notes`
+  - `service_sheet_ref`, `photo_links`, `age_years`, `equipment_ref`
+- Writes workflow transitions to `workflow_events` with:
+  - `trigger_type: "workflow_state"`
+  - `details.from_state`, `details.to_state`, `details.transition_time`
+- Baseline capture is attempted; if baseline schema is not compatible in the deployed DB, onboarding still succeeds and logs baseline capture as unavailable.
+
 **Errors:**
 - `400` - Invalid equipment data
 - `409` - Equipment already exists
@@ -116,6 +140,11 @@ All endpoints return errors in this format:
 **Endpoint:** `GET /api/workflow/status/{equipment_id}`
 
 **Description:** Get current workflow state for equipment
+
+**Resolution order:**
+1. Latest persisted transition in `workflow_events`
+2. In-memory orchestrator state
+3. Default fallback (`onboarding`)
 
 **Response (200):**
 ```json
@@ -278,6 +307,8 @@ All endpoints return errors in this format:
   ]
 }
 ```
+
+**Note:** `equipment_id` in events is stored as equipment UUID; `details.equipment_ref` may include the human-readable equipment code used in requests.
 
 ---
 
@@ -648,3 +679,4 @@ curl -X POST http://localhost:9095/api/workflow/trigger-inspection \
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0 | 2026-02-01 | Initial API contracts for Phase 53 |
+| 1.1 | 2026-03-31 | Added durable onboarding metadata, persisted workflow state transitions, and baseline compatibility behavior |

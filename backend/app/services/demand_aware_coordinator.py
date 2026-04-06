@@ -16,19 +16,19 @@ Priority Hierarchy:
 """
 
 import logging
-from typing import Optional, Dict, List, Any
-from datetime import datetime
 import uuid
+from datetime import datetime
+from typing import Any
 
-from app.services.module_registry_service import module_registry
-from app.services.solar_demand_service import get_solar_demand_service
-from app.services.solar_arbitrage_engine import get_solar_arbitrage_engine
-from app.services.bess_dispatch_engine import get_bess_dispatch_engine
+from app.database.repositories.alert_repository import get_alert_repository
+from app.database.repositories.equipment_repository import get_equipment_repository
+from app.models.module_registry import ModuleType, RecommendationPriority
 from app.services.ai_optimizer import get_ai_optimizer
 from app.services.approval_service import get_approval_service
-from app.models.module_registry import ModuleType, RecommendationPriority
-from app.database.repositories.equipment_repository import get_equipment_repository
-from app.database.repositories.alert_repository import get_alert_repository
+from app.services.bess_dispatch_engine import get_bess_dispatch_engine
+from app.services.module_registry_service import module_registry
+from app.services.solar_arbitrage_engine import get_solar_arbitrage_engine
+from app.services.solar_demand_service import get_solar_demand_service
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +51,7 @@ class DemandAwareCoordinator:
         self.equipment_repo = get_equipment_repository()
         self.alert_repo = get_alert_repository()
 
-    async def evaluate_current_state(self, site_id: str) -> Optional[Dict[str, Any]]:
+    async def evaluate_current_state(self, site_id: str) -> dict[str, Any] | None:
         """
         Evaluate demand and module state, decide coordinator actions.
 
@@ -143,9 +143,9 @@ class DemandAwareCoordinator:
         current_demand_kw: float,
         nmd_limit_kva: float,
         headroom_percent: float,
-        active_module_types: List[ModuleType],
+        active_module_types: list[ModuleType],
         priority: RecommendationPriority,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Generate emergency peak shaving recommendation."""
         logger.info(f"Site {site_id}: Generating EMERGENCY shaving (headroom {headroom_percent:.1f}%)")
 
@@ -170,13 +170,12 @@ class DemandAwareCoordinator:
         }
 
         # Call AI optimizer with demand context
-        try:
-            recommendations = await self.ai_optimizer.generate_recommendations(site_id=site_id, context=ai_context)
-        except Exception as e:
-            logger.warning(f"AI optimizer failed for {site_id}: {e}, using rule-based fallback")
-            recommendations = self._generate_ruleb_ased_shaving(
-                site_id=site_id, active_module_types=active_module_types, required_reduction_kw=required_reduction_kw
-            )
+        recommendations = await self._generate_coordinated_shaving_plan(
+            site_id=site_id,
+            active_module_types=active_module_types,
+            required_reduction_kw=required_reduction_kw,
+            ai_context=ai_context,
+        )
 
         if not recommendations:
             logger.warning(f"No recommendations generated for site {site_id}")
@@ -220,9 +219,9 @@ class DemandAwareCoordinator:
         current_demand_kw: float,
         nmd_limit_kva: float,
         headroom_percent: float,
-        active_module_types: List[ModuleType],
+        active_module_types: list[ModuleType],
         priority: RecommendationPriority,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Generate preventive peak shaving recommendation."""
         logger.info(f"Site {site_id}: Generating PREVENTIVE shaving (headroom {headroom_percent:.1f}%)")
 
@@ -242,13 +241,12 @@ class DemandAwareCoordinator:
             "available_actions": await self._get_available_actions(site_id, active_module_types),
         }
 
-        try:
-            recommendations = await self.ai_optimizer.generate_recommendations(site_id=site_id, context=ai_context)
-        except Exception as e:
-            logger.warning(f"AI optimizer failed for {site_id}: {e}, using rule-based fallback")
-            recommendations = self._generate_ruleb_ased_shaving(
-                site_id=site_id, active_module_types=active_module_types, required_reduction_kw=required_reduction_kw
-            )
+        recommendations = await self._generate_coordinated_shaving_plan(
+            site_id=site_id,
+            active_module_types=active_module_types,
+            required_reduction_kw=required_reduction_kw,
+            ai_context=ai_context,
+        )
 
         if not recommendations:
             return None
@@ -283,8 +281,8 @@ class DemandAwareCoordinator:
         return recommendation
 
     async def _generate_tou_guidance(
-        self, site_id: str, active_module_types: List[ModuleType]
-    ) -> Optional[Dict[str, Any]]:
+        self, site_id: str, active_module_types: list[ModuleType]
+    ) -> dict[str, Any] | None:
         """Generate TOU arbitrage guidance (normal mode, only if solar active)."""
         if ModuleType.SOLAR not in active_module_types:
             return None
@@ -311,7 +309,7 @@ class DemandAwareCoordinator:
             logger.debug(f"TOU guidance failed for {site_id}: {e}")
             return None
 
-    async def _get_available_actions(self, site_id: str, active_module_types: List[ModuleType]) -> Dict[str, List[str]]:
+    async def _get_available_actions(self, site_id: str, active_module_types: list[ModuleType]) -> dict[str, list[str]]:
         """Get available optimization actions per module."""
         available = {}
 
@@ -346,9 +344,42 @@ class DemandAwareCoordinator:
 
         return available
 
-    def _generate_ruleb_ased_shaving(
-        self, site_id: str, active_module_types: List[ModuleType], required_reduction_kw: float
-    ) -> Dict[str, Any]:
+    async def _generate_coordinated_shaving_plan(
+        self,
+        site_id: str,
+        active_module_types: list[ModuleType],
+        required_reduction_kw: float,
+        ai_context: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Return a coordinated shaving plan using a demand-aware AI hook when available.
+
+        The current AIOptimizerService API exposes analyze_building(), not the historical
+        generate_recommendations(site_id=..., context=...) method this coordinator used.
+        Fall back to the coordinator-owned rule planner unless a compatible demand-plan
+        hook is explicitly available.
+        """
+        generate_recommendations = getattr(self.ai_optimizer, "generate_recommendations", None)
+
+        if callable(generate_recommendations):
+            try:
+                recommendations = await generate_recommendations(site_id=site_id, context=ai_context)
+                if isinstance(recommendations, dict) and "module_actions" in recommendations:
+                    return recommendations
+                logger.warning(
+                    "AI optimizer returned unsupported shaving plan for %s; using rule-based fallback", site_id
+                )
+            except Exception as e:
+                logger.warning(f"AI optimizer failed for {site_id}: {e}, using rule-based fallback")
+        else:
+            logger.debug("AI optimizer has no demand shaving API for %s; using rule-based fallback", site_id)
+
+        return self._generate_rule_based_shaving(
+            site_id=site_id, active_module_types=active_module_types, required_reduction_kw=required_reduction_kw
+        )
+
+    def _generate_rule_based_shaving(
+        self, site_id: str, active_module_types: list[ModuleType], required_reduction_kw: float
+    ) -> dict[str, Any]:
         """Generate rule-based shaving when AI is unavailable."""
         logger.info(f"Using rule-based shaving for {site_id} (required: {required_reduction_kw:.0f}kW)")
 
@@ -395,9 +426,17 @@ class DemandAwareCoordinator:
             "total_savings_r": 0,  # Rule-based, no financial context
         }
 
+    def _generate_ruleb_ased_shaving(
+        self, site_id: str, active_module_types: list[ModuleType], required_reduction_kw: float
+    ) -> dict[str, Any]:
+        """Backward-compatible wrapper for legacy typoed helper name."""
+        return self._generate_rule_based_shaving(
+            site_id=site_id, active_module_types=active_module_types, required_reduction_kw=required_reduction_kw
+        )
+
 
 # Singleton instance
-_demand_aware_coordinator: Optional[DemandAwareCoordinator] = None
+_demand_aware_coordinator: DemandAwareCoordinator | None = None
 
 
 def get_demand_aware_coordinator() -> DemandAwareCoordinator:

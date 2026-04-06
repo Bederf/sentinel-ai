@@ -23,7 +23,7 @@ import logging
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 try:
     from brickschema import Graph as BrickGraph
@@ -56,7 +56,7 @@ else:
 # ---------------------------------------------------------------------------
 # Equipment type -> Brick class mapping
 # ---------------------------------------------------------------------------
-EQUIPMENT_TYPE_TO_BRICK: Dict[str, str] = {
+EQUIPMENT_TYPE_TO_BRICK: dict[str, str] = {
     "chiller": "Chiller",
     "ahu": "AHU",
     "vav": "VAV",
@@ -74,7 +74,7 @@ EQUIPMENT_TYPE_TO_BRICK: Dict[str, str] = {
 }
 
 # Classifier brick_class string -> Brick point class
-CLASSIFIER_TO_BRICK_POINT: Dict[str, str] = {
+CLASSIFIER_TO_BRICK_POINT: dict[str, str] = {
     "chiller.supply.temperature": "Supply_Chilled_Water_Temperature_Sensor",
     "chiller.return.temperature": "Return_Chilled_Water_Temperature_Sensor",
     "chiller.supply.pressure": "Supply_Chilled_Water_Pressure_Sensor",
@@ -83,7 +83,7 @@ CLASSIFIER_TO_BRICK_POINT: Dict[str, str] = {
 }
 
 # Confidence string -> float mapping (discovery uses string values)
-CONFIDENCE_MAP: Dict[str, float] = {
+CONFIDENCE_MAP: dict[str, float] = {
     "high": 0.9,
     "medium": 0.6,
     "low": 0.3,
@@ -104,8 +104,8 @@ class DiscoveryPointEnrichment:
     confidence: float
     object_type: str
     instance: int
-    brick_class: Optional[str] = None
-    haystack_tags: Optional[List[str]] = None
+    brick_class: str | None = None
+    haystack_tags: list[str] | None = None
 
 
 @dataclass(frozen=True)
@@ -114,8 +114,8 @@ class DiscoveryEquipmentEnrichment:
 
     equipment_id: str
     equipment_type: str
-    zone: Optional[Dict[str, Any]] = None
-    points: List[DiscoveryPointEnrichment] = field(default_factory=list)
+    zone: dict[str, Any] | None = None
+    points: list[DiscoveryPointEnrichment] = field(default_factory=list)
 
 
 @dataclass
@@ -123,17 +123,17 @@ class ResolutionIndex:
     """Fast runtime lookup table for point/equipment/location resolution."""
 
     # bacnet_ref (e.g. "CH-1.ChwSupplyTemp") -> brick point IRI
-    bacnet_ref_to_point_iri: Dict[str, str] = field(default_factory=dict)
+    bacnet_ref_to_point_iri: dict[str, str] = field(default_factory=dict)
     # "analogInput,1000" -> brick point IRI
-    bacnet_object_to_point_iri: Dict[str, str] = field(default_factory=dict)
+    bacnet_object_to_point_iri: dict[str, str] = field(default_factory=dict)
     # brick point IRI -> brick equipment IRI
-    point_iri_to_equipment_iri: Dict[str, str] = field(default_factory=dict)
+    point_iri_to_equipment_iri: dict[str, str] = field(default_factory=dict)
     # equipment code -> brick equipment IRI
-    equipment_code_to_equipment_iri: Dict[str, str] = field(default_factory=dict)
+    equipment_code_to_equipment_iri: dict[str, str] = field(default_factory=dict)
     # equipment code -> brick location IRI
-    equipment_code_to_location_iri: Dict[str, str] = field(default_factory=dict)
+    equipment_code_to_location_iri: dict[str, str] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "bacnet_ref_to_point_iri": self.bacnet_ref_to_point_iri,
             "bacnet_object_to_point_iri": self.bacnet_object_to_point_iri,
@@ -175,13 +175,13 @@ def _stable_hash(obj: Any) -> str:
 def load_discovery_enrichment(
     mappings_dir: Path,
     site_id: str,
-) -> Dict[str, DiscoveryEquipmentEnrichment]:
+) -> dict[str, DiscoveryEquipmentEnrichment]:
     """Load discovery mappings and build enrichment index keyed by equipment_id.
 
     Reads all mapping_*.json files from the mappings directory.
     Filters to those matching the given site_id.
     """
-    result: Dict[str, DiscoveryEquipmentEnrichment] = {}
+    result: dict[str, DiscoveryEquipmentEnrichment] = {}
 
     if not mappings_dir.exists():
         logger.warning("Discovery mappings directory not found: %s", mappings_dir)
@@ -275,15 +275,15 @@ class BrickAutogenService:
         self.g.bind("sentinel", SENTINEL)
 
         # Delta tracking per equipment
-        self._hash_by_equipment: Dict[str, str] = {}
+        self._hash_by_equipment: dict[str, str] = {}
 
     # -----------------------------------------------------------------------
     # Public API
     # -----------------------------------------------------------------------
     def build(
         self,
-        discovery: Optional[Dict[str, DiscoveryEquipmentEnrichment]] = None,
-    ) -> Tuple[Any, ResolutionIndex, BuildResult]:
+        discovery: dict[str, DiscoveryEquipmentEnrichment] | None = None,
+    ) -> tuple[Any, ResolutionIndex, BuildResult]:
         """Build Brick graph for the site.
 
         Args:
@@ -418,7 +418,7 @@ class BrickAutogenService:
     # -----------------------------------------------------------------------
     # Location hierarchy from discovery zone metadata
     # -----------------------------------------------------------------------
-    def _upsert_location(self, zone: Optional[Dict[str, Any]]) -> Optional[URIRef]:
+    def _upsert_location(self, zone: dict[str, Any] | None) -> URIRef | None:
         """Build location hierarchy from discovery zone metadata.
 
         Real zone example from mapping JSON:
@@ -460,8 +460,8 @@ class BrickAutogenService:
         self,
         eq_iri: URIRef,
         equipment_id: str,
-        points: Dict[str, dict],
-        discovery_points: List[DiscoveryPointEnrichment],
+        points: dict[str, dict],
+        discovery_points: list[DiscoveryPointEnrichment],
         idx: ResolutionIndex,
     ) -> int:
         """Create Brick Point nodes from equipment JSON points dict.
@@ -479,7 +479,7 @@ class BrickAutogenService:
         """
         # Build enrichment lookup by original_name tokens for fuzzy match
         # within the same equipment (deterministic: same equipment_id)
-        enrich_by_category: Dict[str, DiscoveryPointEnrichment] = {}
+        enrich_by_category: dict[str, DiscoveryPointEnrichment] = {}
         for dp in discovery_points:
             cat = dp.point_category
             if cat and cat != "unknown":
@@ -535,8 +535,8 @@ class BrickAutogenService:
         self,
         point_key: str,
         point: dict,
-        enrich_by_category: Dict[str, DiscoveryPointEnrichment],
-    ) -> Optional[DiscoveryPointEnrichment]:
+        enrich_by_category: dict[str, DiscoveryPointEnrichment],
+    ) -> DiscoveryPointEnrichment | None:
         """Find the best discovery enrichment for a canonical point.
 
         Strategy: match by point_category inferred from the canonical point's
@@ -569,7 +569,7 @@ class BrickAutogenService:
         self,
         point_key: str,
         point: dict,
-        enrich: Optional[DiscoveryPointEnrichment],
+        enrich: DiscoveryPointEnrichment | None,
     ) -> URIRef:
         """Determine Brick Point class.
 
@@ -579,11 +579,7 @@ class BrickAutogenService:
         """
         # 1. Classifier enrichment
         if enrich and enrich.brick_class:
-            if enrich.confidence >= self.confidence_threshold:
-                mapped = CLASSIFIER_TO_BRICK_POINT.get(enrich.brick_class.strip().lower())
-                if mapped:
-                    return BRICK[mapped]
-            elif enrich.confidence >= self.low_confidence_threshold:
+            if enrich.confidence >= self.confidence_threshold or enrich.confidence >= self.low_confidence_threshold:
                 mapped = CLASSIFIER_TO_BRICK_POINT.get(enrich.brick_class.strip().lower())
                 if mapped:
                     return BRICK[mapped]
@@ -638,7 +634,7 @@ class BrickAutogenService:
         pt_iri: URIRef,
         object_type: str,
         instance: int,
-        bacnet_ref: Optional[str],
+        bacnet_ref: str | None,
     ) -> None:
         """Attach BACnet external reference to a point.
 
@@ -661,8 +657,8 @@ def build_brick_for_site(
     site_id: str,
     *,
     validate: bool = True,
-    output_dir: Optional[Path] = None,
-) -> Tuple[ResolutionIndex, BuildResult]:
+    output_dir: Path | None = None,
+) -> tuple[ResolutionIndex, BuildResult]:
     """Build Brick graph for a site and optionally save artifacts.
 
     Args:

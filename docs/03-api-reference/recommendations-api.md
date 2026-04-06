@@ -2,9 +2,9 @@
 title: "Recommendations API Reference"
 type: "api-reference"
 status: "complete"
-version: "1.1.0"
+version: "1.2.0"
 created: "2026-02-09"
-updated: "2026-02-27"
+updated: "2026-04-03"
 author: "SENTINEL Development Team"
 tags: ["api", "recommendations", "optimization", "approval-workflow", "background-jobs"]
 domain: "optimization"
@@ -16,8 +16,8 @@ related: ["../08-ai-ml/ai-recommendation-system.md", "../08-ai-ml/background-rec
 
 # Recommendations API Reference
 
-**Base URL:** `http://localhost:9095/api`  
-**Authentication:** JWT bearer token in `Authorization` header  
+**Base URL:** `http://localhost:9095/api`
+**Authentication:** JWT bearer token in `Authorization` header
 **Auto-Generation:** Recommendations are generated automatically every 10 minutes. See [Background Recommendation Generation](../08-ai-ml/background-recommendation-generation.md) for details.
 
 ---
@@ -31,7 +31,7 @@ related: ["../08-ai-ml/ai-recommendation-system.md", "../08-ai-ml/background-rec
 - `GET /optimization/profiles/{name}` - Get profile details
 
 ### Recommendations (4 endpoints)
-- `GET /recommendations/{site_id}` - Get pending recommendations
+- `GET /modules/site/{site_id}/recommendations` - Get pending recommendations (returns list directly)
 - `POST /recommendations/{rec_id}/approve` - Approve recommendation
 - `POST /recommendations/{rec_id}/reject` - Reject recommendation
 - `GET /recommendations/{rec_id}` - Get recommendation details

@@ -14,7 +14,7 @@ in api/optimization.py). Only advisory, supervised, and manual sources.
 import logging
 import uuid
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 from app.database.repositories.audit_repository import AuditRepository
 from app.services.cov_monitor_service import get_cov_monitor_service
@@ -30,7 +30,7 @@ async def execute_command(
     target_value: Any,
     source: str,
     correlation_id: str,
-    decision_id: Optional[str] = None,
+    decision_id: str | None = None,
 ) -> dict:
     """Execute a device write with mandatory verification and audit.
 
@@ -61,7 +61,7 @@ async def execute_command(
     actual_value: Any = None
     verified = False
     success = False
-    error: Optional[str] = None
+    error: str | None = None
 
     try:
         # Step 1: Write to device
@@ -152,7 +152,7 @@ def _audit_execution(
     decision_id: str,
     success: bool,
     verified: bool,
-    error: Optional[str],
+    error: str | None,
 ) -> None:
     """Write a device-control audit record synchronously.
 

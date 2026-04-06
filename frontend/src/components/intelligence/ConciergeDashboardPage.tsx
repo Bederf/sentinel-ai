@@ -7,11 +7,16 @@
  * Phase 161-04 — Concierge Intelligence Dashboard.
  */
 
-import { useState, useCallback } from "react";
+import { Suspense, lazy, useCallback, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import type { ConciergeRoom } from "../../lib/api";
-import { ConciergeMap } from "./ConciergeMap";
-import { SignalDrillDown } from "./SignalDrillDown";
+
+const ConciergeMap = lazy(() =>
+  import("./ConciergeMap").then((module) => ({ default: module.ConciergeMap })),
+);
+const SignalDrillDown = lazy(() =>
+  import("./SignalDrillDown").then((module) => ({ default: module.SignalDrillDown })),
+);
 
 interface ConciergeDashboardPageProps {
   siteId?: string;
@@ -20,6 +25,14 @@ interface ConciergeDashboardPageProps {
 }
 
 const DEFAULT_SITE = "S001";
+
+function ConciergeSurfaceFallback({ message = "Loading concierge intelligence..." }: { message?: string }) {
+  return (
+    <div className="flex h-full items-center justify-center text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+      {message}
+    </div>
+  );
+}
 
 function formatSiteLabel(siteId: string, siteLabel?: string): string {
   if (siteLabel) return siteLabel;
@@ -54,29 +67,35 @@ export function ConciergeDashboardPage({ siteId, showHeader = true, siteLabel }:
   return (
     <div className="h-full flex flex-col overflow-hidden">
       {showHeader && (
-        <HeaderBar siteId={effectiveSiteId} siteLabel={effectiveSiteLabel} onRefresh={handleRefresh} />
+        <HeaderBar siteLabel={effectiveSiteLabel} onRefresh={handleRefresh} />
       )}
 
       {/* Map + overlay panels */}
       <div className="flex-1 min-h-0 relative">
         {/* Map fills available space */}
         <div className="absolute inset-0">
-          <ConciergeMap
-            key={refreshKey}
-            siteId={effectiveSiteId}
-            onSignalSelect={handleSignalSelect}
-          />
+          <Suspense fallback={<ConciergeSurfaceFallback />}>
+            <ConciergeMap
+              key={refreshKey}
+              siteId={effectiveSiteId}
+              onSignalSelect={handleSignalSelect}
+            />
+          </Suspense>
         </div>
 
         {/* Signal drill-down (replaces room panel) */}
         {selectedRoom && selectedSignalId && (
-          <SignalDrillDown
-            siteId={effectiveSiteId}
-            roomId={selectedRoom.room_id}
-            signalId={selectedSignalId}
-            onBack={handleBackToRoom}
-            onResolved={handleRefresh}
-          />
+          <Suspense fallback={<ConciergeSurfaceFallback message="Loading signal detail..." />}>
+            <SignalDrillDown
+              siteId={effectiveSiteId}
+              roomId={selectedRoom.room_id}
+              signalId={selectedSignalId}
+              room={selectedRoom}
+              onSignalSelect={(nextSignalId) => setSelectedSignalId(nextSignalId)}
+              onBack={handleBackToRoom}
+              onResolved={handleRefresh}
+            />
+          </Suspense>
         )}
       </div>
     </div>
@@ -85,26 +104,31 @@ export function ConciergeDashboardPage({ siteId, showHeader = true, siteLabel }:
 
 // ---- Header bar subcomponent ----
 
-function HeaderBar({ siteId, siteLabel, onRefresh }: { siteId: string; siteLabel: string; onRefresh: () => void }) {
+function HeaderBar({ siteLabel, onRefresh }: { siteLabel: string; onRefresh: () => void }) {
   return (
     <div
       className="flex items-center justify-between px-5 py-3 flex-shrink-0"
       style={{
-        background: "var(--color-sentinel-bg-primary, #0d1117)",
-        borderBottom: "1px solid var(--color-sentinel-border, rgba(255,255,255,0.08))",
+        background: "var(--color-sentinel-bg-panel)",
+        borderBottom: "1px solid var(--color-sentinel-border)",
       }}
     >
       <div className="flex items-center gap-3">
-        <h1 className="text-sm font-semibold text-gray-100">
+        <h1 className="text-sm font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>
           Concierge Intelligence
         </h1>
-        <span className="text-[10px] text-gray-500 uppercase tracking-wider">
+        <span className="text-[10px] uppercase tracking-wider" style={{ color: "var(--color-sentinel-text-secondary)" }}>
           {siteLabel}
         </span>
       </div>
       <button
         onClick={onRefresh}
-        className="p-1.5 rounded hover:bg-gray-800 transition-colors text-gray-500 hover:text-gray-300"
+        className="p-1.5 rounded-lg transition-colors hover:brightness-110"
+        style={{
+          background: "var(--color-sentinel-bg-secondary)",
+          color: "var(--color-sentinel-text-secondary)",
+          border: "1px solid var(--color-sentinel-border)",
+        }}
         aria-label="Refresh"
         title="Refresh map"
       >

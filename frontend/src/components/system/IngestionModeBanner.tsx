@@ -2,7 +2,7 @@
  * IngestionModeBanner — Phase 108
  *
  * Prominent pill/badge showing the current ingestion mode.
- * Colors: green (SIMULATION), amber (SHADOW_LIVE), red accent (LIVE_CONTROL).
+ * Colors: amber (SHADOW_LIVE), red accent (LIVE_CONTROL).
  */
 
 interface IngestionModeBannerProps {
@@ -11,12 +11,6 @@ interface IngestionModeBannerProps {
 }
 
 const MODE_STYLES: Record<string, { bg: string; border: string; accent: string; label: string }> = {
-  simulation: {
-    bg: 'rgba(16, 185, 129, 0.15)',
-    border: 'rgba(16, 185, 129, 0.35)',
-    accent: 'var(--color-sentinel-green)',
-    label: 'SIMULATION',
-  },
   shadow_live: {
     bg: 'rgba(245, 158, 11, 0.15)',
     border: 'rgba(245, 158, 11, 0.35)',
@@ -32,7 +26,7 @@ const MODE_STYLES: Record<string, { bg: string; border: string; accent: string; 
 };
 
 export function IngestionModeBanner({ mode, isLive }: IngestionModeBannerProps) {
-  const style = MODE_STYLES[mode] || MODE_STYLES.simulation;
+  const style = MODE_STYLES[mode] || MODE_STYLES.shadow_live;
 
   return (
     <div

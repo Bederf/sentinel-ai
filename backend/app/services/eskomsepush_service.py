@@ -16,7 +16,7 @@ import logging
 import time
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import httpx
 
@@ -47,7 +47,7 @@ class NationalStatus:
     stage: int
     stage_updated: str
     name: str
-    next_stages: List[Dict[str, str]]
+    next_stages: list[dict[str, str]]
 
 
 @dataclass
@@ -65,8 +65,8 @@ class EskomSePushStatus:
     """Combined status from EskomSePush API."""
 
     eskom: NationalStatus
-    capetown: Optional[NationalStatus]
-    area_events: List[AreaEvent]
+    capetown: NationalStatus | None
+    area_events: list[AreaEvent]
     area_name: str
     area_region: str
     fetched_at: str
@@ -76,7 +76,7 @@ class EskomSePushService:
     """Service for interacting with the EskomSePush API v2.0."""
 
     def __init__(self):
-        self._cache: Dict[str, CachedResponse] = {}
+        self._cache: dict[str, CachedResponse] = {}
 
     @property
     def _token(self) -> str:
@@ -95,7 +95,7 @@ class EskomSePushService:
         """Check if the service has valid API credentials."""
         return bool(self._token)
 
-    def _get_cached(self, key: str) -> Optional[Any]:
+    def _get_cached(self, key: str) -> Any | None:
         cached = self._cache.get(key)
         if cached and not cached.is_expired:
             return cached.data
@@ -108,7 +108,7 @@ class EskomSePushService:
             ttl_seconds=self._cache_ttl,
         )
 
-    async def _api_get(self, endpoint: str, params: Optional[Dict] = None) -> Dict:
+    async def _api_get(self, endpoint: str, params: dict | None = None) -> dict:
         """Make authenticated GET request to EskomSePush API."""
         url = f"{ESP_BASE_URL}/{endpoint}"
         headers = {"token": self._token}
@@ -126,7 +126,7 @@ class EskomSePushService:
 
             return response.json()
 
-    async def get_status(self) -> Dict:
+    async def get_status(self) -> dict:
         """Get national load shedding status.
 
         Returns:
@@ -150,7 +150,7 @@ class EskomSePushService:
         self._set_cached("status", data)
         return data
 
-    async def get_area_information(self, area_id: Optional[str] = None) -> Dict:
+    async def get_area_information(self, area_id: str | None = None) -> dict:
         """Get area-specific load shedding events and schedule.
 
         Args:
@@ -176,7 +176,7 @@ class EskomSePushService:
         self._set_cached(cache_key, data)
         return data
 
-    async def search_areas(self, text: str) -> List[Dict]:
+    async def search_areas(self, text: str) -> list[dict]:
         """Search for areas by name.
 
         Returns list of matching areas with id, name, region.
@@ -184,11 +184,11 @@ class EskomSePushService:
         data = await self._api_get("areas_search", params={"text": text})
         return data.get("areas", [])
 
-    async def get_allowance(self) -> Dict:
+    async def get_allowance(self) -> dict:
         """Check remaining API quota."""
         return await self._api_get("api_allowance")
 
-    async def get_combined_status(self, area_id: Optional[str] = None) -> EskomSePushStatus:
+    async def get_combined_status(self, area_id: str | None = None) -> EskomSePushStatus:
         """Get combined national status + area events.
 
         This is the main method used by the optimization endpoints.
@@ -217,7 +217,7 @@ class EskomSePushService:
             )
 
         # Parse area events
-        area_events: List[AreaEvent] = []
+        area_events: list[AreaEvent] = []
         area_name = ""
         area_region = ""
 

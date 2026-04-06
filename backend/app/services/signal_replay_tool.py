@@ -12,7 +12,6 @@ import json
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 from app.services.signal_emitter_base import _reset_dedup
 
@@ -61,7 +60,7 @@ async def _load_case_data(case_name: str) -> dict:
 
 def _in_time_window(
     timestamp_str: str,
-    time_window: Optional[dict],
+    time_window: dict | None,
 ) -> bool:
     """Check if a timestamp falls within the optional time window."""
     if time_window is None:
@@ -93,7 +92,7 @@ def _in_time_window(
 
 async def _replay_emails(
     emails: list,
-    time_window: Optional[dict],
+    time_window: dict | None,
     verbose: bool,
 ) -> list[dict]:
     """Replay email data through the email signal emitter."""
@@ -139,7 +138,7 @@ async def _replay_emails(
 async def _replay_bookings(
     ghost_bookings: list,
     block_bookings: list,
-    time_window: Optional[dict],
+    time_window: dict | None,
     verbose: bool,
 ) -> list[dict]:
     """Replay booking data through ghost and block booking emitters."""
@@ -193,7 +192,7 @@ async def _replay_bookings(
 
 async def _replay_occupancy(
     events: list,
-    time_window: Optional[dict],
+    time_window: dict | None,
     verbose: bool,
 ) -> list[dict]:
     """Replay occupancy events through the occupancy mismatch emitter."""
@@ -293,7 +292,7 @@ async def _run_correlation(signal_ids: list[str]) -> dict:
 
 async def replay_case(
     case_name: str,
-    time_window: Optional[dict] = None,
+    time_window: dict | None = None,
     verbose: bool = False,
 ) -> dict:
     """Replay a historical case through all 3 bridge emitters + correlation.

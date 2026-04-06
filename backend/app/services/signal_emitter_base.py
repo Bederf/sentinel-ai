@@ -17,8 +17,7 @@ import logging
 import re
 import time
 import uuid
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 import httpx
 
@@ -258,8 +257,8 @@ def build_signal_row(
     location_ref: str,
     raw_content: str,
     metadata: dict | None = None,
-    site_id: Optional[str] = None,
-    parent_signal_id: Optional[str] = None,
+    site_id: str | None = None,
+    parent_signal_id: str | None = None,
 ) -> dict:
     """Construct a signal dict matching the ``signal`` table schema.
 
@@ -267,7 +266,7 @@ def build_signal_row(
     to 2000 chars.
     """
     signal_id = str(uuid.uuid4())
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
 
     row: dict = {
         "id": signal_id,

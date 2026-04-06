@@ -18,6 +18,7 @@ from app.api import device_controls
 from app.api import occupancy_analytics, occupancy_energy_correlation
 from app.api import iaq
 from app.api import building_schedule, holiday_calendar
+from app.api import cockpit
 from app.space.sensor_ingest import router as space_occupancy_router
 from app.api.equipment_knowledge import router as equipment_knowledge_router
 
@@ -44,6 +45,9 @@ def register_site_routers(app: FastAPI) -> None:
 
     # Digital Twin Builder (floor plan extraction + AI-powered onboarding)
     app.include_router(digital_twin.router, prefix="/api", tags=["digital-twin"])
+
+    # Cockpit decision system (tower risk, floor spread, deployment posture)
+    app.include_router(cockpit.router, prefix="/api", tags=["cockpit"])
 
     # Zone ingestion system (per-building zone configuration)
     app.include_router(zone_ingestion.router, tags=["zone-ingestion"])

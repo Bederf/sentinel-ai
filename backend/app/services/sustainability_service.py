@@ -14,7 +14,6 @@ import logging
 import random
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict, List, Optional
 
 from app.models.sustainability import (
     BenchmarkComparison,
@@ -34,8 +33,8 @@ class SustainabilityService:
     """Calculates emissions, efficiency metrics, and tracks Green Star SA."""
 
     def __init__(self):
-        self._configs: Dict[str, SustainabilityConfig] = {}
-        self._assessments: Dict[str, GreenStarAssessment] = {}
+        self._configs: dict[str, SustainabilityConfig] = {}
+        self._assessments: dict[str, GreenStarAssessment] = {}
         self._benchmarks = BenchmarkComparison()
 
     def get_config(self, site_id: str) -> SustainabilityConfig:
@@ -54,7 +53,7 @@ class SustainabilityService:
         self._configs[site_id] = config
         return config
 
-    def update_config(self, site_id: str, updates: Dict) -> SustainabilityConfig:
+    def update_config(self, site_id: str, updates: dict) -> SustainabilityConfig:
         """Update and persist site sustainability config."""
         config = self.get_config(site_id)
 
@@ -86,7 +85,7 @@ class SustainabilityService:
         with open(config_path, "w") as f:
             json.dump(config.to_dict(), f, indent=2)
 
-    def _get_energy_data(self, site_id: str, days: int = 30) -> List[Dict]:
+    def _get_energy_data(self, site_id: str, days: int = 30) -> list[dict]:
         """Get energy consumption data from energy API."""
         try:
             from app.api.energy import generate_energy_data, load_equipment
@@ -124,7 +123,7 @@ class SustainabilityService:
             logger.warning(f"Could not load energy data from API: {e}")
             return self._generate_synthetic_energy(site_id, days)
 
-    def _generate_synthetic_energy(self, site_id: str, days: int) -> List[Dict]:
+    def _generate_synthetic_energy(self, site_id: str, days: int) -> list[dict]:
         """Generate synthetic energy data when energy API is unavailable."""
         random.seed(42)
         config = self.get_config(site_id)
@@ -155,8 +154,8 @@ class SustainabilityService:
 
         return result
 
-    def _get_daily_metrics(self, site_id: str, start_date: str, end_date: str) -> List[Dict]:
-        """Query daily_sustainability_metrics table. Falls back to JSON for demo mode."""
+    def _get_daily_metrics(self, site_id: str, start_date: str, end_date: str) -> list[dict]:
+        """Query daily_sustainability_metrics table. Falls back to JSON for local mode."""
         try:
             from app.database.supabase_client import get_supabase_client
 
@@ -235,7 +234,7 @@ class SustainabilityService:
             return round(total_litres, 1) if total_litres > 0 else 85.0
         except Exception as e:
             logger.debug(f"Generator data unavailable: {e}")
-            return 85.0  # Default estimate for demo
+            return 85.0  # Default estimate for local fallback mode
 
     def calculate_current_emissions(self, site_id: str) -> EmissionsSnapshot:
         """Calculate current month's emissions from live data.
@@ -343,7 +342,7 @@ class SustainabilityService:
             data_source=data_source,
         )
 
-    def get_emissions_history(self, site_id: str, months: int = 12) -> List[EmissionsSnapshot]:
+    def get_emissions_history(self, site_id: str, months: int = 12) -> list[EmissionsSnapshot]:
         """Get monthly emissions snapshots for the past N months."""
         config = self.get_config(site_id)
         ef = config.emission_factors
@@ -354,7 +353,7 @@ class SustainabilityService:
         energy_data = self._get_energy_data(site_id, days=days)
 
         # Group by month
-        monthly: Dict[str, List[Dict]] = {}
+        monthly: dict[str, list[dict]] = {}
         for d in energy_data:
             month_key = d["date"][:7]  # YYYY-MM
             if month_key not in monthly:
@@ -450,7 +449,7 @@ class SustainabilityService:
 
         return snapshots
 
-    def get_efficiency_metrics(self, site_id: str) -> Dict:
+    def get_efficiency_metrics(self, site_id: str) -> dict:
         """Calculate efficiency metrics with benchmark comparison."""
         config = self.get_config(site_id)
         sqm = config.site_sqm
@@ -533,7 +532,7 @@ class SustainabilityService:
         return assessment
 
     def update_green_star_score(
-        self, site_id: str, category_id: str, points: int, notes: Optional[str] = None
+        self, site_id: str, category_id: str, points: int, notes: str | None = None
     ) -> GreenStarAssessment:
         """Update a Green Star category score."""
         assessment = self.get_green_star_assessment(site_id)
@@ -560,7 +559,7 @@ class SustainabilityService:
         with open(path, "w") as f:
             json.dump(assessment.to_dict(), f, indent=2)
 
-    def get_summary(self, site_id: str) -> Dict:
+    def get_summary(self, site_id: str) -> dict:
         """Dashboard-ready summary: current month, YTD, trend, targets."""
         current = self.calculate_current_emissions(site_id)
         history = self.get_emissions_history(site_id, months=12)

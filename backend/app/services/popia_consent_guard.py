@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Optional
 
 from app.config.settings import settings
 from app.services.consent_service import CONSENT_TEMPLATES, get_consent_service
@@ -22,10 +21,10 @@ class IngressConsentDecision:
 
     allow_processing: bool
     status: str
-    response_message: Optional[str] = None
+    response_message: str | None = None
 
 
-def _normalize_text(value: Optional[str]) -> str:
+def _normalize_text(value: str | None) -> str:
     return (value or "").strip().lower()
 
 
@@ -46,7 +45,7 @@ def _is_withdraw(message_text: str) -> bool:
     return normalized.startswith("stop ")
 
 
-def has_cross_border_consent(data_subject_id: Optional[str]) -> bool:
+def has_cross_border_consent(data_subject_id: str | None) -> bool:
     """Return true when cross-border transfer consent is active for subject."""
     if not data_subject_id:
         return False
@@ -54,7 +53,7 @@ def has_cross_border_consent(data_subject_id: Optional[str]) -> bool:
     return service.check_consent(data_subject_id, "cross_border_transfer")
 
 
-def should_allow_cloud_processing(data_subject_id: Optional[str]) -> bool:
+def should_allow_cloud_processing(data_subject_id: str | None) -> bool:
     """Cloud processing policy gate based on POPIA consent."""
     if not settings.popia_require_cross_border_consent:
         return True
@@ -65,8 +64,8 @@ def evaluate_ingress_processing_consent(
     *,
     data_subject_id: str,
     platform: str,
-    message_text: Optional[str],
-    ip_address: Optional[str] = None,
+    message_text: str | None,
+    ip_address: str | None = None,
 ) -> IngressConsentDecision:
     """Evaluate and optionally capture PI-processing consent for inbound channels."""
     service = get_consent_service()

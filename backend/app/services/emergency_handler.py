@@ -6,13 +6,13 @@ restoration, and emergency notification distribution.
 
 import logging
 from datetime import datetime
-from typing import Dict, Any, List, Optional
+from typing import Any
 
+from app.models.audit_log import AuditResultType
 from app.models.autonomous_decision import EscalationEvent, EscalationLevel
+from app.services.audit_logger import audit_logger
 from app.services.autonomous_decision_engine import autonomous_decision_engine
 from app.services.device_abstraction import device_manager
-from app.models.audit_log import AuditResultType
-from app.services.audit_logger import audit_logger
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +38,7 @@ class EmergencyHandler:
 
     def __init__(self):
         """Initialize the emergency handler."""
-        self.emergency_history: List[Dict[str, Any]] = []
+        self.emergency_history: list[dict[str, Any]] = []
         self._initialized = False
 
     async def initialize(self) -> None:
@@ -50,7 +50,7 @@ class EmergencyHandler:
         self._initialized = True
         logger.info("EmergencyHandler initialized")
 
-    async def handle_emergency(self, escalation_event: EscalationEvent) -> Dict[str, Any]:
+    async def handle_emergency(self, escalation_event: EscalationEvent) -> dict[str, Any]:
         """
         Handle Level 4 emergency escalation event.
 
@@ -116,7 +116,7 @@ class EmergencyHandler:
         logger.critical(f"EMERGENCY HANDLER COMPLETED - Status: {response['status']}")
         return response
 
-    async def _stop_autonomous_mode(self) -> Dict[str, Any]:
+    async def _stop_autonomous_mode(self) -> dict[str, Any]:
         """
         Immediately stop autonomous mode.
 
@@ -139,9 +139,9 @@ class EmergencyHandler:
 
         except Exception as e:
             logger.error(f"Error stopping autonomous mode: {e}")
-            return {"success": False, "message": f"Failed to stop autonomous mode: {str(e)}"}
+            return {"success": False, "message": f"Failed to stop autonomous mode: {e!s}"}
 
-    async def _restore_safe_state(self, affected_device_id: str) -> Dict[str, Any]:
+    async def _restore_safe_state(self, affected_device_id: str) -> dict[str, Any]:
         """
         Restore affected devices to safe operating states.
 
@@ -177,18 +177,18 @@ class EmergencyHandler:
                         )
 
                 except Exception as e:
-                    error_msg = f"Failed to restore safe state for {device.name}: {str(e)}"
+                    error_msg = f"Failed to restore safe state for {device.name}: {e!s}"
                     errors.append(error_msg)
                     logger.error(error_msg)
 
             return {"devices_affected": devices_affected, "errors": errors, "success": len(errors) == 0}
 
         except Exception as e:
-            error_msg = f"Critical error in safe state restoration: {str(e)}"
+            error_msg = f"Critical error in safe state restoration: {e!s}"
             logger.error(error_msg)
             return {"devices_affected": devices_affected, "errors": [error_msg], "success": False}
 
-    async def _log_emergency_audit(self, escalation_event: EscalationEvent, response: Dict[str, Any]) -> bool:
+    async def _log_emergency_audit(self, escalation_event: EscalationEvent, response: dict[str, Any]) -> bool:
         """
         Log emergency handling to audit system.
 
@@ -240,7 +240,7 @@ class EmergencyHandler:
 
         return False
 
-    def _get_safe_state_for_device(self, device) -> Optional[Dict[str, Any]]:
+    def _get_safe_state_for_device(self, device) -> dict[str, Any] | None:
         """
         Get safe state configuration for a device.
 
@@ -261,7 +261,7 @@ class EmergencyHandler:
 
         return None
 
-    async def _apply_safe_state(self, device, safe_state: Dict[str, Any]) -> bool:
+    async def _apply_safe_state(self, device, safe_state: dict[str, Any]) -> bool:
         """
         Apply safe state to a device.
 
@@ -284,11 +284,11 @@ class EmergencyHandler:
             logger.error(f"Error applying safe state to {device.name}: {e}")
             return False
 
-    def get_emergency_history(self, limit: int = 50) -> List[Dict[str, Any]]:
+    def get_emergency_history(self, limit: int = 50) -> list[dict[str, Any]]:
         """Get emergency handling history."""
         return self.emergency_history[-limit:]
 
-    async def test_emergency_response(self) -> Dict[str, Any]:
+    async def test_emergency_response(self) -> dict[str, Any]:
         """
         Test emergency response system.
 

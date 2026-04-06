@@ -64,12 +64,25 @@ class OperatorGuidance(BaseModel):
     mode: GuidanceMode
 
 
+class EmailClusterPayload(BaseModel):
+    """Email complaint cluster for cockpit heatmap display."""
+    cluster_id: str
+    zone_id: str
+    zone_name: str
+    floor: str
+    email_count: int
+    complaint_type: str
+    severity: Literal["low", "medium", "high", "critical"]
+    summary: str
+
+
 class BuildingStatePayload(BaseModel):
     site_id: str
     building_posture: BuildingPosture
     primary_narrative: PrimaryNarrative | None
     secondary_tensions: list[SecondaryTension] = Field(default_factory=list)
     operator_guidance: OperatorGuidance
+    email_clusters: list[EmailClusterPayload] = Field(default_factory=list)
 
 
 class NarrativeCandidate(BaseModel):

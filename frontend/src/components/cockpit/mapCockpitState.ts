@@ -1,52 +1,56 @@
-import { buildDecisionSurface } from '@/lib/decisionSurface'
-import type { CockpitState, CockpitTwinRiskLevel } from './types'
-import { DEFAULT_COCKPIT_THRESHOLD_POLICY, type CockpitThresholdPolicy } from './thresholdPolicy'
+import type { CockpitGuidanceMode, CockpitState, CockpitTwinRiskLevel } from './types'
+import type { HVACOverview } from '@/lib/hvacApi'
 
-export interface CockpitDecisionPayload {
-  risk?: {
-    score?: number | null
-    band?: CockpitState['severity']['riskBand'] | null
-    reason?: string | null
-    policy_source?: string | null
-    policy_level?: CockpitState['severity']['policyLevel'] | null
-    constraint_type?: CockpitState['severity']['constraintType'] | null
-    time_to_constraint_breach_min?: number | null
-    affected_scope?: {
-      zones?: string[] | null
-      assets?: string[] | null
-      occupants_estimate?: number | null
-    } | null
-  } | null
-  health?: {
-    score?: number | null
-    state?: CockpitState['severity']['healthState'] | null
-    trend?: CockpitState['severity']['healthTrend'] | null
-    reason?: string | null
-    asset_class?: string | null
-    criticality?: CockpitState['severity']['criticality'] | null
-  } | null
-  building_id: string
-  alert_text?: string | null
-  reasoning_summary?: string | null
-  active_posture?: string | null
-  time_to_discomfort?: number | null
-  time_confidence?: string | number | null
-  estimated_impact?: unknown
-  recommended_action?: string | null
+export interface BuildingStateLocation {
+  epicenter: string
+  affected: string[]
+  propagation: 'contained' | 'upward' | 'downward' | 'lateral' | 'building_wide'
+}
+
+export interface BuildingStateNarrative {
+  voice: 'comfort_stress' | 'asset_stress' | 'energy_pressure' | 'operational_stability' | 'occupant_friction'
+  message: string
+  location: BuildingStateLocation
+  time_to_breach_min?: number | null
+  urgency: CockpitGuidanceMode
+  action: string
+}
+
+export interface BuildingStateSecondaryTension {
+  voice: BuildingStateNarrative['voice']
+  message: string
+}
+
+export interface BuildingStatePayload {
+  site_id: string
+  building_posture: 'calm' | 'drifting' | 'compensating' | 'strained' | 'critical'
+  primary_narrative: BuildingStateNarrative | null
+  secondary_tensions: BuildingStateSecondaryTension[]
+  operator_guidance: {
+    headline: string
+    mode: CockpitGuidanceMode
+  }
   urgency_score?: number | null
-  urgency_components?: Record<string, number> | null
   affected_zone_ids?: string[] | null
-  primary_asset_id?: string | null
-  building_metadata?: {
-    deployment_mode?: 'ghost' | 'advisory' | 'supervised' | 'autonomous'
-    floor_labels?: Record<string, string>
-    floor_stack_order?: string[]
-  } | null
+  /** Email complaint clusters with count >= 3 — rendered as heatmap signals */
+  email_clusters?: EmailClusterRaw[]
+}
+
+export interface EmailClusterRaw {
+  cluster_id: string
+  zone_id: string
+  zone_name: string
+  floor: string
+  email_count: number
+  complaint_type: string
+  severity: 'low' | 'medium' | 'high' | 'critical'
+  summary: string
 }
 
 export interface CockpitSiteSummary {
   siteId: string
   siteName: string
+  onboardingPhase?: 'shadow' | 'advisory' | 'supervised' | 'auto'
   posture?: string | null
   activeAlerts: number
   predictionsCount: number
@@ -54,153 +58,227 @@ export interface CockpitSiteSummary {
   dataFreshnessLabel: string
 }
 
-type DecisionSurface = ReturnType<typeof buildDecisionSurface>
+export interface EnergyCentreTelemetry {
+  totalKw: number
+  hvacKw: number
+  lightingKw: number
+  powerKw: number
+  powerPercent: number
+  timestamp?: string
+}
+
+export interface RemoteSiteTelemetry {
+  source?: string
+  power?: Record<string, unknown>
+  hvac?: Record<string, unknown>
+  lighting?: Record<string, unknown>
+  water?: Record<string, unknown>
+  fire?: Record<string, unknown>
+  security?: Record<string, unknown>
+  [key: string]: unknown
+}
 
 const DEFAULT_FLOOR_ORDER = ['R', 'L2', 'L1', 'L0', 'G', 'B1']
 
-function getTone(riskBand: CockpitState['severity']['riskBand']): CockpitState['primaryMetric']['tone'] {
-  if (riskBand === 'critical') return 'critical'
-  if (riskBand === 'high') return 'elevated'
-  if (riskBand === 'medium') return 'warning'
-  return 'normal'
+const SITE_TOWER_PROFILES: Record<string, { towerFloors: string[]; managedFloors: string[] }> = {
+  'site-002': {
+    // Site-002 profile: 10 floors (basement + ground + 8 levels + roof).
+    towerFloors: ['R', 'L7', 'L6', 'L5', 'L4', 'L3', 'L2', 'L1', 'L0', 'B1'],
+    // Sentinel scope: L0, L1, L2 only (three occupied floors).
+    managedFloors: ['L0', 'L1', 'L2'],
+  },
 }
 
-function getEvidenceStrength(score: number): 'strong' | 'moderate' | 'limited' {
-  if (score >= 0.75) return 'strong'
-  if (score >= 0.45) return 'moderate'
-  return 'limited'
+function titleCase(value: string): string {
+  return value
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase())
 }
 
-function formatPostureLabel(posture: string | null | undefined): string {
-  if (!posture) return 'Watch mode'
-  const normalized = posture.trim().toLowerCase()
-  if (normalized === 'comfort_priority') return 'Comfort first'
-  if (normalized === 'energy_priority') return 'Energy first'
-  if (normalized === 'asset_priority') return 'Asset protection'
-  if (normalized === 'adaptive_intelligence') return 'Watch mode'
-  return posture.replace(/_/g, ' ')
+function formatPostureLabel(posture: BuildingStatePayload['building_posture'] | string | null | undefined): string {
+  if (!posture) return 'Waiting'
+  return titleCase(posture)
 }
 
-function clamp01(value: number): number {
-  return Math.max(0, Math.min(1, value))
-}
-
-function toPercent(score: number): number {
-  return Math.round(clamp01(score) * 100)
-}
-
-function normalizedRiskScore(payload: CockpitDecisionPayload): number {
-  return clamp01(payload.risk?.score ?? payload.urgency_score ?? 0)
-}
-
-function fallbackHealthScore(riskScore: number): number {
-  return clamp01(1 - (riskScore * 0.2))
-}
-
-function fallbackHealthState(score: number, thresholds: CockpitThresholdPolicy['health']): CockpitState['severity']['healthState'] {
-  const percent = toPercent(score)
-  if (percent >= Math.min(100, thresholds.healthy + 10)) return 'healthy'
-  if (percent >= thresholds.healthy) return 'stable'
-  if (percent >= thresholds.warning) return 'watch'
-  if (percent >= Math.max(thresholds.critical, thresholds.warning - 20)) return 'degraded'
-  return 'critical'
-}
-
-function fallbackHealthTrend(riskScore: number): CockpitState['severity']['healthTrend'] {
-  if (riskScore >= 0.75) return 'volatile'
-  if (riskScore >= 0.55) return 'declining'
-  if (riskScore <= 0.2) return 'improving'
-  return 'flat'
-}
-
-function resolveAffectedScope(payload: CockpitDecisionPayload): CockpitState['severity']['affectedScope'] {
-  const riskScope = payload.risk?.affected_scope
-  if (riskScope) {
-    return {
-      zones: [...(riskScope.zones ?? [])],
-      assets: [...(riskScope.assets ?? [])],
-      occupantsEstimate: riskScope.occupants_estimate ?? null,
-    }
-  }
-  const assets = payload.primary_asset_id ? [payload.primary_asset_id] : []
-  const zones = [...(payload.affected_zone_ids ?? [])]
-  if (assets.length === 0 && zones.length === 0) return null
-  return { zones, assets, occupantsEstimate: null }
+function formatVoiceLabel(voice: BuildingStateNarrative['voice'] | string): string {
+  return titleCase(voice)
 }
 
 function extractFloorCode(value: string | null | undefined): string | null {
   if (!value) return null
-  const match = value.match(/(?:^|-)(R|L\d+|G|B\d+)(?:-|$)/i)
+  const match = value.match(/(?:^|-|→)(R|L\d+|G|B\d+)(?:-|$|\s)/i)
   return match?.[1]?.toUpperCase() ?? null
 }
 
-function formatFloorLabel(floorId: string, customLabels?: Record<string, string> | null): string {
-  if (customLabels?.[floorId]) return customLabels[floorId]
+function formatFloorLabel(floorId: string): string {
+  if (floorId === 'B1') return 'Basement'
+  if (floorId === 'L0') return 'Ground Floor'
+  if (floorId === 'L1') return 'First Floor'
+  if (floorId === 'L2') return 'Second Floor'
+  if (floorId === 'L3') return 'Third Floor'
   if (floorId === 'R') return 'Roof'
   if (floorId === 'G') return 'Ground'
-  if (floorId === 'B1') return 'Basement B1'
   if (floorId.startsWith('B')) return `Basement ${floorId.slice(1)}`
   if (floorId.startsWith('L')) return `Level ${floorId.slice(1)}`
   return floorId
 }
 
-function riskBandFromScore(
-  score: number,
-  thresholds: CockpitThresholdPolicy['risk'],
-): CockpitState['severity']['riskBand'] {
-  const riskScore = toPercent(score)
-  if (riskScore >= thresholds.critical) return 'critical'
-  if (riskScore >= thresholds.high) return 'high'
-  if (riskScore >= thresholds.medium) return 'medium'
+function toneFromPosture(posture: BuildingStatePayload['building_posture'] | null | undefined): CockpitState['primaryMetric']['tone'] {
+  if (posture === 'critical') return 'critical'
+  if (posture === 'strained') return 'elevated'
+  if (posture === 'drifting' || posture === 'compensating') return 'warning'
+  return 'normal'
+}
+
+function riskBandFromPosture(posture: BuildingStatePayload['building_posture'] | null | undefined): CockpitState['severity']['riskBand'] {
+  if (posture === 'critical') return 'critical'
+  if (posture === 'strained') return 'high'
+  if (posture === 'drifting' || posture === 'compensating') return 'medium'
   return 'low'
 }
 
-function riskLevelFromBand(riskBand: CockpitState['severity']['riskBand']): CockpitTwinRiskLevel {
-  if (riskBand === 'critical') return 'critical'
-  if (riskBand === 'high') return 'approaching'
-  if (riskBand === 'medium') return 'drift'
+function riskLevelFromTone(tone: CockpitState['primaryMetric']['tone']): CockpitTwinRiskLevel {
+  if (tone === 'critical') return 'critical'
+  if (tone === 'elevated') return 'approaching'
+  if (tone === 'warning') return 'drift'
   return 'stable'
 }
 
-function motionProfileFromRiskBand(
-  riskBand: CockpitState['severity']['riskBand'],
-  urgencyScore: number,
-): CockpitState['visualTwin']['motionProfile'] {
-  if (riskBand === 'critical') return 'alert'
-  if (riskBand === 'high' || riskBand === 'medium') return 'watch'
-  // 'low' band: calm only if genuinely near-zero urgency.
-  // Any meaningful urgency (>0.05) keeps 'watch' so the twin shows ambient life.
-  if (urgencyScore > 0.05) return 'watch'
-  return 'calm'
-}
-
-function buildThresholdReason(
-  score: number,
-  riskBand: CockpitState['severity']['riskBand'],
-  thresholds: CockpitThresholdPolicy['risk'],
-): string {
-  const riskScore = toPercent(score)
-  if (riskBand === 'critical') return `Risk ${riskScore} is at or above the critical threshold of ${thresholds.critical}`
-  if (riskBand === 'high') return `Risk ${riskScore} is at or above the high threshold of ${thresholds.high}`
-  if (riskBand === 'medium') return `Risk ${riskScore} is at or above the medium threshold of ${thresholds.medium}`
-  return `Risk ${riskScore} is below the medium threshold of ${thresholds.medium}`
-}
-
-function resolveFocusFloorId(payload: CockpitDecisionPayload): string | null {
-  return (
-    extractFloorCode(payload.affected_zone_ids?.[0] ?? null)
-    ?? extractFloorCode(payload.primary_asset_id ?? null)
-    ?? null
-  )
-}
-
-function buildFloorOrder(configuredOrder: string[], focusFloorId: string | null): string[] {
-  const floorOrder = [...configuredOrder]
-  for (const fallback of DEFAULT_FLOOR_ORDER) {
-    if (!floorOrder.includes(fallback)) floorOrder.push(fallback)
+function buildFloorOrder(siteId: string, focusFloorId: string | null, affectedFloors: string[]): string[] {
+  const profile = SITE_TOWER_PROFILES[siteId]
+  const order = [...(profile?.towerFloors ?? DEFAULT_FLOOR_ORDER)]
+  for (const floorId of affectedFloors) {
+    if (!order.includes(floorId)) order.push(floorId)
   }
-  if (focusFloorId && !floorOrder.includes(focusFloorId)) floorOrder.unshift(focusFloorId)
-  return floorOrder
+  if (focusFloorId && !order.includes(focusFloorId)) {
+    order.unshift(focusFloorId)
+  }
+  return order
+}
+
+function locationSummary(narrative: BuildingStateNarrative | null): string {
+  if (!narrative) return 'Whole building'
+  const { epicenter, affected, propagation } = narrative.location
+  const affectedSummary = affected.length > 0 ? affected.join(' → ') : epicenter
+  return `${epicenter} · ${affectedSummary} · ${titleCase(propagation)}`
+}
+
+function buildUnavailableState(summary: CockpitSiteSummary): CockpitState {
+  return {
+    site: {
+      id: summary.siteId,
+      name: summary.siteName,
+      onboardingPhase: summary.onboardingPhase ?? 'shadow',
+      posture: 'Waiting',
+      mode: 'waiting',
+      renderState: 'waiting',
+      dataFreshnessLabel: summary.dataFreshnessLabel,
+    },
+    sitePulse: {
+      tone: 'normal',
+      attentionScore: 0.1,
+      activeConditionCount: 0,
+      emergingRiskCount: 0,
+      evidenceStrength: 'limited',
+    },
+    primaryMetric: {
+      tone: 'normal',
+      label: 'Live State',
+      value: 'Waiting',
+      detail: `Waiting for ${summary.siteName} to begin reporting live state.`,
+    },
+    activeCondition: {
+      summary: 'Awaiting building signal',
+      rationale: `No live state from ${summary.siteName} yet.`,
+      confidenceLabel: 'Waiting',
+    },
+    decision: {
+      impact: 'Waiting',
+      summary: 'Watch for live building state',
+      tradeoff: 'No operator action required until live state arrives.',
+      confidence: 'Waiting',
+    },
+    visualTwin: {
+      headline: 'Awaiting building signal',
+      activeLabel: summary.siteName,
+      modeLabel: 'Waiting',
+      motionProfile: 'waiting',
+      breathingIntensity: 0.12,
+      flowSpeed: 0.9,
+      consumptionIntensity: 0.12,
+      focusFloorId: null,
+      floors: buildFloorOrder(summary.siteId, null, []).map((floorId, index, order) => ({
+        id: floorId,
+        label: formatFloorLabel(floorId),
+        meshId: `floor:${floorId}`,
+        level: 'stable',
+        intensity: 0.14,
+        spread: 0,
+        elevation: (order.length - index - 1) * 2.25,
+        isManaged: (SITE_TOWER_PROFILES[summary.siteId]?.managedFloors ?? order).includes(floorId),
+      })),
+      zoneSignals: [],
+      flowPaths: [],
+      energyCentre: {
+        online: false,
+        totalKw: 0,
+        hvacKw: 0,
+        lightingKw: 0,
+        powerKw: 0,
+        loadRatio: 0.12,
+        powerShareRatio: 0,
+        stateLabel: 'low',
+      },
+    },
+    evidence: {
+      strength: 'limited',
+      summary: 'Waiting for live building state.',
+      refs: [],
+    },
+    severity: {
+      riskScore: null,
+      riskBand: 'medium',
+      thresholdReason: null,
+      policySource: null,
+      policyLevel: null,
+      constraintType: null,
+      timeToConstraintBreachMin: null,
+      affectedScope: null,
+      healthScore: null,
+      healthState: null,
+      healthTrend: null,
+      healthReason: null,
+      assetClass: null,
+      criticality: null,
+    },
+    emergingRisks: [],
+    emailClusters: [],
+  }
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value))
+}
+
+function clamp01(value: number): number {
+  return Math.min(1, Math.max(0, value))
+}
+
+function riskBandFromScore(
+  score: number,
+  bands: { low: number; medium: number; high: number; critical: number },
+): string {
+  if (score >= bands.critical) return 'critical'
+  if (score >= bands.high) return 'high'
+  if (score >= bands.medium) return 'medium'
+  return 'low'
+}
+
+function riskLevelFromBand(band: string): CockpitTwinRiskLevel {
+  if (band === 'critical') return 'critical'
+  if (band === 'high') return 'approaching'
+  if (band === 'medium') return 'drift'
+  return 'stable'
 }
 
 function buildTwinFloors(
@@ -208,273 +286,416 @@ function buildTwinFloors(
   focusFloorId: string | null,
   urgencyScore: number,
   floorLabels: Record<string, string> | null | undefined,
-  policy: CockpitThresholdPolicy,
-) {
+  bands: { low: number; medium: number; high: number; critical: number },
+  affectedZoneIds: string[],
+): Array<{
+  id: string
+  label: string
+  meshId: string
+  level: CockpitTwinRiskLevel
+  intensity: number
+  spread: number
+  elevation: number
+  isManaged: boolean
+}> {
+  // Floors with direct signals — only these receive non-stable risk levels.
+  // All other floors render as inert host mass regardless of urgencyScore.
+  const directlyAffectedFloors = new Set<string>()
+  if (focusFloorId) directlyAffectedFloors.add(focusFloorId)
+  for (const zoneId of affectedZoneIds) {
+    const code = extractFloorCode(zoneId)
+    if (code) directlyAffectedFloors.add(code)
+  }
+
   const anchorIndex = focusFloorId ? floorOrder.indexOf(focusFloorId) : -1
+
   return floorOrder.map((floorId, index) => {
+    const isManaged = (SITE_TOWER_PROFILES['site-002']?.managedFloors ?? []).includes(floorId)
+    const isDirectlyAffected = directlyAffectedFloors.has(floorId)
+
+    // Spread calculated for directly affected floors only; non-affected floors
+    // are hard-gated to stable regardless of urgencyScore.
     const distance = anchorIndex >= 0 ? Math.abs(index - anchorIndex) : Number.POSITIVE_INFINITY
-    const spread = anchorIndex >= 0 ? clamp01(urgencyScore - distance * 0.22) : 0
+    const spread = isDirectlyAffected && anchorIndex >= 0
+      ? clamp01(urgencyScore - distance * 0.22)
+      : 0
     const riskScore = index === anchorIndex ? urgencyScore : spread * 0.9
-    const level = anchorIndex >= 0 ? riskLevelFromBand(riskBandFromScore(riskScore, policy.risk)) : 'stable'
+
+    const level = isDirectlyAffected
+      ? riskLevelFromBand(riskBandFromScore(riskScore, bands))
+      : 'stable'
+
+    const intensity = isDirectlyAffected
+      ? clamp01(0.18 + spread * 0.82)
+      : 0.16
+
     return {
       id: floorId,
-      label: formatFloorLabel(floorId, floorLabels),
+      label: floorLabels?.[floorId] ?? formatFloorLabel(floorId),
       meshId: `floor:${floorId}`,
       level,
-      intensity: anchorIndex >= 0 ? clamp01(0.18 + spread * 0.82) : 0.16,
-      spread,
+      intensity,
+      spread: isManaged ? spread : 0,
       elevation: (floorOrder.length - index - 1) * 2.25,
+      isManaged,
     }
   })
 }
 
-function buildZoneSignals(
-  payload: CockpitDecisionPayload,
-  focusFloorId: string | null,
-  floorOrder: string[],
-  urgencyScore: number,
-  policy: CockpitThresholdPolicy,
-  actionLabel: string,
-) {
-  const sourceSignals = (payload.affected_zone_ids ?? []).length > 0
-    ? (payload.affected_zone_ids ?? [])
-    : payload.primary_asset_id
-      ? [payload.primary_asset_id]
-      : []
+function normalizeHvacSignal(
+  hvacOverview?: HVACOverview | null,
+  energyCentre?: EnergyCentreTelemetry | null,
+): { intensity: number; flowSpeed: number } {
+  if (!hvacOverview && !energyCentre) return { intensity: 0.22, flowSpeed: 1.05 }
 
-  const floorSlots = new Map<string, number>()
-  return sourceSignals.map((sourceId, index) => {
-    const fallbackFloor = floorOrder[Math.min(index, floorOrder.length - 1)] ?? 'L0'
-    const floorId = extractFloorCode(sourceId) ?? focusFloorId ?? fallbackFloor
-    const slot = floorSlots.get(floorId) ?? 0
-    const weight = clamp01(urgencyScore - index * 0.12)
-    floorSlots.set(floorId, slot + 1)
-    return {
-      zoneId: sourceId,
-      label: sourceId.replace(/^Zone-/, '').replace(/-/g, ' '),
-      floorId,
-      meshId: `mesh:${sourceId.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
-      level: riskLevelFromBand(riskBandFromScore(weight, policy.risk)),
-      weight,
-      slot,
-      isPrimary: index === 0,
-      actionLabel,
+  const hvacKw = hvacOverview?.raw_telemetry?.power?.hvac_kw ?? 0
+  const zoneTotal = hvacOverview?.zones.total ?? 0
+  const zoneFault = hvacOverview?.zones.fault ?? 0
+  const zoneOffline = hvacOverview?.zones.offline ?? 0
+  const faultRatio = zoneTotal > 0 ? (zoneFault + zoneOffline) / zoneTotal : 0
+  const alertPressure = clamp((hvacOverview?.alerts.length ?? 0) / 8, 0, 1)
+  const loadPressure = clamp(hvacKw / 1200, 0, 1)
+  const energyLoadPressure = clamp((energyCentre?.totalKw ?? 0) / 1800, 0, 1)
+  const electricalPressure = clamp((energyCentre?.powerPercent ?? 0) / 100, 0, 1)
+
+  const intensity = clamp(
+    0.18
+      + faultRatio * 0.36
+      + alertPressure * 0.24
+      + loadPressure * 0.24
+      + energyLoadPressure * 0.18
+      + electricalPressure * 0.12,
+    0.18,
+    1,
+  )
+  const flowSpeed = clamp(0.9 + intensity * 2.2, 0.9, 3.2)
+  return { intensity, flowSpeed }
+}
+
+function normalizeConsumptionIntensity(energyCentre?: EnergyCentreTelemetry | null): number {
+  if (!energyCentre) return 0.22
+  const siteLoad = clamp((energyCentre.totalKw || 0) / 1800, 0, 1)
+  const powerShare = clamp((energyCentre.powerPercent || 0) / 100, 0, 1)
+  return clamp(siteLoad * 0.78 + powerShare * 0.22, 0.12, 1)
+}
+
+function energyStateLabel(loadRatio: number): 'low' | 'moderate' | 'high' | 'critical' {
+  if (loadRatio >= 0.82) return 'critical'
+  if (loadRatio >= 0.62) return 'high'
+  if (loadRatio >= 0.35) return 'moderate'
+  return 'low'
+}
+
+function inferModuleRefsFromTelemetry(telemetry?: RemoteSiteTelemetry | null): string[] {
+  if (!telemetry) return []
+  const refs: string[] = []
+  const push = (name: string) => refs.push(`module:${name}`)
+
+  if (telemetry.hvac || 'zones' in telemetry) push('hvac')
+  if (telemetry.power || 'energy' in telemetry) push('energy')
+  if (telemetry.lighting || 'dali' in telemetry) push('lighting')
+  if (telemetry.water) push('water')
+  if (telemetry.fire) push('fire')
+  if (telemetry.security) push('security')
+  if (typeof telemetry.source === 'string' && telemetry.source.toLowerCase().includes('remote')) push('remote-bms')
+
+  return Array.from(new Set(refs))
+}
+
+function buildShadowTelemetrySummary(
+  hvacOverview?: HVACOverview | null,
+  energyCentre?: EnergyCentreTelemetry | null,
+): string {
+  const hvacKw = Math.round(hvacOverview?.raw_telemetry?.power?.hvac_kw ?? 0)
+  const zoneTotal = hvacOverview?.zones.total ?? 0
+  const zoneFault = hvacOverview?.zones.fault ?? 0
+  const zoneOffline = hvacOverview?.zones.offline ?? 0
+  const totalKw = Math.round(energyCentre?.totalKw ?? 0)
+
+  if (zoneTotal > 0) {
+    if (zoneFault + zoneOffline >= Math.max(1, Math.floor(zoneTotal * 0.25))) {
+      return `HVAC stress is rising: ${zoneFault + zoneOffline}/${zoneTotal} zones degraded, ${hvacKw} kW load.`
     }
-  })
-}
-
-function buildVisualTwin(
-  payload: CockpitDecisionPayload,
-  surface: DecisionSurface,
-  urgencyScore: number,
-  policy: CockpitThresholdPolicy,
-): CockpitState['visualTwin'] {
-  const floorLabels = payload.building_metadata?.floor_labels ?? null
-  const configuredOrder = payload.building_metadata?.floor_stack_order ?? []
-  const focusFloorId = resolveFocusFloorId(payload)
-  const floorOrder = buildFloorOrder(configuredOrder, focusFloorId)
-  const floors = buildTwinFloors(floorOrder, focusFloorId, urgencyScore, floorLabels, policy)
-  const zoneSignals = buildZoneSignals(payload, focusFloorId, floorOrder, urgencyScore, policy, surface.action.summary)
-  const riskBand = payload.risk?.band ?? riskBandFromScore(urgencyScore, policy.risk)
-
-  return {
-    headline: surface.time.value === 'Unknown'
-      ? 'No comfort risk right now'
-      : `${zoneSignals[0]?.label ?? 'This area'} will breach in ${surface.time.value}`,
-    activeLabel: zoneSignals[0]?.label ?? surface.cause,
-    modeLabel: surface.presentation.statusLabel,
-    motionProfile: motionProfileFromRiskBand(riskBand, urgencyScore),
-    focusFloorId,
-    floors,
-    zoneSignals,
+    if (hvacKw >= 700) {
+      return `HVAC demand is elevated at ${hvacKw} kW with stable zone coverage.`
+    }
+    if (totalKw >= 1200) {
+      return `Building electrical demand is high (${totalKw} kW) while HVAC remains in observation.`
+    }
   }
-}
 
-function buildFallbackPayload(summary: CockpitSiteSummary): CockpitDecisionPayload {
-  return {
-    building_id: summary.siteId,
-    alert_text: 'No comfort risk for the next 30 minutes.',
-    reasoning_summary: 'Live signals are steady. Keep watching for the next drift window.',
-    active_posture: summary.posture ?? 'adaptive_intelligence',
-    time_to_discomfort: null,
-    time_confidence: 'steady',
-    estimated_impact: 'No immediate comfort, uptime, or compliance impact.',
-    recommended_action: 'No action needed. Keep watching the site.',
-    // Genuine stable state — near-zero urgency so motionProfile resolves to 'calm'
-    // and floors render ambient breathe only (not drift/pulse).
-    urgency_score: 0.03,
-    urgency_components: { comfort: 0.01, asset_risk: 0.01, cost: 0.01 },
-    affected_zone_ids: [],
-    primary_asset_id: null,
-    building_metadata: {
-      deployment_mode: 'advisory',
-    },
+  if (hvacKw > 0) {
+    return `HVAC is tracking at ${hvacKw} kW with telemetry-only observation active.`
   }
+  if (totalKw > 0) {
+    return `Energy Centre load is ${totalKw} kW under shadow observation mode.`
+  }
+  return 'Telemetry indicates stable operation.'
 }
 
-function buildEvidence(
-  summary: CockpitSiteSummary,
-  payload: CockpitDecisionPayload | null | undefined,
-  resolvedPayload: CockpitDecisionPayload,
-  evidenceStrength: CockpitState['evidence']['strength'],
-): CockpitState['evidence'] {
-  const affectedScope = resolveAffectedScope(resolvedPayload)
-  return {
-    strength: evidenceStrength,
-    summary: payload
-      ? `Built from live site signals and ${summary.dataFreshnessLabel.toLowerCase()}.`
-      : 'Built from live site signals and current watch rules.',
-    refs: [
-      ...(affectedScope?.assets ?? []).slice(0, 2).map((assetId) => `asset:${assetId}`),
-      ...(affectedScope?.zones ?? []).slice(0, 2).map((zoneId) => `zone:${zoneId}`),
-      ...Object.keys(resolvedPayload.urgency_components ?? {}).slice(0, 3).map((key) => `signal:${key}`),
+function flowPathsFromNarrative(narrative: BuildingStateNarrative | null): Array<{
+  id: string
+  d: string
+  fromFloorId: string | null
+  toFloorId: string | null
+  direction: BuildingStateLocation['propagation']
+}> {
+  if (!narrative) return []
+
+  const direction = narrative.location.propagation
+  const fromFloorId = extractFloorCode(narrative.location.epicenter)
+  const toFloorId = (narrative.location.affected || [])
+    .map((zone) => extractFloorCode(zone))
+    .find((floor): floor is string => Boolean(floor)) ?? fromFloorId
+
+  const pathMap: Record<BuildingStateLocation['propagation'], string[]> = {
+    contained: ['M356 387 C362 358 366 336 372 312'],
+    upward: [
+      'M356 390 C376 346 390 318 396 276 C400 238 405 206 416 172',
+      'M344 396 C362 360 370 328 374 292 C378 248 380 210 388 176',
+    ],
+    downward: [
+      'M402 174 C396 210 392 242 388 278 C382 322 374 354 356 390',
+      'M388 176 C382 210 376 244 368 284 C364 326 358 358 344 396',
+    ],
+    lateral: [
+      'M292 316 C332 290 366 286 408 294 C440 302 472 310 512 304',
+      'M292 316 C336 332 370 334 412 326 C454 318 484 306 512 304',
+    ],
+    building_wide: [
+      'M272 338 C314 290 350 260 392 238 C434 216 470 188 512 138',
+      'M260 210 C312 220 356 244 392 278 C428 312 468 334 520 346',
     ],
   }
-}
 
-function buildEmergingRisks(
-  payload: CockpitDecisionPayload | null | undefined,
-  resolvedPayload: CockpitDecisionPayload,
-  surface: DecisionSurface,
-): CockpitState['emergingRisks'] {
-  if (!payload) {
-    return [
-      { id: 'risk-watch', title: 'No active breach forecast', detail: 'Keep watching for the next drift window.' },
-      { id: 'risk-evidence', title: 'Keep telemetry fresh', detail: 'If telemetry freshness drops, trust the twin less before escalating action.' },
-    ]
-  }
-
-  const affectedScope = resolveAffectedScope(resolvedPayload)
-  const constraintType = resolvedPayload.risk?.constraint_type ?? 'comfort'
-  const breachMinutes = resolvedPayload.risk?.time_to_constraint_breach_min
-
-  return [
-    {
-      id: 'risk-horizon',
-      title: breachMinutes !== null && breachMinutes !== undefined
-        ? `${constraintType} risk will tighten within ${breachMinutes} minutes`
-        : `${surface.time.label} is still the main risk clock`,
-      detail: breachMinutes !== null && breachMinutes !== undefined
-        ? `The active ${constraintType} policy still projects a breach window within ${breachMinutes} minutes.`
-        : `If nothing changes, the next breach window is still set by ${surface.time.label.toLowerCase()}.`,
-    },
-    {
-      id: 'risk-spread',
-      title: 'Watch nearby zones next',
-      detail: affectedScope && affectedScope.zones.length > 0
-        ? `Watch ${affectedScope.zones.slice(0, 2).join(', ')} for spillover or recovery drift.`
-        : 'Watch neighboring zones and dependent systems for spillover or recovery drift.',
-    },
-  ]
-}
-
-function buildSiteState(summary: CockpitSiteSummary, resolvedPayload: CockpitDecisionPayload, surface: DecisionSurface) {
-  return {
-    id: summary.siteId,
-    name: summary.siteName,
-    posture: formatPostureLabel(resolvedPayload.active_posture ?? summary.posture),
-    mode: surface.mode,
-    dataFreshnessLabel: summary.dataFreshnessLabel,
-  }
-}
-
-function buildSitePulse(
-  summary: CockpitSiteSummary,
-  payload: CockpitDecisionPayload | null | undefined,
-  tone: CockpitState['sitePulse']['tone'],
-  urgencyScore: number,
-  evidenceStrength: CockpitState['sitePulse']['evidenceStrength'],
-) {
-  return {
-    tone,
-    attentionScore: urgencyScore,
-    activeConditionCount: Math.max(summary.activeAlerts, payload ? 1 : 0),
-    emergingRiskCount: Math.max(summary.predictionsCount, 0),
-    evidenceStrength,
-  }
-}
-
-function buildPrimaryMetric(surface: DecisionSurface, tone: CockpitState['primaryMetric']['tone'], confidenceLabel: string) {
-  return {
-    tone,
-    label: 'Time to Comfort Breach',
-    value: surface.time.value === 'Unknown' ? 'Stable' : surface.time.value,
-    detail: confidenceLabel,
-  }
-}
-
-function buildDecisionState(surface: DecisionSurface, confidenceLabel: string) {
-  return {
-    mode: surface.mode,
-    impact: surface.impact,
-    summary: surface.action.summary,
-    command: surface.action.bmsGuide?.command ?? surface.action.operatorPrompt,
-    operatorPrompt: surface.action.operatorPrompt,
-    expectedOutcome: surface.action.expectedOutcome,
-    tradeoff: surface.action.tradeoff,
-    confidence: confidenceLabel,
-    verification: surface.action.bmsGuide?.verification ?? surface.action.expectedOutcome,
-    navigationPath: surface.action.bmsGuide?.navigationPath ?? [],
-  }
-}
-
-function buildActiveCondition(surface: DecisionSurface, resolvedPayload: CockpitDecisionPayload, confidenceLabel: string) {
-  return {
-    summary: surface.cause,
-    rationale: resolvedPayload.reasoning_summary?.trim()
-      || 'Live signals are steady. Keep watching for the next drift window.',
-    confidenceLabel,
-  }
-}
-
-function buildSeverityState(
-  resolvedPayload: CockpitDecisionPayload,
-  riskScore: number,
-  riskBand: CockpitState['severity']['riskBand'],
-  policy: CockpitThresholdPolicy,
-): CockpitState['severity'] {
-  const healthScore = clamp01(resolvedPayload.health?.score ?? fallbackHealthScore(riskScore))
-  const affectedScope = resolveAffectedScope(resolvedPayload)
-  return {
-    riskScore: toPercent(riskScore),
-    riskBand,
-    thresholdReason: resolvedPayload.risk?.reason ?? buildThresholdReason(riskScore, riskBand, policy.risk),
-    policySource: resolvedPayload.risk?.policy_source ?? policy.source,
-    policyLevel: resolvedPayload.risk?.policy_level ?? null,
-    constraintType: resolvedPayload.risk?.constraint_type ?? null,
-    timeToConstraintBreachMin: resolvedPayload.risk?.time_to_constraint_breach_min ?? resolvedPayload.time_to_discomfort ?? null,
-    affectedScope,
-    healthScore: toPercent(healthScore),
-    healthState: resolvedPayload.health?.state ?? fallbackHealthState(healthScore, policy.health),
-    healthTrend: resolvedPayload.health?.trend ?? fallbackHealthTrend(riskScore),
-    healthReason: resolvedPayload.health?.reason ?? resolvedPayload.reasoning_summary ?? null,
-    assetClass: resolvedPayload.health?.asset_class ?? null,
-    criticality: resolvedPayload.health?.criticality ?? null,
-  }
+  return pathMap[direction].map((d, index) => ({
+    id: `flow-${direction}-${index}`,
+    d,
+    fromFloorId,
+    toFloorId,
+    direction,
+  }))
 }
 
 export function mapCockpitState(
   summary: CockpitSiteSummary,
-  payload?: CockpitDecisionPayload | null,
-  policy: CockpitThresholdPolicy = DEFAULT_COCKPIT_THRESHOLD_POLICY,
+  payload?: BuildingStatePayload | null,
+  hvacOverview?: HVACOverview | null,
+  energyCentreTelemetry?: EnergyCentreTelemetry | null,
+  remoteTelemetry?: RemoteSiteTelemetry | null,
 ): CockpitState {
-  const resolvedPayload = payload ?? buildFallbackPayload(summary)
-  const surface = buildDecisionSurface(resolvedPayload)
-  const urgencyScore = normalizedRiskScore(resolvedPayload)
-  const riskBand = resolvedPayload.risk?.band ?? riskBandFromScore(urgencyScore, policy.risk)
-  const tone = getTone(riskBand)
-  const evidenceStrength = getEvidenceStrength(urgencyScore)
-  const confidenceLabel = surface.time.detail
+  if (!payload) return buildUnavailableState(summary)
+
+  const onboardingPhase = summary.onboardingPhase ?? 'shadow'
+  const isShadowPhase = onboardingPhase === 'shadow'
+  const tone = toneFromPosture(payload.building_posture)
+  const riskBand = riskBandFromPosture(payload.building_posture)
+  const narrative = payload.primary_narrative
+  const urgencyScore = payload.urgency_score ?? 0
+  const bands = { low: 0.3, medium: 0.5, high: 0.7, critical: 0.9 }
+  const timeToBreach = narrative?.time_to_breach_min ?? null
+  const timeValue = timeToBreach === null ? 'Stable' : `${timeToBreach} min`
+  const focusFloorId = extractFloorCode(narrative?.location.epicenter)
+  const narrativeAffectedFloors = (narrative?.location.affected ?? [])
+    .map((zone) => extractFloorCode(zone))
+    .filter((floorId): floorId is string => floorId !== null)
+  const floorOrder = buildFloorOrder(summary.siteId, focusFloorId, narrativeAffectedFloors)
+  const zoneSignals = narrative
+    ? [narrative.location.epicenter, ...narrative.location.affected].map((zoneId, index) => {
+        const floorId = extractFloorCode(zoneId) ?? focusFloorId ?? floorOrder[Math.min(index, floorOrder.length - 1)] ?? 'L0'
+        return {
+          zoneId,
+          label: zoneId.replace(/^Zone-/, '').replace(/-/g, ' '),
+          floorId,
+          meshId: `mesh:${zoneId.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+          level: index === 0 ? riskLevelFromTone(tone) : tone === 'critical' ? 'approaching' : riskLevelFromTone(tone),
+          weight: Math.max(0.2, 1 - index * 0.18),
+          slot: index,
+          isPrimary: index === 0,
+          actionLabel: narrative.action,
+        }
+      })
+    : []
+  const hvacSignal = normalizeHvacSignal(hvacOverview, energyCentreTelemetry)
+  const consumptionIntensity = normalizeConsumptionIntensity(energyCentreTelemetry)
+  const energyLoadRatio = clamp((energyCentreTelemetry?.totalKw ?? 0) / 1800, 0, 1)
+  const energyPowerShare = clamp((energyCentreTelemetry?.powerPercent ?? 0) / 100, 0, 1)
+  const shadowSummary = buildShadowTelemetrySummary(hvacOverview, energyCentreTelemetry)
+  const remoteModuleRefs = inferModuleRefsFromTelemetry(remoteTelemetry)
+  const flowPaths = flowPathsFromNarrative(narrative).map((path, index) => ({
+    ...path,
+    intensity: clamp(hvacSignal.intensity - index * 0.1, 0.25, 1),
+  }))
+
+  // --- Email cluster heatmap: merge into zoneSignals ---
+  const emailClusters = (payload.email_clusters ?? []).map((c) => ({
+    clusterId: c.cluster_id,
+    zoneId: c.zone_id,
+    zoneName: c.zone_name,
+    floor: c.floor,
+    emailCount: c.email_count,
+    complaintType: c.complaint_type,
+    severity: c.severity,
+    summary: c.summary,
+  }))
+
+  // Build a map of zoneId → cluster for quick lookup
+  const clusterByZone: Record<string, (typeof emailClusters)[0]> = {}
+  for (const c of emailClusters) {
+    clusterByZone[c.zoneId] = c
+  }
+
+  // If a zone has an email cluster, add it as intakeCluster on the existing zoneSignal
+  const zoneSignalsWithClusters = zoneSignals.map((signal) => {
+    const cluster = clusterByZone[signal.zoneId]
+    if (cluster && cluster.emailCount >= 3) {
+      return { ...signal, intakeCluster: cluster }
+    }
+    return signal
+  })
+
+  // Add zone signals for clusters that don't have a BMS narrative yet (standalone clusters)
+  const clusteredZoneIds = new Set(Object.keys(clusterByZone))
+  const existingZoneIds = new Set(zoneSignals.map((s) => s.zoneId))
+  const standaloneClusters = emailClusters.filter(
+    (c) => c.emailCount >= 3 && !existingZoneIds.has(c.zoneId)
+  )
+  for (const cluster of standaloneClusters) {
+    zoneSignalsWithClusters.push({
+      zoneId: cluster.zoneId,
+      label: cluster.zoneName.replace(/^Zone-/, '').replace(/-/g, ' '),
+      floorId: cluster.floor,
+      meshId: `mesh:${cluster.zoneId.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+      level: cluster.severity === 'critical' ? 'critical' : cluster.severity === 'high' ? 'approaching' : 'drift',
+      weight: 1,
+      slot: zoneSignalsWithClusters.length,
+      isPrimary: false,
+      actionLabel: `${cluster.emailCount}x occupant`,
+      intakeCluster: cluster,
+    })
+  }
+
+  const secondarySummary = payload.secondary_tensions.length > 0
+    ? payload.secondary_tensions.map((tension) => `${formatVoiceLabel(tension.voice)}: ${tension.message}`).join(' | ')
+    : 'No secondary tensions are currently rising above the building background.'
 
   return {
-    site: buildSiteState(summary, resolvedPayload, surface),
-    sitePulse: buildSitePulse(summary, payload, tone, urgencyScore, evidenceStrength),
-    primaryMetric: buildPrimaryMetric(surface, tone, confidenceLabel),
-    activeCondition: buildActiveCondition(surface, resolvedPayload, confidenceLabel),
-    decision: buildDecisionState(surface, confidenceLabel),
-    visualTwin: buildVisualTwin(resolvedPayload, surface, urgencyScore, policy),
-    evidence: buildEvidence(summary, payload, resolvedPayload, evidenceStrength),
-    severity: buildSeverityState(resolvedPayload, urgencyScore, riskBand, policy),
-    emergingRisks: buildEmergingRisks(payload, resolvedPayload, surface),
+    site: {
+      id: summary.siteId,
+      name: summary.siteName,
+      onboardingPhase,
+      posture: formatPostureLabel(payload.building_posture),
+      mode: isShadowPhase ? 'watch' : payload.operator_guidance.mode,
+      renderState: 'live',
+      dataFreshnessLabel: summary.dataFreshnessLabel,
+    },
+    sitePulse: {
+      tone,
+      attentionScore: tone === 'critical' ? 1 : tone === 'elevated' ? 0.8 : tone === 'warning' ? 0.6 : 0.2,
+      activeConditionCount: narrative ? 1 : 0,
+      emergingRiskCount: payload.secondary_tensions.length,
+      evidenceStrength: narrative ? 'moderate' : 'strong',
+    },
+    primaryMetric: {
+      tone,
+      label: 'Time to Constraint',
+      value: timeValue,
+      detail: energyCentreTelemetry
+        ? `${payload.operator_guidance.headline} · Energy Centre ${energyCentreTelemetry.totalKw.toFixed(0)} kW`
+        : payload.operator_guidance.headline,
+    },
+    activeCondition: {
+      summary: isShadowPhase
+        ? shadowSummary
+        : (narrative?.message ?? 'Building is calm.'),
+      rationale: isShadowPhase
+        ? `Shadow training mode: telemetry-only observation across ${locationSummary(narrative)}.`
+        : (
+          narrative
+            ? `${formatVoiceLabel(narrative.voice)} centered on ${locationSummary(narrative)}.`
+            : 'No dominant narrative is active. The building is operating within margin.'
+        ),
+      confidenceLabel: isShadowPhase ? 'Observation only' : payload.operator_guidance.headline,
+    },
+    decision: {
+      impact: locationSummary(narrative),
+      summary: isShadowPhase ? 'Observe telemetry flow and model calibration.' : (narrative?.action ?? 'No action needed.'),
+      tradeoff: secondarySummary,
+      confidence: isShadowPhase ? 'Shadow training mode' : payload.operator_guidance.headline,
+    },
+    visualTwin: {
+      headline: narrative
+        ? narrative.message
+        : 'Building calm. No active dominant narrative.',
+      activeLabel: narrative?.location.epicenter ?? summary.siteName,
+      modeLabel: titleCase(payload.operator_guidance.mode),
+      motionProfile: tone === 'critical' ? 'alert' : tone === 'warning' || tone === 'elevated' ? 'watch' : 'calm',
+      breathingIntensity: hvacSignal.intensity,
+      flowSpeed: hvacSignal.flowSpeed,
+      consumptionIntensity,
+      focusFloorId,
+      floors: buildTwinFloors(
+        floorOrder,
+        focusFloorId,
+        urgencyScore,
+        null,
+        bands,
+        payload.affected_zone_ids ?? [],
+      ),
+      zoneSignals: zoneSignalsWithClusters,
+      flowPaths,
+      energyCentre: {
+        online: Boolean(energyCentreTelemetry) || Boolean(hvacOverview?.raw_telemetry?.power),
+        totalKw: hvacOverview?.raw_telemetry?.power?.total_kw ?? energyCentreTelemetry?.totalKw ?? 0,
+        hvacKw: hvacOverview?.raw_telemetry?.power?.hvac_kw ?? energyCentreTelemetry?.hvacKw ?? 0,
+        lightingKw: hvacOverview?.raw_telemetry?.power?.lighting_kw ?? energyCentreTelemetry?.lightingKw ?? 0,
+        powerKw: energyCentreTelemetry?.powerKw ?? 0,
+        loadRatio: energyLoadRatio,
+        powerShareRatio: energyPowerShare,
+        stateLabel: energyStateLabel(energyLoadRatio),
+      },
+    },
+    evidence: {
+      strength: narrative ? 'moderate' : 'strong',
+      summary: 'Rendered from the backend building-state contract.',
+      refs: narrative
+        ? [
+            ...[narrative.location.epicenter, ...narrative.location.affected].map((zoneId) => `zone:${zoneId}`),
+            ...(energyCentreTelemetry ? [`energy-centre:${energyCentreTelemetry.totalKw.toFixed(0)}kw`] : []),
+            ...remoteModuleRefs,
+          ]
+        : [
+            ...(energyCentreTelemetry ? [`energy-centre:${energyCentreTelemetry.totalKw.toFixed(0)}kw`] : []),
+            ...remoteModuleRefs,
+          ],
+    },
+    severity: {
+      riskScore: null,
+      riskBand,
+      thresholdReason: null,
+      policySource: null,
+      policyLevel: null,
+      constraintType: narrative?.voice === 'comfort_stress' ? 'comfort' : narrative?.voice === 'asset_stress' ? 'asset' : null,
+      timeToConstraintBreachMin: timeToBreach,
+      affectedScope: narrative
+        ? {
+            zones: [narrative.location.epicenter, ...narrative.location.affected],
+            assets: [],
+            occupantsEstimate: null,
+          }
+        : null,
+      healthScore: null,
+      healthState: null,
+      healthTrend: null,
+      healthReason: null,
+      assetClass: null,
+      criticality: null,
+    },
+    emergingRisks: payload.secondary_tensions.map((tension, index) => ({
+      id: `secondary-${index}-${tension.voice}`,
+      title: formatVoiceLabel(tension.voice),
+      detail: tension.message,
+    })),
+    emailClusters,
   }
 }

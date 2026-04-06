@@ -4,7 +4,6 @@ import json
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional
 
 from app.models.simulation_analytics import (
     OptimizationProfile,
@@ -21,7 +20,7 @@ LOG_DIR = Path(__file__).parent.parent / "data" / "simulation_logs"
 PROFILES_PATH = Path(__file__).parent.parent / "data" / "optimization_profiles.json"
 
 
-def _load_profiles() -> Dict[str, OptimizationProfile]:
+def _load_profiles() -> dict[str, OptimizationProfile]:
     """Load optimization profiles from config file."""
     if not PROFILES_PATH.exists():
         return {}
@@ -36,7 +35,7 @@ class SimulationAnalyzer:
         self.log_dir = log_dir
         self.profiles = _load_profiles()
 
-    def list_runs(self) -> List[SimulationRunRecord]:
+    def list_runs(self) -> list[SimulationRunRecord]:
         """List all simulation runs from metadata files."""
         runs = []
         for meta_file in sorted(self.log_dir.glob("*_meta.json"), reverse=True):
@@ -47,7 +46,7 @@ class SimulationAnalyzer:
                 logger.warning(f"Skipping invalid meta file {meta_file}: {e}")
         return runs
 
-    def get_run(self, run_id: str) -> Optional[SimulationRunRecord]:
+    def get_run(self, run_id: str) -> SimulationRunRecord | None:
         """Get metadata for a specific run."""
         meta_path = self.log_dir / f"{run_id}_meta.json"
         if not meta_path.exists():
@@ -58,10 +57,10 @@ class SimulationAnalyzer:
     def get_events(
         self,
         run_id: str,
-        event_type: Optional[str] = None,
+        event_type: str | None = None,
         offset: int = 0,
         limit: int = 100,
-    ) -> List[SimulationEvent]:
+    ) -> list[SimulationEvent]:
         """Read events from JSONL file with optional filtering and pagination."""
         events_path = self.log_dir / f"{run_id}_events.jsonl"
         if not events_path.exists():
@@ -100,8 +99,8 @@ class SimulationAnalyzer:
             return SimulationMetrics()
 
         metrics = SimulationMetrics()
-        fault_times: Dict[str, str] = {}  # equipment_id -> fault timestamp
-        repair_durations: List[float] = []
+        fault_times: dict[str, str] = {}  # equipment_id -> fault timestamp
+        repair_durations: list[float] = []
 
         with open(events_path) as f:
             for line in f:
@@ -184,9 +183,9 @@ class SimulationAnalyzer:
         """Score simulation metrics against an optimization profile."""
         weights = profile.weights
         thresholds = profile.thresholds
-        scores: Dict[str, float] = {}
-        flags: List[str] = []
-        recommendations: List[str] = []
+        scores: dict[str, float] = {}
+        flags: list[str] = []
+        recommendations: list[str] = []
 
         # Runtime score (0-100): higher utilization = higher score
         total_equip = max(len(metrics.equipment_runtime_hours), 1)
@@ -252,8 +251,8 @@ class SimulationAnalyzer:
         )
 
     def analyze_run(
-        self, run_id: str, custom_profiles: Optional[Dict[str, OptimizationProfile]] = None
-    ) -> Optional[SimulationAnalysisReport]:
+        self, run_id: str, custom_profiles: dict[str, OptimizationProfile] | None = None
+    ) -> SimulationAnalysisReport | None:
         """Generate full analysis report for a simulation run."""
         run = self.get_run(run_id)
         if not run:
@@ -284,7 +283,7 @@ class SimulationAnalyzer:
 
         return report
 
-    def get_analysis(self, run_id: str) -> Optional[SimulationAnalysisReport]:
+    def get_analysis(self, run_id: str) -> SimulationAnalysisReport | None:
         """Get existing analysis report or generate one."""
         report_path = self.log_dir / f"{run_id}_analysis.json"
         if report_path.exists():
@@ -292,6 +291,6 @@ class SimulationAnalyzer:
             return SimulationAnalysisReport(**data)
         return self.analyze_run(run_id)
 
-    def get_profiles(self) -> Dict[str, OptimizationProfile]:
+    def get_profiles(self) -> dict[str, OptimizationProfile]:
         """Return loaded optimization profiles."""
         return self.profiles

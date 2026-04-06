@@ -23,8 +23,8 @@ Follows the singleton + GBR pattern from solar_forecast_service.py.
 import logging
 import math
 import random
-from datetime import datetime, date, timezone, timedelta
-from typing import Dict, List, Optional, Any
+from datetime import UTC, date, datetime, timedelta
+from typing import Any
 
 import numpy as np
 from sklearn.ensemble import GradientBoostingRegressor
@@ -54,7 +54,7 @@ _SEASONAL_TEMPS = {
 _PEAK_HOURS = {7, 8, 9, 18, 19}
 
 
-def _simulated_site_load(hour: float, rng: Optional[random.Random] = None) -> float:
+def _simulated_site_load(hour: float, rng: random.Random | None = None) -> float:
     """Simulate Site-002 building load profile (kW) by hour of day.
 
     Sandton office tower: base load ~900 kW (overnight), peak ~1750-1850 kW
@@ -125,9 +125,9 @@ class LoadForecastService:
     INTERVALS_PER_DAY = 96
 
     def __init__(self):
-        self._models: Dict[str, GradientBoostingRegressor] = {}
-        self._accuracy: Dict[str, Dict[str, float]] = {}
-        self._last_forecast_cache: Dict[str, LoadForecast] = {}
+        self._models: dict[str, GradientBoostingRegressor] = {}
+        self._accuracy: dict[str, dict[str, float]] = {}
+        self._last_forecast_cache: dict[str, LoadForecast] = {}
         self._train_all_sites()
 
     def _train_all_sites(self) -> None:
@@ -141,8 +141,8 @@ class LoadForecastService:
     def _train_site(self, site_id: str) -> None:
         """Train a GBR model for a site on 90 days of synthetic 15-min data."""
         today = date.today()
-        features_list: List[List[float]] = []
-        targets: List[float] = []
+        features_list: list[list[float]] = []
+        targets: list[float] = []
 
         for day_offset in range(90, 0, -1):
             d = today - timedelta(days=day_offset)
@@ -249,7 +249,7 @@ class LoadForecastService:
             LoadForecast with per-interval predictions and confidence bands.
         """
         model = self._models.get(site_id)
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         sast_now = now + timedelta(hours=2)
 
         if not model:
@@ -259,7 +259,7 @@ class LoadForecastService:
                 model="gradient_boosting",
             )
 
-        intervals: List[LoadInterval] = []
+        intervals: list[LoadInterval] = []
         total_demand = 0.0
         peak_demand = 0.0
 
@@ -367,7 +367,7 @@ class LoadForecastService:
         Falls back to a simple profile if model is not trained.
         """
         model = self._models.get(site_id)
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         sast = now + timedelta(hours=2)
         hour = sast.hour + sast.minute / 60.0
 
@@ -401,18 +401,18 @@ class LoadForecastService:
 
         return float(max(0.0, model.predict(features)[0]))
 
-    def get_cached_forecast(self, site_id: str) -> Optional[LoadForecast]:
+    def get_cached_forecast(self, site_id: str) -> LoadForecast | None:
         """Return the most recent cached forecast, or None."""
         return self._last_forecast_cache.get(site_id)
 
-    def get_accuracy(self, site_id: str) -> Optional[Dict[str, Any]]:
+    def get_accuracy(self, site_id: str) -> dict[str, Any] | None:
         """Return model accuracy metrics for a site."""
         return self._accuracy.get(site_id)
 
 
 # === Singleton ===
 
-_load_forecast_service: Optional[LoadForecastService] = None
+_load_forecast_service: LoadForecastService | None = None
 
 
 def get_load_forecast_service() -> LoadForecastService:

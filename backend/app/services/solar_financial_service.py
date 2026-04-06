@@ -15,15 +15,15 @@ Carbon offset:
   - Solar kWh x 0.95 kg/kWh (Eskom grid emission factor)
   - Diesel CO2 avoided: litres x 2.68 kg/L
 
-For demo: generates 3 months of retrospective financial reports
+For local seeded mode: generates 3 months of retrospective financial reports
 with realistic savings for Site-002 297 kWp rooftop array.
 """
 
 import logging
 import random
 from dataclasses import dataclass, field
-from datetime import datetime, timezone, date
-from typing import Dict, List, Optional, Any
+from datetime import UTC, date, datetime
+from typing import Any
 
 from app.services.solar_config_service import get_site_solar_config
 
@@ -73,7 +73,7 @@ class SavingsBreakdown:
     diesel_avoidance_zar: float = 0.0
     total_zar: float = 0.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "arbitrage_zar": round(self.arbitrage_zar, 2),
             "demand_charge_zar": round(self.demand_charge_zar, 2),
@@ -104,7 +104,7 @@ class MonthlyFinancialReport:
     diesel_litres_saved: float
     generated_at: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "site_id": self.site_id,
             "month": self.month,
@@ -131,7 +131,7 @@ class FinancialSummary:
 
     site_id: str
     period: str
-    months: List[Dict[str, Any]] = field(default_factory=list)
+    months: list[dict[str, Any]] = field(default_factory=list)
     cumulative_savings_zar: float = 0.0
     cumulative_generation_kwh: float = 0.0
     average_monthly_savings_zar: float = 0.0
@@ -140,7 +140,7 @@ class FinancialSummary:
     payback_months: float = 0.0
     generated_at: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "site_id": self.site_id,
             "period": self.period,
@@ -172,7 +172,7 @@ class CarbonReport:
     trees_equivalent: int  # 1 tree absorbs ~22 kg CO2/year
     generated_at: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "site_id": self.site_id,
             "period": self.period,
@@ -197,7 +197,7 @@ class CarbonReport:
 class SolarFinancialService:
     """Financial reporting for solar installations."""
 
-    # Monthly demo data for Site-002 (297 kWp, JHB)
+    # Monthly seeded data for Site-002 (297 kWp, JHB)
     # Realistic for SA commercial installation
     DEMO_MONTHLY_DATA = {
         # (month, year) -> (generation_kwh, pr, gen_hours_avoided, ls_events)
@@ -237,12 +237,12 @@ class SolarFinancialService:
     def generate_monthly_report(self, site_id: str, month: int, year: int) -> MonthlyFinancialReport:
         """Generate monthly financial report with full savings breakdown.
 
-        For demo, uses pre-seeded data for Dec 2025, Jan 2026, Feb 2026.
+        Uses pre-seeded data for Dec 2025, Jan 2026, Feb 2026 in local mode.
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         month_name = date(year, month, 1).strftime("%B %Y")
 
-        # Get demo data or generate synthetic
+        # Get seeded data or generate synthetic
         data = self.DEMO_MONTHLY_DATA.get(
             (month, year),
             self._generate_synthetic_month(month, year),
@@ -319,7 +319,7 @@ class SolarFinancialService:
 
     def get_financial_summary(self, site_id: str, period: str = "ytd") -> FinancialSummary:
         """Get year-to-date cumulative savings with monthly breakdown."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Generate reports for available months
         months_data = []
@@ -347,7 +347,7 @@ class SolarFinancialService:
         num_months = len(months_data) or 1
         avg_monthly = cumulative_savings / num_months
 
-        # SENTINEL licence fee (demo estimate for a 297 kWp site)
+        # SENTINEL licence fee (seed estimate for a 297 kWp site)
         licence_fee = 85_000.0  # R85K/month
 
         roi = ((avg_monthly - licence_fee) / licence_fee * 100) if licence_fee > 0 else 0
@@ -372,7 +372,7 @@ class SolarFinancialService:
         Eskom grid emission factor: 0.95 kg CO2/kWh (2024 IRP)
         Diesel CO2: 2.68 kg CO2/litre
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         if period == "month":
             # Use current month data
@@ -411,8 +411,8 @@ class SolarFinancialService:
             generated_at=now.isoformat(),
         )
 
-    def _generate_synthetic_month(self, month: int, year: int) -> Dict[str, Any]:
-        """Generate synthetic monthly data for months without demo data."""
+    def _generate_synthetic_month(self, month: int, year: int) -> dict[str, Any]:
+        """Generate synthetic monthly data for months without seeded data."""
         # JHB solar resource varies by season
         seasonal_factor = {
             1: 1.05,
@@ -445,7 +445,7 @@ class SolarFinancialService:
 
 # === Singleton ===
 
-_service: Optional[SolarFinancialService] = None
+_service: SolarFinancialService | None = None
 
 
 def get_solar_financial_service() -> SolarFinancialService:

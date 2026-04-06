@@ -16,9 +16,9 @@ Output: Ranked list of actionable recommendations with financial impact.
 
 import logging
 from datetime import datetime
-from typing import Dict, Optional, Any
-from statistics import mean
 from enum import Enum
+from statistics import mean
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +78,7 @@ class AIRecommendationEngine:
         hvac_cop_current: float = 3.5,
         power_anomalies_count: int = 0,
         cost_variance_pct: float = 0.18,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Generate ranked list of financial recommendations.
 
         Args:
@@ -142,7 +142,7 @@ class AIRecommendationEngine:
     async def _calculate_lighting_recommendation(
         self,
         current_kwh: float,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """Calculate DALI lighting optimization recommendation."""
         baseline_kwh = BASELINE_LIGHTING_KWH_PER_DAY
         savings_kwh_per_day = baseline_kwh - current_kwh
@@ -215,7 +215,7 @@ class AIRecommendationEngine:
     async def _calculate_water_recommendation(
         self,
         current_liters: float,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """Calculate water efficiency recommendation."""
         baseline_liters = BASELINE_WATER_LITERS_PER_DAY
         savings_liters_per_day = baseline_liters - current_liters
@@ -288,7 +288,7 @@ class AIRecommendationEngine:
     async def _calculate_hvac_recommendation(
         self,
         current_cop: float,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """Calculate HVAC maintenance recommendation (COP degradation)."""
         cop_loss_pct = (1.0 - current_cop / BASELINE_HVAC_COP) * 100
 
@@ -369,7 +369,7 @@ class AIRecommendationEngine:
         self,
         anomalies_count: int,
         cost_variance_pct: float,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """Calculate occupancy optimization recommendation."""
         if anomalies_count == 0 and abs(cost_variance_pct) < 2.0:
             return None  # System running well
@@ -455,7 +455,7 @@ async def generate_ai_recommendations(
     hvac_cop_current: float = 3.5,
     power_anomalies_count: int = 0,
     cost_variance_pct: float = 0.18,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Public API for AI recommendation generation.
 
     Args:

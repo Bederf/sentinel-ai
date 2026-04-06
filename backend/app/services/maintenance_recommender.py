@@ -5,14 +5,14 @@ equipment history, and fleet-wide experience.
 """
 
 import logging
-from typing import Dict, Any, Optional, List
-from datetime import datetime
 from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Any
 
 from app.services.model_gateway import model_gateway
 from app.services.vector_db import get_vector_db_service
-from ml.explanations.templates import MAINTENANCE_RECOMMENDATION_TEMPLATE
 from ml.explanations.parser import ExplanationParser
+from ml.explanations.templates import MAINTENANCE_RECOMMENDATION_TEMPLATE
 
 logger = logging.getLogger(__name__)
 
@@ -24,17 +24,17 @@ class MaintenanceRecommendation:
     equipment_id: str
     equipment_type: str
     risk_level: str
-    immediate_actions: List[str] = field(default_factory=list)
-    scheduled_maintenance: List[Dict[str, str]] = field(default_factory=list)
-    preventive_measures: List[str] = field(default_factory=list)
-    spare_parts: List[Dict[str, Any]] = field(default_factory=list)
-    technician_skills: List[str] = field(default_factory=list)
+    immediate_actions: list[str] = field(default_factory=list)
+    scheduled_maintenance: list[dict[str, str]] = field(default_factory=list)
+    preventive_measures: list[str] = field(default_factory=list)
+    spare_parts: list[dict[str, Any]] = field(default_factory=list)
+    technician_skills: list[str] = field(default_factory=list)
     estimated_downtime: str = ""
     priority: str = "medium"
     generated_at: str = ""
     llm_used: bool = False
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "equipment_id": self.equipment_id,
             "equipment_type": self.equipment_type,
@@ -128,9 +128,9 @@ class MaintenanceRecommender:
         self,
         equipment_id: str,
         equipment_type: str,
-        predictions: Dict[str, Any],
-        maintenance_history: Optional[List[Dict]] = None,
-        sensor_readings: Optional[Dict[str, Any]] = None,
+        predictions: dict[str, Any],
+        maintenance_history: list[dict] | None = None,
+        sensor_readings: dict[str, Any] | None = None,
     ) -> MaintenanceRecommendation:
         """Generate maintenance recommendations based on predictions.
 
@@ -177,9 +177,9 @@ class MaintenanceRecommender:
         equipment_type: str,
         risk_level: str,
         predicted_failure: str,
-        predictions: Dict[str, Any],
-        maintenance_history: Optional[List[Dict]] = None,
-        sensor_readings: Optional[Dict[str, Any]] = None,
+        predictions: dict[str, Any],
+        maintenance_history: list[dict] | None = None,
+        sensor_readings: dict[str, Any] | None = None,
     ) -> MaintenanceRecommendation:
         """Generate recommendation using LLM.
 
@@ -241,6 +241,7 @@ class MaintenanceRecommender:
             task_class="medium",
             messages=[{"role": "user", "content": prompt}],
             max_tokens=1536,
+            source="maintenance_recommender",
         )
 
         # Parse response
@@ -358,8 +359,8 @@ class MaintenanceRecommender:
         }.get(risk_level.lower(), "1-2 hours")
 
     async def get_fleet_recommendations(
-        self, equipment_list: List[Dict[str, Any]], predictions_map: Dict[str, Dict]
-    ) -> List[MaintenanceRecommendation]:
+        self, equipment_list: list[dict[str, Any]], predictions_map: dict[str, dict]
+    ) -> list[MaintenanceRecommendation]:
         """Generate recommendations for multiple equipment.
 
         Args:

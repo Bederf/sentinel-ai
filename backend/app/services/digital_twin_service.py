@@ -15,7 +15,6 @@ Pipeline:
 import base64
 import json
 import logging
-from typing import Dict
 
 from app.services.floor_plan_sanitizer import get_floor_plan_sanitizer
 
@@ -36,7 +35,7 @@ class DigitalTwinService:
         site_name: str,
         floors_count: int,
         skip_sanitization: bool = False,
-    ) -> Dict:
+    ) -> dict:
         """
         Extract building config from floor plan image using Claude vision.
 
@@ -88,7 +87,7 @@ class DigitalTwinService:
             image_to_send = sanitized_bytes
             was_sanitized = True
         else:
-            logger.warning(f"Skipping sanitization for {site_code} (demo/non-sensitive only)")
+            logger.warning(f"Skipping sanitization for {site_code} (non-sensitive local/testing use only)")
             image_to_send = image_bytes
             was_sanitized = False
 
@@ -124,7 +123,7 @@ class DigitalTwinService:
         site_name: str,
         floors_count: int,
         was_sanitized: bool,
-    ) -> Dict:
+    ) -> dict:
         """
         Send image to Claude vision API for extraction.
 
@@ -174,6 +173,7 @@ class DigitalTwinService:
                     }
                 ],
                 max_tokens=4096,
+                source="digital_twin_floorplan_extraction",
             )
 
             # Parse response as JSON
@@ -182,8 +182,8 @@ class DigitalTwinService:
             return extracted
         except Exception as e:
             logger.error(f"Vision extraction failed: {e}")
-            # Return demo config for testing
-            return self._generate_demo_config(site_code, site_name, floors_count)
+            # Return seeded config for testing
+            return self._generate_stub_config(site_code, site_name, floors_count)
 
     def _build_extraction_prompt(self, site_name: str, floors_count: int, was_sanitized: bool) -> str:
         """Build structured extraction prompt for Claude vision."""
@@ -258,7 +258,7 @@ class DigitalTwinService:
 """
         return prompt
 
-    def _parse_extraction_response(self, response: str, site_code: str) -> Dict:
+    def _parse_extraction_response(self, response: str, site_code: str) -> dict:
         """Parse Claude vision response into structured config."""
         try:
             # Extract JSON from response
@@ -288,7 +288,7 @@ class DigitalTwinService:
         dxf_bytes: bytes,
         site_code: str,
         site_name: str,
-    ) -> Dict:
+    ) -> dict:
         """
         Extract building config from DXF (AutoCAD) file.
 
@@ -330,12 +330,12 @@ class DigitalTwinService:
             return config
         except Exception as e:
             logger.error(f"DXF parsing failed: {e}", exc_info=True)
-            # Fallback to demo config for testing
-            return self._generate_demo_config(site_code, site_name, 5)
+            # Fallback to seeded config for testing
+            return self._generate_stub_config(site_code, site_name, 5)
 
-    def _generate_demo_config(self, site_code: str, site_name: str, floors_count: int) -> Dict:
-        """Generate realistic demo config for testing."""
-        logger.info(f"Generating demo config for {site_code}")
+    def _generate_stub_config(self, site_code: str, site_name: str, floors_count: int) -> dict:
+        """Generate realistic seeded config for testing."""
+        logger.info(f"Generating seeded config for {site_code}")
 
         # Generate realistic South African commercial building
         _equipment_types = ["chiller", "ahu", "fcu", "vav", "gen", "ups"]
@@ -441,9 +441,9 @@ class DigitalTwinService:
             "equipment": equipment,
             "zones": zones,
             "extraction_metadata": {
-                "method": "demo",
+                "method": "stubbed",
                 "equipment_count": len(equipment),
-                "demo_generated": True,
+                "stubbed": True,
             },
         }
 

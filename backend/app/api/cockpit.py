@@ -343,16 +343,17 @@ def _build_stub_payload_for_site(site_id: str) -> CockpitDecisionPayload | None:
         return _attach_resolved_contract(
             CockpitDecisionPayload(
                 building_id="S002",
-                alert_text="Executive boardroom cooling resilience is slipping.",
+                alert_text="Chiller plant load is rising. Upward pressure detected through L0 and L1.",
                 reasoning_summary=(
-                    "Compressor load is rising while boardroom thermal drift accelerates. "
-                    "Start standby cooling before the next occupied meeting window."
+                    "Chiller cycling margin is tightening around the plant transition. "
+                    "Load propagation is moving upward through the mechanical riser into Level 1. "
+                    "Start standby chiller before the next occupied peak window."
                 ),
-                active_posture="comfort_priority",
+                active_posture="adaptive_intelligence",
                 time_to_discomfort=12,
                 time_confidence="declining",
                 estimated_impact=(
-                    "Boardroom comfort will breach during the next occupied window and plant stress is rising."
+                    "Comfort will degrade in L0 and L1 occupied zones if chiller cycling continues unchecked."
                 ),
                 recommended_action="Start standby chiller and inspect the lead compressor train.",
                 urgency_score=0.78,
@@ -361,10 +362,25 @@ def _build_stub_payload_for_site(site_id: str) -> CockpitDecisionPayload | None:
                     "asset_risk": 0.24,
                     "cost": 0.12,
                 },
-                affected_zone_ids=["Zone-L4-Boardroom-A", "Zone-L4-Boardroom-B"],
+                affected_zone_ids=[
+                    "Zone-B1-ChillerPlant",
+                    "Zone-L0-MechanicalRiser",
+                    "Zone-L1-CeilingVoid",
+                ],
                 primary_asset_id="S002-CHILLER-B1-001",
                 building_metadata={
-                    "deployment_mode": "advisory",
+                    "deployment_mode": "shadow",
+                    "floor_stack_order": ["B1", "L0", "L1", "L2", "L3", "L4", "L5", "R"],
+                    "floor_labels": {
+                        "B1": "Basement",
+                        "L0": "Ground",
+                        "L1": "Level 1",
+                        "L2": "Level 2",
+                        "L3": "Level 3",
+                        "L4": "Level 4",
+                        "L5": "Level 5",
+                        "R":  "Roof",
+                    },
                 },
             )
         )

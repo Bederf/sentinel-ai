@@ -1,10 +1,10 @@
 """Vector database service using Supabase + pgvector."""
 
-from datetime import datetime, timezone
-from typing import List, Optional, Dict, Any
-import re
 import logging
+import re
 import uuid
+from datetime import UTC, datetime
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +24,7 @@ class VectorDBService:
             self._embedding_service = get_embedding_service()
         return self._embedding_service
 
-    def _resolve_site_uuid(self, site_id: Optional[str]) -> Optional[str]:
+    def _resolve_site_uuid(self, site_id: str | None) -> str | None:
         """Resolve a site code like ``site-001`` to the canonical UUID."""
         if not site_id:
             return None
@@ -45,14 +45,14 @@ class VectorDBService:
         document_type: str,
         equipment_type: str,
         full_text: str,
-        site_id: Optional[str] = None,
+        site_id: str | None = None,
         source: str = "internal_procedure",
-        manufacturer: Optional[str] = None,
-        model: Optional[str] = None,
-        summary: Optional[str] = None,
-        keywords: Optional[List[str]] = None,
-        failure_modes: Optional[List[str]] = None,
-    ) -> Dict[str, Any]:
+        manufacturer: str | None = None,
+        model: str | None = None,
+        summary: str | None = None,
+        keywords: list[str] | None = None,
+        failure_modes: list[str] | None = None,
+    ) -> dict[str, Any]:
         """Add a document to the RAG system."""
         resolved_site_id = self._resolve_site_uuid(site_id)
         result = (
@@ -122,7 +122,7 @@ class VectorDBService:
         self.client.table("documents").update(
             {
                 "indexing_status": "embedded",
-                "indexed_at": datetime.now(timezone.utc).isoformat(),
+                "indexed_at": datetime.now(UTC).isoformat(),
                 "chunk_count": len(chunk_records),
             }
         ).eq("id", document_id).execute()
@@ -130,7 +130,7 @@ class VectorDBService:
         logger.info(f"Indexed document {document_id}: {len(chunk_records)} chunks")
         return len(chunk_records)
 
-    def _split_into_chunks(self, text: str, chunk_size: int = 500, overlap: int = 50) -> List[Dict[str, Any]]:
+    def _split_into_chunks(self, text: str, chunk_size: int = 500, overlap: int = 50) -> list[dict[str, Any]]:
         """Split text into overlapping chunks."""
         chunks = []
         words = text.split()
@@ -160,7 +160,7 @@ class VectorDBService:
 
     def _split_markdown_into_chunks(
         self, text: str, max_chunk_size: int = 800, overlap_ratio: float = 0.15
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Split markdown text into section-aware chunks with heading paths.
 
         Inspired by aimthelaw's legal document chunking:
@@ -384,12 +384,12 @@ class VectorDBService:
     def _build_chunk_record(
         self,
         *,
-        document: Dict[str, Any],
+        document: dict[str, Any],
         document_id: str,
         chunk_index: int,
-        chunk: Dict[str, Any],
+        chunk: dict[str, Any],
         embedding: Any,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Build a chunk record with stable citation grounding metadata."""
         chunk_uuid = str(uuid.uuid4())
         section_title = chunk.get("section")
@@ -426,15 +426,15 @@ class VectorDBService:
     def _build_grounding_metadata(
         self,
         *,
-        document: Dict[str, Any],
+        document: dict[str, Any],
         document_id: str,
         chunk_id: str,
         chunk_index: int,
-        section_title: Optional[str],
-        page_number: Optional[int],
-        existing_metadata: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
-        base_metadata: Dict[str, Any] = dict(existing_metadata or {})
+        section_title: str | None,
+        page_number: int | None,
+        existing_metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        base_metadata: dict[str, Any] = dict(existing_metadata or {})
         base_metadata["grounding"] = {
             "document_id": document_id,
             "chunk_id": chunk_id,
@@ -450,12 +450,12 @@ class VectorDBService:
         self,
         query: str,
         n_results: int = 5,
-        equipment_type: Optional[str] = None,
-        document_type: Optional[str] = None,
-        manufacturer: Optional[str] = None,
-        site_id: Optional[str] = None,
+        equipment_type: str | None = None,
+        document_type: str | None = None,
+        manufacturer: str | None = None,
+        site_id: str | None = None,
         similarity_threshold: float = 0.5,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Semantic search for relevant document chunks.
 
         Args:
@@ -493,10 +493,10 @@ class VectorDBService:
         self,
         query: str,
         n_results: int = 5,
-        equipment_type: Optional[str] = None,
-        knowledge_type: Optional[str] = None,
+        equipment_type: str | None = None,
+        knowledge_type: str | None = None,
         similarity_threshold: float = 0.5,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Search equipment knowledge base."""
         query_embedding = self.embedding_service.embed_text(query)
 
@@ -517,11 +517,11 @@ class VectorDBService:
         self,
         query: str,
         n_results: int = 5,
-        equipment_type: Optional[str] = None,
-        site_id: Optional[str] = None,
+        equipment_type: str | None = None,
+        site_id: str | None = None,
         keyword_weight: float = 0.3,
         semantic_weight: float = 0.7,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Hybrid search combining keyword and semantic matching.
 
         Args:
@@ -558,18 +558,18 @@ class VectorDBService:
         knowledge_type: str,
         title: str,
         description: str,
-        code: Optional[str] = None,
-        component: Optional[str] = None,
-        manufacturer: Optional[str] = None,
-        model: Optional[str] = None,
-        symptoms: Optional[List[str]] = None,
-        possible_causes: Optional[List[str]] = None,
-        diagnostic_steps: Optional[List[str]] = None,
-        solution: Optional[str] = None,
-        parts_required: Optional[Dict] = None,
-        estimated_labor_hours: Optional[float] = None,
-        priority: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        code: str | None = None,
+        component: str | None = None,
+        manufacturer: str | None = None,
+        model: str | None = None,
+        symptoms: list[str] | None = None,
+        possible_causes: list[str] | None = None,
+        diagnostic_steps: list[str] | None = None,
+        solution: str | None = None,
+        parts_required: dict | None = None,
+        estimated_labor_hours: float | None = None,
+        priority: str | None = None,
+    ) -> dict[str, Any]:
         """Add a knowledge entry with auto-generated embedding."""
         # Generate embedding from title + description
         embed_text = f"{title}. {description}"
@@ -607,14 +607,14 @@ class VectorDBService:
 
         return result.data[0] if result.data else None
 
-    def get_document(self, document_id: str) -> Optional[Dict[str, Any]]:
+    def get_document(self, document_id: str) -> dict[str, Any] | None:
         """Get a document by ID."""
         result = self.client.table("documents").select("*").eq("id", document_id).single().execute()
         return result.data
 
     def list_documents(
-        self, equipment_type: Optional[str] = None, document_type: Optional[str] = None, limit: int = 50
-    ) -> List[Dict[str, Any]]:
+        self, equipment_type: str | None = None, document_type: str | None = None, limit: int = 50
+    ) -> list[dict[str, Any]]:
         """List documents with optional filters."""
         query = self.client.table("documents").select(
             "id, code, title, equipment_type, document_type, manufacturer, "
@@ -629,7 +629,7 @@ class VectorDBService:
         result = query.limit(limit).order("created_at", desc=True).execute()
         return result.data if result.data else []
 
-    def _attach_grounding_metadata(self, results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def _attach_grounding_metadata(self, results: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Attach normalized grounding metadata for citation-ready responses."""
         if not results:
             return results

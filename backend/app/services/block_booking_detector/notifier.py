@@ -4,16 +4,15 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import datetime
 import smtplib
+from datetime import datetime, timedelta, timezone
 from email.mime.text import MIMEText
-from datetime import timedelta, timezone
 
+from app.config.settings import settings
 from app.models.booking_record import BlockBookingAlert, BlockBookingConfig
 from app.services.block_booking_detector.booking_store import (
     get_booking_store,
 )
-from app.config.settings import settings
 from app.services.n8n_service import get_n8n_service
 
 logger = logging.getLogger(__name__)

@@ -1,8 +1,8 @@
-from typing import Dict, List, Optional
-from enum import Enum
-from datetime import datetime
-import httpx
 import logging
+from datetime import datetime
+from enum import Enum
+
+import httpx
 
 logger = logging.getLogger(__name__)
 
@@ -16,11 +16,11 @@ class CAFMSystem(Enum):
 class CAFMConnector:
     """Connector for integrating with CAFM systems (Archibus, Planon, Maximo)"""
 
-    def __init__(self, system: CAFMSystem, config: Dict):
+    def __init__(self, system: CAFMSystem, config: dict):
         self.system = system
         self.config = config
         self.client = None  # Initialized based on system
-        self.session: Optional[httpx.AsyncClient] = None
+        self.session: httpx.AsyncClient | None = None
 
     async def connect(self) -> bool:
         """Establish connection to CAFM system"""
@@ -99,7 +99,7 @@ class CAFMConnector:
         except httpx.HTTPError as e:
             raise ValueError(f"Maximo connection test failed: {e}")
 
-    async def sync_work_orders(self, since: Optional[datetime] = None) -> List[Dict]:
+    async def sync_work_orders(self, since: datetime | None = None) -> list[dict]:
         """
         Sync work orders from CAFM to SENTINEL.
 
@@ -122,7 +122,7 @@ class CAFMConnector:
 
         return []
 
-    async def _fetch_archibus_work_orders(self, since: Optional[datetime] = None) -> List[Dict]:
+    async def _fetch_archibus_work_orders(self, since: datetime | None = None) -> list[dict]:
         """Fetch work orders from Archibus"""
         try:
             params = {}
@@ -138,7 +138,7 @@ class CAFMConnector:
             logger.error(f"Archibus work order fetch failed: {e}")
             return []
 
-    async def _fetch_planon_work_orders(self, since: Optional[datetime] = None) -> List[Dict]:
+    async def _fetch_planon_work_orders(self, since: datetime | None = None) -> list[dict]:
         """Fetch work orders from Planon"""
         try:
             params = {"include": "details"}
@@ -154,7 +154,7 @@ class CAFMConnector:
             logger.error(f"Planon work order fetch failed: {e}")
             return []
 
-    async def _fetch_maximo_work_orders(self, since: Optional[datetime] = None) -> List[Dict]:
+    async def _fetch_maximo_work_orders(self, since: datetime | None = None) -> list[dict]:
         """Fetch work orders from Maximo"""
         try:
             params = {"oslc.select": "*"}
@@ -170,7 +170,7 @@ class CAFMConnector:
             logger.error(f"Maximo work order fetch failed: {e}")
             return []
 
-    async def push_work_order_to_cafm(self, order: Dict) -> Dict:
+    async def push_work_order_to_cafm(self, order: dict) -> dict:
         """
         Push work order created in SENTINEL to CAFM system.
 
@@ -193,7 +193,7 @@ class CAFMConnector:
 
         return {}
 
-    async def _create_archibus_wo(self, order: Dict) -> Dict:
+    async def _create_archibus_wo(self, order: dict) -> dict:
         """Create work order in Archibus"""
         try:
             payload = {
@@ -214,7 +214,7 @@ class CAFMConnector:
             logger.error(f"Archibus work order creation failed: {e}")
             return {}
 
-    async def _create_planon_wo(self, order: Dict) -> Dict:
+    async def _create_planon_wo(self, order: dict) -> dict:
         """Create work order in Planon"""
         try:
             payload = {
@@ -235,7 +235,7 @@ class CAFMConnector:
             logger.error(f"Planon work order creation failed: {e}")
             return {}
 
-    async def _create_maximo_wo(self, order: Dict) -> Dict:
+    async def _create_maximo_wo(self, order: dict) -> dict:
         """Create work order in Maximo"""
         try:
             payload = {
@@ -256,7 +256,7 @@ class CAFMConnector:
             logger.error(f"Maximo work order creation failed: {e}")
             return {}
 
-    async def sync_assets(self, site_id: str) -> List[Dict]:
+    async def sync_assets(self, site_id: str) -> list[dict]:
         """
         Sync asset catalog from CAFM to SENTINEL.
 
@@ -279,7 +279,7 @@ class CAFMConnector:
 
         return []
 
-    async def _fetch_archibus_assets(self, site_id: str) -> List[Dict]:
+    async def _fetch_archibus_assets(self, site_id: str) -> list[dict]:
         """Fetch assets from Archibus"""
         try:
             response = await self.session.get("/api/v1/assets", params={"filter": f"building='{site_id}'"})
@@ -291,7 +291,7 @@ class CAFMConnector:
             logger.error(f"Archibus asset fetch failed: {e}")
             return []
 
-    async def _fetch_planon_assets(self, site_id: str) -> List[Dict]:
+    async def _fetch_planon_assets(self, site_id: str) -> list[dict]:
         """Fetch assets from Planon"""
         try:
             response = await self.session.get("/api/v1/assets", params={"site": site_id})
@@ -303,7 +303,7 @@ class CAFMConnector:
             logger.error(f"Planon asset fetch failed: {e}")
             return []
 
-    async def _fetch_maximo_assets(self, site_id: str) -> List[Dict]:
+    async def _fetch_maximo_assets(self, site_id: str) -> list[dict]:
         """Fetch assets from Maximo"""
         try:
             response = await self.session.get("/api/v1/asset", params={"oslc.where": f"siteid='{site_id}'"})
@@ -315,7 +315,7 @@ class CAFMConnector:
             logger.error(f"Maximo asset fetch failed: {e}")
             return []
 
-    async def update_cafm_status(self, order_id: str, status: str, resolution: str) -> Dict:
+    async def update_cafm_status(self, order_id: str, status: str, resolution: str) -> dict:
         """
         Update work order status in CAFM system.
 
@@ -338,7 +338,7 @@ class CAFMConnector:
 
         return {}
 
-    async def _update_archibus_status(self, order_id: str, status: str, resolution: str) -> Dict:
+    async def _update_archibus_status(self, order_id: str, status: str, resolution: str) -> dict:
         """Update work order status in Archibus"""
         try:
             payload = {"status": status, "resolution": resolution, "completedDate": datetime.now().isoformat()}
@@ -351,7 +351,7 @@ class CAFMConnector:
             logger.error(f"Archibus status update failed: {e}")
             return {}
 
-    async def _update_planon_status(self, order_id: str, status: str, resolution: str) -> Dict:
+    async def _update_planon_status(self, order_id: str, status: str, resolution: str) -> dict:
         """Update work order status in Planon"""
         try:
             payload = {"status": status, "resolution": resolution, "completionDate": datetime.now().isoformat()}
@@ -364,7 +364,7 @@ class CAFMConnector:
             logger.error(f"Planon status update failed: {e}")
             return {}
 
-    async def _update_maximo_status(self, order_id: str, status: str, resolution: str) -> Dict:
+    async def _update_maximo_status(self, order_id: str, status: str, resolution: str) -> dict:
         """Update work order status in Maximo"""
         try:
             payload = {"status": status, "description": resolution, "completiondate": datetime.now().isoformat()}
@@ -379,7 +379,7 @@ class CAFMConnector:
 
     # Transformation helpers
 
-    def _transform_archibus_wo(self, wo: Dict) -> Dict:
+    def _transform_archibus_wo(self, wo: dict) -> dict:
         """Transform Archibus work order to SENTINEL format"""
         return {
             "cafm_id": wo.get("id", ""),
@@ -393,7 +393,7 @@ class CAFMConnector:
             "cafm_system": "archibus",
         }
 
-    def _transform_planon_wo(self, wo: Dict) -> Dict:
+    def _transform_planon_wo(self, wo: dict) -> dict:
         """Transform Planon work order to SENTINEL format"""
         return {
             "cafm_id": wo.get("id", ""),
@@ -407,7 +407,7 @@ class CAFMConnector:
             "cafm_system": "planon",
         }
 
-    def _transform_maximo_wo(self, wo: Dict) -> Dict:
+    def _transform_maximo_wo(self, wo: dict) -> dict:
         """Transform Maximo work order to SENTINEL format"""
         return {
             "cafm_id": wo.get("wonum", ""),
@@ -421,7 +421,7 @@ class CAFMConnector:
             "cafm_system": "maximo",
         }
 
-    def _transform_archibus_asset(self, asset: Dict) -> Dict:
+    def _transform_archibus_asset(self, asset: dict) -> dict:
         """Transform Archibus asset to SENTINEL format"""
         return {
             "cafm_id": asset.get("id", ""),
@@ -435,7 +435,7 @@ class CAFMConnector:
             "cafm_system": "archibus",
         }
 
-    def _transform_planon_asset(self, asset: Dict) -> Dict:
+    def _transform_planon_asset(self, asset: dict) -> dict:
         """Transform Planon asset to SENTINEL format"""
         return {
             "cafm_id": asset.get("id", ""),
@@ -449,7 +449,7 @@ class CAFMConnector:
             "cafm_system": "planon",
         }
 
-    def _transform_maximo_asset(self, asset: Dict) -> Dict:
+    def _transform_maximo_asset(self, asset: dict) -> dict:
         """Transform Maximo asset to SENTINEL format"""
         return {
             "cafm_id": asset.get("assetnum", ""),

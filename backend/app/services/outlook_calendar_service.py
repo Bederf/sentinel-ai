@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import logging
 import os
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import ClassVar
 
 import httpx
@@ -73,9 +73,7 @@ def _get_msal_token() -> dict | None:
         logger.warning("Failed to acquire MSGraph token: %s", result.get("error_description"))
         return None
 
-    expires_at = now.replace(microsecond=0)
-    expires_in = result.get("expires_in", 3600)
-    expires_at = expires_at.replace(second=expires_at.second + expires_in)
+    expires_at = now.replace(microsecond=0) + timedelta(seconds=result.get("expires_in", 3600))
 
     _msal_token_cache = {
         "access_token": result["access_token"],
@@ -196,12 +194,13 @@ class OutlookCalendarService:
 
         user_email = os.getenv("OUTLOOK_USER_EMAIL", "").strip()
 
-        # Filter: events the user is the organizer, start >= now, has external attendee
-        # We fetch a window starting 1 hour ago to catch any near-real-time events
+        # Filter: upcoming/recent events in the monitored mailbox calendar.
+        # This supports the operational model where the Sentinel mailbox is included
+        # on the invite (as attendee or organizer), not only organizer-owned events.
         hour_ago_iso = datetime.now(UTC).replace(microsecond=0).isoformat()
 
         params = {
-            "$filter": (f"organizer/emailAddress/address eq '{user_email}' and start/dateTime ge '{hour_ago_iso}'"),
+            "$filter": f"start/dateTime ge '{hour_ago_iso}'",
             "$select": "id,subject,start,end,location,attendees,organizer",
             "$orderby": "start/dateTime asc",
             "$top": "50",

@@ -104,6 +104,17 @@ class TestBaselineCalculation:
         assert baseline["mean_kw"] > 0
         assert baseline["samples"] == 168
 
+    @pytest.mark.asyncio
+    async def test_building_scoped_history_uses_total_kwh_when_meter_columns_missing(self, engine):
+        """Daily site/building history should still produce a baseline."""
+        engine._get_consumption_history = MagicMock(
+            return_value=[{"total_kwh": v} for v in [300.0, 280.0, 320.0, 250.0, 350.0, 270.0, 310.0, 290.0]]
+        )
+
+        baseline = await engine.get_power_baseline("S002-MTR-B1-HVAC")
+        assert baseline["samples"] == 8
+        assert baseline["mean_kw"] > 0
+
 
 # ------------------------------------------------------------------
 # 2. Anomaly Detection (Variance Analysis)
@@ -208,12 +219,7 @@ class TestCOPDegradation:
     async def test_healthy_cop_no_adjustment(self, engine):
         """COP within acceptable range -> no adjustment needed."""
         # Mock readings that produce COP of ~3.5 (45/12.86 = 3.5)
-        readings = [{"energy_kwh": 12.86} for _ in range(10)]
-        mock_response = MagicMock()
-        mock_response.data = readings
-        engine.client.table.return_value.select.return_value.eq.return_value.gte.return_value.execute.return_value = (
-            mock_response
-        )
+        engine._get_consumption_history = MagicMock(return_value=[{"energy_kwh": 12.86} for _ in range(10)])
 
         result = await engine.calculate_cop_adjustment("S002-MTR-B1-HVAC")
         assert result["status"] == "healthy"
@@ -223,17 +229,22 @@ class TestCOPDegradation:
     async def test_degraded_cop_triggers_adjustment(self, engine):
         """COP below warning threshold -> adjustment recommended."""
         # Mock readings that produce COP ~2.5 (45/18 = 2.5)
-        readings = [{"energy_kwh": 18.0} for _ in range(10)]
-        mock_response = MagicMock()
-        mock_response.data = readings
-        engine.client.table.return_value.select.return_value.eq.return_value.gte.return_value.execute.return_value = (
-            mock_response
-        )
+        engine._get_consumption_history = MagicMock(return_value=[{"energy_kwh": 18.0} for _ in range(10)])
 
         result = await engine.calculate_cop_adjustment("S002-MTR-B1-HVAC")
         assert result["status"] == "degraded"
         assert result["adjustment_needed"] is True
         assert result["estimated_cop"] < COP_WARNING_THRESHOLD
+
+    @pytest.mark.asyncio
+    async def test_cop_adjustment_uses_total_kwh_from_daily_history(self, engine):
+        """COP adjustment should work with daily building-scoped totals."""
+        engine._get_consumption_history = MagicMock(return_value=[{"total_kwh": 18.0} for _ in range(10)])
+
+        result = await engine.calculate_cop_adjustment("S002-MTR-B1-HVAC")
+
+        assert result["status"] == "degraded"
+        assert result["adjustment_needed"] is True
 
 
 # ------------------------------------------------------------------

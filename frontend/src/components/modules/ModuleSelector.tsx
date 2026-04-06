@@ -240,7 +240,6 @@ const MODULE_ICONS: Partial<Record<ModuleType, React.ComponentType<any>>> = {
   maintenance: Package,
   financial: FileText,
   compliance: Leaf,
-  simulation: Package,
   fleet_ml: Brain,
 };
 

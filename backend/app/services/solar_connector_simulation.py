@@ -12,23 +12,22 @@ normal ingestion service pipeline.
 """
 
 import logging
-from datetime import datetime, timezone
-from typing import Dict, List, Optional
+from datetime import UTC, datetime
 
+from app.database.supabase_client import get_supabase_client
 from app.models.solar import (
-    SolarInverter,
-    SolarString,
     BESSContainer,
     BESSRack,
+    ConnectorStatus,
     GridMeter,
     NormalisedReading,
-    ConnectorStatus,
     QualityFlag,
+    SolarInverter,
+    SolarString,
 )
-from app.services.solar_connector_base import SolarConnector
 from app.services.seasonal_modeler import SeasonalModeler
 from app.services.simulation_orchestrator import get_all_active_simulations
-from app.database.supabase_client import get_supabase_client
+from app.services.solar_connector_base import SolarConnector
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +60,7 @@ class SimulatedSolarConnector(SolarConnector):
         self._status = ConnectorStatus(connected=False)
         logger.info(f"Simulated connector disconnected for {self.site_id}")
 
-    async def read_inverter(self, inverter_id: str) -> Optional[SolarInverter]:
+    async def read_inverter(self, inverter_id: str) -> SolarInverter | None:
         """Read a single inverter from simulation data."""
         readings = await self.get_normalised_readings()
 
@@ -86,7 +85,7 @@ class SimulatedSolarConnector(SolarConnector):
 
         return None
 
-    async def read_all_strings(self, inverter_id: str) -> List[SolarString]:
+    async def read_all_strings(self, inverter_id: str) -> list[SolarString]:
         """Read all strings attached to an inverter from simulation."""
         # For simulation, return a fixed set of 4 strings
         strings = []
@@ -103,7 +102,7 @@ class SimulatedSolarConnector(SolarConnector):
             )
         return strings
 
-    async def read_bess(self, container_id: str) -> Optional[BESSContainer]:
+    async def read_bess(self, container_id: str) -> BESSContainer | None:
         """Read BESS container from simulation data."""
         # Refresh cache if needed
         sim_data = await self._get_simulation_data()
@@ -137,7 +136,7 @@ class SimulatedSolarConnector(SolarConnector):
             ],
         )
 
-    async def read_meter(self, meter_id: str) -> Optional[GridMeter]:
+    async def read_meter(self, meter_id: str) -> GridMeter | None:
         """Read grid meter from simulation data."""
         # Refresh cache if needed
         sim_data = await self._get_simulation_data()
@@ -165,7 +164,7 @@ class SimulatedSolarConnector(SolarConnector):
             frequency_hz=50,
         )
 
-    async def get_normalised_readings(self) -> List[NormalisedReading]:
+    async def get_normalised_readings(self) -> list[NormalisedReading]:
         """Poll simulation and return normalised readings for all equipment."""
         readings = []
 
@@ -193,7 +192,7 @@ class SimulatedSolarConnector(SolarConnector):
                     value=solar_gen_kw,
                     unit="kW",
                     quality=QualityFlag.GOOD,
-                    timestamp=datetime.now(timezone.utc).isoformat(),
+                    timestamp=datetime.now(UTC).isoformat(),
                 ),
                 NormalisedReading(
                     source_id="building-load",
@@ -201,7 +200,7 @@ class SimulatedSolarConnector(SolarConnector):
                     value=site_load_kw,
                     unit="kW",
                     quality=QualityFlag.GOOD,
-                    timestamp=datetime.now(timezone.utc).isoformat(),
+                    timestamp=datetime.now(UTC).isoformat(),
                 ),
                 NormalisedReading(
                     source_id="grid-import",
@@ -209,7 +208,7 @@ class SimulatedSolarConnector(SolarConnector):
                     value=grid_import_kw,
                     unit="kW",
                     quality=QualityFlag.GOOD,
-                    timestamp=datetime.now(timezone.utc).isoformat(),
+                    timestamp=datetime.now(UTC).isoformat(),
                 ),
                 NormalisedReading(
                     source_id="grid-export",
@@ -217,7 +216,7 @@ class SimulatedSolarConnector(SolarConnector):
                     value=grid_export_kw,
                     unit="kW",
                     quality=QualityFlag.GOOD,
-                    timestamp=datetime.now(timezone.utc).isoformat(),
+                    timestamp=datetime.now(UTC).isoformat(),
                 ),
             ]
         )
@@ -226,7 +225,7 @@ class SimulatedSolarConnector(SolarConnector):
 
     # --- private helpers ---
 
-    async def _get_simulation_data(self) -> Optional[Dict]:
+    async def _get_simulation_data(self) -> dict | None:
         """Query solar_annual_simulations table for most recent results.
 
         Returns the full results dict with monthly and daily data.
@@ -277,7 +276,7 @@ class SimulatedSolarConnector(SolarConnector):
                 return orchestrator.simulated_time
         return datetime.now()
 
-    def _get_current_hour_data(self, sim_data: Dict) -> Optional[Dict]:
+    def _get_current_hour_data(self, sim_data: dict) -> dict | None:
         """Extract current hour's data from simulation results.
 
         Uses SeasonalModeler (same as simulation engine) to generate realistic

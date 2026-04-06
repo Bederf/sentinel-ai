@@ -7,7 +7,7 @@ view/update config, trigger manual scans, and ingest booking emails.
 from __future__ import annotations
 
 import logging
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -23,18 +23,8 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/block-bookings", tags=["block-bookings"])
 
 
-def _default_booking_window(site_id: str) -> tuple[date, date]:
-    """Use simulated date for booking visibility when a site simulation is running."""
-    try:
-        from app.api.lifecycle_simulation import get_site_simulation_status_sync
-
-        sim_status = get_site_simulation_status_sync(site_id)
-        if sim_status.running and sim_status.simulated_time:
-            simulated_date = datetime.fromisoformat(sim_status.simulated_time).date()
-            return simulated_date, simulated_date + timedelta(days=28)
-    except Exception:
-        pass
-
+def _default_booking_window(_site_id: str) -> tuple[date, date]:
+    """Default booking window based on current date."""
     today = date.today()
     return today, today + timedelta(days=28)
 

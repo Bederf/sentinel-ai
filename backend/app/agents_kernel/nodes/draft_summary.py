@@ -38,6 +38,7 @@ async def draft_summary_node(state: SentinelAgentState) -> dict:
         messages=[{"role": "user", "content": prompt}],
         system="Produce concise operational summaries grounded only in supplied evidence.",
         stream=False,
+        source="advisory_kernel_summary",
     )
 
     output_state["summary"] = str(summary).strip()

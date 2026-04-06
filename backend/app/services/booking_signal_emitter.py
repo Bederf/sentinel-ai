@@ -11,7 +11,6 @@ Uses shared utilities from ``signal_emitter_base``.
 
 import logging
 import uuid
-from typing import Optional
 
 from app.services.signal_emitter_base import (
     build_signal_row,
@@ -65,7 +64,7 @@ def _room_code_to_location_ref(room_code: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-async def emit_ghost_booking_signal(finding: dict) -> Optional[dict]:
+async def emit_ghost_booking_signal(finding: dict) -> dict | None:
     """Emit a signal for a sensor-confirmed ghost booking (no-show).
 
     Args:
@@ -162,7 +161,7 @@ async def emit_ghost_booking_signal(finding: dict) -> Optional[dict]:
 # ---------------------------------------------------------------------------
 
 
-async def emit_block_booking_signal(alert: dict) -> Optional[dict]:
+async def emit_block_booking_signal(alert: dict) -> dict | None:
     """Emit a signal for a block booking overlap / resource hoarding pattern.
 
     Args:
@@ -248,7 +247,7 @@ async def emit_block_booking_signal(alert: dict) -> Optional[dict]:
 # ---------------------------------------------------------------------------
 
 
-async def emit_booking_saturation_signal(data: dict) -> Optional[dict]:
+async def emit_booking_saturation_signal(data: dict) -> dict | None:
     """Emit a signal for booking saturation (high utilisation).
 
     Args:

@@ -23,7 +23,6 @@ import {
   Sliders,
   LayoutGrid,
   Fuel,
-  Network,
 } from "lucide-react";
 import type { ModuleType } from "./moduleRegistry";
 
@@ -37,8 +36,7 @@ export type View =
   | "settings"
   | "financial"
   | "compliance"
-  | "fleet-ml"
-  | "intelligence";
+  | "fleet-ml";
 
 export type NavCategory = "base" | "addon" | "admin";
 
@@ -65,7 +63,6 @@ export const VIEW_TITLES: Record<View, string> = {
   financial: "Financial",
   compliance: "Compliance & ESG",
   "fleet-ml": "Fleet ML",
-  intelligence: "Issue Intelligence",
 };
 
 /**
@@ -77,14 +74,13 @@ export const BASE_NAV_ITEMS: NavItem[] = [
   { id: "integrations", label: "System Health", icon: Activity, description: "Integration monitoring", category: "base" },
   { id: "logs", label: "Logs", icon: FileText, description: "Audit trail and event logs", category: "base" },
   { id: "maintenance", label: "Maintenance", icon: Wrench, description: "Equipment, work orders & tech chat", category: "base", requiredModule: "maintenance" },
-  { id: "intelligence", label: "Intelligence", icon: Network, description: "Issue clusters & correlation graph", category: "base" },
 ];
 
 /**
  * Admin-only sidebar items (2 items).
  */
 export const ADMIN_NAV_ITEMS: NavItem[] = [
-  { id: "simbiot", label: "SIMBIOT", icon: Plug, description: "BMS Connection Wizard", category: "admin", requiredRole: "admin" },
+  { id: "simbiot", label: "SIMBIOT", icon: Plug, description: "Site ingestion, discovery, and intake controls", category: "admin", requiredRole: "admin" },
   { id: "settings", label: "Settings", icon: SettingsIcon, description: "Admin settings", category: "admin", requiredRole: "admin" },
 ];
 
@@ -105,7 +101,7 @@ export const ALL_NAV_ITEMS: NavItem[] = [
   ...ADDON_NAV_ITEMS,
 ];
 
-// ─── Building Detail Tabs (10 tabs, SIMBIOT-data-driven) ────────────────────
+// ─── Building Detail Tabs (10 tabs, connected-site-data-driven) ─────────────
 
 export type BuildingTabId =
   | "overview"
@@ -118,7 +114,6 @@ export type BuildingTabId =
   | "security"
   | "digital-twin"
   | "controls"
-  | "simulation"
   | "space"
   | "fuel";
 
@@ -149,7 +144,6 @@ export const BUILDING_TAB_ITEMS: BuildingTabItem[] = [
   { id: "security", label: "Security", icon: Shield, controlModule: "security_control", requiredModule: "security" },
   { id: "digital-twin", label: "Digital Twin", icon: Activity, controlModule: "digital_twin_control", requiredModule: "digital_twin" },
   { id: "controls", label: "Controls", icon: Sliders },
-  { id: "simulation", label: "Simulation", icon: Activity, requiredModule: "simulation" },
   { id: "space", label: "Space", icon: LayoutGrid, requiredModule: "space_optimization" },
   { id: "fuel", label: "Fuel", icon: Fuel, requiredModule: "fuel_monitoring" },
 ];

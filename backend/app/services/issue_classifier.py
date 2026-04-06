@@ -13,9 +13,9 @@ matching — no LLM, no ML, deterministic.
 
 from __future__ import annotations
 
-import re
 import logging
-from typing import Any, Dict, List, Optional
+import re
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 # in Python — the LLM never decides the category.
 # ===========================================================================
 
-CALL_LOG_TAXONOMY: List[Dict[str, Any]] = [
+CALL_LOG_TAXONOMY: list[dict[str, Any]] = [
     # --- Plumbing ---
     {
         "discipline": "Plumbing",
@@ -419,7 +419,7 @@ CALL_LOG_TAXONOMY: List[Dict[str, Any]] = [
 ]
 
 # Urgency escalators — bump priority based on context keywords
-URGENCY_ESCALATORS: Dict[str, List[str]] = {
+URGENCY_ESCALATORS: dict[str, list[str]] = {
     "critical": [
         "fire",
         "smoke",
@@ -449,10 +449,10 @@ URGENCY_ESCALATORS: Dict[str, List[str]] = {
 }
 
 # Priority ranking for comparisons
-PRIORITY_RANK: Dict[str, int] = {"critical": 4, "high": 3, "medium": 2, "low": 1}
+PRIORITY_RANK: dict[str, int] = {"critical": 4, "high": 3, "medium": 2, "low": 1}
 
 # Discipline → email-category mapping (backward compat with n8n 8-category classifier)
-DISCIPLINE_TO_CATEGORY: Dict[str, str] = {
+DISCIPLINE_TO_CATEGORY: dict[str, str] = {
     "Electrical": "electrical",
     "HVAC": "hvac",
     "Plumbing": "plumbing",
@@ -471,7 +471,7 @@ DISCIPLINE_TO_CATEGORY: Dict[str, str] = {
 # ===========================================================================
 
 
-def classify_issue(text: str) -> Optional[Dict[str, str]]:
+def classify_issue(text: str) -> dict[str, str] | None:
     """Classify user text against the FIXED taxonomy.
 
     Returns the best matching entry or None if no match.
@@ -512,7 +512,7 @@ def classify_issue(text: str) -> Optional[Dict[str, str]]:
     return None  # NO MATCH
 
 
-def classify_email_subject(subject: str, body_snippet: str = "") -> Optional[Dict[str, str]]:
+def classify_email_subject(subject: str, body_snippet: str = "") -> dict[str, str] | None:
     """Classify email using subject line (primary) + first 200 chars of body (secondary).
 
     Runs subject-only first for tighter matching.
@@ -531,7 +531,7 @@ def classify_email_subject(subject: str, body_snippet: str = "") -> Optional[Dic
 # ===========================================================================
 
 
-def extract_desk_from_message(text: str) -> Optional[str]:
+def extract_desk_from_message(text: str) -> str | None:
     """Try to extract a desk number from the message text."""
     patterns = [
         r"desk\s*(\d{1,3})",
@@ -546,7 +546,7 @@ def extract_desk_from_message(text: str) -> Optional[str]:
     return None
 
 
-def extract_floor_from_message(text: str) -> Optional[str]:
+def extract_floor_from_message(text: str) -> str | None:
     """Try to extract a floor reference from the message."""
     patterns = [
         (r"level\s*(\d+)", lambda m: f"L{m.group(1)}"),
@@ -563,7 +563,7 @@ def extract_floor_from_message(text: str) -> Optional[str]:
     return None
 
 
-def extract_area_from_message(text: str) -> Optional[str]:
+def extract_area_from_message(text: str) -> str | None:
     """Try to extract a named area from the message."""
     areas = [
         "kitchen",
@@ -603,7 +603,7 @@ def extract_area_from_message(text: str) -> Optional[str]:
     return None
 
 
-def desk_to_zone(desk_id: str) -> Dict[str, str]:
+def desk_to_zone(desk_id: str) -> dict[str, str]:
     """Map desk number to zone and floor.
 
     Convention: 001-099=L0, 100-199=L1, 200-299=L2

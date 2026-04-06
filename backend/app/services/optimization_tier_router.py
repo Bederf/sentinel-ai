@@ -8,7 +8,7 @@ Phase 82-01: Foundation routing service.
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 class RoutingTier(str, Enum):
@@ -42,7 +42,7 @@ class RoutingSummary:
     pending_approval: int = 0
     auto_executed: int = 0
     control_tier: str = ""
-    thresholds_used: Dict[str, float] = field(default_factory=dict)
+    thresholds_used: dict[str, float] = field(default_factory=dict)
 
 
 class OptimizationTierRouter:
@@ -64,7 +64,7 @@ class OptimizationTierRouter:
         - blocked:       always "blocked" regardless of control tier
     """
 
-    def __init__(self, settings: Optional[Any] = None):
+    def __init__(self, settings: Any | None = None):
         """Initialize with optional settings object.
 
         Args:
@@ -130,10 +130,10 @@ class OptimizationTierRouter:
 
     def route_recommendations(
         self,
-        recommendations: List[Dict[str, Any]],
+        recommendations: list[dict[str, Any]],
         site_id: str,
         control_tier: str,
-    ) -> List[RoutingDecision]:
+    ) -> list[RoutingDecision]:
         """Route a batch of recommendations.
 
         Each recommendation dict must contain at minimum:
@@ -158,7 +158,7 @@ class OptimizationTierRouter:
 
     def get_routing_summary(
         self,
-        decisions: List[RoutingDecision],
+        decisions: list[RoutingDecision],
         control_tier: str,
     ) -> RoutingSummary:
         """Aggregate routing decisions into a summary.
@@ -198,8 +198,8 @@ class OptimizationTierRouter:
 
     @staticmethod
     def resolve_control_tier(
-        site_profile: Optional[Dict[str, Any]],
-        optimization_settings: Optional[Any] = None,
+        site_profile: dict[str, Any] | None,
+        optimization_settings: Any | None = None,
     ) -> str:
         """Resolve the effective control tier for a site.
 
@@ -321,10 +321,10 @@ class OptimizationTierRouter:
 # Module-level singleton
 # ------------------------------------------------------------------
 
-_router_instance: Optional[OptimizationTierRouter] = None
+_router_instance: OptimizationTierRouter | None = None
 
 
-def get_tier_router(settings: Optional[Any] = None) -> OptimizationTierRouter:
+def get_tier_router(settings: Any | None = None) -> OptimizationTierRouter:
     """Get or create the singleton OptimizationTierRouter.
 
     Args:

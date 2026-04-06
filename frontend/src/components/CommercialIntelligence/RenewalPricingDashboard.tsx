@@ -18,8 +18,6 @@ import {
   Button,
   Flex,
   Grid,
-  Select,
-  SelectItem,
 } from '@tremor/react'
 import { ArrowUpIcon, ArrowDownIcon, CheckCircleIcon } from '@heroicons/react/24/solid'
 import { pricingApi } from '@/lib/api'
@@ -108,12 +106,24 @@ export function RenewalPricingDashboard({ selectedContractId }: RenewalPricingDa
         </CardHeader>
         <Flex className="gap-4">
           <div className="flex-1">
-            <Select value={contractId} onValueChange={setContractId} placeholder="Select contract...">
-              <SelectItem value="">-- Select contract --</SelectItem>
+            <select
+              value={contractId}
+              onChange={(event) => setContractId(event.target.value)}
+              className="w-full rounded-md appearance-none cursor-pointer px-3 py-2 text-sm transition-colors focus:outline-none focus:ring-0"
+              style={{
+                background: "var(--color-grafana-bg-secondary)",
+                border: "1px solid var(--color-grafana-border)",
+                color: "var(--color-grafana-text-primary)",
+                boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)",
+                outline: "none",
+              }}
+              aria-label="Select contract"
+            >
+              <option value="">-- Select contract --</option>
               {/* In production, populate from contracts list */}
-              <SelectItem value="demo-contract-1">Demo Contract #1</SelectItem>
-              <SelectItem value="demo-contract-2">Demo Contract #2</SelectItem>
-            </Select>
+              <option value="seed-contract-1">Seed Contract #1</option>
+              <option value="seed-contract-2">Seed Contract #2</option>
+            </select>
           </div>
           <Button onClick={handleLoadRenewal} disabled={!contractId || loading}>
             {loading ? 'Loading...' : 'Analyze Renewal'}

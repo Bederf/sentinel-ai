@@ -5,6 +5,7 @@
  * No component tree, no state management, no framework.
  */
 
+import "../index.css";
 import { startConnection } from "./connection";
 import { renderQuiet, renderCrisis } from "./renderer";
 import type { DecisionMomentPayload } from "./connection";

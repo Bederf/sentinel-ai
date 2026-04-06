@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from app.services.building_state_models import BuildingPosture, GuidanceMode, OperatorGuidance
+from app.services.building_state_models import BuildingPosture, OperatorGuidance
 
 
 def resolve_operator_guidance(posture: BuildingPosture) -> OperatorGuidance:

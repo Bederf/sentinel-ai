@@ -75,7 +75,7 @@ export function SecurityAnomaliesPanel({
 
   return (
     <div
-      className="rounded-md"
+      className="rounded-lg overflow-hidden"
       style={{
         background: "var(--color-sentinel-bg-panel)",
         border: "1px solid var(--color-sentinel-border)",
@@ -140,7 +140,11 @@ export function SecurityAnomaliesPanel({
           </div>
         ) : (
           anomalies.map((anomaly, idx) => (
-            <div key={idx} className="px-4 py-3 hover:bg-opacity-50 transition-colors">
+            <div
+              key={idx}
+              className="px-4 py-3 transition-colors"
+              style={{ background: idx % 2 === 0 ? "transparent" : "var(--color-sentinel-bg-secondary)" }}
+            >
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-start gap-3 flex-1">
                   <div style={{ color: getSeverityColor(anomaly.severity) }}>

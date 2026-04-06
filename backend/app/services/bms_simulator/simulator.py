@@ -9,13 +9,12 @@ import json
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from .models import SimulationConfig, VendorType
+from .generators.alarm_events import AlarmEventGenerator
 from .generators.point_list import PointListExporter
 from .generators.trend_data import TrendDataGenerator
-from .generators.alarm_events import AlarmEventGenerator
-
+from .models import SimulationConfig, VendorType
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +33,7 @@ class BMSSimulator:
     DATA_DIR = Path(__file__).parent.parent.parent / "data"
     OUTPUT_DIR = DATA_DIR / "bms_simulator"
 
-    def __init__(self, config: Optional[SimulationConfig] = None):
+    def __init__(self, config: SimulationConfig | None = None):
         """
         Initialize the BMS simulator.
 
@@ -56,11 +55,11 @@ class BMSSimulator:
 
     def generate(
         self,
-        site_id: Optional[str] = None,
+        site_id: str | None = None,
         include_diffusers: bool = True,
         include_trends: bool = True,
         include_alarms: bool = True,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Generate complete BMS simulation data.
 
@@ -129,7 +128,7 @@ class BMSSimulator:
             result["files"]["alarms"] = alarm_path
 
             # Load alarms for summary
-            with open(alarm_path, "r") as f:
+            with open(alarm_path) as f:
                 alarms = json.load(f)
             result["summary"]["alarms"] = self.alarm_generator.get_alarm_summary(alarms)
             logger.info(f"Alarm events generated: {alarm_path}")
@@ -147,8 +146,8 @@ class BMSSimulator:
 
     def export_points(
         self,
-        site_id: Optional[str] = None,
-        vendor: Optional[VendorType] = None,
+        site_id: str | None = None,
+        vendor: VendorType | None = None,
     ) -> str:
         """
         Export only the point list.
@@ -180,10 +179,10 @@ class BMSSimulator:
 
     def generate_trends(
         self,
-        site_id: Optional[str] = None,
-        equipment_id: Optional[str] = None,
-        days: Optional[int] = None,
-    ) -> List[str]:
+        site_id: str | None = None,
+        equipment_id: str | None = None,
+        days: int | None = None,
+    ) -> list[str]:
         """
         Generate trend data.
 
@@ -222,7 +221,7 @@ class BMSSimulator:
 
     def generate_alarms(
         self,
-        site_id: Optional[str] = None,
+        site_id: str | None = None,
     ) -> str:
         """
         Generate alarm events.
@@ -236,7 +235,7 @@ class BMSSimulator:
         site_id = site_id or self.config.site_id
         return self.alarm_generator.export_alarms(site_id=site_id)
 
-    def get_device_count(self, site_id: Optional[str] = None) -> Dict[str, int]:
+    def get_device_count(self, site_id: str | None = None) -> dict[str, int]:
         """
         Get count of devices by type.
 
@@ -250,7 +249,7 @@ class BMSSimulator:
         summary = self.point_exporter.get_point_summary(site_id)
         return summary.get("devices_by_type", {})
 
-    def get_diffusers(self, site_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_diffusers(self, site_id: str | None = None) -> list[dict[str, Any]]:
         """
         Get generated Rickard diffuser configurations.
 
@@ -263,7 +262,7 @@ class BMSSimulator:
         site_id = site_id or self.config.site_id
         return self.point_exporter.generate_diffusers(site_id)
 
-    def _save_manifest(self, result: Dict[str, Any]) -> str:
+    def _save_manifest(self, result: dict[str, Any]) -> str:
         """
         Save simulation manifest with metadata.
 

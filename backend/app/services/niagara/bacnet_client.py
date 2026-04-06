@@ -11,15 +11,16 @@ import asyncio
 import logging
 import os
 import uuid
+from collections.abc import Callable
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 # Optional BAC0 import - library may not be installed
 try:
-    import BAC0 as _BAC0  # noqa: N811
+    import BAC0 as _BAC0
 except ImportError:
     _BAC0 = None  # type: ignore[assignment]
 
@@ -32,7 +33,7 @@ except ImportError:
 class BACnetException(Exception):
     """Base exception for BACnet operations."""
 
-    def __init__(self, message: str, device_id: Optional[str] = None):
+    def __init__(self, message: str, device_id: str | None = None):
         self.device_id = device_id
         super().__init__(message)
 
@@ -124,7 +125,7 @@ class DiscoveredDevice:
         self.firmware_version = firmware_version
         self.object_name = object_name
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "device_id": self.device_id,
             "ip_address": self.ip_address,
@@ -156,7 +157,7 @@ class DiscoveredPoint:
         self.present_value = present_value
         self.writable = writable
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "object_type": self.object_type,
             "instance": self.instance,
@@ -180,7 +181,7 @@ class COVSubscription:
         self,
         subscription_id: str,
         device_id: int,
-        points: List[Tuple[str, int]],
+        points: list[tuple[str, int]],
         callback: Callable,
         lifetime: int = 60,
     ):
@@ -192,7 +193,7 @@ class COVSubscription:
         self.created_at = datetime.utcnow()
         self.expires_at = self.created_at + timedelta(seconds=lifetime)
         self.active = True
-        self._renewal_task: Optional[asyncio.Task] = None
+        self._renewal_task: asyncio.Task | None = None
 
     @property
     def is_expired(self) -> bool:
@@ -206,7 +207,7 @@ class COVSubscription:
         if self._renewal_task and not self._renewal_task.done():
             self._renewal_task.cancel()
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "subscription_id": self.subscription_id,
             "device_id": self.device_id,
@@ -249,7 +250,7 @@ class NiagaraBACnetClient:
 
     def __init__(
         self,
-        ip: Optional[str] = None,
+        ip: str | None = None,
         port: int = DEFAULT_BACNET_PORT,
     ):
         self._ip = ip
@@ -257,8 +258,8 @@ class NiagaraBACnetClient:
         self._bacnet = None
         self._started = False
         self._bac0_unavailable = False
-        self._subscriptions: Dict[str, COVSubscription] = {}
-        self._point_cache: Dict[int, List[DiscoveredPoint]] = {}
+        self._subscriptions: dict[str, COVSubscription] = {}
+        self._point_cache: dict[int, list[DiscoveredPoint]] = {}
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -281,7 +282,7 @@ class NiagaraBACnetClient:
             raise BACnetException("BAC0 library not installed")
 
         try:
-            kwargs: Dict[str, Any] = {"port": self._port}
+            kwargs: dict[str, Any] = {"port": self._port}
             if self._ip:
                 kwargs["ip"] = self._ip
 
@@ -328,7 +329,7 @@ class NiagaraBACnetClient:
     # Device discovery
     # ------------------------------------------------------------------
 
-    async def discover_devices(self, timeout: float = DISCOVERY_TIMEOUT_SECONDS) -> List[DiscoveredDevice]:
+    async def discover_devices(self, timeout: float = DISCOVERY_TIMEOUT_SECONDS) -> list[DiscoveredDevice]:
         """Discover BACnet devices on the network using WhoIs/IAm.
 
         Args:
@@ -345,14 +346,14 @@ class NiagaraBACnetClient:
                 asyncio.get_event_loop().run_in_executor(None, self._bacnet.whois),
                 timeout=timeout,
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.warning("Device discovery timed out")
             return []
         except Exception as e:
             logger.error(f"Device discovery failed: {e}")
             raise BACnetException(f"Device discovery failed: {e}")
 
-        devices: List[DiscoveredDevice] = []
+        devices: list[DiscoveredDevice] = []
         if raw_devices:
             for raw in raw_devices:
                 try:
@@ -433,8 +434,8 @@ class NiagaraBACnetClient:
     async def read_multiple_points(
         self,
         device_id: int,
-        points: List[Tuple[str, int]],
-    ) -> Dict[str, Any]:
+        points: list[tuple[str, int]],
+    ) -> dict[str, Any]:
         """Read multiple points from a device.
 
         Args:
@@ -444,7 +445,7 @@ class NiagaraBACnetClient:
         Returns:
             Dict mapping "objectType:instance" to value.
         """
-        results: Dict[str, Any] = {}
+        results: dict[str, Any] = {}
         for obj_type, instance in points:
             key = f"{obj_type}:{instance}"
             try:
@@ -462,9 +463,9 @@ class NiagaraBACnetClient:
     async def read_point_list(
         self,
         device_id: int,
-        object_types: Optional[List[str]] = None,
+        object_types: list[str] | None = None,
         use_cache: bool = True,
-    ) -> List[DiscoveredPoint]:
+    ) -> list[DiscoveredPoint]:
         """Discover all objects/points on a BACnet device.
 
         Args:
@@ -495,7 +496,7 @@ class NiagaraBACnetClient:
             logger.error(f"Failed to read object list from device {device_id}: {e}")
             raise BACnetException(f"Failed to read object list: {e}", device_id=str(device_id))
 
-        points: List[DiscoveredPoint] = []
+        points: list[DiscoveredPoint] = []
         if raw_list and isinstance(raw_list, (list, tuple)):
             for obj_ref in raw_list:
                 try:
@@ -511,7 +512,7 @@ class NiagaraBACnetClient:
         logger.info(f"Discovered {len(points)} points on device {device_id}")
         return points
 
-    def _parse_object_reference(self, device_id: int, obj_ref: Any) -> Optional[DiscoveredPoint]:
+    def _parse_object_reference(self, device_id: int, obj_ref: Any) -> DiscoveredPoint | None:
         """Parse a BACnet object reference from the objectList."""
         if isinstance(obj_ref, (tuple, list)) and len(obj_ref) >= 2:
             obj_type = str(obj_ref[0])
@@ -539,7 +540,7 @@ class NiagaraBACnetClient:
             writable=writable,
         )
 
-    def clear_point_cache(self, device_id: Optional[int] = None) -> None:
+    def clear_point_cache(self, device_id: int | None = None) -> None:
         """Clear cached point lists.
 
         Args:
@@ -634,7 +635,7 @@ class NiagaraBACnetClient:
     async def subscribe_to_points(
         self,
         device_id: int,
-        points: List[Tuple[str, int]],
+        points: list[tuple[str, int]],
         callback: Callable,
         lifetime: int = DEFAULT_COV_LIFETIME,
     ) -> COVSubscription:
@@ -733,11 +734,11 @@ class NiagaraBACnetClient:
         logger.info(f"Cancelled COV subscription {subscription_id}")
         return True
 
-    def get_subscription(self, subscription_id: str) -> Optional[COVSubscription]:
+    def get_subscription(self, subscription_id: str) -> COVSubscription | None:
         """Get a COV subscription by ID."""
         return self._subscriptions.get(subscription_id)
 
-    def list_subscriptions(self) -> List[COVSubscription]:
+    def list_subscriptions(self) -> list[COVSubscription]:
         """List all active COV subscriptions."""
         return [s for s in self._subscriptions.values() if s.active]
 
@@ -749,7 +750,7 @@ class NiagaraBACnetClient:
         self,
         operation: Callable,
         *args: Any,
-        device_id: Optional[int] = None,
+        device_id: int | None = None,
         max_retries: int = MAX_RETRIES,
         **kwargs: Any,
     ) -> Any:
@@ -768,14 +769,14 @@ class NiagaraBACnetClient:
         Raises:
             BACnetException: If all retries are exhausted.
         """
-        last_error: Optional[Exception] = None
+        last_error: Exception | None = None
 
         for attempt in range(1, max_retries + 1):
             try:
                 return await operation(*args, **kwargs)
             except BACnetException:
                 raise  # Don't retry explicit BACnet errors
-            except asyncio.TimeoutError as e:
+            except TimeoutError as e:
                 last_error = e
                 logger.warning(
                     f"Timeout on attempt {attempt}/{max_retries}" + (f" for device {device_id}" if device_id else "")
@@ -800,7 +801,7 @@ class NiagaraBACnetClient:
     # Utility / info
     # ------------------------------------------------------------------
 
-    async def read_device_info(self, device_id: int) -> Dict[str, Any]:
+    async def read_device_info(self, device_id: int) -> dict[str, Any]:
         """Read basic device properties (name, vendor, model, firmware).
 
         Args:
@@ -811,7 +812,7 @@ class NiagaraBACnetClient:
         """
         self._ensure_started()
 
-        info: Dict[str, Any] = {"device_id": device_id}
+        info: dict[str, Any] = {"device_id": device_id}
         properties = [
             ("objectName", "object_name"),
             ("vendorName", "vendor_name"),
@@ -830,7 +831,7 @@ class NiagaraBACnetClient:
 
         return info
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """Get current client status information."""
         return {
             "started": self._started,
@@ -845,7 +846,7 @@ class NiagaraBACnetClient:
 # Singleton factory
 # ---------------------------------------------------------------------------
 
-_client_instance: Optional[NiagaraBACnetClient] = None
+_client_instance: NiagaraBACnetClient | None = None
 
 
 def get_bacnet_client() -> NiagaraBACnetClient:

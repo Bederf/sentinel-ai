@@ -15,10 +15,11 @@ Output: Validation records, anomaly alerts, COP adjustment recommendations.
 
 import json
 import logging
-from datetime import datetime, timedelta, date
+from datetime import date, datetime, timedelta
 from pathlib import Path
-from typing import Dict, Optional, Any
 from statistics import mean, stdev
+from typing import Any
+
 from app.database.supabase_client import get_supabase_client
 from app.services.simulation_store import get_simulation_store
 
@@ -54,11 +55,73 @@ class PowerMeterValidationEngine:
         self.sim_store = get_simulation_store(site_id)
         self._baseline_cache = {}
 
+    def _extract_power_series(self, readings: list[dict[str, Any]]) -> list[float]:
+        """Normalize historical records into comparable kW/kWh values."""
+        powers = []
+        for reading in readings:
+            raw_value = reading.get("energy_kwh")
+            if raw_value is None:
+                raw_value = reading.get("total_kwh")
+            if raw_value is None:
+                raw_value = reading.get("hvac_kwh")
+            if raw_value is None:
+                continue
+            try:
+                powers.append(float(raw_value))
+            except (TypeError, ValueError):
+                continue
+        return powers
+
+    def _get_consumption_history(
+        self,
+        *,
+        meter_id: str,
+        lookback_days: int,
+    ) -> list[dict[str, Any]]:
+        """Fetch historical consumption using whichever live schema is available.
+
+        The canonical daily history table is currently site/building scoped, but some
+        older code expected meter-scoped hourly history. Try modern schemas first and
+        only fall back to the legacy meter query if it still exists.
+        """
+        cutoff = datetime.now() - timedelta(days=lookback_days)
+        strategies = [
+            ("site_id", self.site_id, "date", cutoff.date().isoformat()),
+            ("building_id", self.site_id, "date", cutoff.date().isoformat()),
+            ("meter_id", meter_id, "timestamp", cutoff.isoformat()),
+        ]
+        last_error: Exception | None = None
+
+        for filter_field, filter_value, time_field, cutoff_value in strategies:
+            try:
+                response = (
+                    self.client.table("energy_consumption_history")
+                    .select("*")
+                    .eq(filter_field, filter_value)
+                    .gte(time_field, cutoff_value)
+                    .order(time_field, desc=False)
+                    .execute()
+                )
+                return response.data or []
+            except Exception as e:
+                last_error = e
+                logger.debug(
+                    "Energy history query strategy failed for %s via %s/%s: %s",
+                    self.site_id,
+                    filter_field,
+                    time_field,
+                    e,
+                )
+
+        if last_error:
+            raise last_error
+        return []
+
     async def get_power_baseline(
         self,
         meter_id: str,
         lookback_days: int = 7,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """Get baseline power statistics from real meter data.
 
         Args:
@@ -69,25 +132,13 @@ class PowerMeterValidationEngine:
             Baseline stats: mean_kw, stdev_kw, min_kw, max_kw, percentile_95
         """
         try:
-            cutoff = datetime.now() - timedelta(days=lookback_days)
-
-            # Query real power consumption history
-            response = (
-                self.client.table("energy_consumption_history")
-                .select("*")
-                .eq("meter_id", meter_id)
-                .gte("timestamp", cutoff.isoformat())
-                .order("timestamp", desc=False)
-                .execute()
-            )
-
-            readings = response.data or []
+            readings = self._get_consumption_history(meter_id=meter_id, lookback_days=lookback_days)
             if not readings:
                 logger.warning(f"No meter data found for {meter_id}")
                 return self._get_default_baseline()
 
-            # Extract power values (use energy_kwh as proxy for hourly power)
-            powers = [float(r.get("energy_kwh", 0)) for r in readings if r.get("energy_kwh")]
+            # Extract power values from whichever live schema is available.
+            powers = self._extract_power_series(readings)
 
             if len(powers) < MINIMUM_READINGS_FOR_BASELINE:
                 logger.warning(f"Insufficient readings ({len(powers)}) for baseline")
@@ -113,19 +164,19 @@ class PowerMeterValidationEngine:
             logger.error(f"Error calculating baseline: {e}")
             return self._get_default_baseline()
 
-    def _get_default_baseline(self) -> Dict[str, float]:
+    def _get_default_baseline(self) -> dict[str, float]:
         """Get default baseline when real data unavailable.
 
         Falls back to demo_power_baseline.json fixture if available,
         otherwise uses hardcoded defaults.
         """
-        # Try loading from demo fixture (3-tier fallback: Supabase -> Cache -> JSON)
+        # Try loading from seeded fixture (3-tier fallback: Supabase -> Cache -> JSON)
         try:
             fixture_path = _DATA_DIR / "demo_power_baseline.json"
             if fixture_path.exists():
                 with open(fixture_path) as f:
-                    demo = json.load(f)
-                stats = demo.get("baseline_stats", {})
+                    seeded = json.load(f)
+                stats = seeded.get("baseline_stats", {})
                 return {
                     "mean_kw": stats.get("mean_kwh", 315.4),
                     "stdev_kw": stats.get("stdev_kwh", 42.1),
@@ -138,7 +189,7 @@ class PowerMeterValidationEngine:
                     "source": "demo_fixture",
                 }
         except Exception as e:
-            logger.debug(f"Could not load demo baseline: {e}")
+            logger.debug(f"Could not load seeded baseline: {e}")
 
         # Hardcoded fallback
         return {
@@ -156,10 +207,10 @@ class PowerMeterValidationEngine:
         self,
         meter_id: str,
         simulated_power_kw: float,
-        real_power_kw: Optional[float] = None,
+        real_power_kw: float | None = None,
         simulated_hour: int = 0,
-        simulated_date: Optional[datetime] = None,
-    ) -> Dict[str, Any]:
+        simulated_date: datetime | None = None,
+    ) -> dict[str, Any]:
         """Validate simulated power against real meter reading.
 
         Args:
@@ -233,7 +284,7 @@ class PowerMeterValidationEngine:
         variance_pct: float,
         simulated_kw: float,
         real_kw: float,
-        baseline: Dict[str, float],
+        baseline: dict[str, float],
     ) -> str:
         """Generate actionable recommendation based on variance."""
         if variance_pct < VARIANCE_THRESHOLD_PCT:
@@ -257,7 +308,7 @@ class PowerMeterValidationEngine:
     async def _write_validation_record(
         self,
         meter_id: str,
-        validation_result: Dict[str, Any],
+        validation_result: dict[str, Any],
         simulated_date: datetime,
     ) -> None:
         """Write validation record to database for analysis.
@@ -292,7 +343,7 @@ class PowerMeterValidationEngine:
         self,
         meter_id: str,
         lookback_days: int = 30,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Calculate recommended COP adjustment based on real vs simulated power.
 
         Args:
@@ -303,18 +354,7 @@ class PowerMeterValidationEngine:
             COP adjustment recommendation with confidence
         """
         try:
-            # Get real power consumption
-            cutoff = datetime.now() - timedelta(days=lookback_days)
-
-            response = (
-                self.client.table("energy_consumption_history")
-                .select("*")
-                .eq("meter_id", meter_id)
-                .gte("timestamp", cutoff.isoformat())
-                .execute()
-            )
-
-            records = response.data or []
+            records = self._get_consumption_history(meter_id=meter_id, lookback_days=lookback_days)
             if len(records) < MINIMUM_READINGS_FOR_BASELINE:
                 return {
                     "adjustment_needed": False,
@@ -324,7 +364,14 @@ class PowerMeterValidationEngine:
                 }
 
             # Extract power values
-            real_powers = [float(r.get("energy_kwh", 0)) for r in records]
+            real_powers = self._extract_power_series(records)
+            if len(real_powers) < MINIMUM_READINGS_FOR_BASELINE:
+                return {
+                    "adjustment_needed": False,
+                    "reason": "insufficient_data",
+                    "current_cop": EXPECTED_CHILLER_COP,
+                    "recommended_cop": EXPECTED_CHILLER_COP,
+                }
             avg_real_power = mean(real_powers)
 
             # Estimate COP from actual power usage
@@ -376,8 +423,8 @@ class PowerMeterValidationEngine:
     async def validate_daily_power(
         self,
         simulated_date: datetime,
-        hourly_power_data: Dict[int, float],
-    ) -> Dict[str, Any]:
+        hourly_power_data: dict[int, float],
+    ) -> dict[str, Any]:
         """Validate a full day of power data against baseline.
 
         Aggregates hourly power, compares to baseline stats, and returns
@@ -405,7 +452,7 @@ class PowerMeterValidationEngine:
             hours_recorded = len(hourly_power_data)
             avg_kw = total_kwh / max(hours_recorded, 1)
 
-            # Get baseline (tries real data first, falls back to demo/default)
+            # Get baseline (tries real data first, falls back to seeded/default)
             meter_id = "S002-MTR-B1-MAIN"  # Default main meter
             baseline = await self.get_power_baseline(meter_id)
 
@@ -456,8 +503,8 @@ class PowerMeterValidationEngine:
     async def get_daily_validation_summary(
         self,
         meter_id: str,
-        summary_date: Optional[date] = None,
-    ) -> Dict[str, Any]:
+        summary_date: date | None = None,
+    ) -> dict[str, Any]:
         """Get daily summary of power meter validation.
 
         Args:
@@ -543,10 +590,10 @@ async def validate_power_meter(
     site_id: str,
     meter_id: str,
     simulated_power_kw: float,
-    real_power_kw: Optional[float] = None,
+    real_power_kw: float | None = None,
     simulated_hour: int = 0,
-    simulated_date: Optional[datetime] = None,
-) -> Dict[str, Any]:
+    simulated_date: datetime | None = None,
+) -> dict[str, Any]:
     """Public API for power meter validation.
 
     Called hourly when real meter data available.

@@ -7,7 +7,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Leaf } from 'lucide-react';
-import { useSimulation } from '../../contexts/SimulationContext';
 import {
   Card,
   Title,
@@ -20,8 +19,6 @@ import {
   DonutChart,
   Metric,
   BarList,
-  Select,
-  SelectItem,
 } from '@tremor/react';
 import { PageLoading } from '../PageLoading';
 import { sustainabilityApi } from '../../lib/sustainabilityApi';
@@ -56,9 +53,6 @@ export function SustainabilityDashboard({
   siteId: _externalSiteId,
   enabledModules: _enabledModules = ['compliance'],
 }: SustainabilityDashboardProps) {
-  // Get simulation context for live carbon metrics
-  const { running: isSimulationRunning, daysSimulated, simulatedHour, occupancyPercent } = useSimulation();
-
   const [sites, setSites] = useState<Site[]>([]);
   const [selectedSiteId, setSelectedSiteId] = useState<string>('');
   const [summary, setSummary] = useState<SustainabilitySummary | null>(null);
@@ -76,8 +70,11 @@ export function SustainabilityDashboard({
       .then((fetchedSites) => {
         setSites(fetchedSites);
         if (fetchedSites.length > 0) {
-          // Default to first available site, or use provided siteId
-          const defaultSite = fetchedSites[0];
+          // Default to Sandton City Office Tower (site-002), or use provided siteId.
+          const defaultSite =
+            fetchedSites.find((site) => site.id === "site-002")
+            ?? fetchedSites.find((site) => /sandton city office tower/i.test(site.name))
+            ?? fetchedSites[0];
           const initialSite = _externalSiteId || defaultSite.id;
           setSelectedSiteId(initialSite);
         }
@@ -213,31 +210,18 @@ export function SustainabilityDashboard({
               </h2>
               {dataSource && (
                 <Badge
-                  color={dataSource === 'simulation' ? 'blue' : dataSource === 'measured' ? 'green' : 'gray'}
+                  color={dataSource === 'measured' ? 'green' : 'gray'}
                   size="xs"
                 >
-                  {dataSource === 'simulation' ? 'Sim Data' : dataSource === 'measured' ? 'Live Data' : 'Estimated'}
+                  {dataSource === 'measured' ? 'Live Data' : 'Estimated'}
                 </Badge>
-              )}
-              {isSimulationRunning && (
-                <div className="px-2 py-0.5 rounded text-xs font-medium"
-                  style={{
-                    background: 'rgba(16, 185, 129, 0.15)',
-                    color: 'var(--color-sentinel-emerald)',
-                  }}
-                >
-                  📊 Live • Day {daysSimulated}/365
-                </div>
               )}
             </div>
             <p
               className="text-xs"
               style={{ color: 'var(--color-sentinel-text-secondary)' }}
             >
-              {isSimulationRunning
-                ? `Real-time carbon metrics from simulation • Hour ${simulatedHour}:00 • ${occupancyPercent?.toFixed(0)}% occupied`
-                : 'Carbon emissions, efficiency metrics, and Green Star SA tracker'
-              }
+              Carbon emissions, efficiency metrics, and Green Star SA tracker
             </p>
           </div>
         </div>
@@ -245,17 +229,25 @@ export function SustainabilityDashboard({
         {/* Building Selector + Export Buttons */}
         <div className="flex items-center gap-2 flex-wrap">
           {!sitesLoading && sites.length > 0 && (
-            <Select
+            <select
               value={selectedSiteId}
-              onValueChange={setSelectedSiteId}
-              className="w-56"
+              onChange={(event) => setSelectedSiteId(event.target.value)}
+              className="w-56 rounded-md appearance-none cursor-pointer px-3 py-2 text-sm transition-colors focus:outline-none focus:ring-0"
+              style={{
+                background: "var(--color-grafana-bg-secondary)",
+                border: "1px solid var(--color-grafana-border)",
+                color: "var(--color-grafana-text-primary)",
+                boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)",
+                outline: "none",
+              }}
+              aria-label="Select site"
             >
               {sites.map((site) => (
-                <SelectItem key={site.id} value={site.id}>
+                <option key={site.id} value={site.id}>
                   {site.name}
-                </SelectItem>
+                </option>
               ))}
-            </Select>
+            </select>
           )}
           <Button
             size="xs"
@@ -278,15 +270,15 @@ export function SustainabilityDashboard({
       <Grid className={`grid grid-cols-2 ${esgMetrics ? 'lg:grid-cols-5' : 'lg:grid-cols-4'} gap-4`}>
         <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
           <Text style={{ color: "var(--color-sentinel-text-secondary)" }}>
-            {isSimulationRunning ? 'CO2 in Simulation' : 'Total CO2 YTD'}
+            Total CO2 YTD
           </Text>
           <Metric>{summary?.ytd.total_co2_tonnes.toFixed(1) ?? '—'} t</Metric>
           <Flex className="mt-2">
-            <Badge color={isSimulationRunning ? 'blue' : trendColor} size="xs">
-              {isSimulationRunning ? `Day ${daysSimulated}/365` : trendLabel}
+            <Badge color={trendColor} size="xs">
+              {trendLabel}
             </Badge>
             <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-              {isSimulationRunning ? 'From 365-day sim' : `Target: -${summary?.target_reduction_pct ?? 10}% YoY`}
+              {`Target: -${summary?.target_reduction_pct ?? 10}% YoY`}
             </Text>
           </Flex>
         </Card>
@@ -379,8 +371,7 @@ export function SustainabilityDashboard({
         <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
           <Title>Carbon by System</Title>
           <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-            Source: {dataSource === 'simulation' ? 'Live Simulation' :
-                     dataSource === 'measured' ? 'Metered Data' : 'Estimated'}
+            Source: {dataSource === 'measured' ? 'Metered Data' : 'Estimated'}
           </Text>
           <DonutChart
             className="mt-4 h-48"

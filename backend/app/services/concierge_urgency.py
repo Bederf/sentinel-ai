@@ -8,8 +8,7 @@ to 0.0–1.0 across all rooms for relative comparison.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-
+from datetime import UTC, datetime
 
 SEVERITY_WEIGHTS: dict[str, int] = {
     "low": 1,
@@ -37,7 +36,7 @@ def compute_urgency_score(
     severity_weight = SEVERITY_WEIGHTS.get(highest_severity, 1)
 
     if oldest_unresolved_at:
-        days_unresolved = (datetime.now(timezone.utc) - oldest_unresolved_at).days
+        days_unresolved = (datetime.now(UTC) - oldest_unresolved_at).days
     else:
         days_unresolved = 0
 

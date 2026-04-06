@@ -10,11 +10,11 @@ Phase: Automatic Prediction Generation
 import logging
 import uuid
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Any
+from typing import Any
 
-from app.database.supabase_client import get_supabase_client
 from app.database.repositories.prediction_repository import PredictionRepository
-from app.services.health_threshold_service import get_health_thresholds, get_health_status
+from app.database.supabase_client import get_supabase_client
+from app.services.health_threshold_service import get_health_status, get_health_thresholds
 from app.services.prediction_taxonomy import (
     FORMULA_VERSION_STATIC,
     confidence_from_probability,
@@ -36,7 +36,7 @@ class PredictionGeneratorService:
         self.supabase = get_supabase_client()
         self.prediction_repo = PredictionRepository()
 
-    async def generate_predictions_for_all_sites(self) -> Dict[str, Any]:
+    async def generate_predictions_for_all_sites(self) -> dict[str, Any]:
         """
         Generate predictions for all equipment with health below threshold.
 
@@ -94,7 +94,7 @@ class PredictionGeneratorService:
                     )
 
                 except Exception as e:
-                    error_msg = f"Error generating prediction for {equipment.get('id')}: {str(e)}"
+                    error_msg = f"Error generating prediction for {equipment.get('id')}: {e!s}"
                     logger.error(error_msg)
                     results["errors"].append(error_msg)
 
@@ -109,13 +109,13 @@ class PredictionGeneratorService:
             )
 
         except Exception as e:
-            error_msg = f"Prediction generation failed: {str(e)}"
+            error_msg = f"Prediction generation failed: {e!s}"
             logger.error(error_msg)
             results["errors"].append(error_msg)
 
         return results
 
-    def _get_at_risk_equipment(self, threshold: int) -> List[Dict[str, Any]]:
+    def _get_at_risk_equipment(self, threshold: int) -> list[dict[str, Any]]:
         """
         Query equipment with health score below threshold.
 
@@ -139,7 +139,7 @@ class PredictionGeneratorService:
             logger.error(f"Failed to query at-risk equipment: {e}")
             return []
 
-    def _generate_prediction(self, equipment: Dict[str, Any]) -> Dict[str, Any]:
+    def _generate_prediction(self, equipment: dict[str, Any]) -> dict[str, Any]:
         """
         Generate a prediction record for equipment.
 
@@ -240,7 +240,7 @@ class PredictionGeneratorService:
         else:
             return "component_degradation"
 
-    def _build_evidence(self, equipment: Dict[str, Any]) -> Dict[str, Any]:
+    def _build_evidence(self, equipment: dict[str, Any]) -> dict[str, Any]:
         """Build evidence data for prediction."""
         health_score = equipment.get("health_score", 50)
 
@@ -271,7 +271,7 @@ class PredictionGeneratorService:
 
         return evidence
 
-    def _calculate_financial_impact(self, equipment_type: str, severity: str) -> Dict[str, int]:
+    def _calculate_financial_impact(self, equipment_type: str, severity: str) -> dict[str, int]:
         """Calculate estimated financial impact."""
         # Base costs by equipment type (ZAR)
         base_costs = {
@@ -316,7 +316,7 @@ class PredictionGeneratorService:
             "potential_loss": potential_loss,
         }
 
-    def _get_contributing_factors(self, equipment: Dict[str, Any]) -> List[Dict[str, Any]]:
+    def _get_contributing_factors(self, equipment: dict[str, Any]) -> list[dict[str, Any]]:
         """Get contributing factors for the prediction."""
         health_score = equipment.get("health_score", 50)
         factors = []
@@ -441,7 +441,7 @@ class PredictionGeneratorService:
 
 
 # Singleton instance
-_generator_instance: Optional[PredictionGeneratorService] = None
+_generator_instance: PredictionGeneratorService | None = None
 
 
 def get_prediction_generator() -> PredictionGeneratorService:

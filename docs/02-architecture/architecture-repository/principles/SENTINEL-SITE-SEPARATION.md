@@ -1,3 +1,18 @@
+---
+title: "SENTINEL and Site Separation Principle"
+type: "architecture"
+status: "draft"
+version: "1.0.0"
+created: "2026-03-31"
+updated: "2026-03-31"
+tags: ["sentinel", "documentation"]
+related: []
+domain: "bms"
+audience: "all"
+complexity: "intermediate"
+estimated_read_time: 10
+---
+
 # SENTINEL and Site Separation Principle
 
 ## Core Design Principle
@@ -109,6 +124,137 @@ Modules expand what SENTINEL monitors and controls, but don't change the lifecyc
 - **Kill switches**: Site-level and equipment-level emergency stops
 - **Rollback paths**: Mandatory for all control actions
 - **Audit trails**: Complete history of all SENTINEL actions
+
+## Visual architecture and flows
+
+### System boundary diagram
+
+```mermaid
+graph TD
+    subgraph Building1[Building Site 1]
+        B1_BMS[BMS System]
+    end
+
+    subgraph Building2[Building Site 2]
+        B2_BMS[BMS System]
+    end
+
+    subgraph SIMBIOT[SIMBIOT Integration Layer]
+        SIM_Connect[Connectivity]
+        SIM_Ingestion[Ingestion]
+        SIM_Commands[Command Transport]
+    end
+
+    subgraph SENTINEL[SENTINEL AI Platform]
+        SEN_Storage[Data Storage]
+        SEN_Analytics[Analytics]
+        SEN_Control[Optional Control]
+    end
+
+    subgraph Simulation[Lifecycle Simulation]
+        SIM_BMS[Simulated BMS]
+    end
+
+    B1_BMS -->|Real telemetry| SIM_Connect
+    B2_BMS -->|Real telemetry| SIM_Connect
+    SIM_BMS -->|Simulated telemetry| SIM_Connect
+
+    SIM_Ingestion -->|Normalized data| SEN_Storage
+    SEN_Control -->|Control commands| SIM_Commands
+    SIM_Commands -->|BMS writes| B1_BMS
+    SIM_Commands -->|BMS writes| B2_BMS
+```
+
+### Boundary rule diagrams
+
+```mermaid
+graph LR
+    Building1 --> SENTINEL1[SENTINEL Instance 1]
+    Building2 --> SENTINEL2[SENTINEL Instance 2]
+    Building3 --> SENTINEL3[SENTINEL Instance 3]
+```
+
+```mermaid
+graph TD
+    Building --> BMS
+    BMS --> SIMBIOT
+    SIMBIOT --> SENTINEL
+    Building -.->|FORBIDDEN| SENTINEL
+```
+
+```mermaid
+graph TD
+    subgraph Simulation[Lifecycle Simulation]
+        SIM_BMS[Simulated BMS Interface]
+    end
+    SIM_BMS --> SIMBIOT
+    RealBMS[Real Building BMS] --> SIMBIOT
+    SIMBIOT --> SENTINEL
+```
+
+```mermaid
+graph TD
+    SENTINEL1[Site 1 SENTINEL] --> Console
+    SENTINEL2[Site 2 SENTINEL] --> Console
+    SENTINEL3[Site 3 SENTINEL] --> Console
+    Console -.->|READ-ONLY| SENTINEL1
+    Console -.->|READ-ONLY| SENTINEL2
+    Console -.->|READ-ONLY| SENTINEL3
+```
+
+### Operational sequences
+
+```mermaid
+sequenceDiagram
+    participant Operator
+    participant SIMBIOT
+    participant BuildingBMS
+    participant SENTINEL
+
+    Operator->>SIMBIOT: Start commissioning session
+    SIMBIOT->>BuildingBMS: Discover equipment
+    BuildingBMS-->>SIMBIOT: Equipment list
+    SIMBIOT->>Operator: Show mappings
+    Operator->>SIMBIOT: Approve mappings
+    SIMBIOT->>SENTINEL: Store approved mappings
+    Note over SENTINEL: site_processing = off (no runtime)
+```
+
+```mermaid
+sequenceDiagram
+    participant BuildingBMS
+    participant SIMBIOT
+    participant SENTINEL
+    participant Operator
+
+    loop Every ingest cycle
+        BuildingBMS->>SIMBIOT: Telemetry data
+        SIMBIOT->>SENTINEL: Normalized data
+        SENTINEL->>SENTINEL: Store and analyze
+        SENTINEL->>Operator: Show recommendations
+    end
+    Note over SENTINEL: ingestion_mode = live_control
+    Note over SENTINEL: control_tier = monitor
+```
+
+```mermaid
+sequenceDiagram
+    participant BuildingBMS
+    participant SIMBIOT
+    participant SENTINEL
+    participant Operator
+
+    BuildingBMS->>SIMBIOT: Telemetry data
+    SIMBIOT->>SENTINEL: Normalized data
+    SENTINEL->>SENTINEL: Detect anomaly
+    SENTINEL->>Operator: Recommend control action
+    Operator->>SENTINEL: Approve action
+    SENTINEL->>SIMBIOT: Send control command
+    SIMBIOT->>BuildingBMS: Execute command
+    BuildingBMS-->>SIMBIOT: Confirmation
+    SIMBIOT-->>SENTINEL: Verification data
+    Note over SENTINEL: control_tier = human_in_loop
+```
 
 ## Implementation Checklist
 

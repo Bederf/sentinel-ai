@@ -61,7 +61,7 @@ def build_policy_decision(
     Args:
         tool_name: Name of the tool.
         user_id: Authenticated user ID.
-        auth_method: Auth method used (jwt, mcp_token, demo_mode).
+        auth_method: Auth method used (jwt, mcp_token, api_key).
         site_id: Site/building code if determinable.
         result: "allow" or "deny".
         reason_code: Machine-readable reason (e.g. UNAUTHORIZED, FORBIDDEN,

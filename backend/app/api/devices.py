@@ -9,6 +9,7 @@ import json
 import logging
 import re
 import os
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import List, Optional, Union
 
@@ -228,7 +229,7 @@ async def startup_event():
     """Initialize device manager on startup.
 
     Called from main.py startup event.
-    Loads reference devices (if site002 enabled) + building equipment.
+    Loads local reference devices when enabled, plus discovered building equipment.
     """
     from app.config.settings import settings as _settings
 
@@ -236,13 +237,19 @@ async def startup_event():
         testing_mode = os.getenv("TESTING", "").lower() == "true"
         print("[DEVICES] Starting device manager initialization...")
 
-        # Load Site-002 reference devices (only when data source is enabled)
+        if _settings.sentinel_island_mode:
+            print("[DEVICES] SENTINEL_ISLAND_MODE=true — skipping local reference/building device load")
+            await device_manager.initialize([])
+            logger.info("Device manager initialized empty (SENTINEL_ISLAND_MODE=true)")
+            return
+
+        # Load local Site-002 reference devices when the local source is enabled
         devices_data = []
         ref_count = 0
         if _settings.site002_source_enabled:
             devices_data = await load_reference_devices()
             ref_count = len(devices_data)
-            print(f"[DEVICES] Loaded {ref_count} reference devices (Site-002)")
+            print(f"[DEVICES] Loaded {ref_count} local reference devices (Site-002)")
         else:
             print("[DEVICES] Site-002 data source disabled — skipping reference devices")
 
@@ -288,7 +295,6 @@ async def startup_event():
 
 if os.getenv("TESTING", "").lower() != "true":
 
-    @router.on_event("shutdown")
     async def shutdown_event():
         """Shutdown device manager on shutdown."""
         try:
@@ -301,6 +307,17 @@ else:
     async def shutdown_event():
         """Shutdown device manager on shutdown (testing no-op)."""
         return None
+
+
+@asynccontextmanager
+async def devices_lifespan(_app):
+    try:
+        yield
+    finally:
+        await shutdown_event()
+
+
+router.lifespan_context = devices_lifespan
 
 
 @router.get("/devices", response_model=List[dict])
@@ -426,7 +443,7 @@ async def control_device(
     - priority: 1-16 (default 8)
     """
     try:
-        # Extract user from headers (demo: hardcoded, production: from auth)
+        # Extract user from headers (local fallback vs production auth)
         user = request.headers.get("X-User-Id", "system")
 
         success = await device_manager.write_device_value(device_id, body.point, body.value, body.priority, user)

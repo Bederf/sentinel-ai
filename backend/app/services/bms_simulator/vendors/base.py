@@ -5,7 +5,7 @@ Abstract base class for BMS vendor naming adapters.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict
+from typing import Any
 
 
 class VendorAdapter(ABC):
@@ -62,11 +62,11 @@ class VendorAdapter(ABC):
     @abstractmethod
     def format_point_for_export(
         self,
-        device: Dict[str, Any],
+        device: dict[str, Any],
         point_name: str,
-        point_def: Dict[str, Any],
+        point_def: dict[str, Any],
         instance_base: int,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Format a point for CSV export.
 
@@ -86,7 +86,7 @@ class VendorAdapter(ABC):
         components = snake_str.split("_")
         return "".join(x.title() for x in components)
 
-    def parse_equipment_id(self, equipment_id: str) -> Dict[str, str]:
+    def parse_equipment_id(self, equipment_id: str) -> dict[str, str]:
         """
         Parse equipment ID into components.
 

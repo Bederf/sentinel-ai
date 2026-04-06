@@ -20,9 +20,9 @@ import asyncio
 import logging
 from datetime import datetime
 
-from app.services.event_bus import Importance, SentinelEvent, get_event_bus
-from app.services.decision_moment_aggregator import DecisionMomentAggregator
 from app.api.decisions import cache_decision_payload, clear_decision_payload
+from app.services.decision_moment_aggregator import DecisionMomentAggregator
+from app.services.event_bus import Importance, SentinelEvent, get_event_bus
 
 logger = logging.getLogger(__name__)
 _aggregator = DecisionMomentAggregator()

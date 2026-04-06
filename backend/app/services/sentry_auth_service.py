@@ -7,9 +7,9 @@ Runs as a service in the background, automatically refreshing tokens before expi
 
 import asyncio
 import logging
-import httpx
 from datetime import datetime, timedelta
-from typing import Optional
+
+import httpx
 
 logger = logging.getLogger(__name__)
 
@@ -27,8 +27,8 @@ class SentryAuthService:
     def __init__(
         self,
         api_url: str = "http://localhost:9095",
-        sentry_username: Optional[str] = None,
-        sentry_password: Optional[str] = None,
+        sentry_username: str | None = None,
+        sentry_password: str | None = None,
     ):
         """
         Initialize Sentry auth service.
@@ -42,10 +42,10 @@ class SentryAuthService:
         self.sentry_username = sentry_username or self._get_from_env("SENTRY_BOT_USERNAME")
         self.sentry_password = sentry_password or self._get_from_env("SENTRY_BOT_PASSWORD")
         self.refresh_interval = 60 * 60  # Refresh every hour
-        self._refresh_task: Optional[asyncio.Task] = None
+        self._refresh_task: asyncio.Task | None = None
 
     @staticmethod
-    def _get_from_env(key: str) -> Optional[str]:
+    def _get_from_env(key: str) -> str | None:
         """Get value from environment."""
         import os
 
@@ -101,7 +101,7 @@ class SentryAuthService:
             logger.error(f"Sentry bot login unexpected error: {e}")
             return False
 
-    def get_token(self) -> Optional[str]:
+    def get_token(self) -> str | None:
         """
         Get current JWT token.
 
@@ -120,7 +120,7 @@ class SentryAuthService:
 
         return token
 
-    async def get_token_or_refresh(self) -> Optional[str]:
+    async def get_token_or_refresh(self) -> str | None:
         """
         Get current token, refreshing if needed.
 
@@ -174,13 +174,13 @@ class SentryAuthService:
 
 
 # Global service instance
-_sentry_auth_service: Optional[SentryAuthService] = None
+_sentry_auth_service: SentryAuthService | None = None
 
 
 def initialize_sentry_auth(
     api_url: str = "http://localhost:9095",
-    sentry_username: Optional[str] = None,
-    sentry_password: Optional[str] = None,
+    sentry_username: str | None = None,
+    sentry_password: str | None = None,
 ) -> SentryAuthService:
     """
     Initialize global Sentry auth service.
@@ -199,12 +199,12 @@ def initialize_sentry_auth(
     return _sentry_auth_service
 
 
-def get_sentry_auth_service() -> Optional[SentryAuthService]:
+def get_sentry_auth_service() -> SentryAuthService | None:
     """Get global Sentry auth service instance."""
     return _sentry_auth_service
 
 
-async def get_sentry_jwt_token() -> Optional[str]:
+async def get_sentry_jwt_token() -> str | None:
     """
     Get valid JWT token for Sentry bot API calls.
 

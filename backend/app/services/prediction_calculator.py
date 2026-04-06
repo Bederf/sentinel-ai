@@ -1,10 +1,12 @@
 """Prediction Calculator Service - Calculates failure predictions from historical data."""
 
-from datetime import datetime, timedelta
-from typing import Dict, List, Any, Optional
+import json
 from collections import defaultdict
+from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Any
 
-from app.services.csv_loader import WorkOrderData, AssetData, AlarmData
+from app.services.csv_loader import AlarmData, AssetData, WorkOrderData
 from app.services.health_threshold_service import get_health_thresholds
 from app.services.prediction_taxonomy import (
     FORMULA_VERSION_STATIC,
@@ -12,8 +14,6 @@ from app.services.prediction_taxonomy import (
     severity_from_probability,
     urgency_from_severity,
 )
-from pathlib import Path
-import json
 
 # Load data directory
 DATA_DIR = Path(__file__).parent.parent / "data"
@@ -68,7 +68,7 @@ class PredictionCalculator:
     }
 
     @staticmethod
-    def calculate_predictions(min_probability: int = 60) -> List[Dict[str, Any]]:
+    def calculate_predictions(min_probability: int = 60) -> list[dict[str, Any]]:
         """
         Calculate failure predictions from equipment health scores and historical data.
 
@@ -98,8 +98,8 @@ class PredictionCalculator:
         _asset_lookup = {a["asset_id"]: a for a in assets}
 
         # Group work orders by asset_id (from work orders) and equipment_id
-        wo_by_asset: Dict[str, List[Dict]] = defaultdict(list)
-        wo_by_equipment: Dict[str, List[Dict]] = defaultdict(list)
+        wo_by_asset: dict[str, list[dict]] = defaultdict(list)
+        wo_by_equipment: dict[str, list[dict]] = defaultdict(list)
         for wo in work_orders:
             asset_id = wo.get("asset_id", "")
             if asset_id:
@@ -115,8 +115,8 @@ class PredictionCalculator:
                         wo_by_equipment[eq["id"]].append(wo)
 
         # Group alarms by asset_id and equipment_id
-        alarms_by_asset: Dict[str, List[Dict]] = defaultdict(list)
-        alarms_by_equipment: Dict[str, List[Dict]] = defaultdict(list)
+        alarms_by_asset: dict[str, list[dict]] = defaultdict(list)
+        alarms_by_equipment: dict[str, list[dict]] = defaultdict(list)
         for alarm in alarms:
             asset_id = alarm.get("asset_id", "")
             if asset_id:
@@ -183,13 +183,13 @@ class PredictionCalculator:
 
     @staticmethod
     def _calculate_prediction_from_health(
-        equipment: Dict[str, Any],
-        asset: Optional[Dict[str, Any]],
-        work_orders: List[Dict[str, Any]],
-        alarms: List[Dict[str, Any]],
-        site: Dict[str, Any],
+        equipment: dict[str, Any],
+        asset: dict[str, Any] | None,
+        work_orders: list[dict[str, Any]],
+        alarms: list[dict[str, Any]],
+        site: dict[str, Any],
         site_name: str,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """
         Calculate prediction from equipment health score.
 
@@ -238,7 +238,7 @@ class PredictionCalculator:
         repeat_wo_count = sum(1 for wo in recent_wo if wo.get("repeat_call"))
 
         # Group by fault code to find patterns
-        fault_code_counts: Dict[str, int] = defaultdict(int)
+        fault_code_counts: dict[str, int] = defaultdict(int)
         for wo in recent_wo:
             fault_code = wo.get("fault_code", "")
             if fault_code:
@@ -259,7 +259,7 @@ class PredictionCalculator:
 
         # Calculate alarm frequency
         recent_alarms = [a for a in alarms if a.get("triggered_at") and a.get("triggered_at") >= six_months_ago]
-        alarm_frequency: Dict[str, int] = defaultdict(int)
+        alarm_frequency: dict[str, int] = defaultdict(int)
         for alarm in recent_alarms:
             code = alarm.get("alarm_code", "")
             if code:
@@ -389,7 +389,7 @@ class PredictionCalculator:
                     "factor": "Asset age",
                     "weight": 0.15,
                     "description": (
-                        f"{age_years} years old, {int((age_factor * 100))}% "
+                        f"{age_years} years old, {int(age_factor * 100)}% "
                         f"through expected life ({expected_life} years)"
                     ),
                 }
@@ -470,7 +470,7 @@ class PredictionCalculator:
         }
 
     @staticmethod
-    def _get_parts_for_equipment_type(eq_type: str, prediction_type: str) -> List[Dict[str, Any]]:
+    def _get_parts_for_equipment_type(eq_type: str, prediction_type: str) -> list[dict[str, Any]]:
         """
         Get typical parts required for equipment type and prediction type.
 
@@ -635,7 +635,7 @@ class PredictionCalculator:
     @staticmethod
     def _generate_cost_impact(
         repair_cost: float, potential_loss: float, eq_type: str, downtime_hours: int
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Generate detailed cost impact breakdown for preventive vs reactive maintenance.
 
@@ -675,7 +675,7 @@ class PredictionCalculator:
         }
 
     @staticmethod
-    def _generate_synthetic_notes(health_score: int, age_years: int, expected_life: int, eq_type: str) -> List[str]:
+    def _generate_synthetic_notes(health_score: int, age_years: int, expected_life: int, eq_type: str) -> list[str]:
         """
         Generate synthetic technician observations based on equipment condition.
 

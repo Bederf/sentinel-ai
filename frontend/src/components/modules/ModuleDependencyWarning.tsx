@@ -46,7 +46,6 @@ const MODULE_NAMES: Record<string, string> = {
   maintenance: 'Maintenance & Work Orders',
   financial: 'Financial & Contracts',
   compliance: 'Compliance & ESG',
-  simulation: 'Simulation',
   fleet_ml: 'Fleet ML Analytics',
 };
 

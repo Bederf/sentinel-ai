@@ -355,3 +355,9 @@ See also: [AI Recommendation Agent Spec](../08-ai-ml/ai-recommendation-agent-spe
 - **Audience**: Developers, architects
 - **Covers**: Generic maintenance/work-order adapter layer — one `maintenance_events` table, one adapter per site (MRI Evolution, ServiceNow, CSV, etc.), source-agnostic SLA breach detection and P1-P4 priority normalisation
 - **Related**: [ServiceNow Integration](servicenow-integration.md), [Event Bus Architecture](../02-architecture/event-bus-architecture.md)
+
+### [Document Source Adapter Architecture](document-source-adapter-architecture.md)
+- **Status**: Draft (Phase 179)
+- **Audience**: Developers, architects
+- **Covers**: Document intake adapter layer — `DocumentSourceAdapter` ABC, `DocumentRecord` Pydantic model, `DocumentSource`/`SourceSystem` enums, `ManualUploadAdapter`, `ConceptMRIAdapter`, source vs source_system separation, graceful migration degradation via `_columns_exist` guard
+- **Related**: [Maintenance Intake Architecture](maintenance-intake-architecture.md), [Google Drive Intake Pipeline](drive-intake-pipeline.md), [Telegram Document Intake](sentry-telegram-document-intake.md)

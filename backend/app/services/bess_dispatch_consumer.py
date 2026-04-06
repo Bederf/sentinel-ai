@@ -25,8 +25,8 @@ import json
 import logging
 import os
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +74,7 @@ def _fetch_pending(site_id: str, conn, limit: int = BATCH_SIZE) -> list[dict[str
 def _mark_recommendation(
     rec_id: str,
     status: str,
-    execution_result: Optional[dict],
+    execution_result: dict | None,
     conn,
 ) -> None:
     normalized_status = status if status in VALID_RECOMMENDATION_STATUSES else "failed"
@@ -141,22 +141,26 @@ def _write_parasite_decision(
             decision_type,
             tier,
             rec.get("confidence_score"),
-            json.dumps({
-                "execution_mode": execution_mode,
-                "dry_run": DRY_RUN,
-                "source": "bess_dispatch_consumer",
-                "phase": "0A",
-            }),
-            json.dumps({
-                "action": action_value.get("action"),
-                "power_kw": action_value.get("power_kw"),
-                "duration_minutes": action_value.get("duration_minutes"),
-                "reason": rec.get("reason"),
-                "dispatch_result": dispatch_result,
-            }),
+            json.dumps(
+                {
+                    "execution_mode": execution_mode,
+                    "dry_run": DRY_RUN,
+                    "source": "bess_dispatch_consumer",
+                    "phase": "0A",
+                }
+            ),
+            json.dumps(
+                {
+                    "action": action_value.get("action"),
+                    "power_kw": action_value.get("power_kw"),
+                    "duration_minutes": action_value.get("duration_minutes"),
+                    "reason": rec.get("reason"),
+                    "dispatch_result": dispatch_result,
+                }
+            ),
             "dispatch_command",
             str(action_value.get("action", "")),
-            datetime.now(timezone.utc) if decision_type == "tier3_auto_execute" else None,
+            datetime.now(UTC) if decision_type == "tier3_auto_execute" else None,
         ),
     )
     cur.close()
@@ -211,8 +215,12 @@ def _process_recommendation(
         reason = f"confidence {confidence:.2f} < threshold {CONFIDENCE_THRESHOLD}"
         logger.debug("DEFER bess rec %s: %s", rec_id, reason)
         _write_parasite_decision(
-            rec, "tier1_advisory", "tier1", "deferred",
-            {"reason": reason}, conn,
+            rec,
+            "tier1_advisory",
+            "tier1",
+            "deferred",
+            {"reason": reason},
+            conn,
         )
         _mark_recommendation(rec_id, "failed", {"reason": reason, "failure_type": "confidence_below_threshold"}, conn)
         return "failed"
@@ -228,7 +236,12 @@ def _process_recommendation(
     if DRY_RUN:
         logger.info(
             "[DRY RUN] BESS %s → %s %.0f kW for %d min | conf=%.2f | rec=%s",
-            site_id, bess_action, requested_kw, duration_min, confidence, rec_id,
+            site_id,
+            bess_action,
+            requested_kw,
+            duration_min,
+            confidence,
+            rec_id,
         )
         dispatch_result = {
             "dry_run": True,
@@ -237,8 +250,12 @@ def _process_recommendation(
             "duration_minutes": duration_min,
         }
         _write_parasite_decision(
-            rec, "tier3_auto_execute", "tier3", "simulated",
-            dispatch_result, conn,
+            rec,
+            "tier3_auto_execute",
+            "tier3",
+            "simulated",
+            dispatch_result,
+            conn,
         )
         _mark_recommendation(rec_id, "executed", dispatch_result, conn)
         return "simulated"
@@ -262,7 +279,10 @@ def _process_recommendation(
             reason = cmd.error_message or "constraint blocked dispatch (actual_power_kw=0)"
             logger.warning("DEFERRED bess rec %s after constraint: %s", rec_id, reason)
             _write_parasite_decision(
-                rec, "tier2_supervised", "tier2", "blocked",
+                rec,
+                "tier2_supervised",
+                "tier2",
+                "blocked",
                 {"reason": reason, "constraints": [c.to_dict() for c in cmd.constraints_applied]},
                 conn,
             )
@@ -277,11 +297,20 @@ def _process_recommendation(
         dispatch_result = cmd.to_dict()
         logger.info(
             "DISPATCHED bess %s → %s %.0f kW (requested %.0f) for %d min | conf=%.2f",
-            site_id, bess_action, cmd.actual_power_kw, requested_kw, duration_min, confidence,
+            site_id,
+            bess_action,
+            cmd.actual_power_kw,
+            requested_kw,
+            duration_min,
+            confidence,
         )
         _write_parasite_decision(
-            rec, "tier3_auto_execute", "tier3", "live",
-            dispatch_result, conn,
+            rec,
+            "tier3_auto_execute",
+            "tier3",
+            "live",
+            dispatch_result,
+            conn,
         )
         _mark_recommendation(rec_id, "executed", dispatch_result, conn)
         return "executed"
@@ -299,9 +328,7 @@ def run_bess_dispatch_consumer(site_id: str) -> dict[str, Any]:
     """Single execution cycle for one site. Called by APScheduler (sync context)."""
     import psycopg2
 
-    database_url = os.getenv(
-        "DATABASE_URL", "postgresql://postgres:postgres@127.0.0.1:55322/postgres"
-    )
+    database_url = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@127.0.0.1:55322/postgres")
 
     summary: dict[str, Any] = {
         "site_id": site_id,
@@ -310,7 +337,7 @@ def run_bess_dispatch_consumer(site_id: str) -> dict[str, Any]:
         "executed": 0,
         "failed": 0,
         "dry_run": DRY_RUN,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
     }
 
     try:
@@ -336,7 +363,10 @@ def run_bess_dispatch_consumer(site_id: str) -> dict[str, Any]:
 
         logger.info(
             "BESS consumer: %d pending for %s (dry_run=%s, threshold=%.2f)",
-            len(pending), site_id, DRY_RUN, CONFIDENCE_THRESHOLD,
+            len(pending),
+            site_id,
+            DRY_RUN,
+            CONFIDENCE_THRESHOLD,
         )
 
         for rec in pending:

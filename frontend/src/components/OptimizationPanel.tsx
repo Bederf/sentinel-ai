@@ -9,7 +9,7 @@
  * Follows SENTINEL dark theme design.
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "@tremor/react";
 import { Zap, Clock, Thermometer, CheckCircle, Play, Square, Eye, ShieldCheck } from "lucide-react";
 import { PageLoading } from "./PageLoading";
@@ -114,7 +114,7 @@ function getStageVariant(stage: number): "success" | "warning" | "error" | "info
   return "error";
 }
 
-export function OptimizationPanel({ siteId: initialSiteId = "site-001", scenarioId, compact = false }: OptimizationPanelProps) {
+export function OptimizationPanel({ siteId: initialSiteId = "", scenarioId, compact = false }: OptimizationPanelProps) {
   const [selectedSiteId, setSelectedSiteId] = useState(initialSiteId);
   const [sites, setSites] = useState<Site[]>([]);
   const [eskomStatus, setEskomStatus] = useState<EskomStatusResponse | null>(null);
@@ -126,6 +126,11 @@ export function OptimizationPanel({ siteId: initialSiteId = "site-001", scenario
   // Precooling state
   const [precoolingStatus, setPrecoolingStatus] = useState<"idle" | "starting" | "running" | "stopped">("idle");
   const [_precoolingActions, setPrecoolingActions] = useState<any[]>([]);
+
+  const liveSites = useMemo(
+    () => sites.filter((site) => site.status !== "critical"),
+    [sites]
+  );
 
   // Fetch sites on mount
   useEffect(() => {
@@ -140,9 +145,25 @@ export function OptimizationPanel({ siteId: initialSiteId = "site-001", scenario
     loadSites();
   }, []);
 
+  useEffect(() => {
+    if (liveSites.length === 0) {
+      if (selectedSiteId) {
+        setSelectedSiteId("");
+      }
+      return;
+    }
+    const nextSiteId = liveSites.some((site) => site.id === selectedSiteId)
+      ? selectedSiteId
+      : liveSites[0].id;
+    if (nextSiteId && nextSiteId !== selectedSiteId) {
+      setSelectedSiteId(nextSiteId);
+    }
+  }, [liveSites, selectedSiteId]);
+
   // Check precooling status on mount / site change
   useEffect(() => {
     const checkPrecooling = async () => {
+      if (!selectedSiteId) return;
       try {
         const status = await api.getPrecoolingStatus(selectedSiteId);
         if (status.status === "running") {
@@ -196,6 +217,9 @@ export function OptimizationPanel({ siteId: initialSiteId = "site-001", scenario
         const eskomData = await api.getEskomStatus().catch(() => null);
         // Stagger subsequent requests by 250ms to avoid 429 rate limiting
         await new Promise((resolve) => setTimeout(resolve, 250));
+        if (!selectedSiteId) {
+          return;
+        }
         const scheduleData = await api.getSiteEskomStatus(selectedSiteId).catch(() => null);
         await new Promise((resolve) => setTimeout(resolve, 250));
         const thermalData = await api.getThermalRunway(selectedSiteId).catch(() => null);
@@ -309,7 +333,7 @@ export function OptimizationPanel({ siteId: initialSiteId = "site-001", scenario
             <BuildingSelector
               value={selectedSiteId}
               onChange={setSelectedSiteId}
-              sites={sites}
+              sites={liveSites}
             />
           </div>
           <div>

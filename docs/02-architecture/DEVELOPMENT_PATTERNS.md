@@ -1,3 +1,18 @@
+---
+title: "Development Patterns & Essential Constraints"
+type: "architecture"
+status: "draft"
+version: "1.0.0"
+created: "2026-03-31"
+updated: "2026-03-31"
+tags: ["sentinel", "documentation"]
+related: []
+domain: "bms"
+audience: "all"
+complexity: "intermediate"
+estimated_read_time: 10
+---
+
 # Development Patterns & Essential Constraints
 
 **See CLAUDE.md for quick reference. This document covers detailed pattern explanations.**
@@ -329,6 +344,74 @@ const d3 = await devicesApi.get('device3');  // 3 HTTP requests!
 
 **Why?** Prevents cognitive overload, easier to test, faster refactoring.
 
+## Processing Layer
+
+`app/processing/` is the tabular shaping boundary. It owns all groupby, rank, sort, dedupe, join, and time-bucket operations. Services fetch data via repositories, delegate shaping here, return results.
+
+### Stable contract
+
+Every processor method is a `@staticmethod` with signature `list[dict] → dict | list[dict]`. No I/O, no Pydantic models as inputs, no side effects.
+
+```python
+# ✅ CORRECT - service delegates, processor shapes
+class WaterAggregationService:
+    async def get_top_zones(self, site_id, days, limit):
+        records = await self.repository.get_all(site_id, days)
+        return WaterTableProcessor.rank_top_zones(records, limit, days)
+
+# ❌ WRONG - service does the groupby itself
+class WaterAggregationService:
+    async def get_top_zones(self, site_id, days, limit):
+        records = await self.repository.get_all(site_id, days)
+        grouped = {}
+        for r in records:
+            grouped.setdefault(r["zone_id"], []).append(r)
+        return sorted(grouped.items(), ...)  # belongs in processor
+```
+
+### What belongs in processors
+
+- `groupby`, `sort`, `rank`, `dedupe` (multi-field sort keys)
+- Multi-source fuse/join (e.g. alerts + work orders + intakes)
+- Time-bucket aggregation, monthly/seasonal rollup
+- State-machine scan over event sequences
+- Learning curve / trend computation
+
+### What does NOT belong in processors
+
+- Database queries or HTTP calls
+- Pydantic model construction
+- Business rule decisions (thresholds, policies)
+- Logging or metrics emission
+
+### Polars adoption path
+
+When adopting Polars, replace processor method bodies without touching signatures. The service layer sees no change.
+
+```python
+# Before (pure Python)
+@staticmethod
+def rank_top_zones(records, limit, days):
+    totals = {}
+    for r in records:
+        totals[r["zone_id"]] = totals.get(r["zone_id"], 0) + r.get("volume_liters", 0)
+    return sorted(totals.items(), key=lambda x: -x[1])[:limit]
+
+# After (Polars — same signature, same output)
+@staticmethod
+def rank_top_zones(records, limit, days):
+    import polars as pl
+    return (
+        pl.DataFrame(records)
+        .group_by("zone_id").agg(pl.col("volume_liters").sum())
+        .sort("volume_liters", descending=True)
+        .head(limit)
+        .to_dicts()
+    )
+```
+
+**Migration priority:** water → occupancy → cockpit → solar
+
 ## Code Organization Rules
 
 ### Backend
@@ -336,6 +419,7 @@ const d3 = await devicesApi.get('device3');  // 3 HTTP requests!
 - New routers go in `api/{domain}.py`
 - Register in appropriate registrar (`api/registrars/{registrar}.py`)
 - Business logic in `services/`, never in API handlers
+- Tabular shaping in `processing/`, never in services or repositories
 - All async functions use `httpx` + `await`
 - Repositories follow fallback pattern: Supabase → JSON
 

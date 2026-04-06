@@ -14,14 +14,13 @@ Integration points:
 
 import logging
 from datetime import datetime
-from typing import Dict, List, Optional
 
 from app.models.repair_effectiveness import (
-    RepairOutcome,
     EffectivenessScore,
     ElementImprovement,
     HealthScoreUpdate,
     RepairHistoryEntry,
+    RepairOutcome,
 )
 
 logger = logging.getLogger(__name__)
@@ -38,7 +37,7 @@ class RepairEffectivenessService:
     - Equipment health score recalculation from element trends
     - Repair history and fleet-wide summary
 
-    Uses in-memory storage for demo scope.
+    Uses in-memory storage for local scope.
     """
 
     # Thresholds
@@ -47,9 +46,9 @@ class RepairEffectivenessService:
 
     def __init__(self):
         """Initialize service with in-memory storage."""
-        self._repair_outcomes: Dict[str, RepairOutcome] = {}  # work_order_id -> RepairOutcome
-        self._effectiveness_scores: Dict[str, EffectivenessScore] = {}  # work_order_id -> EffectivenessScore
-        self._health_scores: Dict[str, float] = {}  # equipment_id -> latest health score
+        self._repair_outcomes: dict[str, RepairOutcome] = {}  # work_order_id -> RepairOutcome
+        self._effectiveness_scores: dict[str, EffectivenessScore] = {}  # work_order_id -> EffectivenessScore
+        self._health_scores: dict[str, float] = {}  # equipment_id -> latest health score
 
         logger.info("RepairEffectivenessService initialized")
 
@@ -58,7 +57,7 @@ class RepairEffectivenessService:
     # ========================================================================
 
     async def validate_repair(
-        self, equipment_id: str, work_order_id: str, post_readings: Optional[Dict[str, float]] = None
+        self, equipment_id: str, work_order_id: str, post_readings: dict[str, float] | None = None
     ) -> EffectivenessScore:
         """
         Validate repair effectiveness by comparing pre-repair baseline
@@ -66,7 +65,7 @@ class RepairEffectivenessService:
 
         Steps:
         1. Fetch pre-repair baseline from baseline repository (baseline_type=PRE_REPAIR)
-        2. If post_readings is None, simulate BMS readings (demo scope)
+        2. If post_readings is None, simulate BMS readings (local scope)
         3. Use BaselineComparisonService for element-by-element comparison
         4. Calculate effectiveness_score as average improvement, capped at 100
         5. Calculate health scores from element deviations
@@ -86,7 +85,7 @@ class RepairEffectivenessService:
         # 1. Fetch pre-repair baseline
         pre_baseline = await self._get_pre_repair_baseline(equipment_id)
         pre_baseline_id = ""
-        pre_values: Dict[str, float] = {}
+        pre_values: dict[str, float] = {}
 
         if pre_baseline:
             pre_baseline_id = pre_baseline.get("id", "")
@@ -108,7 +107,7 @@ class RepairEffectivenessService:
             post_readings = self._generate_demo_post_values(equipment_id, pre_values)
 
         # 3. Calculate element-by-element improvements
-        element_improvements: Dict[str, ElementImprovement] = {}
+        element_improvements: dict[str, ElementImprovement] = {}
 
         for element_name, pre_value in pre_values.items():
             post_value = post_readings.get(element_name)
@@ -219,7 +218,7 @@ class RepairEffectivenessService:
         logger.info(f"Calculating health score for {equipment_id}")
 
         previous_score = self._health_scores.get(equipment_id, 100.0)
-        contributing_factors: Dict[str, float] = {}
+        contributing_factors: dict[str, float] = {}
 
         try:
             # Lazy import to avoid circular dependencies
@@ -272,7 +271,7 @@ class RepairEffectivenessService:
             updated_at=datetime.now(),
         )
 
-    async def get_repair_history(self, equipment_id: str) -> List[RepairHistoryEntry]:
+    async def get_repair_history(self, equipment_id: str) -> list[RepairHistoryEntry]:
         """
         Get repair history for equipment, sorted by date (newest first).
 
@@ -282,7 +281,7 @@ class RepairEffectivenessService:
         Returns:
             List of RepairHistoryEntry sorted by repair date descending
         """
-        entries: List[RepairHistoryEntry] = []
+        entries: list[RepairHistoryEntry] = []
 
         for wo_id, score in self._effectiveness_scores.items():
             if score.equipment_id != equipment_id:
@@ -310,7 +309,7 @@ class RepairEffectivenessService:
         entries.sort(key=lambda e: e.repair_date, reverse=True)
         return entries
 
-    async def get_effectiveness_summary(self) -> Dict:
+    async def get_effectiveness_summary(self) -> dict:
         """
         Get fleet-wide effectiveness summary.
 
@@ -338,7 +337,7 @@ class RepairEffectivenessService:
 
         # Calculate total cost and repairs by type
         total_cost = 0.0
-        repairs_by_type: Dict[str, int] = {}
+        repairs_by_type: dict[str, int] = {}
 
         for wo_id, outcome in self._repair_outcomes.items():
             total_cost += outcome.repair_cost
@@ -369,7 +368,7 @@ class RepairEffectivenessService:
     # Private Helper Methods
     # ========================================================================
 
-    async def _get_pre_repair_baseline(self, equipment_id: str) -> Optional[Dict]:
+    async def _get_pre_repair_baseline(self, equipment_id: str) -> dict | None:
         """Fetch pre-repair baseline from repository."""
         try:
             from app.database.repositories.baseline_repository import BaselineRepository
@@ -418,7 +417,7 @@ class RepairEffectivenessService:
         return pre_repair_value * 0.8
 
     def _calculate_health_from_deviations(
-        self, pre_values: Dict[str, float], element_improvements: Dict[str, ElementImprovement]
+        self, pre_values: dict[str, float], element_improvements: dict[str, ElementImprovement]
     ) -> float:
         """
         Calculate health score from pre-repair state.
@@ -445,7 +444,7 @@ class RepairEffectivenessService:
         return max(0.0, score)
 
     def _calculate_health_from_post_readings(
-        self, post_readings: Dict[str, float], element_improvements: Dict[str, ElementImprovement]
+        self, post_readings: dict[str, float], element_improvements: dict[str, ElementImprovement]
     ) -> float:
         """
         Calculate health score from post-repair state.
@@ -466,8 +465,8 @@ class RepairEffectivenessService:
 
         return max(0.0, score)
 
-    def _generate_demo_pre_values(self, equipment_id: str) -> Dict[str, float]:
-        """Generate synthetic pre-repair values for demo scope."""
+    def _generate_demo_pre_values(self, equipment_id: str) -> dict[str, float]:
+        """Generate synthetic pre-repair values for local scope."""
         # Typical chiller pre-repair values (degraded state)
         if "CHILLER" in equipment_id.upper():
             return {
@@ -482,9 +481,9 @@ class RepairEffectivenessService:
         else:
             return {"temperature": 28.5, "vibration": 2.5, "current": 15.0}
 
-    def _generate_demo_post_values(self, equipment_id: str, pre_values: Dict[str, float]) -> Dict[str, float]:
+    def _generate_demo_post_values(self, equipment_id: str, pre_values: dict[str, float]) -> dict[str, float]:
         """
-        Generate synthetic post-repair values for demo scope.
+        Generate synthetic post-repair values for local scope.
 
         Simulates a mostly successful repair (70-90% improvement).
         """
@@ -510,7 +509,7 @@ class RepairEffectivenessService:
 # Singleton Instance
 # ============================================================================
 
-_repair_effectiveness_service: Optional[RepairEffectivenessService] = None
+_repair_effectiveness_service: RepairEffectivenessService | None = None
 
 
 def get_repair_effectiveness_service() -> RepairEffectivenessService:

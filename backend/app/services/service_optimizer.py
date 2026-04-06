@@ -10,15 +10,14 @@ This is the business-value layer that justifies the conditional maintenance appr
 
 import logging
 from datetime import datetime, timedelta
-from typing import List, Optional, Dict
 
 from app.models.condition import (
     AssetUtilization,
-    ServiceWindow,
     MaintenanceCostComparison,
     OptimizedSchedule,
-    UtilizationStatus,
+    ServiceWindow,
     TrendDirection,
+    UtilizationStatus,
 )
 
 logger = logging.getLogger(__name__)
@@ -28,7 +27,7 @@ logger = logging.getLogger(__name__)
 # Service Cost Rates (ZAR per service, by equipment type)
 # ============================================================================
 
-SERVICE_COST_RATES: Dict[str, float] = {
+SERVICE_COST_RATES: dict[str, float] = {
     "chiller": 8500.0,
     "ahu": 3200.0,
     "fcu": 1800.0,
@@ -101,8 +100,8 @@ class ServiceOptimizer:
     # ========================================================================
 
     async def calculate_utilization(
-        self, equipment_id: str, equipment_type: Optional[str] = None
-    ) -> List[AssetUtilization]:
+        self, equipment_id: str, equipment_type: str | None = None
+    ) -> list[AssetUtilization]:
         """
         Calculate asset utilization for all elements of an equipment.
 
@@ -118,7 +117,7 @@ class ServiceOptimizer:
         Returns:
             List of AssetUtilization, one per element with threshold data
         """
-        utilizations: List[AssetUtilization] = []
+        utilizations: list[AssetUtilization] = []
 
         # Try to get element RULs (which include thresholds) from RULCalculator
         rul_calc = self.rul_calculator
@@ -180,7 +179,7 @@ class ServiceOptimizer:
 
         return utilizations
 
-    def _get_threshold(self, element_name: str, element_ruls: Dict, unit: str) -> Optional[float]:
+    def _get_threshold(self, element_name: str, element_ruls: dict, unit: str) -> float | None:
         """Get threshold value from RUL data or defaults."""
         # First try RUL calculator thresholds
         if element_name in element_ruls:
@@ -190,7 +189,7 @@ class ServiceOptimizer:
         return self._default_threshold(element_name, unit)
 
     @staticmethod
-    def _default_threshold(element_name: str, unit: str) -> Optional[float]:
+    def _default_threshold(element_name: str, unit: str) -> float | None:
         """Provide sensible default thresholds for common elements."""
         name_lower = element_name.lower()
         unit_lower = unit.lower().strip()
@@ -231,7 +230,7 @@ class ServiceOptimizer:
 
     @staticmethod
     def _calculate_utilization_percent(
-        current_value: Optional[float], threshold_value: float, element_name: str
+        current_value: float | None, threshold_value: float, element_name: str
     ) -> float:
         """
         Calculate utilization percentage.
@@ -273,7 +272,7 @@ class ServiceOptimizer:
     # Service Window Optimization
     # ========================================================================
 
-    async def optimize_service_window(self, equipment_id: str) -> Optional[ServiceWindow]:
+    async def optimize_service_window(self, equipment_id: str) -> ServiceWindow | None:
         """
         Calculate optimal service window for equipment.
 
@@ -293,8 +292,8 @@ class ServiceOptimizer:
         """
         now = datetime.now()
         days_until_threshold = None
-        driving_elements: List[str] = []
-        reason_parts: List[str] = []
+        driving_elements: list[str] = []
+        reason_parts: list[str] = []
 
         # Try RUL calculator first
         rul_calc = self.rul_calculator
@@ -360,8 +359,8 @@ class ServiceOptimizer:
         Returns:
             (days_until_threshold, driving_elements, reason_parts)
         """
-        driving_elements: List[str] = []
-        reason_parts: List[str] = []
+        driving_elements: list[str] = []
+        reason_parts: list[str] = []
         min_days = None
 
         try:
@@ -410,7 +409,7 @@ class ServiceOptimizer:
     # ========================================================================
 
     async def compare_maintenance_costs(
-        self, equipment_id: str, equipment_type: Optional[str] = None, fixed_interval_days: int = 90
+        self, equipment_id: str, equipment_type: str | None = None, fixed_interval_days: int = 90
     ) -> MaintenanceCostComparison:
         """
         Compare fixed-schedule vs condition-based maintenance costs.
@@ -570,7 +569,7 @@ class ServiceOptimizer:
     # ========================================================================
 
     async def optimize_fleet_schedule(
-        self, equipment_ids: Optional[List[str]] = None, fixed_interval_days: int = 90, limit: int = 20
+        self, equipment_ids: list[str] | None = None, fixed_interval_days: int = 90, limit: int = 20
     ) -> OptimizedSchedule:
         """
         Optimize service schedule across multiple equipment.
@@ -594,7 +593,7 @@ class ServiceOptimizer:
         equipment_ids = equipment_ids[:limit]
 
         # Collect service windows
-        schedule: List[ServiceWindow] = []
+        schedule: list[ServiceWindow] = []
         total_fixed_cost = 0.0
         total_conditional_cost = 0.0
         equipment_with_cost = 0
@@ -643,9 +642,9 @@ class ServiceOptimizer:
             cost_comparison_summary=cost_summary,
         )
 
-    async def _discover_equipment(self, limit: int = 20) -> List[str]:
+    async def _discover_equipment(self, limit: int = 20) -> list[str]:
         """Discover equipment IDs from sites data."""
-        equipment_ids: List[str] = []
+        equipment_ids: list[str] = []
 
         try:
             import json
@@ -655,13 +654,13 @@ class ServiceOptimizer:
             registry_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "sites", "_registry.json")
 
             if os.path.exists(registry_path):
-                with open(registry_path, "r") as f:
+                with open(registry_path) as f:
                     registry = json.load(f)
 
                 for site_id in registry.get("active_sites", []):
                     site_path = os.path.join(os.path.dirname(registry_path), f"{site_id}.json")
                     if os.path.exists(site_path):
-                        with open(site_path, "r") as f:
+                        with open(site_path) as f:
                             site_data = json.load(f)
 
                         # Extract equipment IDs from site data
@@ -676,7 +675,7 @@ class ServiceOptimizer:
                     os.path.dirname(__file__), "bms_simulator", "data", "reference_devices.json"
                 )
                 if os.path.exists(devices_path):
-                    with open(devices_path, "r") as f:
+                    with open(devices_path) as f:
                         devices = json.load(f)
                     for device in devices.get("devices", []):
                         d_id = device.get("device_id") or device.get("id")
@@ -693,7 +692,7 @@ class ServiceOptimizer:
 # Singleton Instance
 # ============================================================================
 
-_service_optimizer: Optional[ServiceOptimizer] = None
+_service_optimizer: ServiceOptimizer | None = None
 
 
 def get_service_optimizer() -> ServiceOptimizer:

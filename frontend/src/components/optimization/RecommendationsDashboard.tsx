@@ -25,7 +25,7 @@ export const RecommendationsDashboard: React.FC<
       setLoading(true)
       setError(null)
       const data = await optimizationApi.getPending(siteId)
-      setRecommendations(data.recommendations)
+      setRecommendations(Array.isArray(data) ? data : (data as { recommendations: Recommendation[] }).recommendations)
     } catch (error) {
       console.error('Failed to load recommendations:', error)
       setError('Failed to load recommendations')

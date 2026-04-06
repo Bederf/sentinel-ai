@@ -6,6 +6,7 @@ import { NotificationSettings } from "../NotificationSettings";
 interface NotificationSettingsPanelProps {
   currentUserEmail: string;
   hasAuthenticatedSession: boolean;
+  siteId?: string;
   onError?: (msg: string) => void;
   onSuccess?: () => void;
 }
@@ -113,6 +114,7 @@ function NotificationTabbedContent({
 export const NotificationSettingsPanel = memo(function NotificationSettingsPanel({
   currentUserEmail,
   hasAuthenticatedSession,
+  siteId: _siteId,
   onError,
   onSuccess,
 }: NotificationSettingsPanelProps) {

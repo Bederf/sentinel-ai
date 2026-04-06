@@ -53,7 +53,6 @@ class ModuleType(str, Enum):
     SUSTAINABILITY = "sustainability"
     CONTRACTS = "contracts"  # FM contract management
     ACCESS = "access"  # Building access control / badge readers
-    SIMULATION = "simulation"
     FLEET_ML = "fleet_ml"
     BLOCK_BOOKING = "block_booking"  # Block booking detection (Space Intelligence)
     SPACE_OPTIMIZATION = "space_optimization"  # Ghost bookings, right-sizing, focus rooms
@@ -593,19 +592,6 @@ MODULE_DEFINITIONS: Dict[ModuleType, ModuleDefinition] = {
         integrates_with=[ModuleType.HVAC_CONTROL, ModuleType.ENERGY_CONTROL, ModuleType.LIGHTING_CONTROL],
         telemetry_points=[],
         ai_features=[],
-    ),
-    ModuleType.SIMULATION: ModuleDefinition(
-        module_type=ModuleType.SIMULATION,
-        name="Simulation",
-        version="1.0.0",
-        description="What-if scenarios and ROI modelling",
-        capabilities=[
-            ModuleCapability("lifecycle_sim", "Lifecycle Simulation", "365-day equipment lifecycle simulation"),
-            ModuleCapability("roi_modelling", "ROI Modelling", "Return on investment modelling"),
-        ],
-        integrates_with=[ModuleType.ENERGY, ModuleType.HVAC],
-        telemetry_points=["simulation_results"],
-        ai_features=["scenario_analysis"],
     ),
     ModuleType.FLEET_ML: ModuleDefinition(
         module_type=ModuleType.FLEET_ML,

@@ -7,13 +7,13 @@ Measures accuracy and feeds results back to improve future recommendations.
 import asyncio
 import logging
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any
 
-from app.models.recommendation import Recommendation, RecommendationStatus
+from app.database.repositories.outcome_repository import OutcomeRepository
 from app.models.outcome import Outcome
+from app.models.recommendation import Recommendation, RecommendationStatus
 from app.services.device_abstraction import device_manager
 from app.services.recommendation_service import get_recommendation_service
-from app.database.repositories.outcome_repository import OutcomeRepository
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +31,7 @@ class OutcomeTracker:
         self.recommendation_service = get_recommendation_service()
         self.repo = OutcomeRepository()
 
-    async def verify_outcome(self, rec_id: str, verify_delay_minutes: int = 30) -> Optional[Outcome]:
+    async def verify_outcome(self, rec_id: str, verify_delay_minutes: int = 30) -> Outcome | None:
         """Verify actual outcome 30 minutes after recommendation execution.
 
         Compares predicted vs actual impact:
@@ -111,7 +111,7 @@ class OutcomeTracker:
             logger.error(f"Error verifying outcome for {rec_id}: {e}")
             return None
 
-    def _calculate_accuracy(self, predicted: Dict, actual: Dict) -> float:
+    def _calculate_accuracy(self, predicted: dict, actual: dict) -> float:
         """Calculate accuracy as percentage match (0.0 to 1.0).
 
         Temperature: ±0.5°C = good
@@ -152,7 +152,7 @@ class OutcomeTracker:
 
         return accuracy
 
-    async def _read_actual_state(self, equipment_id: str) -> Dict[str, Any]:
+    async def _read_actual_state(self, equipment_id: str) -> dict[str, Any]:
         """Read current state from device manager.
 
         Args:
@@ -168,7 +168,7 @@ class OutcomeTracker:
             logger.warning(f"Failed to read actual state for {equipment_id}: {e}")
             return {}
 
-    async def _estimate_cost(self, state: Dict[str, Any], since: datetime) -> float:
+    async def _estimate_cost(self, state: dict[str, Any], since: datetime) -> float:
         """Estimate energy cost since recommendation execution.
 
         Args:
@@ -237,7 +237,7 @@ class OutcomeTracker:
 
 
 # Singleton instance
-_outcome_tracker: Optional[OutcomeTracker] = None
+_outcome_tracker: OutcomeTracker | None = None
 
 
 def get_outcome_tracker() -> OutcomeTracker:

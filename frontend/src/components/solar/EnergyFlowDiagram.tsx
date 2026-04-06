@@ -14,7 +14,6 @@ import { Sun, Battery, Building2, Plug } from "lucide-react";
 import type { SolarOverview } from "../../lib/solarApi";
 import { fetchSolarOverview } from "../../lib/solarApi";
 import { isExpectedApiError } from "../../lib/api";
-import { useSimulation } from "../../contexts/SimulationContext";
 
 interface EnergyFlowDiagramProps {
   siteId: string;
@@ -32,7 +31,6 @@ interface FlowPath {
 export function EnergyFlowDiagram({ siteId }: EnergyFlowDiagramProps) {
   const [overview, setOverview] = useState<SolarOverview | null>(null);
   const [loading, setLoading] = useState(true);
-  const { running, solarEfficiency, simulatedHour } = useSimulation();
 
   const loadData = useCallback(async () => {
     try {
@@ -42,7 +40,7 @@ export function EnergyFlowDiagram({ siteId }: EnergyFlowDiagramProps) {
       if (!isExpectedApiError(err)) {
         console.error("Failed to load solar overview for flow diagram:", err);
       }
-      // Fallback: set Sandton specs so simulation can drive values
+      // Fallback: set baseline specs for layout continuity
       setOverview({
         site_id: siteId,
         site_name: "Solar Campus",
@@ -104,51 +102,11 @@ export function EnergyFlowDiagram({ siteId }: EnergyFlowDiagramProps) {
     typeof value === "number" && Number.isFinite(value) ? value : 0
   );
 
-  const installedCapacity = overview.installed_capacity_kwp || 3900;
-  let currentGenerationKw = safeNumber(overview.current_generation_kw);
-  let gridExportKw = safeNumber(overview.grid_export_kw);
-  let gridImportKw = safeNumber(overview.grid_import_kw);
-  let bessSocPercent = safeNumber(overview.bess_soc_percent);
-  let bessMode = overview.bess_mode || "idle";
-
-  // When simulation is running, compute flows from simulation context
-  // BESS mode follows TOU dispatch (aligned with backend _bess_mode_for_hour):
-  //   Peak (06-09, 17-19): discharge
-  //   Standard (09-17, 19-22): idle (solar tops up if excess)
-  //   Off-peak (22-06): grid charge
-  if (running && solarEfficiency !== undefined) {
-    currentGenerationKw = Math.round((solarEfficiency / 100) * installedCapacity);
-    const buildingLoad = (simulatedHour >= 7 && simulatedHour <= 18) ? 1200 : 400;
-
-    // TOU-based BESS mode (matches backend solar_connector_huawei._bess_mode_for_hour)
-    const isPeak = (simulatedHour >= 6 && simulatedHour < 9) || (simulatedHour >= 17 && simulatedHour < 19);
-    const isOffPeak = simulatedHour >= 22 || simulatedHour < 6;
-
-    if (isPeak && bessSocPercent > 20) {
-      bessMode = "discharging";
-    } else if (isOffPeak) {
-      bessMode = "charging";
-    } else {
-      // Standard hours: idle, but solar tops up if excess
-      bessMode = (currentGenerationKw > buildingLoad) ? "charging" : "idle";
-    }
-
-    if (currentGenerationKw > buildingLoad) {
-      const excess = currentGenerationKw - buildingLoad;
-      const bessCharge = bessMode === "charging" ? Math.min(excess * 0.6, 500) : 0;
-      gridExportKw = Math.round(excess - bessCharge);
-      gridImportKw = 0;
-      bessSocPercent = Math.min(95, 40 + simulatedHour * 3);
-    } else {
-      gridImportKw = Math.round(buildingLoad - currentGenerationKw);
-      gridExportKw = 0;
-      if (bessMode === "discharging") {
-        bessSocPercent = Math.max(20, 80 - (simulatedHour - 6) * 5);
-      } else {
-        bessSocPercent = simulatedHour < 6 ? 35 : Math.min(90, 40 + simulatedHour * 3);
-      }
-    }
-  }
+  const currentGenerationKw = safeNumber(overview.current_generation_kw);
+  const gridExportKw = safeNumber(overview.grid_export_kw);
+  const gridImportKw = safeNumber(overview.grid_import_kw);
+  const bessSocPercent = safeNumber(overview.bess_soc_percent);
+  const bessMode = overview.bess_mode || "idle";
 
   // Compute flows
   const solarToBuilding = Math.max(0, currentGenerationKw - gridExportKw);

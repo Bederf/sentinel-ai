@@ -31,8 +31,7 @@ Architecture:
 import logging
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 logger = logging.getLogger(__name__)
 
@@ -44,11 +43,11 @@ class WriteResult:
     success: bool
     equipment_id: str
     point_name: str
-    previous_value: Optional[float] = None
-    requested_value: Optional[float] = None
-    actual_value: Optional[float] = None  # After safety clamping
+    previous_value: float | None = None
+    requested_value: float | None = None
+    actual_value: float | None = None  # After safety clamping
     verified: bool = False
-    error: Optional[str] = None
+    error: str | None = None
     correlation_id: str = ""
     who: str = "sentinel"
     reason: str = ""
@@ -60,7 +59,7 @@ class WriteResult:
         if not self.correlation_id:
             self.correlation_id = f"bms-{uuid.uuid4().hex[:8]}"
         if not self.timestamp:
-            self.timestamp = datetime.now(timezone.utc).isoformat()
+            self.timestamp = datetime.now(UTC).isoformat()
 
 
 class BMSControlBridge:
@@ -109,7 +108,7 @@ class BMSControlBridge:
             "zone_data": zone,
         }
 
-    def _pick_setpoint_equipment(self, zone_equipment: dict) -> Optional[str]:
+    def _pick_setpoint_equipment(self, zone_equipment: dict) -> str | None:
         """Pick the best equipment for temperature setpoint control.
 
         VAVs are preferred because they directly control zone air supply.
@@ -118,7 +117,7 @@ class BMSControlBridge:
         """
         return zone_equipment.get("vav_id") or zone_equipment.get("fcu_id")
 
-    def _pick_lighting_equipment(self, zone_equipment: dict) -> Optional[str]:
+    def _pick_lighting_equipment(self, zone_equipment: dict) -> str | None:
         """Pick the equipment for lighting control in this zone.
 
         Returns the lighting_id from the zone registry — whatever equipment
@@ -130,7 +129,7 @@ class BMSControlBridge:
     # Generic point read/write (the core of the bridge)
     # ------------------------------------------------------------------
 
-    async def _read_point(self, equipment_id: str, point_name: str) -> Optional[float]:
+    async def _read_point(self, equipment_id: str, point_name: str) -> float | None:
         """Read a point value from the BMS for a given equipment.
 
         Returns None if the read fails or equipment not found.
@@ -161,7 +160,7 @@ class BMSControlBridge:
         Returns WriteResult for audit regardless of success or failure.
         """
         result_id = correlation_id or f"bms-{uuid.uuid4().hex[:8]}"
-        start = datetime.now(timezone.utc)
+        start = datetime.now(UTC)
 
         await self._ensure_device_manager()
         from app.services.device_abstraction import device_manager
@@ -199,7 +198,7 @@ class BMSControlBridge:
             )
         except ValueError as e:
             # Safety engine blocked or validation failed
-            elapsed = (datetime.now(timezone.utc) - start).total_seconds() * 1000
+            elapsed = (datetime.now(UTC) - start).total_seconds() * 1000
             return WriteResult(
                 success=False,
                 equipment_id=equipment_id,
@@ -213,7 +212,7 @@ class BMSControlBridge:
                 write_latency_ms=elapsed,
             )
         except Exception as e:
-            elapsed = (datetime.now(timezone.utc) - start).total_seconds() * 1000
+            elapsed = (datetime.now(UTC) - start).total_seconds() * 1000
             return WriteResult(
                 success=False,
                 equipment_id=equipment_id,
@@ -227,7 +226,7 @@ class BMSControlBridge:
                 write_latency_ms=elapsed,
             )
 
-        elapsed = (datetime.now(timezone.utc) - start).total_seconds() * 1000
+        elapsed = (datetime.now(UTC) - start).total_seconds() * 1000
 
         if success:
             logger.info(f"[{result_id}] BMS write: {equipment_id}.{point_name} {previous_value} → {value} (who={who})")
@@ -350,7 +349,7 @@ class BMSControlBridge:
     # Read current state from BMS
     # ------------------------------------------------------------------
 
-    async def read_hvac_setpoint(self, zone_id: str) -> Optional[float]:
+    async def read_hvac_setpoint(self, zone_id: str) -> float | None:
         """Read the current HVAC setpoint from the BMS for a zone.
 
         Returns None if the zone has no mapped equipment or the read fails.
@@ -361,7 +360,7 @@ class BMSControlBridge:
             return None
         return await self._read_point(equipment_id, "temperature_setpoint")
 
-    async def read_zone_temperature(self, zone_id: str) -> Optional[float]:
+    async def read_zone_temperature(self, zone_id: str) -> float | None:
         """Read the current room temperature from the BMS for a zone."""
         zone_eq = self._resolve_zone_equipment(zone_id)
         equipment_id = self._pick_setpoint_equipment(zone_eq)
@@ -369,7 +368,7 @@ class BMSControlBridge:
             return None
         return await self._read_point(equipment_id, "room_temperature")
 
-    async def read_lighting_brightness(self, zone_id: str) -> Optional[float]:
+    async def read_lighting_brightness(self, zone_id: str) -> float | None:
         """Read the current brightness from the BMS for a zone.
 
         Returns None if the zone has no lighting equipment or the read fails.
@@ -402,7 +401,7 @@ class BMSControlBridge:
 
 
 # Module-level singleton
-_bridge: Optional[BMSControlBridge] = None
+_bridge: BMSControlBridge | None = None
 
 
 def get_bms_control_bridge() -> BMSControlBridge:

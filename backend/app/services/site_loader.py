@@ -33,7 +33,7 @@ import json
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional, Any
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -57,9 +57,9 @@ class Building:
     display_name: str = ""
     address: str = ""
     timezone: str = "Africa/Johannesburg"
-    floors: List[str] = field(default_factory=list)
-    features: Dict[str, bool] = field(default_factory=dict)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    floors: list[str] = field(default_factory=list)
+    features: dict[str, bool] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         return {
@@ -93,17 +93,17 @@ class BuildingDataLoader:
     Falls back to flat JSON files for backward compatibility.
     """
 
-    def __init__(self, data_path: Optional[Path] = None):
+    def __init__(self, data_path: Path | None = None):
         self._data_path = data_path or Path(__file__).parent.parent / "data"
         self._buildings_path = self._data_path / "sites"
-        self._registry: Dict[str, Any] = {}
-        self._buildings: Dict[str, Building] = {}
-        self._desks: Dict[str, List[dict]] = {}  # site_id -> desks
-        self._zones: Dict[str, List[dict]] = {}  # site_id -> zones
-        self._devices: Dict[str, List[dict]] = {}  # site_id -> devices
+        self._registry: dict[str, Any] = {}
+        self._buildings: dict[str, Building] = {}
+        self._desks: dict[str, list[dict]] = {}  # site_id -> desks
+        self._zones: dict[str, list[dict]] = {}  # site_id -> zones
+        self._devices: dict[str, list[dict]] = {}  # site_id -> devices
         self._loaded = False
 
-    def _load_registry(self) -> Dict[str, Any]:
+    def _load_registry(self) -> dict[str, Any]:
         """Load building registry."""
         registry_path = self._buildings_path / "_registry.json"
         if registry_path.exists():
@@ -111,7 +111,7 @@ class BuildingDataLoader:
                 return json.load(f)
         return {"active_sites": [], "default_building": None}
 
-    def _load_building(self, site_id: str) -> Optional[Building]:
+    def _load_building(self, site_id: str) -> Building | None:
         """Load a single building's metadata."""
         site_path = self._buildings_path / site_id / "building.json"
         if site_path.exists():
@@ -121,7 +121,7 @@ class BuildingDataLoader:
                 return Building.from_dict(data)
         return None
 
-    def _load_site_data(self, site_id: str, filename: str) -> List[dict]:
+    def _load_site_data(self, site_id: str, filename: str) -> list[dict]:
         """Load a data file for a building (desks, zones, devices)."""
         file_path = self._buildings_path / site_id / filename
         if file_path.exists():
@@ -217,32 +217,32 @@ class BuildingDataLoader:
                     zone["site_id"] = default_id
                 self._zones[default_id] = zones
 
-    def get_registry(self) -> Dict[str, Any]:
+    def get_registry(self) -> dict[str, Any]:
         """Get the building registry."""
         self.load()
         return self._registry
 
-    def get_default_site_id(self) -> Optional[str]:
+    def get_default_site_id(self) -> str | None:
         """Get the default building ID."""
         self.load()
         return self._registry.get("default_building")
 
-    def get_active_site_ids(self) -> List[str]:
+    def get_active_site_ids(self) -> list[str]:
         """Get list of active building IDs."""
         self.load()
         return self._registry.get("active_sites", [])
 
-    def get_site(self, site_id: str) -> Optional[Building]:
+    def get_site(self, site_id: str) -> Building | None:
         """Get a building by ID."""
         self.load()
         return self._buildings.get(site_id)
 
-    def get_all_sites(self) -> List[Building]:
+    def get_all_sites(self) -> list[Building]:
         """Get all active buildings."""
         self.load()
         return list(self._buildings.values())
 
-    def get_desks(self, site_id: str) -> List[dict]:
+    def get_desks(self, site_id: str) -> list[dict]:
         """Get desks for a building.
 
         Tries Supabase first, then falls back to JSON files.
@@ -287,7 +287,7 @@ class BuildingDataLoader:
                 desks_with_building.append(desk_copy)
         return desks_with_building
 
-    def get_all_desks(self) -> List[dict]:
+    def get_all_desks(self) -> list[dict]:
         """Get all desks across all active buildings."""
         self.load()
         all_desks = []
@@ -295,7 +295,7 @@ class BuildingDataLoader:
             all_desks.extend(self.get_desks(site_id))
         return all_desks
 
-    def get_zones(self, site_id: str) -> List[dict]:
+    def get_zones(self, site_id: str) -> list[dict]:
         """Get zones for a building (from zones table, not hvac_zones).
 
         Tries Supabase first, then falls back to JSON files.
@@ -343,7 +343,7 @@ class BuildingDataLoader:
                 zones_with_building.append(zone_copy)
         return zones_with_building
 
-    def _get_site_uuid(self, site_id: str) -> Optional[str]:
+    def _get_site_uuid(self, site_id: str) -> str | None:
         """Get building UUID from building ID using Supabase.
 
         Args:
@@ -366,7 +366,7 @@ class BuildingDataLoader:
             logger.debug(f"Failed to get building UUID for {site_id}: {e}")
         return None
 
-    def get_all_zones(self) -> List[dict]:
+    def get_all_zones(self) -> list[dict]:
         """Get all zones across all active buildings."""
         self.load()
         all_zones = []
@@ -374,12 +374,12 @@ class BuildingDataLoader:
             all_zones.extend(self.get_zones(site_id))
         return all_zones
 
-    def get_devices(self, site_id: str) -> List[dict]:
+    def get_devices(self, site_id: str) -> list[dict]:
         """Get devices for a building."""
         self.load()
         return self._devices.get(site_id, [])
 
-    def get_all_devices(self) -> List[dict]:
+    def get_all_devices(self) -> list[dict]:
         """Get all devices across all active buildings."""
         self.load()
         all_devices = []
@@ -387,7 +387,7 @@ class BuildingDataLoader:
             all_devices.extend(self.get_devices(site_id))
         return all_devices
 
-    def find_desk(self, desk_id: str, site_id: Optional[str] = None) -> Optional[dict]:
+    def find_desk(self, desk_id: str, site_id: str | None = None) -> dict | None:
         """Find a desk by ID, optionally filtered by building.
 
         Tries Supabase first, then falls back to JSON files.
@@ -432,7 +432,7 @@ class BuildingDataLoader:
 
         return None
 
-    def find_zone(self, zone_id: str, site_id: Optional[str] = None) -> Optional[dict]:
+    def find_zone(self, zone_id: str, site_id: str | None = None) -> dict | None:
         """Find a zone by ID, optionally filtered by building.
 
         Tries Supabase first, then falls back to JSON files.
@@ -469,7 +469,7 @@ class BuildingDataLoader:
 
 
 # Singleton instance
-_loader: Optional[BuildingDataLoader] = None
+_loader: BuildingDataLoader | None = None
 
 
 def get_site_loader() -> BuildingDataLoader:

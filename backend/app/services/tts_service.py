@@ -18,7 +18,6 @@ import hashlib
 import logging
 import re
 from base64 import b64decode, b64encode
-from typing import Optional
 
 import httpx
 
@@ -83,7 +82,7 @@ class TTSService:
             sentences = re.split(r"(?<=[.!?])\s+", plain)
             return " ".join(sentences[:2])
 
-    async def synthesize(self, text: str) -> Optional[bytes]:
+    async def synthesize(self, text: str) -> bytes | None:
         """Synthesize speech audio from text via ElevenLabs.
 
         Args:
@@ -132,7 +131,7 @@ class TTSService:
             logger.error(f"ElevenLabs synthesis failed: {e}")
             return None
 
-    async def text_to_speech(self, full_response: str) -> Optional[bytes]:
+    async def text_to_speech(self, full_response: str) -> bytes | None:
         """Full pipeline: summarize text, check cache, synthesize audio.
 
         Args:
@@ -175,7 +174,7 @@ class TTSService:
 
 
 # Singleton
-_tts_service: Optional[TTSService] = None
+_tts_service: TTSService | None = None
 
 
 def get_tts_service() -> TTSService:

@@ -5,9 +5,9 @@ monitoring tables so the Integration Monitoring dashboard shows the connected
 data sources, sync history, and point mappings.
 """
 
-from datetime import datetime
-from typing import Any, Dict, Optional
 import logging
+from datetime import datetime
+from typing import Any
 
 from app.database.repositories.integration_repository import IntegrationRepository
 from app.services.niagara.mapping_service import get_mapping_service
@@ -20,7 +20,7 @@ def bridge_discovery_to_integration(
     site_id: str,
     bms_vendor: str = "siemens",
     equipment_created: int = 0,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Bridge Niagara discovery results to Integration Monitoring tables.
 
@@ -151,7 +151,7 @@ def bridge_discovery_to_integration(
             logger.warning("Failed to create point mappings: %s", e)
             # Continue - we've at least created the log source
 
-    # 5. Create demo sync history (last 7 days for healthy appearance)
+    # 5. Create seeded sync history (last 7 days for healthy appearance)
     _create_demo_sync_history(repo, source_id, point_count)
 
     logger.info(
@@ -170,7 +170,7 @@ def bridge_discovery_to_integration(
     }
 
 
-def _resolve_site_id(site_id: str) -> Optional[str]:
+def _resolve_site_id(site_id: str) -> str | None:
     """Resolve site_id (e.g., site-002) to building UUID.
 
     Args:
@@ -196,10 +196,10 @@ def _create_demo_sync_history(
     source_id: str,
     base_count: int,
 ) -> None:
-    """Create demo sync jobs for last 7 days to show healthy history.
+    """Create seeded sync jobs for last 7 days to show healthy history.
 
     This provides a realistic-looking sync history in the Integration
-    Monitoring dashboard for demo purposes.
+    Monitoring dashboard for seeded/local validation purposes.
 
     Args:
         repo: Integration repository instance
@@ -220,5 +220,5 @@ def _create_demo_sync_history(
                 failed=0,
             )
         except Exception as e:
-            logger.debug("Failed to create demo sync job: %s", e)
+            logger.debug("Failed to create seeded sync job: %s", e)
             # Non-critical, continue

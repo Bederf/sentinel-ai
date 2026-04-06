@@ -6,10 +6,11 @@ import csv
 import json
 import logging
 import re
-from datetime import date, datetime
+from collections.abc import Iterable
 from dataclasses import dataclass
+from datetime import date, datetime
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 from urllib.parse import quote
 
 import httpx
@@ -163,7 +164,7 @@ DOCUMENT_TYPE_CLASSIFIER = [
         {"certificate", "cert", "certificates", "annual inspection cert", "lift cert", "elevator certificate"},
     ),
     ("reading", {"reading", "readings", "meter reading", "diesel reading"}),
-    ("checklist", {"check list", "checklist", "check-lists", "check-lists"}),
+    ("checklist", {"check list", "checklist", "check-lists"}),
     ("job_card", {"job card", "job cards"}),
     ("report", {"report", "reports"}),
     ("unknown", set()),
@@ -386,7 +387,7 @@ class IndexedConceptDocument:
     concept_url: str
 
     @classmethod
-    def from_dict(cls, payload: dict[str, Any]) -> "IndexedConceptDocument":
+    def from_dict(cls, payload: dict[str, Any]) -> IndexedConceptDocument:
         file_name = str(payload.get("file_name") or payload.get("title") or "")
         title = str(payload.get("title") or file_name or payload.get("concept_document_id") or "Untitled document")
         file_path = str(payload.get("file_path") or payload.get("path") or "")
@@ -945,7 +946,7 @@ def _match_reasons(
     combined_tokens: set[str],
 ) -> list[str]:
     reasons: list[str] = []
-    reasons.extend(sorted((hints.tokens & combined_tokens))[:4])
+    reasons.extend(sorted(hints.tokens & combined_tokens)[:4])
 
     if hints.document_types and document.document_type in hints.document_types:
         reasons.append(document.document_type)

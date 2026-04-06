@@ -27,9 +27,10 @@ import logging
 import logging as _logging
 import os as _os
 import time as _time
+from collections.abc import Callable
 from contextlib import contextmanager
 from functools import wraps
-from typing import Any, Callable, Optional, TypeVar, ParamSpec
+from typing import Any, ParamSpec, TypeVar
 
 from app.config.settings import settings
 
@@ -93,7 +94,7 @@ class CacheService:
         """Prefix key with namespace."""
         return f"bms:{key}"
 
-    def get(self, key: str) -> Optional[Any]:
+    def get(self, key: str) -> Any | None:
         """Get value from cache.
 
         Args:
@@ -122,7 +123,7 @@ class CacheService:
             logger.debug(f"Cache get error for {key}: {e}")
             return None
 
-    def set(self, key: str, value: Any, ttl: Optional[int] = None) -> bool:
+    def set(self, key: str, value: Any, ttl: int | None = None) -> bool:
         """Set value in cache.
 
         Args:
@@ -192,7 +193,7 @@ class CacheService:
             logger.debug(f"Cache delete_pattern error for {pattern}: {e}")
             return 0
 
-    def get_or_set(self, key: str, factory: Callable[[], Any], ttl: Optional[int] = None) -> Any:
+    def get_or_set(self, key: str, factory: Callable[[], Any], ttl: int | None = None) -> Any:
         """Get from cache or compute and store.
 
         Args:
@@ -217,7 +218,7 @@ class CacheService:
 
         return value
 
-    async def get_or_set_async(self, key: str, factory: Callable[[], Any], ttl: Optional[int] = None) -> Any:
+    async def get_or_set_async(self, key: str, factory: Callable[[], Any], ttl: int | None = None) -> Any:
         """Async version of get_or_set.
 
         Args:
@@ -247,7 +248,7 @@ class CacheService:
 
         return value
 
-    def cached(self, key_template: str, ttl: Optional[int] = None) -> Callable[[Callable[P, R]], Callable[P, R]]:
+    def cached(self, key_template: str, ttl: int | None = None) -> Callable[[Callable[P, R]], Callable[P, R]]:
         """Decorator for caching function results.
 
         Args:
@@ -289,7 +290,7 @@ class CacheService:
 
         return decorator
 
-    def cached_async(self, key_template: str, ttl: Optional[int] = None) -> Callable[[Callable[P, R]], Callable[P, R]]:
+    def cached_async(self, key_template: str, ttl: int | None = None) -> Callable[[Callable[P, R]], Callable[P, R]]:
         """Async decorator for caching function results.
 
         Args:
@@ -411,13 +412,13 @@ class CacheKeys:
         return f"equipment:count:{site_id}"
 
     @staticmethod
-    def alerts_active(site_id: Optional[str] = None) -> str:
+    def alerts_active(site_id: str | None = None) -> str:
         if site_id:
             return f"alerts:active:building:{site_id}"
         return "alerts:active:all"
 
     @staticmethod
-    def predictions_active(site_id: Optional[str] = None) -> str:
+    def predictions_active(site_id: str | None = None) -> str:
         if site_id:
             return f"predictions:active:building:{site_id}"
         return "predictions:active:all"

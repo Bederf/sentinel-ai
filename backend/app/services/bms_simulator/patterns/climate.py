@@ -5,11 +5,11 @@ Generates climate-based variations for BMS simulation based on South African cli
 Includes temperature, humidity, and wet-bulb patterns for different regions.
 """
 
-import numpy as np
-from datetime import datetime, timedelta
-from typing import Dict, Tuple, Optional
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from enum import Enum
+
+import numpy as np
 
 
 class Season(str, Enum):
@@ -34,9 +34,9 @@ class ClimateZone(str, Enum):
 class SeasonalClimate:
     """Climate parameters for a season."""
 
-    temp_range: Tuple[float, float]  # Min/max outdoor temp (degC)
-    humidity_range: Tuple[float, float]  # Min/max humidity (%RH)
-    wet_bulb_range: Tuple[float, float]  # Min/max wet bulb (degC)
+    temp_range: tuple[float, float]  # Min/max outdoor temp (degC)
+    humidity_range: tuple[float, float]  # Min/max humidity (%RH)
+    wet_bulb_range: tuple[float, float]  # Min/max wet bulb (degC)
     solar_peak_hour: int = 14  # Hour of peak solar radiation
     solar_intensity: float = 1.0  # Relative solar intensity (0-1)
 
@@ -77,7 +77,7 @@ class ClimateProfile:
 
 
 # Climate profiles for South African regions
-CLIMATE_PROFILES: Dict[str, ClimateProfile] = {
+CLIMATE_PROFILES: dict[str, ClimateProfile] = {
     "johannesburg": ClimateProfile(
         zone=ClimateZone.JOHANNESBURG,
         summer=SeasonalClimate(
@@ -274,7 +274,7 @@ class ClimatePattern:
     def get_outdoor_humidity(
         self,
         dt: datetime,
-        outdoor_temp: Optional[float] = None,
+        outdoor_temp: float | None = None,
         noise_level: float = 0.05,
     ) -> float:
         """
@@ -315,8 +315,8 @@ class ClimatePattern:
     def get_wet_bulb_temp(
         self,
         dt: datetime,
-        outdoor_temp: Optional[float] = None,
-        outdoor_humidity: Optional[float] = None,
+        outdoor_temp: float | None = None,
+        outdoor_humidity: float | None = None,
     ) -> float:
         """
         Calculate wet bulb temperature.
@@ -361,7 +361,7 @@ class ClimatePattern:
     def get_cooling_load_factor(
         self,
         dt: datetime,
-        outdoor_temp: Optional[float] = None,
+        outdoor_temp: float | None = None,
     ) -> float:
         """
         Calculate relative cooling load factor based on outdoor conditions.
@@ -413,7 +413,7 @@ class ClimatePattern:
         base_value: float,
         point_name: str,
         dt: datetime,
-        outdoor_temp: Optional[float] = None,
+        outdoor_temp: float | None = None,
     ) -> float:
         """
         Apply climate effects to chiller point value.
@@ -458,8 +458,8 @@ class ClimatePattern:
         base_value: float,
         point_name: str,
         dt: datetime,
-        outdoor_temp: Optional[float] = None,
-        outdoor_humidity: Optional[float] = None,
+        outdoor_temp: float | None = None,
+        outdoor_humidity: float | None = None,
     ) -> float:
         """
         Apply climate effects to cooling tower point value.
@@ -505,7 +505,7 @@ class ClimatePattern:
         self,
         timestamps: np.ndarray,
         noise_level: float = 0.05,
-    ) -> Dict[str, np.ndarray]:
+    ) -> dict[str, np.ndarray]:
         """
         Generate complete outdoor conditions for a series of timestamps.
 

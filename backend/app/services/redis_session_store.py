@@ -11,8 +11,9 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Callable
 from datetime import datetime, timedelta
-from typing import Any, Callable, Dict, Optional
+from typing import Any
 
 from app.config.settings import settings
 
@@ -32,15 +33,15 @@ class RedisSessionStore:
         self,
         prefix: str,
         ttl_seconds: int = 3600,
-        deserializer: Optional[Callable[[dict], Any]] = None,
+        deserializer: Callable[[dict], Any] | None = None,
     ) -> None:
         self._prefix = prefix
         self._ttl_seconds = ttl_seconds
         self._deserializer = deserializer
         self._redis = None
         self._redis_checked = False
-        self._memory: Dict[str, Any] = {}
-        self._memory_expiry: Dict[str, datetime] = {}
+        self._memory: dict[str, Any] = {}
+        self._memory_expiry: dict[str, datetime] = {}
 
     def _get_redis(self):
         """Lazy Redis connection with fallback."""
@@ -100,7 +101,7 @@ class RedisSessionStore:
             except Exception as e:
                 logger.warning("RedisSessionStore(%s) write failed: %s", self._prefix, e)
 
-    def get(self, session_id: str) -> Optional[Any]:
+    def get(self, session_id: str) -> Any | None:
         """Retrieve session data. Returns original object or deserialized dict."""
         # Try in-memory first (fastest)
         if session_id in self._memory:

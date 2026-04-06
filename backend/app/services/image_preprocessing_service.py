@@ -10,7 +10,6 @@ Prepares uploaded photos (job cards, service sheets) for Claude Vision extractio
 """
 
 import logging
-from typing import Tuple
 
 import cv2
 import numpy as np
@@ -28,7 +27,7 @@ MAX_DIMENSION = 2048  # Max px for Claude Vision
 class ImagePreprocessor:
     """Adaptive image preprocessor for document photos."""
 
-    def preprocess(self, image_data: bytes, media_type: str) -> Tuple[bytes, dict]:
+    def preprocess(self, image_data: bytes, media_type: str) -> tuple[bytes, dict]:
         """Run adaptive preprocessing pipeline.
 
         Args:

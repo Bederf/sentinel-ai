@@ -6,16 +6,16 @@ and degradation patterns.
 """
 
 import json
+from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional
-from dataclasses import dataclass, asdict
+from typing import Any
 
 import numpy as np
 
 from ..models import (
-    SimulationConfig,
     EQUIPMENT_ALARM_PROFILES,
+    SimulationConfig,
 )
 from ..patterns.degradation import DegradationPattern
 from .point_list import PointListExporter
@@ -31,17 +31,17 @@ class AlarmEvent:
     alarm_code: str
     severity: str
     description: str
-    point_name: Optional[str] = None
-    point_value: Optional[float] = None
-    threshold_value: Optional[float] = None
+    point_name: str | None = None
+    point_value: float | None = None
+    threshold_value: float | None = None
     acknowledged: bool = False
-    acknowledged_by: Optional[str] = None
-    acknowledged_at: Optional[str] = None
+    acknowledged_by: str | None = None
+    acknowledged_at: str | None = None
     cleared: bool = False
-    cleared_at: Optional[str] = None
-    notes: Optional[str] = None
+    cleared_at: str | None = None
+    notes: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary, excluding None values."""
         return {k: v for k, v in asdict(self).items() if v is not None}
 
@@ -77,7 +77,7 @@ class AlarmEventGenerator:
         "REFRIGERANT_LO": "Refrigerant level low",
     }
 
-    def __init__(self, config: Optional[SimulationConfig] = None):
+    def __init__(self, config: SimulationConfig | None = None):
         """
         Initialize the alarm event generator.
 
@@ -91,10 +91,10 @@ class AlarmEventGenerator:
 
     def generate_threshold_alarms(
         self,
-        device: Dict[str, Any],
-        trend_data: Dict[str, np.ndarray],
+        device: dict[str, Any],
+        trend_data: dict[str, np.ndarray],
         timestamps: np.ndarray,
-    ) -> List[AlarmEvent]:
+    ) -> list[AlarmEvent]:
         """
         Generate alarms when point values exceed thresholds.
 
@@ -212,7 +212,7 @@ class AlarmEventGenerator:
         equipment_type: str,
         start_date: datetime,
         days: int,
-    ) -> List[AlarmEvent]:
+    ) -> list[AlarmEvent]:
         """
         Generate alarm sequence for degrading equipment.
 
@@ -271,10 +271,10 @@ class AlarmEventGenerator:
 
     def generate_random_alarms(
         self,
-        device: Dict[str, Any],
+        device: dict[str, Any],
         timestamps: np.ndarray,
         alarm_probability: float = 0.001,
-    ) -> List[AlarmEvent]:
+    ) -> list[AlarmEvent]:
         """
         Generate random sporadic alarms (transient faults, communication issues).
 
@@ -322,10 +322,10 @@ class AlarmEventGenerator:
 
     def generate_all_alarms(
         self,
-        site_id: Optional[str] = None,
+        site_id: str | None = None,
         include_diffusers: bool = True,
         include_random: bool = True,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Generate all alarms for a site.
 
@@ -382,8 +382,8 @@ class AlarmEventGenerator:
 
     def export_alarms(
         self,
-        site_id: Optional[str] = None,
-        output_path: Optional[Path] = None,
+        site_id: str | None = None,
+        output_path: Path | None = None,
     ) -> str:
         """
         Export all alarms to JSON file.
@@ -415,8 +415,8 @@ class AlarmEventGenerator:
 
     def get_alarm_summary(
         self,
-        alarms: List[Dict[str, Any]],
-    ) -> Dict[str, Any]:
+        alarms: list[dict[str, Any]],
+    ) -> dict[str, Any]:
         """
         Get summary statistics for generated alarms.
 
@@ -463,8 +463,8 @@ class AlarmEventGenerator:
     def generate_cold_room_excursion_scenario(
         self,
         equipment_id: str = "UMH-COLD-L1-001",
-        start_date: Optional[datetime] = None,
-    ) -> List[AlarmEvent]:
+        start_date: datetime | None = None,
+    ) -> list[AlarmEvent]:
         """
         Generate pharmacy cold room temperature excursion scenario.
 
@@ -565,9 +565,9 @@ class AlarmEventGenerator:
 
     def generate_chiller_cascade_scenario(
         self,
-        equipment_ids: Optional[List[str]] = None,
-        start_date: Optional[datetime] = None,
-    ) -> List[AlarmEvent]:
+        equipment_ids: list[str] | None = None,
+        start_date: datetime | None = None,
+    ) -> list[AlarmEvent]:
         """
         Generate dual chiller failure risk scenario.
 
@@ -685,9 +685,9 @@ class AlarmEventGenerator:
     def generate_theatre_hepa_life_scenario(
         self,
         equipment_id: str = "UMH-AHU-L3-TH2",
-        start_date: Optional[datetime] = None,
+        start_date: datetime | None = None,
         days: int = 90,
-    ) -> List[AlarmEvent]:
+    ) -> list[AlarmEvent]:
         """
         Generate HEPA filter lifecycle trending scenario.
 
@@ -799,8 +799,8 @@ class AlarmEventGenerator:
     def generate_generator_fuel_scenario(
         self,
         equipment_id: str = "UMH-GEN-B1-001",
-        start_date: Optional[datetime] = None,
-    ) -> List[AlarmEvent]:
+        start_date: datetime | None = None,
+    ) -> list[AlarmEvent]:
         """
         Generate fuel vs load shedding duration correlation scenario.
 
@@ -896,8 +896,8 @@ class AlarmEventGenerator:
     def generate_icu_humidity_scenario(
         self,
         equipment_id: str = "UMH-AHU-L3-ICU",
-        start_date: Optional[datetime] = None,
-    ) -> List[AlarmEvent]:
+        start_date: datetime | None = None,
+    ) -> list[AlarmEvent]:
         """
         Generate ICU humidity excursion during Durban summer scenario.
 
@@ -997,7 +997,7 @@ class AlarmEventGenerator:
         self,
         scenario: str,
         **kwargs,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Generate alarms for a named scenario.
 

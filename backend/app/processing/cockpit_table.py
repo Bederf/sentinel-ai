@@ -12,6 +12,7 @@ The heavy operations are ``fuse()`` → ``_dedupe()`` (sort + bucket) and
 ``_build_source_statuses()`` (max-per-source).  Replace those internals with
 Polars expressions; the method signatures are the stable contract.
 """
+
 from __future__ import annotations
 
 from collections.abc import Iterable
@@ -26,9 +27,9 @@ from app.schemas.cockpit import (
     CockpitIssueEvidenceRef,
     CockpitIssueLocation,
     CockpitSourceStatus,
+    IssueCategory,
     IssueSeverity,
     IssueSource,
-    IssueCategory,
     IssueSubsystem,
 )
 
@@ -39,9 +40,9 @@ from app.schemas.cockpit import (
 SOURCE_ORDER: list[str] = ["bms", "intake", "tech"]
 
 SOURCE_THRESHOLDS: dict[str, dict[str, int]] = {
-    "bms":    {"healthy": 45,  "degraded": 45,  "stale": 90,   "unavailable": 300},
-    "intake": {"healthy": 180, "degraded": 180, "stale": 600,  "unavailable": 1800},
-    "tech":   {"healthy": 300, "degraded": 300, "stale": 900,  "unavailable": 3600},
+    "bms": {"healthy": 45, "degraded": 45, "stale": 90, "unavailable": 300},
+    "intake": {"healthy": 180, "degraded": 180, "stale": 600, "unavailable": 1800},
+    "tech": {"healthy": 300, "degraded": 300, "stale": 900, "unavailable": 3600},
 }
 
 SEVERITY_MAP: dict[str, int] = {"critical": 4, "high": 3, "medium": 2, "low": 1}
@@ -50,6 +51,7 @@ SEVERITY_MAP: dict[str, int] = {"critical": 4, "high": 3, "medium": 2, "low": 1}
 # ---------------------------------------------------------------------------
 # Internal record type — pure data, no I/O
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class _NormalizedIssue:
@@ -62,6 +64,7 @@ class _NormalizedIssue:
 # ---------------------------------------------------------------------------
 # Processor
 # ---------------------------------------------------------------------------
+
 
 class CockpitTableProcessor:
     """Pure tabular shaping for the cockpit issue feed.
@@ -92,9 +95,9 @@ class CockpitTableProcessor:
             (issues, source_statuses, audit_trail, selected_id)
         """
         normalized: list[_NormalizedIssue] = []
-        normalized.extend(CockpitTableProcessor._to_normalized_issues(alerts,      source="bms",    priority=0))
-        normalized.extend(CockpitTableProcessor._to_normalized_issues(intakes,     source="intake", priority=1))
-        normalized.extend(CockpitTableProcessor._to_normalized_issues(work_orders, source="tech",   priority=2))
+        normalized.extend(CockpitTableProcessor._to_normalized_issues(alerts, source="bms", priority=0))
+        normalized.extend(CockpitTableProcessor._to_normalized_issues(intakes, source="intake", priority=1))
+        normalized.extend(CockpitTableProcessor._to_normalized_issues(work_orders, source="tech", priority=2))
 
         deduped = CockpitTableProcessor._dedupe(normalized)
 
@@ -367,7 +370,11 @@ class CockpitTableProcessor:
         statuses = []
         for source, items in entries.items():
             last_updated = max(
-                (CockpitTableProcessor._parse_datetime(item.get("updated_at")) for item in items if item.get("updated_at")),
+                (
+                    CockpitTableProcessor._parse_datetime(item.get("updated_at"))
+                    for item in items
+                    if item.get("updated_at")
+                ),
                 default=None,
             )
             if source == "bms" and bridge_last_updated:

@@ -1,9 +1,24 @@
+---
+title: "API & Service Cost Tracking Module"
+type: "spec"
+status: "draft"
+version: "1.1.0"
+created: "2026-03-31"
+updated: "2026-04-01"
+tags: ["sentinel", "documentation"]
+related: []
+domain: "bms"
+audience: "all"
+complexity: "intermediate"
+estimated_read_time: 10
+---
+
 # API & Service Cost Tracking Module
 
 **Phase:** v48.0 Settings Panel + v58.0 Unified Service Cost Tracking (Phase 158)
 **Status:** ✅ Complete
-**Version:** 2.0
-**Updated:** 2026-03-16
+**Version:** 2.1
+**Updated:** 2026-04-01
 
 ## Overview
 
@@ -38,7 +53,19 @@ The Cost Tracking module monitors spend across **all paid external services** us
 | **ElevenLabs** | `elevenlabs_chars` | $0.00003 | Character | Voice TTS synthesis |
 | **EskomSePush** | `eskomsepush_call` | $0.00 (free tier) | API call | Load shedding status |
 
-Each API call is tagged with a **source** label: `chat`, `tools`, `sentry`, `background`, `vision`, `tts`, `alert`, `energy`, `wo`.
+Each API call is tagged with a **source** label for route-level attribution.
+Examples include:
+- `chat_core_gateway`
+- `chat_core_tools`
+- `chat_tech_gateway`
+- `rag_query`
+- `rag_explain_prediction`
+- `local_chat_query_handler`
+- `email_intake_agent`
+- `ai_optimizer`
+- `digital_twin_floorplan_extraction`
+- `job_card_doc_classification`
+- `job_card_field_extraction`
 
 ## Architecture
 
@@ -187,16 +214,18 @@ The **API & Service Costs** panel appears in the Settings page and shows:
 3. **Daily bar chart** — visual spend trend with tooltips
 4. **By provider** — percentage bars with per-provider colors (AI, messaging, services)
 5. **By model** — table with calls, tokens, cost per model
-6. **Exchange rate** — displayed at bottom
+6. **By route/source** — cost by business path (chat core, tech chat, RAG, optimizer, etc.)
+7. **Site budget status** — monthly budget, spent, remaining, hard-cap state
+8. **Exchange rate** — displayed at bottom
 
-New providers (WhatsApp, BulkSMS, Telegram, ElevenLabs, EskomSePush) appear automatically in both "By Provider" and "By Model" sections when data exists.
+New providers (WhatsApp, BulkSMS, Telegram, ElevenLabs, EskomSePush) appear automatically in "By Provider" and "By Model" sections when data exists.
 
 ## API Endpoints
 
 | Endpoint | Method | Auth | Description |
 |----------|--------|------|-------------|
-| `/api/ai-usage/summary?days=30` | GET | ADMIN/OPERATOR | Period summary with breakdowns |
-| `/api/ai-usage/today` | GET | ADMIN/OPERATOR | Real-time today's usage |
+| `/api/ai-usage/summary?days=30&site_id=site-002` | GET | ADMIN/OPERATOR | Period summary with by-source + optional site budget block |
+| `/api/ai-usage/today?site_id=site-002` | GET | ADMIN/OPERATOR | Real-time today's usage + by-source + optional site budget metadata |
 | `/api/ai-usage/exchange-rate` | PUT | ADMIN | Update USD/ZAR rate |
 | `/api/ai-usage/flush` | POST | ADMIN | Force persist to disk |
 
@@ -239,6 +268,19 @@ usage_tracker.record_service("new_provider", units=500, unit_type="chars", sourc
 ```
 
 Add pricing to `SERVICE_PRICING_USD` dict using key format `{provider}_{unit_type}`.
+
+## Site AI Policy + Budget Controls
+
+Site-level AI policy is managed in Settings and persisted in backend settings storage.
+
+Policy fields:
+- `chat_local_ai_only` — force local chat for the site
+- `allow_tool_calling` — enable/disable tool actions in chat
+- `show_recommendations_in_shadow` — control shadow-mode recommendation visibility
+- `monthly_budget_zar` — monthly AI budget per site
+- `hard_cap_enforced` — blocks paid chat execution when budget is exceeded
+
+When `hard_cap_enforced=true` and monthly spend exceeds `monthly_budget_zar`, `/api/chat` returns a budget-cap message and does not execute a paid LLM call.
 
 ## Source Files
 

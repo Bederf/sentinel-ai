@@ -111,8 +111,16 @@ def parse_mqtt_presence_message(topic: str, payload: bytes | str | dict[str, Any
         if moving is not None or stationary is not None:
             occupied = bool(moving) or bool(stationary)
 
+    from app.core.site_resolver import get_primary_site_code
+
+    resolved_site_id = (
+        site_id_override or raw_data.get("site_id") or settings.space_default_site_id or get_primary_site_code()
+    )
+    if not resolved_site_id:
+        raise ValueError("No site_id provided in MQTT payload and no registered primary site is available")
+
     return MqttPresenceEvent(
-        site_id=site_id_override or raw_data.get("site_id") or settings.space_default_site_id,
+        site_id=resolved_site_id,
         room_code=room_code,
         sensor_id=raw_data.get("sensor_id") or node_id or room_code,
         occupied=occupied,
@@ -180,62 +188,68 @@ class SpaceMqttListener:
         self._client = None
         self._enabled = bool(settings.space_mqtt_enabled and settings.space_mqtt_broker)
         self._loop: asyncio.AbstractEventLoop | None = None
+        self._lock = asyncio.Lock()
 
     async def start(self) -> None:
         if not self._enabled:
             return
-        self._loop = asyncio.get_running_loop()
-        try:
-            import paho.mqtt.client as mqtt
-        except ImportError:
-            logger.warning("MQTT listener not started: paho-mqtt not installed")
-            return
-
-        client = mqtt.Client(client_id=settings.space_mqtt_client_id or "sentinel-space-backend")
-        if settings.space_mqtt_username:
-            client.username_pw_set(settings.space_mqtt_username, settings.space_mqtt_password)
-
-        def _on_connect(client, _userdata, _flags, reason_code, _properties=None):
-            if reason_code == 0:
-                # Subscribe to radar topic only (v2.x nodes).
-                # Legacy sentinel/nodes/+/presence topic removed — v1.x backward
-                # compat no longer needed. Remove mqtt.publish(topicLegacy, ...)
-                # from firmware to stop double-publish at source.
-                radar_topic = settings.space_mqtt_radar_topic
-                if radar_topic:
-                    client.subscribe(radar_topic)
-                    logger.warning(
-                        "Space MQTT listener connected — subscribed to %s",
-                        radar_topic,
-                    )
-                else:
-                    # Fallback: use legacy topic if radar topic not configured
-                    client.subscribe(settings.space_mqtt_topic)
-                    logger.warning(
-                        "Space MQTT listener connected — subscribed to %s (legacy)",
-                        settings.space_mqtt_topic,
-                    )
-            else:
-                logger.warning("Space MQTT listener connect failed: %s", reason_code)
-
-        def _on_message(_client, _userdata, message):
+        async with self._lock:
+            if self._client is not None:
+                return
+            self._loop = asyncio.get_running_loop()
             try:
-                logger.warning("Space MQTT rx: %s → %s", message.topic, message.payload[:120])
-                if self._loop and self._loop.is_running():
-                    asyncio.run_coroutine_threadsafe(
-                        process_mqtt_presence_message(message.topic, message.payload),
-                        self._loop,
-                    )
-                else:
-                    logger.warning("Space MQTT message dropped: listener loop unavailable")
-            except Exception:
-                logger.warning("Space MQTT message dropped: no running loop")
+                import paho.mqtt.client as mqtt
+            except ImportError:
+                logger.warning("MQTT listener not started: paho-mqtt not installed")
+                return
 
-        client.on_connect = _on_connect
-        client.on_message = _on_message
-        client.connect_async(settings.space_mqtt_broker, settings.space_mqtt_port, keepalive=30)
-        client.loop_start()
-        self._client = client
+            client = mqtt.Client(client_id=settings.space_mqtt_client_id or "sentinel-space-backend")
+            if settings.space_mqtt_username:
+                client.username_pw_set(settings.space_mqtt_username, settings.space_mqtt_password)
+
+            def _on_connect(client, _userdata, _flags, reason_code, _properties=None):
+                if reason_code == 0:
+                    radar_topic = settings.space_mqtt_radar_topic
+                    if radar_topic:
+                        client.subscribe(radar_topic)
+                        logger.warning(
+                            "Space MQTT listener connected — subscribed to %s",
+                            radar_topic,
+                        )
+                    else:
+                        client.subscribe(settings.space_mqtt_topic)
+                        logger.warning(
+                            "Space MQTT listener connected — subscribed to %s (legacy)",
+                            settings.space_mqtt_topic,
+                        )
+                else:
+                    logger.warning("Space MQTT listener connect failed: %s", reason_code)
+
+            def _on_message(_client, _userdata, message):
+                try:
+                    logger.warning("Space MQTT rx: %s → %s", message.topic, message.payload[:120])
+                    if self._loop and self._loop.is_running():
+                        future = asyncio.run_coroutine_threadsafe(
+                            process_mqtt_presence_message(message.topic, message.payload),
+                            self._loop,
+                        )
+                        future.add_done_callback(
+                            lambda completed: (
+                                logger.warning("Space MQTT message rejected: %s", completed.exception())
+                                if completed.exception()
+                                else None
+                            )
+                        )
+                    else:
+                        logger.warning("Space MQTT message dropped: listener loop unavailable")
+                except Exception:
+                    logger.warning("Space MQTT message dropped: no running loop")
+
+            client.on_connect = _on_connect
+            client.on_message = _on_message
+            client.connect_async(settings.space_mqtt_broker, settings.space_mqtt_port, keepalive=30)
+            client.loop_start()
+            self._client = client
 
     async def stop(self) -> None:
         if self._client is None:

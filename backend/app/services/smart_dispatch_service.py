@@ -17,12 +17,12 @@ import logging
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
-from app.services.remote_monitoring_service import get_remote_monitoring_service
-from app.services.device_abstraction import device_manager
-from app.services.work_order_service import work_order_service
 from app.core.site_resolver import get_primary_site_code
+from app.services.device_abstraction import device_manager
+from app.services.remote_monitoring_service import get_remote_monitoring_service
+from app.services.work_order_service import work_order_service
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +33,7 @@ TECHNICIANS_FILE = DATA_DIR / "technicians.json"
 FLOOR_ORDER = {"B2": 0, "B1": 1, "G": 2, "L0": 3, "L1": 4, "L2": 5, "L3": 6, "R": 7}
 
 # Specialization mapping from equipment type to required skill
-EQUIPMENT_SPECIALIZATION: Dict[str, str] = {
+EQUIPMENT_SPECIALIZATION: dict[str, str] = {
     "chiller": "hvac",
     "ahu": "hvac",
     "fcu": "hvac",
@@ -51,7 +51,7 @@ EQUIPMENT_SPECIALIZATION: Dict[str, str] = {
 }
 
 # Estimated task durations (minutes) by type
-TASK_DURATION_ESTIMATES: Dict[str, int] = {
+TASK_DURATION_ESTIMATES: dict[str, int] = {
     "safety_violation": 45,
     "anomaly_investigation": 30,
     "work_order": 60,
@@ -63,7 +63,7 @@ TASK_DURATION_ESTIMATES: Dict[str, int] = {
 }
 
 # Tools commonly needed by task type
-TOOLS_BY_TASK_TYPE: Dict[str, List[str]] = {
+TOOLS_BY_TASK_TYPE: dict[str, list[str]] = {
     "safety_violation": ["multimeter", "PPE kit", "lockout/tagout kit"],
     "anomaly_investigation": ["multimeter", "thermal camera", "vibration meter"],
     "work_order": ["basic tool kit", "spare parts (per WO)"],
@@ -97,9 +97,9 @@ class SmartDispatchService:
     def __init__(self):
         if self._initialized:
             return
-        self._technicians: List[Dict[str, Any]] = []
-        self._active_dispatches: Dict[str, Dict[str, Any]] = {}
-        self._completed_dispatches: List[Dict[str, Any]] = []
+        self._technicians: list[dict[str, Any]] = []
+        self._active_dispatches: dict[str, dict[str, Any]] = {}
+        self._completed_dispatches: list[dict[str, Any]] = []
         self._load_technicians()
         self._initialized = True
         logger.info(f"SmartDispatchService initialized with {len(self._technicians)} technicians")
@@ -122,7 +122,7 @@ class SmartDispatchService:
     # Dispatch decision engine
     # ------------------------------------------------------------------
 
-    async def evaluate_dispatch(self, equipment_id: str) -> Dict[str, Any]:
+    async def evaluate_dispatch(self, equipment_id: str) -> dict[str, Any]:
         """Evaluate whether a technician dispatch is needed for equipment.
 
         Steps:
@@ -147,7 +147,7 @@ class SmartDispatchService:
         site_id = self._site_id_from_equipment(equipment_id)
 
         # Check if remotely resolvable
-        remote_actions: List[str] = []
+        remote_actions: list[str] = []
         if not report.requires_dispatch and not report.anomalies:
             remote_actions.append("Remote diagnostic completed - all readings normal")
             return {
@@ -224,7 +224,7 @@ class SmartDispatchService:
     # Task bundling ("while you're there")
     # ------------------------------------------------------------------
 
-    async def bundle_tasks(self, site_id: str, primary_equipment_id: str) -> List[Dict[str, Any]]:
+    async def bundle_tasks(self, site_id: str, primary_equipment_id: str) -> list[dict[str, Any]]:
         """Find additional tasks at the same site to bundle with dispatch.
 
         Gathers:
@@ -240,7 +240,7 @@ class SmartDispatchService:
         Returns:
             List of bundled tasks sorted by floor for efficient routing.
         """
-        tasks: List[Dict[str, Any]] = []
+        tasks: list[dict[str, Any]] = []
 
         # a. Open work orders for same site
         try:
@@ -319,7 +319,7 @@ class SmartDispatchService:
 
         # Deduplicate by equipment_id
         seen_equipment: set = set()
-        unique_tasks: List[Dict[str, Any]] = []
+        unique_tasks: list[dict[str, Any]] = []
         for task in tasks:
             eq_id = task.get("equipment_id")
             if eq_id and eq_id not in seen_equipment:
@@ -337,7 +337,7 @@ class SmartDispatchService:
     # Technician assignment
     # ------------------------------------------------------------------
 
-    def find_best_technician(self, site_id: str, required_specialization: str = "general") -> Dict[str, Any]:
+    def find_best_technician(self, site_id: str, required_specialization: str = "general") -> dict[str, Any]:
         """Find the best technician for a dispatch.
 
         Priority:
@@ -408,8 +408,8 @@ class SmartDispatchService:
         self,
         site_id: str,
         technician_id: str,
-        bundled_tasks: List[Dict[str, Any]],
-    ) -> Dict[str, Any]:
+        bundled_tasks: list[dict[str, Any]],
+    ) -> dict[str, Any]:
         """Generate a structured site briefing for a technician.
 
         Includes building info, current status, task list with floor routing,
@@ -494,9 +494,9 @@ class SmartDispatchService:
         self,
         site_id: str,
         equipment_id: str,
-        technician_id: Optional[str] = None,
-        additional_tasks: Optional[List[Dict[str, Any]]] = None,
-    ) -> Dict[str, Any]:
+        technician_id: str | None = None,
+        additional_tasks: list[dict[str, Any]] | None = None,
+    ) -> dict[str, Any]:
         """Create a new dispatch with bundled tasks and site briefing.
 
         Args:
@@ -606,7 +606,7 @@ class SmartDispatchService:
             "site_briefing": briefing,
         }
 
-    def check_in(self, dispatch_id: str, technician_id: str) -> Dict[str, Any]:
+    def check_in(self, dispatch_id: str, technician_id: str) -> dict[str, Any]:
         """Record technician arrival at site.
 
         Args:
@@ -638,7 +638,7 @@ class SmartDispatchService:
             "message": f"Checked in at {dispatch['site_id']}. {len(dispatch['tasks'])} tasks to complete.",
         }
 
-    def complete_task(self, dispatch_id: str, task_id: str, result: Dict[str, Any]) -> Dict[str, Any]:
+    def complete_task(self, dispatch_id: str, task_id: str, result: dict[str, Any]) -> dict[str, Any]:
         """Mark a single task within a dispatch as completed.
 
         Args:
@@ -680,7 +680,7 @@ class SmartDispatchService:
         self,
         dispatch_id: str,
         overall_notes: str = "",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Close a dispatch and record completion metrics.
 
         Args:
@@ -741,7 +741,7 @@ class SmartDispatchService:
             "site_id": dispatch["site_id"],
         }
 
-    def get_active_dispatches(self) -> List[Dict[str, Any]]:
+    def get_active_dispatches(self) -> list[dict[str, Any]]:
         """Get all active dispatches with their current status.
 
         Returns:
@@ -763,7 +763,7 @@ class SmartDispatchService:
             for d in self._active_dispatches.values()
         ]
 
-    def get_technicians(self) -> List[Dict[str, Any]]:
+    def get_technicians(self) -> list[dict[str, Any]]:
         """Get all technicians with current status.
 
         Returns:
@@ -789,9 +789,9 @@ class SmartDispatchService:
     def _suggest_remote_actions(
         self,
         equipment_id: str,
-        anomalies: List[str],
-        recommendations: List[str],
-    ) -> List[str]:
+        anomalies: list[str],
+        recommendations: list[str],
+    ) -> list[str]:
         """Suggest remote actions that might resolve the issue.
 
         Checks for common remotely-resolvable patterns:
@@ -799,7 +799,7 @@ class SmartDispatchService:
         - Communication lost -> remote restart
         - Schedule conflict -> schedule override
         """
-        suggestions: List[str] = []
+        suggestions: list[str] = []
         anomaly_text = " ".join(anomalies).lower()
 
         if "setpoint" in anomaly_text or "temperature" in anomaly_text:
@@ -816,10 +816,10 @@ class SmartDispatchService:
 
         return suggestions
 
-    def _get_site_info(self, site_id: str) -> Dict[str, Any]:
+    def _get_site_info(self, site_id: str) -> dict[str, Any]:
         """Get building information for a site.
 
-        Loads from buildings data or returns demo defaults.
+        Loads from buildings data or returns local defaults.
         """
         # Default for the primary registered site
         if site_id == get_primary_site_code():
@@ -851,12 +851,12 @@ class SmartDispatchService:
             "parking": "Not configured",
         }
 
-    def _build_floor_routing(self, tasks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def _build_floor_routing(self, tasks: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Group tasks by floor for efficient routing.
 
         Returns floor-by-floor route from lowest to highest.
         """
-        floors: Dict[str, List[Dict[str, Any]]] = {}
+        floors: dict[str, list[dict[str, Any]]] = {}
         for task in tasks:
             floor = task.get("floor", "unknown")
             if floor not in floors:
@@ -884,7 +884,7 @@ class SmartDispatchService:
 
         return routing
 
-    async def _get_equipment_details(self, tasks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    async def _get_equipment_details(self, tasks: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Get detailed equipment info for each task.
 
         Reads current device status, location, and relevant readings.
@@ -895,7 +895,7 @@ class SmartDispatchService:
             if not eq_id:
                 continue
 
-            detail: Dict[str, Any] = {
+            detail: dict[str, Any] = {
                 "equipment_id": eq_id,
                 "task_id": task["task_id"],
             }
@@ -928,7 +928,7 @@ class SmartDispatchService:
 
         return details
 
-    def _infer_tools_needed(self, tasks: List[Dict[str, Any]]) -> List[str]:
+    def _infer_tools_needed(self, tasks: list[dict[str, Any]]) -> list[str]:
         """Infer tools and parts needed from task types.
 
         Deduplicates across all tasks.
@@ -974,7 +974,7 @@ class SmartDispatchService:
         return "general"
 
     @staticmethod
-    def _floor_from_equipment(equipment_id: Optional[str]) -> str:
+    def _floor_from_equipment(equipment_id: str | None) -> str:
         """Extract floor from equipment ID.
 
         Equipment ID format: S002-TYPE-FLOOR-ZONE

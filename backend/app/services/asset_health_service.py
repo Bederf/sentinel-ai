@@ -9,7 +9,6 @@ Deviation classification is baseline-specific: <=15% normal, <30% warning, >=30%
 """
 
 import logging
-from typing import List, Optional
 
 from app.config.settings import settings
 from app.database.repositories.baseline_repository import BaselineRepository
@@ -28,7 +27,7 @@ class AssetHealthService:
         self._baseline_repo = BaselineRepository()
         self._threshold_svc = get_health_threshold_service()
 
-    async def get_site_assets(self, site_code: str) -> List[AssetHealthBaseline]:
+    async def get_site_assets(self, site_code: str) -> list[AssetHealthBaseline]:
         """Get baseline + health snapshot for ALL equipment at a site."""
         # 1. Fetch equipment list
         equipment_list = self._equipment_repo.get_by_site_code(site_code)
@@ -44,7 +43,7 @@ class AssetHealthService:
         deviation_status = await self._baseline_repo.get_bulk_max_deviation_24h(equipment_ids)
 
         # 3. Build results
-        assets: List[AssetHealthBaseline] = []
+        assets: list[AssetHealthBaseline] = []
         for eq in equipment_list:
             code = eq.get("code", eq.get("id", ""))
             asset = self._build_asset(eq, code, baseline_status, deviation_status)
@@ -52,7 +51,7 @@ class AssetHealthService:
 
         return assets
 
-    async def get_equipment_detail(self, equipment_id: str) -> Optional[AssetHealthBaseline]:
+    async def get_equipment_detail(self, equipment_id: str) -> AssetHealthBaseline | None:
         """Get baseline + health snapshot for a single equipment item."""
         # equipment_id here is an equipment code (e.g. S002-CHILLER-B1-001)
         eq = self._equipment_repo.get_by_id(equipment_id)
@@ -85,11 +84,15 @@ class AssetHealthService:
 
         health_status = self._threshold_svc.get_health_status(health_score)
 
-        # Determine health source
-        if settings.demo_mode:
-            health_source = "simulation"
-        else:
-            health_source = "equipment_table"
+        # Determine health source from the configured ingestion posture.
+        health_source = "equipment_table"
+        try:
+            resolved_mode = settings.resolved_ingestion_mode
+            mode_value = resolved_mode.value if hasattr(resolved_mode, "value") else str(resolved_mode)
+            if str(mode_value).lower() == "simulation":
+                health_source = "simulation"
+        except Exception:
+            pass
 
         # Baseline data
         bl = baseline_status.get(code, {})
@@ -122,7 +125,7 @@ class AssetHealthService:
 
 
 # Singleton
-_asset_health_service_instance: Optional[AssetHealthService] = None
+_asset_health_service_instance: AssetHealthService | None = None
 
 
 def get_asset_health_service() -> AssetHealthService:

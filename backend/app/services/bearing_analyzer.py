@@ -17,7 +17,7 @@ Reference: ISO 10816 vibration severity standards
 """
 
 import logging
-from typing import Dict, Any, Optional, List
+from typing import Any
 
 import numpy as np
 
@@ -64,8 +64,8 @@ class BearingAnalyzer:
     }
 
     def analyze(
-        self, spectrum_data: Dict[str, Any], equipment_type: str = "motor", shaft_rpm: Optional[float] = None
-    ) -> Dict[str, Any]:
+        self, spectrum_data: dict[str, Any], equipment_type: str = "motor", shaft_rpm: float | None = None
+    ) -> dict[str, Any]:
         """
         Analyze vibration spectrum for bearing defects.
 
@@ -130,7 +130,7 @@ class BearingAnalyzer:
 
         return result
 
-    def _estimate_shaft_rpm(self, peak_freqs: List[float], rpm_range: tuple) -> float:
+    def _estimate_shaft_rpm(self, peak_freqs: list[float], rpm_range: tuple) -> float:
         """Estimate shaft RPM from dominant frequency."""
         min_rpm, max_rpm = rpm_range
         min_freq, max_freq = min_rpm / 60, max_rpm / 60
@@ -144,8 +144,8 @@ class BearingAnalyzer:
         return (min_rpm + max_rpm) / 2
 
     def _check_mechanical_faults(
-        self, peak_freqs: List[float], peak_amps: List[float], shaft_freq: float
-    ) -> Optional[Dict[str, Any]]:
+        self, peak_freqs: list[float], peak_amps: list[float], shaft_freq: float
+    ) -> dict[str, Any] | None:
         """Check for imbalance, misalignment, looseness."""
         faults_found = []
 
@@ -197,8 +197,8 @@ class BearingAnalyzer:
         return None
 
     def _check_bearing_defects(
-        self, bearing_peaks: List[tuple], shaft_freq: float, all_freqs: List[float]
-    ) -> Dict[str, Any]:
+        self, bearing_peaks: list[tuple], shaft_freq: float, all_freqs: list[float]
+    ) -> dict[str, Any]:
         """Check for bearing defect frequencies."""
         result = {
             "defect_detected": False,
@@ -250,7 +250,7 @@ class BearingAnalyzer:
 
         return result
 
-    def _count_harmonics(self, fundamental: float, all_freqs: List[float], max_harmonic: int = 5) -> int:
+    def _count_harmonics(self, fundamental: float, all_freqs: list[float], max_harmonic: int = 5) -> int:
         """Count harmonic frequencies present."""
         count = 0
         for n in range(2, max_harmonic + 1):
@@ -261,7 +261,7 @@ class BearingAnalyzer:
                     break
         return count
 
-    def _calculate_confidence(self, peak_amp: float, all_amps: List[float], harmonic_count: int) -> float:
+    def _calculate_confidence(self, peak_amp: float, all_amps: list[float], harmonic_count: int) -> float:
         """Calculate confidence score for defect detection."""
         # Base confidence from amplitude prominence
         if all_amps and peak_amp > 0:
@@ -283,7 +283,7 @@ class BearingAnalyzer:
 
 
 # Singleton instance
-_analyzer_instance: Optional[BearingAnalyzer] = None
+_analyzer_instance: BearingAnalyzer | None = None
 
 
 def get_bearing_analyzer() -> BearingAnalyzer:

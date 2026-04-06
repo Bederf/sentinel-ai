@@ -16,7 +16,6 @@ occupancy ML model later.
 from __future__ import annotations
 
 import logging
-from collections import defaultdict
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
@@ -26,6 +25,7 @@ from zoneinfo import ZoneInfo
 from app.config.settings import settings
 from app.core.site_resolver import get_registered_site_ids
 from app.database.supabase_client import get_supabase_client
+from app.processing.occupancy_table import aggregate_window as _aggregate_window_proc
 
 logger = logging.getLogger(__name__)
 
@@ -35,13 +35,6 @@ TABLE_DAILY_OUTPUTS = "space_occupancy_daily_ml_outputs"
 def _ensure_timezone() -> ZoneInfo:
     # Hard-code to match your operational requirement.
     return ZoneInfo("Africa/Johannesburg")
-
-
-def _to_naive_utc(dt: datetime) -> datetime:
-    # Convert to UTC and strip tzinfo for deterministic arithmetic.
-    if dt.tzinfo is not None:
-        dt = dt.astimezone(UTC)
-    return dt.replace(tzinfo=None)
 
 
 def _compute_yesterday_window_utc(now_utc: datetime) -> tuple[datetime, datetime, date]:
@@ -116,10 +109,13 @@ def _get_edge_site_scope(site_ids: list[str]) -> list[str]:
     if not settings.edge_mode:
         return site_ids
     # Edge devices should only process the single activated site.
-    if settings.space_default_site_id in site_ids:
-        return [settings.space_default_site_id]
-    # Fallback: still attempt the configured site (useful if registration lags).
-    return [settings.space_default_site_id]
+    from app.core.site_resolver import get_primary_site_code
+
+    preferred_site = settings.space_default_site_id or get_primary_site_code()
+    if preferred_site and preferred_site in site_ids:
+        return [preferred_site]
+    # Fallback: still attempt the preferred/primary site (useful if registration lags).
+    return [preferred_site] if preferred_site else site_ids
 
 
 def _pg_connect():
@@ -210,87 +206,6 @@ def _output_mark_deleted(out_id: str, deleted_at_iso: str) -> None:
         conn.close()
 
 
-def _compute_room_occupied_minutes(events: list[dict[str, Any]], window_end_utc: datetime) -> tuple[int, int]:
-    """Return (occupied_minutes, empty_minutes) using simple transition logic.
-
-    Assumes `events` are ordered by timestamp ascending and contain:
-    - timestamp (ISO string)
-    - occupied (bool)
-    """
-    if not events:
-        return 0, 0
-
-    total_seconds = 0.0
-    occupied_seconds = 0.0
-
-    # Use window_end and first event time as the effective start.
-    # (We could extend precision by querying one event before the window,
-    # but for the current POPIA minimization use-case this approximation is OK.)
-    start_naive = _to_naive_utc(events[0]["_ts"])
-    end_naive = _to_naive_utc(window_end_utc)
-    total_seconds = (end_naive - start_naive).total_seconds()
-
-    segment_start: datetime | None = None
-    for e in events:
-        et = e["_ts_naive"]
-        if e.get("occupied", False) and segment_start is None:
-            segment_start = et
-        elif (not e.get("occupied", False)) and segment_start is not None:
-            occupied_seconds += (et - segment_start).total_seconds()
-            segment_start = None
-
-    if segment_start is not None:
-        occupied_seconds += (end_naive - segment_start).total_seconds()
-
-    occupied_minutes = max(0, int(occupied_seconds / 60))
-    # empty_minutes for completeness; may be slightly approximate.
-    empty_minutes = max(0, int((total_seconds - occupied_seconds) / 60))
-    return occupied_minutes, empty_minutes
-
-
-def _aggregate_window(site_events: list[dict[str, Any]], window_end_utc: datetime) -> dict[str, Any]:
-    by_room: defaultdict[str, list[dict[str, Any]]] = defaultdict(list)
-    for e in site_events:
-        # Normalize timestamps for arithmetic.
-        ts_str = e.get("timestamp")
-        if not ts_str:
-            continue
-        try:
-            # Support timestamps like 2026-03-25T14:32:55+00:00
-            ts = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
-        except ValueError:
-            continue
-        e["_ts"] = ts
-        e["_ts_naive"] = _to_naive_utc(ts)
-        by_room[str(e.get("room_code", ""))].append(e)
-
-    results_rooms: list[dict[str, Any]] = []
-    for room_code, room_events in by_room.items():
-        room_events.sort(key=lambda r: r["_ts_naive"])
-        occupied_minutes, empty_minutes = _compute_room_occupied_minutes(room_events, window_end_utc)
-
-        total_minutes = occupied_minutes + empty_minutes
-        occupied_percent = round((occupied_minutes / total_minutes * 100.0) if total_minutes else 0.0, 2)
-
-        results_rooms.append(
-            {
-                "room_code": room_code,
-                "events_count": len(room_events),
-                "occupied_minutes": occupied_minutes,
-                "empty_minutes": empty_minutes,
-                "occupied_percent": occupied_percent,
-            }
-        )
-
-    return {
-        "window": {
-            "end_utc": window_end_utc.isoformat(),
-        },
-        "rooms": results_rooms,
-        "rooms_total": len(results_rooms),
-    }
-
-
 async def run_daily_occupancy_processing(*, grace_days: int) -> None:
     client = get_supabase_client()
     _try_ensure_daily_outputs_table(client)
@@ -341,8 +256,8 @@ async def _process_and_maybe_delete_for_site(
     )
     events = resp.data or []
 
-    # Aggregate.
-    results = _aggregate_window(events, window.window_end_utc)
+    # Aggregate — tabular shaping lives in app/processing/occupancy_table.py
+    results = _aggregate_window_proc(events, window.window_end_utc)
 
     row = {
         "id": str(uuid4()),

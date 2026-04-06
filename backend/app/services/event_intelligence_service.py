@@ -19,9 +19,10 @@ import logging
 import math
 import time
 from collections import deque
+from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Any, Callable, Deque, Dict, List, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from app.models.operational_event import (
     EventSeverity,
@@ -30,6 +31,7 @@ from app.models.operational_event import (
     _generate_event_id,
 )
 from app.services.event_bus import get_event_bus
+from app.services.ml_config import get_anomaly_alert_threshold
 
 logger = logging.getLogger("sentinel.event_intelligence")
 
@@ -68,7 +70,7 @@ class EventDetectionRule:
 
     rule_id: str
     event_type: OperationalEventType
-    equipment_types: List[str]
+    equipment_types: list[str]
     check: Callable
 
 
@@ -95,12 +97,12 @@ class _TrendBuffer:
     """Ring buffer for tracking recent values of a single point."""
 
     def __init__(self, maxlen: int = TREND_BUFFER_SIZE):
-        self._values: Deque[float] = deque(maxlen=maxlen)
+        self._values: deque[float] = deque(maxlen=maxlen)
 
     def add(self, value: float) -> None:
         self._values.append(value)
 
-    def trend(self) -> Optional[str]:
+    def trend(self) -> str | None:
         """Determine trend from buffered values.
 
         Returns:
@@ -152,11 +154,11 @@ class EventIntelligenceService:
         anomaly_score_threshold: float = DEFAULT_ANOMALY_SCORE_THRESHOLD,
         setpoint_drift_threshold: float = DEFAULT_SETPOINT_DRIFT_THRESHOLD_C,
     ):
-        self._rules: List[EventDetectionRule] = []
-        self._active_conditions: Dict[str, _ActiveCondition] = {}
-        self._event_history: Deque[OperationalEvent] = deque(maxlen=10000)
-        self._trend_buffers: Dict[str, _TrendBuffer] = {}
-        self._energy_history: Dict[str, Deque[float]] = {}
+        self._rules: list[EventDetectionRule] = []
+        self._active_conditions: dict[str, _ActiveCondition] = {}
+        self._event_history: deque[OperationalEvent] = deque(maxlen=10000)
+        self._trend_buffers: dict[str, _TrendBuffer] = {}
+        self._energy_history: dict[str, deque[float]] = {}
 
         # Configurable thresholds
         self._temp_deviation_threshold = temp_deviation_threshold
@@ -248,7 +250,7 @@ class EventIntelligenceService:
     # Trend tracking
     # ------------------------------------------------------------------
 
-    def _get_trend(self, equipment_id: str, point_name: str, value: float) -> Optional[str]:
+    def _get_trend(self, equipment_id: str, point_name: str, value: float) -> str | None:
         """Record a value and return the current trend for a point.
 
         Args:
@@ -270,8 +272,8 @@ class EventIntelligenceService:
     # ------------------------------------------------------------------
 
     async def _check_temperature_deviation(
-        self, equipment_id: str, site_id: str, telemetry: Dict[str, Any]
-    ) -> Optional[OperationalEvent]:
+        self, equipment_id: str, site_id: str, telemetry: dict[str, Any]
+    ) -> OperationalEvent | None:
         """Detect temperature deviation from setpoint.
 
         Triggers when actual temperature deviates from setpoint by more than
@@ -302,7 +304,7 @@ class EventIntelligenceService:
             equipment_id=equipment_id,
             site_id=site_id,
             severity=severity,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             signals=[{"point": "current_temp", "value": current_temp, "setpoint": setpoint}],
             description=(
                 f"{equipment_id}: temperature {current_temp:.1f}C deviates "
@@ -314,8 +316,8 @@ class EventIntelligenceService:
         )
 
     async def _check_energy_spike(
-        self, equipment_id: str, site_id: str, telemetry: Dict[str, Any]
-    ) -> Optional[OperationalEvent]:
+        self, equipment_id: str, site_id: str, telemetry: dict[str, Any]
+    ) -> OperationalEvent | None:
         """Detect energy consumption spikes.
 
         Compares current power reading to a rolling average. Triggers when
@@ -354,7 +356,7 @@ class EventIntelligenceService:
                     equipment_id=equipment_id,
                     site_id=site_id,
                     severity=severity,
-                    timestamp=datetime.now(timezone.utc),
+                    timestamp=datetime.now(UTC),
                     signals=[{"point": "power_kw", "value": power, "rolling_avg": round(avg, 2)}],
                     description=(
                         f"{equipment_id}: power {power:.1f}kW is {power / avg:.1f}x the rolling average {avg:.1f}kW"
@@ -368,14 +370,14 @@ class EventIntelligenceService:
         return None
 
     async def _check_sensor_failure(
-        self, equipment_id: str, site_id: str, telemetry: Dict[str, Any]
-    ) -> Optional[OperationalEvent]:
+        self, equipment_id: str, site_id: str, telemetry: dict[str, Any]
+    ) -> OperationalEvent | None:
         """Detect sensor failures — NaN, None, or stale readings.
 
         Checks all numeric telemetry values. Also checks for a
         'last_reading_timestamp' field to detect stale data.
         """
-        failed_points: List[Dict[str, Any]] = []
+        failed_points: list[dict[str, Any]] = []
 
         for key, value in telemetry.items():
             if key in ("status", "mode", "equipment_type", "is_running", "last_reading_timestamp"):
@@ -393,12 +395,12 @@ class EventIntelligenceService:
                 if isinstance(last_ts, str):
                     last_dt = datetime.fromisoformat(last_ts.replace("Z", "+00:00"))
                 elif isinstance(last_ts, (int, float)):
-                    last_dt = datetime.fromtimestamp(last_ts, tz=timezone.utc)
+                    last_dt = datetime.fromtimestamp(last_ts, tz=UTC)
                 else:
                     last_dt = None
 
                 if last_dt is not None:
-                    age_minutes = (datetime.now(timezone.utc) - last_dt).total_seconds() / 60.0
+                    age_minutes = (datetime.now(UTC) - last_dt).total_seconds() / 60.0
                     if age_minutes > self._stale_reading_minutes:
                         failed_points.append(
                             {
@@ -421,7 +423,7 @@ class EventIntelligenceService:
             equipment_id=equipment_id,
             site_id=site_id,
             severity=severity,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             signals=failed_points,
             description=(
                 f"{equipment_id}: {len(failed_points)} sensor failure(s) detected "
@@ -431,8 +433,8 @@ class EventIntelligenceService:
         )
 
     async def _check_comfort_violation(
-        self, equipment_id: str, site_id: str, telemetry: Dict[str, Any]
-    ) -> Optional[OperationalEvent]:
+        self, equipment_id: str, site_id: str, telemetry: dict[str, Any]
+    ) -> OperationalEvent | None:
         """Detect zone temperature outside comfort band.
 
         Default comfort band is 20-24 deg C (configurable).
@@ -468,7 +470,7 @@ class EventIntelligenceService:
             equipment_id=equipment_id,
             site_id=site_id,
             severity=severity,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             signals=[
                 {
                     "point": "zone_temp",
@@ -488,12 +490,15 @@ class EventIntelligenceService:
         )
 
     async def _check_ml_anomaly(
-        self, equipment_id: str, site_id: str, telemetry: Dict[str, Any]
-    ) -> Optional[OperationalEvent]:
+        self, equipment_id: str, site_id: str, telemetry: dict[str, Any]
+    ) -> OperationalEvent | None:
         """Detect ML-flagged pattern anomalies.
 
         Checks if the telemetry contains an anomaly_score field (injected
-        by upstream ML inference) above the configured threshold.
+        by upstream ML inference) above the dynamic threshold. The threshold
+        starts conservative (0.87) at 72 hours of shadow data and eases to
+        0.75 once 2000+ hours have accumulated — preventing noisy Telegram
+        alerts during early sparse-data calibration.
         """
         anomaly_score = telemetry.get("anomaly_score")
         if anomaly_score is None:
@@ -504,7 +509,10 @@ class EventIntelligenceService:
         except (ValueError, TypeError):
             return None
 
-        if anomaly_score <= self._anomaly_score_threshold:
+        # Dynamic threshold — reads ml_hours_ingested from SentinelDataSync singleton
+        threshold = self._get_dynamic_anomaly_threshold()
+
+        if anomaly_score <= threshold:
             return None
 
         severity = EventSeverity.CRITICAL if anomaly_score > 0.8 else EventSeverity.HIGH
@@ -515,20 +523,37 @@ class EventIntelligenceService:
             equipment_id=equipment_id,
             site_id=site_id,
             severity=severity,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             signals=[{"point": "anomaly_score", "value": anomaly_score}],
             description=(
                 f"{equipment_id}: ML anomaly score {anomaly_score:.2f} "
-                f"exceeds threshold {self._anomaly_score_threshold}"
+                f"exceeds threshold {threshold}"
             ),
-            threshold_value=self._anomaly_score_threshold,
+            threshold_value=threshold,
             actual_value=anomaly_score,
             metadata={"anomaly_score": anomaly_score},
         )
 
+    def _get_dynamic_anomaly_threshold(self) -> float:
+        """Return the graduated alert threshold based on ml_hours_ingested.
+
+        Reads hours from the shared SentinelDataSync singleton so the
+        EventIntelligenceService stays decoupled from the ML feeder.
+        Returns the static default if the singleton is unavailable.
+        """
+        try:
+            from app.services.sentinel_data_sync import get_sentinel_data_sync
+
+            sync = get_sentinel_data_sync()
+            hours = sync.ml_feeder.hours_ingested
+            return get_anomaly_alert_threshold(hours)
+        except Exception:
+            # Fallback to conservative static default if singleton is not available
+            return DEFAULT_ANOMALY_SCORE_THRESHOLD
+
     async def _check_setpoint_drift(
-        self, equipment_id: str, site_id: str, telemetry: Dict[str, Any]
-    ) -> Optional[OperationalEvent]:
+        self, equipment_id: str, site_id: str, telemetry: dict[str, Any]
+    ) -> OperationalEvent | None:
         """Detect setpoint drift from baseline.
 
         Triggers when the current setpoint differs from the baseline
@@ -556,7 +581,7 @@ class EventIntelligenceService:
             equipment_id=equipment_id,
             site_id=site_id,
             severity=EventSeverity.WARNING,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             signals=[{"point": "setpoint", "value": setpoint, "baseline": baseline}],
             description=(
                 f"{equipment_id}: setpoint {setpoint:.1f}C has drifted {drift:.1f}C from baseline {baseline:.1f}C"
@@ -566,8 +591,8 @@ class EventIntelligenceService:
         )
 
     async def _check_threshold_breach(
-        self, equipment_id: str, site_id: str, telemetry: Dict[str, Any]
-    ) -> Optional[OperationalEvent]:
+        self, equipment_id: str, site_id: str, telemetry: dict[str, Any]
+    ) -> OperationalEvent | None:
         """Generic threshold check for points with configured min/max.
 
         Looks for a 'thresholds' dict in telemetry with per-point min/max:
@@ -577,7 +602,7 @@ class EventIntelligenceService:
         if not isinstance(thresholds, dict):
             return None
 
-        breaches: List[Dict[str, Any]] = []
+        breaches: list[dict[str, Any]] = []
         for point_name, limits in thresholds.items():
             if not isinstance(limits, dict):
                 continue
@@ -624,7 +649,7 @@ class EventIntelligenceService:
             equipment_id=equipment_id,
             site_id=site_id,
             severity=severity,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             signals=breaches,
             description=(
                 f"{equipment_id}: {len(breaches)} threshold breach(es) ({', '.join(b['point'] for b in breaches)})"
@@ -637,8 +662,8 @@ class EventIntelligenceService:
     # ------------------------------------------------------------------
 
     async def evaluate_equipment(
-        self, equipment_id: str, site_id: str, telemetry: Dict[str, Any]
-    ) -> List[OperationalEvent]:
+        self, equipment_id: str, site_id: str, telemetry: dict[str, Any]
+    ) -> list[OperationalEvent]:
         """Evaluate all rules against equipment telemetry.
 
         Args:
@@ -650,7 +675,7 @@ class EventIntelligenceService:
             List of detected operational events.
         """
         equip_type = self._extract_equipment_type(equipment_id)
-        events: List[OperationalEvent] = []
+        events: list[OperationalEvent] = []
 
         for rule in self._rules:
             # Check if rule applies to this equipment type
@@ -702,8 +727,8 @@ class EventIntelligenceService:
     async def process_site(
         self,
         site_id: str,
-        equipment_telemetry: Optional[Dict[str, Dict[str, Any]]] = None,
-    ) -> List[OperationalEvent]:
+        equipment_telemetry: dict[str, dict[str, Any]] | None = None,
+    ) -> list[OperationalEvent]:
         """Process all equipment in a site, detect events, emit to bus.
 
         This is the main entry point, called periodically by the scheduler
@@ -720,7 +745,7 @@ class EventIntelligenceService:
         if equipment_telemetry is None:
             equipment_telemetry = await self._load_site_telemetry(site_id)
 
-        all_events: List[OperationalEvent] = []
+        all_events: list[OperationalEvent] = []
         bus = get_event_bus()
 
         for equipment_id, telemetry in equipment_telemetry.items():
@@ -750,7 +775,7 @@ class EventIntelligenceService:
         )
         return all_events
 
-    async def _load_site_telemetry(self, site_id: str) -> Dict[str, Dict[str, Any]]:
+    async def _load_site_telemetry(self, site_id: str) -> dict[str, dict[str, Any]]:
         """Load equipment telemetry for a site from the repository.
 
         Uses lazy import to avoid circular dependencies and ensure
@@ -762,7 +787,7 @@ class EventIntelligenceService:
         Returns:
             Dict mapping equipment_id to operating_data.
         """
-        result: Dict[str, Dict[str, Any]] = {}
+        result: dict[str, dict[str, Any]] = {}
         try:
             from app.database.repositories.equipment_repository import EquipmentRepository
 
@@ -788,9 +813,9 @@ class EventIntelligenceService:
 
     async def get_active_events(
         self,
-        site_id: Optional[str] = None,
-        equipment_id: Optional[str] = None,
-    ) -> List[OperationalEvent]:
+        site_id: str | None = None,
+        equipment_id: str | None = None,
+    ) -> list[OperationalEvent]:
         """Get currently active (unresolved) operational events.
 
         Args:
@@ -809,7 +834,7 @@ class EventIntelligenceService:
 
         return events
 
-    async def get_event_summary(self, site_id: str) -> Dict[str, Any]:
+    async def get_event_summary(self, site_id: str) -> dict[str, Any]:
         """Get summary of events for a site (counts by type, severity).
 
         Args:
@@ -821,8 +846,8 @@ class EventIntelligenceService:
         """
         active = await self.get_active_events(site_id=site_id)
 
-        by_type: Dict[str, int] = {}
-        by_severity: Dict[str, int] = {}
+        by_type: dict[str, int] = {}
+        by_severity: dict[str, int] = {}
 
         for event in active:
             by_type[event.event_type.value] = by_type.get(event.event_type.value, 0) + 1
@@ -841,11 +866,11 @@ class EventIntelligenceService:
 
     async def get_event_history(
         self,
-        site_id: Optional[str] = None,
-        equipment_id: Optional[str] = None,
-        event_type: Optional[str] = None,
+        site_id: str | None = None,
+        equipment_id: str | None = None,
+        event_type: str | None = None,
         limit: int = 100,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get event history with optional filters.
 
         Args:
@@ -857,7 +882,7 @@ class EventIntelligenceService:
         Returns:
             List of event dicts, most recent first.
         """
-        results: List[Dict[str, Any]] = []
+        results: list[dict[str, Any]] = []
 
         for event in reversed(self._event_history):
             if site_id and event.site_id != site_id:
@@ -873,7 +898,7 @@ class EventIntelligenceService:
 
         return results
 
-    async def get_event_by_id(self, event_id: str) -> Optional[Dict[str, Any]]:
+    async def get_event_by_id(self, event_id: str) -> dict[str, Any] | None:
         """Get a specific event by its ID.
 
         Searches active conditions first, then history.
@@ -901,7 +926,7 @@ class EventIntelligenceService:
 # Singleton
 # ---------------------------------------------------------------------------
 
-_service: Optional[EventIntelligenceService] = None
+_service: EventIntelligenceService | None = None
 
 
 def get_event_intelligence_service() -> EventIntelligenceService:

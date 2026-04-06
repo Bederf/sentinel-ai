@@ -14,7 +14,6 @@ import { Sun, TrendingUp, TrendingDown, Minus, Zap, DollarSign } from "lucide-re
 import type { SolarOverview } from "../../lib/solarApi";
 import { fetchSolarOverview } from "../../lib/solarApi";
 import { isExpectedApiError } from "../../lib/api";
-import { useSimulation } from "../../contexts/SimulationContext";
 
 interface SolarOverviewPanelProps {
   siteId: string;
@@ -52,9 +51,6 @@ export function SolarOverviewPanel({ siteId }: SolarOverviewPanelProps) {
   const [overview, setOverview] = useState<SolarOverview | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  // Get live simulation data
-  const { running, solarEfficiency, simulatedHour } = useSimulation();
 
   const loadData = useCallback(async () => {
     try {
@@ -118,49 +114,14 @@ export function SolarOverviewPanel({ siteId }: SolarOverviewPanelProps) {
 
   const installedCapacity = overview.installed_capacity_kwp || 0;
 
-  // When simulation is running, derive all values from simulation context
-  let currentGeneration = overview.current_generation_kw ?? 0;
-  let dailyYield = overview.daily_yield_kwh ?? 0;
-  let savingsToday = overview.estimated_savings_today_zar ?? 0;
-  let performanceRatio = overview.performance_ratio ?? 0;
-  let selfConsumption = overview.self_consumption_percent ?? 0;
-  let gridImport = overview.grid_import_kw ?? 0;
-  let gridExport = overview.grid_export_kw ?? 0;
-  let expectedDailyYield = overview.expected_daily_yield_kwh || (installedCapacity * 5);
-
-  if (running && solarEfficiency !== undefined) {
-    // Current generation from simulation solar efficiency × capacity
-    currentGeneration = Math.round((solarEfficiency / 100) * installedCapacity);
-
-    // Daily yield: accumulate generation across daylight hours up to current hour
-    // Solar curve: cos((h-12)*PI/12) for h in 6-18
-    let yieldAccum = 0;
-    for (let h = 6; h <= Math.min(simulatedHour, 18); h++) {
-      const hourSolar = Math.max(0, Math.cos((h - 12) * Math.PI / 12));
-      yieldAccum += hourSolar * installedCapacity * 0.85; // 85% system efficiency
-    }
-    dailyYield = Math.round(yieldAccum);
-
-    // Building load estimate: ~1200 kW during business hours, ~400 kW off-hours
-    const buildingLoad = (simulatedHour >= 7 && simulatedHour <= 18) ? 1200 : 400;
-
-    // Grid: import when generation < load, export when generation > load
-    if (currentGeneration > buildingLoad) {
-      gridExport = Math.round(currentGeneration - buildingLoad);
-      gridImport = 0;
-    } else {
-      gridImport = Math.round(buildingLoad - currentGeneration);
-      gridExport = 0;
-    }
-
-    // Performance ratio: generation vs theoretical clear-sky
-    performanceRatio = solarEfficiency > 0 ? Math.min(0.95, (solarEfficiency / 100) * 1.1) : 0;
-    selfConsumption = currentGeneration > 0 ? Math.round(Math.min(100, (buildingLoad / currentGeneration) * 100)) : 0;
-
-    // Savings: R5/kWh × daily yield
-    savingsToday = Math.round(dailyYield * 5);
-    expectedDailyYield = Math.round(installedCapacity * 5); // ~5 peak sun hours JHB
-  }
+  const currentGeneration = overview.current_generation_kw ?? 0;
+  const dailyYield = overview.daily_yield_kwh ?? 0;
+  const savingsToday = overview.estimated_savings_today_zar ?? 0;
+  const performanceRatio = overview.performance_ratio ?? 0;
+  const selfConsumption = overview.self_consumption_percent ?? 0;
+  const gridImport = overview.grid_import_kw ?? 0;
+  const gridExport = overview.grid_export_kw ?? 0;
+  const expectedDailyYield = overview.expected_daily_yield_kwh || (installedCapacity * 5);
 
   const generationPercent = installedCapacity > 0
     ? (currentGeneration / installedCapacity) * 100
@@ -185,9 +146,7 @@ export function SolarOverviewPanel({ siteId }: SolarOverviewPanelProps) {
     }).format(amount);
 
   let statusLabel = "Offline";
-  if (running) {
-    statusLabel = (solarEfficiency ?? 0) > 0 ? "🔴 Live • Generating" : "🔴 Live • Nighttime";
-  } else if (currentGeneration > 0) {
+  if (currentGeneration > 0) {
     statusLabel = "Generating";
   }
   if (error) {
@@ -223,8 +182,8 @@ export function SolarOverviewPanel({ siteId }: SolarOverviewPanelProps) {
         <span
           className="text-xs px-2 py-1 rounded"
           style={{
-            background: (currentGeneration > 0 || (running && (solarEfficiency ?? 0) > 0)) ? "rgba(16, 185, 129, 0.15)" : "rgba(107, 114, 128, 0.15)",
-            color: (currentGeneration > 0 || (running && (solarEfficiency ?? 0) > 0)) ? "var(--color-sentinel-green)" : "var(--color-sentinel-text-secondary)",
+            background: currentGeneration > 0 ? "rgba(16, 185, 129, 0.15)" : "rgba(107, 114, 128, 0.15)",
+            color: currentGeneration > 0 ? "var(--color-sentinel-green)" : "var(--color-sentinel-text-secondary)",
           }}
         >
           {statusLabel}

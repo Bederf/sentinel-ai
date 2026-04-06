@@ -8,10 +8,8 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Optional
 
 from app.models.semantic_tag import SemanticDictionary, SemanticTag
-
 
 _DEFAULT_DICTIONARY_PATH = Path(__file__).parent.parent.parent / "app" / "data" / "simbiot" / "semantic_dictionary.json"
 # Fallback: relative path from cwd (e.g. when running from backend/)
@@ -28,14 +26,14 @@ class SemanticDictionaryService:
         tag = service.get_tag("supply_air_temperature_sensor")
     """
 
-    def __init__(self, dictionary_path: Optional[Path] = None) -> None:
+    def __init__(self, dictionary_path: Path | None = None) -> None:
         if dictionary_path is not None:
             self.dictionary_path = Path(dictionary_path)
         elif _DEFAULT_DICTIONARY_PATH.exists():
             self.dictionary_path = _DEFAULT_DICTIONARY_PATH
         else:
             self.dictionary_path = _RELATIVE_FALLBACK
-        self._dictionary: Optional[SemanticDictionary] = None
+        self._dictionary: SemanticDictionary | None = None
 
     # ------------------------------------------------------------------
     # Loading
@@ -66,7 +64,7 @@ class SemanticDictionaryService:
     # Accessors
     # ------------------------------------------------------------------
 
-    def get_tag(self, tag: str) -> Optional[SemanticTag]:
+    def get_tag(self, tag: str) -> SemanticTag | None:
         """Return a semantic tag by name, or None if not found."""
         self._ensure_loaded()
         return self._dictionary.semantic_tags.get(tag)  # type: ignore[union-attr]
@@ -86,11 +84,11 @@ class SemanticDictionaryService:
             if eq_lower in [t.lower() for t in tag.applies_to]
         ]
 
-    def get_safety_class(self, tag: str) -> Optional[str]:
+    def get_safety_class(self, tag: str) -> str | None:
         """Return the safety class string for a tag name."""
         semantic_tag = self.get_tag(tag)
         return semantic_tag.safety_class.value if semantic_tag else None
 
-    def get_dictionary(self) -> Optional[SemanticDictionary]:
+    def get_dictionary(self) -> SemanticDictionary | None:
         """Return the loaded dictionary model (None if not yet loaded)."""
         return self._dictionary

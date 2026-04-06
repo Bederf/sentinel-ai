@@ -10,7 +10,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Mail, AlertCircle, Loader2 } from "lucide-react";
+import { Mail, AlertCircle, Loader2, Info } from "lucide-react";
 import { authApi, type AuthUser } from '@/lib/api';
 
 interface EmailEntryProps {
@@ -118,29 +118,19 @@ export function EmailEntry({ onSuccess }: EmailEntryProps) {
       className="min-h-screen flex flex-col items-center justify-center p-4"
       style={{ background: "var(--color-sentinel-bg-canvas)" }}
     >
-      {/* Logo and Title */}
-      <div className="flex flex-col items-center mb-8">
-        <div
-          className="w-16 h-16 rounded-xl flex items-center justify-center mb-4 overflow-hidden"
-          style={{
-            background: "linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(59, 130, 246, 0.1))",
-            border: "1px solid rgba(59, 130, 246, 0.3)",
-          }}
-        >
-          <img
-            src="/images/sentinel-logo.png"
-            alt="Sentinel"
-            className="w-full h-full object-contain rounded-xl"
-          />
-        </div>
+      {/* Title only — no static logo here; splash already showed the logo video */}
+      <div className="flex flex-col items-center mb-8 text-center">
         <h1
-          className="text-2xl font-bold tracking-wide mb-2"
+          className="text-2xl font-bold tracking-wide mb-1"
           style={{ color: "var(--color-sentinel-text-primary)" }}
         >
           SENTINEL
         </h1>
+        <p className="text-xs tracking-wide mb-3" style={{ color: "var(--color-sentinel-text-disabled)" }}>
+          BMS Intelligence
+        </p>
         <p
-          className="text-sm text-center"
+          className="text-sm"
           style={{ color: "var(--color-sentinel-text-secondary)" }}
         >
           Enter your email to continue
@@ -233,17 +223,19 @@ export function EmailEntry({ onSuccess }: EmailEntryProps) {
         </button>
       </div>
 
-      {/* Hint */}
+      {/* Hint — icon only (avoid repeating the hero logo, which looked like a duplicate large mark) */}
       <p
-        className="mt-6 text-xs flex items-center gap-1"
+        className="mt-6 text-xs flex items-start gap-2 max-w-md text-center sm:text-left"
         style={{ color: "var(--color-sentinel-text-disabled)" }}
       >
-        <img
-          src="/images/sentinel-logo.png"
-          alt=""
-          className="w-3 h-3 opacity-70"
+        <Info
+          className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 opacity-80"
+          aria-hidden
+          style={{ color: "var(--color-sentinel-text-disabled)" }}
         />
-        Your email is your login. Session stays active while your token is valid.
+        <span>
+          Your email is your login. Session stays active while your token is valid.
+        </span>
       </p>
     </div>
   );

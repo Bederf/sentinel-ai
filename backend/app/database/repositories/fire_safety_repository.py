@@ -61,11 +61,11 @@ class FireSafetyRepository:
         if STATE_FILE.exists():
             with open(STATE_FILE) as f:
                 return json.load(f)
-        # Initialize from config demo_state
+        # Initialize from config local_state
         config = self._load_config()
-        demo = config.get("demo_state", {})
+        local_state = config.get("local_state", config.get("demo_state", {}))
         return {
-            "alarms": demo.get("active_alarms", []),
+            "alarms": local_state.get("active_alarms", []),
             "dampers": config.get("dampers", []),
             "pressurization": config.get("pressurization", []),
             "action_log": [],
@@ -301,10 +301,10 @@ class FireSafetyRepository:
         config = self._load_config()
         return config.get("panel", {})
 
-    def get_demo_state(self) -> Dict[str, Any]:
-        """Get pre-configured demo state."""
+    def get_local_state(self) -> Dict[str, Any]:
+        """Get pre-configured local fallback state."""
         config = self._load_config()
-        return config.get("demo_state", {})
+        return config.get("local_state", config.get("demo_state", {}))
 
 
 def get_fire_safety_repository() -> FireSafetyRepository:

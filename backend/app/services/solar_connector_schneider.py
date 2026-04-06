@@ -2,7 +2,7 @@
 
 Supports:
   - Modbus TCP register reads (holding registers)
-  - Simulated data for demo (legacy inverter fleet with realistic patterns)
+  - Simulated data for local seeded mode (legacy inverter fleet with realistic patterns)
 
 Register maps sourced from Schneider Conext CL25000E Modbus Register Map.
 """
@@ -10,17 +10,16 @@ Register maps sourced from Schneider Conext CL25000E Modbus Register Map.
 import logging
 import math
 import random
-from datetime import datetime, timezone
-from typing import Dict, List, Optional
+from datetime import UTC, datetime
 
 from app.models.solar import (
-    SolarInverter,
-    SolarString,
+    ConnectorStatus,
+    DataSource,
     GridMeter,
     NormalisedReading,
-    ConnectorStatus,
     QualityFlag,
-    DataSource,
+    SolarInverter,
+    SolarString,
 )
 from app.services.solar_connector_base import SolarConnector
 
@@ -28,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 
 # === Schneider Conext CL Modbus Register Map (Holding Registers) ===
-SCHNEIDER_CONEXT_REGISTERS: Dict[str, tuple] = {
+SCHNEIDER_CONEXT_REGISTERS: dict[str, tuple] = {
     # (address, count, type, scale_factor, unit)
     "model": (40005, 8, "str", 1, ""),
     "serial": (40013, 8, "str", 1, ""),
@@ -57,7 +56,7 @@ SCHNEIDER_CONEXT_REGISTERS: Dict[str, tuple] = {
 }
 
 # Schneider PM8000 / PM5110 meter registers
-SCHNEIDER_PM_REGISTERS: Dict[str, tuple] = {
+SCHNEIDER_PM_REGISTERS: dict[str, tuple] = {
     "voltage_l1": (3000, 2, "float32", 1, "V"),
     "voltage_l2": (3002, 2, "float32", 1, "V"),
     "voltage_l3": (3004, 2, "float32", 1, "V"),
@@ -98,7 +97,7 @@ def _solar_power_factor(hour: float) -> float:
 
 
 class SimulatedSchneiderConnector(SolarConnector):
-    """Generates realistic Schneider Conext CL data for demo.
+    """Generates realistic Schneider Conext CL data for local seeded mode.
 
     Models the legacy Eastern Carports fleet — 23 smaller (25 kVA) inverters.
     Slightly lower efficiency than Huawei fleet to model aging equipment.
@@ -106,18 +105,18 @@ class SimulatedSchneiderConnector(SolarConnector):
 
     def __init__(
         self,
-        inverters: List[Dict],
-        meters: Optional[List[Dict]] = None,
+        inverters: list[dict],
+        meters: list[dict] | None = None,
     ):
         super().__init__(manufacturer="schneider", protocol="modbus_tcp")
         self._inverter_configs = {inv["id"]: inv for inv in inverters}
         self._meter_configs = {m["meter_id"]: m for m in (meters or [])}
-        self._inverter_state: Dict[str, SolarInverter] = {}
+        self._inverter_state: dict[str, SolarInverter] = {}
 
     async def connect(self) -> bool:
         self._status = ConnectorStatus(
             connected=True,
-            last_poll=datetime.now(timezone.utc).isoformat(),
+            last_poll=datetime.now(UTC).isoformat(),
             error_count=0,
         )
         logger.info(f"Schneider simulated connector online — {len(self._inverter_configs)} inverters")
@@ -127,12 +126,12 @@ class SimulatedSchneiderConnector(SolarConnector):
         self._status.connected = False
         logger.info("Schneider simulated connector disconnected")
 
-    async def read_inverter(self, inverter_id: str) -> Optional[SolarInverter]:
+    async def read_inverter(self, inverter_id: str) -> SolarInverter | None:
         cfg = self._inverter_configs.get(inverter_id)
         if not cfg:
             return None
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         sast_hour = (now.hour + 2) % 24 + now.minute / 60.0
         solar_factor = _solar_power_factor(sast_hour)
 
@@ -177,12 +176,12 @@ class SimulatedSchneiderConnector(SolarConnector):
         self._inverter_state[inverter_id] = inv
         return inv
 
-    async def read_all_strings(self, inverter_id: str) -> List[SolarString]:
+    async def read_all_strings(self, inverter_id: str) -> list[SolarString]:
         cfg = self._inverter_configs.get(inverter_id)
         if not cfg:
             return []
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         sast_hour = (now.hour + 2) % 24 + now.minute / 60.0
         solar_factor = _solar_power_factor(sast_hour)
 
@@ -226,12 +225,12 @@ class SimulatedSchneiderConnector(SolarConnector):
         """Schneider connector does not manage BESS (handled by Huawei connector)."""
         return None
 
-    async def read_meter(self, meter_id: str) -> Optional[GridMeter]:
+    async def read_meter(self, meter_id: str) -> GridMeter | None:
         cfg = self._meter_configs.get(meter_id)
         if not cfg:
             return None
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         sast_hour = (now.hour + 2) % 24 + now.minute / 60.0
         solar_factor = _solar_power_factor(sast_hour)
 
@@ -257,9 +256,9 @@ class SimulatedSchneiderConnector(SolarConnector):
             daily_export_kwh=round(600.88 * 4.8 * solar_factor * 0.94, 0),
         )
 
-    async def get_normalised_readings(self) -> List[NormalisedReading]:
-        readings: List[NormalisedReading] = []
-        now = datetime.now(timezone.utc).isoformat()
+    async def get_normalised_readings(self) -> list[NormalisedReading]:
+        readings: list[NormalisedReading] = []
+        now = datetime.now(UTC).isoformat()
 
         for inv_id in self._inverter_configs:
             inv = await self.read_inverter(inv_id)

@@ -15,7 +15,7 @@ import json
 import logging
 import time
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -25,8 +25,8 @@ _CACHE: dict[str, dict[str, Any]] = {}
 
 def get_json_cached(
     filename: str,
-    data_dir: Optional[Path] = None,
-    ttl: Optional[int] = 300,
+    data_dir: Path | None = None,
+    ttl: int | None = 300,
 ) -> dict | list:
     """
     Load JSON file with optional caching.
@@ -87,7 +87,7 @@ def get_json_cached(
         return [] if filename.endswith("s.json") else {}
 
 
-def invalidate_cache(filename: Optional[str] = None) -> None:
+def invalidate_cache(filename: str | None = None) -> None:
     """
     Invalidate cache entry or entire cache.
 

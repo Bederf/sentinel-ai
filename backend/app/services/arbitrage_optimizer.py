@@ -13,9 +13,9 @@ This module specializes in:
 import json
 import logging
 from dataclasses import dataclass
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Dict, List, Optional, Any, Tuple
+from typing import Any
 
 from app.services.solar_config_service import get_site_solar_config
 
@@ -41,7 +41,7 @@ class PriceForecast:
     final_price_r_per_kwh: float  # price after all adjustments
     confidence_pct: float  # forecast confidence 0-100%
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "hour": self.hour,
             "hour_start": self.hour_start,
@@ -74,7 +74,7 @@ class ArbitrageWindow:
     net_revenue_r: float  # revenue - degradation
     confidence_pct: float  # Window likelihood (weather/LS uncertainty)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "charge_start_hour": self.charge_start_hour,
             "charge_end_hour": self.charge_end_hour,
@@ -124,7 +124,7 @@ class PriceForecaster:
         "mild": 0.0,  # 10-32°C: no adjustment
     }
 
-    def __init__(self, tariff_data: Optional[Dict[str, Any]] = None, site_id: Optional[str] = None):
+    def __init__(self, tariff_data: dict[str, Any] | None = None, site_id: str | None = None):
         """Initialize forecaster with tariff configuration.
 
         Args:
@@ -147,7 +147,7 @@ class PriceForecaster:
             except Exception as e:
                 logger.warning("Could not load site solar config for %s: %s", site_id, e)
 
-    def _load_tariff(self) -> Dict[str, Any]:
+    def _load_tariff(self) -> dict[str, Any]:
         """Load City Power TOU tariff from configuration."""
         tariff_path = Path(__file__).parent.parent / "data" / "solar" / "tariffs" / "city_power_2026.json"
         try:
@@ -173,7 +173,7 @@ class PriceForecaster:
         """Get base tariff price for band."""
         return self.BASE_RATES.get(band, 1.20)
 
-    def _get_weather_adjustment(self, temperature_c: float) -> Tuple[str, float]:
+    def _get_weather_adjustment(self, temperature_c: float) -> tuple[str, float]:
         """Determine weather impact on pricing.
 
         Args:
@@ -206,10 +206,10 @@ class PriceForecaster:
 
     def forecast_24h(
         self,
-        load_shedding_stages: Optional[List[int]] = None,
-        temperature_forecast: Optional[List[float]] = None,
-        solar_forecast_pct: Optional[List[float]] = None,
-    ) -> List[PriceForecast]:
+        load_shedding_stages: list[int] | None = None,
+        temperature_forecast: list[float] | None = None,
+        solar_forecast_pct: list[float] | None = None,
+    ) -> list[PriceForecast]:
         """Generate 24-hour price forecast (hourly granularity).
 
         Args:
@@ -220,7 +220,7 @@ class PriceForecaster:
         Returns:
             List of 24 PriceForecast objects with all adjustments applied
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         sast = now + timedelta(hours=2)  # UTC+2
 
         # Defaults
@@ -293,7 +293,7 @@ class ArbitrageAnalyzer:
     BATTERY_DEGRADATION_COST_R_PER_KWH = 0.05
     MIN_ARBITRAGE_SPREAD = 0.10  # Minimum ZAR/kWh spread to make arbitrage worthwhile
 
-    def __init__(self, price_forecaster: Optional[PriceForecaster] = None, site_id: Optional[str] = None):
+    def __init__(self, price_forecaster: PriceForecaster | None = None, site_id: str | None = None):
         """Initialize analyzer with price forecaster.
 
         Args:
@@ -316,10 +316,10 @@ class ArbitrageAnalyzer:
 
     def find_arbitrage_windows(
         self,
-        forecasts: List[PriceForecast],
+        forecasts: list[PriceForecast],
         max_windows: int = 3,
         battery_soc_pct: float = 50.0,
-    ) -> List[ArbitrageWindow]:
+    ) -> list[ArbitrageWindow]:
         """Identify optimal arbitrage windows from price forecast.
 
         Algorithm:
@@ -395,9 +395,9 @@ class ArbitrageAnalyzer:
 
     def _find_price_valleys(
         self,
-        forecasts: List[PriceForecast],
+        forecasts: list[PriceForecast],
         min_duration_hours: int = 2,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Find low-price consecutive windows (valleys).
 
         Args:
@@ -463,9 +463,9 @@ class ArbitrageAnalyzer:
 
     def _find_price_peaks(
         self,
-        forecasts: List[PriceForecast],
+        forecasts: list[PriceForecast],
         min_duration_hours: int = 2,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Find high-price consecutive windows (peaks).
 
         Args:
@@ -531,8 +531,8 @@ class ArbitrageAnalyzer:
 
 # === Singleton ===
 
-_price_forecaster: Optional[PriceForecaster] = None
-_arbitrage_analyzer: Optional[ArbitrageAnalyzer] = None
+_price_forecaster: PriceForecaster | None = None
+_arbitrage_analyzer: ArbitrageAnalyzer | None = None
 
 
 def get_price_forecaster() -> PriceForecaster:

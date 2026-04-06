@@ -9,16 +9,17 @@ Implements a 3-stage OCR pipeline for service sheet photos:
 Pattern reference: /opt/aimthelaw/backendv2/app/services/receipt_service.py
 """
 
-import gc
 import base64
+import gc
 import json
 import logging
 import re
-from typing import Dict, Any, List, Optional, Set
+from typing import Any
 
 import anthropic
-from app.database.repositories.equipment_repository import EquipmentRepository
+
 from app.config.settings import settings
+from app.database.repositories.equipment_repository import EquipmentRepository
 from app.services.ai_usage_tracker import usage_tracker
 
 logger = logging.getLogger(__name__)
@@ -38,7 +39,7 @@ class OCRService:
     def __init__(self):
         self.client = anthropic.Anthropic()
         self.equipment_repo = EquipmentRepository()
-        self._currently_processing: Set[str] = set()
+        self._currently_processing: set[str] = set()
 
     async def process_service_sheet(
         self,
@@ -47,7 +48,7 @@ class OCRService:
         service_type: str,
         service_record_id: str,
         media_type: str = "image/jpeg",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Main entry point - runs full 3-stage pipeline.
 
@@ -123,7 +124,7 @@ class OCRService:
 
     async def _stage1_ocr_extraction(
         self, image_data: bytes, equipment_id: str, service_type: str, media_type: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Stage 1: Extract structured data from service sheet using Claude Vision."""
         logger.info(f"Stage 1: Starting OCR extraction for equipment {equipment_id}")
 
@@ -213,14 +214,14 @@ For confidence scores: 1.0 = clearly legible, 0.5 = partially readable, 0.0 = gu
 
         except json.JSONDecodeError as e:
             logger.error(f"Stage 1 JSON parse error: {e}")
-            return {"success": False, "error": f"JSON parse error: {str(e)}"}
+            return {"success": False, "error": f"JSON parse error: {e!s}"}
         except Exception as e:
             logger.error(f"Stage 1 OCR failed: {e}")
             return {"success": False, "error": str(e)}
 
     async def _stage2_template_validation(
-        self, extracted_data: Dict[str, Any], equipment_id: str, service_type: str
-    ) -> Dict[str, Any]:
+        self, extracted_data: dict[str, Any], equipment_id: str, service_type: str
+    ) -> dict[str, Any]:
         """Stage 2: Validate extracted data against equipment template."""
         logger.info(f"Stage 2: Validating against template for {equipment_id}")
 
@@ -296,7 +297,7 @@ For confidence scores: 1.0 = clearly legible, 0.5 = partially readable, 0.0 = gu
             "template_used": f"{equipment_type}/{service_type}",
         }
 
-    def _find_extracted_value(self, data: Dict[str, Any], field_name: str) -> Any:
+    def _find_extracted_value(self, data: dict[str, Any], field_name: str) -> Any:
         """Find a value in extracted data by field name."""
         # Check top-level
         if field_name in data:
@@ -320,7 +321,7 @@ For confidence scores: 1.0 = clearly legible, 0.5 = partially readable, 0.0 = gu
 
         return None
 
-    def _find_confidence(self, data: Dict[str, Any], field_name: str) -> float:
+    def _find_confidence(self, data: dict[str, Any], field_name: str) -> float:
         """Find confidence score for a field."""
         # Check readings
         readings = data.get("readings", {})
@@ -338,7 +339,7 @@ For confidence scores: 1.0 = clearly legible, 0.5 = partially readable, 0.0 = gu
 
         return 0.7  # Default confidence
 
-    def _coerce_type(self, value: Any, target_type: str, validation: Dict) -> Any:
+    def _coerce_type(self, value: Any, target_type: str, validation: dict) -> Any:
         """Coerce extracted value to target type with validation."""
         if target_type == "number":
             # Extract numeric value
@@ -377,8 +378,8 @@ For confidence scores: 1.0 = clearly legible, 0.5 = partially readable, 0.0 = gu
         return str(value)  # Default to string
 
     async def _stage3_ai_enhancement(
-        self, stage2_result: Dict[str, Any], equipment_id: str, service_type: str
-    ) -> Dict[str, Any]:
+        self, stage2_result: dict[str, Any], equipment_id: str, service_type: str
+    ) -> dict[str, Any]:
         """Stage 3: AI enhancement to fill gaps and suggest corrections."""
         logger.info("Stage 3: Starting AI enhancement")
 
@@ -416,20 +417,18 @@ For confidence scores: 1.0 = clearly legible, 0.5 = partially readable, 0.0 = gu
                 "corrections_needed": [i["field"] for i in issues if i["severity"] == "error"],
             }
 
-    def _determine_final_status(self, ocr_confidence: float, validation_score: float, issues: List[Dict]) -> str:
+    def _determine_final_status(self, ocr_confidence: float, validation_score: float, issues: list[dict]) -> str:
         """Determine final status based on pipeline results."""
         error_count = len([i for i in issues if i["severity"] == "error"])
 
-        if error_count > 0:
-            return "needs_review"
-        elif validation_score < 0.7 or ocr_confidence < 0.6:
+        if error_count > 0 or validation_score < 0.7 or ocr_confidence < 0.6:
             return "needs_review"
         else:
             return "completed"
 
 
 # Singleton instance
-_ocr_service: Optional[OCRService] = None
+_ocr_service: OCRService | None = None
 
 
 def get_ocr_service() -> OCRService:

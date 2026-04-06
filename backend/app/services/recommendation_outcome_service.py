@@ -11,8 +11,8 @@ the recommendation achieved its goal and feeds the result back into:
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +23,7 @@ SETTLING_MINUTES = 30
 MAX_AGE_HOURS = 24
 
 
-async def validate_outcome(rec_id: str) -> Optional[Dict[str, Any]]:
+async def validate_outcome(rec_id: str) -> dict[str, Any] | None:
     """Validate a single recommendation's outcome by comparing sensor data.
 
     Reads the recommendation's target equipment + action, queries current
@@ -100,7 +100,7 @@ async def validate_outcome(rec_id: str) -> Optional[Dict[str, Any]]:
     }
 
 
-async def process_pending_verifications() -> List[Dict[str, Any]]:
+async def process_pending_verifications() -> list[dict[str, Any]]:
     """Find and verify all recommendations ready for outcome checking.
 
     Queries for recommendations that are:
@@ -118,7 +118,7 @@ async def process_pending_verifications() -> List[Dict[str, Any]]:
     from app.models.recommendation import RecommendationStatus
 
     repo = get_recommendation_repository()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     cutoff = now - timedelta(minutes=SETTLING_MINUTES)
     max_age_cutoff = now - timedelta(hours=MAX_AGE_HOURS)
 
@@ -144,7 +144,7 @@ async def process_pending_verifications() -> List[Dict[str, Any]]:
 
                 # Normalize to UTC-aware
                 if exec_time.tzinfo is None:
-                    exec_time = exec_time.replace(tzinfo=timezone.utc)
+                    exec_time = exec_time.replace(tzinfo=UTC)
 
                 if exec_time > cutoff:
                     continue  # Too recent, not settled yet
@@ -238,7 +238,7 @@ def _evaluate_outcome(
         )
 
 
-async def _get_current_reading(equipment_id: str, point_name: str) -> Optional[float]:
+async def _get_current_reading(equipment_id: str, point_name: str) -> float | None:
     """Query current telemetry value for an equipment point.
 
     Tries device manager first, falls back to Supabase telemetry table.
@@ -289,13 +289,13 @@ async def _get_current_reading(equipment_id: str, point_name: str) -> Optional[f
 async def _mark_outcome(
     repo: Any,
     rec: Any,
-    validated: Optional[bool],
+    validated: bool | None,
     notes: str,
 ) -> None:
     """Update the recommendation record with outcome validation results."""
     rec.outcome_validated = validated
     rec.outcome_notes = notes
-    rec.outcome_validated_at = datetime.now(timezone.utc)
+    rec.outcome_validated_at = datetime.now(UTC)
     try:
         await repo.update(rec.id, rec)
     except Exception as e:
@@ -361,7 +361,7 @@ def _record_to_ml_feedback(rec: Any, success: bool, notes: str) -> None:
         logger.debug("Failed to record to ML feedback: %s", e)
 
 
-def _extract_equipment_type(equipment_id: Optional[str]) -> str:
+def _extract_equipment_type(equipment_id: str | None) -> str:
     """Extract equipment type from ID like S002-FCU-101 -> fcu."""
     if not equipment_id:
         return "unknown"
@@ -371,7 +371,7 @@ def _extract_equipment_type(equipment_id: Optional[str]) -> str:
     return "unknown"
 
 
-def _extract_module_type(action_type: Optional[str], equipment_id: Optional[str]) -> str:
+def _extract_module_type(action_type: str | None, equipment_id: str | None) -> str:
     """Infer module type from action_type or equipment_id."""
     action = (action_type or "").lower()
     eq_type = _extract_equipment_type(equipment_id)

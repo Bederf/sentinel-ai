@@ -12,8 +12,7 @@ Reference: SAE papers on engine knock detection
 """
 
 import logging
-from typing import Dict, Any, List, Optional
-
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +40,7 @@ class KnockDetector:
         },
     }
 
-    def analyze(self, spectrum_data: Dict[str, Any], engine_type: str = "generator") -> Dict[str, Any]:
+    def analyze(self, spectrum_data: dict[str, Any], engine_type: str = "generator") -> dict[str, Any]:
         """
         Analyze audio spectrum for engine knock.
 
@@ -119,7 +118,7 @@ class KnockDetector:
 
         return result
 
-    def _check_harmonics(self, fundamental: float, freqs: List[float], amps: List[float]) -> Dict[str, Any]:
+    def _check_harmonics(self, fundamental: float, freqs: list[float], amps: list[float]) -> dict[str, Any]:
         """Check for harmonic series indicating knock."""
         harmonics = []
         for n in range(2, 8):  # Check up to 7th harmonic
@@ -132,7 +131,7 @@ class KnockDetector:
         return {"count": len(harmonics), "harmonics": harmonics}
 
     def _calculate_knock_confidence(
-        self, knock_amp: float, all_amps: List[float], harmonic_evidence: Dict[str, Any]
+        self, knock_amp: float, all_amps: list[float], harmonic_evidence: dict[str, Any]
     ) -> float:
         """Calculate confidence that knock is present."""
         # Base: amplitude prominence (percentile)
@@ -158,7 +157,7 @@ class KnockDetector:
 
         return min(1.0, amp_percentile * 0.5 + harmonic_boost + decay_boost)
 
-    def _classify_knock_type(self, frequency: float, profile: Dict) -> str:
+    def _classify_knock_type(self, frequency: float, profile: dict) -> str:
         """Classify the type of knock based on frequency."""
         typical = profile["typical_freq"]
 
@@ -172,8 +171,8 @@ class KnockDetector:
             return "valve_train"  # Higher frequency - valve train
 
     def analyze_severity(
-        self, knock_result: Dict[str, Any], baseline: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+        self, knock_result: dict[str, Any], baseline: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         """
         Analyze knock severity based on detection results and baseline.
 
@@ -233,7 +232,7 @@ class KnockDetector:
 
 
 # Singleton instance
-_detector_instance: Optional[KnockDetector] = None
+_detector_instance: KnockDetector | None = None
 
 
 def get_knock_detector() -> KnockDetector:

@@ -17,10 +17,7 @@ def _is_eligible(candidate: NarrativeCandidate) -> bool:
     return (
         not candidate.resolved
         and candidate.spatially_grounded
-        and (
-            candidate.time_to_constraint_breach_min is not None
-            or candidate.eroding_margin
-        )
+        and (candidate.time_to_constraint_breach_min is not None or candidate.eroding_margin)
     )
 
 

@@ -6,16 +6,16 @@ Integrates with ProfileService for control tier settings and DeviceManager for B
 
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from app.models.recommendation import (
+    ActionRiskLevel,
     Recommendation,
     RecommendationStatus,
-    ActionRiskLevel,
 )
-from app.services.profile_service import get_profile_service
 from app.services.device_abstraction import device_manager
 from app.services.ml_feedback_service import get_ml_feedback_service
+from app.services.profile_service import get_profile_service
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +33,7 @@ class RecommendationService:
         """Initialize RecommendationService."""
         self.profile_service = get_profile_service()
 
-    async def create_recommendation(self, rec_data: Dict[str, Any]) -> Recommendation:
+    async def create_recommendation(self, rec_data: dict[str, Any]) -> Recommendation:
         """Create new recommendation with approval requirements.
 
         Determines if approval is required based on:
@@ -101,7 +101,7 @@ class RecommendationService:
 
         return rec
 
-    async def get_pending_recommendations(self, site_id: str, limit: int = 10) -> List[Recommendation]:
+    async def get_pending_recommendations(self, site_id: str, limit: int = 10) -> list[Recommendation]:
         """Get pending recommendations for a site (Tier 2 approval queue).
 
         Args:
@@ -135,10 +135,10 @@ class RecommendationService:
     async def get_history(
         self,
         site_id: str,
-        status_filter: Optional[str] = None,
-        risk_level_filter: Optional[str] = None,
+        status_filter: str | None = None,
+        risk_level_filter: str | None = None,
         limit: int = 50,
-    ) -> List[Recommendation]:
+    ) -> list[Recommendation]:
         """Get historical recommendations for a site with optional filters.
 
         Returns all non-pending recommendations (executed, rejected, auto_executed, failed).
@@ -167,7 +167,7 @@ class RecommendationService:
             logger.error(f"Error fetching recommendation history for {site_id}: {e}")
             return []
 
-    async def approve_recommendation(self, rec_id: str, user_id: str, reason: Optional[str] = None) -> Recommendation:
+    async def approve_recommendation(self, rec_id: str, user_id: str, reason: str | None = None) -> Recommendation:
         """Operator approves recommendation (Tier 2).
 
         Changes status to APPROVED, then executes the recommendation.
@@ -275,7 +275,7 @@ class RecommendationService:
             logger.error(f"Error rejecting recommendation {rec_id}: {e}")
             raise ValueError(f"Failed to reject recommendation: {e}")
 
-    async def execute_recommendation(self, rec_id: str, rec: Recommendation) -> Dict[str, Any]:
+    async def execute_recommendation(self, rec_id: str, rec: Recommendation) -> dict[str, Any]:
         """Execute recommendation via device manager.
 
         Calls device manager to apply the action to the BMS.
@@ -329,8 +329,8 @@ class RecommendationService:
         rec: Recommendation,
         successful: bool,
         outcome_status: str,
-        actual_impact: Optional[Dict[str, Any]] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        actual_impact: dict[str, Any] | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> None:
         """Record recommendation outcome into module-aware ML feedback."""
         try:
@@ -483,7 +483,7 @@ class RecommendationService:
 
 
 # Singleton instance
-_recommendation_service: Optional[RecommendationService] = None
+_recommendation_service: RecommendationService | None = None
 
 
 def get_recommendation_service() -> RecommendationService:

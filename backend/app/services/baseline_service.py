@@ -10,19 +10,19 @@ Provides services for:
 Phase 44: Asset Baseline Assessment
 """
 
-from typing import Dict, List, Optional, Any, Tuple
-from datetime import datetime
 import logging
+from datetime import datetime
+from typing import Any
 
+from app.database.repositories.baseline_repository import BaselineRepository
 from app.models.baseline import (
-    EquipmentBaseline,
-    ElementBaseline,
     BaselineComparison,
     ComparisonResult,
     DeviationStatus,
+    ElementBaseline,
+    EquipmentBaseline,
 )
 from app.services.influxdb_service import get_influxdb_service
-from app.database.repositories.baseline_repository import BaselineRepository
 
 logger = logging.getLogger(__name__)
 
@@ -39,10 +39,10 @@ class BaselineService:
         equipment_id: str,
         captured_by: str,
         baseline_type: str = "initial",
-        notes: Optional[str] = None,
-        measurement_conditions: Optional[Dict[str, Any]] = None,
+        notes: str | None = None,
+        measurement_conditions: dict[str, Any] | None = None,
         source_type: str = "manual",
-        attachment_urls: Optional[List[str]] = None,
+        attachment_urls: list[str] | None = None,
     ) -> EquipmentBaseline:
         """
         Capture a new baseline for equipment.
@@ -89,10 +89,10 @@ class BaselineService:
         captured_by: str,
         measurement_type: str,
         baseline_type: str = "initial",
-        baseline_values: Optional[Dict[str, Any]] = None,
-        notes: Optional[str] = None,
-        measurement_conditions: Optional[Dict[str, Any]] = None,
-        attachment_urls: Optional[List[str]] = None,
+        baseline_values: dict[str, Any] | None = None,
+        notes: str | None = None,
+        measurement_conditions: dict[str, Any] | None = None,
+        attachment_urls: list[str] | None = None,
     ) -> ElementBaseline:
         """
         Capture baseline for a specific element (bearing, filter, etc.).
@@ -131,7 +131,7 @@ class BaselineService:
         return baseline
 
     async def compare_to_baseline(
-        self, equipment_id: str, current_values: Optional[Dict[str, Any]] = None, data_source: str = "bms_sensor"
+        self, equipment_id: str, current_values: dict[str, Any] | None = None, data_source: str = "bms_sensor"
     ) -> BaselineComparison:
         """
         Compare current readings to stored baseline and calculate deviations.
@@ -183,7 +183,7 @@ class BaselineService:
         self,
         equipment_id: str,
         element_id: str,
-        current_values: Optional[Dict[str, Any]] = None,
+        current_values: dict[str, Any] | None = None,
         measurement_type: str = "vibration",
     ) -> BaselineComparison:
         """
@@ -233,8 +233,8 @@ class BaselineService:
         return comparison
 
     def _calculate_deviations(
-        self, baseline_values: Dict[str, Any], current_values: Dict[str, Any]
-    ) -> Dict[str, ComparisonResult]:
+        self, baseline_values: dict[str, Any], current_values: dict[str, Any]
+    ) -> dict[str, ComparisonResult]:
         """
         Calculate deviations between baseline and current values.
 
@@ -273,7 +273,7 @@ class BaselineService:
 
         return results
 
-    def _assess_overall_status(self, comparison_results: Dict[str, ComparisonResult]) -> Tuple[str, float]:
+    def _assess_overall_status(self, comparison_results: dict[str, ComparisonResult]) -> tuple[str, float]:
         """
         Determine overall status from comparison results.
 
@@ -295,7 +295,7 @@ class BaselineService:
 
         return overall_status, max_deviation
 
-    async def _get_equipment_sensor_averages(self, equipment_id: str) -> Dict[str, float]:
+    async def _get_equipment_sensor_averages(self, equipment_id: str) -> dict[str, float]:
         """Get 24-hour average readings from BMS sensors for baseline capture."""
         try:
             # Query InfluxDB for average values over last 24 hours
@@ -314,7 +314,7 @@ class BaselineService:
             logger.error(f"Failed to get sensor averages for {equipment_id}: {e}")
             return {}
 
-    async def _get_current_equipment_readings(self, equipment_id: str) -> Dict[str, float]:
+    async def _get_current_equipment_readings(self, equipment_id: str) -> dict[str, float]:
         """Get current sensor readings for equipment."""
         try:
             # Query InfluxDB for latest values
@@ -334,7 +334,7 @@ class BaselineService:
 
     async def _get_current_element_readings(
         self, equipment_id: str, element_id: str, measurement_type: str
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """Get current readings for an element."""
         try:
             # This would integrate with mobile sensor data or specialized sensors
@@ -344,7 +344,7 @@ class BaselineService:
             logger.error(f"Failed to get element readings: {e}")
             return {}
 
-    def _parse_influx_result(self, result: Any) -> Dict[str, float]:
+    def _parse_influx_result(self, result: Any) -> dict[str, float]:
         """Parse InfluxDB query result to dictionary."""
         # Simplified parsing - actual implementation would handle Flux tables
         return {}
@@ -355,11 +355,11 @@ class BaselineService:
         # Implementation depends on existing alert infrastructure
         logger.warning(f"Critical baseline deviation detected: {comparison.equipment_id}")
 
-    async def get_baseline_history(self, equipment_id: str, limit: int = 10) -> List[EquipmentBaseline]:
+    async def get_baseline_history(self, equipment_id: str, limit: int = 10) -> list[EquipmentBaseline]:
         """Get baseline history for equipment."""
         return await self.repository.get_equipment_baseline_history(equipment_id, limit)
 
-    async def get_baseline_report(self, equipment_id: str) -> Dict[str, Any]:
+    async def get_baseline_report(self, equipment_id: str) -> dict[str, Any]:
         """
         Generate comprehensive baseline report for equipment.
 

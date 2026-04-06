@@ -22,10 +22,10 @@ Load shedding reserve:
 import json
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, date, time, timezone, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 from enum import Enum
 from pathlib import Path
-from typing import Dict, List, Optional, Any
+from typing import Any
 
 from app.services.solar_config_service import get_site_solar_config
 
@@ -74,7 +74,7 @@ class TariffBand:
     period_start: str = ""  # HH:MM
     period_end: str = ""  # HH:MM
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "name": self.name,
             "rate_per_kwh": round(self.rate_per_kwh, 4),
@@ -99,7 +99,7 @@ class ArbitrageValue:
     charge_rate_per_kwh: float = 0.0
     discharge_rate_per_kwh: float = 0.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "charge_kwh": round(self.charge_kwh, 1),
             "discharge_kwh": round(self.discharge_kwh, 1),
@@ -120,13 +120,13 @@ class DispatchSlot:
     end: str  # HH:MM
     action: str  # charge / discharge / idle / solar_priority
     power_kw: float = 0.0
-    target_soc_pct: Optional[float] = None
+    target_soc_pct: float | None = None
     tariff_band: str = ""
     rate_per_kwh: float = 0.0
     note: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
-        result: Dict[str, Any] = {
+    def to_dict(self) -> dict[str, Any]:
+        result: dict[str, Any] = {
             "start": self.start,
             "end": self.end,
             "action": self.action,
@@ -148,11 +148,11 @@ class DispatchSchedule:
     site_id: str
     date: str  # YYYY-MM-DD
     season: str
-    slots: List[DispatchSlot] = field(default_factory=list)
-    load_shedding_adjustment: Optional[Dict[str, Any]] = None
+    slots: list[DispatchSlot] = field(default_factory=list)
+    load_shedding_adjustment: dict[str, Any] | None = None
     projected_savings_zar: float = 0.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "site_id": self.site_id,
             "date": self.date,
@@ -173,12 +173,12 @@ class DispatchAction:
     tariff_band: str
     rate_per_kwh: float
     current_soc_pct: float
-    target_soc_pct: Optional[float] = None
+    target_soc_pct: float | None = None
     load_shedding_active: bool = False
-    next_action_change: Optional[str] = None  # ISO timestamp
+    next_action_change: str | None = None  # ISO timestamp
 
-    def to_dict(self) -> Dict[str, Any]:
-        result: Dict[str, Any] = {
+    def to_dict(self) -> dict[str, Any]:
+        result: dict[str, Any] = {
             "action": self.action,
             "power_kw": round(self.power_kw, 0),
             "reason": self.reason,
@@ -210,7 +210,7 @@ class DailySavings:
     solar_self_consumed_kwh: float
     currency: str = "ZAR"
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "site_id": self.site_id,
             "date": self.date,
@@ -246,7 +246,7 @@ class SolarArbitrageEngine:
     BESS_LS_RESERVE_SOC_PCT = 80.0  # minimum SOC before load shedding
 
     def __init__(self):
-        self._tariff: Dict[str, Any] = {}
+        self._tariff: dict[str, Any] = {}
         self._load_tariff()
         try:
             cfg = get_site_solar_config()
@@ -268,22 +268,22 @@ class SolarArbitrageEngine:
 
     # === Season detection ===
 
-    def _get_season(self, dt: Optional[datetime] = None) -> str:
+    def _get_season(self, dt: datetime | None = None) -> str:
         """Determine tariff season from date. Winter = Jul/Aug (high demand)."""
-        dt = dt or datetime.now(timezone.utc)
+        dt = dt or datetime.now(UTC)
         winter_months = self._tariff.get("time_bands", {}).get("winter", {}).get("months", [7, 8])
         return Season.WINTER.value if dt.month in winter_months else Season.SUMMER.value
 
     # === Tariff band lookup ===
 
-    def get_current_tariff_band(self, timestamp: Optional[datetime] = None) -> TariffBand:
+    def get_current_tariff_band(self, timestamp: datetime | None = None) -> TariffBand:
         """Return the current TOU tariff band with rate.
 
         Checks timestamp against City Power time bands for the appropriate
         season (summer/winter) and returns the matching band with energy
         and network charges converted from c/kWh to ZAR/kWh.
         """
-        ts = timestamp or datetime.now(timezone.utc)
+        ts = timestamp or datetime.now(UTC)
         # Shift to SAST (UTC+2) for tariff band determination
         sast = ts + timedelta(hours=2)
         current_time = sast.time()
@@ -351,7 +351,7 @@ class SolarArbitrageEngine:
         discharge_kwh: float,
         charge_band: str = "off_peak",
         discharge_band: str = "peak",
-        season: Optional[str] = None,
+        season: str | None = None,
     ) -> ArbitrageValue:
         """Calculate revenue from buying energy at low rate and selling at high rate.
 
@@ -388,8 +388,8 @@ class SolarArbitrageEngine:
     def generate_dispatch_schedule(
         self,
         site_id: str,
-        target_date: Optional[date] = None,
-        forecast_cloudy: Optional[bool] = None,
+        target_date: date | None = None,
+        forecast_cloudy: bool | None = None,
     ) -> DispatchSchedule:
         """Generate day-ahead BESS dispatch plan optimised for TOU arbitrage.
 
@@ -411,14 +411,14 @@ class SolarArbitrageEngine:
           - Max charge/discharge rate 250 kW (0.5C)
         """
         d = target_date or date.today()
-        dt = datetime(d.year, d.month, d.day, tzinfo=timezone.utc)
+        dt = datetime(d.year, d.month, d.day, tzinfo=UTC)
         season = self._get_season(dt)
         time_bands = self._tariff.get("time_bands", {}).get(season, {})
 
         # Usable capacity
         usable_kwh = self.BESS_CAPACITY_KWH * ((self.BESS_MAX_SOC_PCT - self.BESS_MIN_SOC_PCT) / 100.0)
 
-        slots: List[DispatchSlot] = []
+        slots: list[DispatchSlot] = []
 
         # Build dispatch slots from tariff time bands
         # Sort all periods chronologically for a 24h schedule
@@ -584,7 +584,7 @@ class SolarArbitrageEngine:
         solar_gen_kw: float = 0.0,
         site_load_kw: float = 0.0,
         load_shedding_active: bool = False,
-        timestamp: Optional[datetime] = None,
+        timestamp: datetime | None = None,
     ) -> DispatchAction:
         """Determine what BESS should do RIGHT NOW based on current state.
 
@@ -597,7 +597,7 @@ class SolarArbitrageEngine:
           6. Standard + no excess -> idle
         """
         band = self.get_current_tariff_band(timestamp)
-        _ts = timestamp or datetime.now(timezone.utc)
+        _ts = timestamp or datetime.now(UTC)
 
         # Priority 1: Load shedding -- discharge to sustain building
         if load_shedding_active:
@@ -781,7 +781,7 @@ class SolarArbitrageEngine:
     def calculate_daily_savings(
         self,
         site_id: str,
-        target_date: Optional[date] = None,
+        target_date: date | None = None,
         period: str = "day",
     ) -> DailySavings:
         """Calculate actual vs no-BESS cost comparison.
@@ -793,7 +793,7 @@ class SolarArbitrageEngine:
           - BESS cycles: 1 full cycle per day (off-peak charge, peak discharge)
         """
         d = target_date or date.today()
-        dt = datetime(d.year, d.month, d.day, tzinfo=timezone.utc)
+        dt = datetime(d.year, d.month, d.day, tzinfo=UTC)
         season = self._get_season(dt)
 
         # Rates in ZAR/kWh
@@ -859,7 +859,7 @@ class SolarArbitrageEngine:
 
 # === Singleton ===
 
-_solar_arbitrage_engine: Optional[SolarArbitrageEngine] = None
+_solar_arbitrage_engine: SolarArbitrageEngine | None = None
 
 
 def get_solar_arbitrage_engine() -> SolarArbitrageEngine:

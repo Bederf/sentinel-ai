@@ -6,8 +6,8 @@ via Server-Sent Events (SSE). Follows the existing events.py pattern.
 
 import asyncio
 import logging
+from collections.abc import AsyncGenerator
 from datetime import datetime
-from typing import AsyncGenerator
 
 from app.models.equipment_status import (
     EquipmentStatusFrame,

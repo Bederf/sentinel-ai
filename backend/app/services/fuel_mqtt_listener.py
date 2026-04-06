@@ -10,7 +10,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from typing import Any, Optional
+from typing import Any
 
 from app.config.settings import settings
 
@@ -51,7 +51,7 @@ class FuelMqttListener:
     def __init__(self) -> None:
         self._client: Any = None
         self._enabled = bool(settings.fuel_mqtt_enabled and settings.fuel_mqtt_broker)
-        self._loop: Optional[asyncio.AbstractEventLoop] = None
+        self._loop: asyncio.AbstractEventLoop | None = None
 
     async def start(self) -> None:
         """Connect to the MQTT broker and subscribe to fuel topics."""
@@ -261,7 +261,7 @@ class FuelMqttListener:
 # Singleton
 # ---------------------------------------------------------------------------
 
-_instance: Optional[FuelMqttListener] = None
+_instance: FuelMqttListener | None = None
 
 
 def get_fuel_mqtt_listener() -> FuelMqttListener:

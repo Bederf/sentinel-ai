@@ -251,7 +251,7 @@ export function useServerEvents(
           if (ticket) {
             eventSourceUrl = `${apiUrl}/api/events/stream?ticket=${encodeURIComponent(ticket)}`
           }
-          // If ticket acquisition fails, still try connecting (demo mode may allow it)
+          // If ticket acquisition fails, still try connecting in local fallback mode
         }
 
         // Guard against race condition if disconnected while awaiting ticket

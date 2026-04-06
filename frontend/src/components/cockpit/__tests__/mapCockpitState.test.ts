@@ -1,150 +1,100 @@
 import { expect, it } from 'vitest'
-import { mapCockpitState, type CockpitDecisionPayload } from '../mapCockpitState'
-import type { CockpitThresholdPolicy } from '../thresholdPolicy'
+import { mapCockpitState, type BuildingStatePayload } from '../mapCockpitState'
 
 const summary = {
   siteId: 'site-002',
   siteName: 'Sandton City Office Tower',
-  posture: 'comfort_priority',
+  posture: 'compensating',
   activeAlerts: 2,
   predictionsCount: 1,
   equipmentCount: 83,
   dataFreshnessLabel: 'Updated 12s ago',
 }
 
-function buildActivePayload(): CockpitDecisionPayload {
+function buildActivePayload(): BuildingStatePayload {
   return {
-    building_id: 'site-002',
-    risk: {
-      score: 0.86,
-      band: 'critical',
-      reason: 'Thermal drift is above the configured critical threshold.',
-      policy_source: 'global.settings',
-      policy_level: 'site_asset_criticality',
-      constraint_type: 'comfort',
-      time_to_constraint_breach_min: 12,
-      affected_scope: {
-        zones: ['Zone-L2-Boardroom'],
-        assets: ['S002-CHILLER-B1-001'],
-        occupants_estimate: 18,
+    site_id: 'site-002',
+    building_posture: 'compensating',
+    primary_narrative: {
+      voice: 'comfort_stress',
+      message: 'Cooling drift is spreading upward from the basement plant.',
+      location: {
+        epicenter: 'B1',
+        affected: ['L0', 'L1'],
+        propagation: 'upward',
       },
+      time_to_breach_min: 18,
+      urgency: 'prepare',
+      action: 'Prepare standby cooling.',
     },
-    health: {
-      score: 0.83,
-      state: 'stable',
-      trend: 'declining',
-      reason: 'Compressor loading remains elevated against the comfort posture.',
-      asset_class: 'chiller',
-      criticality: 'high',
+    secondary_tensions: [
+      {
+        voice: 'energy_pressure',
+        message: 'Load is rising as the building compensates.',
+      },
+    ],
+    operator_guidance: {
+      headline: 'Prepare for intervention.',
+      mode: 'prepare',
     },
-    alert_text: 'Cooling resilience is degrading across the executive zone.',
-    reasoning_summary: 'Thermal runway and occupancy load are converging on the boardroom cluster.',
-    active_posture: 'comfort_priority',
-    time_to_discomfort: 12,
-    time_confidence: 0.82,
-    estimated_impact: 'Boardroom comfort at risk within the next meeting window.',
-    recommended_action: 'Bring standby cooling capacity online.',
-    urgency_score: 0.86,
-    urgency_components: { comfort: 0.55, asset_risk: 0.21, cost: 0.1 },
-    affected_zone_ids: ['Zone-L2-Boardroom'],
-    primary_asset_id: 'S002-CHILLER-B1-001',
-    building_metadata: { deployment_mode: 'supervised' },
   }
 }
 
-it('maps active intelligence payloads into a cockpit state', () => {
+it('maps building-state payloads into a cockpit state', () => {
   const state = mapCockpitState(summary, buildActivePayload())
 
-  expect(state.primaryMetric.label).toBe('Time to Comfort Breach')
-  expect(state.primaryMetric.value).toBe('12 min')
-  expect(state.site.mode).toBe('supervised')
-  expect(state.decision.impact).toBe('Boardroom comfort at risk within the next meeting window.')
-  expect(state.decision.confidence).toBe('82%')
-  expect(state.decision.operatorPrompt).toBe('[HOLD TO APPROVE]')
-  expect(state.evidence.refs).toContain('asset:S002-CHILLER-B1-001')
-  expect(state.severity.riskBand).toBe('critical')
-  expect(state.severity.thresholdReason).toBe('Thermal drift is above the configured critical threshold.')
-  expect(state.severity.policySource).toBe('global.settings')
-  expect(state.severity.policyLevel).toBe('site_asset_criticality')
-  expect(state.severity.constraintType).toBe('comfort')
-  expect(state.severity.timeToConstraintBreachMin).toBe(12)
-  expect(state.severity.affectedScope).toEqual({
-    zones: ['Zone-L2-Boardroom'],
-    assets: ['S002-CHILLER-B1-001'],
-    occupantsEstimate: 18,
-  })
-  expect(state.severity.healthScore).toBe(83)
-  expect(state.severity.healthState).toBe('stable')
-  expect(state.severity.healthTrend).toBe('declining')
-  expect(state.severity.healthReason).toBe('Compressor loading remains elevated against the comfort posture.')
-  expect(state.severity.assetClass).toBe('chiller')
-  expect(state.severity.criticality).toBe('high')
-  expect(state.visualTwin.focusFloorId).toBe('L2')
-  expect(state.visualTwin.motionProfile).toBe('alert')
-  expect(state.visualTwin.zoneSignals[0]?.zoneId).toBe('Zone-L2-Boardroom')
-  expect(state.visualTwin.zoneSignals[0]?.meshId).toBe('mesh:zone-l2-boardroom')
-  expect(state.visualTwin.floors.find((floor) => floor.id === 'L2')?.level).toBe('critical')
-})
-
-it('uses backend-resolved risk semantics before frontend threshold fallback', () => {
-  const payload = buildActivePayload()
-  payload.risk = {
-    score: 0.86,
-    band: 'medium',
-    reason: 'Backend policy resolved this as medium risk for the current rollout.',
-    policy_source: 'site-002.office.default',
-    policy_level: 'site',
-    constraint_type: 'comfort',
-    time_to_constraint_breach_min: 22,
-    affected_scope: {
-      zones: ['Zone-L2-Boardroom'],
-      assets: ['S002-CHILLER-B1-001'],
-      occupants_estimate: 18,
-    },
-  }
-
-  const state = mapCockpitState(summary, payload)
-
+  expect(state.site.posture).toBe('Compensating')
+  expect(state.site.mode).toBe('prepare')
+  expect(state.primaryMetric.label).toBe('Time to Constraint')
+  expect(state.primaryMetric.value).toBe('18 min')
+  expect(state.primaryMetric.detail).toBe('Prepare for intervention.')
+  expect(state.activeCondition.summary).toBe('Cooling drift is spreading upward from the basement plant.')
+  expect(state.decision.impact).toBe('B1 · L0 → L1 · Upward')
+  expect(state.decision.summary).toBe('Prepare standby cooling.')
+  expect(state.decision.tradeoff).toContain('Energy Pressure')
+  expect(state.visualTwin.focusFloorId).toBe('B1')
+  expect(state.visualTwin.zoneSignals[0]?.zoneId).toBe('B1')
+  expect(state.visualTwin.motionProfile).toBe('watch')
   expect(state.severity.riskBand).toBe('medium')
-  expect(state.primaryMetric.tone).toBe('warning')
-  expect(state.severity.thresholdReason).toBe('Backend policy resolved this as medium risk for the current rollout.')
-  expect(state.severity.policySource).toBe('site-002.office.default')
-  expect(state.severity.policyLevel).toBe('site')
-  expect(state.severity.timeToConstraintBreachMin).toBe(22)
+  expect(state.severity.timeToConstraintBreachMin).toBe(18)
 })
 
-it('uses threshold policy instead of hardcoded urgency bands when backend risk is absent', () => {
-  const customPolicy: CockpitThresholdPolicy = {
-    health: { healthy: 80, warning: 60, critical: 0 },
-    risk: { medium: 40, high: 70, critical: 90 },
-    source: 'settings',
-  }
-
-  const payload = buildActivePayload()
-  payload.risk = null
-  payload.health = null
-
-  const state = mapCockpitState(summary, payload, customPolicy)
-
-  expect(state.severity.riskBand).toBe('high')
-  expect(state.primaryMetric.tone).toBe('elevated')
-  expect(state.severity.thresholdReason).toContain('high threshold of 70')
-  expect(state.severity.policySource).toBe('settings')
-  expect(state.severity.policyLevel).toBeNull()
-  expect(state.severity.constraintType).toBeNull()
-  expect(state.visualTwin.floors.find((floor) => floor.id === 'L2')?.level).toBe('approaching')
-})
-
-it('produces a stable quiet-state cockpit when there is no active payload', () => {
-  const state = mapCockpitState(summary, null)
+it('renders an explicit calm payload without synthetic urgency', () => {
+  const state = mapCockpitState(summary, {
+    site_id: 'site-002',
+    building_posture: 'calm',
+    primary_narrative: null,
+    secondary_tensions: [],
+    operator_guidance: {
+      headline: 'No action needed.',
+      mode: 'none',
+    },
+  })
 
   expect(state.primaryMetric.value).toBe('Stable')
-  expect(state.primaryMetric.label).toBe('Time to Comfort Breach')
-  expect(state.activeCondition.summary).toContain('No comfort risk for the next 30 minutes')
-  expect(state.emergingRisks).toHaveLength(2)
+  expect(state.primaryMetric.detail).toBe('No action needed.')
+  expect(state.activeCondition.summary).toBe('Building is calm.')
+  expect(state.decision.summary).toBe('No action needed.')
   expect(state.visualTwin.motionProfile).toBe('calm')
   expect(state.visualTwin.zoneSignals).toHaveLength(0)
-  expect(state.visualTwin.floors.every((floor) => floor.level === 'stable')).toBe(true)
-  expect(state.severity.healthScore).not.toBeNull()
   expect(state.severity.affectedScope).toBeNull()
+})
+
+it('renders an unavailable state instead of inventing a calm story when payload is missing', () => {
+  const state = mapCockpitState(summary, null)
+
+  expect(state.site.renderState).toBe('waiting')
+  expect(state.site.mode).toBe('waiting')
+  expect(state.site.posture).toBe('Waiting')
+  expect(state.primaryMetric.value).toBe('Waiting')
+  expect(state.primaryMetric.label).toBe('Live State')
+  expect(state.activeCondition.summary).toBe('Awaiting building signal')
+  expect(state.decision.summary).toBe('Watch for live building state')
+  expect(state.decision.tradeoff).toBe('No operator action required until live state arrives.')
+  expect(state.visualTwin.motionProfile).toBe('waiting')
+  expect(state.emergingRisks).toEqual([])
+  expect(state.evidence.refs).toEqual([])
+  expect(state.severity.riskScore).toBeNull()
+  expect(state.severity.policySource).toBeNull()
+  expect(state.severity.healthScore).toBeNull()
 })

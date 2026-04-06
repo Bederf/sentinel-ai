@@ -18,7 +18,8 @@ Usage:
 """
 
 import logging
-from typing import Any, Dict, Callable
+from collections.abc import Callable
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +32,7 @@ logger = logging.getLogger(__name__)
 # from app.services.chat.security import TOOL_HANDLERS as SECURITY_HANDLERS
 
 
-def get_all_handlers() -> Dict[str, Callable]:
+def get_all_handlers() -> dict[str, Callable]:
     """
     Get all chat tool handlers.
 
@@ -52,7 +53,7 @@ def get_all_handlers() -> Dict[str, Callable]:
     return {}
 
 
-async def execute_tool(tool_name: str, tool_input: Dict[str, Any]) -> Dict[str, Any]:
+async def execute_tool(tool_name: str, tool_input: dict[str, Any]) -> dict[str, Any]:
     """
     Execute a chat tool by name.
 

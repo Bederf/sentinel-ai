@@ -6,12 +6,12 @@ adjustment capabilities for the autonomous system.
 
 import logging
 from datetime import datetime
-from typing import Dict, Any, List, Optional
+from typing import Any
 
 from app.models.autonomous_decision import BoundaryStatus, EscalationLevel
 from app.models.device import Device
-from app.services.safety_interlocks import safety_engine
 from app.models.safety_rules import RuleType
+from app.services.safety_interlocks import safety_engine
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +30,7 @@ class SafetyBoundaryService:
             logger.info("Safety boundary service initialized")
 
     async def check_boundary_approach(
-        self, device: Device, point_name: str, current_value: float, proposed_value: Optional[float] = None
+        self, device: Device, point_name: str, current_value: float, proposed_value: float | None = None
     ) -> BoundaryStatus:
         """
         Check how close a value is to safety boundaries.
@@ -178,7 +178,7 @@ class SafetyBoundaryService:
             last_updated=datetime.now(),
         )
 
-    async def get_all_boundary_statuses(self, device: Device) -> List[BoundaryStatus]:
+    async def get_all_boundary_statuses(self, device: Device) -> list[BoundaryStatus]:
         """
         Get boundary status for all controllable points on a device.
 
@@ -208,7 +208,7 @@ class SafetyBoundaryService:
 
         return statuses
 
-    async def get_boundary_status_summary(self, device: Device) -> Dict[str, Any]:
+    async def get_boundary_status_summary(self, device: Device) -> dict[str, Any]:
         """
         Get a summary of boundary status for all points on a device.
 
@@ -265,7 +265,7 @@ class SafetyBoundaryService:
             "details": [s.to_dict() for s in statuses],
         }
 
-    async def update_boundary_config(self, device_id: str, point_name: str, new_boundaries: Dict[str, float]) -> bool:
+    async def update_boundary_config(self, device_id: str, point_name: str, new_boundaries: dict[str, float]) -> bool:
         """
         Update boundary configuration for a device/point.
 

@@ -7,7 +7,7 @@
  * 3. SLA Tracking - SLA term cards with traffic-light indicators
  * 4. Budget Overview - Budget vs actual breakdown with variance
  *
- * Falls back to demo data when API is unavailable.
+ * Falls back to seeded data when API is unavailable.
  * Follows SENTINEL dark theme design patterns.
  */
 
@@ -43,24 +43,22 @@ import {
   TableHeaderCell,
   TableBody,
   TableCell,
-  Select,
-  SelectItem,
 } from "@tremor/react";
 import type { Contract, BudgetVariance, BudgetAlert } from "../lib/contractApi";
 import type { SLAPerformanceRecord } from "../lib/profitabilityApi";
 import { PageLoading } from "../components/PageLoading";
 
-// ============= Demo Data =============
+// ============= Seed Data =============
 
-const DEMO_CONTRACT: Contract = {
-  id: "demo-contract-001",
-  contract_code: "CON-DEMO-2024",
+const SEED_CONTRACT: Contract = {
+  id: "seed-contract-001",
+  contract_code: "CON-SEED-2024",
   organization: {
-    code: "ORG-DEMO",
-    name: "Demo Operations",
+    code: "ORG-SEED",
+    name: "Seed Operations",
     tier: "enterprise",
     primary_contact_name: "Site Operations",
-    primary_contact_email: "ops@demo.local",
+    primary_contact_email: "ops@seed.local",
     primary_contact_phone: "+27 11 555 0102",
   },
   contract: {
@@ -517,12 +515,12 @@ export function ContractManagementPage() {
         if (data && data.length > 0) {
           setContracts(data);
         } else {
-          // Fall back to demo data
-          setContracts([DEMO_CONTRACT]);
+          // Fall back to seeded data
+          setContracts([SEED_CONTRACT]);
         }
       } catch {
-        // API not available - use demo data
-        setContracts([DEMO_CONTRACT]);
+        // API not available - use seeded data
+        setContracts([SEED_CONTRACT]);
       } finally {
         setLoading(false);
       }
@@ -575,7 +573,7 @@ export function ContractManagementPage() {
   useEffect(() => {
     if (!selectedContract) return;
     const contractId = selectedContract.id;
-    if (!contractId || contractId.startsWith("demo")) {
+    if (!contractId || contractId.startsWith("seed")) {
       setSlaPerformance([]);
       return;
     }
@@ -623,7 +621,7 @@ export function ContractManagementPage() {
       return;
     }
 
-    const buildDemoRenewalPricing = () => {
+    const buildSeedRenewalPricing = () => {
       const currentFee = selectedContract.contract.monthly_fee_zar;
       const actualCost = currentFee * 0.72;
       const targetMargin = 25;
@@ -635,11 +633,11 @@ export function ContractManagementPage() {
         recommended_monthly_fee_zar: Math.round(recommended),
         delta_zar: Math.round(recommended - currentFee),
         delta_pct: currentFee > 0 ? Math.round(((recommended - currentFee) / currentFee) * 1000) / 10 : 0,
-        notes: ["Demo estimate (no live cost data)."],
+        notes: ["Seed estimate (no live cost data)."],
       };
     };
 
-    const buildDemoBenchmarks = () => {
+    const buildSeedBenchmarks = () => {
       const fees = contracts.map((c) => c.contract.monthly_fee_zar);
       const avg =
         fees.length > 0 ? fees.reduce((sum, f) => sum + f, 0) / fees.length : 0;
@@ -653,9 +651,9 @@ export function ContractManagementPage() {
 
     const loadPricing = async () => {
       const contractId = selectedContract.id;
-      if (!contractId || contractId.startsWith("demo")) {
-        setRenewalPricing(buildDemoRenewalPricing());
-        setBenchmarks(buildDemoBenchmarks());
+      if (!contractId || contractId.startsWith("seed")) {
+        setRenewalPricing(buildSeedRenewalPricing());
+        setBenchmarks(buildSeedBenchmarks());
         return;
       }
 
@@ -676,8 +674,8 @@ export function ContractManagementPage() {
       } catch (err) {
         console.error("Pricing fetch failed:", err);
         setPricingError("Pricing data unavailable");
-        setRenewalPricing(buildDemoRenewalPricing());
-        setBenchmarks(buildDemoBenchmarks());
+        setRenewalPricing(buildSeedRenewalPricing());
+        setBenchmarks(buildSeedBenchmarks());
       } finally {
         setPricingLoading(false);
       }
@@ -696,6 +694,16 @@ export function ContractManagementPage() {
     });
     return Array.from(buildingSet).sort();
   }, [contracts]);
+
+  useEffect(() => {
+    if (buildingFilter || buildings.length === 0) return;
+    const preferred =
+      buildings.find((building) => building === "site-002")
+      ?? buildings.find((building) => /sandton city office tower/i.test(building));
+    if (preferred) {
+      setBuildingFilter(preferred);
+    }
+  }, [buildings, buildingFilter]);
 
   // Compute portfolio KPIs
   const totalContracts = contracts.length;
@@ -921,7 +929,11 @@ export function ContractManagementPage() {
 
         {/* Section 2: Contract List */}
         <div
-          className="glass-panel overflow-hidden"
+          className="rounded-lg overflow-hidden"
+          style={{
+            background: "var(--color-sentinel-bg-panel)",
+            border: "1px solid var(--color-sentinel-border)",
+          }}
         >
           <div
             className="px-4 py-3 flex items-center justify-between"
@@ -949,20 +961,28 @@ export function ContractManagementPage() {
             {/* Building filter + Status filter */}
             <div className="flex items-center gap-3">
               {/* Building selector */}
-              <Select
+              <select
                 value={buildingFilter || "all"}
-                onValueChange={(v) =>
-                  setBuildingFilter(v === "all" ? null : v)
+                onChange={(event) =>
+                  setBuildingFilter(event.target.value === "all" ? null : event.target.value)
                 }
-                className="w-48"
+                className="w-48 rounded-lg appearance-none cursor-pointer px-3 py-2 text-sm transition-colors focus:outline-none focus:ring-0"
+                style={{
+                  background: "var(--color-grafana-bg-secondary)",
+                  border: "1px solid var(--color-grafana-border)",
+                  color: "var(--color-grafana-text-primary)",
+                  boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)",
+                  outline: "none",
+                }}
+                aria-label="Filter buildings"
               >
-                <SelectItem value="all">All Buildings</SelectItem>
+                <option value="all">All Buildings</option>
                 {buildings.map((building) => (
-                  <SelectItem key={building} value={building}>
+                  <option key={building} value={building}>
                     {building}
-                  </SelectItem>
+                  </option>
                 ))}
-              </Select>
+              </select>
 
               {/* Status filter buttons */}
               <div className="flex items-center gap-2">
@@ -1243,7 +1263,11 @@ export function ContractManagementPage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Section 3: SLA Tracking */}
             <div
-              className="glass-panel overflow-hidden"
+              className="rounded-lg overflow-hidden"
+              style={{
+                background: "var(--color-sentinel-bg-panel)",
+                border: "1px solid var(--color-sentinel-border)",
+              }}
             >
               <div
                 className="px-4 py-3 flex items-center gap-3"
@@ -1548,7 +1572,11 @@ export function ContractManagementPage() {
 
             {/* Section 4: Budget Overview */}
             <div
-              className="glass-panel overflow-hidden"
+              className="rounded-lg overflow-hidden"
+              style={{
+                background: "var(--color-sentinel-bg-panel)",
+                border: "1px solid var(--color-sentinel-border)",
+              }}
             >
               <div
                 className="px-4 py-3 flex items-center gap-3"
@@ -2311,7 +2339,11 @@ export function ContractManagementPage() {
         {/* Contact details for selected contract */}
         {selectedContract && (
           <div
-            className="glass-panel p-4"
+            className="rounded-lg p-4"
+            style={{
+              background: "var(--color-sentinel-bg-panel)",
+              border: "1px solid var(--color-sentinel-border)",
+            }}
           >
             <div className="flex items-center gap-2 mb-3">
               <Users

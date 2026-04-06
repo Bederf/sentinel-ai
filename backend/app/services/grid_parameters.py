@@ -14,18 +14,18 @@ Pattern follows solar_ingestion_service.py and solar_performance_service.py.
 """
 
 import logging
-from datetime import datetime, timezone
-from typing import Dict, List, Optional, Any, Tuple
+from datetime import UTC, datetime
+from typing import Any
 
 from app.models.solar import (
     GridMeter,
 )
-from app.services.solar_ingestion_service import get_solar_ingestion_service
 from app.services.grid_compliance_service import (
     GridParameters,
-    get_monitoring_engine,
     get_load_shed_scheduler,
+    get_monitoring_engine,
 )
+from app.services.solar_ingestion_service import get_solar_ingestion_service
 
 logger = logging.getLogger(__name__)
 
@@ -38,11 +38,11 @@ class GridParametersService:
         self.current_voltage_v = 400.0
         self.current_power_kw = 0.0
         self.previous_power_kw = 0.0
-        self.last_reading_time = datetime.now(timezone.utc)
-        self.reading_history: List[Dict[str, Any]] = []
+        self.last_reading_time = datetime.now(UTC)
+        self.reading_history: list[dict[str, Any]] = []
         self.max_history_length = 1440  # Keep 24 hours at 1-minute intervals
 
-    async def poll_grid_meter(self, site_id: str) -> Optional[GridMeter]:
+    async def poll_grid_meter(self, site_id: str) -> GridMeter | None:
         """Poll solar grid meter for frequency, voltage, current."""
         try:
             ingestion_svc = get_solar_ingestion_service()
@@ -51,7 +51,7 @@ class GridParametersService:
             if meter:
                 self.current_frequency_hz = meter.frequency_hz
                 self.current_voltage_v = meter.voltage_v
-                self.last_reading_time = datetime.now(timezone.utc)
+                self.last_reading_time = datetime.now(UTC)
 
                 logger.debug(f"Grid meter update: {self.current_frequency_hz} Hz, {self.current_voltage_v} V")
 
@@ -60,7 +60,7 @@ class GridParametersService:
             logger.error(f"Failed to poll grid meter: {e}")
             return None
 
-    async def poll_inverter_readings(self, site_id: str) -> Optional[Dict[str, Any]]:
+    async def poll_inverter_readings(self, site_id: str) -> dict[str, Any] | None:
         """Poll inverter AC output for frequency, voltage, power."""
         try:
             ingestion_svc = get_solar_ingestion_service()
@@ -85,7 +85,7 @@ class GridParametersService:
                 self.current_power_kw = total_power_kw
                 self.current_frequency_hz = avg_frequency_hz / count
                 self.current_voltage_v = avg_voltage_v / count
-                self.last_reading_time = datetime.now(timezone.utc)
+                self.last_reading_time = datetime.now(UTC)
 
                 logger.debug(f"Inverter update: {self.current_power_kw} kW, {self.current_frequency_hz} Hz")
 
@@ -106,7 +106,7 @@ class GridParametersService:
         Returns:
             GridParameters object with current frequency, voltage, power
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         time_delta = (now - self.last_reading_time).total_seconds() if self.last_reading_time else 1.0
 
         params = GridParameters(
@@ -120,7 +120,7 @@ class GridParametersService:
 
         return params
 
-    async def check_compliance(self, site_id: str) -> Dict[str, Any]:
+    async def check_compliance(self, site_id: str) -> dict[str, Any]:
         """Poll grid meter and run compliance check.
 
         Returns:
@@ -147,7 +147,7 @@ class GridParametersService:
 
         return status.to_dict()
 
-    async def detect_load_shedding(self) -> Tuple[int, Optional[Dict[str, Any]]]:
+    async def detect_load_shedding(self) -> tuple[int, dict[str, Any] | None]:
         """Detect current load shedding stage.
 
         Returns:
@@ -166,7 +166,7 @@ class GridParametersService:
 
         return stage, None
 
-    def _record_to_history(self, params: GridParameters, status: Dict[str, Any]) -> None:
+    def _record_to_history(self, params: GridParameters, status: dict[str, Any]) -> None:
         """Record reading to history for trending."""
         record = {
             "timestamp": params.timestamp,
@@ -182,7 +182,7 @@ class GridParametersService:
         if len(self.reading_history) > self.max_history_length:
             self.reading_history = self.reading_history[-self.max_history_length :]
 
-    async def get_frequency_trend(self, window_minutes: int = 60) -> List[Dict[str, Any]]:
+    async def get_frequency_trend(self, window_minutes: int = 60) -> list[dict[str, Any]]:
         """Get frequency readings over a time window.
 
         Args:
@@ -208,7 +208,7 @@ class GridParametersService:
 
         return filtered
 
-    async def get_voltage_trend(self, window_minutes: int = 60) -> List[Dict[str, Any]]:
+    async def get_voltage_trend(self, window_minutes: int = 60) -> list[dict[str, Any]]:
         """Get voltage readings over a time window.
 
         Args:
@@ -233,7 +233,7 @@ class GridParametersService:
 
         return filtered
 
-    async def get_power_trend(self, window_minutes: int = 60) -> List[Dict[str, Any]]:
+    async def get_power_trend(self, window_minutes: int = 60) -> list[dict[str, Any]]:
         """Get power readings over a time window.
 
         Args:
@@ -261,7 +261,7 @@ class GridParametersService:
 
 # === Singleton accessor ===
 
-_grid_parameters_service: Optional[GridParametersService] = None
+_grid_parameters_service: GridParametersService | None = None
 
 
 def get_grid_parameters_service() -> GridParametersService:

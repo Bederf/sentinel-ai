@@ -4,6 +4,7 @@ Verifies that normalisation, deduplication, ranking, source-status
 computation, and audit-trail assembly match the original logic that
 lived in CockpitIssueFusionService before the refactor.
 """
+
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
@@ -11,15 +12,14 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from app.processing.cockpit_table import (
-    SEVERITY_MAP,
-    CockpitTableProcessor,
     SOURCE_THRESHOLDS,
+    CockpitTableProcessor,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _alert(
     id: str = "a1",
@@ -58,16 +58,20 @@ def _audit(id: str = "au1", action: str = "acknowledge", user_id: str = "u1") ->
 # _map_severity
 # ---------------------------------------------------------------------------
 
+
 class TestMapSeverity:
-    @pytest.mark.parametrize("value,expected", [
-        ("critical", "critical"),
-        ("high",     "high"),
-        ("medium",   "medium"),
-        ("low",      "low"),
-        (None,       "medium"),
-        ("unknown",  "medium"),
-        ("CRITICAL", "critical"),  # .lower() normalises before map lookup
-    ])
+    @pytest.mark.parametrize(
+        "value,expected",
+        [
+            ("critical", "critical"),
+            ("high", "high"),
+            ("medium", "medium"),
+            ("low", "low"),
+            (None, "medium"),
+            ("unknown", "medium"),
+            ("CRITICAL", "critical"),  # .lower() normalises before map lookup
+        ],
+    )
     def test_mapping(self, value, expected):
         assert CockpitTableProcessor._map_severity(value) == expected
 
@@ -75,6 +79,7 @@ class TestMapSeverity:
 # ---------------------------------------------------------------------------
 # _severity_to_confidence
 # ---------------------------------------------------------------------------
+
 
 class TestSeverityToConfidence:
     def test_critical_is_highest(self):
@@ -90,6 +95,7 @@ class TestSeverityToConfidence:
 # ---------------------------------------------------------------------------
 # _build_dedupe_key
 # ---------------------------------------------------------------------------
+
 
 class TestBuildDedupeKey:
     def test_key_with_equipment_id(self):
@@ -122,11 +128,19 @@ class TestBuildDedupeKey:
 # _dedupe — duplicate suppression
 # ---------------------------------------------------------------------------
 
+
 class TestDedupe:
     def test_same_key_kept_once(self):
         alerts = [_alert("a1", equipment_id="eq-1", type_="hvac")]
-        intakes = [{"id": "i1", "equipment_id": "eq-1", "site_id": "S001", "type": "hvac",
-                    "updated_at": datetime.now(UTC).isoformat()}]
+        intakes = [
+            {
+                "id": "i1",
+                "equipment_id": "eq-1",
+                "site_id": "S001",
+                "type": "hvac",
+                "updated_at": datetime.now(UTC).isoformat(),
+            }
+        ]
         issues, _, _, _ = CockpitTableProcessor.fuse(alerts, intakes, [], [], None)
         # Two sources, same equipment + type → deduplicated to 1
         assert len(issues) == 1
@@ -141,10 +155,17 @@ class TestDedupe:
 
     def test_bms_priority_over_intake_for_same_key(self):
         now = datetime.now(UTC)
-        alerts = [_alert("bms-1", equipment_id="eq-1", type_="fault", severity="critical",
-                          updated_at=now.isoformat())]
-        intakes = [{"id": "int-1", "equipment_id": "eq-1", "site_id": "S001", "type": "fault",
-                    "severity": "low", "updated_at": (now - timedelta(hours=1)).isoformat()}]
+        alerts = [_alert("bms-1", equipment_id="eq-1", type_="fault", severity="critical", updated_at=now.isoformat())]
+        intakes = [
+            {
+                "id": "int-1",
+                "equipment_id": "eq-1",
+                "site_id": "S001",
+                "type": "fault",
+                "severity": "low",
+                "updated_at": (now - timedelta(hours=1)).isoformat(),
+            }
+        ]
         issues, _, _, _ = CockpitTableProcessor.fuse(alerts, intakes, [], [], None)
         assert len(issues) == 1
         # BMS (priority 0) wins over intake (priority 1)
@@ -155,11 +176,12 @@ class TestDedupe:
 # _dedupe — ranking
 # ---------------------------------------------------------------------------
 
+
 class TestRanking:
     def test_critical_ranked_above_medium(self):
         now = datetime.now(UTC)
         alerts = [
-            _alert("a-medium",   severity="medium",   equipment_id="eq-m", updated_at=now.isoformat()),
+            _alert("a-medium", severity="medium", equipment_id="eq-m", updated_at=now.isoformat()),
             _alert("a-critical", severity="critical", equipment_id="eq-c", updated_at=now.isoformat()),
         ]
         issues, _, _, _ = CockpitTableProcessor.fuse(alerts, [], [], [], None)
@@ -169,10 +191,8 @@ class TestRanking:
         """Resolved issues rank behind non-resolved ones of the same severity."""
         now = datetime.now(UTC)
         alerts = [
-            _alert("a-resolved", severity="medium", status="resolved",
-                   equipment_id="eq-r", updated_at=now.isoformat()),
-            _alert("a-new",      severity="medium", status="new",
-                   equipment_id="eq-n", updated_at=now.isoformat()),
+            _alert("a-resolved", severity="medium", status="resolved", equipment_id="eq-r", updated_at=now.isoformat()),
+            _alert("a-new", severity="medium", status="new", equipment_id="eq-n", updated_at=now.isoformat()),
         ]
         issues, _, _, _ = CockpitTableProcessor.fuse(alerts, [], [], [], None)
         assert issues[-1].id == "a-resolved"
@@ -199,6 +219,7 @@ class TestRanking:
 # ---------------------------------------------------------------------------
 # _build_source_statuses
 # ---------------------------------------------------------------------------
+
 
 class TestSourceStatuses:
     def test_returns_three_statuses(self):
@@ -228,6 +249,7 @@ class TestSourceStatuses:
 # ---------------------------------------------------------------------------
 # _build_audit_trail
 # ---------------------------------------------------------------------------
+
 
 class TestAuditTrail:
     def test_sorted_newest_first(self):

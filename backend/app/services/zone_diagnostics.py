@@ -3,7 +3,6 @@
 Analyzes zone equipment to determine root cause of comfort issues.
 """
 
-from typing import Dict, List, Optional
 from dataclasses import dataclass
 from enum import Enum
 
@@ -27,11 +26,11 @@ class DiagnosticResult:
     deviation: float
     fault_type: FaultType
     faulty_equipment: str
-    fault_code: Optional[str]
+    fault_code: str | None
     fault_description: str
-    equipment_status: Dict[str, Dict]
-    recommended_actions: List[str]
-    parts_required: List[str]
+    equipment_status: dict[str, dict]
+    recommended_actions: list[str]
+    parts_required: list[str]
     estimated_repair_hours: float
     severity: str  # critical, warning, info
 
@@ -42,7 +41,7 @@ class ZoneDiagnostics:
     def __init__(self, supabase_client):
         self.client = supabase_client
 
-    def get_zone_equipment(self, zone_id: str) -> Dict[str, str]:
+    def get_zone_equipment(self, zone_id: str) -> dict[str, str]:
         """Get equipment codes for a zone."""
         # Parse zone_id like "Zone-L10-C"
         parts = zone_id.split("-")
@@ -58,7 +57,7 @@ class ZoneDiagnostics:
             "co2_sensor": f"CO2-{floor}-0{zone_num}",
         }
 
-    def get_equipment_status(self, equipment_codes: Dict[str, str]) -> Dict[str, Dict]:
+    def get_equipment_status(self, equipment_codes: dict[str, str]) -> dict[str, dict]:
         """Fetch status for all zone equipment."""
         status = {}
         for eq_type, code in equipment_codes.items():

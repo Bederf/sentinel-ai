@@ -12,6 +12,7 @@ with ``pl.DataFrame([s.__dict__ for s in hourly_data])``.
 ``aggregate_seasons()`` is a second group-by pass over the 12 MonthSummary
 rows — trivially expressible as a Polars ``group_by("season").agg(...)``.
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
@@ -42,16 +43,33 @@ SOLAR_CAPACITY_KWP = 3900.0
 THEORETICAL_SOLAR_KWH_PER_KWP_DAY = 5.2
 
 _MONTH_NAMES = [
-    "January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December",
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
 ]
 
 # Month → SA season name (SA seasons)
 _SEASON_MAP: dict[int, str] = {
-    1: "summer", 2: "summer",
-    3: "autumn", 4: "autumn", 5: "autumn",
-    6: "winter", 7: "winter", 8: "winter",
-    9: "spring", 10: "spring", 11: "spring",
+    1: "summer",
+    2: "summer",
+    3: "autumn",
+    4: "autumn",
+    5: "autumn",
+    6: "winter",
+    7: "winter",
+    8: "winter",
+    9: "spring",
+    10: "spring",
+    11: "spring",
     12: "summer",
 }
 
@@ -116,9 +134,7 @@ class SolarTableProcessor:
             sentinel_ai_cost = standard_ems_cost * 0.85
 
             days_in_month = len({h.day_of_year for h in month_hours})
-            theoretical_month_kwh = (
-                SOLAR_CAPACITY_KWP * THEORETICAL_SOLAR_KWH_PER_KWP_DAY * days_in_month
-            ) / 1000
+            theoretical_month_kwh = (SOLAR_CAPACITY_KWP * THEORETICAL_SOLAR_KWH_PER_KWP_DAY * days_in_month) / 1000
             capacity_factor = (solar_kwh / theoretical_month_kwh * 100) if theoretical_month_kwh > 0 else 0.0
 
             monthly[month_num - 1] = MonthSummary(

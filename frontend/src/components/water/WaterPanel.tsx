@@ -22,6 +22,7 @@ import {
   Text,
 } from "@tremor/react";
 import { Droplets, Building2, ChevronDown, AlertTriangle } from "lucide-react";
+import { authorizedFetch } from "@/lib/api/client";
 import { SentinelValueCard } from "../SentinelValueCard";
 import { waterApi } from "../../lib/waterApi";
 import type {
@@ -45,6 +46,17 @@ interface WaterPanelProps {
   siteId?: string;
 }
 
+interface BridgeTelemetrySummary {
+  status: "live" | "unavailable";
+  zones_with_readings?: number;
+  zone_count?: number;
+  power?: {
+    hvac_kw?: number;
+    lighting_kw?: number;
+    total_kw?: number;
+  };
+}
+
 export function WaterPanel({ siteId: propSiteId }: WaterPanelProps) {
   const [selectedSiteId, setSelectedSiteId] = useState<string>(propSiteId || "");
   const [activeTabIndex, setActiveTabIndex] = useState<number>(0);
@@ -53,6 +65,9 @@ export function WaterPanel({ siteId: propSiteId }: WaterPanelProps) {
   const [consumptionData, setConsumptionData] = useState<WaterConsumption[]>([]);
   const [alerts, setAlerts] = useState<WaterAlert[]>([]);
   const [trending, setTrending] = useState<WaterTrending | null>(null);
+  const [bridgeTelemetry, setBridgeTelemetry] = useState<BridgeTelemetrySummary | null>(null);
+  const [sentinelGuidance, setSentinelGuidance] = useState<string | null>(null);
+  const [sentinelPosture, setSentinelPosture] = useState<string | null>(null);
 
   // Fetch buildings with water module (on mount)
   useEffect(() => {
@@ -80,7 +95,7 @@ export function WaterPanel({ siteId: propSiteId }: WaterPanelProps) {
         setCurrentFlow(flow);
       } catch (err) {
         console.error("Failed to fetch current flow:", err);
-        // Fallback for demo mode
+        // Fallback for local mode
         setCurrentFlow({
           site: selectedSiteId,
           flow_rate_lpm: 12.5,
@@ -113,7 +128,7 @@ export function WaterPanel({ siteId: propSiteId }: WaterPanelProps) {
         setConsumptionData(data);
       } catch (err) {
         console.error("Failed to fetch consumption:", err);
-        // Fallback for demo mode
+        // Fallback for local mode
         const demoData: WaterConsumption[] = [];
         for (let i = 6; i >= 0; i--) {
           const date = new Date();
@@ -141,7 +156,7 @@ export function WaterPanel({ siteId: propSiteId }: WaterPanelProps) {
         setAlerts(alertData);
       } catch (err) {
         console.error("Failed to fetch alerts:", err);
-        // Fallback for demo mode
+        // Fallback for local mode
         setAlerts([
           {
             alert_id: "alert-001",
@@ -185,7 +200,7 @@ export function WaterPanel({ siteId: propSiteId }: WaterPanelProps) {
         setTrending(trendData);
       } catch (err) {
         console.error("Failed to fetch trending:", err);
-        // Fallback for demo mode
+        // Fallback for local mode
         setTrending({
           site: selectedSiteId,
           period: "week",
@@ -202,6 +217,51 @@ export function WaterPanel({ siteId: propSiteId }: WaterPanelProps) {
     };
 
     fetchTrending();
+  }, [selectedSiteId]);
+
+  useEffect(() => {
+    if (!selectedSiteId) return;
+    let mounted = true;
+    async function loadTelemetrySummary() {
+      try {
+        const [rawTelemetryResp, stateResp] = await Promise.all([
+          authorizedFetch(`/api/sites/${encodeURIComponent(selectedSiteId)}/telemetry`).catch(() => null),
+          authorizedFetch(`/api/building-state/${encodeURIComponent(selectedSiteId)}`).catch(() => null),
+        ]);
+        if (!mounted) return;
+
+        if (rawTelemetryResp && rawTelemetryResp.ok) {
+          const raw = await rawTelemetryResp.json();
+          setBridgeTelemetry({
+            status: "live",
+            zones_with_readings: raw?.zones_with_readings ?? 0,
+            zone_count: raw?.zone_count ?? 0,
+            power: raw?.power ?? {},
+          });
+        } else {
+          setBridgeTelemetry({ status: "unavailable" });
+        }
+
+        if (stateResp && stateResp.ok) {
+          const state = await stateResp.json();
+          setSentinelGuidance(state?.payload?.operator_guidance?.headline || null);
+          setSentinelPosture(state?.payload?.building_posture || null);
+        } else {
+          setSentinelGuidance(null);
+          setSentinelPosture(null);
+        }
+      } catch {
+        if (mounted) {
+          setBridgeTelemetry({ status: "unavailable" });
+          setSentinelGuidance(null);
+          setSentinelPosture(null);
+        }
+      }
+    }
+    loadTelemetrySummary();
+    return () => {
+      mounted = false;
+    };
   }, [selectedSiteId]);
 
   // Calculate KPIs
@@ -332,9 +392,41 @@ export function WaterPanel({ siteId: propSiteId }: WaterPanelProps) {
         )}
       </div>
 
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+        <div className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+          <div className="flex items-center justify-between mb-2">
+            <Text className="text-sm font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>Raw Bridge Telemetry</Text>
+            <span
+              className="text-xs px-2 py-1 rounded"
+              style={{
+                background: bridgeTelemetry?.status === "live" ? "rgba(16,185,129,0.15)" : "rgba(245,158,11,0.15)",
+                color: bridgeTelemetry?.status === "live" ? "#10B981" : "#F59E0B",
+              }}
+            >
+              {bridgeTelemetry?.status === "live" ? "Live" : "Unavailable"}
+            </span>
+          </div>
+          <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+            Zones: {bridgeTelemetry?.zones_with_readings ?? 0}/{bridgeTelemetry?.zone_count ?? 0}
+          </Text>
+          <Text className="text-xs mt-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+            Power: HVAC {(bridgeTelemetry?.power?.hvac_kw ?? 0).toFixed(2)} kW · Total {(bridgeTelemetry?.power?.total_kw ?? 0).toFixed(2)} kW
+          </Text>
+        </div>
+        <div className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+          <Text className="text-sm font-semibold mb-2" style={{ color: "var(--color-sentinel-text-primary)" }}>SENTINEL Water Interpretation</Text>
+          <Text className="text-xs capitalize" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+            Posture: <span style={{ color: "var(--color-sentinel-text-primary)" }}>{sentinelPosture || "unknown"}</span>
+          </Text>
+          <Text className="text-xs mt-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+            {sentinelGuidance || "No active guidance yet."}
+          </Text>
+        </div>
+      </div>
+
       {/* Quick Stats KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+        <div className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
           <Flex justifyContent="between" alignItems="center">
             <Text style={{ color: "var(--color-sentinel-text-secondary)" }} className="text-xs">
               Today's Consumption
@@ -347,7 +439,7 @@ export function WaterPanel({ siteId: propSiteId }: WaterPanelProps) {
           </Text>
         </div>
 
-        <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+        <div className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
           <Flex justifyContent="between" alignItems="center">
             <Text style={{ color: "var(--color-sentinel-text-secondary)" }} className="text-xs">
               Monthly Cost
@@ -360,7 +452,7 @@ export function WaterPanel({ siteId: propSiteId }: WaterPanelProps) {
           </Text>
         </div>
 
-        <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+        <div className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
           <Flex justifyContent="between" alignItems="center">
             <Text style={{ color: "var(--color-sentinel-text-secondary)" }} className="text-xs">
               Active Alerts
@@ -375,7 +467,7 @@ export function WaterPanel({ siteId: propSiteId }: WaterPanelProps) {
           </Text>
         </div>
 
-        <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+        <div className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
           <Flex justifyContent="between" alignItems="center">
             <Text style={{ color: "var(--color-sentinel-text-secondary)" }} className="text-xs">
               Efficiency

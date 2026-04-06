@@ -27,6 +27,7 @@ from app.models.niagara import (
     BACnetPointWriteResponse,
     BACnetTestConnectionRequest,
 )
+from app.services.simbiot import BmsConnectionConfig, BmsWriteRequest, create_bms_adapter
 from app.services.niagara.bacnet_client import (
     BACnetException,
     BACnetReadError,
@@ -269,6 +270,8 @@ async def write_point(
     object_type: str,
     instance: int,
     request: BACnetPointWriteRequest,
+    site_id: str = Query("site-002", description="Site code for policy enforcement"),
+    bms_vendor: str = Query("bacnet", description="BMS vendor/adapter alias"),
 ):
     """
     Write a value to a BACnet point with priority array support.
@@ -276,21 +279,25 @@ async def write_point(
     Uses BACnet priority arrays for conflict resolution.
     Default priority 8 (manual operator commands).
     """
-    client = get_bacnet_client()
-
-    if not client.is_running:
-        raise HTTPException(
-            status_code=503,
-            detail="BACnet client is not started.",
-        )
-
+    adapter = create_bms_adapter(adapter_type=bms_vendor, bms_vendor=bms_vendor)
+    cfg = BmsConnectionConfig(
+        site_id=site_id,
+        source_type=bms_vendor,
+        metadata={"commissioning": False},
+    )
     try:
-        success = await client.write_point(
-            device_id=device_id,
-            object_type=object_type,
-            instance=instance,
-            value=request.value,
-            priority=request.priority,
+        status = await adapter.connect(cfg)
+        if not status.connected:
+            raise HTTPException(status_code=503, detail=status.message or "BMS adapter unavailable")
+        success = await adapter.write_point(
+            BmsWriteRequest(
+                device_id=str(device_id),
+                point_id=f"{object_type}:{instance}",
+                value=request.value,
+                priority=request.priority,
+                user="niagara_bacnet_api",
+                metadata={"site_id": site_id, "equipment_type": ""},
+            )
         )
 
         return BACnetPointWriteResponse(
@@ -303,6 +310,10 @@ async def write_point(
             message=f"Value written to {object_type},{instance} on device {device_id}",
         )
 
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=f"Write blocked by policy: {e}")
+    except ConnectionError as e:
+        raise HTTPException(status_code=503, detail=f"Connection error: {e}")
     except BACnetTimeoutError as e:
         raise HTTPException(status_code=504, detail=f"Write timed out: {e}")
     except BACnetWriteError as e:
@@ -312,6 +323,11 @@ async def write_point(
     except BACnetException as e:
         logger.error("Point write failed: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        try:
+            await adapter.disconnect()
+        except Exception:
+            pass
 
 
 # ---------------------------------------------------------------------------

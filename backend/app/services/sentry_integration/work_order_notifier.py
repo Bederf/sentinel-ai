@@ -6,17 +6,23 @@ responses in service records.
 """
 
 import asyncio
-import logging
 import json
+import logging
 import os
-from typing import Dict, Any, Optional
+import uuid
 from datetime import datetime
+from typing import Any
 
+from app.database.repositories.notification_repository import (
+    NotificationRepository,
+    SYSTEM_NOTIFIER_TECHNICIAN_ID,
+)
 from app.database.repositories.service_record_repository import ServiceRecordRepository
 from app.database.repositories.work_order_repository import get_work_order_repository
-from app.services.ml_template_service import MLTemplateService
+from app.models.notification import ChannelType, NotificationDeliveryLog, NotificationStatus
 from app.models.service_record import ServiceStatus
 from app.services.health_simulation_service import health_simulation_service
+from app.services.ml_template_service import MLTemplateService
 from app.services.popia_consent_guard import evaluate_ingress_processing_consent
 
 logger = logging.getLogger(__name__)
@@ -30,6 +36,7 @@ class WorkOrderNotifier:
         self.bms_api_url = "http://localhost:9095"  # SENTINEL API
         self.repository = ServiceRecordRepository()
         self.template_service = MLTemplateService()
+        self._notification_repo = NotificationRepository()
 
     @staticmethod
     def _normalize_text(value: Any) -> str:
@@ -40,12 +47,13 @@ class WorkOrderNotifier:
         return text.replace("\\n", "\n")
 
     @staticmethod
-    def _resolve_equipment(equipment_id: str, equipment_name: str = "") -> Optional[Dict[str, Any]]:
+    def _resolve_equipment(equipment_id: str, equipment_name: str = "") -> dict[str, Any] | None:
         """Look up equipment by UUID or code for email body enrichment."""
         if not equipment_id:
             return None
         try:
             import re
+
             from app.database.supabase_client import get_supabase_client
 
             sb = get_supabase_client()
@@ -65,12 +73,13 @@ class WorkOrderNotifier:
         return None
 
     @staticmethod
-    def _resolve_site(site_id: str) -> Optional[Dict[str, Any]]:
+    def _resolve_site(site_id: str) -> dict[str, Any] | None:
         """Look up site by UUID or code for email body enrichment."""
         if not site_id:
             return None
         try:
             import re
+
             from app.database.supabase_client import get_supabase_client
 
             sb = get_supabase_client()
@@ -153,7 +162,7 @@ class WorkOrderNotifier:
             logger.warning(f"Could not load checklist for {equipment_type}: {e}")
             return ""
 
-    async def _load_work_order_context(self, work_order_id: str) -> Dict[str, Any]:
+    async def _load_work_order_context(self, work_order_id: str) -> dict[str, Any]:
         """Load work order context from repository using ID or code."""
         if not work_order_id:
             return {}
@@ -172,7 +181,7 @@ class WorkOrderNotifier:
             logger.warning(f"Failed to load work order context for {work_order_id}: {e}")
             return {}
 
-    def _build_email_subject(self, work_order_data: Dict[str, Any], work_order: Dict[str, Any]) -> str:
+    def _build_email_subject(self, work_order_data: dict[str, Any], work_order: dict[str, Any]) -> str:
         """Build a descriptive subject line with WO reference and priority."""
         equipment_name = work_order_data.get("equipment_name") or work_order.get("title") or "Equipment"
         criticality = str(work_order_data.get("criticality") or work_order.get("priority") or "MEDIUM").upper()
@@ -186,9 +195,9 @@ class WorkOrderNotifier:
 
     def _build_email_body(
         self,
-        work_order_data: Dict[str, Any],
-        service_record: Dict[str, Any],
-        work_order: Dict[str, Any],
+        work_order_data: dict[str, Any],
+        service_record: dict[str, Any],
+        work_order: dict[str, Any],
     ) -> str:
         """Build full-detail email body for technician execution."""
         equipment_obj = work_order.get("equipment") or {}
@@ -408,7 +417,7 @@ class WorkOrderNotifier:
             logger.warning("Exception in native SMTP email: %s", e)
             return False
 
-    async def notify_technician_with_code(self, work_order_data: Dict[str, Any]) -> Dict[str, Any]:
+    async def notify_technician_with_code(self, work_order_data: dict[str, Any]) -> dict[str, Any]:
         """Notify technician via BOTH email and Telegram.
 
         Creates a service record for the work order and sends notifications via:
@@ -448,7 +457,41 @@ class WorkOrderNotifier:
                 except Exception as e:
                     logger.warning(f"Could not look up technician email: {e}")
 
-            # Send Telegram notification (Sentry will poll /api/sentry/work-order/pending)
+            # Resolve technician Telegram ID from DB (match by name, then by email)
+            if not work_order_data.get("technician_id") or "@" in str(work_order_data.get("technician_id", "")):
+                try:
+                    from app.database.repositories.technician_repository import get_technician_repository
+
+                    tech_repo = get_technician_repository()
+                    tech_name = work_order_data.get("technician_name", "")
+                    tech_email = work_order_data.get("technician_email", "")
+                    all_techs = await tech_repo.get_all_technicians(active_only=True)
+
+                    matched = None
+                    # Try name match first
+                    if tech_name:
+                        needle = tech_name.strip().lower()
+                        matched = next(
+                            (t for t in all_techs if t.get("name", "").lower() == needle),
+                            None,
+                        )
+                    # Fall back to email match
+                    if not matched and tech_email:
+                        needle = tech_email.strip().lower()
+                        matched = next(
+                            (t for t in all_techs if t.get("email", "").lower() == needle),
+                            None,
+                        )
+
+                    if matched and matched.get("telegram_id"):
+                        work_order_data["technician_id"] = matched["telegram_id"]
+                        logger.warning(f"[WO-NOTIFY] Resolved Telegram ID for {matched.get('name')}: {matched['telegram_id']}")
+                    elif matched:
+                        logger.warning(f"[WO-NOTIFY] No Telegram ID for {matched.get('name')} (email: {matched.get('email')})")
+                except Exception as e:
+                    logger.warning(f"Could not look up Telegram ID: {e}")
+
+            # Send Telegram notification directly via Sentry CLI
             telegram_sent = await self._send_telegram_notification(work_order_data, service_record)
 
             # Send Email notification via native SMTP
@@ -467,23 +510,155 @@ class WorkOrderNotifier:
             logger.error(f"Error creating service record: {e}")
             return {"success": False, "error": str(e)}
 
-    async def _send_telegram_notification(
-        self, work_order_data: Dict[str, Any], service_record: Dict[str, Any]
-    ) -> bool:
-        """Send Telegram notification via Sentry bot.
-
-        Sentry polls /api/sentry/work-order/pending and sends Telegram messages.
-        This is a placeholder - actual sending is done by Sentry polling.
-        """
+    async def _log_delivery(
+        self,
+        *,
+        work_order_data: dict[str, Any],
+        service_record: dict[str, Any],
+        channel_type: ChannelType,
+        status: NotificationStatus,
+        recipient_identifier: str,
+        title: str,
+        body: str,
+        provider: str = "sentry",
+        external_message_id: str | None = None,
+        error_code: str | None = None,
+        error_message: str | None = None,
+        provider_response: dict[str, Any] | None = None,
+    ) -> None:
+        """Persist work order send attempt into notification delivery log."""
+        # Resolve technician_id — prefer UUID from repo lookup, fall back to system notifier
+        technician_uuid = SYSTEM_NOTIFIER_TECHNICIAN_ID
         try:
-            logger.info(f"Telegram notification queued for {work_order_data['technician_name']}")
-            # Sentry bot will poll and send the actual Telegram message
-            return True
+            from uuid import UUID
+
+            from app.database.repositories.technician_repository import get_technician_repository
+
+            tech_repo = get_technician_repository()
+            tech_telegram_id = str(work_order_data.get("technician_id") or "").strip()
+            if tech_telegram_id and not tech_telegram_id.startswith("@"):
+                tech = await tech_repo.get_technician_by_telegram_id(tech_telegram_id)
+                if tech and tech.get("id"):
+                    technician_uuid = UUID(tech["id"])
+        except Exception:
+            pass
+
+        delivery_log = NotificationDeliveryLog(
+            id=uuid.uuid4(),
+            work_order_id=work_order_data.get("work_order_id"),
+            technician_id=technician_uuid,
+            notification_type="work_order_assigned",
+            title=title,
+            body=body,
+            channel_type=channel_type,
+            recipient_identifier=recipient_identifier,
+            status=status,
+            error_code=error_code,
+            error_message=error_message,
+            provider=provider,
+            provider_response=provider_response or {},
+            external_message_id=external_message_id,
+            sent_at=datetime.utcnow() if status == NotificationStatus.SENT else None,
+        )
+
+        await self._notification_repo.create_delivery_log(delivery_log)
+
+    async def _send_telegram_notification(
+        self, work_order_data: dict[str, Any], service_record: dict[str, Any]
+    ) -> bool:
+        """Send Telegram notification to technician via Sentry bot CLI."""
+        import subprocess
+
+        try:
+            technician_id = str(work_order_data.get("technician_id") or "").strip()
+            # Skip if no Telegram ID, or if it's clearly an email (not a numeric Telegram chat ID)
+            if not technician_id or "@" in technician_id:
+                # No valid Telegram ID — skip (email fallback still works)
+                logger.info("No Telegram ID for %s (technician_id=%r) — skipping Telegram send",
+                    work_order_data.get("technician_name"), technician_id)
+                return False
+
+            from app.services.sentry_integration.config import get_sentry_bot_cli
+
+            wo_ref = work_order_data.get("code") or work_order_data.get("work_order_id", "WO-???")
+            eq_name = work_order_data.get("equipment_name", "?")
+            pri = work_order_data.get("criticality", "MEDIUM").upper()
+            service_type = work_order_data.get("service_type", "callout")
+            tech_name = work_order_data.get("technician_name", "Technician")
+
+            # Build message — include WO ref, priority, equipment name, and Telegram commands
+            equipment_code = work_order_data.get("equipment_code", "")
+            code_underscored = equipment_code.replace("-", "_") if equipment_code else ""
+            wo_ref_underscored = wo_ref.replace("-", "_")
+            msg = (
+                f"📋 Work Order {wo_ref}\n"
+                f"🔧 {eq_name}\n"
+                f"🔴 Priority: {pri} | Type: {service_type}\n"
+                f"👤 Assigned: {tech_name}\n"
+                f"─────────────────\n"
+                f"/info_{code_underscored} - Equipment details\n"
+                f"/note_{code_underscored} - Add note\n"
+                f"/done_{wo_ref_underscored} - Submit inspection"
+            )
+
+            cli = get_sentry_bot_cli()
+            result = await asyncio.to_thread(
+                subprocess.run,
+                [cli, "message", "send",
+                 "--channel", "telegram",
+                 "--account", "default",
+                 "--target", technician_id,
+                 "--message", msg],
+                timeout=15,
+                capture_output=True,
+            )
+            if result.returncode == 0:
+                logger.info("Telegram sent to %s for %s", technician_id, wo_ref)
+                await self._log_delivery(
+                    work_order_data=work_order_data,
+                    service_record=service_record,
+                    channel_type=ChannelType.TELEGRAM,
+                    status=NotificationStatus.SENT,
+                    recipient_identifier=technician_id,
+                    title=f"Work Order {wo_ref}",
+                    body=msg,
+                    provider="sentry",
+                    external_message_id=None,
+                )
+                return True
+            else:
+                stderr = result.stderr.decode("utf-8", errors="replace") if result.stderr else ""
+                logger.warning("Telegram send failed for %s: %s", wo_ref, stderr)
+                await self._log_delivery(
+                    work_order_data=work_order_data,
+                    service_record=service_record,
+                    channel_type=ChannelType.TELEGRAM,
+                    status=NotificationStatus.FAILED,
+                    recipient_identifier=technician_id,
+                    title=f"Work Order {wo_ref}",
+                    body=msg,
+                    provider="sentry",
+                    error_code="non-zero-exit",
+                    error_message=stderr,
+                )
+                return False
         except Exception as e:
-            logger.warning(f"Failed to queue Telegram notification: {e}")
+            logger.warning("Failed to send Telegram notification: %s", e)
+            await self._log_delivery(
+                work_order_data=work_order_data,
+                service_record=service_record,
+                channel_type=ChannelType.TELEGRAM,
+                status=NotificationStatus.FAILED,
+                recipient_identifier=str(work_order_data.get("technician_id") or ""),
+                title=f"Work Order {work_order_data.get('code', '?')}",
+                body="",
+                provider="sentry",
+                error_code="exception",
+                error_message=str(e),
+            )
             return False
 
-    async def _send_email_notification(self, work_order_data: Dict[str, Any], service_record: Dict[str, Any]) -> bool:
+    async def _send_email_notification(self, work_order_data: dict[str, Any], service_record: dict[str, Any]) -> bool:
         """Send email notification to technician via native SMTP (workorder@sentinel-ai.co.za)."""
         try:
             work_order = await self._load_work_order_context(work_order_data.get("work_order_id", ""))
@@ -500,18 +675,44 @@ class WorkOrderNotifier:
             email_body = self._build_email_body(work_order_data, service_record, work_order)
             technician_name = work_order_data.get("technician_name", "Technician")
 
-            return await self._send_email_via_native_smtp(
+            sent = await self._send_email_via_native_smtp(
                 to_email=recipient,
                 subject=email_subject,
                 body=email_body,
                 technician_name=technician_name,
             )
 
+            await self._log_delivery(
+                work_order_data=work_order_data,
+                service_record=service_record,
+                channel_type=ChannelType.EMAIL,
+                status=NotificationStatus.SENT if sent else NotificationStatus.FAILED,
+                recipient_identifier=str(recipient),
+                title=email_subject,
+                body=email_body[:500] if email_body else "",
+                provider="smtp",
+                error_code=None if sent else "smtp_failed",
+                error_message=None if sent else "Email send returned False",
+            )
+            return sent
+
         except Exception as e:
             logger.warning("Failed to send WO email notification: %s", e)
+            await self._log_delivery(
+                work_order_data=work_order_data,
+                service_record=service_record,
+                channel_type=ChannelType.EMAIL,
+                status=NotificationStatus.FAILED,
+                recipient_identifier=str(work_order_data.get("technician_email") or ""),
+                title=f"Work Order {work_order_data.get('code', '?')}",
+                body="",
+                provider="smtp",
+                error_code="exception",
+                error_message=str(e),
+            )
             return False
 
-    async def notify_technician(self, work_order_data: Dict[str, Any]) -> bool:
+    async def notify_technician(self, work_order_data: dict[str, Any]) -> bool:
         """Notify technician about new work order via Sentry.
 
         Sends notification only - data collection does NOT start yet.
@@ -542,7 +743,7 @@ class WorkOrderNotifier:
         result = await self.notify_technician_with_code(work_order_data)
         return result.get("success", False)
 
-    async def create_service_record(self, work_order_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    async def create_service_record(self, work_order_data: dict[str, Any]) -> dict[str, Any] | None:
         """Create a service record from work order data.
 
         Args:
@@ -585,7 +786,7 @@ class WorkOrderNotifier:
 
         return await self.repository.create(record_data)
 
-    async def handle_technician_reply(self, service_record_code: str, reply_data: Dict[str, Any]) -> Dict[str, Any]:
+    async def handle_technician_reply(self, service_record_code: str, reply_data: dict[str, Any]) -> dict[str, Any]:
         """Handle technician's reply to work order notification.
 
         Args:
@@ -637,8 +838,8 @@ class WorkOrderNotifier:
             return {"error": str(e)}
 
     async def _handle_text_reply(
-        self, service_record: Dict[str, Any], equipment_type: str, reply_data: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, service_record: dict[str, Any], equipment_type: str, reply_data: dict[str, Any]
+    ) -> dict[str, Any]:
         """Handle text reply from technician."""
         content = reply_data.get("content", "")
         diagnostic_context = service_record.get("diagnostic_context")
@@ -716,12 +917,12 @@ class WorkOrderNotifier:
 
     async def _handle_comprehensive_response(
         self,
-        service_record: Dict[str, Any],
+        service_record: dict[str, Any],
         equipment_type: str,
-        diagnostic_context: Dict[str, Any],
-        extraction: Dict[str, Any],
+        diagnostic_context: dict[str, Any],
+        extraction: dict[str, Any],
         original_content: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Handle a comprehensive response that contains multiple pieces of info.
 
         When technician says something like:
@@ -827,12 +1028,12 @@ class WorkOrderNotifier:
 
     async def _handle_breakdown_step_response(
         self,
-        service_record: Dict[str, Any],
+        service_record: dict[str, Any],
         equipment_type: str,
-        diagnostic_context: Dict[str, Any],
+        diagnostic_context: dict[str, Any],
         current_step: str,
         content: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Handle response to a breakdown data collection step.
 
         Args:
@@ -894,8 +1095,8 @@ class WorkOrderNotifier:
         return {"success": True, "type": "collection_complete", "collected_items": collected, "is_complete": True}
 
     async def _handle_file_reply(
-        self, service_record: Dict[str, Any], equipment_type: str, reply_data: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, service_record: dict[str, Any], equipment_type: str, reply_data: dict[str, Any]
+    ) -> dict[str, Any]:
         """Handle file/photo reply from technician."""
         file_info = reply_data.get("content", {})
 
@@ -978,12 +1179,12 @@ class WorkOrderNotifier:
         }
 
     async def _handle_audio_reply(
-        self, service_record: Dict[str, Any], equipment_type: str, reply_data: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, service_record: dict[str, Any], equipment_type: str, reply_data: dict[str, Any]
+    ) -> dict[str, Any]:
         """Handle audio reply from technician."""
         return await self._handle_file_reply(service_record, equipment_type, reply_data)
 
-    def _classify_attachment(self, file_info: Dict[str, Any], service_record: Dict[str, Any]) -> str:
+    def _classify_attachment(self, file_info: dict[str, Any], service_record: dict[str, Any]) -> str:
         """Classify attachment type based on file characteristics and current step.
 
         For photos, uses the current collection step to determine if it's a
@@ -1033,7 +1234,7 @@ class WorkOrderNotifier:
         # Default based on what we expect
         return "service_sheet"
 
-    def _check_completion(self, service_record: Dict[str, Any], equipment_type: str) -> Dict[str, Any]:
+    def _check_completion(self, service_record: dict[str, Any], equipment_type: str) -> dict[str, Any]:
         """Check if all required items have been collected.
 
         Args:
@@ -1058,7 +1259,7 @@ class WorkOrderNotifier:
             "completion_percentage": validation["completion_percentage"],
         }
 
-    async def _complete_service_record_and_restore_equipment(self, service_record: Dict[str, Any]):
+    async def _complete_service_record_and_restore_equipment(self, service_record: dict[str, Any]):
         """Complete service record and restore equipment to healthy state.
 
         This method:
@@ -1136,7 +1337,7 @@ class WorkOrderNotifier:
         except Exception as e:
             logger.warning(f"Could not update equipment status: {e}")
 
-    async def get_collection_status(self, service_record_code: str) -> Dict[str, Any]:
+    async def get_collection_status(self, service_record_code: str) -> dict[str, Any]:
         """Get data collection status for a service record.
 
         Args:
@@ -1180,7 +1381,7 @@ class WorkOrderNotifier:
             "next_prompt": next_prompt,
         }
 
-    async def complete_service_record(self, service_record_code: str, force: bool = True) -> Dict[str, Any]:
+    async def complete_service_record(self, service_record_code: str, force: bool = True) -> dict[str, Any]:
         """Complete a service record and trigger health restoration/closure flow."""
         filters = {"code": service_record_code}
         records = await self.repository.list(filters)
@@ -1233,7 +1434,7 @@ work_order_notifier = WorkOrderNotifier()
 async def handle_telegram_comfort_complaint(
     telegram_user_id: str,
     message_text: str,
-) -> Optional[str]:
+) -> str | None:
     """
     Route a comfort complaint from Telegram to the LangGraph agent.
 
@@ -1288,7 +1489,7 @@ async def handle_telegram_comfort_complaint(
         return None
 
 
-async def handle_telegram_recommendation_approval(telegram_user_id: str, message_text: str) -> Optional[str]:
+async def handle_telegram_recommendation_approval(telegram_user_id: str, message_text: str) -> str | None:
     """Handle Telegram-based Tier 2 recommendation approval/rejection.
 
     Detects APPROVE/REJECT commands and resumes the checkpointed
@@ -1320,6 +1521,7 @@ async def handle_telegram_recommendation_approval(telegram_user_id: str, message
             return None
 
         from langchain_core.messages import HumanMessage
+
         from app.agents import get_recommendation_graph
         from app.agents.recommendation_tools import (
             execute_approved_recommendation,

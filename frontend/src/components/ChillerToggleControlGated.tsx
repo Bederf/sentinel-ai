@@ -62,7 +62,7 @@ export function ChillerToggleControlGated({
 
   return (
     <LockedFeatureOverlay
-      module="control"
+      module="hvac_control"
       featureName="Chiller Control"
       customMessage="Enable Controls module to let SENTINEL automatically manage chiller operations, reduce cycling losses, and lower energy costs by 10-15%."
     >

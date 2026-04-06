@@ -15,10 +15,10 @@ import json
 import logging
 import random
 from dataclasses import dataclass, field
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 from enum import Enum
 from pathlib import Path
-from typing import Dict, List, Optional, Any
+from typing import Any
 
 from app.services.solar_ingestion_service import get_solar_ingestion_service
 
@@ -66,12 +66,12 @@ class VoltageCompliance:
     max_v: float = 253.0
     disconnect_low_v: float = 195.5
     disconnect_high_v: float = 264.5
-    current_readings: List[Dict[str, Any]] = field(default_factory=list)
+    current_readings: list[dict[str, Any]] = field(default_factory=list)
     violations_24h: int = 0
-    violations: List[Dict[str, Any]] = field(default_factory=list)
+    violations: list[dict[str, Any]] = field(default_factory=list)
     message: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "status": self.status,
             "nominal_v": self.nominal_v,
@@ -98,12 +98,12 @@ class FrequencyCompliance:
     max_hz: float = 51.0
     disconnect_low_hz: float = 47.5
     disconnect_high_hz: float = 52.0
-    current_readings: List[Dict[str, Any]] = field(default_factory=list)
+    current_readings: list[dict[str, Any]] = field(default_factory=list)
     violations_24h: int = 0
-    violations: List[Dict[str, Any]] = field(default_factory=list)
+    violations: list[dict[str, Any]] = field(default_factory=list)
     message: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "status": self.status,
             "nominal_hz": self.nominal_hz,
@@ -131,10 +131,10 @@ class PowerQualityReport:
     max_dc_injection_pct: float = 0.5
     power_factor: float = 1.0
     power_factor_min: float = 0.95
-    details: List[Dict[str, Any]] = field(default_factory=list)
+    details: list[dict[str, Any]] = field(default_factory=list)
     message: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "status": self.status,
             "thd": {
@@ -161,12 +161,12 @@ class ExportCompliance:
 
     status: str
     current_export_kw: float = 0.0
-    export_limit_kw: Optional[float] = None
+    export_limit_kw: float | None = None
     zero_export_required: bool = False
     zero_export_tolerance_kw: float = 5.0
     message: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "status": self.status,
             "current_export_kw": self.current_export_kw,
@@ -186,13 +186,13 @@ class CertificateStatus:
     standard: str
     date: str
     issuer: str
-    expiry: Optional[str] = None
+    expiry: str | None = None
     status: str = "valid"
     edition_current: bool = True
-    days_to_expiry: Optional[int] = None
+    days_to_expiry: int | None = None
     message: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "equipment": self.equipment,
             "cert_no": self.cert_no,
@@ -216,12 +216,12 @@ class ComplianceEvent:
     severity: str  # warning/violation/info
     equipment_id: str
     description: str
-    value: Optional[float] = None
-    limit: Optional[float] = None
+    value: float | None = None
+    limit: float | None = None
     resolved: bool = False
-    resolved_at: Optional[str] = None
+    resolved_at: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "timestamp": self.timestamp,
             "event_type": self.event_type,
@@ -249,11 +249,11 @@ class ComplianceReport:
     frequency: FrequencyCompliance = field(default_factory=lambda: FrequencyCompliance(status="compliant"))
     power_quality: PowerQualityReport = field(default_factory=lambda: PowerQualityReport(status="compliant"))
     export: ExportCompliance = field(default_factory=lambda: ExportCompliance(status="compliant"))
-    certificates: List[CertificateStatus] = field(default_factory=list)
-    events: List[ComplianceEvent] = field(default_factory=list)
-    summary: Dict[str, Any] = field(default_factory=dict)
+    certificates: list[CertificateStatus] = field(default_factory=list)
+    events: list[ComplianceEvent] = field(default_factory=list)
+    summary: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "site_id": self.site_id,
             "site_name": self.site_name,
@@ -280,14 +280,14 @@ class SolarComplianceService:
 
     Checks NRS 097-2-1 voltage/frequency limits, power quality (THD, PF,
     DC injection), SSEG export limits, and certificate validity.
-    Simulates occasional violations for demo realism.
+    Seeds occasional violations for local realism.
     """
 
     def __init__(self):
-        self._rules: Dict[str, Any] = {}
-        self._events: List[ComplianceEvent] = []
+        self._rules: dict[str, Any] = {}
+        self._events: list[ComplianceEvent] = []
         self._load_rules()
-        self._seed_demo_events()
+        self._seed_events()
 
     def _load_rules(self) -> None:
         """Load compliance rules from JSON configuration."""
@@ -300,15 +300,15 @@ class SolarComplianceService:
             logger.error("Failed to load compliance rules: %s", e)
             self._rules = {}
 
-    def _seed_demo_events(self) -> None:
-        """Seed realistic compliance events for demo purposes.
+    def _seed_events(self) -> None:
+        """Seed realistic compliance events for local seeded operation.
 
         Simulates:
           - A voltage dip during load shedding transition (common in SA)
           - A brief frequency excursion during Eskom grid instability
           - A reconnection event after the frequency event
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Voltage dip during load shedding transition (4 hours ago)
         ls_time = now - timedelta(hours=4, minutes=12)
@@ -368,7 +368,7 @@ class SolarComplianceService:
             )
         )
 
-        logger.info("Seeded %d demo compliance events", len(self._events))
+        logger.info("Seeded %d compliance events", len(self._events))
 
     # === Voltage Compliance ===
 
@@ -412,7 +412,7 @@ class SolarComplianceService:
                             "meter_id": meter.meter_id,
                             "voltage_v": round(phase_v, 1),
                             "type": "disconnect_required",
-                            "timestamp": datetime.now(timezone.utc).isoformat(),
+                            "timestamp": datetime.now(UTC).isoformat(),
                         }
                     )
                 else:
@@ -423,12 +423,12 @@ class SolarComplianceService:
                             "meter_id": meter.meter_id,
                             "voltage_v": round(phase_v, 1),
                             "type": "outside_normal_range",
-                            "timestamp": datetime.now(timezone.utc).isoformat(),
+                            "timestamp": datetime.now(UTC).isoformat(),
                         }
                     )
 
         # Count historical violations in last 24h from events
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         v_events_24h = [
             e
             for e in self._events
@@ -492,7 +492,7 @@ class SolarComplianceService:
                             "meter_id": meter.meter_id,
                             "frequency_hz": round(freq, 2),
                             "type": "disconnect_required",
-                            "timestamp": datetime.now(timezone.utc).isoformat(),
+                            "timestamp": datetime.now(UTC).isoformat(),
                         }
                     )
                 else:
@@ -503,12 +503,12 @@ class SolarComplianceService:
                             "meter_id": meter.meter_id,
                             "frequency_hz": round(freq, 2),
                             "type": "outside_normal_range",
-                            "timestamp": datetime.now(timezone.utc).isoformat(),
+                            "timestamp": datetime.now(UTC).isoformat(),
                         }
                     )
 
         # Count historical frequency events in last 24h
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         f_events_24h = [
             e
             for e in self._events
@@ -554,7 +554,7 @@ class SolarComplianceService:
         thd_values = [m.thd_pct for m in meters if m.thd_pct > 0]
         avg_thd = sum(thd_values) / len(thd_values) if thd_values else 0.0
 
-        # Simulate near-limit THD for demo (makes compliance dashboard
+        # Simulate near-limit THD for seeded operation (makes compliance dashboard
         # non-trivially empty — shows realistic warning state for SA grid)
         if avg_thd < 3.5:
             avg_thd = round(random.uniform(4.2, 4.9), 1)
@@ -680,10 +680,10 @@ class SolarComplianceService:
 
     # === Certificate Validity ===
 
-    async def check_certificate_validity(self, site_id: str) -> List[CertificateStatus]:
+    async def check_certificate_validity(self, site_id: str) -> list[CertificateStatus]:
         """Check NRS 097 certificate dates, flag expiry or outdated editions."""
         certs_config = self._rules.get("nrs_097_certificates", [])
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         current_edition = "NRS 097-2-1:2024 Ed.3"
 
         results = []
@@ -696,7 +696,7 @@ class SolarComplianceService:
 
             if expiry:
                 try:
-                    expiry_date = datetime.strptime(expiry, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+                    expiry_date = datetime.strptime(expiry, "%Y-%m-%d").replace(tzinfo=UTC)
                     days_to_expiry = (expiry_date - now).days
                     if days_to_expiry < 0:
                         cert_status = "expired"
@@ -730,7 +730,7 @@ class SolarComplianceService:
 
     # === Compliance Report ===
 
-    async def generate_compliance_report(self, site_id: str, period: str = "month") -> Optional[ComplianceReport]:
+    async def generate_compliance_report(self, site_id: str, period: str = "month") -> ComplianceReport | None:
         """Generate full SSEG compliance report for utility submission."""
         ingestion = get_solar_ingestion_service()
         sites = ingestion.get_registered_sites()
@@ -752,7 +752,7 @@ class SolarComplianceService:
         certificates = await self.check_certificate_validity(site_id)
 
         # Get events for the period
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         if period == "week":
             from_ts = now - timedelta(weeks=1)
         elif period == "day":
@@ -825,8 +825,8 @@ class SolarComplianceService:
     # === Compliance Events ===
 
     async def get_compliance_events(
-        self, site_id: str, from_ts: Optional[str] = None, to_ts: Optional[str] = None
-    ) -> List[ComplianceEvent]:
+        self, site_id: str, from_ts: str | None = None, to_ts: str | None = None
+    ) -> list[ComplianceEvent]:
         """Get historical compliance events, optionally filtered by time range."""
         events = list(self._events)
 
@@ -850,7 +850,7 @@ class SolarComplianceService:
 
     # === Overall Status (for dashboard) ===
 
-    async def get_overall_compliance(self, site_id: str) -> Optional[Dict[str, Any]]:
+    async def get_overall_compliance(self, site_id: str) -> dict[str, Any] | None:
         """Get traffic-light compliance summary for dashboard display."""
         ingestion = get_solar_ingestion_service()
         sites = ingestion.get_registered_sites()
@@ -886,7 +886,7 @@ class SolarComplianceService:
             overall = ComplianceStatus.COMPLIANT.value
 
         # Next report due
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         next_month = now.replace(day=1) + timedelta(days=32)
         next_report_due = next_month.replace(day=1).strftime("%Y-%m-%d")
 
@@ -924,7 +924,7 @@ class SolarComplianceService:
 
 # === Singleton ===
 
-_solar_compliance_service: Optional[SolarComplianceService] = None
+_solar_compliance_service: SolarComplianceService | None = None
 
 
 def get_solar_compliance_service() -> SolarComplianceService:

@@ -10,6 +10,7 @@ Replace each method body with a Polars expression that consumes the same
 ``records: list[dict]`` input and produces the same output dict.
 The public signatures are the stable contract — callers need no changes.
 """
+
 from __future__ import annotations
 
 from datetime import date, datetime
@@ -273,9 +274,7 @@ class WaterTableProcessor:
         daily_data: dict[str, dict[str, Any]] = {}
         for record in zone_records:
             timestamp = record["timestamp"]
-            record_date = (
-                datetime.fromisoformat(timestamp).date() if isinstance(timestamp, str) else timestamp.date()
-            )
+            record_date = datetime.fromisoformat(timestamp).date() if isinstance(timestamp, str) else timestamp.date()
             date_str = record_date.isoformat()
             if date_str not in daily_data:
                 daily_data[date_str] = {"volume_liters": 0, "flows": []}

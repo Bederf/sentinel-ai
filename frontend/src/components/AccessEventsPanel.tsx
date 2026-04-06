@@ -107,7 +107,7 @@ export function AccessEventsPanel({ siteId = "", refreshKey }: AccessEventsPanel
   if (loading && events.length === 0) {
     return (
       <div
-        className="rounded-md overflow-hidden"
+        className="rounded-lg overflow-hidden"
         style={{
           background: "var(--color-sentinel-bg-panel)",
           border: "1px solid var(--color-sentinel-border)",
@@ -130,7 +130,7 @@ export function AccessEventsPanel({ siteId = "", refreshKey }: AccessEventsPanel
 
   return (
     <div
-      className="rounded-md overflow-hidden"
+      className="rounded-lg overflow-hidden"
       style={{
         background: "var(--color-sentinel-bg-panel)",
         border: "1px solid var(--color-sentinel-border)",
@@ -138,7 +138,7 @@ export function AccessEventsPanel({ siteId = "", refreshKey }: AccessEventsPanel
     >
       {/* Header with filter tabs */}
       <div
-        className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+        className="p-3 md:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
         style={{ borderBottom: "1px solid var(--color-sentinel-border)" }}
       >
         <div className="flex items-center gap-2">
@@ -163,7 +163,7 @@ export function AccessEventsPanel({ siteId = "", refreshKey }: AccessEventsPanel
         <div className="flex items-center gap-2">
           {/* Filter tabs */}
           <div
-            className="flex rounded overflow-hidden"
+            className="flex rounded-lg overflow-hidden"
             style={{ border: "1px solid var(--color-sentinel-border)" }}
           >
             {filters.map((f) => {
@@ -181,7 +181,7 @@ export function AccessEventsPanel({ siteId = "", refreshKey }: AccessEventsPanel
                     color: isActive
                       ? "var(--color-sentinel-text-primary)"
                       : "var(--color-sentinel-text-secondary)",
-                    borderRight: "1px solid var(--color-sentinel-border)",
+                    borderRight: f.id === "after-hours" ? "none" : "1px solid var(--color-sentinel-border)",
                   }}
                 >
                   <Icon className="h-3.5 w-3.5" />

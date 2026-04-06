@@ -292,6 +292,7 @@ export function useSettingsController({ siteId, onError }: UseSettingsController
     canManageFeatureAccess,
     canToggleModules,
     currentUserEmail,
+    currentUserRole,
     handleFeatureToggle,
     handleMlTrainingToggle,
     handleSaveRiskThresholds,

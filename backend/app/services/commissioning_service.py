@@ -4,17 +4,17 @@ Implements 8 hard gates, truth-check validation, and consecutive-day tracking
 as the formal gate before promoting a building to LIVE_CONTROL mode.
 """
 
-from datetime import datetime, date
+from datetime import date, datetime
 
 from app.config.settings import settings as app_settings
 from app.database.repositories.integration_repository import IntegrationRepository
 from app.models.commissioning import (
-    CommissioningGateId,
     CommissioningGate,
-    TruthCheckEntry,
-    TruthCheckResult,
+    CommissioningGateId,
     CommissioningScorecard,
     PromotionResult,
+    TruthCheckEntry,
+    TruthCheckResult,
 )
 from app.models.integration import BuildingStatus
 
@@ -269,7 +269,7 @@ class CommissioningService:
             pct = (invalid / total) * 100
             return pct, f"{invalid}/{total} invalid values ({pct:.2f}%)"
         except Exception as e:
-            # Table may not exist in demo mode
+            # Table may not exist in local mode
             return 0.0, f"Could not query trends: {e}"
 
     def _check_timestamp_integrity(self, site_id: str) -> tuple[float, str]:

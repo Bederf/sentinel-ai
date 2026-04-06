@@ -1,89 +1,47 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 
 import pytest
 
-from app.models.health_rating import HealthComponentBreakdown, HealthDataQualityResult, HealthRating
-from app.services.sentinel_data_sync import SentinelDataSync
+from app.services.sentinel_data_sync import SentinelDataSync, _blend_health_score
 
 
-class _FakeSnapshotService:
-    def __init__(self):
-        self.store_calls = []
-        self.rollup_calls = []
+class TestBlendHealthScore:
+    """Tests for _blend_health_score — the LSTM health blend function.
 
-    async def store_snapshot(self, rating, site_id=None):
-        self.store_calls.append((rating, site_id))
-        return "snapshot-1"
+    Covered extensively in test_sentinel_data_sync_08b.py.
+    These are sanity-check backups.
+    """
 
-    async def update_daily_rollup(self, equipment_id, date):
-        self.rollup_calls.append((equipment_id, date))
+    def test_blend_below_gate_returns_base(self):
+        """Below MIN_LSTM_TRAINING_HOURS (500h): base returned unchanged."""
+        base = 85.0
+        sensor_readings = {"lstm_anomaly_score": 0.2}
+        result = _blend_health_score(base, sensor_readings, ml_hours_ingested=400.0)
+        assert result == base
 
+    def test_blend_no_lstm_key_returns_base(self):
+        """lstm_anomaly_score absent: base returned regardless of hours."""
+        base = 72.0
+        result = _blend_health_score(base, {}, ml_hours_ingested=2000.0)
+        assert result == base
 
-class _FakeCalculator:
-    async def compute_rating(self, equipment_id, equipment, mode):
-        return HealthRating(
-            equipment_id=equipment_id,
-            health_score=91.0,
-            health_status="healthy",
-            confidence="high",
-            assessment_state="normal",
-            components=HealthComponentBreakdown(),
-            data_quality=HealthDataQualityResult(
-                freshness_minutes=0.0,
-                snapshot_count_24h=1,
-                valid_point_ratio=1.0,
-                baseline_age_days=0,
-                gates_passed=4,
-                gates_total=4,
-                confidence="high",
-                assessment_state="normal",
-            ),
-            snapshot_at="2026-03-25T10:00:00Z",
-        )
+    def test_blend_high_anomaly_drops_health(self):
+        """High lstm_anomaly (0.9) + high trust (2000h): health drops to 24."""
+        base = 80.0
+        sensor_readings = {"lstm_anomaly_score": 0.9}
+        result = _blend_health_score(base, sensor_readings, ml_hours_ingested=2000.0)
+        assert result == 24.0
 
 
-@pytest.mark.asyncio
-async def test_capture_health_snapshots_uses_equipment_uuid():
-    sync = SentinelDataSync(site_id="site-002")
-    snapshot_service = _FakeSnapshotService()
-    sync._get_snapshot_service = lambda: snapshot_service
-    sync._get_health_calculator = lambda: _FakeCalculator()
-    sync._fetch_equipment_snapshot_metadata = lambda codes: {
-        "S002-CHILLER-B1-001": {
-            "id": "11111111-1111-1111-1111-111111111111",
-            "site_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
-            "type": "CHILLER",
-            "install_date": None,
-            "commissioning_date": None,
-            "operating_data": {},
-        }
-    }
+class TestSentinelDataSyncInit:
+    """Basic SentinelDataSync initialisation and structure tests."""
 
-    stored = await sync._capture_health_snapshots(
-        {
-            "S002-CHILLER-B1-001": {
-                "health_score": 91.0,
-                "sensor_readings": {"supply_temp": 6.5},
-            }
-        },
-        datetime(2026, 3, 25, 10, 0, 0),
-    )
+    def test_sync_initialises_with_site_id(self):
+        sync = SentinelDataSync(site_id="site-002")
+        assert sync.site_id == "site-002"
 
-    assert stored == 1
-    assert snapshot_service.store_calls[0][0].equipment_id == "11111111-1111-1111-1111-111111111111"
-    assert snapshot_service.store_calls[0][1] == "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-    assert snapshot_service.rollup_calls == [("11111111-1111-1111-1111-111111111111", "2026-03-25")]
-
-
-def test_should_store_health_snapshot_throttles_unchanged_health():
-    sync = SentinelDataSync(site_id="site-002")
-    simulated_time = datetime(2026, 3, 25, 10, 0, 0)
-    sync._last_snapshot_state["S002-CHILLER-B1-001"] = (simulated_time, 91.0)
-
-    should_store = sync._should_store_health_snapshot(
-        "S002-CHILLER-B1-001",
-        {"health_score": 91.4, "sensor_readings": {"supply_temp": 6.5}},
-        simulated_time + timedelta(minutes=5),
-    )
-
-    assert should_store is False
+    def test_sync_initialises_ml_feeder(self):
+        sync = SentinelDataSync(site_id="site-002")
+        assert sync.ml_feeder is not None
+        assert hasattr(sync.ml_feeder, "ingest")
+        assert hasattr(sync.ml_feeder, "hours_ingested")

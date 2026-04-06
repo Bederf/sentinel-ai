@@ -15,18 +15,19 @@ Phase 54: Equipment Baseline Assessment - Wave 1 (Parallel with 54-01, 54-03)
 """
 
 import logging
-from typing import Dict, Any, Optional
 from datetime import datetime
-from pydantic import BaseModel, Field
+from typing import Any
+
+from pydantic import BaseModel, ConfigDict, Field
 
 # Import baseline models
-from app.models.baseline import EquipmentBaseline, BaselineType, BaselineSource, BaselineStatus
+from app.models.baseline import BaselineSource, BaselineStatus, BaselineType, EquipmentBaseline
 
 # Import existing services
 try:
-    from app.services.device_abstraction import DeviceManager
     from app.services.baseline_comparator import get_baseline_comparator
     from app.services.baseline_service import BaselineService
+    from app.services.device_abstraction import DeviceManager
     from app.services.safety_interlocks import safety_engine
 except ImportError as e:
     # Fallback for development
@@ -82,13 +83,14 @@ class SensorDataNotAvailable(BaselineCaptureError):
 class BaselineElement(BaseModel):
     """Single baseline element with value, unit, and tolerance."""
 
+    model_config = ConfigDict(
+        json_schema_extra={"example": {"value": 7.2, "unit": "°C", "tolerance": 2.0, "tolerance_type": "absolute"}}
+    )
+
     value: float = Field(..., description="Baseline value")
     unit: str = Field(..., description="Measurement unit (°C, PSI, mm/s, etc.)")
     tolerance: float = Field(..., description="Acceptable deviation (absolute or %)")
     tolerance_type: str = Field(default="percent", description="Tolerance type: 'percent' or 'absolute'")
-
-    class Config:
-        json_schema_extra = {"example": {"value": 7.2, "unit": "°C", "tolerance": 2.0, "tolerance_type": "absolute"}}
 
 
 # ============================================================================
@@ -223,11 +225,11 @@ class BaselineCaptureService:
         self,
         equipment_id: str,
         source: BaselineSource,
-        data: Optional[Dict[str, Any]] = None,
+        data: dict[str, Any] | None = None,
         captured_by: str = "unknown",
         baseline_type: BaselineType = BaselineType.INITIAL,
-        notes: Optional[str] = None,
-        measurement_conditions: Optional[Dict[str, Any]] = None,
+        notes: str | None = None,
+        measurement_conditions: dict[str, Any] | None = None,
     ) -> EquipmentBaseline:
         """
         Capture baseline from specified source.
@@ -343,8 +345,8 @@ class BaselineCaptureService:
         return False
 
     async def _normalize_from_manual(
-        self, equipment_id: str, manual_data: Dict[str, Any]
-    ) -> Dict[str, BaselineElement]:
+        self, equipment_id: str, manual_data: dict[str, Any]
+    ) -> dict[str, BaselineElement]:
         """
         Normalize manual entry data to baseline elements.
 
@@ -389,8 +391,8 @@ class BaselineCaptureService:
         return elements
 
     async def _normalize_from_device(
-        self, equipment_id: str, device_data: Optional[Dict[str, Any]]
-    ) -> Dict[str, BaselineElement]:
+        self, equipment_id: str, device_data: dict[str, Any] | None
+    ) -> dict[str, BaselineElement]:
         """
         Normalize BMS device readings to baseline elements.
 
@@ -472,8 +474,8 @@ class BaselineCaptureService:
             raise InvalidBaselineData(f"Failed to read device data: {e}")
 
     async def _normalize_from_sensor_analysis(
-        self, equipment_id: str, sensor_data: Optional[Dict[str, Any]]
-    ) -> Dict[str, BaselineElement]:
+        self, equipment_id: str, sensor_data: dict[str, Any] | None
+    ) -> dict[str, BaselineElement]:
         """
         Normalize phone sensor baseline data to baseline elements.
 
@@ -557,8 +559,8 @@ class BaselineCaptureService:
             raise InvalidBaselineData(f"Failed to read sensor data: {e}")
 
     def _apply_default_tolerances(
-        self, equipment_type: str, elements: Dict[str, BaselineElement]
-    ) -> Dict[str, BaselineElement]:
+        self, equipment_type: str, elements: dict[str, BaselineElement]
+    ) -> dict[str, BaselineElement]:
         """
         Apply default tolerances based on equipment type and metric type.
 
@@ -702,7 +704,7 @@ class BaselineCaptureService:
 # Singleton Factory
 # ============================================================================
 
-_baseline_capture_service_instance: Optional[BaselineCaptureService] = None
+_baseline_capture_service_instance: BaselineCaptureService | None = None
 
 
 def get_baseline_capture_service() -> BaselineCaptureService:

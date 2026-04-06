@@ -14,7 +14,6 @@ The evaluator never recomputes metrics — it aggregates from existing services.
 import asyncio
 import logging
 from datetime import datetime
-from typing import Dict, Optional
 
 from app.services.quality_gate_policy import (
     METRIC_REASON_CODES,
@@ -35,7 +34,7 @@ CONFIDENCE_CAP = 0.59
 # Default metric values per mode category.
 # simulation defaults produce PASS (lenient).
 # live defaults produce FAIL (fail-closed).
-_SIMULATION_DEFAULTS: Dict[str, float] = {
+_SIMULATION_DEFAULTS: dict[str, float] = {
     "freshness_minutes": 60.0,
     "ingest_error_rate_pct_1h": 0.0,
     "match_coverage_pct": 100.0,
@@ -52,7 +51,7 @@ _SIMULATION_DEFAULTS: Dict[str, float] = {
     "drift_critical_alerts_24h": 0.0,
 }
 
-_LIVE_DEFAULTS: Dict[str, float] = {
+_LIVE_DEFAULTS: dict[str, float] = {
     "freshness_minutes": 9999.0,
     "ingest_error_rate_pct_1h": 100.0,
     "match_coverage_pct": 0.0,
@@ -70,7 +69,7 @@ _LIVE_DEFAULTS: Dict[str, float] = {
 }
 
 # Enforcement mapping: (mode, gate_status) -> EnforcementAction
-_ENFORCEMENT_MAP: Dict[tuple, EnforcementAction] = {
+_ENFORCEMENT_MAP: dict[tuple, EnforcementAction] = {
     ("simulation", GateStatus.PASS): EnforcementAction.NORMAL,
     ("simulation", GateStatus.WARN): EnforcementAction.NORMAL,
     ("simulation", GateStatus.FAIL): EnforcementAction.CAP_CONFIDENCE,
@@ -93,10 +92,14 @@ class QualityGateEvaluator:
         recommendation = evaluator.apply_enforcement(result, recommendation)
     """
 
+    _last_audit_signature: str | None = None
+    _last_audit_logged_at: datetime | None = None
+    _audit_heartbeat_minutes: int = 60
+
     def __init__(self) -> None:
         self._policy = QualityGatePolicy()
 
-    def evaluate(self, mode: str, metrics: Dict[str, float], site_id: str = "unknown") -> QualityGateResult:
+    def evaluate(self, mode: str, metrics: dict[str, float], site_id: str = "unknown") -> QualityGateResult:
         """Evaluate metrics against quality gate thresholds for a mode.
 
         Pure function — no IO. Takes pre-collected metrics and returns
@@ -166,8 +169,8 @@ class QualityGateEvaluator:
         # Prometheus metrics instrumentation (best-effort, never blocks business logic)
         try:
             from app.api.metrics import (
-                sentinel_quality_gate_evaluations_total,
                 sentinel_quality_gate_enforcement,
+                sentinel_quality_gate_evaluations_total,
             )
 
             sentinel_quality_gate_evaluations_total.labels(site_id=site_id, status=result.overall.value).inc()
@@ -225,7 +228,7 @@ class QualityGateEvaluator:
 
         return recommendation
 
-    async def collect_metrics(self, site_id: Optional[str] = None) -> Dict[str, float]:
+    async def collect_metrics(self, site_id: str | None = None) -> dict[str, float]:
         """Aggregate metrics from existing services.
 
         Collects from MonitoringService, CommissioningService, MVVerificationService,
@@ -246,7 +249,7 @@ class QualityGateEvaluator:
 
         # Start with defaults based on mode
         defaults = _SIMULATION_DEFAULTS if is_simulation else _LIVE_DEFAULTS
-        metrics: Dict[str, float] = dict(defaults)
+        metrics: dict[str, float] = dict(defaults)
 
         # Fail-closed: no site_id in live modes means all metrics stay at FAIL defaults
         if not site_id and not is_simulation:
@@ -317,8 +320,9 @@ class QualityGateEvaluator:
                 metrics["label_lag_p95_hours"] = max(1.0, 48.0 * (1.0 - fb_summary.avg_prediction_accuracy))
 
         async def _collect_drift_alerts():
-            from app.services.audit_logger import AuditLogger
             from datetime import timedelta
+
+            from app.services.audit_logger import AuditLogger
 
             audit = AuditLogger()
             cutoff = datetime.now() - timedelta(hours=24)
@@ -343,7 +347,7 @@ class QualityGateEvaluator:
         async def _safe_collect(name: str, coro_fn):
             try:
                 await asyncio.wait_for(coro_fn(), timeout=5.0)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 logger.warning(f"Quality gate collector '{name}' timed out (5s)")
             except Exception as e:
                 logger.warning(f"Failed to collect {name} metrics: {e}")
@@ -360,11 +364,37 @@ class QualityGateEvaluator:
             audit = AuditLogger()
             from app.models.audit_log import AuditResultType
 
-            audit_result = AuditResultType.SUCCESS if result.overall == GateStatus.PASS else AuditResultType.FAILED
+            # Collapse repetitive quality-gate logs unless state meaningfully changes.
+            signature = (
+                f"{result.mode}|{result.overall.value}|{result.enforcement.value}|"
+                f"{','.join(sorted(result.failed_rules))}|{','.join(sorted(result.warn_rules))}"
+            )
+            now = datetime.utcnow()
+            if (
+                self.__class__._last_audit_signature == signature
+                and self.__class__._last_audit_logged_at is not None
+                and (now - self.__class__._last_audit_logged_at).total_seconds()
+                < self.__class__._audit_heartbeat_minutes * 60
+            ):
+                return
+
+            # Do not mark non-blocking quality gate outcomes as hard failures.
+            if result.overall == GateStatus.PASS:
+                audit_result = AuditResultType.SUCCESS
+            elif result.enforcement.value == "block_writes":
+                audit_result = AuditResultType.FAILED
+            else:
+                audit_result = AuditResultType.WARNING
+
+            detail = (
+                f"Quality gate {result.overall.value}; enforcement={result.enforcement.value}; "
+                f"failed_rules={len(result.failed_rules)}; warn_rules={len(result.warn_rules)}"
+            )
             audit.log_system_event(
                 event_type="quality_gate_evaluated",
                 user="system",
                 result=audit_result,
+                error_message=detail if audit_result != AuditResultType.SUCCESS else None,
                 metadata={
                     "mode": result.mode,
                     "overall": result.overall.value,
@@ -374,5 +404,7 @@ class QualityGateEvaluator:
                     "reason_codes": [rc.value for rc in result.reason_codes],
                 },
             )
+            self.__class__._last_audit_signature = signature
+            self.__class__._last_audit_logged_at = now
         except Exception as e:
             logger.debug(f"Failed to audit log quality gate evaluation: {e}")

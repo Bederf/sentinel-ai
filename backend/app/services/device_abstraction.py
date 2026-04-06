@@ -10,13 +10,13 @@ bms_simulator package can be removed without breaking SENTINEL core.
 
 import logging
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional, List
 from datetime import datetime
+from typing import Any
 
-from app.models.device import Device, DeviceValue, DeviceStatus, DevicePoint, create_device_from_dict
-from app.services.safety_interlocks import safety_engine
-from app.services.audit_logger import AuditLogger
 from app.models.audit_log import AuditResultType
+from app.models.device import Device, DevicePoint, DeviceStatus, DeviceValue, create_device_from_dict
+from app.services.audit_logger import AuditLogger
+from app.services.safety_interlocks import safety_engine
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +48,7 @@ class DeviceInterface(ABC):
         """Write a value to a device point."""
         pass
 
-    async def validate_control(self, point_name: str, value: Any) -> Dict[str, Any]:
+    async def validate_control(self, point_name: str, value: Any) -> dict[str, Any]:
         """
         Validate a control action against safety rules.
 
@@ -78,12 +78,12 @@ class DeviceInterface(ABC):
         pass
 
     @abstractmethod
-    async def get_points(self) -> Dict[str, DevicePoint]:
+    async def get_points(self) -> dict[str, DevicePoint]:
         """Get all available points on the device."""
         pass
 
     @abstractmethod
-    async def scan_points(self) -> Dict[str, DevicePoint]:
+    async def scan_points(self) -> dict[str, DevicePoint]:
         """Scan device for available points (dynamic discovery)."""
         pass
 
@@ -145,7 +145,7 @@ class DeviceAdapter(ABC):
         finally:
             self._connected = False
 
-    async def validate_control(self, point_name: str, value: Any) -> Dict[str, Any]:
+    async def validate_control(self, point_name: str, value: Any) -> dict[str, Any]:
         """
         Validate a control action against safety rules.
 
@@ -280,11 +280,11 @@ class DeviceAdapter(ABC):
         """Get device status."""
         return self.device.status
 
-    async def get_points(self) -> Dict[str, DevicePoint]:
+    async def get_points(self) -> dict[str, DevicePoint]:
         """Get device points."""
         return self.device.points
 
-    async def scan_points(self) -> Dict[str, DevicePoint]:
+    async def scan_points(self) -> dict[str, DevicePoint]:
         """Scan for points (default implementation returns existing points)."""
         return await self.get_points()
 
@@ -293,16 +293,16 @@ class DeviceManager:
     """Singleton manager for device discovery and lifecycle management."""
 
     _instance = None
-    _devices: Dict[str, Device] = {}
-    _adapters: Dict[str, DeviceAdapter] = {}
+    _devices: dict[str, Device] = {}
+    _adapters: dict[str, DeviceAdapter] = {}
     _initialized = False
 
     def __new__(cls):
         if cls._instance is None:
-            cls._instance = super(DeviceManager, cls).__new__(cls)
+            cls._instance = super().__new__(cls)
         return cls._instance
 
-    async def initialize(self, devices_data: Optional[List[Dict[str, Any]]] = None) -> None:
+    async def initialize(self, devices_data: list[dict[str, Any]] | None = None) -> None:
         """Initialize device manager with optional initial devices."""
         if self._initialized:
             return
@@ -316,7 +316,7 @@ class DeviceManager:
         self._initialized = True
         logger.info(f"DeviceManager initialized with {len(self._devices)} devices")
 
-    async def add_device(self, device_data: Dict[str, Any]) -> Device:
+    async def add_device(self, device_data: dict[str, Any]) -> Device:
         """Add a device to the manager."""
         device = create_device_from_dict(device_data)
 
@@ -339,19 +339,22 @@ class DeviceManager:
         SimulatedDeviceAdapter is imported lazily so the bms_simulator package
         can be removed without impacting SENTINEL core.
         """
-        from app.services.niagara.bacnet_adapter import NiagaraBACnetAdapter
         from app.config.settings import settings
+        from app.services.niagara.bacnet_adapter import NiagaraBACnetAdapter
+
+        production_island = settings.sentinel_island_mode
 
         # Lazy-load SimulatedDeviceAdapter (removable with bms_simulator/)
         SimulatedDeviceAdapter = None
-        try:
-            from app.services.bms_simulator.adapters.simulated_adapter import (
-                SimulatedDeviceAdapter as _SimAdapter,
-            )
+        if not production_island:
+            try:
+                from app.services.bms_simulator.adapters.simulated_adapter import (
+                    SimulatedDeviceAdapter as _SimAdapter,
+                )
 
-            SimulatedDeviceAdapter = _SimAdapter
-        except ImportError:
-            pass
+                SimulatedDeviceAdapter = _SimAdapter
+            except ImportError:
+                pass
 
         # Map protocol to adapter class
         adapter_map: dict = {
@@ -359,7 +362,6 @@ class DeviceManager:
             # Future: "modbus": ModbusDeviceAdapter,
         }
         if SimulatedDeviceAdapter is not None:
-            adapter_map["mock"] = SimulatedDeviceAdapter
             adapter_map["site002"] = SimulatedDeviceAdapter
 
         adapter_class = adapter_map.get(device.protocol.value)
@@ -374,7 +376,7 @@ class DeviceManager:
                     device.id,
                 )
                 return
-        elif adapter_class is NiagaraBACnetAdapter and settings.site002_source_enabled:
+        elif adapter_class is NiagaraBACnetAdapter and settings.site002_source_enabled and not production_island:
             if SimulatedDeviceAdapter is not None:
                 logger.info(
                     "Site-002 source enabled: using simulated adapter for BACnet device %s",
@@ -397,23 +399,23 @@ class DeviceManager:
         except Exception as e:
             logger.error(f"Failed to connect device {device.id}: {e}")
 
-    async def get_device(self, device_id: str) -> Optional[Device]:
+    async def get_device(self, device_id: str) -> Device | None:
         """Get device by ID."""
         return self._devices.get(device_id)
 
-    async def get_adapter(self, device_id: str) -> Optional[DeviceAdapter]:
+    async def get_adapter(self, device_id: str) -> DeviceAdapter | None:
         """Get device adapter by ID."""
         return self._adapters.get(device_id)
 
-    async def list_devices(self) -> List[Device]:
+    async def list_devices(self) -> list[Device]:
         """List all devices."""
         return list(self._devices.values())
 
-    async def list_devices_by_site(self, site_id: str) -> List[Device]:
+    async def list_devices_by_site(self, site_id: str) -> list[Device]:
         """List devices at a specific site."""
         return [device for device in self._devices.values() if device.site_id == site_id]
 
-    async def list_devices_by_type(self, device_type: str) -> List[Device]:
+    async def list_devices_by_type(self, device_type: str) -> list[Device]:
         """List devices of a specific type."""
         return [device for device in self._devices.values() if device.device_type.value == device_type]
 
@@ -443,7 +445,7 @@ class DeviceManager:
 
         return await adapter.get_status()
 
-    async def get_device_safety_status(self, device_id: str) -> Dict[str, Any]:
+    async def get_device_safety_status(self, device_id: str) -> dict[str, Any]:
         """Get device safety status using safety engine."""
         device = await self.get_device(device_id)
         if not device:
@@ -456,7 +458,7 @@ class DeviceManager:
         # Get safety status from engine
         return await safety_engine.get_device_safety_status(device)
 
-    async def scan_device_points(self, device_id: str) -> Dict[str, DevicePoint]:
+    async def scan_device_points(self, device_id: str) -> dict[str, DevicePoint]:
         """Scan device for available points."""
         adapter = await self.get_adapter(device_id)
         if not adapter:

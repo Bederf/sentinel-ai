@@ -23,11 +23,15 @@ from app.services import slash_command_router
 from app.services.model_gateway import model_gateway
 from app.services.openai_service import openai_service
 from app.services.popia_consent_guard import should_allow_cloud_processing
+from app.repositories.chat_context_repository import chat_context_repository
 from app.services.work_order_service import work_order_service
 from app.utils.ai_provenance import get_cloud_llm_provenance, get_local_llm_provenance, provenance_headers
 
 # Track Claude credit exhaustion so we skip it on subsequent requests (tools path only)
 _claude_credits_exhausted = False
+
+# In-memory context window: conversation_id -> list of message dicts
+# Accumulates conversation history per session so Claude sees prior messages.
 
 limiter = Limiter(key_func=get_remote_address)
 
@@ -40,7 +44,11 @@ class ChatRequest(BaseModel):
     """Request model for chat endpoint."""
 
     message: str = Field(..., max_length=MAX_CHAT_MESSAGE_LENGTH)
-    conversation_id: str | None = None
+    conversation_id: str | None = Field(
+        None,
+        description="Session ID for conversation continuity. "
+        "If provided, prior messages are loaded and new messages stored for context.",
+    )
     search_docs: bool = False  # Deprecated: doc search is now a tool, not a mode
     site_id: str | None = Field(None, pattern=r"^site-\d{3}$")  # Selected building/site
     include_system_docs: bool = Field(
@@ -129,7 +137,10 @@ def _is_knowledge_query(message: str) -> bool:
 
 
 # Keywords that signal a platform/architecture question — suggest enabling system docs.
+# Covers SENTINEL platform docs AND IT/risk/bank/FSR/security vocabulary.
+# When detected: enables search_system_documents + injects Bombard-with-Facts prompt.
 _PLATFORM_DOC_KEYWORDS = {
+    # SENTINEL platform docs
     "how do i upload",
     "how does sentinel",
     "how does the security",
@@ -147,6 +158,205 @@ _PLATFORM_DOC_KEYWORDS = {
     "audit framework",
     "data privacy",
     "deployment guide",
+    # IT / Risk / Compliance / FSR / Bank vocabulary
+    "fsr",
+    "fsr assessment",
+    "fsr questionnaire",
+    "financial sector risk",
+    "firstrand",
+    "bank network",
+    "banking network",
+    "network architecture",
+    "network security",
+    "network design",
+    "iso 27001",
+    "iso 42001",
+    "iso 42001 ai",
+    "iso 42001 controls",
+    "nist",
+    "nist ai",
+    "nist ai rmf",
+    "mitre att",
+    "mitre att&ck",
+    "mitre att&ck framework",
+    "owasp",
+    "owasp top",
+    "owasp zap",
+    "owasp testing",
+    "siem",
+    "siem tool",
+    "splunk",
+    "wazuh",
+    "elastic siem",
+    "penetration test",
+    "pen test",
+    "pentest",
+    "vulnerability scan",
+    "vulnerability assessment",
+    "cve",
+    "cvss",
+    "zero day",
+    "zero-day",
+    "security audit",
+    "security assessment",
+    "security review",
+    "threat model",
+    "threat modelling",
+    "attack surface",
+    "threat intelligence",
+    "ransomware",
+    "phishing",
+    "social engineering",
+    "ddos",
+    "firewall",
+    "next-gen firewall",
+    "ngfw",
+    "web app firewall",
+    "waf",
+    "waf rules",
+    "mfa",
+    "multi-factor",
+    "2fa",
+    "totp",
+    "sso",
+    "saml",
+    "oauth",
+    "identity provider",
+    "idp",
+    "privileged access",
+    "pam",
+    "just-in-time access",
+    "jit access",
+    "least privilege",
+    "zero trust",
+    "zero trust architecture",
+    "microsegmentation",
+    "encryption",
+    "encrypt",
+    "tls",
+    "ssl",
+    "certificate",
+    "pki",
+    "key management",
+    "secret management",
+    "hashiCorp vault",
+    "vault secrets",
+    "popia",
+    "po pia",
+    "protection of personal",
+    "gdpr",
+    "data privacy",
+    "data protection",
+    "cross-border",
+    "cross border data",
+    "privacy impact",
+    "data classification",
+    "data sovereignty",
+    "eu ai act",
+    "eu ai",
+    "ai act compliance",
+    "ai risk",
+    "ai governance",
+    "ai oversight",
+    "ai explainability",
+    "ai audit",
+    "ai transparency",
+    "ai incident",
+    "incident response",
+    "ir plan",
+    "incident response plan",
+    "soc",
+    "security operations",
+    "security ops",
+    "threat hunting",
+    "endpoint detection",
+    "edr",
+    "xdr",
+    "antivirus",
+    "malware",
+    "ransomware",
+    "back-up",
+    "backup",
+    "dr plan",
+    "disaster recovery",
+    "bcp",
+    "business continuity",
+    "bcdr",
+    "backup and recovery",
+    "rto",
+    "rpo",
+    "recovery time",
+    "recovery point",
+    "sla",
+    "availability sla",
+    "uptime",
+    "simbiot",
+    "sim biot",
+    "bacnet",
+    "dali-2",
+    "dali2",
+    "protocol",
+    "building automation",
+    "standards",
+    "audit trail",
+    "audit log",
+    "log management",
+    "sast",
+    "dast",
+    "static analysis",
+    "dynamic analysis",
+    "code review",
+    "secure coding",
+    "supply chain",
+    "supply chain security",
+    "sbom",
+    "software bill",
+    "third-party",
+    "third party risk",
+    "vendor risk",
+    "patch management",
+    "patching",
+    "security patch",
+    "cve",
+    "common vulnerability",
+    " hardening",
+    "security hardening",
+    "baseline",
+    "cis benchmark",
+    "disa stig",
+    "stig",
+    "pen test report",
+    "penetration testing report",
+    "security report",
+    "audit report",
+    "compliance report",
+    "controls",
+    "control effectiveness",
+    "control testing",
+    "effectiveness review",
+    "maturity model",
+    "capability maturity",
+    "cmmi",
+    "risk register",
+    "risk matrix",
+    "risk assessment",
+    "risk treatment",
+    "residual risk",
+    "risk appetite",
+    "risk tolerance",
+    "it risk",
+    "cyber risk",
+    "operational risk",
+    "information security",
+    "infosec",
+    "cybersecurity",
+    "cyber security",
+    "cyber resilience",
+    "data breach",
+    "breach notification",
+    "breach response",
+    "forensics",
+    "digital forensics",
 }
 
 
@@ -194,6 +404,7 @@ async def generate_sse_stream(
     user_role: str | None = None,
     data_subject_id: str | None = None,
     include_system_docs: bool = False,
+    conversation_id: str | None = None,
 ) -> AsyncGenerator[str, None]:
     """
     Generate SSE-formatted stream from Claude response.
@@ -202,10 +413,15 @@ async def generate_sse_stream(
     doc search results and injects them into the first Claude call — saving
     one full API round-trip (~13s).
 
+    Conversation history is stored in the database per conversation_id, so Claude
+    sees all prior messages in the same session for contextual memory.
+
     Args:
         user_message: The user's message to send to Claude
         use_tools: Whether to enable tool calling for device control
         site_id: Selected building/site for context (e.g., "site-002")
+        conversation_id: Session ID for conversation continuity. If provided, prior
+            messages are loaded from DB and new messages stored for context.
 
     Yields:
         SSE-formatted data chunks
@@ -216,6 +432,15 @@ async def generate_sse_stream(
         message_with_context = context_prefix + user_message
     else:
         message_with_context = user_message
+
+    # Build messages list — prepend prior conversation history if available
+    messages = [{"role": "user", "content": message_with_context}]
+    if conversation_id:
+        try:
+            prior = chat_context_repository.get_history(conversation_id)
+            messages = prior + messages
+        except Exception:
+            pass  # Never fail chat due to storage errors
 
     # Suggest enabling platform documentation when relevant
     if not include_system_docs and _is_platform_doc_query(user_message):
@@ -230,21 +455,34 @@ async def generate_sse_stream(
     if use_tools and _is_knowledge_query(user_message):
         doc_context = await _prefetch_doc_results(user_message)
         if doc_context == _NO_RESULTS_SENTINEL:
-            # No docs in RAG — we already know the honest answer.
-            # Skip the 20s Claude API call entirely.
             knowledge_fast_path = True
         elif doc_context:
-            message_with_context = f"{doc_context}\n\n---\n\n{message_with_context}"
+            # Inject docs into the last user message (most recent context)
+            messages[-1] = {"role": "user", "content": f"{doc_context}\n\n---\n\n{message_with_context}"}
 
     if knowledge_fast_path:
-        yield format_sse_chunk(
+        response_text = (
             "I don't have documentation about that topic in the system. "
             "You may need to upload the relevant documents or check with your facility manager."
         )
+        yield format_sse_chunk(response_text)
+        if conversation_id:
+            try:
+                chat_context_repository.add_message(conversation_id, "assistant", response_text)
+            except Exception:
+                pass
         yield "data: [DONE]\n\n"
         return
 
-    messages = [{"role": "user", "content": message_with_context}]
+    # Accumulator for storing the complete assistant response
+    assistant_parts: list[str] = []
+
+    # Store user message optimistically (before stream) — if stream fails, partial handler saves assistant
+    if conversation_id:
+        try:
+            chat_context_repository.add_message(conversation_id, "user", message_with_context)
+        except Exception:
+            pass
 
     # POPIA cross-border routing guard: fall back to local AI when cloud
     # processing consent is missing for the data subject.
@@ -255,6 +493,14 @@ async def generate_sse_stream(
     # Secure SSE buffer: filters output through the 5-stage pipeline
     buffer = SecureSSEBuffer(user_role=user_role)
 
+    # Get tools if enabled (Minimax accepts OpenAI-format tools but won't use them)
+    available_tools = None
+    if use_tools:
+        try:
+            available_tools = get_chat_tools(site_id, user_email=user_email, user_role=user_role)
+        except Exception:
+            pass
+
     try:
         if use_local_fallback:
             async for chunk in hybrid_ai_service.stream_response(
@@ -264,70 +510,46 @@ async def generate_sse_stream(
             ):
                 safe_text = buffer.add_token(chunk)
                 if safe_text is not None:
+                    assistant_parts.append(safe_text)
                     yield format_sse_chunk(safe_text)
                 if buffer.killed:
                     break
-        elif use_tools:
-            # Tool-enabled streaming: Claude primary, OpenAI fallback
-            streamed = False
-            global _claude_credits_exhausted
-            if claude_service.is_configured() and not _claude_credits_exhausted:
-                try:
-                    async for chunk in claude_service.stream_response_with_tools(
-                        messages,
-                        site_id=site_id,
-                        user_email=user_email,
-                        user_role=user_role,
-                        include_system_docs=include_system_docs,
-                    ):
-                        safe_text = buffer.add_token(chunk)
-                        if safe_text is not None:
-                            yield format_sse_chunk(safe_text)
-                        if buffer.killed:
-                            break
-                    streamed = True
-                except Exception as claude_err:
-                    if "credit balance" in str(claude_err).lower():
-                        _claude_credits_exhausted = True
-                        logger.warning("Claude credits exhausted, switching to OpenAI")
-                    else:
-                        logger.error("Claude tool chat error: %s", claude_err)
-            if not streamed and openai_service.is_configured():
-                try:
-                    buffer = SecureSSEBuffer(user_role=user_role)
-                    async for chunk in openai_service.stream_response_with_tools(messages):
-                        safe_text = buffer.add_token(chunk)
-                        if safe_text is not None:
-                            yield format_sse_chunk(safe_text)
-                        if buffer.killed:
-                            break
-                    streamed = True
-                except Exception as oai_err:
-                    logger.error("OpenAI tool chat fallback error: %s", oai_err)
-            if not streamed:
-                yield format_sse_chunk("AI services are temporarily unavailable. Please try again shortly.")
         else:
-            # Regular streaming without tools: route through model_gateway
+            # Route all LLM calls through model_gateway (Minimax for everything in cloud_dev/api_prod)
             try:
                 stream_gen = await model_gateway.call(
                     task_class=SENTINEL_BOT_DEFAULT_CLASS,
                     messages=messages,
                     stream=True,
+                    tools=available_tools,
                 )
                 async for chunk in stream_gen:
                     safe_text = buffer.add_token(chunk)
                     if safe_text is not None:
+                        assistant_parts.append(safe_text)
                         yield format_sse_chunk(safe_text)
                     if buffer.killed:
                         break
             except Exception as gw_err:
                 logger.error("Gateway chat stream error: %s", gw_err)
-                yield format_sse_chunk("AI services are temporarily unavailable. Please try again shortly.")
+                msg = "AI services are temporarily unavailable. Please try again shortly."
+                assistant_parts.append(msg)
+                yield format_sse_chunk(msg)
 
         # Flush remaining buffer content
         final = buffer.finalize()
         if final:
+            assistant_parts.append(final)
             yield format_sse_chunk(final)
+
+        assistant_text = "".join(assistant_parts)
+
+        # Store assistant response (user message already stored before stream)
+        if conversation_id:
+            try:
+                chat_context_repository.add_message(conversation_id, "assistant", assistant_text)
+            except Exception:
+                pass
 
         # Send completion sentinel
         yield "data: [DONE]\n\n"
@@ -335,6 +557,21 @@ async def generate_sse_stream(
     except ValueError as e:
         # Configuration error (API key missing) — log details, send generic message
         logger.error("Configuration error in chat stream: %s", e, exc_info=True)
+        yield format_sse_chunk("An error occurred processing your request.")
+        yield "data: [DONE]\n\n"
+
+    except Exception as e:
+        # API or unexpected errors — save partial response if we have one
+        logger.error("Chat stream error: %s", e, exc_info=True)
+        if conversation_id and assistant_parts:
+            try:
+                chat_context_repository.add_message(
+                    conversation_id, "assistant", "".join(assistant_parts), status="partial"
+                )
+            except Exception:
+                pass
+        yield format_sse_chunk("An error occurred processing your request.")
+        yield "data: [DONE]\n\n"
         yield format_sse_chunk("An error occurred processing your request.")
         yield "data: [DONE]\n\n"
 
@@ -419,7 +656,8 @@ async def chat(
         f"message={user_message[:50]}..."
     )
     auth_ctx = get_current_auth(request)
-    data_subject_id = getattr(auth_ctx, "email", None) or getattr(auth_ctx, "user_id", None)
+    user_email = getattr(auth_ctx, "email", None)
+    data_subject_id = user_email or getattr(auth_ctx, "user_id", None)
 
     # Doc search is now a tool available in all chat modes (no separate docs-only path).
     # Log query for feature tracking
@@ -468,10 +706,11 @@ async def chat(
             user_message,
             use_tools=tools_enabled,
             site_id=chat_request.site_id,
-            user_email=getattr(auth_ctx, "email", None),
+            user_email=user_email,
             user_role=getattr(auth_ctx, "role", None),
             data_subject_id=data_subject_id,
             include_system_docs=chat_request.include_system_docs,
+            conversation_id=chat_request.conversation_id,
         ),
         media_type="text/event-stream",
         headers={
@@ -524,9 +763,7 @@ class TTSRequest(BaseModel):
 async def chat_tts(request: FastAPIRequest, tts_request: TTSRequest):
     """Convert chat response text to speech audio.
 
-    Summarizes the text to 1-2 sentences, then synthesizes speech via ElevenLabs.
     Returns MP3 audio bytes.
-
     Rate limited to 10 requests per minute.
     """
     from app.services.tts_service import get_tts_service
@@ -552,6 +789,101 @@ async def chat_tts(request: FastAPIRequest, tts_request: TTSRequest):
         media_type="audio/mpeg",
         headers={"Content-Disposition": "inline; filename=response.mp3"},
     )
+
+
+
+# ---------------------------------------------------------------------------
+# Voice summary — summarize AI response then speak it
+# ---------------------------------------------------------------------------
+
+class VoiceSummaryRequest(BaseModel):
+    """Request model for summarised voice output."""
+    text: str = Field(..., max_length=8000)
+
+
+def _strip_markdown_for_speech(text: str) -> str:
+    """Remove markdown formatting to get plain text for summarization."""
+    import re
+    text = re.sub(r"```[\s\S]*?```", "", text)
+    text = re.sub(r"`[^`]+`", "", text)
+    text = re.sub(r"^#{1,6}\s+", "", text, flags=re.MULTILINE)
+    text = re.sub(r"\*{1,3}([^*]+)\*{1,3}", r"\1", text)
+    text = re.sub(r"_{1,3}([^_]+)_{1,3}", r"\1", text)
+    text = re.sub(r"\[([^\]]+)\]\([^\)]+\)", r"\1", text)
+    text = re.sub(r"^\s*>\s+", "", text, flags=re.MULTILINE)
+    text = re.sub(r"^[-*_]{3,}\s*$", "", text, flags=re.MULTILINE)
+    text = re.sub(r"\|[^\n]+\|", "", text)
+    text = re.sub(r"^\s*[-:|]+\s*$", "", text, flags=re.MULTILINE)
+    text = re.sub(r"^\s*[-*+]\s+", "", text, flags=re.MULTILINE)
+    text = re.sub(r"^\s*\d+\.\s+", "", text, flags=re.MULTILINE)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    text = re.sub(r" {2,}", " ", text)
+    return text.strip()
+
+
+async def _summarize_for_voice(text: str) -> str:
+    """Summarize text into 1-2 natural sentences for spoken output using Claude Haiku."""
+    import re
+    plain = _strip_markdown_for_speech(text)
+    if len(plain) <= 350:
+        match = re.search(r"^(.{0,350}[.!?])\s", plain)
+        return match.group(1) if match else plain[:350]
+
+    try:
+        from anthropic import Anthropic
+        from app.config.settings import settings
+        if settings.anthropic_api_key:
+            client = Anthropic(api_key=settings.anthropic_api_key)
+            response = client.messages.create(
+                model="claude-3-haiku-20250707",
+                max_tokens=100,
+                messages=[{"role": "user", "content": (
+                    "You are a voice assistant. Convert this AI response into "
+                    "1-2 short, natural sentences that sound good when spoken aloud. "
+                    "Be direct and concise. No formatting. Max 25 words.\n\n"
+                    f"Response:\n{plain[:3000]}\n\nSpoken summary:"
+                )}],
+            )
+            summary = response.content[0].text.strip().strip('"').strip("'").strip()
+            summary = _strip_markdown_for_speech(summary)
+            if summary and len(summary) >= 10:
+                return summary
+    except Exception as e:
+        logger.debug("Voice summary via Haiku failed (%s), using extraction fallback", e)
+
+    sentences = re.findall(r"[^.!?]+[.!?]+", plain)
+    result = ""
+    for s in sentences:
+        if len(result) + len(s) <= 350:
+            result += s
+        else:
+            break
+    return result.strip() if result else plain[:350]
+
+
+@router.post("/chat/voice-summary", tags=["llm_touching"])
+@limiter.limit("10/minute")
+async def chat_voice_summary(request: FastAPIRequest, vs_request: VoiceSummaryRequest):
+    """Summarize an AI chat response and return it as spoken audio."""
+    import base64
+    from app.services.tts_service import get_tts_service
+    tts = get_tts_service()
+    if not tts.is_configured():
+        raise HTTPException(status_code=503, detail="Text-to-speech is not configured.")
+    text = vs_request.text.strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="Text cannot be empty")
+    summary = await _summarize_for_voice(text)
+    if not summary:
+        summary = text[:350]
+    audio = await tts.text_to_speech(summary)
+    if audio is None:
+        raise HTTPException(status_code=502, detail="Speech synthesis failed")
+    b64 = base64.b64encode(audio).decode("utf-8")
+    data_uri = f"data:audio/mpeg;base64,{b64}"
+    logger.info("Voice summary: %d chars -> %d chars spoken", len(text), len(summary))
+    return {"text": summary, "audio_url": data_uri}
+
 
 
 @router.get("/work-orders")

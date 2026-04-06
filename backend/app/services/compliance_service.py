@@ -9,18 +9,18 @@ Phase 28: SENTINEL Compliance
 
 import logging
 from datetime import datetime, timedelta
-from typing import List, Dict, Optional, Any
+from typing import Any
 
+from app.database.repositories.compliance_repository import ComplianceRepository
 from app.models.compliance import (
-    RiskLevel,
     ComplianceAudit,
+    ComplianceStatus,
+    ElectricalCompliance,
     FireEquipmentTracking,
     LegionellaRiskAssessment,
-    ElectricalCompliance,
-    ComplianceStatus,
+    RiskLevel,
 )
 from app.models.inspection import InspectionSchedule
-from app.database.repositories.compliance_repository import ComplianceRepository
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +44,7 @@ class ComplianceService:
     # OHS Compliance Methods
     # ========================================================================
 
-    async def generate_ohs_checklist(self, site_code: str, zone_id: str) -> Dict[str, Any]:
+    async def generate_ohs_checklist(self, site_code: str, zone_id: str) -> dict[str, Any]:
         """
         Generate OHS checklist for a specific zone.
 
@@ -78,7 +78,7 @@ class ComplianceService:
             logger.error(f"Failed to generate OHS checklist: {e}")
             raise
 
-    async def track_ohs_completion(self, task_id: str, findings: Dict[str, Any]) -> Dict[str, Any]:
+    async def track_ohs_completion(self, task_id: str, findings: dict[str, Any]) -> dict[str, Any]:
         """
         Mark OHS checklist complete with findings.
 
@@ -140,7 +140,7 @@ class ComplianceService:
         equipment_id: str,
         pressure: float,
         test_date: datetime,
-        certified_by: Optional[str] = None,
+        certified_by: str | None = None,
     ) -> FireEquipmentTracking:
         """
         Record fire equipment pressure test.
@@ -177,8 +177,8 @@ class ComplianceService:
     # ========================================================================
 
     async def schedule_emergency_light_test(
-        self, light_codes: List[str], auto_test: bool = True
-    ) -> List[InspectionSchedule]:
+        self, light_codes: list[str], auto_test: bool = True
+    ) -> list[InspectionSchedule]:
         """
         Schedule emergency light testing.
 
@@ -205,7 +205,7 @@ class ComplianceService:
         light_code: str,
         battery_health_percent: int,
         test_result: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Record emergency light test result.
 
@@ -391,7 +391,7 @@ class ComplianceService:
             logger.error(f"Failed to schedule lift inspection: {e}")
             raise
 
-    async def record_lift_test_results(self, lift_code: str, test_results: Dict[str, Any]) -> Dict[str, Any]:
+    async def record_lift_test_results(self, lift_code: str, test_results: dict[str, Any]) -> dict[str, Any]:
         """
         Record lift inspection test results.
 
@@ -440,8 +440,8 @@ class ComplianceService:
     async def create_compliance_audit(
         self,
         audit_type: str,
-        findings: Dict[str, Any],
-        auditor_info: Dict[str, Any],
+        findings: dict[str, Any],
+        auditor_info: dict[str, Any],
     ) -> ComplianceAudit:
         """
         Create comprehensive compliance audit record.
@@ -501,10 +501,10 @@ class ComplianceService:
     async def get_compliance_audits(
         self,
         site_code: str,
-        compliance_type: Optional[str] = None,
-        status: Optional[str] = None,
+        compliance_type: str | None = None,
+        status: str | None = None,
         limit: int = 50,
-    ) -> List[ComplianceAudit]:
+    ) -> list[ComplianceAudit]:
         """
         Get compliance audit history for site.
 
@@ -527,7 +527,7 @@ class ComplianceService:
 
 
 # Singleton instance for global access
-_compliance_service: Optional[ComplianceService] = None
+_compliance_service: ComplianceService | None = None
 
 
 def get_compliance_service() -> ComplianceService:

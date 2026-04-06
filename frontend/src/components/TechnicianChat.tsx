@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 import { authorizedFetch } from '../lib/api/client';
 import { documentsApi } from '../lib/api/documents';
+import { sitesApi } from '../lib/api/sites';
 import {
   conceptDocumentsApi,
   type ConceptDocumentSearchResult,
@@ -85,6 +86,18 @@ interface VisionData {
   overall_condition?: string;
   maintenance_priority?: string;
   notes?: string;
+}
+
+interface RagSearchResult {
+  id?: string;
+  document_id?: string;
+  title?: string;
+  document_type?: string | null;
+  site_id?: string | null;
+  source?: string | null;
+  content?: string | null;
+  text?: string | null;
+  similarity?: number | null;
 }
 
 // Diagnosis response data structure
@@ -175,7 +188,36 @@ function isBrowserOpenableConceptLink(url?: string | null): boolean {
   return Boolean(url && /^https?:\/\//i.test(url));
 }
 
+function mapRagResultToRepositoryResult(
+  row: RagSearchResult,
+  siteId: string,
+  siteLabel?: string,
+  index: number = 0,
+): ConceptDocumentSearchResult {
+  const documentId = row.document_id || row.id || `tech-rag-${siteId}-${index}`;
+  const snippet = row.content || row.text || undefined;
+  const source = row.source || 'technician_notes';
+
+  return {
+    document_id: documentId,
+    concept_document_id: documentId,
+    title: row.title || 'Untitled technician document',
+    document_type: row.document_type || 'service_report',
+    document_date: null,
+    building_name: siteLabel || siteId,
+    equipment_category: 'technician repository',
+    equipment_name: null,
+    path: `${siteLabel || siteId} / Supabase / ${source}`,
+    open_url: '',
+    download_url: null,
+    match_reasons: ['semantic', source],
+    snippet,
+  };
+}
+
 export default function TechnicianChat({ siteId, siteLabel }: TechnicianChatProps = {}) {
+  const isConceptSite = siteId === 'site-001';
+  const repoLabel = isConceptSite ? 'Concept documents' : 'equipment document repository';
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -187,6 +229,7 @@ export default function TechnicianChat({ siteId, siteLabel }: TechnicianChatProp
   const [documentUploading, setDocumentUploading] = useState(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [equipmentId, setEquipmentId] = useState('');
+  const [equipmentForUpload, setEquipmentForUpload] = useState<{ id: string; code: string; name: string; type: string }[]>([]);
   const [documentName, setDocumentName] = useState('Air-Handler Unit (AHU) Major Service');
   const [documentSubClass, setDocumentSubClass] = useState('HVAC');
   const [categoryDiscipline, setCategoryDiscipline] = useState('Preventive Maintenance');
@@ -272,6 +315,23 @@ export default function TechnicianChat({ siteId, siteLabel }: TechnicianChatProp
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, conceptSearch]);
+
+  // Fetch equipment for upload dropdown
+  useEffect(() => {
+    if (!siteId) return;
+    sitesApi.getEquipment(siteId).then((data) => {
+      if (data?.equipment) {
+        setEquipmentForUpload(
+          data.equipment.map((e) => ({
+            id: e.id,
+            code: e.code,
+            name: e.name,
+            type: e.equipment_type,
+          })),
+        );
+      }
+    }).catch(() => {});
+  }, [siteId]);
 
   // Setup offline/online listeners and cache initial data
   useEffect(() => {
@@ -414,7 +474,7 @@ export default function TechnicianChat({ siteId, siteLabel }: TechnicianChatProp
         results: [],
         totalResults: 0,
         weakResults: false,
-        message: 'Select a site before searching Concept documents.',
+        message: 'Select a site before searching the equipment document repository.',
       });
       return;
     }
@@ -432,11 +492,38 @@ export default function TechnicianChat({ siteId, siteLabel }: TechnicianChatProp
     });
 
     try {
-      const response: ConceptDocumentSearchResponse = await conceptDocumentsApi.search({
-        site_id: siteId,
-        query: text,
-        top_k: 10,
-      });
+      let response: ConceptDocumentSearchResponse;
+      if (isConceptSite) {
+        response = await conceptDocumentsApi.search({
+          site_id: siteId,
+          query: text,
+          top_k: 10,
+        });
+      } else {
+        const params = new URLSearchParams({
+          query: text,
+          n_results: '10',
+          site_id: siteId,
+          source: 'technician_notes',
+          similarity_threshold: '0.2',
+        });
+        const ragResponse = await authorizedFetch(`/api/rag/search?${params}`);
+        if (!ragResponse.ok) {
+          throw new Error(`Repository search failed: ${ragResponse.status}`);
+        }
+        const ragData = (await ragResponse.json()) as { results?: RagSearchResult[] };
+        const mappedResults = (ragData.results || []).map((row, index) =>
+          mapRagResultToRepositoryResult(row, siteId, siteLabel, index),
+        );
+        response = {
+          mode: 'concept_document_search',
+          query: text,
+          building_id: siteId,
+          results: mappedResults,
+          total_results: mappedResults.length,
+          weak_results: mappedResults.length > 0 && mappedResults.length < 3,
+        };
+      }
 
       setConceptSearch({
         status: response.total_results > 0 ? 'ready' : 'empty',
@@ -447,7 +534,7 @@ export default function TechnicianChat({ siteId, siteLabel }: TechnicianChatProp
         message: null,
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Concept document search failed.';
+      const message = error instanceof Error ? error.message : 'Equipment document repository search failed.';
       const unavailable = message.toLowerCase().includes('unavailable');
       setConceptSearch({
         status: unavailable ? 'unavailable' : 'error',
@@ -480,15 +567,17 @@ export default function TechnicianChat({ siteId, siteLabel }: TechnicianChatProp
       return;
     }
 
-    try {
-      await conceptDocumentsApi.logAction({
-        site_id: siteId,
-        document_id: result.document_id,
-        action,
-        query: conceptSearch.query || undefined,
-      });
-    } catch (error) {
-      console.error('Failed to audit Concept document action:', error);
+    if (isConceptSite) {
+      try {
+        await conceptDocumentsApi.logAction({
+          site_id: siteId,
+          document_id: result.document_id,
+          action,
+          query: conceptSearch.query || undefined,
+        });
+      } catch (error) {
+        console.error('Failed to audit Concept document action:', error);
+      }
     }
 
     window.open(targetUrl, '_blank', 'noopener,noreferrer');
@@ -741,26 +830,54 @@ export default function TechnicianChat({ siteId, siteLabel }: TechnicianChatProp
   ];
 
   return (
-    <div className="flex flex-col h-full bg-gray-50 dark:bg-gray-900">
+    <div className="flex flex-col h-full" style={{ background: "var(--color-sentinel-bg-canvas)" }}>
       {/* Offline Indicator */}
       <OfflineIndicator />
 
       {/* Header */}
-      <div className="flex-none bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3">
+      <div
+        className="flex-none px-4 py-3"
+        style={{
+          background: "var(--color-sentinel-bg-panel)",
+          borderBottom: "1px solid var(--color-sentinel-border)",
+        }}
+      >
         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div className="min-w-0">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-              <Wrench className="w-5 h-5 text-blue-600" />
+            <h2 className="text-lg font-semibold flex items-center gap-2" style={{ color: "var(--color-sentinel-text-primary)" }}>
+              <Wrench className="w-5 h-5" style={{ color: "var(--color-sentinel-blue)" }} />
               SENTINEL Tech Chat
             </h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
+            <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
               Your expert colleague in your pocket
             </p>
             {siteLabel && (
-              <p className="mt-1 text-xs uppercase tracking-[0.16em] text-gray-400 dark:text-gray-500">
+              <p className="mt-1 text-xs uppercase tracking-[0.16em]" style={{ color: "var(--color-sentinel-text-disabled)" }}>
                 Site scoped to {siteLabel}
               </p>
             )}
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <span
+                className="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em]"
+                style={{
+                  background: "rgba(59, 130, 246, 0.18)",
+                  border: "1px solid rgba(59, 130, 246, 0.4)",
+                  color: "var(--color-sentinel-blue)",
+                }}
+              >
+                Tech-RAG Scope: Technician docs only
+              </span>
+              <span
+                className="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-medium"
+                style={{
+                  background: "var(--color-sentinel-bg-secondary)",
+                  border: "1px solid var(--color-sentinel-border)",
+                  color: "var(--color-sentinel-text-secondary)",
+                }}
+              >
+                Provenance: equipment/work-order scoped
+              </span>
+            </div>
           </div>
 
           <div className="flex flex-col items-start gap-2 md:items-end">
@@ -775,15 +892,17 @@ export default function TechnicianChat({ siteId, siteLabel }: TechnicianChatProp
               aria-pressed={conceptSearchEnabled}
             >
               <FileText className="h-4 w-4" />
-              Search Concept documents
+              {`Search ${repoLabel}`}
             </button>
             {conceptSearchEnabled && (
               <div className="flex flex-col items-start gap-1 md:items-end">
                 <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-800 dark:bg-blue-900/40 dark:text-blue-100">
-                  Concept document search active
+                  {`${repoLabel} active`}
                 </span>
                 <p className="text-xs text-gray-600 dark:text-gray-300">
-                  Find saved documents in Concept using natural language
+                  {isConceptSite
+                    ? 'Search Concept documents for this site using natural language'
+                    : 'Find building-scoped equipment documents and service sheets using natural language'}
                 </p>
               </div>
             )}
@@ -796,13 +915,22 @@ export default function TechnicianChat({ siteId, siteLabel }: TechnicianChatProp
         {conceptSearchEnabled ? (
           <div className="mx-auto flex w-full max-w-4xl flex-col gap-4">
             {conceptSearch.status === 'idle' && (
-              <div className="rounded-2xl border border-dashed border-blue-200 bg-blue-50/70 p-6 text-center dark:border-blue-900 dark:bg-blue-950/20">
-                <div className="mx-auto mb-4 inline-flex h-14 w-14 items-center justify-center rounded-full bg-white text-blue-600 shadow-sm dark:bg-gray-800 dark:text-blue-300">
+              <div
+                className="rounded-lg p-6 text-center"
+                style={{
+                  background: "var(--color-sentinel-bg-panel)",
+                  border: "1px dashed var(--color-sentinel-border)",
+                }}
+              >
+                <div
+                  className="mx-auto mb-4 inline-flex h-14 w-14 items-center justify-center rounded-full shadow-sm"
+                  style={{ background: "var(--color-sentinel-bg-secondary)", color: "var(--color-sentinel-blue)" }}
+                >
                   <FileText className="h-7 w-7" />
                 </div>
-                <h3 className="text-lg font-medium text-gray-900 dark:text-white">Search stored site documents</h3>
-                <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                  Find saved documents in Concept using natural language.
+                <h3 className="text-lg font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>Search stored technician documents</h3>
+                <p className="mt-2 text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                  Search building-scoped equipment documents and technician service sheets using natural language.
                 </p>
                 <div className="mt-5 flex flex-wrap justify-center gap-2">
                   {conceptSearchExamples.map((action, idx) => (
@@ -822,14 +950,20 @@ export default function TechnicianChat({ siteId, siteLabel }: TechnicianChatProp
 
             {conceptSearch.status === 'loading' && (
               <div className="rounded-2xl border border-gray-200 bg-white px-4 py-5 text-sm text-gray-500 shadow-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">
-                Searching Concept documents...
+                Searching equipment document repository...
               </div>
             )}
 
             {conceptSearch.query && conceptSearch.status !== 'idle' && conceptSearch.status !== 'loading' && (
-              <div className="rounded-2xl border border-gray-200 bg-white px-4 py-3 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-                <p className="text-xs uppercase tracking-[0.16em] text-gray-400 dark:text-gray-500">Query</p>
-                <p className="mt-1 text-sm text-gray-900 dark:text-white">{conceptSearch.query}</p>
+              <div
+                className="rounded-lg px-4 py-3 shadow-sm"
+                style={{
+                  background: "var(--color-sentinel-bg-panel)",
+                  border: "1px solid var(--color-sentinel-border)",
+                }}
+              >
+                <p className="text-xs uppercase tracking-[0.16em]" style={{ color: "var(--color-sentinel-text-disabled)" }}>Query</p>
+                <p className="mt-1 text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>{conceptSearch.query}</p>
               </div>
             )}
 
@@ -853,6 +987,7 @@ export default function TechnicianChat({ siteId, siteLabel }: TechnicianChatProp
                     <ConceptDocumentCard
                       key={result.document_id}
                       result={result}
+                      siteLabel={siteLabel}
                       onAction={openConceptDocument}
                     />
                   ))}
@@ -863,7 +998,9 @@ export default function TechnicianChat({ siteId, siteLabel }: TechnicianChatProp
             {conceptSearch.status === 'empty' && (
               <div className="rounded-2xl border border-gray-200 bg-white px-4 py-5 text-sm shadow-sm dark:border-gray-700 dark:bg-gray-800">
                 <p className="font-medium text-gray-900 dark:text-white">
-                  No matching documents found in Concept for this site.
+                  {isConceptSite
+                    ? 'No matching documents found in Concept for this site.'
+                    : 'No matching equipment service documents found for this site.'}
                 </p>
                 <p className="mt-2 text-gray-500 dark:text-gray-400">
                   Try broader wording or remove date-specific terms.
@@ -874,10 +1011,14 @@ export default function TechnicianChat({ siteId, siteLabel }: TechnicianChatProp
             {conceptSearch.status === 'unavailable' && (
               <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-5 text-sm shadow-sm dark:border-red-900/60 dark:bg-red-950/20">
                 <p className="font-medium text-red-900 dark:text-red-200">
-                  Concept document search is currently unavailable.
+                  {isConceptSite
+                    ? 'Concept document search is currently unavailable.'
+                    : 'Equipment document repository search is currently unavailable.'}
                 </p>
                 <p className="mt-2 text-red-700 dark:text-red-300">
-                  Please try again later or open documents directly in Concept.
+                  {isConceptSite
+                    ? 'Please try again later or open documents directly in Concept.'
+                    : 'Please try again later.'}
                 </p>
               </div>
             )}
@@ -1021,7 +1162,7 @@ export default function TechnicianChat({ siteId, siteLabel }: TechnicianChatProp
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={conceptSearchEnabled ? 'Search stored site documents' : 'Describe a fault or search for parts...'}
+            placeholder={conceptSearchEnabled ? `Search ${repoLabel}` : 'Describe a fault or search for parts...'}
             disabled={isTyping}
             className="flex-1 px-4 py-2.5 bg-gray-100 dark:bg-gray-700 border-0 rounded-full text-sm text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
           />
@@ -1029,7 +1170,7 @@ export default function TechnicianChat({ siteId, siteLabel }: TechnicianChatProp
             type="submit"
             disabled={!input.trim() || isTyping}
             className="flex-none p-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors"
-            aria-label={conceptSearchEnabled ? 'Run Concept document search' : 'Send technical chat message'}
+            aria-label={conceptSearchEnabled ? `Run ${repoLabel} search` : 'Send technical chat message'}
           >
             <Send className="w-5 h-5" />
           </button>
@@ -1040,13 +1181,20 @@ export default function TechnicianChat({ siteId, siteLabel }: TechnicianChatProp
                 Technician document upload
               </p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                <input
-                  type="text"
+                <select
                   value={equipmentId}
                   onChange={(e) => setEquipmentId(e.target.value)}
-                  placeholder="Equipment ID (required)"
                   className="px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                />
+                >
+                  <option value="">Select equipment (required)</option>
+                  {equipmentForUpload
+                    .filter((eq) => ['ahu', 'chiller', 'fcu', 'vav', 'cooling_tower', 'generator', 'pump', 'ups', 'bess'].includes(eq.type))
+                    .map((eq) => (
+                      <option key={eq.id} value={eq.code}>
+                        {eq.name} ({eq.code})
+                      </option>
+                    ))}
+                </select>
                 <input
                   type="file"
                   accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp,.txt"
@@ -1164,9 +1312,11 @@ function MessageBubble({ message, onStartGuided }: { message: Message; onStartGu
 
 function ConceptDocumentCard({
   result,
+  siteLabel,
   onAction,
 }: {
   result: ConceptDocumentSearchResult;
+  siteLabel?: string;
   onAction: (result: ConceptDocumentSearchResult, action: 'open' | 'download') => void | Promise<void>;
 }) {
   const canOpenFile = isBrowserOpenableConceptLink(result.open_url);
@@ -1205,6 +1355,10 @@ function ConceptDocumentCard({
               Matched on: {result.match_reasons.join(', ')}
             </p>
           )}
+          <div className="mt-3 rounded-lg px-3 py-2 text-xs" style={{ background: "var(--color-sentinel-bg-secondary)", border: "1px solid var(--color-sentinel-border)", color: "var(--color-sentinel-text-secondary)" }}>
+            <span className="font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>Provenance:</span>{" "}
+            Technician document retrieval (Tech-RAG lane), scoped to {siteLabel || result.building_name || "current site"} and linked equipment/work-order metadata when available.
+          </div>
           {result.snippet && (
             <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">{result.snippet}</p>
           )}

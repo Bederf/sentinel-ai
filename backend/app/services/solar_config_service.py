@@ -14,7 +14,6 @@ import json
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, Optional
 
 from app.core.site_resolver import get_primary_site_code
 
@@ -194,11 +193,11 @@ class SiteConfig:
     time_bands: TariffTimeBands
 
 
-def _load_json(path: Path) -> Optional[Dict]:
+def _load_json(path: Path) -> dict | None:
     """Load JSON file, return None on failure."""
     try:
         if path.exists():
-            with open(path, "r") as f:
+            with open(path) as f:
                 return json.load(f)
     except Exception as e:
         logger.warning(f"Failed to load {path}: {e}")
@@ -321,7 +320,7 @@ def _load_site_config(site_id: str) -> SiteConfig:
 
 
 # Module-level cache
-_site_configs: Dict[str, SiteConfig] = {}
+_site_configs: dict[str, SiteConfig] = {}
 
 
 def get_site_solar_config(site_id: str | None = None) -> SiteConfig:

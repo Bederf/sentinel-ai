@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 from enum import Enum
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class SourceType(str, Enum):
@@ -82,6 +82,7 @@ class LogSourceUpdate(BaseModel):
 
 
 class LogSource(LogSourceBase):
+    model_config = ConfigDict(from_attributes=True)
     id: str
     site_id: str
     vendor_pattern: Optional[str] = None
@@ -91,9 +92,6 @@ class LogSource(LogSourceBase):
     last_sync_records: Optional[int] = None
     created_at: datetime
     updated_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 # Column Mapping
@@ -105,11 +103,9 @@ class ColumnMappingCreate(BaseModel):
 
 
 class ColumnMapping(ColumnMappingCreate):
+    model_config = ConfigDict(from_attributes=True)
     id: str
     log_source_id: str
-
-    class Config:
-        from_attributes = True
 
 
 # Point-Asset Mapping
@@ -123,13 +119,11 @@ class PointAssetMappingCreate(BaseModel):
 
 
 class PointAssetMapping(PointAssetMappingCreate):
+    model_config = ConfigDict(from_attributes=True)
     id: str
     site_id: str
     is_verified: bool = False
     created_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 # Parsed/Normalized Records

@@ -11,7 +11,7 @@ Reference: backend/app/services/vision_service.py for Vision API patterns
 import base64
 import json
 import logging
-from typing import Dict, Any, Optional
+from typing import Any
 
 from app.services.model_gateway import model_gateway
 
@@ -27,7 +27,7 @@ class PhyphoxAnalyzer:
         measurement_type: str,  # "vibration" or "audio"
         equipment_id: str,
         media_type: str = "image/jpeg",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Extract spectrum data from phyphox screenshot.
 
@@ -60,6 +60,7 @@ class PhyphoxAnalyzer:
                     }
                 ],
                 max_tokens=1024,
+                source="phyphox_screenshot_analysis",
             )
 
             # Parse structured response
@@ -107,7 +108,7 @@ Extract and return as JSON:
 }
 Only return valid JSON, no other text."""
 
-    def _parse_response(self, response_text: str, measurement_type: str) -> Dict[str, Any]:
+    def _parse_response(self, response_text: str, measurement_type: str) -> dict[str, Any]:
         """Parse Vision API response to structured data."""
         try:
             # Extract JSON from response
@@ -130,7 +131,7 @@ Only return valid JSON, no other text."""
 
 
 # Singleton instance
-_analyzer_instance: Optional[PhyphoxAnalyzer] = None
+_analyzer_instance: PhyphoxAnalyzer | None = None
 
 
 def get_phyphox_analyzer() -> PhyphoxAnalyzer:

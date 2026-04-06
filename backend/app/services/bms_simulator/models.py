@@ -7,8 +7,9 @@ Includes support for Siemens Desigo, Niagara, and Rickard DALI equipment.
 
 from datetime import date, timedelta
 from enum import Enum
-from typing import Dict, List, Optional, Tuple, Any
-from pydantic import BaseModel, Field
+from typing import Any
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class VendorType(str, Enum):
@@ -60,6 +61,8 @@ class AlarmSeverity(str, Enum):
 class SimulationConfig(BaseModel):
     """Configuration for BMS simulation."""
 
+    model_config = ConfigDict(use_enum_values=True)
+
     site_id: str = Field(default="site-002", description="Site ID to read equipment from")
     vendor: VendorType = Field(default=VendorType.SIEMENS_DESIGO, description="Target vendor format")
     seed: int = Field(default=42, description="Random seed for reproducibility")
@@ -67,13 +70,10 @@ class SimulationConfig(BaseModel):
     days: int = Field(default=30, description="Number of days of trend data to generate")
     interval_minutes: int = Field(default=15, description="Trend data interval in minutes")
     include_degradation: bool = Field(default=True, description="Include equipment degradation patterns")
-    degradation_equipment: List[str] = Field(
+    degradation_equipment: list[str] = Field(
         default_factory=lambda: ["S002-CHILLER-B1-001"], description="Equipment IDs to apply degradation to"
     )
     include_diffusers: bool = Field(default=True, description="Generate Rickard diffusers linked to VAVs")
-
-    class Config:
-        use_enum_values = True
 
 
 class PointDefinition(BaseModel):
@@ -83,11 +83,11 @@ class PointDefinition(BaseModel):
     point_type: str  # analog_input, analog_value, binary_input, binary_value, multistate_value
     description: str
     unit: str = ""
-    min_value: Optional[float] = None
-    max_value: Optional[float] = None
+    min_value: float | None = None
+    max_value: float | None = None
     default_value: Any = None
     writable: bool = False
-    metadata: Optional[Dict[str, Any]] = None
+    metadata: dict[str, Any] | None = None
 
 
 class DiffuserConfig(BaseModel):
@@ -105,7 +105,7 @@ class DiffuserConfig(BaseModel):
 
 
 # Value ranges by point type (extrapolated from reference_devices.json point definitions)
-POINT_VALUE_RANGES: Dict[str, Tuple[float, float]] = {
+POINT_VALUE_RANGES: dict[str, tuple[float, float]] = {
     # Temperature points
     "supply_air_temp": (12.0, 18.0),
     "return_air_temp": (22.0, 26.0),
@@ -182,7 +182,7 @@ POINT_VALUE_RANGES: Dict[str, Tuple[float, float]] = {
 
 
 # BACnet object type mapping from point_type
-BACNET_OBJECT_TYPE_MAP: Dict[str, str] = {
+BACNET_OBJECT_TYPE_MAP: dict[str, str] = {
     "analog_input": "analogInput",
     "analog_value": "analogValue",
     "analog_output": "analogOutput",
@@ -196,7 +196,7 @@ BACNET_OBJECT_TYPE_MAP: Dict[str, str] = {
 
 
 # Equipment alarm profiles - typical alarms by equipment type
-EQUIPMENT_ALARM_PROFILES: Dict[str, List[Dict[str, Any]]] = {
+EQUIPMENT_ALARM_PROFILES: dict[str, list[dict[str, Any]]] = {
     "chiller": [
         {
             "code": "VIB_WARN",
@@ -687,7 +687,7 @@ EQUIPMENT_ALARM_PROFILES: Dict[str, List[Dict[str, Any]]] = {
 
 
 # Degradation patterns for specific equipment types
-DEGRADATION_PATTERNS: Dict[str, Dict[str, Any]] = {
+DEGRADATION_PATTERNS: dict[str, dict[str, Any]] = {
     "chiller": {
         "points": ["compressor_amps", "chw_supply_temp"],
         "rate_per_day": 0.002,  # 0.2% increase per day
@@ -792,7 +792,7 @@ DEGRADATION_PATTERNS: Dict[str, Dict[str, Any]] = {
 
 
 # Diurnal pattern parameters
-DIURNAL_PATTERNS: Dict[str, Dict[str, Any]] = {
+DIURNAL_PATTERNS: dict[str, dict[str, Any]] = {
     "temperature": {
         "peak_hour": 14,  # 2 PM peak
         "amplitude": 0.15,  # 15% variation
@@ -813,7 +813,7 @@ DIURNAL_PATTERNS: Dict[str, Dict[str, Any]] = {
 
 
 # Site code mappings for vendor formatting
-SITE_CODE_MAP: Dict[str, str] = {
+SITE_CODE_MAP: dict[str, str] = {
     "site-001": "GWC",  # Gateway Centre
     "site-002": "STC",  # Sandton City
     "site-003": "RSB",  # Rosebank
@@ -824,7 +824,7 @@ SITE_CODE_MAP: Dict[str, str] = {
 
 
 # Floor code mappings
-FLOOR_CODE_MAP: Dict[str, str] = {
+FLOOR_CODE_MAP: dict[str, str] = {
     "B2": "B2",
     "B1": "B1",
     "G": "G",
@@ -842,7 +842,7 @@ FLOOR_CODE_MAP: Dict[str, str] = {
 }
 
 # Hospital site diffuser configuration (for site-004 uMhlanga Private Hospital)
-HOSPITAL_DIFFUSER_CONFIG: Dict[str, Dict[str, Any]] = {
+HOSPITAL_DIFFUSER_CONFIG: dict[str, dict[str, Any]] = {
     "site-004": {
         "total_diffusers": 30,
         "gateways": {

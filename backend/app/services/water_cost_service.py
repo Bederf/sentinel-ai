@@ -5,12 +5,12 @@ for water consumption with zone-based attribution.
 """
 
 import logging
-from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
+from typing import Any
 
-from app.models.water_meter import WaterConsumption, WaterCost
-from app.database.repositories.water_cost_repository import WaterCostRepository
 from app.database.repositories.water_consumption_repository import WaterConsumptionRepository
+from app.database.repositories.water_cost_repository import WaterCostRepository
+from app.models.water_meter import WaterConsumption, WaterCost
 
 logger = logging.getLogger(__name__)
 
@@ -20,8 +20,8 @@ class WaterCostService:
 
     def __init__(
         self,
-        cost_repository: Optional[WaterCostRepository] = None,
-        consumption_repository: Optional[WaterConsumptionRepository] = None,
+        cost_repository: WaterCostRepository | None = None,
+        consumption_repository: WaterConsumptionRepository | None = None,
     ):
         """Initialize service with repositories.
 
@@ -97,8 +97,8 @@ class WaterCostService:
     async def forecast_monthly_cost(
         self,
         site: str,
-        zone_id: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        zone_id: str | None = None,
+    ) -> dict[str, Any]:
         """Forecast monthly cost based on recent consumption.
 
         Args:
@@ -201,8 +201,8 @@ class WaterCostService:
     async def forecast_annual_cost(
         self,
         site: str,
-        zone_id: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        zone_id: str | None = None,
+    ) -> dict[str, Any]:
         """Forecast annual cost based on recent patterns.
 
         Args:
@@ -297,7 +297,7 @@ class WaterCostService:
         self,
         site: str,
         period_days: int = 30,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Compare costs across zones at a site.
 
         Args:
@@ -369,7 +369,7 @@ class WaterCostService:
         consumption_reduction_liters: float,
         site: str,
         period_days: int = 30,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Simulate cost savings from consumption reduction.
 
         Args:
@@ -431,7 +431,7 @@ class WaterCostService:
 
 
 # Module-level getter for dependency injection
-_water_cost_service: Optional[WaterCostService] = None
+_water_cost_service: WaterCostService | None = None
 
 
 def get_water_cost_service() -> WaterCostService:

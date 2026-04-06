@@ -12,9 +12,9 @@ Purpose:
 """
 
 import logging
-from typing import List, Dict, Any, Optional, Set
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +63,7 @@ class CombinedBenefit:
             comfort_impact=self.comfort_impact or other.comfort_impact,
         )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for API response."""
         return {
             "energy_reduction_kw": round(self.energy_reduction_kw, 2),
@@ -78,11 +78,11 @@ class GroupedRecommendation:
     """Multiple recommendations grouped by objective."""
 
     objective: RecommendationObjective
-    component_ids: List[str]  # IDs of individual recommendations
-    components: List[Dict[str, Any]]  # Full recommendation details
+    component_ids: list[str]  # IDs of individual recommendations
+    components: list[dict[str, Any]]  # Full recommendation details
     combined_benefit: CombinedBenefit = field(default_factory=CombinedBenefit)
     group_confidence: float = 0.0  # Minimum confidence of all components
-    execution_order: List[SystemType] = field(default_factory=list)
+    execution_order: list[SystemType] = field(default_factory=list)
     priority: str = "medium"  # "critical", "high", "medium", "low"
     description: str = ""  # Human-readable description
 
@@ -94,7 +94,7 @@ class GroupedRecommendation:
         """Check if group meets Tier 3 confidence requirement."""
         return self.group_confidence >= threshold
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for API response."""
         return {
             "id": f"group_{self.objective}_{hash(tuple(self.component_ids))}",
@@ -169,7 +169,7 @@ class RecommendationGrouping:
         """Initialize grouping service."""
         pass
 
-    async def group_recommendations_by_objective(self, recommendations: List[Dict[str, Any]]) -> Dict[str, Any]:
+    async def group_recommendations_by_objective(self, recommendations: list[dict[str, Any]]) -> dict[str, Any]:
         """
         Group recommendations by objective across all systems.
 
@@ -214,7 +214,7 @@ class RecommendationGrouping:
             },
         }
 
-    def _classify_objective(self, recommendation: Dict[str, Any]) -> RecommendationObjective:
+    def _classify_objective(self, recommendation: dict[str, Any]) -> RecommendationObjective:
         """Classify recommendation into objective category."""
         action = recommendation.get("action", "").lower()
         system = recommendation.get("system", "").lower()
@@ -241,18 +241,18 @@ class RecommendationGrouping:
             else:
                 return RecommendationObjective.EFFICIENCY
 
-    def _matches_pattern(self, text: str, patterns: Set[str]) -> bool:
+    def _matches_pattern(self, text: str, patterns: set[str]) -> bool:
         """Check if text matches any pattern."""
         text_lower = text.lower()
         return any(pattern in text_lower for pattern in patterns)
 
     def _create_grouped_recommendation(
-        self, objective: RecommendationObjective, recommendations: List[Dict[str, Any]]
+        self, objective: RecommendationObjective, recommendations: list[dict[str, Any]]
     ) -> GroupedRecommendation:
         """Create grouped recommendation from multiple individual recommendations."""
 
         # Extract system types
-        systems: Set[SystemType] = set()
+        systems: set[SystemType] = set()
         for rec in recommendations:
             system = rec.get("system", "").lower()
             if "hvac" in system:
@@ -312,7 +312,7 @@ class RecommendationGrouping:
             return "low"
 
     def _create_description(
-        self, objective: RecommendationObjective, systems: Set[SystemType], component_count: int
+        self, objective: RecommendationObjective, systems: set[SystemType], component_count: int
     ) -> str:
         """Create human-readable description of grouped recommendation."""
         system_names = ", ".join(s.value.capitalize() for s in sorted(systems))
@@ -321,10 +321,10 @@ class RecommendationGrouping:
 
     async def group_with_api_recommendations(
         self,
-        hvac_recommendations: List[Dict[str, Any]],
-        lighting_recommendations: List[Dict[str, Any]],
-        power_recommendations: List[Dict[str, Any]],
-    ) -> Dict[str, Any]:
+        hvac_recommendations: list[dict[str, Any]],
+        lighting_recommendations: list[dict[str, Any]],
+        power_recommendations: list[dict[str, Any]],
+    ) -> dict[str, Any]:
         """
         Group recommendations from all three AI optimizer outputs.
 
@@ -367,7 +367,7 @@ class RecommendationGrouping:
 
 
 # Singleton instance
-_grouping_service: Optional[RecommendationGrouping] = None
+_grouping_service: RecommendationGrouping | None = None
 
 
 def get_recommendation_grouping() -> RecommendationGrouping:

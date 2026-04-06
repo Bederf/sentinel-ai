@@ -1,12 +1,11 @@
 """Work Order Service for creating maintenance work orders from chat."""
 
-import re
+import json
 import logging
+import re
+import uuid
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional
-import json
-import uuid
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -31,8 +30,8 @@ class WorkOrder:
     id: str
     site_id: str
     site_name: str
-    equipment_id: Optional[str]
-    equipment_name: Optional[str]
+    equipment_id: str | None
+    equipment_name: str | None
     description: str
     priority: str  # critical, high, medium, low
     category: str  # hvac, electrical, maintenance, plumbing, other
@@ -173,7 +172,7 @@ class WorkOrderService:
             self._equipment = load_json("equipment.json")
         return self._equipment
 
-    def _find_site(self, query: str) -> Optional[dict]:
+    def _find_site(self, query: str) -> dict | None:
         """Find a site by name or ID."""
         query_lower = query.lower().strip()
         for site in self.sites:
@@ -181,7 +180,7 @@ class WorkOrderService:
                 return site
         return None
 
-    def _find_equipment(self, query: str) -> Optional[dict]:
+    def _find_equipment(self, query: str) -> dict | None:
         """Find equipment by name or ID."""
         query_lower = query.lower().strip().replace(" ", "").replace("-", "")
         for eq in self.equipment:
@@ -194,7 +193,7 @@ class WorkOrderService:
                 return eq
         return None
 
-    def _extract_equipment_reference(self, message: str) -> Optional[str]:
+    def _extract_equipment_reference(self, message: str) -> str | None:
         """Extract equipment reference from message."""
         message_lower = message.lower()
         for pattern in EQUIPMENT_PATTERNS:
@@ -221,7 +220,7 @@ class WorkOrderService:
                     return priority
         return "medium"  # Default priority
 
-    def detect_work_order_request(self, message: str) -> Optional[dict]:
+    def detect_work_order_request(self, message: str) -> dict | None:
         """
         Detect if a message is a work order request.
 
@@ -278,8 +277,8 @@ class WorkOrderService:
     def create_work_order(
         self,
         description: str,
-        site_id: Optional[str] = None,
-        equipment_ref: Optional[str] = None,
+        site_id: str | None = None,
+        equipment_ref: str | None = None,
         category: str = "other",
         priority: str = "medium",
         reported_by: str = "AI Chat System",
@@ -330,13 +329,13 @@ class WorkOrderService:
             reported_by=reported_by,
         )
 
-        # Store work order (in-memory for demo)
+        # Store work order in the current in-memory backend store
         self._work_orders.append(work_order)
 
         logger.info(f"Created work order: {wo_id}")
         return work_order
 
-    def get_work_orders(self, site_id: Optional[str] = None) -> list[WorkOrder]:
+    def get_work_orders(self, site_id: str | None = None) -> list[WorkOrder]:
         """Get all work orders, optionally filtered by site."""
         if site_id:
             return [wo for wo in self._work_orders if wo.site_id == site_id]

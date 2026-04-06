@@ -11,13 +11,13 @@ Usage:
     result = await lookup.lookup_fault_code("Carrier", "E4", "30XA")
 """
 
-from typing import Dict, List, Optional
 import asyncio
 import json
+import logging
 import re
 from pathlib import Path
+
 from bs4 import BeautifulSoup
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -121,17 +121,17 @@ class EquipmentLookup:
     ]
 
     # South African parts suppliers - loaded from JSON
-    SA_PARTS_SUPPLIERS: List[Dict] = []
+    SA_PARTS_SUPPLIERS: list[dict] = []
 
     # Generic equivalents mapping - loaded from JSON
-    GENERIC_EQUIVALENTS: Dict = {}
+    GENERIC_EQUIVALENTS: dict = {}
 
     # Part number mappings - loaded from JSON
-    PART_NUMBER_MAPPINGS: Dict = {}
+    PART_NUMBER_MAPPINGS: dict = {}
 
     def __init__(self):
         """Initialize EquipmentLookup service."""
-        self._fault_codes_db: Optional[Dict] = None
+        self._fault_codes_db: dict | None = None
         self._load_fault_codes_db()
         self._load_parts_suppliers_db()
 
@@ -139,7 +139,7 @@ class EquipmentLookup:
         """Load fault codes database from JSON file."""
         try:
             db_path = Path(__file__).parent.parent / "data" / "fault_codes.json"
-            with open(db_path, "r") as f:
+            with open(db_path) as f:
                 self._fault_codes_db = json.load(f)
             logger.info(f"Loaded fault codes database with {self._count_total_codes()} codes")
         except FileNotFoundError:
@@ -161,7 +161,7 @@ class EquipmentLookup:
         """Load parts suppliers database from JSON file."""
         try:
             suppliers_path = Path(__file__).parent.parent / "data" / "parts_suppliers.json"
-            with open(suppliers_path, "r") as f:
+            with open(suppliers_path) as f:
                 data = json.load(f)
 
             # Convert class variables to instance variables
@@ -183,8 +183,8 @@ class EquipmentLookup:
             EquipmentLookup.PART_NUMBER_MAPPINGS = {}
 
     async def lookup_fault_code(
-        self, manufacturer: str, fault_code: str, model: Optional[str] = None, equipment_type: Optional[str] = None
-    ) -> Dict:
+        self, manufacturer: str, fault_code: str, model: str | None = None, equipment_type: str | None = None
+    ) -> dict:
         """
         Look up fault code from local database with web scraping fallback.
 
@@ -272,7 +272,7 @@ class EquipmentLookup:
 
         return mappings.get(mfg_lower, mfg_lower)
 
-    def _lookup_local_db(self, manufacturer: str, model: Optional[str], fault_code: str) -> Optional[Dict]:
+    def _lookup_local_db(self, manufacturer: str, model: str | None, fault_code: str) -> dict | None:
         """
         Look up fault code in local database.
 
@@ -325,7 +325,7 @@ class EquipmentLookup:
         # Not found
         return None
 
-    def _should_enrich(self, fault_info: Optional[Dict]) -> bool:
+    def _should_enrich(self, fault_info: dict | None) -> bool:
         """Determine if fault info needs web scraping enrichment."""
         if not fault_info:
             return True
@@ -334,7 +334,7 @@ class EquipmentLookup:
         severity = fault_info.get("severity", "")
         return severity in ["critical", "high"]
 
-    def _needs_parts_search(self, fault_info: Dict) -> bool:
+    def _needs_parts_search(self, fault_info: dict) -> bool:
         """Check if parts search should be performed based on probable causes."""
         causes = fault_info.get("probable_causes", [])
 
@@ -348,7 +348,7 @@ class EquipmentLookup:
 
         return False
 
-    async def _scrape_manufacturer(self, manufacturer: str, model: Optional[str], fault_code: str) -> Optional[Dict]:
+    async def _scrape_manufacturer(self, manufacturer: str, model: str | None, fault_code: str) -> dict | None:
         """
         Scrape manufacturer website for fault code documentation.
 
@@ -387,7 +387,7 @@ class EquipmentLookup:
 
         return scraped_info
 
-    async def _search_forums(self, manufacturer: str, model: Optional[str], fault_code: str) -> List[Dict]:
+    async def _search_forums(self, manufacturer: str, model: str | None, fault_code: str) -> list[dict]:
         """
         Search technical forums for real-world solutions.
 
@@ -419,8 +419,8 @@ class EquipmentLookup:
         return results
 
     async def _search_parts(
-        self, manufacturer: str, model: Optional[str], fault_code: str, causes: List[Dict]
-    ) -> List[Dict]:
+        self, manufacturer: str, model: str | None, fault_code: str, causes: list[dict]
+    ) -> list[dict]:
         """
         Search SA suppliers for relevant parts based on fault and causes.
 
@@ -507,8 +507,8 @@ class EquipmentLookup:
         return parts
 
     async def _search_supplier(
-        self, supplier: Dict, part_name: str, manufacturer: str, model: Optional[str]
-    ) -> List[Dict]:
+        self, supplier: dict, part_name: str, manufacturer: str, model: str | None
+    ) -> list[dict]:
         """
         Search specific supplier for part.
 
@@ -529,7 +529,7 @@ class EquipmentLookup:
         search_template = supplier.get("search_url", "")
         search_url = base_url + search_template.format(query=query)
 
-        # Skip slow HTTP requests - return placeholder data for fast demo response
+        # Skip slow HTTP requests - return placeholder data for fast local response
         # In production, would make actual HTTP request with timeout
         results = [
             {
@@ -543,7 +543,7 @@ class EquipmentLookup:
 
         return results
 
-    def _parse_supplier_results(self, html: str, supplier_name: str) -> List[Dict]:
+    def _parse_supplier_results(self, html: str, supplier_name: str) -> list[dict]:
         """
         Parse supplier HTML to extract product info.
 
@@ -633,7 +633,7 @@ class EquipmentLookup:
             return model_map.get(part_name, "N/A")
         return "N/A"
 
-    def _supplier_relevant(self, supplier: Dict, manufacturer: str) -> bool:
+    def _supplier_relevant(self, supplier: dict, manufacturer: str) -> bool:
         """
         Check if supplier stocks this manufacturer's parts.
 
@@ -647,7 +647,7 @@ class EquipmentLookup:
         brands = supplier.get("brands", [])
         return "all" in [b.lower() for b in brands] or manufacturer.lower() in [b.lower() for b in brands]
 
-    def _find_generic_alternative(self, oem_part_number: str) -> Optional[Dict]:
+    def _find_generic_alternative(self, oem_part_number: str) -> dict | None:
         """
         Find generic alternative for OEM part.
 
@@ -670,7 +670,7 @@ class EquipmentLookup:
 
 
 # Convenience function for quick lookups
-async def lookup_fault_code_quick(manufacturer: str, fault_code: str, model: Optional[str] = None) -> Dict:
+async def lookup_fault_code_quick(manufacturer: str, fault_code: str, model: str | None = None) -> dict:
     """
     Quick lookup function for fault codes.
 

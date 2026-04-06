@@ -1,5 +1,6 @@
 """Alerts API endpoints - SENTINEL Integration."""
 
+import logging
 import json
 import uuid
 from pathlib import Path
@@ -7,30 +8,31 @@ from typing import Optional
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from app.config.settings import settings
 from app.middleware.auth_middleware import require_query_site_access
 from app.middleware.rate_limiter import limiter
 from pydantic import BaseModel
 
-# Import orchestrator for live simulation alerts
-from app.services.lifecycle_orchestrator import get_lifecycle_orchestrator
 from app.services.sentry_integration.alert_notifier import alert_notifier
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 # Load data directory
 DATA_DIR = Path(__file__).parent.parent / "data"
 
 
 def load_alerts() -> list[dict]:
-    """Load alerts from JSON file, Supabase database, AND simulation."""
+    """Load alerts from canonical sources."""
     alerts = []
 
-    # Load static alerts from JSON
-    alerts_file = DATA_DIR / "alerts.json"
-    if alerts_file.exists():
-        with open(alerts_file) as f:
-            static_alerts = json.load(f)
-            alerts.extend(static_alerts)
+    if not settings.sentinel_island_mode:
+        # Load static alerts from JSON for local simulator/dev workflows only.
+        alerts_file = DATA_DIR / "alerts.json"
+        if alerts_file.exists():
+            with open(alerts_file) as f:
+                static_alerts = json.load(f)
+                alerts.extend(static_alerts)
 
     # Load active alerts from Supabase database
     try:
@@ -85,43 +87,6 @@ def load_alerts() -> list[dict]:
             alerts.append(alert)
     except Exception:
         # If Supabase not available, continue without database alerts
-        pass
-
-    # Load live alerts from simulation
-    try:
-        sim_alerts = get_lifecycle_orchestrator().get_active_alerts()
-        for sa in sim_alerts:
-            # Convert simulation alert to standard format
-            alert = {
-                "id": sa["id"],
-                "anomaly_id": None,
-                "equipment_id": sa["equipment_id"],
-                "site_id": sa.get("site_id", "unknown"),
-                "type": sa["type"],
-                "severity": sa["severity"],
-                "status": sa["status"],
-                "title": sa["title"],
-                "message": sa["message"],
-                "created_at": sa["created_at"],
-                "updated_at": sa["created_at"],
-                "acknowledged": sa["acknowledged"],
-                "acknowledged_by": sa.get("acknowledged_by"),
-                "acknowledged_at": sa.get("acknowledged_at"),
-                "priority": sa["priority"],
-                "category": sa.get("category", "hvac"),
-                "estimated_cost_zar": 15000.0 if sa["severity"] == "critical" else 5000.0,
-                "potential_damage_zar": 150000.0 if sa["severity"] == "critical" else 50000.0,
-                "equipment_name": sa["equipment_name"],
-                "site_name": sa.get("site_name", "Sandton City Office Tower"),
-                "health_score": sa.get("health_score"),
-                "fault_codes": sa.get("fault_codes", []),
-                "recommended_action": sa.get("recommended_action") or sa.get("suggested_action"),
-                "operational_context": sa.get("operational_context"),
-                "is_simulation": True,
-            }
-            alerts.append(alert)
-    except Exception:
-        # If simulation not available, continue with static alerts only
         pass
 
     return alerts
@@ -684,13 +649,8 @@ async def create_alert(http_request: Request, request: CreateAlertRequest) -> Cr
 async def acknowledge_alert(request: Request, alert_id: str, acknowledged_by: str = "operator"):
     """Acknowledge an alert and recalculate equipment health score."""
 
-    # Handle simulation alerts (SIM-ALERT-*)
     if alert_id.startswith("SIM-ALERT-"):
-        success = get_lifecycle_orchestrator().acknowledge_alert(alert_id)
-        if success:
-            return {"status": "acknowledged", "alert_id": alert_id}
-        else:
-            raise HTTPException(status_code=404, detail=f"Simulation alert {alert_id} not found")
+        raise HTTPException(status_code=404, detail=f"Alert {alert_id} not found")
 
     # Handle database alerts
     try:
@@ -727,7 +687,40 @@ async def acknowledge_alert(request: Request, alert_id: str, acknowledged_by: st
         # Recalculate equipment health score based on remaining active alerts
         await recalculate_equipment_health_score(client, equipment_id)
 
-        return {"status": "acknowledged", "alert_id": alert_id}
+        # Auto-create work order if no open record exists for this equipment
+        work_order_created = False
+        work_order_id = None
+        try:
+            if equipment_id:
+                eq_result = client.table("equipment").select("code, type").eq("id", equipment_id).limit(1).execute()
+                eq_code = eq_result.data[0]["code"] if eq_result.data else None
+
+                if eq_code:
+                    # Check for any open service record
+                    existing = (
+                        client.table("service_records")
+                        .select("id")
+                        .eq("equipment_id", equipment_id)
+                        .in_("status", ["assigned", "in_progress", "open", "pending"])
+                        .limit(1)
+                        .execute()
+                    )
+
+                    if not existing.data:
+                        logger.info(
+                            "Skipping legacy alert->work-order bridge for %s because "
+                            "lifecycle orchestration is not part of SENTINEL",
+                            alert_id,
+                        )
+        except Exception as wo_err:
+            logger.warning("Auto-WO creation after acknowledge failed for %s: %s", alert_id, wo_err)
+
+        return {
+            "status": "acknowledged",
+            "alert_id": alert_id,
+            "work_order_created": work_order_created,
+            "work_order_id": work_order_id,
+        }
     except HTTPException:
         raise
     except Exception:

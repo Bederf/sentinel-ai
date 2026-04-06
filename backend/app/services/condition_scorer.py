@@ -14,8 +14,8 @@ Weights are configurable per asset class.
 """
 
 import logging
-from typing import Dict, Any, Optional
 from enum import Enum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -115,11 +115,11 @@ class ConditionScorer:
 
     def calculate_score(
         self,
-        reading: Dict[str, Any],
-        baseline: Optional[Dict[str, Any]] = None,
+        reading: dict[str, Any],
+        baseline: dict[str, Any] | None = None,
         equipment_profile: str = "generator_default",
         asset_class: str = "generator",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Calculate condition score (0-100) from sensor reading.
 
@@ -230,7 +230,7 @@ class ConditionScorer:
             "action_required": grade in (ConditionGrade.POOR, ConditionGrade.CRITICAL),
         }
 
-    def _score_rms(self, rms: float, profile: Dict) -> float:
+    def _score_rms(self, rms: float, profile: dict) -> float:
         """Score RMS vibration level (0-100)."""
         if rms <= 0:
             return 80  # No data
@@ -251,7 +251,7 @@ class ConditionScorer:
         else:
             return max(0, 20 - (rms - critical) * 2)
 
-    def _score_harmonic_structure(self, peaks: list, profile: Dict) -> float:
+    def _score_harmonic_structure(self, peaks: list, profile: dict) -> float:
         """Score whether peaks match expected harmonics (0-100)."""
         if not peaks:
             return 50  # No data
@@ -279,7 +279,7 @@ class ConditionScorer:
 
         return max(0, min(100, match_ratio * 100 - unexpected_penalty))
 
-    def _score_baseline_deviation(self, reading: Dict, baseline: Dict) -> float:
+    def _score_baseline_deviation(self, reading: dict, baseline: dict) -> float:
         """Score deviation from baseline (0-100)."""
         current_rms = reading.get("rms_total_ms2") or reading.get("rms_value", 0)
         baseline_rms = baseline.get("vibration_rms_ms2", current_rms)
@@ -328,7 +328,7 @@ class ConditionScorer:
         else:
             return 30
 
-    def format_for_telegram(self, result: Dict[str, Any], equipment_name: str) -> str:
+    def format_for_telegram(self, result: dict[str, Any], equipment_name: str) -> str:
         """
         Format condition score for Telegram.
 
@@ -380,7 +380,7 @@ class ConditionScorer:
 
 
 # Singleton instance
-_scorer_instance: Optional[ConditionScorer] = None
+_scorer_instance: ConditionScorer | None = None
 
 
 def get_condition_scorer() -> ConditionScorer:

@@ -18,9 +18,9 @@ import logging
 import os
 import threading
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 # Consent text templates — presented to data subjects on first contact
 # ---------------------------------------------------------------------------
 
-CONSENT_TEMPLATES: Dict[str, Dict[str, str]] = {
+CONSENT_TEMPLATES: dict[str, dict[str, str]] = {
     "first_contact": {
         "whatsapp": (
             "SENTINEL Building Management processes your phone number and messages "
@@ -101,10 +101,10 @@ class ConsentRecord(BaseModel):
     consent_given: bool
     consent_text: str  # exact text the user agreed to
     given_at: str  # ISO 8601 datetime
-    expires_at: Optional[str] = None  # ISO 8601 datetime or None
-    withdrawn_at: Optional[str] = None  # ISO 8601 if consent withdrawn
-    ip_address: Optional[str] = None
-    metadata: Dict[str, Any] = Field(default_factory=dict)
+    expires_at: str | None = None  # ISO 8601 datetime or None
+    withdrawn_at: str | None = None  # ISO 8601 if consent withdrawn
+    ip_address: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 # ---------------------------------------------------------------------------
@@ -123,7 +123,7 @@ def hash_identifier(raw_id: str) -> str:
 
 
 def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 # ---------------------------------------------------------------------------
@@ -150,7 +150,7 @@ class ConsentService:
             return
         self._initialized = True
         self._json_path = Path(__file__).parent.parent / "data" / "consent_records.json"
-        self._records: List[ConsentRecord] = []
+        self._records: list[ConsentRecord] = []
         self._load_json()
 
     # ── JSON storage ──────────────────────────────────────────────────
@@ -189,9 +189,9 @@ class ConsentService:
         platform: str,
         consent_type: str,
         consent_given: bool,
-        consent_text: Optional[str] = None,
-        ip_address: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        consent_text: str | None = None,
+        ip_address: str | None = None,
+        metadata: dict[str, Any] | None = None,
         *,
         hash_subject: bool = True,
     ) -> ConsentRecord:
@@ -261,7 +261,7 @@ class ConsentService:
         consent_type: str,
         *,
         hash_subject: bool = True,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ) -> ConsentRecord:
         """Record a consent withdrawal (creates a NEW record, does not modify existing).
 
@@ -298,25 +298,25 @@ class ConsentService:
         logger.info("Consent withdrawn: subject=%s type=%s", hashed_id[:12], consent_type)
         return withdrawal
 
-    def get_consent_history(self, data_subject_id: str, *, hash_subject: bool = True) -> List[ConsentRecord]:
+    def get_consent_history(self, data_subject_id: str, *, hash_subject: bool = True) -> list[ConsentRecord]:
         """Get the full consent history for a data subject."""
         hashed_id = hash_identifier(data_subject_id) if hash_subject else data_subject_id
 
         return [r for r in self._records if r.data_subject_id == hashed_id]
 
-    def get_consent_stats(self) -> Dict[str, Any]:
+    def get_consent_stats(self) -> dict[str, Any]:
         """Get aggregate consent statistics for FSR audit reporting."""
         total = len(self._records)
         active_consents = sum(1 for r in self._records if r.consent_given and r.withdrawn_at is None)
         withdrawals = sum(1 for r in self._records if not r.consent_given)
 
         # By platform
-        by_platform: Dict[str, int] = {}
+        by_platform: dict[str, int] = {}
         for r in self._records:
             by_platform[r.platform] = by_platform.get(r.platform, 0) + 1
 
         # By consent type
-        by_type: Dict[str, int] = {}
+        by_type: dict[str, int] = {}
         for r in self._records:
             by_type[r.consent_type] = by_type.get(r.consent_type, 0) + 1
 
@@ -331,9 +331,9 @@ class ConsentService:
 
     def export_consent_records(
         self,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+        start_date: str | None = None,
+        end_date: str | None = None,
+    ) -> list[dict[str, Any]]:
         """Export consent records for FSR audit (optional date range filter).
 
         Args:

@@ -12,10 +12,10 @@ This service provides:
 - Measurement type inference from parameter names
 """
 
-from typing import List, Dict, Any, Optional
-from pathlib import Path
 import json
 import logging
+from pathlib import Path
+from typing import Any
 
 from app.database.repositories.checklist_template_repository import (
     get_checklist_template_repository,
@@ -38,7 +38,7 @@ class ChecklistService:
 
     def __init__(self):
         """Initialize ChecklistService with template path and lazy Supabase repo."""
-        self._templates_cache: Optional[Dict[str, Any]] = None
+        self._templates_cache: dict[str, Any] | None = None
         self._templates_path = Path(__file__).parent.parent / "data" / "inspection_checklist_templates.json"
         self._repo = None  # Lazy-init Supabase repository
 
@@ -52,7 +52,7 @@ class ChecklistService:
                 self._repo = None
         return self._repo
 
-    def _load_templates(self) -> Dict[str, Any]:
+    def _load_templates(self) -> dict[str, Any]:
         """
         Load templates from JSON file with caching.
 
@@ -65,13 +65,13 @@ class ChecklistService:
         """
         if self._templates_cache is None:
             logger.info(f"Loading checklist templates from {self._templates_path}")
-            with open(self._templates_path, "r") as f:
+            with open(self._templates_path) as f:
                 data = json.load(f)
                 self._templates_cache = data.get("templates", {})
                 logger.info(f"Loaded {len(self._templates_cache)} checklist templates")
         return self._templates_cache
 
-    def get_template(self, template_id: str) -> Optional[Dict[str, Any]]:
+    def get_template(self, template_id: str) -> dict[str, Any] | None:
         """
         Get checklist template by ID.
 
@@ -96,7 +96,7 @@ class ChecklistService:
         templates = self._load_templates()
         return templates.get(template_id)
 
-    def get_templates_by_equipment_type(self, equipment_type: str) -> List[Dict[str, Any]]:
+    def get_templates_by_equipment_type(self, equipment_type: str) -> list[dict[str, Any]]:
         """
         Get all templates for an equipment type.
 
@@ -123,7 +123,7 @@ class ChecklistService:
 
     def get_template_for_inspection(
         self, equipment_type: str, inspection_type: str = "routine"
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """
         Get best matching template for equipment and inspection type.
 
@@ -168,7 +168,7 @@ class ChecklistService:
         )
         return templates[0]
 
-    def _get_json_templates_by_equipment_type(self, equipment_type: str) -> List[Dict[str, Any]]:
+    def _get_json_templates_by_equipment_type(self, equipment_type: str) -> list[dict[str, Any]]:
         """Get templates from JSON file only (no Supabase).
 
         Used as internal fallback when Supabase is unavailable.
@@ -176,7 +176,7 @@ class ChecklistService:
         templates = self._load_templates()
         return [t for t in templates.values() if t.get("equipment_type") == equipment_type]
 
-    def get_oem_template(self, equipment_type: str, manufacturer: str, model: str = None) -> Optional[Dict[str, Any]]:
+    def get_oem_template(self, equipment_type: str, manufacturer: str, model: str = None) -> dict[str, Any] | None:
         """
         Get OEM-specific template by manufacturer.
 
@@ -198,7 +198,7 @@ class ChecklistService:
                 logger.warning(f"Supabase OEM template lookup failed: {e}")
         return None  # No OEM fallback in JSON
 
-    def list_all_templates(self) -> List[Dict[str, Any]]:
+    def list_all_templates(self) -> list[dict[str, Any]]:
         """
         List all available templates with summary info.
 
@@ -250,7 +250,7 @@ class ChecklistService:
 
         return results
 
-    def calculate_completion_status(self, template: Dict[str, Any], responses: Dict[str, Any]) -> Dict[str, Any]:
+    def calculate_completion_status(self, template: dict[str, Any], responses: dict[str, Any]) -> dict[str, Any]:
         """
         Calculate inspection completion status from responses.
 
@@ -340,8 +340,8 @@ class ChecklistService:
         }
 
     def prepare_measurements_for_db(
-        self, template: Dict[str, Any], responses: Dict[str, Any], task_id: str
-    ) -> List[Dict[str, Any]]:
+        self, template: dict[str, Any], responses: dict[str, Any], task_id: str
+    ) -> list[dict[str, Any]]:
         """
         Convert checklist responses to measurement records for database.
 
@@ -423,7 +423,7 @@ class ChecklistService:
 
         return measurements
 
-    def _infer_measurement_type(self, item: Dict[str, Any]) -> str:
+    def _infer_measurement_type(self, item: dict[str, Any]) -> str:
         """
         Infer measurement type from parameter name and item context.
 
@@ -471,7 +471,7 @@ class ChecklistService:
         # Default
         return "general"
 
-    def validate_response_format(self, template: Dict[str, Any], responses: Dict[str, Any]) -> Dict[str, Any]:
+    def validate_response_format(self, template: dict[str, Any], responses: dict[str, Any]) -> dict[str, Any]:
         """
         Validate response format against template requirements.
 
@@ -558,7 +558,7 @@ class ChecklistService:
 # Singleton Factory
 # ============================================================================
 
-_checklist_service_instance: Optional[ChecklistService] = None
+_checklist_service_instance: ChecklistService | None = None
 
 
 def get_checklist_service() -> ChecklistService:

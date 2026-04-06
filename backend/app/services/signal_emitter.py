@@ -15,7 +15,6 @@ import re
 import uuid
 from datetime import datetime
 from email.utils import getaddresses, parsedate_to_datetime
-from typing import Optional
 from zoneinfo import ZoneInfo
 
 from app.database.repositories.room_registry_repository import get_room_registry_repository
@@ -55,7 +54,7 @@ _MEETING_ROOM_KEYWORDS = (
 # ---------------------------------------------------------------------------
 
 
-def _thread_id_from_references(message_id: str, in_reply_to: str, references: str) -> Optional[str]:
+def _thread_id_from_references(message_id: str, in_reply_to: str, references: str) -> str | None:
     """Derive a stable thread ID from email headers.
 
     Uses the earliest message-id in the References chain, or in_reply_to,
@@ -118,7 +117,7 @@ def _normalise_signal_type_for_storage(signal_type: str) -> tuple[str, str | Non
 
 
 def _coerce_site_uuid(site_id: str | None) -> tuple[str | None, str | None]:
-    """Return a UUID site_id for persistence, preserving logical site codes separately."""
+    """Return a site ref suitable for persistence, preserving logical site codes separately."""
     if not site_id:
         return None, None
 
@@ -129,7 +128,7 @@ def _coerce_site_uuid(site_id: str | None) -> tuple[str | None, str | None]:
     try:
         return str(uuid.UUID(value)), None
     except (ValueError, AttributeError):
-        return None, value
+        return value, value
 
 
 def _looks_like_thread_header(lines: list[str], index: int) -> bool:
@@ -309,7 +308,7 @@ def _classify_email(subject: str, body: str) -> tuple[str, str, str]:
     return "email_helpdesk", "observation_email", "low"
 
 
-def _extract_location_ref(subject: str, body: str) -> Optional[str]:
+def _extract_location_ref(subject: str, body: str) -> str | None:
     """Extract Fairlands location reference from email text."""
     text = f"{subject} {body}"
 
@@ -361,14 +360,14 @@ async def _resolve_room_context(subject: str, body: str) -> tuple[str | None, st
     room_id = extract_room_id(text)
     if not room_id:
         location_ref = _extract_location_ref(subject, body)
-        return None, location_ref, "S001" if location_ref == "Fairlands" else None
+        return None, location_ref, "site-001" if location_ref == "Fairlands" else None
 
     repo = get_room_registry_repository()
     room = await repo.get_room(room_id)
     if room:
         return room_id, _room_id_to_location_ref(room_id), room.get("site_id")
 
-    return room_id, _room_id_to_location_ref(room_id), "S001"
+    return room_id, _room_id_to_location_ref(room_id), "site-001"
 
 
 # ---------------------------------------------------------------------------

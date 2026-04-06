@@ -10,7 +10,7 @@ from datetime import datetime
 from enum import Enum
 from typing import List, Optional, Dict, Any
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 # ============================================================================
@@ -91,6 +91,25 @@ class ComplianceChecklistStatus(str, Enum):
 class ComplianceChecklistTemplate(BaseModel):
     """Template for compliance checklists."""
 
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "compliance_type": "Fire",
+                "requirement_standard": "NFPA 10",
+                "template_name": "Fire Extinguisher Inspection",
+                "checklist_items": [
+                    {
+                        "item_id": "FE-001",
+                        "description": "Visual inspection of pressure gauge",
+                        "frequency": "monthly",
+                        "evidence_required": True,
+                    }
+                ],
+                "risk_level": "high",
+            }
+        }
+    )
+
     id: Optional[str] = None
     compliance_type: ComplianceType
     requirement_standard: str  # e.g., 'NFPA 10', 'IEC 62034'
@@ -107,24 +126,6 @@ class ComplianceChecklistTemplate(BaseModel):
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "compliance_type": "Fire",
-                "requirement_standard": "NFPA 10",
-                "template_name": "Fire Extinguisher Inspection",
-                "checklist_items": [
-                    {
-                        "item_id": "FE-001",
-                        "description": "Visual inspection of pressure gauge",
-                        "frequency": "monthly",
-                        "evidence_required": True,
-                    }
-                ],
-                "risk_level": "high",
-            }
-        }
-
 
 # ============================================================================
 # Compliance Audit Model
@@ -133,6 +134,23 @@ class ComplianceChecklistTemplate(BaseModel):
 
 class ComplianceAudit(BaseModel):
     """Comprehensive audit record for compliance."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "site_id": "site-002",
+                "compliance_type": "Fire",
+                "audit_type": "scheduled",
+                "auditor_role": "Fire Safety Officer",
+                "findings": {
+                    "critical_issues": ["Extinguisher expired"],
+                    "recommendations": ["Replace extinguisher"],
+                    "cost_estimates": {"replacement": 500},
+                },
+                "status": "draft",
+            }
+        }
+    )
 
     id: Optional[str] = None
     site_id: str
@@ -161,22 +179,6 @@ class ComplianceAudit(BaseModel):
             raise ValueError(f"Audit type must be one of {allowed}")
         return v
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "site_id": "site-002",
-                "compliance_type": "Fire",
-                "audit_type": "scheduled",
-                "auditor_role": "Fire Safety Officer",
-                "findings": {
-                    "critical_issues": ["Extinguisher expired"],
-                    "recommendations": ["Replace extinguisher"],
-                    "cost_estimates": {"replacement": 500},
-                },
-                "status": "draft",
-            }
-        }
-
 
 # ============================================================================
 # Fire Equipment Tracking Model
@@ -185,6 +187,20 @@ class ComplianceAudit(BaseModel):
 
 class FireEquipmentTracking(BaseModel):
     """Track fire safety equipment and inspection schedule."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "site_id": "S002",
+                "equipment_type": "extinguisher",
+                "location_description": "L1 Corridor B",
+                "unique_identifier": "FE-2024-001",
+                "inspection_frequency_months": 12,
+                "charge_pressure": 150.0,
+                "status": "active",
+            }
+        }
+    )
 
     id: Optional[str] = None
     site_id: str
@@ -212,19 +228,6 @@ class FireEquipmentTracking(BaseModel):
             raise ValueError("Inspection frequency must be 1-24 months")
         return v
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "site_id": "S002",
-                "equipment_type": "extinguisher",
-                "location_description": "L1 Corridor B",
-                "unique_identifier": "FE-2024-001",
-                "inspection_frequency_months": 12,
-                "charge_pressure": 150.0,
-                "status": "active",
-            }
-        }
-
 
 # ============================================================================
 # Emergency Light Testing Model
@@ -233,6 +236,20 @@ class FireEquipmentTracking(BaseModel):
 
 class EmergencyLightTesting(BaseModel):
     """Emergency lighting compliance (IEC 62034)."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "site_id": "S002",
+                "light_code": "S002-EMERG-L2-001",
+                "fixture_location": "Level 2, Corridor A",
+                "test_interval_days": 365,
+                "auto_test_enabled": True,
+                "battery_health_percent": 100,
+                "battery_alert_threshold": 75,
+            }
+        }
+    )
 
     id: Optional[str] = None
     site_id: str
@@ -268,19 +285,6 @@ class EmergencyLightTesting(BaseModel):
             raise ValueError("Test interval must be at least 30 days")
         return v
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "site_id": "S002",
-                "light_code": "S002-EMERG-L2-001",
-                "fixture_location": "Level 2, Corridor A",
-                "test_interval_days": 365,
-                "auto_test_enabled": True,
-                "battery_health_percent": 100,
-                "battery_alert_threshold": 75,
-            }
-        }
-
 
 # ============================================================================
 # Legionella Risk Assessment Model
@@ -289,6 +293,20 @@ class EmergencyLightTesting(BaseModel):
 
 class LegionellaRiskAssessment(BaseModel):
     """Legionella management for cooling towers (SABS standard)."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "site_id": "S002",
+                "tower_code": "S002-CT-B1-001",
+                "risk_level": "high",
+                "water_temperature": 30.0,
+                "biocide_treatment_interval_days": 30,
+                "temperature_monitoring": True,
+                "status": "at_risk",
+            }
+        }
+    )
 
     id: Optional[str] = None
     site_id: str
@@ -330,19 +348,6 @@ class LegionellaRiskAssessment(BaseModel):
             raise ValueError("Treatment interval must be 7-90 days")
         return v
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "site_id": "S002",
-                "tower_code": "S002-CT-B1-001",
-                "risk_level": "high",
-                "water_temperature": 30.0,
-                "biocide_treatment_interval_days": 30,
-                "temperature_monitoring": True,
-                "status": "at_risk",
-            }
-        }
-
 
 # ============================================================================
 # Electrical Compliance Model
@@ -351,6 +356,19 @@ class LegionellaRiskAssessment(BaseModel):
 
 class ElectricalCompliance(BaseModel):
     """Electrical Certificate of Compliance tracking."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "site_id": "S002",
+                "certificate_type": "CoC_new_installation",
+                "issued_by": "John Smith - SABS #12345",
+                "issue_date": "2024-01-15T00:00:00Z",
+                "scope": "L1-L2 distribution board upgrade",
+                "status": "active",
+            }
+        }
+    )
 
     id: Optional[str] = None
     site_id: str
@@ -383,18 +401,6 @@ class ElectricalCompliance(BaseModel):
             # Auto-calculate 5-year validity (South African standard)
             self.expiry_date = self.issue_date + __import__("datetime").timedelta(days=365 * 5)
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "site_id": "S002",
-                "certificate_type": "CoC_new_installation",
-                "issued_by": "John Smith - SABS #12345",
-                "issue_date": "2024-01-15T00:00:00Z",
-                "scope": "L1-L2 distribution board upgrade",
-                "status": "active",
-            }
-        }
-
 
 # ============================================================================
 # Lift Inspection Tracking Model
@@ -403,6 +409,25 @@ class ElectricalCompliance(BaseModel):
 
 class LiftInspectionTracking(BaseModel):
     """Lift/Elevator safety inspection and test results."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "site_id": "S002",
+                "lift_code": "S002-LIFT-R-001",
+                "location_description": "Roof Level - Main Lift",
+                "inspection_type": "periodic_6monthly",
+                "inspector_license_number": "LSA-2024-001",
+                "test_results": {
+                    "brake_load_test": "pass",
+                    "speed_governor": "pass",
+                    "emergency_stop_time": 0.8,
+                },
+                "is_compliant": True,
+                "status": "completed",
+            }
+        }
+    )
 
     id: Optional[str] = None
     site_id: str
@@ -429,24 +454,6 @@ class LiftInspectionTracking(BaseModel):
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "site_id": "S002",
-                "lift_code": "S002-LIFT-R-001",
-                "location_description": "Roof Level - Main Lift",
-                "inspection_type": "periodic_6monthly",
-                "inspector_license_number": "LSA-2024-001",
-                "test_results": {
-                    "brake_load_test": "pass",
-                    "speed_governor": "pass",
-                    "emergency_stop_time": 0.8,
-                },
-                "is_compliant": True,
-                "status": "completed",
-            }
-        }
-
 
 # ============================================================================
 # Compliance Status Summary Model
@@ -456,20 +463,8 @@ class LiftInspectionTracking(BaseModel):
 class ComplianceStatus(BaseModel):
     """Aggregate compliance status for dashboard reporting."""
 
-    site_id: str
-    critical_issues_count: int = 0
-    high_risk_items_count: int = 0
-    items_expiring_30days: int = 0
-    overdue_inspections: int = 0
-    last_audit_date: Optional[datetime] = None
-    compliance_score_percent: int = 100
-    summary: Dict[str, Any] = Field(
-        default_factory=dict,
-        description="{ohs_status, fire_status, electrical_status, legionella_status, lift_status}",
-    )
-
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "site_id": "S002",
                 "critical_issues_count": 2,
@@ -484,3 +479,16 @@ class ComplianceStatus(BaseModel):
                 },
             }
         }
+    )
+
+    site_id: str
+    critical_issues_count: int = 0
+    high_risk_items_count: int = 0
+    items_expiring_30days: int = 0
+    overdue_inspections: int = 0
+    last_audit_date: Optional[datetime] = None
+    compliance_score_percent: int = 100
+    summary: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="{ohs_status, fire_status, electrical_status, legionella_status, lift_status}",
+    )

@@ -7,33 +7,33 @@ ML failure predictions, SLA tier requirements, and target margins.
 """
 
 import uuid
-from typing import List, Dict, Any, Optional
-from decimal import Decimal
 from datetime import date, timedelta
+from decimal import Decimal
+from typing import Any
 
-from app.models.pricing import (
-    SLATier,
-    ConditionFactor,
-    RiskBuffer,
-    QuoteRequest,
-    QuoteResponse,
-    PricingConfig,
-    WhatIfScenario,
-    WhatIfResponse,
-    WhatIfScenarioResult,
-    RenewalPricingRequest,
-    RenewalPricingResponse,
-    PricingBenchmarkResponse,
-    RenewalQuote,
-    ContractComparable,
-    RenegotiationAnalysis,
-    RenegotiationOption,
-)
-from app.database.repositories.sla_repository import get_sla_repository
-from app.services.profitability_service import get_profitability_service
 from app.database.repositories.budget_repository import BudgetRepository
 from app.database.repositories.condition_assessment_repository import ConditionAssessmentRepository
 from app.database.repositories.contract_repository import ContractRepository
+from app.database.repositories.sla_repository import get_sla_repository
+from app.models.pricing import (
+    ConditionFactor,
+    ContractComparable,
+    PricingBenchmarkResponse,
+    PricingConfig,
+    QuoteRequest,
+    QuoteResponse,
+    RenegotiationAnalysis,
+    RenegotiationOption,
+    RenewalPricingRequest,
+    RenewalPricingResponse,
+    RenewalQuote,
+    RiskBuffer,
+    SLATier,
+    WhatIfResponse,
+    WhatIfScenario,
+    WhatIfScenarioResult,
+)
+from app.services.profitability_service import get_profitability_service
 
 
 class PricingEngine:
@@ -51,10 +51,10 @@ class PricingEngine:
 
     def __init__(
         self,
-        budget_repo: Optional[BudgetRepository] = None,
-        condition_repo: Optional[ConditionAssessmentRepository] = None,
-        contract_repo: Optional[ContractRepository] = None,
-        config: Optional[PricingConfig] = None,
+        budget_repo: BudgetRepository | None = None,
+        condition_repo: ConditionAssessmentRepository | None = None,
+        contract_repo: ContractRepository | None = None,
+        config: PricingConfig | None = None,
     ):
         """Initialize pricing engine with repositories and configuration."""
         self.budget_repo = budget_repo or BudgetRepository()
@@ -67,7 +67,7 @@ class PricingEngine:
         request: QuoteRequest,
         condition_score_delta: int = 0,
         risk_buffer_multiplier: Decimal = Decimal("1.0"),
-        target_margin_pct_override: Optional[Decimal] = None,
+        target_margin_pct_override: Decimal | None = None,
     ) -> QuoteResponse:
         """
         Calculate recommended price for contract quote.
@@ -126,12 +126,12 @@ class PricingEngine:
             valid_until=date.today() + timedelta(days=30),
         )
 
-    def calculate_what_if(self, request: QuoteRequest, scenarios: List[WhatIfScenario]) -> WhatIfResponse:
+    def calculate_what_if(self, request: QuoteRequest, scenarios: list[WhatIfScenario]) -> WhatIfResponse:
         """
         Run what-if analysis for pricing scenarios.
         """
         base_quote = self.calculate_price(request)
-        results: List[WhatIfScenarioResult] = []
+        results: list[WhatIfScenarioResult] = []
 
         for scenario in scenarios:
             equipment_codes = list(request.equipment_codes)
@@ -336,8 +336,8 @@ class PricingEngine:
         )
 
     def get_comparable_contracts(
-        self, equipment_types: List[str], sla_tier: SLATier, limit: int = 10
-    ) -> List[ContractComparable]:
+        self, equipment_types: list[str], sla_tier: SLATier, limit: int = 10
+    ) -> list[ContractComparable]:
         """
         Find similar contracts in portfolio for benchmarking.
 
@@ -377,7 +377,7 @@ class PricingEngine:
             return []
 
     def calculate_renegotiation_terms(
-        self, contract_id: str, options_requested: Optional[str] = None
+        self, contract_id: str, options_requested: str | None = None
     ) -> RenegotiationAnalysis:
         """
         Analyze renegotiation options for contract renewal.
@@ -512,7 +512,7 @@ class PricingEngine:
             },
         )
 
-    def _get_contract_equipment_codes(self, contract_id: str) -> List[str]:
+    def _get_contract_equipment_codes(self, contract_id: str) -> list[str]:
         """Get equipment codes for a contract."""
         try:
             assets = self.contract_repo.get_contract_assets(contract_id)
@@ -556,7 +556,7 @@ class PricingEngine:
             max_monthly_fee_zar=max(fees),
         )
 
-    def _calculate_base_cost(self, equipment_codes: List[str]) -> Decimal:
+    def _calculate_base_cost(self, equipment_codes: list[str]) -> Decimal:
         """
         Calculate base cost from equipment budget templates.
 
@@ -586,7 +586,7 @@ class PricingEngine:
 
         return total_monthly
 
-    def _calculate_condition_adjustment(self, base_cost: Decimal, factors: List[ConditionFactor]) -> Decimal:
+    def _calculate_condition_adjustment(self, base_cost: Decimal, factors: list[ConditionFactor]) -> Decimal:
         """
         Calculate cost adjustment based on equipment condition.
 
@@ -606,7 +606,7 @@ class PricingEngine:
 
         return adjustment
 
-    def _calculate_age_adjustment(self, base_cost: Decimal, factors: List[ConditionFactor]) -> Decimal:
+    def _calculate_age_adjustment(self, base_cost: Decimal, factors: list[ConditionFactor]) -> Decimal:
         """
         Calculate cost adjustment based on equipment age.
 
@@ -636,7 +636,7 @@ class PricingEngine:
 
         return adjustment
 
-    def _calculate_risk_buffer(self, base_cost: Decimal, buffers: List[RiskBuffer]) -> Decimal:
+    def _calculate_risk_buffer(self, base_cost: Decimal, buffers: list[RiskBuffer]) -> Decimal:
         """
         Calculate risk buffer from ML failure predictions.
 
@@ -675,7 +675,7 @@ class PricingEngine:
                 return margin_target.margin_pct
         return self.config.default_margin_pct
 
-    def _get_condition_factors(self, equipment_codes: List[str], score_delta: int = 0) -> List[ConditionFactor]:
+    def _get_condition_factors(self, equipment_codes: list[str], score_delta: int = 0) -> list[ConditionFactor]:
         """
         Get condition assessment data for equipment.
 
@@ -708,7 +708,7 @@ class PricingEngine:
 
         return factors
 
-    def _get_risk_buffers(self, equipment_codes: List[str], multiplier: Decimal = Decimal("1.0")) -> List[RiskBuffer]:
+    def _get_risk_buffers(self, equipment_codes: list[str], multiplier: Decimal = Decimal("1.0")) -> list[RiskBuffer]:
         """
         Get ML prediction risk buffers for equipment.
 
@@ -737,7 +737,7 @@ class PricingEngine:
 
         return buffers
 
-    def _calculate_fee_range(self, recommended_fee: Decimal) -> Dict[str, Decimal]:
+    def _calculate_fee_range(self, recommended_fee: Decimal) -> dict[str, Decimal]:
         """Calculate pricing range for quote."""
         return {
             "min": recommended_fee * Decimal("0.9"),  # -10%
@@ -746,8 +746,8 @@ class PricingEngine:
         }
 
     def _identify_risk_factors(
-        self, condition_factors: List[ConditionFactor], risk_buffers: List[RiskBuffer]
-    ) -> List[str]:
+        self, condition_factors: list[ConditionFactor], risk_buffers: list[RiskBuffer]
+    ) -> list[str]:
         """Identify key risk factors for quote."""
         factors = []
 
@@ -765,7 +765,7 @@ class PricingEngine:
 
         return factors if factors else ["No significant risk factors identified"]
 
-    def _list_assumptions(self, request: QuoteRequest) -> List[str]:
+    def _list_assumptions(self, request: QuoteRequest) -> list[str]:
         """List key assumptions in quote."""
         return [
             f"Contract duration: {request.contract_months} months",
@@ -775,7 +775,7 @@ class PricingEngine:
             "Based on current equipment condition assessments",
         ]
 
-    def _get_market_comparison(self, request: QuoteRequest) -> Optional[Dict[str, Any]]:
+    def _get_market_comparison(self, request: QuoteRequest) -> dict[str, Any] | None:
         """Get market benchmark data for comparison."""
         try:
             # Find similar contracts in portfolio
@@ -804,7 +804,7 @@ class PricingEngine:
             return parts[1].lower()
         return "unknown"
 
-    def _calculate_equipment_age(self, installed_date: Optional[str]) -> float:
+    def _calculate_equipment_age(self, installed_date: str | None) -> float:
         """Calculate equipment age in years from installation date."""
         if not installed_date:
             return 5.0  # Default 5 years if unknown
@@ -818,7 +818,7 @@ class PricingEngine:
         except Exception:
             return 5.0  # Default 5 years if parsing fails
 
-    def _get_ml_prediction(self, equipment_code: str) -> Optional[Dict[str, Any]]:
+    def _get_ml_prediction(self, equipment_code: str) -> dict[str, Any] | None:
         """
         Get ML failure prediction for equipment.
 
@@ -838,7 +838,7 @@ class PricingEngine:
                 "health_score": 80,
             }
 
-    def _get_default_templates(self) -> Dict[str, Any]:
+    def _get_default_templates(self) -> dict[str, Any]:
         """Get default budget templates if repository unavailable."""
         return {
             "chiller": {"typical_monthly_breakdown": {"labor": 4500, "parts": 2500, "callout": 800}},

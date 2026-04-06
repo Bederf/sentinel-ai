@@ -5,10 +5,10 @@ history tracking for autonomous boundary management.
 """
 
 import logging
+from collections.abc import Callable
 from datetime import datetime
-from typing import Dict, List, Optional, Callable
 
-from app.models.autonomous_decision import BoundaryStatus, EscalationLevel, EscalationEvent
+from app.models.autonomous_decision import BoundaryStatus, EscalationEvent, EscalationLevel
 from app.services.notification_service import notification_service
 
 logger = logging.getLogger(__name__)
@@ -19,9 +19,9 @@ class EscalationEngine:
 
     def __init__(self):
         """Initialize the escalation engine."""
-        self.escalation_history: List[EscalationEvent] = []
-        self.active_escalations: Dict[str, EscalationEvent] = {}
-        self._escalation_callbacks: List[Callable] = []
+        self.escalation_history: list[EscalationEvent] = []
+        self.active_escalations: dict[str, EscalationEvent] = {}
+        self._escalation_callbacks: list[Callable] = []
         self._initialized = False
 
     async def initialize(self) -> None:
@@ -34,7 +34,7 @@ class EscalationEngine:
         self._initialized = True
         logger.info("EscalationEngine initialized")
 
-    async def evaluate_escalation(self, boundary_status: BoundaryStatus) -> Optional[EscalationEvent]:
+    async def evaluate_escalation(self, boundary_status: BoundaryStatus) -> EscalationEvent | None:
         """
         Evaluate boundary status and trigger appropriate escalation if needed.
 
@@ -133,7 +133,7 @@ class EscalationEngine:
             logger.error(f"Error triggering notifications for escalation {event.id}: {e}")
 
     async def acknowledge_escalation(
-        self, escalation_id: str, acknowledged_by: str, comment: Optional[str] = None
+        self, escalation_id: str, acknowledged_by: str, comment: str | None = None
     ) -> bool:
         """
         Acknowledge an escalation event.
@@ -171,8 +171,8 @@ class EscalationEngine:
             logger.info(f"Escalation cleared: {escalation_key}")
 
     async def get_escalation_history(
-        self, limit: int = 100, escalation_level: Optional[EscalationLevel] = None, acknowledged: Optional[bool] = None
-    ) -> List[EscalationEvent]:
+        self, limit: int = 100, escalation_level: EscalationLevel | None = None, acknowledged: bool | None = None
+    ) -> list[EscalationEvent]:
         """
         Get escalation history with optional filtering.
 
@@ -194,11 +194,11 @@ class EscalationEngine:
 
         return filtered_events[-limit:]
 
-    async def get_active_escalations(self) -> List[EscalationEvent]:
+    async def get_active_escalations(self) -> list[EscalationEvent]:
         """Get currently active escalation events."""
         return list(self.active_escalations.values())
 
-    async def get_escalation_status(self, device_id: str, point_name: str) -> Optional[EscalationEvent]:
+    async def get_escalation_status(self, device_id: str, point_name: str) -> EscalationEvent | None:
         """
         Get escalation status for a specific device/point.
 

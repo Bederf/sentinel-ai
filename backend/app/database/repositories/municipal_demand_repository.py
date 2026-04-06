@@ -1,4 +1,4 @@
-"""Repository for municipal demand history (demo/BMS aggregates)."""
+"""Repository for municipal demand history (local fallback/BMS aggregates)."""
 
 from typing import List, Optional, Dict, Any
 from datetime import date

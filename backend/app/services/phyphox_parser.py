@@ -12,7 +12,7 @@ import csv
 import io
 import json
 import logging
-from typing import Dict, Any, List, Optional
+from typing import Any
 
 import numpy as np
 
@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 class PhyphoxParser:
     """Parse phyphox experiment exports (CSV/JSON)."""
 
-    def parse_export(self, data: bytes, filename: str) -> Dict[str, Any]:
+    def parse_export(self, data: bytes, filename: str) -> dict[str, Any]:
         """
         Parse phyphox export file.
 
@@ -44,7 +44,7 @@ class PhyphoxParser:
             except Exception:
                 return self._parse_csv(data)
 
-    def _parse_csv(self, data: bytes) -> Dict[str, Any]:
+    def _parse_csv(self, data: bytes) -> dict[str, Any]:
         """Parse phyphox CSV export."""
         try:
             text = data.decode("utf-8")
@@ -66,7 +66,7 @@ class PhyphoxParser:
         else:
             return self._parse_generic_csv(headers, data_rows)
 
-    def _parse_acceleration_csv(self, headers: List[str], rows: List[List[str]]) -> Dict[str, Any]:
+    def _parse_acceleration_csv(self, headers: list[str], rows: list[list[str]]) -> dict[str, Any]:
         """Parse acceleration time-series data."""
         # Find column indices
         time_idx = next((i for i, h in enumerate(headers) if "time" in h.lower()), 0)
@@ -130,7 +130,7 @@ class PhyphoxParser:
             "confidence": 0.9,  # High confidence for CSV data
         }
 
-    def _compute_spectrum(self, signal: np.ndarray, sample_rate: float) -> Dict[str, Any]:
+    def _compute_spectrum(self, signal: np.ndarray, sample_rate: float) -> dict[str, Any]:
         """Compute frequency spectrum via FFT."""
         n = len(signal)
 
@@ -210,7 +210,7 @@ class PhyphoxParser:
 
         return "random"
 
-    def _parse_json(self, data: bytes) -> Dict[str, Any]:
+    def _parse_json(self, data: bytes) -> dict[str, Any]:
         """Parse phyphox JSON export."""
         content = json.loads(data.decode("utf-8"))
 
@@ -221,7 +221,7 @@ class PhyphoxParser:
 
         return {"measurement_type": "unknown", "source": "json_export", "raw_content": content, "confidence": 0.5}
 
-    def _parse_phyphox_json_sets(self, content: Dict) -> Dict[str, Any]:
+    def _parse_phyphox_json_sets(self, content: dict) -> dict[str, Any]:
         """Parse phyphox JSON with sets structure."""
         sets = content.get("sets", [])
 
@@ -243,7 +243,7 @@ class PhyphoxParser:
 
         return {"measurement_type": "unknown", "source": "json_export", "sets_found": len(sets), "confidence": 0.5}
 
-    def _parse_spectrum_csv(self, headers: List[str], rows: List[List[str]]) -> Dict[str, Any]:
+    def _parse_spectrum_csv(self, headers: list[str], rows: list[list[str]]) -> dict[str, Any]:
         """Parse pre-computed spectrum CSV (frequency vs amplitude)."""
         freq_idx = next((i for i, h in enumerate(headers) if "freq" in h.lower()), 0)
         amp_idx = next((i for i, h in enumerate(headers) if "amp" in h.lower() or "mag" in h.lower()), 1)
@@ -279,7 +279,7 @@ class PhyphoxParser:
             "confidence": 0.9,
         }
 
-    def _parse_generic_csv(self, headers: List[str], rows: List[List[str]]) -> Dict[str, Any]:
+    def _parse_generic_csv(self, headers: list[str], rows: list[list[str]]) -> dict[str, Any]:
         """Parse unknown CSV format."""
         return {
             "measurement_type": "unknown",
@@ -292,7 +292,7 @@ class PhyphoxParser:
 
 
 # Singleton instance
-_parser_instance: Optional[PhyphoxParser] = None
+_parser_instance: PhyphoxParser | None = None
 
 
 def get_phyphox_parser() -> PhyphoxParser:

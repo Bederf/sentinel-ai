@@ -284,12 +284,12 @@ class InterlockRule(SafetyRule):
         # For now, return a placeholder result
         # In a real implementation, we would query the trigger device state
         return {
-            "allowed": True,  # Default to allowed for demo
+            "allowed": True,  # Default to allowed for local fallback
             "severity": self.severity.value,
             "message": f"Interlock check: {self.trigger_device_id}.{self.trigger_point} = {self.trigger_value}",
             "rule_id": self.id,
             "rule_name": self.name,
-            "interlock_active": False,  # Assume not active for demo
+            "interlock_active": False,  # Assume not active for local fallback
         }
 
     def to_dict(self) -> Dict[str, Any]:
@@ -339,7 +339,7 @@ class RuntimeLimitRule(SafetyRule):
 
     def check(self, device: Any, value: Any) -> Dict[str, Any]:
         """Check runtime and start frequency limits."""
-        # For demo, assume device has runtime data in metadata
+        # For local fallback, assume device has runtime data in metadata
         runtime = device.metadata.get("runtime_minutes", 0) if hasattr(device, "metadata") else 0
         starts_this_hour = device.metadata.get("starts_this_hour", 0) if hasattr(device, "metadata") else 0
 
@@ -490,7 +490,7 @@ class CustomRule(SafetyRule):
 
     def check(self, device: Any, value: Any) -> Dict[str, Any]:
         """Execute custom validation logic."""
-        # For demo, always allow with warning about custom logic
+        # For local fallback, always allow with warning about custom logic
         return {
             "allowed": True,
             "severity": self.severity.value,

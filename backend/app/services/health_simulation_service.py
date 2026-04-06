@@ -12,10 +12,10 @@ Configuration:
 """
 
 import asyncio
-import random
 import logging
+import random
 from datetime import datetime
-from typing import Dict, Any, List, Optional
+from typing import Any
 
 from app.core.site_resolver import get_primary_site_code
 from app.database.supabase_client import get_supabase_client
@@ -29,9 +29,9 @@ class HealthSimulationService:
     def __init__(self):
         self.client = get_supabase_client()
         self.is_running = False
-        self._task: Optional[asyncio.Task] = None
+        self._task: asyncio.Task | None = None
         self._deferred = False  # True when lifecycle orchestrator is managing health
-        self._deferred_by: Optional[str] = None  # task_id of deferring simulation
+        self._deferred_by: str | None = None  # task_id of deferring simulation
 
         # Configuration
         self.config = {
@@ -218,7 +218,7 @@ class HealthSimulationService:
                     f"THRESHOLD CROSSED: {u['name']} dropped from {u['old_health']:.0f}% to {u['new_health']:.0f}%"
                 )
 
-    def _get_equipment(self) -> List[Dict[str, Any]]:
+    def _get_equipment(self) -> list[dict[str, Any]]:
         """Get equipment from Supabase."""
         try:
             # First get the building UUID from the code
@@ -242,7 +242,7 @@ class HealthSimulationService:
             logger.error(f"Failed to get equipment: {e}")
             return []
 
-    def _calculate_new_health(self, equipment: Dict[str, Any]) -> float:
+    def _calculate_new_health(self, equipment: dict[str, Any]) -> float:
         """Calculate new health score with realistic degradation."""
         current_health = equipment.get("health_score", 85)
         equipment_type = equipment.get("type", "unknown")
@@ -314,7 +314,7 @@ class HealthSimulationService:
         except Exception as e:
             logger.error(f"Failed to update equipment {equipment_id}: {e}")
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """Get simulation status."""
         return {
             "running": self.is_running,
@@ -414,7 +414,7 @@ class HealthSimulationService:
 health_simulation_service = HealthSimulationService()
 
 # Singleton accessor
-_health_sim_instance: Optional[HealthSimulationService] = None
+_health_sim_instance: HealthSimulationService | None = None
 
 
 def get_health_simulation_service() -> HealthSimulationService:
@@ -425,4 +425,4 @@ def get_health_simulation_service() -> HealthSimulationService:
     return _health_sim_instance
 
 
-__all__ = ["health_simulation_service", "HealthSimulationService", "get_health_simulation_service"]
+__all__ = ["HealthSimulationService", "get_health_simulation_service", "health_simulation_service"]

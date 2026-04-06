@@ -1,6 +1,6 @@
 // PointMatchingStep.tsx
 import { useState, useEffect } from 'react';
-import { Badge, Button, Card, Callout, Select, SelectItem, Table, TableBody, TableCell, TableHead, TableRow, Text, Title } from '@tremor/react';
+import { Badge, Button, Card, Callout, Table, TableBody, TableCell, TableHead, TableRow, Text, Title } from '@tremor/react';
 import { CheckCircle, AlertTriangle } from 'lucide-react';
 import { authorizedFetch } from '../lib/api/client';
 
@@ -172,19 +172,26 @@ export function PointMatchingStep({ siteId, columnMappings: _columnMappings, onN
                   </div>
                 </TableCell>
                 <TableCell>
-                  <Select
+                  <select
                     value={match.asset_id || ''}
-                    onChange={(value: any) => handleAssetChange(match.bms_point_id, value as string)}
-                    placeholder="Select asset..."
-                    className="w-48"
+                    onChange={(event) => handleAssetChange(match.bms_point_id, event.target.value)}
+                    className="w-48 rounded-md appearance-none cursor-pointer px-3 py-2 text-sm transition-colors focus:outline-none focus:ring-0"
+                    style={{
+                      background: "var(--color-grafana-bg-secondary)",
+                      border: "1px solid var(--color-grafana-border)",
+                      color: "var(--color-grafana-text-primary)",
+                      boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)",
+                      outline: "none",
+                    }}
+                    aria-label="Select matched asset"
                   >
-                    <SelectItem value="">-- Unmatched --</SelectItem>
+                    <option value="">-- Unmatched --</option>
                     {match.alternatives?.map(alt => (
-                      <SelectItem key={alt.asset_id} value={alt.asset_id}>
+                      <option key={alt.asset_id} value={alt.asset_id}>
                         {alt.asset_tag} ({((alt.confidence ?? 0) * 100).toFixed(0)}%)
-                      </SelectItem>
+                      </option>
                     ))}
-                  </Select>
+                  </select>
                 </TableCell>
                 <TableCell>
                   <Badge
@@ -219,42 +226,69 @@ export function PointMatchingStep({ siteId, columnMappings: _columnMappings, onN
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Poll Frequency
             </label>
-            <Select
+            <select
               value={syncSettings.poll_frequency_minutes.toString()}
-              onChange={(value: any) => setSyncSettings({ ...syncSettings, poll_frequency_minutes: parseInt(value as string) })}
+              onChange={(event) => setSyncSettings({ ...syncSettings, poll_frequency_minutes: parseInt(event.target.value, 10) })}
+              className="w-full rounded-md appearance-none cursor-pointer px-3 py-2 text-sm transition-colors focus:outline-none focus:ring-0"
+              style={{
+                background: "var(--color-grafana-bg-secondary)",
+                border: "1px solid var(--color-grafana-border)",
+                color: "var(--color-grafana-text-primary)",
+                boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)",
+                outline: "none",
+              }}
+              aria-label="Poll frequency"
             >
-              <SelectItem value="1">1 minute</SelectItem>
-              <SelectItem value="5">5 minutes</SelectItem>
-              <SelectItem value="15">15 minutes</SelectItem>
-              <SelectItem value="60">1 hour</SelectItem>
-            </Select>
+              <option value="1">1 minute</option>
+              <option value="5">5 minutes</option>
+              <option value="15">15 minutes</option>
+              <option value="60">1 hour</option>
+            </select>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Store Raw Data
             </label>
-            <Select
+            <select
               value={syncSettings.store_raw_days.toString()}
-              onChange={(value: any) => setSyncSettings({ ...syncSettings, store_raw_days: parseInt(value as string) })}
+              onChange={(event) => setSyncSettings({ ...syncSettings, store_raw_days: parseInt(event.target.value, 10) })}
+              className="w-full rounded-md appearance-none cursor-pointer px-3 py-2 text-sm transition-colors focus:outline-none focus:ring-0"
+              style={{
+                background: "var(--color-grafana-bg-secondary)",
+                border: "1px solid var(--color-grafana-border)",
+                color: "var(--color-grafana-text-primary)",
+                boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)",
+                outline: "none",
+              }}
+              aria-label="Store raw data duration"
             >
-              <SelectItem value="30">30 days</SelectItem>
-              <SelectItem value="90">90 days</SelectItem>
-              <SelectItem value="180">180 days</SelectItem>
-              <SelectItem value="365">1 year</SelectItem>
-            </Select>
+              <option value="30">30 days</option>
+              <option value="90">90 days</option>
+              <option value="180">180 days</option>
+              <option value="365">1 year</option>
+            </select>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Store Aggregated Data
             </label>
-            <Select
+            <select
               value={syncSettings.store_aggregated_years.toString()}
-              onChange={(value: any) => setSyncSettings({ ...syncSettings, store_aggregated_years: parseInt(value as string) })}
+              onChange={(event) => setSyncSettings({ ...syncSettings, store_aggregated_years: parseInt(event.target.value, 10) })}
+              className="w-full rounded-md appearance-none cursor-pointer px-3 py-2 text-sm transition-colors focus:outline-none focus:ring-0"
+              style={{
+                background: "var(--color-grafana-bg-secondary)",
+                border: "1px solid var(--color-grafana-border)",
+                color: "var(--color-grafana-text-primary)",
+                boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)",
+                outline: "none",
+              }}
+              aria-label="Store aggregated data duration"
             >
-              <SelectItem value="1">1 year</SelectItem>
-              <SelectItem value="2">2 years</SelectItem>
-              <SelectItem value="5">5 years</SelectItem>
-            </Select>
+              <option value="1">1 year</option>
+              <option value="2">2 years</option>
+              <option value="5">5 years</option>
+            </select>
           </div>
         </div>
       </Card>

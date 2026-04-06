@@ -35,8 +35,8 @@ EQUIPMENT_FILE = DATA_DIR / "equipment.json"
 ALERTS_FILE = DATA_DIR / "alerts.json"
 SITES_DIR = DATA_DIR / "sites"
 
-# Base URL for document links
-BASE_URL = "https://bms.sentinel.local"
+# Base URL for document links (set from settings at runtime)
+BASE_URL = None
 
 
 def _load_json(filepath: Path) -> Any:
@@ -176,8 +176,8 @@ class SupabaseDataLoader:
                     "id, code, title, document_type, equipment_type, manufacturer, model, "
                     "summary, keywords, failure_modes, source_url"
                 )
-                .eq("is_latest", True)
-                .limit(100)
+                .order("created_at", desc=True)
+                .limit(1000)
                 .execute()
             )
             return response.data or []

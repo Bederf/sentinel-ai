@@ -5,10 +5,10 @@ and building-relative coordinate systems. Used by DXF parser to normalize
 CAD coordinates to standard building geometry.
 """
 
-import numpy as np
-from dataclasses import dataclass
-from typing import Tuple, List
 import logging
+from dataclasses import dataclass
+
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +33,7 @@ class BoundingBox:
         return self.max_y - self.min_y
 
     @property
-    def center(self) -> Tuple[float, float]:
+    def center(self) -> tuple[float, float]:
         """Center point of bounding box."""
         return ((self.min_x + self.max_x) / 2, (self.min_y + self.max_y) / 2)
 
@@ -43,7 +43,7 @@ class BoundingBox:
         return self.width * self.height
 
 
-def calculate_bounding_box(entities: List) -> BoundingBox:
+def calculate_bounding_box(entities: list) -> BoundingBox:
     """
     Calculate bounding box from DXF entities.
 
@@ -109,7 +109,7 @@ def normalize_coordinates(
     bbox: BoundingBox,
     target_width: float = 150.0,
     target_depth: float = 120.0,
-) -> Tuple[float, float]:
+) -> tuple[float, float]:
     """
     Normalize DXF coordinates to building-relative meters.
 
@@ -188,7 +188,7 @@ def infer_floor_from_z_coordinate(z: float, floor_height: float = 3.5) -> str:
         return f"L{level_num}"
 
 
-def euclidean_distance(p1: Tuple[float, float], p2: Tuple[float, float]) -> float:
+def euclidean_distance(p1: tuple[float, float], p2: tuple[float, float]) -> float:
     """
     Calculate Euclidean distance between two 2D points.
 
@@ -209,8 +209,8 @@ def euclidean_distance(p1: Tuple[float, float], p2: Tuple[float, float]) -> floa
 
 
 def cluster_points(
-    points: List[Tuple[float, float]], distance_threshold: float = 5.0
-) -> List[List[Tuple[float, float]]]:
+    points: list[tuple[float, float]], distance_threshold: float = 5.0
+) -> list[list[tuple[float, float]]]:
     """
     Cluster nearby points using simple distance-based grouping.
 
@@ -254,7 +254,7 @@ def cluster_points(
     return clusters
 
 
-def get_cluster_centroid(points: List[Tuple[float, float]]) -> Tuple[float, float]:
+def get_cluster_centroid(points: list[tuple[float, float]]) -> tuple[float, float]:
     """
     Calculate centroid (center) of a cluster of points.
 
@@ -276,7 +276,7 @@ def get_cluster_centroid(points: List[Tuple[float, float]]) -> Tuple[float, floa
     return (float(x_avg), float(y_avg))
 
 
-def angle_from_points(p1: Tuple[float, float], p2: Tuple[float, float]) -> float:
+def angle_from_points(p1: tuple[float, float], p2: tuple[float, float]) -> float:
     """
     Calculate angle in degrees from point p1 to point p2.
 
@@ -306,7 +306,7 @@ def angle_from_points(p1: Tuple[float, float], p2: Tuple[float, float]) -> float
     return float(angle_deg)
 
 
-def point_in_bounding_box(point: Tuple[float, float], bbox: BoundingBox) -> bool:
+def point_in_bounding_box(point: tuple[float, float], bbox: BoundingBox) -> bool:
     """
     Check if a point is inside a bounding box.
 
@@ -328,7 +328,7 @@ def point_in_bounding_box(point: Tuple[float, float], bbox: BoundingBox) -> bool
     return bbox.min_x <= x <= bbox.max_x and bbox.min_y <= y <= bbox.max_y
 
 
-def scale_coordinates(x: float, y: float, scale_factor: float) -> Tuple[float, float]:
+def scale_coordinates(x: float, y: float, scale_factor: float) -> tuple[float, float]:
     """
     Scale coordinates by a factor.
 
@@ -348,7 +348,7 @@ def scale_coordinates(x: float, y: float, scale_factor: float) -> Tuple[float, f
     return (float(x * scale_factor), float(y * scale_factor))
 
 
-def translate_coordinates(x: float, y: float, dx: float, dy: float) -> Tuple[float, float]:
+def translate_coordinates(x: float, y: float, dx: float, dy: float) -> tuple[float, float]:
     """
     Translate (shift) coordinates by an offset.
 
@@ -367,8 +367,8 @@ def translate_coordinates(x: float, y: float, dx: float, dy: float) -> Tuple[flo
 
 
 def rotate_coordinates(
-    x: float, y: float, angle_degrees: float, origin: Tuple[float, float] = (0, 0)
-) -> Tuple[float, float]:
+    x: float, y: float, angle_degrees: float, origin: tuple[float, float] = (0, 0)
+) -> tuple[float, float]:
     """
     Rotate coordinates around an origin point.
 

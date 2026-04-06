@@ -10,7 +10,7 @@ import json
 import logging
 import uuid
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from app.config.settings import settings
 
@@ -22,7 +22,7 @@ class SessionService:
 
     def __init__(self) -> None:
         self._redis = None
-        self._memory: Dict[str, Dict[str, Any]] = {}
+        self._memory: dict[str, dict[str, Any]] = {}
         self._ttl_seconds = settings.jwt_refresh_token_ttl_days * 24 * 60 * 60
 
     def _get_redis(self):
@@ -61,8 +61,8 @@ class SessionService:
     def create_session(
         self,
         user_id: str,
-        ip: Optional[str],
-        user_agent: Optional[str],
+        ip: str | None,
+        user_agent: str | None,
         token_jti: str,
     ) -> str:
         """Create and persist a session entry."""
@@ -95,7 +95,7 @@ class SessionService:
             self._memory[self._session_key(user_id, session_id)] = record
         return session_id
 
-    def _read_session(self, user_id: str, session_id: str) -> Optional[Dict[str, Any]]:
+    def _read_session(self, user_id: str, session_id: str) -> dict[str, Any] | None:
         redis_client = self._get_redis()
         key = self._session_key(user_id, session_id)
         if redis_client:
@@ -110,7 +110,7 @@ class SessionService:
             return None
         return record
 
-    def _write_session(self, user_id: str, session_id: str, data: Dict[str, Any]) -> None:
+    def _write_session(self, user_id: str, session_id: str, data: dict[str, Any]) -> None:
         redis_client = self._get_redis()
         key = self._session_key(user_id, session_id)
         if redis_client:
@@ -118,10 +118,10 @@ class SessionService:
             return
         self._memory[key] = data
 
-    def get_active_sessions(self, user_id: str) -> List[Dict[str, Any]]:
+    def get_active_sessions(self, user_id: str) -> list[dict[str, Any]]:
         """Return active (non-revoked) sessions for user."""
         redis_client = self._get_redis()
-        sessions: List[Dict[str, Any]] = []
+        sessions: list[dict[str, Any]] = []
         if redis_client:
             idx = self._session_index_key(user_id)
             session_ids = list(redis_client.smembers(idx) or [])
@@ -176,7 +176,7 @@ class SessionService:
                 revoked_count += 1
         return revoked_count
 
-    def find_session_by_token_jti(self, user_id: str, token_jti: str) -> Optional[Dict[str, Any]]:
+    def find_session_by_token_jti(self, user_id: str, token_jti: str) -> dict[str, Any] | None:
         """Find a user session by refresh token JTI."""
         sessions = self.get_active_sessions(user_id)
         for session in sessions:

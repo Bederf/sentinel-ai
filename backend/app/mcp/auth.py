@@ -2,10 +2,9 @@
 MCP SSE Authentication Helper.
 
 Provides token-based authentication for MCP SSE endpoints.
-Supports three credential sources (tried in order):
+Supports two credential sources (tried in order):
   1. JWT Bearer token (Authorization header) — real user identity
   2. MCP shared token (query param, X-MCP-Token header, or Bearer fallback)
-  3. Demo mode + localhost bypass — demo AuthContext
 
 Usage:
     from app.mcp.auth import require_mcp_auth
@@ -122,14 +121,13 @@ async def require_mcp_auth(request: Request) -> AuthContext:
     Authentication strategy (tried in order):
       1. Standard JWT auth (gives real user identity)
       2. MCP shared token (gives service-level identity)
-      3. Demo mode + localhost bypass (gives demo identity)
 
     Returns:
         AuthContext on success.
 
     Raises:
         HTTPException 401 on missing/invalid credentials.
-        HTTPException 503 when MCP_AUTH_TOKEN not configured (non-demo).
+        HTTPException 503 when MCP_AUTH_TOKEN not configured.
     """
     source_ip = _extract_ip_address(request)
 
@@ -192,25 +190,6 @@ async def require_mcp_auth(request: Request) -> AuthContext:
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid MCP authentication token",
             )
-
-    # 3. Demo mode + localhost bypass (development environment only)
-    # Use direct TCP client IP to prevent X-Forwarded-For spoofing
-    direct_ip = request.client.host if request.client else "unknown"
-    if (
-        settings.demo_mode
-        and direct_ip in _LOCALHOST_IPS
-        and getattr(settings, "environment", "development") not in ("production", "staging")
-    ):
-        logger.debug("MCP auth via demo mode bypass: ip=%s", source_ip)
-        return AuthContext(
-            user_id="demo-user",
-            role=SentinelRole.OPERATOR,
-            auth_method="demo_mode",
-            source_ip=source_ip,
-            email=None,
-            scopes=["operator:all"],
-            metadata={"auth_type": "demo_mode_bypass"},
-        )
 
     # No valid credentials
     if not settings.mcp_auth_token:

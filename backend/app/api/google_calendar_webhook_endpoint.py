@@ -158,3 +158,26 @@ async def _process_with_error_logging(event_id: str, channel_id: str) -> None:
         svc.handle_webhook_notification({"event_id": event_id, "channelId": channel_id})
     except Exception as exc:
         logger.error("[GoogleCalWebhook] handle_webhook_notification failed for %s: %s", event_id, exc, exc_info=True)
+
+
+@router.get("/token")
+async def get_google_access_token(request: Request) -> dict:
+    """Return a fresh Google OAuth2 access token for n8n to use when calling the Calendar API.
+
+    Secured with the same Sentry API key used by other internal endpoints.
+    """
+    from app.services.google_calendar_service import _refresh_access_token
+
+    api_key = request.headers.get("X-Sentry-API-Key", "")
+    import os
+    expected = os.getenv("SENTRY_BOT_API_KEY", "")
+    if expected and api_key != expected:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    token_data = _refresh_access_token()
+    if not token_data:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=503, detail="Google credentials unavailable")
+
+    return {"access_token": token_data["token"]}

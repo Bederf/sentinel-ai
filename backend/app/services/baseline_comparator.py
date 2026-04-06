@@ -13,7 +13,7 @@ Thresholds are relative to baseline, not absolute values.
 """
 
 import logging
-from typing import Dict, Any, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -37,8 +37,8 @@ class BaselineComparator:
     }
 
     def compare_to_baseline(
-        self, current: Dict[str, Any], baseline: Dict[str, Any], measurement_type: str = "vibration"
-    ) -> Dict[str, Any]:
+        self, current: dict[str, Any], baseline: dict[str, Any], measurement_type: str = "vibration"
+    ) -> dict[str, Any]:
         """
         Compare current reading to baseline.
 
@@ -72,7 +72,7 @@ class BaselineComparator:
 
         return comparison
 
-    def _compare_vibration(self, current: Dict, baseline: Dict) -> Dict:
+    def _compare_vibration(self, current: dict, baseline: dict) -> dict:
         """Compare vibration readings."""
         result = {"deviations": [], "alerts": []}
 
@@ -184,7 +184,7 @@ class BaselineComparator:
 
         return result
 
-    def _compare_audio(self, current: Dict, baseline: Dict) -> Dict:
+    def _compare_audio(self, current: dict, baseline: dict) -> dict:
         """Compare audio readings."""
         result = {"deviations": [], "alerts": []}
 
@@ -245,7 +245,7 @@ class BaselineComparator:
 
         return result
 
-    def generate_trend_report(self, equipment_id: str, recordings: List[Dict], baseline: Dict) -> Dict[str, Any]:
+    def generate_trend_report(self, equipment_id: str, recordings: list[dict], baseline: dict) -> dict[str, Any]:
         """
         Generate trend analysis from multiple readings.
 
@@ -320,7 +320,7 @@ class BaselineComparator:
 
         return {"trend": "stable", "message": "Insufficient RMS data for trend"}
 
-    def calculate_deviation_score(self, comparison: Dict[str, Any]) -> int:
+    def calculate_deviation_score(self, comparison: dict[str, Any]) -> int:
         """
         Calculate a 0-100 score based on deviation from baseline.
 
@@ -352,7 +352,7 @@ class BaselineComparator:
 
 
 # Singleton instance
-_comparator_instance: Optional[BaselineComparator] = None
+_comparator_instance: BaselineComparator | None = None
 
 
 def get_baseline_comparator() -> BaselineComparator:

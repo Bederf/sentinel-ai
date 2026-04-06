@@ -116,7 +116,7 @@ export function EquipmentVerificationWizard({
       for (let testIdx = 0; testIdx < result.tests.length; testIdx++) {
         await new Promise((r) => setTimeout(r, 800)); // Simulate test execution time
 
-        // Randomly decide pass/fail (90% pass rate for demo)
+        // Randomly decide pass/fail (90% pass rate for local fallback mode)
         const testPass = Math.random() > 0.1;
 
         setState((prev) => ({

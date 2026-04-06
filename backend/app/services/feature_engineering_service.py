@@ -14,7 +14,7 @@ Derived features:
 """
 
 import logging
-from typing import Dict, Any, Optional
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -38,9 +38,9 @@ class FeatureEngineeringService:
     SA_CARBON_INTENSITY = 0.35  # kg CO2/kWh
 
     def __init__(self):
-        self._site_cache: Dict[str, Dict[str, Any]] = {}
+        self._site_cache: dict[str, dict[str, Any]] = {}
 
-    def _get_site_metadata(self, site_id: str) -> Dict[str, Any]:
+    def _get_site_metadata(self, site_id: str) -> dict[str, Any]:
         """Load building metadata (sqm, floors, operating hours)."""
         if site_id in self._site_cache:
             return self._site_cache[site_id]
@@ -59,13 +59,13 @@ class FeatureEngineeringService:
         # Fallback defaults
         return {"sqm": 9000, "floors": 5, "operating_hours": {"start": "08:00", "end": "18:00"}}
 
-    async def compute_site_features(self, site_id: str) -> Dict[str, Any]:
+    async def compute_site_features(self, site_id: str) -> dict[str, Any]:
         """Compute all building-level derived features.
 
         Returns dict with: eui, base_load_index, cooling_degree_days,
         setpoint_deviation, efficiency_score, and their components.
         """
-        features: Dict[str, Any] = {}
+        features: dict[str, Any] = {}
         building = self._get_site_metadata(site_id)
         sqm = building.get("sqm", 9000)
 
@@ -115,7 +115,7 @@ class FeatureEngineeringService:
         # Normalise to days (24h)
         return round(cdd_sum / 24.0, 2)
 
-    def compute_efficiency_score(self, features: Dict[str, Any], building: Dict[str, Any]) -> float:
+    def compute_efficiency_score(self, features: dict[str, Any], building: dict[str, Any]) -> float:
         """Compute building efficiency score (0-100).
 
         Components (weighted):
@@ -169,12 +169,12 @@ class FeatureEngineeringService:
 
         return max(0, min(100, score))
 
-    async def _get_daily_telemetry(self, site_id: str) -> Dict[str, Any]:
+    async def _get_daily_telemetry(self, site_id: str) -> dict[str, Any]:
         """Gather daily telemetry for feature computation.
 
         Tries simulation store first, then Supabase sustainability metrics.
         """
-        telemetry: Dict[str, Any] = {}
+        telemetry: dict[str, Any] = {}
 
         # Try simulation store (in-memory data from running simulation)
         try:
@@ -209,8 +209,8 @@ class FeatureEngineeringService:
         # Try Supabase sustainability metrics as fallback
         if not telemetry.get("total_daily_kwh"):
             try:
-                from pathlib import Path
                 import json
+                from pathlib import Path
 
                 metrics_path = (
                     Path(__file__).parent.parent / "data" / "sustainability" / "daily_metrics" / f"{site_id}.json"

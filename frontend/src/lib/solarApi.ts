@@ -46,7 +46,7 @@ async function fetchJson<T>(endpoint: string): Promise<T> {
     }
     return res.json();
   } catch (err) {
-    // If API fails, log and re-throw (components will show demo data)
+    // If API fails, log and re-throw (components will show seeded data)
     console.debug(`Solar API failed for ${endpoint}:`, err);
     throw err;
   }

@@ -1,4 +1,22 @@
 /* ═══════════════════════════════════════════════════════════════ */
+/* GRAFANA CSS VARIABLE FALLBACKS — Legacy component support     */
+/* Maps Grafana-style variables to SENTINEL theme variables       */
+/* ═══════════════════════════════════════════════════════════════ */
+
+:root {
+  --color-grafana-text-primary: var(--color-sentinel-text-primary, #e2e8f0);
+  --color-grafana-text-secondary: var(--color-sentinel-text-secondary, #64748b);
+  --color-grafana-text-disabled: var(--color-sentinel-text-disabled, #475569);
+  --color-grafana-bg-canvas: var(--color-sentinel-bg-canvas, #0a0f1a);
+  --color-grafana-bg-primary: var(--color-sentinel-bg-primary, #0f1422);
+  --color-grafana-bg-secondary: var(--color-sentinel-bg-secondary, #111827);
+  --color-grafana-bg-panel: var(--color-sentinel-bg-panel, #111827);
+  --color-grafana-border: var(--color-sentinel-border, #1e2d42);
+  --color-grafana-border-strong: var(--color-sentinel-border-strong, #2a3a55);
+  --color-grafana-amber: var(--color-sentinel-amber, #00d2ff);
+}
+
+/* ═══════════════════════════════════════════════════════════════ */
 /* MATRIX THEME — Cyberpunk Terminal with Neon Green HUD          */
 /* Applied via .matrix-theme class on <html> or data-theme="matrix" */
 /* ═══════════════════════════════════════════════════════════════ */

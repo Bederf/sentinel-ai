@@ -17,7 +17,6 @@ Currency: South African Rand (ZAR)
 import logging
 import uuid
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -74,7 +73,7 @@ class EscalationRecord(BaseModel):
 # Default Failure Costs (ZAR) by Equipment Type
 # ============================================================================
 
-DEFAULT_FAILURE_COSTS: Dict[str, float] = {
+DEFAULT_FAILURE_COSTS: dict[str, float] = {
     "CHILLER": 50_000.0,
     "AHU": 30_000.0,
     "FCU": 15_000.0,
@@ -112,9 +111,9 @@ class FollowupSchedulerService:
     """
 
     def __init__(self):
-        self._scheduled_followups: List[FollowupTask] = []
-        self._cost_analyses: Dict[str, CostBenefitAnalysis] = {}  # work_order_id -> analysis
-        self._escalations: Dict[str, EscalationRecord] = {}  # equipment_id -> latest escalation
+        self._scheduled_followups: list[FollowupTask] = []
+        self._cost_analyses: dict[str, CostBenefitAnalysis] = {}  # work_order_id -> analysis
+        self._escalations: dict[str, EscalationRecord] = {}  # equipment_id -> latest escalation
         logger.info("FollowupSchedulerService initialized")
 
     def schedule_followup(
@@ -239,7 +238,7 @@ class FollowupSchedulerService:
         )
         return analysis
 
-    def check_escalation(self, equipment_id: str) -> Optional[EscalationRecord]:
+    def check_escalation(self, equipment_id: str) -> EscalationRecord | None:
         """
         Check escalation status for equipment based on repair history.
 
@@ -262,8 +261,8 @@ class FollowupSchedulerService:
         return self._create_escalation(equipment_id, failed_count)
 
     def get_pending_followups(
-        self, equipment_id: Optional[str] = None, status: Optional[str] = None
-    ) -> List[FollowupTask]:
+        self, equipment_id: str | None = None, status: str | None = None
+    ) -> list[FollowupTask]:
         """
         Get follow-up tasks, optionally filtered.
 
@@ -284,7 +283,7 @@ class FollowupSchedulerService:
 
         return sorted(results, key=lambda f: f.scheduled_date)
 
-    def get_cost_analyses(self, equipment_id: Optional[str] = None) -> List[CostBenefitAnalysis]:
+    def get_cost_analyses(self, equipment_id: str | None = None) -> list[CostBenefitAnalysis]:
         """
         Get cost-benefit analyses, optionally filtered by equipment.
 
@@ -360,7 +359,7 @@ class FollowupSchedulerService:
 # Singleton Instance
 # ============================================================================
 
-_followup_scheduler: Optional[FollowupSchedulerService] = None
+_followup_scheduler: FollowupSchedulerService | None = None
 
 
 def get_followup_scheduler() -> FollowupSchedulerService:

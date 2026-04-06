@@ -39,11 +39,11 @@ class GlobalModelTrainer:
     def __init__(self):
         self._training_history: List[Dict[str, Any]] = []
         self._global_models: Dict[str, Dict[str, Any]] = {}
-        self._initialize_demo_models()
+        self._initialize_seed_models()
 
-    def _initialize_demo_models(self) -> None:
-        """Initialize demo global models for testing."""
-        demo_models = [
+    def _initialize_seed_models(self) -> None:
+        """Initialize seed global models for testing."""
+        seed_models = [
             {
                 "model_id": "global-lstm-chiller-001",
                 "model_type": "lstm",
@@ -134,7 +134,7 @@ class GlobalModelTrainer:
             },
         ]
 
-        for model in demo_models:
+        for model in seed_models:
             self._global_models[model["model_id"]] = model
 
     def list_global_models(

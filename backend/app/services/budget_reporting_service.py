@@ -6,7 +6,7 @@ Phase 49-10: Cost reporting and export.
 
 from __future__ import annotations
 
-from typing import Dict, Any, Optional
+from typing import Any
 
 from app.database.repositories.budget_repository import BudgetRepository
 from app.services.budget_variance_service import get_budget_variance_service
@@ -15,13 +15,13 @@ from app.services.budget_variance_service import get_budget_variance_service
 class BudgetReportingService:
     """Build budget vs actual reports with monthly breakdowns."""
 
-    def __init__(self, budget_repo: Optional[BudgetRepository] = None):
+    def __init__(self, budget_repo: BudgetRepository | None = None):
         self.budget_repo = budget_repo or BudgetRepository()
 
-    def build_report(self, contract_id: str, year: int, month: Optional[int] = None) -> Dict[str, Any]:
+    def build_report(self, contract_id: str, year: int, month: int | None = None) -> dict[str, Any]:
         budgets = self.budget_repo.get_by_contract(contract_id, year=year)
         monthly = []
-        equipment_type_totals: Dict[str, Dict[str, float]] = {}
+        equipment_type_totals: dict[str, dict[str, float]] = {}
 
         for month in range(1, 13):
             entries = [b for b in budgets if b.get("budget_month") == month and b.get("equipment_type") is None]
@@ -113,7 +113,7 @@ class BudgetReportingService:
         }
 
 
-_service: Optional[BudgetReportingService] = None
+_service: BudgetReportingService | None = None
 
 
 def get_budget_reporting_service() -> BudgetReportingService:

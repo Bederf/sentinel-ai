@@ -20,7 +20,7 @@ class EnergyConsumptionRepository:
         """Get energy consumption history for a building.
 
         Args:
-            site_id: Building code (e.g., "site-002", "demo-office")
+            site_id: Building code (e.g., "site-002", "local-office")
             days: Number of days to retrieve (default 30, max 365)
 
         Returns:

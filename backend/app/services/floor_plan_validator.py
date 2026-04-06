@@ -7,7 +7,7 @@ Checks coordinates, overlaps, equipment types, zone coverage, and floor assignme
 import logging
 import math
 from dataclasses import dataclass, field
-from typing import Any, Dict, List
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -88,7 +88,7 @@ class FloorPlanValidator:
     - Zone coverage (at least 50% of floor area has assigned zones)
     """
 
-    def validate_extraction(self, extraction_result: Dict[str, Any]) -> ValidationReport:
+    def validate_extraction(self, extraction_result: dict[str, Any]) -> ValidationReport:
         """Validate a complete extraction result.
 
         Args:
@@ -128,7 +128,7 @@ class FloorPlanValidator:
 
         return report
 
-    def _check_zero_coordinates(self, equipment: List[Dict], report: ValidationReport) -> None:
+    def _check_zero_coordinates(self, equipment: list[dict], report: ValidationReport) -> None:
         """Reject equipment at exact (0, 0) — likely extraction failure."""
         for eq in equipment:
             x = eq.get("x", 0)
@@ -137,7 +137,7 @@ class FloorPlanValidator:
                 name = eq.get("name", "unknown")
                 report.errors.append(f"Equipment '{name}' has zero coordinates (0, 0) — likely extraction failure")
 
-    def _check_equipment_overlaps(self, equipment: List[Dict], report: ValidationReport) -> None:
+    def _check_equipment_overlaps(self, equipment: list[dict], report: ValidationReport) -> None:
         """Check that no two equipment are closer than MIN_EQUIPMENT_DISTANCE."""
         overlap_count = 0
         for i in range(len(equipment)):
@@ -166,8 +166,8 @@ class FloorPlanValidator:
 
     def _check_bounding_box(
         self,
-        equipment: List[Dict],
-        floors: List[Dict],
+        equipment: list[dict],
+        floors: list[dict],
         report: ValidationReport,
     ) -> None:
         """Check all equipment are within building bounding box."""
@@ -190,8 +190,8 @@ class FloorPlanValidator:
 
     def _check_floor_coverage(
         self,
-        equipment: List[Dict],
-        floors: List[Dict],
+        equipment: list[dict],
+        floors: list[dict],
         report: ValidationReport,
     ) -> None:
         """Warn if any defined floor has no equipment."""
@@ -205,7 +205,7 @@ class FloorPlanValidator:
             if level and level not in equipment_floors:
                 report.warnings.append(f"Floor '{level}' has no equipment — may indicate extraction gap")
 
-    def _check_equipment_types(self, equipment: List[Dict], report: ValidationReport) -> None:
+    def _check_equipment_types(self, equipment: list[dict], report: ValidationReport) -> None:
         """Check all equipment types are valid SENTINEL types."""
         for eq in equipment:
             eq_type = eq.get("equipment_type", "").upper()
@@ -217,9 +217,9 @@ class FloorPlanValidator:
 
     def _check_zone_coverage(
         self,
-        equipment: List[Dict],
-        zones: List[Dict],
-        floors: List[Dict],
+        equipment: list[dict],
+        zones: list[dict],
+        floors: list[dict],
         report: ValidationReport,
     ) -> None:
         """Check that at least 50% of floors have zone assignments."""

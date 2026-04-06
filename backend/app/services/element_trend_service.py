@@ -12,13 +12,12 @@ Uses numpy-free manual least squares for degradation rate calculation.
 
 import logging
 from datetime import datetime, timedelta
-from typing import List, Optional, Dict
 
 from app.models.condition import (
-    ElementTrendPoint,
-    ElementTrend,
-    EquipmentTrendSummary,
     DegradationRate,
+    ElementTrend,
+    ElementTrendPoint,
+    EquipmentTrendSummary,
     TrendDirection,
     TrendSource,
 )
@@ -66,7 +65,7 @@ class ElementTrendService:
 
     async def get_element_history(
         self, equipment_id: str, element_name: str, days: int = 90
-    ) -> List[ElementTrendPoint]:
+    ) -> list[ElementTrendPoint]:
         """
         Get historical measurement data for an equipment element.
 
@@ -82,7 +81,7 @@ class ElementTrendService:
         Returns:
             List of ElementTrendPoint sorted by timestamp, deduplicated
         """
-        points: List[ElementTrendPoint] = []
+        points: list[ElementTrendPoint] = []
         cutoff = datetime.now() - timedelta(days=days)
 
         # 1. Query inspection measurements
@@ -152,7 +151,7 @@ class ElementTrendService:
 
         return points
 
-    def _deduplicate_points(self, points: List[ElementTrendPoint]) -> List[ElementTrendPoint]:
+    def _deduplicate_points(self, points: list[ElementTrendPoint]) -> list[ElementTrendPoint]:
         """Remove duplicate data points (same timestamp to the minute)."""
         seen = set()
         unique = []
@@ -168,7 +167,7 @@ class ElementTrendService:
     # Degradation Rate Calculation
     # ========================================================================
 
-    def calculate_degradation_rate(self, data_points: List[ElementTrendPoint]) -> DegradationRate:
+    def calculate_degradation_rate(self, data_points: list[ElementTrendPoint]) -> DegradationRate:
         """
         Calculate degradation rate using manual linear regression.
 
@@ -325,7 +324,7 @@ class ElementTrendService:
             )
 
         # 2. Calculate trend for each element
-        element_trends: List[ElementTrend] = []
+        element_trends: list[ElementTrend] = []
         for element_name, measurement_type in element_names.items():
             points = await self.get_element_history(equipment_id, element_name, days)
 
@@ -384,7 +383,7 @@ class ElementTrendService:
             message=message,
         )
 
-    async def _discover_elements(self, equipment_id: str, days: int) -> Dict[str, str]:
+    async def _discover_elements(self, equipment_id: str, days: int) -> dict[str, str]:
         """
         Discover unique element names and their measurement types
         from inspection history.
@@ -392,7 +391,7 @@ class ElementTrendService:
         Returns:
             Dict mapping element_name -> measurement_type
         """
-        elements: Dict[str, str] = {}
+        elements: dict[str, str] = {}
 
         try:
             measurements = await self.inspection_repo.get_measurements_by_equipment(
@@ -411,7 +410,7 @@ class ElementTrendService:
 
         return elements
 
-    def _find_worst_element(self, trends: List[ElementTrend]) -> Optional[str]:
+    def _find_worst_element(self, trends: list[ElementTrend]) -> str | None:
         """Find the element with the worst degradation rate."""
         worst = None
         worst_rate = 0.0
@@ -426,7 +425,7 @@ class ElementTrendService:
 
         return worst
 
-    def _compute_overall_direction(self, trends: List[ElementTrend]) -> TrendDirection:
+    def _compute_overall_direction(self, trends: list[ElementTrend]) -> TrendDirection:
         """
         Compute overall equipment trend from element trends.
 
@@ -455,7 +454,7 @@ class ElementTrendService:
 
         return TrendDirection.STABLE
 
-    def _compute_condition_score(self, trends: List[ElementTrend]) -> float:
+    def _compute_condition_score(self, trends: list[ElementTrend]) -> float:
         """
         Compute overall condition score (0-100) from element trends.
 
@@ -481,7 +480,7 @@ class ElementTrendService:
         return round(sum(scores) / len(scores), 1)
 
     def _build_summary_message(
-        self, trends: List[ElementTrend], degrading_count: int, worst_element: Optional[str]
+        self, trends: list[ElementTrend], degrading_count: int, worst_element: str | None
     ) -> str:
         """Build human-readable summary message."""
         total = len(trends)
@@ -506,7 +505,7 @@ class ElementTrendService:
 # Singleton Instance
 # ============================================================================
 
-_trend_service: Optional[ElementTrendService] = None
+_trend_service: ElementTrendService | None = None
 
 
 def get_element_trend_service() -> ElementTrendService:

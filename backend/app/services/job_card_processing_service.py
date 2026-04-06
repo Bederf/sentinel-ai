@@ -17,14 +17,14 @@ import json
 import logging
 import re
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from app.services.model_gateway import model_gateway
 
 logger = logging.getLogger(__name__)
 
 # Document type templates — extraction prompts
-EXTRACTION_TEMPLATES: Dict[str, Dict[str, Any]] = {
+EXTRACTION_TEMPLATES: dict[str, dict[str, Any]] = {
     "job_card": {
         "fields": [
             "job_number",
@@ -119,12 +119,12 @@ class ProcessingResult:
 
     status: str  # completed, needs_review, failed
     document_type: str
-    extracted_data: Dict[str, Any] = field(default_factory=dict)
+    extracted_data: dict[str, Any] = field(default_factory=dict)
     extracted_text: str = ""
     confidence: float = 0.0
-    preprocessing_metadata: Dict[str, Any] = field(default_factory=dict)
-    equipment_codes: List[str] = field(default_factory=list)
-    error: Optional[str] = None
+    preprocessing_metadata: dict[str, Any] = field(default_factory=dict)
+    equipment_codes: list[str] = field(default_factory=list)
+    error: str | None = None
 
 
 class JobCardProcessingService:
@@ -139,8 +139,8 @@ class JobCardProcessingService:
         media_type: str,
         site_id: str,
         document_type: str = "auto",
-        work_order_id: Optional[str] = None,
-        equipment_id: Optional[str] = None,
+        work_order_id: str | None = None,
+        equipment_id: str | None = None,
     ) -> ProcessingResult:
         """Process a document image through the full pipeline.
 
@@ -239,6 +239,7 @@ class JobCardProcessingService:
                     }
                 ],
                 max_tokens=100,
+                source="job_card_doc_classification",
             )
             result = result_text.strip().lower()
             # Normalize response
@@ -255,8 +256,8 @@ class JobCardProcessingService:
         image_data: bytes,
         media_type: str,
         document_type: str,
-        equipment_context: Optional[str] = None,
-    ) -> tuple[Dict[str, Any], float]:
+        equipment_context: str | None = None,
+    ) -> tuple[dict[str, Any], float]:
         """Extract structured fields using Claude Vision with type-specific template."""
         template = EXTRACTION_TEMPLATES.get(document_type, EXTRACTION_TEMPLATES["job_card"])
         prompt = template["prompt"]
@@ -285,6 +286,7 @@ class JobCardProcessingService:
                     }
                 ],
                 max_tokens=4000,
+                source="job_card_field_extraction",
             )
             json_match = re.search(r"\{[\s\S]*\}", response_text)
             if json_match:
@@ -302,7 +304,7 @@ class JobCardProcessingService:
             logger.error("Field extraction failed: %s", e)
             return {}, 0.0
 
-    def _flatten_to_text(self, extracted_data: Dict[str, Any], document_type: str) -> str:
+    def _flatten_to_text(self, extracted_data: dict[str, Any], document_type: str) -> str:
         """Convert structured extracted data to readable prose for RAG embedding."""
         parts = []
 
@@ -372,7 +374,7 @@ class JobCardProcessingService:
 
 
 # Singleton
-_service: Optional[JobCardProcessingService] = None
+_service: JobCardProcessingService | None = None
 
 
 def get_job_card_service() -> JobCardProcessingService:

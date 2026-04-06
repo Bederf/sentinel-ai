@@ -21,7 +21,7 @@ Services must NOT contain hardcoded model strings.
 from __future__ import annotations
 
 import logging
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
 
 from app.config import settings as _settings_module
 from app.config.routing_profiles import VALID_TASK_CLASSES, get_profile
@@ -68,6 +68,7 @@ class ModelGateway:
         max_tokens: int = 1536,
         stream: bool = False,
         tools: list | None = None,
+        source: str = "gateway",
     ) -> str | AsyncGenerator:
         """
         Route an LLM call based on task_class and active profile.
@@ -95,6 +96,7 @@ class ModelGateway:
                 max_tokens=max_tokens,
                 stream=stream,
                 tools=tools,
+                source=source,
             )
         elif mode == "cloud":
             return await self._call_cloud(
@@ -104,6 +106,7 @@ class ModelGateway:
                 system=system,
                 max_tokens=max_tokens,
                 stream=stream,
+                source=source,
             )
         elif mode == "local":
             return await self._call_local(
@@ -113,6 +116,7 @@ class ModelGateway:
                 system=system,
                 max_tokens=max_tokens,
                 stream=stream,
+                source=source,
             )
         else:
             raise ValueError(f"Unknown execution mode '{mode}'")
@@ -126,6 +130,7 @@ class ModelGateway:
         max_tokens: int,
         stream: bool,
         tools: list | None,
+        source: str,
     ) -> str | AsyncGenerator:
         """
         api mode: direct provider API.
@@ -143,10 +148,12 @@ class ModelGateway:
                     messages=messages,
                     system_prompt=system or "",
                     model_override=model,
+                    source=source,
                 )
             else:
                 # Non-streaming: call Anthropic SDK directly (gateway is the only importer)
                 from anthropic import Anthropic
+
                 from app.config.settings import settings
                 from app.services.ai_usage_tracker import usage_tracker
 
@@ -183,7 +190,7 @@ class ModelGateway:
                         model=model,
                         input_tokens=getattr(u, "input_tokens", 0),
                         output_tokens=getattr(u, "output_tokens", 0),
-                        source="gateway",
+                        source=source,
                         cache_read_tokens=getattr(u, "cache_read_input_tokens", 0),
                         cache_creation_tokens=getattr(u, "cache_creation_input_tokens", 0),
                     )
@@ -204,10 +211,12 @@ class ModelGateway:
                 return openai_service.stream_response(
                     messages=messages,
                     include_site_context=False,
+                    source=source,
                 )
             else:
                 # Non-streaming OpenAI call via httpx (gateway is the provider boundary)
                 import httpx
+
                 from app.config.settings import settings
                 from app.services.ai_usage_tracker import usage_tracker
 
@@ -238,7 +247,7 @@ class ModelGateway:
                         model=model,
                         input_tokens=usage.get("prompt_tokens", 0),
                         output_tokens=usage.get("completion_tokens", 0),
-                        source="gateway",
+                        source=source,
                     )
                 except Exception:
                     pass
@@ -247,11 +256,35 @@ class ModelGateway:
                 if not choices:
                     return ""
                 return choices[0].get("message", {}).get("content", "")
+
+        elif provider == "minimax":
+            from app.services.minimax_service import minimax_service
+
+            if stream:
+                return minimax_service.stream_response(
+                    messages=messages,
+                    system_prompt=system,
+                    source=source,
+                )
+            else:
+                return await minimax_service.non_stream_response(
+                    messages=messages,
+                    system_prompt=system,
+                    source=source,
+                )
+
         else:
             raise ValueError(f"api mode: unknown provider '{provider}'")
 
     async def _call_cloud(
-        self, provider: str, model: str, messages: list[dict], system: str | None, max_tokens: int, stream: bool
+        self,
+        provider: str,
+        model: str,
+        messages: list[dict],
+        system: str | None,
+        max_tokens: int,
+        stream: bool,
+        source: str,
     ) -> str | AsyncGenerator:
         """
         cloud mode: externally hosted models through an abstraction layer.
@@ -287,7 +320,14 @@ class ModelGateway:
             raise ValueError(f"cloud mode: unknown provider '{provider}'")
 
     async def _call_local(
-        self, provider: str, model: str, messages: list[dict], system: str | None, max_tokens: int, stream: bool
+        self,
+        provider: str,
+        model: str,
+        messages: list[dict],
+        system: str | None,
+        max_tokens: int,
+        stream: bool,
+        source: str,
     ) -> str | AsyncGenerator:
         """
         local mode: local-only inference. No external calls permitted.

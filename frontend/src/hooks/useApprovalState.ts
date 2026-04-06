@@ -25,6 +25,7 @@ import { authorizedFetch } from '@/lib/api/client';
  */
 export function useApprovalState(siteId: string, enabled: boolean = true) {
   const queryClient = useQueryClient();
+  const recommendationsEnabled = enabled && !!siteId && siteId !== 'site-001';
 
   // Fetch pending recommendations
   const recommendationsQuery = useQuery({
@@ -32,14 +33,16 @@ export function useApprovalState(siteId: string, enabled: boolean = true) {
     queryFn: async () => {
       // Placeholder: In real implementation, call API to fetch pending recommendations
       // For now, return empty array (tests will mock this)
-      const response = await authorizedFetch(`/api/recommendations/${siteId}?status=pending`);
+      // Backend route: GET /modules/site/{site_id}/recommendations?status=pending
+      const response = await authorizedFetch(`/modules/site/${siteId}/recommendations?status=pending`);
       if (!response.ok) throw new Error('Failed to fetch recommendations');
       const data = await response.json();
-      return data.recommendations || [];
+      // Backend returns a list directly, not wrapped in {recommendations: [...]}
+      return Array.isArray(data) ? data : (data.recommendations || []);
     },
     staleTime: 30000, // 30 seconds (recommendations change frequently)
     gcTime: 5 * 60 * 1000, // 5 minutes (formerly cacheTime)
-    enabled: enabled && !!siteId,
+    enabled: recommendationsEnabled,
     retry: false,
   });
 

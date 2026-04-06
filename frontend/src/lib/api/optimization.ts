@@ -46,8 +46,10 @@ export const optimizationApi = {
 
   // Recommendations
   getPending: (siteId: string, limit: number = 10) =>
-    fetchApi<{ recommendations: Recommendation[] }>(
-      `/api/recommendations/${siteId}?limit=${limit}`
+    // Backend route: GET /modules/site/{site_id}/recommendations?limit=N
+    // Returns a list directly (not wrapped in {recommendations: [...]})
+    fetchApi<Recommendation[]>(
+      `/modules/site/${siteId}/recommendations?limit=${limit}`
     ),
 
   getHistory: (

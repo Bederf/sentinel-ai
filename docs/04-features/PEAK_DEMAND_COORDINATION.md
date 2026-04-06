@@ -1,3 +1,18 @@
+---
+title: "Peak Demand Management & Multi-Module Coordination"
+type: "spec"
+status: "draft"
+version: "1.0.0"
+created: "2026-03-31"
+updated: "2026-03-31"
+tags: ["sentinel", "documentation"]
+related: []
+domain: "bms"
+audience: "all"
+complexity: "intermediate"
+estimated_read_time: 10
+---
+
 # Peak Demand Management & Multi-Module Coordination
 
 **Purpose:** Coordinate multi-module peak demand shaving across Solar, HVAC, Energy, and Load Deferral modules. Prevents NMD (Network Moment Demand) breaches while optimizing cost savings through TOU arbitrage and demand response.

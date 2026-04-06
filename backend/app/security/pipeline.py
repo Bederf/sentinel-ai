@@ -95,7 +95,7 @@ def _get_user_role_level(auth_ctx: AuthContext) -> int:
 
 
 async def _get_auth_context(request: Request) -> AuthContext:
-    """Get or create auth context from request, handling demo mode.
+    """Get or create auth context from request, handling local profile mode.
 
     Centralizes the auth extraction logic so both require_role and
     require_site_access share the same authentication flow.
@@ -430,7 +430,7 @@ def validate_llm_routes(app: FastAPI) -> None:
 
     In production (``settings.environment == "production"``): raises
     ``RuntimeError`` for any route missing required dependencies.
-    In dev/demo: logs a CRITICAL warning.
+    In local/dev: logs a CRITICAL warning.
 
     Call this during ``app.on_event("startup")`` or in a lifespan handler.
     """

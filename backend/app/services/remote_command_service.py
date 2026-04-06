@@ -15,13 +15,13 @@ import logging
 import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
-from app.models.remote_ops import AuthorizationLevel, COMMAND_AUTHORIZATION
+from app.models.audit_log import AuditResultType
+from app.models.remote_ops import COMMAND_AUTHORIZATION, AuthorizationLevel
+from app.services.audit_logger import AuditLogger
 from app.services.auth_service import get_authorization_service
 from app.services.device_abstraction import device_manager
-from app.services.audit_logger import AuditLogger
-from app.models.audit_log import AuditResultType
 
 logger = logging.getLogger(__name__)
 
@@ -49,16 +49,16 @@ class RemoteCommandService:
     def __init__(self):
         if self._initialized:
             return
-        self._active_overrides: Dict[str, Dict[str, Any]] = {}
-        self._command_history: List[Dict[str, Any]] = []
-        self._rate_limit_counters: Dict[str, List[datetime]] = {}
+        self._active_overrides: dict[str, dict[str, Any]] = {}
+        self._command_history: list[dict[str, Any]] = []
+        self._rate_limit_counters: dict[str, list[datetime]] = {}
         self._audit_logger = AuditLogger()
         self._auth_service = get_authorization_service()
         self._config = self._load_config()
         self._initialized = True
         logger.info("RemoteCommandService initialized (safety delegated to SafetyEngine)")
 
-    def _load_config(self) -> Dict[str, Any]:
+    def _load_config(self) -> dict[str, Any]:
         """Load operational config from remote_ops_config.json."""
         try:
             if CONFIG_FILE.exists():
@@ -69,7 +69,7 @@ class RemoteCommandService:
         return {}
 
     @property
-    def _override_durations(self) -> Dict[str, Any]:
+    def _override_durations(self) -> dict[str, Any]:
         """Get override duration settings from config."""
         defaults = {
             "setpoint_override_hours": 4,
@@ -80,7 +80,7 @@ class RemoteCommandService:
         return {**defaults, **configured}
 
     @property
-    def _rate_limit_config(self) -> Dict[str, int]:
+    def _rate_limit_config(self) -> dict[str, int]:
         """Get rate limit settings from config."""
         rl = self._config.get("rate_limit", {})
         return {
@@ -98,10 +98,10 @@ class RemoteCommandService:
         user_role: str,
         device_id: str,
         command_type: str,
-        point: Optional[str] = None,
-        value: Optional[Any] = None,
+        point: str | None = None,
+        value: Any | None = None,
         reason: str = "",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Execute a remote command with authorization and safety validation.
 
         Steps:
@@ -119,7 +119,7 @@ class RemoteCommandService:
             expires_at, rollback_available, and safety_warnings.
         """
         command_id = str(uuid.uuid4())
-        safety_warnings: List[str] = []
+        safety_warnings: list[str] = []
 
         # 1. Authorization check
         required_level = COMMAND_AUTHORIZATION.get(command_type, AuthorizationLevel.ENGINEER)
@@ -424,7 +424,7 @@ class RemoteCommandService:
         logger.info(f"Override {command_id} scheduled: {device_id}/{point} reverts at {expires_at.isoformat()}")
         return expires_at
 
-    async def check_expired_overrides(self) -> List[Dict[str, Any]]:
+    async def check_expired_overrides(self) -> list[dict[str, Any]]:
         """Check and revert expired overrides.
 
         Called periodically (e.g., every minute) to revert overrides
@@ -434,8 +434,8 @@ class RemoteCommandService:
             List of override dicts that were reverted.
         """
         now = datetime.now()
-        reverted: List[Dict[str, Any]] = []
-        expired_ids: List[str] = []
+        reverted: list[dict[str, Any]] = []
+        expired_ids: list[str] = []
 
         for cmd_id, override in self._active_overrides.items():
             expires_at = datetime.fromisoformat(override["expires_at"])
@@ -484,7 +484,7 @@ class RemoteCommandService:
 
         return reverted
 
-    async def rollback_command(self, command_id: str, user_id: str, user_role: str) -> Dict[str, Any]:
+    async def rollback_command(self, command_id: str, user_id: str, user_role: str) -> dict[str, Any]:
         """Manually revert a command to its pre-command state.
 
         Args:
@@ -582,7 +582,7 @@ class RemoteCommandService:
                 "error": f"Rollback failed: {e}",
             }
 
-    def get_active_overrides(self, site_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_active_overrides(self, site_id: str | None = None) -> list[dict[str, Any]]:
         """List active overrides, optionally filtered by site_id.
 
         Args:
@@ -606,10 +606,10 @@ class RemoteCommandService:
 
     def get_command_history(
         self,
-        user_id: Optional[str] = None,
-        device_id: Optional[str] = None,
+        user_id: str | None = None,
+        device_id: str | None = None,
         limit: int = 20,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get recent command history with optional filters.
 
         Args:
@@ -637,7 +637,7 @@ class RemoteCommandService:
         command_type: str,
         user_role: str,
         device_id: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Check command-specific authorization requirements.
 
         These are authorization checks (role-based), not safety guardrails.
@@ -647,7 +647,7 @@ class RemoteCommandService:
         Returns:
             Dict with allowed (bool), error (str), warnings (list).
         """
-        warnings: List[str] = []
+        warnings: list[str] = []
 
         # Fire panel reset requires ENGINEER and gets ALARM-level audit
         if command_type == "fire_panel_reset":
@@ -676,7 +676,7 @@ class RemoteCommandService:
 
         return {"allowed": True, "error": None, "warnings": warnings}
 
-    def _check_rate_limit(self, user_id: str) -> Dict[str, Any]:
+    def _check_rate_limit(self, user_id: str) -> dict[str, Any]:
         """Check in-memory rate limiting for a user.
 
         Returns:
@@ -715,7 +715,7 @@ class RemoteCommandService:
 
         return {"blocked": False, "message": "OK", "warning": warning}
 
-    async def _execute_status_check(self, device_id: str) -> Dict[str, Any]:
+    async def _execute_status_check(self, device_id: str) -> dict[str, Any]:
         """Execute a read-only status check on a device."""
         device = await device_manager.get_device(device_id)
         if not device:
@@ -747,7 +747,7 @@ class RemoteCommandService:
             "points": points_data,
         }
 
-    async def _execute_fault_reset(self, device_id: str, user_id: str, reason: str) -> Dict[str, Any]:
+    async def _execute_fault_reset(self, device_id: str, user_id: str, reason: str) -> dict[str, Any]:
         """Execute a fault reset on a device/equipment.
 
         Performs three actions:
@@ -866,13 +866,13 @@ class RemoteCommandService:
         user_role: str,
         device_id: str,
         command_type: str,
-        point: Optional[str],
-        value: Optional[Any],
+        point: str | None,
+        value: Any | None,
         reason: str,
         success: bool,
-        error: Optional[str] = None,
-        previous_value: Optional[Any] = None,
-        expires_at: Optional[datetime] = None,
+        error: str | None = None,
+        previous_value: Any | None = None,
+        expires_at: datetime | None = None,
     ) -> None:
         """Record command in in-memory history."""
         self._command_history.append(

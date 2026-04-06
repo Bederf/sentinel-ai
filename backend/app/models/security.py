@@ -11,7 +11,7 @@ Provides data structures for:
 from typing import Optional, List, Dict, Any
 from enum import Enum
 from datetime import datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 import uuid
 
 
@@ -42,6 +42,8 @@ class AccessStatus(str, Enum):
 class AccessEvent(BaseModel):
     """Single access control event (person entering/exiting)."""
 
+    model_config = ConfigDict(use_enum_values=True)
+
     event_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     timestamp: datetime
     access_point_id: str  # Door/reader ID
@@ -51,9 +53,6 @@ class AccessEvent(BaseModel):
     access_type: AccessType  # badge/code/override/biometric
     location: str  # Building zone or door name
     duration_seconds: Optional[int] = None  # Time held door open
-
-    class Config:
-        use_enum_values = True
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
@@ -91,6 +90,8 @@ class PointStatus(str, Enum):
 class AccessPoint(BaseModel):
     """Physical access control point (door, gate, reader)."""
 
+    model_config = ConfigDict(use_enum_values=True)
+
     point_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     site_id: str
     zone: str  # Floor or area
@@ -98,9 +99,6 @@ class AccessPoint(BaseModel):
     device_type: DeviceType  # reader, lock, sensor, controller
     status: PointStatus  # active, inactive, alarm, maintenance
     last_activity: Optional[datetime] = None
-
-    class Config:
-        use_enum_values = True
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
@@ -137,6 +135,8 @@ class AccessLevel(str, Enum):
 class AccessCard(BaseModel):
     """Access credential (badge, card, code)."""
 
+    model_config = ConfigDict(use_enum_values=True)
+
     card_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     person_name: str
     access_level: AccessLevel
@@ -144,9 +144,6 @@ class AccessCard(BaseModel):
     expiry_date: datetime
     status: CardStatus
     allowed_points: List[str] = Field(default_factory=list)  # Point IDs
-
-    class Config:
-        use_enum_values = True
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
@@ -178,6 +175,8 @@ class VisitorStatus(str, Enum):
 class Visitor(BaseModel):
     """Temporary visitor with managed access."""
 
+    model_config = ConfigDict(use_enum_values=True)
+
     visitor_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str
     company: str
@@ -188,9 +187,6 @@ class Visitor(BaseModel):
     checkin_time: Optional[datetime] = None
     checkout_time: Optional[datetime] = None
     purpose: Optional[str] = None
-
-    class Config:
-        use_enum_values = True
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
@@ -255,6 +251,8 @@ class AlertStatus(str, Enum):
 class SecurityAlert(BaseModel):
     """Security event that requires attention."""
 
+    model_config = ConfigDict(use_enum_values=True)
+
     alert_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     alert_type: AlertType
     timestamp: datetime
@@ -267,9 +265,6 @@ class SecurityAlert(BaseModel):
     acknowledged_by: Optional[str] = None
     acknowledged_at: Optional[datetime] = None
     resolved_at: Optional[datetime] = None
-
-    class Config:
-        use_enum_values = True
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""

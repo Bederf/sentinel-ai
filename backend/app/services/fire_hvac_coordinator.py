@@ -7,7 +7,7 @@ changes go through FireSafetyRepository (dual-write Supabase + JSON).
 
 import logging
 import time
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Optional
 
 from app.database.repositories.fire_safety_repository import get_fire_safety_repository
 from app.models.fire_safety import (
@@ -24,13 +24,13 @@ class CauseEffectResult:
     """Result of cause-effect execution."""
 
     def __init__(self):
-        self.triggered_effects: List[Dict[str, Any]] = []
+        self.triggered_effects: list[dict[str, Any]] = []
         self.devices_affected: int = 0
         self.execution_time_ms: float = 0.0
         self.any_failures: bool = False
-        self.failures: List[Dict[str, Any]] = []
+        self.failures: list[dict[str, Any]] = []
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "triggered_effects": self.triggered_effects,
             "devices_affected": self.devices_affected,
@@ -51,8 +51,8 @@ class FireHVACCoordinator:
     def __init__(self):
         self._repo = get_fire_safety_repository()
         self._mode: str = "normal"  # normal | fire_mode | smoke_management | resetting
-        self._affected_zones: Set[str] = set()
-        self._shutdown_devices: List[Dict[str, Any]] = []
+        self._affected_zones: set[str] = set()
+        self._shutdown_devices: list[dict[str, Any]] = []
         self._device_manager = None
 
     def _get_device_manager(self):
@@ -125,10 +125,10 @@ class FireHVACCoordinator:
             delay_seconds = effect.get("delay_seconds", 0)
             priority = effect.get("priority", 1)
 
-            # Apply delay (simulated for demo)
+            # Apply delay (simulated for local mode)
             if delay_seconds > 0:
                 logger.info(f"Effect delay: {delay_seconds}s for {target_type}/{target_id}")
-                # In demo mode, don't actually wait - just log the delay
+                # In local mode, don't actually wait - just log the delay
                 # await asyncio.sleep(delay_seconds)
 
             effect_result = await self._execute_single_effect(target_type, target_id, action, zone_id)
@@ -188,7 +188,7 @@ class FireHVACCoordinator:
 
     async def _execute_single_effect(
         self, target_type: str, target_id: str, action: str, zone_id: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Execute a single cause-effect action.
 
         Tries DeviceManager first, falls back to simulation.
@@ -206,7 +206,7 @@ class FireHVACCoordinator:
         else:
             return {"success": False, "detail": f"Unknown target type: {target_type}"}
 
-    async def _execute_hvac_action(self, target_id: str, action: str, dm=None) -> Dict[str, Any]:
+    async def _execute_hvac_action(self, target_id: str, action: str, dm=None) -> dict[str, Any]:
         """Execute HVAC shutdown/alert action."""
         if action == "shutdown":
             if dm:
@@ -239,7 +239,7 @@ class FireHVACCoordinator:
 
         return {"success": False, "detail": f"Unknown HVAC action: {action}"}
 
-    async def _execute_damper_action(self, target_id: str, action: str, zone_id: str) -> Dict[str, Any]:
+    async def _execute_damper_action(self, target_id: str, action: str, zone_id: str) -> dict[str, Any]:
         """Execute damper close/open action through repository."""
         if action == "close":
             # Update damper state through repository (dual-write)
@@ -277,7 +277,7 @@ class FireHVACCoordinator:
 
         return {"success": False, "detail": f"Unknown damper action: {action}"}
 
-    async def _execute_pressurization_action(self, target_id: str, action: str) -> Dict[str, Any]:
+    async def _execute_pressurization_action(self, target_id: str, action: str) -> dict[str, Any]:
         """Execute pressurization activate/deactivate through repository."""
         if action == "activate":
             # Get config target pressure (SANS 10400-T: 50 Pa)
@@ -316,7 +316,7 @@ class FireHVACCoordinator:
 
         return {"success": False, "detail": f"Unknown pressurization action: {action}"}
 
-    async def _execute_exhaust_action(self, target_id: str, action: str, dm=None) -> Dict[str, Any]:
+    async def _execute_exhaust_action(self, target_id: str, action: str, dm=None) -> dict[str, Any]:
         """Execute exhaust fan action for smoke extraction."""
         if action == "activate":
             if dm:
@@ -333,7 +333,7 @@ class FireHVACCoordinator:
 
         return {"success": False, "detail": f"Unknown exhaust action: {action}"}
 
-    async def shutdown_hvac_for_zone(self, zone_id: str) -> List[Dict[str, Any]]:
+    async def shutdown_hvac_for_zone(self, zone_id: str) -> list[dict[str, Any]]:
         """Shut down all HVAC serving the alarm zone.
 
         Maps fire zone to HVAC zones using floor matching, then shuts
@@ -428,7 +428,7 @@ class FireHVACCoordinator:
 
         return shutdown_results
 
-    async def close_smoke_dampers(self, zone_id: str) -> List[Dict[str, Any]]:
+    async def close_smoke_dampers(self, zone_id: str) -> list[dict[str, Any]]:
         """Close smoke dampers for affected zone through repository."""
         dampers = self._repo.get_dampers()
         zone_dampers = [d for d in dampers if d.get("zone_id") == zone_id]
@@ -493,7 +493,7 @@ class FireHVACCoordinator:
 
         return results
 
-    async def activate_pressurization(self, stairwell_ids: List[str]) -> List[Dict[str, Any]]:
+    async def activate_pressurization(self, stairwell_ids: list[str]) -> list[dict[str, Any]]:
         """Start stairwell pressurization fans through repository.
 
         Target: 50 Pa differential per SANS 10400-T.
@@ -532,7 +532,7 @@ class FireHVACCoordinator:
 
         return results
 
-    async def enter_smoke_management_mode(self, zone_id: str) -> Dict[str, Any]:
+    async def enter_smoke_management_mode(self, zone_id: str) -> dict[str, Any]:
         """Coordinated smoke management for a fire zone.
 
         Strategy:
@@ -604,7 +604,7 @@ class FireHVACCoordinator:
             "adjacent_zones": list(adjacent_zones) if adjacent_zones else [],
         }
 
-    async def reset_fire_mode(self) -> Dict[str, Any]:
+    async def reset_fire_mode(self) -> dict[str, Any]:
         """Return to normal operations after alarm cleared.
 
         Staged reset:
@@ -754,7 +754,7 @@ class FireHVACCoordinator:
             },
         }
 
-    def get_coordination_status(self) -> Dict[str, Any]:
+    def get_coordination_status(self) -> dict[str, Any]:
         """Get current coordination state."""
         return {
             "mode": self._mode,
@@ -766,14 +766,14 @@ class FireHVACCoordinator:
 
     # --- Helper methods ---
 
-    def _extract_floor(self, zone_id: str) -> Optional[str]:
+    def _extract_floor(self, zone_id: str) -> str | None:
         """Extract floor from zone_id (e.g., FZ-L1-C -> L1)."""
         parts = zone_id.split("-")
         if len(parts) >= 2:
             return parts[1]
         return None
 
-    def _get_adjacent_zones(self, zone_id: str) -> Set[str]:
+    def _get_adjacent_zones(self, zone_id: str) -> set[str]:
         """Get adjacent fire zones on the same floor."""
         floor = self._extract_floor(zone_id)
         if not floor:
@@ -787,7 +787,7 @@ class FireHVACCoordinator:
                 adjacent.add(z_id)
         return adjacent
 
-    def _get_stairwells_for_zones(self, zone_ids: Set[str]) -> List[str]:
+    def _get_stairwells_for_zones(self, zone_ids: set[str]) -> list[str]:
         """Find stairwell pressurization systems for given zones.
 
         Returns stairwell IDs near the affected zones.

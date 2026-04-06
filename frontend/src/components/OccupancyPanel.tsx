@@ -19,7 +19,6 @@ import { OccupancyHeatmap } from "./OccupancyHeatmap";
 import { BuildingSelector } from "./BuildingSelector";
 import { api, lightingApi, isExpectedApiError } from '@/lib/api';
 import { PageLoading } from "./PageLoading";
-import { useSimulation } from '@/contexts/SimulationContext';
 import type { BuildingOccupancy, LightingStats, ZoneLighting, ZoneOccupancy, LightingSensor, LightingLuminaire, Site } from '@/lib/api';
 
 // Get occupancy color based on percentage
@@ -39,9 +38,6 @@ interface OccupancyPanelProps {
 // All registered sites are eligible for lighting integration (no hardcoded filter)
 
 export function OccupancyPanel({ compact = false, onViewDetails }: OccupancyPanelProps) {
-  // Get live simulation state when available
-  const { running, occupancyPercent: simOccupancyPercent } = useSimulation();
-
   const [buildingOccupancy, setBuildingOccupancy] = useState<BuildingOccupancy | null>(null);
   const [lightingStats, setDaliStats] = useState<LightingStats | null>(null);
   const [zoneLighting, setZoneLighting] = useState<Record<string, ZoneLighting>>({});
@@ -64,8 +60,7 @@ export function OccupancyPanel({ compact = false, onViewDetails }: OccupancyPane
   // All registered sites are eligible for lighting
   const lightingSites = sites;
 
-  // Compute display occupancy: use simulated value if running, otherwise use API data
-  const displayOccupancy = running ? simOccupancyPercent : buildingOccupancy?.occupancy_percent ?? 0;
+  const displayOccupancy = buildingOccupancy?.occupancy_percent ?? 0;
 
   const fetchData = useCallback(async (showRefreshing = false) => {
     try {
@@ -119,7 +114,11 @@ export function OccupancyPanel({ compact = false, onViewDetails }: OccupancyPane
         const sitesData = await api.getSites();
         setSites(sitesData);
         if (sitesData.length > 0 && !selectedSiteId) {
-          setSelectedSiteId(sitesData[0].id);
+          const preferredSite =
+            sitesData.find((site) => site.id === "site-002")
+            ?? sitesData.find((site) => /sandton city office tower/i.test(site.name))
+            ?? sitesData[0];
+          setSelectedSiteId(preferredSite.id);
         }
       } catch (err) {
         if (!isExpectedApiError(err)) {
@@ -352,8 +351,8 @@ export function OccupancyPanel({ compact = false, onViewDetails }: OccupancyPane
           {/* Floor Summary Bars */}
           <div className="space-y-2">
             {buildingOccupancy.floors.map((floor) => {
-              // Prefer real per-floor data from lighting API; only use sim scalar as fallback
-              const floorOccupancy = floor.occupancy_percent > 0 ? floor.occupancy_percent : (running ? displayOccupancy : 0);
+              // Prefer real per-floor data from lighting API; use aggregate as fallback
+              const floorOccupancy = floor.occupancy_percent > 0 ? floor.occupancy_percent : displayOccupancy;
               return (
                 <div key={floor.floor} className="flex items-center gap-2">
                   <span
@@ -468,7 +467,7 @@ export function OccupancyPanel({ compact = false, onViewDetails }: OccupancyPane
                 <Users className="h-5 w-5" style={{ color: "var(--color-sentinel-blue)" }} />
               </div>
               <span className="text-sm font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>
-                {running ? "Live Occupancy" : "Occupancy"}
+                Occupancy
               </span>
             </div>
             <span
@@ -478,9 +477,9 @@ export function OccupancyPanel({ compact = false, onViewDetails }: OccupancyPane
               {displayOccupancy.toFixed(0)}%
             </span>
             <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-              {running
-                ? "From simulation"
-                : `${buildingOccupancy.occupied_sensors} of ${buildingOccupancy.total_sensors} sensors`}
+              {buildingOccupancy.total_sensors
+                ? `${buildingOccupancy.occupied_sensors} of ${buildingOccupancy.total_sensors} sensors`
+                : "Estimated"}
             </span>
           </div>
 
@@ -676,7 +675,7 @@ export function OccupancyPanel({ compact = false, onViewDetails }: OccupancyPane
                       <div className="flex items-center gap-2 mb-1">
                         <Users className="h-4 w-4" style={{ color: "var(--color-sentinel-blue)" }} />
                         <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                          {running ? "Live Occupancy" : "Occupancy"}
+                          Occupancy
                         </span>
                       </div>
                       <span

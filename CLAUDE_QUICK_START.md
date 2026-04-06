@@ -157,6 +157,8 @@ git commit -m "type(scope): description"
 | Tests timeout | Check if test has `@pytest.mark.slow` (>5 seconds) |
 | Circular import errors | Check `backend/app/api/registrars/` router registration order |
 | Device control fails | Verify `DEMO_MODE=true` in `.env` (enables mock devices) |
+| site-001 showing in UI | `sessionStorage.clear()` in browser console; guards in App.tsx block it |
+| Recommendations 404 | Use `/modules/site/{site_id}/recommendations` NOT `/api/recommendations/` |
 
 ## Development Workflow Examples
 

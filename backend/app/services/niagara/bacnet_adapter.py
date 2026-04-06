@@ -7,7 +7,7 @@ devices controlled via Tridium Niagara JACE/Supervisor.
 
 import logging
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any
 
 from app.models.device import (
     Device,
@@ -103,7 +103,7 @@ class NiagaraBACnetAdapter(DeviceAdapter):
 
     def __init__(self, device: Device):
         super().__init__(device)
-        self._bacnet_device_id: Optional[int] = None
+        self._bacnet_device_id: int | None = None
         self._client = get_bacnet_client()
 
     @property
@@ -260,7 +260,7 @@ class NiagaraBACnetAdapter(DeviceAdapter):
     # Extended operations
     # ------------------------------------------------------------------
 
-    async def scan_points(self) -> Dict[str, DevicePoint]:
+    async def scan_points(self) -> dict[str, DevicePoint]:
         """Discover BACnet points on this device and return as DevicePoints.
 
         Reads the device's objectList to enumerate all available
@@ -272,7 +272,7 @@ class NiagaraBACnetAdapter(DeviceAdapter):
                 use_cache=False,  # Force fresh scan
             )
 
-            points: Dict[str, DevicePoint] = {}
+            points: dict[str, DevicePoint] = {}
             for dp in discovered:
                 device_point = _discovered_point_to_device_point(dp)
                 points[device_point.name] = device_point

@@ -19,21 +19,21 @@ ROUTING_PROFILES: dict[str, dict[str, Any]] = {
     "api_prod": {
         "mode": "api",
         "routing": {
-            "heavy": {"provider": "anthropic", "model": "claude-sonnet-4-20250514"},
-            "medium": {"provider": "anthropic", "model": "claude-haiku-4-5-20251001"},
-            "light": {"provider": "anthropic", "model": "claude-haiku-4-5-20251001"},
-            "chat_ai": {"provider": "anthropic", "model": "claude-haiku-4-5-20251001"},
-            "chat_tech": {"provider": "anthropic", "model": "claude-sonnet-4-20250514"},
+            "heavy": {"provider": "minimax", "model": "MiniMax-M2.5"},
+            "medium": {"provider": "minimax", "model": "MiniMax-M2.5"},
+            "light": {"provider": "minimax", "model": "MiniMax-M2.5"},
+            "chat_ai": {"provider": "minimax", "model": "MiniMax-M2.5"},
+            "chat_tech": {"provider": "minimax", "model": "MiniMax-M2.5"},
         },
     },
     "cloud_dev": {
-        "mode": "cloud",
+        "mode": "api",
         "routing": {
-            "heavy": {"provider": "ollama_cloud", "model": "minimax-m2.7:cloud"},
-            "medium": {"provider": "ollama_cloud", "model": "minimax-m2.7:cloud"},
-            "light": {"provider": "ollama_cloud", "model": "minimax-m2.7:cloud"},
-            "chat_ai": {"provider": "ollama_cloud", "model": "minimax-m2.7:cloud"},
-            "chat_tech": {"provider": "ollama_cloud", "model": "minimax-m2.7:cloud"},
+            "heavy": {"provider": "minimax", "model": "MiniMax-M2.5"},
+            "medium": {"provider": "minimax", "model": "MiniMax-M2.5"},
+            "light": {"provider": "minimax", "model": "MiniMax-M2.5"},
+            "chat_ai": {"provider": "minimax", "model": "MiniMax-M2.5"},
+            "chat_tech": {"provider": "minimax", "model": "MiniMax-M2.5"},
         },
     },
     "local_full": {

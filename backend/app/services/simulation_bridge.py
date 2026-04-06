@@ -4,8 +4,8 @@ Converts simulation data to match existing equipment format
 """
 
 from datetime import datetime, timedelta
-from typing import List, Dict, Any
 from pathlib import Path
+from typing import Any
 
 from app.services.bms_simulation_service import create_simulation_service
 
@@ -22,7 +22,7 @@ class SimulationBridge:
         if not self.simulation_service.is_running:
             await self.simulation_service.start_simulation()
 
-    def convert_simulation_to_equipment_format(self, sim_equipment: Dict[str, Any]) -> Dict[str, Any]:
+    def convert_simulation_to_equipment_format(self, sim_equipment: dict[str, Any]) -> dict[str, Any]:
         """Convert simulation equipment to existing equipment format"""
         return {
             "id": sim_equipment["id"],
@@ -54,7 +54,7 @@ class SimulationBridge:
             else sim_equipment["timestamp"],
         }
 
-    def convert_simulation_to_sensor_format(self, sim_equipment: Dict[str, Any]) -> List[Dict[str, Any]]:
+    def convert_simulation_to_sensor_format(self, sim_equipment: dict[str, Any]) -> list[dict[str, Any]]:
         """Convert simulation sensor readings to sensor format"""
         sensors = []
 
@@ -85,7 +85,7 @@ class SimulationBridge:
 
         return sensors
 
-    def convert_simulation_to_alert_format(self, sim_equipment: Dict[str, Any]) -> List[Dict[str, Any]]:
+    def convert_simulation_to_alert_format(self, sim_equipment: dict[str, Any]) -> list[dict[str, Any]]:
         """Convert simulation fault codes to alert format"""
         alerts = []
 
@@ -143,7 +143,7 @@ class SimulationBridge:
 
         return converted_equipment, all_sensors, all_alerts
 
-    def _get_model_for_equipment(self, sim_equipment: Dict[str, Any]) -> str:
+    def _get_model_for_equipment(self, sim_equipment: dict[str, Any]) -> str:
         """Generate a model name based on equipment type and manufacturer"""
         manufacturer = sim_equipment["manufacturer"]
         equipment_type = sim_equipment["type"]
@@ -258,7 +258,7 @@ class SimulationBridge:
         severity_map = {"critical": 5, "major": 4, "minor": 2}
         return severity_map.get(severity, 3)
 
-    def _generate_specifications(self, sim_equipment: Dict[str, Any]) -> Dict[str, Any]:
+    def _generate_specifications(self, sim_equipment: dict[str, Any]) -> dict[str, Any]:
         """Generate realistic specifications for equipment"""
         specs = {
             "capacity": "Standard",
@@ -286,4 +286,4 @@ class SimulationBridge:
 simulation_bridge = SimulationBridge()
 
 # Export for use
-__all__ = ["simulation_bridge", "SimulationBridge"]
+__all__ = ["SimulationBridge", "simulation_bridge"]

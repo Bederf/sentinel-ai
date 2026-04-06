@@ -19,19 +19,18 @@ To prevent circular imports:
     4. Depend on protocols/interfaces, not concrete implementations
 """
 
-from typing import Dict, Any, List, Optional
-
+from typing import Any
 
 # Document the expected contracts (for documentation purposes)
 
 
 async def execute_tool(
     tool_name: str,
-    tool_input: Dict[str, Any],
-    site_id: Optional[str] = None,
-    user_email: Optional[str] = None,
-    user_role: Optional[str] = None,
-) -> Dict[str, Any]:
+    tool_input: dict[str, Any],
+    site_id: str | None = None,
+    user_email: str | None = None,
+    user_role: str | None = None,
+) -> dict[str, Any]:
     """Execute a tool function (from chat_tools module).
 
     This is the contract that chat_tools.execute_tool provides.
@@ -57,10 +56,10 @@ async def execute_tool(
 
 
 def get_chat_tools(
-    site_id: Optional[str] = None,
-    user_email: Optional[str] = None,
-    user_role: Optional[str] = None,
-) -> List[Dict[str, Any]]:
+    site_id: str | None = None,
+    user_email: str | None = None,
+    user_role: str | None = None,
+) -> list[dict[str, Any]]:
     """Get available chat tools (from chat_tools module).
 
     This is the contract that chat_tools.CHAT_TOOLS provides.
@@ -77,4 +76,4 @@ def get_chat_tools(
 
 # Type aliases for better code documentation
 ToolHandler = Any  # Callable that takes **kwargs and returns Dict[str, Any]
-ToolDefinition = Dict[str, Any]  # Has name, description, input_schema
+ToolDefinition = dict[str, Any]  # Has name, description, input_schema

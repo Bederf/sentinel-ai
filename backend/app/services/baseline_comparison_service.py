@@ -13,12 +13,12 @@ Severity thresholds:
 """
 
 import logging
-from typing import Dict, Optional, List
 from datetime import datetime
+
 from pydantic import BaseModel, Field
 
 from app.database.repositories.baseline_repository import BaselineRepository
-from app.models.baseline import EquipmentBaseline, DeviationStatus
+from app.models.baseline import DeviationStatus, EquipmentBaseline
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +38,7 @@ class BaselineDeviation(BaseModel):
     tolerance_type: str = Field(default="absolute", description="'absolute' or 'percentage'")
     deviation_percent: float = Field(..., description="Deviation as % of baseline")
     severity: str = Field(..., description="Severity: 'normal', 'warning', 'critical'")
-    recommended_action: Optional[str] = Field(None, description="Suggested action")
+    recommended_action: str | None = Field(None, description="Suggested action")
 
 
 class BaselineComparison(BaseModel):
@@ -48,7 +48,7 @@ class BaselineComparison(BaseModel):
     equipment_id: str
     comparison_date: datetime
     baseline_date: datetime
-    deviations: List[BaselineDeviation] = Field(default_factory=list)
+    deviations: list[BaselineDeviation] = Field(default_factory=list)
     overall_status: DeviationStatus
     max_deviation_percent: float
     summary: str
@@ -58,7 +58,7 @@ class BaselineReportRequest(BaseModel):
     """Request for baseline report generation."""
 
     equipment_id: str
-    baseline_id: Optional[str] = Field(None, description="Specific baseline, uses latest if None")
+    baseline_id: str | None = Field(None, description="Specific baseline, uses latest if None")
     include_recommendations: bool = Field(default=True)
 
 
@@ -81,7 +81,7 @@ class BaselineComparisonService:
 
     def __init__(self):
         """Initialize comparison service with repository."""
-        self.repository: Optional[BaselineRepository] = None
+        self.repository: BaselineRepository | None = None
 
     def ensure_repository(self):
         """Ensure repository is initialized."""
@@ -89,7 +89,7 @@ class BaselineComparisonService:
             self.repository = BaselineRepository()
 
     async def compare_to_baseline(
-        self, equipment_id: str, current_data: Dict[str, float], baseline_id: Optional[str] = None
+        self, equipment_id: str, current_data: dict[str, float], baseline_id: str | None = None
     ) -> BaselineComparison:
         """
         Compare current readings to baseline.
@@ -170,7 +170,7 @@ class BaselineComparisonService:
 
     def _calculate_deviation(
         self, element_name: str, baseline_value: float, current_value: float, tolerance: float, tolerance_type: str
-    ) -> Optional[BaselineDeviation]:
+    ) -> BaselineDeviation | None:
         """
         Calculate deviation for a single element.
 
@@ -269,7 +269,7 @@ class BaselineComparisonService:
         else:
             return f"Monitor {element_name} - within acceptable range."
 
-    def _determine_overall_status(self, deviations: List[BaselineDeviation]) -> tuple[DeviationStatus, float]:
+    def _determine_overall_status(self, deviations: list[BaselineDeviation]) -> tuple[DeviationStatus, float]:
         """
         Determine overall status from deviations list.
 
@@ -304,7 +304,7 @@ class BaselineComparisonService:
         else:
             return DeviationStatus.NORMAL, max_deviation
 
-    def _build_summary(self, deviations: List[BaselineDeviation], overall_status: DeviationStatus) -> str:
+    def _build_summary(self, deviations: list[BaselineDeviation], overall_status: DeviationStatus) -> str:
         """Build human-readable summary."""
         critical_count = sum(1 for d in deviations if d.severity == "critical")
         warning_count = sum(1 for d in deviations if d.severity == "warning")
@@ -317,7 +317,7 @@ class BaselineComparisonService:
             return "All readings within normal range."
 
     async def generate_baseline_report(
-        self, equipment_id: str, baseline: EquipmentBaseline, comparison: Optional[BaselineComparison] = None
+        self, equipment_id: str, baseline: EquipmentBaseline, comparison: BaselineComparison | None = None
     ) -> bytes:
         """
         Generate PDF baseline report.
@@ -340,13 +340,14 @@ class BaselineComparisonService:
         """
         # Import PDF library here to avoid dependency if not used
         try:
-            from reportlab.lib.pagesizes import landscape, letter
-            from reportlab.lib import colors
-            from reportlab.lib.units import inch
-            from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-            from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-            from reportlab.lib.enums import TA_CENTER, TA_LEFT  # noqa: F401
             from io import BytesIO
+
+            from reportlab.lib import colors
+            from reportlab.lib.enums import TA_CENTER, TA_LEFT  # noqa: F401
+            from reportlab.lib.pagesizes import landscape, letter
+            from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+            from reportlab.lib.units import inch
+            from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
             buffer = BytesIO()
 
@@ -488,7 +489,7 @@ class BaselineComparisonService:
             return self._generate_text_report(equipment_id, baseline, comparison)
 
     def _generate_text_report(
-        self, equipment_id: str, baseline: EquipmentBaseline, comparison: Optional[BaselineComparison]
+        self, equipment_id: str, baseline: EquipmentBaseline, comparison: BaselineComparison | None
     ) -> bytes:
         """Generate simple text report as fallback."""
         lines = [
@@ -554,7 +555,7 @@ class BaselineComparisonService:
 # Singleton Instance
 # ============================================================================
 
-_comparison_service: Optional[BaselineComparisonService] = None
+_comparison_service: BaselineComparisonService | None = None
 
 
 def get_baseline_comparison_service() -> BaselineComparisonService:

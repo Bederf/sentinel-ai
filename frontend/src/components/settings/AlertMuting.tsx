@@ -13,12 +13,13 @@ interface AlertMute {
 }
 
 interface AlertMutingProps {
+  siteId?: string;
   onError?: (error: string) => void;
   onSuccess?: () => void;
   readOnly?: boolean;
 }
 
-export function AlertMuting({ onError, onSuccess, readOnly = false }: AlertMutingProps) {
+export function AlertMuting({ siteId, onError, onSuccess, readOnly = false }: AlertMutingProps) {
   const [mutes, setMutes] = useState<AlertMute[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
@@ -29,7 +30,8 @@ export function AlertMuting({ onError, onSuccess, readOnly = false }: AlertMutin
   const fetchMutes = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await authorizedFetch("/api/alert-muting");
+      const query = siteId ? `?site_id=${encodeURIComponent(siteId)}` : "";
+      const response = await authorizedFetch(`/api/alert-muting${query}`);
       if (!response.ok) throw new Error("Failed to fetch mutes");
       const data = await response.json();
       setMutes(data.mutes || []);
@@ -38,7 +40,7 @@ export function AlertMuting({ onError, onSuccess, readOnly = false }: AlertMutin
     } finally {
       setLoading(false);
     }
-  }, [onError]);
+  }, [onError, siteId]);
 
   useEffect(() => { fetchMutes(); }, [fetchMutes]);
 

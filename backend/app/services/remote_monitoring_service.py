@@ -13,13 +13,13 @@ Integrates with:
 import logging
 import uuid
 from datetime import datetime
-from typing import Optional, List, Dict, Any
+from typing import Any, Optional
 
 from app.models.remote_ops import (
-    RemoteDiagnosticReport,
     DispatchDecision,
-    RemoteSessionLog,
+    RemoteDiagnosticReport,
     RemoteSessionAction,
+    RemoteSessionLog,
 )
 from app.services.device_abstraction import device_manager
 
@@ -38,7 +38,7 @@ class RemoteMonitoringService:
     """
 
     _instance: Optional["RemoteMonitoringService"] = None
-    _sessions: Dict[str, RemoteSessionLog] = {}
+    _sessions: dict[str, RemoteSessionLog] = {}
 
     def __new__(cls):
         if cls._instance is None:
@@ -49,7 +49,7 @@ class RemoteMonitoringService:
     # Building-level aggregation
     # ------------------------------------------------------------------
 
-    async def get_site_status(self, site_id: str) -> Dict[str, Any]:
+    async def get_site_status(self, site_id: str) -> dict[str, Any]:
         """Aggregate building-wide status from all devices at a site.
 
         Returns device counts, active alarms, devices in warning/alarm,
@@ -83,8 +83,8 @@ class RemoteMonitoringService:
         devices_offline = 0
         devices_in_alarm = 0
         devices_in_warning = 0
-        active_alarms: List[Dict[str, Any]] = []
-        temperatures: List[float] = []
+        active_alarms: list[dict[str, Any]] = []
+        temperatures: list[float] = []
         total_health = 0
         health_count = 0
 
@@ -187,7 +187,7 @@ class RemoteMonitoringService:
             )
 
         # Read all device points
-        readings: Dict[str, Any] = {}
+        readings: dict[str, Any] = {}
         adapter = await device_manager.get_adapter(equipment_id)
         if adapter:
             try:
@@ -209,7 +209,7 @@ class RemoteMonitoringService:
                 logger.warning(f"Failed to read points for {equipment_id}: {exc}")
 
         # Safety status
-        safety_status: Optional[Dict[str, Any]] = None
+        safety_status: dict[str, Any] | None = None
         try:
             safety_status = await device_manager.get_device_safety_status(equipment_id)
         except Exception:
@@ -220,11 +220,11 @@ class RemoteMonitoringService:
         overall_safety = safety_status.get("overall_status", "unknown") if safety_status else "unknown"
         status_summary = f"Device {status_val} | Safety: {overall_safety}"
 
-        # Anomaly detection (simple heuristic for demo)
-        anomalies: List[str] = []
-        recommendations: List[str] = []
+        # Anomaly detection (simple heuristic for local fallback mode)
+        anomalies: list[str] = []
+        recommendations: list[str] = []
         requires_dispatch = False
-        dispatch_reason: Optional[str] = None
+        dispatch_reason: str | None = None
 
         if safety_status:
             violations = safety_status.get("violations", [])
@@ -296,8 +296,8 @@ class RemoteMonitoringService:
         report = await self.get_equipment_diagnostic(equipment_id, "full_diagnostic")
 
         # Decision logic
-        remote_actions: List[str] = []
-        bundled_tasks: List[str] = []
+        remote_actions: list[str] = []
+        bundled_tasks: list[str] = []
 
         if report.requires_dispatch:
             # Determine urgency from safety status
@@ -382,9 +382,9 @@ class RemoteMonitoringService:
         self,
         session_id: str,
         action_type: str,
-        target: Optional[str] = None,
-        details: Optional[str] = None,
-        result: Optional[str] = None,
+        target: str | None = None,
+        details: str | None = None,
+        result: str | None = None,
     ) -> None:
         """Log an action within an active session."""
         session = self._sessions.get(session_id)
@@ -398,7 +398,7 @@ class RemoteMonitoringService:
                 )
             )
 
-    async def end_session(self, session_id: str) -> Optional[RemoteSessionLog]:
+    async def end_session(self, session_id: str) -> RemoteSessionLog | None:
         """End a remote session and log it."""
         session = self._sessions.get(session_id)
         if session:
@@ -407,7 +407,7 @@ class RemoteMonitoringService:
             return session
         return None
 
-    async def get_remote_session_summary(self, user_id: str) -> List[Dict[str, Any]]:
+    async def get_remote_session_summary(self, user_id: str) -> list[dict[str, Any]]:
         """Get recent remote sessions for a user.
 
         Args:

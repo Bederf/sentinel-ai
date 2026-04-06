@@ -11,7 +11,7 @@ Supabase and feeding the ML pipeline — not the simulation layer.
 
 import logging
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any
 
 from app.core.site_resolver import get_primary_site_code
 from app.services.simulation_store import get_simulation_store
@@ -29,12 +29,12 @@ class SimulationPersistence:
     async def persist_hourly_state(
         self,
         simulated_time: datetime,
-        equipment_states: Dict[str, Dict[str, Any]],
+        equipment_states: dict[str, dict[str, Any]],
         schedule_state: Any,
         energy_kw: float,
         ambient_temp: float,
         humidity: float,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Persist all simulation state for the current hour to JSON.
 
@@ -95,7 +95,7 @@ class SimulationPersistence:
 
         return results
 
-    def _update_equipment_health(self, equipment_code: str, state: Dict[str, Any]):
+    def _update_equipment_health(self, equipment_code: str, state: dict[str, Any]):
         """Update equipment health_score and status in JSON store."""
         health_score = state.get("health_score")
         if health_score is None:
@@ -120,7 +120,7 @@ class SimulationPersistence:
     def _write_sensor_readings(
         self,
         simulated_time: datetime,
-        equipment_states: Dict[str, Dict[str, Any]],
+        equipment_states: dict[str, dict[str, Any]],
         ambient_temp: float,
         humidity: float,
     ) -> int:
@@ -171,11 +171,11 @@ class SimulationPersistence:
     def _write_zone_history(
         self,
         simulated_time: datetime,
-        equipment_states: Dict[str, Dict[str, Any]],
+        equipment_states: dict[str, dict[str, Any]],
         schedule_state: Any,
     ) -> int:
         """Aggregate zone-level readings from equipment and write to zone history."""
-        zone_data: Dict[str, Dict[str, Any]] = {}
+        zone_data: dict[str, dict[str, Any]] = {}
 
         for code, state in equipment_states.items():
             readings = state.get("sensor_readings", {})
@@ -193,10 +193,7 @@ class SimulationPersistence:
             if equip_type in ("fcu",):
                 if "room_temp" in readings:
                     zone_data[zone_id]["temp"] = readings["room_temp"]
-            elif equip_type in ("vav",):
-                if "zone_temp" in readings:
-                    zone_data[zone_id].setdefault("temp", readings["zone_temp"])
-            elif equip_type in ("temp_sensor",):
+            elif equip_type in ("vav",) or equip_type in ("temp_sensor",):
                 if "zone_temp" in readings:
                     zone_data[zone_id].setdefault("temp", readings["zone_temp"])
             elif equip_type in ("co2_sensor", "zone_sensor"):
@@ -244,7 +241,7 @@ class SimulationPersistence:
     async def persist_solar_snapshot(
         self,
         simulated_time: datetime,
-        equipment_states: Dict[str, Dict[str, Any]],
+        equipment_states: dict[str, dict[str, Any]],
         site_load_kw: float,
         tariff_band: str,
         tariff_rate: float,
@@ -344,7 +341,7 @@ class SimulationPersistence:
         return True
 
 
-_persistence_instance: Optional[SimulationPersistence] = None
+_persistence_instance: SimulationPersistence | None = None
 
 
 def get_simulation_persistence(site_id: str | None = None) -> SimulationPersistence:

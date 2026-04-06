@@ -8,13 +8,14 @@ Provides unified interface for confidence-based prediction filtering.
 """
 
 import logging
-from typing import Optional, Dict, Any, List
-from datetime import datetime, timedelta
-import joblib
 import os
+from datetime import datetime, timedelta
+from typing import Any
 
-from app.ml.models.model_registry_db import get_model_registry, ModelRegistryDB
+import joblib
+
 from app.database.supabase_client import get_supabase_client
+from app.ml.models.model_registry_db import ModelRegistryDB, get_model_registry
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +34,7 @@ class NiagaraMLInference:
     def __init__(self):
         """Initialize inference service."""
         self.supabase = get_supabase_client()
-        self._registry: Optional[ModelRegistryDB] = None
+        self._registry: ModelRegistryDB | None = None
         self._model_cache = {}  # Cache loaded models
 
     async def _get_registry(self) -> ModelRegistryDB:
@@ -44,7 +45,7 @@ class NiagaraMLInference:
 
     async def get_prediction_with_confidence(
         self, equipment_code: str, min_confidence: float = 0.70, tier: int = 2
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """
         Generate prediction with confidence score for equipment.
 
@@ -129,12 +130,12 @@ class NiagaraMLInference:
             }
 
         except Exception as e:
-            logger.error(f"Error generating prediction for {equipment_code}: {str(e)}")
+            logger.error(f"Error generating prediction for {equipment_code}: {e!s}")
             return None
 
     async def get_predictions_for_site(
-        self, site_code: str, min_confidence: float = 0.70, tier: int = 2, equipment_types: Optional[List[str]] = None
-    ) -> Dict[str, Any]:
+        self, site_code: str, min_confidence: float = 0.70, tier: int = 2, equipment_types: list[str] | None = None
+    ) -> dict[str, Any]:
         """
         Generate predictions for all equipment at a site.
 
@@ -199,11 +200,11 @@ class NiagaraMLInference:
             )
 
         except Exception as e:
-            logger.error(f"Error generating site predictions for {site_code}: {str(e)}")
+            logger.error(f"Error generating site predictions for {site_code}: {e!s}")
 
         return results
 
-    def _extract_equipment_type(self, equipment_code: str) -> Optional[str]:
+    def _extract_equipment_type(self, equipment_code: str) -> str | None:
         """
         Extract equipment type from equipment code.
 
@@ -225,16 +226,16 @@ class NiagaraMLInference:
         except Exception:
             return None
 
-    async def _get_equipment_data(self, equipment_code: str) -> Optional[Dict[str, Any]]:
+    async def _get_equipment_data(self, equipment_code: str) -> dict[str, Any] | None:
         """Get equipment record from database."""
         try:
             response = self.supabase.table("equipment").select("*").eq("code", equipment_code).single().execute()
             return response.data if response.data else None
         except Exception as e:
-            logger.warning(f"Could not fetch equipment {equipment_code}: {str(e)}")
+            logger.warning(f"Could not fetch equipment {equipment_code}: {e!s}")
             return None
 
-    async def _get_site_equipment(self, site_code: str) -> List[Dict[str, Any]]:
+    async def _get_site_equipment(self, site_code: str) -> list[dict[str, Any]]:
         """Get all equipment for a site."""
         try:
             response = (
@@ -245,10 +246,10 @@ class NiagaraMLInference:
             )
             return response.data or []
         except Exception as e:
-            logger.warning(f"Could not fetch equipment for site {site_code}: {str(e)}")
+            logger.warning(f"Could not fetch equipment for site {site_code}: {e!s}")
             return []
 
-    async def _prepare_features(self, equipment: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    async def _prepare_features(self, equipment: dict[str, Any]) -> dict[str, Any] | None:
         """
         Prepare features for ML inference.
 
@@ -266,10 +267,10 @@ class NiagaraMLInference:
             # Get last 7 days of sensor readings
             seven_days_ago = (datetime.now() - timedelta(days=7)).isoformat()
             readings_response = (
-                self.supabase.table("sensor_readings")
-                .select("value, timestamp")
+                self.supabase.table("equipment_sensor_readings")
+                .select("value, recorded_at")
                 .eq("equipment_id", equipment_id)
-                .gte("timestamp", seven_days_ago)
+                .gte("recorded_at", seven_days_ago)
                 .order("timestamp", desc=True)
                 .limit(1000)
                 .execute()
@@ -307,10 +308,10 @@ class NiagaraMLInference:
             return features
 
         except Exception as e:
-            logger.warning(f"Error preparing features for {equipment.get('id')}: {str(e)}")
+            logger.warning(f"Error preparing features for {equipment.get('id')}: {e!s}")
             return None
 
-    def _calculate_days_in_service(self, equipment: Dict[str, Any]) -> int:
+    def _calculate_days_in_service(self, equipment: dict[str, Any]) -> int:
         """Calculate days equipment has been in service."""
         try:
             install_date_str = equipment.get("install_date")
@@ -321,7 +322,7 @@ class NiagaraMLInference:
         except Exception:
             return 0
 
-    def _calculate_trend(self, readings: List[Dict[str, Any]]) -> Optional[str]:
+    def _calculate_trend(self, readings: list[dict[str, Any]]) -> str | None:
         """Calculate trend from readings (improving, stable, degrading)."""
         try:
             if len(readings) < 5:
@@ -346,7 +347,7 @@ class NiagaraMLInference:
         except Exception:
             return None
 
-    def _has_recent_service(self, equipment: Dict[str, Any]) -> bool:
+    def _has_recent_service(self, equipment: dict[str, Any]) -> bool:
         """Check if equipment had service in last 30 days."""
         try:
             last_service = equipment.get("last_service_date")
@@ -358,7 +359,7 @@ class NiagaraMLInference:
         except Exception:
             return False
 
-    async def _run_inference(self, equipment_type: str, features: Dict[str, Any], model_config) -> Optional[float]:
+    async def _run_inference(self, equipment_type: str, features: dict[str, Any], model_config) -> float | None:
         """
         Run ML model inference.
 
@@ -401,10 +402,10 @@ class NiagaraMLInference:
             return confidence
 
         except Exception as e:
-            logger.error(f"Inference failed for {equipment_type}: {str(e)}")
+            logger.error(f"Inference failed for {equipment_type}: {e!s}")
             return None
 
-    def _load_model(self, model_path: Optional[str]):
+    def _load_model(self, model_path: str | None):
         """Load model from disk with caching."""
         if not model_path:
             return None
@@ -425,12 +426,12 @@ class NiagaraMLInference:
             return model
 
         except Exception as e:
-            logger.error(f"Failed to load model {model_path}: {str(e)}")
+            logger.error(f"Failed to load model {model_path}: {e!s}")
             return None
 
 
 # Singleton instance
-_inference_service: Optional[NiagaraMLInference] = None
+_inference_service: NiagaraMLInference | None = None
 
 
 def get_ml_inference() -> NiagaraMLInference:

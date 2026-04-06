@@ -12,9 +12,9 @@ Supports:
 """
 
 import logging
-from typing import Optional, Dict, List, Any
 from dataclasses import dataclass
 from enum import Enum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -54,11 +54,11 @@ class ControlPoint:
     name: str  # e.g., "cooling_setpoint"
     description: str
     data_type: str  # "float", "int", "bool", "enum"
-    min_value: Optional[float] = None
-    max_value: Optional[float] = None
+    min_value: float | None = None
+    max_value: float | None = None
     unit: str = ""
     writable: bool = True
-    enum_values: Optional[List[str]] = None  # For enum types
+    enum_values: list[str] | None = None  # For enum types
 
 
 @dataclass
@@ -355,7 +355,7 @@ class DeviceControlService:
     """Service for device control operations."""
 
     @staticmethod
-    def get_equipment_type(equipment_code: str) -> Optional[EquipmentType]:
+    def get_equipment_type(equipment_code: str) -> EquipmentType | None:
         """Extract equipment type from equipment code.
 
         Format: {site}-{TYPE}-{location}
@@ -377,7 +377,7 @@ class DeviceControlService:
             return None
 
     @staticmethod
-    def get_control_points(equipment_code: str) -> Dict[str, ControlPoint]:
+    def get_control_points(equipment_code: str) -> dict[str, ControlPoint]:
         """Get all controllable points for equipment."""
         eq_type = DeviceControlService.get_equipment_type(equipment_code)
         if not eq_type:
@@ -393,7 +393,7 @@ class DeviceControlService:
         return eq_type in EQUIPMENT_CONTROL_POINTS
 
     @staticmethod
-    def validate_control_value(equipment_code: str, point_name: str, value: Any) -> Dict[str, Any]:
+    def validate_control_value(equipment_code: str, point_name: str, value: Any) -> dict[str, Any]:
         """Validate a control value against point constraints.
 
         Returns: {"valid": bool, "errors": [str], "warning": Optional[str]}
@@ -442,7 +442,7 @@ class DeviceControlService:
 
 
 # Singleton instance
-_service: Optional[DeviceControlService] = None
+_service: DeviceControlService | None = None
 
 
 def get_device_control_service() -> DeviceControlService:

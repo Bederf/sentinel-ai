@@ -40,17 +40,18 @@ DOC_CATEGORY_MAP = {
     "02-architecture": ("general", "system_documentation"),
     "03-api-reference": ("general", "api_reference"),
     "04-features": ("general", "system_documentation"),
-    "05-bms-concepts": ("general", "system_documentation"),
     "05-integrations": ("general", "integration_guide"),
     "06-safety-compliance": ("general", "safety_procedure"),
-    "07-integrations": ("general", "integration_guide"),
-    "08-security": ("security", "security_policy"),
     "08-ai-ml": ("general", "system_documentation"),
+    "09-security": ("security", "security_policy"),
+    "10-operations": ("general", "system_documentation"),
     "11-testing": ("general", "system_documentation"),
     "12-development": ("general", "system_documentation"),
     "13-modules": ("general", "system_documentation"),
-    "14-south-africa-context": ("general", "system_documentation"),
+    "14-regional": ("general", "system_documentation"),
+    "15-business-context": ("general", "system_documentation"),
     "16-glossary": ("general", "system_documentation"),
+    "_archive": ("general", "system_documentation"),
 }
 
 # Map extra scan dirs to categories (for files outside docs/)

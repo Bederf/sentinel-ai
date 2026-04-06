@@ -531,10 +531,15 @@ export interface FuelStatus {
 
 async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`;
+  const token =
+    (typeof window !== "undefined" && localStorage.getItem("access_token")) ||
+    (typeof window !== "undefined" && localStorage.getItem("sentinel_token")) ||
+    "";
   const response = await fetch(url, {
     ...options,
     headers: {
       "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...options?.headers,
     },
   });
@@ -641,7 +646,7 @@ export const generatorApi = {
   },
 
   /**
-   * Simulate event (demo)
+   * Simulate event (local fallback)
    */
   simulate: async (event: 'load_shedding' | 'mains_restored' | 'normal'): Promise<any> => {
     return fetchApi(`/api/generators/simulate/${event}`, { method: 'POST' });

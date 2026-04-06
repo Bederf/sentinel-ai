@@ -105,6 +105,8 @@ async def search_documents(
     query: str = Query(..., description="Search query"),
     equipment_type: Optional[str] = Query(None, description="Filter by equipment type"),
     document_type: Optional[str] = Query(None, description="Filter by document type"),
+    site_id: Optional[str] = Query(None, description="Filter by site/building"),
+    source: Optional[str] = Query(None, description="Filter by document source"),
     n_results: int = Query(5, ge=1, le=20, description="Number of results"),
     similarity_threshold: float = Query(0.7, ge=0.0, le=1.0, description="Minimum similarity score"),
     auth: AuthContext = Depends(require_role(1)),
@@ -113,14 +115,23 @@ async def search_documents(
     client = get_supabase_client()
     vector_db = get_vector_db_service(client)
 
+    # If a source filter is provided, over-fetch and then filter locally so callers
+    # still receive enough source-constrained hits.
+    fetch_count = min(100, n_results * 5) if source else n_results
     results = vector_db.search(
         query=query,
-        n_results=n_results,
+        n_results=fetch_count,
         equipment_type=equipment_type,
         document_type=document_type,
+        site_id=site_id,
         similarity_threshold=similarity_threshold,
     )
 
+    if source:
+        source_value = source.strip().lower()
+        results = [row for row in results if str(row.get("source", "")).strip().lower() == source_value]
+
+    results = results[:n_results]
     return {"query": query, "count": len(results), "results": results}
 
 
@@ -198,7 +209,7 @@ async def explain_equipment_risk(
     except Exception as e:
         logger.warning(f"Equipment lookup failed: {e}")
 
-    # Fallback demo prediction
+    # Fallback seeded prediction
     if not prediction:
         prediction = {
             "equipment_type": "chiller",

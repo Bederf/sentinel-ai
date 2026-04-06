@@ -3,7 +3,7 @@
 Generates:
 - UUID tokens (QR payload)
 - 6-digit zero-padded PINs (manual fallback)
-- QR codes (base64 PNG of UUID string only)
+- QR codes (base64 PNG of UUID string + SENTINEL logo overlay)
 """
 
 from __future__ import annotations
@@ -12,13 +12,21 @@ import base64
 import io
 import random
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Optional, Tuple
 
 import qrcode
+from PIL import Image, ImageDraw
+from qrcode.constants import ERROR_CORRECT_H
 
 from app.database.repositories.visit_repository import VisitRepository
 from app.models.visit import Visit, VisitStatus
+
+_LOGO_PATH = Path(__file__).parent.parent.parent / "assets" / "sentinel-logo.png"
+_QR_DARK = "#0a0f1e"   # SENTINEL navy
+_QR_LIGHT = "#ffffff"
+_LOGO_RATIO = 0.25     # logo occupies 25% of QR width
 
 
 class VisitTokenService:
@@ -26,6 +34,7 @@ class VisitTokenService:
 
     PIN_MIN = 0
     PIN_MAX = 999999
+    QR_ERROR_CORRECTION = ERROR_CORRECT_H
 
     def __init__(self, repo: Optional[VisitRepository] = None) -> None:
         self._repo = repo or VisitRepository()
@@ -48,15 +57,43 @@ class VisitTokenService:
         return f"{random.randint(self.PIN_MIN, self.PIN_MAX):06d}"
 
     def generate_qr_code(self, token: uuid.UUID) -> str:
-        """Generate a base64 PNG QR code encoding only the raw UUID string.
+        """Generate a branded base64 PNG QR code with SENTINEL logo overlay.
 
-        Per spec: QR contains NO other visitor data — just the token UUID.
-        Returns a base64-encoded PNG string (data URI prefix optional).
+        Uses ERROR_CORRECT_H (30% recovery) so the logo cutout doesn't break
+        scannability. Logo is centred in a white circular badge.
+        Returns a base64-encoded PNG string.
         """
-        qr = qrcode.QRCode(version=1, box_size=10, border=2)
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=self.QR_ERROR_CORRECTION,
+            box_size=10,
+            border=2,
+        )
         qr.add_data(str(token))
         qr.make(fit=True)
-        img = qr.make_image(fill_color="black", back_color="white")
+        img = qr.make_image(fill_color=_QR_DARK, back_color=_QR_LIGHT).convert("RGBA")
+
+        # Overlay logo if available
+        if _LOGO_PATH.exists():
+            qr_size = img.size[0]
+            logo_size = int(qr_size * _LOGO_RATIO)
+
+            logo = Image.open(_LOGO_PATH).convert("RGBA")
+            logo = logo.resize((logo_size, logo_size), Image.LANCZOS)
+
+            # White circular badge behind logo
+            badge_size = int(logo_size * 1.3)
+            badge = Image.new("RGBA", (badge_size, badge_size), (0, 0, 0, 0))
+            draw = ImageDraw.Draw(badge)
+            draw.ellipse((0, 0, badge_size, badge_size), fill=(255, 255, 255, 255))
+
+            # Centre logo on badge
+            logo_offset = (badge_size - logo_size) // 2
+            badge.paste(logo, (logo_offset, logo_offset), logo)
+
+            # Centre badge on QR
+            pos = ((qr_size - badge_size) // 2, (qr_size - badge_size) // 2)
+            img.paste(badge, pos, badge)
 
         buf = io.BytesIO()
         img.save(buf, format="PNG")
@@ -74,8 +111,12 @@ class VisitTokenService:
         host_mobile: Optional[str] = None,
         visitor_name: Optional[str] = None,
         visitor_vehicle: Optional[str] = None,
+        status: VisitStatus = VisitStatus.CREATED,
     ) -> Tuple[Visit, str]:
         """Create a new Visit record with token + PIN + QR code.
+
+        Args:
+            status: Initial visit status. Use PENDING for invites awaiting visitor acceptance.
 
         Returns:
             Tuple of (Visit model, qr_code_base64 string)
@@ -97,7 +138,7 @@ class VisitTokenService:
             building_id=building_id,
             meeting_start=meeting_start,
             meeting_end=meeting_end,
-            status=VisitStatus.CREATED,
+            status=status,
             qr_code=qr_code,
             created_at=now,
             updated_at=now,
@@ -134,24 +175,15 @@ class VisitTokenService:
         """
         now = datetime.now(timezone.utc)
 
-        # meeting_start is timezone-aware or naive
         meeting_start = visit.meeting_start
         if meeting_start.tzinfo is None:
             meeting_start = meeting_start.replace(tzinfo=timezone.utc)
 
-        # meeting_end is timezone-aware or naive
         meeting_end = visit.meeting_end
         if meeting_end.tzinfo is None:
             meeting_end = meeting_end.replace(tzinfo=timezone.utc)
 
-        window_start = meeting_start
-        window_end = meeting_end
-
-        # Allow 30 min early arrival
-        from datetime import timedelta
-
         window_start = meeting_start - timedelta(minutes=30)
-        # Allow 60 min grace after meeting_end
         window_end = meeting_end + timedelta(minutes=60)
 
         return window_start <= now <= window_end

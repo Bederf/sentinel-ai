@@ -1,6 +1,7 @@
 """Supabase client for database operations."""
 
 import os
+import warnings
 from typing import Optional
 from app.config.settings import settings
 
@@ -31,14 +32,48 @@ def get_supabase_client():
             _supabase_client = _DummySupabaseClient()
             return _supabase_client
 
-        from supabase import create_client
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            warnings.filterwarnings(
+                "ignore",
+                message="The 'timeout' parameter is deprecated. Please configure it in the http client instead.",
+                category=DeprecationWarning,
+            )
+            warnings.filterwarnings(
+                "ignore",
+                message="'.*' deprecated - use '.*'",
+                category=DeprecationWarning,
+            )
+            warnings.filterwarnings(
+                "ignore",
+                message="'.*' argument is deprecated, use '.*'",
+                category=DeprecationWarning,
+            )
+            from supabase import create_client
 
         if not settings.supabase_url or not settings.supabase_service_role_key:
             raise ValueError(
                 "Supabase credentials not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env"
             )
 
-        _supabase_client = create_client(settings.supabase_url, settings.supabase_service_role_key)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            warnings.filterwarnings(
+                "ignore",
+                message="The 'timeout' parameter is deprecated. Please configure it in the http client instead.",
+                category=DeprecationWarning,
+            )
+            warnings.filterwarnings(
+                "ignore",
+                message="'.*' deprecated - use '.*'",
+                category=DeprecationWarning,
+            )
+            warnings.filterwarnings(
+                "ignore",
+                message="'.*' argument is deprecated, use '.*'",
+                category=DeprecationWarning,
+            )
+            _supabase_client = create_client(settings.supabase_url, settings.supabase_service_role_key)
 
     return _supabase_client
 

@@ -5,7 +5,7 @@ configurable weights for comfort, cost, runtime, energy, and maintenance impacts
 """
 
 import logging
-from typing import Dict, List, Any
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +22,7 @@ class RecommendationScorer:
     - Maintenance: reduced service calls and preventive care
     """
 
-    def __init__(self, profile: Dict[str, Any]):
+    def __init__(self, profile: dict[str, Any]):
         """Initialize scorer with a profile definition.
 
         Args:
@@ -57,7 +57,7 @@ class RecommendationScorer:
         self.weights = weights
         logger.debug(f"Initialized RecommendationScorer with weights: {self.weights}")
 
-    def score_recommendation(self, recommendation: Dict[str, Any]) -> float:
+    def score_recommendation(self, recommendation: dict[str, Any]) -> float:
         """Score a single recommendation against profile weights.
 
         Uses profile weights to calculate weighted score:
@@ -108,7 +108,7 @@ class RecommendationScorer:
         # Clamp final score to 0-1 range
         return min(1.0, max(0.0, score))
 
-    def rank_recommendations(self, recommendations: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def rank_recommendations(self, recommendations: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Rank recommendations by multi-objective score.
 
         Scores all recommendations and sorts them by score in descending order
@@ -131,7 +131,7 @@ class RecommendationScorer:
 
         return sorted_recs
 
-    def _infer_module_key(self, recommendation: Dict[str, Any]) -> str:
+    def _infer_module_key(self, recommendation: dict[str, Any]) -> str:
         """Infer module key used for module_multipliers lookup."""
         for key in ("system", "module", "source_module", "equipment_type", "target_module"):
             value = recommendation.get(key)

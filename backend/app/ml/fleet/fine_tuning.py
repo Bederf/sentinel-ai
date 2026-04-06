@@ -42,11 +42,11 @@ class LocalFineTuner:
     def __init__(self):
         self._fine_tune_history: List[Dict[str, Any]] = []
         self._fine_tuned_models: Dict[str, Dict[str, Any]] = {}
-        self._initialize_demo_models()
+        self._initialize_seed_models()
 
-    def _initialize_demo_models(self) -> None:
-        """Initialize demo fine-tuned models for testing."""
-        demo_models = [
+    def _initialize_seed_models(self) -> None:
+        """Initialize seed fine-tuned models for testing."""
+        seed_models = [
             {
                 "model_id": "ft-lstm-chiller-site002-001",
                 "site_code": "site-002",
@@ -119,7 +119,7 @@ class LocalFineTuner:
             },
         ]
 
-        for model in demo_models:
+        for model in seed_models:
             self._fine_tuned_models[model["model_id"]] = model
 
     def list_fine_tuned_models(

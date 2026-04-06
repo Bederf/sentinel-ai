@@ -31,7 +31,7 @@ export function SolarFinancialReport({ siteId }: SolarFinancialReportProps) {
       setSummary(data);
       setError(null);
     } catch (_e) {
-      // Fallback to demo data
+      // Fallback to seeded data
       const demoData: FinancialSummary = {
         site_id: siteId,
         period: "ytd",

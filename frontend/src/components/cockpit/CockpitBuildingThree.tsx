@@ -5,21 +5,39 @@ import { Suspense, useCallback, useLayoutEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { MOUSE } from 'three'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
-import type { CockpitState } from './types'
+import type { CockpitState, CockpitTwinZoneSignal } from './types'
 import { cockpitFloorPalette, cockpitFlowColor, cockpitToneKey } from './cockpitTwinTheme'
 import { motionReduced } from './motionPreference'
 
 interface CockpitBuildingThreeProps {
   state: CockpitState
   className?: string
+  onZoneSelect?: (signal: CockpitTwinZoneSignal | null) => void
 }
 
 const SLAB_HEIGHT = 0.28
 const BASE_WIDTH = 1.35
 const BASE_DEPTH = 1.05
+const TOWER_SLAB_COUNT = 30
+const MAX_FLOORS = 8
+
+/**
+ * Maps Sentinel floor IDs to their stack index in the 30-slab host tower.
+ * Keeps managed levels distributed across the full tower height so they don't
+ * cluster at the base. L0 is omitted here — it occupies the same physical
+ * position as B1 (index 0) and would duplicate it.
+ */
+const SENTINEL_FLOOR_STACK_INDEX: Record<string, number> = {
+  B1: 0,
+  L0: 0,
+  L1: 8,   // lower third
+  L2: 14,  // mid-tower
+  L3: 20,  // upper-mid, above the second setback
+  R:  29,  // crown
+}
 
 function GridHelperMemo() {
-  const grid = useMemo(() => new THREE.GridHelper(48, 48, 0x334155, 0x0c1222), [])
+  const grid = useMemo(() => new THREE.GridHelper(18, 18, 0x334155, 0x0c1222), [])
   return <primitive object={grid} position={[0, 0, 0]} />
 }
 
@@ -28,6 +46,7 @@ type SlabInfo = {
   intensity: number
   isManaged: boolean
   riskLevel: string
+  isFocus?: boolean
 }
 
 /** Local Y bounds (pre-scale) for Sentinel-managed slabs only */
@@ -59,6 +78,7 @@ function ManagedSlab({
   breath,
   waiting,
   calm,
+  isFocus,
 }: {
   floor: SlabInfo
   tone: ReturnType<typeof cockpitToneKey>
@@ -69,6 +89,7 @@ function ManagedSlab({
   breath: number
   waiting: boolean
   calm: boolean
+  isFocus?: boolean
 }) {
   const groupRef = useRef<THREE.Group>(null)
   const pal = cockpitFloorPalette(tone, floor.intensity, floor.isManaged, floor.riskLevel)
@@ -77,7 +98,9 @@ function ManagedSlab({
     const g = groupRef.current
     if (!g || motionReduced() || waiting || calm) return
     const t = performance.now() * 0.001
-    const s = 1 + Math.sin(t * 1.8) * breath * 0.014
+    const s = isFocus
+      ? 1 + Math.sin(t * 1.8 * 1.6) * breath * 0.014 * 1.4
+      : 1 + Math.sin(t * 1.8) * breath * 0.014
     g.scale.setScalar(s)
   })
 
@@ -146,28 +169,64 @@ function BuildingStack({
   const waiting = state.site.renderState === 'waiting'
   const calm = !waiting && state.primaryMetric.value === 'Stable'
   const breath = Math.max(0.12, Math.min(1, state.visualTwin.breathingIntensity || 0.2))
+  const focusFloorId = state.visualTwin.focusFloorId
+
+  const floorSignalWeights = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const signal of state.visualTwin.zoneSignals) {
+      const current = map.get(signal.floorId) ?? 0
+      map.set(signal.floorId, Math.max(current, signal.weight))
+    }
+    return map
+  }, [state.visualTwin.zoneSignals])
 
   const slabs: SlabInfo[] = useMemo(() => {
-    if (floors.length === 0) {
-      return Array.from({ length: 5 }).map((_, i) => ({
-        id: `default-${i}`,
-        intensity: 0.25,
-        isManaged: i >= 2,
-        riskLevel: 'stable',
+    const hasSentinelFloors = floors.some((f) => f.id in SENTINEL_FLOOR_STACK_INDEX)
+
+    if (!hasSentinelFloors) {
+      // Non-Sandton layout: render floors as-is (original behaviour)
+      if (floors.length === 0) {
+        return Array.from({ length: 5 }).map((_, i) => ({
+          id: `default-${i}`,
+          intensity: 0.25,
+          isManaged: i >= 2,
+          riskLevel: 'stable',
+        }))
+      }
+      return floors.map((f) => ({
+        id: f.id,
+        intensity: floorSignalWeights.get(f.id) ?? f.intensity,
+        isManaged: Boolean(f.isManaged),
+        riskLevel: f.level,
+        isFocus: f.id === focusFloorId,
       }))
     }
-    return floors.map((f) => ({
-      id: f.id,
-      intensity: f.intensity,
-      isManaged: Boolean(f.isManaged),
-      riskLevel: f.level,
-    }))
-  }, [floors])
+
+    // Sandton tower: expand to TOWER_SLAB_COUNT slabs with Sentinel floors at
+    // their correct stack positions; remaining slabs are unmanaged host mass.
+    const sentinelMap = new Map<number, (typeof floors)[0]>()
+    for (const f of floors) {
+      const idx = SENTINEL_FLOOR_STACK_INDEX[f.id]
+      if (idx !== undefined) sentinelMap.set(idx, f)
+    }
+
+    return Array.from({ length: TOWER_SLAB_COUNT }).map((_, i) => {
+      const f = sentinelMap.get(i)
+      if (f) {
+        return {
+          id: f.id,
+          intensity: floorSignalWeights.get(f.id) ?? f.intensity,
+          isManaged: true,
+          riskLevel: f.level,
+          isFocus: f.id === focusFloorId,
+        }
+      }
+      return { id: `host-${i}`, intensity: 0, isManaged: false, riskLevel: 'stable' }
+    })
+  }, [floors, floorSignalWeights, focusFloorId])
 
   const reversed = [...slabs].reverse()
   const totalHeight = reversed.length * SLAB_HEIGHT
-  let yCursor = 0
-
   return (
     <group position={[0, 0, 0]}>
       {/* Full host-tower cage so overall mass stays readable on dark scenes */}
@@ -188,8 +247,7 @@ function BuildingStack({
 
       {reversed.map((floor, index) => {
         const h = SLAB_HEIGHT
-        const y = yCursor + h / 2
-        yCursor += h
+        const y = index * h + h / 2
         const setback = 1 - index * 0.0045
         const w = BASE_WIDTH * setback
         const d = BASE_DEPTH * setback
@@ -207,6 +265,7 @@ function BuildingStack({
               breath={breath}
               waiting={waiting}
               calm={calm}
+              isFocus={floor.isFocus}
             />
           )
         }
@@ -308,14 +367,95 @@ function AnimatedTracer({
   )
 }
 
+/** Color and animation speed by zone risk level */
+const LEVEL_COLORS: Record<string, { color: string; emissive: string; speed: number; maxIntensity: number }> = {
+  critical: { color: '#fca5a5', emissive: '#ef4444', speed: 4, maxIntensity: 1.2 },
+  approaching: { color: '#fdba74', emissive: '#f97316', speed: 2.5, maxIntensity: 1.0 },
+  drift: { color: '#fde68a', emissive: '#eab308', speed: 1.2, maxIntensity: 0.7 },
+  stable: { color: '#67e8f9', emissive: '#22d3ee', speed: 0, maxIntensity: 0.6 },
+}
+
+function AnimatedZoneMarker({
+  position,
+  level,
+  onClick,
+}: {
+  position: [number, number, number]
+  level: string
+  onClick?: () => void
+}) {
+  const meshRef = useRef<THREE.Mesh>(null)
+  const haloRef = useRef<THREE.Mesh>(null)
+  const cfg = LEVEL_COLORS[level] ?? LEVEL_COLORS.stable
+  const isFlashing = cfg.speed > 0
+
+  useFrame(() => {
+    if (!meshRef.current || !haloRef.current) return
+    const t = performance.now() * 0.001
+
+    if (isFlashing) {
+      // Flash: oscillate emissive intensity
+      const pulse = (Math.sin(t * cfg.speed) + 1) / 2
+      const intensity = cfg.maxIntensity * (0.3 + pulse * 0.7)
+      ;(meshRef.current.material as THREE.MeshStandardMaterial).emissiveIntensity = intensity
+
+      // Halo: scale pulse
+      const haloScale = 1.0 + pulse * 0.6
+      haloRef.current.scale.setScalar(haloScale)
+      ;(haloRef.current.material as THREE.MeshBasicMaterial).opacity = pulse * 0.25
+    } else {
+      // Subtle breathe for stable
+      const breathe = (Math.sin(t * 1.5) + 1) / 2
+      ;(meshRef.current.material as THREE.MeshStandardMaterial).emissiveIntensity =
+        cfg.maxIntensity * (0.4 + breathe * 0.4)
+    }
+  })
+
+  const size = level === 'critical' || level === 'approaching' ? 0.13 : 0.09
+
+  return (
+    <group position={position}>
+      {/* Core marker */}
+      <mesh ref={meshRef} onClick={onClick}>
+        <sphereGeometry args={[size, 16, 16]} />
+        <meshStandardMaterial
+          color={cfg.color}
+          emissive={cfg.emissive}
+          emissiveIntensity={cfg.maxIntensity}
+          metalness={0.2}
+          roughness={0.2}
+          transparent
+          opacity={0.95}
+          depthWrite={false}
+        />
+      </mesh>
+
+      {/* Outer halo for warning/critical */}
+      {isFlashing && (
+        <mesh ref={haloRef}>
+          <sphereGeometry args={[size * 2.2, 12, 12]} />
+          <meshBasicMaterial
+            color={cfg.emissive}
+            transparent
+            opacity={0.12}
+            depthWrite={false}
+          />
+        </mesh>
+      )}
+    </group>
+  )
+}
+
 function ZoneMarkers({
   state,
   buildingHeight,
+  onZoneSelect,
 }: {
   state: CockpitState
   buildingHeight: number
+  onZoneSelect?: (signal: CockpitTwinZoneSignal | null) => void
 }) {
-  const signals = state.visualTwin.zoneSignals.slice(0, 5)
+  const signals = state.visualTwin.zoneSignals.filter((s) => s.weight > 0.05)
   const floors = state.visualTwin.floors
   const n = Math.max(floors.length, 1)
 
@@ -334,19 +474,12 @@ function ZoneMarkers({
         const x = Math.cos(angle) * 0.72
         const z = Math.sin(angle) * 0.58 + 0.1
         return (
-          <mesh key={`${sig.zoneId}-${index}`} position={[x, y, z]}>
-            <sphereGeometry args={[0.09, 16, 16]} />
-            <meshStandardMaterial
-              color="#f8fafc"
-              emissive="#ffffff"
-              emissiveIntensity={0.9}
-              metalness={0.2}
-              roughness={0.2}
-              transparent
-              opacity={0.98}
-              depthWrite={false}
-            />
-          </mesh>
+          <AnimatedZoneMarker
+            key={`${sig.zoneId}-${index}`}
+            position={[x, y, z]}
+            level={sig.level}
+            onClick={() => onZoneSelect?.(sig)}
+          />
         )
       })}
     </group>
@@ -397,17 +530,19 @@ function SceneR3F({
   defaultCam,
   computedTarget,
   modelScale,
+  onZoneSelect,
 }: {
   state: CockpitState
   controlsRef: MutableRefObject<OrbitControlsImpl | null>
   defaultCam: THREE.Vector3
   computedTarget: THREE.Vector3
   modelScale: number
+  onZoneSelect?: (signal: CockpitTwinZoneSignal | null) => void
 }) {
   const tone = cockpitToneKey(state)
   const { camera } = useThree()
 
-  const floorCount = Math.max(state.visualTwin.floors.length, 5)
+  const floorCount = Math.min(Math.max(state.visualTwin.floors.length, 5), MAX_FLOORS)
   const buildingHeight = floorCount * SLAB_HEIGHT
   const yRange = useMemo(() => managedLocalYRange(state.visualTwin.floors), [state.visualTwin.floors])
 
@@ -450,7 +585,7 @@ function SceneR3F({
         <BuildingStack state={state} tone={tone} />
         <DriftPath state={state} tone={tone} visible={showFlow} yRange={yRange} />
         <AnimatedTracer tone={tone} yRange={yRange} active={showFlow} />
-        <ZoneMarkers state={state} buildingHeight={buildingHeight} />
+        <ZoneMarkers state={state} buildingHeight={buildingHeight} onZoneSelect={onZoneSelect} />
       </group>
 
       <OrbitControls
@@ -458,8 +593,8 @@ function SceneR3F({
         makeDefault
         enableDamping
         dampingFactor={0.08}
-        minDistance={Math.max(2.2, worldHalf * 0.95)}
-        maxDistance={Math.max(12, worldHalf * 4.2)}
+        minDistance={Math.max(1.4, worldHalf * 0.7)}
+        maxDistance={Math.max(8, worldHalf * 3.2)}
         minPolarAngle={0.32}
         maxPolarAngle={Math.PI / 2 + 0.14}
         target={computedTarget}
@@ -475,20 +610,22 @@ function SceneR3F({
   )
 }
 
-export function CockpitBuildingThree({ state, className }: CockpitBuildingThreeProps) {
+export function CockpitBuildingThree({ state, className, onZoneSelect }: CockpitBuildingThreeProps) {
   const controlsRef = useRef<OrbitControlsImpl>(null)
-  const floorCount = Math.max(state.visualTwin.floors.length, 5)
+  const hasSentinelFloors = state.visualTwin.floors.some((f) => f.id in SENTINEL_FLOOR_STACK_INDEX)
+  const floorCount = hasSentinelFloors ? TOWER_SLAB_COUNT : Math.min(Math.max(state.visualTwin.floors.length, 5), MAX_FLOORS)
   const buildingHeight = floorCount * SLAB_HEIGHT
 
   const modelScale = useMemo(
-    () => THREE.MathUtils.clamp(5.8 / Math.max(buildingHeight, 2.8), 1.75, 3.6),
+    () => THREE.MathUtils.clamp(4.2 / Math.max(buildingHeight, 2.8), 1.1, 2.2),
     [buildingHeight],
   )
 
   const layout = useMemo(() => {
     const wh = buildingHeight * modelScale * 0.5
     const target = new THREE.Vector3(0, wh, 0)
-    const cam = new THREE.Vector3(wh * 1.22, wh * 0.92, wh * 1.68)
+    // Tighter fov=30 needs a further z to frame the full tower silhouette without distortion
+    const cam = new THREE.Vector3(wh * 1.05, wh * 0.78, wh * 1.45)
     return { computedTarget: target, defaultCam: cam }
   }, [buildingHeight, modelScale])
 
@@ -514,7 +651,7 @@ export function CockpitBuildingThree({ state, className }: CockpitBuildingThreeP
     oc.update()
   }, [computedTarget, defaultCam])
 
-  const viewportHeight = 'clamp(560px, 74vh, 920px)'
+  const viewportHeight = 'clamp(380px, 52vh, 580px)'
 
   return (
     <div className={`relative w-full ${className ?? ''}`} style={{ height: viewportHeight }}>
@@ -524,11 +661,12 @@ export function CockpitBuildingThree({ state, className }: CockpitBuildingThreeP
         style={{ width: '100%', height: '100%' }}
         shadows
         gl={{ antialias: true, alpha: false, powerPreference: 'high-performance' }}
-        camera={{ fov: 48, near: 0.1, far: 220, position: [defaultCam.x, defaultCam.y, defaultCam.z] }}
+        camera={{ fov: 30, near: 0.1, far: 220, position: [defaultCam.x, defaultCam.y, defaultCam.z] }}
         onDoubleClick={(e) => {
           e.preventDefault()
           reset()
         }}
+        onPointerMissed={() => onZoneSelect?.(null)}
       >
         <Suspense fallback={null}>
           <SceneR3F
@@ -537,9 +675,19 @@ export function CockpitBuildingThree({ state, className }: CockpitBuildingThreeP
             defaultCam={defaultCam}
             computedTarget={computedTarget}
             modelScale={modelScale}
+            onZoneSelect={onZoneSelect}
           />
         </Suspense>
       </Canvas>
+      {/* Sentinel-managed floor legend: L0 omitted — same physical location as B1 */}
+      <div className="pointer-events-none absolute bottom-10 left-3 flex flex-col gap-0.5">
+        {(['R', 'L3', 'L2', 'L1', 'B1'] as const).map((label) => (
+          <div key={label} className="flex items-center gap-1.5">
+            <div className="h-1.5 w-1.5 rounded-full bg-cyan-400/70" />
+            <span className="text-[9px] uppercase tracking-[0.14em] text-cyan-300/70">{label}</span>
+          </div>
+        ))}
+      </div>
       <div className="pointer-events-none absolute bottom-2 left-3 max-w-[90%] text-[10px] uppercase tracking-[0.16em] text-slate-500">
         Drag orbit · Wheel zoom · Right-drag pan · Double-click reset · Sentinel scope: occupied levels only
       </div>

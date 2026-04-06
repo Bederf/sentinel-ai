@@ -6,24 +6,23 @@ Respects technician preferences: quiet hours, alert level thresholds, emergency 
 """
 
 import logging
-from typing import Optional
-from uuid import UUID
 from datetime import datetime
+from uuid import UUID
 
-from .notification_providers import (
-    TelegramProvider,
-    WhatsAppProvider,
-    BulkSMSProvider,
-)
-from .notification_providers.base_provider import NotificationResult
+from ..database.repositories.notification_repository import NotificationRepository
 from ..models.notification import (
-    ChannelType,
     AlertLevel,
+    ChannelType,
+    NotificationDeliveryLog,
     NotificationStatus,
     TechnicianNotificationChannel,
-    NotificationDeliveryLog,
 )
-from ..database.repositories.notification_repository import NotificationRepository
+from .notification_providers import (
+    BulkSMSProvider,
+    TelegramProvider,
+    WhatsAppProvider,
+)
+from .notification_providers.base_provider import NotificationResult
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +52,7 @@ class NotificationService:
         title: str,
         body: str,
         alert_level: AlertLevel = AlertLevel.WARNING,
-        work_order_id: Optional[UUID] = None,
+        work_order_id: UUID | None = None,
         notification_type: str = "work_order_assigned",
     ) -> dict:
         """Send notification to technician via enabled channels.
@@ -232,7 +231,7 @@ class NotificationService:
         technician_id: UUID,
         title: str,
         body: str,
-        work_order_id: Optional[UUID],
+        work_order_id: UUID | None,
         notification_type: str,
     ) -> tuple:
         """Send notification to single channel and log delivery.

@@ -17,9 +17,8 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import asdict
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Optional
 
 from app.models.fuel import FuelTankConfig, FuelTelemetry
 
@@ -58,11 +57,11 @@ class FuelStore:
         except Exception as exc:
             logger.error("Failed to load fuel tank configs: %s", exc)
 
-    def get_tank_config(self, tank_id: str) -> Optional[FuelTankConfig]:
+    def get_tank_config(self, tank_id: str) -> FuelTankConfig | None:
         """Return config for a single tank, or None if unknown."""
         return self._tanks.get(tank_id)
 
-    def get_all_tanks(self, site_id: Optional[str] = None) -> list[FuelTankConfig]:
+    def get_all_tanks(self, site_id: str | None = None) -> list[FuelTankConfig]:
         """Return all tank configs, optionally filtered by site_id."""
         tanks = list(self._tanks.values())
         if site_id:
@@ -120,7 +119,7 @@ class FuelStore:
     # Telemetry read (3-tier fallback)
     # ------------------------------------------------------------------
 
-    async def get_latest_telemetry(self, tank_id: str) -> Optional[FuelTelemetry]:
+    async def get_latest_telemetry(self, tank_id: str) -> FuelTelemetry | None:
         """Read latest telemetry for a tank using the 3-tier fallback chain."""
         # Tier 1: Redis cache
         record = self._read_redis(tank_id)
@@ -139,7 +138,7 @@ class FuelStore:
 
         return None
 
-    def _read_redis(self, tank_id: str) -> Optional[dict]:
+    def _read_redis(self, tank_id: str) -> dict | None:
         try:
             from app.services.cache_service import cache
 
@@ -147,7 +146,7 @@ class FuelStore:
         except Exception:
             return None
 
-    def _read_supabase(self, tank_id: str) -> Optional[dict]:
+    def _read_supabase(self, tank_id: str) -> dict | None:
         try:
             from app.database.supabase_client import get_client
 
@@ -168,11 +167,11 @@ class FuelStore:
             logger.debug("Supabase fuel read failed: %s", exc)
         return None
 
-    def _read_json(self, tank_id: str) -> Optional[dict]:
+    def _read_json(self, tank_id: str) -> dict | None:
         if not _TELEMETRY_FILE.exists():
             return None
         try:
-            last_match: Optional[dict] = None
+            last_match: dict | None = None
             with open(_TELEMETRY_FILE) as fh:
                 for line in fh:
                     line = line.strip()
@@ -197,9 +196,9 @@ class FuelStore:
             try:
                 received = datetime.fromisoformat(received)
             except ValueError:
-                received = datetime.now(tz=timezone.utc)
+                received = datetime.now(tz=UTC)
         elif not isinstance(received, datetime):
-            received = datetime.now(tz=timezone.utc)
+            received = datetime.now(tz=UTC)
 
         return FuelTelemetry(
             node_id=record.get("node_id", ""),
@@ -231,7 +230,7 @@ class FuelStore:
 # Singleton
 # ------------------------------------------------------------------
 
-_instance: Optional[FuelStore] = None
+_instance: FuelStore | None = None
 
 
 def get_fuel_store() -> FuelStore:

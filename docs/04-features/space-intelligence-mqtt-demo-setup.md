@@ -1,3 +1,18 @@
+---
+title: "Space Intelligence — 5-Room MQTT Demo Setup"
+type: "spec"
+status: "draft"
+version: "1.0.0"
+created: "2026-03-31"
+updated: "2026-03-31"
+tags: ["sentinel", "documentation"]
+related: []
+domain: "bms"
+audience: "all"
+complexity: "intermediate"
+estimated_read_time: 10
+---
+
 # Space Intelligence — 5-Room MQTT Demo Setup
 
 > **Rev 1.0** | 2026-03-08 | Wemos D1 Mini + HLK-LD2410C + Mosquitto MQTT

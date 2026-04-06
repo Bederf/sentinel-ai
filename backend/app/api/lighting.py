@@ -475,67 +475,6 @@ def run_lighting_simulation(max_day: int = 365) -> dict:
 # ============================================================================
 
 
-@router.get("/simulation")
-async def get_lighting_simulation(
-    site_id: str = Query(None, description="Site ID"),
-    max_day: int = Query(365, ge=1, le=365, description="Simulate up to this many days (1-365)"),
-):
-    """
-    Get 365-day DALI lighting simulation with 3-tier comparison.
-
-    Compares three scenarios:
-    1. **Baseline**: Traditional fixed schedules (no DALI)
-    2. **With DALI**: Occupancy detection + daylight harvesting (Tridonic)
-    3. **With SENTINEL AI**: Predictive optimization on top of DALI
-
-    Simulation includes:
-    - Physics-based daylight calculations (Johannesburg latitude: -26.12°)
-    - Seasonal weather patterns (summer thunderstorms, winter clear)
-    - Realistic occupancy patterns (weekday/weekend/holiday)
-    - ML learning curve (60% → 95% over 12 months)
-    - Tariff bands (off-peak, standard, peak rates)
-
-    Returns:
-        - **summary**: Annual costs, savings, metrics
-        - **daily_data**: Daily cumulative costs (every 3 days sampled)
-        - **monthly_data**: Monthly cost breakdown
-
-    Example response:
-    ```json
-    {
-      "summary": {
-        "baseline_annual_cost": 182000,
-        "dali_annual_cost": 127000,
-        "sentinel_annual_cost": 102000,
-        "total_savings_zar": 80000,
-        "savings_pct": 44,
-        "ml_effectiveness_pct": 92
-      },
-      "daily_data": [
-        {
-          "day": 1,
-          "baseline_cumulative": 450,
-          "dali_cumulative": 315,
-          "sentinel_cumulative": 280,
-          "learning_factor": 0.601
-        },
-        ...
-      ],
-      "monthly_data": [
-        {
-          "month": "Mar",
-          "baseline_cost": 15230,
-          "dali_cost": 10661,
-          "sentinel_cost": 9480
-        },
-        ...
-      ]
-    }
-    ```
-    """
-    return run_lighting_simulation(max_day=max_day)
-
-
 @router.get("/live")
 async def get_live_lighting_data(
     site_id: str = Query(None, description="Site ID"),
@@ -652,7 +591,7 @@ async def get_building_occupancy(site_id: str = Query(None, description="Site ID
     - Level 1: Meeting rooms (low occupancy - mostly empty during meetings held elsewhere)
     - Level 2: Open office (medium occupancy - mixed use throughout day)
 
-    This endpoint tells the demo story: shows zones that are being lit despite low occupancy,
+    This endpoint highlights zones that are being lit despite low occupancy,
     demonstrating where SENTINEL saves energy through occupancy-based control.
     """
     from datetime import datetime
@@ -862,7 +801,7 @@ async def get_zone_lighting(zone_id: str):
     Get lighting data for a specific zone.
 
     Returns current brightness, lux readings, daylight harvesting status, and energy waste.
-    Tells the demo story with realistic data showing:
+    Provides realistic data showing:
     - How daylight harvesting works (high lux = dimmed brightness)
     - Energy waste detection (low occupancy + high brightness)
     - Zone-specific optimization
@@ -992,7 +931,7 @@ async def get_zone_lighting(zone_id: str):
     )
 
     response = zone_lighting.to_dict()
-    # Add extra fields for demo
+    # Add extra fields for local visualization
     response["lux_reading"] = data["lux"]
     response["daylight_harvesting_active"] = data["daylight_harvesting"]
     response["timestamp"] = timestamp
@@ -1010,7 +949,7 @@ async def get_lighting_stats(site_id: str = Query(None, description="Site ID")):
     - Energy waste detected across the building
     - ML effectiveness in optimizing lighting
 
-    Tells the demo story: Shows real savings happening right now.
+    Shows real savings happening right now.
     """
     from datetime import datetime
 
@@ -1019,7 +958,7 @@ async def get_lighting_stats(site_id: str = Query(None, description="Site ID")):
     now = datetime.now()
     timestamp = now.isoformat()
 
-    # Realistic demo stats for current time (afternoon with daylight)
+    # Realistic local stats for current time (afternoon with daylight)
     # This shows the intelligent lighting system working
     stats = LightingStats(
         site_id=site_id,
@@ -1085,19 +1024,15 @@ async def get_detailed_occupancy(
         # Get zone mappings from database or fallback to JSON
         zones_data = []
 
-        # In DEMO_MODE, always use JSON fallback directly
-        demo_mode = os.getenv("DEMO_MODE", "").lower() == "true"
+        # Try Supabase first
+        try:
+            supabase = get_supabase_client()
+            zone_mappings = supabase.table("zone_display_mappings").select("*").eq("site_id", site_id).execute()
+            zones_data = zone_mappings.data if zone_mappings.data else []
+        except Exception as db_error:
+            logger.debug(f"Supabase zone lookup failed: {db_error}, using JSON fallback")
 
-        if not demo_mode:
-            # Try Supabase first in production
-            try:
-                supabase = get_supabase_client()
-                zone_mappings = supabase.table("zone_display_mappings").select("*").eq("site_id", site_id).execute()
-                zones_data = zone_mappings.data if zone_mappings.data else []
-            except Exception as db_error:
-                logger.debug(f"Supabase zone lookup failed: {db_error}, using JSON fallback")
-
-        # If zones still empty (or DEMO_MODE), try JSON fallback
+        # If zones still empty, try JSON fallback
         if not zones_data:
             try:
                 # Map site_id to site_id for file path

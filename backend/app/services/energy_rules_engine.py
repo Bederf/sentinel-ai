@@ -14,9 +14,10 @@ Rules:
 """
 
 from datetime import date
-from typing import Optional, List
-from app.models.energy_rules import BuildingState, RuleResult, RulesEngineOutput, SystemBreakdown, LearningCurvePhase
+from typing import Optional
+
 from app.core.site_resolver import get_primary_site_code
+from app.models.energy_rules import BuildingState, LearningCurvePhase, RuleResult, RulesEngineOutput, SystemBreakdown
 
 # ==================== RULE THRESHOLDS (Tunable) ====================
 
@@ -73,27 +74,15 @@ class EnergyRulesEngine:
     energy savings (0-35%) with transparent reasoning.
     """
 
-    def __init__(self, site_id: str | None = None, deployment_date: Optional[date] = None):
+    def __init__(self, site_id: str | None = None, deployment_date: date | None = None):
         """Initialize rules engine.
 
         Args:
             site_id: Site identifier
             deployment_date: When SENTINEL deployment began (for learning curve)
-                           If None, tries to get from lifecycle orchestrator,
-                           then falls back to DEFAULT_DEPLOYMENT_DATE
+                           If None, falls back to DEFAULT_DEPLOYMENT_DATE
         """
         self.site_id = site_id or get_primary_site_code() or "unknown"
-
-        # Get deployment date, trying orchestrator first
-        if deployment_date is None:
-            try:
-                from app.services.lifecycle_orchestrator import get_lifecycle_orchestrator
-
-                orchestrator = get_lifecycle_orchestrator()
-                if orchestrator.simulation_start_time:
-                    deployment_date = orchestrator.simulation_start_time.date()
-            except Exception:
-                pass
 
         # Final fallback
         if deployment_date is None:
@@ -102,7 +91,7 @@ class EnergyRulesEngine:
         self.deployment_date = deployment_date
 
     def evaluate_rules(
-        self, site_state: BuildingState, active_modules: List[str], baseline_kwh: float
+        self, site_state: BuildingState, active_modules: list[str], baseline_kwh: float
     ) -> RulesEngineOutput:
         """Evaluate all 5 rules and calculate total savings.
 
@@ -252,7 +241,7 @@ class EnergyRulesEngine:
             conditions_met=conditions_met,
         )
 
-    def _evaluate_rule_4_daylight_harvesting(self, state: BuildingState, active_modules: List[str]) -> RuleResult:
+    def _evaluate_rule_4_daylight_harvesting(self, state: BuildingState, active_modules: list[str]) -> RuleResult:
         """Rule 4: Daylight harvesting (4% max, DALI-only).
 
         Reduces artificial lighting when daylight is sufficient.
@@ -402,7 +391,7 @@ class EnergyRulesEngine:
         else:
             return LearningCurvePhase.PHASE_4_STABLE
 
-    def _calculate_system_breakdown(self, rules: List[RuleResult], total_delta_kwh: float) -> SystemBreakdown:
+    def _calculate_system_breakdown(self, rules: list[RuleResult], total_delta_kwh: float) -> SystemBreakdown:
         """Allocate savings to HVAC/Lighting/Power systems.
 
         Uses SYSTEM_ALLOCATION matrix to distribute each rule's
@@ -428,7 +417,7 @@ class EnergyRulesEngine:
         )
 
 
-def get_energy_rules_engine(site_id: str | None = None, deployment_date: Optional[date] = None) -> EnergyRulesEngine:
+def get_energy_rules_engine(site_id: str | None = None, deployment_date: date | None = None) -> EnergyRulesEngine:
     """Get or create singleton rules engine instance.
 
     Args:
@@ -441,16 +430,6 @@ def get_energy_rules_engine(site_id: str | None = None, deployment_date: Optiona
         EnergyRulesEngine singleton instance
     """
     global _energy_rules_engine
-
-    if deployment_date is None and _energy_rules_engine is None:
-        try:
-            from app.services.lifecycle_orchestrator import get_lifecycle_orchestrator
-
-            orchestrator = get_lifecycle_orchestrator()
-            if orchestrator.simulation_start_time:
-                deployment_date = orchestrator.simulation_start_time.date()
-        except Exception:
-            pass
 
     if _energy_rules_engine is None or _energy_rules_engine.site_id != site_id:
         _energy_rules_engine = EnergyRulesEngine(site_id=site_id, deployment_date=deployment_date)

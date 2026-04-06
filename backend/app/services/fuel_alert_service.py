@@ -15,7 +15,6 @@ Usage:
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 from app.models.fuel import FuelEventType
 
@@ -156,7 +155,7 @@ class FuelAlertService:
 # Singleton
 # ---------------------------------------------------------------------------
 
-_instance: Optional[FuelAlertService] = None
+_instance: FuelAlertService | None = None
 
 
 def get_fuel_alert_service() -> FuelAlertService:

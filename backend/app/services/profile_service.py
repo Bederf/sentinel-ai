@@ -4,16 +4,16 @@ Handles loading, caching, and management of optimization profiles and site-speci
 profile configurations including zone and schedule overrides.
 """
 
+import copy
 import json
 import logging
-import copy
 from pathlib import Path
-from typing import Dict, List, Optional, Any
+from typing import Any
 
 from app.models.optimization import (
+    ScheduleProfileOverride,
     SiteProfileConfig,
     ZoneProfileOverride,
-    ScheduleProfileOverride,
 )
 
 logger = logging.getLogger(__name__)
@@ -24,10 +24,10 @@ class ProfileService:
 
     def __init__(self):
         """Initialize ProfileService and load profiles from JSON."""
-        self.profiles: Dict[str, Dict[str, Any]] = self._load_profiles()
-        self.site_configs: Dict[str, SiteProfileConfig] = {}  # Runtime cache
+        self.profiles: dict[str, dict[str, Any]] = self._load_profiles()
+        self.site_configs: dict[str, SiteProfileConfig] = {}  # Runtime cache
 
-    def _load_profiles(self) -> Dict[str, Dict[str, Any]]:
+    def _load_profiles(self) -> dict[str, dict[str, Any]]:
         """Load optimization profiles from JSON file.
 
         Returns:
@@ -40,7 +40,7 @@ class ProfileService:
             return {}
 
         try:
-            with open(profile_path, "r") as f:
+            with open(profile_path) as f:
                 data = json.load(f)
                 # Map profile names to IDs for consistent access
                 profiles = {}
@@ -52,7 +52,7 @@ class ProfileService:
             logger.error(f"Error loading optimization profiles: {e}")
             return {}
 
-    def get_site_profile(self, site_id: str) -> Optional[Dict[str, Any]]:
+    def get_site_profile(self, site_id: str) -> dict[str, Any] | None:
         """Get active profile for a site.
 
         Returns the profile object that corresponds to the site's active profile setting.
@@ -88,7 +88,7 @@ class ProfileService:
 
         return profile
 
-    def get_zone_profile(self, site_id: str, zone_id: str) -> Optional[Dict[str, Any]]:
+    def get_zone_profile(self, site_id: str, zone_id: str) -> dict[str, Any] | None:
         """Get profile for specific zone (handles overrides).
 
         If a zone has an override, returns the override profile. Otherwise,
@@ -113,7 +113,7 @@ class ProfileService:
         # Fall back to site profile
         return self.get_site_profile(site_id)
 
-    def get_profile_params(self, profile: str, module: str) -> Dict[str, Any]:
+    def get_profile_params(self, profile: str, module: str) -> dict[str, Any]:
         """Get module-specific parameters for a profile.
 
         Extracts parameters relevant to a specific module (e.g., hvac, lighting).
@@ -159,7 +159,7 @@ class ProfileService:
                 logger.warning(f"Building file not found: {site_path}")
                 return False
 
-            with open(site_path, "r") as f:
+            with open(site_path) as f:
                 site_data = json.load(f)
 
             # Update optimization section
@@ -178,7 +178,7 @@ class ProfileService:
             logger.error(f"Error saving profile config for {site_id}: {e}")
             return False
 
-    def load_site_profile_config(self, site_id: str) -> Optional[SiteProfileConfig]:
+    def load_site_profile_config(self, site_id: str) -> SiteProfileConfig | None:
         """Load profile configuration from building.json.
 
         Loads from cache if available, otherwise reads from file.
@@ -200,7 +200,7 @@ class ProfileService:
                 logger.warning(f"Building file not found: {site_path}")
                 return None
 
-            with open(site_path, "r") as f:
+            with open(site_path) as f:
                 site_data = json.load(f)
 
             optimization_data = site_data.get("optimization", {})
@@ -225,7 +225,7 @@ class ProfileService:
             logger.error(f"Error loading profile config for {site_id}: {e}")
             return None
 
-    def list_profiles(self) -> List[Dict[str, Any]]:
+    def list_profiles(self) -> list[dict[str, Any]]:
         """List all available optimization profiles.
 
         Returns:
@@ -324,7 +324,7 @@ class ProfileService:
 
         return self.save_site_profile_config(site_id, config)
 
-    def clear_cache(self, site_id: Optional[str] = None) -> None:
+    def clear_cache(self, site_id: str | None = None) -> None:
         """Clear runtime cache.
 
         Args:
@@ -338,7 +338,7 @@ class ProfileService:
 
 
 # Singleton instance
-_profile_service: Optional[ProfileService] = None
+_profile_service: ProfileService | None = None
 
 
 def get_profile_service() -> ProfileService:

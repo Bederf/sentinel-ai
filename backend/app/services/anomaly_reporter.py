@@ -8,7 +8,7 @@ Reference: backend/app/services/sentry_integration for message patterns
 """
 
 import logging
-from typing import Dict, Any, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +85,7 @@ class AnomalyReporter:
     }
 
     def generate_report(
-        self, analysis_result: Dict[str, Any], equipment_id: str, equipment_name: Optional[str] = None
+        self, analysis_result: dict[str, Any], equipment_id: str, equipment_name: str | None = None
     ) -> str:
         """
         Generate a Telegram-friendly report from analysis results.
@@ -182,7 +182,7 @@ Vibration levels appear normal. Continue regular maintenance schedule."""
 
         return "\n".join(lines)
 
-    def generate_summary_for_service_record(self, analysis_result: Dict[str, Any]) -> Dict[str, Any]:
+    def generate_summary_for_service_record(self, analysis_result: dict[str, Any]) -> dict[str, Any]:
         """
         Generate structured summary for storage in service record.
 
@@ -218,7 +218,7 @@ Vibration levels appear normal. Continue regular maintenance schedule."""
             "mechanical_fault_detected": mechanical_fault is not None,
         }
 
-    def generate_baseline_report(self, analysis_result: Dict[str, Any], equipment_name: str, condition: str) -> str:
+    def generate_baseline_report(self, analysis_result: dict[str, Any], equipment_name: str, condition: str) -> str:
         """
         Generate report for baseline capture.
 
@@ -269,7 +269,7 @@ Vibration levels appear normal. Continue regular maintenance schedule."""
 
         return "\n".join(lines)
 
-    def generate_comparison_report(self, comparison_result: Dict[str, Any], equipment_name: str) -> str:
+    def generate_comparison_report(self, comparison_result: dict[str, Any], equipment_name: str) -> str:
         """
         Generate report comparing current reading to baseline.
 
@@ -329,7 +329,7 @@ Vibration levels appear normal. Continue regular maintenance schedule."""
 
 
 # Singleton instance
-_reporter_instance: Optional[AnomalyReporter] = None
+_reporter_instance: AnomalyReporter | None = None
 
 
 def get_anomaly_reporter() -> AnomalyReporter:

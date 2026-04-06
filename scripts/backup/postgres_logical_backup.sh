@@ -21,6 +21,9 @@ PGPORT="${PGPORT:-55322}"
 PGUSER="${PGUSER:-postgres}"
 export PGPASSWORD="${PGPASSWORD:-postgres}"
 
+# Docker container running Supabase Postgres 17 — use it for version-matched pg_dump
+PG_CONTAINER="${PG_CONTAINER:-supabase_db_bms-intelligence}"
+
 DATABASES_CSV="${SENTINEL_BACKUP_DATABASES:-${DATABASES:-postgres}}"
 SCHEMAS_CSV="${SENTINEL_BACKUP_SCHEMAS:-${SCHEMAS:-}}"
 REQUIRED_EXTENSIONS="${SENTINEL_REQUIRED_EXTENSIONS:-vector,pgcrypto,uuid-ossp}"
@@ -34,18 +37,25 @@ echo "Starting PostgreSQL logical backup"
 echo "Timestamp: ${TIMESTAMP}"
 echo "Mode: ${BACKUP_MODE}"
 echo "Target dir: ${TARGET_DIR}"
+echo "Container: ${PG_CONTAINER}"
 echo "Host: ${PGHOST}:${PGPORT}"
 echo "User: ${PGUSER}"
 echo "Databases: ${DATABASES_CSV}"
 echo "Schemas: ${SCHEMAS_CSV:-ALL}"
 echo
 
-for tool in pg_dump pg_dumpall; do
-  if ! command -v "${tool}" >/dev/null 2>&1; then
-    echo "Required tool '${tool}' is not installed or not on PATH." >&2
-    exit 1
-  fi
-done
+# Use pg_dump from inside the container to avoid version mismatch (server=17, system=15)
+_pg_dump() {
+  docker exec -e PGPASSWORD="${PGPASSWORD}" "${PG_CONTAINER}" pg_dump "$@"
+}
+_pg_dumpall() {
+  docker exec -e PGPASSWORD="${PGPASSWORD}" "${PG_CONTAINER}" pg_dumpall "$@"
+}
+
+if ! docker inspect "${PG_CONTAINER}" >/dev/null 2>&1; then
+  echo "Container '${PG_CONTAINER}' not found or not running." >&2
+  exit 1
+fi
 
 IFS=',' read -r -a DATABASES <<< "${DATABASES_CSV}"
 IFS=',' read -r -a SCHEMAS <<< "${SCHEMAS_CSV}"
@@ -68,11 +78,11 @@ fi
   echo "DATABASES=${DATABASES_CSV}"
   echo "SCHEMAS=${SCHEMAS_CSV}"
   echo "REQUIRED_EXTENSIONS=${REQUIRED_EXTENSIONS}"
+  echo "PG_CONTAINER=${PG_CONTAINER}"
 } > "${TARGET_DIR}/backup.env"
 
-pg_dumpall \
-  --host="${PGHOST}" \
-  --port="${PGPORT}" \
+_pg_dumpall \
+  --host=localhost \
   --username="${PGUSER}" \
   --globals-only \
   > "${TARGET_DIR}/globals.sql"
@@ -84,27 +94,27 @@ for db in "${DATABASES[@]}"; do
   echo
   echo "Backing up database '${db}'"
 
-  pg_dump \
-    --host="${PGHOST}" \
-    --port="${PGPORT}" \
+  _pg_dump \
+    --host=localhost \
     --username="${PGUSER}" \
     --format=custom \
     --no-owner \
     --no-privileges \
     "${SCHEMA_ARGS[@]}" \
-    --file="${TARGET_DIR}/${db}.dump" \
+    --file="/tmp/${db}.dump" \
     "${db}"
+  docker cp "${PG_CONTAINER}:/tmp/${db}.dump" "${TARGET_DIR}/${db}.dump"
 
-  pg_dump \
-    --host="${PGHOST}" \
-    --port="${PGPORT}" \
+  _pg_dump \
+    --host=localhost \
     --username="${PGUSER}" \
     --schema-only \
     --no-owner \
     --no-privileges \
     "${SCHEMA_ARGS[@]}" \
-    --file="${TARGET_DIR}/${db}.schema.sql" \
+    --file="/tmp/${db}.schema.sql" \
     "${db}"
+  docker cp "${PG_CONTAINER}:/tmp/${db}.schema.sql" "${TARGET_DIR}/${db}.schema.sql"
 done
 
 if [[ "${RETENTION_DAYS}" =~ ^[0-9]+$ ]] && [[ "${RETENTION_DAYS}" -gt 0 ]]; then

@@ -17,16 +17,16 @@ import logging
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Dict, Tuple, Optional
 from enum import Enum
+from typing import Optional
 
 from app.config.settings import settings
-from app.ml.models.model_registry_db import get_model_registry
 from app.database.repositories.parasite_decision_repository import (
     get_parasite_decision_repository,
 )
+from app.ml.models.model_registry_db import get_model_registry
+from app.services.circuit_breaker import call_with_breaker, get_breaker
 from app.services.decision_event_logger import emit_decision_event
-from app.services.circuit_breaker import get_breaker, call_with_breaker
 
 logger = logging.getLogger(__name__)
 
@@ -86,7 +86,7 @@ class TierRoutingEngine:
         self._cb_decision_db = get_breaker("parasite_decisions_db", failure_threshold=5, recovery_timeout_seconds=30.0)
         self._cb_threshold_db = get_breaker("model_thresholds_db", failure_threshold=3, recovery_timeout_seconds=20.0)
 
-    async def route_recommendation(self, recommendation: Dict) -> TierRoutingResult:
+    async def route_recommendation(self, recommendation: dict) -> TierRoutingResult:
         """Route a recommendation to the appropriate autonomy tier.
 
         Implements the complete routing logic:
@@ -276,7 +276,7 @@ class TierRoutingEngine:
             correlation_id=correlation_id,
         )
 
-    async def get_effective_thresholds(self, equipment_type: str) -> Tuple[float, float, str]:
+    async def get_effective_thresholds(self, equipment_type: str) -> tuple[float, float, str]:
         """Get effective thresholds, using stricter-of-two logic.
 
         Reads thresholds from TWO sources:
@@ -331,7 +331,7 @@ class TierRoutingEngine:
         # Fallback to settings only
         return settings_tier2, settings_tier3, "settings"
 
-    async def get_routing_stats(self) -> Dict:
+    async def get_routing_stats(self) -> dict:
         """Get current routing statistics for monitoring dashboard.
 
         Returns:
@@ -359,7 +359,7 @@ class TierRoutingEngine:
             "tier3_enabled": self.settings.parasite_tier3_enabled,
         }
 
-    def _extract_confidence(self, recommendation: Dict) -> float:
+    def _extract_confidence(self, recommendation: dict) -> float:
         """Extract numeric confidence from recommendation dict.
 
         Handles both numeric (0.0-1.0) and string ("high"/"medium"/"low")
@@ -386,7 +386,7 @@ class TierRoutingEngine:
         mapping = {"high": 0.90, "medium": 0.75, "low": 0.50}
         return mapping.get(string_confidence, 0.50)
 
-    def _extract_equipment_type(self, recommendation: Dict) -> str:
+    def _extract_equipment_type(self, recommendation: dict) -> str:
         """Extract equipment type from target_equipment code.
 
         Equipment codes follow patterns:
@@ -418,7 +418,7 @@ class TierRoutingEngine:
 
 
 # Singleton factory
-_instance: Optional[TierRoutingEngine] = None
+_instance: TierRoutingEngine | None = None
 
 
 def get_tier_routing_engine() -> TierRoutingEngine:

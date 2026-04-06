@@ -8,8 +8,8 @@ import logging
 from typing import Any
 
 from app.database.supabase_client import get_supabase_client
-from app.services.vector_db import get_vector_db_service
 from app.services.fm_context import fm_context_service
+from app.services.vector_db import get_vector_db_service
 
 logger = logging.getLogger(__name__)
 

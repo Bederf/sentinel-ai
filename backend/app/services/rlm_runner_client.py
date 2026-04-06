@@ -10,7 +10,6 @@ Phase: 113-03
 import asyncio
 import logging
 import time
-from typing import Optional
 
 import httpx
 
@@ -40,9 +39,9 @@ class RLMRunnerClient:
 
     def __init__(
         self,
-        base_url: Optional[str] = None,
-        enabled: Optional[bool] = None,
-        timeout: Optional[int] = None,
+        base_url: str | None = None,
+        enabled: bool | None = None,
+        timeout: int | None = None,
     ):
         self.base_url = (base_url or settings.rlm_runner_url).rstrip("/")
         self.enabled = enabled if enabled is not None else settings.rlm_runner_enabled
@@ -57,7 +56,7 @@ class RLMRunnerClient:
         self,
         case_id: str,
         question: str,
-        model: Optional[str] = None,
+        model: str | None = None,
     ) -> dict:
         """Submit an analysis run to the runner.
 
@@ -90,7 +89,7 @@ class RLMRunnerClient:
             logger.error("RLM Runner unavailable at %s: %s", self.base_url, exc)
             raise RLMRunnerUnavailableError(f"RLM Runner unavailable at {self.base_url}") from exc
 
-    async def get_result(self, run_id: str) -> Optional[dict]:
+    async def get_result(self, run_id: str) -> dict | None:
         """Fetch result for a completed run.
 
         GET {runner}/runs/{run_id}.
@@ -110,7 +109,7 @@ class RLMRunnerClient:
             logger.error("RLM Runner unavailable at %s: %s", self.base_url, exc)
             raise RLMRunnerUnavailableError(f"RLM Runner unavailable at {self.base_url}") from exc
 
-    async def get_trace(self, run_id: str) -> Optional[list]:
+    async def get_trace(self, run_id: str) -> list | None:
         """Fetch trace log for a run.
 
         GET {runner}/runs/{run_id}/trace.
@@ -134,7 +133,7 @@ class RLMRunnerClient:
         self,
         run_id: str,
         interval: float = 5.0,
-        timeout: Optional[float] = None,
+        timeout: float | None = None,
     ) -> dict:
         """Poll runner until the run reaches a terminal state.
 
@@ -188,7 +187,7 @@ class RLMRunnerClient:
 # Module-level singleton
 # ---------------------------------------------------------------------------
 
-_client: Optional[RLMRunnerClient] = None
+_client: RLMRunnerClient | None = None
 
 
 def get_rlm_runner_client() -> RLMRunnerClient:

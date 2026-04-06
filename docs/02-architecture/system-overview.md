@@ -2,9 +2,9 @@
 title: "System Architecture Overview"
 type: "architecture"
 status: "approved"
-version: "1.2.0"
+version: "1.3.0"
 created: "2026-01-30"
-updated: "2026-03-01"
+updated: "2026-03-30"
 author: "Sentinel Development Team"
 tags: ["architecture", "system-design", "components"]
 related: ["device-abstraction-layer.md", "database-schema.md", "../03-api-reference/rest-api-endpoints.md"]
@@ -30,6 +30,13 @@ SENTINEL is a full-stack BMS platform with:
 - **MCP Server** - Model Context Protocol for AI tools
 - **Database** - Supabase with JSON fallback
 
+In the current production topology, SENTINEL can also run as an island deployment:
+- SENTINEL backend/frontend on one VM or Jetson
+- SIMBIOT connects SENTINEL to building-operational data over one of several transport paths
+- supported connection paths include WireGuard/VPN bridge, edge/local adapter, BACnet, and other site-specific adapters
+- SENTINEL consumes the building view exposed through SIMBIOT rather than remote lifecycle internals
+- SENTINEL remains the canonical writer to Supabase
+
 ```mermaid
 graph TB
     subgraph Frontend["Frontend Layer"]
@@ -54,6 +61,7 @@ graph TB
     subgraph Protocols["Protocol Layer"]
         BACnet[BACnet IP]
         Modbus[Modbus TCP/RTU]
+        SiteBridge[SIMBIOT Site Connection<br/>VPN, Edge, BACnet, Adapter]
         Mock[Mock Devices]
     end
 
@@ -87,6 +95,7 @@ graph TB
 
     DeviceMgr --> BACnet
     DeviceMgr --> Modbus
+    Services --> SiteBridge
     DeviceMgr --> Mock
 
     AIOptimizer --> Claude
@@ -114,11 +123,20 @@ graph TB
     classDef ml fill:#e8eaf6,stroke:#283593
 
     class DeviceMgr,SafetyEngine,AIOptimizer,AuditLogger,MLContext core
-    class BACnet,Modbus,Mock protocol
+    class BACnet,Modbus,SiteBridge,Mock protocol
     class Claude,Ollama,MCP ai
     class LSTM,Anomaly,Classifier,FeatureEng ml
     class Supabase,Redis,JSON storage
 ```
+
+### Remote Site Data Boundary
+
+From SENTINEL's perspective, SIMBIOT is the connection boundary to the building.
+
+- SENTINEL may reach a site over WireGuard/VPN, edge/local adapter, BACnet, or another supported integration path
+- the upstream may be a real BMS such as Desigo, or another remote site endpoint that exposes the building view
+- SENTINEL consumes telemetry, equipment state, zone state, and site-operational health
+- lifecycle/orchestrator internals are not part of SENTINEL's required contract
 
 ## Backend Architecture
 

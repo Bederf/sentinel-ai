@@ -14,8 +14,8 @@ Flow:
 """
 
 import logging
-from typing import Dict, Any, Optional
 from datetime import datetime
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -25,11 +25,11 @@ class OCRCorrectionHandler:
 
     def __init__(self):
         # service_record_id -> correction state
-        self.pending_corrections: Dict[str, Dict] = {}
+        self.pending_corrections: dict[str, dict] = {}
 
     async def start_correction_flow(
-        self, service_record_id: str, pipeline_result: Dict[str, Any], telegram_user_id: str
-    ) -> Dict[str, Any]:
+        self, service_record_id: str, pipeline_result: dict[str, Any], telegram_user_id: str
+    ) -> dict[str, Any]:
         """
         Start correction flow for a service record that needs review.
 
@@ -65,7 +65,7 @@ class OCRCorrectionHandler:
         # Return first field to correct
         return self._get_next_correction_prompt(service_record_id)
 
-    def _get_next_correction_prompt(self, service_record_id: str) -> Dict[str, Any]:
+    def _get_next_correction_prompt(self, service_record_id: str) -> dict[str, Any]:
         """Get the next field that needs correction."""
         state = self.pending_corrections.get(service_record_id)
         if not state:
@@ -98,7 +98,7 @@ class OCRCorrectionHandler:
             "progress": f"{idx + 1}/{len(issues)}",
         }
 
-    def _format_correction_prompt(self, issue: Dict, current_value: Any, current_num: int, total: int) -> str:
+    def _format_correction_prompt(self, issue: dict, current_value: Any, current_num: int, total: int) -> str:
         """Format a user-friendly correction prompt."""
         field_name = issue["field"].replace("_", " ").title()
 
@@ -115,7 +115,7 @@ class OCRCorrectionHandler:
 
         return "\n".join(prompt_lines)
 
-    async def process_correction_response(self, service_record_id: str, response: str) -> Dict[str, Any]:
+    async def process_correction_response(self, service_record_id: str, response: str) -> dict[str, Any]:
         """
         Process technician's correction response.
 
@@ -154,7 +154,7 @@ class OCRCorrectionHandler:
 
         return self._get_next_correction_prompt(service_record_id)
 
-    def _apply_corrections(self, service_record_id: str) -> Dict[str, Any]:
+    def _apply_corrections(self, service_record_id: str) -> dict[str, Any]:
         """Apply all corrections and return final data."""
         state = self.pending_corrections.get(service_record_id)
         if not state:
@@ -181,7 +181,7 @@ class OCRCorrectionHandler:
 
         return final_data
 
-    def get_correction_status(self, service_record_id: str) -> Dict[str, Any]:
+    def get_correction_status(self, service_record_id: str) -> dict[str, Any]:
         """Get current correction status for a service record."""
         state = self.pending_corrections.get(service_record_id)
         if not state:
@@ -209,7 +209,7 @@ class OCRCorrectionHandler:
 
 
 # Singleton instance
-_correction_handler: Optional[OCRCorrectionHandler] = None
+_correction_handler: OCRCorrectionHandler | None = None
 
 
 def get_ocr_correction_handler() -> OCRCorrectionHandler:

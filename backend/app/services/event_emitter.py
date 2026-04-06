@@ -7,10 +7,10 @@ to all connected dashboard clients via SSE.
 import asyncio
 import json
 import logging
-from typing import Dict, List, Any
 from dataclasses import dataclass
-from enum import Enum
 from datetime import datetime
+from enum import Enum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +30,7 @@ class Event:
     """SSE event with type and data."""
 
     event_type: EventType
-    data: Dict[str, Any]
+    data: dict[str, Any]
     timestamp: str = None
 
     def __post_init__(self):
@@ -70,7 +70,7 @@ class EventEmitter:
 
         self._initialized = True
         # List of async queues, one per connected client
-        self._clients: List[asyncio.Queue] = []
+        self._clients: list[asyncio.Queue] = []
         logger.info("EventEmitter initialized")
 
     async def register_client(self) -> asyncio.Queue:

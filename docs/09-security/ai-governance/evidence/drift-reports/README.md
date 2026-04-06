@@ -1,3 +1,18 @@
+---
+title: "Drift Report Evidence"
+type: "policy"
+status: "draft"
+version: "1.0.0"
+created: "2026-03-31"
+updated: "2026-03-31"
+tags: ["sentinel", "documentation"]
+related: []
+domain: "security"
+audience: "all"
+complexity: "intermediate"
+estimated_read_time: 10
+---
+
 # Drift Report Evidence
 
 **Collection date:** 2026-02-23 (framework established)

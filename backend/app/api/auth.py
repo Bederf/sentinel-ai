@@ -397,9 +397,9 @@ async def verify_admin_pin(request: Request, body: VerifyPinRequest):
             _record_failed_attempt(f"pin:{source_ip}")
             logger.warning(f"PIN verification failed from ip={source_ip}")
             raise HTTPException(status_code=403, detail="Invalid PIN")
-    except ValueError as e:
-        # Invalid hash format
-        logger.error(f"Invalid ADMIN_PIN_HASH format: {e}")
+    except (ValueError, AttributeError, TypeError) as e:
+        # Invalid hash format, None hash, or wrong type
+        logger.error(f"PIN verification error ({type(e).__name__}): {e}", exc_info=True)
         raise HTTPException(status_code=503, detail="PIN verification misconfigured")
 
 

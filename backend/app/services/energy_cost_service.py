@@ -11,13 +11,13 @@ Integrates with:
 """
 
 import logging
-from datetime import datetime, date
-from typing import Dict, Any, Optional
 from dataclasses import dataclass
+from datetime import date, datetime
+from typing import Any
 
+from app.core.site_resolver import get_primary_site_code
 from app.database.supabase_client import get_supabase_client
 from app.services.tariff_schedule_service import TariffScheduleService
-from app.core.site_resolver import get_primary_site_code
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +69,7 @@ class EnergyCostService:
         self.demand_charge_r_kva = self._get_demand_charge()
         self.service_charge_r_month = self._get_service_charge()
 
-    def _load_tariff(self) -> Optional[Dict[str, Any]]:
+    def _load_tariff(self) -> dict[str, Any] | None:
         """Load tariff schedule for municipality."""
         try:
             tariff = self.tariff_svc.get_tariff(
@@ -96,7 +96,7 @@ class EnergyCostService:
             "service_charge_r_month": 8456.78,
         }
 
-    def _get_demand_charge(self) -> Dict[str, float]:
+    def _get_demand_charge(self) -> dict[str, float]:
         """Get demand charge by season (R/kVA)."""
         if not self.tariff_data:
             return {"summer": 189.45, "winter": 267.89}
@@ -226,8 +226,8 @@ class EnergyCostService:
     async def calculate_daily_cost(
         self,
         simulated_date: datetime,
-        hourly_power_data: Dict[int, float],  # {hour: power_kw}
-    ) -> Dict[str, Any]:
+        hourly_power_data: dict[int, float],  # {hour: power_kw}
+    ) -> dict[str, Any]:
         """
         Calculate total cost for a simulated day.
 
@@ -291,7 +291,7 @@ class EnergyCostService:
     async def write_daily_cost_summary(
         self,
         simulated_date: datetime,
-        daily_cost: Dict[str, Any],
+        daily_cost: dict[str, Any],
     ) -> bool:
         """
         Write daily cost summary to database for dashboard.
@@ -333,7 +333,7 @@ class EnergyCostService:
         site_id: str,
         year: int,
         month: int,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Get monthly cost summary from daily records.
 

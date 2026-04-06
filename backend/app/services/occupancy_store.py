@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import threading
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from app.config.settings import settings
 from app.database.supabase_client import get_supabase_client
@@ -42,7 +42,7 @@ def _str_to_dt(s: str | datetime) -> datetime:
         normalized = s.replace("Z", "+00:00")
         dt = datetime.fromisoformat(normalized)
     if dt.tzinfo is not None:
-        dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+        dt = dt.astimezone(UTC).replace(tzinfo=None)
     return dt
 
 
@@ -364,6 +364,7 @@ def mark_ghost_finding_notified(
     email_sent: bool = False,
     whatsapp_sent: bool = False,
     whatsapp_message_id: str | None = None,
+    reset_reminder_cycle: bool = False,
 ) -> GhostBookingFinding | None:
     with _lock:
         try:
@@ -385,6 +386,9 @@ def mark_ghost_finding_notified(
                 r["whatsapp_notified_at"] = now_str
             if whatsapp_message_id:
                 r["whatsapp_message_id"] = whatsapp_message_id
+            if reset_reminder_cycle:
+                r["reminder_sent"] = False
+                r["reminder_sent_at"] = None
             if r.get("status") == "open":
                 r["status"] = "pending_inspection"
             _client().table("ghost_findings").update(r).eq("id", finding_id).execute()

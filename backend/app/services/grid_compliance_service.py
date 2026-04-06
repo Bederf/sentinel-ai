@@ -16,20 +16,19 @@ Pattern follows solar_compliance_service.py and device_abstraction.py.
 
 import logging
 from dataclasses import dataclass
-from datetime import datetime, timezone, timedelta
-from typing import Dict, List, Optional, Tuple
+from datetime import UTC, datetime, timedelta
 
-from app.models.solar import (
-    GridParameter,
-    ComplianceSeverity,
-    FrequencyBand,
-    VoltageBand,
-    RampRateLimit,
-    ComplianceViolation,
-    GridComplianceStatus,
-    LoadShedEvent,
-)
 from app.database.supabase_client import get_supabase_client
+from app.models.solar import (
+    ComplianceSeverity,
+    ComplianceViolation,
+    FrequencyBand,
+    GridComplianceStatus,
+    GridParameter,
+    LoadShedEvent,
+    RampRateLimit,
+    VoltageBand,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -123,8 +122,8 @@ class MonitoringEngine:
     def __init__(self, grid_code: str = "nrs_097_2_3", system_id: str = "solar-001"):
         self.grid_code = grid_code
         self.system_id = system_id
-        self.last_check_time = datetime.now(timezone.utc)
-        self.violations: List[ComplianceViolation] = []
+        self.last_check_time = datetime.now(UTC)
+        self.violations: list[ComplianceViolation] = []
         self.monitoring_interval_seconds = 10
 
         # Load frequency and voltage bands
@@ -150,8 +149,8 @@ class MonitoringEngine:
         Returns:
             GridComplianceStatus with violations and recommendations
         """
-        now = datetime.now(timezone.utc)
-        violations: List[ComplianceViolation] = []
+        now = datetime.now(UTC)
+        violations: list[ComplianceViolation] = []
 
         # Check frequency compliance
         freq_violations = self._validate_frequency(params, now)
@@ -192,9 +191,9 @@ class MonitoringEngine:
             temperature_c=25.0,
         )
 
-    def _validate_frequency(self, params: GridParameters, now: datetime) -> List[ComplianceViolation]:
+    def _validate_frequency(self, params: GridParameters, now: datetime) -> list[ComplianceViolation]:
         """Validate frequency against grid code limits."""
-        violations: List[ComplianceViolation] = []
+        violations: list[ComplianceViolation] = []
         normal_band = self.frequency_bands["normal"]
 
         # Check normal operating band
@@ -255,9 +254,9 @@ class MonitoringEngine:
 
         return violations
 
-    def _validate_voltage(self, params: GridParameters, now: datetime) -> List[ComplianceViolation]:
+    def _validate_voltage(self, params: GridParameters, now: datetime) -> list[ComplianceViolation]:
         """Validate voltage against grid code limits."""
-        violations: List[ComplianceViolation] = []
+        violations: list[ComplianceViolation] = []
         normal_band = self.voltage_bands["normal"]
 
         # Check normal operating band
@@ -318,9 +317,9 @@ class MonitoringEngine:
 
         return violations
 
-    def _validate_ramp_rate(self, params: GridParameters, now: datetime) -> List[ComplianceViolation]:
+    def _validate_ramp_rate(self, params: GridParameters, now: datetime) -> list[ComplianceViolation]:
         """Validate power ramp rate against grid code limits."""
-        violations: List[ComplianceViolation] = []
+        violations: list[ComplianceViolation] = []
 
         if params.time_delta_seconds <= 0:
             return violations
@@ -394,7 +393,7 @@ class LoadShedScheduler:
         self.stage_transition_time = None
         self.hysteresis_hz = 0.1  # Prevent oscillation between stages
         self.check_interval_seconds = 2  # Monitor frequency every 2 seconds
-        self.history: List[LoadShedEvent] = []
+        self.history: list[LoadShedEvent] = []
 
         logger.info(
             "LoadShedScheduler initialized (check interval: %ds, hysteresis: %f Hz)",
@@ -402,7 +401,7 @@ class LoadShedScheduler:
             self.hysteresis_hz,
         )
 
-    async def detect_stage(self, frequency_hz: float) -> Tuple[int, Optional[LoadShedEvent]]:
+    async def detect_stage(self, frequency_hz: float) -> tuple[int, LoadShedEvent | None]:
         """Detect current load shedding stage and trigger dispatch if stage changed.
 
         Args:
@@ -420,7 +419,7 @@ class LoadShedScheduler:
         if new_stage != self.current_stage:
             self.previous_stage = self.current_stage
             self.current_stage = new_stage
-            self.stage_transition_time = datetime.now(timezone.utc)
+            self.stage_transition_time = datetime.now(UTC)
 
             # Route dispatch commands
             dispatch_action, affected_systems = await self._route_dispatch(self.previous_stage, self.current_stage)
@@ -463,7 +462,7 @@ class LoadShedScheduler:
 
         return 0  # No load shedding
 
-    async def _route_dispatch(self, previous_stage: int, current_stage: int) -> Tuple[str, List[str]]:
+    async def _route_dispatch(self, previous_stage: int, current_stage: int) -> tuple[str, list[str]]:
         """Route dispatch commands based on stage transition.
 
         Priority: BESS discharge → Solar curtailment → Standby
@@ -521,15 +520,15 @@ class LoadShedScheduler:
         """Get current load shedding stage (0-8)."""
         return self.current_stage
 
-    def get_last_transition(self) -> Optional[LoadShedEvent]:
+    def get_last_transition(self) -> LoadShedEvent | None:
         """Get the last stage transition event."""
         return self.history[-1] if self.history else None
 
 
 # === Singleton accessors ===
 
-_monitoring_engines: Dict[str, MonitoringEngine] = {}
-_load_shed_scheduler: Optional[LoadShedScheduler] = None
+_monitoring_engines: dict[str, MonitoringEngine] = {}
+_load_shed_scheduler: LoadShedScheduler | None = None
 
 
 def get_monitoring_engine(grid_code: str = "nrs_097_2_3", system_id: str = "solar-001") -> MonitoringEngine:

@@ -621,7 +621,7 @@ export interface Site {
   } | null;
   // Bridge ingestion status
   bridge_connected?: boolean;
-  bridge_data_source?: "simbiot" | "simulation" | "none";
+  bridge_data_source?: "remote_bridge" | "local_adapter" | "none";
   bridge_last_sync?: string | null;
   bridge_sync_error?: string | null;
 }
@@ -1460,6 +1460,26 @@ export const api = {
     return response.blob();
   },
 
+  /**
+   * Summarize AI response text and return spoken audio as a data URI.
+   * The text output stays full/lengthy; the voice is condensed to 1-2 sentences.
+   */
+  async voiceSummary(text: string): Promise<{ text: string; audio_url: string }> {
+    const token = localStorage.getItem("sentinel_token");
+    const response = await fetch(`${API_BASE_URL}/api/chat/voice-summary`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ text }),
+    });
+    if (!response.ok) {
+      throw new Error(`Voice summary API error: ${response.status}`);
+    }
+    return response.json();
+  },
+
   // ============= Dashboard API Methods =============
 
   /**
@@ -1526,10 +1546,6 @@ export const api = {
       return response.alerts;
     } catch (err) {
       const apiError = err as ApiError | undefined;
-      const message = apiError?.message?.toLowerCase() || "";
-      if (apiError?.status === 401 && message.includes("authentication required")) {
-        return [];
-      }
       if (apiError?.status === 429) {
         return [];
       }
@@ -2292,10 +2308,10 @@ export const api = {
   },
 
   /**
-   * Generate demo audit data for testing
+   * Generate seeded audit data for testing
    */
   async generateDemoAuditData(): Promise<DemoAuditDataResponse> {
-    return fetchApi<DemoAuditDataResponse>(`/api/audit/demo-data`, {
+    return fetchApi<DemoAuditDataResponse>(`/api/audit/seed-data`, {
       method: "POST",
     });
   },
@@ -4052,7 +4068,7 @@ export interface DiscoverClassifyRequest {
   device_ip: string;
   site_id: string;
   device_bacnet_id?: number;
-  adapter_type?: 'bacnet' | 'simulation';
+  adapter_type?: string;
   bms_vendor?: BMSVendor;
 }
 
@@ -4103,6 +4119,21 @@ export interface NiagaraCorrectRequest {
   equipment_type?: string;
 }
 
+export interface SimbiotCapabilitiesSummary {
+  devices: number;
+  points: number;
+  writable_points: number;
+  controllable_devices: number;
+}
+
+export interface SimbiotCapabilitiesResponse {
+  site_id: string;
+  adapter_id: string;
+  adapter_capabilities: Record<string, boolean>;
+  summary: SimbiotCapabilitiesSummary;
+  devices: Array<Record<string, unknown>>;
+}
+
 export const niagaraApi = {
   configureOBIX: (config: NiagaraOBIXConfig) =>
     fetchApi<NiagaraConfigResponse>('/api/niagara/obix/config', {
@@ -4118,6 +4149,23 @@ export const niagaraApi = {
       method: 'POST',
       body: JSON.stringify(req || {}),
     }),
+
+  getSimbiotCapabilities: (params: {
+    site_id: string;
+    bms_vendor: BMSVendor;
+    host?: string;
+    port?: number;
+    commissioning?: boolean;
+  }) => {
+    const query = new URLSearchParams();
+    query.set("bms_vendor", params.bms_vendor);
+    if (params.host) query.set("host", params.host);
+    if (typeof params.port === "number") query.set("port", String(params.port));
+    query.set("commissioning", String(params.commissioning ?? true));
+    return fetchApi<SimbiotCapabilitiesResponse>(
+      `/api/simbiot/sites/${encodeURIComponent(params.site_id)}/capabilities?${query.toString()}`
+    );
+  },
 
   discoverAndClassify: (req: DiscoverClassifyRequest) =>
     fetchApi<DiscoverClassifyResponse>('/api/niagara/discover-and-classify', {
@@ -4583,6 +4631,24 @@ export interface WorkflowDashboardResponse {
   workflow_states: Record<string, WorkflowState>;
 }
 
+export interface WorkflowOnboardAssetRequest {
+  site_id: string;
+  site_name: string;
+  site_address: string;
+  captured_by: string;
+  notes?: string;
+  equipment: Array<Record<string, ApiValue>>;
+}
+
+export interface WorkflowOnboardAssetResponse {
+  success: boolean;
+  site_id: string;
+  equipment_onboarded: number;
+  baselines_captured: number;
+  workflow_state: string;
+  equipment: Array<Record<string, ApiValue>>;
+}
+
 export const workflowApi = {
   /** Get workflow dashboard data for all equipment */
   getDashboardEquipment: (siteId?: string) => {
@@ -4619,6 +4685,13 @@ export const workflowApi = {
     fetchApi<{ equipment_id: string; count: number; work_orders: Array<Record<string, ApiValue>> }>(
       `/api/workflow/triggers/work-orders/${equipmentId}`
     ),
+
+  /** Onboard equipment with metadata to initialize workflow/baselines */
+  onboardAsset: (payload: WorkflowOnboardAssetRequest) =>
+    fetchApi<WorkflowOnboardAssetResponse>("/api/workflow/onboard-asset", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
 };
 
 // ============= Service Feedback API =============
@@ -4950,10 +5023,50 @@ export interface SpaceSiteStructure {
   }>;
 }
 
+// ---------------------------------------------------------------------------
+// Focus Room types
+// ---------------------------------------------------------------------------
+
+export interface FocusSession {
+  session_id: string;
+  room_code: string;
+  room_type: string;
+  sensor_id: string;
+  start_time: string;
+  end_time: string | null;
+  is_active: boolean;
+  duration_seconds: number;
+  duration_minutes: number;
+  extended_use: boolean;
+  red_light_on: boolean;
+  max_allowed_minutes: number;
+  red_light_cooldown_seconds: number;
+  red_light_cooldown_remaining_seconds: number;
+}
+
+export interface FocusSessionResponse {
+  sessions: FocusSession[];
+  count: number;
+}
+
+export interface FocusAnalytics {
+  site_id: string;
+  total_sessions: number;
+  active_sessions: number;
+  completed_sessions: number;
+  average_duration_minutes: number;
+  longest_session_minutes: number;
+  extended_use_count: number;
+  extended_use_sessions: number;
+  sessions_by_room: Record<string, number>;
+  peak_hour: number | null;
+}
+
 export const spaceSettingsApi = {
   /** Get all space optimization settings including concierge list */
-  async getSettings(): Promise<SpaceSettings> {
-    return fetchApi<SpaceSettings>('/api/settings/space');
+  async getSettings(siteId?: string): Promise<SpaceSettings> {
+    const params = siteId ? `?site_id=${encodeURIComponent(siteId)}` : '';
+    return fetchApi<SpaceSettings>(`/api/settings/space${params}`);
   },
 
   /** Update grace period settings */
@@ -4999,6 +5112,24 @@ export const spaceSettingsApi = {
     await fetchApi<{ status: string; id: string }>(`/api/settings/space/concierges/${encodeURIComponent(id)}`, {
       method: 'DELETE',
     });
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Space Focus Room API
+// ---------------------------------------------------------------------------
+
+export const spaceApi = {
+  /** Get all focus room sessions for a site (optionally filtered by room) */
+  async getFocusSessions(siteId: string, roomCode?: string): Promise<FocusSessionResponse> {
+    const params = new URLSearchParams({ site_id: siteId });
+    if (roomCode) params.set("room_code", roomCode);
+    return fetchApi<FocusSessionResponse>(`/api/space/focus-sessions?${params}`);
+  },
+
+  /** Get focus room analytics for a site */
+  async getFocusAnalytics(siteId: string): Promise<FocusAnalytics> {
+    return fetchApi<FocusAnalytics>(`/api/space/focus-analytics?site_id=${encodeURIComponent(siteId)}`);
   },
 };
 
@@ -5079,6 +5210,7 @@ export interface BuildingConfig {
   optimization?: {
     site_id?: string;
     active_profile?: string;
+    sentinel_operating_mode?: "comfort" | "cost_saving" | "asset_preservation";
     control_tier?: string;
     zone_overrides?: Array<{ zone_id: string; profile: string; reason: string }>;
     schedule_overrides?: unknown[];
@@ -5096,6 +5228,7 @@ export interface BuildingConfigUpdatePayload {
   total_desks?: number;
   parking_bays?: number;
   optimization_profile?: string;
+  sentinel_operating_mode?: "comfort" | "cost_saving" | "asset_preservation";
   control_tier?: string;
   features?: Record<string, boolean>;
   contacts?: Record<string, string | undefined>;

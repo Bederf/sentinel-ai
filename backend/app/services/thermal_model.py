@@ -5,13 +5,12 @@ including thermal runway (time until comfort breach) and pre-cooling benefits.
 """
 
 import logging
-from typing import Dict, List, Tuple
 
 logger = logging.getLogger(__name__)
 
 
 def calculate_thermal_runway(
-    current_temp: float, comfort_limit: float, building_params: Dict, weather_forecast: Dict
+    current_temp: float, comfort_limit: float, building_params: dict, weather_forecast: dict
 ) -> int:
     """
     Calculate minutes until building temperature breaches comfort limit.
@@ -59,7 +58,7 @@ def calculate_thermal_runway(
 
     minutes_to_limit = int(temp_to_limit / temp_change_per_minute)
 
-    # Add some randomness for realism but keep deterministic for demo
+    # Add some randomness for realism but keep deterministic for local seeded mode
     # Use building params as seed for deterministic results
     deterministic_factor = int((thermal_mass * 100 + insulation_factor * 10) % 20)
     minutes_to_limit = max(10, min(180, minutes_to_limit + deterministic_factor))
@@ -73,7 +72,7 @@ def calculate_thermal_runway(
     return minutes_to_limit
 
 
-def calculate_precooling_benefit(building_params: Dict, pre_cooling_temp: float, pre_cooling_duration: int) -> int:
+def calculate_precooling_benefit(building_params: dict, pre_cooling_temp: float, pre_cooling_duration: int) -> int:
     """
     Calculate extended thermal runway minutes from pre-cooling.
 
@@ -125,8 +124,8 @@ def calculate_precooling_benefit(building_params: Dict, pre_cooling_temp: float,
 
 
 def generate_thermal_curve(
-    start_temp: float, comfort_limit: float, outage_duration: int, building_params: Dict
-) -> List[Tuple[float, float]]:
+    start_temp: float, comfort_limit: float, outage_duration: int, building_params: dict
+) -> list[tuple[float, float]]:
     """
     Generate temperature points over time during an outage.
 
@@ -196,9 +195,9 @@ def generate_thermal_curve(
     return points
 
 
-def get_gateway_theatre_params() -> Dict:
+def get_gateway_theatre_params() -> dict:
     """
-    Get hardcoded building parameters for Gateway Theatre (demo consistency).
+    Get hardcoded building parameters for Gateway Theatre (seed consistency).
 
     Returns:
         Dictionary with thermal parameters for Gateway Theatre
@@ -213,7 +212,7 @@ def get_gateway_theatre_params() -> Dict:
     }
 
 
-def get_sandton_city_params() -> Dict:
+def get_sandton_city_params() -> dict:
     """
     Get building parameters for Sandton City (medium complexity).
 
@@ -230,7 +229,7 @@ def get_sandton_city_params() -> Dict:
     }
 
 
-def get_centurion_mall_params() -> Dict:
+def get_centurion_mall_params() -> dict:
     """
     Get building parameters for Centurion Mall (complex scenario).
 

@@ -20,6 +20,7 @@ class ChannelType(str, Enum):
     TELEGRAM = "telegram"
     WHATSAPP = "whatsapp"
     SMS = "sms"
+    EMAIL = "email"
 
 
 class NotificationStatus(str, Enum):

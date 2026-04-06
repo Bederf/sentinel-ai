@@ -16,10 +16,11 @@ Output: Updates power_meters table (S002-MTR-B1-WATER) and energy_consumption_hi
 
 import logging
 from datetime import datetime
-from typing import Dict, Optional, Tuple, Any
+from typing import Any
+
+from app.database.repositories.water_cost_repository import WaterCostRepository
 from app.database.supabase_client import get_supabase_client
 from app.services.simulation_store import get_simulation_store
-from app.database.repositories.water_cost_repository import WaterCostRepository
 
 logger = logging.getLogger(__name__)
 
@@ -65,11 +66,11 @@ class WaterConsumptionEngine:
     def calculate_water_consumption(
         self,
         simulated_hour: int,
-        occupancy_data: Dict[str, float],
+        occupancy_data: dict[str, float],
         cloud_cover_pct: float = 0.0,
         is_raining: bool = False,
-        simulated_date: Optional[datetime] = None,
-    ) -> Tuple[Dict[str, float], float]:
+        simulated_date: datetime | None = None,
+    ) -> tuple[dict[str, float], float]:
         """Calculate hourly water consumption across zones.
 
         Args:
@@ -161,7 +162,7 @@ class WaterConsumptionEngine:
 
     async def _write_water_consumption(
         self,
-        zone_consumption: Dict[str, float],
+        zone_consumption: dict[str, float],
         total_liters: float,
         simulated_hour: int,
         simulated_date: datetime,
@@ -190,8 +191,8 @@ class WaterConsumptionEngine:
     async def calculate_daily_water_cost(
         self,
         simulated_date: datetime,
-        hourly_consumption_dict: Dict[int, float],  # {hour: liters}
-    ) -> Dict[str, Any]:
+        hourly_consumption_dict: dict[int, float],  # {hour: liters}
+    ) -> dict[str, Any]:
         """Calculate daily water cost using tiered tariff.
 
         Args:
@@ -251,11 +252,11 @@ class WaterConsumptionEngine:
 async def update_simulation_water(
     site_id: str,
     simulated_hour: int,
-    occupancy_data: Dict[str, float],
+    occupancy_data: dict[str, float],
     cloud_cover_pct: float = 0.0,
     is_raining: bool = False,
-    simulated_date: Optional[datetime] = None,
-) -> Tuple[Dict[str, float], float]:
+    simulated_date: datetime | None = None,
+) -> tuple[dict[str, float], float]:
     """Public API for water consumption calculation.
 
     Called hourly from lifecycle_orchestrator via thermal_simulation_engine.

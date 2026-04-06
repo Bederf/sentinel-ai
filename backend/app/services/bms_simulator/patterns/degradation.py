@@ -8,10 +8,10 @@ Includes:
 - Fault progression sequences
 """
 
-import numpy as np
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass
+from datetime import datetime, timedelta
+
+import numpy as np
 
 
 @dataclass
@@ -22,7 +22,7 @@ class DegradationConfig:
     max_increase: float = 0.35  # Maximum increase before failure (35%)
     start_day_offset: int = 0  # Days after start before degradation begins
     pattern_type: str = "linear"  # linear, exponential, stepped
-    alarm_thresholds: List[float] = None  # Thresholds for alarm triggers
+    alarm_thresholds: list[float] = None  # Thresholds for alarm triggers
 
     def __post_init__(self):
         if self.alarm_thresholds is None:
@@ -76,7 +76,7 @@ class DegradationPattern:
     def __init__(
         self,
         seed: int = 42,
-        config: Optional[DegradationConfig] = None,
+        config: DegradationConfig | None = None,
     ):
         """
         Initialize the degradation pattern generator.
@@ -106,10 +106,10 @@ class DegradationPattern:
     def generate(
         self,
         base_value: float,
-        value_range: Tuple[float, float],
+        value_range: tuple[float, float],
         timestamps: np.ndarray,
         noise_level: float = 0.02,
-    ) -> Tuple[np.ndarray, List[Dict]]:
+    ) -> tuple[np.ndarray, list[dict]]:
         """
         Generate values with degradation pattern.
 
@@ -228,7 +228,7 @@ class DegradationPattern:
         start_date: datetime,
         days: int,
         interval_minutes: int = 15,
-    ) -> Tuple[np.ndarray, List[Dict]]:
+    ) -> tuple[np.ndarray, list[dict]]:
         """
         Generate a complete fault progression sequence for an equipment.
 

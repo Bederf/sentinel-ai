@@ -9,7 +9,7 @@
  */
 
 import { useState, useEffect, useRef } from "react";
-import { Text, Badge, Flex, Grid, Tab, TabGroup, TabList, TabPanel, TabPanels } from "@tremor/react";
+import { Text, Flex, Grid, Tab, TabGroup, TabList, TabPanel, TabPanels } from "@tremor/react";
 import { Fan, Thermometer, Activity, AlertTriangle, CheckCircle, Clock, Wrench, ClipboardList } from "lucide-react";
 import { hvacApi, type HVACEquipment } from "../../lib/hvacApi";
 
@@ -86,6 +86,48 @@ export function EquipmentStatusPanel({ siteId, compact = false, onEquipmentSelec
     }
   }
 
+  function chipStyle(kind: "green" | "amber" | "red" | "gray") {
+    switch (kind) {
+      case "green":
+        return {
+          background: "rgba(34, 197, 94, 0.14)",
+          color: "var(--color-sentinel-green)",
+          border: "1px solid rgba(34, 197, 94, 0.30)",
+        };
+      case "amber":
+        return {
+          background: "rgba(245, 158, 11, 0.14)",
+          color: "var(--color-sentinel-amber)",
+          border: "1px solid rgba(245, 158, 11, 0.30)",
+        };
+      case "red":
+        return {
+          background: "rgba(239, 68, 68, 0.14)",
+          color: "var(--color-sentinel-red)",
+          border: "1px solid rgba(239, 68, 68, 0.30)",
+        };
+      default:
+        return {
+          background: "rgba(148, 163, 184, 0.14)",
+          color: "var(--color-sentinel-text-secondary)",
+          border: "1px solid rgba(148, 163, 184, 0.28)",
+        };
+    }
+  }
+
+  function isMeaningfulValue(value: unknown): boolean {
+    if (value === null || value === undefined) return false;
+    const normalized = String(value).trim().toLowerCase();
+    return !["", "n/a", "na", "none", "null", "undefined", "unknown", "never", "-"].includes(normalized);
+  }
+
+  function formatDateOrNull(value: unknown): string | null {
+    if (!isMeaningfulValue(value)) return null;
+    const date = new Date(String(value));
+    if (Number.isNaN(date.getTime())) return null;
+    return date.toLocaleDateString();
+  }
+
   if (loading) {
     return (
       <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
@@ -145,9 +187,12 @@ export function EquipmentStatusPanel({ siteId, compact = false, onEquipmentSelec
         </Flex>
         <div className="flex items-center gap-2">
           {getStatusIcon(eq.status)}
-          <Badge color={eq.status === "normal" ? "green" : "red"} size="xs">
+          <span
+            className="text-xs px-2 py-0.5 rounded capitalize"
+            style={chipStyle(eq.status === "normal" ? "green" : "red")}
+          >
             {eq.status}
-          </Badge>
+          </span>
         </div>
       </Flex>
 
@@ -158,12 +203,12 @@ export function EquipmentStatusPanel({ siteId, compact = false, onEquipmentSelec
       >
         <Flex justifyContent="between" alignItems="center" className="mb-2">
           <Text className="text-sm">Health Score</Text>
-          <Badge
-            color={getHealthColor(eq.calculated_health || eq.health_score)}
-            size="lg"
+          <span
+            className="text-sm px-2.5 py-0.5 rounded font-medium"
+            style={chipStyle(getHealthColor(eq.calculated_health || eq.health_score))}
           >
             {(eq.calculated_health || eq.health_score).toFixed(0)}%
-          </Badge>
+          </span>
         </Flex>
 
         {/* Health Factors Breakdown */}
@@ -197,7 +242,6 @@ export function EquipmentStatusPanel({ siteId, compact = false, onEquipmentSelec
                       }}
                     />
                   </div>
-                  <span className="w-12" style={{ color: "var(--color-sentinel-text-disabled)" }}>{factor.value}</span>
                 </Flex>
               </Flex>
             ))}
@@ -208,40 +252,46 @@ export function EquipmentStatusPanel({ siteId, compact = false, onEquipmentSelec
       {/* Equipment Info */}
       {!compact && (
         <div className="space-y-2 text-xs" style={{ color: "var(--color-sentinel-text-disabled)" }}>
-          <Flex justifyContent="between">
-            <span>Manufacturer</span>
-            <span style={{ color: "var(--color-sentinel-text-secondary)" }}>{eq.manufacturer || "N/A"}</span>
-          </Flex>
-          <Flex justifyContent="between">
-            <span>Model</span>
-            <span style={{ color: "var(--color-sentinel-text-secondary)" }}>{eq.model || "N/A"}</span>
-          </Flex>
-          <Flex justifyContent="between">
-            <span>Capacity</span>
-            <span style={{ color: "var(--color-sentinel-text-secondary)" }}>{eq.capacity || "N/A"}</span>
-          </Flex>
-          <Flex justifyContent="between" alignItems="center">
-            <Flex alignItems="center" className="gap-1">
-              <Wrench className="w-3 h-3" />
-              <span>Last Service</span>
+          {isMeaningfulValue(eq.manufacturer) && (
+            <Flex justifyContent="between">
+              <span>Manufacturer</span>
+              <span style={{ color: "var(--color-sentinel-text-secondary)" }}>{eq.manufacturer}</span>
             </Flex>
-            <span style={{ color: "var(--color-sentinel-text-secondary)" }}>
-              {eq.last_service
-                ? new Date(eq.last_service).toLocaleDateString()
-                : "N/A"}
-            </span>
-          </Flex>
-          <Flex justifyContent="between" alignItems="center">
-            <Flex alignItems="center" className="gap-1">
-              <Clock className="w-3 h-3" />
-              <span>Installed</span>
+          )}
+          {isMeaningfulValue(eq.model) && (
+            <Flex justifyContent="between">
+              <span>Model</span>
+              <span style={{ color: "var(--color-sentinel-text-secondary)" }}>{eq.model}</span>
             </Flex>
-            <span style={{ color: "var(--color-sentinel-text-secondary)" }}>
-              {eq.install_date
-                ? new Date(eq.install_date).toLocaleDateString()
-                : "N/A"}
-            </span>
-          </Flex>
+          )}
+          {isMeaningfulValue(eq.capacity) && (
+            <Flex justifyContent="between">
+              <span>Capacity</span>
+              <span style={{ color: "var(--color-sentinel-text-secondary)" }}>{eq.capacity}</span>
+            </Flex>
+          )}
+          {formatDateOrNull(eq.last_service) && (
+            <Flex justifyContent="between" alignItems="center">
+              <Flex alignItems="center" className="gap-1">
+                <Wrench className="w-3 h-3" />
+                <span>Last Service</span>
+              </Flex>
+              <span style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                {formatDateOrNull(eq.last_service)}
+              </span>
+            </Flex>
+          )}
+          {formatDateOrNull(eq.install_date) && (
+            <Flex justifyContent="between" alignItems="center">
+              <Flex alignItems="center" className="gap-1">
+                <Clock className="w-3 h-3" />
+                <span>Installed</span>
+              </Flex>
+              <span style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                {formatDateOrNull(eq.install_date)}
+              </span>
+            </Flex>
+          )}
         </div>
       )}
 
@@ -279,7 +329,9 @@ export function EquipmentStatusPanel({ siteId, compact = false, onEquipmentSelec
       <div className="space-y-3">
         <Flex justifyContent="between" alignItems="center">
           <Text className="font-medium">Equipment</Text>
-          <Badge color="gray">{equipment.length} total</Badge>
+          <span className="text-xs px-2 py-0.5 rounded" style={chipStyle("gray")}>
+            {equipment.length} total
+          </span>
         </Flex>
         <Grid className="grid grid-cols-2 gap-2">
           {equipment.slice(0, 4).map((eq) => (
@@ -298,15 +350,15 @@ export function EquipmentStatusPanel({ siteId, compact = false, onEquipmentSelec
           <Text>{equipment.length} HVAC equipment items</Text>
         </div>
         <div className="flex gap-2">
-          <Badge color="green">
+          <span className="text-sm px-2.5 py-0.5 rounded" style={chipStyle("green")}>
             {equipment.filter((e) => e.health_status === "healthy").length} Healthy
-          </Badge>
-          <Badge color="amber">
+          </span>
+          <span className="text-sm px-2.5 py-0.5 rounded" style={chipStyle("amber")}>
             {equipment.filter((e) => e.health_status === "attention").length} Attention
-          </Badge>
-          <Badge color="red">
+          </span>
+          <span className="text-sm px-2.5 py-0.5 rounded" style={chipStyle("red")}>
             {equipment.filter((e) => e.health_status === "critical").length} Critical
-          </Badge>
+          </span>
         </div>
       </Flex>
 

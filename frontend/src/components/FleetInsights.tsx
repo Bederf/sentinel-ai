@@ -107,7 +107,7 @@ function RiskBar({
   return (
     <div>
       {/* Stacked bar */}
-      <div className="flex h-6 rounded-md overflow-hidden mb-3">
+      <div className="flex h-6 rounded-lg overflow-hidden mb-3">
         {levels.map(({ key, color }) => {
           const d = distribution[key];
           return d.percentage > 0 ? (

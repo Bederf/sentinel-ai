@@ -1,3 +1,18 @@
+---
+title: "MCP Tool Onboarding Checklist (C3 + H5)"
+type: "spec"
+status: "draft"
+version: "1.0.0"
+created: "2026-03-31"
+updated: "2026-03-31"
+tags: ["sentinel", "documentation"]
+related: []
+domain: "bms"
+audience: "all"
+complexity: "intermediate"
+estimated_read_time: 10
+---
+
 # MCP Tool Onboarding Checklist (C3 + H5)
 
 When adding a new MCP tool to the SIMBIOT server, every item below must be completed

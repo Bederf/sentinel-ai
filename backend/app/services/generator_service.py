@@ -1,20 +1,20 @@
 """Generator Service for DeepSea DSE Controller Integration.
 
 SCADA-style monitoring for generator sets with:
-- Modbus polling (mock for demo)
+- Modbus polling (seeded when live telemetry is unavailable)
 - N+1 redundancy management
 - Diesel fuel tracking
 - Predictive maintenance analysis
 """
 
-from typing import Dict, List, Optional
-from datetime import datetime
 import json
 import logging
 import random
+from datetime import datetime
 from pathlib import Path
 
-from app.models.generator import Generator, GeneratorGroup, DieselTank, GeneratorHealth, PredictiveIndicator
+from app.config.settings import settings
+from app.models.generator import DieselTank, Generator, GeneratorGroup, GeneratorHealth, PredictiveIndicator
 
 logger = logging.getLogger(__name__)
 
@@ -23,14 +23,17 @@ class GeneratorService:
     """Service for generator system monitoring and control."""
 
     def __init__(self):
-        self._generators: Dict[str, Generator] = {}
-        self._groups: Dict[str, GeneratorGroup] = {}
-        self._tanks: Dict[str, DieselTank] = {}
-        self._health_cache: Dict[str, GeneratorHealth] = {}
-        self._load_mock_data()
+        self._generators: dict[str, Generator] = {}
+        self._groups: dict[str, GeneratorGroup] = {}
+        self._tanks: dict[str, DieselTank] = {}
+        self._health_cache: dict[str, GeneratorHealth] = {}
+        if settings.sentinel_island_mode:
+            logger.info("GeneratorService: skipping local seeded data in SENTINEL_ISLAND_MODE")
+        else:
+            self._load_seed_data()
 
-    def _load_mock_data(self):
-        """Load mock generator data from JSON."""
+    def _load_seed_data(self):
+        """Load local seeded generator data from JSON."""
         # Try building-specific data first (Sandton)
         data_paths = [
             Path(__file__).parent.parent / "data" / "sites" / "sandton" / "generators.json",
@@ -65,11 +68,11 @@ class GeneratorService:
                 )
                 break
         else:
-            logger.warning("Generator mock data not found")
+            logger.warning("Generator seeded data not found")
 
     # === Generator Operations ===
 
-    def get_generators(self, site_id: Optional[str] = None, group_id: Optional[str] = None) -> List[Generator]:
+    def get_generators(self, site_id: str | None = None, group_id: str | None = None) -> list[Generator]:
         """Get all generators with optional filters."""
         generators = list(self._generators.values())
         if site_id:
@@ -78,11 +81,11 @@ class GeneratorService:
             generators = [g for g in generators if g.group_id == group_id]
         return generators
 
-    def get_generator(self, generator_id: str) -> Optional[Generator]:
+    def get_generator(self, generator_id: str) -> Generator | None:
         """Get single generator by ID."""
         return self._generators.get(generator_id)
 
-    def get_generator_telemetry(self, generator_id: str) -> Optional[Dict]:
+    def get_generator_telemetry(self, generator_id: str) -> dict | None:
         """Get current telemetry for a generator (simulated Modbus poll)."""
         gen = self._generators.get(generator_id)
         if not gen:
@@ -118,18 +121,18 @@ class GeneratorService:
 
     # === Group Operations ===
 
-    def get_groups(self, site_id: Optional[str] = None) -> List[GeneratorGroup]:
+    def get_groups(self, site_id: str | None = None) -> list[GeneratorGroup]:
         """Get all generator groups with optional site filter."""
         groups = list(self._groups.values())
         if site_id:
             groups = [g for g in groups if g.site_id == site_id]
         return groups
 
-    def get_group(self, group_id: str) -> Optional[GeneratorGroup]:
+    def get_group(self, group_id: str) -> GeneratorGroup | None:
         """Get single group by ID."""
         return self._groups.get(group_id)
 
-    def get_group_status(self, group_id: str) -> Optional[Dict]:
+    def get_group_status(self, group_id: str) -> dict | None:
         """Get comprehensive status for a generator group."""
         group = self._groups.get(group_id)
         if not group:
@@ -190,15 +193,15 @@ class GeneratorService:
 
     # === Diesel Tank Operations ===
 
-    def get_tanks(self, site_id: Optional[str] = None) -> List[DieselTank]:
+    def get_tanks(self, site_id: str | None = None) -> list[DieselTank]:
         """Get all diesel tanks."""
         return list(self._tanks.values())
 
-    def get_tank(self, tank_id: str) -> Optional[DieselTank]:
+    def get_tank(self, tank_id: str) -> DieselTank | None:
         """Get single tank by ID."""
         return self._tanks.get(tank_id)
 
-    def get_fuel_status(self, group_id: str) -> Optional[Dict]:
+    def get_fuel_status(self, group_id: str) -> dict | None:
         """Get fuel status for a generator group."""
         group = self._groups.get(group_id)
         if not group or not group.diesel_tank_id:
@@ -235,7 +238,7 @@ class GeneratorService:
             "alerts": self._get_fuel_alerts(tank),
         }
 
-    def _get_fuel_alerts(self, tank: DieselTank) -> List[Dict]:
+    def _get_fuel_alerts(self, tank: DieselTank) -> list[dict]:
         """Generate fuel-related alerts."""
         alerts = []
 
@@ -260,7 +263,7 @@ class GeneratorService:
 
     # === Predictive Maintenance ===
 
-    def get_generator_health(self, generator_id: str) -> Optional[GeneratorHealth]:
+    def get_generator_health(self, generator_id: str) -> GeneratorHealth | None:
         """Get health assessment with predictive indicators."""
         gen = self._generators.get(generator_id)
         if not gen:
@@ -422,7 +425,7 @@ class GeneratorService:
             recommendation=recommendation,
         )
 
-    def get_site_health_summary(self, site_id: str) -> Dict:
+    def get_site_health_summary(self, site_id: str) -> dict:
         """Get health summary for all generators at a site."""
         generators = self.get_generators(site_id=site_id)
         health_data = []
@@ -453,7 +456,7 @@ class GeneratorService:
 
     # === SCADA Overview ===
 
-    def get_scada_overview(self, site_id: str) -> Dict:
+    def get_scada_overview(self, site_id: str) -> dict:
         """Get SCADA-style overview for control room display."""
         groups = self.get_groups(site_id=site_id)
 
@@ -482,10 +485,10 @@ class GeneratorService:
 
         return overview
 
-    # === Simulation (for demo) ===
+    # === Seeded state changes ===
 
     def simulate_state_change(self, event: str = "normal"):
-        """Simulate state changes for demo purposes."""
+        """Simulate seeded state changes for local/offline use."""
         for gen in self._generators.values():
             if event == "load_shedding":
                 # Simulate load shedding - start generators
@@ -528,7 +531,7 @@ class GeneratorService:
 
 
 # Singleton instance
-_generator_service: Optional[GeneratorService] = None
+_generator_service: GeneratorService | None = None
 
 
 def get_generator_service() -> GeneratorService:

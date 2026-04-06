@@ -5,21 +5,21 @@ Records repair outcomes, generates training data for ML models,
 and tracks prediction accuracy. Closes the feedback loop between
 ML predictions and real-world maintenance results.
 
-Uses in-memory storage for demo scope.
+Uses in-memory storage for local scope.
 """
 
-import logging
 import json
+import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from app.config.settings import settings
 from app.models.ml_feedback import (
     MLFeedbackRecord,
-    TrainingDataPoint,
-    PredictionAccuracy,
     MLFeedbackSummary,
+    PredictionAccuracy,
+    TrainingDataPoint,
 )
 
 logger = logging.getLogger(__name__)
@@ -44,11 +44,11 @@ class MLFeedbackService:
     def __init__(self):
         """Initialize with in-memory storage."""
         self._client = None
-        self._feedback_records: List[MLFeedbackRecord] = []
-        self._training_data: List[TrainingDataPoint] = []
-        self._prediction_accuracy: Dict[str, PredictionAccuracy] = {}
+        self._feedback_records: list[MLFeedbackRecord] = []
+        self._training_data: list[TrainingDataPoint] = []
+        self._prediction_accuracy: dict[str, PredictionAccuracy] = {}
         self._record_counter: int = 0
-        self._scoring_inputs: Dict[str, Dict[str, Any]] = {}
+        self._scoring_inputs: dict[str, dict[str, Any]] = {}
 
         self._load_state()
         logger.info("MLFeedbackService initialized")
@@ -63,8 +63,8 @@ class MLFeedbackService:
         work_order_id: str,
         effectiveness_score: float,
         repair_successful: bool,
-        failure_type: Optional[str] = None,
-        prediction_id: Optional[str] = None,
+        failure_type: str | None = None,
+        prediction_id: str | None = None,
     ) -> MLFeedbackRecord:
         """
         Record repair outcome as ML feedback.
@@ -147,12 +147,12 @@ class MLFeedbackService:
         action_type: str,
         successful: bool,
         outcome_status: str,
-        predicted_impact: Optional[Dict[str, Any]] = None,
-        actual_impact: Optional[Dict[str, Any]] = None,
-        confidence_score: Optional[float] = None,
-        equipment_id: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
-    ) -> Optional[MLFeedbackRecord]:
+        predicted_impact: dict[str, Any] | None = None,
+        actual_impact: dict[str, Any] | None = None,
+        confidence_score: float | None = None,
+        equipment_id: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> MLFeedbackRecord | None:
         """Record module-level recommendation outcome into the shared ML loop.
 
         This keeps base-package ML feedback active while adding module-specific
@@ -207,7 +207,7 @@ class MLFeedbackService:
 
         self._feedback_records.append(record)
 
-        training_features: Dict[str, float] = {
+        training_features: dict[str, float] = {
             "effectiveness_score": float(effective_score),
             "success_flag": 1.0 if successful else 0.0,
         }
@@ -252,8 +252,8 @@ class MLFeedbackService:
 
     def generate_training_data(
         self,
-        equipment_type: Optional[str] = None,
-    ) -> List[TrainingDataPoint]:
+        equipment_type: str | None = None,
+    ) -> list[TrainingDataPoint]:
         """
         Generate training dataset from feedback records.
 
@@ -357,8 +357,8 @@ class MLFeedbackService:
         predictions_evaluated = sum(1 for r in self._feedback_records if r.prediction_id is not None)
         module_feedback_records = [r for r in self._feedback_records if r.feedback_type == "module_outcome"]
 
-        module_feedback_counts: Dict[str, int] = {}
-        module_success_counts: Dict[str, int] = {}
+        module_feedback_counts: dict[str, int] = {}
+        module_success_counts: dict[str, int] = {}
         for record in module_feedback_records:
             module_name = self._normalize_module_type(record.metadata.get("module_type", ""))
             if not module_name:
@@ -367,7 +367,7 @@ class MLFeedbackService:
             if record.repair_successful:
                 module_success_counts[module_name] = module_success_counts.get(module_name, 0) + 1
 
-        module_success_rates: Dict[str, float] = {}
+        module_success_rates: dict[str, float] = {}
         for module_name, total_count in module_feedback_counts.items():
             success_count = module_success_counts.get(module_name, 0)
             module_success_rates[module_name] = (
@@ -397,15 +397,15 @@ class MLFeedbackService:
 
     def get_module_feedback_summary(
         self,
-        site_id: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        site_id: str | None = None,
+    ) -> dict[str, Any]:
         """Get module-outcome feedback summary, optionally scoped to a site."""
         module_records = [r for r in self._feedback_records if r.feedback_type == "module_outcome"]
         if site_id:
             module_records = [r for r in module_records if r.metadata.get("site_id") == site_id]
 
-        counts: Dict[str, int] = {}
-        success_counts: Dict[str, int] = {}
+        counts: dict[str, int] = {}
+        success_counts: dict[str, int] = {}
         for record in module_records:
             module_name = self._normalize_module_type(record.metadata.get("module_type", ""))
             if not module_name:
@@ -429,7 +429,7 @@ class MLFeedbackService:
     def get_feedback_for_equipment(
         self,
         equipment_id: str,
-    ) -> List[MLFeedbackRecord]:
+    ) -> list[MLFeedbackRecord]:
         """
         Get all feedback records for a specific equipment.
 
@@ -443,7 +443,7 @@ class MLFeedbackService:
         logger.info(f"Retrieved {len(records)} feedback records for {equipment_id}")
         return records
 
-    def refresh_scoring_inputs(self, site_id: Optional[str] = None) -> Dict[str, Any]:
+    def refresh_scoring_inputs(self, site_id: str | None = None) -> dict[str, Any]:
         """Refresh feedback-derived scoring inputs (module multipliers).
 
         Converts module success rates into ranking multipliers used by
@@ -461,7 +461,7 @@ class MLFeedbackService:
                 if isinstance(sid, str) and sid.strip():
                     site_ids.add(sid.strip())
 
-        refreshed: Dict[str, Dict[str, Any]] = {}
+        refreshed: dict[str, dict[str, Any]] = {}
         for sid in site_ids:
             module_summary = self.get_module_feedback_summary(site_id=sid)
             success_rates = module_summary.get("success_rates", {})
@@ -485,7 +485,7 @@ class MLFeedbackService:
             "site_ids": sorted(list(refreshed.keys())),
         }
 
-    def get_scoring_inputs(self, site_id: str) -> Dict[str, Any]:
+    def get_scoring_inputs(self, site_id: str) -> dict[str, Any]:
         """Get feedback-derived scoring inputs for a site."""
         if not site_id:
             return {}
@@ -563,7 +563,7 @@ class MLFeedbackService:
             if not ML_FEEDBACK_FILE.exists():
                 return
 
-            with open(ML_FEEDBACK_FILE, "r") as f:
+            with open(ML_FEEDBACK_FILE) as f:
                 payload = json.load(f)
             self._hydrate_from_payload(payload)
             logger.info(
@@ -589,7 +589,7 @@ class MLFeedbackService:
 
         self._save_state_json(payload)
 
-    def _save_state_supabase(self, payload: Dict[str, Any]) -> bool:
+    def _save_state_supabase(self, payload: dict[str, Any]) -> bool:
         """Persist ML feedback state payload to Supabase."""
         client = self.client
         if client is None:
@@ -608,7 +608,7 @@ class MLFeedbackService:
             logger.warning("Failed to persist ML feedback state to Supabase: %s", e)
             return False
 
-    def _save_state_json(self, payload: Optional[Dict[str, Any]] = None) -> None:
+    def _save_state_json(self, payload: dict[str, Any] | None = None) -> None:
         """Persist ML feedback state payload to JSON backup."""
         try:
             DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -618,7 +618,7 @@ class MLFeedbackService:
         except Exception as e:
             logger.warning("Failed to persist ML feedback JSON backup: %s", e)
 
-    def _build_state_payload(self) -> Dict[str, Any]:
+    def _build_state_payload(self) -> dict[str, Any]:
         """Build serialized state payload for Supabase/JSON persistence."""
         return {
             "feedback_records": [r.model_dump(mode="json") for r in self._feedback_records[-2000:]],
@@ -631,7 +631,7 @@ class MLFeedbackService:
             "updated_at": datetime.now().isoformat(),
         }
 
-    def _hydrate_from_payload(self, payload: Dict[str, Any]) -> None:
+    def _hydrate_from_payload(self, payload: dict[str, Any]) -> None:
         """Hydrate in-memory state from serialized payload."""
         records = payload.get("feedback_records", [])
         training = payload.get("training_data", [])
@@ -675,7 +675,7 @@ class MLFeedbackService:
 
         acc.last_evaluated = datetime.now()
 
-    def _infer_model_type(self, prediction_id: Optional[str]) -> str:
+    def _infer_model_type(self, prediction_id: str | None) -> str:
         """Infer model type from prediction ID pattern."""
         if not prediction_id:
             return "unknown"
@@ -698,7 +698,7 @@ class MLFeedbackService:
             return parts[1].lower()
         return "unknown"
 
-    def _get_latest_features(self, equipment_id: str) -> Dict[str, float]:
+    def _get_latest_features(self, equipment_id: str) -> dict[str, float]:
         """
         Get latest feature values for equipment from element trend service.
 
@@ -710,7 +710,7 @@ class MLFeedbackService:
 
             get_element_trend_service()  # ensure service initialized
 
-            # For demo scope, return basic features
+            # For local scope, return basic features
             # In production, this would query real-time sensor data
             return {
                 "effectiveness_score": 0.0,
@@ -733,7 +733,7 @@ class MLFeedbackService:
         }
         return aliases.get(normalized, normalized)
 
-    def _candidate_site_ids(self, site_id: str) -> List[str]:
+    def _candidate_site_ids(self, site_id: str) -> list[str]:
         """Return site-id variants used across legacy/new storage formats."""
         if not isinstance(site_id, str):
             return []
@@ -750,7 +750,7 @@ class MLFeedbackService:
         elif sid.startswith("S") and sid[1:].isdigit():
             candidates.append(f"site-{sid[1:]}")
 
-        deduped: List[str] = []
+        deduped: list[str] = []
         for item in candidates:
             if item and item not in deduped:
                 deduped.append(item)
@@ -803,8 +803,8 @@ class MLFeedbackService:
         self,
         *,
         successful: bool,
-        predicted_impact: Dict[str, Any],
-        actual_impact: Dict[str, Any],
+        predicted_impact: dict[str, Any],
+        actual_impact: dict[str, Any],
     ) -> float:
         """Compute a normalized 0-100 effectiveness score for module outcomes."""
         predicted_energy = predicted_impact.get("energy_kwh")
@@ -833,7 +833,7 @@ class MLFeedbackService:
 # Singleton Instance
 # ============================================================================
 
-_ml_feedback_service: Optional[MLFeedbackService] = None
+_ml_feedback_service: MLFeedbackService | None = None
 
 
 def get_ml_feedback_service() -> MLFeedbackService:

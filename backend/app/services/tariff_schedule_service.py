@@ -7,7 +7,7 @@ import logging
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 from app.database.repositories.tariff_schedule_repository import TariffScheduleRepository
 
@@ -19,14 +19,14 @@ class TariffSchedule:
     municipality: str
     tariff_name: str
     effective_date: date
-    tariff_data: Dict[str, Any]
+    tariff_data: dict[str, Any]
 
     def calculate_total_charge(
         self,
-        consumption_kwh: Dict[str, float],
+        consumption_kwh: dict[str, float],
         demand_kva: float,
         month: int,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """Calculate total bill from TOU consumption and demand.
 
         Expects tariff_data with keys:
@@ -81,10 +81,10 @@ class TariffScheduleService:
 
     def list_tariffs(
         self,
-        municipality: Optional[str] = None,
-        utility_type: Optional[str] = None,
-        active_date: Optional[date] = None,
-    ) -> list[Dict[str, Any]]:
+        municipality: str | None = None,
+        utility_type: str | None = None,
+        active_date: date | None = None,
+    ) -> list[dict[str, Any]]:
         return self.repo.list_tariffs(municipality, utility_type, active_date)
 
     def get_tariff(
@@ -92,7 +92,7 @@ class TariffScheduleService:
         municipality: str,
         tariff_name: str,
         effective_date: date,
-    ) -> Optional[TariffSchedule]:
+    ) -> TariffSchedule | None:
         record = self.repo.get_tariff(municipality, tariff_name, effective_date)
         if record:
             eff_date = record.get("effective_date")
@@ -118,10 +118,10 @@ class TariffScheduleService:
             )
         return None
 
-    def upsert_tariff(self, payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def upsert_tariff(self, payload: dict[str, Any]) -> dict[str, Any] | None:
         return self.repo.upsert_tariff(payload)
 
-    def _load_default_tariff(self, municipality: str, tariff_name: str) -> Optional[Dict[str, Any]]:
+    def _load_default_tariff(self, municipality: str, tariff_name: str) -> dict[str, Any] | None:
         """Load a default tariff from bundled JSON files."""
         tariff_path = Path("backend/app/data/solar/tariffs/city_power_2026.json")
         if not tariff_path.exists():
@@ -129,7 +129,7 @@ class TariffScheduleService:
 
         if "city power" in municipality.lower() or "city power" in tariff_name.lower():
             try:
-                with open(tariff_path, "r") as f:
+                with open(tariff_path) as f:
                     return json.load(f)
             except Exception as exc:
                 logger.error("Failed to load default tariff: %s", exc)

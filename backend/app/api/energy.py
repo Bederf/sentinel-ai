@@ -250,23 +250,7 @@ class EnergyPrediction(BaseModel):
 
 
 def _estimate_occupancy(dt: datetime, site_id: str) -> int:
-    """Estimate occupancy % from live simulation first, fallback to time-based.
-
-    Primary: Try to get from lifecycle orchestrator's simulation state
-    Fallback: Time/day-of-week heuristics
-    """
-    try:
-        from app.services.lifecycle_orchestrator import get_lifecycle_orchestrator
-
-        orchestrator = get_lifecycle_orchestrator()
-        if orchestrator.site_state:
-            occupancy = orchestrator.site_state.get("occupancy_percent")
-            if occupancy is not None:
-                return int(occupancy)
-    except Exception:
-        pass
-
-    # Fallback: time-based heuristics
+    """Estimate occupancy % from time/day-of-week heuristics."""
     hour = dt.hour
     day_of_week = dt.weekday()
     is_weekend = day_of_week >= 5
@@ -288,23 +272,7 @@ def _estimate_occupancy(dt: datetime, site_id: str) -> int:
 
 
 def _estimate_daylight(dt: datetime, site_id: str) -> int:
-    """Estimate daylight lux from live simulation first, fallback to seasonal.
-
-    Primary: Try to get from lifecycle orchestrator
-    Fallback: SeasonalModeler patterns
-    """
-    try:
-        from app.services.lifecycle_orchestrator import get_lifecycle_orchestrator
-
-        orchestrator = get_lifecycle_orchestrator()
-        if orchestrator.site_state:
-            daylight = orchestrator.site_state.get("daylight_factor")
-            if daylight is not None:
-                return int(daylight)
-    except Exception:
-        pass
-
-    # Fallback: seasonal + hourly pattern
+    """Estimate daylight lux from seasonal and hourly patterns."""
     hour = dt.hour
     month = dt.month
 
@@ -329,23 +297,7 @@ def _estimate_daylight(dt: datetime, site_id: str) -> int:
 
 
 def _estimate_chiller_load(site_id: str) -> int:
-    """Estimate chiller load % from live simulation first.
-
-    Primary: Try to get from lifecycle orchestrator
-    Fallback: Temperature-based estimation
-    """
-    try:
-        from app.services.lifecycle_orchestrator import get_lifecycle_orchestrator
-
-        orchestrator = get_lifecycle_orchestrator()
-        if orchestrator.site_state:
-            chiller_load = orchestrator.site_state.get("chiller_load_percent")
-            if chiller_load is not None:
-                return int(chiller_load)
-    except Exception:
-        pass
-
-    # Fallback: use ambient temperature for estimation
+    """Estimate chiller load % from ambient temperature heuristics."""
     # Higher temp = higher chiller load
     month = date.today().month
     if month in [12, 1, 2]:  # Summer
@@ -675,6 +627,18 @@ async def get_energy(
     # Query succeeded but there are no rows for this selection.
     # Keep behavior explicit: only synthesize data if fallback is enabled.
     if success and not supabase_data:
+        if settings.sentinel_island_mode:
+            logger.warning(
+                "Supabase energy query returned 0 rows for site=%s days=%s; refusing synthetic fallback in "
+                "SENTINEL_ISLAND_MODE",
+                site_id,
+                days,
+            )
+            return EnergyResponse(
+                days=days,
+                site_id=site_id,
+                data=[],
+            )
         if not settings.energy_allow_mock_fallback:
             logger.info(
                 "Supabase energy query returned 0 rows for site=%s days=%s; returning empty dataset",
@@ -687,10 +651,18 @@ async def get_energy(
                 data=[],
             )
         logger.warning(
-            "Supabase energy query returned 0 rows for site=%s days=%s; using mock generation "
+            "Supabase energy query returned 0 rows for site=%s days=%s; using synthetic fallback "
             "(ENERGY_ALLOW_MOCK_FALLBACK=true)",
             site_id,
             days,
+        )
+
+    if settings.sentinel_island_mode:
+        logger.warning("Supabase energy query failed; refusing synthetic fallback in SENTINEL_ISLAND_MODE")
+        return EnergyResponse(
+            days=days,
+            site_id=site_id,
+            data=[],
         )
 
     if not settings.energy_allow_mock_fallback:
@@ -703,8 +675,8 @@ async def get_energy(
             data=[],
         )
 
-    # Fall back to mock data generation using Supabase buildings
-    logger.warning("Supabase energy query failed; using mock generation (ENERGY_ALLOW_MOCK_FALLBACK=true)")
+    # Fall back to synthetic data generation using Supabase buildings
+    logger.warning("Supabase energy query failed; using synthetic fallback (ENERGY_ALLOW_MOCK_FALLBACK=true)")
 
     from app.database.supabase_client import get_supabase_client
 
@@ -766,7 +738,7 @@ async def seed_energy_data(
     days: int = Query(90, ge=1, le=365, description="Number of days to seed"),
 ) -> dict:
     """
-    Seed energy consumption data for demo purposes.
+    Seed synthetic energy consumption data for non-production use.
 
     Uses the mock data generator and stores results in Supabase.
 
@@ -777,6 +749,9 @@ async def seed_energy_data(
     Returns:
         Dictionary with seeding results
     """
+    if settings.sentinel_island_mode:
+        raise HTTPException(status_code=404, detail="Synthetic energy seeding is disabled on SENTINEL island instances")
+
     from app.database.supabase_client import get_supabase_client
 
     try:
@@ -1132,7 +1107,7 @@ async def get_energy_comparison(
     days: int = Query(30, ge=1, le=365, description="Number of days"),
 ):
     """
-    Returns 3-tier energy comparison for Grant demo.
+    Returns 3-tier energy comparison for a live site.
 
     Scenarios:
     - Baseline: Traditional lighting (no DALI)
@@ -1146,46 +1121,7 @@ async def get_energy_comparison(
     Returns:
         Dictionary with 3 scenarios showing kWh, savings, and descriptions
     """
-    # Try to get real data from running simulation
-    try:
-        from app.services.lifecycle_orchestrator import get_lifecycle_orchestrator
-
-        orchestrator = get_lifecycle_orchestrator()
-        if orchestrator.running and orchestrator.days_simulated > 0:
-            data = orchestrator.get_energy_comparison_data()
-            return {
-                "site_id": site_id,
-                "period_days": data["days_simulated"],
-                "data_source": "simulation",
-                "scenarios": [
-                    {
-                        "name": "Baseline (No DALI)",
-                        "kwh": data["baseline_kwh"],
-                        "description": "Traditional lighting controls",
-                        "savings_percent": 0,
-                    },
-                    {
-                        "name": "With DALI (Tridonic)",
-                        "kwh": data["dali_kwh"],
-                        "description": "Occupancy & daylight harvesting",
-                        "savings_percent": 20,
-                        "savings_kwh": round(data["baseline_kwh"] - data["dali_kwh"], 2),
-                    },
-                    {
-                        "name": "With SENTINEL (AI)",
-                        "kwh": data["sentinel_kwh"],
-                        "description": "AI optimization + Solar/BESS integration",
-                        "savings_percent": data["savings_percent"],
-                        "savings_kwh": data["savings_kwh"],
-                        "solar_gen_kwh": data.get("solar_gen_kwh", 0),
-                        "bess_discharge_kwh": data.get("bess_discharge_kwh", 0),
-                    },
-                ],
-            }
-    except Exception:
-        pass
-
-    # Fallback: estimate from energy data when no simulation is running
+    # Estimate from energy data and live heuristics.
     energy_response = await get_energy(site_id=site_id, days=days)
     total_kwh = sum(d.total_kwh for d in energy_response.data)
 
@@ -2185,7 +2121,7 @@ async def get_tariff_adjustment_recommendation(
 
         engine = get_cost_validation_engine(site_id)
 
-        # For demo: return mock validation records
+        # Temporary seeded validation records until live validation storage is wired in
         # In production, would query historical cost_validations table
         mock_validations = [
             {

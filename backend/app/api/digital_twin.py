@@ -113,7 +113,7 @@ async def extract_from_image(
 
     **Use Cases:**
     - Set skip_sanitization=False (default) for production/sensitive buildings
-    - Set skip_sanitization=True only for demo/non-sensitive test buildings
+    - Set skip_sanitization=True only for non-sensitive local test buildings
 
     Args:
         request: Image extraction request with floor plan and building info
@@ -193,17 +193,17 @@ async def extract_from_image(
 
 
 @router.get(
-    "/demo-config",
+    "/stub-config",
     response_model=BuildingConfigResponse,
-    summary="Get demo building configuration",
+    summary="Get seed building configuration",
 )
-async def get_demo_config(
+async def get_stub_config(
     site_code: str = Query(..., description="Building code"),
-    site_name: str = "Demo Building",
+    site_name: str = "Template Building",
     floors_count: int = 5,
 ) -> BuildingConfigResponse:
     """
-    Get realistic demo building configuration for testing SIMBIOT wizard.
+    Get realistic seed building configuration for testing SIMBIOT wizard.
 
     Generates a realistic South African commercial office building with:
     - Basement + ground floor (plant rooms with chillers, AHUs, generators)
@@ -213,15 +213,15 @@ async def get_demo_config(
 
     Args:
         site_code: Building identifier (default: site-002)
-        site_name: Building display name (default: Demo Building)
+        site_name: Building display name (default: Template Building)
         floors_count: Number of floors (1-5, default: 5)
 
     Returns:
-        Demo building configuration
+        Seed building configuration
     """
     try:
         service = get_digital_twin_service()
-        config = service._generate_demo_config(site_code, site_name, floors_count)
+        config = service._generate_stub_config(site_code, site_name, floors_count)
 
         return BuildingConfigResponse(
             site_code=config["site_code"],
@@ -479,7 +479,7 @@ async def validate_config(
         # Try to get stored config
         config = None
         try:
-            config = service._generate_demo_config(site_id, site_id, 3)
+            config = service._generate_stub_config(site_id, site_id, 3)
         except Exception:
             pass
 
@@ -630,28 +630,19 @@ async def create_status_ticket(
 ) -> dict:
     """Create a short-lived, single-use ticket for the equipment status SSE stream.
 
-    In demo mode, returns a ticket without authentication.
-    In production, requires Bearer token in Authorization header.
+    Requires Bearer token in Authorization header.
 
     Returns:
         {"ticket": "random-uuid-string"}
     """
-    import os
-
-    # In demo mode, allow unauthenticated tickets
-    demo_mode = os.getenv("DEMO_MODE", "false").lower() == "true"
-    user_id = "demo-user"
-
-    if not demo_mode:
-        # Try to extract user from auth header
-        auth_header = request.headers.get("authorization", "")
-        if auth_header.startswith("Bearer "):
-            user_id = auth_header[7:][:8]  # Use first 8 chars as identifier
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Authentication required for SSE ticket",
-            )
+    auth_header = request.headers.get("authorization", "")
+    if auth_header.startswith("Bearer "):
+        user_id = auth_header[7:][:8]  # Use first 8 chars as identifier
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required for SSE ticket",
+        )
 
     ticket = _dt_create_ticket(user_id)
     return {"ticket": ticket}
@@ -668,7 +659,6 @@ async def stream_equipment_status(
     """Server-Sent Events stream for real-time equipment status and predictions.
 
     Authentication: Pass a ticket from POST /api/digital-twin/status/ticket.
-    In demo mode, unauthenticated connections are allowed.
 
     Events contain EquipmentStatusFrame with:
     - equipment_updates: Current status of all equipment
@@ -682,19 +672,16 @@ async def stream_equipment_status(
     const es = new EventSource(`/api/digital-twin/status/stream?site_id=${siteId}&ticket=${ticket}`);
     ```
     """
-    import os
-
-    demo_mode = os.getenv("DEMO_MODE", "false").lower() == "true"
     ticket = request.query_params.get("ticket", "")
 
     if ticket:
         user_id = _dt_validate_ticket(ticket)
-        if user_id is None and not demo_mode:
+        if user_id is None:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid or expired SSE ticket",
             )
-    elif not demo_mode:
+    else:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="SSE ticket required. POST /api/digital-twin/status/ticket first.",

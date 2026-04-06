@@ -1,14 +1,14 @@
 """Device initialization endpoints.
 
-Initialize device status from simulation data so the dashboard
-shows real-time metrics instead of all devices offline.
+Initialize device status from the currently connected site state so the
+dashboard shows current metrics instead of all devices offline.
 """
 
 import logging
 from fastapi import APIRouter, Depends, Request, HTTPException
 from app.middleware.auth_middleware import require_auth, AuthLevel
 from app.models.auth import AuthContext
-from app.services.device_status_initializer import initialize_demo_devices
+from app.services.device_status_initializer import initialize_connected_site_devices
 from app.core.site_resolver import get_primary_site_code
 from app.database.repositories.user_site_access_repository import (
     get_user_site_access_repository,
@@ -24,10 +24,9 @@ async def init_site_devices(
     site_id: str,
     auth: AuthContext = Depends(require_auth(AuthLevel.OPERATOR)),
 ):
-    """Initialize device status for a site from simulation data.
+    """Initialize device status for a site from the current site state.
 
-    Called on dashboard load to populate real-time metrics from
-    the 365-day simulation so devices show as online with current data.
+    Called on dashboard load to populate current metrics for the connected site.
 
     Args:
         site_id: Site identifier (e.g., 'site-002')
@@ -56,7 +55,7 @@ async def init_site_devices(
                 detail="Access denied to this site",
             )
 
-        result = await initialize_demo_devices(site_id)
+        result = await initialize_connected_site_devices(site_id)
         return {
             "status": "initialized",
             "site_id": site_id,
@@ -77,7 +76,7 @@ async def init_default_devices(
     request: Request,
     auth: AuthContext = Depends(require_auth(AuthLevel.OPERATOR)),
 ):
-    """Initialize devices for the default site (site-002).
+    """Initialize devices for the primary registered site.
 
     Convenience endpoint called on app launch or dashboard load.
 
@@ -87,7 +86,7 @@ async def init_default_devices(
     try:
         site_id = get_primary_site_code() or "unknown"
 
-        # Verify user has access to default site (Security: Authorization check)
+        # Verify user has access to the primary registered site (Security: Authorization check)
         site_access_repo = get_user_site_access_repository()
         has_access = site_access_repo.has_access_to_site_code(
             user_email=auth.email,
@@ -96,14 +95,14 @@ async def init_default_devices(
         )
 
         if not has_access:
-            logger.warning(f"User {auth.email} attempted to initialize devices for unauthorized default site")
+            logger.warning(f"User {auth.email} attempted to initialize devices for unauthorized primary site")
             # Return consistent 403 for all unauthorized access (prevents enumeration)
             raise HTTPException(
                 status_code=403,
                 detail="Access denied to this site",
             )
 
-        result = await initialize_demo_devices(site_id)
+        result = await initialize_connected_site_devices(site_id)
         return {
             "status": "initialized",
             "site_id": site_id,

@@ -13,10 +13,9 @@ from __future__ import annotations
 import logging
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from typing import Optional
 
 import aiosmtplib
 
@@ -35,9 +34,9 @@ class ReplyResult:
     """Outcome of an attempted email reply."""
 
     sent: bool = False
-    message_id: Optional[str] = None
-    references: Optional[str] = None
-    error: Optional[str] = None
+    message_id: str | None = None
+    references: str | None = None
+    error: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -65,12 +64,12 @@ class EmailReplyService:
         self,
         *,
         to_email: str,
-        to_name: Optional[str],
+        to_name: str | None,
         subject: str,
         body_plain: str,
-        body_html: Optional[str],
-        in_reply_to: Optional[str] = None,
-        references: Optional[str] = None,
+        body_html: str | None,
+        in_reply_to: str | None = None,
+        references: str | None = None,
     ) -> ReplyResult:
         """Send a threaded reply via SMTP.
 
@@ -103,14 +102,16 @@ class EmailReplyService:
             outbound_message_id = msg["Message-ID"]
             outbound_references = msg.get("References")
 
+            # Port 587 uses STARTTLS (upgrade from plain); port 465 uses implicit TLS
+            is_implicit_tls = settings.notification_smtp_port == 465
             await aiosmtplib.send(
                 msg,
                 hostname=settings.notification_smtp_host,
                 port=settings.notification_smtp_port,
                 username=settings.notification_smtp_username,
                 password=settings.notification_smtp_password,
-                use_tls=settings.notification_smtp_use_tls,
-                start_tls=not settings.notification_smtp_use_tls,
+                use_tls=settings.notification_smtp_use_tls and is_implicit_tls,
+                start_tls=settings.notification_smtp_use_tls and not is_implicit_tls,
             )
 
             logger.info(
@@ -136,12 +137,12 @@ class EmailReplyService:
         self,
         *,
         to_email: str,
-        to_name: Optional[str],
+        to_name: str | None,
         subject: str,
         body_plain: str,
-        body_html: Optional[str],
-        in_reply_to: Optional[str],
-        references: Optional[str],
+        body_html: str | None,
+        in_reply_to: str | None,
+        references: str | None,
     ) -> MIMEMultipart:
         """Build a multipart/alternative MIME message with threading headers."""
         msg = MIMEMultipart("alternative")
@@ -153,7 +154,7 @@ class EmailReplyService:
         msg["From"] = from_addr
         msg["To"] = to_addr
         msg["Subject"] = subject
-        msg["Date"] = datetime.now(timezone.utc).strftime("%a, %d %b %Y %H:%M:%S +0000")
+        msg["Date"] = datetime.now(UTC).strftime("%a, %d %b %Y %H:%M:%S +0000")
 
         # Unique Message-ID for the outbound reply
         msg["Message-ID"] = self._generate_message_id()
@@ -190,8 +191,8 @@ class EmailReplyService:
 
     @staticmethod
     def _build_references_chain(
-        in_reply_to: Optional[str],
-        existing_references: Optional[str],
+        in_reply_to: str | None,
+        existing_references: str | None,
     ) -> str:
         """Build the References header per RFC 2822 Section 3.6.4.
 
@@ -221,7 +222,7 @@ class EmailReplyService:
 # Singleton
 # ---------------------------------------------------------------------------
 
-_service: Optional[EmailReplyService] = None
+_service: EmailReplyService | None = None
 
 
 def get_email_reply_service() -> EmailReplyService:

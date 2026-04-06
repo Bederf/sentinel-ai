@@ -32,7 +32,15 @@ interface UsageSummary {
   total_tokens: number;
   by_provider: Record<string, ModelUsage>;
   by_model: Record<string, ModelUsage>;
+  by_source?: Record<string, ModelUsage>;
   daily: DailyCost[];
+  budget?: {
+    monthly_budget_zar: number;
+    spent_zar: number;
+    remaining_zar: number;
+    hard_cap_enforced: boolean;
+    over_budget: boolean;
+  };
 }
 
 interface TodayUsage {
@@ -42,9 +50,11 @@ interface TodayUsage {
   total_cost_usd: number;
   total_cost_zar: number;
   models: Record<string, TodayModel>;
+  by_source?: Record<string, ModelUsage>;
 }
 
 interface AiCostTrackerProps {
+  siteId?: string;
   onError?: (error: string) => void;
 }
 
@@ -68,7 +78,7 @@ const PROVIDER_COLORS: Record<string, string> = {
   eskomsepush: "rgb(239, 68, 68)",
 };
 
-export function AiCostTracker({ onError }: AiCostTrackerProps) {
+export function AiCostTracker({ siteId, onError }: AiCostTrackerProps) {
   const [summary, setSummary] = useState<UsageSummary | null>(null);
   const [today, setToday] = useState<TodayUsage | null>(null);
   const [loading, setLoading] = useState(true);
@@ -78,8 +88,8 @@ export function AiCostTracker({ onError }: AiCostTrackerProps) {
     setLoading(true);
     try {
       const [sumRes, todayRes] = await Promise.all([
-        authorizedFetch(`/api/ai-usage/summary?days=${period}`),
-        authorizedFetch("/api/ai-usage/today"),
+        authorizedFetch(`/api/ai-usage/summary?days=${period}${siteId ? `&site_id=${encodeURIComponent(siteId)}` : ""}`),
+        authorizedFetch(`/api/ai-usage/today${siteId ? `?site_id=${encodeURIComponent(siteId)}` : ""}`),
       ]);
 
       if (sumRes.ok) setSummary(await sumRes.json());
@@ -89,7 +99,7 @@ export function AiCostTracker({ onError }: AiCostTrackerProps) {
     } finally {
       setLoading(false);
     }
-  }, [period, onError]);
+  }, [period, onError, siteId]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -104,6 +114,11 @@ export function AiCostTracker({ onError }: AiCostTrackerProps) {
 
   // Find max daily cost for chart scaling
   const maxDailyCost = summary ? Math.max(...summary.daily.map((d) => d.cost_zar), 0.01) : 1;
+  const topCostlyRoutes = summary?.by_source
+    ? Object.entries(summary.by_source)
+      .sort(([, a], [, b]) => b.cost_zar - a.cost_zar)
+      .slice(0, 10)
+    : [];
 
   return (
     <div className="glass-panel overflow-hidden">
@@ -161,6 +176,24 @@ export function AiCostTracker({ onError }: AiCostTrackerProps) {
                   sub={summary ? `$${fmt(summary.total_cost_usd, 4)}` : ""}
                   color="rgb(168, 85, 247)"
                 />
+              </div>
+            )}
+
+            {summary?.budget && summary.budget.monthly_budget_zar > 0 && (
+              <div
+                className="p-3 rounded-lg"
+                style={{
+                  background: summary.budget.over_budget ? "rgba(239, 68, 68, 0.12)" : "rgba(59, 130, 246, 0.12)",
+                  border: `1px solid ${summary.budget.over_budget ? "rgba(239,68,68,0.5)" : "rgba(59,130,246,0.5)"}`,
+                }}
+              >
+                <div className="text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                  Budget: R {fmt(summary.budget.spent_zar)} / R {fmt(summary.budget.monthly_budget_zar)}
+                  {summary.budget.hard_cap_enforced ? " (hard cap enabled)" : ""}
+                </div>
+                <div className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                  Remaining: R {fmt(summary.budget.remaining_zar)}
+                </div>
               </div>
             )}
 
@@ -234,6 +267,61 @@ export function AiCostTracker({ onError }: AiCostTrackerProps) {
                       </div>
                     );
                   })}
+                </div>
+              </div>
+            )}
+
+            {summary && summary.by_source && Object.keys(summary.by_source).length > 0 && (
+              <div>
+                <h3 className="text-xs font-semibold mb-2" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                  By Route / Source
+                </h3>
+                <div className="space-y-1">
+                  {Object.entries(summary.by_source).map(([source, data]) => (
+                    <div key={source} className="flex items-center justify-between py-1.5 px-2 rounded" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
+                      <div>
+                        <span className="text-xs font-mono" style={{ color: "var(--color-sentinel-text-primary)" }}>{source}</span>
+                        <span className="text-[10px] ml-2" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                          {data.calls} calls · {fmtTokens(data.tokens)} tokens
+                        </span>
+                      </div>
+                      <span className="text-xs font-semibold" style={{ color: "var(--color-sentinel-amber)" }}>
+                        R {fmt(data.cost_zar)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {topCostlyRoutes.length > 0 && (
+              <div>
+                <h3 className="text-xs font-semibold mb-2" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                  Top 10 Costly Routes (This Period)
+                </h3>
+                <div className="space-y-1">
+                  {topCostlyRoutes.map(([source, data], index) => (
+                    <div
+                      key={source}
+                      className="flex items-center justify-between py-1.5 px-2 rounded"
+                      style={{ background: "var(--color-sentinel-bg-secondary)" }}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span
+                          className="text-[10px] font-semibold w-5 text-center"
+                          style={{ color: "var(--color-sentinel-text-secondary)" }}
+                        >
+                          #{index + 1}
+                        </span>
+                        <span className="text-xs font-mono" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                          {source}
+                        </span>
+                      </div>
+                      <span className="text-xs font-semibold" style={{ color: "var(--color-sentinel-amber)" }}>
+                        R {fmt(data.cost_zar)}
+                      </span>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}

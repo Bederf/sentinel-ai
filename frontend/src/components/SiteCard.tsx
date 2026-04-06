@@ -1,30 +1,15 @@
 /**
- * SiteCard Component - SENTINEL site panel
+ * SiteCard — Dashboard card for a single site/building.
  *
- * Displays:
- * - Site name with protection status indicator
- * - Location and type information
- * - Equipment count metric
- * - Risk alerts with severity coloring
- * - Safety status indicators (via useSiteSummary)
- * - Status-based left border accent
- *
- * Migrated to use batch hooks (Phase 75-04):
- * - useSiteSummary replaces per-device API calls
- * - Single aggregated query returns all site data
- * - Eliminates 30+ concurrent requests
+ * Displays: site name, location, type badge, equipment count, risk count,
+ * status badge (Protected/Elevated/Critical), safety summary, and optimization status.
  */
 
-import { Building2, Cpu, AlertTriangle, MapPin, Shield, Clock, ShieldOff } from "lucide-react";
-import { useEffect, useState } from "react";
+import { type Site } from "@/lib/api";
+import { api } from "@/lib/api";
 import { useSiteSummary } from "@/hooks/useSiteSummary";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import api, { type Site, type OptimizationRecommendation, type BuildingEquipmentItem, createWorkOrder } from '@/lib/api';
-import { OptimizationStatusBadge } from "./OptimizationStatusBadge";
-import { OptimizationRecommendationModal } from "./OptimizationRecommendationModal";
-import { ExpandableRiskList } from "./ExpandableRiskList";
-import { RiskDetailModal } from "./RiskDetailModal";
-import { getTimezoneAbbreviation, isDifferentTimezone } from "../lib/timeFormat";
+import { Shield, AlertTriangle, Zap, TrendingUp, Eye, EyeOff } from "lucide-react";
+import { useState, useEffect } from "react";
 
 interface SiteCardProps {
   site: Site;
@@ -34,668 +19,217 @@ interface SiteCardProps {
   onEquipmentControlNavigate?: (equipmentId: string, siteId: string) => void;
 }
 
-type SafetyStatus = 'safe' | 'warning' | 'blocked' | 'alarm' | 'unknown';
-
-interface DeviceSafetySummary {
-  total: number;
-  safe: number;
-  warning: number;
-  blocked: number;
-  alarm: number;
-  overallStatus: SafetyStatus;
+function StatusBadge({ status }: { status: string }) {
+  const config: Record<string, { label: string; color: string; bg: string }> = {
+    normal: { label: "Protected", color: "#22c55e", bg: "rgba(34,197,94,0.15)" },
+    warning: { label: "Elevated", color: "#f59e0b", bg: "rgba(245,158,11,0.15)" },
+    critical: { label: "Critical", color: "#ef4444", bg: "rgba(239,68,68,0.15)" },
+    healthy: { label: "Protected", color: "#22c55e", bg: "rgba(34,197,94,0.15)" },
+    degraded: { label: "Elevated", color: "#f59e0b", bg: "rgba(245,158,11,0.15)" },
+    at_risk: { label: "Critical", color: "#ef4444", bg: "rgba(239,68,68,0.15)" },
+  };
+  const cfg = config[status] ?? config.normal;
+  return (
+    <span
+      style={{ color: cfg.color, background: cfg.bg }}
+      className="px-2 py-0.5 rounded text-xs font-medium"
+    >
+      {cfg.label}
+    </span>
+  );
 }
 
-type OptimizationStatusType = "optimized" | "recommendation_pending" | "warning" | "error" | "unknown";
-
-/**
- * Get status colors for SENTINEL theme
- */
-function getStatusConfig(status: Site["status"]): {
-  color: string;
-  bg: string;
-  border: string;
-  label: string;
-} {
-  switch (status) {
-    case "normal":
-      return {
-        color: "var(--color-sentinel-green)",
-        bg: "rgba(16, 185, 129, 0.15)",
-        border: "rgba(16, 185, 129, 0.5)",
-        label: "Protected",
-      };
-    case "warning":
-      return {
-        color: "var(--color-sentinel-amber)",
-        bg: "rgba(245, 158, 11, 0.15)",
-        border: "rgba(245, 158, 11, 0.5)",
-        label: "Elevated",
-      };
-    case "critical":
-      return {
-        color: "var(--color-sentinel-red)",
-        bg: "rgba(220, 38, 38, 0.15)",
-        border: "rgba(220, 38, 38, 0.5)",
-        label: "Critical",
-      };
-    default:
-      return {
-        color: "var(--color-sentinel-text-secondary)",
-        bg: "rgba(142, 142, 142, 0.15)",
-        border: "rgba(142, 142, 142, 0.5)",
-        label: "Unknown",
-      };
-  }
+interface OptimizationStatusProps {
+  siteId: string;
+  enabled: boolean;
 }
 
-/**
- * Get color for safe percentage based on thresholds
- * Red: 0-49%, Amber: 50-79%, Green: 80-100%
- */
-function getSafePercentageColor(safe: number, total: number): string {
-  if (total === 0) return "var(--color-sentinel-text-disabled)";
+function OptimizationStatus({ siteId, enabled }: OptimizationStatusProps) {
+  const [status, setStatus] = useState<{
+    state: string;
+    last: string | null;
+  } | null>(null);
 
-  const percentage = (safe / total) * 100;
+  useEffect(() => {
+    if (!enabled) return;
+    api.getOptimizationStatus(siteId)
+      .then((r) =>
+        setStatus({
+          state: r.optimization_status ?? "unknown",
+          last: r.last_optimization ?? null,
+        })
+      )
+      .catch(() => null);
+  }, [siteId, enabled]);
 
-  if (percentage < 50) {
-    return "var(--color-sentinel-red)"; // 0-49%
-  } else if (percentage < 80) {
-    return "var(--color-sentinel-amber)"; // 50-79%
-  } else {
-    return "var(--color-sentinel-green)"; // 80-100%
-  }
+  if (!enabled) return null;
+
+  const color =
+    status?.state === "optimized"
+      ? "#22c55e"
+      : status?.state === "optimizing"
+      ? "#f59e0b"
+      : "#6b7280";
+  const label =
+    status?.state === "optimized"
+      ? "Optimized"
+      : status?.state === "optimizing"
+      ? "Optimizing"
+      : "Not optimized";
+
+  return (
+    <div className="flex items-center gap-1 text-xs" style={{ color }}>
+      <TrendingUp className="w-3 h-3" />
+      <span>{label}</span>
+    </div>
+  );
 }
 
-export function SiteCard({ site, onClick, showSafetyStatus = true, showOptimizationStatus = false, onEquipmentControlNavigate }: SiteCardProps) {
-  const statusConfig = getStatusConfig(site.status);
-  const hasAlerts = site.alert_count > 0;
-  const queryClient = useQueryClient();
-
-  // Fetch aggregated site summary (replaces per-device API calls)
-  const { data: siteSummary, isLoading: loadingSafety } = useSiteSummary(site.id, {
+export function SiteCard({
+  site,
+  onClick,
+  showSafetyStatus = false,
+  showOptimizationStatus = false,
+}: SiteCardProps) {
+  const { data: summary, isLoading } = useSiteSummary(site.id, {
     enabled: showSafetyStatus,
   });
 
-  const [optimizationStatus, setOptimizationStatus] = useState<OptimizationStatusType>("unknown");
-  const [optimizationMode, setOptimizationMode] = useState<"automatic" | "supervised">("supervised");
-  const [hasRecommendation, setHasRecommendation] = useState(false);
-  const [showRecommendationModal, setShowRecommendationModal] = useState(false);
-  const [currentRecommendation, setCurrentRecommendation] = useState<OptimizationRecommendation | null>(null);
+  const safeCount = summary?.safety?.safe ?? site.equipment_count - site.alert_count;
+  const totalCount = summary?.equipment_count ?? site.equipment_count;
 
-  // SENTINEL processing toggle state
-  const [processingEnabled, setProcessingEnabled] = useState(site.sentinel_processing_enabled !== false);
-  const [processingLoading, setProcessingLoading] = useState(false);
-
-  // Keep switch state aligned with latest site payload after refetch/navigation.
-  useEffect(() => {
-    setProcessingEnabled(site.sentinel_processing_enabled !== false);
-  }, [site.id, site.sentinel_processing_enabled]);
-
-  const handleProcessingToggle = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (processingLoading) return;
-
-    const newEnabled = !processingEnabled;
-    // Optimistic update
-    setProcessingEnabled(newEnabled);
-    setProcessingLoading(true);
-
-    try {
-      const result = await api.toggleSiteProcessing(site.id, newEnabled);
-      setProcessingEnabled(result.sentinel_processing_enabled);
-      // Invalidate both legacy and current list keys.
-      queryClient.invalidateQueries({ queryKey: ['sites'] });
-      queryClient.invalidateQueries({ queryKey: ['buildings-list'] });
-    } catch (error) {
-      console.error("Failed to toggle SENTINEL processing:", error);
-      // Rollback on error
-      setProcessingEnabled(!newEnabled);
-    } finally {
-      setProcessingLoading(false);
-    }
-  };
-
-  // Expandable risk list state
-  const [riskListExpanded, setRiskListExpanded] = useState(false);
-  const [selectedRiskEquipment, setSelectedRiskEquipment] = useState<BuildingEquipmentItem | null>(null);
-  const [showRiskModal, setShowRiskModal] = useState(false);
-
-  const handleClick = () => {
-    if (onClick) {
-      onClick(site);
-    }
-  };
-
-  // Build safety summary from site summary response
-  const safetySummary: DeviceSafetySummary | null = siteSummary ? {
-    total: siteSummary.equipment_count,
-    safe: siteSummary.safety.safe,
-    warning: siteSummary.safety.warning,
-    blocked: siteSummary.safety.blocked,
-    alarm: siteSummary.safety.alarm,
-    overallStatus:
-      siteSummary.safety.blocked > 0 ? 'blocked' :
-      siteSummary.safety.alarm > 0 ? 'alarm' :
-      siteSummary.safety.warning > 0 ? 'warning' :
-      siteSummary.safety.safe > 0 ? 'safe' :
-      'unknown'
-  } : null;
-
-  // Fetch optimization status for this site
-  const { data: optimizationResponse } = useQuery({
-    queryKey: ['optimization-status', site.id],
-    queryFn: () => (site.optimization_enabled ? api.getOptimizationStatus(site.id) : Promise.resolve(null)),
-    enabled: showOptimizationStatus && site.optimization_enabled,
-    staleTime: 30 * 1000,
-  });
-
-  // Update optimization status when response changes
-  if (optimizationResponse) {
-    if (optimizationResponse.optimization_status !== optimizationStatus) {
-      setOptimizationStatus(optimizationResponse.optimization_status);
-    }
-    const mode = optimizationResponse.optimization_settings?.mode || "supervised";
-    if (mode !== optimizationMode) {
-      setOptimizationMode(mode);
-    }
-    const hasRecs = !!(optimizationResponse.last_recommendation &&
-                    optimizationResponse.last_recommendation.recommendations &&
-                    optimizationResponse.last_recommendation.recommendations.length > 0);
-    if (hasRecs !== hasRecommendation) {
-      setHasRecommendation(hasRecs);
-    }
-  }
-
-  // Handle optimization badge click - show modal if there's a recommendation to review
-  const handleOptimizationClick = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-
-    try {
-      const status = await api.getOptimizationStatus(site.id);
-      const hasRecs = !!(status.last_recommendation &&
-                      status.last_recommendation.recommendations &&
-                      status.last_recommendation.recommendations.length > 0);
-
-      setHasRecommendation(hasRecs);
-
-      if (hasRecs) {
-        setCurrentRecommendation(status.last_recommendation);
-        setShowRecommendationModal(true);
-      }
-    } catch (error) {
-      console.error('Failed to refresh optimization status:', error);
-      if (hasRecommendation) {
-        setShowRecommendationModal(true);
-      }
-    }
-  };
-
-  // Handle approve recommendation
-  const handleApproveRecommendation = async (recommendationId: string) => {
-    try {
-      const setpointsToApply = currentRecommendation?.recommendations.map((rec) => ({
-        device_id: rec.equipment_id,
-        point_name: rec.point_name || "setpoint",
-        value: rec.recommended_value,
-      })) || [];
-
-      await api.approveOptimization(site.id, recommendationId, setpointsToApply);
-
-      const status = await api.getOptimizationStatus(site.id);
-      setOptimizationStatus(status.optimization_status);
-
-      setShowRecommendationModal(false);
-      setCurrentRecommendation(null);
-    } catch (error) {
-      console.error('Failed to approve recommendation:', error);
-      throw error;
-    }
-  };
-
-  // Handle reject recommendation
-  const handleRejectRecommendation = async (_recommendationId: string, _reason?: string) => {
-    try {
-      const status = await api.getOptimizationStatus(site.id);
-      setOptimizationStatus(status.optimization_status);
-
-      setShowRecommendationModal(false);
-      setCurrentRecommendation(null);
-    } catch (error) {
-      console.error('Failed to reject recommendation:', error);
-      throw error;
-    }
-  };
-
-  // Handle equipment click from risk list
-  const handleEquipmentClick = (equipment: BuildingEquipmentItem) => {
-    if (onEquipmentControlNavigate) {
-      onEquipmentControlNavigate(equipment.id, site.id);
-    }
-  };
-
-  // Handle status badge click from risk list
-  const handleStatusBadgeClick = (equipment: BuildingEquipmentItem) => {
-    setSelectedRiskEquipment(equipment);
-    setShowRiskModal(true);
-  };
-
-  // Handle navigation to control from risk modal
-  const handleNavigateToControl = (equipmentId: string) => {
-    if (onEquipmentControlNavigate) {
-      onEquipmentControlNavigate(equipmentId, site.id);
-    }
-  };
-
-  // Handle work order creation from risk modal
-  const handleCreateWorkOrder = async (equipmentId: string) => {
-    const equipment = selectedRiskEquipment;
-    if (!equipment) return;
-
-    try {
-      const workOrder = await createWorkOrder({
-        site_id: site.id,
-        equipment_id: equipment.id || equipmentId,
-        fault_description: `${equipment.name} health at ${equipment.health}% - maintenance required`,
-        diagnosis: `Equipment health below threshold. Status: ${equipment.status}`,
-        priority: equipment.status === "critical" ? "high" : "medium",
-      });
-
-      alert(`Work Order ${workOrder.id} created for ${equipment.name}`);
-    } catch (error) {
-      console.error("Failed to create work order:", error);
-      alert("Failed to create work order. Please try again.");
-    }
-  };
+  const safeFraction =
+    totalCount > 0 ? `${safeCount}/${totalCount}` : `${site.equipment_count}`;
 
   return (
     <div
-      className={`relative rounded-md overflow-hidden transition-all duration-150 glass-card ${onClick ? "cursor-pointer hover:brightness-110" : ""}`}
-      onClick={handleClick}
-      title={`${site.name} — ${statusConfig.label}. ${site.equipment_count} equipment monitored. Click to view details.`}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onClick={onClick ? () => onClick(site) : undefined}
+      onKeyDown={onClick ? (e) => e.key === "Enter" && onClick(site) : undefined}
+      className={onClick ? "cursor-pointer hover:brightness-110 transition-all" : ""}
+      style={{
+        background: "var(--color-grafana-bg-panel)",
+        border: "1px solid var(--color-grafana-border)",
+        borderRadius: "8px",
+        padding: "16px",
+        display: "flex",
+        flexDirection: "column",
+        gap: "8px",
+      }}
     >
-      {/* Left status accent bar */}
-      <div
-        className="absolute left-0 top-0 bottom-0 w-1"
-        style={{ background: statusConfig.color }}
-      />
-
-      <div className="p-4 pl-5">
-        {/* Header: Site Number, Name and Status */}
-        <div className="flex items-start justify-between mb-2">
-          <div className="flex flex-col gap-0.5">
-            <div className="flex items-center gap-2">
-              <Building2
-                className="h-4 w-4"
-                style={{ color: "var(--color-sentinel-blue)" }}
-              />
-              <span
-                className="text-xs font-medium uppercase tracking-wide"
-                style={{ color: "var(--color-sentinel-blue)" }}
-              >
-                {site.id}
-              </span>
-            </div>
-            <span
-              className="font-medium text-sm ml-6"
-              style={{ color: "var(--color-sentinel-text-primary)" }}
-            >
-              {site.name}
-            </span>
-          </div>
-          <div className="flex flex-col items-end gap-1">
-            {/* SENTINEL processing toggle + Status badge row */}
-            <div className="flex items-center gap-2">
-              {/* Processing toggle */}
-              <button
-                type="button"
-                onClick={handleProcessingToggle}
-                disabled={processingLoading}
-                className="relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none"
-                style={{
-                  backgroundColor: processingEnabled
-                    ? "var(--color-sentinel-green)"
-                    : "rgba(142, 142, 142, 0.4)",
-                  opacity: processingLoading ? 0.5 : 1,
-                  cursor: processingLoading ? "not-allowed" : "pointer",
-                }}
-                title={
-                  processingLoading
-                    ? "Updating..."
-                    : processingEnabled
-                    ? "SENTINEL active — click to mute processing"
-                    : "SENTINEL muted — click to resume processing"
-                }
-                role="switch"
-                aria-checked={processingEnabled}
-                aria-label="Toggle SENTINEL processing"
-              >
-                <span
-                  className={`pointer-events-none inline-block h-4 w-4 transform rounded-full shadow ring-0 transition duration-200 ease-in-out ${
-                    processingEnabled ? "translate-x-4" : "translate-x-0"
-                  }`}
-                  style={{ backgroundColor: "white" }}
-                >
-                  {processingEnabled ? (
-                    <Shield className="h-2.5 w-2.5 m-[3px]" style={{ color: "var(--color-sentinel-green)" }} />
-                  ) : (
-                    <ShieldOff className="h-2.5 w-2.5 m-[3px]" style={{ color: "rgba(142, 142, 142, 0.6)" }} />
-                  )}
-                </span>
-              </button>
-
-              {/* Status badge */}
-              <div
-                className="flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium"
-                style={{
-                  background: statusConfig.bg,
-                  color: statusConfig.color,
-                }}
-              >
-                <div
-                  className="w-1.5 h-1.5 rounded-full"
-                  style={{ background: statusConfig.color }}
-                />
-                {statusConfig.label}
-              </div>
-            </div>
-            {/* Optimization badge (if enabled) */}
-            {showOptimizationStatus && site.optimization_enabled && (
-              <div
-                className={hasRecommendation ? "cursor-pointer hover:opacity-80 transition-opacity" : ""}
-                onClick={handleOptimizationClick}
-                title={hasRecommendation ? "Click to view recommendation" : undefined}
-              >
-                <OptimizationStatusBadge
-                  status={optimizationStatus}
-                  mode={optimizationMode}
-                  size="sm"
-                  lastOptimization={site.last_optimization}
-                  hasRecommendation={hasRecommendation}
-                />
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Location */}
-        <div className="flex items-center gap-1.5 mb-2">
-          <MapPin
-            className="h-3 w-3"
-            style={{ color: "var(--color-sentinel-text-disabled)" }}
-          />
-          <span
-            className="text-xs"
-            style={{ color: "var(--color-sentinel-text-secondary)" }}
+      {/* Header */}
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex-1 min-w-0">
+          <h4
+            className="font-medium text-sm truncate"
+            style={{ color: "var(--color-grafana-text-primary)" }}
           >
-            {site.location}
-          </span>
-        </div>
-
-        {/* Operating Hours */}
-        {site.operating_hours && (
-          <div className="flex items-center gap-1.5 mb-3">
-            <Clock
-              className="h-3 w-3"
-              style={{ color: "var(--color-sentinel-text-disabled)" }}
-            />
-            <span
-              className="text-xs"
-              style={{ color: "var(--color-sentinel-text-secondary)" }}
+            {site.name}
+          </h4>
+          {site.location && (
+            <p
+              className="text-xs truncate"
+              style={{ color: "var(--color-grafana-text-secondary)" }}
             >
-              {site.operating_hours.start} - {site.operating_hours.end}
-              {isDifferentTimezone(site.timezone) && site.timezone && (
-                <span
-                  className="ml-1.5 px-1 py-0.5 rounded text-xs font-medium"
-                  style={{
-                    background: "rgba(59, 130, 246, 0.15)",
-                    color: "var(--color-sentinel-blue)",
-                  }}
-                  title={`Building timezone: ${site.timezone}`}
-                >
-                  {getTimezoneAbbreviation(site.timezone)}
-                </span>
-              )}
-            </span>
-          </div>
-        )}
+              {site.location}
+            </p>
+          )}
+        </div>
+        <StatusBadge status={site.status ?? "normal"} />
+      </div>
 
-        {/* Type badge */}
-        <div
-          className="inline-block px-2 py-0.5 rounded text-xs mb-3"
+      {/* Type badge */}
+      {site.type && (
+        <span
+          className="self-start px-2 py-0.5 rounded text-xs"
           style={{
-            background: "var(--color-sentinel-bg-secondary)",
-            color: "var(--color-sentinel-text-secondary)",
-            border: "1px solid var(--color-sentinel-border)",
+            background: "var(--color-grafana-bg-secondary)",
+            border: "1px solid var(--color-grafana-border)",
+            color: "var(--color-grafana-text-secondary)",
           }}
         >
           {site.type}
+        </span>
+      )}
+
+      {/* Stats */}
+      <div className="flex gap-4">
+        <div className="flex items-center gap-1.5">
+          <Shield className="w-3.5 h-3.5" style={{ color: "var(--color-grafana-text-secondary)" }} />
+          <span className="text-sm font-medium" style={{ color: "var(--color-grafana-text-primary)" }}>
+            {site.equipment_count}
+          </span>
+          <span className="text-xs" style={{ color: "var(--color-grafana-text-secondary)" }}>
+            Equipment
+          </span>
         </div>
-
-        {/* Stats Row */}
-        <div
-          className="flex items-center justify-between pt-3"
-          style={{ borderTop: "1px solid var(--color-sentinel-border)" }}
-        >
-          {/* Equipment Count */}
-          <div
-            className="flex items-center gap-2 group relative"
-            title={
-              site.equipment_breakdown
-                ? `Equipment Breakdown:\n` +
-                  `├─ ${site.equipment_breakdown.equipment} Legacy Equipment\n` +
-                  `├─ ${site.equipment_breakdown.hvac_zones} HVAC Zones\n` +
-                  `├─ ${site.equipment_breakdown.generators + site.equipment_breakdown.generator_groups + site.equipment_breakdown.diesel_tanks} Generator Plant\n` +
-                  `├─ ${site.equipment_breakdown.energy_centre} Energy Centre\n` +
-                  `└─ ${site.equipment_breakdown.dali_controllers} DALI Controllers`
-                : `${site.equipment_count} Total Equipment`
-            }
+        <div className="flex items-center gap-1.5">
+          <AlertTriangle
+            className="w-3.5 h-3.5"
+            style={{ color: site.alert_count > 0 ? "#f59e0b" : "var(--color-grafana-text-secondary)" }}
+          />
+          <span
+            className="text-sm font-medium"
+            style={{
+              color: site.alert_count > 0 ? "#f59e0b" : "var(--color-grafana-text-primary)",
+            }}
           >
-            <Cpu
-              className="h-4 w-4"
-              style={{ color: "var(--color-sentinel-blue)" }}
-            />
-            <div>
-              <div
-                className="text-lg font-medium"
-                style={{
-                  color: "var(--color-sentinel-text-primary)",
-                  fontVariantNumeric: "tabular-nums",
-                }}
-              >
-                {site.equipment_count}
-              </div>
-              <div
-                className="text-xs flex items-center gap-1"
-                style={{ color: "var(--color-sentinel-text-disabled)" }}
-              >
-                Equipment
-                {site.equipment_breakdown && (
-                  <span
-                    className="inline-block w-1 h-1 rounded-full"
-                    style={{ background: "var(--color-sentinel-blue)" }}
-                    title="Detailed breakdown available"
-                  />
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Safety Status */}
-          {showSafetyStatus && (
-            <div className="flex items-center gap-2">
-              <Shield
-                className="h-4 w-4"
-                style={{
-                  color: safetySummary
-                    ? getSafePercentageColor(safetySummary.safe, safetySummary.total)
-                    : getSafePercentageColor(
-                        Math.max(0, (site.equipment_count || 0) - (site.alert_count || 0)),
-                        site.equipment_count || 0
-                      ),
-                }}
-              />
-              <div className="text-right">
-                {loadingSafety ? (
-                  <div
-                    className="text-lg font-medium"
-                    style={{
-                      color: "var(--color-sentinel-text-disabled)",
-                      fontVariantNumeric: "tabular-nums",
-                    }}
-                  >
-                    ...
-                  </div>
-                ) : safetySummary ? (
-                  <>
-                    <div
-                      className="text-lg font-medium"
-                      style={{
-                        color: getSafePercentageColor(safetySummary.safe, safetySummary.total),
-                        fontVariantNumeric: "tabular-nums",
-                      }}
-                    >
-                      {safetySummary.safe}/{site.equipment_count}
-                    </div>
-                    <div
-                      className="text-xs"
-                      style={{ color: "var(--color-sentinel-text-disabled)" }}
-                    >
-                      Safe
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div
-                      className="text-lg font-medium"
-                      style={{
-                        color: getSafePercentageColor(
-                          Math.max(0, (site.equipment_count || 0) - (site.alert_count || 0)),
-                          site.equipment_count || 0
-                        ),
-                        fontVariantNumeric: "tabular-nums",
-                      }}
-                    >
-                      {Math.max(0, (site.equipment_count || 0) - (site.alert_count || 0))}/{site.equipment_count || 0}
-                    </div>
-                    <div
-                      className="text-xs"
-                      style={{ color: "var(--color-sentinel-text-disabled)" }}
-                    >
-                      Safe
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Risk Alert Count - Show warning + alarm + blocked equipment from summary */}
-          {showSafetyStatus && safetySummary ? (
-            <div className="flex items-center gap-2">
-              <AlertTriangle
-                className="h-4 w-4"
-                style={{
-                  color: (safetySummary.warning + safetySummary.alarm + safetySummary.blocked) > 0
-                    ? "var(--color-sentinel-amber)"
-                    : "var(--color-sentinel-text-disabled)",
-                }}
-              />
-              <div className="text-right">
-                <div
-                  className="text-lg font-medium"
-                  style={{
-                    color: (safetySummary.warning + safetySummary.alarm + safetySummary.blocked) > 0
-                      ? "var(--color-sentinel-amber)"
-                      : "var(--color-sentinel-text-primary)",
-                    fontVariantNumeric: "tabular-nums",
-                  }}
-                >
-                  {safetySummary.warning + safetySummary.alarm + safetySummary.blocked}
-                </div>
-                <div
-                  className="text-xs"
-                  style={{ color: "var(--color-sentinel-text-disabled)" }}
-                >
-                  Risks
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2">
-              <AlertTriangle
-                className="h-4 w-4"
-                style={{
-                  color: hasAlerts
-                    ? "var(--color-sentinel-amber)"
-                    : "var(--color-sentinel-text-disabled)",
-                }}
-              />
-              <div className="text-right">
-                <div
-                  className="text-lg font-medium"
-                  style={{
-                    color: hasAlerts
-                      ? "var(--color-sentinel-amber)"
-                      : "var(--color-sentinel-text-primary)",
-                    fontVariantNumeric: "tabular-nums",
-                  }}
-                >
-                  {site.alert_count}
-                </div>
-                <div
-                  className="text-xs"
-                  style={{ color: "var(--color-sentinel-text-disabled)" }}
-                >
-                  Risks
-                </div>
-              </div>
-            </div>
-          )}
+            {site.alert_count}
+          </span>
+          <span className="text-xs" style={{ color: "var(--color-grafana-text-secondary)" }}>
+            Risks
+          </span>
         </div>
       </div>
 
-      {/* Expandable Risk List — show when safety summary has risks OR legacy alert_count > 0 */}
-      {(safetySummary
-        ? (safetySummary.warning + safetySummary.alarm + safetySummary.blocked) > 0
-        : hasAlerts
-      ) && (
-        <ExpandableRiskList
-          siteId={site.id}
-          expanded={riskListExpanded}
-          onToggle={() => setRiskListExpanded(!riskListExpanded)}
-          onEquipmentClick={handleEquipmentClick}
-          onStatusBadgeClick={handleStatusBadgeClick}
-        />
+      {/* Safety status */}
+      {showSafetyStatus && (
+        <div className="flex items-center gap-2">
+          {isLoading ? (
+            <span className="text-xs" style={{ color: "var(--color-grafana-text-disabled)" }}>
+              Loading...
+            </span>
+          ) : (
+            <>
+              <span
+                className="text-xs font-medium"
+                style={{ color: "var(--color-grafana-text-primary)" }}
+              >
+                {safeFraction}
+              </span>
+              <span className="text-xs" style={{ color: "var(--color-grafana-text-secondary)" }}>
+                Safe
+              </span>
+              {summary?.safety && (
+                <div className="flex gap-1.5 ml-auto">
+                  {summary.safety.warning > 0 && (
+                    <span className="text-xs" style={{ color: "#f59e0b" }}>
+                      {summary.safety.warning}⚠
+                    </span>
+                  )}
+                  {summary.safety.alarm > 0 && (
+                    <span className="text-xs" style={{ color: "#ef4444" }}>
+                      {summary.safety.alarm}🔴
+                    </span>
+                  )}
+                  {summary.safety.blocked > 0 && (
+                    <span className="text-xs" style={{ color: "#a855f7" }}>
+                      {summary.safety.blocked}🚫
+                    </span>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+        </div>
       )}
 
-      {/* Recommendation Modal */}
-      {showRecommendationModal && currentRecommendation && (
-        <OptimizationRecommendationModal
-          isOpen={showRecommendationModal}
-          onClose={() => {
-            setShowRecommendationModal(false);
-            setCurrentRecommendation(null);
-          }}
-          recommendation={currentRecommendation}
-          onApprove={handleApproveRecommendation}
-          onReject={handleRejectRecommendation}
-          siteName={site.name}
-        />
-      )}
-
-      {/* Risk Detail Modal */}
-      {showRiskModal && selectedRiskEquipment && (
-        <RiskDetailModal
-          isOpen={showRiskModal}
-          onClose={() => {
-            setShowRiskModal(false);
-            setSelectedRiskEquipment(null);
-          }}
-          equipment={selectedRiskEquipment}
-          onNavigateToControl={handleNavigateToControl}
-          onCreateWorkOrder={handleCreateWorkOrder}
-        />
-      )}
+      {/* Optimization status */}
+      <OptimizationStatus
+        siteId={site.id}
+        enabled={showOptimizationStatus ?? site.optimization_enabled ?? false}
+      />
     </div>
   );
 }

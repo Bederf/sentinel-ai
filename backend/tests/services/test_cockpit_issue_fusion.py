@@ -64,6 +64,9 @@ def test_dedupe_prefers_bms_alert_over_intake():
     assert len(issues) == 1
     assert issues[0].source == "bms"
     assert issues[0].title == "Chiller fault"
+    assert issues[0].issue_category == "fault"
+    assert issues[0].subsystem == "hvac"
+    assert issues[0].constraint_type == "comfort"
 
 
 def test_dedupe_runs_against_zone_when_equipment_missing():
@@ -108,6 +111,8 @@ def test_dedupe_runs_against_zone_when_equipment_missing():
 
     assert len(issues) == 1
     assert issues[0].location.zone_ids == ["Zone-L4-Boardroom-A"]
+    assert issues[0].issue_category == "thermal"
+    assert issues[0].constraint_type == "comfort"
 
 
 def test_selected_issue_id_preserved_when_present():

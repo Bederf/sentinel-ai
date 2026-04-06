@@ -5,10 +5,10 @@ The "invisible optimiser" brain.  Runs a 5-minute dispatch cycle that:
   2. Checks load shedding (manual override or EskomSePush API if configured)
   3. Gets dispatch action from arbitrage engine
   4. Applies compliance constraints (export limits from 34-03)
-  5. Executes action (update simulated BESS state for demo)
+  5. Executes action (update local seeded BESS state when live hardware is unavailable)
   6. Logs dispatch event
 
-For demo purposes the full 24h cycle is simulated with compressed time
+For local seeded operation the full 24h cycle is simulated with compressed time
 to show BESS charging at night, discharging at peak, savings accumulating.
 """
 
@@ -16,17 +16,17 @@ import json
 import logging
 import random
 from dataclasses import dataclass
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Dict, List, Optional, Any
+from typing import Any
 
 from app.config.settings import settings
+from app.core.site_resolver import get_primary_site_code
 from app.services.solar_arbitrage_engine import (
-    get_solar_arbitrage_engine,
     DispatchActionType,
+    get_solar_arbitrage_engine,
 )
 from app.services.solar_config_service import get_site_solar_config
-from app.core.site_resolver import get_primary_site_code
 
 logger = logging.getLogger(__name__)
 
@@ -53,10 +53,10 @@ class DispatchEvent:
     site_load_kw: float = 0.0
     grid_import_kw: float = 0.0
     grid_export_kw: float = 0.0
-    aegis_proposal_id: Optional[str] = None  # Join key to parasite_decisions
-    write_result: Optional[Dict[str, Any]] = None  # Modbus write result
+    aegis_proposal_id: str | None = None  # Join key to parasite_decisions
+    write_result: dict[str, Any] | None = None  # Modbus write result
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         d = {
             "timestamp": self.timestamp,
             "action": self.action,
@@ -88,15 +88,15 @@ class DispatchStatus:
     bess_soc_pct: float
     tariff_band: str
     rate_per_kwh: float
-    next_action_change: Optional[str] = None
+    next_action_change: str | None = None
     savings_today_zar: float = 0.0
     cycles_today: int = 0
     dispatch_events_today: int = 0
-    last_dispatch: Optional[str] = None
+    last_dispatch: str | None = None
     load_shedding_active: bool = False
     uptime_hours: float = 0.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "site_id": self.site_id,
             "mode": self.mode,
@@ -134,23 +134,23 @@ class SolarDispatchService:
     BESS_EFFICIENCY = 0.90
 
     def __init__(self):
-        self._dispatch_log: Dict[str, List[DispatchEvent]] = {}
-        self._simulated_soc: Dict[str, float] = {}
-        self._last_real_soc: Dict[str, float] = {}  # Last known real SOC (for sync callers)
-        self._started_at: Dict[str, str] = {}
-        self._mode: Dict[str, str] = {}  # autonomous / manual / stopped
+        self._dispatch_log: dict[str, list[DispatchEvent]] = {}
+        self._simulated_soc: dict[str, float] = {}
+        self._last_real_soc: dict[str, float] = {}  # Last known real SOC (for sync callers)
+        self._started_at: dict[str, str] = {}
+        self._mode: dict[str, str] = {}  # autonomous / manual / stopped
         try:
             cfg = get_site_solar_config()
             self.BESS_CAPACITY_KWH = cfg.bess.capacity_kwh
             self.BESS_RATED_POWER_KW = cfg.bess.rated_power_kw
         except Exception:
             pass
-        self._seed_demo_history(get_primary_site_code() or "unknown")
+        self._seed_history(get_primary_site_code() or "unknown")
 
-    # === Demo seed ===
+    # === Seeded history ===
 
-    def _seed_demo_history(self, site_id: str) -> None:
-        """Seed a realistic 24-hour dispatch log for demo purposes.
+    def _seed_history(self, site_id: str) -> None:
+        """Seed a realistic 24-hour dispatch log for local seeded operation.
 
         Simulates the BESS through a full day:
           22:00 -> 06:00 : charging (off-peak)
@@ -161,8 +161,8 @@ class SolarDispatchService:
           20:00 -> 22:00 : idle (standard evening)
         """
         engine = get_solar_arbitrage_engine()
-        events: List[DispatchEvent] = []
-        now = datetime.now(timezone.utc)
+        events: list[DispatchEvent] = []
+        now = datetime.now(UTC)
         _sast_now = now + timedelta(hours=2)
 
         # Start from yesterday 22:00 SAST
@@ -260,7 +260,7 @@ class SolarDispatchService:
             soc,
         )
 
-    def _get_hourly_profile(self, engine) -> Dict[int, Dict[str, Any]]:
+    def _get_hourly_profile(self, engine) -> dict[int, dict[str, Any]]:
         """Build hour-by-hour dispatch profile (SAST hours)."""
         season = engine._get_season()
         off_peak_rate = engine._get_band_rate("off_peak", season)
@@ -390,11 +390,18 @@ class SolarDispatchService:
     async def _get_current_soc(self, site_id: str) -> float:
         """Get current BESS SOC, preferring real hardware reads when in live mode.
 
-        Falls back to simulated SOC on any failure or in demo/simulation mode.
+        Falls back to cached SOC only on production islands; local simulation
+        remains available for non-island development.
         """
         from app.config.settings import settings
 
-        if settings.solar_connector_mode == "simulation" or settings.demo_mode:
+        if settings.sentinel_island_mode:
+            if site_id in self._last_real_soc:
+                return self._last_real_soc[site_id]
+            logger.warning("No live SOC available for %s in SENTINEL_ISLAND_MODE; using 0.0 fail-closed value", site_id)
+            return 0.0
+
+        if settings.solar_connector_mode == "simulation":
             return self._simulated_soc.get(site_id, 50.0)
 
         try:
@@ -408,6 +415,9 @@ class SolarDispatchService:
         except Exception as e:
             logger.warning("Real SOC read failed for %s: %s", site_id, e)
 
+        if settings.sentinel_island_mode:
+            return self._last_real_soc.get(site_id, 0.0)
+
         return self._simulated_soc.get(site_id, 50.0)
 
     def get_current_soc_sync(self, site_id: str) -> float:
@@ -415,6 +425,10 @@ class SolarDispatchService:
 
         For use by sync callers like aegis_bridge.py.
         """
+        from app.config.settings import settings
+
+        if settings.sentinel_island_mode:
+            return self._last_real_soc.get(site_id, 0.0)
         if site_id in self._last_real_soc:
             return self._last_real_soc[site_id]
         return self._simulated_soc.get(site_id, 50.0)
@@ -470,7 +484,7 @@ class SolarDispatchService:
 
     # === Dispatch execution ===
 
-    async def execute_dispatch_cycle(self, site_id: str) -> Optional[DispatchEvent]:
+    async def execute_dispatch_cycle(self, site_id: str) -> DispatchEvent | None:
         """Execute a single dispatch cycle.
 
         Called every 5 minutes by the autonomous scheduler.
@@ -481,7 +495,7 @@ class SolarDispatchService:
 
         # Get current state (real hardware SOC when in live mode)
         current_soc = await self._get_current_soc(site_id)
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         sast = now + timedelta(hours=2)
 
         # Simulate solar and load based on time of day
@@ -601,8 +615,8 @@ class SolarDispatchService:
 
         # Route dispatch command to Modbus BESS writer (gated by AEGIS)
         try:
-            from app.services.modbus_bess_writer import execute_dispatch_with_write
             from app.services.bess_dispatch_engine import BESSState
+            from app.services.modbus_bess_writer import execute_dispatch_with_write
 
             bess_state = BESSState(
                 soc_pct=soc_before,
@@ -634,7 +648,7 @@ class SolarDispatchService:
         aegis_proposal_id after AEGIS bridge returns the join key).
         """
         try:
-            today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+            today = datetime.now(UTC).strftime("%Y-%m-%d")
             solar_dir = DATA_DIR / "solar"
             solar_dir.mkdir(parents=True, exist_ok=True)
             path = solar_dir / f"dispatch_log_{site_id}_{today}.jsonl"
@@ -654,17 +668,17 @@ class SolarDispatchService:
         except Exception as e:
             logger.warning("Failed to persist dispatch event: %s", e)
 
-    def get_persistent_dispatch_log(self, site_id: str, hours: int = 24) -> List[Dict]:
+    def get_persistent_dispatch_log(self, site_id: str, hours: int = 24) -> list[dict]:
         """Read dispatch events from JSONL files for the given time window."""
         events = []
         solar_dir = DATA_DIR / "solar"
         if not solar_dir.exists():
             return events
 
-        cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+        cutoff = datetime.now(UTC) - timedelta(hours=hours)
         # Check today and yesterday's files
         for day_offset in range(2):
-            day = (datetime.now(timezone.utc) - timedelta(days=day_offset)).strftime("%Y-%m-%d")
+            day = (datetime.now(UTC) - timedelta(days=day_offset)).strftime("%Y-%m-%d")
             path = solar_dir / f"dispatch_log_{site_id}_{day}.jsonl"
             if not path.exists():
                 continue
@@ -685,18 +699,18 @@ class SolarDispatchService:
 
     # === Dispatch log ===
 
-    def get_dispatch_log(self, site_id: str, hours: int = 24) -> List[DispatchEvent]:
+    def get_dispatch_log(self, site_id: str, hours: int = 24) -> list[DispatchEvent]:
         """Get recent dispatch history for a site."""
         events = self._dispatch_log.get(site_id, [])
         if hours > 0:
-            cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+            cutoff = datetime.now(UTC) - timedelta(hours=hours)
             events = [e for e in events if datetime.fromisoformat(e.timestamp) >= cutoff]
         # Most recent first
         return sorted(events, key=lambda e: e.timestamp, reverse=True)
 
     # === Dispatch status ===
 
-    def get_dispatch_status(self, site_id: str) -> Optional[DispatchStatus]:
+    def get_dispatch_status(self, site_id: str) -> DispatchStatus | None:
         """Get current dispatch status for a site."""
         engine = get_solar_arbitrage_engine()
 
@@ -737,11 +751,11 @@ class SolarDispatchService:
         uptime = 0.0
         if started_at:
             start_dt = datetime.fromisoformat(started_at)
-            uptime = (datetime.now(timezone.utc) - start_dt).total_seconds() / 3600
+            uptime = (datetime.now(UTC) - start_dt).total_seconds() / 3600
 
         # Next action change estimate
         next_change = None
-        sast = datetime.now(timezone.utc) + timedelta(hours=2)
+        sast = datetime.now(UTC) + timedelta(hours=2)
         if band.period_end:
             eh, em = map(int, band.period_end.split(":"))
             next_dt = sast.replace(hour=eh, minute=em, second=0, microsecond=0)
@@ -768,14 +782,14 @@ class SolarDispatchService:
 
     # === Autonomous dispatch control ===
 
-    async def start_autonomous_dispatch(self, site_id: str) -> Dict[str, Any]:
+    async def start_autonomous_dispatch(self, site_id: str) -> dict[str, Any]:
         """Start autonomous dispatch for a site.
 
         In production this would spawn a background task running every 5 minutes.
-        For demo, the seeded history already shows a full cycle.
+        For seeded operation, the historical log already shows a full cycle.
         """
         self._mode[site_id] = "autonomous"
-        self._started_at[site_id] = datetime.now(timezone.utc).isoformat()
+        self._started_at[site_id] = datetime.now(UTC).isoformat()
 
         if site_id not in self._simulated_soc:
             self._simulated_soc[site_id] = 50.0
@@ -788,7 +802,7 @@ class SolarDispatchService:
             "started_at": self._started_at[site_id],
         }
 
-    async def stop_dispatch(self, site_id: str) -> Dict[str, Any]:
+    async def stop_dispatch(self, site_id: str) -> dict[str, Any]:
         """Stop autonomous dispatch for a site."""
         self._mode[site_id] = "stopped"
         logger.info("Stopped dispatch for site %s", site_id)
@@ -797,7 +811,7 @@ class SolarDispatchService:
 
 # === Singleton ===
 
-_solar_dispatch_service: Optional[SolarDispatchService] = None
+_solar_dispatch_service: SolarDispatchService | None = None
 
 
 def get_solar_dispatch_service() -> SolarDispatchService:

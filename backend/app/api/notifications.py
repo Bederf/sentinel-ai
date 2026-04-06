@@ -22,10 +22,11 @@ import logging
 from typing import List, Optional
 from uuid import UUID
 from datetime import datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from fastapi import APIRouter, HTTPException, Query
 
+from app.config.settings import settings
 from app.database.repositories.notification_repository import NotificationRepository
 from app.services.notification_service import NotificationService
 from app.models.notification import (
@@ -54,6 +55,8 @@ class NotificationChannelCreate(BaseModel):
 class NotificationChannelResponse(BaseModel):
     """Notification channel response."""
 
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     technician_id: str
     channel_type: str
@@ -65,9 +68,6 @@ class NotificationChannelResponse(BaseModel):
     verification_attempts: int
     created_at: str
     updated_at: str
-
-    class Config:
-        from_attributes = True
 
 
 class NotificationPreferencesCreate(BaseModel):
@@ -87,6 +87,8 @@ class NotificationPreferencesCreate(BaseModel):
 class NotificationPreferencesResponse(BaseModel):
     """Notification preferences response."""
 
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     technician_id: str
     preferred_channel: str
@@ -101,12 +103,11 @@ class NotificationPreferencesResponse(BaseModel):
     created_at: str
     updated_at: str
 
-    class Config:
-        from_attributes = True
-
 
 class NotificationDeliveryLogResponse(BaseModel):
     """Notification delivery log response."""
+
+    model_config = ConfigDict(from_attributes=True)
 
     id: str
     work_order_id: Optional[str] = None
@@ -121,9 +122,6 @@ class NotificationDeliveryLogResponse(BaseModel):
     sent_at: Optional[str] = None
     retry_count: int
     created_at: str
-
-    class Config:
-        from_attributes = True
 
 
 class ProviderStatusResponse(BaseModel):
@@ -732,7 +730,7 @@ async def get_provider_status():
         service = NotificationService()
         statuses = service.get_provider_status()
 
-        return [
+        provider_rows = [
             ProviderStatusResponse(
                 channel=channel,
                 provider=info["name"],
@@ -740,6 +738,18 @@ async def get_provider_status():
             )
             for channel, info in statuses.items()
         ]
+        # Email is a first-class operations channel in Settings UI, but not part of
+        # ChannelType providers in NotificationService yet. Expose SMTP readiness
+        # here so UI can render accurate status.
+        email_enabled = bool(settings.notification_smtp_host and settings.notification_smtp_username and settings.notification_smtp_password)
+        provider_rows.append(
+            ProviderStatusResponse(
+                channel="email",
+                provider="smtp",
+                enabled=email_enabled,
+            )
+        )
+        return provider_rows
 
     except Exception as e:
         logger.error(f"Error getting provider status: {e}")

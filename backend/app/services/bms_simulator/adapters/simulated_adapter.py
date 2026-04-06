@@ -6,14 +6,14 @@ or network connections.
 """
 
 import asyncio
-import random
-import logging
 import json
+import logging
+import random
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any
 
-from app.models.device import Device, DeviceValue, DevicePoint, PointType
+from app.models.device import Device, DevicePoint, DeviceValue, PointType
 from app.services.device_abstraction import DeviceAdapter
 
 logger = logging.getLogger(__name__)
@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 STATE_FILE = Path(__file__).parent.parent.parent.parent / "data" / "bms_simulator" / "device_state.json"
 
 # Global state cache for all simulated devices
-_global_state_cache: Dict[str, Dict[str, Any]] = {}
+_global_state_cache: dict[str, dict[str, Any]] = {}
 _state_loaded = False
 
 
@@ -34,7 +34,7 @@ def _load_global_state() -> None:
 
     if STATE_FILE.exists():
         try:
-            with open(STATE_FILE, "r") as f:
+            with open(STATE_FILE) as f:
                 _global_state_cache = json.load(f)
             logger.info(f"Loaded device state for {len(_global_state_cache)} devices")
         except Exception as e:
@@ -71,7 +71,7 @@ class SimulatedDeviceAdapter(DeviceAdapter):
         self._initialize_state()
 
     @property
-    def _state(self) -> Dict[str, Any]:
+    def _state(self) -> dict[str, Any]:
         """Get device state from global cache."""
         _load_global_state()
         if self.device.id not in _global_state_cache:
@@ -83,7 +83,7 @@ class SimulatedDeviceAdapter(DeviceAdapter):
         _load_global_state()
 
         # Check if we have persisted state
-        if self.device.id in _global_state_cache and _global_state_cache[self.device.id]:
+        if _global_state_cache.get(self.device.id):
             logger.debug(f"Using persisted state for device {self.device.id}")
             # Ensure all points have values (for new points added after state was saved)
             for point_name, point in self.device.points.items():
@@ -142,7 +142,7 @@ class SimulatedDeviceAdapter(DeviceAdapter):
         await self._simulate_network_delay()
 
         if await self._simulate_error():
-            raise IOError(f"Read error on point {point_name}")
+            raise OSError(f"Read error on point {point_name}")
 
         if point_name not in self._state:
             raise ValueError(f"Point {point_name} not found in device state")
@@ -212,12 +212,12 @@ class SimulatedDeviceAdapter(DeviceAdapter):
         # For simulated adapter, simulate 80% success rate
         return random.random() < 0.8
 
-    async def scan_points(self) -> Dict[str, DevicePoint]:
+    async def scan_points(self) -> dict[str, DevicePoint]:
         """Scan for device points — returns configured points."""
         await self._simulate_network_delay(200, 500)
         return self.device.points
 
-    def get_state(self) -> Dict[str, Any]:
+    def get_state(self) -> dict[str, Any]:
         """Get current device state (for testing)."""
         return self._state.copy()
 

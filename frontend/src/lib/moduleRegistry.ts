@@ -21,7 +21,7 @@ export type ModuleType =
   | 'hvac_control' | 'energy_control' | 'lighting_control' | 'solar_control'
   | 'water_control' | 'security_control' | 'digital_twin_control'
   // Standalone Add-ons (9, toggleable)
-  | 'maintenance' | 'financial' | 'compliance' | 'simulation' | 'fleet_ml'
+  | 'maintenance' | 'financial' | 'compliance' | 'fleet_ml'
   | 'block_booking' | 'space_optimization'
   | 'fuel_monitoring' | 'fuel_alerts';
 export type ModuleStatus = 'active' | 'inactive' | 'error' | 'maintenance';
@@ -406,7 +406,6 @@ export const MODULE_ICONS: Record<ModuleType, string> = {
   maintenance: 'wrench',
   financial: 'dollar-sign',
   compliance: 'leaf',
-  simulation: 'play',
   fleet_ml: 'brain',
   block_booking: 'calendar-check',
   space_optimization: 'layout-grid',
@@ -444,7 +443,6 @@ export const MODULE_COLORS: Record<ModuleType, string> = {
   maintenance: 'orange',
   financial: 'orange',
   compliance: 'emerald',
-  simulation: 'cyan',
   fleet_ml: 'cyan',
   block_booking: 'rose',
   space_optimization: 'teal',

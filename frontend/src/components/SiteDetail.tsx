@@ -72,7 +72,7 @@ import { ArcadeView } from "./arcade/ArcadeView";
 import { OverviewCockpitHost } from "./cockpit/OverviewCockpitHost";
 import { BUILDING_TAB_ITEMS } from "../lib/navigation";
 import type { BuildingTabId } from "../lib/navigation";
-import { phaseAllows, PHASE_LABELS, PHASE_COLORS, PHASE_DESCRIPTIONS, ALL_PHASES, type OnboardingPhase } from "../lib/onboardingPhase";
+import { phaseAllows, PHASE_LABELS, PHASE_COLORS, PHASE_DESCRIPTIONS, type OnboardingPhase } from "../lib/onboardingPhase";
 import { setStoredSelectedSite } from "../lib/siteSelection";
 
 // ─── Lazy-loaded tab components ─────────────────────────────────────
@@ -98,8 +98,6 @@ const FireSafetyPage = lazy(() => import("./fire/FireSafetyPage").then(m => ({ d
 const SecurityDashboard = lazy(() => import("./security").then(m => ({ default: m.SecurityDashboard })));
 // Digital Twin
 const DigitalTwin = lazy(() => import("./digital-twin").then(m => ({ default: m.DigitalTwin })));
-// Simulation
-const SimulationDashboard = lazy(() => import("./SimulationDashboard").then(m => ({ default: m.SimulationDashboard  })));
 // Space Optimization
 const SpaceOptimizationPage = lazy(() => import("./SpaceOptimizationPage").then(m => ({ default: m.SpaceOptimizationPage })));
 // Fuel
@@ -188,6 +186,8 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
   const [lightingSub, setLightingSub] = useState<LightingSub>("Lighting");
   const [solarBessSub, setSolarBessSub] = useState<SolarBessSub>("Dashboard");
   const [equipmentExpanded, setEquipmentExpanded] = useState(false);
+  /** Building spatial view (ArcadeView) — collapsed by default */
+  const [spatialViewExpanded, setSpatialViewExpanded] = useState(false);
 
   // Equipment control
   const [selectedEquipment, setSelectedEquipment] = useState<Equipment | null>(null);
@@ -204,7 +204,9 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
   const [discovering, setDiscovering] = useState(false);
   const [metadataTab, setMetadataTab] = useState<"info" | "network" | "device" | "operating" | "notes">("info");
   const [sitePhase, setSitePhase] = useState<OnboardingPhase>("shadow");
-  const [phaseUpdating, setPhaseUpdating] = useState(false);
+  const [liveBridgeConnected, setLiveBridgeConnected] = useState<boolean | null>(null);
+  const [liveBridgeLastSync, setLiveBridgeLastSync] = useState<string | null>(null);
+  const [liveBridgeSource, setLiveBridgeSource] = useState<string | null>(null);
 
   // Prediction detail modal
   const [selectedPrediction, setSelectedPrediction] = useState<Prediction | null>(null);
@@ -277,6 +279,17 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
 
   // SENTINEL processing state — gates all intelligence panels
   const sentinelEnabled = site?.sentinel_processing_enabled !== false;
+  const bridgeSourceValue = liveBridgeSource ?? site?.bridge_data_source ?? null;
+  const bridgeConnectedValue = liveBridgeConnected ?? site?.bridge_connected ?? false;
+  const bridgeLastSyncValue = liveBridgeLastSync ?? site?.bridge_last_sync ?? null;
+  const bridgeSourceLabel =
+    bridgeSourceValue === "remote_bridge"
+      ? "SIMBIOT"
+      : bridgeSourceValue === "local_adapter"
+      ? "Local Adapter"
+      : bridgeSourceValue === "none" || !bridgeSourceValue
+      ? "SIMBIOT"
+      : bridgeSourceValue;
 
   useEffect(() => {
     const loadSiteData = async () => {
@@ -292,6 +305,28 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
           location: siteData.location,
         } as SiteDetailData);
         setSitePhase((siteData.onboarding_phase as OnboardingPhase) ?? "shadow");
+
+        // Live runtime bridge status: status/telemetry endpoints are source of truth
+        // over possibly stale persisted bridge_* metadata.
+        const token = localStorage.getItem("access_token") || localStorage.getItem("sentinel_token");
+        const authHeaders: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+        try {
+          const [statusRes, telemetryRes] = await Promise.all([
+            fetch(`/api/sites/${encodeURIComponent(siteId)}/status`, { headers: authHeaders }),
+            fetch(`/api/sites/${encodeURIComponent(siteId)}/telemetry`, { headers: authHeaders }),
+          ]);
+          const statusJson = statusRes.ok ? await statusRes.json() : null;
+          const telemetryJson = telemetryRes.ok ? await telemetryRes.json() : null;
+          const statusConnected = Boolean(statusJson?.site_available) && Boolean(statusJson?.telemetry_fresh);
+          const telemetryConnected = telemetryRes.ok && Boolean(telemetryJson?.timestamp);
+          setLiveBridgeConnected(statusConnected || telemetryConnected);
+          setLiveBridgeLastSync(telemetryJson?.timestamp ?? statusJson?.last_telemetry_at ?? null);
+          setLiveBridgeSource(telemetryJson?.source_mode === "live" ? "remote_bridge" : (siteData.bridge_data_source ?? null));
+        } catch {
+          setLiveBridgeConnected(null);
+          setLiveBridgeLastSync(null);
+          setLiveBridgeSource(null);
+        }
 
         // When SENTINEL is off, don't pull any BMS data
         if (siteData.sentinel_processing_enabled === false) {
@@ -730,33 +765,33 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
                   {site.type.replace("_", " ")}
                 </div>
                 {/* Data valve badge - shows if data is flowing and from where */}
-                {(site.bridge_data_source && site.bridge_data_source !== "none") || sentinelEnabled === false ? (
+                {(bridgeSourceValue && bridgeSourceValue !== "none") || liveBridgeConnected !== null || sentinelEnabled === false ? (
                   <div
                     className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium"
                     title={
                       sentinelEnabled === false
                         ? "Data valve closed - no data flowing"
-                        : site.bridge_connected
-                        ? `Data flowing from ${site.bridge_data_source}${site.bridge_last_sync ? ` (last sync: ${new Date(site.bridge_last_sync).toLocaleTimeString()})` : ""}`
-                        : `Data valve open, source: ${site.bridge_data_source} ${site.bridge_sync_error ? `- ${site.bridge_sync_error}` : "- not connected"}`
+                        : bridgeConnectedValue
+                        ? `Data flowing from ${bridgeSourceLabel}${bridgeLastSyncValue ? ` (last sync: ${new Date(bridgeLastSyncValue).toLocaleTimeString()})` : ""}`
+                        : `Data valve open, source: ${bridgeSourceLabel} ${site.bridge_sync_error ? `- ${site.bridge_sync_error}` : "- not connected"}`
                     }
                     style={{
                       background:
                         sentinelEnabled === false
                           ? "rgba(107, 114, 128, 0.15)" // Gray when closed
-                          : site.bridge_connected
+                          : bridgeConnectedValue
                           ? "rgba(16, 185, 129, 0.15)" // Green when connected
                           : "rgba(239, 68, 68, 0.15)", // Red when open but not connected
                       color:
                         sentinelEnabled === false
                           ? "var(--color-sentinel-text-secondary)"
-                          : site.bridge_connected
+                          : bridgeConnectedValue
                           ? "var(--color-sentinel-green)"
                           : "var(--color-sentinel-red)",
                       border: `1px solid ${
                         sentinelEnabled === false
                           ? "rgba(107, 114, 128, 0.3)"
-                          : site.bridge_connected
+                          : bridgeConnectedValue
                           ? "rgba(16, 185, 129, 0.3)"
                           : "rgba(239, 68, 68, 0.3)"
                       }`,
@@ -767,11 +802,11 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
                       <span>Valve Closed</span>
                     ) : (
                       <>
-                        <span>{site.bridge_data_source === "simbiot" ? "SIMBIOT" : "SIM"}</span>
+                        <span>{bridgeSourceLabel}</span>
                         <div
                           className="w-1.5 h-1.5 rounded-full"
                           style={{
-                            background: site.bridge_connected
+                            background: bridgeConnectedValue
                               ? "var(--color-sentinel-green)"
                               : "var(--color-sentinel-red)",
                           }}
@@ -781,7 +816,7 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
                   </div>
                 ) : null}
 
-                {/* Onboarding phase badge + admin selector */}
+                {/* Onboarding phase badge (change phase in Settings) */}
                 <div className="flex items-center gap-2">
                   <div
                     className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium"
@@ -806,34 +841,6 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
                       </span>
                     );
                   })()}
-                  <select
-                    value={sitePhase}
-                    disabled={phaseUpdating}
-                    onChange={async (e) => {
-                      const newPhase = e.target.value as OnboardingPhase;
-                      setPhaseUpdating(true);
-                      try {
-                        await api.updateSitePhase(siteId, newPhase);
-                        setSitePhase(newPhase);
-                      } catch {
-                        // revert on error
-                      } finally {
-                        setPhaseUpdating(false);
-                      }
-                    }}
-                    className="text-xs rounded px-1 py-0.5 border"
-                    style={{
-                      background: "var(--color-sentinel-bg-secondary)",
-                      color: "var(--color-sentinel-text-secondary)",
-                      borderColor: "var(--color-sentinel-border)",
-                      opacity: phaseUpdating ? 0.5 : 1,
-                    }}
-                    title="Advance SENTINEL onboarding phase"
-                  >
-                    {ALL_PHASES.map((p) => (
-                      <option key={p} value={p}>{PHASE_LABELS[p]}</option>
-                    ))}
-                  </select>
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-4" style={{ color: "var(--color-sentinel-text-secondary)" }}>
@@ -1090,8 +1097,33 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
 
       {activeMainTab === "overview" ? (
       <>
-      {/* ArcadeView — spatial intelligence interface */}
-      <ArcadeView siteId={siteId} onModuleDisplayChange={handleModuleDisplayChange} />
+      <div className="mb-6">
+        <button
+          type="button"
+          onClick={() => setSpatialViewExpanded((v) => !v)}
+          className="w-full flex items-center justify-between rounded-md px-4 py-2.5 mb-2 text-left text-sm font-medium transition-colors hover:brightness-110"
+          style={{
+            background: "var(--color-sentinel-bg-secondary)",
+            border: "1px solid var(--color-sentinel-border)",
+            color: "var(--color-sentinel-text-primary)",
+          }}
+          aria-expanded={spatialViewExpanded}
+        >
+          <span className="flex items-center gap-2">
+            <ChevronRight
+              className={`h-4 w-4 shrink-0 transition-transform ${spatialViewExpanded ? "rotate-90" : ""}`}
+              aria-hidden
+            />
+            Building spatial view
+          </span>
+          <span className="text-xs font-normal" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+            {spatialViewExpanded ? "Hide" : "Show"}
+          </span>
+        </button>
+        {spatialViewExpanded && (
+          <ArcadeView siteId={siteId} onModuleDisplayChange={handleModuleDisplayChange} />
+        )}
+      </div>
       {/* Sentinel Cockpit — decision intelligence with fullscreen support */}
       {sentinelEnabled && site && (
         <div className="mb-6">
@@ -1783,7 +1815,7 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
                   </button>
                 ))}
               </div>
-              {lightingSub === "Lighting" && <LightingPage />}
+              {lightingSub === "Lighting" && <LightingPage siteId={siteId} />}
               {lightingSub === "Occupancy" && (
                 <div className="p-4 md:p-6"><OccupancyFullPanel compact={false} /></div>
               )}
@@ -1842,17 +1874,12 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
 
           {/* Digital Twin (write actions gated by digital_twin_control) */}
           {activeMainTab === "digital-twin" && (
-            <div className="h-[calc(100vh-180px)]"><DigitalTwin /></div>
+            <div className="h-[calc(100vh-180px)]"><DigitalTwin siteId={siteId} /></div>
           )}
 
           {/* Controls — all-device control panel (visible when any control add-on active) */}
           {activeMainTab === "controls" && (
             <ControlDashboard onError={() => {}} />
-          )}
-
-          {/* Simulation — only visible when simulation add-on is active */}
-          {activeMainTab === "simulation" && isModuleActive('simulation') && (
-            <SimulationDashboard />
           )}
 
           {/* Space Optimization — only visible when space_optimization add-on is active */}

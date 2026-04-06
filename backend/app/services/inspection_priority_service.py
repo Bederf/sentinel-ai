@@ -13,7 +13,7 @@ Used by: maintenance scheduling, work order prioritisation, helpdesk queue.
 
 import logging
 from datetime import datetime
-from typing import Dict, Any, List, Optional
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -74,12 +74,12 @@ class InspectionPriorityService:
         self,
         equipment_id: str,
         equipment_type: str,
-        last_inspection_date: Optional[datetime] = None,
+        last_inspection_date: datetime | None = None,
         anomaly_score: float = 0.0,
         fault_count_30d: int = 0,
-        rul_days: Optional[float] = None,
-        criticality_override: Optional[float] = None,
-    ) -> Dict[str, Any]:
+        rul_days: float | None = None,
+        criticality_override: float | None = None,
+    ) -> dict[str, Any]:
         """Compute inspection priority score for a single asset.
 
         Args:
@@ -170,7 +170,7 @@ class InspectionPriorityService:
             "computed_at": datetime.utcnow().isoformat(),
         }
 
-    async def compute_fleet_priorities(self, site_id: str) -> List[Dict[str, Any]]:
+    async def compute_fleet_priorities(self, site_id: str) -> list[dict[str, Any]]:
         """Compute inspection priorities for all equipment at a site.
 
         Gathers anomaly scores, health data, and inspection records
@@ -191,7 +191,7 @@ class InspectionPriorityService:
             return []
 
         # Get anomaly scores in bulk
-        anomaly_map: Dict[str, float] = {}
+        anomaly_map: dict[str, float] = {}
         try:
             from app.services.ml_inference import get_anomaly_service
 

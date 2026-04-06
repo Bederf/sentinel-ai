@@ -3,15 +3,15 @@
 import json
 import logging
 import sys
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
 
 from anthropic import Anthropic, APIError, AuthenticationError, RateLimitError
 
 from app.config.settings import settings
 from app.models.auth import SentinelRole
-from app.services.fm_context import fm_context_service
 from app.services.chat_tools import execute_tool, get_chat_tools
 from app.services.cross_system_analyzer import get_cross_system_analyzer
+from app.services.fm_context import fm_context_service
 
 logger = logging.getLogger(__name__)
 
@@ -337,7 +337,10 @@ def build_system_prompt_with_context() -> str:
     return full_prompt
 
 
-def build_system_prompt_for_tools() -> str:
+def build_system_prompt_for_tools(
+    include_system_docs: bool = False,
+    is_it_risk_query: bool = False,
+) -> str:
     """
     Build a lean system prompt for the tool-calling path.
 
@@ -348,29 +351,66 @@ def build_system_prompt_for_tools() -> str:
     Agent memory IS included here (not tool-fetchable — it's institutional
     knowledge that should always be in context).
 
+    Args:
+        include_system_docs: When True, adds instruction to use search_system_documents
+            for SENTINEL platform questions (architecture, security, compliance, onboarding).
+        is_it_risk_query: When True, the user is asking an IT/risk/bank question.
+            Answer with dense facts: specific scores, standards, audit dates, compliance
+            percentages, control mappings. Do not be vague or marketing-heavy.
+
     Returns:
         System prompt with behavioral instructions only.
     """
     threshold_context = _get_threshold_context()
     agent_memory_context = fm_context_service.get_agent_memory_context()
 
+    docs_instruction = ""
+    if include_system_docs:
+        docs_instruction = (
+            "\n"
+            "-- For SENTINEL platform questions (architecture, security design, compliance controls,\n"
+            "   onboarding, deployment, configuration): use search_system_documents\n"
+        )
+
+    # Bombarding IT/risk people with facts — specific evidence, scores, standards
+    it_risk_instruction = ""
+    if is_it_risk_query:
+        it_risk_instruction = """
+**IT / Risk / Compliance Query — Bombard with Facts:**
+When answering questions about security, risk, compliance, penetration testing,
+FSR assessments, OWASP, SIEM, network architecture, POPIA, or any IT concern:
+- Lead with specific evidence: FSR scores (17/18 domains at target, avg 4.0/5.0),
+  ISO 42001 controls (13 mapped, 87% effective), EU AI Act compliance (75%),
+  NIST AI RMF mappings.
+- Name specific controls, audit dates, and evidence paths — not vague claims.
+- Quote specific numbers: vulnerability remediation SLAs (Critical 7d, High 14d),
+  MFA coverage, WAF rules count (9), SIEM rules (6), SAST/DAST CI jobs (5).
+- Do NOT say "SENTINEL takes security seriously" without backing it with facts.
+- Do NOT give marketing language — give evidence, scores, and specifics.
+- Always use search_system_documents when available (FSR gap analysis, ISO 42001
+  evidence bundle, NIST control effectiveness review, vulnerability management process).
+"""
+
     return f"""{FM_SYSTEM_PROMPT_BASE}
 
----
+----
 
 {threshold_context}
 
 {agent_memory_context}
 
-**Note:** Use your tools to fetch live building data. Do NOT guess or fabricate data — always call tools first.
-- For a specific asset: call get_hybrid_context first (returns Brick + telemetry + ML + docs in one call)
-- For building-wide overviews: use get_system_status, get_equipment_health, get_alerts_and_anomalies
-- For knowledge/compliance questions: use search_documents
+{it_risk_instruction}
 
----
+**Note:** Use your tools to fetch live building data. Do NOT guess or fabricate data — always call tools first.
+-- For a specific asset: call get_hybrid_context first (returns Brick + telemetry + ML + docs in one call)
+-- For building-wide overviews: use get_system_status, get_equipment_health, get_alerts_and_anomalies
+-- For operational knowledge/questions (equipment manuals, fault codes, maintenance procedures): use search_documents{docs_instruction}
+
+----
 
 {CITATION_INSTRUCTIONS}
 """
+
 
 
 class ClaudeService:
@@ -398,6 +438,7 @@ class ClaudeService:
         system_prompt: str | None = None,
         include_site_context: bool = True,
         model_override: str | None = None,
+        source: str = "chat",
     ) -> AsyncGenerator[str, None]:
         """
         Stream a response from Claude.
@@ -458,7 +499,7 @@ class ClaudeService:
                         model=effective_model,
                         input_tokens=getattr(u, "input_tokens", 0),
                         output_tokens=getattr(u, "output_tokens", 0),
-                        source="chat",
+                        source=source,
                         cache_read_tokens=getattr(u, "cache_read_input_tokens", 0),
                         cache_creation_tokens=getattr(u, "cache_creation_input_tokens", 0),
                     )
@@ -495,6 +536,8 @@ class ClaudeService:
         user_role: SentinelRole | None = None,
         model_override: str | None = None,
         include_system_docs: bool = False,
+        is_it_risk_query: bool = False,
+        source: str = "tools",
     ) -> AsyncGenerator[str, None]:
         """
         Stream a response from Claude with tool calling support.
@@ -524,7 +567,7 @@ class ClaudeService:
         if system_prompt:
             system_text = system_prompt
         elif include_site_context:
-            system_text = build_system_prompt_for_tools()
+            system_text = build_system_prompt_for_tools(include_system_docs=include_system_docs, is_it_risk_query=is_it_risk_query)
         else:
             system_text = FM_SYSTEM_PROMPT_BASE
 
@@ -546,11 +589,17 @@ class ClaudeService:
             include_system_docs=include_system_docs,
         )
 
-        # Cache tool definitions too — they rarely change between requests.
-        # Copy last tool to avoid mutating the shared CHAT_TOOLS list.
+        # Anthropic tool schema does not accept output_schema on tool definitions.
+        # Strip unsupported keys before sending to the API and avoid mutating shared defs.
         if available_tools:
-            available_tools = list(available_tools)  # shallow copy of list
-            available_tools[-1] = {**available_tools[-1], "cache_control": {"type": "ephemeral"}}
+            normalized_tools = []
+            for tool in available_tools:
+                normalized = dict(tool)
+                normalized.pop("output_schema", None)
+                normalized_tools.append(normalized)
+            # Cache one tool definition too — they rarely change between requests.
+            normalized_tools[-1] = {**normalized_tools[-1], "cache_control": {"type": "ephemeral"}}
+            available_tools = normalized_tools
 
         # Keep track of conversation with tool calls
         conversation = list(messages)
@@ -589,7 +638,7 @@ class ClaudeService:
                         model=effective_model,
                         input_tokens=getattr(u, "input_tokens", 0),
                         output_tokens=getattr(u, "output_tokens", 0),
-                        source="tools",
+                        source=source,
                         cache_read_tokens=getattr(u, "cache_read_input_tokens", 0),
                         cache_creation_tokens=getattr(u, "cache_creation_input_tokens", 0),
                     )

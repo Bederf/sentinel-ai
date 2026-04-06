@@ -92,7 +92,7 @@ export function BESSStatusPanel({ siteId }: BESSStatusPanelProps) {
       if (!isExpectedApiError(err)) {
         console.error("Failed to load BESS status:", err);
       }
-      // Fallback to demo data
+      // Fallback to seeded data
       const demoData: BESSStatus = {
         bess_id: "S002-BESS-001",
         name: "LUNA2000 BESS",

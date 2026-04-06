@@ -25,9 +25,9 @@ Load shedding coordination:
 import logging
 import random
 from dataclasses import dataclass, field
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 from enum import Enum
-from typing import Dict, List, Optional, Any
+from typing import Any
 
 from app.core.site_resolver import get_primary_site_code
 from app.services.solar_config_service import get_site_solar_config
@@ -67,14 +67,14 @@ class DispatchPriority:
     site_id: str
     timestamp: str
     active_source: str  # solar / bess / grid / generator
-    priority_stack: List[Dict[str, Any]] = field(default_factory=list)
+    priority_stack: list[dict[str, Any]] = field(default_factory=list)
     reason: str = ""
     solar_available_kw: float = 0.0
     bess_soc_pct: float = 0.0
     site_load_kw: float = 0.0
     load_shedding_active: bool = False
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "site_id": self.site_id,
             "timestamp": self.timestamp,
@@ -102,7 +102,7 @@ class GeneratorAssessment:
     solar_forecast_kw: float = 0.0  # Expected solar for remaining LS window
     site_load_kw: float = 0.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "site_id": self.site_id,
             "should_start": self.should_start,
@@ -133,7 +133,7 @@ class DieselAvoidance:
     generator_starts: int = 0
     generator_avoided_starts: int = 0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "site_id": self.site_id,
             "period": self.period,
@@ -165,8 +165,8 @@ class GeneratorEvent:
     fuel_litres_used: float = 0.0
     duration_hours: float = 0.0
 
-    def to_dict(self) -> Dict[str, Any]:
-        result: Dict[str, Any] = {
+    def to_dict(self) -> dict[str, Any]:
+        result: dict[str, Any] = {
             "timestamp": self.timestamp,
             "event_type": self.event_type,
             "site_id": self.site_id,
@@ -197,9 +197,9 @@ class LSResponse:
     bess_can_sustain_hours: float
     generator_needed: bool
     solar_contribution_kw: float
-    actions: List[str] = field(default_factory=list)
+    actions: list[str] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "site_id": self.site_id,
             "stage": self.stage,
@@ -241,7 +241,7 @@ class SolarGeneratorCoordinator:
     CRITICAL_LOAD_PCT = 0.70  # 70% of base load is critical
 
     def __init__(self):
-        self._events: Dict[str, List[GeneratorEvent]] = {}  # site_id -> events
+        self._events: dict[str, list[GeneratorEvent]] = {}  # site_id -> events
         try:
             cfg = get_site_solar_config()
             self.BESS_CAPACITY_KWH = cfg.bess.capacity_kwh
@@ -251,10 +251,10 @@ class SolarGeneratorCoordinator:
         self._seed_demo_events()
 
     def _seed_demo_events(self) -> None:
-        """Seed realistic generator event history for demo."""
+        """Seed realistic generator event history for local mode."""
         site_id = get_primary_site_code() or "unknown"
-        events: List[GeneratorEvent] = []
-        now = datetime.now(timezone.utc)
+        events: list[GeneratorEvent] = []
+        now = datetime.now(UTC)
 
         # Simulate a month of load shedding events
         # JHB typically sees Stage 2-4, 2-3 events per week
@@ -368,7 +368,7 @@ class SolarGeneratorCoordinator:
         Priority stack: Solar > BESS > Grid > Generator.
         Returns active source and status of each tier.
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         sast = now + timedelta(hours=2)
         hour = sast.hour
 
@@ -448,7 +448,7 @@ class SolarGeneratorCoordinator:
           3. Solar generation insufficient for critical load
           4. BESS cannot sustain load for remaining LS window
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         sast = now + timedelta(hours=2)
         hour = sast.hour
         rng = random.Random(hash(f"{site_id}-gen-{now.strftime('%Y%m%d%H')}"))
@@ -465,7 +465,7 @@ class SolarGeneratorCoordinator:
             solar_factor = max(0, 1.0 - ((hour - peak_hour) / spread) ** 2)
             solar_kw = 297 * solar_factor * rng.uniform(0.6, 1.0)
 
-        # For demo, no active load shedding (generator not needed)
+        # In local mode, no active load shedding (generator not needed)
         ls_active = False
         ls_remaining_hours = 0.0
 
@@ -519,7 +519,7 @@ class SolarGeneratorCoordinator:
         - Litres and ZAR saved
         """
         events = self._events.get(site_id, [])
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Period filter
         if period == "day":
@@ -600,10 +600,10 @@ class SolarGeneratorCoordinator:
         self,
         site_id: str,
         period: str = "month",
-    ) -> List[GeneratorEvent]:
+    ) -> list[GeneratorEvent]:
         """Get generator event log for a period."""
         events = self._events.get(site_id, [])
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         if period == "day":
             cutoff = now - timedelta(days=1)
@@ -628,7 +628,7 @@ class SolarGeneratorCoordinator:
 
         Evaluates BESS capacity vs LS duration and determines strategy.
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         sast = now + timedelta(hours=2)
         hour = sast.hour
         rng = random.Random(hash(f"{site_id}-ls-{start}"))
@@ -698,7 +698,7 @@ class SolarGeneratorCoordinator:
 
 # === Singleton ===
 
-_solar_generator_coordinator: Optional[SolarGeneratorCoordinator] = None
+_solar_generator_coordinator: SolarGeneratorCoordinator | None = None
 
 
 def get_solar_generator_coordinator() -> SolarGeneratorCoordinator:

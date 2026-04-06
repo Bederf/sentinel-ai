@@ -18,13 +18,13 @@ import logging
 from collections import defaultdict
 from datetime import date, timedelta
 
+from app.services.room_signal_mapper import link_signal_to_room
 from app.services.signal_emitter_base import (
     build_signal_row,
     check_dedup,
     room_code_to_location_ref,
     write_signal,
 )
-from app.services.room_signal_mapper import link_signal_to_room
 
 logger = logging.getLogger(__name__)
 

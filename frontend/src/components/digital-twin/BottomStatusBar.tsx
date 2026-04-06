@@ -2,9 +2,11 @@ import type { Equipment } from '@/lib/api/sites';
 
 interface BottomStatusBarProps {
   equipment: Equipment[];
+  /** Prefer live bridge total kW when available (matches building-level load). */
+  loadKwOverride?: number | null;
 }
 
-export function BottomStatusBar({ equipment }: BottomStatusBarProps) {
+export function BottomStatusBar({ equipment, loadKwOverride }: BottomStatusBarProps) {
   // Calculate stats from equipment data
   const onlineCount = equipment.filter((e) => {
     const status = (e.status || '').toLowerCase();
@@ -44,9 +46,14 @@ export function BottomStatusBar({ equipment }: BottomStatusBarProps) {
       return sum;
     }, 0);
 
+  const displayLoadKw =
+    loadKwOverride != null && Number.isFinite(loadKwOverride) && loadKwOverride > 0
+      ? loadKwOverride
+      : totalLoadKw;
+
   return (
     <div
-      className="absolute bottom-0 left-0 right-0 z-10 flex items-center justify-center gap-8 py-3 px-6"
+      className="absolute bottom-0 left-0 right-0 z-10 flex flex-wrap items-center justify-center gap-6 sm:gap-8 py-3 px-4 sm:px-6"
       style={{
         background: 'linear-gradient(to top, rgba(6, 14, 24, 0.95), rgba(6, 14, 24, 0.7))',
         borderTop: '1px solid rgba(0, 255, 65, 0.15)',
@@ -134,7 +141,7 @@ export function BottomStatusBar({ equipment }: BottomStatusBarProps) {
             textShadow: '0 0 10px rgba(0, 188, 212, 0.4)',
           }}
         >
-          {totalLoadKw > 0 ? `${Math.round(totalLoadKw)} kW` : '— kW'}
+          {displayLoadKw > 0 ? `${Math.round(displayLoadKw)} kW` : '— kW'}
         </span>
         <span
           style={{

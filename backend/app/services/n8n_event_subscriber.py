@@ -14,7 +14,6 @@ Register at startup after register_default_subscribers():
 """
 
 import logging
-from typing import Dict
 
 from app.services.event_bus import Importance, SentinelEvent, get_event_bus
 from app.services.n8n_service import get_n8n_service
@@ -28,7 +27,7 @@ logger = logging.getLogger("sentinel.n8n_events")
 
 # Explicit mappings: event_type -> n8n webhook path.
 # Unmapped events auto-convert: dots->hyphens, underscores->hyphens.
-WEBHOOK_MAPPINGS: Dict[str, str] = {
+WEBHOOK_MAPPINGS: dict[str, str] = {
     "maintenance.work_order_created": "work-order-created",
     "maintenance.work_order_completed": "work-order-completed",
     "sentry.escalation_triggered": "escalation",

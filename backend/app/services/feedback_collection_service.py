@@ -10,15 +10,15 @@ Phase 59: Service Feedback & Health Score Integration
 
 import json
 import logging
-from pathlib import Path
-from datetime import datetime
-from typing import Optional, List, Dict, Any, Tuple
 from dataclasses import dataclass, field
+from datetime import datetime
 from enum import Enum
+from pathlib import Path
+from typing import Any
 
-from app.database.repositories.service_record_repository import ServiceRecordRepository
-from app.database.repositories.equipment_repository import EquipmentRepository
 from app.database.repositories.baseline_repository import BaselineRepository
+from app.database.repositories.equipment_repository import EquipmentRepository
+from app.database.repositories.service_record_repository import ServiceRecordRepository
 
 logger = logging.getLogger(__name__)
 
@@ -52,14 +52,14 @@ class FeedbackItem:
     item_type: FeedbackItemType
     item_key: str  # e.g., "vibration", "oil_level", "before_photo"
     value: Any
-    unit: Optional[str] = None
-    numeric_value: Optional[float] = None
-    file_path: Optional[str] = None
+    unit: str | None = None
+    numeric_value: float | None = None
+    file_path: str | None = None
     confidence: float = 1.0
-    baseline_value: Optional[float] = None
-    deviation_percent: Optional[float] = None
+    baseline_value: float | None = None
+    deviation_percent: float | None = None
     health_impact: HealthImpact = HealthImpact.NEUTRAL
-    notes: Optional[str] = None
+    notes: str | None = None
 
 
 @dataclass
@@ -68,10 +68,10 @@ class FeedbackTemplate:
 
     equipment_type: str
     service_type: str
-    required_items: List[str]
-    optional_items: List[str]
-    prompts: Dict[str, str]
-    validation_rules: Dict[str, Dict[str, Any]]
+    required_items: list[str]
+    optional_items: list[str]
+    prompts: dict[str, str]
+    validation_rules: dict[str, dict[str, Any]]
     audio_duration_seconds: int = 10
 
 
@@ -86,14 +86,14 @@ class FeedbackSession:
     equipment_type: str
     service_type: str
     template: FeedbackTemplate
-    items_collected: List[str] = field(default_factory=list)
-    feedback_items: List[FeedbackItem] = field(default_factory=list)
-    started_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
+    items_collected: list[str] = field(default_factory=list)
+    feedback_items: list[FeedbackItem] = field(default_factory=list)
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
     health_score_change: int = 0
     status: str = "in_progress"
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize session for Redis persistence."""
         return {
             "session_id": self.session_id,
@@ -135,7 +135,7 @@ class FeedbackSession:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "FeedbackSession":
+    def from_dict(cls, data: dict[str, Any]) -> "FeedbackSession":
         """Reconstruct FeedbackSession from serialized dict (Redis/JSON)."""
         tmpl_data = data.get("template", {})
         template = FeedbackTemplate(
@@ -201,7 +201,7 @@ class FeedbackCollectionService:
     def __init__(self):
         from app.services.redis_session_store import RedisSessionStore
 
-        self._templates: Dict[str, Dict[str, FeedbackTemplate]] = {}
+        self._templates: dict[str, dict[str, FeedbackTemplate]] = {}
         self._store = RedisSessionStore(
             prefix="bms:feedback",
             ttl_seconds=14400,  # 4 hours
@@ -213,7 +213,7 @@ class FeedbackCollectionService:
         self.baseline_repo = BaselineRepository()
 
     @property
-    def _sessions(self) -> Dict[str, FeedbackSession]:
+    def _sessions(self) -> dict[str, FeedbackSession]:
         """Backward-compat: expose in-memory dict from store."""
         return self._store._memory
 
@@ -243,7 +243,7 @@ class FeedbackCollectionService:
         except Exception as e:
             logger.error(f"Failed to load feedback templates: {e}")
 
-    def get_template(self, equipment_type: str, service_type: str) -> Optional[FeedbackTemplate]:
+    def get_template(self, equipment_type: str, service_type: str) -> FeedbackTemplate | None:
         """Get feedback template for equipment type and service type."""
         eq_templates = self._templates.get(equipment_type.lower())
         if not eq_templates:
@@ -353,11 +353,11 @@ class FeedbackCollectionService:
 
         return session
 
-    def get_session(self, session_id: str) -> Optional[FeedbackSession]:
+    def get_session(self, session_id: str) -> FeedbackSession | None:
         """Get an active feedback session."""
         return self._store.get(session_id)
 
-    def get_next_prompt(self, session_id: str) -> Optional[Tuple[str, str, bool]]:
+    def get_next_prompt(self, session_id: str) -> tuple[str, str, bool] | None:
         """
         Get the next item to collect and its prompt.
 
@@ -388,9 +388,9 @@ class FeedbackCollectionService:
         item_key: str,
         value: Any,
         item_type: FeedbackItemType = FeedbackItemType.READING,
-        unit: Optional[str] = None,
-        file_path: Optional[str] = None,
-        notes: Optional[str] = None,
+        unit: str | None = None,
+        file_path: str | None = None,
+        notes: str | None = None,
     ) -> FeedbackItem:
         """
         Submit a feedback item for a session.
@@ -454,7 +454,7 @@ class FeedbackCollectionService:
         return feedback_item
 
     async def _validate_reading(
-        self, session: FeedbackSession, item: FeedbackItem, rules: Dict[str, Any]
+        self, session: FeedbackSession, item: FeedbackItem, rules: dict[str, Any]
     ) -> FeedbackItem:
         """
         Validate a reading against rules and baseline.
@@ -545,7 +545,7 @@ class FeedbackCollectionService:
         session.health_score_change = score_change
         return score_change
 
-    async def complete_feedback_session(self, session_id: str, force: bool = False) -> Dict[str, Any]:
+    async def complete_feedback_session(self, session_id: str, force: bool = False) -> dict[str, Any]:
         """
         Complete a feedback session and update equipment health.
 
@@ -604,8 +604,9 @@ class FeedbackCollectionService:
 
                 # Emit real-time SSE event for dashboard update
                 try:
-                    from app.services.event_emitter import get_event_emitter
                     import asyncio
+
+                    from app.services.event_emitter import get_event_emitter
 
                     emitter = get_event_emitter()
                     asyncio.create_task(
@@ -645,7 +646,7 @@ class FeedbackCollectionService:
 
         return summary
 
-    def _build_feedback_summary(self, session: FeedbackSession) -> Dict[str, Any]:
+    def _build_feedback_summary(self, session: FeedbackSession) -> dict[str, Any]:
         """Build a summary of collected feedback."""
         readings = []
         attachments = []
@@ -680,7 +681,7 @@ class FeedbackCollectionService:
             },
         }
 
-    def get_session_status(self, session_id: str) -> Optional[Dict[str, Any]]:
+    def get_session_status(self, session_id: str) -> dict[str, Any] | None:
         """Get current status of a feedback session."""
         session = self._store.get(session_id)
         if not session:
@@ -717,7 +718,7 @@ class FeedbackCollectionService:
             "completed_at": session.completed_at.isoformat() if session.completed_at else None,
         }
 
-    def get_water_repair_template(self) -> Optional[Dict[str, Any]]:
+    def get_water_repair_template(self) -> dict[str, Any] | None:
         """Get water repair feedback template.
 
         Returns:
@@ -738,9 +739,9 @@ class FeedbackCollectionService:
     async def process_water_repair_feedback(
         self,
         work_order_id: str,
-        feedback: Dict[str, Any],
+        feedback: dict[str, Any],
         technician_id: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Process water repair feedback and calculate health impact.
 
         Args:
@@ -766,9 +767,7 @@ class FeedbackCollectionService:
             # Repair method impact: +2 for permanent fixes, 0 for temporary, -1 for partial
             if repair_method == "pipe_replacement":
                 health_impact += 2  # Excellent permanent fix
-            elif repair_method == "joint_resealing":
-                health_impact += 2
-            elif repair_method == "valve_replacement":
+            elif repair_method == "joint_resealing" or repair_method == "valve_replacement":
                 health_impact += 2
             elif repair_method == "patching":
                 health_impact += 0  # Neutral - acceptable fix
@@ -778,9 +777,7 @@ class FeedbackCollectionService:
             # Service quality impact
             if service_quality == "excellent":
                 health_impact += 1
-            elif service_quality == "good":
-                health_impact += 0
-            elif service_quality == "acceptable":
+            elif service_quality == "good" or service_quality == "acceptable":
                 health_impact += 0
             elif service_quality == "poor":
                 health_impact -= 3  # Reflects poorly on technician
@@ -827,7 +824,7 @@ class FeedbackCollectionService:
                 "message": str(e),
             }
 
-    def _build_water_feedback_summary(self, feedback: Dict[str, Any], health_impact: int) -> Dict[str, Any]:
+    def _build_water_feedback_summary(self, feedback: dict[str, Any], health_impact: int) -> dict[str, Any]:
         """Build summary of water repair feedback."""
         return {
             "leak_type": feedback.get("leak_type", "unknown"),
@@ -846,7 +843,7 @@ class FeedbackCollectionService:
 
 
 # Singleton instance
-_feedback_service: Optional[FeedbackCollectionService] = None
+_feedback_service: FeedbackCollectionService | None = None
 
 
 def get_feedback_collection_service() -> FeedbackCollectionService:

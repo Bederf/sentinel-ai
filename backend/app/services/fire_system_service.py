@@ -8,7 +8,7 @@ Integrates with FireHVACCoordinator for cause-effect execution on alarms.
 
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 from uuid import uuid4
 
 from app.database.repositories.fire_safety_repository import get_fire_safety_repository
@@ -43,9 +43,9 @@ class FireSystemService:
 
     def get_system_status(self) -> FireSystemStatus:
         """Get aggregate fire system status."""
-        # Get panel info and demo state
+        # Get panel info and local fallback state
         panel_info = self._repo.get_panel_info()
-        demo_state = self._repo.get_demo_state()
+        local_state = self._repo.get_local_state()
 
         # Get active alarms
         active_alarms = self.get_active_alarms()
@@ -64,14 +64,14 @@ class FireSystemService:
         elif any(a.severity == AlarmSeverity.FAULT for a in active_alarms) or not all_dampers_healthy:
             panel_status = PanelStatus.FAULT
         else:
-            panel_status = PanelStatus(demo_state.get("panel_status", "normal"))
+            panel_status = PanelStatus(local_state.get("panel_status", "normal"))
 
         # Zone count
         zones = self._repo.get_zones()
         zone_count = len(zones)
 
-        # Battery voltage from demo state or panel info
-        battery_voltage = demo_state.get("battery_voltage", panel_info.get("battery_voltage", 27.6))
+        # Battery voltage from local fallback state or panel info
+        battery_voltage = local_state.get("battery_voltage", panel_info.get("battery_voltage", 27.6))
 
         return FireSystemStatus(
             panel_status=panel_status,
@@ -84,7 +84,7 @@ class FireSystemService:
             last_test_date=panel_info.get("last_test_date"),
         )
 
-    def get_active_alarms(self) -> List[FireAlarm]:
+    def get_active_alarms(self) -> list[FireAlarm]:
         """Get all active (uncleared) fire alarms."""
         raw_alarms = self._repo.get_active_alarms()
         alarms = []
@@ -107,7 +107,7 @@ class FireSystemService:
                 logger.warning(f"Error parsing alarm: {e}")
         return alarms
 
-    def get_zone_status(self, zone_id: str) -> Optional[dict]:
+    def get_zone_status(self, zone_id: str) -> dict | None:
         """Get details for a specific fire zone including active alarms."""
         zone_data = self._repo.get_zone(zone_id)
         if not zone_data:
@@ -124,7 +124,7 @@ class FireSystemService:
             "has_active_alarm": len(zone_alarms) > 0,
         }
 
-    def get_zones(self) -> List[FireZone]:
+    def get_zones(self) -> list[FireZone]:
         """Get all fire zones."""
         raw_zones = self._repo.get_zones()
         zones = []
@@ -146,7 +146,7 @@ class FireSystemService:
                 logger.warning(f"Error parsing zone: {e}")
         return zones
 
-    def get_damper_status(self) -> List[DamperStatus]:
+    def get_damper_status(self) -> list[DamperStatus]:
         """Get all smoke damper positions and health."""
         raw_dampers = self._repo.get_dampers()
         dampers = []
@@ -168,7 +168,7 @@ class FireSystemService:
                 logger.warning(f"Error parsing damper: {e}")
         return dampers
 
-    def get_pressurization_status(self) -> List[StairwellPressure]:
+    def get_pressurization_status(self) -> list[StairwellPressure]:
         """Get stairwell pressurization fan status."""
         raw_press = self._repo.get_pressurization()
         pressurization = []
@@ -188,7 +188,7 @@ class FireSystemService:
                 logger.warning(f"Error parsing pressurization: {e}")
         return pressurization
 
-    def get_cause_effect_matrix(self) -> List[CauseEffectEntry]:
+    def get_cause_effect_matrix(self) -> list[CauseEffectEntry]:
         """Get the cause-effect matrix."""
         raw_matrix = self._repo.get_cause_effect_matrix()
         entries = []
@@ -218,8 +218,8 @@ class FireSystemService:
 
     def get_system_health(self) -> FireSystemHealth:
         """Get fire system health summary."""
-        demo_state = self._repo.get_demo_state()
-        battery_voltage = demo_state.get("battery_voltage", 27.6)
+        local_state = self._repo.get_local_state()
+        battery_voltage = local_state.get("battery_voltage", 27.6)
 
         # Check battery status
         if battery_voltage < 23.0:
@@ -257,7 +257,7 @@ class FireSystemService:
             overall_health=overall,
         )
 
-    async def trigger_alarm(self, zone_id: str, alarm_type: str) -> Dict[str, Any]:
+    async def trigger_alarm(self, zone_id: str, alarm_type: str) -> dict[str, Any]:
         """Trigger a fire alarm and execute cause-effect chain.
 
         Creates a FireAlarm entry via repository, then calls
@@ -298,7 +298,7 @@ class FireSystemService:
             "coordinator_mode": coordinator._mode,
         }
 
-    async def clear_alarm(self, alarm_id: str) -> Dict[str, Any]:
+    async def clear_alarm(self, alarm_id: str) -> dict[str, Any]:
         """Clear a fire alarm and trigger reset if no more active alarms.
 
         Marks alarm as acknowledged/cleared via repository, then checks
@@ -332,7 +332,7 @@ class FireSystemService:
         remaining = self._repo.get_active_alarms()
         remaining_active = [a for a in remaining if a.get("alarm_id") != alarm_id and not a.get("cleared", False)]
 
-        result: Dict[str, Any] = {
+        result: dict[str, Any] = {
             "alarm_id": alarm_id,
             "cleared": True,
             "remaining_active_alarms": len(remaining_active),
@@ -356,7 +356,7 @@ class FireSystemService:
         return result
 
     def simulate_alarm(self, zone_id: str, alarm_type: str = "smoke") -> dict:
-        """Simulate a fire alarm for demo purposes (legacy sync method).
+        """Simulate a fire alarm for local testing (legacy sync method).
 
         Returns the alarm details and the cause-effect actions that would activate.
         For full coordination, use trigger_alarm() instead.
@@ -394,7 +394,7 @@ class FireSystemService:
                 "action_type": "simulate_alarm",
                 "zone_id": zone_id,
                 "description": f"Simulated {alarm_type} alarm in {zone_id}",
-                "mode": "demo",
+                "mode": "local",
             }
         )
 

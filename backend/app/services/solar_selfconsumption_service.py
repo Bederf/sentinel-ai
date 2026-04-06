@@ -16,11 +16,11 @@ import logging
 import math
 import random
 from dataclasses import dataclass, field
-from datetime import datetime, timezone, timedelta
-from typing import Dict, List, Optional, Any
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
-from app.services.solar_config_service import get_site_solar_config
 from app.core.site_resolver import get_primary_site_code
+from app.services.solar_config_service import get_site_solar_config
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +46,7 @@ class SelfConsumptionMetrics:
     target_self_consumption_pct: float = 95.0
     meets_target: bool = True
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "site_id": self.site_id,
             "period": self.period,
@@ -78,7 +78,7 @@ class ExportStatus:
     curtailment_active: bool = False
     curtailment_kw: float = 0.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "site_id": self.site_id,
             "timestamp": self.timestamp,
@@ -99,13 +99,13 @@ class ExcessPlan:
     site_id: str
     timestamp: str
     excess_solar_kw: float
-    plan: List[Dict[str, Any]] = field(default_factory=list)
+    plan: list[dict[str, Any]] = field(default_factory=list)
     # plan items: { "priority": 1, "action": "charge_bess", "power_kw": 500, "note": "..." }
     total_absorbed_kw: float = 0.0
     remaining_export_kw: float = 0.0
     bess_can_absorb: bool = True
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "site_id": self.site_id,
             "timestamp": self.timestamp,
@@ -130,7 +130,7 @@ class EnergyBalanceInterval:
     bess_discharged_kwh: float
     building_consumed_kwh: float
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "timestamp": self.timestamp,
             "solar_gen_kwh": round(self.solar_gen_kwh, 2),
@@ -160,9 +160,9 @@ class EnergyBalance:
     self_consumption_pct: float
     self_sufficiency_pct: float
     balance_check: bool  # True if energy in = energy out (sanity check)
-    intervals: List[EnergyBalanceInterval] = field(default_factory=list)
+    intervals: list[EnergyBalanceInterval] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "site_id": self.site_id,
             "period": self.period,
@@ -209,7 +209,7 @@ class SolarSelfConsumptionService:
     EXPORT_LIMIT_TYPE = "capped"  # zero_export / capped / unlimited
 
     def __init__(self):
-        self._energy_balance_cache: Dict[str, EnergyBalance] = {}
+        self._energy_balance_cache: dict[str, EnergyBalance] = {}
         try:
             cfg = get_site_solar_config()
             self.PV_CAPACITY_KWP = cfg.pv.total_capacity_kwp
@@ -221,7 +221,7 @@ class SolarSelfConsumptionService:
         self._seed_demo_data(get_primary_site_code() or "unknown")
 
     def _seed_demo_data(self, site_id: str) -> None:
-        """Seed a full day energy balance for demo."""
+        """Seed a full day energy balance for local mode."""
         balance = self._simulate_day_balance(site_id)
         self._energy_balance_cache[site_id] = balance
         logger.info(
@@ -266,12 +266,12 @@ class SolarSelfConsumptionService:
 
     def _simulate_day_balance(self, site_id: str) -> EnergyBalance:
         """Simulate complete day energy balance with 15-min intervals."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         sast = now + timedelta(hours=2)
         start_sast = sast.replace(hour=0, minute=0, second=0, microsecond=0)
         start_utc = start_sast - timedelta(hours=2)
 
-        intervals: List[EnergyBalanceInterval] = []
+        intervals: list[EnergyBalanceInterval] = []
         totals = {
             "solar_gen": 0.0,
             "solar_self": 0.0,
@@ -441,7 +441,7 @@ class SolarSelfConsumptionService:
 
     def get_export_status(self, site_id: str) -> ExportStatus:
         """Get current grid export status and limit compliance."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         sast = now + timedelta(hours=2)
         hour = sast.hour + sast.minute / 60.0
 
@@ -485,7 +485,7 @@ class SolarSelfConsumptionService:
 
     def get_excess_generation_plan(self, site_id: str) -> ExcessPlan:
         """Plan for handling excess solar: BESS first, building second, export last."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         sast = now + timedelta(hours=2)
         hour = sast.hour + sast.minute / 60.0
 
@@ -493,7 +493,7 @@ class SolarSelfConsumptionService:
         load_kw = self._site_load_kw(hour)
         excess = max(0, solar_kw - load_kw)
 
-        plan_items: List[Dict[str, Any]] = []
+        plan_items: list[dict[str, Any]] = []
         total_absorbed = 0.0
 
         if excess <= 0:
@@ -649,7 +649,7 @@ class SolarSelfConsumptionService:
 
 # === Singleton ===
 
-_solar_selfconsumption_service: Optional[SolarSelfConsumptionService] = None
+_solar_selfconsumption_service: SolarSelfConsumptionService | None = None
 
 
 def get_solar_selfconsumption_service() -> SolarSelfConsumptionService:

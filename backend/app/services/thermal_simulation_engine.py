@@ -13,16 +13,16 @@ Integration point: Called from lifecycle_orchestrator._process_hour() each simul
 """
 
 import logging
-from datetime import datetime, date
-from typing import Optional, Dict, Any
+from datetime import date, datetime
+from typing import Any
 
 from app.database.supabase_client import get_supabase_client
+from app.services.cost_validation_engine import get_cost_validation_engine
 from app.services.energy_cost_service import EnergyCostService
 from app.services.lighting_simulation_engine import update_simulation_lighting
-from app.services.water_consumption_engine import update_simulation_water
 from app.services.power_meter_validation_engine import get_power_meter_validation_engine
-from app.services.cost_validation_engine import get_cost_validation_engine
 from app.services.simulation_store import get_simulation_store
+from app.services.water_consumption_engine import update_simulation_water
 
 logger = logging.getLogger(__name__)
 
@@ -52,10 +52,10 @@ class ThermalSimulationEngine:
         self.CONSIDER_EQUIPMENT_HEALTH = consider_equipment_health
 
         # Cache zone metadata to avoid repeated DB queries
-        self._zone_cache: Dict[str, Dict[str, Any]] = {}
-        self._last_temps: Dict[str, float] = {}  # Track previous hour temps
-        self._equipment_health_cache: Dict[str, int] = {}  # equipment_id -> health_score
-        self._sensor_id_cache: Dict[str, str] = {}  # sensor_code -> sensor_id (UUID)
+        self._zone_cache: dict[str, dict[str, Any]] = {}
+        self._last_temps: dict[str, float] = {}  # Track previous hour temps
+        self._equipment_health_cache: dict[str, int] = {}  # equipment_id -> health_score
+        self._sensor_id_cache: dict[str, str] = {}  # sensor_code -> sensor_id (UUID)
         self._sensor_cache_loaded: bool = False
 
         # CO2 Simulation Parameters
@@ -66,7 +66,7 @@ class ThermalSimulationEngine:
         self.DCV_BOOST_FACTOR = 1.5  # Extra ventilation multiplier above threshold
 
         # CO2 state tracking
-        self._zone_co2: Dict[str, float] = {}  # zone_id -> current CO2 ppm
+        self._zone_co2: dict[str, float] = {}  # zone_id -> current CO2 ppm
 
         # HVAC Power Consumption Parameters
         # FCU = Fan Coil Unit, AHU = Air Handling Unit
@@ -91,28 +91,28 @@ class ThermalSimulationEngine:
         self.CHILLER_IDS = ["S002-CHILLER-B1-001", "S002-CHILLER-B1-002"]
 
         # Chiller plant state
-        self._chiller_states: Dict[str, Dict[str, Any]] = {
+        self._chiller_states: dict[str, dict[str, Any]] = {
             cid: {"role": "lead" if i == 0 else "lag", "running": False, "load_pct": 0.0, "health": 100.0}
             for i, cid in enumerate(self.CHILLER_IDS)
         }
 
         # Power consumption tracking
-        self._hvac_power_cache: Dict[str, float] = {}  # zone_id -> power_kw
+        self._hvac_power_cache: dict[str, float] = {}  # zone_id -> power_kw
         self._chiller_power_cache: float = 0.0  # Total chiller power
 
         # Daily cost tracking (resets each day)
-        self._daily_hourly_power: Dict[int, float] = {}  # {hour: total_hvac_kw}
-        self._current_simulation_date: Optional[date] = None
+        self._daily_hourly_power: dict[int, float] = {}  # {hour: total_hvac_kw}
+        self._current_simulation_date: date | None = None
 
     async def update_zone_temperatures(
         self,
         simulated_hour: int,
-        occupancy_data: Dict[str, float],  # zone_id -> occupancy_percent
+        occupancy_data: dict[str, float],  # zone_id -> occupancy_percent
         ambient_temp: float,  # Current ambient temperature (°C)
         is_night_mode: bool,  # Is building in night setback?
-        hvac_status: Optional[Dict[str, Any]] = None,  # Optional HVAC overrides
-        simulated_date: Optional[datetime] = None,  # Date for tariff band calculation
-    ) -> Dict[str, float]:
+        hvac_status: dict[str, Any] | None = None,  # Optional HVAC overrides
+        simulated_date: datetime | None = None,  # Date for tariff band calculation
+    ) -> dict[str, float]:
         """
         Calculate and update temperature for all zones in the building.
 
@@ -241,7 +241,7 @@ class ThermalSimulationEngine:
         occupancy_pct: float,
         ambient_temp: float,
         setpoint: float,
-        zone_config: Dict[str, Any],
+        zone_config: dict[str, Any],
     ) -> float:
         """
         Calculate new zone temperature based on thermal dynamics.
@@ -355,7 +355,7 @@ class ThermalSimulationEngine:
         zone_id: str,
         occupancy_pct: float,
         fan_response_factor: float,
-        zone_config: Dict[str, Any],
+        zone_config: dict[str, Any],
     ) -> float:
         """Calculate zone CO2 level based on occupancy and ventilation.
 
@@ -632,7 +632,7 @@ class ThermalSimulationEngine:
         except Exception as e:
             logger.warning(f"[THERMAL] Could not load equipment health: {e}")
 
-    def update_health_cache(self, health_dict: Dict[str, float]) -> None:
+    def update_health_cache(self, health_dict: dict[str, float]) -> None:
         """Update equipment health cache from external source (e.g., orchestrator).
 
         Called each simulated hour so the thermal engine uses current health values
@@ -668,8 +668,8 @@ class ThermalSimulationEngine:
     async def _write_sensor_readings(
         self,
         simulated_hour: int,
-        zone_temps: Dict[str, float],
-        occupancy_data: Dict[str, float],
+        zone_temps: dict[str, float],
+        occupancy_data: dict[str, float],
         ambient_temp: float,
         is_night_mode: bool,
     ) -> None:
@@ -719,11 +719,11 @@ class ThermalSimulationEngine:
     async def calculate_hvac_power_consumption(
         self,
         simulated_hour: int,
-        zone_temps: Dict[str, float],
-        occupancy_data: Dict[str, float],
+        zone_temps: dict[str, float],
+        occupancy_data: dict[str, float],
         ambient_temp: float,
-        simulated_date: Optional[datetime] = None,
-    ) -> Dict[str, float]:
+        simulated_date: datetime | None = None,
+    ) -> dict[str, float]:
         """
         Calculate HVAC power consumption per zone and for chiller.
 
@@ -819,9 +819,9 @@ class ThermalSimulationEngine:
     async def _write_power_consumption(
         self,
         simulated_hour: int,
-        zone_power: Dict[str, float],
+        zone_power: dict[str, float],
         chiller_power: float,
-        simulated_date: Optional[datetime] = None,
+        simulated_date: datetime | None = None,
     ) -> None:
         """
         Write HVAC power consumption to power_meters table.
@@ -923,7 +923,7 @@ class ThermalSimulationEngine:
 
 
 # Singleton instance per building
-_thermal_engines: Dict[str, ThermalSimulationEngine] = {}
+_thermal_engines: dict[str, ThermalSimulationEngine] = {}
 
 
 def get_thermal_engine(site_id: str, consider_equipment_health: bool = False) -> ThermalSimulationEngine:
@@ -948,12 +948,12 @@ def get_thermal_engine(site_id: str, consider_equipment_health: bool = False) ->
 async def update_simulation_temperatures(
     site_id: str,
     simulated_hour: int,
-    occupancy_data: Dict[str, float],
+    occupancy_data: dict[str, float],
     ambient_temp: float,
     is_night_mode: bool = False,
     consider_equipment_health: bool = False,
-    simulated_date: Optional[datetime] = None,
-) -> Dict[str, float]:
+    simulated_date: datetime | None = None,
+) -> dict[str, float]:
     """
     Public API to update zone temperatures during simulation.
 

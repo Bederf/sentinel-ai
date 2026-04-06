@@ -94,7 +94,7 @@ REDACTED_SNIPPET_MAX_LENGTH: int = 200  # max chars shown in redacted log snippe
 TRUST_LEVELS: dict[str, int] = {
     "VERIFIED": 3,  # Authenticated user with step-up auth
     "STANDARD": 2,  # Authenticated user (JWT/API key)
-    "UNTRUSTED": 1,  # Unauthenticated or demo-mode user
+    "UNTRUSTED": 1,  # Unauthenticated or local-fallback user
     "QUARANTINED": 0,  # Input that failed a security check
 }
 

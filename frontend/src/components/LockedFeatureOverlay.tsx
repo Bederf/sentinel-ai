@@ -7,7 +7,7 @@
  * If module is inactive: renders greyed-out child + upgrade prompt with savings data
  *
  * Usage:
- * <LockedFeatureOverlay module="control" featureName="Temperature Setpoint">
+ * <LockedFeatureOverlay module="hvac_control" featureName="Temperature Setpoint">
  *   <TemperatureControl {...props} />
  * </LockedFeatureOverlay>
  */

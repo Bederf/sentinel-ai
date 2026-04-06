@@ -10,6 +10,7 @@ The state machine over ordered events is the most natural target — replace
 the Python loop in ``compute_room_occupied_minutes()`` with a Polars
 ``shift``/``cumsum`` expression once the data lands in a DataFrame.
 """
+
 from __future__ import annotations
 
 from collections import defaultdict

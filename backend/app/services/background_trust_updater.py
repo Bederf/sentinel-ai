@@ -141,9 +141,10 @@ class BackgroundTrustUpdater:
         Falls back to scanning the JSON fallback directory if Supabase
         is unavailable.
         """
+        import json
+
         from app.database.repositories.trust_history_repository import DATA_DIR
         from app.models.trust_history import TrustHistory
-        import json
 
         records: list[TrustHistory] = []
 

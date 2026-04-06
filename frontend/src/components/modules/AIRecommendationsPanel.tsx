@@ -6,7 +6,7 @@
  */
 
 import { useState } from 'react';
-import { Card, Title, Text, Badge, Flex, Button, Select, SelectItem } from '@tremor/react';
+import { Card, Title, Text, Badge, Flex, Button } from '@tremor/react';
 import { useModules, useCriticalRecommendations, useCrossSystemRecommendations } from '../../contexts/ModuleHooks';
 import { PRIORITY_COLORS, MODULE_COLORS } from '../../lib/moduleRegistry';
 import type { AIRecommendation, ModuleType } from '../../lib/moduleRegistry';
@@ -113,20 +113,28 @@ export function AIRecommendationsPanel({
       {/* Filter */}
       {!moduleFilter && (
         <div className="mt-4">
-          <Select
+          <select
             value={filter}
-            onValueChange={(v: any) => setFilter(v)}
-            placeholder="Filter recommendations"
+            onChange={(event) => setFilter(event.target.value as typeof filter)}
+            className="w-full rounded-md appearance-none cursor-pointer px-3 py-2 text-sm transition-colors focus:outline-none focus:ring-0"
+            style={{
+              background: "var(--color-grafana-bg-secondary)",
+              border: "1px solid var(--color-grafana-border)",
+              color: "var(--color-grafana-text-primary)",
+              boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)",
+              outline: "none",
+            }}
+            aria-label="Filter recommendations"
           >
-            <SelectItem value="all">All Recommendations</SelectItem>
-            <SelectItem value="critical">Critical Only</SelectItem>
-            <SelectItem value="cross_system">Cross-System Only</SelectItem>
+            <option value="all">All Recommendations</option>
+            <option value="critical">Critical Only</option>
+            <option value="cross_system">Cross-System Only</option>
             {activeModules.map(m => (
-              <SelectItem key={m.module_type} value={m.module_type}>
+              <option key={m.module_type} value={m.module_type}>
                 {m.module_type.toUpperCase()} Module
-              </SelectItem>
+              </option>
             ))}
-          </Select>
+          </select>
         </div>
       )}
 

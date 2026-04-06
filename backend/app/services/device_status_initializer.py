@@ -1,33 +1,28 @@
-"""Initialize device status from simulation results.
+"""Initialize device status from current connected-site state.
 
-When a 365-day simulation is running or completed, populate device status
-from the simulation data so the dashboard shows real-time metrics instead
-of all devices being offline.
-
-This bridges the gap between:
-- Background simulation (generates annual results)
-- Live device status (what the dashboard displays)
+Populate device status so the dashboard shows current metrics instead of all
+devices being offline.
 """
 
 import logging
 from datetime import datetime
-from typing import Dict, Optional, Any
+from typing import Any
 
-from app.database.supabase_client import get_supabase_client
-from app.services.solar_connector_simulation import SimulatedSolarConnector
+from app.config.settings import settings
 from app.core.site_resolver import get_primary_site_code
+from app.database.supabase_client import get_supabase_client
 
 logger = logging.getLogger(__name__)
 
 
 class DeviceStatusInitializer:
-    """Initialize device status from simulation data for real-time dashboard."""
+    """Initialize device status from connected-site state for the real-time dashboard."""
 
     def __init__(self):
         self.client = get_supabase_client()
 
-    async def initialize_site_devices(self, site_id: str) -> Dict[str, Any]:
-        """Initialize all device statuses for a site from simulation data.
+    async def initialize_site_devices(self, site_id: str) -> dict[str, Any]:
+        """Initialize all device statuses for a site from connected-site state.
 
         Args:
             site_id: Site identifier (e.g., 'site-002')
@@ -45,7 +40,7 @@ class DeviceStatusInitializer:
             site_uuid = site_config.get("site_uuid")
             plant_capacity = site_config.get("solar_capacity_kwp", 3.875)
 
-            # Initialize solar devices from simulation
+            # Island deployments must not fabricate solar state locally.
             solar_count = await self._init_solar_devices(site_id, site_uuid, plant_capacity)
 
             # Initialize HVAC devices (mark online if equipment exists)
@@ -70,10 +65,10 @@ class DeviceStatusInitializer:
             logger.error(f"Error initializing devices for {site_id}: {e}")
             return {"status": "error", "error": str(e)}
 
-    async def _get_site_config(self, site_id: str) -> Optional[Dict[str, Any]]:
+    async def _get_site_config(self, site_id: str) -> dict[str, Any] | None:
         """Get site configuration."""
         try:
-            # For demo, return config for the primary registered site
+            # Return config for the primary registered site
             primary = get_primary_site_code()
             if site_id == primary:
                 return {
@@ -89,8 +84,14 @@ class DeviceStatusInitializer:
             return None
 
     async def _init_solar_devices(self, site_id: str, site_uuid: str, capacity_kwp: float) -> int:
-        """Initialize solar devices (inverters, BESS) from simulation data."""
+        """Initialize solar devices when a local simulator is explicitly enabled."""
+        if settings.sentinel_island_mode:
+            logger.info("Skipping local solar device hydration in SENTINEL_ISLAND_MODE")
+            return 0
+
         try:
+            from app.services.solar_connector_simulation import SimulatedSolarConnector
+
             connector = SimulatedSolarConnector(site_id, capacity_kwp)
             await connector.connect()
 
@@ -152,7 +153,7 @@ class DeviceStatusInitializer:
     async def _init_hvac_devices(self, site_id: str, site_uuid: str) -> int:
         """Initialize HVAC devices (mark online if they exist)."""
         try:
-            # Query HVAC equipment from demo data
+            # Query HVAC equipment from the connected site's equipment set
             if not self.client:
                 return 0
 
@@ -221,7 +222,7 @@ class DeviceStatusInitializer:
         device_code: str,
         device_type: str,
         status: str,
-        metrics: Dict[str, Any],
+        metrics: dict[str, Any],
     ) -> bool:
         """Update a device's status in the system.
 
@@ -248,7 +249,7 @@ class DeviceStatusInitializer:
             }
 
             # Update in-memory cache (could also write to Redis or database)
-            # For now, this bridges the gap for the demo
+            # For now, this bridges the gap for connected-site status hydration
 
             logger.debug(f"Updated status for {device_code}: {status}")
             return True
@@ -258,11 +259,11 @@ class DeviceStatusInitializer:
             return False
 
 
-async def initialize_demo_devices(site_id: str | None = None) -> Dict[str, Any]:
-    """Initialize demo devices from simulation data.
+async def initialize_connected_site_devices(site_id: str | None = None) -> dict[str, Any]:
+    """Initialize connected-site devices from current state data.
 
     Call this on user login or dashboard load to populate device status
-    from the running 365-day simulation.
+    from the currently connected site state.
 
     Args:
         site_id: Site to initialize

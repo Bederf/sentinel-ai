@@ -20,8 +20,6 @@ import {
   Flex,
   Text,
   Grid,
-  Select,
-  SelectItem,
   NumberInput,
 } from "@tremor/react";
 import {
@@ -74,7 +72,7 @@ export function MLModelStatus({ onModelTrained }: MLModelStatusProps) {
         selectedModelType,
         selectedEquipmentType,
         epochs,
-        true // use demo data
+        true // use seeded data
       );
 
       // Refresh model list
@@ -135,27 +133,45 @@ export function MLModelStatus({ onModelTrained }: MLModelStatusProps) {
         <Grid className="grid grid-cols-1 sm:grid-cols-4 gap-4 mt-4">
           <div>
             <Text className="mb-1">Model Type</Text>
-            <Select
+            <select
               value={selectedModelType}
-              onValueChange={(v) => setSelectedModelType(v as "lstm" | "autoencoder")}
+              onChange={(event) => setSelectedModelType(event.target.value as "lstm" | "autoencoder")}
+              className="w-full rounded-md appearance-none cursor-pointer px-3 py-2 text-sm transition-colors focus:outline-none focus:ring-0"
+              style={{
+                background: "var(--color-grafana-bg-secondary)",
+                border: "1px solid var(--color-grafana-border)",
+                color: "var(--color-grafana-text-primary)",
+                boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)",
+                outline: "none",
+              }}
+              aria-label="Select model type"
             >
-              <SelectItem value="lstm">LSTM (Forecasting)</SelectItem>
-              <SelectItem value="autoencoder">Autoencoder (Anomaly)</SelectItem>
-            </Select>
+              <option value="lstm">LSTM (Forecasting)</option>
+              <option value="autoencoder">Autoencoder (Anomaly)</option>
+            </select>
           </div>
 
           <div>
             <Text className="mb-1">Equipment Type</Text>
-            <Select
+            <select
               value={selectedEquipmentType}
-              onValueChange={setSelectedEquipmentType}
+              onChange={(event) => setSelectedEquipmentType(event.target.value)}
+              className="w-full rounded-md appearance-none cursor-pointer px-3 py-2 text-sm transition-colors focus:outline-none focus:ring-0"
+              style={{
+                background: "var(--color-grafana-bg-secondary)",
+                border: "1px solid var(--color-grafana-border)",
+                color: "var(--color-grafana-text-primary)",
+                boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)",
+                outline: "none",
+              }}
+              aria-label="Select equipment type"
             >
               {equipmentTypes.map((eq) => (
-                <SelectItem key={eq} value={eq}>
+                <option key={eq} value={eq}>
                   {eq.charAt(0).toUpperCase() + eq.slice(1)}
-                </SelectItem>
+                </option>
               ))}
-            </Select>
+            </select>
           </div>
 
           <div>

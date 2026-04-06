@@ -8,22 +8,21 @@ Supports two source types per site:
 - "niagara": Reads from DeviceManager (Niagara-discovered lighting devices)
 """
 
-from dataclasses import dataclass, field
-from typing import Dict, List, Optional
-from datetime import datetime
 import json
 import logging
 import random
+from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 
 from app.database.supabase_client import get_supabase_client
 from app.models.lighting import (
-    LightingController,
-    LightingSensor,
-    LightingLuminaire,
-    ZoneOccupancy,
-    ZoneLighting,
     FloorSummary,
+    LightingController,
+    LightingLuminaire,
+    LightingSensor,
+    ZoneLighting,
+    ZoneOccupancy,
 )
 
 logger = logging.getLogger(__name__)
@@ -36,11 +35,11 @@ class SiteLightingData:
     site_id: str
     site_name: str
     source: str  # "json" or "niagara"
-    controllers: Dict[str, LightingController] = field(default_factory=dict)
-    sensors: Dict[str, LightingSensor] = field(default_factory=dict)
-    luminaires: Dict[str, LightingLuminaire] = field(default_factory=dict)
-    zones: Dict[str, dict] = field(default_factory=dict)
-    last_loaded: Optional[str] = None
+    controllers: dict[str, LightingController] = field(default_factory=dict)
+    sensors: dict[str, LightingSensor] = field(default_factory=dict)
+    luminaires: dict[str, LightingLuminaire] = field(default_factory=dict)
+    zones: dict[str, dict] = field(default_factory=dict)
+    last_loaded: str | None = None
 
 
 class LightingService:
@@ -60,7 +59,7 @@ class LightingService:
     DALI_DEVICE_TYPES = {"dali_controller", "luminaire", "light_sensor", "lighting"}
 
     def __init__(self):
-        self._sites_data: Dict[str, SiteLightingData] = {}
+        self._sites_data: dict[str, SiteLightingData] = {}
         self._sources_config = self._load_sources_config()
         # Load JSON-backed sites at startup
         for site_id, config in self._sources_config.get("sites", {}).items():
@@ -369,34 +368,34 @@ class LightingService:
 
     # === Site-aware Data Access Helpers ===
 
-    def _get_site_data(self, site_id: Optional[str]) -> Optional[SiteLightingData]:
+    def _get_site_data(self, site_id: str | None) -> SiteLightingData | None:
         """Get data for a specific site, or None."""
         if site_id and site_id in self._sites_data:
             return self._sites_data[site_id]
         return None
 
-    def _all_controllers(self) -> List[LightingController]:
+    def _all_controllers(self) -> list[LightingController]:
         """Get controllers across all sites."""
         result = []
         for site_data in self._sites_data.values():
             result.extend(site_data.controllers.values())
         return result
 
-    def _all_sensors(self) -> List[LightingSensor]:
+    def _all_sensors(self) -> list[LightingSensor]:
         """Get sensors across all sites."""
         result = []
         for site_data in self._sites_data.values():
             result.extend(site_data.sensors.values())
         return result
 
-    def _all_luminaires(self) -> List[LightingLuminaire]:
+    def _all_luminaires(self) -> list[LightingLuminaire]:
         """Get luminaires across all sites."""
         result = []
         for site_data in self._sites_data.values():
             result.extend(site_data.luminaires.values())
         return result
 
-    def _all_zones(self) -> Dict[str, dict]:
+    def _all_zones(self) -> dict[str, dict]:
         """Get zones across all sites."""
         result = {}
         for site_data in self._sites_data.values():
@@ -405,7 +404,7 @@ class LightingService:
 
     # === Controller Operations ===
 
-    def get_controllers(self, site_id: Optional[str] = None) -> List[LightingController]:
+    def get_controllers(self, site_id: str | None = None) -> list[LightingController]:
         """Get all controllers, optionally filtered by site."""
         site_data = self._get_site_data(site_id)
         if site_data:
@@ -415,7 +414,7 @@ class LightingService:
             return [c for c in self._all_controllers() if c.site_id == site_id]
         return self._all_controllers()
 
-    def get_controller(self, controller_id: str) -> Optional[LightingController]:
+    def get_controller(self, controller_id: str) -> LightingController | None:
         """Get single controller by ID."""
         for site_data in self._sites_data.values():
             if controller_id in site_data.controllers:
@@ -425,8 +424,8 @@ class LightingService:
     # === Sensor Operations ===
 
     def get_sensors(
-        self, zone_id: Optional[str] = None, controller_id: Optional[str] = None, site_id: Optional[str] = None
-    ) -> List[LightingSensor]:
+        self, zone_id: str | None = None, controller_id: str | None = None, site_id: str | None = None
+    ) -> list[LightingSensor]:
         """Get sensors with optional filters."""
         site_data = self._get_site_data(site_id)
         if site_data:
@@ -439,14 +438,14 @@ class LightingService:
             sensors = [s for s in sensors if s.controller_id == controller_id]
         return sensors
 
-    def get_sensor(self, sensor_id: str) -> Optional[LightingSensor]:
+    def get_sensor(self, sensor_id: str) -> LightingSensor | None:
         """Get single sensor by ID."""
         for site_data in self._sites_data.values():
             if sensor_id in site_data.sensors:
                 return site_data.sensors[sensor_id]
         return None
 
-    def get_sensor_by_desk(self, desk_id: str) -> Optional[LightingSensor]:
+    def get_sensor_by_desk(self, desk_id: str) -> LightingSensor | None:
         """Get sensor associated with a desk (for complaint handling)."""
         for site_data in self._sites_data.values():
             for sensor in site_data.sensors.values():
@@ -457,8 +456,8 @@ class LightingService:
     # === Luminaire Operations ===
 
     def get_luminaires(
-        self, zone_id: Optional[str] = None, faulty_only: bool = False, site_id: Optional[str] = None
-    ) -> List[LightingLuminaire]:
+        self, zone_id: str | None = None, faulty_only: bool = False, site_id: str | None = None
+    ) -> list[LightingLuminaire]:
         """Get luminaires with optional filters."""
         site_data = self._get_site_data(site_id)
         if site_data:
@@ -471,7 +470,7 @@ class LightingService:
             luminaires = [lum for lum in luminaires if lum.fault_status]
         return luminaires
 
-    def get_luminaire(self, luminaire_id: str) -> Optional[LightingLuminaire]:
+    def get_luminaire(self, luminaire_id: str) -> LightingLuminaire | None:
         """Get single luminaire by ID."""
         for site_data in self._sites_data.values():
             if luminaire_id in site_data.luminaires:
@@ -491,14 +490,14 @@ class LightingService:
             return "quiet"
         return "empty"
 
-    def _get_zones(self, site_id: Optional[str] = None) -> Dict[str, dict]:
+    def _get_zones(self, site_id: str | None = None) -> dict[str, dict]:
         """Get zones dict, optionally scoped to a site."""
         site_data = self._get_site_data(site_id)
         if site_data:
             return site_data.zones
         return self._all_zones()
 
-    def get_zone_occupancy(self, zone_id: str) -> Optional[ZoneOccupancy]:
+    def get_zone_occupancy(self, zone_id: str) -> ZoneOccupancy | None:
         """Get occupancy summary for a zone."""
         zones = self._all_zones()
         zone = zones.get(zone_id)
@@ -526,7 +525,7 @@ class LightingService:
             last_updated=datetime.now().isoformat(),
         )
 
-    def get_zone_lighting(self, zone_id: str) -> Optional[ZoneLighting]:
+    def get_zone_lighting(self, zone_id: str) -> ZoneLighting | None:
         """Get lighting summary for a zone."""
         zones = self._all_zones()
         zone = zones.get(zone_id)
@@ -565,7 +564,7 @@ class LightingService:
             active_scene_name=zone.get("active_scene_name"),
         )
 
-    def get_zone_summary(self, zone_id: str) -> Dict:
+    def get_zone_summary(self, zone_id: str) -> dict:
         """Get combined occupancy + lighting for a zone."""
         occupancy = self.get_zone_occupancy(zone_id)
         lighting = self.get_zone_lighting(zone_id)
@@ -576,7 +575,7 @@ class LightingService:
 
     # === Floor Aggregations ===
 
-    def get_floor_summary(self, floor: str, site_id: Optional[str] = None) -> FloorSummary:
+    def get_floor_summary(self, floor: str, site_id: str | None = None) -> FloorSummary:
         """Get occupancy summary for entire floor."""
         zones = self._get_zones(site_id)
         floor_zones = [z for z in zones.values() if z.get("floor") == floor]
@@ -611,7 +610,7 @@ class LightingService:
             total_power_watts=round(total_power, 1),
         )
 
-    def get_building_occupancy(self, site_id: Optional[str] = None) -> Dict:
+    def get_building_occupancy(self, site_id: str | None = None) -> dict:
         """Get occupancy overview for entire building (or a specific site)."""
         # If no site_id provided, use first available site for backwards compat
         if not site_id and self._sites_data:
@@ -676,14 +675,14 @@ class LightingService:
 
     # === All Zones ===
 
-    def get_all_zones(self, site_id: Optional[str] = None) -> List[dict]:
+    def get_all_zones(self, site_id: str | None = None) -> list[dict]:
         """Get all zones with basic info."""
         zones = self._get_zones(site_id)
         return list(zones.values())
 
     # === Source Health ===
 
-    def get_sources_health(self) -> List[Dict]:
+    def get_sources_health(self) -> list[dict]:
         """Get health status for all configured DALI sources."""
         results = []
         for site_id, site_data in self._sites_data.items():
@@ -723,10 +722,10 @@ class LightingService:
             )
         return results
 
-    # === Simulation (for demo) ===
+    # === Seeded occupancy changes ===
 
     def simulate_occupancy_change(self):
-        """Simulate realistic occupancy changes for demo."""
+        """Simulate realistic occupancy changes for local seeded operation."""
         for site_data in self._sites_data.values():
             for sensor in site_data.sensors.values():
                 if random.random() < 0.1:
@@ -953,7 +952,7 @@ class LightingService:
 
         return True
 
-    async def get_zone_brightness(self, zone_id: str) -> Optional[int]:
+    async def get_zone_brightness(self, zone_id: str) -> int | None:
         """Get current average brightness for a zone."""
         luminaires = self.get_luminaires(zone_id=zone_id)
         if not luminaires:
@@ -964,7 +963,7 @@ class LightingService:
 
 
 # Singleton instance
-_lighting_service: Optional[LightingService] = None
+_lighting_service: LightingService | None = None
 
 
 def get_lighting_service() -> LightingService:

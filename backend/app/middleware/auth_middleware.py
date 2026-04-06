@@ -5,7 +5,7 @@ Handles Bearer token (Supabase JWT) and API key authentication.
 Ported from AimTheLaw auth stack, adapted for BMS domain.
 
 NOT registered globally - individual endpoints opt-in via require_auth() dependency.
-Demo mode bypass preserved to avoid breaking existing demo flows.
+Profile-based access overrides preserved for constrained local access flows.
 
 FSR Domain: 4.7 - Logical Access Control
 
@@ -24,6 +24,7 @@ Usage:
 """
 
 import asyncio
+import hmac
 import hashlib
 import logging
 import uuid
@@ -270,6 +271,12 @@ def _extract_api_key(request: Request) -> str | None:
         return api_key
 
     return None
+
+
+def _extract_sentry_bot_api_key(request: Request) -> str | None:
+    """Extract the legacy Sentry bot API key header."""
+    api_key = request.headers.get("X-Sentry-API-Key", "")
+    return api_key or None
 
 
 def _extract_ip_address(request: Request) -> str:
@@ -527,6 +534,25 @@ async def _authenticate_request(request: Request) -> AuthContext | None:
             logger.warning(f"Auth failure: invalid bearer token from ip={source_ip} path={request.url.path}")
             return None
 
+    # Try legacy Sentry bot API key
+    sentry_bot_key = _extract_sentry_bot_api_key(request)
+    if sentry_bot_key and settings.sentry_bot_api_key:
+        if hmac.compare_digest(sentry_bot_key, settings.sentry_bot_api_key):
+            auth_ctx = AuthContext(
+                user_id="svc:sentry-bot",
+                role=SentinelRole.ADMIN,
+                auth_method="sentry_bot_api_key",
+                source_ip=source_ip,
+                email="sentry-bot@sentinel.local",
+                scopes=["admin:all"],
+                metadata={"description": "legacy_sentry_bot_api_key"},
+                is_bot_agent=True,
+            )
+            logger.debug("Auth success: user=svc:sentry-bot role=admin method=sentry_bot_api_key ip=%s", source_ip)
+            return auth_ctx
+        logger.warning("Auth failure: invalid Sentry bot API key from ip=%s path=%s", source_ip, request.url.path)
+        return None
+
     # Try API key
     api_key = _extract_api_key(request)
     if api_key:
@@ -735,7 +761,7 @@ def require_site_access(
     authenticated user has access to the site referenced in the path parameter.
 
     ADMIN role always has access. Other roles are checked against:
-    1. demo_configs (allowedSites)
+    1. access_profiles (allowedSites)
     2. user_site_access table (Supabase)
     3. Default deny
 
@@ -794,18 +820,18 @@ def require_site_access(
             request.state.auth = auth_ctx
             return auth_ctx
 
-        # Check site access: demo config first, then Supabase DB
-        from app.config.demo_configs import get_demo_config_for_email, has_demo_site_access
+        # Check site access: access profile first, then Supabase DB
+        from app.config.access_profiles import get_access_profile_for_email, has_profile_site_access
 
         email = getattr(auth_ctx, "email", None) or ""
 
-        # Step 1: Demo config check (if user has a demo config)
-        demo_config = get_demo_config_for_email(email) if email else None
-        if demo_config:
-            # User has demo config — use it as the authority
-            if not has_demo_site_access(email, site_code):
+        # Step 1: Access profile check (if user has a profile)
+        access_profile = get_access_profile_for_email(email) if email else None
+        if access_profile:
+            # User has an access profile — use it as the authority
+            if not has_profile_site_access(email, site_code):
                 logger.warning(
-                    "Site access denied (demo config): user=%s site=%s path=%s",
+                    "Site access denied (access profile): user=%s site=%s path=%s",
                     auth_ctx.user_id,
                     site_code,
                     request.url.path,
@@ -815,9 +841,9 @@ def require_site_access(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail=f"You do not have access to site {site_code}",
                 )
-            # Demo config allows it — skip DB check
+            # Access profile allows it — skip DB check
         else:
-            # Step 2: No demo config — check database (Supabase user_site_access)
+            # Step 2: No access profile — check database (Supabase user_site_access)
             try:
                 from app.database.repositories.user_site_access_repository import (
                     UserSiteAccessRepository,
@@ -839,8 +865,8 @@ def require_site_access(
             except HTTPException:
                 raise
             except Exception as e:
-                # Supabase unavailable — allow (fail-open for non-demo users)
-                # Production should use strict mode; demo mode is permissive
+                # Supabase unavailable — allow fail-open for non-profiled users
+                # Production should use strict mode; local profile mode is permissive
                 logger.debug("Site access DB check failed, allowing: %s", e)
 
         request.state.auth = auth_ctx
@@ -899,15 +925,15 @@ def require_query_site_access(
             return auth_ctx
 
         # Check site access (same logic as require_site_access)
-        from app.config.demo_configs import get_demo_config_for_email, has_demo_site_access
+        from app.config.access_profiles import get_access_profile_for_email, has_profile_site_access
 
         email = getattr(auth_ctx, "email", None) or ""
-        demo_config = get_demo_config_for_email(email) if email else None
+        access_profile = get_access_profile_for_email(email) if email else None
 
-        if demo_config:
-            if not has_demo_site_access(email, site_code):
+        if access_profile:
+            if not has_profile_site_access(email, site_code):
                 logger.warning(
-                    "Query site access denied (demo config): user=%s site=%s path=%s",
+                    "Query site access denied (access profile): user=%s site=%s path=%s",
                     auth_ctx.user_id,
                     site_code,
                     request.url.path,
@@ -1001,15 +1027,15 @@ def require_equipment_access(
         site_code = _equipment_code_to_site(equipment_code)
 
         if site_code:
-            from app.config.demo_configs import get_demo_config_for_email, has_demo_site_access
+            from app.config.access_profiles import get_access_profile_for_email, has_profile_site_access
 
             email = getattr(auth_ctx, "email", None) or ""
-            demo_config = get_demo_config_for_email(email) if email else None
+            access_profile = get_access_profile_for_email(email) if email else None
 
-            if demo_config:
-                if not has_demo_site_access(email, site_code):
+            if access_profile:
+                if not has_profile_site_access(email, site_code):
                     logger.warning(
-                        "Equipment access denied (demo config): user=%s equipment=%s site=%s",
+                        "Equipment access denied (access profile): user=%s equipment=%s site=%s",
                         auth_ctx.user_id,
                         equipment_code,
                         site_code,

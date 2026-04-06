@@ -17,8 +17,11 @@ from datetime import datetime, timedelta
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from app.config.settings import settings
 from app.services.health_threshold_service import get_health_status, get_health_thresholds
 from app.services.prediction_taxonomy import FORMULA_VERSION_STATIC
+from app.services.building_state_engine import build_building_state_payload
+from app.services.simbiot_service import simbiot_service
 from app.database.repositories.equipment_repository import EquipmentRepository
 from app.database.repositories.hvac_zone_repository import HVACZoneRepository
 from app.database.repositories.safety_rules_repository import SafetyRulesRepository
@@ -379,6 +382,40 @@ async def get_hvac_overview(site_id: str):
                 }
             )
 
+    sentinel_intelligence = None
+    raw_telemetry = None
+    try:
+        payload = build_building_state_payload(site_id)
+        sentinel_intelligence = {
+            "building_posture": payload.building_posture,
+            "operator_guidance": payload.operator_guidance.model_dump(),
+            "primary_narrative": payload.primary_narrative.model_dump() if payload.primary_narrative else None,
+            "secondary_tensions": [t.model_dump() for t in payload.secondary_tensions],
+        }
+    except Exception as exc:
+        logger.warning("Failed to build SENTINEL HVAC intelligence payload for %s: %s", site_id, exc)
+
+    if settings.sentinel_island_mode and settings.simbiot_api_url:
+        try:
+            telemetry = await simbiot_service.get_site_telemetry(site_id)
+            power = telemetry.get("power") or {}
+            raw_telemetry = {
+                "status": "live",
+                "timestamp": telemetry.get("timestamp"),
+                "policy_stage": telemetry.get("policy_stage"),
+                "zones_with_readings": telemetry.get("zones_with_readings"),
+                "zone_count": telemetry.get("zone_count"),
+                "power": {
+                    "hvac_kw": float(power.get("hvac_kw", 0) or 0),
+                    "lighting_kw": float(power.get("lighting_kw", 0) or 0),
+                    "total_kw": float(power.get("total_kw", 0) or 0),
+                },
+                "equipment_summary": telemetry.get("equipment_summary") or {},
+            }
+        except Exception as exc:
+            logger.warning("Failed to fetch raw bridge telemetry for %s: %s", site_id, exc)
+            raw_telemetry = {"status": "unavailable"}
+
     return {
         "site_id": site_id,
         "timestamp": datetime.now().isoformat(),
@@ -390,6 +427,8 @@ async def get_hvac_overview(site_id: str):
         "chillers_running": sum(
             1 for e in hvac_equipment if e.get("type") == "chiller" and e.get("status") == "normal"
         ),
+        "raw_telemetry": raw_telemetry,
+        "sentinel_intelligence": sentinel_intelligence,
     }
 
 
@@ -588,7 +627,7 @@ async def control_chiller(chiller_id: str, request: ChillerControlRequest):
         for rule in rules:
             if rule.get("rule_type") == "runtime_limit":
                 # In a real system, check actual runtime
-                # For demo, we just acknowledge the rule exists
+                # For local mode, acknowledge the rule without device write-back
                 pass
     except Exception as e:
         logger.warning(f"Error checking safety rules: {e}")

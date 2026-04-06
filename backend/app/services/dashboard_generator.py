@@ -12,7 +12,7 @@ import logging
 import math
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger("sentinel.dashboard_generator")
 
@@ -55,7 +55,7 @@ class EquipmentClass(str, Enum):
 # Maps equipment ID prefixes to classes.
 # SENTINEL naming: {SITE}-{TYPE}-{LOCATION}-{NUM}
 # Sorted longest-first so MTR-R-SOLAR matches before MTR.
-EQUIPMENT_TYPE_MAP: List[tuple] = sorted(
+EQUIPMENT_TYPE_MAP: list[tuple] = sorted(
     [
         # HVAC
         ("AHU", EquipmentClass.AHU),
@@ -107,7 +107,7 @@ EQUIPMENT_TYPE_MAP: List[tuple] = sorted(
 )
 
 
-def classify_equipment(equipment_id: str, equipment_type: Optional[str] = None) -> EquipmentClass:
+def classify_equipment(equipment_id: str, equipment_type: str | None = None) -> EquipmentClass:
     """Classify equipment from ID or type string.
 
     Tries explicit type field first, then extracts type segment from the
@@ -160,10 +160,10 @@ class DashboardCard:
     card_type: str  # kpi, chart, status_grid, gauge, list
     domain: str
     priority: int
-    equipment_classes: List[EquipmentClass]
-    config: Dict[str, Any] = field(default_factory=dict)
+    equipment_classes: list[EquipmentClass]
+    config: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize to dictionary."""
         return {
             "card_id": self.card_id,
@@ -177,7 +177,7 @@ class DashboardCard:
 
 
 # Card templates per equipment class
-CARD_TEMPLATES: Dict[EquipmentClass, List[Dict[str, Any]]] = {
+CARD_TEMPLATES: dict[EquipmentClass, list[dict[str, Any]]] = {
     EquipmentClass.CHILLER: [
         {
             "suffix": "status",
@@ -367,7 +367,7 @@ class MonitoringRule:
     evaluation_window: str  # e.g., "5m", "15m", "1h"
     cooldown_minutes: int = 30
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize to dictionary."""
         return {
             "rule_id": self.rule_id,
@@ -384,7 +384,7 @@ class MonitoringRule:
 
 
 # Default monitoring rules per equipment class
-DEFAULT_RULES: Dict[EquipmentClass, List[Dict[str, Any]]] = {
+DEFAULT_RULES: dict[EquipmentClass, list[dict[str, Any]]] = {
     EquipmentClass.CHILLER: [
         {
             "suffix": "high-load",
@@ -639,7 +639,7 @@ DEFAULT_RULES: Dict[EquipmentClass, List[Dict[str, Any]]] = {
 # Module Suggestions
 # =============================================================================
 
-MODULE_SUGGESTIONS: Dict[EquipmentClass, Dict[str, Any]] = {
+MODULE_SUGGESTIONS: dict[EquipmentClass, dict[str, Any]] = {
     EquipmentClass.CHILLER: {
         "module": "hvac_control",
         "reason": "Chiller staging and setpoint optimization for energy savings",
@@ -682,7 +682,7 @@ MODULE_SUGGESTIONS: Dict[EquipmentClass, Dict[str, Any]] = {
 # Health Weights
 # =============================================================================
 
-HEALTH_WEIGHTS: Dict[EquipmentClass, int] = {
+HEALTH_WEIGHTS: dict[EquipmentClass, int] = {
     EquipmentClass.CHILLER: 15,
     EquipmentClass.AHU: 10,
     EquipmentClass.FCU: 5,
@@ -715,7 +715,7 @@ HEALTH_WEIGHTS: Dict[EquipmentClass, int] = {
 # Domain groupings for AI context generation
 # =============================================================================
 
-_DOMAIN_MAP: Dict[str, List[EquipmentClass]] = {
+_DOMAIN_MAP: dict[str, list[EquipmentClass]] = {
     "HVAC": [
         EquipmentClass.CHILLER,
         EquipmentClass.AHU,
@@ -774,8 +774,8 @@ class DashboardGenerator:
     def generate_for_site(
         self,
         site_id: str,
-        equipment_list: Optional[List[Dict[str, Any]]] = None,
-    ) -> Dict[str, Any]:
+        equipment_list: list[dict[str, Any]] | None = None,
+    ) -> dict[str, Any]:
         """Generate a complete dashboard configuration for a site.
 
         Args:
@@ -792,7 +792,7 @@ class DashboardGenerator:
         classified = self._classify_all(equipment_list)
 
         # Build equipment summary
-        summary: Dict[str, int] = {}
+        summary: dict[str, int] = {}
         for item in classified:
             cls_name = item["equipment_class"].value
             summary[cls_name] = summary.get(cls_name, 0) + 1
@@ -823,7 +823,7 @@ class DashboardGenerator:
             "ai_context": ai_context,
         }
 
-    def _classify_all(self, equipment_list: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def _classify_all(self, equipment_list: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Classify all equipment in the list.
 
         Args:
@@ -840,7 +840,7 @@ class DashboardGenerator:
             result.append({**eq, "equipment_class": eq_class})
         return result
 
-    def _generate_cards(self, site_id: str, classified: List[Dict[str, Any]]) -> List[DashboardCard]:
+    def _generate_cards(self, site_id: str, classified: list[dict[str, Any]]) -> list[DashboardCard]:
         """Generate dashboard cards from classified equipment.
 
         Always includes health score gauge and active alerts KPI.
@@ -854,7 +854,7 @@ class DashboardGenerator:
         Returns:
             List of DashboardCard instances
         """
-        cards: List[DashboardCard] = []
+        cards: list[DashboardCard] = []
 
         # Always-present cards
         cards.append(
@@ -881,7 +881,7 @@ class DashboardGenerator:
         )
 
         # Group by class
-        class_groups: Dict[EquipmentClass, List[Dict[str, Any]]] = {}
+        class_groups: dict[EquipmentClass, list[dict[str, Any]]] = {}
         for item in classified:
             cls = item["equipment_class"]
             if cls == EquipmentClass.UNKNOWN:
@@ -917,7 +917,7 @@ class DashboardGenerator:
         cards.sort(key=lambda c: c.priority)
         return cards
 
-    def _generate_rules(self, site_id: str, classified: List[Dict[str, Any]]) -> List[MonitoringRule]:
+    def _generate_rules(self, site_id: str, classified: list[dict[str, Any]]) -> list[MonitoringRule]:
         """Generate monitoring rules from templates.
 
         Args:
@@ -927,7 +927,7 @@ class DashboardGenerator:
         Returns:
             List of MonitoringRule instances
         """
-        rules: List[MonitoringRule] = []
+        rules: list[MonitoringRule] = []
         seen_classes: set = set()
 
         for item in classified:
@@ -955,7 +955,7 @@ class DashboardGenerator:
 
         return rules
 
-    def _calculate_health_weights(self, classified: List[Dict[str, Any]]) -> Dict[str, float]:
+    def _calculate_health_weights(self, classified: list[dict[str, Any]]) -> dict[str, float]:
         """Calculate normalised health scoring weights.
 
         Uses base weights per class with diminishing returns for multiple
@@ -967,14 +967,14 @@ class DashboardGenerator:
         Returns:
             Dict mapping equipment class name to normalised weight (sums to 100).
         """
-        class_counts: Dict[EquipmentClass, int] = {}
+        class_counts: dict[EquipmentClass, int] = {}
         for item in classified:
             cls = item["equipment_class"]
             if cls == EquipmentClass.UNKNOWN:
                 continue
             class_counts[cls] = class_counts.get(cls, 0) + 1
 
-        raw_weights: Dict[EquipmentClass, float] = {}
+        raw_weights: dict[EquipmentClass, float] = {}
         for cls, count in class_counts.items():
             base = HEALTH_WEIGHTS.get(cls, 1)
             # Diminishing returns: sqrt scaling for multiple units
@@ -986,7 +986,7 @@ class DashboardGenerator:
 
         return {cls.value: round((w / total) * 100, 2) for cls, w in raw_weights.items()}
 
-    def _suggest_modules(self, classified: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def _suggest_modules(self, classified: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Suggest add-on modules based on discovered equipment.
 
         Deduplicates by module name.
@@ -998,7 +998,7 @@ class DashboardGenerator:
             List of module suggestion dicts.
         """
         seen_modules: set = set()
-        suggestions: List[Dict[str, Any]] = []
+        suggestions: list[dict[str, Any]] = []
 
         for item in classified:
             cls = item["equipment_class"]
@@ -1021,8 +1021,8 @@ class DashboardGenerator:
     def _generate_ai_context(
         self,
         site_id: str,
-        classified: List[Dict[str, Any]],
-        equipment_list: List[Dict[str, Any]],
+        classified: list[dict[str, Any]],
+        equipment_list: list[dict[str, Any]],
     ) -> str:
         """Generate natural language AI context summary.
 
@@ -1036,7 +1036,7 @@ class DashboardGenerator:
         Returns:
             Multi-line natural language summary string.
         """
-        lines: List[str] = [
+        lines: list[str] = [
             f"Site {site_id} has {len(equipment_list)} equipment items discovered.",
             "",
         ]
@@ -1048,7 +1048,7 @@ class DashboardGenerator:
                 continue
 
             # Count per class within domain
-            counts: Dict[str, int] = {}
+            counts: dict[str, int] = {}
             for item in domain_items:
                 cls_name = item["equipment_class"].value
                 counts[cls_name] = counts.get(cls_name, 0) + 1
@@ -1062,7 +1062,7 @@ class DashboardGenerator:
 
         return "\n".join(lines)
 
-    def _load_equipment(self, site_id: str) -> List[Dict[str, Any]]:
+    def _load_equipment(self, site_id: str) -> list[dict[str, Any]]:
         """Load equipment list with 3-tier fallback.
 
         Tier 1: Supabase via equipment repository
@@ -1089,8 +1089,8 @@ class DashboardGenerator:
 
         # Tier 2: JSON building data files
         try:
-            from pathlib import Path
             import json
+            from pathlib import Path
 
             equipment_dir = Path(__file__).parent.parent / "data" / "sites" / site_id / "equipment"
             if equipment_dir.is_dir():
@@ -1121,7 +1121,7 @@ class DashboardGenerator:
 # Singleton
 # =============================================================================
 
-_instance: Optional[DashboardGenerator] = None
+_instance: DashboardGenerator | None = None
 
 
 def get_dashboard_generator() -> DashboardGenerator:

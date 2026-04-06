@@ -10,6 +10,12 @@ tags: [edge, jetson, ollama, deployment, systemd]
 Step-by-step guide for deploying SENTINEL in edge mode on an NVIDIA Jetson Orin.
 Edge mode routes all LLM inference through local Ollama (no internet required after setup).
 
+This runbook assumes the current production topology:
+- SENTINEL runs on the Jetson/VPS
+- SIMBIOT connects SENTINEL to building-operational data over WireGuard/VPN, edge/local connection, BACnet, or another supported adapter path
+- the upstream may be a bridge-backed remote site endpoint or a real BMS such as Desigo
+- SENTINEL remains the canonical writer to Supabase
+
 **Estimated time:** 45 minutes | **Prerequisites:** Jetson Orin, JetPack 5+, 16 GB+ RAM, 64 GB+ NVMe
 
 ---
@@ -51,8 +57,40 @@ cp /opt/sentinel/repo/backend/.env.example /opt/sentinel/backend/.env
 #   MODEL_STORAGE_PATH=/opt/sentinel/ml/models
 #   DEMO_MODE=false
 #   ENABLE_SITE002_SOURCE=false
+#   SENTINEL_ISLAND_MODE=true
+#   BRIDGE_BASE_URL=http://10.99.0.1:8080
+#   BRIDGE_API_TOKEN=<shared bridge bearer token>
+#   (SIMBIOT_API_URL / SIMBIOT_API_KEY remain accepted as compatibility aliases)
 #   (Add SUPABASE_URL / SUPABASE_KEY if using cloud DB, else leave blank for JSON fallback)
 ```
+
+For the clean-island deployment model:
+- this Jetson/VPS runs Sentinel only
+- remote site systems host the building-facing adapters or site endpoint
+- only Sentinel writes canonical state to Supabase
+- remote site systems expose building-operational data to SIMBIOT; they do not write to Supabase
+- SENTINEL does not require remote lifecycle/orchestrator internals
+
+### WireGuard Preconditions
+
+Before starting `sentinel-backend`, verify the transport path from the Sentinel host:
+
+```bash
+# 1. WireGuard interface is up
+sudo wg show
+
+# 2. Remote bridge IP is routed via WireGuard
+ip route | grep 10.99.0.0
+
+# 3. Remote site endpoint responds on the chosen address/path
+curl -H "Authorization: Bearer <BRIDGE_API_TOKEN>" http://10.99.0.1:8080/health
+```
+
+If step 3 fails, troubleshoot in this order:
+1. WireGuard peer handshake and allowed IPs
+2. Firewall rules on the Sentinel host and remote VM
+3. Bridge/orchestrator process health on the remote VM
+4. `BRIDGE_BASE_URL` and token values in `/etc/sentinel/edge.conf`
 
 ## 4. Install Ollama & Pull Model (15 min)
 
@@ -102,6 +140,8 @@ EDGE_MODE=true /opt/sentinel/backend/venv/bin/python -m pytest tests/startup/tes
 | Ollama unreachable | `systemctl status ollama` |
 | Wrong routing profile | `grep EDGE_MODE /opt/sentinel/backend/.env` |
 | Model not found | `ollama list` |
+| Bridge unreachable | `curl -H "Authorization: Bearer <token>" $BRIDGE_BASE_URL/health` |
+| WireGuard not established | `sudo wg show` |
 
 ## Related
 

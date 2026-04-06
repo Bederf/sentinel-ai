@@ -967,7 +967,7 @@ async def suspend_building(
     )
 
 
-# ==================== Demo Seeding ====================
+# ==================== Seed Data Helpers ====================
 
 
 @router.get("/unmatched-points")
@@ -986,12 +986,12 @@ async def get_unmatched_points(
     return result
 
 
-@router.post("/demo/seed-integration-data")
+@router.post("/seed-integration-data")
 async def seed_integration_data():
     """
-    Seed demo integration data for the monitoring dashboard.
+    Seed integration data for the monitoring dashboard.
 
-    Creates demo point_asset_mappings and column_mappings for testing.
+    Creates seeded point_asset_mappings and column_mappings for testing.
     Uses REAL equipment IDs from the primary registered building for realistic data.
     """
     import random

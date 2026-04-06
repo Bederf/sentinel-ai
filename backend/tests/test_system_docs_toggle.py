@@ -63,6 +63,17 @@ class TestPlatformDocHint:
         assert _is_platform_doc_query("What compliance controls exist?")
         assert _is_platform_doc_query("How does onboarding work?")
 
+    def test_security_concern_queries_detected(self):
+        """Security-related client concerns should trigger the platform docs hint."""
+        from app.api.chat import _is_platform_doc_query
+
+        assert _is_platform_doc_query("I'm worried that SENTINEL can be hacked")
+        assert _is_platform_doc_query("Can SENTINEL be breached?")
+        assert _is_platform_doc_query("What are the security vulnerabilities of SENTINEL?")
+        assert _is_platform_doc_query("Does SENTINEL handle cyber security?")
+        assert _is_platform_doc_query("What is the password and authentication policy?")
+        assert _is_platform_doc_query("How does POPIA data protection work in SENTINEL?")
+
     def test_operational_query_not_detected_as_platform(self):
         """Operational questions should NOT trigger the platform doc hint."""
         from app.api.chat import _is_platform_doc_query

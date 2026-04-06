@@ -11,6 +11,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
+from app.api.buildings import _building_to_site
 from app.middleware.auth_middleware import require_site_access, require_role
 from app.models.auth import AuthContext, SentinelRole
 
@@ -49,17 +50,19 @@ class WeekSchedule(BaseModel):
 
 
 def _load_building_json(site_id: str) -> dict:
-    """Load building.json for a site."""
-    path = DATA_PATH / site_id / "building.json"
+    """Load building.json for a site. Returns empty dict if not found (caller decides how to handle)."""
+    resolved_site_id = _building_to_site(site_id)
+    path = DATA_PATH / resolved_site_id / "building.json"
     if not path.exists():
-        raise HTTPException(status_code=404, detail=f"Building '{site_id}' not found")
+        return {}
     with open(path) as f:
         return json.load(f)
 
 
 def _save_building_json(site_id: str, data: dict) -> None:
     """Save building.json for a site."""
-    path = DATA_PATH / site_id / "building.json"
+    resolved_site_id = _building_to_site(site_id)
+    path = DATA_PATH / resolved_site_id / "building.json"
     with open(path, "w") as f:
         json.dump(data, f, indent=2)
 

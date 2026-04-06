@@ -52,7 +52,7 @@ export const WaterZoneBreakdown: React.FC<WaterZoneBreakdownProps> = ({
   const { data: zones, isLoading } = useQuery({
     queryKey: ["water", "zones", "breakdown", siteId, days],
     queryFn: async () => {
-      // Fallback: Generate demo zones until backend implements endpoint
+      // Fallback: Generate seeded zones until backend implements endpoint
       const mockZones: ZoneBreakdown[] = [
         {
           zone_id: "zone-001",

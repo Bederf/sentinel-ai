@@ -13,12 +13,12 @@ See: docs/02-architecture/hybrid-knowledge-layer.md
 
 from __future__ import annotations
 
+import inspect
 import logging
 import time
-import inspect
-from uuid import uuid4
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
+from uuid import uuid4
 
 logger = logging.getLogger(__name__)
 
@@ -31,38 +31,38 @@ class HybridContext:
     """Merged context from Brick + RAG + Telemetry for AI reasoning."""
 
     # Identity
-    equipment_id: Optional[str] = None
-    equipment_type: Optional[str] = None
-    equipment_label: Optional[str] = None
-    site_id: Optional[str] = None
+    equipment_id: str | None = None
+    equipment_type: str | None = None
+    equipment_label: str | None = None
+    site_id: str | None = None
 
     # Brick graph context
-    location_path: List[Dict[str, str]] = field(default_factory=list)
-    points: List[Dict[str, Any]] = field(default_factory=list)
-    manufacturer: Optional[str] = None
-    model: Optional[str] = None
-    protocol: Optional[str] = None
-    vendor: Optional[Dict[str, Any]] = None
-    contract: Optional[Dict[str, Any]] = None
+    location_path: list[dict[str, str]] = field(default_factory=list)
+    points: list[dict[str, Any]] = field(default_factory=list)
+    manufacturer: str | None = None
+    model: str | None = None
+    protocol: str | None = None
+    vendor: dict[str, Any] | None = None
+    contract: dict[str, Any] | None = None
 
     # Document RAG context
-    documents: List[Dict[str, Any]] = field(default_factory=list)
+    documents: list[dict[str, Any]] = field(default_factory=list)
 
     # Telemetry + ML context
-    telemetry: Dict[str, Any] = field(default_factory=dict)
-    ml_context: Dict[str, Any] = field(default_factory=dict)
+    telemetry: dict[str, Any] = field(default_factory=dict)
+    ml_context: dict[str, Any] = field(default_factory=dict)
 
     # Decision Memory context (Phase 145)
-    decision_memory: Optional[str] = None
+    decision_memory: str | None = None
 
     # Active operational events (Phase 145)
-    active_events: List[Dict[str, Any]] = field(default_factory=list)
+    active_events: list[dict[str, Any]] = field(default_factory=list)
 
     # Metadata
-    sources_used: List[str] = field(default_factory=list)
-    retrieval_telemetry: Optional[Dict[str, Any]] = None
+    sources_used: list[str] = field(default_factory=list)
+    retrieval_telemetry: dict[str, Any] | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "equipment_id": self.equipment_id,
             "equipment_type": self.equipment_type,
@@ -206,9 +206,9 @@ class HybridQueryService:
     async def query(
         self,
         *,
-        equipment_id: Optional[str] = None,
-        bacnet_ref: Optional[str] = None,
-        question: Optional[str] = None,
+        equipment_id: str | None = None,
+        bacnet_ref: str | None = None,
+        question: str | None = None,
         include_documents: bool = True,
         include_telemetry: bool = True,
         include_ml: bool = True,
@@ -272,9 +272,9 @@ class HybridQueryService:
         self,
         ctx: HybridContext,
         *,
-        equipment_id: Optional[str],
-        bacnet_ref: Optional[str],
-    ) -> Optional[str]:
+        equipment_id: str | None,
+        bacnet_ref: str | None,
+    ) -> str | None:
         """Resolve to equipment_id, using Brick if we only have a bacnet_ref."""
         if equipment_id:
             return equipment_id
@@ -340,7 +340,7 @@ class HybridQueryService:
         self,
         ctx: HybridContext,
         equipment_id: str,
-        question: Optional[str],
+        question: str | None,
     ) -> None:
         """Search RAG for documents related to this equipment."""
         try:
@@ -359,8 +359,8 @@ class HybridQueryService:
             trace_id = str(uuid4())
             retrieval_path = "canonical_doc_rag"
             top_k_requested = 5
-            used_fallback: Optional[str] = None
-            fallback_reason: Optional[str] = None
+            used_fallback: str | None = None
+            fallback_reason: str | None = None
             started_at = time.perf_counter()
             search_response = search_svc.search(
                 query=search_query,
@@ -381,7 +381,7 @@ class HybridQueryService:
             duration_ms = int((time.perf_counter() - started_at) * 1000)
             hit_count = len(results or [])
 
-            telemetry: Dict[str, Any] = {
+            telemetry: dict[str, Any] = {
                 "trace_id": trace_id,
                 "retrieval_path": retrieval_path,
                 "query_time_ms": duration_ms,
@@ -422,7 +422,7 @@ class HybridQueryService:
             logger.debug("Document search failed for %s: %s", equipment_id, e)
 
     @staticmethod
-    def _record_retrieval_telemetry(telemetry: Optional[Dict[str, Any]]) -> None:
+    def _record_retrieval_telemetry(telemetry: dict[str, Any] | None) -> None:
         """Best-effort metric emission for canonical retrieval telemetry."""
         if not telemetry:
             return
@@ -477,7 +477,7 @@ class HybridQueryService:
         Rather than calling the full _gather_ml_context() from ai_optimizer
         (which processes ALL equipment), we pull per-equipment ML data.
         """
-        ml: Dict[str, Any] = {}
+        ml: dict[str, Any] = {}
 
         # Anomaly score
         try:
@@ -631,7 +631,7 @@ class HybridQueryService:
 # ---------------------------------------------------------------------------
 # Singleton
 # ---------------------------------------------------------------------------
-_instances: Dict[str, HybridQueryService] = {}
+_instances: dict[str, HybridQueryService] = {}
 
 
 def get_hybrid_query_service(site_id: str = "site-002") -> HybridQueryService:

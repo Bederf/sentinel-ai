@@ -10,21 +10,20 @@ Pattern follows energy_centre_service.py.
 
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Dict, List, Optional
 
+from app.database.supabase_client import get_supabase_client
 from app.models.solar import (
-    SolarPlant,
-    SolarInverter,
     BESSContainer,
     GridMeter,
     NormalisedReading,
+    SolarInverter,
+    SolarPlant,
 )
 from app.services.solar_connector_base import SolarConnector
 from app.services.solar_connector_huawei import SimulatedHuaweiConnector
 from app.services.solar_connector_schneider import SimulatedSchneiderConnector
-from app.database.supabase_client import get_supabase_client
 
 logger = logging.getLogger(__name__)
 
@@ -32,13 +31,13 @@ logger = logging.getLogger(__name__)
 class SiteRegistration:
     """Holds all connectors and config for a single solar site."""
 
-    def __init__(self, site_id: str, site_name: str, config: Dict):
+    def __init__(self, site_id: str, site_name: str, config: dict):
         self.site_id = site_id
         self.site_name = site_name
         self.config = config
-        self.connectors: Dict[str, SolarConnector] = {}
-        self.plants: Dict[str, SolarPlant] = {}
-        self.last_poll: Optional[str] = None
+        self.connectors: dict[str, SolarConnector] = {}
+        self.plants: dict[str, SolarPlant] = {}
+        self.last_poll: str | None = None
 
 
 class SolarIngestionService:
@@ -46,21 +45,21 @@ class SolarIngestionService:
 
     Responsibilities:
       - Load site configs from JSON (auto-registers Site-002 on startup)
-      - Instantiate per-manufacturer connectors (simulated for demo)
+      - Instantiate per-manufacturer connectors (simulated for local mode)
       - Poll all connectors and aggregate normalised readings
       - Quality-flag management: fresh (<30s) = good, >60s = stale
       - Serve site overviews, inverter details, BESS status, meter data
     """
 
     def __init__(self):
-        self._sites: Dict[str, SiteRegistration] = {}
+        self._sites: dict[str, SiteRegistration] = {}
         self._load_site_configs()
 
     # === Site management ===
 
     def _load_site_configs(self):
         """Auto-load site configurations from Supabase and JSON fallback."""
-        configs_by_id: Dict[str, Dict] = {}
+        configs_by_id: dict[str, dict] = {}
 
         # 1) Supabase (preferred)
         supabase_configs = self._load_site_configs_from_supabase()
@@ -87,14 +86,14 @@ class SolarIngestionService:
             self.register_site(site_id, config)
             logger.info("Auto-loaded solar site: %s", site_id)
 
-    def _load_site_configs_from_json(self) -> List[Dict]:
+    def _load_site_configs_from_json(self) -> list[dict]:
         """Load site configurations from data/solar/ directory."""
         solar_data_dir = Path(__file__).parent.parent / "data" / "solar"
         if not solar_data_dir.exists():
             logger.warning("Solar data directory not found: %s", solar_data_dir)
             return []
 
-        configs: List[Dict] = []
+        configs: list[dict] = []
         config_files = list(solar_data_dir.glob("*_config.json"))
         for config_path in config_files:
             try:
@@ -107,7 +106,7 @@ class SolarIngestionService:
                 logger.error("Failed to load solar config %s: %s", config_path, e)
         return configs
 
-    def _load_site_configs_from_supabase(self) -> List[Dict]:
+    def _load_site_configs_from_supabase(self) -> list[dict]:
         """Load solar site configs from Supabase tables (if available)."""
         try:
             client = get_supabase_client()
@@ -131,29 +130,29 @@ class SolarIngestionService:
             buildings_data = client.table("sites").select("id, code").execute().data or []
             site_uuid_to_code = {str(b["id"]): b["code"] for b in buildings_data}
 
-            plants_by_site: Dict[str, List[Dict]] = {}
+            plants_by_site: dict[str, list[dict]] = {}
             for plant in plants:
                 plant_site_uuid = str(plant["site_id"])
                 resolved_site_id = site_uuid_to_code.get(plant_site_uuid, plant_site_uuid)
                 plants_by_site.setdefault(resolved_site_id, []).append(plant)
 
-            inverters_by_plant: Dict[str, List[Dict]] = {}
+            inverters_by_plant: dict[str, list[dict]] = {}
             for inv in inverters:
                 inverters_by_plant.setdefault(inv["plant_id"], []).append(inv)
 
-            bess_by_site: Dict[str, Dict] = {}
+            bess_by_site: dict[str, dict] = {}
             for b in bess:
                 bess_site_uuid = str(b.get("site_id", ""))
                 resolved_bess_site = site_uuid_to_code.get(bess_site_uuid, bess_site_uuid)
                 bess_by_site[resolved_bess_site] = b
 
-            meters_by_site: Dict[str, List[Dict]] = {}
+            meters_by_site: dict[str, list[dict]] = {}
             for m in meters:
                 meter_site_uuid = str(m.get("site_id", ""))
                 resolved_meter_site = site_uuid_to_code.get(meter_site_uuid, meter_site_uuid)
                 meters_by_site.setdefault(resolved_meter_site, []).append(m)
 
-            configs: List[Dict] = []
+            configs: list[dict] = []
             for site in sites:
                 site_id = site["site_id"]
                 site_plants = []
@@ -221,7 +220,7 @@ class SolarIngestionService:
             logger.error("Failed to load solar configs from Supabase: %s", e)
             return []
 
-    def _seed_supabase_from_configs(self, configs: List[Dict]) -> None:
+    def _seed_supabase_from_configs(self, configs: list[dict]) -> None:
         """Seed Supabase solar tables from JSON config if empty."""
         try:
             client = get_supabase_client()
@@ -333,7 +332,7 @@ class SolarIngestionService:
             except Exception as e:
                 logger.error("Failed seeding solar site %s: %s", site_id, e)
 
-    def register_site(self, site_id: str, config: Dict) -> None:
+    def register_site(self, site_id: str, config: dict) -> None:
         """Register a solar site and instantiate its connectors."""
         site_name = config.get("site_name", site_id)
         reg = SiteRegistration(site_id, site_name, config)
@@ -358,7 +357,7 @@ class SolarIngestionService:
             reg.plants[plant.plant_id] = plant
 
             # Group inverters by manufacturer and create connectors
-            manufacturers: Dict[str, List[Dict]] = {}
+            manufacturers: dict[str, list[dict]] = {}
             for inv_cfg in plant_cfg.get("inverters", []):
                 inv_cfg["plant_id"] = plant.plant_id
                 inv_cfg["site_id"] = site_id
@@ -401,10 +400,10 @@ class SolarIngestionService:
     def _create_connector(
         self,
         manufacturer: str,
-        inverters: List[Dict],
-        config: Dict,
-        bess: Optional[Dict] = None,
-    ) -> Optional[SolarConnector]:
+        inverters: list[dict],
+        config: dict,
+        bess: dict | None = None,
+    ) -> SolarConnector | None:
         """Factory method — create the appropriate connector for a manufacturer.
 
         Respects settings.solar_connector_mode:
@@ -444,7 +443,7 @@ class SolarIngestionService:
 
     # === Polling ===
 
-    async def connect_all(self, site_id: Optional[str] = None) -> None:
+    async def connect_all(self, site_id: str | None = None) -> None:
         """Connect all connectors for a site (or all sites)."""
         sites = [self._sites[site_id]] if site_id and site_id in self._sites else self._sites.values()
         for site in sites:
@@ -454,7 +453,7 @@ class SolarIngestionService:
                 except Exception as e:
                     logger.error(f"Failed to connect {key}: {e}")
 
-    async def poll_site(self, site_id: str) -> Dict:
+    async def poll_site(self, site_id: str) -> dict:
         """Poll all connectors for a site and return aggregated overview."""
         site = self._sites.get(site_id)
         if not site:
@@ -469,7 +468,7 @@ class SolarIngestionService:
                     logger.error(f"Connect failed for {key}: {e}")
 
         # Aggregate readings
-        all_readings: List[NormalisedReading] = []
+        all_readings: list[NormalisedReading] = []
         for key, connector in site.connectors.items():
             try:
                 readings = await connector.get_normalised_readings()
@@ -477,7 +476,7 @@ class SolarIngestionService:
             except Exception as e:
                 logger.error(f"Poll failed for {key}: {e}")
 
-        site.last_poll = datetime.now(timezone.utc).isoformat()
+        site.last_poll = datetime.now(UTC).isoformat()
 
         return {
             "site_id": site_id,
@@ -489,7 +488,7 @@ class SolarIngestionService:
 
     # === Site overview ===
 
-    async def get_site_overview(self, site_id: str) -> Optional[Dict]:
+    async def get_site_overview(self, site_id: str) -> dict | None:
         """Get high-level site overview from Supabase snapshots.
 
         Data source priority:
@@ -612,7 +611,7 @@ class SolarIngestionService:
             response = {
                 "site_id": site_id,
                 "site_name": site.site_name,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 "data_source": data_source,
                 # Flat fields (frontend SolarOverview interface)
                 "installed_capacity_kwp": round(total_capacity_kwp, 1),
@@ -660,7 +659,7 @@ class SolarIngestionService:
             logger.error(f"Failed to get site overview: {e}", exc_info=True)
             return None
 
-    async def _get_annual_summary(self, site_id: str) -> Optional[Dict]:
+    async def _get_annual_summary(self, site_id: str) -> dict | None:
         """Fetch annual simulation summary from cache."""
         try:
             supabase = get_supabase_client()
@@ -692,7 +691,7 @@ class SolarIngestionService:
             logger.debug(f"Failed to fetch annual summary: {e}")
             return None
 
-    async def _get_latest_snapshot(self, site_id: str) -> Optional[Dict]:
+    async def _get_latest_snapshot(self, site_id: str) -> dict | None:
         """Get the most recent solar_hourly_snapshots row for a site.
 
         Returns None if no simulation data has been persisted yet,
@@ -715,7 +714,7 @@ class SolarIngestionService:
             logger.debug(f"Failed to fetch solar snapshot: {e}")
             return None
 
-    async def _get_daily_yield(self, site_id: str, sim_date: Optional[str] = None) -> float:
+    async def _get_daily_yield(self, site_id: str, sim_date: str | None = None) -> float:
         """Sum solar_gen_kw from a simulated day's hourly snapshots.
 
         Each snapshot represents 1 hour, so kW × 1h = kWh.
@@ -744,7 +743,7 @@ class SolarIngestionService:
 
     # === Inverter detail ===
 
-    async def get_inverters(self, site_id: str) -> List[SolarInverter]:
+    async def get_inverters(self, site_id: str) -> list[SolarInverter]:
         """Get all inverters for a site with current readings."""
         site = self._sites.get(site_id)
         if not site:
@@ -770,7 +769,7 @@ class SolarIngestionService:
                             logger.error(f"Failed to read inverter {inv_cfg['id']}: {e}")
         return inverters
 
-    async def get_inverter_detail(self, site_id: str, inverter_id: str) -> Optional[Dict]:
+    async def get_inverter_detail(self, site_id: str, inverter_id: str) -> dict | None:
         """Get single inverter detail with string-level data."""
         site = self._sites.get(site_id)
         if not site:
@@ -794,7 +793,7 @@ class SolarIngestionService:
 
     # === BESS ===
 
-    async def get_bess_status(self, site_id: str) -> Optional[BESSContainer]:
+    async def get_bess_status(self, site_id: str) -> BESSContainer | None:
         """Get BESS container status for a site."""
         site = self._sites.get(site_id)
         if not site:
@@ -818,7 +817,7 @@ class SolarIngestionService:
 
     # === Meters ===
 
-    async def get_meter_readings(self, site_id: str) -> List[GridMeter]:
+    async def get_meter_readings(self, site_id: str) -> list[GridMeter]:
         """Get all meter readings for a site."""
         site = self._sites.get(site_id)
         if not site:
@@ -844,15 +843,15 @@ class SolarIngestionService:
     async def get_readings(
         self,
         site_id: str,
-        reading_type: Optional[str] = None,
-        equipment_type: Optional[str] = None,
-    ) -> List[NormalisedReading]:
+        reading_type: str | None = None,
+        equipment_type: str | None = None,
+    ) -> list[NormalisedReading]:
         """Get normalised readings, optionally filtered by type."""
         site = self._sites.get(site_id)
         if not site:
             return []
 
-        all_readings: List[NormalisedReading] = []
+        all_readings: list[NormalisedReading] = []
         for key, connector in site.connectors.items():
             if not connector.is_connected():
                 try:
@@ -875,7 +874,7 @@ class SolarIngestionService:
 
     # === Connector health ===
 
-    def get_connector_status(self, site_id: str) -> List[Dict]:
+    def get_connector_status(self, site_id: str) -> list[dict]:
         """Get health status of all connectors for a site."""
         site = self._sites.get(site_id)
         if not site:
@@ -893,7 +892,7 @@ class SolarIngestionService:
 
     # === Site listing ===
 
-    def get_registered_sites(self) -> List[Dict]:
+    def get_registered_sites(self) -> list[dict]:
         """List all registered solar sites with building names."""
         results = []
 
@@ -931,7 +930,7 @@ class SolarIngestionService:
 
 # === Singleton ===
 
-_solar_ingestion_service: Optional[SolarIngestionService] = None
+_solar_ingestion_service: SolarIngestionService | None = None
 
 
 def get_solar_ingestion_service() -> SolarIngestionService:

@@ -33,26 +33,22 @@ PLANNING_INCLUDE_DIRS = {
     ".planning/phases/64-risk-governance-foundation",
 }
 
-# Priority documentation files (indexed first)
+# Priority documentation files (indexed first) - system docs only
 PRIORITY_DOCS = [
-    "FEATURES.md",
-    "CLAUDE.md",
-    "README.md",
     "docs/02-architecture/system-overview.md",
     "docs/04-features/demo-simulation-control.md",
     "docs/06-safety-compliance/safety-interlocks-engine.md",
     "docs/06-safety-compliance/audit-logging.md",
     "docs/03-api-reference/mcp-tools-reference.md",
-    "backend/README_MCP_INTEGRATION.md",
     # Security & risk governance
-    "docs/SECURITY-PRIVACY.md",
-    "docs/08-security/information-security-framework.md",
-    "docs/08-security/information-security-policy.md",
-    "docs/08-security/data-privacy-policy.md",
-    "docs/08-security/incident-response-policy.md",
-    "docs/08-security/business-continuity-policy.md",
-    "docs/08-security/information-security-risk-register.md",
-    "docs/08-security/third-party-security-register.md",
+    "docs/09-security/SECURITY-PRIVACY.md",
+    "docs/09-security/information-security-framework.md",
+    "docs/09-security/information-security-policy.md",
+    "docs/09-security/data-privacy-policy.md",
+    "docs/09-security/incident-response-policy.md",
+    "docs/09-security/business-continuity-policy.md",
+    "docs/09-security/information-security-risk-register.md",
+    "docs/09-security/third-party-security-register.md",
     ".planning/phases/64-risk-governance-foundation/FSR-GAP-ANALYSIS.md",
     # Contract management
     "docs/04-features/48-contract-management.md",
@@ -63,8 +59,10 @@ PRIORITY_DOCS = [
 def find_md_files(root: Path, skip_dirs: set) -> List[Path]:
     """Find all .md files in project, excluding specified directories.
 
-    Files inside .planning/ are skipped UNLESS they fall under a
-    directory listed in PLANNING_INCLUDE_DIRS.
+    System-documentation mode:
+    - include files under docs/
+    - include explicitly allowed .planning subdirs
+    - exclude all other repository markdown (memories, local notes, backups, etc.)
     """
     md_files = []
 
@@ -73,11 +71,12 @@ def find_md_files(root: Path, skip_dirs: set) -> List[Path]:
         if any(skip in path.parts for skip in skip_dirs):
             continue
 
-        # Special handling for .planning: skip unless in an included subdir
-        if ".planning" in path.parts:
-            relative = str(path.relative_to(root))
-            if not any(relative.startswith(inc) for inc in PLANNING_INCLUDE_DIRS):
-                continue
+        relative = str(path.relative_to(root))
+
+        in_docs = relative.startswith("docs/")
+        in_allowed_planning = any(relative.startswith(inc) for inc in PLANNING_INCLUDE_DIRS)
+        if not (in_docs or in_allowed_planning):
+            continue
 
         md_files.append(path)
 
@@ -110,14 +109,16 @@ def get_doc_category(filepath: Path) -> str:
         return "integrations"
     elif "docs/06-safety" in path_str:
         return "safety"
-    elif "docs/07-integrations" in path_str:
-        return "integrations"
-    elif "docs/08-security" in path_str:
+    elif "docs/09-security" in path_str:
         return "security"
+    elif "docs/10-operations" in path_str:
+        return "operations"
     elif "docs/11-testing" in path_str:
         return "testing"
-    elif "docs/14-south-africa" in path_str:
+    elif "docs/14-regional" in path_str:
         return "regional"
+    elif "docs/15-business-context" in path_str:
+        return "business"
     elif ".planning/phases/64-risk-governance" in path_str:
         return "security"
     elif "SECURITY-PRIVACY" in path_str:
@@ -141,6 +142,8 @@ CATEGORY_TO_DOC_TYPE = {
     "architecture": "system_documentation",
     "features": "system_documentation",
     "testing": "system_documentation",
+    "operations": "system_documentation",
+    "business": "system_documentation",
     "regional": "system_documentation",
     "system": "system_documentation",
     "overview": "system_documentation",

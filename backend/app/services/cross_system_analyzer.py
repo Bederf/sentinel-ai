@@ -10,14 +10,14 @@ Data Sources:
 - Desks: desks.json via BuildingDataLoader (desk context: near_window, etc.)
 """
 
-from typing import Dict, List, Optional, Any
-from dataclasses import dataclass
-import logging
 import asyncio
+import logging
+from dataclasses import dataclass
+from typing import Any
 
+from app.models.lighting import ZoneLighting, ZoneOccupancy
 from app.services.lighting_service import get_lighting_service
 from app.services.site_loader import get_site_loader
-from app.models.lighting import ZoneOccupancy, ZoneLighting
 
 logger = logging.getLogger(__name__)
 
@@ -44,13 +44,13 @@ class ComfortDiagnosis:
     hvac_analysis: str
 
     # VAV device data (from Desigo via device manager)
-    vav_id: Optional[str] = None
-    vav_damper_position: Optional[float] = None
-    vav_airflow_actual: Optional[float] = None
-    vav_airflow_setpoint: Optional[float] = None
-    vav_discharge_temp: Optional[float] = None
-    vav_reheat_valve: Optional[float] = None
-    vav_analysis: Optional[str] = None
+    vav_id: str | None = None
+    vav_damper_position: float | None = None
+    vav_airflow_actual: float | None = None
+    vav_airflow_setpoint: float | None = None
+    vav_discharge_temp: float | None = None
+    vav_reheat_valve: float | None = None
+    vav_analysis: str | None = None
 
     # Lighting/Occupancy data
     occupancy_percent: float = 0.0
@@ -64,13 +64,13 @@ class ComfortDiagnosis:
     # Combined diagnosis
     root_cause: str = ""
     confidence: str = "low"  # 'high', 'medium', 'low'
-    suggestions: List[str] = None
+    suggestions: list[str] = None
 
     # Desk-specific (if complaint from specific location)
-    desk_id: Optional[str] = None
-    desk_sensor: Optional[str] = None
-    desk_occupied: Optional[bool] = None
-    desk_lux: Optional[float] = None
+    desk_id: str | None = None
+    desk_sensor: str | None = None
+    desk_occupied: bool | None = None
+    desk_lux: float | None = None
 
     def __post_init__(self):
         if self.suggestions is None:
@@ -83,7 +83,7 @@ class CrossSystemAnalyzer:
     def __init__(self):
         self.lighting = get_lighting_service()
         self._site_loader = get_site_loader()
-        self._hvac_data: Dict[str, Dict] = {}
+        self._hvac_data: dict[str, dict] = {}
         self._load_hvac_from_zones()
 
     def _load_hvac_from_zones(self) -> None:
@@ -112,7 +112,7 @@ class CrossSystemAnalyzer:
         self._site_loader.load(force=True)
         self._load_hvac_from_zones()
 
-    def _get_vav_data(self, vav_id: str) -> Dict[str, Any]:
+    def _get_vav_data(self, vav_id: str) -> dict[str, Any]:
         """
         Fetch VAV device data from DeviceManager (Desigo simulation).
 
@@ -157,7 +157,7 @@ class CrossSystemAnalyzer:
             logger.error(f"Error fetching VAV data for {vav_id}: {e}")
             return {}
 
-    def _get_point_value(self, points: Dict, point_name: str) -> Optional[float]:
+    def _get_point_value(self, points: dict, point_name: str) -> float | None:
         """Extract point value from device points dict."""
         point = points.get(point_name)
         if point is None:
@@ -171,7 +171,7 @@ class CrossSystemAnalyzer:
             return point.get("value") or point.get("default_value")
         return None
 
-    def _analyze_vav(self, vav_data: Dict, complaint_type: str) -> str:
+    def _analyze_vav(self, vav_data: dict, complaint_type: str) -> str:
         """Analyze VAV contribution to comfort issue."""
         if not vav_data:
             return "VAV data not available"
@@ -213,7 +213,7 @@ class CrossSystemAnalyzer:
         return f"VAV operating normally: damper {damper:.0f}%, airflow {airflow:.0f} L/s, discharge {discharge:.1f}°C"
 
     def analyze_comfort_complaint(
-        self, zone_id: str, complaint_type: str = "too_hot", desk_id: Optional[str] = None
+        self, zone_id: str, complaint_type: str = "too_hot", desk_id: str | None = None
     ) -> ComfortDiagnosis:
         """
         Analyze a comfort complaint using HVAC + Lighting + Occupancy data.
@@ -284,7 +284,7 @@ class CrossSystemAnalyzer:
             **desk_data,
         )
 
-    def _analyze_hvac(self, hvac: Dict, complaint_type: str) -> str:
+    def _analyze_hvac(self, hvac: dict, complaint_type: str) -> str:
         """Analyze HVAC contribution to comfort issue"""
         temp = hvac["temp"]
         setpoint = hvac["setpoint"]
@@ -312,7 +312,7 @@ class CrossSystemAnalyzer:
         return f"Zone at {temp}C (setpoint {setpoint}C), status: {status}"
 
     def _analyze_lighting(
-        self, occupancy: Optional[ZoneOccupancy], lighting: Optional[ZoneLighting], complaint_type: str, desk_data: Dict
+        self, occupancy: ZoneOccupancy | None, lighting: ZoneLighting | None, complaint_type: str, desk_data: dict
     ) -> str:
         """Analyze lighting/occupancy contribution"""
         parts = []
@@ -346,13 +346,13 @@ class CrossSystemAnalyzer:
 
     def _determine_root_cause(
         self,
-        hvac: Dict,
-        occupancy: Optional[ZoneOccupancy],
-        lighting: Optional[ZoneLighting],
+        hvac: dict,
+        occupancy: ZoneOccupancy | None,
+        lighting: ZoneLighting | None,
         complaint_type: str,
-        desk_data: Dict,
-        vav_data: Dict = None,
-    ) -> tuple[str, str, List[str]]:
+        desk_data: dict,
+        vav_data: dict = None,
+    ) -> tuple[str, str, list[str]]:
         """Determine most likely root cause and suggestions (includes VAV analysis)"""
 
         suggestions = []
@@ -443,7 +443,7 @@ class CrossSystemAnalyzer:
                     ],
                 )
 
-        # Solar heat gain scenario (the hero demo case)
+        # Solar heat gain scenario (the primary local test case)
         desk_lux = desk_data.get("desk_lux", 0)
         max_lux = occupancy.max_lux_level if occupancy else 0
 
@@ -482,9 +482,7 @@ class CrossSystemAnalyzer:
 
                 if occupancy and occupancy.occupancy_percent < 30:
                     suggestions.append(
-                        "Note: Zone is only {:.0f}% occupied - less internal heat load".format(
-                            occupancy.occupancy_percent
-                        )
+                        f"Note: Zone is only {occupancy.occupancy_percent:.0f}% occupied - less internal heat load"
                     )
                 return (cause, confidence, suggestions)
 
@@ -497,10 +495,10 @@ class CrossSystemAnalyzer:
                 low_occ_suggestions.insert(0, "Check VAV box positions in unoccupied areas")
             return (
                 (
-                    "Low zone occupancy ({:.0f}%) means less internal heat"
+                    f"Low zone occupancy ({occupancy.occupancy_percent:.0f}%) means less internal heat"
                     " load, but may also indicate poor air circulation in"
                     " unoccupied areas"
-                ).format(occupancy.occupancy_percent),
+                ),
                 "medium",
                 low_occ_suggestions,
             )
@@ -614,7 +612,7 @@ class CrossSystemAnalyzer:
 
 
 # Singleton
-_analyzer: Optional[CrossSystemAnalyzer] = None
+_analyzer: CrossSystemAnalyzer | None = None
 
 
 def get_cross_system_analyzer() -> CrossSystemAnalyzer:

@@ -14,9 +14,9 @@ and load-shedding emergency response.
 
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Dict, List, Optional, Any, Tuple
+from typing import Any
 
 from app.services.solar_config_service import get_site_solar_config
 
@@ -61,7 +61,7 @@ class DispatchConstraint:
     message: str
     mitigation: str  # What action was taken
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "constraint_type": self.constraint_type,
             "severity": self.severity,
@@ -83,11 +83,11 @@ class DispatchCommand:
     actual_power_kw: float  # Power after constraint limiting
     duration_minutes: int
     reason: str
-    constraints_applied: List[DispatchConstraint] = field(default_factory=list)
+    constraints_applied: list[DispatchConstraint] = field(default_factory=list)
     success: bool = True
-    error_message: Optional[str] = None
+    error_message: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "site_id": self.site_id,
             "timestamp": self.timestamp,
@@ -143,7 +143,7 @@ class BESSDispatchEngine:
     def __init__(self):
         """Initialize dispatch engine."""
         self._last_power_kw = 0.0
-        self._last_update_time = datetime.now(timezone.utc)
+        self._last_update_time = datetime.now(UTC)
 
         # Override class defaults from site solar config
         try:
@@ -159,7 +159,7 @@ class BESSDispatchEngine:
         requested_power_kw: float,
         bess_state: BESSState,
         load_shedding_stage: int = 0,
-    ) -> Tuple[float, List[DispatchConstraint]]:
+    ) -> tuple[float, list[DispatchConstraint]]:
         """Validate dispatch command and apply constraints.
 
         Args:
@@ -289,7 +289,7 @@ class BESSDispatchEngine:
         max_ramp_pct = self.RAMP_RATE_LS_PCT_PER_MIN if load_shedding_stage >= 4 else self.RAMP_RATE_NORMAL_PCT_PER_MIN
         max_ramp_power = self.BESS_RATED_POWER_KW * max_ramp_pct / 100.0
 
-        time_delta = (datetime.now(timezone.utc) - self._last_update_time).total_seconds() / 60.0
+        time_delta = (datetime.now(UTC) - self._last_update_time).total_seconds() / 60.0
         max_power_change = max_ramp_power * max(1.0, time_delta)
 
         if abs(limited_power - self._last_power_kw) > max_power_change:
@@ -386,7 +386,7 @@ class BESSDispatchEngine:
         Returns:
             DispatchCommand with actual power and constraints applied
         """
-        timestamp = datetime.now(timezone.utc).isoformat()
+        timestamp = datetime.now(UTC).isoformat()
 
         # Validate action
         if action not in [DispatchActionType.CHARGE.value, DispatchActionType.DISCHARGE.value]:
@@ -412,7 +412,7 @@ class BESSDispatchEngine:
 
         # Update state for next ramp rate check
         self._last_power_kw = actual_power
-        self._last_update_time = datetime.now(timezone.utc)
+        self._last_update_time = datetime.now(UTC)
 
         # Determine success
         success = actual_power > 0.0 or action == "idle"
@@ -438,7 +438,7 @@ class BESSDispatchEngine:
         site_id: str,
         ls_stage: int,
         current_bess_state: BESSState,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Automatically adjust dispatch for load shedding event.
 
         Strategy:
@@ -454,7 +454,7 @@ class BESSDispatchEngine:
         Returns:
             Dict with stage, action_taken, power_change_kw, recommendation
         """
-        timestamp = datetime.now(timezone.utc).isoformat()
+        timestamp = datetime.now(UTC).isoformat()
         action_taken = "none"
         power_change_kw = 0.0
         recommendation = ""
@@ -492,7 +492,7 @@ class BESSDispatchEngine:
 
 # === Singleton ===
 
-_bess_dispatch_engine: Optional[BESSDispatchEngine] = None
+_bess_dispatch_engine: BESSDispatchEngine | None = None
 
 
 def get_bess_dispatch_engine() -> BESSDispatchEngine:

@@ -2,7 +2,7 @@
 
 import logging
 import re
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
 
 import httpx
 
@@ -117,6 +117,7 @@ class XiaomiService:
         system_prompt: str | None = None,
         include_site_context: bool = True,
         model_override: str | None = None,
+        source: str = "chat",
     ) -> AsyncGenerator[str, None]:
         """Return a completion from Xiaomi MiMo as a single streamed chunk."""
         if not self._api_key:
@@ -168,7 +169,7 @@ class XiaomiService:
                     model=model,
                     input_tokens=u.get("prompt_tokens", 0),
                     output_tokens=u.get("completion_tokens", 0),
-                    source="chat",
+                    source=source,
                 )
             except Exception:
                 pass  # Never let tracking break chat

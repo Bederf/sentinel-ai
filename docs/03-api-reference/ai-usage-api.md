@@ -1,3 +1,18 @@
+---
+title: "Service Usage & Cost Tracking API Reference"
+type: "reference"
+status: "draft"
+version: "1.1.0"
+created: "2026-03-31"
+updated: "2026-04-01"
+tags: ["sentinel", "documentation"]
+related: []
+domain: "bms"
+audience: "all"
+complexity: "intermediate"
+estimated_read_time: 10
+---
+
 # Service Usage & Cost Tracking API Reference
 
 **Base URL:** `http://localhost:9095/api`
@@ -11,7 +26,7 @@
 
 ### GET /api/ai-usage/summary
 
-Returns aggregated costs across all external services (AI, messaging, unit-based) over a configurable period. Breaks down by provider, model, and daily time series.
+Returns aggregated costs across all external services (AI, messaging, unit-based) over a configurable period. Breaks down by provider, model, source/route, and daily time series.
 
 **Method:** `GET`
 **Path:** `/api/ai-usage/summary`
@@ -21,6 +36,7 @@ Returns aggregated costs across all external services (AI, messaging, unit-based
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `days` | int | 30 | Lookback period (1–365) |
+| `site_id` | string | null | Optional site scope (e.g. `site-002`) |
 
 #### Request
 
@@ -84,6 +100,27 @@ curl -X GET "http://localhost:9095/api/ai-usage/summary?days=30" \
       "cost_zar": 41.07
     }
   },
+  "by_source": {
+    "chat_core_gateway": {
+      "calls": 90,
+      "tokens": 560000,
+      "cost_usd": 2.91,
+      "cost_zar": 53.84
+    },
+    "chat_core_tools": {
+      "calls": 44,
+      "tokens": 980000,
+      "cost_usd": 7.72,
+      "cost_zar": 142.82
+    }
+  },
+  "budget": {
+    "monthly_budget_zar": 1500,
+    "spent_zar": 230.38,
+    "remaining_zar": 1269.62,
+    "hard_cap_enforced": true,
+    "over_budget": false
+  },
   "daily": [
     {
       "date": "2026-03-14",
@@ -99,7 +136,7 @@ curl -X GET "http://localhost:9095/api/ai-usage/summary?days=30" \
 
 ### GET /api/ai-usage/today
 
-Returns real-time usage for the current day, broken down by model.
+Returns real-time usage for the current day, broken down by model and source.
 
 **Method:** `GET`
 **Path:** `/api/ai-usage/today`
@@ -150,6 +187,24 @@ curl -X GET http://localhost:9095/api/ai-usage/today \
       "cost_usd": 0.012,
       "cost_zar": 0.22
     }
+  },
+  "by_source": {
+    "chat_core_gateway": {
+      "calls": 21,
+      "tokens": 40200,
+      "cost_usd": 0.1823,
+      "cost_zar": 3.37
+    },
+    "chat_tech_gateway": {
+      "calls": 8,
+      "tokens": 21100,
+      "cost_usd": 0.0962,
+      "cost_zar": 1.78
+    }
+  },
+  "budget": {
+    "monthly_budget_zar": 1500,
+    "hard_cap_enforced": true
   }
 }
 ```
@@ -243,6 +298,18 @@ A daily summary email is sent at **23:55** to `info@sentinel-ai.co.za` via the b
 - 30-day running total by provider
 
 Uses the `notification_smtp_*` settings from `.env`.
+
+## Site Budget and Hard Cap Notes
+
+Site-level budget metadata appears in `/summary` and `/today` when `site_id` is provided.
+
+- `monthly_budget_zar`: configured budget for the site
+- `spent_zar`: spend in selected window (`summary`)
+- `remaining_zar`: remaining budget (`summary`)
+- `hard_cap_enforced`: whether hard cap is active
+- `over_budget`: indicates cap breach (`summary`)
+
+When hard cap is active and breached, chat execution is blocked at `/api/chat` for that site.
 
 ## Cost Alert Threshold
 

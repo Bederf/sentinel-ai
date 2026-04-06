@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Optional
 
 from app.config.settings import settings
 from app.models.fuel import FuelEvent, FuelEventType, FuelTankConfig, FuelTelemetry
@@ -69,7 +68,7 @@ class FuelEventProcessor:
     """Evaluates fuel telemetry against configurable thresholds to detect
     events, compute derived values, and track generator consumption."""
 
-    _instance: Optional["FuelEventProcessor"] = None
+    _instance: FuelEventProcessor | None = None
 
     def __init__(self) -> None:
         self._previous_readings: dict[str, FuelTelemetry] = {}  # tank_id -> last reading
@@ -150,7 +149,7 @@ class FuelEventProcessor:
         self,
         telemetry: FuelTelemetry,
         tank_config: FuelTankConfig,
-        previous: Optional[FuelTelemetry],
+        previous: FuelTelemetry | None,
     ) -> None:
         """Mutate telemetry to fill days_to_empty, consumption_anomaly,
         runtime_remaining_hrs."""
@@ -181,9 +180,9 @@ class FuelEventProcessor:
     def _check_low_fuel(
         self,
         telemetry: FuelTelemetry,
-        previous: Optional[FuelTelemetry],
+        previous: FuelTelemetry | None,
         config: FuelTankConfig,
-    ) -> Optional[FuelEvent]:
+    ) -> FuelEvent | None:
         """Detect low fuel: below pct_2 = CRITICAL, below pct_1 = HIGH."""
         pct_1 = self._get_threshold(config, "low_alert_pct_1", settings.fuel_low_alert_pct_1)
         pct_2 = self._get_threshold(config, "low_alert_pct_2", settings.fuel_low_alert_pct_2)
@@ -211,9 +210,9 @@ class FuelEventProcessor:
     def _check_theft(
         self,
         telemetry: FuelTelemetry,
-        previous: Optional[FuelTelemetry],
+        previous: FuelTelemetry | None,
         config: FuelTankConfig,
-    ) -> Optional[FuelEvent]:
+    ) -> FuelEvent | None:
         """Detect theft: rapid fuel loss while generator is NOT running."""
         if previous is None:
             return None
@@ -251,9 +250,9 @@ class FuelEventProcessor:
     def _check_refill(
         self,
         telemetry: FuelTelemetry,
-        previous: Optional[FuelTelemetry],
+        previous: FuelTelemetry | None,
         config: FuelTankConfig,
-    ) -> Optional[FuelEvent]:
+    ) -> FuelEvent | None:
         """Detect refill: level jumps above threshold."""
         if previous is None:
             return None
@@ -279,9 +278,9 @@ class FuelEventProcessor:
     def _check_leak(
         self,
         telemetry: FuelTelemetry,
-        previous: Optional[FuelTelemetry],
+        previous: FuelTelemetry | None,
         config: FuelTankConfig,
-    ) -> Optional[FuelEvent]:
+    ) -> FuelEvent | None:
         """Detect leak: sustained slow fuel loss without generator running."""
         if previous is None:
             return None
@@ -332,9 +331,9 @@ class FuelEventProcessor:
     def _check_temp(
         self,
         telemetry: FuelTelemetry,
-        previous: Optional[FuelTelemetry],
+        previous: FuelTelemetry | None,
         config: FuelTankConfig,
-    ) -> Optional[FuelEvent]:
+    ) -> FuelEvent | None:
         """Detect fuel temperature outside acceptable range."""
         temp_min = settings.fuel_temp_min_c
         temp_max = settings.fuel_temp_max_c
@@ -370,9 +369,9 @@ class FuelEventProcessor:
     def _check_sensor_fault(
         self,
         telemetry: FuelTelemetry,
-        previous: Optional[FuelTelemetry],
+        previous: FuelTelemetry | None,
         config: FuelTankConfig,
-    ) -> Optional[FuelEvent]:
+    ) -> FuelEvent | None:
         """Detect sensor fault (already flagged by validate_sensor_reading)."""
         if telemetry.sensor_fault:
             return FuelEvent(
@@ -391,9 +390,9 @@ class FuelEventProcessor:
     def _check_runtime(
         self,
         telemetry: FuelTelemetry,
-        previous: Optional[FuelTelemetry],
+        previous: FuelTelemetry | None,
         config: FuelTankConfig,
-    ) -> Optional[FuelEvent]:
+    ) -> FuelEvent | None:
         """Detect generator runtime complete (True->False transition)."""
         gen_id = telemetry.generator_id or config.generator_id
         if not gen_id:
@@ -458,7 +457,7 @@ class FuelEventProcessor:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _get_threshold(config: FuelTankConfig, attr_name: Optional[str], global_default: float) -> float:
+    def _get_threshold(config: FuelTankConfig, attr_name: str | None, global_default: float) -> float:
         """Return per-tank threshold if available, else global settings default."""
         if attr_name and hasattr(config, attr_name):
             val = getattr(config, attr_name, None)
@@ -494,7 +493,7 @@ class FuelEventProcessor:
 # Singleton
 # ---------------------------------------------------------------------------
 
-_instance: Optional[FuelEventProcessor] = None
+_instance: FuelEventProcessor | None = None
 
 
 def get_fuel_event_processor() -> FuelEventProcessor:

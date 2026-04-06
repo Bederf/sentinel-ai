@@ -16,16 +16,17 @@ import os
 import re
 import sys
 import time
-from typing import Any, AsyncGenerator
+from collections.abc import AsyncGenerator
+from typing import Any
 
 from anthropic import RateLimitError
 
 from app.config.settings import settings
 from app.services.claude_service import claude_service
 from app.services.openai_service import openai_service
-from app.services.zai_service import zai_service
-from app.services.xiaomi_service import xiaomi_service
 from app.services.popia_consent_guard import should_allow_cloud_processing
+from app.services.xiaomi_service import xiaomi_service
+from app.services.zai_service import zai_service
 
 # Add sentry tools to path for rate limit tracker
 sys.path.insert(0, "$SENTRY_HOME/tools")
@@ -344,6 +345,7 @@ class HybridAIService:
         messages: list[dict],
         include_site_context: bool = True,
         tier: int = 2,
+        source: str = "chat",
     ) -> AsyncGenerator[str, None]:
         """Stream response from a specific provider."""
         if provider == "openai":
@@ -351,24 +353,28 @@ class HybridAIService:
                 messages,
                 include_site_context=include_site_context,
                 tier=tier,
+                source=source,
             ):
                 yield chunk
         elif provider == "zai":
             async for chunk in zai_service.stream_response(
                 messages,
                 include_site_context=include_site_context,
+                source=source,
             ):
                 yield chunk
         elif provider == "xiaomi":
             async for chunk in xiaomi_service.stream_response(
                 messages,
                 include_site_context=include_site_context,
+                source=source,
             ):
                 yield chunk
         else:  # anthropic
             async for chunk in claude_service.stream_response(
                 messages,
                 include_site_context=include_site_context,
+                source=source,
             ):
                 yield chunk
 
@@ -378,6 +384,7 @@ class HybridAIService:
         include_site_context: bool = True,
         data_subject_id: str | None = None,
         tier: int = 2,
+        source: str = "chat",
     ) -> AsyncGenerator[str, None]:
         """Try primary provider, fallback to alternatives on failure."""
         provider = self.get_active_cloud_provider()
@@ -392,6 +399,7 @@ class HybridAIService:
                 messages,
                 include_site_context,
                 tier,
+                source,
             ):
                 yield chunk
             return
@@ -414,6 +422,7 @@ class HybridAIService:
                     messages,
                     include_site_context,
                     tier,
+                    source,
                 ):
                     yield chunk
                 return
@@ -451,6 +460,7 @@ class HybridAIService:
         message: str,
         use_tools: bool = False,
         data_subject_id: str | None = None,
+        source: str = "chat",
     ) -> AsyncGenerator[str, None]:
         """Stream response from configured cloud provider with fallback.
 
@@ -577,6 +587,7 @@ class HybridAIService:
             include_site_context=True,
             data_subject_id=data_subject_id,
             tier=routing.get("tier", 2),
+                    source=source,
         ):
             yield chunk
 

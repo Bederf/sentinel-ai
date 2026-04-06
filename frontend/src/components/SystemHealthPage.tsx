@@ -5,7 +5,7 @@
  * 1. Health - Current health overview and component status
  * 2. Historical Insights - Uptime trends and health trends
  * 3. AI Performance - Optimization run analytics and profile scores
- * 4. Model Health - ML model freshness, accuracy, and A/B tests
+ * 3. Historical - trends and performance snapshots
  */
 
 import { useState, useEffect } from 'react';
@@ -37,8 +37,6 @@ import { monitoringApi } from '@/lib/api';
 import { authorizedFetch } from '../lib/api/client';
 
 import { PageLoading } from './PageLoading';
-import { AIPerformanceTab } from './system/AIPerformanceTab';
-import { ModelHealthTab } from './system/ModelHealthTab';
 
 interface _HealthComponent {
   name: string;
@@ -184,9 +182,23 @@ export default function SystemHealthPage() {
 
   const overallStatus = currentHealth?.overall_status || 'healthy';
   const overallTone = getStatusTone(overallStatus);
+  const healthTrendData = (history?.snapshots || [])
+    .map((snapshot: any) => {
+      const score = Number(snapshot?.overall_score);
+      if (!Number.isFinite(score)) return null;
+
+      const parsedTimestamp = snapshot?.timestamp ? new Date(snapshot.timestamp) : null;
+      const date =
+        parsedTimestamp && !Number.isNaN(parsedTimestamp.getTime())
+          ? parsedTimestamp.toLocaleTimeString()
+          : String(snapshot?.timestamp || "Unknown");
+
+      return { date, score };
+    })
+    .filter((point: { date: string; score: number } | null): point is { date: string; score: number } => point !== null);
 
   return (
-    <div className="h-full overflow-y-auto p-4 md:p-6">
+    <div className="h-full overflow-y-auto p-4 md:p-6" style={{ background: "var(--color-sentinel-bg-canvas)" }}>
       {/* Page Header — matches Lighting tab pattern */}
       <div className="mb-6">
         <div className="flex items-center justify-between mb-4">
@@ -208,11 +220,9 @@ export default function SystemHealthPage() {
 
       {/* Tab Interface */}
       <TabGroup defaultIndex={selectedTab} onIndexChange={setSelectedTab}>
-        <TabList className="mb-4 overflow-x-auto">
+        <TabList className="mb-4 overflow-x-auto rounded-lg border" style={{ borderColor: "var(--color-sentinel-border)" }}>
           <Tab>Health</Tab>
           <Tab>Historical</Tab>
-          <Tab>AI Performance</Tab>
-          <Tab>Model Health</Tab>
         </TabList>
 
         <TabPanels>
@@ -221,7 +231,7 @@ export default function SystemHealthPage() {
             {currentHealth && (
               <>
                 {/* Overall Health Card */}
-                <Card className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+                <Card className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
                   <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                     <div className="space-y-2">
                       <p
@@ -246,7 +256,7 @@ export default function SystemHealthPage() {
                       </div>
                     </div>
                     <div
-                      className="inline-flex items-center gap-2 rounded-md px-3 py-2 h-fit"
+                      className="inline-flex items-center gap-2 rounded-lg px-3 py-2 h-fit"
                       style={{
                         background: overallTone.bg,
                         border: `1px solid ${overallTone.border}`,
@@ -272,7 +282,7 @@ export default function SystemHealthPage() {
                 </Card>
 
                 {/* Integration Status */}
-                <Card className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+                <Card className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
                   <div className="flex items-start justify-between">
                     <div>
                       <p
@@ -308,19 +318,19 @@ export default function SystemHealthPage() {
                     <Server className="w-5 h-5" style={{ color: "var(--color-sentinel-blue)" }} />
                   </div>
                   <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3">
-                    <div className="rounded-md p-2.5" style={{ background: "var(--color-sentinel-bg-secondary)", border: "1px solid var(--glass-border)" }}>
+                    <div className="rounded-lg p-2.5" style={{ background: "var(--color-sentinel-bg-secondary)", border: "1px solid var(--color-sentinel-border)" }}>
                       <Text style={{ color: "var(--color-sentinel-text-secondary)" }} className="uppercase text-[10px] tracking-wide">Sources</Text>
                       <Metric style={{ color: "var(--color-sentinel-text-primary)" }}>{integrationHealth?.sources_count || 0}</Metric>
                     </div>
-                    <div className="rounded-md p-2.5" style={{ background: "var(--color-sentinel-bg-secondary)", border: "1px solid var(--glass-border)" }}>
+                    <div className="rounded-lg p-2.5" style={{ background: "var(--color-sentinel-bg-secondary)", border: "1px solid var(--color-sentinel-border)" }}>
                       <Text style={{ color: "var(--color-sentinel-text-secondary)" }} className="uppercase text-[10px] tracking-wide">Records</Text>
                       <Metric style={{ color: "var(--color-sentinel-text-primary)" }}>{integrationHealth?.total_records_ingested || 0}</Metric>
                     </div>
-                    <div className="rounded-md p-2.5" style={{ background: "var(--color-sentinel-bg-secondary)", border: "1px solid var(--glass-border)" }}>
+                    <div className="rounded-lg p-2.5" style={{ background: "var(--color-sentinel-bg-secondary)", border: "1px solid var(--color-sentinel-border)" }}>
                       <Text style={{ color: "var(--color-sentinel-text-secondary)" }} className="uppercase text-[10px] tracking-wide">Mapped Points</Text>
                       <Metric style={{ color: "var(--color-sentinel-text-primary)" }}>{integrationHealth?.total_points_mapped || 0}</Metric>
                     </div>
-                    <div className="rounded-md p-2.5" style={{ background: "var(--color-sentinel-bg-secondary)", border: "1px solid var(--glass-border)" }}>
+                    <div className="rounded-lg p-2.5" style={{ background: "var(--color-sentinel-bg-secondary)", border: "1px solid var(--color-sentinel-border)" }}>
                       <Text style={{ color: "var(--color-sentinel-text-secondary)" }} className="uppercase text-[10px] tracking-wide">Unmatched</Text>
                       <Metric style={{ color: "var(--color-sentinel-text-primary)" }}>{integrationHealth?.unmatched_points || 0}</Metric>
                     </div>
@@ -348,7 +358,7 @@ export default function SystemHealthPage() {
                         device_manager: "Device Manager",
                       };
                       return (
-                        <Card key={key} className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+                        <Card key={key} className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
                           <div className="flex items-start justify-between">
                             <div className="flex-1">
                               <Text style={{ color: "var(--color-sentinel-text-secondary)" }}>
@@ -383,80 +393,78 @@ export default function SystemHealthPage() {
               <>
                 {/* Uptime Metrics */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <Card className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
-                    <Text style={{ color: "var(--color-sentinel-text-secondary)" }}>Average Health Score</Text>
-                    <Metric style={{ color: "var(--color-sentinel-text-primary)" }}>{history.metrics?.avg_score || 0}</Metric>
+                  <Card className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+                    <Text className="uppercase text-[11px] tracking-wide" style={{ color: "var(--color-sentinel-text-secondary)" }}>Average Health Score</Text>
+                    <Metric style={{ color: "var(--color-sentinel-text-primary)", fontVariantNumeric: "tabular-nums" }}>{history.metrics?.avg_score || 0}</Metric>
                   </Card>
-                  <Card className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
-                    <Text style={{ color: "var(--color-sentinel-text-secondary)" }}>Uptime ({history.range})</Text>
-                    <Metric style={{ color: "var(--color-sentinel-text-primary)" }}>
+                  <Card className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+                    <Text className="uppercase text-[11px] tracking-wide" style={{ color: "var(--color-sentinel-text-secondary)" }}>Uptime ({history.range})</Text>
+                    <Metric style={{ color: "var(--color-sentinel-text-primary)", fontVariantNumeric: "tabular-nums" }}>
                       {history.metrics?.uptime_percentage || 0}%
                     </Metric>
                   </Card>
-                  <Card className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
-                    <Text style={{ color: "var(--color-sentinel-text-secondary)" }}>Min Score</Text>
-                    <Metric style={{ color: "var(--color-sentinel-text-primary)" }}>{history.metrics?.min_score || 0}</Metric>
+                  <Card className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+                    <Text className="uppercase text-[11px] tracking-wide" style={{ color: "var(--color-sentinel-text-secondary)" }}>Min Score</Text>
+                    <Metric style={{ color: "var(--color-sentinel-text-primary)", fontVariantNumeric: "tabular-nums" }}>{history.metrics?.min_score || 0}</Metric>
                   </Card>
-                  <Card className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
-                    <Text style={{ color: "var(--color-sentinel-text-secondary)" }}>Max Score</Text>
-                    <Metric style={{ color: "var(--color-sentinel-text-primary)" }}>{history.metrics?.max_score || 0}</Metric>
+                  <Card className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+                    <Text className="uppercase text-[11px] tracking-wide" style={{ color: "var(--color-sentinel-text-secondary)" }}>Max Score</Text>
+                    <Metric style={{ color: "var(--color-sentinel-text-primary)", fontVariantNumeric: "tabular-nums" }}>{history.metrics?.max_score || 0}</Metric>
                   </Card>
                 </div>
 
                 {/* Trend Analysis */}
-                <Card className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
-                  <Text style={{ color: "var(--color-sentinel-text-secondary)" }}>Trend</Text>
+                <Card className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+                  <Text className="uppercase text-[11px] tracking-wide" style={{ color: "var(--color-sentinel-text-secondary)" }}>Trend</Text>
                   <div className="flex items-center gap-2 mt-2">
                     {history.metrics?.trend === 'improving' && (
                       <>
                         <TrendingUp className="w-5 h-5 text-green-500" />
-                        <Badge color="green">Improving</Badge>
+                        <span className="text-xs font-semibold px-2 py-1 rounded" style={{ background: "rgba(16, 185, 129, 0.15)", border: "1px solid rgba(16, 185, 129, 0.35)", color: "var(--color-sentinel-green)" }}>Improving</span>
                       </>
                     )}
                     {history.metrics?.trend === 'degrading' && (
                       <>
                         <TrendingDown className="w-5 h-5 text-red-500" />
-                        <Badge color="red">Degrading</Badge>
+                        <span className="text-xs font-semibold px-2 py-1 rounded" style={{ background: "rgba(220, 38, 38, 0.15)", border: "1px solid rgba(220, 38, 38, 0.35)", color: "var(--color-sentinel-red)" }}>Degrading</span>
                       </>
                     )}
                     {history.metrics?.trend === 'stable' && (
                       <>
                         <Clock className="w-5 h-5 text-gray-500" />
-                        <Badge color="gray">Stable</Badge>
+                        <span className="text-xs font-semibold px-2 py-1 rounded" style={{ background: "rgba(148, 163, 184, 0.15)", border: "1px solid rgba(148, 163, 184, 0.35)", color: "var(--color-sentinel-text-secondary)" }}>Stable</span>
                       </>
                     )}
                   </div>
                 </Card>
 
                 {/* Health Score Chart */}
-                {history.snapshots && history.snapshots.length > 0 && (
-                  <Card className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
-                    <Text style={{ color: "var(--color-sentinel-text-secondary)" }}>Health Score Trend</Text>
+                {healthTrendData.length > 0 && (
+                  <Card className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+                    <Text className="uppercase text-[11px] tracking-wide" style={{ color: "var(--color-sentinel-text-secondary)" }}>Health Score Trend</Text>
                     <LineChart
                       className="mt-6"
-                      data={history.snapshots.map((s: any) => ({
-                        date: new Date(s.timestamp).toLocaleTimeString(),
-                        score: s.overall_score,
-                      }))}
+                      data={healthTrendData}
                       index="date"
                       yAxisWidth={40}
                       categories={['score']}
+                      colors={['blue']}
+                      showLegend={false}
                     />
+                  </Card>
+                )}
+                {healthTrendData.length === 0 && (
+                  <Card className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+                    <Text className="uppercase text-[11px] tracking-wide" style={{ color: "var(--color-sentinel-text-secondary)" }}>Health Score Trend</Text>
+                    <Text className="mt-3" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                      No valid health score points are available for this range yet.
+                    </Text>
                   </Card>
                 )}
               </>
             )}
           </TabPanel>
 
-          {/* TAB 3: AI PERFORMANCE */}
-          <TabPanel className="space-y-6">
-            <AIPerformanceTab />
-          </TabPanel>
-
-          {/* TAB 4: MODEL HEALTH */}
-          <TabPanel className="space-y-6">
-            <ModelHealthTab />
-          </TabPanel>
         </TabPanels>
       </TabGroup>
     </div>

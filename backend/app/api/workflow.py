@@ -409,6 +409,7 @@ def determine_workflow_state(
     has_pending_inspection: bool,
     has_active_work_order: bool,
     has_baseline_deviation: bool,
+    has_onboarding_evidence: bool,
 ) -> str:
     """Determine the current workflow state based on various factors."""
     if has_active_work_order:
@@ -419,6 +420,11 @@ def determine_workflow_state(
         return "anomaly_detected"
     if has_baseline_deviation:
         return "anomaly_detected"
+    # Operational default: equipment is treated as healthy unless there is
+    # active anomaly/inspection/repair evidence.
+    # Missing onboarding evidence should not block equipment from Health view.
+    if not has_onboarding_evidence:
+        return "healthy"
     return "healthy"
 
 
@@ -457,6 +463,17 @@ async def get_dashboard_equipment(site_id: Optional[str] = Query(None, descripti
         dashboard_equipment = []
         workflow_states = {}
 
+        onboarding_by_uuid = {}
+        equipment_ids = [eq.get("id") for eq in equipment_list if eq.get("id")]
+        if equipment_ids:
+            try:
+                op_result = client.table("equipment").select("id, operating_data").in_("id", equipment_ids).execute()
+                for row in op_result.data or []:
+                    onboarding_meta = ((row.get("operating_data") or {}).get("onboarding") or {})
+                    onboarding_by_uuid[row.get("id")] = bool(onboarding_meta.get("onboarded"))
+            except Exception:
+                onboarding_by_uuid = {}
+
         for eq in equipment_list:
             eq_uuid = eq.get("id")
             eq_code = eq.get("code", eq_uuid)
@@ -488,6 +505,7 @@ async def get_dashboard_equipment(site_id: Optional[str] = Query(None, descripti
 
             total_baselines = baseline_summary.get("total_baselines", 0)
             has_baseline_deviation = False  # Would need to check recent comparisons
+            has_onboarding_evidence = bool(onboarding_by_uuid.get(eq_uuid)) or total_baselines > 0
 
             # Get recent inspections
             try:
@@ -531,6 +549,7 @@ async def get_dashboard_equipment(site_id: Optional[str] = Query(None, descripti
                 has_pending_inspection=has_pending_inspection,
                 has_active_work_order=has_active_work_order,
                 has_baseline_deviation=has_baseline_deviation,
+                has_onboarding_evidence=has_onboarding_evidence,
             )
 
             # Build state history from available data
@@ -606,7 +625,7 @@ async def get_dashboard_equipment(site_id: Optional[str] = Query(None, descripti
 
 
 # ============================================================================
-# Test Endpoints (for demo/development)
+# Test Endpoints (for local development)
 # ============================================================================
 
 
@@ -618,7 +637,7 @@ async def test_trigger_ml_anomaly(
     """
     Test endpoint to trigger ML anomaly workflow.
 
-    For demo and development testing.
+    For local development testing.
     """
     trigger_engine = get_trigger_engine()
 
@@ -643,7 +662,7 @@ async def test_full_workflow(equipment_id: str = Query(..., description="Equipme
 
     Simulates: ML Anomaly → Inspection → Deficiency → Work Order → Repair → Validation
 
-    For demo and development testing.
+    For local development testing.
     """
     trigger_engine = get_trigger_engine()
     results = []

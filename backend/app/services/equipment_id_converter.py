@@ -11,11 +11,11 @@ This enables:
 - Fleet-wide analytics and comparisons
 """
 
+import json
 import logging
 import re
-import json
-from typing import Optional, Dict, Any
 from pathlib import Path
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -103,7 +103,7 @@ class EquipmentIDConverter:
         """Initialize converter with site-specific zone mappings."""
         self.site_zone_mappings = self._load_site_zone_mappings()
 
-    def _load_site_zone_mappings(self) -> Dict[str, Dict[str, Any]]:
+    def _load_site_zone_mappings(self) -> dict[str, dict[str, Any]]:
         """Load site-specific zone mappings from config file."""
         config_path = Path(__file__).parent.parent / "data" / "niagara" / "site_zone_mappings.json"
 
@@ -121,7 +121,7 @@ class EquipmentIDConverter:
         bms_id: str,
         equipment_type: str,
         site_id: str,
-        zone_mapping: Optional[Dict[str, str]] = None,
+        zone_mapping: dict[str, str] | None = None,
     ) -> str:
         """Convert BMS equipment ID to SENTINEL v2.0 standard.
 
@@ -181,7 +181,7 @@ class EquipmentIDConverter:
 
         return v2_id
 
-    def parse_floor_zone(self, bms_id: str) -> Optional[Dict[str, str]]:
+    def parse_floor_zone(self, bms_id: str) -> dict[str, str] | None:
         """Extract floor and zone from BMS equipment ID.
 
         Args:
@@ -241,7 +241,7 @@ class EquipmentIDConverter:
         logger.debug(f"Could not parse floor/zone from '{bms_id}'")
         return None
 
-    def _normalize_equipment_type(self, equipment_type: str) -> Optional[str]:
+    def _normalize_equipment_type(self, equipment_type: str) -> str | None:
         """Normalize equipment type to v2.0 standard uppercase.
 
         Args:
@@ -317,7 +317,7 @@ class EquipmentIDConverter:
         site_prefix = f"S{site_num.zfill(3)}"
         return site_prefix
 
-    def _get_zone_mappings_for_site(self, site_id: str) -> Dict[str, str]:
+    def _get_zone_mappings_for_site(self, site_id: str) -> dict[str, str]:
         """Get zone number→letter mappings for a specific site.
 
         Args:
@@ -364,7 +364,7 @@ class EquipmentIDConverter:
 
 
 # Singleton instance
-_converter: Optional[EquipmentIDConverter] = None
+_converter: EquipmentIDConverter | None = None
 
 
 def get_equipment_id_converter() -> EquipmentIDConverter:

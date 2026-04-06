@@ -19,9 +19,8 @@ Alert deduplication:
 import logging
 import uuid
 from datetime import datetime, timedelta
-from typing import Optional
 
-from app.config.settings import settings, IngestionMode
+from app.config.settings import IngestionMode, settings
 from app.database.repositories.integration_repository import IntegrationRepository
 from app.models.audit_log import AuditActionType, AuditResultType
 from app.models.integration import ConnectionType
@@ -63,7 +62,7 @@ class MonitoringService:
         self._integration_repo = IntegrationRepository()
         self._audit_logger = AuditLogger()
 
-    async def get_snapshot(self, site_id: Optional[str] = None) -> MonitoringSnapshot:
+    async def get_snapshot(self, site_id: str | None = None) -> MonitoringSnapshot:
         """Build a unified monitoring snapshot."""
         mode = settings.resolved_ingestion_mode
         is_live = settings.is_live_mode
@@ -94,7 +93,7 @@ class MonitoringService:
     # Ingestion KPIs
     # ------------------------------------------------------------------
 
-    def _collect_ingestion_kpis(self, site_id: Optional[str] = None) -> IngestionKPIs:
+    def _collect_ingestion_kpis(self, site_id: str | None = None) -> IngestionKPIs:
         """Pull quality metrics and integration health from the integration repo."""
         try:
             health = self._integration_repo.get_integration_health(site_id)
@@ -178,9 +177,9 @@ class MonitoringService:
 
     async def _collect_commissioning(
         self,
-        site_id: Optional[str],
+        site_id: str | None,
         mode: IngestionMode,
-    ) -> Optional[CommissioningSnapshot]:
+    ) -> CommissioningSnapshot | None:
         """Run commissioning scorecard if not in SIMULATION mode.
 
         Per adjustment #3: if is_live_mode and site_id is missing,
@@ -222,10 +221,10 @@ class MonitoringService:
         self,
         ingestion: IngestionKPIs,
         control: ControlKPIs,
-        commissioning: Optional[CommissioningSnapshot],
+        commissioning: CommissioningSnapshot | None,
         mode: IngestionMode,
         is_live: bool,
-        site_id: Optional[str] = None,
+        site_id: str | None = None,
     ) -> list[MonitoringAlert]:
         """Evaluate monitoring alert rules.
 
@@ -420,7 +419,7 @@ class MonitoringService:
         and per-rule details.
         """
         try:
-            from app.services.quality_gate_evaluator import QualityGateEvaluator, _SIMULATION_DEFAULTS
+            from app.services.quality_gate_evaluator import _SIMULATION_DEFAULTS, QualityGateEvaluator
 
             evaluator = QualityGateEvaluator()
             mode_str = mode.value
@@ -468,7 +467,7 @@ class MonitoringService:
     # Provenance summary
     # ------------------------------------------------------------------
 
-    def _get_provenance_summary(self, site_id: Optional[str] = None) -> dict[str, int]:
+    def _get_provenance_summary(self, site_id: str | None = None) -> dict[str, int]:
         """Bucket log sources by connection type into live_protocol vs file_manual."""
         result = {"live_protocol": 0, "file_manual": 0}
 

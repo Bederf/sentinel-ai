@@ -188,7 +188,7 @@ def cmd_generate_alarms(args: argparse.Namespace) -> int:
     print(f"\nAlarm events exported to: {path}")
 
     # Load and summarize
-    with open(path, "r") as f:
+    with open(path) as f:
         alarms = json.load(f)
 
     summary = simulator.alarm_generator.get_alarm_summary(alarms)
@@ -230,6 +230,7 @@ def cmd_list_diffusers(args: argparse.Namespace) -> int:
 def cmd_generate_scenario(args: argparse.Namespace) -> int:
     """Generate a hospital-specific alarm scenario."""
     from pathlib import Path
+
     from .generators.alarm_events import AlarmEventGenerator
 
     config = SimulationConfig(site_id=args.site)

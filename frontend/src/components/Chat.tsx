@@ -41,6 +41,16 @@ export function Chat() {
   const inputRef = useRef<HTMLInputElement>(null);
   const hasLoadedSitesRef = useRef(false);
 
+  // Conversation ID for contextual memory — persists across messages in the same session
+  // and across page reloads via sessionStorage
+  const [conversationId, setConversationId] = useState<string>(() => {
+    const stored = sessionStorage.getItem("sentinel_conversation_id");
+    if (stored) return stored;
+    const id = crypto.randomUUID();
+    sessionStorage.setItem("sentinel_conversation_id", id);
+    return id;
+  });
+
   // Speech-to-text and text-to-speech hooks
   const stt = useSpeechRecognition();
   const tts = useTextToSpeech();
@@ -138,6 +148,10 @@ export function Chat() {
     setIsLoading(false);
     stt.reset();
     tts.stop();
+    // Start new conversation thread — generates new conversation ID for context memory
+    const newId = crypto.randomUUID();
+    sessionStorage.setItem("sentinel_conversation_id", newId);
+    setConversationId(newId);
     inputRef.current?.focus();
   };
 
@@ -164,7 +178,7 @@ export function Chat() {
     let fullResponse = "";
     try {
 
-      await streamChat(text, undefined, (chunk) => {
+      await streamChat(text, conversationId, (chunk) => {
         fullResponse += chunk;
         // Update the streaming message content in-place
         setMessages((prev) =>

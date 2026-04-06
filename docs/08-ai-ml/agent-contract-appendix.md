@@ -1,3 +1,18 @@
+---
+title: "Agent Contract Appendix: Quality Gate Metrics & Safety Boundary Rules"
+type: "guide"
+status: "draft"
+version: "1.0.0"
+created: "2026-03-31"
+updated: "2026-03-31"
+tags: ["sentinel", "documentation"]
+related: []
+domain: "bms"
+audience: "all"
+complexity: "intermediate"
+estimated_read_time: 10
+---
+
 # Agent Contract Appendix: Quality Gate Metrics & Safety Boundary Rules
 
 > **Version:** 1.0 | **Last Updated:** 2026-02-22

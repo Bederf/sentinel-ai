@@ -2,7 +2,7 @@
 
 This module defines protocol-agnostic device models that can represent
 any building automation device (HVAC, lighting, security, etc.) regardless
-of the underlying protocol (BACnet, Modbus, mock, etc.).
+of the underlying protocol (BACnet, Modbus, HTTP, etc.).
 """
 
 from dataclasses import dataclass, field
@@ -410,7 +410,7 @@ def create_device_from_dict(data: Dict[str, Any]) -> Device:
 
     # Set default values for required fields
     data.setdefault("id", str(uuid.uuid4()))
-    data.setdefault("protocol", ProtocolType.MOCK.value)
+    data.setdefault("protocol", ProtocolType.HTTP.value)
     data.setdefault("status", DeviceStatus.ONLINE.value)
 
     # Extract site_id from metadata.site_id if not provided directly
@@ -476,7 +476,7 @@ def create_device_from_dict(data: Dict[str, Any]) -> Device:
         try:
             data["protocol"] = ProtocolType(data["protocol"])
         except ValueError:
-            data["protocol"] = ProtocolType.MOCK
+            data["protocol"] = ProtocolType.HTTP
     if isinstance(data.get("status"), str):
         try:
             data["status"] = DeviceStatus(data["status"])

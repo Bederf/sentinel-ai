@@ -55,7 +55,7 @@ export const WaterAlertPanel: React.FC<WaterAlertPanelProps> = ({
       try {
         return await waterApi.getActiveAlerts(siteId);
       } catch {
-        // Fallback demo data
+        // Fallback seeded data
         return [
           {
             alert_id: "alert-w001",

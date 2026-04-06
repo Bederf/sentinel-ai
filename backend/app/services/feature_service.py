@@ -17,14 +17,14 @@ import logging
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict, List, Optional, Any
+from typing import Any, Optional
 
 from app.models.feature import (
-    FeatureDefinition,
-    FeatureSet,
     ComputedFeatures,
     FeatureBatchResponse,
+    FeatureDefinition,
     FeatureDefinitionsResponse,
+    FeatureSet,
 )
 from app.services.influxdb_service import get_influxdb_service
 
@@ -41,7 +41,7 @@ class FeatureComputeService:
     various aggregation methods (mean, std, min, max, trend).
     """
 
-    def __init__(self, definitions_path: Optional[str] = None):
+    def __init__(self, definitions_path: str | None = None):
         """Initialize the feature service.
 
         Args:
@@ -54,7 +54,7 @@ class FeatureComputeService:
             definitions_path = Path(definitions_path)
 
         self._definitions_path = definitions_path
-        self._definitions: Dict[str, Any] = {}
+        self._definitions: dict[str, Any] = {}
         self._load_definitions()
 
         # Get InfluxDB service
@@ -63,7 +63,7 @@ class FeatureComputeService:
     def _load_definitions(self) -> None:
         """Load feature definitions from JSON file."""
         try:
-            with open(self._definitions_path, "r") as f:
+            with open(self._definitions_path) as f:
                 self._definitions = json.load(f)
             logger.info(f"Loaded feature definitions v{self._definitions.get('version', 'unknown')}")
         except Exception as e:
@@ -88,7 +88,7 @@ class FeatureComputeService:
             equipment_specific=equipment_specific,
         )
 
-    def _get_feature_definitions(self, equipment_type: str) -> List[FeatureDefinition]:
+    def _get_feature_definitions(self, equipment_type: str) -> list[FeatureDefinition]:
         """Get feature definitions for an equipment type.
 
         Combines common features with type-specific features.
@@ -117,7 +117,7 @@ class FeatureComputeService:
         self,
         equipment_id: str,
         equipment_type: str,
-        as_of: Optional[datetime] = None,
+        as_of: datetime | None = None,
     ) -> ComputedFeatures:
         """Compute features for a single equipment.
 
@@ -132,14 +132,14 @@ class FeatureComputeService:
         start_time = time.time()
         as_of = as_of or datetime.utcnow()
 
-        features: Dict[str, Optional[float]] = {}
-        missing_sensors: List[str] = []
+        features: dict[str, float | None] = {}
+        missing_sensors: list[str] = []
 
         # Get feature definitions for this equipment type
         definitions = self._get_feature_definitions(equipment_type)
 
         # Group features by window_days to minimize queries
-        windows: Dict[int, List[FeatureDefinition]] = {}
+        windows: dict[int, list[FeatureDefinition]] = {}
         for fd in definitions:
             if fd.window_days not in windows:
                 windows[fd.window_days] = []
@@ -153,7 +153,7 @@ class FeatureComputeService:
             sensor_types = list(set(f.source_sensor for f in window_features))
 
             # Query sensor data
-            sensor_data: Dict[str, List[float]] = {}
+            sensor_data: dict[str, list[float]] = {}
             for sensor_type in sensor_types:
                 readings = self._influxdb.query_raw(
                     equipment_id=equipment_id,
@@ -187,9 +187,9 @@ class FeatureComputeService:
 
     def compute_batch(
         self,
-        equipment_ids: List[str],
+        equipment_ids: list[str],
         equipment_type: str,
-        as_of: Optional[datetime] = None,
+        as_of: datetime | None = None,
     ) -> FeatureBatchResponse:
         """Compute features for multiple equipment of the same type.
 
@@ -222,7 +222,7 @@ class FeatureComputeService:
             total_computation_time_ms=round(total_time_ms, 2),
         )
 
-    def _compute_aggregation(self, values: List[float], aggregation: str) -> Optional[float]:
+    def _compute_aggregation(self, values: list[float], aggregation: str) -> float | None:
         """Compute aggregation for a list of values.
 
         Args:
@@ -264,7 +264,7 @@ class FeatureComputeService:
             logger.warning(f"Unknown aggregation method: {aggregation}")
             return None
 
-    def _compute_trend(self, values: List[float]) -> Optional[float]:
+    def _compute_trend(self, values: list[float]) -> float | None:
         """Compute trend using linear regression slope.
 
         Uses simple linear regression: slope = sum((x-x_mean)(y-y_mean)) / sum((x-x_mean)^2)

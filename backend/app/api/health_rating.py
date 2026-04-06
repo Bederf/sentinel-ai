@@ -94,9 +94,7 @@ async def get_equipment_health_rating(equipment_id: str) -> HealthRating:
     if rating is None:
         # Compute a fresh rating
         calculator = _get_calculator()
-        from app.config.settings import settings
-
-        mode = "simulation" if settings.demo_mode else "equipment_table"
+        mode = "equipment_table"
         rating = await calculator.compute_rating(
             equipment_id=equipment_id,
             equipment=equipment,
@@ -284,7 +282,7 @@ async def recompute_health_assessment(request: RecomputeRequest) -> dict:
     - scope='site' requires site_id
     - scope='all' requires neither
     - Returns 202 Accepted with a job ID
-    - Runs recompute synchronously in demo mode, async otherwise
+    - Runs recompute synchronously in local mode, async otherwise
     """
     # Validate scope requirements
     if request.scope == "single" and not request.equipment_id:
@@ -326,7 +324,7 @@ async def recompute_health_assessment(request: RecomputeRequest) -> dict:
     except Exception as e:
         logger.debug("Audit log skipped for recompute: %s", e)
 
-    # Run recompute (sync in demo mode for simplicity)
+    # Run recompute (sync in local mode for simplicity)
     snapshot_svc = _get_snapshot_service()
     try:
         result: RecomputeResult = await snapshot_svc.recompute(

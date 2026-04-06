@@ -7,7 +7,6 @@ import threading
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional
 
 from app.database.supabase_client import get_supabase_client
 
@@ -50,7 +49,7 @@ def _dict_to_concierge(d: dict) -> ConciergeUser:
     )
 
 
-def list_concierges(site_id: Optional[str] = None) -> list[ConciergeUser]:
+def list_concierges(site_id: str | None = None) -> list[ConciergeUser]:
     """List all concierge users, optionally filtered by site_id."""
     try:
         query = _client().table("space_concierges").select("*")
@@ -63,7 +62,7 @@ def list_concierges(site_id: Optional[str] = None) -> list[ConciergeUser]:
         return []
 
 
-def get_concierge(concierge_id: str) -> Optional[ConciergeUser]:
+def get_concierge(concierge_id: str) -> ConciergeUser | None:
     """Get a single concierge by ID."""
     try:
         response = _client().table("space_concierges").select("*").eq("id", concierge_id).limit(1).execute()
@@ -98,7 +97,7 @@ def create_concierge(data: dict) -> ConciergeUser:
     return concierge
 
 
-def update_concierge(concierge_id: str, data: dict) -> Optional[ConciergeUser]:
+def update_concierge(concierge_id: str, data: dict) -> ConciergeUser | None:
     """Update an existing concierge. Returns updated user or None if not found."""
     with _lock:
         concierge = get_concierge(concierge_id)
@@ -128,7 +127,7 @@ def delete_concierge(concierge_id: str) -> bool:
             return False
 
 
-def find_concierge_for_room(site_id: str, building_code: str, floor: Optional[int] = None) -> Optional[ConciergeUser]:
+def find_concierge_for_room(site_id: str, building_code: str, floor: int | None = None) -> ConciergeUser | None:
     """Find the best matching active concierge for a room location."""
     concierges = list_concierges(site_id=site_id)
     active = [c for c in concierges if c.active]

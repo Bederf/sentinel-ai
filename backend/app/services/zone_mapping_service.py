@@ -4,11 +4,11 @@ Maps HVAC zones to DALI lighting zones for coordinated recommendations.
 Enables occupancy-driven multi-system control.
 """
 
+import json
 import logging
-from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 from pathlib import Path
-import json
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -40,9 +40,9 @@ class ZoneMappingService:
     """
 
     def __init__(self):
-        self._mappings: Dict[str, ZoneMapping] = {}
-        self._dali_to_hvac: Dict[str, List[str]] = {}
-        self._hvac_to_dali: Dict[str, str] = {}
+        self._mappings: dict[str, ZoneMapping] = {}
+        self._dali_to_hvac: dict[str, list[str]] = {}
+        self._hvac_to_dali: dict[str, str] = {}
         self._load_mappings()
 
     def _load_mappings(self):
@@ -63,7 +63,7 @@ class ZoneMappingService:
         # HVAC zones often subdivide: Zone-L12-N-A, Zone-L12-N-B or Zone-L12-A, Zone-L12-B
         self._generate_default_mappings()
 
-    def _parse_mappings(self, data: Dict[str, Any]):
+    def _parse_mappings(self, data: dict[str, Any]):
         """Parse mapping configuration."""
         for mapping_data in data.get("mappings", []):
             mapping = ZoneMapping(
@@ -133,7 +133,7 @@ class ZoneMappingService:
 
         logger.info(f"Generated {len(self._mappings)} default zone mappings")
 
-    def get_dali_zone_for_hvac(self, hvac_zone_id: str) -> Optional[str]:
+    def get_dali_zone_for_hvac(self, hvac_zone_id: str) -> str | None:
         """Get the corresponding DALI zone for an HVAC zone.
 
         Args:
@@ -144,7 +144,7 @@ class ZoneMappingService:
         """
         return self._hvac_to_dali.get(hvac_zone_id)
 
-    def get_hvac_zones_for_dali(self, dali_zone_id: str) -> List[str]:
+    def get_hvac_zones_for_dali(self, dali_zone_id: str) -> list[str]:
         """Get all HVAC zones that map to a DALI zone.
 
         Args:
@@ -155,23 +155,23 @@ class ZoneMappingService:
         """
         return self._dali_to_hvac.get(dali_zone_id, [])
 
-    def get_mapping(self, hvac_zone_id: str) -> Optional[ZoneMapping]:
+    def get_mapping(self, hvac_zone_id: str) -> ZoneMapping | None:
         """Get full mapping details for an HVAC zone."""
         return self._mappings.get(hvac_zone_id)
 
-    def get_all_mappings(self) -> List[ZoneMapping]:
+    def get_all_mappings(self) -> list[ZoneMapping]:
         """Get all zone mappings."""
         return list(self._mappings.values())
 
-    def get_zones_by_floor(self, floor: str) -> List[ZoneMapping]:
+    def get_zones_by_floor(self, floor: str) -> list[ZoneMapping]:
         """Get all zone mappings for a specific floor."""
         return [m for m in self._mappings.values() if m.floor == floor]
 
-    def get_zones_by_type(self, zone_type: str) -> List[ZoneMapping]:
+    def get_zones_by_type(self, zone_type: str) -> list[ZoneMapping]:
         """Get all zone mappings of a specific type."""
         return [m for m in self._mappings.values() if m.zone_type == zone_type]
 
-    def get_zones_by_priority(self, max_priority: int) -> List[ZoneMapping]:
+    def get_zones_by_priority(self, max_priority: int) -> list[ZoneMapping]:
         """Get all zone mappings with priority <= max_priority.
 
         Args:
@@ -194,7 +194,7 @@ class ZoneMappingService:
         self,
         equipment_id: str,
         site_id: str,
-    ) -> Optional[Dict[str, str]]:
+    ) -> dict[str, str] | None:
         """Parse floor and zone from v2.0 equipment ID.
 
         Args:
@@ -245,9 +245,9 @@ class ZoneMappingService:
 
     def auto_assign_equipment_to_zones(
         self,
-        equipment_list: List[Dict[str, Any]],
+        equipment_list: list[dict[str, Any]],
         site_id: str,
-    ) -> Dict[str, List[str]]:
+    ) -> dict[str, list[str]]:
         """Auto-assign equipment to zones based on parsed location.
 
         Args:
@@ -269,7 +269,7 @@ class ZoneMappingService:
               "Zone-L2": ["S002-AHU-L2"]
             }
         """
-        zone_assignments: Dict[str, List[str]] = {}
+        zone_assignments: dict[str, list[str]] = {}
 
         for equipment in equipment_list:
             eq_id = equipment.get("equipment_id", "")
@@ -372,9 +372,9 @@ class ZoneMappingService:
 
     def create_zones_from_equipment(
         self,
-        equipment_list: List[Dict[str, Any]],
+        equipment_list: list[dict[str, Any]],
         site_id: str,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Auto-generate zone definitions from discovered equipment.
 
         Args:
@@ -399,7 +399,7 @@ class ZoneMappingService:
               }
             ]
         """
-        zones_by_floor_letter: Dict[str, Dict[str, Any]] = {}
+        zones_by_floor_letter: dict[str, dict[str, Any]] = {}
 
         for equipment in equipment_list:
             eq_id = equipment.get("equipment_id", "")
@@ -435,7 +435,7 @@ class ZoneMappingService:
 
 
 # Singleton instance
-_zone_mapping_service: Optional[ZoneMappingService] = None
+_zone_mapping_service: ZoneMappingService | None = None
 
 
 def get_zone_mapping_service() -> ZoneMappingService:

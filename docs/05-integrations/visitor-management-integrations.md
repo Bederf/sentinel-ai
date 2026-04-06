@@ -172,22 +172,24 @@ For webhook delivery, the app also needs:
 
 **Component:** `n8n/workflows/visitor-intake-imap.json` — n8n workflow (Phase 178)
 
-### Accept-First Flow
+### Flow
 
-Same Accept-First logic handled in n8n:
+Accept-First is applied via IMAP. When the organizer creates a meeting, the invite copied to `info@` creates a PENDING visit (no QR email). When the visitor's acceptance reply arrives at `info@` (METHOD=REPLY, PARTSTAT=ACCEPTED), the QR email is sent.
 
 ```
-METHOD=REQUEST (new invite)  → POST /api/visits/internal → status=PENDING → no email
+METHOD=REQUEST (new invite)  → POST /api/visits/internal → status=PENDING → no email sent
 METHOD=REPLY + PARTSTAT=ACCEPTED → POST /api/visits/rsvp → status=CREATED → QR email sent
-METHOD=REPLY + PARTSTAT=DECLINED → POST /api/visits/rsvp → status=CANCELLED
+METHOD=REPLY + PARTSTAT=DECLINED → POST /api/visits/rsvp → status=CANCELLED → no email sent
 ```
+
+> Note: Acceptance replies arrive at `info@` when info@ is a shared mailbox on the organizer's account. Google Calendar and Graph webhook paths (Sections 1 & 2) handle accept-first natively via calendar API watching.
 
 ### Workflow Architecture
 
 ```
-[Poll info@ Inbox] → [Parse ICS Invite] → [Filter: request]     → POST PENDING
-                                            → [Filter: reply_accepted] → POST RSVP Accept → Build QR Email → Send Email
-                                            → [Filter: reply_declined] → POST RSVP Decline
+[Poll info@ Inbox] → [Parse ICS Invite] → [Filter: request]          → POST PENDING → (no email)
+                                         → [Filter: reply_accepted]   → POST RSVP Accept → Build QR Email → Send Email
+                                         → [Filter: reply_declined]    → POST RSVP Decline
 ```
 
 Each filter node (Code node) receives all parsed items and returns only the matching `_route` subset. The Switch node was replaced due to a bug in n8n 2.9.4 with `mode: expression` on empty input arrays.

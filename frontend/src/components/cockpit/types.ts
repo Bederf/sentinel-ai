@@ -1,6 +1,5 @@
-import type { DeploymentMode } from '@/lib/decisionSurface'
-
 export type CockpitRenderMode = 'embedded' | 'operator' | 'wall'
+export type CockpitGuidanceMode = 'waiting' | 'none' | 'watch' | 'prepare' | 'intervene_soon' | 'act_now'
 
 export interface CockpitMetricTone {
   tone: 'normal' | 'warning' | 'elevated' | 'critical'
@@ -26,19 +25,25 @@ export interface CockpitActiveCondition {
 }
 
 export interface CockpitDecision {
-  mode: DeploymentMode
   impact: string
   summary: string
-  command: string
-  operatorPrompt: string
-  expectedOutcome: string
   tradeoff: string
   confidence: string
-  verification: string
-  navigationPath: string[]
 }
 
 export type CockpitTwinRiskLevel = 'stable' | 'drift' | 'approaching' | 'critical'
+
+/** Email complaint cluster — surfaces in cockpit when email_count >= 3 */
+export interface EmailClusterData {
+  clusterId: string
+  zoneId: string
+  zoneName: string
+  floor: string
+  emailCount: number
+  complaintType: string
+  severity: 'low' | 'medium' | 'high' | 'critical'
+  summary: string
+}
 
 export interface CockpitTwinFloor {
   id: string
@@ -48,6 +53,7 @@ export interface CockpitTwinFloor {
   intensity: number
   spread: number
   elevation: number
+  isManaged?: boolean
 }
 
 export interface CockpitTwinZoneSignal {
@@ -60,16 +66,41 @@ export interface CockpitTwinZoneSignal {
   slot: number
   isPrimary: boolean
   actionLabel: string
+  /** Occupant email cluster heatmap data — present when email_count >= 3 */
+  intakeCluster?: EmailClusterData
+}
+
+export interface CockpitTwinFlowPath {
+  id: string
+  d: string
+  fromFloorId: string | null
+  toFloorId: string | null
+  intensity: number
+  direction: 'upward' | 'downward' | 'lateral' | 'contained' | 'building_wide'
 }
 
 export interface CockpitVisualTwin {
   headline: string
   activeLabel: string
   modeLabel: string
-  motionProfile: 'calm' | 'watch' | 'alert'
+  motionProfile: 'waiting' | 'calm' | 'watch' | 'alert'
+  breathingIntensity: number
+  flowSpeed: number
+  consumptionIntensity: number
   focusFloorId: string | null
   floors: CockpitTwinFloor[]
   zoneSignals: CockpitTwinZoneSignal[]
+  flowPaths: CockpitTwinFlowPath[]
+  energyCentre: {
+    online: boolean
+    totalKw: number
+    hvacKw: number
+    lightingKw: number
+    powerKw: number
+    loadRatio: number
+    powerShareRatio: number
+    stateLabel: 'low' | 'moderate' | 'high' | 'critical'
+  }
 }
 
 export interface CockpitEvidence {
@@ -118,8 +149,10 @@ export interface CockpitState {
   site: {
     id: string
     name: string
+    onboardingPhase: 'shadow' | 'advisory' | 'supervised' | 'auto'
     posture: string
-    mode: DeploymentMode
+    mode: CockpitGuidanceMode
+    renderState: 'waiting' | 'live'
     dataFreshnessLabel: string
   }
   sitePulse: CockpitSitePulse
@@ -130,4 +163,16 @@ export interface CockpitState {
   evidence: CockpitEvidence
   severity: CockpitSeverityInterpretation
   emergingRisks: CockpitRiskItem[]
+  /** Active occupant complaint clusters (count >= 3) — email heatmap signals */
+  emailClusters: EmailClusterData[]
+}
+
+export interface ModelReadiness {
+  siteId: string
+  trainingEnabled: boolean
+  ready: boolean
+  activeModelCount: number
+  equipmentTypesCovered: string[]
+  lastTrainingAt: string | null
+  message: string
 }

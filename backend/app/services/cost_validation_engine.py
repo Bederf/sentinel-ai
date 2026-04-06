@@ -17,8 +17,9 @@ import json
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Optional, Any, List
 from statistics import mean, stdev
+from typing import Any
+
 from app.database.supabase_client import get_supabase_client
 from app.services.simulation_store import get_simulation_store
 
@@ -55,7 +56,7 @@ class CostValidationEngine:
         energy_kwh: float,
         water_liters: float,
         cost_date: datetime,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Calculate daily cost from simulated consumption using current tariffs.
 
         Args:
@@ -97,7 +98,7 @@ class CostValidationEngine:
                 "total_cost_r": 0.0,
             }
 
-    async def _calculate_energy_cost(self, kwh: float, season: str) -> Dict[str, float]:
+    async def _calculate_energy_cost(self, kwh: float, season: str) -> dict[str, float]:
         """Calculate energy cost using TOU tariff."""
         # Johannesburg City Power commercial TOU rates (simplified to average)
         if season == "summer":
@@ -114,7 +115,7 @@ class CostValidationEngine:
             "total_cost_r": round(energy_cost + service_charge, 2),
         }
 
-    async def _calculate_water_cost(self, liters: float) -> Dict[str, float]:
+    async def _calculate_water_cost(self, liters: float) -> dict[str, float]:
         """Calculate water cost using Johannesburg tiered tariff."""
         # Tier thresholds (daily allocation of monthly)
         tier_1_daily = 100000 / 30  # First tier
@@ -160,7 +161,7 @@ class CostValidationEngine:
         self,
         simulated_date: datetime,
         daily_cost: Any,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Validate daily cost against running average.
 
         Called by thermal engine at hour 23 after daily cost is calculated.
@@ -239,10 +240,10 @@ class CostValidationEngine:
             }
 
     async def _get_expected_daily_cost(self) -> float:
-        """Get expected daily cost from invoices or demo data.
+        """Get expected daily cost from invoices or seeded data.
 
         Returns average daily cost from the most recent invoice data.
-        Falls back to demo fixtures if no real data available.
+        Falls back to seeded fixtures if no real data available.
         """
         try:
             # Try to get from real invoice data in database
@@ -265,7 +266,7 @@ class CostValidationEngine:
         except Exception as e:
             logger.debug(f"Could not get real invoice data: {e}")
 
-        # Fallback: try demo fixtures (3-tier: Supabase -> Cache -> JSON)
+        # Fallback: try seeded fixtures (3-tier: Supabase -> Cache -> JSON)
         try:
             fixture_path = _DATA_DIR / "demo_monthly_invoices.json"
             if fixture_path.exists():
@@ -277,7 +278,7 @@ class CostValidationEngine:
                         avg_monthly = mean(monthly_costs)
                         return avg_monthly / 30.0
         except Exception as e:
-            logger.debug(f"Could not load demo invoices: {e}")
+            logger.debug(f"Could not load seeded invoices: {e}")
 
         # Hardcoded fallback: estimate from typical commercial rate
         # ~315 kWh/day * R5/kWh = ~R1,575/day
@@ -288,9 +289,9 @@ class CostValidationEngine:
         month: int,
         year: int,
         real_invoice_cost_r: float,
-        simulated_total_kwh: Optional[float] = None,
-        simulated_total_water_liters: Optional[float] = None,
-    ) -> Dict[str, Any]:
+        simulated_total_kwh: float | None = None,
+        simulated_total_water_liters: float | None = None,
+    ) -> dict[str, Any]:
         """Validate simulated monthly cost against real invoice.
 
         Args:
@@ -390,7 +391,7 @@ class CostValidationEngine:
 
     async def _write_cost_validation_record(
         self,
-        validation_result: Dict[str, Any],
+        validation_result: dict[str, Any],
     ) -> None:
         """Write cost validation record to database."""
         try:
@@ -434,8 +435,8 @@ class CostValidationEngine:
 
     async def get_tariff_adjustment_recommendation(
         self,
-        historical_validations: List[Dict[str, Any]],
-    ) -> Dict[str, Any]:
+        historical_validations: list[dict[str, Any]],
+    ) -> dict[str, Any]:
         """Recommend tariff adjustments based on historical variance.
 
         Args:
@@ -518,9 +519,9 @@ async def validate_cost(
     month: int,
     year: int,
     real_invoice_cost_r: float,
-    simulated_total_kwh: Optional[float] = None,
-    simulated_total_water_liters: Optional[float] = None,
-) -> Dict[str, Any]:
+    simulated_total_kwh: float | None = None,
+    simulated_total_water_liters: float | None = None,
+) -> dict[str, Any]:
     """Public API for cost validation.
 
     Args:

@@ -9,17 +9,23 @@ Phase 53: SENTINEL Asset Management Workflow Integration
 
 import logging
 from datetime import datetime, timedelta
-from typing import Optional, Dict, List, Any
+from typing import Any
+
 from pydantic import BaseModel
+
+from app.database.repositories.baseline_repository import BaselineRepository
+from app.database.repositories.equipment_repository import EquipmentRepository
+from app.database.repositories.workflow_event_repository import get_workflow_event_repository
+from app.database.supabase_client import get_supabase_client
 
 # Import existing services
 try:
-    from app.services.baseline_service import get_baseline_service
-    from app.services.inspection_service import get_inspection_service
-    from app.services.ml_inference import get_lstm_service, get_anomaly_service
-    from app.services.explanation_service import get_explanation_service
-    from app.services.maintenance_recommender import get_maintenance_recommender
     from app.services.audit_logger import get_audit_logger
+    from app.services.baseline_service import get_baseline_service
+    from app.services.explanation_service import get_explanation_service
+    from app.services.inspection_service import get_inspection_service
+    from app.services.maintenance_recommender import get_maintenance_recommender
+    from app.services.ml_inference import get_anomaly_service, get_lstm_service
 except ImportError:
     # Fallback for development
     def get_baseline_service():
@@ -78,9 +84,9 @@ class OnboardAssetRequest(BaseModel):
     site_id: str
     site_name: str
     site_address: str
-    equipment: List[Dict[str, Any]]
+    equipment: list[dict[str, Any]]
     captured_by: str
-    notes: Optional[str] = None
+    notes: str | None = None
 
 
 class OnboardAssetResponse(BaseModel):
@@ -91,7 +97,7 @@ class OnboardAssetResponse(BaseModel):
     equipment_onboarded: int
     baselines_captured: int
     workflow_state: WorkflowState
-    equipment: List[Dict[str, Any]]
+    equipment: list[dict[str, Any]]
 
 
 class WorkflowStatusResponse(BaseModel):
@@ -100,11 +106,11 @@ class WorkflowStatusResponse(BaseModel):
     success: bool
     equipment_id: str
     current_state: WorkflowState
-    state_history: List[Dict[str, Any]]
-    active_inspection: Optional[Dict[str, Any]]
-    active_repair: Optional[Dict[str, Any]]
-    last_anomaly: Optional[Dict[str, Any]]
-    baseline_status: Dict[str, Any]
+    state_history: list[dict[str, Any]]
+    active_inspection: dict[str, Any] | None
+    active_repair: dict[str, Any] | None
+    last_anomaly: dict[str, Any] | None
+    baseline_status: dict[str, Any]
 
 
 class MLAnomalyTrigger(BaseModel):
@@ -128,7 +134,7 @@ class InspectionTriggerResponse(BaseModel):
     scheduled_date: datetime
     priority: str
     reason: str
-    workflow_transition: Dict[str, WorkflowState]
+    workflow_transition: dict[str, WorkflowState]
 
 
 class RepairValidationRequest(BaseModel):
@@ -146,8 +152,8 @@ class RepairValidationResponse(BaseModel):
     success: bool
     equipment_id: str
     work_order_id: str
-    effectiveness: Dict[str, Any]
-    workflow_transition: Dict[str, WorkflowState]
+    effectiveness: dict[str, Any]
+    workflow_transition: dict[str, WorkflowState]
     ml_feedback_recorded: bool
 
 
@@ -158,7 +164,7 @@ class StateTransition(BaseModel):
     to_state: WorkflowState
     transition_time: datetime
     trigger_reason: str
-    duration_seconds: Optional[int] = None
+    duration_seconds: int | None = None
 
 
 # ============================================================================
@@ -187,10 +193,13 @@ class AssetWorkflowOrchestrator:
         self.explanation_service = get_explanation_service()
         self.maintenance_recommender = get_maintenance_recommender()
         self.audit_logger = get_audit_logger()
+        self.equipment_repo = EquipmentRepository()
+        self.baseline_repo = BaselineRepository()
+        self.workflow_event_repo = get_workflow_event_repository()
 
-        # In-memory state management (demo scope)
-        self._equipment_states: Dict[str, WorkflowState] = {}
-        self._state_history: Dict[str, List[StateTransition]] = {}
+        # In-memory state management (local scope)
+        self._equipment_states: dict[str, WorkflowState] = {}
+        self._state_history: dict[str, list[StateTransition]] = {}
 
         logger.info("AssetWorkflowOrchestrator initialized")
 
@@ -214,39 +223,52 @@ class AssetWorkflowOrchestrator:
             # Step 2: Capture initial baseline for each equipment
             baselines_captured = 0
             for eq in request.equipment:
-                equipment_id = eq.get("equipment_id")
-                if not equipment_id:
+                equipment_ref = eq.get("equipment_id")
+                if not equipment_ref:
                     continue
 
+                db_equipment = self.equipment_repo.get_by_id(equipment_ref) or self.equipment_repo.get_by_uuid(
+                    equipment_ref
+                )
+                equipment_uuid = db_equipment.get("id") if db_equipment else equipment_ref
+
                 # Set initial state
-                self._set_state(equipment_id, WorkflowState.ONBOARDING)
+                self._set_state(equipment_ref, WorkflowState.ONBOARDING)
+
+                # Persist onboarding metadata to equipment record for durable state.
+                self._persist_onboarding_metadata(
+                    equipment_ref=equipment_ref,
+                    equipment_uuid=equipment_uuid,
+                    request=request,
+                    equipment_payload=eq,
+                    db_equipment=db_equipment or {},
+                )
 
                 baseline_values = eq.get("baseline_values", {})
                 baseline_id = None
-                if baseline_values:
-                    self._set_state(equipment_id, WorkflowState.BASELINE_CAPTURE)
-
-                    # Capture baseline (fallback to simulated capture if service missing)
-                    baseline_id = await self._capture_initial_baseline(
-                        equipment_id=equipment_id,
-                        baseline_values=baseline_values,
-                        captured_by=request.captured_by,
-                        notes=request.notes,
-                    )
+                self._set_state(equipment_ref, WorkflowState.BASELINE_CAPTURE)
+                baseline_id = await self._capture_initial_baseline(
+                    equipment_id=equipment_uuid,
+                    baseline_values=baseline_values,
+                    captured_by=request.captured_by,
+                    notes=request.notes,
+                    attachment_urls=eq.get("photo_links") or [],
+                )
+                if baseline_id:
                     baselines_captured += 1
 
                 # Transition to monitoring
-                self._set_state(equipment_id, WorkflowState.MONITORING)
+                self._set_state(equipment_ref, WorkflowState.MONITORING)
 
                 equipment_results.append(
-                    {"equipment_id": equipment_id, "baseline_id": baseline_id, "state": WorkflowState.MONITORING}
+                    {"equipment_id": equipment_ref, "baseline_id": baseline_id, "state": WorkflowState.MONITORING}
                 )
 
                 # Audit log
                 await self._audit_log(
-                    equipment_id=equipment_id,
+                    equipment_id=equipment_ref,
                     action="asset_onboarded",
-                    details={"site_id": request.site_id, "baseline_id": baseline_id},
+                    details={"site_id": request.site_id, "baseline_id": baseline_id, "equipment_uuid": equipment_uuid},
                 )
 
             return OnboardAssetResponse(
@@ -264,7 +286,8 @@ class AssetWorkflowOrchestrator:
 
     async def get_workflow_status(self, equipment_id: str) -> WorkflowStatusResponse:
         """Get current workflow status for equipment"""
-        current_state = self._equipment_states.get(equipment_id, WorkflowState.ONBOARDING)
+        persisted_state = self._get_persisted_state(equipment_id)
+        current_state = self._equipment_states.get(equipment_id, persisted_state or WorkflowState.ONBOARDING)
         state_history = self._get_state_history(equipment_id)
 
         # Get additional status from services
@@ -417,9 +440,10 @@ class AssetWorkflowOrchestrator:
             self._state_history[equipment_id].append(transition)
 
         self._equipment_states[equipment_id] = state
+        self._record_state_transition_event(equipment_id, from_state, state)
         logger.info(f"Workflow state: {equipment_id} -> {state}")
 
-    def _get_state_history(self, equipment_id: str) -> List[Dict[str, Any]]:
+    def _get_state_history(self, equipment_id: str) -> list[dict[str, Any]]:
         """Get state history for equipment"""
         history = self._state_history.get(equipment_id, [])
         return [
@@ -433,15 +457,154 @@ class AssetWorkflowOrchestrator:
         ]
 
     async def _capture_initial_baseline(
-        self, equipment_id: str, baseline_values: Dict[str, float], captured_by: str, notes: Optional[str]
-    ) -> str:
-        """Capture initial baseline for equipment"""
-        # Future: Call baseline service
-        baseline_id = f"bl-{equipment_id}-{datetime.now().strftime('%Y%m%d%H%M%S')}"
-        logger.info(f"Captured baseline {baseline_id} for {equipment_id}")
-        return baseline_id
+        self,
+        equipment_id: str,
+        baseline_values: dict[str, float],
+        captured_by: str,
+        notes: str | None,
+        attachment_urls: list[str] | None = None,
+    ) -> str | None:
+        """Capture initial baseline for equipment and persist it when schema supports it."""
+        persisted_values = baseline_values or {"onboarding_confirmed": 1}
+        try:
+            baseline = await self.baseline_repo.create_equipment_baseline(
+                equipment_id=equipment_id,
+                captured_by=captured_by,
+                baseline_type="onboarding",
+                baseline_values=persisted_values,
+                source_type="manual",
+                notes=notes,
+                attachment_urls=attachment_urls or [],
+            )
+            logger.info(f"Captured baseline {baseline.id} for {equipment_id}")
+            return baseline.id
+        except Exception as exc:
+            logger.warning(
+                "Baseline capture unavailable for %s during onboarding (continuing): %s",
+                equipment_id,
+                exc,
+            )
+            return None
 
-    async def _get_baseline(self, baseline_id: str) -> Optional[Dict[str, Any]]:
+    def _persist_onboarding_metadata(
+        self,
+        *,
+        equipment_ref: str,
+        equipment_uuid: str,
+        request: OnboardAssetRequest,
+        equipment_payload: dict[str, Any],
+        db_equipment: dict[str, Any],
+    ) -> None:
+        """Persist onboarding metadata into equipment rows for durable retrieval."""
+        client = get_supabase_client()
+        if not client:
+            return
+
+        now = datetime.now().isoformat()
+        operating_data = dict(db_equipment.get("operating_data") or {})
+        onboarding_meta = dict(operating_data.get("onboarding") or {})
+        onboarding_meta.update(
+            {
+                "onboarded": True,
+                "onboarded_at": now,
+                "captured_by": request.captured_by,
+                "notes": request.notes,
+                "service_sheet_ref": equipment_payload.get("service_sheet_ref"),
+                "photo_links": equipment_payload.get("photo_links") or [],
+                "age_years": equipment_payload.get("age_years"),
+                "equipment_ref": equipment_ref,
+            }
+        )
+        operating_data["onboarding"] = onboarding_meta
+
+        updates: dict[str, Any] = {
+            "operating_data": operating_data,
+            "updated_at": now,
+        }
+        if equipment_payload.get("manufacturer"):
+            updates["manufacturer"] = equipment_payload.get("manufacturer")
+        if equipment_payload.get("model"):
+            updates["model"] = equipment_payload.get("model")
+
+        age_years = equipment_payload.get("age_years")
+        if isinstance(age_years, (int, float)) and age_years > 0 and not db_equipment.get("install_date"):
+            try:
+                install_year = max(1970, datetime.now().year - int(age_years))
+                updates["install_date"] = f"{install_year}-01-01"
+            except Exception:
+                pass
+
+        try:
+            client.table("equipment").update(updates).eq("id", equipment_uuid).execute()
+        except Exception as exc:
+            logger.warning("Failed to persist onboarding metadata for %s: %s", equipment_ref, exc)
+
+    def _record_state_transition_event(
+        self,
+        equipment_id: str,
+        from_state: WorkflowState | None,
+        to_state: WorkflowState,
+    ) -> None:
+        """Persist workflow state transitions as events for durability."""
+        persisted_equipment_id = self._resolve_equipment_uuid(equipment_id)
+        event_payload = {
+            "equipment_id": persisted_equipment_id,
+            "trigger_type": "workflow_state",
+            "action_taken": "state_transition",
+            "source": "workflow_orchestrator",
+            "details": {
+                "equipment_ref": equipment_id,
+                "from_state": from_state.value if from_state else None,
+                "to_state": to_state.value,
+                "transition_time": datetime.now().isoformat(),
+            },
+            "success": True,
+        }
+        try:
+            self.workflow_event_repo.create(event_payload)
+        except Exception as exc:
+            logger.warning("Failed to persist workflow transition event for %s: %s", equipment_id, exc)
+
+    def _get_persisted_state(self, equipment_id: str) -> WorkflowState | None:
+        """Resolve latest workflow state from persisted events."""
+        persisted_equipment_id = self._resolve_equipment_uuid(equipment_id)
+        try:
+            events = self.workflow_event_repo.list(equipment_id=persisted_equipment_id, limit=20)
+            for event in events:
+                details = event.get("details") or {}
+                to_state = details.get("to_state")
+                if not to_state:
+                    continue
+                try:
+                    return WorkflowState(to_state)
+                except ValueError:
+                    continue
+        except Exception as exc:
+            logger.warning("Could not read persisted workflow state for %s: %s", equipment_id, exc)
+        return None
+
+    def _resolve_equipment_uuid(self, equipment_ref: str) -> str:
+        """Resolve code/uuid references to a canonical UUID for persistence tables."""
+        try:
+            if not equipment_ref:
+                return equipment_ref
+            # If already UUID-shaped, keep as-is.
+            import uuid
+
+            try:
+                uuid.UUID(str(equipment_ref))
+                return equipment_ref
+            except Exception:
+                pass
+
+            db_equipment = self.equipment_repo.get_by_id(equipment_ref)
+            if db_equipment and db_equipment.get("id"):
+                return db_equipment["id"]
+        except Exception:
+            pass
+        return equipment_ref
+
+    async def _get_baseline(self, baseline_id: str) -> dict[str, Any] | None:
         """Get baseline by ID"""
         # Future: Call baseline service
         baseline_id_lower = baseline_id.lower()
@@ -455,8 +618,8 @@ class AssetWorkflowOrchestrator:
         return {"id": baseline_id, "baseline_values": {"vibration_rms": 1.8, "motor_current": 145.2}}
 
     async def _calculate_effectiveness(
-        self, pre_baseline: Dict[str, Any], post_baseline: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, pre_baseline: dict[str, Any], post_baseline: dict[str, Any]
+    ) -> dict[str, Any]:
         """Calculate repair effectiveness from baseline comparison"""
         pre_values = pre_baseline.get("baseline_values", {})
         post_values = post_baseline.get("baseline_values", {})
@@ -484,7 +647,7 @@ class AssetWorkflowOrchestrator:
             "improvements": improvements,
         }
 
-    async def _record_ml_feedback(self, equipment_id: str, work_order_id: str, effectiveness: Dict[str, Any]) -> bool:
+    async def _record_ml_feedback(self, equipment_id: str, work_order_id: str, effectiveness: dict[str, Any]) -> bool:
         """Record repair outcome for ML training via MLFeedbackService."""
         try:
             from app.services.ml_feedback_service import get_ml_feedback_service
@@ -503,27 +666,27 @@ class AssetWorkflowOrchestrator:
             logger.warning(f"ML feedback recording failed (non-critical): {e}")
             return False
 
-    async def _get_baseline_status(self, equipment_id: str) -> Dict[str, Any]:
+    async def _get_baseline_status(self, equipment_id: str) -> dict[str, Any]:
         """Get baseline status for equipment"""
         # Future: Call baseline service
         return {"has_baseline": True, "last_capture": datetime.now().isoformat(), "deviation_status": "normal"}
 
-    async def _get_active_inspection(self, equipment_id: str) -> Optional[Dict[str, Any]]:
+    async def _get_active_inspection(self, equipment_id: str) -> dict[str, Any] | None:
         """Get active inspection for equipment"""
         # Future: Call inspection service
         return None
 
-    async def _get_active_repair(self, equipment_id: str) -> Optional[Dict[str, Any]]:
+    async def _get_active_repair(self, equipment_id: str) -> dict[str, Any] | None:
         """Get active repair for equipment"""
         # Future: Call work order service
         return None
 
-    async def _get_last_anomaly(self, equipment_id: str) -> Optional[Dict[str, Any]]:
+    async def _get_last_anomaly(self, equipment_id: str) -> dict[str, Any] | None:
         """Get last anomaly for equipment"""
         # Future: Call ML service
         return None
 
-    async def _audit_log(self, equipment_id: str, action: str, details: Dict[str, Any]):
+    async def _audit_log(self, equipment_id: str, action: str, details: dict[str, Any]):
         """Log workflow action to audit log"""
         if self.audit_logger:
             await self.audit_logger.log_workflow_event(equipment_id=equipment_id, action=action, details=details)
@@ -535,7 +698,7 @@ class AssetWorkflowOrchestrator:
 # Singleton Instance
 # ============================================================================
 
-_orchestrator_instance: Optional[AssetWorkflowOrchestrator] = None
+_orchestrator_instance: AssetWorkflowOrchestrator | None = None
 
 
 def get_workflow_orchestrator() -> AssetWorkflowOrchestrator:

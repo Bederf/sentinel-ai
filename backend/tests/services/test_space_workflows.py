@@ -115,6 +115,212 @@ async def test_ghost_room_monitor_creates_and_notifies():
 
 
 @pytest.mark.asyncio
+async def test_ghost_room_monitor_realerts_on_second_hour_window():
+    from app.services import occupancy_store
+    from app.services.ghost_room_monitor import scan_due_ghost_bookings
+
+    now = datetime(2026, 3, 10, 10, 5)
+    booking = BookingRecord(
+        id="booking-2hr",
+        site_id="site-002",
+        organiser_email="alice@example.com",
+        organiser_name="Alice Smith",
+        room_id="FA1-1Q2-MR4",
+        room_name="FA1-1Q2-MR4",
+        booking_date=now.date(),
+        start_time=datetime(2026, 3, 10, 9, 0),
+        end_time=datetime(2026, 3, 10, 11, 0),
+        raw_email_hash="hash-2hr",
+    )
+    existing = GhostBookingFinding(
+        id="ghost-2hr",
+        site_id="site-002",
+        room_code="FA1-1Q2-MR4",
+        room_name="FA1-1Q2-MR4",
+        booking_id="booking-2hr",
+        organiser_email="alice@example.com",
+        organiser_name="Alice Smith",
+        booking_start=booking.start_time,
+        booking_end=booking.end_time,
+        grace_period_minutes=5,
+        detected_at=datetime(2026, 3, 10, 9, 5),
+        status="pending_inspection",
+        notification_sent=True,
+        notification_sent_at=datetime(2026, 3, 10, 9, 5),
+        reminder_sent=True,
+    )
+    occupancy_store.save_ghost_finding(existing)
+
+    real_now = datetime.utcnow()
+    occupancy_store.save_event(
+        OccupancyEvent(
+            room_code="FA1-1Q2-MR4",
+            sensor_id="node_001",
+            occupied=False,
+            timestamp=real_now,
+            received_at=real_now,
+        )
+    )
+
+    send_alert = AsyncMock(return_value={"success": True})
+    with (
+        patch("app.services.ghost_room_monitor.get_registered_site_ids", return_value=["site-002"]),
+        patch("app.services.ghost_room_monitor.get_booking_store") as get_store,
+        patch(
+            "app.services.ghost_room_monitor.get_block_booking_config",
+            return_value=BlockBookingConfig(site_id="site-002"),
+        ),
+        patch("app.services.ghost_room_monitor.send_ghost_booking_alert", send_alert),
+    ):
+        get_store.return_value.get_bookings_for_site.side_effect = lambda site_id, target_date: (
+            [booking] if target_date == date(2026, 3, 10) else []
+        )
+        result = await scan_due_ghost_bookings(now=now)
+
+    assert result["ghost_findings_created"] == 0
+    assert result["notifications_sent"] == 1
+    assert result["reminders_sent"] == 0
+    send_alert.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_ghost_room_monitor_does_not_realert_before_next_hour_window():
+    from app.services import occupancy_store
+    from app.services.ghost_room_monitor import scan_due_ghost_bookings
+
+    now = datetime(2026, 3, 10, 9, 50)
+    booking = BookingRecord(
+        id="booking-2hr-early",
+        site_id="site-002",
+        organiser_email="alice@example.com",
+        organiser_name="Alice Smith",
+        room_id="FA1-1Q2-MR4",
+        room_name="FA1-1Q2-MR4",
+        booking_date=now.date(),
+        start_time=datetime(2026, 3, 10, 9, 0),
+        end_time=datetime(2026, 3, 10, 11, 0),
+        raw_email_hash="hash-2hr-early",
+    )
+    existing = GhostBookingFinding(
+        id="ghost-2hr-early",
+        site_id="site-002",
+        room_code="FA1-1Q2-MR4",
+        room_name="FA1-1Q2-MR4",
+        booking_id="booking-2hr-early",
+        organiser_email="alice@example.com",
+        organiser_name="Alice Smith",
+        booking_start=booking.start_time,
+        booking_end=booking.end_time,
+        grace_period_minutes=5,
+        detected_at=datetime(2026, 3, 10, 9, 5),
+        status="pending_inspection",
+        notification_sent=True,
+        notification_sent_at=datetime(2026, 3, 10, 9, 5),
+        reminder_sent=True,
+    )
+    occupancy_store.save_ghost_finding(existing)
+
+    real_now = datetime.utcnow()
+    occupancy_store.save_event(
+        OccupancyEvent(
+            room_code="FA1-1Q2-MR4",
+            sensor_id="node_001",
+            occupied=False,
+            timestamp=real_now,
+            received_at=real_now,
+        )
+    )
+
+    send_alert = AsyncMock(return_value={"success": True})
+    with (
+        patch("app.services.ghost_room_monitor.get_registered_site_ids", return_value=["site-002"]),
+        patch("app.services.ghost_room_monitor.get_booking_store") as get_store,
+        patch(
+            "app.services.ghost_room_monitor.get_block_booking_config",
+            return_value=BlockBookingConfig(site_id="site-002"),
+        ),
+        patch("app.services.ghost_room_monitor.send_ghost_booking_alert", send_alert),
+    ):
+        get_store.return_value.get_bookings_for_site.side_effect = lambda site_id, target_date: (
+            [booking] if target_date == date(2026, 3, 10) else []
+        )
+        result = await scan_due_ghost_bookings(now=now)
+
+    assert result["notifications_sent"] == 0
+    assert result["reminders_sent"] == 0
+    send_alert.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_ghost_room_monitor_stops_after_booking_cancellation():
+    from app.services import occupancy_store
+    from app.services.ghost_room_monitor import scan_due_ghost_bookings
+
+    now = datetime(2026, 3, 10, 9, 25)
+    cancelled_booking = BookingRecord(
+        id="booking-cancelled",
+        site_id="site-002",
+        organiser_email="alice@example.com",
+        organiser_name="Alice Smith",
+        room_id="FA1-1Q2-MR4",
+        room_name="FA1-1Q2-MR4",
+        booking_date=now.date(),
+        start_time=datetime(2026, 3, 10, 9, 0),
+        end_time=datetime(2026, 3, 10, 11, 0),
+        raw_email_hash="hash-cancelled",
+    )
+    existing = GhostBookingFinding(
+        id="ghost-cancelled",
+        site_id="site-002",
+        room_code="FA1-1Q2-MR4",
+        room_name="FA1-1Q2-MR4",
+        booking_id="booking-cancelled",
+        organiser_email="alice@example.com",
+        organiser_name="Alice Smith",
+        booking_start=cancelled_booking.start_time,
+        booking_end=cancelled_booking.end_time,
+        grace_period_minutes=5,
+        detected_at=datetime(2026, 3, 10, 9, 5),
+        status="pending_inspection",
+        notification_sent=True,
+        notification_sent_at=datetime(2026, 3, 10, 9, 5),
+    )
+    occupancy_store.save_ghost_finding(existing)
+
+    real_now = datetime.utcnow()
+    occupancy_store.save_event(
+        OccupancyEvent(
+            room_code="FA1-1Q2-MR4",
+            sensor_id="node_001",
+            occupied=False,
+            timestamp=real_now,
+            received_at=real_now,
+        )
+    )
+
+    send_alert = AsyncMock(return_value={"success": True})
+    with (
+        patch("app.services.ghost_room_monitor.get_registered_site_ids", return_value=["site-002"]),
+        patch("app.services.ghost_room_monitor.get_booking_store") as get_store,
+        patch(
+            "app.services.ghost_room_monitor.get_block_booking_config",
+            return_value=BlockBookingConfig(site_id="site-002"),
+        ),
+        patch("app.services.ghost_room_monitor.send_ghost_booking_alert", send_alert),
+    ):
+        # Simulate that the booking was cancelled after the first notification:
+        # the booking store no longer returns it for scans.
+        get_store.return_value.get_bookings_for_site.return_value = []
+        result = await scan_due_ghost_bookings(now=now)
+
+    assert result["bookings_scanned"] == 0
+    assert result["ghost_findings_created"] == 0
+    assert result["notifications_sent"] == 0
+    assert result["reminders_sent"] == 0
+    send_alert.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_process_concierge_whatsapp_reply_yes_marks_occupied():
     from app.services import occupancy_store
     from app.services.ghost_room_notifier import process_concierge_whatsapp_reply
@@ -243,6 +449,49 @@ async def test_ghost_booking_notifier_sends_email_and_whatsapp_details():
     assert payload["booking_date"] == "2026-03-10"
     assert payload["source_booking_flagged"] is True
     whatsapp_service.send_text_message.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_ghost_booking_notifier_resets_reminder_cycle_on_fresh_realert():
+    from app.services import occupancy_store
+    from app.services.ghost_room_notifier import send_ghost_booking_alert
+
+    finding = GhostBookingFinding(
+        id="ghost-realert",
+        site_id="site-002",
+        room_code="S002-L1-MR1",
+        room_name="S002-L1-MR1",
+        booking_id="booking-realert",
+        organiser_email="alice@example.com",
+        organiser_name="Alice Smith",
+        booking_start=datetime(2026, 3, 10, 9, 0),
+        booking_end=datetime(2026, 3, 10, 11, 0),
+        grace_period_minutes=5,
+        detected_at=datetime(2026, 3, 10, 9, 5),
+        status="pending_inspection",
+        notification_sent=True,
+        notification_sent_at=datetime(2026, 3, 10, 9, 5),
+        reminder_sent=True,
+        reminder_sent_at=datetime(2026, 3, 10, 9, 20),
+    )
+    occupancy_store.save_ghost_finding(finding)
+    config = BlockBookingConfig(
+        site_id="site-002",
+        concierge_email="",
+        concierge_whatsapp="whatsapp:+27721234567",
+    )
+    whatsapp_service = AsyncMock()
+    whatsapp_service.send_text_message.return_value = {"success": True, "message_id": "WA-RE-001"}
+
+    with patch("app.integrations.whatsapp_service.get_whatsapp_service", return_value=whatsapp_service):
+        result = await send_ghost_booking_alert(finding, config, site_name="Site 002")
+
+    updated = occupancy_store.get_ghost_finding_by_id("ghost-realert")
+    assert result["success"] is True
+    assert updated is not None
+    assert updated.reminder_sent is False
+    assert updated.reminder_sent_at is None
+    assert updated.whatsapp_message_id == "WA-RE-001"
 
 
 def test_parse_mqtt_presence_message_prefers_zone_as_room_code():

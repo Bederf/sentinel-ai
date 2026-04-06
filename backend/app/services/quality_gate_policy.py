@@ -17,7 +17,6 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +71,7 @@ class ReasonCode(str, Enum):
 # Metric -> ReasonCode mapping
 # ---------------------------------------------------------------------------
 
-METRIC_REASON_CODES: Dict[str, ReasonCode] = {
+METRIC_REASON_CODES: dict[str, ReasonCode] = {
     "freshness_minutes": ReasonCode.DATA_FRESHNESS_FAIL,
     "ingest_error_rate_pct_1h": ReasonCode.INGEST_ERROR_RATE_FAIL,
     "match_coverage_pct": ReasonCode.MATCH_COVERAGE_FAIL,
@@ -108,8 +107,8 @@ class MetricThreshold:
     When warn_bound is None, there is no WARN band (pass or fail directly).
     """
 
-    pass_bound: Optional[float] = None
-    warn_bound: Optional[float] = None
+    pass_bound: float | None = None
+    warn_bound: float | None = None
     direction: str = "lower_is_better"
     na: bool = False
 
@@ -148,7 +147,7 @@ class QualityGatePolicy:
     """
 
     # Class-level threshold registry: (metric, mode) -> MetricThreshold
-    THRESHOLDS: Dict[tuple, MetricThreshold] = {
+    THRESHOLDS: dict[tuple, MetricThreshold] = {
         # ===================================================================
         # SIMULATION mode
         # ===================================================================
@@ -279,7 +278,7 @@ class QualityGatePolicy:
     }
 
     # All 14 metric names (ordered for consistent iteration)
-    METRIC_NAMES: List[str] = [
+    METRIC_NAMES: list[str] = [
         "freshness_minutes",
         "ingest_error_rate_pct_1h",
         "match_coverage_pct",
@@ -296,9 +295,9 @@ class QualityGatePolicy:
         "drift_critical_alerts_24h",
     ]
 
-    MODES: List[str] = ["simulation", "shadow_live", "live_control"]
+    MODES: list[str] = ["simulation", "shadow_live", "live_control"]
 
-    def get_thresholds(self, mode: str) -> Dict[str, MetricThreshold]:
+    def get_thresholds(self, mode: str) -> dict[str, MetricThreshold]:
         """Get all 14 metric thresholds for a given mode.
 
         Args:
@@ -341,7 +340,7 @@ class MetricRuleResult:
     value: float
     state: RuleState
     threshold: MetricThreshold
-    reason_code: Optional[ReasonCode] = None
+    reason_code: ReasonCode | None = None
 
 
 @dataclass
@@ -349,11 +348,11 @@ class QualityGateResult:
     """Aggregate result of evaluating all quality gate metrics."""
 
     overall: GateStatus
-    rule_results: List[MetricRuleResult]
-    failed_rules: List[str]
-    warn_rules: List[str]
+    rule_results: list[MetricRuleResult]
+    failed_rules: list[str]
+    warn_rules: list[str]
     enforcement: EnforcementAction
-    reason_codes: List[ReasonCode]
+    reason_codes: list[ReasonCode]
     mode: str
     evaluated_at: str = ""
 

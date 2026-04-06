@@ -7,8 +7,8 @@ Stores HealthRating snapshots in asset_health_snapshots (Supabase) and
 aggregates daily rollups. Provides a recompute job that can process
 single equipment, a site, or all equipment.
 
-DEMO MODE: When Supabase is unavailable, stores snapshots in-memory
-so tests and demo mode work without a database.
+When Supabase is unavailable, stores snapshots in-memory
+so tests and local/offline operation work without a database.
 
 HARD RULE: Only writes health_score and health_status.
 NEVER writes risk probabilities.
@@ -18,7 +18,7 @@ import logging
 import time
 from collections import defaultdict
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from app.models.health_rating import (
     DailyRollup,
@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 class HealthSnapshotService:
     """Service for storing and retrieving health rating snapshots.
 
-    Supports Supabase persistence with in-memory fallback for demo mode.
+    Supports Supabase persistence with in-memory fallback for local/offline mode.
     """
 
     def __init__(self):
@@ -41,8 +41,8 @@ class HealthSnapshotService:
         self._use_memory = False
 
         # In-memory fallback storage (keyed by equipment_id)
-        self._memory_snapshots: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
-        self._memory_rollups: Dict[str, Dict[str, Dict[str, Any]]] = defaultdict(dict)
+        self._memory_snapshots: dict[str, list[dict[str, Any]]] = defaultdict(list)
+        self._memory_rollups: dict[str, dict[str, dict[str, Any]]] = defaultdict(dict)
 
         self._init_supabase()
 
@@ -67,7 +67,7 @@ class HealthSnapshotService:
     async def store_snapshot(
         self,
         rating: HealthRating,
-        site_id: Optional[str] = None,
+        site_id: str | None = None,
     ) -> str:
         """Store a health rating snapshot.
 
@@ -107,7 +107,7 @@ class HealthSnapshotService:
         return await self._store_supabase(snapshot_data, rating)
 
     def _store_memory(self, snapshot_data: dict) -> str:
-        """Store snapshot in memory (demo/test fallback)."""
+        """Store snapshot in memory (test/local fallback)."""
         import uuid
 
         snapshot_id = str(uuid.uuid4())
@@ -156,7 +156,7 @@ class HealthSnapshotService:
     # Retrieve
     # ------------------------------------------------------------------
 
-    async def get_latest(self, equipment_id: str) -> Optional[HealthRating]:
+    async def get_latest(self, equipment_id: str) -> HealthRating | None:
         """Get the most recent snapshot for an equipment item.
 
         Args:
@@ -192,7 +192,7 @@ class HealthSnapshotService:
         self,
         equipment_id: str,
         range_days: int = 7,
-    ) -> List[HealthRating]:
+    ) -> list[HealthRating]:
         """Get snapshots within the given range.
 
         Args:
@@ -228,7 +228,7 @@ class HealthSnapshotService:
         self,
         equipment_id: str,
         range_days: int = 30,
-    ) -> List[DailyRollup]:
+    ) -> list[DailyRollup]:
         """Get daily rollups for an equipment item.
 
         If rollups are missing in Supabase, computes them from snapshots.
@@ -360,8 +360,8 @@ class HealthSnapshotService:
     async def recompute(
         self,
         scope: str,
-        equipment_id: Optional[str] = None,
-        site_id: Optional[str] = None,
+        equipment_id: str | None = None,
+        site_id: str | None = None,
     ) -> RecomputeResult:
         """Recompute health ratings for the given scope.
 
@@ -442,9 +442,9 @@ class HealthSnapshotService:
     async def _get_equipment_list(
         self,
         scope: str,
-        equipment_id: Optional[str],
-        site_id: Optional[str],
-    ) -> List[Dict[str, Any]]:
+        equipment_id: str | None,
+        site_id: str | None,
+    ) -> list[dict[str, Any]]:
         """Get equipment list based on scope."""
         if scope == "single" and equipment_id:
             return [await self._get_single_equipment(equipment_id)]
@@ -462,7 +462,7 @@ class HealthSnapshotService:
             logger.error(f"Could not get equipment list: {e}")
             return []
 
-    async def _get_single_equipment(self, equipment_id: str) -> Dict[str, Any]:
+    async def _get_single_equipment(self, equipment_id: str) -> dict[str, Any]:
         """Get a single equipment item by ID or code."""
         try:
             from app.database.repositories.equipment_repository import (
@@ -483,8 +483,6 @@ class HealthSnapshotService:
         try:
             from app.config.settings import settings
 
-            if settings.demo_mode:
-                return "simulation"
             # Check for resolved_ingestion_mode attribute
             if hasattr(settings, "resolved_ingestion_mode"):
                 mode = settings.resolved_ingestion_mode

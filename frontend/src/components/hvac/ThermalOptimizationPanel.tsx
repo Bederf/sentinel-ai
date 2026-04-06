@@ -8,7 +8,7 @@
  */
 
 import { useState, useEffect, useRef } from "react";
-import { Text, Badge, Flex, Grid, Tab, TabGroup, TabList, TabPanel, TabPanels } from "@tremor/react";
+import { Text, Flex, Grid, Tab, TabGroup, TabList, TabPanel, TabPanels } from "@tremor/react";
 import { Thermometer, Clock, Zap, AlertTriangle } from "lucide-react";
 import { hvacApi, type ThermalRunway } from "../../lib/hvacApi";
 import { ThermalRunwayChart } from "../ThermalRunwayChart";
@@ -80,6 +80,28 @@ export function ThermalOptimizationPanel({ siteId, compact = false }: ThermalOpt
 
   const { data, metrics, outage_period, current_conditions } = thermalData;
 
+  function chipStyle(kind: "blue" | "gray" | "red") {
+    if (kind === "blue") {
+      return {
+        background: "rgba(59, 130, 246, 0.14)",
+        color: "var(--color-sentinel-blue)",
+        border: "1px solid rgba(59, 130, 246, 0.30)",
+      };
+    }
+    if (kind === "red") {
+      return {
+        background: "rgba(239, 68, 68, 0.14)",
+        color: "var(--color-sentinel-red)",
+        border: "1px solid rgba(239, 68, 68, 0.30)",
+      };
+    }
+    return {
+      background: "rgba(148, 163, 184, 0.14)",
+      color: "var(--color-sentinel-text-secondary)",
+      border: "1px solid rgba(148, 163, 184, 0.28)",
+    };
+  }
+
   // Compact view
   if (compact) {
     return (
@@ -89,9 +111,9 @@ export function ThermalOptimizationPanel({ siteId, compact = false }: ThermalOpt
             <Thermometer className="w-5 h-5" style={{ color: "var(--color-sentinel-blue)" }} />
             <Text className="font-medium">Thermal Runway</Text>
           </Flex>
-          <Badge color="blue" size="lg">
+          <span className="text-base px-3.5 py-0.5 rounded font-medium" style={chipStyle("blue")}>
             +{metrics.improvement_percent}% with pre-cooling
-          </Badge>
+          </span>
         </Flex>
 
         <Grid className="grid grid-cols-2 gap-4">
@@ -131,12 +153,12 @@ export function ThermalOptimizationPanel({ siteId, compact = false }: ThermalOpt
           <Text>Load shedding preparation and thermal modeling</Text>
         </div>
         <div className="flex gap-2">
-          <Badge color="gray">
+          <span className="text-xs px-2 py-0.5 rounded" style={chipStyle("gray")}>
             Current: {current_conditions.avg_temperature}°C
-          </Badge>
-          <Badge color="red">
+          </span>
+          <span className="text-xs px-2 py-0.5 rounded" style={chipStyle("red")}>
             Comfort Limit: {current_conditions.comfort_limit}°C
-          </Badge>
+          </span>
         </div>
       </Flex>
 

@@ -8,7 +8,7 @@ Default lambda = 0.01 gives a half-life of ~69 days (ln(2)/0.01 = 69.3).
 """
 
 import math
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from app.services.correlation.candidate_generator import CandidateSignal
 
@@ -53,11 +53,11 @@ def compute_days_elapsed(
         Days elapsed as a float.
     """
     if reference_date is None:
-        reference_date = datetime.now(timezone.utc)
+        reference_date = datetime.now(UTC)
 
     # If signal_created_at is naive, assume UTC
     if signal_created_at.tzinfo is None:
-        signal_created_at = signal_created_at.replace(tzinfo=timezone.utc)
+        signal_created_at = signal_created_at.replace(tzinfo=UTC)
 
     return (reference_date - signal_created_at).total_seconds() / 86400.0
 

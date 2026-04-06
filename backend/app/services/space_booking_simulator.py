@@ -5,18 +5,18 @@ from __future__ import annotations
 import json
 import logging
 import random
-from hashlib import sha256
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
+from hashlib import sha256
 from pathlib import Path
 
 from app.api.block_bookings import get_block_booking_config
 from app.api.space_settings import get_space_setting
+from app.services import occupancy_store
 from app.services.block_booking_detector.booking_store import get_booking_store
 from app.services.block_booking_detector.email_parser import parse_booking_confirmation
 from app.services.block_booking_detector.notifier import send_block_booking_alert
 from app.services.block_booking_detector.overlap_detector import detect_overlaps
-from app.services import occupancy_store
 from app.services.site_holiday_service import get_site_holiday_service
 from app.services.space_event_service import process_occupancy_event
 

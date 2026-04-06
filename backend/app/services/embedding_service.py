@@ -9,7 +9,6 @@ import logging
 import time
 from collections import OrderedDict
 from threading import Lock
-from typing import List
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +30,7 @@ class _EmbeddingCache:
     """
 
     def __init__(self, max_size: int = _CACHE_MAX_SIZE):
-        self._cache: OrderedDict[str, tuple[List[float], float, int]] = OrderedDict()
+        self._cache: OrderedDict[str, tuple[list[float], float, int]] = OrderedDict()
         self._max_size = max_size
         self._lock = Lock()
         self._hits = 0
@@ -41,7 +40,7 @@ class _EmbeddingCache:
     def _key(text: str) -> str:
         return hashlib.md5(text.encode(), usedforsecurity=False).hexdigest()
 
-    def get(self, text: str) -> List[float] | None:
+    def get(self, text: str) -> list[float] | None:
         key = self._key(text)
         with self._lock:
             entry = self._cache.get(key)
@@ -61,7 +60,7 @@ class _EmbeddingCache:
             self._cache.move_to_end(key)
             return embedding
 
-    def put(self, text: str, embedding: List[float]) -> None:
+    def put(self, text: str, embedding: list[float]) -> None:
         key = self._key(text)
         with self._lock:
             if key in self._cache:
@@ -109,7 +108,7 @@ class EmbeddingService:
         """Pre-load the model so first real query doesn't pay the cost."""
         _ = self.model
 
-    def embed_text(self, text: str) -> List[float]:
+    def embed_text(self, text: str) -> list[float]:
         """Generate embedding for a single text (with LRU cache)."""
         # Skip cache for very short strings (not meaningful queries)
         if len(text) > 10:
@@ -124,7 +123,7 @@ class EmbeddingService:
 
         return embedding
 
-    def embed_batch(self, texts: List[str], batch_size: int = 32) -> List[List[float]]:
+    def embed_batch(self, texts: list[str], batch_size: int = 32) -> list[list[float]]:
         """Generate embeddings for multiple texts efficiently."""
         if not texts:
             return []

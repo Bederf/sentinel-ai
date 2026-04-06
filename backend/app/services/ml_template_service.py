@@ -8,9 +8,8 @@ to ask targeted questions rather than open-ended ones.
 """
 
 import json
-from typing import Dict, Any, Optional, List
 from pathlib import Path
-
+from typing import Any
 
 # Root cause options by equipment type for confirmation prompts
 ROOT_CAUSE_OPTIONS = {
@@ -67,7 +66,7 @@ ROOT_CAUSE_OPTIONS = {
 class MLTemplateService:
     """Service for managing ML data collection templates."""
 
-    def __init__(self, templates_path: Optional[str] = None):
+    def __init__(self, templates_path: str | None = None):
         """Initialize template service.
 
         Args:
@@ -82,14 +81,14 @@ class MLTemplateService:
 
         self._templates = None
 
-    def _load_templates(self) -> Dict[str, Any]:
+    def _load_templates(self) -> dict[str, Any]:
         """Load templates from JSON file."""
         if self._templates is None:
-            with open(self.templates_path, "r") as f:
+            with open(self.templates_path) as f:
                 self._templates = json.load(f)
         return self._templates
 
-    def get_template(self, equipment_type: str, service_type: str) -> Optional[Dict[str, Any]]:
+    def get_template(self, equipment_type: str, service_type: str) -> dict[str, Any] | None:
         """Get template for equipment type and service type.
 
         Args:
@@ -125,7 +124,7 @@ class MLTemplateService:
 
         return template
 
-    def get_next_prompt(self, equipment_type: str, service_type: str, collected_items: list) -> Optional[str]:
+    def get_next_prompt(self, equipment_type: str, service_type: str, collected_items: list) -> str | None:
         """Get the next prompt for data collection.
 
         Args:
@@ -174,7 +173,7 @@ class MLTemplateService:
 
         return missing
 
-    def validate_collected_items(self, equipment_type: str, service_type: str, collected_items: list) -> Dict[str, Any]:
+    def validate_collected_items(self, equipment_type: str, service_type: str, collected_items: list) -> dict[str, Any]:
         """Validate collected items against template.
 
         Args:
@@ -202,7 +201,7 @@ class MLTemplateService:
             "completion_percentage": (len(collected_items) / len(required_items) * 100) if required_items else 0,
         }
 
-    def get_validation_rules(self, equipment_type: str, service_type: str) -> Dict[str, Any]:
+    def get_validation_rules(self, equipment_type: str, service_type: str) -> dict[str, Any]:
         """Get validation rules for readings.
 
         Args:
@@ -218,7 +217,7 @@ class MLTemplateService:
 
         return template.get("validation_rules", {})
 
-    def get_audio_config(self, equipment_type: str, service_type: str) -> Optional[Dict[str, Any]]:
+    def get_audio_config(self, equipment_type: str, service_type: str) -> dict[str, Any] | None:
         """Get audio recording configuration.
 
         Args:
@@ -258,10 +257,10 @@ class MLTemplateService:
         self,
         equipment_type: str,
         service_type: str,
-        diagnostic_context: Optional[Dict[str, Any]],
-        collected_items: List[str],
+        diagnostic_context: dict[str, Any] | None,
+        collected_items: list[str],
         current_step: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Generate context-aware prompt based on diagnostic context.
 
         Instead of asking open-ended questions, uses the known fault
@@ -371,7 +370,7 @@ class MLTemplateService:
         standard_prompt = self.get_next_prompt(equipment_type, service_type, collected_items)
         return {"prompt": standard_prompt, "type": "open_text", "options": None}
 
-    def get_breakdown_flow(self, equipment_type: str, diagnostic_context: Optional[Dict[str, Any]]) -> List[str]:
+    def get_breakdown_flow(self, equipment_type: str, diagnostic_context: dict[str, Any] | None) -> list[str]:
         """Get the ordered flow of steps for breakdown data collection.
 
         Args:
@@ -405,8 +404,8 @@ class MLTemplateService:
         ]
 
     def extract_info_from_response(
-        self, equipment_type: str, diagnostic_context: Optional[Dict[str, Any]], response_text: str
-    ) -> Dict[str, Any]:
+        self, equipment_type: str, diagnostic_context: dict[str, Any] | None, response_text: str
+    ) -> dict[str, Any]:
         """Extract structured information from a free-form technician response.
 
         If technician provides comprehensive info in one message, extract all

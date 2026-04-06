@@ -15,6 +15,8 @@ import { Card, Text, Grid, Badge, Flex, Tab, TabGroup, TabList, TabPanel, TabPan
 import { Activity } from 'lucide-react';
 import { energyCentreApi } from '../../lib/energyCentreApi';
 import type { SCADAOverview } from '../../lib/energyCentreApi';
+import { fetchEnergyComparisonSummary } from '../../lib/api/energy';
+import { authorizedFetch } from '../../lib/api/client';
 import { SingleLineDiagram } from './SingleLineDiagram';
 import { GeneratorSynoptic } from './GeneratorSynoptic';
 import { PowerMeteringCard } from './PowerMeteringCard';
@@ -43,20 +45,76 @@ interface AIRecommendation {
   timestamp: string;
 }
 
+interface BridgeTelemetrySummary {
+  status: 'live' | 'unavailable';
+  zones_with_readings?: number;
+  zone_count?: number;
+  power?: {
+    hvac_kw?: number;
+    lighting_kw?: number;
+    total_kw?: number;
+  };
+}
+
+interface SentinelEnergySummary {
+  savings_percent: number;
+  daily_savings_zar: number;
+  actual_kwh: number;
+  sentinel_kwh: number;
+}
+
 export function EnergyCentreDashboard({ siteId, onAIRecommendation, enabledModules = ['energy'] }: EnergyCentreDashboardProps) {
   const [overview, setOverview] = useState<SCADAOverview | null>(null);
   const [alerts, setAlerts] = useState<AIRecommendation[]>([]);
+  const [bridgeTelemetry, setBridgeTelemetry] = useState<BridgeTelemetrySummary | null>(null);
+  const [sentinelEnergy, setSentinelEnergy] = useState<SentinelEnergySummary | null>(null);
+  const [sentinelGuidance, setSentinelGuidance] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState(0);
 
   const loadOverview = useCallback(async () => {
     try {
-      const data = await energyCentreApi.getSCADAOverview(siteId);
+      const [data, comparison, rawTelemetryResp, stateResp] = await Promise.all([
+        energyCentreApi.getSCADAOverview(siteId),
+        fetchEnergyComparisonSummary(siteId).catch(() => null),
+        authorizedFetch(`/api/sites/${encodeURIComponent(siteId)}/telemetry`).catch(() => null),
+        authorizedFetch(`/api/building-state/${encodeURIComponent(siteId)}`).catch(() => null),
+      ]);
       setOverview(data);
 
       // Generate AI recommendations based on telemetry
       const recommendations = generateRecommendations(data, enabledModules);
       setAlerts(recommendations);
+
+      if (comparison) {
+        setSentinelEnergy({
+          savings_percent: comparison.daily_savings_percent,
+          daily_savings_zar: comparison.daily_savings_zar,
+          actual_kwh: comparison.actual.total_kwh,
+          sentinel_kwh: comparison.sentinel.total_kwh,
+        });
+      } else {
+        setSentinelEnergy(null);
+      }
+
+      if (rawTelemetryResp && rawTelemetryResp.ok) {
+        const raw = await rawTelemetryResp.json();
+        setBridgeTelemetry({
+          status: 'live',
+          zones_with_readings: raw?.zones_with_readings ?? 0,
+          zone_count: raw?.zone_count ?? 0,
+          power: raw?.power ?? {},
+        });
+      } else {
+        setBridgeTelemetry({ status: 'unavailable' });
+      }
+
+      if (stateResp && stateResp.ok) {
+        const state = await stateResp.json();
+        setSentinelGuidance(state?.payload?.operator_guidance?.headline || null);
+      } else {
+        setSentinelGuidance(null);
+      }
 
       // Notify parent of new recommendations
       if (onAIRecommendation && recommendations.length > 0) {
@@ -272,6 +330,39 @@ export function EnergyCentreDashboard({ siteId, onAIRecommendation, enabledModul
         <TabPanels>
           {/* Overview Tab */}
           <TabPanel>
+            <div className="space-y-4 mb-4">
+              <Card>
+                <Flex justifyContent="between" alignItems="start">
+                  <div>
+                    <Text className="text-sm font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                      Raw Bridge Telemetry
+                    </Text>
+                    <Text className="mt-1 text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                      Zones: {bridgeTelemetry?.zones_with_readings ?? 0}/{bridgeTelemetry?.zone_count ?? 0} ·
+                      HVAC: {(bridgeTelemetry?.power?.hvac_kw ?? 0).toFixed(2)} kW ·
+                      Total: {(bridgeTelemetry?.power?.total_kw ?? 0).toFixed(2)} kW
+                    </Text>
+                  </div>
+                  <Badge color={bridgeTelemetry?.status === 'live' ? 'green' : 'amber'}>
+                    {bridgeTelemetry?.status === 'live' ? 'Live' : 'Unavailable'}
+                  </Badge>
+                </Flex>
+              </Card>
+
+              <Card>
+                <Text className="text-sm font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                  SENTINEL Energy Intelligence
+                </Text>
+                <Text className="mt-1 text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                  {sentinelEnergy
+                    ? `Savings ${sentinelEnergy.savings_percent.toFixed(1)}% · Baseline ${sentinelEnergy.actual_kwh.toFixed(1)} kWh · With SENTINEL ${sentinelEnergy.sentinel_kwh.toFixed(1)} kWh`
+                    : 'Energy comparison not available yet'}
+                </Text>
+                <Text className="mt-1 text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                  {sentinelGuidance || 'No active guidance yet.'}
+                </Text>
+              </Card>
+            </div>
             <Grid className="grid grid-cols-2 gap-4">
               <SingleLineDiagram siteId={siteId} />
               <div className="space-y-4">

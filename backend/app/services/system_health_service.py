@@ -11,10 +11,9 @@ import asyncio
 import logging
 import uuid
 from datetime import datetime, timedelta
-from typing import Optional, Dict, Any
+from typing import Any
 
 import httpx
-
 
 from app.config.settings import settings
 from app.core.site_resolver import get_primary_site_code
@@ -32,7 +31,7 @@ class SystemHealthService:
 
     # ==================== Health Aggregation ====================
 
-    async def get_current_health(self) -> Dict[str, Any]:
+    async def get_current_health(self) -> dict[str, Any]:
         """
         Aggregate health by probing real services.
 
@@ -60,8 +59,8 @@ class SystemHealthService:
             "device_manager",
         ]
 
-        component_scores: Dict[str, int] = {}
-        component_details: Dict[str, Dict[str, Any]] = {}
+        component_scores: dict[str, int] = {}
+        component_details: dict[str, dict[str, Any]] = {}
         errors = []
 
         for label, result in zip(labels, checks):
@@ -108,7 +107,7 @@ class SystemHealthService:
 
     # ==================== Individual Probes ====================
 
-    async def _check_supabase(self) -> Dict[str, Any]:
+    async def _check_supabase(self) -> dict[str, Any]:
         """Probe Supabase with a lightweight query."""
         try:
             result = self.client.table("sites").select("id", count="exact").limit(1).execute()
@@ -121,7 +120,7 @@ class SystemHealthService:
         except Exception as e:
             return {"score": 30, "status": "degraded", "note": f"Query failed: {e}"}
 
-    async def _check_redis(self) -> Dict[str, Any]:
+    async def _check_redis(self) -> dict[str, Any]:
         """Probe Redis health via direct connection."""
         if not settings.redis_enabled:
             return {"score": 70, "status": "degraded", "note": "Disabled in config"}
@@ -169,7 +168,7 @@ class SystemHealthService:
             logger.error("Redis check error (%s): %s", type(e).__name__, e)
             return {"score": 20, "status": "critical", "note": f"Unreachable: {e}"}
 
-    async def _check_event_bus(self) -> Dict[str, Any]:
+    async def _check_event_bus(self) -> dict[str, Any]:
         """Check Event Bus singleton metrics."""
         try:
             from app.services.event_bus import get_event_bus
@@ -196,10 +195,10 @@ class SystemHealthService:
         except Exception as e:
             return {"score": 0, "status": "critical", "note": f"Not available: {e}"}
 
-    async def _check_n8n(self) -> Dict[str, Any]:
+    async def _check_n8n(self) -> dict[str, Any]:
         """Check n8n connectivity."""
         try:
-            from app.services.n8n_service import get_n8n_service, N8nConnectionStatus
+            from app.services.n8n_service import N8nConnectionStatus, get_n8n_service
 
             svc = get_n8n_service()
             if not svc.is_configured:
@@ -224,7 +223,7 @@ class SystemHealthService:
         except Exception as e:
             return {"score": 30, "status": "degraded", "note": f"Check failed: {e}"}
 
-    async def _check_servicenow(self) -> Dict[str, Any]:
+    async def _check_servicenow(self) -> dict[str, Any]:
         """Check ServiceNow configuration."""
         try:
             from app.services.servicenow_service import get_servicenow_service
@@ -245,7 +244,7 @@ class SystemHealthService:
         except Exception as e:
             return {"score": 30, "status": "degraded", "note": f"Check failed: {e}"}
 
-    async def _check_notifications(self) -> Dict[str, Any]:
+    async def _check_notifications(self) -> dict[str, Any]:
         """Check Notification Router state."""
         try:
             from app.services.sentry_notification_router import get_sentry_router
@@ -268,7 +267,7 @@ class SystemHealthService:
         except Exception as e:
             return {"score": 30, "status": "degraded", "note": f"Check failed: {e}"}
 
-    async def _check_device_manager(self) -> Dict[str, Any]:
+    async def _check_device_manager(self) -> dict[str, Any]:
         """Check Device Manager state."""
         try:
             from app.services.device_abstraction import device_manager
@@ -290,7 +289,7 @@ class SystemHealthService:
 
     # ==================== Extended Probes (Phase 160) ====================
 
-    async def _check_disk(self) -> Dict[str, Any]:
+    async def _check_disk(self) -> dict[str, Any]:
         """Probe system disk usage."""
         try:
             import shutil
@@ -313,7 +312,7 @@ class SystemHealthService:
         except Exception as e:
             return {"score": 50, "status": "degraded", "note": f"Check failed: {e}"}
 
-    async def _check_llm(self) -> Dict[str, Any]:
+    async def _check_llm(self) -> dict[str, Any]:
         """Probe LLM availability (Ollama local or Claude API)."""
         try:
             async with httpx.AsyncClient(timeout=5.0) as client:
@@ -348,7 +347,7 @@ class SystemHealthService:
         except Exception as e:
             return {"score": 30, "status": "degraded", "note": f"LLM check failed: {e}"}
 
-    async def _check_ml_models(self) -> Dict[str, Any]:
+    async def _check_ml_models(self) -> dict[str, Any]:
         """Probe ML model files on disk."""
         try:
             from pathlib import Path
@@ -375,7 +374,7 @@ class SystemHealthService:
         except Exception as e:
             return {"score": 30, "status": "degraded", "note": f"ML check failed: {e}"}
 
-    async def _check_background_jobs(self) -> Dict[str, Any]:
+    async def _check_background_jobs(self) -> dict[str, Any]:
         """Probe APScheduler background job status."""
         try:
             from app.services.background_scheduler import scheduler_service
@@ -394,7 +393,7 @@ class SystemHealthService:
         except Exception as e:
             return {"score": 50, "status": "degraded", "note": f"Scheduler check failed: {e}"}
 
-    async def _check_rag(self) -> Dict[str, Any]:
+    async def _check_rag(self) -> dict[str, Any]:
         """Probe RAG document store status."""
         try:
             from pathlib import Path
@@ -416,7 +415,7 @@ class SystemHealthService:
         except Exception as e:
             return {"score": 30, "status": "degraded", "note": f"RAG check failed: {e}"}
 
-    async def get_extended_health(self) -> Dict[str, Any]:
+    async def get_extended_health(self) -> dict[str, Any]:
         """Extended health including disk, LLM, ML, jobs, RAG probes."""
         base = await self.get_current_health()
 
@@ -452,7 +451,7 @@ class SystemHealthService:
         client: httpx.AsyncClient,
         endpoint: str,
         key: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Check a single health endpoint."""
         try:
             url = f"{self.base_url}{endpoint}"
@@ -464,11 +463,11 @@ class SystemHealthService:
                 "timestamp": datetime.utcnow().isoformat(),
             }
         except Exception as e:
-            raise Exception(f"Failed to check {endpoint}: {str(e)}")
+            raise Exception(f"Failed to check {endpoint}: {e!s}")
 
     # ==================== Health Storage ====================
 
-    async def store_health_snapshot(self, snapshot: Dict[str, Any]) -> str:
+    async def store_health_snapshot(self, snapshot: dict[str, Any]) -> str:
         """Store health snapshot to database.
 
         Args:
@@ -503,7 +502,7 @@ class SystemHealthService:
     async def get_health_history(
         self,
         time_range: str = "24h",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Get historical health data for trend analysis.
 
         Args:
@@ -599,7 +598,7 @@ class SystemHealthService:
     async def run_diagnostics(
         self,
         target: str = "full_system",
-        site_code: Optional[str] = None,
+        site_code: str | None = None,
     ) -> str:
         """
         Run SIMBIOT diagnostics workflow.
@@ -644,7 +643,7 @@ class SystemHealthService:
         self,
         diagnostic_id: str,
         target: str,
-        site_code: Optional[str],
+        site_code: str | None,
     ) -> None:
         """Execute diagnostics workflow (runs in background)."""
         try:
@@ -740,52 +739,22 @@ class SystemHealthService:
     async def _call_simbiot_tool(
         self,
         tool_name: str,
-        params: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        params: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """
         Call a SIMBIOT MCP tool.
 
-        In production, this would use the actual MCP client.
-        For now, returns mock data.
+        Until the live MCP client is wired in here, fail closed instead of
+        fabricating diagnostic data.
         """
-        # Mock implementation - in production would call actual MCP server
-        mock_responses = {
-            "get_devices": {
-                "status": "success",
-                "devices": [
-                    {"id": "dev-001", "type": "chiller", "status": "online"},
-                    {"id": "dev-002", "type": "ahu", "status": "online"},
-                ],
-            },
-            "discover_tridonic_gateway": {
-                "status": "success",
-                "gateway_found": True,
-                "controllers": 2,
-                "sensors": 45,
-            },
-            "get_buildings": {
-                "status": "success",
-                "sites": [
-                    {"code": "site-002", "name": "Sandton", "status": "active"},
-                ],
-            },
-            "search_alarms": {
-                "status": "success",
-                "alarms": [],
-            },
-            "get_health_score": {
-                "status": "success",
-                "score": 85,
-                "details": {},
-            },
-            "get_asset_detail": {
-                "status": "success",
-                "assets": [],
-            },
+        logger.warning("SIMBIOT MCP tool call requested before live client integration: %s", tool_name)
+        return {
+            "status": "unavailable",
+            "tool": tool_name,
+            "reason": "live_mcp_client_not_integrated",
         }
-        return mock_responses.get(tool_name, {"status": "unknown_tool"})
 
-    async def get_diagnostic_results(self, diagnostic_id: str) -> Dict[str, Any]:
+    async def get_diagnostic_results(self, diagnostic_id: str) -> dict[str, Any]:
         """Poll diagnostic results by ID.
 
         Args:
@@ -812,7 +781,7 @@ class SystemHealthService:
         severity: str,
         component: str,
         message: str,
-        details: Optional[Dict[str, Any]] = None,
+        details: dict[str, Any] | None = None,
     ) -> str:
         """
         Log a system error.
@@ -851,12 +820,12 @@ class SystemHealthService:
 
     async def get_error_logs(
         self,
-        category: Optional[str] = None,
-        severity: Optional[str] = None,
-        resolved: Optional[bool] = None,
+        category: str | None = None,
+        severity: str | None = None,
+        resolved: bool | None = None,
         limit: int = 100,
         offset: int = 0,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Get error logs with filters.
 

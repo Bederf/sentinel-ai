@@ -1,24 +1,24 @@
 """
 Authentication Service - User authentication and authorization
 
-Provides JWT-based authentication for production with demo fallback
+Provides JWT-based authentication for production
 and an AuthorizationService for role-based access control in remote
 operations (Phase 59).
 """
 
 import logging
-from typing import Optional, List, Dict
+from typing import Optional
 
 from fastapi import Header, HTTPException
 
-from app.models.user import User
-from app.models.remote_ops import AuthorizationLevel, COMMAND_AUTHORIZATION
 from app.middleware.auth_middleware import validate_jwt_token
+from app.models.remote_ops import COMMAND_AUTHORIZATION, AuthorizationLevel
+from app.models.user import User
 
 logger = logging.getLogger(__name__)
 
 
-async def get_current_user(authorization: Optional[str] = Header(None)) -> User:
+async def get_current_user(authorization: str | None = Header(None)) -> User:
     """
     Get the current authenticated user from request headers.
 
@@ -95,7 +95,7 @@ class AuthorizationService:
     _instance: Optional["AuthorizationService"] = None
 
     # Default role-to-level mapping
-    _authorization_levels: Dict[str, AuthorizationLevel] = {
+    _authorization_levels: dict[str, AuthorizationLevel] = {
         "viewer": AuthorizationLevel.VIEW_ONLY,
         "operator": AuthorizationLevel.OPERATOR,
         "technician": AuthorizationLevel.TECHNICIAN,
@@ -121,7 +121,7 @@ class AuthorizationService:
         user_level = self.get_user_authorization_level(user_role)
         return user_level >= required_level
 
-    def get_allowed_commands(self, user_role: str) -> List[str]:
+    def get_allowed_commands(self, user_role: str) -> list[str]:
         """Return the list of remote command types the user is allowed to execute.
 
         Args:

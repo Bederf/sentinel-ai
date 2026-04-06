@@ -312,8 +312,11 @@ export function MLMetrics() {
         }
         setSites(fetchedSites);
         if (fetchedSites.length > 0 && !selectedSiteId) {
-          // Default to first available site
-          setSelectedSiteId(fetchedSites[0].id);
+          const defaultSite =
+            fetchedSites.find((site) => site.id === "site-002")
+            ?? fetchedSites.find((site) => /sandton city office tower/i.test(site.name))
+            ?? fetchedSites[0];
+          setSelectedSiteId(defaultSite.id);
         }
       })
       .catch((err: any) => {

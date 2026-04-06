@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
+import httpx
 
 from app.config.settings import settings
 from app.database.repositories import SiteRepository
@@ -18,7 +19,7 @@ from app.models.auth import AuthContext, AuthLevel, SentinelRole
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-# Buildings directory for demo data and new site creation
+# Buildings directory for site metadata and new site creation
 SITES_DIR = Path(__file__).parent.parent / "data" / "sites"
 
 # Load sites data (fallback)
@@ -33,26 +34,7 @@ def load_sites() -> list[dict]:
             sites = json.load(f)
             if sites:
                 return sites
-    # Fallback demo site when no JSON data is available
-    return [
-        {
-            "id": "site-001",
-            "name": "Demo Office Park",
-            "address": "123 Demo St, Johannesburg",
-            "region": "Gauteng",
-            "type": "office",
-            "sqm": 12000,
-            "floors": 8,
-            "year_built": 2015,
-            "operating_hours": {"start": "08:00", "end": "18:00"},
-            "timezone": "Africa/Johannesburg",
-            "occupancy_pattern": "weekday",
-            "latitude": -26.2041,
-            "longitude": 28.0473,
-            "contact_email": "ops@demo.local",
-            "contact_phone": "+27-11-000-0000",
-        }
-    ]
+    return []
 
 
 def load_equipment() -> list[dict]:
@@ -454,9 +436,9 @@ class SiteResponse(SiteBase):
     sentinel_processing_enabled: bool = True
     onboarding_phase: str = "shadow"
     last_phase_transition: Optional[dict] = None  # most recent phase_transition_log row
-    # Bridge ingestion status
+    # SIMBIOT ingestion status
     bridge_connected: bool = False
-    bridge_data_source: str = "none"  # "simbiot" | "simulation" | "none"
+    bridge_data_source: str = "none"  # "remote_bridge" | "local_adapter" | "none"
     bridge_last_sync: Optional[str] = None  # ISO timestamp
     bridge_sync_error: Optional[str] = None  # Error message if applicable
 
@@ -486,9 +468,7 @@ def get_sites_from_supabase(
         repo = SiteRepository()
 
         # Filter by user access if auth context provided
-        # Demo-mode users get full access (no user_site_access grants exist for them)
-        is_demo = user_email and user_email.startswith("demo@")
-        if user_email and user_role and not is_demo:
+        if user_email and user_role:
             buildings = repo.get_all_for_user(
                 user_email=user_email, user_role=user_role, region=region, site_type=site_type
             )
@@ -633,12 +613,6 @@ async def list_sites(
     sites = load_sites()
     alerts = load_alerts()
 
-    # Apply demo site access restrictions for non-admin users
-    if user_email and user_role != SentinelRole.ADMIN:
-        from app.config.demo_configs import has_demo_site_access
-
-        sites = [s for s in sites if has_demo_site_access(user_email, s.get("code", s.get("id")))]
-
     if region:
         sites = [s for s in sites if s["region"].lower() == region.lower()]
     if site_type:
@@ -691,12 +665,12 @@ async def list_sites(
     return SiteListResponse(total=len(result), sites=[SiteResponse(**s) for s in result])
 
 
-# ============= Demo Buildings Endpoint =============
+# ============= Template Buildings Endpoint =============
 # NOTE: These specific routes MUST come before /sites/{site_id} to avoid being caught by the wildcard
 
 
-class DemoBuilding(BaseModel):
-    """Demo building available for discovery simulation."""
+class TemplateBuilding(BaseModel):
+    """Template building available for onboarding/discovery seeding."""
 
     id: str
     name: str
@@ -705,13 +679,16 @@ class DemoBuilding(BaseModel):
     description: str
 
 
-@router.get("/sites/demo-buildings", response_model=List[DemoBuilding])
-async def list_demo_buildings() -> List[DemoBuilding]:
-    """List demo buildings available for discovery simulation.
+@router.get("/sites/template-buildings", response_model=List[TemplateBuilding])
+async def list_template_buildings() -> List[TemplateBuilding]:
+    """List template buildings available for onboarding/discovery seeding.
 
     Scans buildings directory for sites that have equipment files.
-    These can be used as demo data sources during onboarding.
+    These can be used as template data sources during onboarding.
     """
+    if settings.sentinel_island_mode:
+        return []
+
     registry_path = SITES_DIR / "_registry.json"
 
     if not registry_path.exists():
@@ -720,7 +697,7 @@ async def list_demo_buildings() -> List[DemoBuilding]:
     with open(registry_path) as f:
         registry = json.load(f)
 
-    demo_buildings = []
+    template_buildings = []
     for site_id in registry.get("active_sites", []):
         site_file = SITES_DIR / site_id / "building.json"
         equipment_dir = SITES_DIR / site_id / "equipment"
@@ -737,13 +714,13 @@ async def list_demo_buildings() -> List[DemoBuilding]:
         # Count equipment files
         equipment_count = len(list(equipment_dir.glob("*.json")))
         if equipment_count == 0:
-            continue  # Skip sites with no demo equipment
+            continue  # Skip sites with no template equipment
 
         metadata = building.get("metadata", {})
         site_type = metadata.get("type", "office")
 
-        demo_buildings.append(
-            DemoBuilding(
+        template_buildings.append(
+            TemplateBuilding(
                 id=site_id,
                 name=building.get("name", site_id),
                 type=site_type,
@@ -752,7 +729,7 @@ async def list_demo_buildings() -> List[DemoBuilding]:
             )
         )
 
-    return demo_buildings
+    return template_buildings
 
 
 # ============= Site Creation Endpoints =============
@@ -1118,6 +1095,69 @@ async def toggle_site_processing(
     return ProcessingToggleResponse(site_id=site_id, sentinel_processing_enabled=enabled)
 
 
+@router.get("/sites/{site_id}/telemetry")
+async def get_site_telemetry(
+    site_id: str,
+    auth: AuthContext = Depends(require_site_access("site_id")),
+) -> dict[str, Any]:
+    """Proxy live site telemetry from the remote bridge."""
+    def _unavailable(reason: str) -> dict[str, Any]:
+        return {
+            "site_id": site_id,
+            "source_mode": "unavailable",
+            "bridge_connected": False,
+            "timestamp": None,
+            "error": reason,
+        }
+
+    if not settings.sentinel_island_mode:
+        raise HTTPException(status_code=404, detail="Telemetry route is only available on connected-site instances")
+    if not settings.simbiot_api_url:
+        logger.warning("Telemetry bridge unavailable for %s: remote bridge is not configured", site_id)
+        return _unavailable("remote_bridge_not_configured")
+
+    from app.services.simbiot_service import simbiot_service
+
+    try:
+        return await simbiot_service.get_site_telemetry(site_id)
+    except httpx.HTTPStatusError as exc:
+        status_code = exc.response.status_code if exc.response is not None else None
+        detail = exc.response.text[:300] if exc.response is not None else str(exc)
+        logger.warning(
+            "Remote telemetry HTTP failure for %s: status=%s detail=%s",
+            site_id,
+            status_code,
+            detail,
+        )
+        return _unavailable(f"remote_bridge_http_{status_code or 'error'}")
+    except Exception as exc:
+        logger.warning("Failed to fetch remote telemetry for %s: %s", site_id, exc)
+        return _unavailable("remote_bridge_unavailable")
+
+
+@router.get("/sites/{site_id}/status")
+async def get_site_status(
+    site_id: str,
+    auth: AuthContext = Depends(require_site_access("site_id")),
+) -> dict[str, Any]:
+    """Proxy live site status from the remote bridge."""
+    if not settings.sentinel_island_mode:
+        raise HTTPException(status_code=404, detail="Status route is only available on connected-site instances")
+    if not settings.simbiot_api_url:
+        raise HTTPException(status_code=503, detail="Remote bridge is not configured")
+
+    from app.services.simbiot_service import simbiot_service
+
+    try:
+        return await simbiot_service.get_site_status(site_id)
+    except httpx.HTTPStatusError as exc:
+        detail = exc.response.text[:300] if exc.response is not None else str(exc)
+        raise HTTPException(status_code=exc.response.status_code, detail=detail) from exc
+    except Exception as exc:
+        logger.warning("Failed to fetch remote status for %s: %s", site_id, exc)
+        raise HTTPException(status_code=503, detail="Remote bridge status unavailable") from exc
+
+
 # ============= Onboarding Phase Endpoint =============
 
 
@@ -1228,7 +1268,7 @@ async def update_site_phase(site_id: str, request: PhaseUpdateRequest) -> PhaseU
 
 
 def _get_bridge_status(sentinel_enabled: bool = True) -> dict:
-    """Get bridge ingestion status (SIMBIOT connection, data source, sync time).
+    """Get SIMBIOT ingestion status (connection, transport source, sync time).
 
     Bridge status is tied to sentinel_processing_enabled (the data valve).
     When valve is CLOSED (sentinel_enabled=False), no data flows (bridge_data_source="none").
@@ -1250,8 +1290,8 @@ def _get_bridge_status(sentinel_enabled: bool = True) -> dict:
         bridge_last_sync = None
         bridge_sync_error = None
 
-        # Check SIMBIOT bridge status only if enabled
-        if settings.site002_source_enabled:
+        # Check SIMBIOT remote bridge status when a bridge endpoint is configured
+        if settings.simbiot_api_url:
             try:
                 from app.services.simbiot_service import simbiot_service
 
@@ -1264,14 +1304,15 @@ def _get_bridge_status(sentinel_enabled: bool = True) -> dict:
                 logger.warning(f"Failed to get SIMBIOT status: {e}")
                 bridge_sync_error = str(e)[:100]
 
-            # If SIMBIOT is enabled, mark data source as SIMBIOT
-            if bridge_connected or settings.site002_source_enabled:
-                bridge_data_source = "simbiot"
-        else:
-            # Check if simulation is being used as data source
-            if settings.ingestion_mode == "simulation":
-                bridge_data_source = "simulation"
-                bridge_connected = True  # Simulation IS connected (data flows)
+            if bridge_connected or settings.simbiot_api_url:
+                bridge_data_source = "remote_bridge"
+        elif (
+            not settings.sentinel_island_mode
+            and settings.site002_source_enabled
+            and settings.ingestion_mode == "simulation"
+        ):
+            bridge_data_source = "local_adapter"
+            bridge_connected = True  # Local adapter is connected (data flows)
 
         return {
             "bridge_connected": bridge_connected,
@@ -1396,7 +1437,7 @@ class BatchSiteRequest(BaseModel):
     """Request for batch site retrieval."""
 
     site_ids: List[str] = Field(
-        ..., min_items=1, max_items=100, description="List of site IDs to retrieve (max 100 per request)"
+        ..., min_length=1, max_length=100, description="List of site IDs to retrieve (max 100 per request)"
     )
 
 

@@ -122,7 +122,11 @@ async def _notify_technician(
         try:
             await asyncio.to_thread(
                 subprocess.run,
-                [cli, "message", "send", "--target", str(tech_telegram_id), "--message", msg],
+                [cli, "message", "send",
+                 "--channel", "telegram",
+                 "--account", "default",
+                 "--target", str(tech_telegram_id),
+                 "--message", msg],
                 timeout=15,
                 capture_output=True,
             )

@@ -1,3 +1,18 @@
+---
+title: "Buildings API"
+type: "reference"
+status: "draft"
+version: "1.0.0"
+created: "2026-03-31"
+updated: "2026-03-31"
+tags: ["sentinel", "documentation"]
+related: []
+domain: "bms"
+audience: "all"
+complexity: "intermediate"
+estimated_read_time: 10
+---
+
 # Buildings API
 
 ## Overview
@@ -7,7 +22,7 @@ Building Management API — CRUD for buildings, equipment, zones, desks, and bui
 ## Endpoints
 
 - GET /api/buildings — List all buildings
-- GET /api/buildings/{site_id} — Get building details
+- GET /api/buildings/{site_id} — Get building details (returns minimal data from sites.json if no building.json)
 - POST /api/buildings — Create building
 - PUT /api/buildings/{site_id}/config — Update building configuration (Phase 157)
 - POST /api/buildings/{site_id}/desks — Upload desk data
@@ -49,7 +64,7 @@ Update building metadata, optimization profile, and contacts from the Settings U
 
 ### Operating Schedule (Phase 158)
 
-`GET/PUT /api/buildings/{site_id}/schedule` manages per-day operating hours stored in `building.json`. The `SiteSchedule` service reads this config at runtime, falling back to hardcoded defaults if absent.
+`GET/PUT /api/buildings/{site_id}/schedule` manages per-day operating hours stored in `building.json`. The `SiteSchedule` service reads this config at runtime, falling back to hardcoded defaults if absent. If no `building.json` exists, `GET` returns `{}` and `PUT` creates the file.
 
 ### Holiday Calendar (Phase 158)
 

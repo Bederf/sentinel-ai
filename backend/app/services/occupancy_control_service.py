@@ -25,8 +25,8 @@ Native controllers handle IMMEDIATE occupancy response natively (<1s).
 
 import logging
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from app.core.site_resolver import get_primary_site_code
 
@@ -37,13 +37,13 @@ class ZoneControlState:
     """Tracks the current control state for a single zone to prevent flapping."""
 
     __slots__ = (
-        "zone_id",
         "hvac_relaxed",
-        "lighting_dimmed",
-        "last_occupancy_pct",
         "last_action_time",
-        "original_setpoint",
+        "last_occupancy_pct",
+        "lighting_dimmed",
         "original_brightness",
+        "original_setpoint",
+        "zone_id",
     )
 
     def __init__(self, zone_id: str):
@@ -51,9 +51,9 @@ class ZoneControlState:
         self.hvac_relaxed: bool = False
         self.lighting_dimmed: bool = False
         self.last_occupancy_pct: float = -1.0
-        self.last_action_time: Optional[datetime] = None
-        self.original_setpoint: Optional[float] = None
-        self.original_brightness: Optional[int] = None
+        self.last_action_time: datetime | None = None
+        self.original_setpoint: float | None = None
+        self.original_brightness: int | None = None
 
 
 class OccupancyControlService:
@@ -199,7 +199,7 @@ class OccupancyControlService:
         # 7. Update state
         state.last_occupancy_pct = occ_pct
         if actions > 0:
-            state.last_action_time = datetime.now(timezone.utc)
+            state.last_action_time = datetime.now(UTC)
 
         return actions
 
@@ -214,7 +214,7 @@ class OccupancyControlService:
         occ_pct: float,
         occ_status: str,
         occupancy_source: str,
-        badge_count: Optional[int],
+        badge_count: int | None,
         correlation_id: str,
         settings: Any,
     ) -> int:
@@ -271,7 +271,7 @@ class OccupancyControlService:
         occ_pct: float,
         occ_status: str,
         occupancy_source: str,
-        badge_count: Optional[int],
+        badge_count: int | None,
         correlation_id: str,
     ) -> int:
         """Relax HVAC setpoint for an unoccupied/low-occupancy zone.
@@ -352,7 +352,7 @@ class OccupancyControlService:
         occ_pct: float,
         occ_status: str,
         occupancy_source: str,
-        badge_count: Optional[int],
+        badge_count: int | None,
         correlation_id: str,
     ) -> int:
         """Restore HVAC setpoint when zone becomes occupied again.
@@ -414,7 +414,7 @@ class OccupancyControlService:
         occ_pct: float,
         occ_status: str,
         occupancy_source: str,
-        badge_count: Optional[int],
+        badge_count: int | None,
         correlation_id: str,
         settings: Any,
     ) -> int:
@@ -473,7 +473,7 @@ class OccupancyControlService:
         occ_pct: float,
         occ_status: str,
         occupancy_source: str,
-        badge_count: Optional[int],
+        badge_count: int | None,
         correlation_id: str,
     ) -> int:
         """Dim lighting for an unoccupied/low zone via BMSControlBridge.
@@ -545,7 +545,7 @@ class OccupancyControlService:
         occ_pct: float,
         occ_status: str,
         occupancy_source: str,
-        badge_count: Optional[int],
+        badge_count: int | None,
         correlation_id: str,
     ) -> int:
         """Restore lighting when zone becomes occupied.
@@ -610,7 +610,7 @@ class OccupancyControlService:
 
         return LightingService()
 
-    def _get_badge_occupancy(self, zone_id: str) -> Optional[int]:
+    def _get_badge_occupancy(self, zone_id: str) -> int | None:
         """Get badge-based occupancy count for a zone. Returns None if unavailable."""
         try:
             from app.services.security_occupancy_service import SecurityOccupancyService
@@ -633,16 +633,16 @@ class OccupancyControlService:
         zone_id: str,
         module: str,
         action_type: str,
-        previous_value: Optional[float],
-        new_value: Optional[float],
-        offset_applied: Optional[float],
+        previous_value: float | None,
+        new_value: float | None,
+        offset_applied: float | None,
         occ_pct: float,
         occ_status: str,
         occupancy_source: str,
-        badge_count: Optional[int],
+        badge_count: int | None,
         status: str,
         correlation_id: str,
-        error_message: Optional[str] = None,
+        error_message: str | None = None,
     ):
         """Log control action to Supabase occupancy_control_actions table."""
         try:
@@ -677,7 +677,7 @@ class OccupancyControlService:
 
 
 # Module-level singleton
-_occupancy_control_service: Optional[OccupancyControlService] = None
+_occupancy_control_service: OccupancyControlService | None = None
 
 
 def get_occupancy_control_service() -> OccupancyControlService:

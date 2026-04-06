@@ -6,13 +6,13 @@ It predicts specific failure types (compressor, bearing, motor, etc.) for equipm
 
 import logging
 from datetime import datetime
-from typing import Dict, List
 
 import pandas as pd
+
+from app.database.repositories.equipment_repository import EquipmentRepository
+from app.services.feature_service import FeatureComputeService
 from ml.classifier.model import FailureClassifier
 from ml.registry import get_model_registry
-from app.services.feature_service import FeatureComputeService
-from app.database.repositories.equipment_repository import EquipmentRepository
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +44,7 @@ class FailureClassificationService:
     def __init__(self):
         """Initialize the classification service."""
         self.registry = get_model_registry()
-        self._models: Dict[str, FailureClassifier] = {}
+        self._models: dict[str, FailureClassifier] = {}
         self._registry_generation: int = self.registry._generation
         self.feature_service = FeatureComputeService()
         self.equipment_repo = EquipmentRepository()
@@ -81,7 +81,7 @@ class FailureClassificationService:
 
         return self._models[equipment_type]
 
-    def predict_failure_type(self, equipment_id: str) -> Dict:
+    def predict_failure_type(self, equipment_id: str) -> dict:
         """Predict most likely failure type for equipment.
 
         Args:
@@ -149,7 +149,7 @@ class FailureClassificationService:
             "timestamp": datetime.utcnow().isoformat(),
         }
 
-    def get_fleet_failure_risks(self, min_confidence: float = 0.5) -> List[Dict]:
+    def get_fleet_failure_risks(self, min_confidence: float = 0.5) -> list[dict]:
         """Get failure type predictions for all equipment.
 
         Args:
@@ -195,7 +195,7 @@ class FailureClassificationService:
 
         return results
 
-    def get_feature_importance(self, equipment_type: str, top_n: int = 20) -> List[Dict]:
+    def get_feature_importance(self, equipment_type: str, top_n: int = 20) -> list[dict]:
         """Get feature importance for an equipment type.
 
         Args:
@@ -211,7 +211,7 @@ class FailureClassificationService:
 
         return importance_df.to_dict("records")
 
-    def get_model_info(self, equipment_type: str) -> Dict:
+    def get_model_info(self, equipment_type: str) -> dict:
         """Get model information for an equipment type.
 
         Args:
@@ -231,7 +231,7 @@ class FailureClassificationService:
             "metadata": model_info.get("metadata", {}),
         }
 
-    def list_available_models(self) -> List[Dict]:
+    def list_available_models(self) -> list[dict]:
         """List all available classification models.
 
         Returns:

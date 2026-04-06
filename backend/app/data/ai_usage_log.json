@@ -81,14 +81,125 @@
       "telegram/message": {
         "provider": "telegram",
         "model": "message",
-        "calls": 1,
+        "calls": 7,
         "input_tokens": 0,
         "output_tokens": 0,
         "cache_read_tokens": 0,
         "cache_creation_tokens": 0,
         "cost_usd": 0.0,
         "sources": {
-          "alert": 1
+          "alert": 1,
+          "signal_emitter": 6
+        }
+      }
+    },
+    "2026-03-28": {
+      "whatsapp_twilio/message": {
+        "provider": "whatsapp_twilio",
+        "model": "message",
+        "calls": 21,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cache_read_tokens": 0,
+        "cache_creation_tokens": 0,
+        "cost_usd": 0.10000000000000002,
+        "sources": {
+          "alert": 21
+        }
+      },
+      "telegram/message": {
+        "provider": "telegram",
+        "model": "message",
+        "calls": 15,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cache_read_tokens": 0,
+        "cache_creation_tokens": 0,
+        "cost_usd": 0.0,
+        "sources": {
+          "signal_emitter": 15
+        }
+      }
+    },
+    "2026-03-29": {},
+    "2026-03-30": {},
+    "2026-03-31": {
+      "whatsapp_twilio/message|unknown": {
+        "provider": "whatsapp_twilio",
+        "model": "message",
+        "site_id": "unknown",
+        "calls": 6,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cache_read_tokens": 0,
+        "cache_creation_tokens": 0,
+        "cost_usd": 0.030000000000000002,
+        "sources": {
+          "alert": 6
+        }
+      }
+    },
+    "2026-04-01": {
+      "whatsapp_twilio/message|unknown": {
+        "provider": "whatsapp_twilio",
+        "model": "message",
+        "site_id": "unknown",
+        "calls": 10,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cache_read_tokens": 0,
+        "cache_creation_tokens": 0,
+        "cost_usd": 0.045,
+        "sources": {
+          "alert": 10
+        }
+      }
+    },
+    "2026-04-02": {},
+    "2026-04-03": {},
+    "2026-04-04": {
+      "anthropic/claude-sonnet-4-20250514|unknown": {
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-20250514",
+        "site_id": "unknown",
+        "calls": 10,
+        "input_tokens": 3421,
+        "output_tokens": 1511,
+        "cache_read_tokens": 73514,
+        "cache_creation_tokens": 18521,
+        "cost_usd": 0.12443595,
+        "sources": {
+          "tools": 10
+        }
+      },
+      "elevenlabs/chars|unknown": {
+        "provider": "elevenlabs",
+        "model": "chars",
+        "site_id": "unknown",
+        "calls": 4,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cache_read_tokens": 0,
+        "cache_creation_tokens": 0,
+        "cost_usd": 0.02511,
+        "sources": {
+          "tts": 4
+        }
+      }
+    },
+    "2026-04-05": {
+      "elevenlabs/chars|unknown": {
+        "provider": "elevenlabs",
+        "model": "chars",
+        "site_id": "unknown",
+        "calls": 3,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cache_read_tokens": 0,
+        "cache_creation_tokens": 0,
+        "cost_usd": 0.02202,
+        "sources": {
+          "tts": 3
         }
       }
     }
@@ -446,6 +557,28 @@
       "resolved_model": "claude-sonnet-4-20250514",
       "session_id": "",
       "provider": "anthropic"
+    },
+    {
+      "event": "escalation_triggered",
+      "timestamp": "2026-04-06T15:17:36.803639Z",
+      "from_class": "chat_ai",
+      "to_class": "heavy",
+      "reason": "multi-system reasoning required",
+      "mode": "api",
+      "resolved_model": "MiniMax-M2.5",
+      "session_id": "",
+      "provider": "minimax"
+    },
+    {
+      "event": "escalation_triggered",
+      "timestamp": "2026-04-06T15:17:36.817649Z",
+      "from_class": "chat_ai",
+      "to_class": "heavy",
+      "reason": "technical depth required",
+      "mode": "api",
+      "resolved_model": "MiniMax-M2.5",
+      "session_id": "",
+      "provider": "minimax"
     }
   ]
 }

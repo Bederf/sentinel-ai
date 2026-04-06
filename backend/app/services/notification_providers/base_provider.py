@@ -5,7 +5,6 @@ Defines the interface that all channel implementations (Telegram, WhatsApp, SMS)
 """
 
 from abc import ABC, abstractmethod
-from typing import Optional
 from dataclasses import dataclass
 
 
@@ -14,9 +13,9 @@ class NotificationResult:
     """Result of a notification send attempt."""
 
     success: bool
-    message_id: Optional[str] = None  # Provider's message ID for tracking
-    error_code: Optional[str] = None
-    error_message: Optional[str] = None
+    message_id: str | None = None  # Provider's message ID for tracking
+    error_code: str | None = None
+    error_message: str | None = None
     provider_response: dict = None  # Full response from provider
 
 

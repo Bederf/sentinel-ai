@@ -1,3 +1,18 @@
+---
+title: "Municipal Tariff Updates (Annual)"
+type: "spec"
+status: "draft"
+version: "1.0.0"
+created: "2026-03-31"
+updated: "2026-03-31"
+tags: ["sentinel", "documentation"]
+related: []
+domain: "bms"
+audience: "all"
+complexity: "intermediate"
+estimated_read_time: 10
+---
+
 # Municipal Tariff Updates (Annual)
 
 Municipal tariffs typically change once per year (FY). The system supports annual refresh via a tariff ingestion service that downloads official PDF sources and registers them in `municipal_tariff_schedules`.

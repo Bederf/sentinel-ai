@@ -1,8 +1,5 @@
-import quietFixture from '@/lib/fixtures/site-002-quiet.json'
-import crisisFixture from '@/lib/fixtures/site-002-crisis.json'
-import { CockpitNervousSystemTwin } from './CockpitNervousSystemTwin'
 import { CockpitView } from './CockpitView'
-import { mapCockpitState, type CockpitDecisionPayload } from './mapCockpitState'
+import { mapCockpitState, type BuildingStatePayload } from './mapCockpitState'
 
 const summary = {
   siteId: 'site-002',
@@ -14,30 +11,68 @@ const summary = {
   dataFreshnessLabel: 'Updated 12s ago',
 }
 
-const warningFixture: CockpitDecisionPayload = {
-  building_id: 'site-002',
-  alert_text: 'Boardroom A is drifting toward discomfort.',
-  reasoning_summary: 'Cooling load is rising faster than the current air-side response. Intervene before the next meeting starts.',
-  active_posture: 'comfort_priority',
-  time_to_discomfort: 18,
-  time_confidence: 0.64,
-  estimated_impact: 'Boardroom comfort will tighten during the next occupied window.',
-  recommended_action: 'Bring standby cooling online before the room loses comfort.',
-  urgency_score: 0.58,
-  urgency_components: { comfort: 0.34, asset_risk: 0.14, cost: 0.1 },
-  affected_zone_ids: ['Zone-L2-Boardroom-A'],
-  primary_asset_id: 'S002-AHU-L2-001',
-  building_metadata: {
-    deployment_mode: 'supervised',
-    floor_labels: {
-      R: 'Roof',
-      L2: 'Level 2',
-      L1: 'Level 1',
-      L0: 'Ground',
-      G: 'Ground Parking',
-      B1: 'Basement',
+const calmFixture: BuildingStatePayload = {
+  site_id: 'site-002',
+  building_posture: 'calm',
+  primary_narrative: null,
+  secondary_tensions: [],
+  operator_guidance: {
+    headline: 'No action needed.',
+    mode: 'none',
+  },
+}
+
+const warningFixture: BuildingStatePayload = {
+  site_id: 'site-002',
+  building_posture: 'compensating',
+  primary_narrative: {
+    voice: 'comfort_stress',
+    message: 'Cooling drift is spreading upward from the basement plant.',
+    location: {
+      epicenter: 'B1',
+      affected: ['L0', 'L1'],
+      propagation: 'upward',
     },
-    floor_stack_order: ['R', 'L2', 'L1', 'L0', 'G', 'B1'],
+    time_to_breach_min: 18,
+    urgency: 'prepare',
+    action: 'Prepare standby cooling.',
+  },
+  secondary_tensions: [
+    {
+      voice: 'energy_pressure',
+      message: 'Load is rising as the building compensates.',
+    },
+  ],
+  operator_guidance: {
+    headline: 'Prepare for intervention.',
+    mode: 'prepare',
+  },
+}
+
+const criticalFixture: BuildingStatePayload = {
+  site_id: 'site-002',
+  building_posture: 'critical',
+  primary_narrative: {
+    voice: 'comfort_stress',
+    message: 'Cooling capacity is collapsing across the occupied tower spine.',
+    location: {
+      epicenter: 'B1',
+      affected: ['L0', 'L1', 'L2'],
+      propagation: 'upward',
+    },
+    time_to_breach_min: 7,
+    urgency: 'act_now',
+    action: 'Act now to restore standby cooling.',
+  },
+  secondary_tensions: [
+    {
+      voice: 'operational_stability',
+      message: 'Plant transition margin is nearly exhausted.',
+    },
+  ],
+  operator_guidance: {
+    headline: 'Immediate operator attention required.',
+    mode: 'act_now',
   },
 }
 
@@ -45,7 +80,7 @@ const reviewStates = [
   {
     id: 'stable',
     label: 'Stable',
-    state: mapCockpitState(summary, quietFixture as CockpitDecisionPayload),
+    state: mapCockpitState(summary, calmFixture),
   },
   {
     id: 'warning',
@@ -55,7 +90,7 @@ const reviewStates = [
   {
     id: 'critical',
     label: 'Critical',
-    state: mapCockpitState(summary, crisisFixture as CockpitDecisionPayload),
+    state: mapCockpitState(summary, criticalFixture),
   },
 ]
 
@@ -81,11 +116,7 @@ export function CockpitStateReview() {
                 </div>
               </div>
 
-              <CockpitView
-                state={review.state}
-                renderMode="embedded"
-                spatialCanvas={<CockpitNervousSystemTwin state={review.state} />}
-              />
+              <CockpitView state={review.state} renderMode="embedded" />
             </section>
           ))}
         </div>

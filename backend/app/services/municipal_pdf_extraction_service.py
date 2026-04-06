@@ -10,7 +10,7 @@ import logging
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 class MunicipalPdfExtractionService:
     """Extract invoice text and basic fields from PDF files."""
 
-    async def parse_invoice(self, pdf_path: Path) -> Dict[str, Any]:
+    async def parse_invoice(self, pdf_path: Path) -> dict[str, Any]:
         text = self._extract_text(pdf_path)
         if not text or len(text.strip()) < 200:
             logger.info("PDF text extraction weak; attempting OCR fallback")
@@ -64,7 +64,7 @@ class MunicipalPdfExtractionService:
 
         return ""
 
-    async def _fallback_ocr(self, pdf_path: Path) -> Optional[Dict[str, Any]]:
+    async def _fallback_ocr(self, pdf_path: Path) -> dict[str, Any] | None:
         try:
             from app.services.municipal_ocr_service import MunicipalInvoiceOCRService
 
@@ -81,7 +81,7 @@ class MunicipalPdfExtractionService:
             logger.info("OCR fallback unavailable: %s", exc)
         return None
 
-    def _extract_fields(self, text: str) -> Dict[str, Any]:
+    def _extract_fields(self, text: str) -> dict[str, Any]:
         return {
             "account_number": self._find_first(text, r"Account\s*(Number|No)\s*[:#]?\s*(\d{6,15})"),
             "invoice_number": self._find_first(text, r"Invoice\s*(Number|No)\s*[:#]?\s*([A-Z0-9-]{6,20})"),
@@ -93,7 +93,7 @@ class MunicipalPdfExtractionService:
             **self._extract_billing_period(text),
         }
 
-    def _extract_billing_period(self, text: str) -> Dict[str, Any]:
+    def _extract_billing_period(self, text: str) -> dict[str, Any]:
         # Example formats: "01 Jan 2026 to 31 Jan 2026" or "01/01/2026 - 31/01/2026"
         match = re.search(
             r"(\d{2}[\/\-\s][A-Za-z]{3}[\/\-\s]\d{4}|\d{2}/\d{2}/\d{4})\s*(to|-)\s*(\d{2}[\/\-\s][A-Za-z]{3}[\/\-\s]\d{4}|\d{2}/\d{2}/\d{4})",
@@ -118,13 +118,13 @@ class MunicipalPdfExtractionService:
                 continue
         return value
 
-    def _find_first(self, text: str, pattern: str) -> Optional[str]:
+    def _find_first(self, text: str, pattern: str) -> str | None:
         match = re.search(pattern, text, re.IGNORECASE)
         if match:
             return match.group(match.lastindex or 1)
         return None
 
-    def _find_number(self, text: str, pattern: str) -> Optional[float]:
+    def _find_number(self, text: str, pattern: str) -> float | None:
         match = re.search(pattern, text, re.IGNORECASE)
         if match:
             value = match.group(match.lastindex or 1).replace(",", "")
@@ -134,10 +134,10 @@ class MunicipalPdfExtractionService:
                 return None
         return None
 
-    def _find_currency(self, text: str, pattern: str) -> Optional[float]:
+    def _find_currency(self, text: str, pattern: str) -> float | None:
         return self._find_number(text, pattern)
 
-    def _score_confidence(self, parsed: Dict[str, Any]) -> float:
+    def _score_confidence(self, parsed: dict[str, Any]) -> float:
         fields = [
             "account_number",
             "invoice_number",
@@ -148,6 +148,6 @@ class MunicipalPdfExtractionService:
         found = sum(1 for f in fields if parsed.get(f))
         return round(found / len(fields), 2)
 
-    def _missing_core_fields(self, parsed: Dict[str, Any]) -> bool:
+    def _missing_core_fields(self, parsed: dict[str, Any]) -> bool:
         core = ["account_number", "invoice_number", "total_amount_zar"]
         return any(not parsed.get(field) for field in core)

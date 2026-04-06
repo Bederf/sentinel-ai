@@ -119,7 +119,7 @@ async def get_current_decision(
     Returns the current DecisionMomentPayload for the given site.
 
     If a cached payload exists (from event bus trigger) and is fresh, returns it.
-    Otherwise assembles on-demand from query params (demo / manual trigger path).
+    Otherwise assembles on-demand from query params (manual/local trigger path).
 
     Query params are used for the on-demand assembly path only — when the event bus
     has pre-warmed the cache, those are ignored.
@@ -133,7 +133,7 @@ async def get_current_decision(
         if age_seconds < _CACHE_TTL_SECONDS:
             return JSONResponse(content={"data": cached_dict, "source": "cache", "age_seconds": int(age_seconds)})
 
-    # On-demand assembly (demo path / no active event)
+    # On-demand assembly (local path / no active event)
     if not asset_id:
         raise HTTPException(
             status_code=422,

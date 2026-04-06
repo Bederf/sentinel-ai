@@ -1,3 +1,18 @@
+---
+title: "n8n Email Intake Pipeline — Setup Runbook"
+type: "spec"
+status: "draft"
+version: "1.0.0"
+created: "2026-03-31"
+updated: "2026-03-31"
+tags: ["sentinel", "documentation"]
+related: []
+domain: "bms"
+audience: "all"
+complexity: "intermediate"
+estimated_read_time: 10
+---
+
 # n8n Email Intake Pipeline — Setup Runbook
 
 **Phase:** 134 | **Version:** 134.0 | **Date:** 2026-02-28

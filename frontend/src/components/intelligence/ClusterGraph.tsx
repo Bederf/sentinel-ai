@@ -51,18 +51,6 @@ export interface ClusterGraphData {
 
 // ---- Domain colours (SENTINEL design system) ----
 
-const DOMAIN_COLORS: Record<string, string> = {
-  cluster: "var(--color-sentinel-blue, #3B82F6)",
-  email: "var(--color-sentinel-blue, #3B82F6)",
-  space_optimisation: "var(--color-sentinel-amber, #F59E0B)",
-  occupancy: "var(--color-sentinel-green, #10B981)",
-  hvac: "var(--color-sentinel-red, #DC2626)",
-  maintenance: "#F59E0B",
-  security: "#14B8A6",
-  energy: "#8B5CF6",
-  entity: "#8B7FD4",
-};
-
 const DOMAIN_COLORS_RAW: Record<string, string> = {
   cluster: "#3B82F6",
   email: "#3B82F6",
@@ -73,12 +61,6 @@ const DOMAIN_COLORS_RAW: Record<string, string> = {
   security: "#14B8A6",
   energy: "#8B5CF6",
   entity: "#8B7FD4",
-};
-
-const ENTITY_COLORS: Record<string, string> = {
-  person: "#8B7FD4",
-  room: "#2980B9",
-  department: "#8B5CF6",
 };
 
 const DOMAIN_LABELS: Record<string, string> = {
@@ -521,6 +503,7 @@ export function ClusterGraph({ data, className = "", onNodeSelect }: ClusterGrap
 
       {/* Controls */}
       <div className="absolute bottom-5 right-5 flex flex-col gap-1.5">
+        {/* eslint-disable-next-line react-hooks/refs */}
         {[
           { label: "Fit", icon: "\u229E", onClick: handleFit },
           { label: "Zoom in", icon: "+", onClick: handleZoomIn },
@@ -590,8 +573,6 @@ export function ClusterGraph({ data, className = "", onNodeSelect }: ClusterGrap
 // ---- Node detail rendering ----
 
 function NodeDetail({ node }: { node: GraphNode }) {
-  const m = node.metadata || {};
-
   if (node.node_type === "cluster") return <ClusterDetail node={node} />;
   if (node.node_type === "signal") return <SignalDetail node={node} />;
   return <EntityDetail node={node} />;

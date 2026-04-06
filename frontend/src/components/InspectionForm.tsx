@@ -14,7 +14,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { Card, Badge, Button, TextInput, NumberInput, Select, SelectItem } from '@tremor/react';
+import { Card, Badge, Button, TextInput, NumberInput } from '@tremor/react';
 import {
   Camera,
   Save,
@@ -306,19 +306,26 @@ export default function InspectionForm({
 
                 {/* Checklist Item (Multiple Choice) */}
                 {item.item_type === 'checklist' && item.options && (
-                  <Select
+                  <select
                     value={responses[item.item_id]?.value || ''}
-                    onValueChange={(value: string) =>
-                      handleResponseChange(item.item_id, value)
-                    }
-                    placeholder="Select option"
+                    onChange={(event) => handleResponseChange(item.item_id, event.target.value)}
+                    className="w-full rounded-md appearance-none cursor-pointer px-3 py-2 text-sm transition-colors focus:outline-none focus:ring-0"
+                    style={{
+                      background: "var(--color-grafana-bg-secondary)",
+                      border: "1px solid var(--color-grafana-border)",
+                      color: "var(--color-grafana-text-primary)",
+                      boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)",
+                      outline: "none",
+                    }}
+                    aria-label={`Select option for ${item.question}`}
                   >
+                    <option value="">Select option</option>
                     {item.options.map((opt) => (
-                      <SelectItem key={opt.value} value={opt.value}>
+                      <option key={opt.value} value={opt.value}>
                         {opt.label}
-                      </SelectItem>
+                      </option>
                     ))}
-                  </Select>
+                  </select>
                 )}
 
                 {/* Measurement Item (Numerical) */}

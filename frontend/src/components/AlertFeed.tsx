@@ -11,7 +11,7 @@
  */
 
 import { useState, useEffect, useCallback } from "react";
-import { Bell, Clock, RefreshCw, CheckCircle, CheckCheck } from "lucide-react";
+import { Bell, Clock, RefreshCw, CheckCircle, CheckCheck, ClipboardList } from "lucide-react";
 import api from '@/lib/api';
 import type { Alert } from '@/lib/api';
 
@@ -112,6 +112,8 @@ export function AlertFeed({
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
   // Track locally read alerts for immediate UI feedback
   const [locallyReadAlerts, setLocallyReadAlerts] = useState<Set<string>>(new Set());
+  // Per-alert ack state: acking = spinner, wo = work order was auto-created
+  const [ackState, setAckState] = useState<Record<string, { acking: boolean; wo: boolean }>>({});
 
   // Fetch alerts from API
   const fetchAlerts = useCallback(async () => {
@@ -216,6 +218,32 @@ export function AlertFeed({
       } catch (err) {
         console.error(`Failed to acknowledge alert ${alert.id}:`, err);
       }
+    }
+  };
+
+  // Explicit acknowledge button handler — separate from row click/navigate
+  const handleAckButton = async (e: React.MouseEvent, alertId: string) => {
+    e.stopPropagation(); // don't trigger row click / navigation
+    if (ackState[alertId]?.acking || locallyReadAlerts.has(alertId)) return;
+
+    setAckState(prev => ({ ...prev, [alertId]: { acking: true, wo: false } }));
+    setLocallyReadAlerts(prev => new Set(prev).add(alertId));
+    if (onAlertRead) onAlertRead(alertId);
+
+    try {
+      const result = await api.acknowledgeAlert(alertId);
+      setAckState(prev => ({
+        ...prev,
+        [alertId]: { acking: false, wo: result.work_order_created ?? false },
+      }));
+      // Clear WO badge after 4 seconds
+      if (result.work_order_created) {
+        setTimeout(() => {
+          setAckState(prev => ({ ...prev, [alertId]: { acking: false, wo: false } }));
+        }, 4000);
+      }
+    } catch {
+      setAckState(prev => ({ ...prev, [alertId]: { acking: false, wo: false } }));
     }
   };
 
@@ -490,18 +518,55 @@ export function AlertFeed({
                       </div>
                     )}
 
-                    {/* Timestamp */}
-                    <div className="flex items-center gap-1">
-                      <Clock
-                        className="h-3 w-3"
-                        style={{ color: "var(--color-grafana-text-disabled)" }}
-                      />
-                      <span
-                        className="text-xs"
-                        style={{ color: "var(--color-grafana-text-disabled)" }}
-                      >
-                        {getRelativeTime(alert.created_at)}
-                      </span>
+                    {/* Timestamp + Ack button row */}
+                    <div className="flex items-center justify-between gap-1">
+                      <div className="flex items-center gap-1">
+                        <Clock
+                          className="h-3 w-3"
+                          style={{ color: "var(--color-grafana-text-disabled)" }}
+                        />
+                        <span
+                          className="text-xs"
+                          style={{ color: "var(--color-grafana-text-disabled)" }}
+                        >
+                          {getRelativeTime(alert.created_at)}
+                        </span>
+                      </div>
+
+                      {/* Acknowledge button — only shown on unread alerts */}
+                      {!isRead && (
+                        <div className="flex items-center gap-1.5">
+                          {ackState[alert.id]?.wo && (
+                            <span
+                              className="flex items-center gap-1 text-xs px-1.5 py-0.5 rounded"
+                              style={{
+                                background: "rgba(16, 185, 129, 0.15)",
+                                color: "var(--color-sentinel-green, #10B981)",
+                              }}
+                            >
+                              <ClipboardList className="h-3 w-3" />
+                              WO queued
+                            </span>
+                          )}
+                          <button
+                            onClick={(e) => handleAckButton(e, alert.id)}
+                            className="flex items-center gap-1 text-xs px-2 py-1 rounded transition-colors hover:brightness-125"
+                            style={{
+                              background: "rgba(61, 113, 217, 0.15)",
+                              color: "var(--color-grafana-blue, #3D71D9)",
+                              border: "1px solid rgba(61, 113, 217, 0.3)",
+                            }}
+                            title="Acknowledge alert and create work order"
+                          >
+                            {ackState[alert.id]?.acking ? (
+                              <RefreshCw className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <CheckCheck className="h-3 w-3" />
+                            )}
+                            Ack
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

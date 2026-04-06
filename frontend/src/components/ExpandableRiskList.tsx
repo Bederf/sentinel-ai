@@ -37,6 +37,12 @@ export function ExpandableRiskList({
   onEquipmentClick,
   onStatusBadgeClick,
 }: ExpandableRiskListProps) {
+  const handleToggleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    // Prevent SiteCard click handler from navigating away.
+    e.stopPropagation();
+    onToggle();
+  };
+
   const [equipment, setEquipment] = useState<BuildingEquipmentItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasFetched, setHasFetched] = useState(false);
@@ -116,7 +122,10 @@ export function ExpandableRiskList({
     >
       {/* Toggle Header */}
       <button
-        onClick={onToggle}
+        type="button"
+        onClick={handleToggleClick}
+        aria-expanded={expanded}
+        aria-controls={`risk-list-${siteId}`}
         className="w-full p-3 flex items-center justify-between hover:bg-white/5 transition-colors"
       >
         <span
@@ -137,12 +146,12 @@ export function ExpandableRiskList({
       </button>
 
       {/* Expandable Content */}
+      {expanded && (
       <div
-        className="overflow-hidden transition-all duration-200 ease-in-out"
-        style={{
-          maxHeight: expanded ? "400px" : "0",
-          opacity: expanded ? 1 : 0,
-        }}
+        id={`risk-list-${siteId}`}
+        onClick={(e) => e.stopPropagation()}
+        className="overflow-y-auto"
+        style={{ maxHeight: "420px" }}
       >
         <div className="px-3 pb-3">
           {loading ? (
@@ -245,6 +254,7 @@ export function ExpandableRiskList({
           )}
         </div>
       </div>
+      )}
     </div>
   );
 }

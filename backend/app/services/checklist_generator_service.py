@@ -10,9 +10,9 @@ stored in Supabase for reuse across identical equipment.
 """
 
 import json
-import re
 import logging
-from typing import List, Dict, Any, Optional
+import re
+from typing import Any
 
 from app.config.settings import settings
 from app.services.model_gateway import model_gateway
@@ -55,8 +55,8 @@ class ChecklistGeneratorService:
         manufacturer: str,
         model: str,
         capacity: str = None,
-        additional_specs: Optional[Dict[str, Any]] = None,
-    ) -> List[Dict[str, Any]]:
+        additional_specs: dict[str, Any] | None = None,
+    ) -> list[dict[str, Any]]:
         """Generate OEM-specific inspection/maintenance checklists.
 
         Generates 3 template variants:
@@ -87,8 +87,8 @@ class ChecklistGeneratorService:
                 if oem_templates:
                     return oem_templates
 
-        # Demo mode: return pre-built templates
-        if settings.demo_mode:
+        # Local simulator mode: return pre-built templates
+        if settings.site002_source_enabled and not settings.sentinel_island_mode:
             return self._generate_demo_templates(equipment_type, manufacturer, model, capacity)
 
         # Build and call Claude API
@@ -99,6 +99,7 @@ class ChecklistGeneratorService:
                 task_class="medium",
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=settings.claude_max_tokens,
+                source="checklist_generation",
             )
 
             templates = self._parse_response(response_text, equipment_type, manufacturer, model)
@@ -115,10 +116,10 @@ class ChecklistGeneratorService:
 
         except Exception as e:
             logger.error(f"Claude API checklist generation failed: {e}")
-            # Fall back to demo templates on API failure
+            # Fall back to seeded templates on API failure
             return self._generate_demo_templates(equipment_type, manufacturer, model, capacity)
 
-    async def generate_for_equipment(self, equipment_code: str) -> List[Dict[str, Any]]:
+    async def generate_for_equipment(self, equipment_code: str) -> list[dict[str, Any]]:
         """Generate checklists for equipment by looking up its metadata.
 
         Args:
@@ -165,7 +166,7 @@ class ChecklistGeneratorService:
         manufacturer: str,
         model: str,
         capacity: str = None,
-        additional_specs: Optional[Dict[str, Any]] = None,
+        additional_specs: dict[str, Any] | None = None,
     ) -> str:
         """Build Claude prompt for checklist generation.
 
@@ -253,7 +254,7 @@ Respond with ONLY the JSON array of 3 templates. No markdown, no explanation, ju
         equipment_type: str,
         manufacturer: str,
         model: str,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Parse Claude response into template dicts.
 
         Handles markdown code blocks and validates required fields.
@@ -321,8 +322,8 @@ Respond with ONLY the JSON array of 3 templates. No markdown, no explanation, ju
         manufacturer: str,
         model: str,
         capacity: str = None,
-    ) -> List[Dict[str, Any]]:
-        """Generate pre-built demo templates without Claude API.
+    ) -> list[dict[str, Any]]:
+        """Generate pre-built seeded templates without Claude API.
 
         Used when DEMO_MODE=true or as fallback on API failure.
 
@@ -333,7 +334,7 @@ Respond with ONLY the JSON array of 3 templates. No markdown, no explanation, ju
             capacity: Optional capacity string.
 
         Returns:
-            List of 3 demo template dicts.
+            List of 3 seeded template dicts.
         """
         capacity_text = f" ({capacity})" if capacity else ""
         base_name = f"{manufacturer} {model}{capacity_text}"
@@ -684,13 +685,13 @@ Respond with ONLY the JSON array of 3 templates. No markdown, no explanation, ju
             },
         ]
 
-        # Store demo templates in Supabase if available
+        # Store seeded templates in Supabase if available
         if self.repo:
             for template in templates:
                 try:
                     self.repo.upsert_template(template)
                 except Exception as e:
-                    logger.warning(f"Could not store demo template in Supabase: {e}")
+                    logger.warning(f"Could not store seeded template in Supabase: {e}")
 
         return templates
 
@@ -699,7 +700,7 @@ Respond with ONLY the JSON array of 3 templates. No markdown, no explanation, ju
 # Singleton Factory
 # ============================================================================
 
-_instance: Optional[ChecklistGeneratorService] = None
+_instance: ChecklistGeneratorService | None = None
 
 
 def get_checklist_generator_service() -> ChecklistGeneratorService:

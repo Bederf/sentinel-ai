@@ -14,7 +14,6 @@ from __future__ import annotations
 import logging
 from collections import defaultdict
 from datetime import datetime
-from typing import Optional
 
 from app.models.booking_record import (
     BlockBookingAlert,
@@ -92,7 +91,7 @@ def detect_overlaps(
     site_id: str,
     bookings: list[BookingRecord],
     config: BlockBookingConfig,
-    store: Optional[BookingStore] = None,
+    store: BookingStore | None = None,
 ) -> list[BlockBookingAlert]:
     """Scan bookings for same-slot reservations by the same organiser.
 

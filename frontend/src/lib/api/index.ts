@@ -122,20 +122,6 @@ export {
   type ValidationResult,
 } from './solar_config';
 export {
-  fetchAnnualSummary,
-  startAnnualSimulation,
-  pollSimulationStatus,
-  formatZAR as formatZARSolar,
-  formatKWh,
-  formatPercent as formatPercentSolar,
-  getLearningPhase,
-  type AnnualSummary,
-  type MonthSummary,
-  type SeasonSummary,
-  type LearningCurvePoint,
-  type SimulationStatus,
-} from './solarAnnual';
-export {
   pricingApi,
   formatZAR,
   parseZAR,

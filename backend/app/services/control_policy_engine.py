@@ -15,9 +15,9 @@ import json
 import logging
 import time
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from app.config.settings import IngestionMode, settings
 from app.models.control_policy import (
@@ -71,12 +71,12 @@ class ControlPolicyEngine:
     - Enforces rate limits, setpoint limits, ramp rates
     """
 
-    _instance: Optional[ControlPolicyEngine] = None
+    _instance: ControlPolicyEngine | None = None
 
     def __init__(self) -> None:
-        self._policies: Dict[str, AssetControlPolicy] = {}
-        self._active_envelopes: Dict[str, CommandEnvelope] = {}
-        self._hourly_counts: Dict[str, List[float]] = defaultdict(list)
+        self._policies: dict[str, AssetControlPolicy] = {}
+        self._active_envelopes: dict[str, CommandEnvelope] = {}
+        self._hourly_counts: dict[str, list[float]] = defaultdict(list)
         self._load_policies()
 
     # -----------------------------------------------------------------
@@ -107,7 +107,7 @@ class ControlPolicyEngine:
                 return ControlMode.SUPERVISED
         return ControlMode.RECOMMEND
 
-    def get_available_tools(self) -> List[str]:
+    def get_available_tools(self) -> list[str]:
         """Return tool names available in current control mode.
 
         RECOMMEND: Read-only tools only
@@ -142,7 +142,7 @@ class ControlPolicyEngine:
         except Exception as e:
             logger.error("Failed to load control policies: %s", e)
 
-    def get_policy(self, equipment_type: str) -> Optional[AssetControlPolicy]:
+    def get_policy(self, equipment_type: str) -> AssetControlPolicy | None:
         """Get control policy for an equipment type."""
         return self._policies.get(equipment_type.upper())
 
@@ -150,7 +150,7 @@ class ControlPolicyEngine:
         """Register or update an asset control policy."""
         self._policies[policy.equipment_type.upper()] = policy
 
-    def list_policies(self) -> List[AssetControlPolicy]:
+    def list_policies(self) -> list[AssetControlPolicy]:
         """List all registered policies."""
         return list(self._policies.values())
 
@@ -162,10 +162,10 @@ class ControlPolicyEngine:
         self,
         target_equipment: str,
         site_id: str,
-        proposed_action: Dict[str, Any],
+        proposed_action: dict[str, Any],
         reason: str = "",
         created_by: str = "ai_optimizer",
-        correlation_id: Optional[str] = None,
+        correlation_id: str | None = None,
     ) -> CommandEnvelope:
         """Evaluate a proposed action against all policy checks.
 
@@ -209,7 +209,7 @@ class ControlPolicyEngine:
         eq_type = self._extract_equipment_type(target_equipment)
         policy = self.get_policy(eq_type)
 
-        checks: Dict[str, Any] = {"equipment_type": eq_type, "control_mode": mode.value}
+        checks: dict[str, Any] = {"equipment_type": eq_type, "control_mode": mode.value}
 
         # Step 3: Setpoint limits
         if policy:
@@ -294,7 +294,7 @@ class ControlPolicyEngine:
 
         return envelope
 
-    async def execute_envelope(self, envelope_id: str, approved_by: Optional[str] = None) -> CommandEnvelope:
+    async def execute_envelope(self, envelope_id: str, approved_by: str | None = None) -> CommandEnvelope:
         """Execute a command envelope after all checks pass.
 
         Args:
@@ -325,13 +325,13 @@ class ControlPolicyEngine:
 
         if approved_by:
             envelope.approved_by = approved_by
-            envelope.approved_at = datetime.now(timezone.utc)
+            envelope.approved_at = datetime.now(UTC)
 
         # Record rate limit
         self._record_execution(envelope.target_equipment)
 
         envelope.executed = True
-        envelope.executed_at = datetime.now(timezone.utc)
+        envelope.executed_at = datetime.now(UTC)
         envelope.execution_result = {"status": "executed", "envelope_id": envelope_id}
 
         logger.info(
@@ -366,14 +366,14 @@ class ControlPolicyEngine:
             raise ValueError("Envelope already rolled back")
 
         envelope.rolled_back = True
-        envelope.rolled_back_at = datetime.now(timezone.utc)
+        envelope.rolled_back_at = datetime.now(UTC)
         envelope.execution_result = envelope.execution_result or {}
         envelope.execution_result["rollback_reason"] = reason
 
         logger.info("Rolled back envelope %s: %s", envelope_id, reason)
         return envelope
 
-    def get_active_envelopes(self, site_id: Optional[str] = None) -> List[CommandEnvelope]:
+    def get_active_envelopes(self, site_id: str | None = None) -> list[CommandEnvelope]:
         """Get active (executed, not rolled back) command envelopes."""
         results = []
         for env in self._active_envelopes.values():
@@ -397,7 +397,7 @@ class ControlPolicyEngine:
             return parts[1].upper()
         return "UNKNOWN"
 
-    def _get_previous_value(self, equipment_id: str, point_name: str) -> Optional[float]:
+    def _get_previous_value(self, equipment_id: str, point_name: str) -> float | None:
         """Get previous value for ramp rate checking.
 
         Checks active envelopes for the most recent executed action on this point.
@@ -416,7 +416,7 @@ class ControlPolicyEngine:
         """Check if current time is within any lockout window."""
         if not policy.lockout_windows:
             return False
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         current_time = now.strftime("%H:%M")
         for window in policy.lockout_windows:
             start = window.get("start", "")
@@ -446,8 +446,8 @@ class ControlPolicyEngine:
         self._hourly_counts[equipment_id].append(time.monotonic())
 
     async def _capture_previous_state(
-        self, equipment_id: str, proposed_action: Dict[str, Any]
-    ) -> Optional[Dict[str, Any]]:
+        self, equipment_id: str, proposed_action: dict[str, Any]
+    ) -> dict[str, Any] | None:
         """Capture current state before executing action."""
         try:
             from app.database.repositories.equipment_repository import get_equipment_repository
@@ -461,7 +461,7 @@ class ControlPolicyEngine:
                 return {
                     "point": point_name,
                     "value": current_value,
-                    "captured_at": datetime.now(timezone.utc).isoformat(),
+                    "captured_at": datetime.now(UTC).isoformat(),
                 }
         except Exception as e:
             logger.debug("Could not capture previous state for %s: %s", equipment_id, e)
@@ -470,9 +470,9 @@ class ControlPolicyEngine:
     def _generate_rollback(
         self,
         equipment_id: str,
-        proposed_action: Dict[str, Any],
-        previous_state: Optional[Dict[str, Any]],
-    ) -> Optional[Dict[str, Any]]:
+        proposed_action: dict[str, Any],
+        previous_state: dict[str, Any] | None,
+    ) -> dict[str, Any] | None:
         """Generate a rollback command from the previous state."""
         if not previous_state or previous_state.get("value") is None:
             return None
@@ -488,7 +488,7 @@ class ControlPolicyEngine:
 # Singleton
 # -----------------------------------------------------------------
 
-_engine: Optional[ControlPolicyEngine] = None
+_engine: ControlPolicyEngine | None = None
 
 
 def get_control_policy_engine() -> ControlPolicyEngine:

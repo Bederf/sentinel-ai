@@ -9,8 +9,9 @@ Provides:
 
 import logging
 from datetime import datetime, timedelta
-from typing import Dict, Any, List, Optional
 from pathlib import Path
+from typing import Any
+
 import numpy as np
 
 logger = logging.getLogger(__name__)
@@ -36,8 +37,8 @@ class LSTMInferenceService:
 
     def __init__(self):
         self.registry = _get_registry()
-        self._loaded_models: Dict[str, Any] = {}
-        self._loaded_scalers: Dict[str, Any] = {}
+        self._loaded_models: dict[str, Any] = {}
+        self._loaded_scalers: dict[str, Any] = {}
         self._registry_generation: int = self.registry._generation
 
     def _load_model(self, equipment_type: str):
@@ -60,8 +61,9 @@ class LSTMInferenceService:
             raise ValueError(f"No active LSTM model for {equipment_type}")
 
         # Lazy import
-        from ml.lstm.model import SensorLSTM
         import joblib
+
+        from ml.lstm.model import SensorLSTM
 
         model = SensorLSTM.load(model_info["model_path"])
         scaler_path = model_info["metadata"].get("scaler_path")
@@ -75,7 +77,7 @@ class LSTMInferenceService:
 
         return model
 
-    def predict(self, equipment_id: str, equipment_type: str, sensor_data: np.ndarray = None) -> Dict[str, Any]:
+    def predict(self, equipment_id: str, equipment_type: str, sensor_data: np.ndarray = None) -> dict[str, Any]:
         """
         Get 24/48/72h predictions for equipment.
 
@@ -93,10 +95,10 @@ class LSTMInferenceService:
         except ValueError as e:
             return {"equipment_id": equipment_id, "error": str(e), "predictions": None}
 
-        # Use provided data or generate demo data
+        # Use provided data or generate seeded data
         if sensor_data is None:
             # In production, this would fetch from InfluxDB
-            # For now, generate demo data
+            # For now, generate seeded data
             sensor_data = self._generate_demo_input(equipment_type)
 
         # Validate shape
@@ -142,7 +144,7 @@ class LSTMInferenceService:
         }
 
     def _generate_demo_input(self, equipment_type: str) -> np.ndarray:
-        """Generate demo input data for testing."""
+        """Generate seeded input data for testing."""
         np.random.seed(int(datetime.now().timestamp()) % 1000)
 
         # Equipment-specific feature counts
@@ -161,7 +163,7 @@ class LSTMInferenceService:
 
         return data
 
-    def get_trend(self, equipment_id: str, equipment_type: str, hours_history: int = 168) -> Dict[str, Any]:
+    def get_trend(self, equipment_id: str, equipment_type: str, hours_history: int = 168) -> dict[str, Any]:
         """Get historical + predicted trend data for visualization."""
         # Get predictions
         prediction = self.predict(equipment_id, equipment_type)
@@ -169,7 +171,7 @@ class LSTMInferenceService:
         if prediction.get("error"):
             return prediction
 
-        # Generate demo historical data
+        # Generate seeded historical data
         historical = self._generate_demo_input(equipment_type)[:, 0].tolist()
 
         return {
@@ -196,8 +198,8 @@ class AnomalyDetectionService:
 
     def __init__(self):
         self.registry = _get_registry()
-        self._loaded_models: Dict[str, Any] = {}
-        self._loaded_scalers: Dict[str, Any] = {}
+        self._loaded_models: dict[str, Any] = {}
+        self._loaded_scalers: dict[str, Any] = {}
         self._registry_generation: int = self.registry._generation
 
     def _load_model(self, equipment_type: str):
@@ -220,8 +222,9 @@ class AnomalyDetectionService:
             raise ValueError(f"No active autoencoder for {equipment_type}")
 
         # Lazy import
-        from ml.autoencoder.model import SensorAutoencoder
         import joblib
+
+        from ml.autoencoder.model import SensorAutoencoder
 
         model = SensorAutoencoder.load(model_info["model_path"])
         scaler_path = model_info["metadata"].get("scaler_path")
@@ -235,7 +238,7 @@ class AnomalyDetectionService:
 
         return model
 
-    def check_equipment(self, equipment_id: str, equipment_type: str, sensor_data: np.ndarray = None) -> Dict[str, Any]:
+    def check_equipment(self, equipment_id: str, equipment_type: str, sensor_data: np.ndarray = None) -> dict[str, Any]:
         """
         Check equipment for anomalies.
 
@@ -252,7 +255,7 @@ class AnomalyDetectionService:
         except ValueError as e:
             return {"equipment_id": equipment_id, "error": str(e), "is_anomaly": None}
 
-        # Use provided data or generate demo data
+        # Use provided data or generate seeded data
         if sensor_data is None:
             sensor_data = self._generate_demo_window(equipment_type)
 
@@ -309,7 +312,7 @@ class AnomalyDetectionService:
             return "critical"
 
     def _generate_demo_window(self, equipment_type: str, inject_anomaly: bool = False) -> np.ndarray:
-        """Generate demo 24-hour window for testing."""
+        """Generate seeded 24-hour window for testing."""
         np.random.seed(int(datetime.now().timestamp()) % 1000)
 
         feature_counts = {"chiller": 5, "ahu": 5, "generator": 5}
@@ -332,13 +335,13 @@ class AnomalyDetectionService:
 
         return data
 
-    def check_all_equipment(self, equipment_list: List[Dict[str, str]] = None) -> List[Dict[str, Any]]:
+    def check_all_equipment(self, equipment_list: list[dict[str, str]] = None) -> list[dict[str, Any]]:
         """
         Check multiple equipment for anomalies.
 
         Args:
             equipment_list: List of {"equipment_id": ..., "equipment_type": ...}
-                           If None, uses demo list
+                           If None, uses seeded list
 
         Returns:
             List of anomaly detection results sorted by score
@@ -366,19 +369,19 @@ class AnomalyDetectionService:
 
         return results
 
-    def get_anomaly_alerts(self) -> List[Dict[str, Any]]:
+    def get_anomaly_alerts(self) -> list[dict[str, Any]]:
         """Get equipment currently flagged as anomalous."""
         all_results = self.check_all_equipment()
         return [r for r in all_results if r.get("is_anomaly", False)]
 
-    def get_anomaly_history(self, equipment_id: str, equipment_type: str, days: int = 7) -> List[Dict[str, Any]]:
-        """Get anomaly score history for trending (demo implementation)."""
+    def get_anomaly_history(self, equipment_id: str, equipment_type: str, days: int = 7) -> list[dict[str, Any]]:
+        """Get anomaly score history for trending (seed implementation)."""
         try:
             model = self._load_model(equipment_type)
         except ValueError:
             return []
 
-        # Generate demo history
+        # Generate seeded history
         history = []
         np.random.seed(42)
 
@@ -399,10 +402,204 @@ class AnomalyDetectionService:
 
         return history
 
+    def fetch_sensor_window_from_db(
+        self, equipment_code: str, equipment_type: str, hours: int = 24
+    ) -> np.ndarray | None:
+        """Fetch sensor readings from equipment_sensor_readings and return a 24h numpy window.
+
+        Queries the last `hours` of readings, pivots sensor_type columns into a
+        2-D array (timesteps × features) using the feature order the autoencoder
+        was trained on.  Returns None if there are insufficient rows.
+        """
+        import os
+
+        import psycopg2
+
+        feature_cols: dict[str, list[str]] = {
+            "chiller": [
+                "chilled_water_supply_temp",
+                "chilled_water_return_temp",
+                "power_kw",
+                "valve_position",
+                "fan_speed",
+            ],
+            "ahu": ["supply_temp", "return_temp", "fan_speed", "damper_position", "power_kw"],
+            "generator": ["power_kw", "voltage", "current", "frequency", "power_factor"],
+            "fcu": ["room_temp", "fan_speed", "valve_position", "power_kw", "damper_position"],
+        }
+        cols = feature_cols.get(equipment_type)
+        if not cols:
+            return None
+
+        database_url = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@127.0.0.1:55322/postgres")
+        since = datetime.utcnow() - timedelta(hours=hours)
+
+        try:
+            conn = psycopg2.connect(database_url)
+            conn.autocommit = True
+            cur = conn.cursor()
+
+            placeholders = ",".join(["%s"] * len(cols))
+            cur.execute(
+                f"""
+                SELECT recorded_at, sensor_type, value
+                FROM equipment_sensor_readings
+                WHERE equipment_id = %s
+                  AND sensor_type IN ({placeholders})
+                  AND recorded_at >= %s
+                ORDER BY recorded_at ASC
+                """,
+                [equipment_code, *cols, since],
+            )
+            rows = cur.fetchall()
+            cur.close()
+            conn.close()
+        except Exception as e:
+            logger.warning(f"fetch_sensor_window_from_db failed for {equipment_code}: {e}")
+            return None
+
+        if not rows:
+            return None
+
+        # Pivot: bucket by hour, then build feature matrix
+        from collections import defaultdict
+
+        hourly: dict[str, dict[str, float]] = defaultdict(dict)
+        for recorded_at, sensor_type, value in rows:
+            bucket = recorded_at.strftime("%Y-%m-%dT%H")
+            hourly[bucket][sensor_type] = float(value)
+
+        sorted_buckets = sorted(hourly.keys())
+        if len(sorted_buckets) < 24:
+            return None  # Insufficient coverage
+
+        matrix = []
+        for bucket in sorted_buckets[-24:]:
+            readings = hourly[bucket]
+            # Use 0.0 for missing sensors within an hour
+            matrix.append([readings.get(col, 0.0) for col in cols])
+
+        return np.array(matrix, dtype=np.float32)
+
+    def run_anomaly_scan(self, site_id: str) -> list[dict[str, Any]]:
+        """Run anomaly detection on all active equipment for a site using real DB data.
+
+        Fetches sensor windows from equipment_sensor_readings, runs the autoencoder,
+        and persists anomalies to the anomalies table.  Returns a list of result dicts.
+        """
+        import os
+        import uuid
+
+        import psycopg2
+
+        database_url = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@127.0.0.1:55322/postgres")
+
+        # Equipment types with trained autoencoders
+        supported_types = {"chiller", "ahu", "generator", "fcu"}
+
+        # Fetch active equipment for site
+        try:
+            conn = psycopg2.connect(database_url)
+            conn.autocommit = True
+            cur = conn.cursor()
+            cur.execute(
+                """
+                SELECT e.id, e.code, LOWER(e.type) AS type
+                FROM equipment e
+                JOIN sites s ON s.id = e.site_id
+                WHERE s.code = %s
+                  AND e.status != 'decommissioned'
+                  AND LOWER(e.type) = ANY(%s)
+                """,
+                [site_id, list(supported_types)],
+            )
+            equipment_rows = cur.fetchall()
+            cur.close()
+            conn.close()
+        except Exception as e:
+            logger.error(f"run_anomaly_scan: equipment query failed for {site_id}: {e}")
+            return []
+
+        results = []
+        anomalies_to_insert = []
+        now = datetime.utcnow()
+
+        for eq_id, eq_code, eq_type in equipment_rows:
+            sensor_data = self.fetch_sensor_window_from_db(eq_code, eq_type)
+            if sensor_data is None:
+                logger.debug(f"Skipping {eq_code}: insufficient sensor data in DB")
+                continue
+
+            result = self.check_equipment(eq_code, eq_type, sensor_data=sensor_data)
+            result["equipment_db_id"] = str(eq_id)
+            results.append(result)
+
+            if result.get("is_anomaly") and not result.get("error"):
+                severity_map = {"elevated": "warning", "high": "warning", "critical": "critical"}
+                raw_sev = result.get("severity", "warning")
+                severity = severity_map.get(raw_sev, "warning")
+                anomalies_to_insert.append(
+                    {
+                        "id": str(uuid.uuid4()),
+                        "code": f"ANOM-{eq_code}-{now.strftime('%Y%m%d%H')}",
+                        "equipment_id": str(eq_id),
+                        "site_id": site_id,
+                        "type": "autoencoder_reconstruction_error",
+                        "severity": severity,
+                        "status": "active",
+                        "detected_at": now.isoformat(),
+                        "confidence": min(1.0, result.get("score_pct", 0) / 100.0),
+                        "sensor_values": {
+                            "anomaly_score": result.get("anomaly_score"),
+                            "threshold": result.get("threshold"),
+                            "score_pct": result.get("score_pct"),
+                        },
+                    }
+                )
+
+        if anomalies_to_insert:
+            try:
+                conn = psycopg2.connect(database_url)
+                conn.autocommit = True
+                cur = conn.cursor()
+
+                # site_id must be UUID in anomalies table — resolve it
+                cur.execute("SELECT id FROM sites WHERE code = %s LIMIT 1", [site_id])
+                row = cur.fetchone()
+                site_uuid = str(row[0]) if row else None
+
+                if site_uuid:
+                    for a in anomalies_to_insert:
+                        a["site_id"] = site_uuid
+                        cur.execute(
+                            """
+                            INSERT INTO anomalies
+                                (id, code, equipment_id, site_id, type, severity, status,
+                                 detected_at, confidence, sensor_values)
+                            VALUES
+                                (%(id)s, %(code)s, %(equipment_id)s::uuid, %(site_id)s::uuid,
+                                 %(type)s, %(severity)s, %(status)s,
+                                 %(detected_at)s::timestamptz, %(confidence)s, %(sensor_values)s::jsonb)
+                            ON CONFLICT DO NOTHING
+                            """,
+                            {**a, "sensor_values": __import__("json").dumps(a["sensor_values"])},
+                        )
+                    logger.info(f"[ANOMALY SCAN] Persisted {len(anomalies_to_insert)} anomalies for {site_id}")
+
+                cur.close()
+                conn.close()
+            except Exception as e:
+                logger.error(f"run_anomaly_scan: anomaly insert failed: {e}")
+
+        logger.info(
+            f"[ANOMALY SCAN] {site_id}: checked {len(results)} equipment, {len(anomalies_to_insert)} anomalies detected"
+        )
+        return results
+
 
 # Singleton instances
-_lstm_service: Optional[LSTMInferenceService] = None
-_anomaly_service: Optional[AnomalyDetectionService] = None
+_lstm_service: LSTMInferenceService | None = None
+_anomaly_service: AnomalyDetectionService | None = None
 
 
 def get_lstm_service() -> LSTMInferenceService:

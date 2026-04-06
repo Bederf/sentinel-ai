@@ -2,7 +2,7 @@
  * Unified Tremor Component Mocking Strategy
  *
  * Centralizes mocking for all Tremor components to ensure consistent
- * test behavior across Dashboard, SystemHealthPage, SimulationDashboard,
+ * test behavior across Dashboard and SystemHealthPage,
  * and other Tremor-dependent components.
  *
  * **Important Note on Tab Testing:**

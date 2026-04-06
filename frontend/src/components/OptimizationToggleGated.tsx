@@ -43,7 +43,7 @@ export function OptimizationToggleGated({
 
   return (
     <LockedFeatureOverlay
-      module="control"
+      module="energy_control"
       featureName="AI Optimization"
       customMessage="Enable Controls module to let SENTINEL automatically optimize your building operations based on occupancy, weather, and energy pricing — estimated R15K+/month in savings."
     >

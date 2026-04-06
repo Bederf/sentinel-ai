@@ -15,16 +15,15 @@ Core intelligence:
 import json
 import logging
 from pathlib import Path
-from typing import Dict, List, Optional
 
 from app.models.condition import (
     ElementRUL,
-    EquipmentRUL,
-    ServiceRecommendation,
-    RiskLevel,
-    Urgency,
-    TrendDirection,
     ElementTrend,
+    EquipmentRUL,
+    RiskLevel,
+    ServiceRecommendation,
+    TrendDirection,
+    Urgency,
 )
 from app.services.element_trend_service import get_element_trend_service
 
@@ -44,14 +43,14 @@ class RULCalculator:
 
     def __init__(self):
         """Initialize calculator with lazy-loaded thresholds."""
-        self._threshold_cache: Dict[str, Dict[str, float]] = {}
+        self._threshold_cache: dict[str, dict[str, float]] = {}
         self._templates_loaded = False
 
     # ========================================================================
     # Threshold Loading
     # ========================================================================
 
-    def _get_element_thresholds(self, equipment_type: str) -> Dict[str, float]:
+    def _get_element_thresholds(self, equipment_type: str) -> dict[str, float]:
         """
         Get failure threshold values for each element of an equipment type.
 
@@ -68,7 +67,7 @@ class RULCalculator:
         if equipment_type in self._threshold_cache:
             return self._threshold_cache[equipment_type]
 
-        thresholds: Dict[str, float] = {}
+        thresholds: dict[str, float] = {}
 
         # Load from checklist templates
         if not self._templates_loaded:
@@ -107,7 +106,7 @@ class RULCalculator:
         self._all_templates = {}
         try:
             if CHECKLIST_TEMPLATES_PATH.exists():
-                with open(CHECKLIST_TEMPLATES_PATH, "r") as f:
+                with open(CHECKLIST_TEMPLATES_PATH) as f:
                     data = json.load(f)
                     self._all_templates = data.get("templates", {})
                 logger.info(f"Loaded {len(self._all_templates)} checklist templates")
@@ -118,7 +117,7 @@ class RULCalculator:
 
         self._templates_loaded = True
 
-    def _get_fallback_defaults(self, equipment_type: str) -> Dict[str, float]:
+    def _get_fallback_defaults(self, equipment_type: str) -> dict[str, float]:
         """
         Get fallback threshold defaults for common measurements.
 
@@ -268,7 +267,7 @@ class RULCalculator:
             risk_level=risk_level,
         )
 
-    def _classify_risk(self, days_remaining: Optional[float]) -> RiskLevel:
+    def _classify_risk(self, days_remaining: float | None) -> RiskLevel:
         """Classify risk level based on days until threshold."""
         if days_remaining is None:
             return RiskLevel.LOW
@@ -314,7 +313,7 @@ class RULCalculator:
         thresholds = self._get_element_thresholds(equipment_type)
 
         # Calculate RUL for each element
-        element_ruls: List[ElementRUL] = []
+        element_ruls: list[ElementRUL] = []
         for trend in summary.element_trends:
             # Find matching threshold
             threshold = self._find_threshold(trend.element_name, thresholds)
@@ -380,7 +379,7 @@ class RULCalculator:
             message=message,
         )
 
-    def _find_threshold(self, element_name: str, thresholds: Dict[str, float]) -> Optional[float]:
+    def _find_threshold(self, element_name: str, thresholds: dict[str, float]) -> float | None:
         """
         Find a threshold value for an element name.
 
@@ -420,7 +419,7 @@ class RULCalculator:
             return "vav"
         return "general"
 
-    def _recommend_service_window(self, days_until_first: Optional[float]) -> Optional[str]:
+    def _recommend_service_window(self, days_until_first: float | None) -> str | None:
         """
         Generate service window recommendation based on worst element.
 
@@ -442,10 +441,10 @@ class RULCalculator:
 
     def _build_rul_message(
         self,
-        element_ruls: List[ElementRUL],
+        element_ruls: list[ElementRUL],
         degrading_count: int,
-        worst_element: Optional[str],
-        days_until_first: Optional[float],
+        worst_element: str | None,
+        days_until_first: float | None,
     ) -> str:
         """Build human-readable RUL summary message."""
         total = len(element_ruls)
@@ -469,7 +468,7 @@ class RULCalculator:
     # Service Recommendations
     # ========================================================================
 
-    async def get_service_recommendations(self, equipment_id: str, days: int = 90) -> List[ServiceRecommendation]:
+    async def get_service_recommendations(self, equipment_id: str, days: int = 90) -> list[ServiceRecommendation]:
         """
         Generate prioritized service recommendations for degrading elements.
 
@@ -486,7 +485,7 @@ class RULCalculator:
         # Get RUL data
         equipment_rul = await self.calculate_equipment_rul(equipment_id, days=days)
 
-        recommendations: List[ServiceRecommendation] = []
+        recommendations: list[ServiceRecommendation] = []
 
         for rul in equipment_rul.element_ruls:
             # Only recommend for elements approaching threshold
@@ -540,7 +539,7 @@ class RULCalculator:
         self,
         element_name: str,
         days_remaining: float,
-        current_value: Optional[float],
+        current_value: float | None,
         threshold_value: float,
         unit: str,
     ) -> tuple:
@@ -591,7 +590,7 @@ class RULCalculator:
 # Singleton Instance
 # ============================================================================
 
-_rul_calculator: Optional[RULCalculator] = None
+_rul_calculator: RULCalculator | None = None
 
 
 def get_rul_calculator() -> RULCalculator:

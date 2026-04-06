@@ -1,3 +1,18 @@
+---
+title: "Gen Set 5 Quick Start — Phase 41-03 to 46 Implementation"
+type: "spec"
+status: "draft"
+version: "1.0.0"
+created: "2026-03-31"
+updated: "2026-03-31"
+tags: ["sentinel", "documentation"]
+related: []
+domain: "bms"
+audience: "all"
+complexity: "intermediate"
+estimated_read_time: 10
+---
+
 # Gen Set 5 Quick Start — Phase 41-03 to 46 Implementation
 
 **Goal:** Before approving the R611,820.75 quote, capture phyphox diagnostic data to confirm/challenge the repair scope and validate cost-benefit.

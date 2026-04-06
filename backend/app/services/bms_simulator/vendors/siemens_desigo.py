@@ -6,10 +6,10 @@ Pattern: {Site}/{Floor}/{Device-Code}/{PointName}
 Example: STC/B1/CH-01/ChwSupplyTemp
 """
 
-from typing import Any, Dict
+from typing import Any
 
+from ..models import FLOOR_CODE_MAP, SITE_CODE_MAP
 from .base import VendorAdapter
-from ..models import SITE_CODE_MAP, FLOOR_CODE_MAP
 
 
 class SiemensDesigoAdapter(VendorAdapter):
@@ -105,11 +105,11 @@ class SiemensDesigoAdapter(VendorAdapter):
 
     def format_point_for_export(
         self,
-        device: Dict[str, Any],
+        device: dict[str, Any],
         point_name: str,
-        point_def: Dict[str, Any],
+        point_def: dict[str, Any],
         instance_base: int,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Format a point for CSV export in Desigo format.
 

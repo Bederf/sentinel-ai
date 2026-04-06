@@ -12,6 +12,8 @@ interface FloorSelectorProps {
   selectedFloors: Set<number>;
   onToggle: (floor: number) => void;
   onIsolate: (floor: number) => void;
+  /** When true, floor list starts open (matrix / HUD layout). */
+  defaultExpanded?: boolean;
 }
 
 export function FloorSelector({
@@ -19,8 +21,9 @@ export function FloorSelector({
   selectedFloors,
   onToggle,
   onIsolate,
+  defaultExpanded = false,
 }: FloorSelectorProps) {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(defaultExpanded);
 
   return (
     <div

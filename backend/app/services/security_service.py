@@ -6,8 +6,8 @@ Uses SecurityRepository for all data operations (Supabase + JSON fallback).
 """
 
 import logging
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime
+from typing import Any, Optional
 from uuid import uuid4
 
 from app.database.repositories.security_repository import get_security_repository
@@ -72,7 +72,7 @@ class SecurityService:
             occupancy_total=occupancy_total,
         )
 
-    def get_access_zones(self) -> List[AccessZone]:
+    def get_access_zones(self) -> list[AccessZone]:
         """Get all access zones with current door status."""
         raw_zones = self._repo.get_zones()
         zones = []
@@ -91,7 +91,7 @@ class SecurityService:
                 logger.warning(f"Error parsing access zone: {e}")
         return zones
 
-    def get_doors(self) -> List[Door]:
+    def get_doors(self) -> list[Door]:
         """Get all doors with status."""
         raw_doors = self._repo.get_doors()
         doors = []
@@ -111,7 +111,7 @@ class SecurityService:
                 logger.warning(f"Error parsing door: {e}")
         return doors
 
-    def get_door_status(self, door_id: str) -> Optional[Door]:
+    def get_door_status(self, door_id: str) -> Door | None:
         """Get a single door's status."""
         raw_door = self._repo.get_door_status(door_id)
         if not raw_door:
@@ -129,7 +129,7 @@ class SecurityService:
             logger.warning(f"Error parsing door {door_id}: {e}")
             return None
 
-    def get_recent_badge_events(self, zone_id: str = None, limit: int = 50) -> List[BadgeEvent]:
+    def get_recent_badge_events(self, zone_id: str = None, limit: int = 50) -> list[BadgeEvent]:
         """Get recent badge events with optional zone filter."""
         raw_events = self._repo.get_badge_events(zone_id=zone_id, limit=limit)
         events = []
@@ -152,13 +152,13 @@ class SecurityService:
                 logger.warning(f"Error parsing badge event: {e_err}")
         return events
 
-    def process_badge_event(self, event_data: Dict[str, Any]) -> Dict[str, Any]:
+    def process_badge_event(self, event_data: dict[str, Any]) -> dict[str, Any]:
         """Validate and log a badge event."""
         # Generate event ID if not provided
         if "event_id" not in event_data:
             event_data["event_id"] = f"EVT-{uuid4().hex[:8].upper()}"
         if "timestamp" not in event_data:
-            event_data["timestamp"] = datetime.now(timezone.utc).isoformat()
+            event_data["timestamp"] = datetime.now(UTC).isoformat()
         if "granted" not in event_data:
             event_data["granted"] = True
         if "reason" not in event_data:
@@ -187,7 +187,7 @@ class SecurityService:
         result = self._repo.log_badge_event(event_data)
         return result or event_data
 
-    def get_cameras(self) -> List[Camera]:
+    def get_cameras(self) -> list[Camera]:
         """Get all cameras with status."""
         raw_cameras = self._repo.get_cameras()
         cameras = []
@@ -210,7 +210,7 @@ class SecurityService:
                 logger.warning(f"Error parsing camera: {e}")
         return cameras
 
-    def get_camera_status(self, camera_id: str) -> Optional[Camera]:
+    def get_camera_status(self, camera_id: str) -> Camera | None:
         """Get a single camera's status."""
         raw_camera = self._repo.get_camera_status(camera_id)
         if not raw_camera:
@@ -231,7 +231,7 @@ class SecurityService:
             logger.warning(f"Error parsing camera {camera_id}: {e}")
             return None
 
-    def get_alarm_zones(self) -> List[AlarmZone]:
+    def get_alarm_zones(self) -> list[AlarmZone]:
         """Get all alarm zones."""
         raw_zones = self._repo.get_alarm_zones()
         zones = []
@@ -249,7 +249,7 @@ class SecurityService:
                 logger.warning(f"Error parsing alarm zone: {e}")
         return zones
 
-    def arm_alarm_zone(self, zone_id: str, arm_type: str = "full") -> Dict[str, Any]:
+    def arm_alarm_zone(self, zone_id: str, arm_type: str = "full") -> dict[str, Any]:
         """Arm an alarm zone."""
         self._repo.update_alarm_zone_status(
             zone_id,
@@ -260,7 +260,7 @@ class SecurityService:
         )
         return {"zone_id": zone_id, "status": "armed", "arm_type": arm_type}
 
-    def disarm_alarm_zone(self, zone_id: str) -> Dict[str, Any]:
+    def disarm_alarm_zone(self, zone_id: str) -> dict[str, Any]:
         """Disarm an alarm zone."""
         self._repo.update_alarm_zone_status(
             zone_id,
@@ -270,8 +270,8 @@ class SecurityService:
         )
         return {"zone_id": zone_id, "status": "disarmed"}
 
-    def trigger_alarm(self, zone_id: str) -> Dict[str, Any]:
-        """Trigger an alarm zone (demo)."""
+    def trigger_alarm(self, zone_id: str) -> dict[str, Any]:
+        """Trigger an alarm zone."""
         self._repo.update_alarm_zone_status(
             zone_id,
             {
@@ -282,10 +282,10 @@ class SecurityService:
             "zone_id": zone_id,
             "status": "triggered",
             "message": f"Alarm triggered in zone {zone_id}",
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
 
-    def get_after_hours_events(self, since: str = None) -> List[BadgeEvent]:
+    def get_after_hours_events(self, since: str = None) -> list[BadgeEvent]:
         """Get events outside business hours (06:00-20:00)."""
         events = self.get_recent_badge_events(limit=200)
         after_hours = []
@@ -304,7 +304,7 @@ class SecurityService:
                 continue
         return after_hours
 
-    def get_denied_access_events(self, since: str = None) -> List[BadgeEvent]:
+    def get_denied_access_events(self, since: str = None) -> list[BadgeEvent]:
         """Get denied entry events."""
         events = self.get_recent_badge_events(limit=200)
         return [e for e in events if not e.granted]

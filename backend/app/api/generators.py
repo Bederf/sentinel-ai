@@ -149,7 +149,7 @@ async def get_site_health_summary(site_id: str):
 
 @router.post("/simulate/{event}")
 async def simulate_event(event: str):
-    """Simulate state changes for demo purposes.
+    """Simulate state changes for local testing.
 
     Events:
     - load_shedding: Simulate Eskom outage, generators start

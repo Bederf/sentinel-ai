@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from app.database.supabase_client import get_supabase_client
 from app.services.simbiot import BmsConnectionConfig, create_bms_adapter
@@ -44,8 +44,8 @@ async def sync_site_capabilities_to_supabase(
     *,
     site_code: str,
     bms_vendor: str = "bacnet",
-    host: Optional[str] = None,
-    port: Optional[int] = None,
+    host: str | None = None,
+    port: int | None = None,
     commissioning: bool = True,
 ) -> dict[str, Any]:
     """Sync site capabilities into equipment.operating_data for existing assets."""
@@ -65,10 +65,7 @@ async def sync_site_capabilities_to_supabase(
         )
     except Exception:
         eq_result = (
-            client.table("equipment")
-            .select("id, code, device_info, operating_data")
-            .eq("site_id", site_uuid)
-            .execute()
+            client.table("equipment").select("id, code, device_info, operating_data").eq("site_id", site_uuid).execute()
         )
     equipment_rows = eq_result.data or []
 
@@ -98,13 +95,13 @@ async def sync_site_capabilities_to_supabase(
                 "point_count": len(points),
                 "writable_point_count": writable_count,
                 "controllable": writable_count > 0,
-                "synced_at": datetime.now(timezone.utc).isoformat(),
+                "synced_at": datetime.now(UTC).isoformat(),
             }
 
         updated = 0
         matched = 0
         unmatched = 0
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         for eq in equipment_rows:
             candidates = _extract_equipment_device_candidates(eq)
             matched_cap = None
@@ -144,7 +141,9 @@ async def sync_site_capabilities_to_supabase(
                 )
             operating_data["capability_sync"] = cap_state
 
-            client.table("equipment").update({"operating_data": operating_data, "updated_at": now}).eq("id", eq["id"]).execute()
+            client.table("equipment").update({"operating_data": operating_data, "updated_at": now}).eq(
+                "id", eq["id"]
+            ).execute()
             updated += 1
 
         return {

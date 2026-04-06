@@ -410,7 +410,7 @@ async def train_lstm_model(equipment_type: str, request: TrainRequest, backgroun
         trainer = LSTMTrainer()
         return trainer.train_equipment_type(equipment_type, epochs=request.epochs, use_demo_data=request.use_demo_data)
 
-    # For demo, run synchronously (in production, use background task)
+    # Run synchronously in local mode (production should use a background task)
     try:
         result = train_task()
         return TrainResponse(
@@ -421,6 +421,76 @@ async def train_lstm_model(equipment_type: str, request: TrainRequest, backgroun
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+class ModelReadinessResponse(BaseModel):
+    """ML model training readiness for a site."""
+
+    site_id: str
+    training_enabled: bool
+    ready: bool
+    active_model_count: int
+    equipment_types_covered: list[str]
+    last_training_at: str | None
+    message: str
+
+
+@router.get("/model-readiness/{site_id}", response_model=ModelReadinessResponse)
+async def get_model_readiness(site_id: str):
+    """
+    Check whether ML models are trained and ready for a site.
+
+    A site is READY when:
+    - Background training is enabled
+    - At least one active ML model exists in the registry
+
+    Returns readiness status with model counts and equipment coverage.
+    """
+    from ml.registry import get_model_registry
+    from app.config.settings import settings
+
+    site_id = site_id.strip().lower()
+    training_enabled = settings.ml_background_training_enabled
+
+    if not training_enabled:
+        return ModelReadinessResponse(
+            site_id=site_id,
+            training_enabled=False,
+            ready=False,
+            active_model_count=0,
+            equipment_types_covered=[],
+            last_training_at=None,
+            message="ML background training is disabled.",
+        )
+
+    registry = get_model_registry()
+    active_models = registry.list_models(status="active")
+
+    # Filter to models relevant to this site (site-specific equipment)
+    # For now, include all active models — site filtering by equipment type
+    # can be refined once site-specific model scoping is implemented
+    covered_types = sorted({m["equipment_type"] for m in active_models if m.get("equipment_type")})
+
+    last_training = None
+    if active_models:
+        last_training = max((m.get("registered_at") for m in active_models if m.get("registered_at")), default=None)
+
+    ready = len(active_models) > 0
+
+    if ready:
+        message = f"{len(active_models)} active model(s) trained covering {len(covered_types)} equipment type(s). Site is ready for advisory mode."
+    else:
+        message = "No active ML models found. Shadow training in progress — models will be registered once sufficient telemetry is collected."
+
+    return ModelReadinessResponse(
+        site_id=site_id,
+        training_enabled=True,
+        ready=ready,
+        active_model_count=len(active_models),
+        equipment_types_covered=covered_types,
+        last_training_at=last_training,
+        message=message,
+    )
 
 
 @router.post("/train/autoencoder/{equipment_type}", response_model=TrainResponse)

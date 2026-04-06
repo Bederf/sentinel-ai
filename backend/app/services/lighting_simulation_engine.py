@@ -23,7 +23,7 @@ import hashlib
 import logging
 import random
 from datetime import datetime, timedelta
-from typing import Optional, Dict, Any, List
+from typing import Any
 
 from app.database.supabase_client import get_supabase_client
 from app.services.simulation_store import get_simulation_store
@@ -100,31 +100,31 @@ class LightingSimulationEngine:
         self.sim_store = get_simulation_store(site_id)
 
         # Cache zone metadata
-        self._zone_cache: Dict[str, Dict[str, Any]] = {}
-        self._lighting_power_cache: Dict[str, float] = {}  # zone_id -> power_kw
+        self._zone_cache: dict[str, dict[str, Any]] = {}
+        self._lighting_power_cache: dict[str, float] = {}  # zone_id -> power_kw
 
         # Daily tracking for energy history
-        self._daily_hourly_lighting: Dict[int, float] = {}  # hour -> total lighting kW
+        self._daily_hourly_lighting: dict[int, float] = {}  # hour -> total lighting kW
 
         # --- sceneCOM telemetry state ---
         # Per-luminaire persistent state: {luminaire_id: {...}}
-        self._luminaire_state: Dict[str, Dict[str, Any]] = {}
+        self._luminaire_state: dict[str, dict[str, Any]] = {}
         # Latest telemetry snapshot (populated each hour)
-        self._latest_telemetry: Dict[str, Any] = {}
+        self._latest_telemetry: dict[str, Any] = {}
         # Zone-to-luminaire mapping: {zone_id: [luminaire_ids]}
-        self._zone_luminaires: Dict[str, List[str]] = {}
+        self._zone_luminaires: dict[str, list[str]] = {}
         # Deterministic RNG seeded per building for reproducible faults
         self._rng = random.Random(int(hashlib.md5(site_id.encode(), usedforsecurity=False).hexdigest()[:8], 16))
 
     async def calculate_lighting_power(
         self,
         simulated_hour: int,
-        occupancy_data: Dict[str, float],  # zone_id -> occupancy_percent
+        occupancy_data: dict[str, float],  # zone_id -> occupancy_percent
         daylight_lux: float,  # Current daylight (lux)
         cloud_cover_pct: float,  # 0-100
         is_raining: bool,  # Weather condition
-        simulated_date: Optional[datetime] = None,
-    ) -> Dict[str, float]:
+        simulated_date: datetime | None = None,
+    ) -> dict[str, float]:
         """
         Calculate lighting power consumption per zone.
 
@@ -209,7 +209,7 @@ class LightingSimulationEngine:
         daylight_lux: float,
         cloud_cover_pct: float,
         is_raining: bool,
-        zone_config: Dict[str, Any],
+        zone_config: dict[str, Any],
     ) -> float:
         """
         Calculate lighting power for a single zone.
@@ -272,7 +272,7 @@ class LightingSimulationEngine:
     # sceneCOM telemetry generation
     # ------------------------------------------------------------------
 
-    def get_latest_telemetry(self) -> Dict[str, Any]:
+    def get_latest_telemetry(self) -> dict[str, Any]:
         """Return the latest sceneCOM telemetry snapshot.
 
         Structure::
@@ -327,8 +327,8 @@ class LightingSimulationEngine:
 
     def _generate_scenecom_telemetry(
         self,
-        zone_power: Dict[str, float],
-        occupancy_data: Dict[str, float],
+        zone_power: dict[str, float],
+        occupancy_data: dict[str, float],
         daylight_lux: float,
         simulated_hour: int,
     ) -> None:
@@ -341,11 +341,11 @@ class LightingSimulationEngine:
         self._ensure_luminaire_topology()
 
         now_iso = datetime.utcnow().isoformat() + "Z"
-        luminaire_records: List[Dict[str, Any]] = []
-        sensor_records: List[Dict[str, Any]] = []
-        controller_zones: Dict[str, List[str]] = {}  # controller_id → zone_ids
-        emergency_records: List[Dict[str, Any]] = []
-        fault_records: List[Dict[str, Any]] = []
+        luminaire_records: list[dict[str, Any]] = []
+        sensor_records: list[dict[str, Any]] = []
+        controller_zones: dict[str, list[str]] = {}  # controller_id → zone_ids
+        emergency_records: list[dict[str, Any]] = []
+        fault_records: list[dict[str, Any]] = []
 
         for zone_id, lum_ids in self._zone_luminaires.items():
             zone_power_kw = zone_power.get(zone_id, 0.0)
@@ -587,10 +587,10 @@ class LightingSimulationEngine:
     async def _write_lighting_power(
         self,
         simulated_hour: int,
-        zone_power: Dict[str, float],
+        zone_power: dict[str, float],
         total_power: float,
         daylight_lux: float,
-        simulated_date: Optional[datetime] = None,
+        simulated_date: datetime | None = None,
     ) -> None:
         """
         Write lighting power to power_meters table.
@@ -614,7 +614,7 @@ class LightingSimulationEngine:
     async def calculate_daily_lighting_cost(
         self,
         simulated_date: datetime,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Calculate total daily lighting cost and savings.
 
@@ -655,7 +655,7 @@ class LightingSimulationEngine:
 
 
 # Singleton instance per building
-_lighting_engines: Dict[str, LightingSimulationEngine] = {}
+_lighting_engines: dict[str, LightingSimulationEngine] = {}
 
 
 def get_lighting_engine(site_id: str) -> LightingSimulationEngine:
@@ -668,12 +668,12 @@ def get_lighting_engine(site_id: str) -> LightingSimulationEngine:
 async def update_simulation_lighting(
     site_id: str,
     simulated_hour: int,
-    occupancy_data: Dict[str, float],
+    occupancy_data: dict[str, float],
     daylight_lux: float,
     cloud_cover_pct: float = 0.0,
     is_raining: bool = False,
-    simulated_date: Optional[datetime] = None,
-) -> Dict[str, float]:
+    simulated_date: datetime | None = None,
+) -> dict[str, float]:
     """
     Public API to calculate lighting power during simulation.
 

@@ -13,8 +13,7 @@ ai_optimizer.py for equipment grouping / peer comparison.
 import logging
 import statistics
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Dict, List, Optional
+from datetime import UTC, datetime
 
 from app.models.solar import SolarInverter, SolarString
 from app.services.solar_ingestion_service import get_solar_ingestion_service
@@ -84,7 +83,7 @@ class PerformanceMetrics:
     pr_trend: str = "stable"  # improving/stable/declining
     pr_7d_average: float = 0.0
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         return {
             "site_id": self.site_id,
             "timestamp": self.timestamp,
@@ -136,7 +135,7 @@ class InverterComparison:
     probable_cause: str = ""
     cost_impact_monthly_zar: float = 0.0
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         return {
             "inverter_id": self.inverter_id,
             "name": self.name,
@@ -182,7 +181,7 @@ class StringAnomaly:
     probable_cause: str = ""
     recommended_action: str = ""
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         return {
             "string_id": self.string_id,
             "inverter_id": self.inverter_id,
@@ -215,7 +214,7 @@ class DiagnosticIssue:
     confidence: float
     cost_impact_monthly_zar: float = 0.0
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         return {
             "severity": self.severity,
             "equipment_id": self.equipment_id,
@@ -234,11 +233,11 @@ class DiagnosticReport:
 
     site_id: str
     timestamp: str
-    performance_ratio: Dict
-    issues: List[DiagnosticIssue] = field(default_factory=list)
-    summary: Dict = field(default_factory=dict)
+    performance_ratio: dict
+    issues: list[DiagnosticIssue] = field(default_factory=list)
+    summary: dict = field(default_factory=dict)
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         return {
             "site_id": self.site_id,
             "timestamp": self.timestamp,
@@ -263,12 +262,12 @@ class SolarPerformanceService:
 
     # === Performance Ratio ===
 
-    async def calculate_pr(self, site_id: str, period: str = "day") -> Optional[PerformanceMetrics]:
+    async def calculate_pr(self, site_id: str, period: str = "day") -> PerformanceMetrics | None:
         """Calculate Performance Ratio for a site.
 
         PR = Actual Energy / (Installed Capacity x Peak Sun Hours x (1 - System Losses))
 
-        For instantaneous calculation (demo), we use current power vs expected
+        For instantaneous calculation, we use current power vs expected
         power at current solar resource level.
         """
         overview = await self._ingestion.get_site_overview(site_id)
@@ -287,7 +286,7 @@ class SolarPerformanceService:
         loss_factor = 1.0 - total_loss
 
         # Estimate current peak sun hours factor from actual generation
-        # In real system this comes from pyranometer; for demo we derive it
+        # In a live system this comes from pyranometer; here we derive it
         # from the generation-to-capacity ratio
         instantaneous_ratio = actual_kw / capacity_kwp if capacity_kwp > 0 else 0
 
@@ -342,7 +341,7 @@ class SolarPerformanceService:
 
         return PerformanceMetrics(
             site_id=site_id,
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
             period=period,
             performance_ratio=pr,
             pr_rating=rating,
@@ -358,7 +357,7 @@ class SolarPerformanceService:
 
     # === Inverter Peer Comparison ===
 
-    async def compare_inverter_peers(self, site_id: str) -> List[InverterComparison]:
+    async def compare_inverter_peers(self, site_id: str) -> list[InverterComparison]:
         """Compare inverters against their peer group (same manufacturer/model).
 
         Groups inverters by manufacturer+model, calculates specific yield
@@ -370,12 +369,12 @@ class SolarPerformanceService:
             return []
 
         # Group by manufacturer + model
-        peer_groups: Dict[str, List[SolarInverter]] = {}
+        peer_groups: dict[str, list[SolarInverter]] = {}
         for inv in inverters:
             key = f"{inv.manufacturer} {inv.model}"
             peer_groups.setdefault(key, []).append(inv)
 
-        results: List[InverterComparison] = []
+        results: list[InverterComparison] = []
 
         for group_key, group_inverters in peer_groups.items():
             # Calculate specific yield for each inverter in group
@@ -459,8 +458,8 @@ class SolarPerformanceService:
     async def detect_string_anomalies(
         self,
         site_id: str,
-        inverter_id: Optional[str] = None,
-    ) -> List[StringAnomaly]:
+        inverter_id: str | None = None,
+    ) -> list[StringAnomaly]:
         """Detect string-level anomalies using statistical peer comparison.
 
         For each inverter, reads all strings and groups by MPPT tracker.
@@ -477,7 +476,7 @@ class SolarPerformanceService:
         if not site:
             return []
 
-        anomalies: List[StringAnomaly] = []
+        anomalies: list[StringAnomaly] = []
 
         # Get inverter list (filtered or all)
         inverters = await self._ingestion.get_inverters(site_id)
@@ -495,7 +494,7 @@ class SolarPerformanceService:
                 continue
 
             # Build SolarString objects from dict data
-            strings: List[SolarString] = []
+            strings: list[SolarString] = []
             for s_dict in strings_data:
                 strings.append(
                     SolarString(
@@ -521,7 +520,7 @@ class SolarPerformanceService:
                 continue
 
             # Group strings by MPPT tracker
-            mppt_groups: Dict[int, List[SolarString]] = {}
+            mppt_groups: dict[int, list[SolarString]] = {}
             for s in strings:
                 mppt_groups.setdefault(s.mppt_tracker, []).append(s)
 
@@ -634,7 +633,7 @@ class SolarPerformanceService:
 
             # --- Cross-MPPT comparison (detect tracker-level faults) ---
             if len(mppt_groups) >= 2:
-                mppt_avg_powers: Dict[int, float] = {}
+                mppt_avg_powers: dict[int, float] = {}
                 for mppt_num, mppt_strings in mppt_groups.items():
                     avg_p = statistics.mean([s.dc_power_kw for s in mppt_strings])
                     mppt_avg_powers[mppt_num] = avg_p
@@ -681,7 +680,7 @@ class SolarPerformanceService:
 
     # === Diagnostic Summary ===
 
-    async def get_diagnostic_summary(self, site_id: str) -> Optional[DiagnosticReport]:
+    async def get_diagnostic_summary(self, site_id: str) -> DiagnosticReport | None:
         """Generate a comprehensive diagnostic report for a site.
 
         Aggregates: PR metrics, underperforming inverters, string anomalies,
@@ -697,7 +696,7 @@ class SolarPerformanceService:
         string_anomalies = await self.detect_string_anomalies(site_id)
         bess = await self._ingestion.get_bess_status(site_id)
 
-        issues: List[DiagnosticIssue] = []
+        issues: list[DiagnosticIssue] = []
 
         # --- PR issues ---
         if pr.performance_ratio > 0 and pr.pr_rating in ("acceptable", "poor"):
@@ -803,7 +802,7 @@ class SolarPerformanceService:
 
         return DiagnosticReport(
             site_id=site_id,
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
             performance_ratio={
                 "current": round(pr.performance_ratio, 4),
                 "target": round(pr.pr_target, 4),
@@ -826,7 +825,7 @@ class SolarPerformanceService:
 
 # === Singleton ===
 
-_solar_performance_service: Optional[SolarPerformanceService] = None
+_solar_performance_service: SolarPerformanceService | None = None
 
 
 def get_solar_performance_service() -> SolarPerformanceService:

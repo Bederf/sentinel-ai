@@ -14,7 +14,6 @@ Exposes: billing_demand_kva, spike_cost, shaving_target_kva, ratchet_history.
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Dict, List, Optional
 
 from app.services.solar_config_service import get_site_solar_config
 
@@ -31,7 +30,7 @@ class MonthlyDemandRecord:
     year: int
     month: int
     peak_demand_kva: float
-    timestamp: Optional[str] = None
+    timestamp: str | None = None
 
 
 @dataclass
@@ -48,18 +47,18 @@ class RatchetResult:
     spike_cost_r: float  # additional cost above defended threshold
     shaving_target_kva: float  # target to stay under ratchet
     headroom_kva: float  # how far current peak is from shaving target
-    ratchet_history: List[MonthlyDemandRecord] = field(default_factory=list)
-    ratchet_expires: Optional[str] = None  # when the highest ratchet month drops off
+    ratchet_history: list[MonthlyDemandRecord] = field(default_factory=list)
+    ratchet_expires: str | None = None  # when the highest ratchet month drops off
 
 
 class DemandRatchetService:
     """Calculates billing demand with ratchet and recommends shaving targets."""
 
     def __init__(self):
-        self._demand_history: Dict[str, List[MonthlyDemandRecord]] = {}
+        self._demand_history: dict[str, list[MonthlyDemandRecord]] = {}
 
-    def _get_demo_history(self, site_id: str) -> List[MonthlyDemandRecord]:
-        """Generate realistic demo demand history for site-002."""
+    def _get_seed_history(self, site_id: str) -> list[MonthlyDemandRecord]:
+        """Generate realistic seeded demand history for site-002."""
         # Realistic monthly peaks for a Sandton office tower (kVA)
         # Summer months higher (cooling load), winter months moderate
         records = []
@@ -88,17 +87,17 @@ class DemandRatchetService:
             )
         return records
 
-    def get_demand_history(self, site_id: str) -> List[MonthlyDemandRecord]:
-        """Get demand history for a site. Falls back to demo data."""
+    def get_demand_history(self, site_id: str) -> list[MonthlyDemandRecord]:
+        """Get demand history for a site. Falls back to seeded data."""
         if site_id not in self._demand_history:
             # In production, this would query Supabase billing_demand table
-            self._demand_history[site_id] = self._get_demo_history(site_id)
+            self._demand_history[site_id] = self._get_seed_history(site_id)
         return self._demand_history[site_id]
 
     def calculate_ratchet(
         self,
         site_id: str,
-        current_month_peak_kva: Optional[float] = None,
+        current_month_peak_kva: float | None = None,
     ) -> RatchetResult:
         """
         Calculate billing demand with ratchet for current month.
@@ -218,7 +217,7 @@ class DemandRatchetService:
 
 
 # Singleton
-_demand_ratchet_service: Optional[DemandRatchetService] = None
+_demand_ratchet_service: DemandRatchetService | None = None
 
 
 def get_demand_ratchet_service() -> DemandRatchetService:

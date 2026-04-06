@@ -26,8 +26,6 @@ import {
   Badge,
   Callout,
   Button,
-  Select,
-  SelectItem,
 } from "@tremor/react";
 import {
   Table,
@@ -491,6 +489,17 @@ export function ProfitabilityDashboardPage() {
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [contracts]);
 
+  useEffect(() => {
+    if (buildingFilter || buildings.length === 0) return;
+    const preferred =
+      buildings.find((building) => building.id === "site-002")
+      ?? buildings.find((building) => /sandton city office tower/i.test(building.name))
+      ?? null;
+    if (preferred) {
+      setBuildingFilter(preferred.id);
+    }
+  }, [buildings, buildingFilter]);
+
   // Filter contracts by search and building
   const filteredContracts = useMemo(() => {
     let filtered = sortedContracts;
@@ -594,7 +603,11 @@ export function ProfitabilityDashboardPage() {
       <Callout
         title="Error"
         color="rose"
-        className="glass-panel"
+        className="rounded-lg"
+        style={{
+          background: "var(--color-sentinel-bg-panel)",
+          border: "1px solid rgba(220, 38, 38, 0.35)",
+        }}
       >
         {error}
       </Callout>
@@ -622,36 +635,52 @@ export function ProfitabilityDashboardPage() {
 
         {/* Filters */}
         <div className="flex items-center gap-3">
-          <Select
+          <select
             value={buildingFilter || "all"}
-            onValueChange={(v) =>
-              setBuildingFilter(v === "all" ? null : v)
+            onChange={(event) =>
+              setBuildingFilter(event.target.value === "all" ? null : event.target.value)
             }
-            className="w-48"
+            className="w-48 rounded-lg appearance-none cursor-pointer px-3 py-2 text-sm transition-colors focus:outline-none focus:ring-0"
+            style={{
+              background: "var(--color-grafana-bg-secondary)",
+              border: "1px solid var(--color-grafana-border)",
+              color: "var(--color-grafana-text-primary)",
+              boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)",
+              outline: "none",
+            }}
+            aria-label="Filter buildings"
           >
-            <SelectItem value="all">All Buildings</SelectItem>
+            <option value="all">All Buildings</option>
             {buildings.map((building) => (
-              <SelectItem key={building.id} value={building.id}>
+              <option key={building.id} value={building.id}>
                 {building.name}
-              </SelectItem>
+              </option>
             ))}
-          </Select>
+          </select>
 
-          <Select
+          <select
             value={periodFilter}
-            onValueChange={(v) =>
-              setPeriodFilter(v as PeriodOption)
+            onChange={(event) =>
+              setPeriodFilter(event.target.value as PeriodOption)
             }
-            className="w-40"
+            className="w-40 rounded-lg appearance-none cursor-pointer px-3 py-2 text-sm transition-colors focus:outline-none focus:ring-0"
+            style={{
+              background: "var(--color-grafana-bg-secondary)",
+              border: "1px solid var(--color-grafana-border)",
+              color: "var(--color-grafana-text-primary)",
+              boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)",
+              outline: "none",
+            }}
+            aria-label="Filter period"
           >
             {(["this_month", "last_month", "last_quarter", "ytd"] as const).map(
               (option) => (
-                <SelectItem key={option} value={option}>
+                <option key={option} value={option}>
                   {getPeriodRange(option).label}
-                </SelectItem>
+                </option>
               )
             )}
-          </Select>
+          </select>
 
           <Button
             variant="secondary"

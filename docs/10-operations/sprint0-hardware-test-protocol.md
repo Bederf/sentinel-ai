@@ -1,3 +1,18 @@
+---
+title: "Sprint 0 Hardware Integration Test Protocol"
+type: "guide"
+status: "draft"
+version: "1.0.0"
+created: "2026-03-31"
+updated: "2026-03-31"
+tags: ["sentinel", "documentation"]
+related: []
+domain: "bms"
+audience: "all"
+complexity: "intermediate"
+estimated_read_time: 10
+---
+
 # Sprint 0 Hardware Integration Test Protocol
 
 > **Version:** 1.1 | **Gate for:** v27.0 pilot deployment | **Estimated time:** 2-3 hours on site

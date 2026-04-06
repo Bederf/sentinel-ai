@@ -259,7 +259,7 @@ async def calculate_safety_score(decisions):
 
 @router.post("/test")
 async def test_autonomous_decision(auth: AuthContext = Depends(require_role(2))):
-    """Create a test autonomous decision (for demo purposes)."""
+    """Create a test autonomous decision for local validation."""
     if not autonomous_decision_engine._initialized:
         await autonomous_decision_engine.initialize()
 

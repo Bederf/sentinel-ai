@@ -23,7 +23,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set
+from typing import Any
 
 import httpx
 
@@ -88,12 +88,12 @@ class NotificationRecipient:
 
     name: str
     role: str  # "technician", "supervisor", "manager", "admin"
-    channels: List[DeliveryChannel]
-    site_ids: Optional[Set[str]] = None  # None = all sites
+    channels: list[DeliveryChannel]
+    site_ids: set[str] | None = None  # None = all sites
     min_importance: Importance = Importance.MEDIUM
-    whatsapp: Optional[str] = None
-    telegram_chat_id: Optional[str] = None
-    email: Optional[str] = None
+    whatsapp: str | None = None
+    telegram_chat_id: str | None = None
+    email: str | None = None
 
     def should_notify(self, event: SentinelEvent) -> bool:
         if event.importance < self.min_importance:
@@ -133,7 +133,7 @@ class MessageFormatter:
     }
 
     @classmethod
-    def format_push(cls, event: SentinelEvent) -> Dict[str, str]:
+    def format_push(cls, event: SentinelEvent) -> dict[str, str]:
         """Format for immediate push notification."""
         emoji = cls.IMPORTANCE_EMOJI.get(event.importance, "\U0001f4cb")
         domain_emoji = cls.DOMAIN_EMOJI.get(event.domain, "\U0001f514")
@@ -194,18 +194,18 @@ class MessageFormatter:
     @classmethod
     def format_digest(
         cls,
-        events: List[SentinelEvent],
+        events: list[SentinelEvent],
         period: str = "daily",
-    ) -> Dict[str, str]:
+    ) -> dict[str, str]:
         """Format a batch of events as a digest summary."""
         if not events:
             return {"whatsapp": "No events to report.", "telegram": "No events to report."}
 
-        by_domain: Dict[str, List[SentinelEvent]] = defaultdict(list)
+        by_domain: dict[str, list[SentinelEvent]] = defaultdict(list)
         for e in events:
             by_domain[e.domain].append(e)
 
-        by_importance: Dict[str, int] = defaultdict(int)
+        by_importance: dict[str, int] = defaultdict(int)
         for e in events:
             by_importance[e.importance.name] += 1
 
@@ -284,8 +284,8 @@ class DigestAccumulator:
     """Collects events for batched delivery (daily/weekly)."""
 
     def __init__(self):
-        self._daily: Dict[str, List[SentinelEvent]] = defaultdict(list)
-        self._weekly: Dict[str, List[SentinelEvent]] = defaultdict(list)
+        self._daily: dict[str, list[SentinelEvent]] = defaultdict(list)
+        self._weekly: dict[str, list[SentinelEvent]] = defaultdict(list)
 
     def add_daily(self, recipient_key: str, event: SentinelEvent):
         self._daily[recipient_key].append(event)
@@ -293,12 +293,12 @@ class DigestAccumulator:
     def add_weekly(self, recipient_key: str, event: SentinelEvent):
         self._weekly[recipient_key].append(event)
 
-    def flush_daily(self) -> Dict[str, List[SentinelEvent]]:
+    def flush_daily(self) -> dict[str, list[SentinelEvent]]:
         events = dict(self._daily)
         self._daily.clear()
         return events
 
-    def flush_weekly(self) -> Dict[str, List[SentinelEvent]]:
+    def flush_weekly(self) -> dict[str, list[SentinelEvent]]:
         events = dict(self._weekly)
         self._weekly.clear()
         return events
@@ -311,7 +311,7 @@ class DigestAccumulator:
     def weekly_count(self) -> int:
         return sum(len(v) for v in self._weekly.values())
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         return {
             "daily_pending": self.daily_count,
             "daily_recipients": len(self._daily),
@@ -333,17 +333,17 @@ class EscalationEntry:
     escalation_deadline: datetime
     acknowledged: bool = False
     escalated: bool = False
-    recipient: Optional[str] = None
+    recipient: str | None = None
 
 
 class EscalationTracker:
     """Tracks unacknowledged notifications and triggers escalation."""
 
     def __init__(self, escalation_minutes: int = 15):
-        self._entries: Dict[str, EscalationEntry] = {}
+        self._entries: dict[str, EscalationEntry] = {}
         self._escalation_window = timedelta(minutes=escalation_minutes)
 
-    def track(self, event: SentinelEvent, recipient: Optional[str] = None):
+    def track(self, event: SentinelEvent, recipient: str | None = None):
         now = datetime.utcnow()
         self._entries[event.event_id] = EscalationEntry(
             event_id=event.event_id,
@@ -359,7 +359,7 @@ class EscalationTracker:
             return True
         return False
 
-    async def check_escalations(self) -> List[SentinelEvent]:
+    async def check_escalations(self) -> list[SentinelEvent]:
         now = datetime.utcnow()
         escalations = []
 
@@ -399,7 +399,7 @@ class EscalationTracker:
 
         return escalations
 
-    def get_pending(self) -> List[Dict[str, Any]]:
+    def get_pending(self) -> list[dict[str, Any]]:
         now = datetime.utcnow()
         return [
             {
@@ -417,7 +417,7 @@ class EscalationTracker:
             if not e.acknowledged and not e.escalated
         ]
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         return {
             "tracked": len(self._entries),
             "pending_acknowledgement": sum(1 for e in self._entries.values() if not e.acknowledged and not e.escalated),
@@ -441,15 +441,15 @@ class SentryNotificationRouter:
         - WHETHER to escalate (track acknowledgements)
     """
 
-    def __init__(self, config: Optional[SentryRouterConfig] = None):
+    def __init__(self, config: SentryRouterConfig | None = None):
         self._config = config or SentryRouterConfig.from_env()
         self._formatter = MessageFormatter()
         self._digest = DigestAccumulator()
         self._escalation = EscalationTracker(
             escalation_minutes=self._config.escalation_minutes,
         )
-        self._recipients: List[NotificationRecipient] = []
-        self._metrics: Dict[str, int] = {
+        self._recipients: list[NotificationRecipient] = []
+        self._metrics: dict[str, int] = {
             "pushes_sent": 0,
             "digests_collected": 0,
             "escalations_triggered": 0,
@@ -464,7 +464,7 @@ class SentryNotificationRouter:
         self._recipients.append(recipient)
         logger.info("Registered recipient: %s (%s)", recipient.name, recipient.role)
 
-    def get_recipients_for_event(self, event: SentinelEvent) -> List[NotificationRecipient]:
+    def get_recipients_for_event(self, event: SentinelEvent) -> list[NotificationRecipient]:
         return [r for r in self._recipients if r.should_notify(event)]
 
     # -------------------------------------------------------------------
@@ -504,7 +504,7 @@ class SentryNotificationRouter:
     async def _deliver_push(
         self,
         event: SentinelEvent,
-        recipients: List[NotificationRecipient],
+        recipients: list[NotificationRecipient],
     ):
         formatted = self._formatter.format_push(event)
 
@@ -527,7 +527,7 @@ class SentryNotificationRouter:
     def _collect_daily(
         self,
         event: SentinelEvent,
-        recipients: List[NotificationRecipient],
+        recipients: list[NotificationRecipient],
     ):
         for r in recipients:
             self._digest.add_daily(r.name, event)
@@ -536,7 +536,7 @@ class SentryNotificationRouter:
     def _collect_weekly(
         self,
         event: SentinelEvent,
-        recipients: List[NotificationRecipient],
+        recipients: list[NotificationRecipient],
     ):
         for r in recipients:
             self._digest.add_weekly(r.name, event)
@@ -612,7 +612,7 @@ class SentryNotificationRouter:
         channel: DeliveryChannel,
         recipient: NotificationRecipient,
         message: str,
-        event: Optional[SentinelEvent] = None,
+        event: SentinelEvent | None = None,
     ) -> bool:
         if not self._config.is_configured:
             logger.debug("Sentry webhook not configured — would send to %s", recipient.name)
@@ -666,7 +666,7 @@ class SentryNotificationRouter:
     # Status & Metrics
     # -------------------------------------------------------------------
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         return {
             "configured": self._config.is_configured,
             "recipients": len(self._recipients),
@@ -681,7 +681,7 @@ class SentryNotificationRouter:
 # Singleton
 # ---------------------------------------------------------------------------
 
-_router: Optional[SentryNotificationRouter] = None
+_router: SentryNotificationRouter | None = None
 
 
 def get_sentry_router() -> SentryNotificationRouter:

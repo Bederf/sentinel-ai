@@ -2,7 +2,7 @@
 
 Supports:
   - SMA Modbus TCP register reads (SMA specific register map, different from Huawei/Schneider)
-  - Simulated data for demo (Site-002 Western Canopy — 10 x SMA Sunny Tripower Core1)
+  - Simulated data for local seeded mode (Site-002 Western Canopy — 10 x SMA Sunny Tripower Core1)
 
 SMA register map differs significantly from Huawei/Schneider:
   - SMA uses SunSpec-compliant registers starting at 40000
@@ -15,17 +15,16 @@ Register maps sourced from SMA Sunny Tripower Core1 STP 50-41 Modbus Interface.
 import logging
 import math
 import random
-from datetime import datetime, timezone
-from typing import Dict, List, Optional
+from datetime import UTC, datetime
 
 from app.models.solar import (
-    SolarInverter,
-    SolarString,
+    ConnectorStatus,
+    DataSource,
     GridMeter,
     NormalisedReading,
-    ConnectorStatus,
     QualityFlag,
-    DataSource,
+    SolarInverter,
+    SolarString,
 )
 from app.services.solar_connector_base import SolarConnector
 
@@ -34,7 +33,7 @@ logger = logging.getLogger(__name__)
 
 # === SMA Sunny Tripower Core1 Modbus Register Map (SunSpec-based) ===
 
-SMA_TRIPOWER_REGISTERS: Dict[str, tuple] = {
+SMA_TRIPOWER_REGISTERS: dict[str, tuple] = {
     # (address, count, type, scale_factor, unit)
     # SMA uses SunSpec model 101/103 for inverter data
     "model": (30053, 8, "str", 1, ""),
@@ -94,7 +93,7 @@ def _solar_power_factor(hour: float) -> float:
 
 
 class SimulatedSMAConnector(SolarConnector):
-    """Generates realistic SMA Sunny Tripower Core1 data for demo.
+    """Generates realistic SMA Sunny Tripower Core1 data for local seeded mode.
 
     Models the Site-002 Western Canopy fleet — 10 medium-size (50 kVA)
     inverters with SMA-specific characteristics:
@@ -105,18 +104,18 @@ class SimulatedSMAConnector(SolarConnector):
 
     def __init__(
         self,
-        inverters: List[Dict],
-        meters: Optional[List[Dict]] = None,
+        inverters: list[dict],
+        meters: list[dict] | None = None,
     ):
         super().__init__(manufacturer="sma", protocol="modbus_tcp")
         self._inverter_configs = {inv["id"]: inv for inv in inverters}
         self._meter_configs = {m["meter_id"]: m for m in (meters or [])}
-        self._inverter_state: Dict[str, SolarInverter] = {}
+        self._inverter_state: dict[str, SolarInverter] = {}
 
     async def connect(self) -> bool:
         self._status = ConnectorStatus(
             connected=True,
-            last_poll=datetime.now(timezone.utc).isoformat(),
+            last_poll=datetime.now(UTC).isoformat(),
             error_count=0,
         )
         logger.info(f"SMA simulated connector online — {len(self._inverter_configs)} inverters")
@@ -126,12 +125,12 @@ class SimulatedSMAConnector(SolarConnector):
         self._status.connected = False
         logger.info("SMA simulated connector disconnected")
 
-    async def read_inverter(self, inverter_id: str) -> Optional[SolarInverter]:
+    async def read_inverter(self, inverter_id: str) -> SolarInverter | None:
         cfg = self._inverter_configs.get(inverter_id)
         if not cfg:
             return None
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         sast_hour = (now.hour + 2) % 24 + now.minute / 60.0
         solar_factor = _solar_power_factor(sast_hour)
 
@@ -176,12 +175,12 @@ class SimulatedSMAConnector(SolarConnector):
         self._inverter_state[inverter_id] = inv
         return inv
 
-    async def read_all_strings(self, inverter_id: str) -> List[SolarString]:
+    async def read_all_strings(self, inverter_id: str) -> list[SolarString]:
         cfg = self._inverter_configs.get(inverter_id)
         if not cfg:
             return []
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         sast_hour = (now.hour + 2) % 24 + now.minute / 60.0
         solar_factor = _solar_power_factor(sast_hour)
 
@@ -220,12 +219,12 @@ class SimulatedSMAConnector(SolarConnector):
         """SMA connector does not manage BESS (handled by Huawei connector)."""
         return None
 
-    async def read_meter(self, meter_id: str) -> Optional[GridMeter]:
+    async def read_meter(self, meter_id: str) -> GridMeter | None:
         cfg = self._meter_configs.get(meter_id)
         if not cfg:
             return None
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         sast_hour = (now.hour + 2) % 24 + now.minute / 60.0
         solar_factor = _solar_power_factor(sast_hour)
 
@@ -256,9 +255,9 @@ class SimulatedSMAConnector(SolarConnector):
             last_poll=now.isoformat(),
         )
 
-    async def get_normalised_readings(self) -> List[NormalisedReading]:
-        readings: List[NormalisedReading] = []
-        now = datetime.now(timezone.utc)
+    async def get_normalised_readings(self) -> list[NormalisedReading]:
+        readings: list[NormalisedReading] = []
+        now = datetime.now(UTC)
 
         for inv_id in self._inverter_configs:
             inv = await self.read_inverter(inv_id)

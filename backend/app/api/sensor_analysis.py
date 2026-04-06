@@ -30,34 +30,34 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/sensor-analysis", tags=["sensor-analysis"])
 
-# In-memory storage for demo (would use database in production)
+# In-memory storage for seeded/offline use (would use database in production)
 _baselines = {}
 _recordings = {}
-_demo_loaded = False
+_seed_loaded = False
 
 
-def _load_demo_data():
-    """Load demo baselines and recordings from JSON files on first access."""
-    global _demo_loaded
-    if _demo_loaded:
+def _load_seed_data():
+    """Load seeded baselines and recordings from JSON files on first access."""
+    global _seed_loaded
+    if _seed_loaded:
         return
 
     data_dir = Path(__file__).parent.parent / "data" / "sensor_analysis"
 
     # Load baselines
-    baselines_file = data_dir / "demo_baselines.json"
+    baselines_file = data_dir / "seed_baselines.json"
     if baselines_file.exists():
         try:
             with open(baselines_file, "r") as f:
                 baselines = json.load(f)
             for equipment_id, baseline in baselines.items():
                 _baselines[equipment_id] = baseline
-            logger.info(f"Loaded {len(baselines)} demo baselines")
+            logger.info(f"Loaded {len(baselines)} seeded baselines")
         except Exception as e:
-            logger.warning(f"Failed to load demo baselines: {e}")
+            logger.warning(f"Failed to load seeded baselines: {e}")
 
     # Load recordings
-    recordings_file = data_dir / "demo_recordings.json"
+    recordings_file = data_dir / "seed_recordings.json"
     if recordings_file.exists():
         try:
             with open(recordings_file, "r") as f:
@@ -66,11 +66,11 @@ def _load_demo_data():
                 if equipment_id not in _recordings:
                     _recordings[equipment_id] = []
                 _recordings[equipment_id].extend(recs)
-            logger.info(f"Loaded demo recordings for {len(recordings)} equipment items")
+            logger.info(f"Loaded seeded recordings for {len(recordings)} equipment items")
         except Exception as e:
-            logger.warning(f"Failed to load demo recordings: {e}")
+            logger.warning(f"Failed to load seeded recordings: {e}")
 
-    _demo_loaded = True
+    _seed_loaded = True
 
 
 @router.post("/process")
@@ -228,7 +228,7 @@ async def capture_baseline(
         "is_active": True,
     }
 
-    # Store baseline (in-memory for demo)
+    # Store baseline in in-memory seeded/offline storage
     _baselines[equipment_id] = baseline
 
     # Generate report
@@ -246,7 +246,7 @@ async def capture_baseline(
 @router.get("/baseline/{equipment_id}")
 async def get_baseline(equipment_id: str):
     """Get current baseline for equipment."""
-    _load_demo_data()  # Ensure demo data is loaded
+    _load_seed_data()  # Ensure seeded data is loaded
     if equipment_id in _baselines:
         return {"equipment_id": equipment_id, "baseline": _baselines[equipment_id], "has_baseline": True}
 
@@ -272,7 +272,7 @@ async def delete_baseline(equipment_id: str):
 async def get_equipment_trend(
     equipment_id: str, limit: int = Query(10, description="Number of recent readings to analyze")
 ):
-    _load_demo_data()  # Ensure demo data is loaded
+    _load_seed_data()  # Ensure seeded data is loaded
     """Get trend analysis for equipment based on historical readings."""
     if equipment_id not in _recordings or len(_recordings[equipment_id]) < 2:
         return {
@@ -339,7 +339,7 @@ async def get_recordings(
     equipment_id: str, limit: int = Query(20, description="Maximum number of recordings to return")
 ):
     """Get historical recordings for equipment."""
-    _load_demo_data()  # Ensure demo data is loaded
+    _load_seed_data()  # Ensure seeded data is loaded
     recordings = _recordings.get(equipment_id, [])
 
     return {"equipment_id": equipment_id, "total_count": len(recordings), "recordings": recordings[-limit:]}
@@ -348,7 +348,7 @@ async def get_recordings(
 @router.get("/health")
 async def health_check():
     """Health check endpoint for sensor analysis service."""
-    _load_demo_data()  # Ensure demo data is loaded
+    _load_seed_data()  # Ensure seeded data is loaded
     return {
         "status": "healthy",
         "baselines_count": len(_baselines),

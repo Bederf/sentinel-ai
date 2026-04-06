@@ -67,7 +67,7 @@ def load_site_equipment(site_id: str) -> list[dict]:
     equipment: list[dict] = []
     for fpath in sorted(equip_dir.glob("*.json")):
         try:
-            with open(fpath, "r", encoding="utf-8") as f:
+            with open(fpath, encoding="utf-8") as f:
                 data = json.load(f)
         except (json.JSONDecodeError, OSError) as exc:
             logger.warning("Skipping malformed equipment file %s: %s", fpath.name, exc)

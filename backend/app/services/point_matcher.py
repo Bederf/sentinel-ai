@@ -1,7 +1,6 @@
 """Service for matching BMS points to CAFM assets."""
 
 import re
-from typing import List, Dict, Optional, Tuple
 from difflib import SequenceMatcher
 
 from app.models.integration import (
@@ -58,7 +57,7 @@ class PointMatcherService:
         "Load": "load_percent",
     }
 
-    def extract_asset_id(self, point_id: str) -> Tuple[Optional[str], Optional[str]]:
+    def extract_asset_id(self, point_id: str) -> tuple[str | None, str | None]:
         """
         Extract asset ID and parameter name from BMS point ID.
 
@@ -96,7 +95,7 @@ class PointMatcherService:
 
         return None, None
 
-    def _extract_parameter(self, point_id: str, asset_id: str) -> Optional[str]:
+    def _extract_parameter(self, point_id: str, asset_id: str) -> str | None:
         """Extract parameter name from point ID after asset ID."""
         # Find what comes after the asset ID
         idx = point_id.upper().find(asset_id.upper())
@@ -116,7 +115,7 @@ class PointMatcherService:
     def match_to_cafm(
         self,
         extracted_id: str,
-        cafm_assets: List[Dict[str, str]],
+        cafm_assets: list[dict[str, str]],
         fuzzy_threshold: float = 0.8,
     ) -> AssetMatchResult:
         """
@@ -197,8 +196,8 @@ class PointMatcherService:
 
     def bulk_match(
         self,
-        point_ids: List[str],
-        cafm_assets: List[Dict[str, str]],
+        point_ids: list[str],
+        cafm_assets: list[dict[str, str]],
     ) -> BulkMatchResult:
         """
         Match multiple BMS points to CAFM assets.
@@ -210,13 +209,13 @@ class PointMatcherService:
         Returns:
             BulkMatchResult with all matches and statistics
         """
-        matches: List[AssetMatchResult] = []
+        matches: list[AssetMatchResult] = []
         exact_count = 0
         fuzzy_count = 0
         unmatched_count = 0
 
         # Cache extraction results to avoid re-processing same assets
-        extraction_cache: Dict[str, Tuple[Optional[str], Optional[str]]] = {}
+        extraction_cache: dict[str, tuple[str | None, str | None]] = {}
 
         unique_points = list(set(point_ids))
 

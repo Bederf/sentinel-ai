@@ -14,12 +14,12 @@ import json
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Any
+from typing import Any, Optional
 
 from app.models.data_quality import (
     DataQualityAlert,
 )
-from app.services.data_quality_service import get_data_quality_service, DataQualityService
+from app.services.data_quality_service import DataQualityService, get_data_quality_service
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +41,7 @@ class DataQualityAlertService:
 
     def __init__(
         self,
-        data_quality_service: Optional[DataQualityService] = None,
+        data_quality_service: DataQualityService | None = None,
     ):
         """Initialize the alert service.
 
@@ -49,13 +49,13 @@ class DataQualityAlertService:
             data_quality_service: Data quality service instance
         """
         self._quality_service = data_quality_service or get_data_quality_service()
-        self._active_alerts: Dict[str, DataQualityAlert] = {}
-        self._alert_history: List[DataQualityAlert] = []
+        self._active_alerts: dict[str, DataQualityAlert] = {}
+        self._alert_history: list[DataQualityAlert] = []
 
     def check_all_equipment(
         self,
-        equipment_list: Optional[List[Dict[str, str]]] = None,
-    ) -> List[DataQualityAlert]:
+        equipment_list: list[dict[str, str]] | None = None,
+    ) -> list[DataQualityAlert]:
         """Check all equipment for data quality issues.
 
         Args:
@@ -67,7 +67,7 @@ class DataQualityAlertService:
         if equipment_list is None:
             equipment_list = self._load_all_equipment()
 
-        new_alerts: List[DataQualityAlert] = []
+        new_alerts: list[DataQualityAlert] = []
 
         for eq in equipment_list:
             equipment_id = eq["equipment_id"]
@@ -85,7 +85,7 @@ class DataQualityAlertService:
         self,
         equipment_id: str,
         equipment_type: str,
-    ) -> List[DataQualityAlert]:
+    ) -> list[DataQualityAlert]:
         """Check a single equipment for data quality issues.
 
         Checks for:
@@ -100,7 +100,7 @@ class DataQualityAlertService:
         Returns:
             List of alerts generated for this equipment
         """
-        alerts: List[DataQualityAlert] = []
+        alerts: list[DataQualityAlert] = []
 
         # Get quality metrics for this equipment
         quality = self._quality_service.get_equipment_quality(
@@ -133,8 +133,8 @@ class DataQualityAlertService:
         self,
         equipment_id: str,
         sensor_type: str,
-        last_reading_at: Optional[datetime],
-    ) -> Optional[DataQualityAlert]:
+        last_reading_at: datetime | None,
+    ) -> DataQualityAlert | None:
         """Check if sensor data is stale (no recent readings).
 
         Args:
@@ -194,7 +194,7 @@ class DataQualityAlertService:
         self,
         equipment_id: str,
         sensor_health: Any,
-    ) -> List[DataQualityAlert]:
+    ) -> list[DataQualityAlert]:
         """Check for significant data gaps.
 
         Args:
@@ -204,7 +204,7 @@ class DataQualityAlertService:
         Returns:
             List of alerts for significant gaps
         """
-        alerts: List[DataQualityAlert] = []
+        alerts: list[DataQualityAlert] = []
 
         for gap in sensor_health.gaps:
             if gap.duration_minutes >= self.GAP_THRESHOLD_MINUTES:
@@ -240,9 +240,9 @@ class DataQualityAlertService:
         self,
         equipment_id: str,
         sensor_type: str,
-        values: List[float],
-        timestamps: List[datetime],
-    ) -> Optional[DataQualityAlert]:
+        values: list[float],
+        timestamps: list[datetime],
+    ) -> DataQualityAlert | None:
         """Check for sudden sensor drift.
 
         Detects when a sensor value changes by more than the drift
@@ -295,9 +295,9 @@ class DataQualityAlertService:
 
     def get_active_alerts(
         self,
-        equipment_id: Optional[str] = None,
-        alert_type: Optional[str] = None,
-    ) -> List[DataQualityAlert]:
+        equipment_id: str | None = None,
+        alert_type: str | None = None,
+    ) -> list[DataQualityAlert]:
         """Get all active (unresolved) alerts.
 
         Args:
@@ -320,8 +320,8 @@ class DataQualityAlertService:
     def get_alert_history(
         self,
         limit: int = 100,
-        equipment_id: Optional[str] = None,
-    ) -> List[DataQualityAlert]:
+        equipment_id: str | None = None,
+    ) -> list[DataQualityAlert]:
         """Get alert history (including resolved alerts).
 
         Args:
@@ -369,7 +369,7 @@ class DataQualityAlertService:
 
         return False
 
-    def get_alert_summary(self) -> Dict[str, Any]:
+    def get_alert_summary(self) -> dict[str, Any]:
         """Get summary of alerts by type and severity.
 
         Returns:
@@ -377,8 +377,8 @@ class DataQualityAlertService:
         """
         active = self.get_active_alerts()
 
-        by_type: Dict[str, int] = {}
-        by_severity: Dict[str, int] = {}
+        by_type: dict[str, int] = {}
+        by_severity: dict[str, int] = {}
 
         for alert in active:
             by_type[alert.alert_type] = by_type.get(alert.alert_type, 0) + 1
@@ -391,7 +391,7 @@ class DataQualityAlertService:
             "total_history": len(self._alert_history),
         }
 
-    def _load_all_equipment(self) -> List[Dict[str, str]]:
+    def _load_all_equipment(self) -> list[dict[str, str]]:
         """Load all equipment from equipment.json.
 
         Returns:
@@ -399,7 +399,7 @@ class DataQualityAlertService:
         """
         try:
             equipment_path = Path(__file__).parent.parent / "data" / "equipment.json"
-            with open(equipment_path, "r") as f:
+            with open(equipment_path) as f:
                 all_equipment = json.load(f)
 
             return [{"equipment_id": eq["id"], "equipment_type": eq.get("type", "unknown")} for eq in all_equipment]

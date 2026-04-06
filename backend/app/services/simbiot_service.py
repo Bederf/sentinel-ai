@@ -5,11 +5,11 @@ Auto-creates work orders when AI detects equipment anomalies or occupants raise 
 """
 
 import logging
-from typing import Optional
+
 import httpx
 
 try:
-    from simbiot_concept import ConceptConnector, ConceptConfig, SentinelAnomaly
+    from simbiot_concept import ConceptConfig, ConceptConnector, SentinelAnomaly
 except ImportError:
     ConceptConnector = None  # type: ignore[misc,assignment]
     ConceptConfig = None  # type: ignore[misc,assignment]
@@ -22,7 +22,7 @@ class SimbiotService:
     """Singleton service wrapping the SIMBIOT ConceptConnector."""
 
     def __init__(self):
-        self._connector: Optional[ConceptConnector] = None
+        self._connector: ConceptConnector | None = None
         self._enabled = False
 
     async def initialise(self, config):
@@ -69,9 +69,12 @@ class SimbiotService:
         from app.config.settings import settings
 
         if not settings.simbiot_api_url:
-            raise RuntimeError("SIMBIOT_API_URL not configured")
+            raise RuntimeError("Remote bridge API URL not configured (SIMBIOT_API_URL or BRIDGE_BASE_URL)")
         if not settings.simbiot_api_key and not (settings.simbiot_username and settings.simbiot_password):
-            raise RuntimeError("SIMBIOT credentials not configured")
+            raise RuntimeError(
+                "Remote bridge credentials not configured "
+                "(SIMBIOT_API_KEY/BRIDGE_API_TOKEN or SIMBIOT_USERNAME+SIMBIOT_PASSWORD)"
+            )
 
         base = settings.simbiot_api_url.rstrip("/")
         url = f"{base}/documents/upload"
@@ -95,6 +98,42 @@ class SimbiotService:
                 return resp.json()
             except Exception:
                 return {"status": "accepted", "raw_response": resp.text[:500]}
+
+    async def _request_bridge(self, method: str, path: str) -> dict:
+        """Call the configured remote site bridge endpoint."""
+        from app.config.settings import settings
+
+        if not settings.simbiot_api_url:
+            raise RuntimeError("Remote bridge API URL not configured (SIMBIOT_API_URL or BRIDGE_BASE_URL)")
+        if not settings.simbiot_api_key and not (settings.simbiot_username and settings.simbiot_password):
+            raise RuntimeError(
+                "Remote bridge credentials not configured "
+                "(SIMBIOT_API_KEY/BRIDGE_API_TOKEN or SIMBIOT_USERNAME+SIMBIOT_PASSWORD)"
+            )
+
+        base = settings.simbiot_api_url.rstrip("/")
+        url = f"{base}{path}"
+        headers: dict[str, str] = {}
+        if settings.simbiot_api_key:
+            headers["Authorization"] = f"Bearer {settings.simbiot_api_key}"
+            headers["X-API-Key"] = settings.simbiot_api_key
+
+        auth = None
+        if settings.simbiot_username and settings.simbiot_password:
+            auth = (settings.simbiot_username, settings.simbiot_password)
+
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            response = await client.request(method=method, url=url, headers=headers, auth=auth)
+            response.raise_for_status()
+            return response.json()
+
+    async def get_site_telemetry(self, site_id: str) -> dict:
+        """Fetch live site telemetry from the remote bridge."""
+        return await self._request_bridge("GET", f"/api/sites/{site_id}/telemetry")
+
+    async def get_site_status(self, site_id: str) -> dict:
+        """Fetch live site health/status from the remote bridge."""
+        return await self._request_bridge("GET", f"/api/sites/{site_id}/health")
 
     @property
     def status(self) -> dict:

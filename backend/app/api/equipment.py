@@ -9,8 +9,8 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 
-import httpx
 
+from app.config.settings import settings
 from app.database.repositories.equipment_repository import EquipmentRepository
 from app.database.repositories.sensor_repository import SensorRepository
 from app.services.csv_loader import AssetData, AlarmData as CSVAlarmData
@@ -21,9 +21,6 @@ from app.core.site_resolver import get_primary_site_code
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
-
-# Simulation API endpoint (already running)
-SIMULATION_API = "http://localhost:9095/api/simulation"
 
 # Load data directory
 DATA_DIR = Path(__file__).parent.parent / "data"
@@ -74,7 +71,7 @@ def _derive_status(condition: str, health_score: int) -> str:
 
 
 async def load_equipment() -> list[dict]:
-    """Load equipment from Supabase (primary source), fallback to CSV/JSON."""
+    """Load equipment from canonical sources."""
     try:
         # Primary source: Load from Supabase
         equipment_data = equipment_repo.get_all()
@@ -121,6 +118,10 @@ async def load_equipment() -> list[dict]:
             return equipment_list
     except Exception as e:
         logger.error(f"Failed to load from Supabase: {e}")
+
+    if settings.sentinel_island_mode:
+        logger.warning("Remote equipment source unavailable; refusing local fallback in SENTINEL_ISLAND_MODE")
+        return []
 
     # Fallback to CSV/JSON if Supabase fails
     try:
@@ -209,26 +210,17 @@ async def load_equipment() -> list[dict]:
         except Exception as e:
             logger.error(f"Failed to load equipment.json: {e}")
 
-    # Final fallback to simulation API
-    logger.warning("No local data found, falling back to simulation API")
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(f"{SIMULATION_API}/equipment", timeout=5.0)
-            if response.status_code == 200:
-                data = response.json()
-                equipment_list = data.get("equipment", [])
-                logger.info(f"Loaded {len(equipment_list)} equipment items from simulation API")
-                return equipment_list
-            else:
-                logger.error(f"Simulation API returned {response.status_code}")
-                return []
-    except Exception as e:
-        logger.error(f"Failed to load equipment from simulation API: {e}")
-        return []
+    return []
 
 
 async def load_sensors() -> list[dict]:
-    """Load sensors from sensors.json file (primary source)."""
+    """Load sensors from canonical sources only."""
+    if settings.sentinel_island_mode:
+        logger.warning(
+            "Sensor API has no remote-backed source configured; refusing local fallback in SENTINEL_ISLAND_MODE"
+        )
+        return []
+
     sensors_file = DATA_DIR / "sensors.json"
     if sensors_file.exists():
         try:
@@ -239,50 +231,17 @@ async def load_sensors() -> list[dict]:
         except Exception as e:
             logger.error(f"Failed to load sensors.json: {e}")
 
-    # Fallback to simulation API only if JSON not available
-    logger.warning("sensors.json not found, falling back to simulation API")
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(f"{SIMULATION_API}/equipment", timeout=5.0)
-            if response.status_code != 200:
-                return []
-
-            equipment_list = response.json().get("equipment", [])
-            all_sensors = []
-
-            for eq in equipment_list:
-                # Convert sensor readings to sensor format
-                for sensor_name, value in eq.get("sensor_readings", {}).items():
-                    if isinstance(value, (int, float)):
-                        sensor = {
-                            "id": f"{eq['id']}_{sensor_name.upper()}",
-                            "equipment_id": eq["id"],
-                            "name": f"{eq['name']} {sensor_name.replace('_', ' ').title()}",
-                            "type": "temperature"
-                            if "temp" in sensor_name.lower()
-                            else "pressure"
-                            if "press" in sensor_name.lower()
-                            else "generic",
-                            "unit": "°C"
-                            if "temp" in sensor_name.lower()
-                            else "bar"
-                            if "press" in sensor_name.lower()
-                            else "-",
-                            "current_value": value,
-                            "timestamp": eq.get("timestamp", ""),
-                            "quality": "good",
-                        }
-                        all_sensors.append(sensor)
-
-            logger.info(f"Loaded {len(all_sensors)} sensors from simulation API")
-            return all_sensors
-    except Exception as e:
-        logger.error(f"Failed to load sensors from simulation API: {e}")
-        return []
+    return []
 
 
 async def load_alerts() -> list[dict]:
-    """Load alerts from alarms.csv via csv_loader (primary source)."""
+    """Load alerts from canonical sources only."""
+    if settings.sentinel_island_mode:
+        logger.warning(
+            "Alert API has no remote-backed source configured; refusing local fallback in SENTINEL_ISLAND_MODE"
+        )
+        return []
+
     try:
         # Load from CSV using the csv_loader service
         alarms = CSVAlarmData.load()
@@ -340,40 +299,7 @@ async def load_alerts() -> list[dict]:
         except Exception as e:
             logger.error(f"Failed to load alerts.json: {e}")
 
-    # Final fallback to simulation API
-    logger.warning("No local alert data found, falling back to simulation API")
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(f"{SIMULATION_API}/equipment", timeout=5.0)
-            if response.status_code != 200:
-                return []
-
-            equipment_list = response.json().get("equipment", [])
-            all_alerts = []
-
-            for eq in equipment_list:
-                for fault_code in eq.get("fault_codes", []):
-                    alert = {
-                        "id": f"ALERT_{eq['id']}_{fault_code}",
-                        "equipment_id": eq["id"],
-                        "type": "fault",
-                        "severity": "major" if "E14" in fault_code or "F21" in fault_code else "minor",
-                        "title": f"{eq['name']} - Fault {fault_code}",
-                        "description": f"Fault {fault_code} detected on {eq['name']}",
-                        "status": "active",
-                        "created_at": eq.get("timestamp", ""),
-                        "acknowledged": False,
-                        "assigned_to": None,
-                        "priority": 4 if "E14" in fault_code or "F21" in fault_code else 2,
-                        "tags": ["fault", "simulated"],
-                    }
-                    all_alerts.append(alert)
-
-            logger.info(f"Loaded {len(all_alerts)} alerts from simulation API")
-            return all_alerts
-    except Exception as e:
-        logger.error(f"Failed to load alerts from simulation API: {e}")
-        return []
+    return []
 
 
 def load_safety_rules() -> list[dict]:

@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import re
 from enum import Enum
-from typing import Optional
 
 from app.services.issue_classifier import classify_issue
 
@@ -89,7 +88,7 @@ _CALLBACK_FLOW_MAP = {
 def classify_intent(
     message_text: str,
     has_active_session: bool,
-    callback_data: Optional[str] = None,
+    callback_data: str | None = None,
 ) -> tuple[TelegramIntent, float]:
     """Classify a Telegram message into a conversation intent.
 

@@ -1,17 +1,17 @@
 /**
  * ArcadeView — spatial intelligence interface for the building Overview tab.
  * Fetches DecisionMomentPayload from /api/decisions/current/{siteId} on mount + every 30s.
- * Renders FloorStack + SummaryStrip in quiet mode; CrisisOverlay when urgency gate fires.
+ * Renders FloorStack + SummaryStrip inside the building overview shell.
  * Phase 167-03.
  */
 
 import { useState, useEffect, useRef } from "react";
 import { authorizedFetch } from "@/lib/api";
+import { buildCurrentDecisionUrl } from "@/lib/decisions";
 import { FloorStack } from "./FloorStack";
 import type { FloorStackProps } from "./FloorStack";
 import { SummaryStrip } from "./SummaryStrip";
 import { ContextPanel } from "./ContextPanel";
-import { CrisisOverlay } from "./CrisisOverlay";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -56,62 +56,7 @@ export interface ArcadeViewProps {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 const POLL_INTERVAL_MS = 30_000;
-const URGENCY_THRESHOLD = 0.70;
-
 const DEFAULT_FLOOR_ORDER = ["R", "L2", "L1", "L0", "G", "B1"];
-
-// ─── Suppress helpers (localStorage + config-driven) ──────────────────────────
-
-/**
- * Extract suppress window from payload (default 30 min).
- * Reads from payload.building_metadata.dismiss_window_minutes.
- * This allows each site to have its own suppression policy.
- */
-function getSuppressMinutes(payload: DecisionPayload | null): number {
-  return payload?.building_metadata?.dismiss_window_minutes ?? 30;
-}
-
-/**
- * Key for localStorage — site-specific suppress window.
- */
-const SUPPRESS_KEY = (siteId: string) => `sentinel_crisis_suppress_${siteId}`;
-
-/**
- * Check if crisis is currently suppressed (has unexpired suppress window in localStorage).
- */
-function isSuppressed(siteId: string): boolean {
-  try {
-    const ts = localStorage.getItem(SUPPRESS_KEY(siteId));
-    if (!ts) return false;
-    return new Date() < new Date(ts);
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Set suppress window in localStorage using config-driven duration (from payload).
- * BLOCKER FIX: Duration comes from payload, not hardcoded constant.
- */
-function setSuppressed(siteId: string, suppressMinutes: number): void {
-  try {
-    const until = new Date(Date.now() + suppressMinutes * 60 * 1000);
-    localStorage.setItem(SUPPRESS_KEY(siteId), until.toISOString());
-  } catch {
-    // localStorage unavailable — ignore
-  }
-}
-
-/**
- * Clear suppress window (optional cleanup).
- */
-function _clearSuppress(siteId: string): void {
-  try {
-    localStorage.removeItem(SUPPRESS_KEY(siteId));
-  } catch {
-    // localStorage unavailable — ignore
-  }
-}
 
 function SkeletonFloors({ count }: { count: number }) {
   return (
@@ -140,33 +85,19 @@ export function ArcadeView({ siteId, onModuleDisplayChange }: ArcadeViewProps) {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Trigger state
+  // Trigger state (floor click → /api/decisions/trigger + module_display for overview sections)
   const [selectedFloor, setSelectedFloor] = useState<string | null>(null);
   const [contextOpen, setContextOpen] = useState(false);
-  const [_triggerModuleDisplay, setTriggerModuleDisplay] = useState<Record<string, string>>({});
-
-  // ── Crisis handlers ──────────────────────────────────────────────────────
-
-  const handleCrisisDismiss = () => {
-    // BLOCKER FIX: Read suppress window from payload, not hardcoded.
-    const suppressMinutes = getSuppressMinutes(payload);
-    setSuppressed(siteId, suppressMinutes);
-    // Suppress is re-evaluated on next poll (every 30s) or re-render.
-    // Force re-fetch to refresh state and confirm suppress is active.
-    fetchPayload();
-  };
-
-  const handleCrisisApprove = async () => {
-    // BLOCKER FIX: Read suppress window from payload, not hardcoded.
-    const suppressMinutes = getSuppressMinutes(payload);
-    setSuppressed(siteId, suppressMinutes);
-    // Future: POST to /api/decisions/approve — Phase 168.
-    fetchPayload();
-  };
+  const [triggerModuleDisplay, setTriggerModuleDisplay] = useState<Record<string, string>>({});
+  const [triggerLoading, setTriggerLoading] = useState(false);
+  const [triggerFailed, setTriggerFailed] = useState(false);
 
   const handleFloorClick = async (floorId: string) => {
     setSelectedFloor(floorId);
     setContextOpen(true);
+    setTriggerLoading(true);
+    setTriggerFailed(false);
+    setTriggerModuleDisplay({});
     try {
       const resp = await authorizedFetch(`/api/decisions/trigger/${encodeURIComponent(siteId)}`, {
         method: "POST",
@@ -178,9 +109,14 @@ export function ArcadeView({ siteId, onModuleDisplayChange }: ArcadeViewProps) {
         const moduleDisplay: Record<string, string> = data.module_display ?? {};
         setTriggerModuleDisplay(moduleDisplay);
         onModuleDisplayChange?.(moduleDisplay);
+        setTriggerFailed(false);
+      } else {
+        setTriggerFailed(true);
       }
     } catch {
-      // Graceful — trigger failure doesn't break arcade view
+      setTriggerFailed(true);
+    } finally {
+      setTriggerLoading(false);
     }
   };
 
@@ -192,10 +128,9 @@ export function ArcadeView({ siteId, onModuleDisplayChange }: ArcadeViewProps) {
       }
       abortControllerRef.current = new AbortController();
 
-      const response = await authorizedFetch(
-        `/api/decisions/current/${encodeURIComponent(siteId)}`,
-        { signal: abortControllerRef.current.signal }
-      );
+      const response = await authorizedFetch(buildCurrentDecisionUrl(siteId), {
+        signal: abortControllerRef.current.signal,
+      });
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
       }
@@ -249,14 +184,6 @@ export function ArcadeView({ siteId, onModuleDisplayChange }: ArcadeViewProps) {
   const activeRiskCount: number | null = metadata.active_risk_count ?? null;
   const healthPct: number | null = metadata.health_pct ?? null;
 
-  // Urgency gate — crisis overlay fires when:
-  //   renderer_hint === "crisis" AND urgency_score >= 0.70 AND not suppressed
-  const showCrisis =
-    payload !== null &&
-    payload.renderer_hint === "crisis" &&
-    (payload.urgency_score ?? 0) >= URGENCY_THRESHOLD &&
-    !isSuppressed(siteId);
-
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
@@ -308,64 +235,53 @@ export function ArcadeView({ siteId, onModuleDisplayChange }: ArcadeViewProps) {
         )}
       </div>
 
-      {/* Crisis overlay replaces FloorStack + SummaryStrip when urgency gate fires */}
-      {showCrisis ? (
-        <CrisisOverlay
-          alertText={payload?.alert_text ?? ""}
-          reasoningSummary={payload?.reasoning_summary ?? ""}
-          recommendedAction={payload?.recommended_action ?? ""}
-          timeToDiscomfort={payload?.time_to_discomfort ?? null}
-          affectedFloor={
-            payload?.active_incident_map
-              ? (Object.keys(payload.active_incident_map)[0] ?? null)
-              : null
-          }
-          deploymentMode={payload?.building_metadata?.deployment_mode ?? "ghost"}
-          onDismiss={handleCrisisDismiss}
-          onApprove={handleCrisisApprove}
-        />
+      {/* Summary strip */}
+      <SummaryStrip
+        equipmentCount={equipmentCount}
+        activeRiskCount={activeRiskCount}
+        healthPct={healthPct}
+      />
+
+      {/* Floor stack */}
+      {loading && !payload ? (
+        <SkeletonFloors count={floorStackOrder.length} />
       ) : (
-        <>
-          {/* Summary strip */}
-          <SummaryStrip
-            equipmentCount={equipmentCount}
-            activeRiskCount={activeRiskCount}
-            healthPct={healthPct}
-          />
-
-          {/* Floor stack */}
-          {loading && !payload ? (
-            <SkeletonFloors count={floorStackOrder.length} />
-          ) : (
-            <FloorStack
-              floorStackOrder={floorStackOrder}
-              floorLabels={floorLabels}
-              activeIncidentMap={activeIncidentMap}
-              rendererHint={rendererHint}
-              onFloorClick={handleFloorClick}
-              selectedFloor={selectedFloor}
-            />
-          )}
-
-          {/* ContextPanel — slides in from right on floor selection */}
-          <ContextPanel
-            open={contextOpen}
-            floorId={selectedFloor}
-            floorLabel={
-              payload?.building_metadata?.floor_labels?.[selectedFloor ?? ""] ??
-              selectedFloor ??
-              ""
-            }
-            siteId={siteId}
-            onClose={() => {
-              setContextOpen(false);
-              setSelectedFloor(null);
-              setTriggerModuleDisplay({});
-              onModuleDisplayChange?.({});
-            }}
-          />
-        </>
+        <FloorStack
+          floorStackOrder={floorStackOrder}
+          floorLabels={floorLabels}
+          activeIncidentMap={activeIncidentMap}
+          rendererHint={rendererHint}
+          onFloorClick={handleFloorClick}
+          selectedFloor={selectedFloor}
+        />
       )}
+
+      {/* ContextPanel — slides in from right on floor selection */}
+      <ContextPanel
+        open={contextOpen}
+        floorId={selectedFloor}
+        floorLabel={
+          payload?.building_metadata?.floor_labels?.[selectedFloor ?? ""] ??
+          selectedFloor ??
+          ""
+        }
+        siteId={siteId}
+        moduleDisplay={triggerModuleDisplay}
+        triggerLoading={triggerLoading}
+        triggerFailed={triggerFailed}
+        floorIncident={
+          selectedFloor && payload?.active_incident_map
+            ? payload.active_incident_map[selectedFloor] ?? null
+            : null
+        }
+        onClose={() => {
+          setContextOpen(false);
+          setSelectedFloor(null);
+          setTriggerModuleDisplay({});
+          setTriggerFailed(false);
+          onModuleDisplayChange?.({});
+        }}
+      />
     </div>
   );
 }

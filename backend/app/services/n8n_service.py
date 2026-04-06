@@ -19,7 +19,7 @@ import os
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import httpx
 
@@ -78,13 +78,13 @@ class N8nConnectionStatus(str, Enum):
 class N8nStatus:
     status: N8nConnectionStatus
     message: str
-    version: Optional[str] = None
+    version: str | None = None
     active_workflows: int = 0
     total_workflows: int = 0
     failed_24h: int = 0
-    last_checked: Optional[str] = None
+    last_checked: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "status": self.status.value,
             "message": self.message,
@@ -106,11 +106,11 @@ class WorkflowSummary:
     id: str
     name: str
     active: bool
-    tags: List[str] = field(default_factory=list)
-    created_at: Optional[str] = None
-    updated_at: Optional[str] = None
+    tags: list[str] = field(default_factory=list)
+    created_at: str | None = None
+    updated_at: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
             "name": self.name,
@@ -127,11 +127,11 @@ class ExecutionSummary:
     workflow_id: str
     workflow_name: str
     status: str  # "success", "error", "waiting", "running"
-    started_at: Optional[str] = None
-    finished_at: Optional[str] = None
-    error_message: Optional[str] = None
+    started_at: str | None = None
+    finished_at: str | None = None
+    error_message: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
             "workflow_id": self.workflow_id,
@@ -159,9 +159,9 @@ class N8nService:
         - Workflow activation/deactivation for maintenance
     """
 
-    def __init__(self, config: Optional[N8nConfig] = None):
+    def __init__(self, config: N8nConfig | None = None):
         self._config = config or N8nConfig.from_env()
-        self._client: Optional[httpx.AsyncClient] = None
+        self._client: httpx.AsyncClient | None = None
         self._status = N8nStatus(
             status=N8nConnectionStatus.NOT_CONFIGURED,
             message="n8n credentials not configured",
@@ -283,15 +283,15 @@ class N8nService:
     async def list_workflows(
         self,
         active_only: bool = False,
-        tag: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        tag: str | None = None,
+    ) -> dict[str, Any]:
         """List all workflows with optional filters."""
         if not self._config.is_configured:
             return self._not_available("Workflows", "n8n not configured")
 
         try:
             client = self._get_client()
-            params: Dict[str, str] = {}
+            params: dict[str, str] = {}
             if active_only:
                 params["active"] = "true"
 
@@ -324,7 +324,7 @@ class N8nService:
             logger.error("n8n list workflows failed: %s", e)
             return self._not_available("Workflows", "Request failed")
 
-    async def get_workflow(self, workflow_id: str) -> Dict[str, Any]:
+    async def get_workflow(self, workflow_id: str) -> dict[str, Any]:
         """Get detailed workflow info including node configuration."""
         if not self._config.is_configured:
             return self._not_available("Workflow", "n8n not configured")
@@ -353,15 +353,15 @@ class N8nService:
             logger.error("n8n get workflow failed: %s", e)
             return self._not_available("Workflow", "Request failed")
 
-    async def activate_workflow(self, workflow_id: str) -> Dict[str, Any]:
+    async def activate_workflow(self, workflow_id: str) -> dict[str, Any]:
         """Activate a workflow."""
         return await self._set_workflow_active(workflow_id, True)
 
-    async def deactivate_workflow(self, workflow_id: str) -> Dict[str, Any]:
+    async def deactivate_workflow(self, workflow_id: str) -> dict[str, Any]:
         """Deactivate a workflow."""
         return await self._set_workflow_active(workflow_id, False)
 
-    async def _set_workflow_active(self, workflow_id: str, active: bool) -> Dict[str, Any]:
+    async def _set_workflow_active(self, workflow_id: str, active: bool) -> dict[str, Any]:
         if not self._config.is_configured:
             return {"success": False, "reason": "n8n not configured"}
 
@@ -383,17 +383,17 @@ class N8nService:
 
     async def list_executions(
         self,
-        workflow_id: Optional[str] = None,
-        status: Optional[str] = None,
+        workflow_id: str | None = None,
+        status: str | None = None,
         limit: int = 20,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """List recent executions with optional filters."""
         if not self._config.is_configured:
             return self._not_available("Executions", "n8n not configured")
 
         try:
             client = self._get_client()
-            params: Dict[str, Any] = {"limit": limit}
+            params: dict[str, Any] = {"limit": limit}
             if workflow_id:
                 params["workflowId"] = workflow_id
             if status:
@@ -423,7 +423,7 @@ class N8nService:
             logger.error("n8n list executions failed: %s", e)
             return self._not_available("Executions", "Request failed")
 
-    async def get_execution(self, execution_id: str) -> Dict[str, Any]:
+    async def get_execution(self, execution_id: str) -> dict[str, Any]:
         """Get detailed execution info including node-level results."""
         if not self._config.is_configured:
             return self._not_available("Execution", "n8n not configured")
@@ -459,9 +459,9 @@ class N8nService:
     async def trigger_webhook(
         self,
         webhook_path: str,
-        payload: Dict[str, Any],
+        payload: dict[str, Any],
         test: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Trigger a workflow via its webhook URL.
 
         Args:
@@ -513,7 +513,7 @@ class N8nService:
     # Health Summary for Dashboard
     # -------------------------------------------------------------------
 
-    async def get_health_summary(self) -> Dict[str, Any]:
+    async def get_health_summary(self) -> dict[str, Any]:
         """Comprehensive health summary for the System Health dashboard card."""
         if not self._config.is_configured:
             return {
@@ -548,7 +548,7 @@ class N8nService:
     # -------------------------------------------------------------------
 
     @staticmethod
-    def _detect_trigger_type(nodes: List[Dict]) -> str:
+    def _detect_trigger_type(nodes: list[dict]) -> str:
         """Detect the trigger type from workflow nodes."""
         for node in nodes:
             node_type = node.get("type", "").lower()
@@ -563,7 +563,7 @@ class N8nService:
         return "manual"
 
     @staticmethod
-    def _extract_error(execution: Dict) -> Optional[str]:
+    def _extract_error(execution: dict) -> str | None:
         """Extract error message from execution data."""
         if execution.get("error"):
             err = execution["error"]
@@ -581,7 +581,7 @@ class N8nService:
         return None
 
     @staticmethod
-    def _extract_node_results(data: Dict) -> List[Dict[str, Any]]:
+    def _extract_node_results(data: dict) -> list[dict[str, Any]]:
         """Extract per-node execution results for debugging."""
         node_results = []
         run_data = data.get("data", {}).get("resultData", {}).get("runData", {})
@@ -606,7 +606,7 @@ class N8nService:
             )
         return node_results
 
-    def _not_available(self, label: str, reason: str) -> Dict[str, Any]:
+    def _not_available(self, label: str, reason: str) -> dict[str, Any]:
         return {"not_available": True, "reason": reason, "label": label}
 
 
@@ -614,7 +614,7 @@ class N8nService:
 # Singleton
 # ---------------------------------------------------------------------------
 
-_service: Optional[N8nService] = None
+_service: N8nService | None = None
 
 
 def get_n8n_service() -> N8nService:

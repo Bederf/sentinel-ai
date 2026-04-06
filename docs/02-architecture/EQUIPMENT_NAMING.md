@@ -1,3 +1,18 @@
+---
+title: "Equipment Naming Conventions (Two-Tier System)"
+type: "architecture"
+status: "draft"
+version: "1.0.0"
+created: "2026-03-31"
+updated: "2026-03-31"
+tags: ["sentinel", "documentation"]
+related: []
+domain: "bms"
+audience: "all"
+complexity: "intermediate"
+estimated_read_time: 10
+---
+
 # Equipment Naming Conventions (Two-Tier System)
 
 **Complete Alignment:** Zones, Desks, and Equipment all reference the same numeric zone identifiers for office areas. Plant equipment uses location codes.

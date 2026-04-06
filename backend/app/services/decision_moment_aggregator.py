@@ -12,18 +12,19 @@ Dependency map:
 """
 
 from __future__ import annotations
+
 import json
 import logging
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from app.models.decision_moment import DecisionMomentPayload
-from app.services.zone_mapping_service import ZoneMappingService
-from app.services.fault_urgency import compute_fault_urgency, build_alert_text
-from app.services.thermal_model import calculate_thermal_runway
+from app.services.fault_urgency import build_alert_text, compute_fault_urgency
 from app.services.floor_zone_utils import build_active_incident_map
+from app.services.thermal_model import calculate_thermal_runway
+from app.services.zone_mapping_service import ZoneMappingService
 
 logger = logging.getLogger(__name__)
 
@@ -163,8 +164,8 @@ class DecisionMomentAggregator:
               "deployment_mode": "ghost"
             }
         """
-        from app.services.floor_zone_utils import FLOOR_STACK_ORDER, FLOOR_LABELS
         from app.database.repositories.site_3d_config_repository import get_site_3d_config_repository
+        from app.services.floor_zone_utils import FLOOR_LABELS, FLOOR_STACK_ORDER
 
         # Defaults
         metadata: dict = {
@@ -244,7 +245,7 @@ class DecisionMomentAggregator:
         Never raises — always returns a payload with honest null fields where data is missing.
         """
         t0 = time.perf_counter()
-        triggered_at = datetime.now(timezone.utc)
+        triggered_at = datetime.now(UTC)
 
         # Load building profile (graceful degradation if missing)
         profile = _load_building_profile(building_id)
@@ -302,8 +303,8 @@ class DecisionMomentAggregator:
         )
 
         # Phase 165 fields — build inline (sync path; _build_building_metadata is async for v2)
-        from app.services.floor_zone_utils import FLOOR_STACK_ORDER, FLOOR_LABELS
         from app.database.repositories.site_3d_config_repository import get_site_3d_config_repository
+        from app.services.floor_zone_utils import FLOOR_LABELS, FLOOR_STACK_ORDER
 
         building_metadata: dict = {
             "floors_count": 0,

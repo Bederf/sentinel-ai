@@ -16,7 +16,6 @@ Emission factors are configured per South African context:
 
 import logging
 from datetime import date
-from typing import Dict, Tuple
 
 from app.database.supabase_client import get_supabase_client
 
@@ -47,7 +46,7 @@ class CarbonCalculator:
         site_id: str,
         period_start: date,
         period_end: date,
-    ) -> Tuple[float, Dict]:
+    ) -> tuple[float, dict]:
         """
         Calculate Scope 1 (direct) emissions for a building.
 
@@ -109,7 +108,7 @@ class CarbonCalculator:
         site_id: str,
         period_start: date,
         period_end: date,
-    ) -> Tuple[float, Dict]:
+    ) -> tuple[float, dict]:
         """
         Calculate Scope 2 (purchased electricity) emissions.
 
@@ -193,7 +192,7 @@ class CarbonCalculator:
         site_id: str,
         period_start: date,
         period_end: date,
-    ) -> Tuple[float, Dict]:
+    ) -> tuple[float, dict]:
         """
         Calculate Scope 3 (indirect/value chain) emissions.
 
@@ -254,7 +253,7 @@ class CarbonCalculator:
         site_id: str,
         period_start: date,
         period_end: date,
-    ) -> Tuple[float, Dict]:
+    ) -> tuple[float, dict]:
         """
         Estimate Scope 3 emissions if measured data unavailable.
 
@@ -297,7 +296,7 @@ class CarbonCalculator:
         site_id: str,
         period_start: date,
         period_end: date,
-    ) -> Dict:
+    ) -> dict:
         """
         Calculate total emissions (Scope 1 + 2 + 3) for a building.
 
@@ -330,7 +329,7 @@ class CarbonCalculator:
         site_id: str,
         period_start: date,
         period_end: date,
-    ) -> Dict:
+    ) -> dict:
         """
         Calculate carbon intensity (kg CO2e per m² per month).
 
@@ -407,7 +406,7 @@ class CarbonCalculator:
         self,
         site_id: str,
         year: int,
-    ) -> Dict:
+    ) -> dict:
         """
         Calculate annual emissions baseline and store in database.
 
@@ -465,7 +464,7 @@ class CarbonCalculator:
         site_id: str,
         period_start: date,
         period_end: date,
-    ) -> Dict:
+    ) -> dict:
         """
         Calculate ESG metrics and overall ESG score (0-100).
 

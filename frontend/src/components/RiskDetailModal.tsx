@@ -153,7 +153,7 @@ export function RiskDetailModal({
     equipment.health
   );
 
-  // Generate demo health factors if not present
+  // Generate local fallback health factors if not present
   const healthFactors = equipment.health_factors || {
     age: { score: Math.min(100, equipment.health + 10), value: "5 years" },
     service: {

@@ -7,7 +7,6 @@
 
 import React, { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useSimulation } from '@/contexts/SimulationContext';
 import { useModules } from '@/contexts/ModuleHooks';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Card } from '@/components/Card';
@@ -67,8 +66,8 @@ export function OccupancyAnalyticsPage() {
   const [siteId] = useState(contextSiteId || '');
   const [days, setDays] = useState<1 | 7 | 30>(1);
 
-  // Get simulation context
-  const { running: isSimulationRunning, simulatedHour, daysSimulated } = useSimulation();
+  const simulatedHour = new Date().getHours();
+  const isSimulationRunning = false;
 
   // Fetch occupancy trend
   const { data: trendData, isLoading: trendLoading } = useQuery<OccupancyTrendData>({
@@ -130,9 +129,9 @@ export function OccupancyAnalyticsPage() {
     ];
     const avg = Math.round(allValues.reduce((a, b) => a + b, 0) / allValues.length);
 
-    // Get current hour occupancy from simulation if running
+    // Get current hour occupancy from live data
     let currentOccupancy = avg;
-    if (isSimulationRunning && simulatedHour !== undefined) {
+    if (simulatedHour !== undefined) {
       const hourIndex = trendData.hours.indexOf(simulatedHour);
       if (hourIndex !== -1) {
         const hourValues = [
@@ -147,7 +146,7 @@ export function OccupancyAnalyticsPage() {
     }
 
     return { averageOccupancy: avg, currentHourOccupancy: currentOccupancy };
-  }, [trendData, isSimulationRunning, simulatedHour]);
+  }, [trendData, simulatedHour]);
 
   const isLoading = trendLoading || utilizationLoading || peakHoursLoading;
 
@@ -159,22 +158,9 @@ export function OccupancyAnalyticsPage() {
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-4xl font-bold">Occupancy Analytics</h1>
-              {isSimulationRunning && (
-                <div className="px-3 py-1 rounded-full text-sm font-medium"
-                  style={{
-                    background: 'rgba(59, 130, 246, 0.15)',
-                    color: 'var(--color-sentinel-blue)',
-                  }}
-                >
-                  🔴 Live • Hour {simulatedHour}:00 (Day {daysSimulated}/365)
-                </div>
-              )}
             </div>
             <p className="text-muted-foreground mt-2">
-              {isSimulationRunning
-                ? 'Real-time occupancy from 365-day simulation'
-                : 'Building-wide occupancy trends, zone utilization, and peak hour analysis'
-              }
+              Building-wide occupancy trends, zone utilization, and peak hour analysis
             </p>
           </div>
 

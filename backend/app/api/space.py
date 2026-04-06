@@ -17,7 +17,7 @@ from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.core.site_resolver import require_any_site
 
@@ -52,8 +52,7 @@ class OccupancyEventRequest(BaseModel):
     moving_gate: int | None = Field(default=None, description="Moving target gate (0-8)")
     static_gate: int | None = Field(default=None, description="Static target gate (0-8)")
 
-    class Config:
-        extra = "ignore"  # Silently ignore unknown fields like 'count'
+    model_config = ConfigDict(extra="ignore")  # Silently ignore unknown fields like 'count'
 
 
 class DismissRequest(BaseModel):

@@ -12,7 +12,7 @@ interface SplashScreenProps {
   minDisplayTime?: number; // Minimum time to show splash (ms)
 }
 
-export function SplashScreen({ onComplete, minDisplayTime = 2500 }: SplashScreenProps) {
+export function SplashScreen({ onComplete, minDisplayTime = 8500 }: SplashScreenProps) {
   const [fadeOut, setFadeOut] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const startTimeRef = useRef<number>(0);
@@ -21,6 +21,17 @@ export function SplashScreen({ onComplete, minDisplayTime = 2500 }: SplashScreen
   const complete = () => {
     if (completedRef.current) return;
     completedRef.current = true;
+    // Stop decoding / avoid any lingering video frame after splash (esp. mobile / PiP quirks)
+    const video = videoRef.current;
+    if (video) {
+      try {
+        video.pause();
+        video.removeAttribute("src");
+        video.load();
+      } catch {
+        /* ignore */
+      }
+    }
     setFadeOut(true);
     setTimeout(() => {
       onComplete();

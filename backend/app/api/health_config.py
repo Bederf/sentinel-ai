@@ -8,7 +8,7 @@ import json
 from pathlib import Path
 from typing import Dict, Any, Optional
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 router = APIRouter(prefix="/api/health-config", tags=["health-config"])
 
@@ -39,8 +39,7 @@ class HealthThresholds(BaseModel):
 class FaultWeights(BaseModel):
     """Optional fault weights by fault type."""
 
-    class Config:
-        extra = "allow"
+    model_config = ConfigDict(extra="allow")
 
 
 class EquipmentHealthConfig(BaseModel):

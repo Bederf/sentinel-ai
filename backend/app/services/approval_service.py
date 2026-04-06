@@ -11,8 +11,8 @@ import hashlib
 import json
 import logging
 from dataclasses import dataclass
-from datetime import datetime
-from typing import Any, Dict, Optional, Tuple
+from datetime import UTC, datetime
+from typing import Any, Optional
 
 from app.config.settings import settings
 from app.database.repositories.audit_repository import AuditRepository
@@ -39,10 +39,10 @@ class ApprovalResult:
     success: bool
     recommendation_id: str
     status: str  # "approved", "rejected", "executed", "failed"
-    executed_at: Optional[datetime] = None
-    error_message: Optional[str] = None
+    executed_at: datetime | None = None
+    error_message: str | None = None
     cov_verified: bool = False
-    execution_result: Optional[Dict[str, Any]] = None
+    execution_result: dict[str, Any] | None = None
 
 
 class ApprovalService:
@@ -55,7 +55,7 @@ class ApprovalService:
         self.recommendations_repo = RecommendationRepository()
         self.audit_repo = AuditRepository()
 
-    async def validate_approval(self, recommendation_id: str, approved_by: str) -> Tuple[bool, str]:
+    async def validate_approval(self, recommendation_id: str, approved_by: str) -> tuple[bool, str]:
         """Validate that a recommendation can be approved.
 
         Args:
@@ -82,8 +82,8 @@ class ApprovalService:
             return True, ""
 
         except Exception as e:
-            logger.error(f"Error validating approval for {recommendation_id}: {str(e)}")
-            return False, f"Validation error: {str(e)}"
+            logger.error(f"Error validating approval for {recommendation_id}: {e!s}")
+            return False, f"Validation error: {e!s}"
 
     async def _check_quality_gate(self, site_id: str):
         """Evaluate quality gate for a site.
@@ -128,7 +128,7 @@ class ApprovalService:
             logger.debug(f"Failed to audit log quality gate block: {e}")
 
     async def execute_approval(
-        self, recommendation_id: str, approved_by: str, approval_notes: Optional[str] = None
+        self, recommendation_id: str, approved_by: str, approval_notes: str | None = None
     ) -> ApprovalResult:
         """Execute an approved recommendation with safety validation and device control.
 
@@ -441,12 +441,12 @@ class ApprovalService:
             )
 
         except Exception as e:
-            logger.error(f"Error executing approval for {recommendation_id}: {str(e)}")
+            logger.error(f"Error executing approval for {recommendation_id}: {e!s}")
             return ApprovalResult(
                 success=False,
                 recommendation_id=recommendation_id,
                 status="failed",
-                error_message=f"Approval execution error: {str(e)}",
+                error_message=f"Approval execution error: {e!s}",
             )
 
     async def reject_approval(self, recommendation_id: str, rejected_by: str, reason: str) -> ApprovalResult:
@@ -577,16 +577,16 @@ class ApprovalService:
             return ApprovalResult(success=True, recommendation_id=recommendation_id, status="rejected")
 
         except Exception as e:
-            logger.error(f"Error rejecting recommendation {recommendation_id}: {str(e)}")
+            logger.error(f"Error rejecting recommendation {recommendation_id}: {e!s}")
             return ApprovalResult(
                 success=False,
                 recommendation_id=recommendation_id,
                 status="failed",
-                error_message=f"Rejection error: {str(e)}",
+                error_message=f"Rejection error: {e!s}",
             )
 
     async def rollback_approval(
-        self, recommendation_id: str, rollback_reason: Optional[str] = None, initiated_by: Optional[str] = None
+        self, recommendation_id: str, rollback_reason: str | None = None, initiated_by: str | None = None
     ) -> ApprovalResult:
         """Rollback an executed approval to its original state.
 
@@ -724,15 +724,15 @@ class ApprovalService:
             )
 
         except Exception as e:
-            logger.error(f"Error rolling back recommendation {recommendation_id}: {str(e)}")
+            logger.error(f"Error rolling back recommendation {recommendation_id}: {e!s}")
             return ApprovalResult(
                 success=False,
                 recommendation_id=recommendation_id,
                 status="failed",
-                error_message=f"Rollback error: {str(e)}",
+                error_message=f"Rollback error: {e!s}",
             )
 
-    async def _validate_safety(self, equipment_id: str, proposed_value: Any) -> Dict[str, Any]:
+    async def _validate_safety(self, equipment_id: str, proposed_value: Any) -> dict[str, Any]:
         """Pre-flight safety check before device write.
 
         Note: The device adapter also runs safety validation during write_value().
@@ -768,10 +768,10 @@ class ApprovalService:
                 "reason": f"No adapter registered for {equipment_id} — write rejected (fail-closed, SAFETY-001)",
             }
         except Exception as e:
-            logger.error(f"Error in safety validation: {str(e)}")
-            return {"is_safe": False, "reason": f"Safety validation error: {str(e)}"}
+            logger.error(f"Error in safety validation: {e!s}")
+            return {"is_safe": False, "reason": f"Safety validation error: {e!s}"}
 
-    async def _execute_device_write(self, equipment_id: str, point_name: str, target_value: Any) -> Dict[str, Any]:
+    async def _execute_device_write(self, equipment_id: str, point_name: str, target_value: Any) -> dict[str, Any]:
         """Execute write to device via adapter (BACnet, Modbus, or simulated).
 
         The device manager routes writes to the correct adapter. SENTINEL does not
@@ -828,7 +828,7 @@ class ApprovalService:
             return verified
 
         except Exception as e:
-            logger.error(f"Error verifying COV feedback: {str(e)}")
+            logger.error(f"Error verifying COV feedback: {e!s}")
             return False
 
     async def _create_audit_log(
@@ -836,7 +836,7 @@ class ApprovalService:
         action_type: str,
         equipment_code: str,
         approved_by: str,
-        approval_notes: Optional[str],
+        approval_notes: str | None,
         change_description: str,
         execution_status: str,
         cov_verified: bool,
@@ -874,7 +874,7 @@ class ApprovalService:
             logger.info(f"Audit log created for {action_type} on {equipment_code}")
 
         except Exception as e:
-            logger.error(f"Error creating audit log: {str(e)}")
+            logger.error(f"Error creating audit log: {e!s}")
 
     async def auto_execute_recommendation(
         self,
@@ -1318,7 +1318,7 @@ class ApprovalService:
             )
 
         except Exception as e:
-            logger.error(f"Tier 3 auto-execute: Error executing {recommendation_id}: {str(e)}")
+            logger.error(f"Tier 3 auto-execute: Error executing {recommendation_id}: {e!s}")
             # Invariant 2 guard: prevent stranded "pending" records on unhandled exception.
             # Fetch and mark failed so the record is never left in PENDING indefinitely.
             try:
@@ -1340,7 +1340,7 @@ class ApprovalService:
                 success=False,
                 recommendation_id=recommendation_id,
                 status="failed",
-                error_message=f"Tier 3 auto-execute error: {str(e)}",
+                error_message=f"Tier 3 auto-execute error: {e!s}",
             )
 
     async def _auto_rollback(
@@ -1464,12 +1464,12 @@ class ApprovalService:
             return True
 
         except Exception as e:
-            logger.error(f"Auto-rollback: Error rolling back recommendation: {str(e)}")
+            logger.error(f"Auto-rollback: Error rolling back recommendation: {e!s}")
             return False
 
     async def execute_multi_module_approval(
-        self, recommendation_id: str, approved_by: str, approval_notes: Optional[str] = None
-    ) -> Dict[str, Any]:
+        self, recommendation_id: str, approved_by: str, approval_notes: str | None = None
+    ) -> dict[str, Any]:
         """Execute a multi-module peak shaving recommendation.
 
         Coordinates actions across multiple modules (BESS, HVAC, Energy) with atomic execution:
@@ -1519,7 +1519,7 @@ class ApprovalService:
             }
 
         except Exception as e:
-            logger.error(f"Error executing multi-module approval: {str(e)}")
+            logger.error(f"Error executing multi-module approval: {e!s}")
             return {"success": False, "error": str(e), "recommendation_id": recommendation_id}
 
     def _record_module_feedback(
@@ -1528,8 +1528,8 @@ class ApprovalService:
         recommendation: Recommendation,
         successful: bool,
         outcome_status: str,
-        actual_impact: Optional[Dict[str, Any]] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        actual_impact: dict[str, Any] | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> None:
         """Record approval-path outcomes into module-aware ML feedback."""
         try:
@@ -1637,11 +1637,13 @@ class ApprovalService:
             HTTPException: On various failures (safety, lock, database, BMS)
         """
         import asyncio
+        from datetime import datetime
+
         from fastapi import HTTPException
+
         from app.database.repositories.parasite_decision_repository import ParasiteDecisionRepository
         from app.middleware.redis_client import redis_client
         from app.services.audit_logger import AuditLogger
-        from datetime import datetime, timezone
 
         audit_logger = AuditLogger()
         decision_repo = ParasiteDecisionRepository()
@@ -1651,7 +1653,7 @@ class ApprovalService:
         try:
             decision = await decision_repo.get_decision_by_id(decision_id)
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Database error: {e!s}")
 
         if not decision:
             raise HTTPException(status_code=404, detail="Decision not found")
@@ -1680,7 +1682,7 @@ class ApprovalService:
         except HTTPException:
             raise
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Lock error: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Lock error: {e!s}")
 
         try:
             # Step 6: State transition
@@ -1690,7 +1692,7 @@ class ApprovalService:
                 # This is handled by Supabase direct update if needed
                 pass
             except Exception as e:
-                raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+                raise HTTPException(status_code=500, detail=f"Database error: {e!s}")
 
             # Step 7: Log DECISION_APPROVED
             await audit_logger.record_event(
@@ -1700,7 +1702,7 @@ class ApprovalService:
                     "decision_id": decision_id,
                     "user_id": user_id,
                     "user_role": user_role,
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "timestamp": datetime.now(UTC).isoformat(),
                 }
             )
 
@@ -1720,7 +1722,7 @@ class ApprovalService:
                     "device_id": command["device_id"],
                     "point": command["point"],
                     "value": command["value"],
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "timestamp": datetime.now(UTC).isoformat(),
                 }
             )
 
@@ -1739,7 +1741,7 @@ class ApprovalService:
             except Exception as e:
                 raise HTTPException(
                     status_code=500,
-                    detail=f"BMS write failed: {str(e)}",
+                    detail=f"BMS write failed: {e!s}",
                 )
 
             # Step 11: Return ACCEPTED immediately (do NOT wait for verification)
@@ -1764,7 +1766,7 @@ class ApprovalService:
                     )
                 )
             except Exception as e:
-                logger.warning(f"Failed to spawn verification task: {str(e)}")
+                logger.warning(f"Failed to spawn verification task: {e!s}")
 
             return response
 
@@ -1780,16 +1782,16 @@ class ApprovalService:
                     "decision_id": decision_id,
                     "error": str(e),
                     "user_id": user_id,
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "timestamp": datetime.now(UTC).isoformat(),
                 }
             )
-            raise HTTPException(status_code=500, detail=f"Execution error: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Execution error: {e!s}")
         finally:
             # Step 14: Lock release on all paths (success/failure/exception)
             try:
                 await redis_client.delete(lock_key)
             except Exception as e:
-                logger.error(f"Failed to release lock {lock_key}: {str(e)}")
+                logger.error(f"Failed to release lock {lock_key}: {e!s}")
 
 
 def get_approval_service() -> ApprovalService:

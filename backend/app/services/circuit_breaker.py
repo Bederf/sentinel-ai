@@ -33,8 +33,9 @@ Usage:
 import asyncio
 import logging
 import time
+from collections.abc import Awaitable, Callable
 from enum import Enum
-from typing import Any, Awaitable, Callable, Dict, Optional, TypeVar
+from typing import Any, TypeVar
 
 logger = logging.getLogger(__name__)
 
@@ -130,7 +131,7 @@ class CircuitBreaker:
                 f"({len(self._failure_timestamps)} failures in {self.failure_window_seconds}s)"
             )
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """Get circuit breaker status for health endpoint."""
         return {
             "name": self.name,
@@ -147,7 +148,7 @@ async def call_with_breaker(
     breaker: CircuitBreaker,
     fn: Callable[..., Awaitable[T]],
     *args: Any,
-    fallback: Optional[T] = None,
+    fallback: T | None = None,
     timeout_seconds: float = 5.0,
     **kwargs: Any,
 ) -> T:
@@ -172,7 +173,7 @@ async def call_with_breaker(
         result = await asyncio.wait_for(fn(*args, **kwargs), timeout=timeout_seconds)
         breaker.record_success()
         return result
-    except asyncio.TimeoutError:
+    except TimeoutError:
         breaker.record_failure()
         logger.warning(f"[CIRCUIT] {breaker.name}: timeout after {timeout_seconds}s")
         return fallback  # type: ignore[return-value]
@@ -186,7 +187,7 @@ async def call_with_breaker(
 # Global breaker registry — one breaker per downstream dependency
 # =============================================================================
 
-_breakers: Dict[str, CircuitBreaker] = {}
+_breakers: dict[str, CircuitBreaker] = {}
 
 
 def get_breaker(
@@ -204,6 +205,6 @@ def get_breaker(
     return _breakers[name]
 
 
-def get_all_breaker_statuses() -> list[Dict[str, Any]]:
+def get_all_breaker_statuses() -> list[dict[str, Any]]:
     """Get status of all registered circuit breakers (for /api/health)."""
     return [b.get_status() for b in _breakers.values()]

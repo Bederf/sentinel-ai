@@ -46,12 +46,6 @@ vi.mock('@/components/KPICard', () => ({
 // ==================== IngestionModeBanner ====================
 
 describe('IngestionModeBanner', () => {
-  it('renders SIMULATION mode with correct label', () => {
-    render(<IngestionModeBanner mode="simulation" isLive={false} />);
-    expect(screen.getByText('SIMULATION')).toBeDefined();
-    expect(screen.getByText('OFFLINE')).toBeDefined();
-  });
-
   it('renders SHADOW_LIVE mode with correct label', () => {
     render(<IngestionModeBanner mode="shadow_live" isLive={true} />);
     expect(screen.getByText('SHADOW LIVE')).toBeDefined();
@@ -125,7 +119,7 @@ describe('MonitoringKPIPanel', () => {
 describe('CommissioningGatePanel', () => {
   it('renders muted message when commissioning is null', () => {
     render(<CommissioningGatePanel commissioning={null} />);
-    expect(screen.getByText(/not applicable in simulation mode/i)).toBeDefined();
+    expect(screen.getByText(/commissioning data is not available yet/i)).toBeDefined();
   });
 
   it('renders GO badge when all gates passed', () => {

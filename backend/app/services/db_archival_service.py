@@ -8,7 +8,7 @@ Phase 4 of Supabase Performance Optimization.
 """
 
 import logging
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 
 from app.config.settings import settings
 
@@ -104,7 +104,7 @@ def archive_old_records(dry_run: bool = False) -> dict:
     from app.database.supabase_client import get_supabase_client
 
     client = get_supabase_client()
-    cutoff = datetime.now(timezone.utc) - timedelta(days=ARCHIVE_RETENTION_DAYS)
+    cutoff = datetime.now(UTC) - timedelta(days=ARCHIVE_RETENTION_DAYS)
     cutoff_iso = cutoff.isoformat()
     summary = {
         "dry_run": dry_run,

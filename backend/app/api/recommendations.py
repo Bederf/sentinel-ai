@@ -15,6 +15,8 @@ from pydantic import BaseModel
 from app.middleware.auth_middleware import require_site_access
 from app.middleware.rate_limiter import limiter
 from app.models.auth import AuthContext
+from app.config.settings import IngestionMode, settings
+from app.services.site_ai_policy_service import get_site_ai_policy
 from app.services.recommendation_service import get_recommendation_service
 from app.utils.ai_provenance import attach_ai_provenance, get_ml_provenance
 
@@ -69,6 +71,22 @@ async def get_pending_recommendations(
         JSON response with pending recommendations
     """
     try:
+        # Shadow mode default is learning-only unless site policy explicitly allows visibility.
+        policy = get_site_ai_policy(site_id)
+        if settings.resolved_ingestion_mode == IngestionMode.SHADOW_LIVE and not policy.get(
+            "show_recommendations_in_shadow", False
+        ):
+            return attach_ai_provenance(
+                {
+                    "site_id": site_id,
+                    "recommendations": [],
+                    "count": 0,
+                    "suppressed": True,
+                    "mode": settings.resolved_ingestion_mode.value,
+                },
+                get_ml_provenance("recommendation-engine-v1"),
+            )
+
         service = get_recommendation_service()
         recs = await service.get_pending_recommendations(site_id, limit)
 
@@ -109,6 +127,26 @@ async def get_recommendation_history(
         JSON response with historical recommendations
     """
     try:
+        # Shadow mode default is learning-only unless site policy explicitly allows visibility.
+        policy = get_site_ai_policy(site_id)
+        if settings.resolved_ingestion_mode == IngestionMode.SHADOW_LIVE and not policy.get(
+            "show_recommendations_in_shadow", False
+        ):
+            return attach_ai_provenance(
+                {
+                    "site_id": site_id,
+                    "recommendations": [],
+                    "count": 0,
+                    "filters": {
+                        "status": None,
+                        "risk_level": None,
+                    },
+                    "suppressed": True,
+                    "mode": settings.resolved_ingestion_mode.value,
+                },
+                get_ml_provenance("recommendation-engine-v1"),
+            )
+
         service = get_recommendation_service()
 
         # Extract filters from request body

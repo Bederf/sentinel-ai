@@ -115,6 +115,7 @@ class AiUsageTracker:
         input_tokens: int,
         output_tokens: int,
         source: str = "chat",
+        site_id: str = "unknown",
         cache_read_tokens: int = 0,
         cache_creation_tokens: int = 0,
     ):
@@ -138,12 +139,14 @@ class AiUsageTracker:
                 self._today_key = today
                 self._today_cache = {}
 
-            # Build key: provider/model
-            key = f"{provider}/{model}"
+            # Build key: provider/model/site to preserve site-scoped accounting.
+            site_key = (site_id or "unknown").strip() or "unknown"
+            key = f"{provider}/{model}|{site_key}"
             if key not in self._today_cache:
                 self._today_cache[key] = {
                     "provider": provider,
                     "model": model,
+                    "site_id": site_key,
                     "calls": 0,
                     "input_tokens": 0,
                     "output_tokens": 0,
@@ -179,7 +182,7 @@ class AiUsageTracker:
 
                 governance_metrics.record_ai_usage(
                     route=source,
-                    site_id="unknown",  # ai_usage_tracker doesn't have site context
+                    site_id=site_key,
                     provider=provider,
                     tokens=input_tokens + output_tokens,
                     cost=cost,
@@ -196,6 +199,7 @@ class AiUsageTracker:
         provider: str,
         recipient_count: int = 1,
         source: str = "alert",
+        site_id: str = "unknown",
     ):
         """Record a messaging API call (WhatsApp, BulkSMS, Telegram).
 
@@ -209,10 +213,12 @@ class AiUsageTracker:
             input_tokens=0,
             output_tokens=0,
             source=source,
+            site_id=site_id,
         )
         # Override cost (record() would compute 0 from tokens)
         with self._write_lock:
-            key = f"{provider}/message"
+            site_key = (site_id or "unknown").strip() or "unknown"
+            key = f"{provider}/message|{site_key}"
             if key in self._today_cache:
                 self._today_cache[key]["cost_usd"] += unit_cost
         self._check_cost_alert()
@@ -223,6 +229,7 @@ class AiUsageTracker:
         units: int,
         unit_type: str = "chars",
         source: str = "tts",
+        site_id: str = "unknown",
     ):
         """Record a unit-based service call (ElevenLabs chars, EskomSePush calls).
 
@@ -236,10 +243,12 @@ class AiUsageTracker:
             input_tokens=0,
             output_tokens=0,
             source=source,
+            site_id=site_id,
         )
         # Override cost and store unit count
         with self._write_lock:
-            key = f"{provider}/{unit_type}"
+            site_key = (site_id or "unknown").strip() or "unknown"
+            key = f"{provider}/{unit_type}|{site_key}"
             if key in self._today_cache:
                 self._today_cache[key]["cost_usd"] += unit_cost
         self._check_cost_alert()
@@ -366,7 +375,7 @@ class AiUsageTracker:
         with self._write_lock:
             self._flush()
 
-    def get_summary(self, days: int = 30) -> dict:
+    def get_summary(self, days: int = 30, site_id: str | None = None) -> dict:
         """Get usage summary for the last N days."""
         with self._write_lock:
             self._flush()
@@ -384,6 +393,7 @@ class AiUsageTracker:
 
         totals_by_provider: dict = {}
         totals_by_model: dict = {}
+        totals_by_source: dict = {}
         daily_costs: list = []
         grand_total_usd = 0.0
         grand_total_tokens = 0
@@ -399,6 +409,11 @@ class AiUsageTracker:
             day_cost = 0.0
             day_tokens = 0
             for key, entry in models.items():
+                if str(key).startswith("_"):
+                    continue
+                entry_site = str(entry.get("site_id", "unknown")).strip() or "unknown"
+                if site_id and entry_site != site_id:
+                    continue
                 provider = entry.get("provider", "unknown")
                 model = entry.get("model", "unknown")
                 cost = entry.get("cost_usd", 0)
@@ -417,6 +432,17 @@ class AiUsageTracker:
                 totals_by_model[model]["calls"] += entry.get("calls", 0)
                 totals_by_model[model]["tokens"] += tokens
                 totals_by_model[model]["cost_usd"] += cost
+
+                # By source/route (apportion cost across sources by call share)
+                source_counts = entry.get("sources", {}) or {}
+                total_source_calls = sum(source_counts.values()) or entry.get("calls", 0) or 1
+                for source_name, source_call_count in source_counts.items():
+                    if source_name not in totals_by_source:
+                        totals_by_source[source_name] = {"calls": 0, "tokens": 0, "cost_usd": 0.0}
+                    share = float(source_call_count) / float(total_source_calls)
+                    totals_by_source[source_name]["calls"] += source_call_count
+                    totals_by_source[source_name]["tokens"] += int(tokens * share)
+                    totals_by_source[source_name]["cost_usd"] += cost * share
 
                 day_cost += cost
                 day_tokens += tokens
@@ -446,10 +472,14 @@ class AiUsageTracker:
                 k: {**v, "cost_usd": round(v["cost_usd"], 4), "cost_zar": round(v["cost_usd"] * rate, 2)}
                 for k, v in sorted(totals_by_model.items(), key=lambda x: -x[1]["cost_usd"])
             },
+            "by_source": {
+                k: {**v, "cost_usd": round(v["cost_usd"], 4), "cost_zar": round(v["cost_usd"] * rate, 2)}
+                for k, v in sorted(totals_by_source.items(), key=lambda x: -x[1]["cost_usd"])
+            },
             "daily": daily_costs,
         }
 
-    def get_today(self) -> dict:
+    def get_today(self, site_id: str | None = None) -> dict:
         """Get today's usage only."""
         with self._write_lock:
             today = date.today().isoformat()
@@ -459,9 +489,28 @@ class AiUsageTracker:
                 self._today_cache = {}
 
             rate = self._usd_zar
-            total_usd = sum(e.get("cost_usd", 0) for e in self._today_cache.values())
-            total_tokens = sum(e.get("input_tokens", 0) + e.get("output_tokens", 0) for e in self._today_cache.values())
-            total_calls = sum(e.get("calls", 0) for e in self._today_cache.values())
+
+            def _included(entry: dict) -> bool:
+                if site_id is None:
+                    return True
+                return str(entry.get("site_id", "unknown")).strip() == site_id
+
+            filtered_entries = [e for k, e in self._today_cache.items() if not str(k).startswith("_") and _included(e)]
+            total_usd = sum(e.get("cost_usd", 0) for e in filtered_entries)
+            total_tokens = sum(e.get("input_tokens", 0) + e.get("output_tokens", 0) for e in filtered_entries)
+            total_calls = sum(e.get("calls", 0) for e in filtered_entries)
+            totals_by_source: dict[str, dict] = {}
+            for entry in filtered_entries:
+                tokens = entry.get("input_tokens", 0) + entry.get("output_tokens", 0)
+                cost = entry.get("cost_usd", 0.0)
+                source_counts = entry.get("sources", {}) or {}
+                total_source_calls = sum(source_counts.values()) or entry.get("calls", 0) or 1
+                for source_name, source_call_count in source_counts.items():
+                    bucket = totals_by_source.setdefault(source_name, {"calls": 0, "tokens": 0, "cost_usd": 0.0})
+                    share = float(source_call_count) / float(total_source_calls)
+                    bucket["calls"] += source_call_count
+                    bucket["tokens"] += int(tokens * share)
+                    bucket["cost_usd"] += cost * share
 
             return {
                 "date": today,
@@ -478,6 +527,11 @@ class AiUsageTracker:
                         "cost_zar": round(v.get("cost_usd", 0) * rate, 2),
                     }
                     for k, v in self._today_cache.items()
+                    if not str(k).startswith("_") and _included(v)
+                },
+                "by_source": {
+                    k: {**v, "cost_usd": round(v["cost_usd"], 4), "cost_zar": round(v["cost_usd"] * rate, 2)}
+                    for k, v in sorted(totals_by_source.items(), key=lambda x: -x[1]["cost_usd"])
                 },
             }
 
@@ -488,8 +542,8 @@ class AiUsageTracker:
         Returns True if email sent successfully.
         """
         import smtplib
-        from email.mime.text import MIMEText
         from email.mime.multipart import MIMEMultipart
+        from email.mime.text import MIMEText
 
         from app.config.settings import settings
 

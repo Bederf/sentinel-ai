@@ -26,8 +26,8 @@ Timeout: 10s (falls back to rules-based if solver fails)
 
 import logging
 import time
-from datetime import datetime, timezone, timedelta
-from typing import Dict, List, Optional, Any
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from ortools.sat.python import cp_model
 
@@ -58,7 +58,7 @@ _PEAK_HOURS = _DEFAULT_PEAK_HOURS
 _OFF_PEAK_HOURS = _DEFAULT_OFF_PEAK_HOURS
 
 
-def _tariff_for_hour(hour: int, site_config=None, month: Optional[int] = None) -> tuple:
+def _tariff_for_hour(hour: int, site_config=None, month: int | None = None) -> tuple:
     """Return (rate_zar_per_kwh, band_name) for a SAST hour.
 
     When site_config (SiteConfig) is provided, uses verified invoice tariff
@@ -83,10 +83,10 @@ def _tariff_for_hour(hour: int, site_config=None, month: Optional[int] = None) -
 
 
 def _build_ls_schedule_from_eskom(
-    area_events: List,
+    area_events: list,
     sast_start: datetime,
     n: int = 96,
-) -> List[bool]:
+) -> list[bool]:
     """Convert EskomSePush AreaEvent list into a 96-slot boolean schedule.
 
     Each slot represents a 15-minute interval starting from sast_start.
@@ -141,7 +141,7 @@ class MIPDispatchOptimizer:
     SOLVER_TIMEOUT_S = 10
 
     def __init__(self):
-        self._last_schedule: Dict[str, OptimalDispatchSchedule] = {}
+        self._last_schedule: dict[str, OptimalDispatchSchedule] = {}
         self._site_config = None
         try:
             from app.services.solar_config_service import get_site_solar_config
@@ -154,9 +154,9 @@ class MIPDispatchOptimizer:
         self,
         site_id: str,
         initial_soc_kwh: float = 100.0,
-        load_forecast: Optional[List[float]] = None,
-        solar_forecast: Optional[List[float]] = None,
-        ls_schedule: Optional[List[bool]] = None,
+        load_forecast: list[float] | None = None,
+        solar_forecast: list[float] | None = None,
+        ls_schedule: list[bool] | None = None,
     ) -> OptimalDispatchSchedule:
         """Solve the optimal BESS dispatch schedule.
 
@@ -171,7 +171,7 @@ class MIPDispatchOptimizer:
             OptimalDispatchSchedule with 96 intervals
         """
         n = 96  # 15-min intervals in 24h
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         sast_now = now + timedelta(hours=2)
 
         # Default forecasts if not provided
@@ -247,11 +247,11 @@ class MIPDispatchOptimizer:
         self,
         n: int,
         initial_soc_kwh: float,
-        load: List[float],
-        solar: List[float],
-        tariff: List[float],
-        bands: List[str],
-        ls: List[bool],
+        load: list[float],
+        solar: list[float],
+        tariff: list[float],
+        bands: list[str],
+        ls: list[bool],
         sast_start: datetime,
     ) -> OptimalDispatchSchedule:
         """Solve using CP-SAT with integer-scaled variables."""
@@ -442,12 +442,12 @@ class MIPDispatchOptimizer:
         site_id: str,
         n: int,
         initial_soc_kwh: float,
-        load: List[float],
-        solar: List[float],
-        tariff: List[float],
-        bands: List[str],
+        load: list[float],
+        solar: list[float],
+        tariff: list[float],
+        bands: list[str],
         sast_start: datetime,
-        ls: Optional[List[bool]] = None,
+        ls: list[bool] | None = None,
     ) -> OptimalDispatchSchedule:
         """Simple rules-based fallback when solver fails.
 
@@ -537,9 +537,9 @@ class MIPDispatchOptimizer:
         self,
         site_id: str,
         initial_soc_kwh: float = 100.0,
-        load_forecast: Optional[List[float]] = None,
-        solar_forecast: Optional[List[float]] = None,
-        ls_schedule: Optional[List[bool]] = None,
+        load_forecast: list[float] | None = None,
+        solar_forecast: list[float] | None = None,
+        ls_schedule: list[bool] | None = None,
     ) -> OptimalDispatchSchedule:
         """Async wrapper that enriches ls_schedule from EskomSePush if available.
 
@@ -561,7 +561,7 @@ class MIPDispatchOptimizer:
 
                     if eskomsepush_service.is_configured:
                         status = await eskomsepush_service.get_combined_status()
-                        sast_start = datetime.now(timezone.utc) + timedelta(hours=2)
+                        sast_start = datetime.now(UTC) + timedelta(hours=2)
                         ls_schedule = _build_ls_schedule_from_eskom(
                             status.area_events,
                             sast_start,
@@ -571,7 +571,7 @@ class MIPDispatchOptimizer:
 
         return self.optimize(site_id, initial_soc_kwh, load_forecast, solar_forecast, ls_schedule)
 
-    def get_cached_schedule(self, site_id: str) -> Optional[OptimalDispatchSchedule]:
+    def get_cached_schedule(self, site_id: str) -> OptimalDispatchSchedule | None:
         """Return the most recent cached schedule, or None."""
         return self._last_schedule.get(site_id)
 
@@ -579,12 +579,12 @@ class MIPDispatchOptimizer:
         self,
         site_id: str,
         initial_soc_kwh: float = 100.0,
-        load_forecast: Optional[List[float]] = None,
-        solar_forecast: Optional[List[float]] = None,
-    ) -> Dict[str, Any]:
+        load_forecast: list[float] | None = None,
+        solar_forecast: list[float] | None = None,
+    ) -> dict[str, Any]:
         """Compare MIP schedule vs rules-based side-by-side."""
         n = 96
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         sast_now = now + timedelta(hours=2)
 
         if load_forecast is None:
@@ -641,7 +641,7 @@ class MIPDispatchOptimizer:
 
 # === Singleton ===
 
-_mip_dispatch_optimizer: Optional[MIPDispatchOptimizer] = None
+_mip_dispatch_optimizer: MIPDispatchOptimizer | None = None
 
 
 def get_mip_dispatch_optimizer() -> MIPDispatchOptimizer:

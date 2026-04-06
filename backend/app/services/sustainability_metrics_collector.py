@@ -20,7 +20,6 @@ import json
 import logging
 from datetime import date
 from pathlib import Path
-from typing import Dict, Optional
 
 from app.core.site_resolver import get_primary_site_code
 from app.models.sustainability import (
@@ -66,11 +65,11 @@ class SustainabilityMetricsCollector:
         self.site_id = site_id
         self._supabase = None
         self._emission_factors = EmissionFactors()
-        self._config: Optional[SustainabilityConfig] = None
+        self._config: SustainabilityConfig | None = None
 
     @property
     def supabase(self):
-        """Lazy Supabase client (None when unavailable / demo mode)."""
+        """Lazy Supabase client (None when unavailable / local mode)."""
         if self._supabase is None:
             try:
                 from app.database.supabase_client import get_supabase_client
@@ -99,8 +98,8 @@ class SustainabilityMetricsCollector:
     async def collect_daily_metrics(
         self,
         date: date,
-        energy_breakdown: Dict,
-        occupancy_data: Dict,
+        energy_breakdown: dict,
+        occupancy_data: dict,
     ) -> DailySustainabilityWrite:
         """Collect daily sustainability metrics from all available sources.
 
@@ -274,7 +273,7 @@ class SustainabilityMetricsCollector:
 
         return round(capacity_kwp * factor, 2)
 
-    def _persist_json(self, row: Dict) -> None:
+    def _persist_json(self, row: dict) -> None:
         """Append daily metrics to JSON fallback file."""
         DAILY_METRICS_DIR.mkdir(parents=True, exist_ok=True)
         json_path = DAILY_METRICS_DIR / f"{self.site_id}.json"

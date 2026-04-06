@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any
 
 import httpx
 
@@ -55,7 +55,7 @@ class TelegramMessageSender:
         self,
         chat_id: str,
         text: str,
-        keyboard: Optional[InlineKeyboard] = None,
+        keyboard: InlineKeyboard | None = None,
         parse_mode: str = "HTML",
     ) -> dict:
         """Send a text message, optionally with an inline keyboard."""
@@ -94,7 +94,7 @@ class TelegramMessageSender:
         self,
         chat_id: str,
         message_id: int,
-        keyboard: Optional[InlineKeyboard] = None,
+        keyboard: InlineKeyboard | None = None,
     ) -> None:
         """Remove or replace buttons after a selection is made."""
         payload: dict[str, Any] = {
@@ -118,7 +118,7 @@ class TelegramMessageSender:
 # Singleton accessor
 # ---------------------------------------------------------------------------
 
-_sender_instance: Optional[TelegramMessageSender] = None
+_sender_instance: TelegramMessageSender | None = None
 
 
 def get_telegram_sender() -> TelegramMessageSender:

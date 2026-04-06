@@ -6,13 +6,13 @@ Generates comprehensive baseline assessment reports in multiple formats (JSON, P
 Phase 44: Asset Baseline Assessment
 """
 
-from typing import Dict, Any, List
-from datetime import datetime
 import logging
+from datetime import datetime
+from typing import Any
 
+from app.models.baseline import BaselineComparison
 from app.services.baseline_service import get_baseline_service
 from app.services.site_loader import get_site_loader
-from app.models.baseline import BaselineComparison
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +26,7 @@ class BaselineReportService:
 
     async def generate_json_report(
         self, equipment_id: str, include_element_baselines: bool = True, include_comparison_history: bool = True
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Generate comprehensive baseline report in JSON format.
 
@@ -102,7 +102,7 @@ class BaselineReportService:
 
         return report
 
-    def _calculate_deviation_stats(self, comparison_history: List[BaselineComparison]) -> Dict[str, Any]:
+    def _calculate_deviation_stats(self, comparison_history: list[BaselineComparison]) -> dict[str, Any]:
         """Calculate deviation statistics from comparison history."""
         if not comparison_history:
             return {
@@ -147,7 +147,7 @@ class BaselineReportService:
             "trend": trend,
         }
 
-    def _generate_recommendations(self, deviation_stats: Dict[str, Any], equipment: Any) -> List[Dict[str, Any]]:
+    def _generate_recommendations(self, deviation_stats: dict[str, Any], equipment: Any) -> list[dict[str, Any]]:
         """Generate maintenance recommendations based on deviations."""
         recommendations = []
 
@@ -250,19 +250,19 @@ class BaselineReportService:
         from io import BytesIO
 
         buffer = BytesIO()
-        buffer.write("Baseline Assessment Report\n".encode())
+        buffer.write(b"Baseline Assessment Report\n")
         buffer.write(f"Equipment: {json_report['equipment_info']['name']}\n".encode())
         buffer.write(f"Generated: {json_report['report_metadata']['generated_at']}\n\n".encode())
 
         if json_report["baseline_status"]["has_active_baseline"]:
-            buffer.write("BASELINE STATUS: ACTIVE\n".encode())
+            buffer.write(b"BASELINE STATUS: ACTIVE\n")
             baseline = json_report["baseline_status"]["active_baseline"]
             buffer.write(f"Last Baseline: {baseline['baseline_date']}\n".encode())
             buffer.write(f"Captured By: {baseline['captured_by']}\n\n".encode())
         else:
-            buffer.write("BASELINE STATUS: NO ACTIVE BASELINE\n\n".encode())
+            buffer.write(b"BASELINE STATUS: NO ACTIVE BASELINE\n\n")
 
-        buffer.write("DEVIATION STATISTICS:\n".encode())
+        buffer.write(b"DEVIATION STATISTICS:\n")
         stats = json_report["deviation_statistics"]
         buffer.write(f"Total Comparisons: {stats['total_comparisons']}\n".encode())
         buffer.write(f"Normal: {stats['normal_count']}\n".encode())
@@ -271,7 +271,7 @@ class BaselineReportService:
         buffer.write(f"Max Deviation: {stats['max_deviation']}%\n\n".encode())
 
         if "recommendations" in json_report:
-            buffer.write("RECOMMENDATIONS:\n".encode())
+            buffer.write(b"RECOMMENDATIONS:\n")
             for rec in json_report["recommendations"]:
                 buffer.write(f"- {rec['title']} ({rec['priority']})\n".encode())
 

@@ -7,12 +7,12 @@ based on zone occupancy levels.
 """
 
 import logging
-from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime, timedelta
+from typing import Any, Optional
 
+from app.core.site_resolver import get_primary_site_code
 from app.database.repositories.security_repository import get_security_repository
 from app.models.security import OccupancySource, SecurityOccupancy
-from app.core.site_resolver import get_primary_site_code
 from app.services.profile_service import get_profile_service
 
 logger = logging.getLogger(__name__)
@@ -34,7 +34,7 @@ class SecurityOccupancyService:
         self._repo = get_security_repository()
         self._profile_service = get_profile_service()
 
-    def _get_profile_thresholds(self, site_id: str) -> Dict[str, Any]:
+    def _get_profile_thresholds(self, site_id: str) -> dict[str, Any]:
         """Get occupancy thresholds from site profile, or use defaults.
 
         Returns a dict with profile-specific thresholds for HVAC and lighting
@@ -59,7 +59,7 @@ class SecurityOccupancyService:
             "lighting_low": LIGHTING_LOW_LEVEL,
         }
 
-    def _calculate_zone_occupancy(self, zone_id: str) -> Dict[str, Any]:
+    def _calculate_zone_occupancy(self, zone_id: str) -> dict[str, Any]:
         """Calculate occupancy for a zone from badge events."""
         events = self._repo.get_badge_events(zone_id=zone_id, limit=500)
 
@@ -79,7 +79,7 @@ class SecurityOccupancyService:
             "occupancy_count": occupancy,
             "badge_entries": entries,
             "badge_exits": exits,
-            "last_updated": datetime.now(timezone.utc).isoformat(),
+            "last_updated": datetime.now(UTC).isoformat(),
             "source": "badge",
         }
 
@@ -96,7 +96,7 @@ class SecurityOccupancyService:
             source=OccupancySource(data["source"]),
         )
 
-    def get_building_occupancy(self) -> Dict[str, Any]:
+    def get_building_occupancy(self) -> dict[str, Any]:
         """Get total building occupancy from all zones."""
         zones = self._repo.get_zones()
         zone_occupancies = []
@@ -113,10 +113,10 @@ class SecurityOccupancyService:
             "site_name": "Sandton City Office Tower",
             "total_occupancy": total,
             "zones": zone_occupancies,
-            "last_updated": datetime.now(timezone.utc).isoformat(),
+            "last_updated": datetime.now(UTC).isoformat(),
         }
 
-    def get_occupancy_by_floor(self, floor: str) -> Dict[str, Any]:
+    def get_occupancy_by_floor(self, floor: str) -> dict[str, Any]:
         """Get floor-level occupancy aggregation."""
         zones = self._repo.get_zones()
         floor_zones = [z for z in zones if z.get("floor") == floor]
@@ -134,14 +134,14 @@ class SecurityOccupancyService:
             "total_occupancy": total,
             "zone_count": len(floor_zones),
             "zones": zone_occupancies,
-            "last_updated": datetime.now(timezone.utc).isoformat(),
+            "last_updated": datetime.now(UTC).isoformat(),
         }
 
-    def get_floor_occupancy(self, floor: str) -> Dict[str, Any]:
+    def get_floor_occupancy(self, floor: str) -> dict[str, Any]:
         """Alias for get_occupancy_by_floor — used by API endpoints."""
         return self.get_occupancy_by_floor(floor)
 
-    def process_access_event(self, event_data: Dict[str, Any]) -> Dict[str, Any]:
+    def process_access_event(self, event_data: dict[str, Any]) -> dict[str, Any]:
         """Handle a badge access event and update zone occupancy.
 
         Args:
@@ -182,10 +182,10 @@ class SecurityOccupancyService:
             "current_occupancy": occ_data["occupancy_count"],
             "hvac_recommendation": hvac_rec,
             "lighting_recommendation": lighting_rec,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
 
-    def get_occupancy_trend(self, zone_id: str, hours: int = 24) -> List[Dict[str, Any]]:
+    def get_occupancy_trend(self, zone_id: str, hours: int = 24) -> list[dict[str, Any]]:
         """Get hourly occupancy trend data for a zone.
 
         Queries badge events for the specified time range and returns
@@ -198,7 +198,7 @@ class SecurityOccupancyService:
         Returns:
             List of hourly occupancy readings for graphing.
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         start_time = now - timedelta(hours=hours)
 
         # Get badge events for time range
@@ -217,7 +217,7 @@ class SecurityOccupancyService:
                     continue
 
         # Build hourly buckets
-        hourly_data: List[Dict[str, Any]] = []
+        hourly_data: list[dict[str, Any]] = []
         for h in range(hours):
             bucket_start = start_time + timedelta(hours=h)
             bucket_end = bucket_start + timedelta(hours=1)
@@ -255,8 +255,8 @@ class SecurityOccupancyService:
     # --- Cross-module coordination ---
 
     def check_hvac_adjustment(
-        self, zone_id: str, thresholds: Optional[Dict[str, Any]] = None
-    ) -> Optional[Dict[str, Any]]:
+        self, zone_id: str, thresholds: dict[str, Any] | None = None
+    ) -> dict[str, Any] | None:
         """Check if HVAC setpoint should be relaxed based on occupancy.
 
         Uses profile-driven thresholds if provided, otherwise uses defaults.
@@ -306,8 +306,8 @@ class SecurityOccupancyService:
         return None
 
     def check_lighting_adjustment(
-        self, zone_id: str, thresholds: Optional[Dict[str, Any]] = None
-    ) -> Optional[Dict[str, Any]]:
+        self, zone_id: str, thresholds: dict[str, Any] | None = None
+    ) -> dict[str, Any] | None:
         """Check if lighting should be dimmed based on occupancy.
 
         Uses profile-driven thresholds if provided, otherwise uses defaults.
@@ -355,7 +355,7 @@ class SecurityOccupancyService:
             }
         return None
 
-    def get_all_recommendations(self, site_id: str) -> Dict[str, Any]:
+    def get_all_recommendations(self, site_id: str) -> dict[str, Any]:
         """Get cross-module recommendations for all zones.
 
         Uses profile-driven thresholds from the site's active profile.
@@ -389,10 +389,10 @@ class SecurityOccupancyService:
             "lighting": lighting_recommendations,
             "total_recommendations": len(hvac_recommendations) + len(lighting_recommendations),
             "dali_data_available": dali_data is not None,
-            "last_updated": datetime.now(timezone.utc).isoformat(),
+            "last_updated": datetime.now(UTC).isoformat(),
         }
 
-    def _get_dali_occupancy_data(self) -> Optional[Dict[str, Any]]:
+    def _get_dali_occupancy_data(self) -> dict[str, Any] | None:
         """Try to get DALI PIR sensor data for combined occupancy."""
         try:
             from app.services.lighting_service import get_lighting_service
@@ -410,7 +410,7 @@ class SecurityOccupancyService:
 
     # --- C•CURE 9000 Integration: Anomaly Detection (Phase 58.2) ---
 
-    def detect_after_hours_anomaly(self, site_id: str | None = None) -> List[Dict]:
+    def detect_after_hours_anomaly(self, site_id: str | None = None) -> list[dict]:
         """Detect after-hours badge access + HVAC/lighting activation correlation.
 
         Priority 1: After-hours anomaly detection
@@ -428,12 +428,16 @@ class SecurityOccupancyService:
             - energy_impact: Estimated kWh excess consumption
             - recommendation: Action for operator
         """
+        from app.config.settings import settings
         from app.services.ccure import CCureAdapter
 
         after_hours_events = []
 
-        # Create CCure adapter in demo mode
-        adapter = CCureAdapter(demo_mode=True)
+        if settings.sentinel_island_mode:
+            logger.info("Skipping after-hours security seeded correlation in SENTINEL_ISLAND_MODE")
+            return after_hours_events
+
+        adapter = CCureAdapter(seeded_mode=False)
 
         # Get badge events from C•CURE
         import asyncio
@@ -444,7 +448,11 @@ class SecurityOccupancyService:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
 
-        events = loop.run_until_complete(adapter.get_badge_events(limit=50))
+        if not loop.run_until_complete(adapter.connect()):
+            logger.warning("Skipping after-hours security correlation because live C•CURE is unavailable")
+            return after_hours_events
+
+        events = loop.run_until_complete(adapter.get_badge_events(limit=50)) or []
 
         for event in events:
             # Check if event is marked as after_hours or timestamp is after 18:00 / before 06:00
@@ -459,7 +467,7 @@ class SecurityOccupancyService:
                 if is_after_hours and event.get("granted", True):
                     zone_id = event.get("zone_id")
 
-                    # For demo: simulate HVAC/lighting activation
+                    # Seeded approximation until live HVAC/lighting correlation is wired in
                     hvac_activation = self._simulate_hvac_activation(zone_id, event_time)
                     lighting_activation = self._simulate_lighting_activation(zone_id, event_time)
 
@@ -474,14 +482,14 @@ class SecurityOccupancyService:
                             "recommendation": self._generate_after_hours_recommendation(
                                 event, hvac_activation, lighting_activation
                             ),
-                            "detected_at": datetime.now(timezone.utc).isoformat(),
+                            "detected_at": datetime.now(UTC).isoformat(),
                         }
                         after_hours_events.append(anomaly)
 
         return after_hours_events
 
-    def _simulate_hvac_activation(self, zone_id: str, event_time: datetime) -> Optional[Dict]:
-        """Simulate HVAC zone activation for demo mode."""
+    def _simulate_hvac_activation(self, zone_id: str, event_time: datetime) -> dict | None:
+        """Approximate HVAC zone activation from seeded heuristics."""
         # Convert CCURE zone to HVAC zone ID
         hvac_zone_id = zone_id.replace("CCURE-ZN", "HVAC-ZN")
 
@@ -494,8 +502,8 @@ class SecurityOccupancyService:
             "mode": "cooling",
         }
 
-    def _simulate_lighting_activation(self, zone_id: str, event_time: datetime) -> Optional[Dict]:
-        """Simulate lighting zone activation for demo mode."""
+    def _simulate_lighting_activation(self, zone_id: str, event_time: datetime) -> dict | None:
+        """Approximate lighting zone activation from seeded heuristics."""
         # Convert CCURE zone to DALI zone ID
         lighting_zone_id = zone_id.replace("CCURE-ZN", "DALI-ZN")
 
@@ -508,7 +516,7 @@ class SecurityOccupancyService:
             "occupancy_detected": True,
         }
 
-    def _estimate_energy_impact(self, hvac_activation: Optional[Dict], lighting_activation: Optional[Dict]) -> str:
+    def _estimate_energy_impact(self, hvac_activation: dict | None, lighting_activation: dict | None) -> str:
         """Estimate energy impact of after-hours activation."""
         total_kwh = 0
 
@@ -524,9 +532,9 @@ class SecurityOccupancyService:
 
     def _generate_after_hours_recommendation(
         self,
-        badge_event: Dict,
-        hvac_activation: Optional[Dict],
-        lighting_activation: Optional[Dict],
+        badge_event: dict,
+        hvac_activation: dict | None,
+        lighting_activation: dict | None,
     ) -> str:
         """Generate recommendation for after-hours anomaly."""
         person_name = badge_event.get("person_name", "Unknown")
@@ -543,7 +551,7 @@ class SecurityOccupancyService:
             f"Verify access was authorized."
         )
 
-    def detect_security_equipment_health_issues(self) -> List[Dict]:
+    def detect_security_equipment_health_issues(self) -> list[dict]:
         """Detect controller offline + network/UPS correlation.
 
         Priority 2: Security equipment health monitoring
@@ -556,12 +564,16 @@ class SecurityOccupancyService:
             - ups_status: UPS battery level
             - recommendation: Action for operator
         """
+        from app.config.settings import settings
         from app.services.ccure import CCureAdapter
 
         health_issues = []
 
-        # Create CCure adapter in demo mode
-        adapter = CCureAdapter(demo_mode=True)
+        if settings.sentinel_island_mode:
+            logger.info("Skipping security equipment seeded correlation in SENTINEL_ISLAND_MODE")
+            return health_issues
+
+        adapter = CCureAdapter(seeded_mode=False)
 
         # Get controllers from C•CURE
         import asyncio
@@ -572,7 +584,11 @@ class SecurityOccupancyService:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
 
-        controllers = loop.run_until_complete(adapter.get_controllers())
+        if not loop.run_until_complete(adapter.connect()):
+            logger.warning("Skipping security equipment health correlation because live C•CURE is unavailable")
+            return health_issues
+
+        controllers = loop.run_until_complete(adapter.get_controllers()) or []
 
         for controller in controllers:
             if controller.status == "offline":
@@ -591,15 +607,15 @@ class SecurityOccupancyService:
                     "recommendation": self._generate_equipment_health_recommendation(
                         controller.model_dump(), network_status, ups_status
                     ),
-                    "detected_at": datetime.now(timezone.utc).isoformat(),
+                    "detected_at": datetime.now(UTC).isoformat(),
                 }
                 health_issues.append(issue)
 
         return health_issues
 
-    def _simulate_network_health(self, ip_address: str) -> Dict:
+    def _simulate_network_health(self, ip_address: str) -> dict:
         """Simulate network switch health for controller IP."""
-        # For demo: Return mock status
+        # Placeholder until live network telemetry is wired in
         return {
             "switch": "SW-01",
             "port": "GigabitEthernet1/0/24",
@@ -608,9 +624,9 @@ class SecurityOccupancyService:
             "errors": 0,
         }
 
-    def _simulate_ups_health(self) -> Dict:
+    def _simulate_ups_health(self) -> dict:
         """Simulate UPS battery level and status."""
-        # For demo: Return mock status
+        # Placeholder until live network telemetry is wired in
         return {
             "ups_id": "UPS-COMMS-01",
             "battery_level": 95,
@@ -619,7 +635,7 @@ class SecurityOccupancyService:
         }
 
     def _generate_equipment_health_recommendation(
-        self, controller: Dict, network_status: Dict, ups_status: Dict
+        self, controller: dict, network_status: dict, ups_status: dict
     ) -> str:
         """Generate recommendation for equipment health issue."""
         controller_name = controller.get("name", "Unknown")

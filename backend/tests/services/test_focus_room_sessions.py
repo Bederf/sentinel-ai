@@ -11,6 +11,7 @@ from unittest.mock import patch
 
 import pytest
 
+from app.models.space_occupancy import OccupancyEvent
 from app.models.space_occupancy import FocusRoomSession
 from tests.services.fake_space_store import FakeSpaceSupabase
 
@@ -30,6 +31,22 @@ def _isolate_store():
 def _ts(hour: int, minute: int = 0) -> datetime:
     """Quick helper to create timestamps on a fixed date."""
     return datetime(2026, 3, 10, hour, minute, 0)
+
+
+def _save_event(room_code: str, sensor_id: str, occupied: bool, timestamp: datetime) -> None:
+    from app.services import occupancy_store
+
+    occupancy_store.save_event(
+        OccupancyEvent(
+            site_id="site-002",
+            room_code=room_code,
+            sensor_id=sensor_id,
+            occupied=occupied,
+            timestamp=timestamp,
+            received_at=timestamp,
+            source="test",
+        )
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -174,6 +191,7 @@ class TestFocusRoomSessionService:
             occupied=False,
             timestamp=_ts(9, 45),
             min_session_seconds=180,
+            vacancy_grace_seconds=0,
         )
         assert r2["action"] == "session_closed"
         assert r2["duration_seconds"] == 2700  # 45 min
@@ -198,6 +216,7 @@ class TestFocusRoomSessionService:
             occupied=False,
             timestamp=_ts(9) + timedelta(minutes=2),
             min_session_seconds=180,
+            vacancy_grace_seconds=0,
         )
         assert r2["action"] == "session_discarded"
         assert r2["duration_seconds"] == 120
@@ -220,9 +239,101 @@ class TestFocusRoomSessionService:
             timestamp=_ts(11, 30),  # 2.5 hours
             min_session_seconds=180,
             extended_use_seconds=7200,
+            vacancy_grace_seconds=0,
         )
         assert r2["action"] == "session_closed"
         assert r2["extended_use"] is True
+
+    def test_short_coffee_break_does_not_reset_session(self):
+        from app.services import occupancy_store
+        from app.services.focus_room_session_service import process_focus_room_event
+
+        process_focus_room_event(
+            site_id="site-002",
+            room_code="FR-01",
+            sensor_id="LD2410C-FR-01",
+            occupied=True,
+            timestamp=_ts(9),
+        )
+
+        gap_started = process_focus_room_event(
+            site_id="site-002",
+            room_code="FR-01",
+            sensor_id="LD2410C-FR-01",
+            occupied=False,
+            timestamp=_ts(10, 0),
+            vacancy_grace_seconds=60,
+        )
+        _save_event("FR-01", "LD2410C-FR-01", False, _ts(10, 0))
+        gap_started = process_focus_room_event(
+            site_id="site-002",
+            room_code="FR-01",
+            sensor_id="LD2410C-FR-01",
+            occupied=False,
+            timestamp=_ts(10, 0),
+            vacancy_grace_seconds=60,
+        )
+        assert gap_started["action"] == "vacancy_grace"
+
+        _save_event("FR-01", "LD2410C-FR-01", False, _ts(10, 0) + timedelta(seconds=30))
+        gap_continues = process_focus_room_event(
+            site_id="site-002",
+            room_code="FR-01",
+            sensor_id="LD2410C-FR-01",
+            occupied=False,
+            timestamp=_ts(10, 0) + timedelta(seconds=30),
+            vacancy_grace_seconds=60,
+        )
+        assert gap_continues["action"] == "vacancy_grace"
+
+        resumed = process_focus_room_event(
+            site_id="site-002",
+            room_code="FR-01",
+            sensor_id="LD2410C-FR-01",
+            occupied=True,
+            timestamp=_ts(10, 1),
+        )
+        assert resumed["action"] == "no_action"
+
+        active = occupancy_store.get_active_session("FR-01")
+        assert active is not None
+        assert active.start_time == _ts(9)
+
+    def test_long_vacancy_closes_session_at_first_empty_reading(self):
+        from app.services.focus_room_session_service import process_focus_room_event
+
+        process_focus_room_event(
+            site_id="site-002",
+            room_code="FR-01",
+            sensor_id="LD2410C-FR-01",
+            occupied=True,
+            timestamp=_ts(9),
+        )
+
+        first_empty = _ts(10, 0)
+        _save_event("FR-01", "LD2410C-FR-01", False, first_empty)
+        gap_started = process_focus_room_event(
+            site_id="site-002",
+            room_code="FR-01",
+            sensor_id="LD2410C-FR-01",
+            occupied=False,
+            timestamp=first_empty,
+            vacancy_grace_seconds=60,
+        )
+        assert gap_started["action"] == "vacancy_grace"
+
+        _save_event("FR-01", "LD2410C-FR-01", False, first_empty + timedelta(seconds=70))
+        closed = process_focus_room_event(
+            site_id="site-002",
+            room_code="FR-01",
+            sensor_id="LD2410C-FR-01",
+            occupied=False,
+            timestamp=first_empty + timedelta(seconds=70),
+            vacancy_grace_seconds=60,
+        )
+        assert closed["action"] == "session_closed"
+        assert closed["end_time"] == first_empty.isoformat()
+        assert closed["duration_seconds"] == 3600
 
     def test_duplicate_occupied_no_action(self):
         from app.services.focus_room_session_service import process_focus_room_event
@@ -276,6 +387,7 @@ class TestFocusRoomSessionService:
             occupied=False,
             timestamp=_ts(9, 45),
             min_session_seconds=180,
+            vacancy_grace_seconds=0,
         )
 
         # Session 2: 10:30 - 12:00
@@ -293,6 +405,7 @@ class TestFocusRoomSessionService:
             occupied=False,
             timestamp=_ts(12),
             min_session_seconds=180,
+            vacancy_grace_seconds=0,
         )
 
         sessions = occupancy_store.get_sessions_for_room("FR-01")
@@ -481,6 +594,7 @@ class TestFocusRoomAPI:
             occupied=False,
             timestamp=_ts(10),
             min_session_seconds=180,
+            vacancy_grace_seconds=0,
         )
 
         # Session 2: 11:00 - 12:00
@@ -498,6 +612,7 @@ class TestFocusRoomAPI:
             occupied=False,
             timestamp=_ts(12),
             min_session_seconds=180,
+            vacancy_grace_seconds=0,
         )
 
         sessions = occupancy_store.get_sessions_for_room("FR-05")

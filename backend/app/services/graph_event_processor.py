@@ -94,7 +94,7 @@ async def process_graph_event(change_type: str, event_id: str) -> None:
             meeting_end=meeting_end,
         )
     elif change_type == "updated":
-        _handle_event_updated(
+        await _handle_event_updated(
             repo=repo,
             event_id=event_id,
             host_email=host_email,
@@ -265,7 +265,7 @@ def _handle_event_created(
         meeting_subject=subject,
         meeting_start=meeting_start,
         meeting_end=meeting_end,
-        status=VisitStatus.CREATED,
+        status=VisitStatus.PENDING,  # Accept-first: QR held until visitor accepts invite
         qr_code=qr_code,
         created_at=now,
         updated_at=now,
@@ -279,19 +279,13 @@ def _handle_event_created(
         logger.error("[GraphEvent] Could not create visit for event %s: %s", event_id, exc)
         return
 
-    logger.info("[GraphEvent] Created Visit %s for event %s (visitor %s)", visit.id, event_id, visitor_email)
-
-    # Send confirmation email
-    try:
-        from app.services.visitor_email_service import VisitorEmailService
-
-        email_svc = VisitorEmailService()
-        email_svc.send_visitor_confirmation(visit)
-    except Exception as exc:
-        logger.error("[GraphEvent] Failed to send visitor email for %s: %s", visit.id, exc)
+    logger.info("[GraphEvent] Created PENDING Visit %s for event %s (visitor %s) — QR held until RSVP accepted", visit.id, event_id, visitor_email)
+    # NOTE: QR email is NOT sent here. Visitor must accept the invite first.
+    # When visitor accepts via their calendar client, Graph sends an "updated" notification
+    # with the attendee PARTSTAT=ACCEPTED, which triggers RSVP processing.
 
 
-def _handle_event_updated(
+async def _handle_event_updated(
     repo: VisitRepository,
     event_id: str,
     host_email: str,
@@ -300,12 +294,31 @@ def _handle_event_updated(
     meeting_start: datetime,
     meeting_end: datetime,
 ) -> None:
-    """Update an existing visit when its calendar event is modified."""
+    """Update an existing visit when its calendar event is modified.
+
+    Also detects visitor RSVP acceptance: when the visitor's partStat changes to "accepted",
+    the visit transitions from PENDING -> CREATED and the QR confirmation email is sent.
+    """
     existing = repo.get_visit_by_external_event_id(event_id)
     if existing is None:
         logger.debug("[GraphEvent] No existing visit for event %s — treating as created", event_id)
         return
 
+    # Check if visitor has accepted — re-fetch event to get latest attendee status
+    attendee_accepted = await _check_rsvp_accepted(event_id, existing.visitor_email)
+    if attendee_accepted and existing.status == VisitStatus.PENDING.value:
+        # Visitor accepted — transition to CREATED and send QR email
+        updated = repo.update_visit(existing.id, {"status": VisitStatus.CREATED})
+        logger.info("[GraphEvent] Visit %s ACCEPTED by visitor — QR email will be sent", existing.id)
+        try:
+            from app.services.visitor_email_service import VisitorEmailService
+            email_svc = VisitorEmailService()
+            email_svc.send_visitor_confirmation(updated or existing)
+        except Exception as exc:
+            logger.error("[GraphEvent] Failed to send QR email for %s: %s", existing.id, exc)
+        return
+
+    # Normal event update — just sync the fields
     updates: dict = {
         "host_email": host_email,
         "meeting_subject": subject,
@@ -319,6 +332,39 @@ def _handle_event_updated(
         logger.info("[GraphEvent] Updated Visit %s for event %s", updated.id, event_id)
     else:
         logger.warning("[GraphEvent] Failed to update Visit for event %s", event_id)
+
+
+async def _check_rsvp_accepted(event_id: str, visitor_email: str) -> bool:
+    """Re-fetch event from Graph and check if visitor's partStat is 'accepted'."""
+    token = _acquire_token()  # Uses cached token, safe to call from async
+    if not token:
+        return False
+
+    import httpx
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.get(
+                f"https://graph.microsoft.com/v1.0/me/events/{event_id}",
+                headers={"Authorization": f"Bearer {token}"},
+                params={"$select": "attendees"},
+            )
+            if response.status_code == 404:
+                return False
+            response.raise_for_status()
+            event = response.json()
+    except Exception:
+        return False
+
+    attendees = event.get("attendees", [])
+    for a in attendees:
+        email = a.get("emailAddress", {}).get("address", "").lower()
+        if email == visitor_email.lower():
+            if _is_external_email(email):
+                # External attendee — check responseStatus
+                response_status = a.get("responseStatus", {})
+                if response_status.get("response") == "accepted":
+                    return True
+    return False
 
 
 def _handle_event_deleted(repo: VisitRepository, event_id: str) -> None:

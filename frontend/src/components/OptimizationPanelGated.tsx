@@ -20,7 +20,7 @@ interface OptimizationPanelGatedProps {
 }
 
 export function OptimizationPanelGated({
-  siteId = 'site-001',
+  siteId = '',
   scenarioId,
   compact = false,
   gated = true,
@@ -32,7 +32,7 @@ export function OptimizationPanelGated({
 
   return (
     <LockedFeatureOverlay
-      module="control"
+      module="energy_control"
       featureName="Load Shedding Optimization"
       customMessage="Enable Controls module to let SENTINEL automatically pre-cool your building and reduce load during peak demand — save R8K-12K per load shedding event."
     >

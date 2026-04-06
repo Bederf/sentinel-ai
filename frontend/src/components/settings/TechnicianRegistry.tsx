@@ -129,6 +129,7 @@ export function TechnicianRegistry({
           email: editEmail.trim() || undefined,
           phone: editPhone.trim() || undefined,
           specialties: editSpecs.length ? editSpecs : undefined,
+          site_id: siteId,
         }),
       });
       if (!res.ok) throw new Error("Failed to update");

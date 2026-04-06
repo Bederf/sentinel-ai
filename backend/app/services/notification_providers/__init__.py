@@ -6,13 +6,13 @@ which orchestrates routing based on technician preferences.
 """
 
 from .base_provider import BaseNotificationProvider
+from .bulksms_provider import BulkSMSProvider
 from .telegram_provider import TelegramProvider
 from .whatsapp_provider import WhatsAppProvider
-from .bulksms_provider import BulkSMSProvider
 
 __all__ = [
     "BaseNotificationProvider",
+    "BulkSMSProvider",
     "TelegramProvider",
     "WhatsAppProvider",
-    "BulkSMSProvider",
 ]

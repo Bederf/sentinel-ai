@@ -11,7 +11,8 @@ suitable for safety-critical BMS control actions.
 import json
 import logging
 import re
-from typing import Any, AsyncGenerator
+from collections.abc import AsyncGenerator
+from typing import Any
 
 import httpx
 
@@ -158,6 +159,7 @@ class OpenAIService:
         include_site_context: bool = True,
         tier: int = 1,
         model_override: str | None = None,
+        source: str = "chat",
     ) -> AsyncGenerator[str, None]:
         """Return a chat completion from OpenAI as a single yielded chunk.
 
@@ -207,10 +209,10 @@ class OpenAIService:
                 u = body.get("usage", {})
                 usage_tracker.record(
                     provider="openai",
-                    model=self._model,
+                    model=model,
                     input_tokens=u.get("prompt_tokens", 0),
                     output_tokens=u.get("completion_tokens", 0),
-                    source="chat",
+                    source=source,
                 )
             except Exception:
                 pass
@@ -240,6 +242,7 @@ class OpenAIService:
         system_prompt: str | None = None,
         include_site_context: bool = True,
         tier: int = 2,
+        source: str = "tools",
     ) -> AsyncGenerator[str, None]:
         """Chat completion with iterative tool calling.
 
@@ -300,7 +303,7 @@ class OpenAIService:
                     model=model,
                     input_tokens=u.get("prompt_tokens", 0),
                     output_tokens=u.get("completion_tokens", 0),
-                    source="tools",
+                    source=source,
                 )
             except Exception:
                 pass

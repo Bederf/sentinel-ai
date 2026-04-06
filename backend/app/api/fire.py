@@ -200,7 +200,7 @@ async def simulate_alarm(
     zone_id: str = Query(..., description="Zone ID to simulate alarm in"),
     alarm_type: str = Query("smoke", description="Alarm type: smoke, heat, manual, flow, fault"),
 ):
-    """Simulate a fire alarm event for demo purposes.
+    """Simulate a fire alarm event for local testing.
 
     Creates a simulated alarm and returns the cause-effect
     actions that would be triggered.
@@ -298,7 +298,7 @@ async def force_reset(request: ForceResetRequest):
     - Restart HVAC (AHUs first, then FCU/VAV)
     - Wind down pressurization fans
     """
-    # Validate authorization (demo: accept 'ENGINEER' or any non-empty string)
+    # Validate authorization (currently accepts any non-empty engineer token)
     if not request.authorization or len(request.authorization) < 3:
         raise HTTPException(
             status_code=403,

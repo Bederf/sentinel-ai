@@ -410,7 +410,7 @@ export function PrecoolingSchedule({
   );
 }
 
-// Default props for demo
+// Default props for local fallback mode
 PrecoolingSchedule.defaultProps = {
   schedule: [
     {

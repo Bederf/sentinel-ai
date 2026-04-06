@@ -10,25 +10,25 @@ Handles:
 
 import json
 import logging
+import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import List, Dict, Any, Optional
-import uuid
+from typing import Any
 
 from app.config.settings import settings
 from app.models.module_registry import (
-    ModuleType,
-    ModuleStatus,
+    INTEGRATION_DEFINITIONS,
+    MODULE_DEFINITIONS,
+    AIRecommendation,
+    CrossModuleLink,
     ModuleDefinition,
     ModuleInstance,
-    CrossModuleLink,
-    AIRecommendation,
     ModuleIntegrationEvent,
-    SiteModuleConfig,
-    RecommendationType,
+    ModuleStatus,
+    ModuleType,
     RecommendationPriority,
-    MODULE_DEFINITIONS,
-    INTEGRATION_DEFINITIONS,
+    RecommendationType,
+    SiteModuleConfig,
 )
 from app.services.health_threshold_service import get_health_thresholds
 
@@ -67,9 +67,9 @@ class ModuleRegistryService:
         """Initialize module registry."""
         self.data_dir = Path(__file__).parent.parent / "data" / "modules"
         self.data_dir.mkdir(parents=True, exist_ok=True)
-        self._site_configs: Dict[str, SiteModuleConfig] = {}
-        self._recommendations: Dict[str, List[AIRecommendation]] = {}  # By site
-        self._demo_presets: Dict[str, Dict[str, Any]] = {}
+        self._site_configs: dict[str, SiteModuleConfig] = {}
+        self._recommendations: dict[str, list[AIRecommendation]] = {}  # By site
+        self._site_presets: dict[str, dict[str, Any]] = {}
         self._supabase_client = None
         self._use_json = settings.use_json_storage
         self._load_configs()
@@ -253,21 +253,21 @@ class ModuleRegistryService:
             logger.error(f"Error saving module configs to JSON: {e}")
 
     def _load_presets(self) -> None:
-        """Load demo presets from disk."""
-        presets_file = self.data_dir / "demo_presets.json"
+        """Load site presets from disk."""
+        presets_file = self.data_dir / "site_presets.json"
         if presets_file.exists():
             try:
                 with open(presets_file) as f:
-                    self._demo_presets = json.load(f)
-                logger.info(f"Loaded {len(self._demo_presets)} demo presets")
+                    self._site_presets = json.load(f)
+                logger.info(f"Loaded {len(self._site_presets)} site presets")
             except Exception as e:
-                logger.error(f"Error loading demo presets: {e}")
+                logger.error(f"Error loading site presets: {e}")
 
-    def get_available_presets(self) -> Dict[str, Dict[str, Any]]:
-        """Get all available demo presets."""
-        return self._demo_presets
+    def get_available_presets(self) -> dict[str, dict[str, Any]]:
+        """Get all available site presets."""
+        return self._site_presets
 
-    def _parse_site_config(self, data: Dict) -> SiteModuleConfig:
+    def _parse_site_config(self, data: dict) -> SiteModuleConfig:
         """Parse site config from JSON."""
         return SiteModuleConfig(
             site_id=data["site_id"],
@@ -301,7 +301,7 @@ class ModuleRegistryService:
             auto_integration=data.get("auto_integration", True),
         )
 
-    def _serialize_site_config(self, config: SiteModuleConfig) -> Dict:
+    def _serialize_site_config(self, config: SiteModuleConfig) -> dict:
         """Serialize site config to JSON."""
         return {
             "site_id": config.site_id,
@@ -337,19 +337,19 @@ class ModuleRegistryService:
 
     # ==================== Module Management ====================
 
-    def get_available_modules(self) -> List[ModuleDefinition]:
+    def get_available_modules(self) -> list[ModuleDefinition]:
         """Get all available module definitions."""
         return list(MODULE_DEFINITIONS.values())
 
-    def get_module_definition(self, module_type: ModuleType) -> Optional[ModuleDefinition]:
+    def get_module_definition(self, module_type: ModuleType) -> ModuleDefinition | None:
         """Get definition for a specific module type."""
         return MODULE_DEFINITIONS.get(module_type)
 
-    def get_site_config(self, site_id: str) -> Optional[SiteModuleConfig]:
+    def get_site_config(self, site_id: str) -> SiteModuleConfig | None:
         """Get module configuration for a site."""
         return self._site_configs.get(site_id)
 
-    def get_active_modules(self, site_id: str) -> List[ModuleInstance]:
+    def get_active_modules(self, site_id: str) -> list[ModuleInstance]:
         """Get all active modules for a site."""
         config = self._site_configs.get(site_id)
         if not config:
@@ -362,7 +362,7 @@ class ModuleRegistryService:
         return any(m.module_type == module_type for m in modules)
 
     def activate_module(
-        self, site_id: str, site_name: str, module_type: ModuleType, config: Optional[Dict[str, Any]] = None
+        self, site_id: str, site_name: str, module_type: ModuleType, config: dict[str, Any] | None = None
     ) -> ModuleInstance:
         """
         Activate a module for a site.
@@ -439,21 +439,21 @@ class ModuleRegistryService:
         self._save_configs()
         return True
 
-    def apply_preset(self, site_id: str, preset_name: str) -> Dict[str, Any]:
+    def apply_preset(self, site_id: str, preset_name: str) -> dict[str, Any]:
         """
-        Apply a demo preset to a site.
+        Apply a site preset to a site.
 
-        Presets define a specific module configuration for demo scenarios:
+        Presets define a specific module configuration for common site profiles:
         - 'grant': Base + Controls + Lighting/Occupancy
         - 'bederf': Base + Controls + Solar/BESS
         - 'full': Base + All modules
 
         Returns activation status for each module and any errors.
         """
-        if preset_name not in self._demo_presets:
-            raise ValueError(f"Unknown preset: {preset_name}. Available: {list(self._demo_presets.keys())}")
+        if preset_name not in self._site_presets:
+            raise ValueError(f"Unknown preset: {preset_name}. Available: {list(self._site_presets.keys())}")
 
-        preset = self._demo_presets[preset_name]
+        preset = self._site_presets[preset_name]
         config = self._site_configs.get(site_id)
 
         if not config:
@@ -482,9 +482,9 @@ class ModuleRegistryService:
             except ValueError as e:
                 # Module might be non-deactivatable (base module), skip silently
                 if "part of the base pack" not in str(e):
-                    result["errors"].append(f"Failed to deactivate {module_name}: {str(e)}")
+                    result["errors"].append(f"Failed to deactivate {module_name}: {e!s}")
             except Exception as e:
-                result["errors"].append(f"Failed to deactivate {module_name}: {str(e)}")
+                result["errors"].append(f"Failed to deactivate {module_name}: {e!s}")
 
         # Activate modules
         to_activate = preset.get("activate", [])
@@ -496,9 +496,9 @@ class ModuleRegistryService:
                 result["activated"].append(module_name)
                 logger.info(f"Preset '{preset_name}': Activated {module_name}")
             except ValueError as e:
-                result["errors"].append(f"Failed to activate {module_name}: {str(e)}")
+                result["errors"].append(f"Failed to activate {module_name}: {e!s}")
             except Exception as e:
-                result["errors"].append(f"Failed to activate {module_name}: {str(e)}")
+                result["errors"].append(f"Failed to activate {module_name}: {e!s}")
 
         logger.info(
             f"Applied preset '{preset_name}' to site {site_id}:"
@@ -560,11 +560,11 @@ class ModuleRegistryService:
     def get_recommendations(
         self,
         site_id: str,
-        module_filter: Optional[List[ModuleType]] = None,
-        priority_filter: Optional[List[RecommendationPriority]] = None,
+        module_filter: list[ModuleType] | None = None,
+        priority_filter: list[RecommendationPriority] | None = None,
         include_resolved: bool = False,
         limit: int = 50,
-    ) -> List[AIRecommendation]:
+    ) -> list[AIRecommendation]:
         """Get AI recommendations for a site with optional filters."""
         recs = self._recommendations.get(site_id, [])
 
@@ -700,7 +700,7 @@ class ModuleRegistryService:
 
     # ==================== Telemetry Integration ====================
 
-    def get_unified_telemetry(self, site_id: str) -> Dict[str, Any]:
+    def get_unified_telemetry(self, site_id: str) -> dict[str, Any]:
         """
         Get unified telemetry from all active modules.
 
@@ -742,7 +742,7 @@ class ModuleRegistryService:
         return telemetry
 
     def update_module_health(
-        self, site_id: str, module_type: ModuleType, health_score: float, telemetry_timestamp: Optional[str] = None
+        self, site_id: str, module_type: ModuleType, health_score: float, telemetry_timestamp: str | None = None
     ) -> None:
         """Update health score and telemetry timestamp for a module."""
         config = self._site_configs.get(site_id)
@@ -779,7 +779,7 @@ class ModuleRegistryService:
 
     # ==================== Integration Summary ====================
 
-    def get_integration_summary(self, site_id: str) -> Dict[str, Any]:
+    def get_integration_summary(self, site_id: str) -> dict[str, Any]:
         """Get summary of module integration status."""
         config = self._site_configs.get(site_id)
         if not config:

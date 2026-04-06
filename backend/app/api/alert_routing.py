@@ -12,7 +12,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from app.middleware.auth_middleware import require_role
@@ -103,10 +103,13 @@ def _default_rules() -> list:
 
 @router.get("/rules")
 async def list_routing_rules(
+    site_id: str | None = Query(None, description="Optional site scope"),
     auth: AuthContext = Depends(require_role(SentinelRole.ADMIN, SentinelRole.OPERATOR)),
 ) -> dict:
     """List all alert routing rules."""
     rules = _load_rules()
+    if site_id:
+        rules = [r for r in rules if not r.get("site_ids") or site_id in (r.get("site_ids") or [])]
     return {"rules": rules, "count": len(rules)}
 
 

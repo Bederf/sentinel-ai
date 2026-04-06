@@ -1,3 +1,18 @@
+---
+title: "DALI Intelligence Dashboard - Implementation Checklist"
+type: "spec"
+status: "draft"
+version: "1.0.0"
+created: "2026-03-31"
+updated: "2026-03-31"
+tags: ["sentinel", "documentation"]
+related: []
+domain: "lighting"
+audience: "all"
+complexity: "intermediate"
+estimated_read_time: 10
+---
+
 # DALI Intelligence Dashboard - Implementation Checklist
 
 ## Status: 90% Complete ✅

@@ -8,6 +8,9 @@ from pydantic import BaseModel
 IssueSeverity = Literal["critical", "high", "medium", "low"]
 IssueSource = Literal["bms", "intake", "tech"]
 IssueStatus = Literal["new", "triaged", "in_progress", "resolved"]
+IssueCategory = Literal["thermal", "fault", "energy", "occupant", "stability", "security", "water", "general"]
+IssueSubsystem = Literal["hvac", "power", "lighting", "security", "water", "occupancy", "general"]
+ConstraintType = Literal["comfort", "asset", "energy", "occupant", "stability", "general"]
 CockpitActionType = Literal["acknowledge", "assign", "create_work_order", "escalate"]
 AuditActorType = Literal["user", "system"]
 AuditOutcome = Literal["success", "rejected", "failed"]
@@ -46,9 +49,17 @@ class CockpitIssue(BaseModel):
     recommended_action: str | None = None
     confidence: float | None = None
     confidence_label: str | None = None
+    issue_category: IssueCategory | None = None
+    subsystem: IssueSubsystem | None = None
+    constraint_type: ConstraintType | None = None
     location: CockpitIssueLocation
     evidence_refs: list[CockpitIssueEvidenceRef] = []
     source_record_id: str | None = None
+
+    def dict(self, *args, **kwargs):
+        """Backward-compatible Pydantic v1-style export without deprecation warnings."""
+
+        return self.model_dump(*args, **kwargs)
 
 
 class CockpitSourceStatus(BaseModel):

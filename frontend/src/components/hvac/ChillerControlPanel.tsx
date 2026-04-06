@@ -10,7 +10,7 @@
  */
 
 import { useState, useEffect, useRef } from "react";
-import { Text, Badge, Flex, Grid } from "@tremor/react";
+import { Text, Flex, Grid } from "@tremor/react";
 import { Thermometer, Power, PowerOff, Activity, AlertTriangle, Clock, Droplets } from "lucide-react";
 import { hvacApi, type Chiller } from "../../lib/hvacApi";
 import { useHealthThresholds } from "../../hooks/useHealthThresholds";
@@ -114,6 +114,35 @@ export function ChillerControlPanel({ siteId, compact = false, onChillerChange }
     return "var(--color-sentinel-red)";
   }
 
+  function chipStyle(kind: "green" | "amber" | "red" | "gray") {
+    switch (kind) {
+      case "green":
+        return {
+          background: "rgba(34, 197, 94, 0.14)",
+          color: "var(--color-sentinel-green)",
+          border: "1px solid rgba(34, 197, 94, 0.30)",
+        };
+      case "amber":
+        return {
+          background: "rgba(245, 158, 11, 0.14)",
+          color: "var(--color-sentinel-amber)",
+          border: "1px solid rgba(245, 158, 11, 0.30)",
+        };
+      case "red":
+        return {
+          background: "rgba(239, 68, 68, 0.14)",
+          color: "var(--color-sentinel-red)",
+          border: "1px solid rgba(239, 68, 68, 0.30)",
+        };
+      default:
+        return {
+          background: "rgba(148, 163, 184, 0.14)",
+          color: "var(--color-sentinel-text-secondary)",
+          border: "1px solid rgba(148, 163, 184, 0.28)",
+        };
+    }
+  }
+
   if (loading) {
     return (
       <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
@@ -155,9 +184,12 @@ export function ChillerControlPanel({ siteId, compact = false, onChillerChange }
             <h3 className="font-medium text-lg" style={{ color: "var(--color-sentinel-text-primary)" }}>Chiller Control</h3>
             <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>{chillers.length} chillers configured</p>
           </div>
-          <Badge color={runningCount > 0 ? "green" : "gray"} size="lg">
+          <span
+            className="text-sm px-2.5 py-0.5 rounded font-medium"
+            style={chipStyle(runningCount > 0 ? "green" : "gray")}
+          >
             {runningCount}/{chillers.length} Running
-          </Badge>
+          </span>
         </Flex>
       )}
 
@@ -197,9 +229,12 @@ export function ChillerControlPanel({ siteId, compact = false, onChillerChange }
                   </Flex>
                   <Text className="text-xs" style={{ color: "var(--color-sentinel-text-disabled)" }}>{chiller.location}</Text>
                 </div>
-                <Badge color={getHealthColor(chiller.calculated_health || chiller.health_score)}>
+                <span
+                  className="text-sm px-2.5 py-0.5 rounded font-medium"
+                  style={chipStyle(getHealthColor(chiller.calculated_health || chiller.health_score))}
+                >
                   Health: {(chiller.calculated_health || chiller.health_score).toFixed(0)}%
-                </Badge>
+                </span>
               </Flex>
 
               {/* Status and Control - Gated by Controls Module */}

@@ -44,10 +44,7 @@ class TestDocumentNameToSourceLookup:
         assert _DOCUMENT_NAME_TO_SOURCE.get("Fire Pump System Inspection") == DocumentSource.INSPECTION
 
     def test_certificate_of_compliance_maps_to_certificate(self):
-        assert (
-            _DOCUMENT_NAME_TO_SOURCE.get("Certificate of Compliance (COC)")
-            == DocumentSource.CERTIFICATE
-        )
+        assert _DOCUMENT_NAME_TO_SOURCE.get("Certificate of Compliance (COC)") == DocumentSource.CERTIFICATE
 
     def test_earth_leakage_test_maps_to_test_report(self):
         assert _DOCUMENT_NAME_TO_SOURCE.get("Earth Leakage Test") == DocumentSource.TEST_REPORT
@@ -446,9 +443,7 @@ class TestGetDocumentFile:
         with patch("app.services.document_source_adapter._get_supabase") as mock_get:
             mock_db = MagicMock()
             mock_get.return_value = mock_db
-            mock_db.table.return_value.select.return_value.eq.return_value.execute.return_value = MagicMock(
-                data=[]
-            )
+            mock_db.table.return_value.select.return_value.eq.return_value.execute.return_value = MagicMock(data=[])
             adapter = ManualUploadAdapter()
             with pytest.raises(FileNotFoundError):
                 adapter.get_document_file("nonexistent-doc")
@@ -462,9 +457,7 @@ class TestUpsertIdempotency:
         with patch("app.services.document_source_adapter._get_supabase") as mock_get:
             mock_db = MagicMock()
             mock_get.return_value = mock_db
-            mock_db.table.return_value.upsert.return_value.execute.return_value = MagicMock(
-                data=[{"id": "doc-123"}]
-            )
+            mock_db.table.return_value.upsert.return_value.execute.return_value = MagicMock(data=[{"id": "doc-123"}])
             adapter = ManualUploadAdapter()
             with patch.object(adapter, "_columns_exist", return_value=True):
                 record = DocumentRecord(
@@ -484,9 +477,7 @@ class TestUpsertIdempotency:
         with patch("app.services.document_source_adapter._get_supabase") as mock_get:
             mock_db = MagicMock()
             mock_get.return_value = mock_db
-            mock_db.table.return_value.upsert.return_value.execute.return_value = MagicMock(
-                data=[{"id": "doc-123"}]
-            )
+            mock_db.table.return_value.upsert.return_value.execute.return_value = MagicMock(data=[{"id": "doc-123"}])
             adapter = ManualUploadAdapter()
             record = DocumentRecord(
                 source_system=SourceSystem.MANUAL_UPLOAD,

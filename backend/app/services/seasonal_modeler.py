@@ -10,11 +10,10 @@ Provides realistic seasonal variations for:
 - HVAC load demand by season
 """
 
-from datetime import date
-from typing import Dict, Optional
-from enum import Enum
-from dataclasses import dataclass
 import random
+from dataclasses import dataclass
+from datetime import date
+from enum import Enum
 
 
 class Season(str, Enum):
@@ -310,7 +309,7 @@ SA_SEASONAL_DATA = {
 class SeasonalModeler:
     """Applies South African seasonal modeling to simulations."""
 
-    def __init__(self, seed: Optional[int] = None):
+    def __init__(self, seed: int | None = None):
         """Initialize with optional seed for reproducibility."""
         self.rng = random.Random(seed)
 
@@ -480,7 +479,7 @@ class SeasonalModeler:
         config = self.get_config_for_date(simulated_date)
         return config.season.value.capitalize()
 
-    def get_month_summary(self, month: int) -> Dict[str, any]:
+    def get_month_summary(self, month: int) -> dict[str, any]:
         """Get summary statistics for a month."""
         config = SA_SEASONAL_DATA[month]
         return {

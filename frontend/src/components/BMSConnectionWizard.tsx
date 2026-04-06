@@ -9,7 +9,6 @@ import {
   Search,
   ClipboardCheck,
   ShieldCheck,
-  Building2,
   MapPin,
   HelpCircle,
 } from "lucide-react";
@@ -19,6 +18,7 @@ import type {
   DiscoverClassifyResponse,
   BMSVendor,
   BACnetDevice,
+  SimbiotCapabilitiesSummary,
 } from '@/lib/api';
 import { sitesApi } from '@/lib/api/sites';
 import { api, niagaraApi } from '@/lib/api';
@@ -79,7 +79,6 @@ interface WizardState {
   username: string;
   password: string;
   useHttps: boolean;
-  useSimulation: boolean;  // Discover equipment from simulation database instead of live BMS
   siteId: string;  // Auto-generated on site creation
   discoveredDevices: BACnetDevice[];
   selectedDeviceId: number | null;
@@ -93,6 +92,8 @@ interface WizardState {
   approveStatus: ApproveStatus;
   approveMessage: string;
   approveResult: { equipment_created: number } | null;
+  capabilitySummary: SimbiotCapabilitiesSummary | null;
+  capabilityError: string | null;
   loading: boolean;
   error: string | null;
   // Equipment verification
@@ -111,6 +112,7 @@ type WizardAction =
   | { type: "SET_MAPPINGS"; mappings: NiagaraMappingSummary }
   | { type: "TOGGLE_EQUIPMENT"; equipmentId: string }
   | { type: "SET_APPROVE_STATUS"; status: ApproveStatus; message?: string; result?: { equipment_created: number } }
+  | { type: "SET_CAPABILITIES"; summary: SimbiotCapabilitiesSummary | null; error?: string | null }
   | { type: "SET_LOADING"; loading: boolean }
   | { type: "SET_ERROR"; error: string | null }
   | { type: "SET_VERIFICATION_WIZARD"; show: boolean }
@@ -160,6 +162,12 @@ function wizardReducer(state: WizardState, action: WizardAction): WizardState {
         approveMessage: action.message || "",
         approveResult: action.result || state.approveResult,
         loading: action.status === "approving",
+      };
+    case "SET_CAPABILITIES":
+      return {
+        ...state,
+        capabilitySummary: action.summary,
+        capabilityError: action.error || null,
       };
     case "SET_LOADING":
       return { ...state, loading: action.loading };
@@ -304,7 +312,6 @@ export function BMSConnectionWizard({
     username: "",
     password: "",
     useHttps: false,
-    useSimulation: true,  // Default to simulation mode for wizard
     siteId: initialSiteId || "",
     discoveredDevices: [],
     selectedDeviceId: null,
@@ -318,6 +325,8 @@ export function BMSConnectionWizard({
     approveStatus: "idle",
     approveMessage: "",
     approveResult: null,
+    capabilitySummary: null,
+    capabilityError: null,
     loading: false,
     error: null,
     showVerificationWizard: false,
@@ -395,32 +404,12 @@ export function BMSConnectionWizard({
       return;
     }
 
-    if (!state.useSimulation && !state.host.trim()) {
+    if (!state.host.trim()) {
       dispatch({
         type: "SET_CONNECTION_STATUS",
         status: "failed",
         message: "Please enter the BMS host or IP address",
       });
-      return;
-    }
-
-    if (state.useSimulation) {
-      try {
-        const siteId = await ensureSiteCreated();
-        dispatch({ type: "SET_BACNET_DEVICES", devices: [], selectedDeviceId: null });
-
-        dispatch({
-          type: "SET_CONNECTION_STATUS",
-          status: "connected",
-          message: `Site "${state.siteName}" created (${siteId}). Equipment will be discovered from the simulation database.`,
-        });
-      } catch (err) {
-        dispatch({
-          type: "SET_CONNECTION_STATUS",
-          status: "failed",
-          message: err instanceof Error ? err.message : "Failed to create site",
-        });
-      }
       return;
     }
 
@@ -460,7 +449,7 @@ export function BMSConnectionWizard({
         return;
       }
 
-      await ensureSiteCreated();
+      const resolvedSiteId = await ensureSiteCreated();
       const selectedDeviceId = pickDefaultDeviceId(res.devices, state.host);
       dispatch({ type: "SET_BACNET_DEVICES", devices: res.devices, selectedDeviceId });
       dispatch({
@@ -468,6 +457,22 @@ export function BMSConnectionWizard({
         status: "connected",
         message: buildConnectionMessage(res.devices, selectedDeviceId),
       });
+      try {
+        const capabilities = await niagaraApi.getSimbiotCapabilities({
+          site_id: resolvedSiteId,
+          bms_vendor: state.bmsVendor,
+          host: state.host.trim(),
+          port: state.port,
+          commissioning: true,
+        });
+        dispatch({ type: "SET_CAPABILITIES", summary: capabilities.summary, error: null });
+      } catch (capErr) {
+        dispatch({
+          type: "SET_CAPABILITIES",
+          summary: null,
+          error: capErr instanceof Error ? capErr.message : "Could not load capabilities",
+        });
+      }
     } catch (err) {
       dispatch({
         type: "SET_CONNECTION_STATUS",
@@ -475,7 +480,7 @@ export function BMSConnectionWizard({
         message: err instanceof Error ? err.message : "Connection failed",
       });
     }
-  }, [buildConnectionMessage, ensureSiteCreated, pickDefaultDeviceId, state.bmsVendor, state.host, state.password, state.port, state.siteName, state.useHttps, state.useSimulation, state.username]);
+  }, [buildConnectionMessage, ensureSiteCreated, pickDefaultDeviceId, state.bmsVendor, state.host, state.password, state.port, state.siteName, state.useHttps, state.username]);
 
   // ---------- Step 2: Discover & Classify ----------
   const handleDiscover = useCallback(async () => {
@@ -483,7 +488,7 @@ export function BMSConnectionWizard({
       dispatch({ type: "SET_ERROR", error: "Create the site before starting discovery" });
       return;
     }
-    if (!state.useSimulation && state.selectedDeviceId == null) {
+    if (state.selectedDeviceId == null) {
       dispatch({ type: "SET_ERROR", error: "Select the BACnet device to ingest before discovery" });
       return;
     }
@@ -500,10 +505,10 @@ export function BMSConnectionWizard({
       dispatch({ type: "SET_DISCOVERY_PHASE", phase: 3 }); // Classifying equipment...
 
       const res = await niagaraApi.discoverAndClassify({
-        device_ip: state.useSimulation ? "simulation" : state.host,
+        device_ip: state.host,
         site_id: state.siteId,
-        device_bacnet_id: state.useSimulation ? undefined : state.selectedDeviceId ?? undefined,
-        adapter_type: state.useSimulation ? "simulation" : "bacnet",
+        device_bacnet_id: state.selectedDeviceId ?? undefined,
+        adapter_type: "bacnet",
         bms_vendor: state.bmsVendor,
       });
       dispatch({ type: "SET_DISCOVERY_PHASE", phase: 4 }); // Grouping into zones...
@@ -518,7 +523,7 @@ export function BMSConnectionWizard({
       });
       dispatch({ type: "SET_DISCOVERY_PHASE", phase: 0 });
     }
-  }, [state.bmsVendor, state.host, state.selectedDeviceId, state.siteId, state.useSimulation]);
+  }, [state.bmsVendor, state.host, state.selectedDeviceId, state.siteId]);
 
   // ---------- Step 3: Load Mappings ----------
   const handleLoadMappings = useCallback(async () => {
@@ -592,7 +597,7 @@ export function BMSConnectionWizard({
   const canGoNext = (): boolean => {
     switch (state.step) {
       case 1:
-        return state.connectionStatus === "connected" && !!state.siteId && (state.useSimulation || state.selectedDeviceId !== null);
+        return state.connectionStatus === "connected" && !!state.siteId && state.selectedDeviceId !== null;
       case 2:
         return !!state.discoveryId && !state.loading;
       case 3:
@@ -641,15 +646,13 @@ export function BMSConnectionWizard({
           className="text-sm"
           style={{ color: "var(--color-sentinel-text-secondary)" }}
         >
-          Enter details for your new building, then configure the BMS connection or select demo data.
+          Enter details for your new building, then configure the BMS connection.
         </p>
       </div>
 
       {/* Help section */}
       <HelpSection title="Getting Started" variant="info">
-        Enter your building details and choose how to connect to your BMS. For testing and demos,
-        select <strong>Demo Data</strong> to load pre-configured equipment. For production, enter
-        your BMS connection details to automatically discover equipment.
+        Enter your building details and connect to your BMS to automatically discover equipment.
       </HelpSection>
 
       {/* New Site Details Section */}
@@ -661,7 +664,7 @@ export function BMSConnectionWizard({
         }}
       >
         <div className="flex items-center gap-2 mb-3">
-          <Building2 className="w-5 h-5" style={{ color: "var(--color-sentinel-blue)" }} />
+          <MapPin className="w-5 h-5" style={{ color: "var(--color-sentinel-blue)" }} />
           <h4
             className="text-sm font-semibold"
             style={{ color: "var(--color-sentinel-text-primary)" }}
@@ -837,6 +840,7 @@ export function BMSConnectionWizard({
                 value: e.target.value,
               });
               dispatch({ type: "SET_BACNET_DEVICES", devices: [], selectedDeviceId: null });
+              dispatch({ type: "SET_CAPABILITIES", summary: null, error: null });
               dispatch({
                 type: "SET_FIELD",
                 field: "port",
@@ -869,98 +873,9 @@ export function BMSConnectionWizard({
               </p>
             </div>
           )}
-        </div>\n\n        {/* Connection Mode Toggle */}
-        <div className="space-y-2">
-          {/* Connect to BMS option */}
-          <label
-            className="flex items-center gap-3 p-3 rounded cursor-pointer"
-            style={{
-              background: !state.useSimulation
-                ? "var(--color-sentinel-blue)11"
-                : "transparent",
-              border: `1px solid ${!state.useSimulation ? "var(--color-sentinel-blue)" : "var(--color-sentinel-border)"}`,
-            }}
-          >
-            <input
-              type="radio"
-              name="connectionMode"
-            checked={!state.useSimulation}
-            onChange={() =>
-              {
-                dispatch({
-                  type: "SET_FIELD",
-                  field: "useSimulation",
-                  value: false,
-                });
-                dispatch({ type: "SET_BACNET_DEVICES", devices: [], selectedDeviceId: null });
-                dispatch({ type: "SET_CONNECTION_STATUS", status: "idle" });
-              }
-            }
-            className="w-4 h-4"
-          />
-            <div>
-              <span
-                className="text-sm font-medium"
-                style={{ color: "var(--color-sentinel-text-primary)" }}
-              >
-                Connect to BMS
-              </span>
-              <p
-                className="text-xs mt-0.5"
-                style={{ color: "var(--color-sentinel-text-secondary)" }}
-              >
-                Connect to a live BMS system via BACnet/oBIX
-              </p>
-            </div>
-          </label>
-
-          {/* Discover from Simulation option */}
-          <label
-            className="flex items-center gap-3 p-3 rounded cursor-pointer"
-            style={{
-              background: state.useSimulation
-                ? "var(--color-sentinel-blue)11"
-                : "transparent",
-              border: `1px solid ${state.useSimulation ? "var(--color-sentinel-blue)" : "var(--color-sentinel-border)"}`,
-            }}
-          >
-            <input
-              type="radio"
-              name="connectionMode"
-            checked={state.useSimulation}
-            onChange={() =>
-              {
-                dispatch({
-                  type: "SET_FIELD",
-                  field: "useSimulation",
-                  value: true,
-                });
-                dispatch({ type: "SET_BACNET_DEVICES", devices: [], selectedDeviceId: null });
-                dispatch({ type: "SET_CONNECTION_STATUS", status: "idle" });
-              }
-            }
-            className="w-4 h-4"
-          />
-            <div>
-              <span
-                className="text-sm font-medium"
-                style={{ color: "var(--color-sentinel-text-primary)" }}
-              >
-                Discover from Simulation
-              </span>
-              <p
-                className="text-xs mt-0.5"
-                style={{ color: "var(--color-sentinel-text-secondary)" }}
-              >
-                Equipment will be discovered from the simulation database
-              </p>
-            </div>
-          </label>
         </div>
-
-        {/* BMS Connection fields — shown when Connect to BMS is selected */}
-        {!state.useSimulation && (
-          <div className="grid grid-cols-2 gap-4 mt-4">
+        {/* BMS Connection fields */}
+        <div className="grid grid-cols-2 gap-4 mt-4">
             <div className="col-span-2 sm:col-span-1">
               <label className="block text-sm font-medium mb-1 flex items-center gap-2" style={labelStyle}>
                 <span>Host / IP Address</span>
@@ -1102,10 +1017,8 @@ export function BMSConnectionWizard({
               </div>
             )}
           </div>
-        )}
-
-        {/* BACnet-only info for non-Niagara vendors (not in simulation mode) */}
-        {!state.useSimulation && !isNiagara && (
+        {/* BACnet-only info for non-Niagara vendors */}
+        {!isNiagara && (
           <div
             className="p-3 rounded text-sm mt-4"
             style={{
@@ -1126,7 +1039,7 @@ export function BMSConnectionWizard({
         disabled={
           state.connectionStatus === "testing" ||
           !state.siteName.trim() ||
-          (!state.useSimulation && !state.host.trim())
+          !state.host.trim()
         }
         className="flex items-center gap-2 px-4 py-2 rounded text-sm font-medium transition-opacity disabled:opacity-50"
         style={{
@@ -1136,26 +1049,65 @@ export function BMSConnectionWizard({
       >
         {state.connectionStatus === "testing" ? (
           <Loader2 className="w-4 h-4 animate-spin" />
-        ) : state.useSimulation ? (
-          <Building2 className="w-4 h-4" />
         ) : (
           <Wifi className="w-4 h-4" />
         )}
-        {state.useSimulation ? "Create Site & Discover" : "Test Connection"}
+        Test Connection
       </button>
 
       {/* Connection result */}
       {state.connectionStatus === "connected" && (
-        <div
-          className="flex items-start gap-2 p-3 rounded text-sm"
-          style={{
-            background: "var(--color-sentinel-green)11",
-            border: "1px solid var(--color-sentinel-green)",
-            color: "var(--color-sentinel-green)",
-          }}
-        >
-          <CheckCircle className="w-4 h-4 mt-0.5 shrink-0" />
-          <span>{state.connectionMessage}</span>
+        <div className="space-y-3">
+          <div
+            className="flex items-start gap-2 p-3 rounded text-sm"
+            style={{
+              background: "var(--color-sentinel-green)11",
+              border: "1px solid var(--color-sentinel-green)",
+              color: "var(--color-sentinel-green)",
+            }}
+          >
+            <CheckCircle className="w-4 h-4 mt-0.5 shrink-0" />
+            <span>{state.connectionMessage}</span>
+          </div>
+          {state.capabilitySummary && (
+            <div
+              className="rounded p-3"
+              style={{
+                background: "var(--color-sentinel-bg-secondary)",
+                border: "1px solid var(--color-sentinel-border)",
+              }}
+            >
+              <p
+                className="text-xs uppercase tracking-wide mb-2"
+                style={{ color: "var(--color-sentinel-text-secondary)" }}
+              >
+                Control Capabilities (SIMBIOT)
+              </p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                <SummaryCard label="Devices" value={state.capabilitySummary.devices} color="var(--color-sentinel-blue)" />
+                <SummaryCard label="Points" value={state.capabilitySummary.points} color="var(--color-sentinel-text-primary)" />
+                <SummaryCard label="Writable" value={state.capabilitySummary.writable_points} color="var(--color-sentinel-amber)" />
+                <SummaryCard label="Controllable" value={state.capabilitySummary.controllable_devices} color="var(--color-sentinel-green)" />
+              </div>
+              {state.capabilitySummary.writable_points === 0 && (
+                <p className="text-xs mt-2" style={{ color: "var(--color-sentinel-amber)" }}>
+                  Telemetry-only mode detected. No writable command points exposed yet.
+                </p>
+              )}
+            </div>
+          )}
+          {state.capabilityError && (
+            <div
+              className="text-xs px-3 py-2 rounded"
+              style={{
+                background: "var(--color-sentinel-red)11",
+                border: "1px solid var(--color-sentinel-red)",
+                color: "var(--color-sentinel-red)",
+              }}
+            >
+              Capabilities check failed: {state.capabilityError}
+            </div>
+          )}
         </div>
       )}
       {state.connectionStatus === "failed" && (
@@ -1994,7 +1946,7 @@ export function BMSConnectionWizard({
         className="text-2xl font-bold mb-2"
         style={{ color: "var(--color-sentinel-text-primary)" }}
       >
-        BMS Connection Wizard
+        SIMBIOT Connection Wizard
       </h2>
       <p
         className="text-sm mb-8"

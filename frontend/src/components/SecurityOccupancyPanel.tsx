@@ -94,7 +94,7 @@ export function SecurityOccupancyPanel({ siteId = "", refreshKey }: SecurityOccu
   if (loading && zones.length === 0) {
     return (
       <div
-        className="rounded-md overflow-hidden"
+        className="rounded-lg overflow-hidden"
         style={{
           background: "var(--color-sentinel-bg-panel)",
           border: "1px solid var(--color-sentinel-border)",
@@ -119,7 +119,7 @@ export function SecurityOccupancyPanel({ siteId = "", refreshKey }: SecurityOccu
   if (error) {
     return (
       <div
-        className="rounded-md overflow-hidden"
+        className="rounded-lg overflow-hidden"
         style={{
           background: "var(--color-sentinel-bg-panel)",
           border: "1px solid var(--color-sentinel-border)",
@@ -147,7 +147,7 @@ export function SecurityOccupancyPanel({ siteId = "", refreshKey }: SecurityOccu
     <div className="space-y-4">
       {/* Building Total Occupancy */}
       <div
-        className="rounded-md p-5"
+        className="rounded-lg p-4"
         style={{
           background: "var(--color-sentinel-bg-panel)",
           border: "1px solid var(--color-sentinel-border)",
@@ -181,7 +181,7 @@ export function SecurityOccupancyPanel({ siteId = "", refreshKey }: SecurityOccu
           </div>
           <div className="text-right">
             <span
-              className="text-3xl font-bold block"
+              className="text-2xl font-bold block"
               style={{ color: getOccupancyColor(totalOccupancy) }}
             >
               {totalOccupancy}
@@ -236,7 +236,7 @@ export function SecurityOccupancyPanel({ siteId = "", refreshKey }: SecurityOccu
       {/* Cross-module Recommendations */}
       {recommendations.length > 0 && (
         <div
-          className="rounded-md overflow-hidden"
+          className="rounded-lg overflow-hidden"
           style={{
             background: "var(--color-sentinel-bg-panel)",
             border: "1px solid var(--color-sentinel-border)",
@@ -274,14 +274,14 @@ export function SecurityOccupancyPanel({ siteId = "", refreshKey }: SecurityOccu
                 {hvacRecs.map((rec, idx) => (
                   <div
                     key={`hvac-${idx}`}
-                    className="flex items-start gap-3 p-3 rounded"
+                    className="flex items-start gap-3 p-3 rounded-lg"
                     style={{
                       background: "rgba(59, 130, 246, 0.05)",
                       border: "1px solid rgba(59, 130, 246, 0.15)",
                     }}
                   >
                     <div
-                      className="p-1.5 rounded flex-shrink-0 mt-0.5"
+                      className="p-1.5 rounded-lg flex-shrink-0 mt-0.5"
                       style={{ background: "rgba(59, 130, 246, 0.15)" }}
                     >
                       <Thermometer
@@ -325,14 +325,14 @@ export function SecurityOccupancyPanel({ siteId = "", refreshKey }: SecurityOccu
                 {lightingRecs.map((rec, idx) => (
                   <div
                     key={`lighting-${idx}`}
-                    className="flex items-start gap-3 p-3 rounded"
+                    className="flex items-start gap-3 p-3 rounded-lg"
                     style={{
                       background: "rgba(245, 158, 11, 0.05)",
                       border: "1px solid rgba(245, 158, 11, 0.15)",
                     }}
                   >
                     <div
-                      className="p-1.5 rounded flex-shrink-0 mt-0.5"
+                      className="p-1.5 rounded-lg flex-shrink-0 mt-0.5"
                       style={{ background: "rgba(245, 158, 11, 0.15)" }}
                     >
                       <Lightbulb

@@ -5,7 +5,13 @@ from datetime import datetime
 import pytest
 
 from app.api import building_state
-from app.services.building_state_models import BuildingStatePayload, OperatorGuidance, PrimaryNarrative, NarrativeLocation, SecondaryTension
+from app.services.building_state_models import (
+    BuildingStatePayload,
+    NarrativeLocation,
+    OperatorGuidance,
+    PrimaryNarrative,
+    SecondaryTension,
+)
 
 
 @pytest.mark.asyncio
@@ -43,7 +49,10 @@ async def test_get_building_state_returns_active_stub_for_site_002(monkeypatch):
         ),
         secondary_tensions=[
             SecondaryTension(voice="energy_pressure", message="Load is rising as the building compensates."),
-            SecondaryTension(voice="operational_stability", message="Chiller cycling margin is tightening around the plant transition."),
+            SecondaryTension(
+                voice="operational_stability",
+                message="Chiller cycling margin is tightening around the plant transition.",
+            ),
         ],
         operator_guidance=OperatorGuidance(headline="Prepare for intervention.", mode="prepare"),
     )

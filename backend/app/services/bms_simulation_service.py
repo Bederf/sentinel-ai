@@ -13,16 +13,16 @@ Use ``lifecycle_orchestrator.py`` and ``equipment_json_loader.py`` instead.
 
 import asyncio
 import json
-import random
+import logging
 import math
+import random
+from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict, List, Optional, Any
-from dataclasses import dataclass, asdict
-import logging
+from typing import Any
 
-from app.services.health_threshold_service import get_health_thresholds
 from app.core.site_resolver import get_primary_site_code
+from app.services.health_threshold_service import get_health_thresholds
 from app.services.sentry_integration.alert_notifier import alert_notifier
 
 logger = logging.getLogger(__name__)
@@ -44,8 +44,8 @@ class EquipmentState:
     power_consumption: float
     runtime_hours: float
     last_maintenance: datetime
-    fault_codes: List[str]
-    sensor_readings: Dict[str, float]
+    fault_codes: list[str]
+    sensor_readings: dict[str, float]
     timestamp: datetime
 
 
@@ -61,8 +61,8 @@ class BMSimulationService:
         self.data_generator = DataGenerator()
 
         # Alert queue for SENTINEL integration
-        self.alert_queue: List[Dict[str, Any]] = []
-        self.alert_history: List[Dict[str, Any]] = []
+        self.alert_queue: list[dict[str, Any]] = []
+        self.alert_history: list[dict[str, Any]] = []
         self._alert_id_counter = 1000
 
         # Simulation configuration
@@ -92,8 +92,8 @@ class BMSimulationService:
         }
 
         # Track demand history seeding (one row per day per site)
-        self._demand_seed_dates: Dict[str, str] = {}
-        self._billing_seed_months: Dict[str, str] = {}
+        self._demand_seed_dates: dict[str, str] = {}
+        self._billing_seed_months: dict[str, str] = {}
 
     async def start_simulation(self):
         """Start the BMS simulation"""
@@ -519,7 +519,7 @@ class BMSimulationService:
         try:
             tariff_path = Path(__file__).parent.parent / "data" / "solar" / "tariffs" / "city_power_2026.json"
             if tariff_path.exists():
-                with open(tariff_path, "r") as f:
+                with open(tariff_path) as f:
                     tariff_data = json.load(f)
         except Exception as exc:
             logger.info("Failed loading tariff JSON: %s", exc)
@@ -1007,7 +1007,7 @@ class BMSimulationService:
             else "electrical"
             if equipment.type == "ups"
             else "sensor",
-            "suggested_action": action_map.get(alert_type, None),
+            "suggested_action": action_map.get(alert_type),
             "actionable_remotely": alert_type
             in ["too_hot", "too_cold", "high_energy", "after_hours", "equipment_idle"],
         }
@@ -1039,11 +1039,11 @@ class BMSimulationService:
             # Use sync version since this runs in async context but we don't want to block
             alert_notifier.send_alert_sync(telegram_alert)
 
-    def get_active_alerts(self) -> List[Dict[str, Any]]:
+    def get_active_alerts(self) -> list[dict[str, Any]]:
         """Get all active alerts from simulation"""
         return [a for a in self.alert_queue if a["status"] == "active"]
 
-    def get_alert_history(self) -> List[Dict[str, Any]]:
+    def get_alert_history(self) -> list[dict[str, Any]]:
         """Get alert history"""
         return self.alert_history.copy()
 
@@ -1067,7 +1067,7 @@ class BMSimulationService:
                 return True
         return False
 
-    def perform_maintenance(self, equipment_id: str) -> Dict[str, Any]:
+    def perform_maintenance(self, equipment_id: str) -> dict[str, Any]:
         """Simulate maintenance on equipment - restores health"""
         if equipment_id not in self.equipment:
             return {"success": False, "message": f"Equipment {equipment_id} not found"}
@@ -1125,7 +1125,7 @@ class BMSimulationService:
                     description = fault_descriptions.get(fault_code, f"Fault code {fault_code} detected")
                     self._generate_alert(equipment, "fault", f"{equipment.name}: {description}")
 
-    def get_equipment_summary(self) -> Dict[str, Any]:
+    def get_equipment_summary(self) -> dict[str, Any]:
         """Get summary of all equipment"""
         if not self.equipment:
             return {
@@ -1173,7 +1173,7 @@ class BMSimulationService:
             self.equipment[equipment_id].fault_codes.clear()
             logger.info(f"Cleared faults from {equipment_id}")
 
-    def get_real_time_data(self, equipment_id: Optional[str] = None) -> Dict[str, Any]:
+    def get_real_time_data(self, equipment_id: str | None = None) -> dict[str, Any]:
         """Get current real-time data for equipment"""
         if equipment_id:
             if equipment_id in self.equipment:
@@ -1244,7 +1244,7 @@ class FaultSimulator:
             },
         }
 
-    def generate_fault(self, equipment: EquipmentState) -> Optional[str]:
+    def generate_fault(self, equipment: EquipmentState) -> str | None:
         """Generate a realistic fault code for equipment"""
         # Higher chance of fault for older equipment or equipment with lower health
         health_factor = (100 - equipment.health_score) / 100
@@ -1321,4 +1321,4 @@ def create_simulation_service() -> BMSimulationService:
 
 
 # Export for use in other modules
-__all__ = ["BMSimulationService", "create_simulation_service", "EquipmentState"]
+__all__ = ["BMSimulationService", "EquipmentState", "create_simulation_service"]

@@ -16,9 +16,9 @@ from __future__ import annotations
 import json
 import logging
 from collections import Counter, defaultdict
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from app.database.supabase_client import get_supabase_client
 from app.models.decision_memory import (
@@ -44,16 +44,16 @@ class DecisionMemoryService:
     Automatically extracts patterns when evidence accumulates.
     """
 
-    _instance: Optional[DecisionMemoryService] = None
+    _instance: DecisionMemoryService | None = None
 
     def __init__(
         self,
-        data_dir: Optional[Path] = None,
-        records_file: Optional[Path] = None,
-        patterns_file: Optional[Path] = None,
+        data_dir: Path | None = None,
+        records_file: Path | None = None,
+        patterns_file: Path | None = None,
     ) -> None:
-        self._records: List[DecisionRecord] = []
-        self._patterns: List[DecisionPattern] = []
+        self._records: list[DecisionRecord] = []
+        self._patterns: list[DecisionPattern] = []
         self._loaded = False
         self._client = None
         # Allow explicit path overrides for testing isolation
@@ -111,11 +111,11 @@ class DecisionMemoryService:
         diagnosis_confidence: float = 0.0,
         diagnosis_source: str = "ai_reasoning",
         action_type: str = "",
-        action_details: Optional[Dict[str, Any]] = None,
-        signals_snapshot: Optional[List[Dict]] = None,
-        correlation_id: Optional[str] = None,
-        recommendation_id: Optional[str] = None,
-        event_id: Optional[str] = None,
+        action_details: dict[str, Any] | None = None,
+        signals_snapshot: list[dict] | None = None,
+        correlation_id: str | None = None,
+        recommendation_id: str | None = None,
+        event_id: str | None = None,
     ) -> DecisionRecord:
         """Record a new decision.
 
@@ -155,9 +155,9 @@ class DecisionMemoryService:
         self,
         record_id: str,
         outcome: DecisionOutcome,
-        outcome_details: Optional[str] = None,
-        work_order_id: Optional[str] = None,
-    ) -> Optional[DecisionRecord]:
+        outcome_details: str | None = None,
+        work_order_id: str | None = None,
+    ) -> DecisionRecord | None:
         """Record the outcome of a previously recorded decision.
 
         After recording, checks if a pattern can be extracted or updated.
@@ -169,7 +169,7 @@ class DecisionMemoryService:
             logger.warning("Decision record %s not found", record_id)
             return None
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         record.outcome = outcome
         record.outcome_details = outcome_details
         record.outcome_evaluated_at = now
@@ -207,9 +207,9 @@ class DecisionMemoryService:
         self,
         event_type: str,
         equipment_type: str,
-        equipment_id: Optional[str] = None,
+        equipment_id: str | None = None,
         limit: int = 10,
-    ) -> List[DecisionRecord]:
+    ) -> list[DecisionRecord]:
         """Find past decisions for similar events.
 
         Prioritizes: same equipment > same type > same event type.
@@ -238,21 +238,21 @@ class DecisionMemoryService:
         self,
         event_type: str,
         equipment_type: str,
-    ) -> Optional[DecisionPattern]:
+    ) -> DecisionPattern | None:
         """Get the best learned pattern for an event type + equipment type.
 
         Returns the pattern with highest confidence if one exists.
         """
         self._ensure_loaded()
 
-        best: Optional[DecisionPattern] = None
+        best: DecisionPattern | None = None
         for pattern in self._patterns:
             if pattern.event_type == event_type and pattern.equipment_type == equipment_type:
                 if best is None or pattern.diagnosis_confidence > best.diagnosis_confidence:
                     best = pattern
 
         if best:
-            best.last_matched_at = datetime.now(timezone.utc)
+            best.last_matched_at = datetime.now(UTC)
             self._save_patterns()
 
         return best
@@ -261,7 +261,7 @@ class DecisionMemoryService:
         self,
         event_type: str,
         equipment_type: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Get pattern + recent decisions for a given event/equipment combo.
 
         Used by the reasoning layer for enriched context.
@@ -279,7 +279,7 @@ class DecisionMemoryService:
     # Pattern extraction
     # -----------------------------------------------------------------
 
-    async def _extract_patterns(self, event_type: str, equipment_type: str) -> Optional[DecisionPattern]:
+    async def _extract_patterns(self, event_type: str, equipment_type: str) -> DecisionPattern | None:
         """Extract or update a pattern from accumulated records.
 
         Requires >= PATTERN_THRESHOLD records with same diagnosis + RESOLVED outcome.
@@ -296,12 +296,12 @@ class DecisionMemoryService:
             return None
 
         # Group by diagnosis
-        by_diagnosis: Dict[str, List[DecisionRecord]] = defaultdict(list)
+        by_diagnosis: dict[str, list[DecisionRecord]] = defaultdict(list)
         for r in relevant:
             if r.diagnosis:
                 by_diagnosis[r.diagnosis].append(r)
 
-        best_pattern: Optional[DecisionPattern] = None
+        best_pattern: DecisionPattern | None = None
 
         for diagnosis, records in by_diagnosis.items():
             if len(records) < PATTERN_THRESHOLD:
@@ -338,7 +338,7 @@ class DecisionMemoryService:
                 existing.avg_resolution_time_minutes = avg_time
                 existing.diagnosis_confidence = success_rate
                 existing.applicable_sites = sites
-                existing.updated_at = datetime.now(timezone.utc)
+                existing.updated_at = datetime.now(UTC)
                 pattern = existing
             else:
                 # Get action details from most recent successful record
@@ -369,7 +369,7 @@ class DecisionMemoryService:
     # Statistics
     # -----------------------------------------------------------------
 
-    async def get_decision_stats(self, site_id: Optional[str] = None) -> Dict[str, Any]:
+    async def get_decision_stats(self, site_id: str | None = None) -> dict[str, Any]:
         """Get statistics about decision memory."""
         self._ensure_loaded()
 
@@ -401,8 +401,8 @@ class DecisionMemoryService:
 
     def format_for_prompt(
         self,
-        patterns: Optional[List[DecisionPattern]] = None,
-        records: Optional[List[DecisionRecord]] = None,
+        patterns: list[DecisionPattern] | None = None,
+        records: list[DecisionRecord] | None = None,
     ) -> str:
         """Format decision memory as readable text for AI prompt injection."""
         sections = []
@@ -433,19 +433,19 @@ class DecisionMemoryService:
     # Persistence (Postgres primary, JSON fallback for test/local overrides)
     # -----------------------------------------------------------------
 
-    def _find_record(self, record_id: str) -> Optional[DecisionRecord]:
+    def _find_record(self, record_id: str) -> DecisionRecord | None:
         for r in self._records:
             if r.record_id == record_id:
                 return r
         return None
 
-    def _find_pattern(self, event_type: str, equipment_type: str, diagnosis: str) -> Optional[DecisionPattern]:
+    def _find_pattern(self, event_type: str, equipment_type: str, diagnosis: str) -> DecisionPattern | None:
         for p in self._patterns:
             if p.event_type == event_type and p.equipment_type == equipment_type and p.likely_diagnosis == diagnosis:
                 return p
         return None
 
-    def _load_records(self) -> List[DecisionRecord]:
+    def _load_records(self) -> list[DecisionRecord]:
         records_file = self._records_file
         try:
             if self._db_enabled and self.client:
@@ -459,7 +459,7 @@ class DecisionMemoryService:
             logger.error("Failed to load decision records: %s", e)
         return []
 
-    def _load_patterns(self) -> List[DecisionPattern]:
+    def _load_patterns(self) -> list[DecisionPattern]:
         patterns_file = self._patterns_file
         try:
             if self._db_enabled and self.client:
@@ -504,7 +504,7 @@ class DecisionMemoryService:
 # Singleton
 # -----------------------------------------------------------------
 
-_service: Optional[DecisionMemoryService] = None
+_service: DecisionMemoryService | None = None
 
 
 def get_decision_memory_service() -> DecisionMemoryService:

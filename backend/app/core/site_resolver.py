@@ -1,4 +1,4 @@
-"""Site Resolver — single source of truth for registered site resolution.
+"""Site Resolver — single source of truth for registered and connected site resolution.
 
 SENTINEL should never need to know a site ID in advance. There is no default site.
 There is only "the registered sites."
@@ -15,8 +15,11 @@ Fallback order: Supabase -> JSON (backend/app/data/sites.json)
 import json
 import logging
 from pathlib import Path
+from time import monotonic
 
 from fastapi import HTTPException, Query
+
+from app.config.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +29,7 @@ _SITES_JSON = Path(__file__).parent.parent / "data" / "sites.json"
 # In-memory cache (refreshed each call to Supabase; JSON is stable)
 _cached_sites: list[dict] | None = None
 _cache_source: str | None = None
+_connected_sites_cache: tuple[float, list[str]] | None = None
 
 
 def _load_from_supabase() -> list[dict] | None:
@@ -103,6 +107,63 @@ def get_registered_site_ids() -> list[str]:
     """
     sites = get_registered_sites()
     return [s["code"] for s in sites if s.get("code")]
+
+
+def get_connected_site_ids() -> list[str]:
+    """Return site codes that are operationally connected right now.
+
+    In production island mode, Sentinel should only run live operational loops
+    for sites that are reachable through the remote bridge. Registered sites may
+    exist in inventory without being connected.
+    """
+    global _connected_sites_cache
+
+    site_ids = get_registered_site_ids()
+    if not site_ids:
+        return []
+
+    if not (settings.sentinel_island_mode and settings.simbiot_api_url):
+        return site_ids
+
+    now = monotonic()
+    if _connected_sites_cache and now - _connected_sites_cache[0] < 30:
+        return list(_connected_sites_cache[1])
+
+    connected: list[str] = []
+    try:
+        import httpx
+    except Exception as exc:
+        logger.warning("httpx unavailable for connected site resolution: %s", exc)
+        return []
+
+    base = settings.simbiot_api_url.rstrip("/")
+    headers: dict[str, str] = {}
+    if settings.simbiot_api_key:
+        headers["Authorization"] = f"Bearer {settings.simbiot_api_key}"
+        headers["X-API-Key"] = settings.simbiot_api_key
+
+    auth = None
+    if settings.simbiot_username and settings.simbiot_password:
+        auth = (settings.simbiot_username, settings.simbiot_password)
+
+    try:
+        with httpx.Client(timeout=2.0, auth=auth) as client:
+            for site_id in site_ids:
+                try:
+                    response = client.get(f"{base}/api/sites/{site_id}/health", headers=headers)
+                    if response.status_code != 200:
+                        continue
+                    payload = response.json()
+                    if isinstance(payload, dict) and payload.get("status") == "ok":
+                        connected.append(site_id)
+                except Exception:
+                    continue
+    except Exception as exc:
+        logger.warning("Connected site resolution failed: %s", exc)
+        connected = []
+
+    _connected_sites_cache = (now, connected)
+    return list(connected)
 
 
 def get_primary_site() -> dict | None:

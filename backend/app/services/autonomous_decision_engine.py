@@ -4,23 +4,24 @@ This service implements the core decision engine that evaluates and executes
 approved rules automatically within strict safety boundaries.
 """
 
+import json
 import logging
 import uuid
-import json
-from pathlib import Path
+from collections.abc import Callable
 from datetime import datetime
-from typing import Dict, Any, List, Optional, Callable
+from pathlib import Path
+from typing import Any
 
+from app.models.audit_log import AuditResultType
 from app.models.autonomous_decision import (
     AutonomousDecision,
+    AutonomousSystemStatus,
+    BoundaryStatus,
     DecisionStatus,
     EscalationLevel,
-    BoundaryStatus,
-    AutonomousSystemStatus,
 )
-from app.models.audit_log import AuditResultType
-from app.services.safety_interlocks import safety_engine
 from app.services.device_abstraction import device_manager
+from app.services.safety_interlocks import safety_engine
 
 logger = logging.getLogger(__name__)
 
@@ -35,13 +36,13 @@ class AutonomousDecisionEngine:
     def __init__(self):
         """Initialize the autonomous decision engine."""
         self.enabled = False
-        self.decision_history: List[AutonomousDecision] = []
-        self.active_decisions: Dict[str, AutonomousDecision] = {}
-        self.boundary_status_cache: Dict[str, BoundaryStatus] = {}
+        self.decision_history: list[AutonomousDecision] = []
+        self.active_decisions: dict[str, AutonomousDecision] = {}
+        self.boundary_status_cache: dict[str, BoundaryStatus] = {}
         self._initialized = False
-        self._decision_callbacks: List[Callable] = []
+        self._decision_callbacks: list[Callable] = []
 
-    async def initialize(self, load_demo_data: bool = True) -> None:
+    async def initialize(self, load_seed_data: bool = True) -> None:
         """Initialize the autonomous decision engine."""
         if self._initialized:
             return
@@ -53,7 +54,7 @@ class AutonomousDecisionEngine:
             await safety_engine.initialize()
 
         # Load decision history
-        if load_demo_data:
+        if load_seed_data:
             await self._load_decision_history()
 
         self._initialized = True
@@ -63,8 +64,8 @@ class AutonomousDecisionEngine:
         """Load decision history from JSON file."""
         try:
             if not DECISION_HISTORY_FILE.exists():
-                logger.info("No decision history file found, creating demo data")
-                await self._create_demo_decisions()
+                logger.info("No decision history file found, creating seeded history")
+                await self._create_seed_decisions()
                 return
 
             with open(DECISION_HISTORY_FILE) as f:
@@ -75,10 +76,10 @@ class AutonomousDecisionEngine:
             logger.info(f"Loaded {len(self.decision_history)} decisions from history")
         except Exception as e:
             logger.error(f"Failed to load decision history: {e}")
-            await self._create_demo_decisions()
+            await self._create_seed_decisions()
 
-    async def _create_demo_decisions(self) -> None:
-        """Create demo autonomous decisions for demonstration."""
+    async def _create_seed_decisions(self) -> None:
+        """Create seeded autonomous decisions for local validation."""
         from datetime import timedelta
 
         decisions = [
@@ -447,7 +448,7 @@ class AutonomousDecisionEngine:
             decision.result = AuditResultType.FAILED
             decision.metadata["error"] = str(e)
 
-            logger.error(f"Decision {decision.id} EXCEPTION - {str(e)}")
+            logger.error(f"Decision {decision.id} EXCEPTION - {e!s}")
 
         finally:
             # Remove from active decisions
@@ -482,9 +483,9 @@ class AutonomousDecisionEngine:
         self,
         limit: int = 100,
         offset: int = 0,
-        device_id: Optional[str] = None,
-        status: Optional[DecisionStatus] = None,
-    ) -> List[AutonomousDecision]:
+        device_id: str | None = None,
+        status: DecisionStatus | None = None,
+    ) -> list[AutonomousDecision]:
         """Get decision history with optional filtering."""
         filtered_decisions = self.decision_history
 
@@ -529,7 +530,7 @@ class AutonomousDecisionEngine:
             safety_score=safety_score,
         )
 
-    def enable_autonomous_mode(self) -> Dict[str, Any]:
+    def enable_autonomous_mode(self) -> dict[str, Any]:
         """Enable autonomous mode."""
         if self.enabled:
             return {"success": False, "message": "Autonomous mode already enabled"}
@@ -539,7 +540,7 @@ class AutonomousDecisionEngine:
 
         return {"success": True, "message": "Autonomous mode enabled successfully"}
 
-    def disable_autonomous_mode(self) -> Dict[str, Any]:
+    def disable_autonomous_mode(self) -> dict[str, Any]:
         """Disable autonomous mode and cancel active decisions."""
         if not self.enabled:
             return {"success": False, "message": "Autonomous mode already disabled"}

@@ -121,7 +121,7 @@ def _verify_webhook_secret(provided: Optional[str]) -> None:
     if not configured:
         if settings.is_live_mode:
             raise HTTPException(status_code=503, detail="Email intake misconfigured: missing webhook secret")
-        # In simulation / demo, allow unauthenticated
+        # In local non-live mode, allow unauthenticated intake
         return
 
     if not provided or not hmac.compare_digest(provided, configured):

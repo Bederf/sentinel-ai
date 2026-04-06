@@ -1,27 +1,23 @@
-bms.aimthelaw.co.za {
-    # Serve frontend static files from dist
-    root * /opt/bms-intelligence/frontend/dist
+{
+    http_port 8090
+    https_port 8443
+}
 
-    # API requests go to backend
-    # Note: Backend handles CORS via FastAPI middleware in startup/middleware.py
-    # This allows dynamic CORS checking and support for both production + localhost
-    reverse_proxy /api/* localhost:9095 {
-        # Pass through Origin header to backend for CORS handling
-        header_up Origin {http.request.header.Origin}
+:8090 {
+    # API → backend
+    handle /api/* {
+        reverse_proxy 127.0.0.1:9095 {
+            header_up Origin "https://bms.sentinel-ai.co.za"
+        }
     }
 
-    # SPA fallback - route all non-API requests to index.html
-    try_files {path} /index.html
+    # Static assets → frontend (vite preview)
+    handle /assets/* {
+        reverse_proxy 127.0.0.1:9096
+    }
 
-    # File serving
-    file_server
-
-    # Security headers
-    header X-Frame-Options "DENY"
-    header X-Content-Type-Options "nosniff"
-    header X-XSS-Protection "1; mode=block"
-    header Referrer-Policy "strict-origin-when-cross-origin"
-
-    # Enable gzip compression
-    encode gzip
+    # Everything else → frontend
+    handle {
+        reverse_proxy 127.0.0.1:9096
+    }
 }

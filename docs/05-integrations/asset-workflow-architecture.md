@@ -1,3 +1,18 @@
+---
+title: "SENTINEL Asset Management Workflow - Integration Architecture"
+type: "spec"
+status: "draft"
+version: "1.0.0"
+created: "2026-03-31"
+updated: "2026-03-31"
+tags: ["sentinel", "documentation"]
+related: []
+domain: "bms"
+audience: "all"
+complexity: "intermediate"
+estimated_read_time: 10
+---
+
 # SENTINEL Asset Management Workflow - Integration Architecture
 
 **Date:** 2026-02-08
@@ -91,10 +106,10 @@ This document describes the integration architecture that connects SIMBIOT, Asse
 - `GET /api/maintenance/recommendations` - Get recommendations
 - `GET /api/maintenance/priorities` - Get prioritized actions
 
-### 6. Workflow Orchestrator (NEW)
+### 6. Workflow Orchestrator
 **Purpose:** Coordinate automated workflow across all systems
 **Key Operations:**
-- Onboard asset (SIMBIOT + baseline capture)
+- Onboard asset (metadata + baseline capture attempt)
 - Schedule baseline inspection
 - Process ML anomaly (create inspection)
 - Generate maintenance recommendation
@@ -106,10 +121,11 @@ This document describes the integration architecture that connects SIMBIOT, Asse
 - `GET /api/workflow/status/{equipment_id}` - Get workflow status
 - `POST /api/workflow/validate-repair` - Validate repair effectiveness
 
-### 7. Workflow Events Log (NEW)
+### 7. Workflow Events Log
 **Purpose:** Persistent log of workflow trigger outcomes for observability
 **Key Operations:**
 - Record trigger outcomes (created, suppressed, errors)
+- Record workflow state transitions (`workflow_state`) with from/to state detail
 - Filter by equipment or trigger type
 
 **API Endpoints:**
@@ -180,14 +196,18 @@ This document describes the integration architecture that connects SIMBIOT, Asse
 
 ## Data Flow
 
-### Flow 1: Asset Onboarding
+### Flow 1: Asset Onboarding (Durable)
 ```
 User → Workflow Orchestrator
-  ├─→ SIMBIOT: create_building()
-  ├─→ SIMBIOT: import_point_list()
-  ├─→ SIMBIOT: add_building_zones()
-  └─→ Baseline Service: capture_baseline(initial)
+  ├─→ Persist equipment onboarding metadata (operating_data.onboarding)
+  ├─→ Persist workflow state transitions in workflow_events
+  └─→ Baseline Service: capture_baseline(initial) [best effort]
 ```
+
+### Production note: schema compatibility
+
+- Durable onboarding metadata + workflow transition persistence is active.
+- If `equipment_baselines` schema is older than expected (e.g. missing baseline columns), onboarding continues and baseline capture is logged as unavailable instead of failing onboarding.
 
 ### Flow 2: Routine Inspection Cycle
 ```
@@ -362,7 +382,7 @@ See `asset-workflow-api-contracts.md` for detailed API specifications.
 
 - **Backend:** FastAPI + Python 3.11
 - **Orchestrator:** Async Python service
-- **State Management:** In-memory with audit log
+- **State Management:** Durable event-backed state (`workflow_events`) with in-memory runtime cache
 - **Database:** Supabase (PostgreSQL) with JSON fallback
 - **ML:** TensorFlow (LSTM/Autoencoder), lifelines (Survival)
 - **AI:** Ollama (phi3:mini) for explanations

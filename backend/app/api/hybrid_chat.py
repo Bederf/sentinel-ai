@@ -61,6 +61,7 @@ async def generate_hybrid_sse_stream(
             task_class=SENTINEL_BOT_TECH_DEFAULT_CLASS,
             messages=messages,
             stream=True,
+            source="chat_tech_gateway",
         )
         async for chunk in stream_gen:
             safe_text = buffer.add_token(chunk)

@@ -12,12 +12,12 @@ Usage:
     response = engine.process_response("session-123", "Oil level is low")
 """
 
-import re
 import logging
-from typing import Dict, List, Optional, Any
-from enum import Enum
-from datetime import datetime
+import re
 from dataclasses import dataclass, field
+from datetime import datetime
+from enum import Enum
+from typing import Any
 
 from app.services.equipment_lookup import EquipmentLookup
 
@@ -40,7 +40,7 @@ class Checkpoint:
 
     step_id: str
     question: str
-    response: Optional[str]
+    response: str | None
     timestamp: datetime
     state: DiagnosisState
 
@@ -51,16 +51,16 @@ class DiagnosisFlow:
 
     session_id: str
     state: DiagnosisState = DiagnosisState.IDENTIFYING
-    equipment: Dict[str, Any] = field(default_factory=dict)
-    fault_code: Optional[str] = None
-    fault_info: Optional[Dict] = None
-    checkpoints: List[Checkpoint] = field(default_factory=list)
-    collected_info: Dict[str, Any] = field(default_factory=dict)
+    equipment: dict[str, Any] = field(default_factory=dict)
+    fault_code: str | None = None
+    fault_info: dict | None = None
+    checkpoints: list[Checkpoint] = field(default_factory=list)
+    collected_info: dict[str, Any] = field(default_factory=dict)
     current_step_index: int = 0
     created_at: datetime = field(default_factory=datetime.now)
     updated_at: datetime = field(default_factory=datetime.now)
 
-    def add_checkpoint(self, step_id: str, question: str, response: Optional[str] = None) -> Checkpoint:
+    def add_checkpoint(self, step_id: str, question: str, response: str | None = None) -> Checkpoint:
         """Add a checkpoint to the flow"""
         checkpoint = Checkpoint(
             step_id=step_id, question=question, response=response, timestamp=datetime.now(), state=self.state
@@ -84,11 +84,11 @@ class DiagnosisFlow:
         self.state = new_state
         self.updated_at = datetime.now()
 
-    def get_completed_checkpoints(self) -> List[Checkpoint]:
+    def get_completed_checkpoints(self) -> list[Checkpoint]:
         """Get all checkpoints with responses"""
         return [cp for cp in self.checkpoints if cp.response is not None]
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         """Serialize flow state for API response and Redis persistence"""
         return {
             "session_id": self.session_id,
@@ -113,7 +113,7 @@ class DiagnosisFlow:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict) -> "DiagnosisFlow":
+    def from_dict(cls, data: dict) -> "DiagnosisFlow":
         """Reconstruct DiagnosisFlow from serialized dict (Redis/JSON)."""
         flow = cls(session_id=data["session_id"])
         flow.state = DiagnosisState(data.get("state", "identifying"))
@@ -151,7 +151,7 @@ class DiagnosisFlowEngine:
     """
 
     # Pre-defined diagnostic checklists for common faults
-    FAULT_CHECKLISTS: Dict[str, List[Dict[str, Any]]] = {
+    FAULT_CHECKLISTS: dict[str, list[dict[str, Any]]] = {
         "E4": [
             {
                 "id": "oil_level",
@@ -288,11 +288,11 @@ class DiagnosisFlowEngine:
         self.equipment_lookup = EquipmentLookup()
 
     @property
-    def flows(self) -> Dict[str, DiagnosisFlow]:
+    def flows(self) -> dict[str, DiagnosisFlow]:
         """Backward-compat: expose in-memory dict from store."""
         return self._store._memory
 
-    def start_diagnosis(self, session_id: str, initial_query: str) -> Dict:
+    def start_diagnosis(self, session_id: str, initial_query: str) -> dict:
         """
         Start a new diagnosis flow from natural language query.
 
@@ -338,7 +338,7 @@ class DiagnosisFlowEngine:
         self._store.put(session_id, flow)
         return result
 
-    def process_response(self, session_id: str, step_id: str, response: str) -> Dict:
+    def process_response(self, session_id: str, step_id: str, response: str) -> dict:
         """
         Process technician's response and return next step.
 
@@ -379,14 +379,14 @@ class DiagnosisFlowEngine:
         # Get next step
         return self._get_next_step(flow)
 
-    def get_flow_state(self, session_id: str) -> Optional[Dict]:
+    def get_flow_state(self, session_id: str) -> dict | None:
         """Get current state of a diagnosis flow"""
         flow = self._store.get(session_id)
         if flow:
             return flow.to_dict()
         return None
 
-    def end_diagnosis(self, session_id: str) -> Dict:
+    def end_diagnosis(self, session_id: str) -> dict:
         """End a diagnosis session and return summary"""
         flow = self._store.get(session_id)
         if not flow:
@@ -407,7 +407,7 @@ class DiagnosisFlowEngine:
 
         return summary
 
-    def _parse_equipment_query(self, query: str) -> Dict:
+    def _parse_equipment_query(self, query: str) -> dict:
         """Extract equipment and fault info from natural language query"""
         query_lower = query.lower()
 
@@ -480,7 +480,7 @@ class DiagnosisFlowEngine:
             "raw_query": query,
         }
 
-    def _get_next_step(self, flow: DiagnosisFlow) -> Dict:
+    def _get_next_step(self, flow: DiagnosisFlow) -> dict:
         """Generate the next step in the diagnosis flow"""
         if flow.state == DiagnosisState.IDENTIFYING:
             return self._get_identifying_step(flow)
@@ -493,7 +493,7 @@ class DiagnosisFlowEngine:
         else:
             return self._get_completion_step(flow)
 
-    def _get_identifying_step(self, flow: DiagnosisFlow) -> Dict:
+    def _get_identifying_step(self, flow: DiagnosisFlow) -> dict:
         """Generate questions to identify the equipment and problem"""
         questions = []
 
@@ -557,7 +557,7 @@ class DiagnosisFlowEngine:
             "flow": flow.to_dict(),
         }
 
-    def _get_checking_step(self, flow: DiagnosisFlow) -> Dict:
+    def _get_checking_step(self, flow: DiagnosisFlow) -> dict:
         """Generate diagnostic checks based on fault code"""
         # Get checklist for this fault code
         checklist = self.FAULT_CHECKLISTS.get(flow.fault_code, self.DEFAULT_CHECKLIST)
@@ -600,7 +600,7 @@ class DiagnosisFlowEngine:
             "flow": flow.to_dict(),
         }
 
-    def _get_analysis_step(self, flow: DiagnosisFlow) -> Dict:
+    def _get_analysis_step(self, flow: DiagnosisFlow) -> dict:
         """Analyze collected data and provide diagnosis"""
         # Analyze responses for critical findings
         critical_findings = []
@@ -630,7 +630,7 @@ class DiagnosisFlowEngine:
             "flow": flow.to_dict(),
         }
 
-    def _get_resolution_step(self, flow: DiagnosisFlow) -> Dict:
+    def _get_resolution_step(self, flow: DiagnosisFlow) -> dict:
         """Generate resolution plan with repair steps"""
         diagnosis = flow.collected_info.get("diagnosis", {})
         critical_findings = flow.collected_info.get("critical_findings", [])
@@ -686,7 +686,7 @@ class DiagnosisFlowEngine:
             "flow": flow.to_dict(),
         }
 
-    def _get_completion_step(self, flow: DiagnosisFlow) -> Dict:
+    def _get_completion_step(self, flow: DiagnosisFlow) -> dict:
         """Generate completion summary"""
         return {
             "type": "complete",
@@ -715,7 +715,7 @@ class DiagnosisFlowEngine:
             if answered >= len(checklist):
                 flow.advance_state(DiagnosisState.ANALYZING)
 
-    def _generate_diagnosis(self, flow: DiagnosisFlow, critical_findings: List[Dict]) -> Dict:
+    def _generate_diagnosis(self, flow: DiagnosisFlow, critical_findings: list[dict]) -> dict:
         """Generate diagnosis summary from collected info"""
         fault_name = "Unknown fault"
         if flow.fault_info:
@@ -739,7 +739,7 @@ class DiagnosisFlowEngine:
             "confidence": "high" if len(critical_findings) > 0 else "medium",
         }
 
-    def _generate_repair_steps(self, flow: DiagnosisFlow, critical_findings: List[Dict]) -> List[str]:
+    def _generate_repair_steps(self, flow: DiagnosisFlow, critical_findings: list[dict]) -> list[str]:
         """Generate generic repair steps based on findings"""
         steps = [
             f"1. Isolate power supply to the {flow.equipment.get('equipment_type', 'equipment')} (LOTO required)",
@@ -760,7 +760,7 @@ class DiagnosisFlowEngine:
 
         return steps
 
-    def _estimate_repair_time(self, critical_findings: List[Dict]) -> str:
+    def _estimate_repair_time(self, critical_findings: list[dict]) -> str:
         """Estimate repair time based on findings"""
         if not critical_findings:
             return "1-2 hours (investigation)"
@@ -771,7 +771,7 @@ class DiagnosisFlowEngine:
 
 
 # Singleton instance
-_engine_instance: Optional[DiagnosisFlowEngine] = None
+_engine_instance: DiagnosisFlowEngine | None = None
 
 
 def get_diagnosis_engine() -> DiagnosisFlowEngine:

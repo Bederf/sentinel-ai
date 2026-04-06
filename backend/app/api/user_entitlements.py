@@ -31,7 +31,7 @@ async def get_current_user_entitlements(auth: AuthContext = Depends(require_auth
 
     Returns:
         {
-            "user_email": "grant@demo.local",
+            "user_email": "operator@sentinel.local",
             "entitlements": ["control", "lighting", "energy", "hvac", "ml"],
             "preset": "grant"  // If user matches a preset
         }
@@ -60,7 +60,7 @@ async def get_user_entitlements(user_email: str, auth: AuthContext = Depends(req
 
     Returns:
         {
-            "user_email": "grant@demo.local",
+            "user_email": "operator@sentinel.local",
             "entitlements": ["control", "lighting", "energy", "hvac", "ml"],
             "preset": "grant"
         }

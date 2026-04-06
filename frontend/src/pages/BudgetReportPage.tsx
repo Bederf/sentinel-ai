@@ -7,8 +7,6 @@ import {
   Card,
   Title,
   Text,
-  Select,
-  SelectItem,
   Button,
 } from "@tremor/react";
 import {
@@ -172,47 +170,81 @@ export function BudgetReportPage() {
             <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
               Contract
             </Text>
-            <Select value={selectedContractId} onValueChange={setSelectedContractId}>
+            <select
+              value={selectedContractId}
+              onChange={(event) => setSelectedContractId(event.target.value)}
+              className="w-full rounded-lg appearance-none cursor-pointer px-3 py-2 text-sm transition-colors focus:outline-none focus:ring-0"
+              style={{
+                background: "var(--color-grafana-bg-secondary)",
+                border: "1px solid var(--color-grafana-border)",
+                color: "var(--color-grafana-text-primary)",
+                boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)",
+                outline: "none",
+              }}
+              aria-label="Select contract"
+            >
               {contracts.map((contract) => (
-                <SelectItem
+                <option
                   key={contract.id || contract.contract_code}
                   value={contract.id || contract.contract_code}
                 >
                   {contract.contract_code} · {contract.organization.name}
-                </SelectItem>
+                </option>
               ))}
-            </Select>
+            </select>
           </div>
           <div className="w-32 lg:w-40">
             <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
               Year
             </Text>
-            <Select value={`${year}`} onValueChange={(value) => setYear(Number(value))}>
+            <select
+              value={`${year}`}
+              onChange={(event) => setYear(Number(event.target.value))}
+              className="w-full rounded-lg appearance-none cursor-pointer px-3 py-2 text-sm transition-colors focus:outline-none focus:ring-0"
+              style={{
+                background: "var(--color-grafana-bg-secondary)",
+                border: "1px solid var(--color-grafana-border)",
+                color: "var(--color-grafana-text-primary)",
+                boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)",
+                outline: "none",
+              }}
+              aria-label="Select year"
+            >
               {[year - 1, year, year + 1].map((y) => (
-                <SelectItem key={y} value={`${y}`}>
+                <option key={y} value={`${y}`}>
                   {y}
-                </SelectItem>
+                </option>
               ))}
-            </Select>
+            </select>
           </div>
           <div className="w-40">
             <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
               Month
             </Text>
-            <Select value={month ? `${month}` : "all"} onValueChange={(value) => {
-              if (value === "all") {
+            <select value={month ? `${month}` : "all"} onChange={(event) => {
+              if (event.target.value === "all") {
                 setMonth(null);
               } else {
-                setMonth(Number(value));
+                setMonth(Number(event.target.value));
               }
-            }}>
-              <SelectItem value="all">All</SelectItem>
+            }}
+              className="w-full rounded-lg appearance-none cursor-pointer px-3 py-2 text-sm transition-colors focus:outline-none focus:ring-0"
+              style={{
+                background: "var(--color-grafana-bg-secondary)",
+                border: "1px solid var(--color-grafana-border)",
+                color: "var(--color-grafana-text-primary)",
+                boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)",
+                outline: "none",
+              }}
+              aria-label="Select month"
+            >
+              <option value="all">All</option>
               {Array.from({ length: 12 }, (_, idx) => idx + 1).map((m) => (
-                <SelectItem key={m} value={`${m}`}>
+                <option key={m} value={`${m}`}>
                   {m}
-                </SelectItem>
+                </option>
               ))}
-            </Select>
+            </select>
           </div>
         </div>
       </Card>

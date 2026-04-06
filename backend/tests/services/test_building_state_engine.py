@@ -1,12 +1,12 @@
 from datetime import UTC, datetime, timedelta
 
-from app.services.cockpit_issue_fusion import CockpitIssueFusionService
+from app.schemas.cockpit import CockpitSourceStatus
 from app.services.building_posture_resolver import resolve_building_posture
 from app.services.building_state_engine import build_building_state_payload
 from app.services.building_state_models import NarrativeCandidate, NarrativeLocation
+from app.services.cockpit_issue_fusion import CockpitIssueFusionService
 from app.services.dominant_narrative_selector import select_dominant_narrative
 from app.services.narrative_candidate_generator import generate_narrative_candidates
-from app.schemas.cockpit import CockpitSourceStatus
 
 
 class _NoOpRepo:
@@ -422,30 +422,28 @@ def test_generate_narrative_candidates_uses_fused_issues_before_fallback():
             (),
             {
                 "aggregate": staticmethod(
-                    lambda site_id: (
-                        service.aggregate(
-                            site_id,
-                            alert_entries=[
-                                {
-                                    "id": "alert-live-1",
-                                    "site_id": "S002",
-                                    "equipment_id": "S002-CHILLER-B1-001",
-                                    "zone_id": "Zone-L2-Boardroom-A",
-                                    "floor_id": "L2",
-                                    "type": "thermal",
-                                    "title": "Boardroom cooling drift",
-                                    "summary": "Cooling drift is accelerating toward discomfort.",
-                                    "severity": "critical",
-                                    "status": "new",
-                                    "recommended_action": "Prepare standby cooling.",
-                                    "impact": "Executive zone comfort is degrading.",
-                                    "updated_at": timestamp,
-                                    "created_at": timestamp,
-                                }
-                            ],
-                            intake_entries=[],
-                            work_order_entries=[],
-                        )
+                    lambda site_id: service.aggregate(
+                        site_id,
+                        alert_entries=[
+                            {
+                                "id": "alert-live-1",
+                                "site_id": "S002",
+                                "equipment_id": "S002-CHILLER-B1-001",
+                                "zone_id": "Zone-L2-Boardroom-A",
+                                "floor_id": "L2",
+                                "type": "thermal",
+                                "title": "Boardroom cooling drift",
+                                "summary": "Cooling drift is accelerating toward discomfort.",
+                                "severity": "critical",
+                                "status": "new",
+                                "recommended_action": "Prepare standby cooling.",
+                                "impact": "Executive zone comfort is degrading.",
+                                "updated_at": timestamp,
+                                "created_at": timestamp,
+                            }
+                        ],
+                        intake_entries=[],
+                        work_order_entries=[],
                     )
                 )
             },
@@ -494,34 +492,32 @@ def test_build_building_state_payload_prefers_fused_issue_feed():
         (),
         {
             "aggregate": staticmethod(
-                lambda site_id: (
-                    CockpitIssueFusionService(
-                        alert_repo=_NoOpRepo(),
-                        email_repo=_NoOpRepo(),
-                        work_order_repo=_NoOpRepo(),
-                        audit_repo=_NoOpRepo(),
-                    ).aggregate(
-                        site_id,
-                        alert_entries=[
-                            {
-                                "id": "alert-live-2",
-                                "site_id": "S002",
-                                "zone_id": "Zone-L4-Boardroom-A",
-                                "floor_id": "L4",
-                                "type": "thermal",
-                                "title": "Boardroom thermal drift",
-                                "summary": "Cooling drift is accelerating across the executive meeting space.",
-                                "severity": "critical",
-                                "status": "new",
-                                "recommended_action": "Prepare standby cooling.",
-                                "impact": "Occupied meeting space will breach comfort bounds.",
-                                "updated_at": timestamp,
-                                "created_at": timestamp,
-                            }
-                        ],
-                        intake_entries=[],
-                        work_order_entries=[],
-                    )
+                lambda site_id: CockpitIssueFusionService(
+                    alert_repo=_NoOpRepo(),
+                    email_repo=_NoOpRepo(),
+                    work_order_repo=_NoOpRepo(),
+                    audit_repo=_NoOpRepo(),
+                ).aggregate(
+                    site_id,
+                    alert_entries=[
+                        {
+                            "id": "alert-live-2",
+                            "site_id": "S002",
+                            "zone_id": "Zone-L4-Boardroom-A",
+                            "floor_id": "L4",
+                            "type": "thermal",
+                            "title": "Boardroom thermal drift",
+                            "summary": "Cooling drift is accelerating across the executive meeting space.",
+                            "severity": "critical",
+                            "status": "new",
+                            "recommended_action": "Prepare standby cooling.",
+                            "impact": "Occupied meeting space will breach comfort bounds.",
+                            "updated_at": timestamp,
+                            "created_at": timestamp,
+                        }
+                    ],
+                    intake_entries=[],
+                    work_order_entries=[],
                 )
             )
         },

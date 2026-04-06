@@ -79,7 +79,7 @@ class ModelDriftCalculator:
     async def get_all_drift_scores(self) -> list[dict[str, Any]]:
         """Score every active model in the registry.
 
-        In demo/dev mode we use the stored ``r_squared_avg`` as both
+        In local/dev mode we use the stored ``r_squared_avg`` as both
         baseline and current (drift = 0).  Production would fetch live
         evaluation metrics separately.
         """
@@ -94,7 +94,7 @@ class ModelDriftCalculator:
 
             model_id = m.get("model_id", m.get("id", "unknown"))
             baseline = m.get("r_squared_avg") or 0.0
-            # In demo mode current == baseline; production would query
+            # In local mode current == baseline; production would query
             # a live evaluation table.
             current = baseline
 

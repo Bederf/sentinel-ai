@@ -17,7 +17,6 @@ derive from equipment type code instead (see EQUIPMENT_CRITICALITY mapping below
 
 from __future__ import annotations
 
-
 # Severity weights matching event_bus.Importance levels
 SEVERITY_WEIGHTS: dict[str, float] = {
     "critical": 1.0,

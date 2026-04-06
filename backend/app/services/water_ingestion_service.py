@@ -5,15 +5,15 @@ Follows the same pattern as solar_ingestion_service.py and energy_centre_service
 """
 
 import asyncio
+import json
 import logging
 from datetime import datetime
-from typing import Dict, List, Optional
 from pathlib import Path
-import json
+from typing import Optional
 
-from app.models.water_meter import WaterMeter, WaterConsumption
-from app.services.water_meter_adapter import create_water_meter_adapter
 from app.database.repositories.water_consumption_repository import WaterConsumptionRepository
+from app.models.water_meter import WaterConsumption, WaterMeter
+from app.services.water_meter_adapter import create_water_meter_adapter
 
 logger = logging.getLogger(__name__)
 
@@ -21,14 +21,14 @@ logger = logging.getLogger(__name__)
 class SiteRegistration:
     """Holds meter and config for a single site."""
 
-    def __init__(self, site_id: str, config: Dict):
+    def __init__(self, site_id: str, config: dict):
         self.site_id = site_id
         self.config = config
-        self.meters: Dict[str, WaterMeter] = {}
-        self.adapters: Dict[str, any] = {}  # device_id -> adapter
-        self.last_poll: Optional[datetime] = None
-        self.previous_pulse_counts: Dict[str, int] = {}  # For flow rate calculation
-        self.meter_zone_map: Dict[str, Optional[str]] = {}  # meter_id -> zone_id mapping
+        self.meters: dict[str, WaterMeter] = {}
+        self.adapters: dict[str, any] = {}  # device_id -> adapter
+        self.last_poll: datetime | None = None
+        self.previous_pulse_counts: dict[str, int] = {}  # For flow rate calculation
+        self.meter_zone_map: dict[str, str | None] = {}  # meter_id -> zone_id mapping
 
 
 class WaterIngestionService:
@@ -56,7 +56,7 @@ class WaterIngestionService:
         if hasattr(self, "_initialized"):
             return
         self._initialized = True
-        self._sites: Dict[str, SiteRegistration] = {}
+        self._sites: dict[str, SiteRegistration] = {}
         self._repository = WaterConsumptionRepository()
         self._load_sites()
 
@@ -132,9 +132,9 @@ class WaterIngestionService:
     def register_site(
         self,
         site_id: str,
-        config: Dict,
-        meters: List[WaterMeter],
-        meter_zone_map: Optional[Dict[str, Optional[str]]] = None,
+        config: dict,
+        meters: list[WaterMeter],
+        meter_zone_map: dict[str, str | None] | None = None,
     ):
         """Register a site with its water meters.
 
@@ -170,7 +170,7 @@ class WaterIngestionService:
         self._sites[site_id] = registration
         logger.info(f"Registered site {site_id} with {len(meters)} water meter(s)")
 
-    def get_sites(self) -> List[str]:
+    def get_sites(self) -> list[str]:
         """Get list of registered sites."""
         return list(self._sites.keys())
 
@@ -262,7 +262,7 @@ class WaterIngestionService:
 
     # === Queries ===
 
-    def get_latest_consumption(self, site_id: str) -> Optional[WaterConsumption]:
+    def get_latest_consumption(self, site_id: str) -> WaterConsumption | None:
         """Get latest consumption reading for a site."""
         record = self._repository.get_latest_consumption(site_id)
         if record:
@@ -272,10 +272,10 @@ class WaterIngestionService:
     def get_consumption_history(
         self,
         site_id: str,
-        start_date: Optional[datetime] = None,
-        end_date: Optional[datetime] = None,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
         limit: int = 1000,
-    ) -> List[WaterConsumption]:
+    ) -> list[WaterConsumption]:
         """Get consumption history for a site."""
         records = self._repository.get_consumption_by_site(
             site=site_id,
@@ -285,7 +285,7 @@ class WaterIngestionService:
         )
         return [WaterConsumption.from_dict(r) for r in records]
 
-    def get_site_status(self, site_id: str) -> Dict:
+    def get_site_status(self, site_id: str) -> dict:
         """Get ingestion status for a site."""
         if site_id not in self._sites:
             return {"error": "Site not registered"}
@@ -300,7 +300,7 @@ class WaterIngestionService:
 
 
 # Singleton instance
-_water_ingestion_service: Optional[WaterIngestionService] = None
+_water_ingestion_service: WaterIngestionService | None = None
 
 
 def get_water_ingestion_service() -> WaterIngestionService:

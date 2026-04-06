@@ -7,13 +7,13 @@
  * Layout:
  *   Row 1: Overview Panel | BESS Status | Energy Flow Diagram
  *   Row 2: Inverter Status Matrix (full width)
- *   Row 3: Financial Report | Forecast vs Actual Chart
+ *   Row 3: (removed) financial cards moved out of ops view
  */
 
 import { useState, useEffect, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Sun, Building2, ChevronDown, RefreshCw } from "lucide-react";
-import { useSimulation } from "../../contexts/SimulationContext";
+import { authorizedFetch } from "@/lib/api/client";
 import { fetchSolarSites } from "../../lib/solarApi";
 import type { SolarSite } from "../../lib/solarApi";
 import { useModuleAccess } from "../../hooks/useModuleAccess";
@@ -22,9 +22,6 @@ import { SolarOverviewPanel } from "./SolarOverviewPanel";
 import { BESSStatusPanel } from "./BESSStatusPanel";
 import { InverterStatusMatrix } from "./InverterStatusMatrix";
 import { EnergyFlowDiagram } from "./EnergyFlowDiagram";
-import { SolarFinancialReport } from "./SolarFinancialReport";
-import { ForecastActualChart } from "./ForecastActualChart";
-import { SolarAnnualCard } from "./SolarAnnualCard";
 
 /**
  * SolarDashboard - Main solar & BESS monitoring view
@@ -35,17 +32,32 @@ import { SolarAnnualCard } from "./SolarAnnualCard";
  * Layout:
  * - Row 1: Overview (generation, performance) | BESS (SOC, mode) | Energy Flow
  * - Row 2: Inverter Status Matrix (full width)
- * - Row 3: Financial Report | Forecast vs Actual Chart
+ * - Row 3: intentionally omitted (financial cards are non-operational)
  */
-export function SolarDashboard() {
+interface BridgeTelemetrySummary {
+  status: "live" | "unavailable";
+  zones_with_readings?: number;
+  zone_count?: number;
+  power?: {
+    hvac_kw?: number;
+    lighting_kw?: number;
+    total_kw?: number;
+  };
+}
+
+interface SolarDashboardProps {
+  siteId?: string;
+}
+
+export function SolarDashboard({ siteId: propSiteId }: SolarDashboardProps) {
   const queryClient = useQueryClient();
   const [solarSites, setSolarSites] = useState<SolarSite[]>([]);
-  const [selectedSiteId, setSelectedSiteId] = useState<string>("");
+  const [selectedSiteId, setSelectedSiteId] = useState<string>(propSiteId ?? "");
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [bridgeTelemetry, setBridgeTelemetry] = useState<BridgeTelemetrySummary | null>(null);
+  const [sentinelGuidance, setSentinelGuidance] = useState<string | null>(null);
+  const [sentinelPosture, setSentinelPosture] = useState<string | null>(null);
   const { isActive: isSolarActive } = useModuleAccess('solar');
-
-  // Get simulation context for live solar efficiency data
-  const { running: isSimulationRunning, solarEfficiency, cloudCover, simulatedHour, daysSimulated } = useSimulation();
 
   // Refetch all solar data when module is activated (eliminates 30s stale data lag)
   useEffect(() => {
@@ -67,8 +79,19 @@ export function SolarDashboard() {
           new Map(sites.map((site) => [site.site_id, site])).values()
         );
         setSolarSites(uniqueSites);
+        if (propSiteId) {
+          const requested = uniqueSites.find((site) => site.site_id === propSiteId);
+          if (requested) {
+            setSelectedSiteId(requested.site_id);
+            return;
+          }
+        }
         if (uniqueSites.length > 0 && !selectedSiteId) {
-          setSelectedSiteId(uniqueSites[0].site_id);
+          const preferredSite =
+            uniqueSites.find((site) => site.site_id === "site-002")
+            ?? uniqueSites.find((site) => /sandton city office tower/i.test(site.site_name || ""))
+            ?? uniqueSites[0];
+          setSelectedSiteId(preferredSite.site_id);
         }
       })
       .catch(() => {
@@ -77,6 +100,53 @@ export function SolarDashboard() {
         setSolarSites([]);
         // selectedSiteId stays empty if no API data
       });
+  }, [selectedSiteId, propSiteId]);
+
+  useEffect(() => {
+    if (!selectedSiteId) return;
+    let mounted = true;
+
+    async function loadTelemetrySummary() {
+      try {
+        const [rawTelemetryResp, stateResp] = await Promise.all([
+          authorizedFetch(`/api/sites/${encodeURIComponent(selectedSiteId)}/telemetry`).catch(() => null),
+          authorizedFetch(`/api/building-state/${encodeURIComponent(selectedSiteId)}`).catch(() => null),
+        ]);
+        if (!mounted) return;
+
+        if (rawTelemetryResp && rawTelemetryResp.ok) {
+          const raw = await rawTelemetryResp.json();
+          setBridgeTelemetry({
+            status: "live",
+            zones_with_readings: raw?.zones_with_readings ?? 0,
+            zone_count: raw?.zone_count ?? 0,
+            power: raw?.power ?? {},
+          });
+        } else {
+          setBridgeTelemetry({ status: "unavailable" });
+        }
+
+        if (stateResp && stateResp.ok) {
+          const state = await stateResp.json();
+          setSentinelGuidance(state?.payload?.operator_guidance?.headline || null);
+          setSentinelPosture(state?.payload?.building_posture || null);
+        } else {
+          setSentinelGuidance(null);
+          setSentinelPosture(null);
+        }
+      } catch {
+        if (mounted) {
+          setBridgeTelemetry({ status: "unavailable" });
+          setSentinelGuidance(null);
+          setSentinelPosture(null);
+        }
+      }
+    }
+
+    loadTelemetrySummary();
+    return () => {
+      mounted = false;
+    };
   }, [selectedSiteId]);
 
   // Refetch all solar data when module is activated
@@ -130,25 +200,12 @@ export function SolarDashboard() {
               >
                 Solar &amp; BESS
               </h1>
-              {isSimulationRunning && (
-                <div className="px-2 py-0.5 rounded text-xs font-medium"
-                  style={{
-                    background: 'rgba(250, 204, 21, 0.15)',
-                    color: '#FACC15',
-                  }}
-                >
-                  ☀️ Live • {solarEfficiency?.toFixed(0)}% efficiency
-                </div>
-              )}
             </div>
             <p
               className="text-sm"
               style={{ color: "var(--color-sentinel-text-secondary)" }}
             >
-              {isSimulationRunning
-                ? `Live generation data \u2022 Hour ${simulatedHour}:00 (Day ${daysSimulated}/365) \u2022 ${cloudCover?.toFixed(0)}% cloud cover`
-                : 'Generation, Storage, Dispatch &amp; Financial Performance'
-              }
+              Generation, Storage and Dispatch Operations
             </p>
           </div>
         </div>
@@ -208,21 +265,57 @@ export function SolarDashboard() {
         <PageLoading message="Loading solar sites..." />
       ) : (
       <>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+        <div className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-sm font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>
+              Raw Bridge Telemetry
+            </h2>
+            <span
+              className="text-xs px-2 py-1 rounded"
+              style={{
+                background: bridgeTelemetry?.status === "live" ? "rgba(16,185,129,0.15)" : "rgba(245,158,11,0.15)",
+                color: bridgeTelemetry?.status === "live" ? "#10B981" : "#F59E0B",
+              }}
+            >
+              {bridgeTelemetry?.status === "live" ? "Live" : "Unavailable"}
+            </span>
+          </div>
+          <p className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+            Zones: {bridgeTelemetry?.zones_with_readings ?? 0}/{bridgeTelemetry?.zone_count ?? 0}
+          </p>
+          <p className="text-xs mt-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+            Power: HVAC {(bridgeTelemetry?.power?.hvac_kw ?? 0).toFixed(2)} kW · Lighting {(bridgeTelemetry?.power?.lighting_kw ?? 0).toFixed(2)} kW · Total {(bridgeTelemetry?.power?.total_kw ?? 0).toFixed(2)} kW
+          </p>
+        </div>
+        <div className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+          <h2 className="text-sm font-semibold mb-2" style={{ color: "var(--color-sentinel-text-primary)" }}>
+            SENTINEL Solar Interpretation
+          </h2>
+          <p className="text-xs capitalize" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+            Posture: <span style={{ color: "var(--color-sentinel-text-primary)" }}>{sentinelPosture || "unknown"}</span>
+          </p>
+          <p className="text-xs mt-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+            {sentinelGuidance || "No active guidance yet."}
+          </p>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
         <div
-          className="rounded-md overflow-hidden"
+          className="rounded-lg overflow-hidden"
           style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}
         >
           <SolarOverviewPanel siteId={selectedSiteId} />
         </div>
         <div
-          className="rounded-md overflow-hidden"
+          className="rounded-lg overflow-hidden"
           style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}
         >
           <BESSStatusPanel siteId={selectedSiteId} />
         </div>
         <div
-          className="rounded-md overflow-hidden"
+          className="rounded-lg overflow-hidden"
           style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}
         >
           <EnergyFlowDiagram siteId={selectedSiteId} />
@@ -232,38 +325,13 @@ export function SolarDashboard() {
       {/* Row 2: Inverter Matrix (full width) */}
       <div className="mb-4">
         <div
-          className="rounded-md overflow-hidden"
+          className="rounded-lg overflow-hidden"
           style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}
         >
           <InverterStatusMatrix siteId={selectedSiteId} />
         </div>
       </div>
 
-      {/* Row 3: Financial Report + Forecast Chart */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-        <div
-          className="rounded-md overflow-hidden"
-          style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}
-        >
-          <SolarFinancialReport siteId={selectedSiteId} />
-        </div>
-        <div
-          className="rounded-md overflow-hidden"
-          style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}
-        >
-          <ForecastActualChart siteId={selectedSiteId} />
-        </div>
-      </div>
-
-      {/* Row 4: Annual Performance Summary (365 days) */}
-      <div className="mb-4">
-        <div
-          className="rounded-md overflow-hidden"
-          style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}
-        >
-          <SolarAnnualCard siteId={selectedSiteId} />
-        </div>
-      </div>
       </>
       )}
     </div>

@@ -2,6 +2,7 @@
 
 import json
 import logging
+from datetime import UTC
 from pathlib import Path
 
 from app.core.site_resolver import get_primary_site_code
@@ -316,9 +317,9 @@ class FMContextService:
                 return ""
 
             # Filter out expired memories
-            from datetime import datetime, timezone
+            from datetime import datetime
 
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             active = []
             for m in memories:
                 expires = m.get("expires_at")

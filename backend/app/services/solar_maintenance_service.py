@@ -18,12 +18,12 @@ Work orders follow existing Sentry notification + auto-assignment pattern.
 
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 from enum import Enum
-from typing import Dict, List, Optional, Any
+from typing import Any
 
-from app.services.solar_ingestion_service import get_solar_ingestion_service
 from app.services.solar_health_service import get_solar_health_service
+from app.services.solar_ingestion_service import get_solar_ingestion_service
 from app.services.solar_performance_service import get_solar_performance_service
 
 logger = logging.getLogger(__name__)
@@ -72,9 +72,9 @@ class MaintenanceRecommendation:
     estimated_cost_zar: float
     reason: str
     next_due_date: str
-    details: Dict[str, Any] = field(default_factory=dict)
+    details: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "type": self.type.value,
             "equipment_id": self.equipment_id,
@@ -100,7 +100,7 @@ class MaintenanceCalendarEntry:
     estimated_duration_hours: float
     estimated_cost_zar: float
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "date": self.date,
             "type": self.type.value,
@@ -119,11 +119,11 @@ class MaintenanceCalendar:
 
     site_id: str
     generated_at: str
-    entries: List[MaintenanceCalendarEntry] = field(default_factory=list)
+    entries: list[MaintenanceCalendarEntry] = field(default_factory=list)
     total_estimated_cost_zar: float = 0.0
     total_entries: int = 0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "site_id": self.site_id,
             "generated_at": self.generated_at,
@@ -144,7 +144,7 @@ class WorkOrderResult:
     assigned_to: str
     status: str
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "work_order_id": self.work_order_id,
             "equipment_id": self.equipment_id,
@@ -162,10 +162,10 @@ class SolarMaintenanceService:
     """Condition-based maintenance scheduler for solar installations."""
 
     def __init__(self):
-        self._last_evaluation: Dict[str, datetime] = {}
+        self._last_evaluation: dict[str, datetime] = {}
         logger.info("SolarMaintenanceService initialized")
 
-    async def evaluate_maintenance_needs(self, site_id: str) -> List[MaintenanceRecommendation]:
+    async def evaluate_maintenance_needs(self, site_id: str) -> list[MaintenanceRecommendation]:
         """Evaluate all equipment and return maintenance recommendations.
 
         Checks:
@@ -174,8 +174,8 @@ class SolarMaintenanceService:
           - BESS maintenance (cycle milestones, cell imbalance)
           - String repairs (persistent underperformance)
         """
-        recommendations: List[MaintenanceRecommendation] = []
-        now = datetime.now(timezone.utc)
+        recommendations: list[MaintenanceRecommendation] = []
+        now = datetime.now(UTC)
 
         # --- Panel cleaning ---
         recommendations.extend(await self._check_panel_cleaning(site_id, now))
@@ -200,7 +200,7 @@ class SolarMaintenanceService:
         self._last_evaluation[site_id] = now
         return recommendations
 
-    async def generate_work_orders(self, site_id: str) -> List[WorkOrderResult]:
+    async def generate_work_orders(self, site_id: str) -> list[WorkOrderResult]:
         """Convert urgent/soon recommendations to work orders.
 
         Uses existing work order patterns with auto-assignment.
@@ -213,7 +213,7 @@ class SolarMaintenanceService:
             r for r in recommendations if r.priority in (MaintenancePriority.URGENT, MaintenancePriority.SOON)
         ]
 
-        work_orders: List[WorkOrderResult] = []
+        work_orders: list[WorkOrderResult] = []
         for i, rec in enumerate(actionable, start=1):
             wo_id = f"WO-SOLAR-{site_id.upper()}-{i:03d}"
             work_orders.append(
@@ -241,8 +241,8 @@ class SolarMaintenanceService:
           - Annual thermal imaging
           - Condition-based entries from evaluate_maintenance_needs
         """
-        now = datetime.now(timezone.utc)
-        entries: List[MaintenanceCalendarEntry] = []
+        now = datetime.now(UTC)
+        entries: list[MaintenanceCalendarEntry] = []
 
         ingestion = get_solar_ingestion_service()
         site_config = ingestion.get_site_config(site_id)
@@ -338,9 +338,9 @@ class SolarMaintenanceService:
 
     # --- Private evaluation methods ---
 
-    async def _check_panel_cleaning(self, site_id: str, now: datetime) -> List[MaintenanceRecommendation]:
+    async def _check_panel_cleaning(self, site_id: str, now: datetime) -> list[MaintenanceRecommendation]:
         """Check for soiling loss — PR decline above expected degradation."""
-        recs: List[MaintenanceRecommendation] = []
+        recs: list[MaintenanceRecommendation] = []
 
         health_svc = get_solar_health_service()
         degradation = await health_svc.calculate_degradation_rate(site_id)
@@ -350,7 +350,7 @@ class SolarMaintenanceService:
         # Use fleet average degradation as baseline
         fleet_avg_rate = degradation.fleet_average_rate_pct
         # PR decline beyond degradation suggests soiling
-        # For demo: estimate soiling loss as a fraction of PR shortfall
+        # In local seeded mode, estimate soiling loss as a fraction of PR shortfall
         ingestion = get_solar_ingestion_service()
         overview = await ingestion.get_site_overview(site_id)
         if not overview:
@@ -389,9 +389,9 @@ class SolarMaintenanceService:
             )
         return recs
 
-    async def _check_inverter_service(self, site_id: str, now: datetime) -> List[MaintenanceRecommendation]:
+    async def _check_inverter_service(self, site_id: str, now: datetime) -> list[MaintenanceRecommendation]:
         """Check inverter runtime hours, fault count, thermal events."""
-        recs: List[MaintenanceRecommendation] = []
+        recs: list[MaintenanceRecommendation] = []
 
         ingestion = get_solar_ingestion_service()
         inverters = await ingestion.get_inverters(site_id)
@@ -446,9 +446,9 @@ class SolarMaintenanceService:
                 )
         return recs
 
-    async def _check_bess_maintenance(self, site_id: str, now: datetime) -> List[MaintenanceRecommendation]:
+    async def _check_bess_maintenance(self, site_id: str, now: datetime) -> list[MaintenanceRecommendation]:
         """Check BESS cycle milestones and cell imbalance."""
-        recs: List[MaintenanceRecommendation] = []
+        recs: list[MaintenanceRecommendation] = []
 
         health_svc = get_solar_health_service()
         bess_health = await health_svc.get_bess_health(site_id)
@@ -506,9 +506,9 @@ class SolarMaintenanceService:
 
         return recs
 
-    async def _check_string_repair(self, site_id: str, now: datetime) -> List[MaintenanceRecommendation]:
+    async def _check_string_repair(self, site_id: str, now: datetime) -> list[MaintenanceRecommendation]:
         """Check for persistently underperforming strings."""
-        recs: List[MaintenanceRecommendation] = []
+        recs: list[MaintenanceRecommendation] = []
 
         perf_svc = get_solar_performance_service()
         anomalies = await perf_svc.detect_string_anomalies(site_id)
@@ -558,7 +558,7 @@ class SolarMaintenanceService:
 
 # === Singleton ===
 
-_service: Optional[SolarMaintenanceService] = None
+_service: SolarMaintenanceService | None = None
 
 
 def get_solar_maintenance_service() -> SolarMaintenanceService:

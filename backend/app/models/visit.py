@@ -18,16 +18,18 @@ from pydantic import BaseModel, ConfigDict
 class VisitStatus(str, Enum):
     """Visit lifecycle states.
 
-    CREATED    — Outlook event created, QR sent to visitor
+    PENDING    — Invite received, visitor has not yet accepted
+    CREATED    — Visitor accepted, QR sent
     ARRIVED    — Visitor scanned at reception (QR or PIN)
     REGISTERED — Visitor name/photo captured by reception
     APPROVED   — Host approved via WhatsApp
     DENIED     — Host denied access
     ACTIVE     — Access card issued, visitor on premises
     EXPIRED    — Past meeting_end or timed out
-    CANCELLED  — Explicitly cancelled
+    CANCELLED  — Event cancelled or visitor declined
     """
 
+    PENDING = "pending"
     CREATED = "created"
     ARRIVED = "arrived"
     REGISTERED = "registered"

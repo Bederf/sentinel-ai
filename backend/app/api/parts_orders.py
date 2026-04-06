@@ -4,6 +4,8 @@ from pydantic import BaseModel, Field
 from datetime import datetime
 import uuid
 
+from app.config.settings import settings
+
 router = APIRouter(prefix="/api/parts-orders", tags=["parts-orders"])
 
 
@@ -30,8 +32,17 @@ class PartsOrder(BaseModel):
     order_reference: Optional[str] = None
 
 
-# In-memory storage for demo (TODO: replace with Supabase)
+# In-memory storage for local-only ordering stub (TODO: replace with Supabase)
 _orders_db: dict[str, PartsOrder] = {}
+
+
+def _ensure_parts_ordering_supported() -> None:
+    """Reject stub ordering flows on production islands."""
+    if settings.sentinel_island_mode:
+        raise HTTPException(
+            status_code=501,
+            detail="Parts ordering requires a live supplier integration and is disabled on production island instances",
+        )
 
 
 @router.post("/", response_model=PartsOrder)
@@ -71,6 +82,7 @@ async def create_parts_order(order: PartsOrder) -> PartsOrder:
 @router.get("/", response_model=List[PartsOrder])
 async def get_parts_orders(technician_id: str, status: Optional[str] = None) -> List[PartsOrder]:
     """Get parts orders for technician, optionally filtered by status"""
+    _ensure_parts_ordering_supported()
     orders = [order for order in _orders_db.values() if order.technician_id == technician_id]
 
     if status:
@@ -82,6 +94,7 @@ async def get_parts_orders(technician_id: str, status: Optional[str] = None) -> 
 @router.get("/{order_id}", response_model=PartsOrder)
 async def get_parts_order(order_id: str) -> PartsOrder:
     """Get a specific parts order"""
+    _ensure_parts_ordering_supported()
     if order_id not in _orders_db:
         raise HTTPException(status_code=404, detail="Order not found")
 
@@ -91,6 +104,7 @@ async def get_parts_order(order_id: str) -> PartsOrder:
 @router.put("/{order_id}/approve", response_model=PartsOrder)
 async def approve_order(order_id: str, approver_id: str) -> PartsOrder:
     """Approve pending order (supervisor action)"""
+    _ensure_parts_ordering_supported()
     if order_id not in _orders_db:
         raise HTTPException(status_code=404, detail="Order not found")
 
@@ -114,6 +128,7 @@ async def approve_order(order_id: str, approver_id: str) -> PartsOrder:
 @router.put("/{order_id}/reject", response_model=PartsOrder)
 async def reject_order(order_id: str, reason: Optional[str] = None) -> PartsOrder:
     """Reject pending order (supervisor action)"""
+    _ensure_parts_ordering_supported()
     if order_id not in _orders_db:
         raise HTTPException(status_code=404, detail="Order not found")
 
@@ -131,6 +146,7 @@ async def reject_order(order_id: str, reason: Optional[str] = None) -> PartsOrde
 @router.get("/{order_id}/tracking", response_model=dict)
 async def get_order_tracking(order_id: str) -> dict:
     """Get order tracking information"""
+    _ensure_parts_ordering_supported()
     if order_id not in _orders_db:
         raise HTTPException(status_code=404, detail="Order not found")
 
@@ -171,9 +187,12 @@ async def sync_order_status(order_id: str) -> dict:
 
 async def _place_order_with_supplier(order: PartsOrder) -> str:
     """
-    Place order with supplier (mock implementation).
+    Place order with supplier via a non-production stub.
     Returns order reference number.
     """
     # In production: integrate with supplier APIs
     # For now: generate mock reference
     return f"ORD-{datetime.now().strftime('%Y%m%d')}-{order.id[:6].upper()}"
+    _ensure_parts_ordering_supported()
+
+    _ensure_parts_ordering_supported()

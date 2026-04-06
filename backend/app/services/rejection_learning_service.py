@@ -7,12 +7,12 @@ to prevent similar future rejections.
 import logging
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
+from app.database.repositories.rejection_repository import RejectionRepository
 from app.models.recommendation import Recommendation
 from app.services.profile_service import get_profile_service
 from app.services.recommendation_service import get_recommendation_service
-from app.database.repositories.rejection_repository import RejectionRepository
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +37,7 @@ class RejectionRecord:
     reason: str
     rejected_at: datetime
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize to dictionary for JSON storage."""
         return {
             "recommendation_id": self.recommendation_id,
@@ -49,7 +49,7 @@ class RejectionRecord:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "RejectionRecord":
+    def from_dict(cls, data: dict[str, Any]) -> "RejectionRecord":
         """Deserialize from dictionary."""
         rejected_at = data.get("rejected_at")
         if isinstance(rejected_at, str):
@@ -92,7 +92,7 @@ class EquipmentConstraint:
     reason: str
     created_at: datetime
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize to dictionary for JSON storage."""
         return {
             "site_id": self.site_id,
@@ -104,7 +104,7 @@ class EquipmentConstraint:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "EquipmentConstraint":
+    def from_dict(cls, data: dict[str, Any]) -> "EquipmentConstraint":
         """Deserialize from dictionary."""
         created_at = data.get("created_at")
         if isinstance(created_at, str):
@@ -176,7 +176,7 @@ class RejectionLearningService:
         except Exception as e:
             logger.error(f"Error processing rejection: {e}")
 
-    async def _add_action_constraint(self, rec: Recommendation, recent_rejections: List[RejectionRecord]) -> None:
+    async def _add_action_constraint(self, rec: Recommendation, recent_rejections: list[RejectionRecord]) -> None:
         """Add constraint to prevent similar rejected actions.
 
         Example: 3 rejections of "lower setpoint below 22°C on Floor 3"
@@ -245,7 +245,7 @@ class RejectionLearningService:
 
 
 # Singleton instance
-_rejection_learning_service: Optional[RejectionLearningService] = None
+_rejection_learning_service: RejectionLearningService | None = None
 
 
 def get_rejection_learning_service() -> RejectionLearningService:

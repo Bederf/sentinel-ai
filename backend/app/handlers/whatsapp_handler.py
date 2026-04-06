@@ -45,7 +45,7 @@ class WhatsAppHandler:
                         logger.info(f"Loaded {len(mapping)} technicians from {config_path}")
                         return mapping
 
-            logger.warning("technicians_whatsapp.json not found, using demo data")
+            logger.warning("technicians_whatsapp.json not found, using local fallback data")
             return {}
 
         except Exception as e:

@@ -13,13 +13,13 @@ professional CAD drawings using standardized layer conventions.
 - FP-LIFE: Fire protection and life safety equipment
 """
 
-import re
 import logging
-import tempfile
 import os
-from typing import Dict, List, Optional, Any
-from dataclasses import dataclass, field
+import re
+import tempfile
 from collections import defaultdict
+from dataclasses import dataclass, field
+from typing import Any
 
 import ezdxf
 from ezdxf.document import Drawing
@@ -27,8 +27,8 @@ from ezdxf.document import Drawing
 from app.services.geometry_utils import (
     BoundingBox,
     calculate_bounding_box,
-    normalize_coordinates,
     infer_floor_from_z_coordinate,
+    normalize_coordinates,
 )
 
 logger = logging.getLogger(__name__)
@@ -71,11 +71,11 @@ class BatchResult:
         total_floors: Total floor count.
     """
 
-    equipment: List[Dict[str, Any]] = field(default_factory=list)
-    floors: List[Dict[str, Any]] = field(default_factory=list)
-    zones: List[Dict[str, Any]] = field(default_factory=list)
-    validation: Optional[Dict] = None
-    per_file_status: List[Dict] = field(default_factory=list)
+    equipment: list[dict[str, Any]] = field(default_factory=list)
+    floors: list[dict[str, Any]] = field(default_factory=list)
+    zones: list[dict[str, Any]] = field(default_factory=list)
+    validation: dict | None = None
+    per_file_status: list[dict] = field(default_factory=list)
     total_equipment: int = 0
     total_floors: int = 0
 
@@ -131,7 +131,7 @@ class DXFParserService:
         dxf_bytes: bytes,
         site_code: str,
         site_name: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Main entry point: parse DXF and return BuildingConfig format.
 
@@ -263,7 +263,7 @@ class DXFParserService:
         doc: Drawing,
         bbox: BoundingBox,
         site_code: str,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Extract HVAC equipment from AE-HVAC layer.
 
@@ -319,7 +319,7 @@ class DXFParserService:
         doc: Drawing,
         bbox: BoundingBox,
         site_code: str,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Extract electrical equipment from EL-POWER layer.
 
@@ -370,7 +370,7 @@ class DXFParserService:
         doc: Drawing,
         bbox: BoundingBox,
         site_code: str,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Extract fire/safety equipment from FP-LIFE layer.
 
@@ -416,7 +416,7 @@ class DXFParserService:
         bbox: BoundingBox,
         site_code: str,
         layer_type: str,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """
         Extract equipment from a single DXF entity.
 
@@ -493,7 +493,7 @@ class DXFParserService:
             "confidence": 0.95,  # High confidence from CAD
         }
 
-    def _extract_name_from_attributes(self, insert_entity) -> Optional[str]:
+    def _extract_name_from_attributes(self, insert_entity) -> str | None:
         """
         Extract equipment name from DXF block attributes.
 
@@ -658,7 +658,7 @@ class DXFParserService:
 
         return f"{site_code}-{equipment_type}-{floor}-{zone}"
 
-    def _infer_floor_definitions(self, equipment: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def _infer_floor_definitions(self, equipment: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """
         Infer floor definitions from equipment positions.
 
@@ -708,7 +708,7 @@ class DXFParserService:
 
         return floors
 
-    def _create_zones_from_equipment(self, equipment: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def _create_zones_from_equipment(self, equipment: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """
         Create zone definitions from equipment clustering.
 
@@ -746,7 +746,7 @@ class DXFParserService:
 
     async def parse_batch(
         self,
-        files: List[Dict[str, Any]],
+        files: list[dict[str, Any]],
         site_id: str,
         site_name: str = "",
     ) -> BatchResult:
@@ -765,19 +765,19 @@ class DXFParserService:
             BatchResult with merged equipment, floors, zones, and per-file status.
         """
         from app.services.dwg_converter_service import (
-            get_dwg_converter_service,
-            DWGConverterNotAvailable,
             DWGConversionError,
+            DWGConverterNotAvailable,
+            get_dwg_converter_service,
         )
         from app.services.floor_plan_validator import get_floor_plan_validator
 
         dwg_service = get_dwg_converter_service()
         validator = get_floor_plan_validator()
 
-        all_equipment: List[Dict[str, Any]] = []
-        all_floors: List[Dict[str, Any]] = []
-        all_zones: List[Dict[str, Any]] = []
-        per_file_status: List[Dict] = []
+        all_equipment: list[dict[str, Any]] = []
+        all_floors: list[dict[str, Any]] = []
+        all_zones: list[dict[str, Any]] = []
+        per_file_status: list[dict] = []
 
         for file_info in files:
             filename = file_info["filename"]

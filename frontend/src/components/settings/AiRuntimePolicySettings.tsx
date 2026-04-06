@@ -1,0 +1,210 @@
+import { useEffect, useState } from "react";
+import { Bot, Save } from "lucide-react";
+
+interface AiRuntimePolicy {
+  chat_local_ai_only: boolean;
+  allow_tool_calling: boolean;
+  show_recommendations_in_shadow: boolean;
+  monthly_budget_zar: number;
+  hard_cap_enforced: boolean;
+}
+
+interface AiRuntimePolicySettingsProps {
+  siteId?: string;
+  readOnly?: boolean;
+  currentUserRole?: string;
+  onError?: (error: string) => void;
+  onSuccess?: () => void;
+}
+
+const DEFAULT_POLICY: AiRuntimePolicy = {
+  chat_local_ai_only: false,
+  allow_tool_calling: true,
+  show_recommendations_in_shadow: false,
+  monthly_budget_zar: 0,
+  hard_cap_enforced: false,
+};
+
+export function AiRuntimePolicySettings({
+  siteId,
+  readOnly,
+  currentUserRole,
+  onError,
+  onSuccess,
+}: AiRuntimePolicySettingsProps) {
+  const [policy, setPolicy] = useState<AiRuntimePolicy>(DEFAULT_POLICY);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!siteId) return;
+    const token = localStorage.getItem("sentinel_token");
+    if (!token) return;
+
+    setLoading(true);
+    fetch(`/api/settings/ai-policy/${encodeURIComponent(siteId)}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((response) => (response.ok ? response.json() : DEFAULT_POLICY))
+      .then((data) => {
+        setPolicy({
+          chat_local_ai_only: !!data.chat_local_ai_only,
+          allow_tool_calling: !!data.allow_tool_calling,
+          show_recommendations_in_shadow: !!data.show_recommendations_in_shadow,
+          monthly_budget_zar: Number(data.monthly_budget_zar || 0),
+          hard_cap_enforced: !!data.hard_cap_enforced,
+        });
+      })
+      .catch(() => {
+        setPolicy(DEFAULT_POLICY);
+      })
+      .finally(() => setLoading(false));
+  }, [siteId]);
+
+  const canEdit = currentUserRole === "admin" && !readOnly;
+
+  const savePolicy = async () => {
+    if (!siteId || !canEdit) return;
+    const token = localStorage.getItem("sentinel_token");
+    if (!token) return;
+
+    setSaving(true);
+    try {
+      const response = await fetch(`/api/settings/ai-policy/${encodeURIComponent(siteId)}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(policy),
+      });
+      if (!response.ok) {
+        throw new Error("Failed to save AI runtime policy");
+      }
+      onSuccess?.();
+    } catch (error) {
+      onError?.(error instanceof Error ? error.message : "Failed to save AI runtime policy");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="glass-panel overflow-visible">
+      <div className="p-4 border-b rounded-t-lg" style={{ borderColor: "var(--color-sentinel-border)" }}>
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded" style={{ background: "rgba(59, 130, 246, 0.15)", color: "var(--color-sentinel-blue)" }}>
+            <Bot className="h-5 w-5" />
+          </div>
+          <div>
+            <h2 className="text-lg font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>AI Runtime Policy</h2>
+            <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+              Site-scoped controls for chat execution and shadow-mode recommendation visibility.
+            </p>
+          </div>
+        </div>
+      </div>
+      <div className="p-6 space-y-4">
+        <label className="flex items-start gap-3">
+          <input
+            type="checkbox"
+            className="mt-1"
+            checked={policy.chat_local_ai_only}
+            disabled={!canEdit || loading}
+            onChange={(e) => setPolicy((prev) => ({ ...prev, chat_local_ai_only: e.target.checked }))}
+          />
+          <div>
+            <div style={{ color: "var(--color-sentinel-text-primary)" }}>Force local AI chat only</div>
+            <div className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+              Disables cloud LLM chat paths for this site.
+            </div>
+          </div>
+        </label>
+
+        <div className="space-y-2">
+          <div style={{ color: "var(--color-sentinel-text-primary)" }}>Monthly AI budget (ZAR)</div>
+          <input
+            type="number"
+            min={0}
+            step={10}
+            value={policy.monthly_budget_zar}
+            disabled={!canEdit || loading}
+            onChange={(e) =>
+              setPolicy((prev) => ({
+                ...prev,
+                monthly_budget_zar: Math.max(0, Number(e.target.value || 0)),
+              }))
+            }
+            className="w-full px-3 py-2 rounded"
+            style={{
+              background: "var(--color-sentinel-bg-secondary)",
+              border: "1px solid var(--color-sentinel-border)",
+              color: "var(--color-sentinel-text-primary)",
+            }}
+          />
+          <label className="flex items-start gap-3">
+            <input
+              type="checkbox"
+              className="mt-1"
+              checked={policy.hard_cap_enforced}
+              disabled={!canEdit || loading || policy.monthly_budget_zar <= 0}
+              onChange={(e) => setPolicy((prev) => ({ ...prev, hard_cap_enforced: e.target.checked }))}
+            />
+            <div>
+              <div style={{ color: "var(--color-sentinel-text-primary)" }}>Enforce hard cap</div>
+              <div className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                Block paid AI chat calls when site monthly budget is exceeded.
+              </div>
+            </div>
+          </label>
+        </div>
+
+        <label className="flex items-start gap-3">
+          <input
+            type="checkbox"
+            className="mt-1"
+            checked={policy.allow_tool_calling}
+            disabled={!canEdit || loading || policy.chat_local_ai_only}
+            onChange={(e) => setPolicy((prev) => ({ ...prev, allow_tool_calling: e.target.checked }))}
+          />
+          <div>
+            <div style={{ color: "var(--color-sentinel-text-primary)" }}>Allow chat tool-calling</div>
+            <div className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+              Enables tool-based actions from chat (disabled when local-only is forced).
+            </div>
+          </div>
+        </label>
+
+        <label className="flex items-start gap-3">
+          <input
+            type="checkbox"
+            className="mt-1"
+            checked={policy.show_recommendations_in_shadow}
+            disabled={!canEdit || loading}
+            onChange={(e) => setPolicy((prev) => ({ ...prev, show_recommendations_in_shadow: e.target.checked }))}
+          />
+          <div>
+            <div style={{ color: "var(--color-sentinel-text-primary)" }}>Show recommendations in shadow mode</div>
+            <div className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+              Keep hidden for learning-only shadow mode; enable only when you want advisory visibility.
+            </div>
+          </div>
+        </label>
+
+        <div className="pt-2">
+          <button
+            type="button"
+            disabled={!canEdit || saving || loading || !siteId}
+            onClick={savePolicy}
+            className="px-4 py-2 rounded inline-flex items-center gap-2 disabled:opacity-50"
+            style={{ background: "var(--color-sentinel-blue)", color: "#fff" }}
+          >
+            <Save className="h-4 w-4" />
+            {saving ? "Saving..." : "Save AI policy"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+

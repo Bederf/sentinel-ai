@@ -22,7 +22,7 @@ function resolveApiBaseUrl(): string {
   return RAW_API_BASE_URL;
 }
 
-const isDemoContract = (contractId: string) => contractId.startsWith("demo-");
+const isSeedContract = (contractId: string) => contractId.startsWith("seed-");
 
 function authHeaders(): Record<string, string> {
   const token = localStorage.getItem("sentinel_token");
@@ -183,14 +183,14 @@ export interface ContractListItem {
   organization_name?: string | null;
 }
 
-// ============= Demo Fallback Data =============
+// ============= Seed Fallback Data =============
 
-const demoContracts: ContractProfitabilityDetail[] = [
+const seedContracts: ContractProfitabilityDetail[] = [
   {
-    contract_id: "demo-contract-001",
-    contract_name: "CON-DEMO-2024",
-    site_id: "demo-building",
-    site_name: "Demo Office Tower",
+    contract_id: "seed-contract-001",
+    contract_name: "CON-SEED-2024",
+    site_id: "seed-building",
+    site_name: "Seed Office Tower",
     monthly_revenue_zar: 285000,
     clawbacks_zar: 0,
     net_revenue_zar: 285000,
@@ -209,7 +209,7 @@ const demoContracts: ContractProfitabilityDetail[] = [
     cost_per_asset_zar: 5087,
   },
   {
-    contract_id: "demo-uch-s004",
+    contract_id: "seed-uch-s004",
     contract_name: "CON-UCH-S004-2024",
     site_id: "site-004",
     site_name: "uMhlanga Private Hospital",
@@ -232,11 +232,11 @@ const demoContracts: ContractProfitabilityDetail[] = [
   },
 ];
 
-const demoPortfolioMetrics: PortfolioMetrics = {
-  total_contracts: demoContracts.length,
-  total_revenue_zar: demoContracts.reduce((sum, c) => sum + c.net_revenue_zar, 0),
-  total_cost_zar: demoContracts.reduce((sum, c) => sum + c.total_cost_zar, 0),
-  gross_margin_zar: demoContracts.reduce((sum, c) => sum + c.gross_margin_zar, 0),
+const seedPortfolioMetrics: PortfolioMetrics = {
+  total_contracts: seedContracts.length,
+  total_revenue_zar: seedContracts.reduce((sum, c) => sum + c.net_revenue_zar, 0),
+  total_cost_zar: seedContracts.reduce((sum, c) => sum + c.total_cost_zar, 0),
+  gross_margin_zar: seedContracts.reduce((sum, c) => sum + c.gross_margin_zar, 0),
   gross_margin_percentage: 9.2,
   profit_contracts: 1,
   loss_contracts: 1,
@@ -245,9 +245,9 @@ const demoPortfolioMetrics: PortfolioMetrics = {
   period_end: "2026-02-28",
 };
 
-const demoLossLeaders: LossLeaderAnalysis[] = [
+const seedLossLeaders: LossLeaderAnalysis[] = [
   {
-    contract_id: "demo-uch-s004",
+    contract_id: "seed-uch-s004",
     contract_name: "CON-UCH-S004-2024",
     loss_amount_zar: 42000,
     loss_percentage: 22.7,
@@ -258,18 +258,18 @@ const demoLossLeaders: LossLeaderAnalysis[] = [
   },
 ];
 
-const demoTrendsByContract: Record<string, ProfitabilityTrend[]> = {
-  "demo-contract-001": [
-    { contract_id: "demo-contract-001", period: "2025-11", revenue_zar: 285000, cost_zar: 170000, margin_zar: 115000, margin_pct: 40.4, trend: "stable" },
-    { contract_id: "demo-contract-001", period: "2025-12", revenue_zar: 285000, cost_zar: 166000, margin_zar: 119000, margin_pct: 41.8, trend: "improving" },
-    { contract_id: "demo-contract-001", period: "2026-01", revenue_zar: 285000, cost_zar: 167000, margin_zar: 118000, margin_pct: 41.4, trend: "stable" },
-    { contract_id: "demo-contract-001", period: "2026-02", revenue_zar: 285000, cost_zar: 172000, margin_zar: 113000, margin_pct: 39.6, trend: "declining" },
+const seedTrendsByContract: Record<string, ProfitabilityTrend[]> = {
+  "seed-contract-001": [
+    { contract_id: "seed-contract-001", period: "2025-11", revenue_zar: 285000, cost_zar: 170000, margin_zar: 115000, margin_pct: 40.4, trend: "stable" },
+    { contract_id: "seed-contract-001", period: "2025-12", revenue_zar: 285000, cost_zar: 166000, margin_zar: 119000, margin_pct: 41.8, trend: "improving" },
+    { contract_id: "seed-contract-001", period: "2026-01", revenue_zar: 285000, cost_zar: 167000, margin_zar: 118000, margin_pct: 41.4, trend: "stable" },
+    { contract_id: "seed-contract-001", period: "2026-02", revenue_zar: 285000, cost_zar: 172000, margin_zar: 113000, margin_pct: 39.6, trend: "declining" },
   ],
-  "demo-uch-s004": [
-    { contract_id: "demo-uch-s004", period: "2025-11", revenue_zar: 185000, cost_zar: 215000, margin_zar: -30000, margin_pct: -16.2, trend: "declining" },
-    { contract_id: "demo-uch-s004", period: "2025-12", revenue_zar: 185000, cost_zar: 217000, margin_zar: -32000, margin_pct: -17.3, trend: "declining" },
-    { contract_id: "demo-uch-s004", period: "2026-01", revenue_zar: 185000, cost_zar: 218000, margin_zar: -33000, margin_pct: -17.8, trend: "declining" },
-    { contract_id: "demo-uch-s004", period: "2026-02", revenue_zar: 185000, cost_zar: 227000, margin_zar: -42000, margin_pct: -22.7, trend: "declining" },
+  "seed-uch-s004": [
+    { contract_id: "seed-uch-s004", period: "2025-11", revenue_zar: 185000, cost_zar: 215000, margin_zar: -30000, margin_pct: -16.2, trend: "declining" },
+    { contract_id: "seed-uch-s004", period: "2025-12", revenue_zar: 185000, cost_zar: 217000, margin_zar: -32000, margin_pct: -17.3, trend: "declining" },
+    { contract_id: "seed-uch-s004", period: "2026-01", revenue_zar: 185000, cost_zar: 218000, margin_zar: -33000, margin_pct: -17.8, trend: "declining" },
+    { contract_id: "seed-uch-s004", period: "2026-02", revenue_zar: 185000, cost_zar: 227000, margin_zar: -42000, margin_pct: -22.7, trend: "declining" },
   ],
 };
 
@@ -287,8 +287,8 @@ export const profitabilityApi = {
     if (period_end) params.set("period_end", period_end);
     const qs = params.toString();
     return fetchJson<PortfolioMetrics>(`/api/contracts/profitability/portfolio${qs ? `?${qs}` : ""}`)
-      .then((metrics) => (metrics.total_contracts > 0 ? metrics : demoPortfolioMetrics))
-      .catch(() => demoPortfolioMetrics);
+      .then((metrics) => (metrics.total_contracts > 0 ? metrics : seedPortfolioMetrics))
+      .catch(() => seedPortfolioMetrics);
   },
 
   /**
@@ -302,9 +302,9 @@ export const profitabilityApi = {
     period_start?: string,
     period_end?: string
   ): Promise<ContractProfitabilityDetail> => {
-    if (isDemoContract(contractId)) {
-      const fallback = demoContracts.find((contract) => contract.contract_id === contractId);
-      return Promise.resolve(fallback || demoContracts[0]);
+    if (isSeedContract(contractId)) {
+      const fallback = seedContracts.find((contract) => contract.contract_id === contractId);
+      return Promise.resolve(fallback || seedContracts[0]);
     }
     const params = new URLSearchParams();
     if (period_start) params.set("period_start", period_start);
@@ -313,8 +313,8 @@ export const profitabilityApi = {
     return fetchJson<ContractProfitabilityDetail>(
       `/api/contracts/profitability/contract/${encodeURIComponent(contractId)}${qs ? `?${qs}` : ""}`
     ).catch(() => {
-      const fallback = demoContracts.find((contract) => contract.contract_id === contractId);
-      return fallback || demoContracts[0];
+      const fallback = seedContracts.find((contract) => contract.contract_id === contractId);
+      return fallback || seedContracts[0];
     });
   },
 
@@ -334,9 +334,9 @@ export const profitabilityApi = {
       .then((payload) =>
         payload.loss_leaders.length > 0
           ? payload
-          : { loss_leaders: demoLossLeaders, count: demoLossLeaders.length }
+          : { loss_leaders: seedLossLeaders, count: seedLossLeaders.length }
       )
-      .catch(() => ({ loss_leaders: demoLossLeaders, count: demoLossLeaders.length }));
+      .catch(() => ({ loss_leaders: seedLossLeaders, count: seedLossLeaders.length }));
   },
 
   /**
@@ -348,10 +348,10 @@ export const profitabilityApi = {
     contractId: string,
     months: number = 12
   ): Promise<{ contract_id: string; trends: ProfitabilityTrend[] }> => {
-    if (isDemoContract(contractId)) {
+    if (isSeedContract(contractId)) {
       return Promise.resolve({
         contract_id: contractId,
-        trends: demoTrendsByContract[contractId] || demoTrendsByContract[demoContracts[0].contract_id],
+        trends: seedTrendsByContract[contractId] || seedTrendsByContract[seedContracts[0].contract_id],
       });
     }
     return fetchJson<{ contract_id: string; trends: ProfitabilityTrend[] }>(
@@ -362,12 +362,12 @@ export const profitabilityApi = {
           ? response
           : {
               contract_id: contractId,
-              trends: demoTrendsByContract[contractId] || demoTrendsByContract[demoContracts[0].contract_id],
+              trends: seedTrendsByContract[contractId] || seedTrendsByContract[seedContracts[0].contract_id],
             }
       )
       .catch(() => ({
         contract_id: contractId,
-        trends: demoTrendsByContract[contractId] || demoTrendsByContract[demoContracts[0].contract_id],
+        trends: seedTrendsByContract[contractId] || seedTrendsByContract[seedContracts[0].contract_id],
       }));
   },
 
@@ -462,8 +462,8 @@ export const profitabilityApi = {
     ).catch(() => ({
       contract: { id: contractId },
       period: { start: period_start || "", end: period_end || "" },
-      profitability: demoContracts[0],
-      trends: demoTrendsByContract[demoContracts[0].contract_id] || [],
+      profitability: seedContracts[0],
+      trends: seedTrendsByContract[seedContracts[0].contract_id] || [],
       assets: [],
       data_quality_flags: ["report_unavailable"],
       assumptions: [],
@@ -514,7 +514,7 @@ export const profitabilityApi = {
         `/api/contracts${qs ? `?${qs}` : ""}`
       );
       if (!response.contracts || response.contracts.length === 0) {
-        return demoContracts.map((contract) => ({
+        return seedContracts.map((contract) => ({
           id: contract.contract_id,
           code: contract.contract_name,
           site_name: contract.site_name,
@@ -527,7 +527,7 @@ export const profitabilityApi = {
         organization_name: contract.organizations?.name ?? null,
       }));
     } catch {
-      return demoContracts.map((contract) => ({
+      return seedContracts.map((contract) => ({
         id: contract.contract_id,
         code: contract.contract_name,
         site_name: contract.site_name,

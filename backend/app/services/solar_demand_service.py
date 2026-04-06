@@ -20,11 +20,11 @@ import logging
 import math
 import random
 from dataclasses import dataclass, field
-from datetime import datetime, timezone, timedelta
-from typing import Dict, List, Optional, Any
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
-from app.services.solar_config_service import get_site_solar_config
 from app.core.site_resolver import get_primary_site_code
+from app.services.solar_config_service import get_site_solar_config
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +48,7 @@ class DemandStatus:
     bess_shaving_active: bool = False
     bess_shaving_kw: float = 0.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "site_id": self.site_id,
             "timestamp": self.timestamp,
@@ -74,7 +74,7 @@ class DemandInterval:
     bess_offset_kw: float = 0.0
     net_demand_kw: float = 0.0  # after solar + bess offset
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "timestamp": self.timestamp,
             "demand_kw": round(self.demand_kw, 1),
@@ -90,13 +90,13 @@ class DemandProfile:
 
     site_id: str
     period: str  # day / week
-    intervals: List[DemandInterval] = field(default_factory=list)
+    intervals: list[DemandInterval] = field(default_factory=list)
     peak_demand_kw: float = 0.0
     peak_demand_time: str = ""
     avg_demand_kw: float = 0.0
     peak_with_shaving_kw: float = 0.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "site_id": self.site_id,
             "period": self.period,
@@ -121,7 +121,7 @@ class MonthlyPeak:
     exceeded_nmd: bool
     penalty_zar: float = 0.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "month": self.month,
             "peak_demand_kw": round(self.peak_demand_kw, 1),
@@ -144,10 +144,10 @@ class NMDStatus:
     alert_level: str  # normal / warning / critical
     alert_message: str
     ratchet_risk: bool  # True if peak is approaching NMD
-    months_history: List[MonthlyPeak] = field(default_factory=list)
+    months_history: list[MonthlyPeak] = field(default_factory=list)
     estimated_annual_penalty_zar: float = 0.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "site_id": self.site_id,
             "nmd_limit_kva": round(self.nmd_limit_kva, 0),
@@ -173,10 +173,10 @@ class PeakRiskAssessment:
     nmd_limit_kva: float
     risk_level: str  # low / medium / high / critical
     risk_pct: float  # predicted_peak / nmd * 100
-    contributing_factors: List[str] = field(default_factory=list)
+    contributing_factors: list[str] = field(default_factory=list)
     recommendation: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "site_id": self.site_id,
             "timestamp": self.timestamp,
@@ -203,7 +203,7 @@ class ShavingPotential:
     achievable_peak_kw: float  # current_peak - max_shaving
     demand_savings_zar_month: float
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "site_id": self.site_id,
             "current_peak_kw": round(self.current_peak_kw, 1),
@@ -229,7 +229,7 @@ class ShavingRecommendation:
     priority: str  # low / medium / high / critical
     estimated_savings_zar: float = 0.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "site_id": self.site_id,
             "timestamp": self.timestamp,
@@ -255,7 +255,7 @@ class DeferralSuggestion:
     criticality: str  # low / medium / high
     reason: str
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "equipment_code": self.equipment_code,
             "equipment_name": self.equipment_name,
@@ -283,7 +283,7 @@ class DemandSavings:
     savings_zar: float
     savings_pct: float
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "site_id": self.site_id,
             "period": self.period,
@@ -325,9 +325,9 @@ class SolarDemandService:
     PEAK_DEMAND_KW = 1850.0
 
     def __init__(self):
-        self._demand_history: Dict[str, List[DemandInterval]] = {}
-        self._monthly_peaks: Dict[str, List[MonthlyPeak]] = {}
-        self._nmd_cache: Dict[str, float] = {}
+        self._demand_history: dict[str, list[DemandInterval]] = {}
+        self._monthly_peaks: dict[str, list[MonthlyPeak]] = {}
+        self._nmd_cache: dict[str, float] = {}
         self._load_config(get_primary_site_code() or "unknown")
         self._seed_demo_data(get_primary_site_code() or "unknown")
 
@@ -380,14 +380,14 @@ class SolarDemandService:
 
     def _seed_demo_data(self, site_id: str) -> None:
         """Seed realistic demand profile and monthly peak history."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         sast = now + timedelta(hours=2)
 
         # Seed 15-minute demand intervals for today (starting from midnight SAST)
         start_sast = sast.replace(hour=0, minute=0, second=0, microsecond=0)
         start_utc = start_sast - timedelta(hours=2)
 
-        intervals: List[DemandInterval] = []
+        intervals: list[DemandInterval] = []
         t = start_utc
 
         while t <= now:
@@ -424,7 +424,7 @@ class SolarDemandService:
         self._demand_history[site_id] = intervals
 
         # Seed 12 months of peak history
-        monthly_peaks: List[MonthlyPeak] = []
+        monthly_peaks: list[MonthlyPeak] = []
         for months_ago in range(12, 0, -1):
             month_dt = now - timedelta(days=months_ago * 30)
             month_str = month_dt.strftime("%Y-%m")
@@ -534,7 +534,7 @@ class SolarDemandService:
 
     def get_current_demand(self, site_id: str) -> DemandStatus:
         """Get current building demand snapshot with NMD headroom."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         sast = now + timedelta(hours=2)
         hour = sast.hour + sast.minute / 60.0
 
@@ -594,7 +594,7 @@ class SolarDemandService:
             return DemandProfile(site_id=site_id, period=period)
 
         # For day: use today's intervals
-        # For week: would aggregate, but for demo just use what we have
+        # For week: would aggregate, but in local mode just use what we have
         peak_demand = max(i.demand_kw for i in intervals)
         peak_net = max(i.net_demand_kw for i in intervals)
         peak_time = ""
@@ -615,7 +615,7 @@ class SolarDemandService:
             peak_with_shaving_kw=peak_net,
         )
 
-    def get_monthly_peak_history(self, site_id: str, months: int = 12) -> List[MonthlyPeak]:
+    def get_monthly_peak_history(self, site_id: str, months: int = 12) -> list[MonthlyPeak]:
         """Get historical monthly peaks for NMD ratchet tracking."""
         peaks = self._monthly_peaks.get(site_id, [])
         return peaks[-months:]
@@ -669,7 +669,7 @@ class SolarDemandService:
 
     def predict_peak_risk(self, site_id: str) -> PeakRiskAssessment:
         """Predict if today's peak will exceed NMD threshold."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         sast = now + timedelta(hours=2)
         hour = sast.hour + sast.minute / 60.0
 
@@ -792,7 +792,7 @@ class SolarDemandService:
 
     def get_shaving_recommendation(self, site_id: str) -> ShavingRecommendation:
         """Get real-time peak shaving recommendation."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         demand = self.get_current_demand(site_id)
 
         # NMD target with buffer
@@ -852,7 +852,7 @@ class SolarDemandService:
 
     # === Load deferral ===
 
-    def get_deferral_suggestions(self, site_id: str) -> List[DeferralSuggestion]:
+    def get_deferral_suggestions(self, site_id: str) -> list[DeferralSuggestion]:
         """Identify non-critical loads that could shift to off-peak.
 
         Based on typical commercial building equipment at Site-002 campus.
@@ -961,7 +961,7 @@ class SolarDemandService:
 
 # === Singleton ===
 
-_solar_demand_service: Optional[SolarDemandService] = None
+_solar_demand_service: SolarDemandService | None = None
 
 
 def get_solar_demand_service() -> SolarDemandService:

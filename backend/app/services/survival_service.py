@@ -10,9 +10,7 @@ Provides:
 
 import logging
 from datetime import datetime
-from typing import Dict, List, Optional
 from pathlib import Path
-
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +64,7 @@ class SurvivalService:
             self._data_prep = SurvivalDataPrep()
         return self._data_prep
 
-    def predict_equipment(self, equipment_id: str) -> Dict:
+    def predict_equipment(self, equipment_id: str) -> dict:
         """
         Get survival prediction for single equipment.
 
@@ -169,7 +167,7 @@ class SurvivalService:
         else:
             return "low"
 
-    def _get_top_factors(self, equipment: Dict, features: Dict, model) -> List[Dict]:
+    def _get_top_factors(self, equipment: dict, features: dict, model) -> list[dict]:
         """Get top contributing factors for this equipment."""
         try:
             hazard_ratios = model.get_hazard_ratios()
@@ -219,7 +217,7 @@ class SurvivalService:
 
         return contributions[:5]
 
-    def get_fleet_risk_summary(self) -> Dict:
+    def get_fleet_risk_summary(self) -> dict:
         """Get risk summary across all equipment."""
         data_prep = self._get_data_prep()
         equipment_list = data_prep._load_equipment()
@@ -263,7 +261,7 @@ class SurvivalService:
             "timestamp": datetime.utcnow().isoformat(),
         }
 
-    def get_hazard_ratios(self) -> List[Dict]:
+    def get_hazard_ratios(self) -> list[dict]:
         """Get hazard ratios for all features."""
         try:
             model = self._load_model()
@@ -273,7 +271,7 @@ class SurvivalService:
             logger.error(f"Error getting hazard ratios: {e}")
             return []
 
-    def get_training_summary(self) -> Dict:
+    def get_training_summary(self) -> dict:
         """Get summary of training data and model."""
         try:
             model_info = self.registry.get_active_model("survival", "universal")
@@ -299,7 +297,7 @@ class SurvivalService:
 
 
 # Singleton instance
-_service: Optional[SurvivalService] = None
+_service: SurvivalService | None = None
 
 
 def get_survival_service() -> SurvivalService:

@@ -9,10 +9,22 @@
 import { useEffect, useRef, useCallback, useState } from 'react'
 import type { EquipmentStatusUpdate, PredictiveFault, EquipmentStatusFrame } from '@/lib/api'
 
+const DT_TICKET_RETRY_COOLDOWN_MS = 30000
+let dtTicketRequestInFlight: Promise<string | null> | null = null
+let dtTicketCooldownUntil = 0
+
 /**
  * Obtain a short-lived SSE ticket for the digital twin stream.
  */
 async function obtainDtSseTicket(apiUrl: string, token: string | null): Promise<string | null> {
+  if (Date.now() < dtTicketCooldownUntil) {
+    return null
+  }
+  if (dtTicketRequestInFlight) {
+    return dtTicketRequestInFlight
+  }
+
+  dtTicketRequestInFlight = (async () => {
   try {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' }
     if (token) {
@@ -22,12 +34,21 @@ async function obtainDtSseTicket(apiUrl: string, token: string | null): Promise<
       method: 'POST',
       headers,
     })
+    if (res.status === 429) {
+      dtTicketCooldownUntil = Date.now() + DT_TICKET_RETRY_COOLDOWN_MS
+      return null
+    }
     if (!res.ok) return null
     const data = await res.json()
     return data.ticket || null
   } catch {
     return null
+  } finally {
+    dtTicketRequestInFlight = null
   }
+  })()
+
+  return dtTicketRequestInFlight
 }
 
 interface UseEquipmentStatusSSEResult {
@@ -66,13 +87,30 @@ export function useEquipmentStatusSSE(siteId: string): UseEquipmentStatusSSEResu
     const token = localStorage.getItem('sentinel_token')
 
     const doConnect = async () => {
+      const scheduleReconnect = () => {
+        if (reconnectAttemptsRef.current < maxReconnectAttempts) {
+          reconnectAttemptsRef.current += 1
+          const delay = reconnectDelayRef.current
+          reconnectDelayRef.current = Math.min(reconnectDelayRef.current * 2, 30000)
+          setTimeout(() => {
+            connectingRef.current = false
+            // eslint-disable-next-line react-hooks/immutability
+            connect()
+          }, delay)
+        } else {
+          connectingRef.current = false
+        }
+      }
+
       try {
         // Get a short-lived ticket
         const ticket = await obtainDtSseTicket(apiUrl, token)
-        let url = `${apiUrl}/api/digital-twin/status/stream?site_id=${encodeURIComponent(siteId)}`
-        if (ticket) {
-          url += `&ticket=${encodeURIComponent(ticket)}`
+        if (!ticket) {
+          setIsConnected(false)
+          scheduleReconnect()
+          return
         }
+        const url = `${apiUrl}/api/digital-twin/status/stream?site_id=${encodeURIComponent(siteId)}&ticket=${encodeURIComponent(ticket)}`
 
         // Guard against race condition
         if (eventSourceRef.current) {
@@ -137,25 +175,13 @@ export function useEquipmentStatusSSE(siteId: string): UseEquipmentStatusSSEResu
           eventSourceRef.current = null
 
           // Schedule reconnection with exponential backoff
-          if (reconnectAttemptsRef.current < maxReconnectAttempts) {
-            reconnectAttemptsRef.current += 1
-            const delay = reconnectDelayRef.current
-            reconnectDelayRef.current = Math.min(reconnectDelayRef.current * 2, 30000)
-
-            setTimeout(() => {
-              connectingRef.current = false
-              // eslint-disable-next-line react-hooks/immutability
-              connect()
-            }, delay)
-          } else {
-            connectingRef.current = false
-          }
+          scheduleReconnect()
         })
 
         eventSourceRef.current = eventSource
         connectingRef.current = false
       } catch {
-        connectingRef.current = false
+        scheduleReconnect()
       }
     }
 

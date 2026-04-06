@@ -182,7 +182,7 @@ export function AegisConsolePage({ siteId: propSiteId }: AegisConsolePageProps) 
     <div className="h-full overflow-y-auto p-4 md:p-6" style={{ background: "var(--color-sentinel-bg-canvas)" }}>
       <div className="mx-auto max-w-[1600px] space-y-6">
         <div
-          className="rounded-md p-4 md:p-5"
+          className="rounded-lg p-4 md:p-5"
           style={{
             background: "var(--color-sentinel-bg-panel)",
             border: "1px solid var(--color-sentinel-border)",
@@ -199,7 +199,7 @@ export function AegisConsolePage({ siteId: propSiteId }: AegisConsolePageProps) 
             </div>
             <button
               onClick={() => void loadDashboard(true)}
-              className="inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm"
+              className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm"
               style={{
                 background: "var(--color-sentinel-bg-secondary)",
                 border: "1px solid var(--color-sentinel-border)",
@@ -213,7 +213,7 @@ export function AegisConsolePage({ siteId: propSiteId }: AegisConsolePageProps) 
 
           {error && (
             <div
-              className="mt-4 rounded-md px-3 py-2 text-sm"
+              className="mt-4 rounded-lg px-3 py-2 text-sm"
               style={{
                 background: "rgba(220, 38, 38, 0.15)",
                 border: "1px solid rgba(220, 38, 38, 0.3)",
@@ -229,7 +229,7 @@ export function AegisConsolePage({ siteId: propSiteId }: AegisConsolePageProps) 
           {kpiCards.map((card) => (
             <div
               key={card.label}
-              className="rounded-md p-3"
+              className="rounded-lg p-3"
               style={{
                 background: "var(--color-sentinel-bg-panel)",
                 border: "1px solid var(--color-sentinel-border)",
@@ -246,7 +246,7 @@ export function AegisConsolePage({ siteId: propSiteId }: AegisConsolePageProps) 
         </div>
 
         <div
-          className="rounded-md p-4"
+          className="rounded-lg p-4"
           style={{
             background: "var(--color-sentinel-bg-panel)",
             border: "1px solid var(--color-sentinel-border)",
@@ -259,7 +259,7 @@ export function AegisConsolePage({ siteId: propSiteId }: AegisConsolePageProps) 
             <select
               value={filters.approval_outcome || ""}
               onChange={(e) => setFilters((prev) => ({ ...prev, approval_outcome: e.target.value }))}
-              className="rounded-md px-3 py-2 text-sm"
+              className="rounded-lg px-3 py-2 text-sm"
               style={{ background: "var(--color-sentinel-bg-secondary)", border: "1px solid var(--color-sentinel-border)" }}
             >
               <option value="">Approval: all</option>
@@ -270,7 +270,7 @@ export function AegisConsolePage({ siteId: propSiteId }: AegisConsolePageProps) 
             <select
               value={filters.execution_mode || ""}
               onChange={(e) => setFilters((prev) => ({ ...prev, execution_mode: e.target.value }))}
-              className="rounded-md px-3 py-2 text-sm"
+              className="rounded-lg px-3 py-2 text-sm"
               style={{ background: "var(--color-sentinel-bg-secondary)", border: "1px solid var(--color-sentinel-border)" }}
             >
               <option value="">Execution mode: all</option>
@@ -281,7 +281,7 @@ export function AegisConsolePage({ siteId: propSiteId }: AegisConsolePageProps) 
             <select
               value={filters.dispatch_action_type || ""}
               onChange={(e) => setFilters((prev) => ({ ...prev, dispatch_action_type: e.target.value }))}
-              className="rounded-md px-3 py-2 text-sm"
+              className="rounded-lg px-3 py-2 text-sm"
               style={{ background: "var(--color-sentinel-bg-secondary)", border: "1px solid var(--color-sentinel-border)" }}
             >
               <option value="">Dispatch action: all</option>
@@ -292,7 +292,7 @@ export function AegisConsolePage({ siteId: propSiteId }: AegisConsolePageProps) 
             <select
               value={filters.write_status || ""}
               onChange={(e) => setFilters((prev) => ({ ...prev, write_status: e.target.value }))}
-              className="rounded-md px-3 py-2 text-sm"
+              className="rounded-lg px-3 py-2 text-sm"
               style={{ background: "var(--color-sentinel-bg-secondary)", border: "1px solid var(--color-sentinel-border)" }}
             >
               <option value="">Write status: all</option>
@@ -305,7 +305,7 @@ export function AegisConsolePage({ siteId: propSiteId }: AegisConsolePageProps) 
 
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
           <div
-            className="rounded-md p-4 xl:col-span-2"
+            className="rounded-lg p-4 xl:col-span-2"
             style={{
               background: "var(--color-sentinel-bg-panel)",
               border: "1px solid var(--color-sentinel-border)",
@@ -346,7 +346,7 @@ export function AegisConsolePage({ siteId: propSiteId }: AegisConsolePageProps) 
                         <td className="px-2 py-2">
                           <button
                             onClick={() => void handleInspectDecision(decision.id)}
-                            className="rounded-md px-2 py-1 text-xs"
+                            className="rounded-lg px-2 py-1 text-xs"
                             style={{
                               background: "var(--color-sentinel-bg-secondary)",
                               border: "1px solid var(--color-sentinel-border)",
@@ -366,7 +366,7 @@ export function AegisConsolePage({ siteId: propSiteId }: AegisConsolePageProps) 
 
           <div className="space-y-6">
             <div
-              className="rounded-md p-4"
+              className="rounded-lg p-4"
               style={{
                 background: "var(--color-sentinel-bg-panel)",
                 border: "1px solid var(--color-sentinel-border)",
@@ -396,7 +396,7 @@ export function AegisConsolePage({ siteId: propSiteId }: AegisConsolePageProps) 
             </div>
 
             <div
-              className="rounded-md p-4"
+              className="rounded-lg p-4"
               style={{
                 background: "var(--color-sentinel-bg-panel)",
                 border: "1px solid var(--color-sentinel-border)",
@@ -427,7 +427,7 @@ export function AegisConsolePage({ siteId: propSiteId }: AegisConsolePageProps) 
         </div>
 
         <div
-          className="rounded-md p-4"
+          className="rounded-lg p-4"
           style={{
             background: "var(--color-sentinel-bg-panel)",
             border: "1px solid var(--color-sentinel-border)",
@@ -470,7 +470,7 @@ export function AegisConsolePage({ siteId: propSiteId }: AegisConsolePageProps) 
 
         {selectedDecision && (
           <div
-            className="rounded-md p-4"
+            className="rounded-lg p-4"
             style={{
               background: "var(--color-sentinel-bg-panel)",
               border: "1px solid var(--color-sentinel-border)",
@@ -481,7 +481,7 @@ export function AegisConsolePage({ siteId: propSiteId }: AegisConsolePageProps) 
                 Decision detail: {selectedDecision.id}
               </h3>
               <button
-                className="rounded-md px-2 py-1 text-xs"
+                className="rounded-lg px-2 py-1 text-xs"
                 style={{
                   background: "var(--color-sentinel-bg-secondary)",
                   border: "1px solid var(--color-sentinel-border)",
@@ -493,7 +493,7 @@ export function AegisConsolePage({ siteId: propSiteId }: AegisConsolePageProps) 
               </button>
             </div>
             <pre
-              className="max-h-[420px] overflow-auto rounded-md p-3 text-xs"
+              className="max-h-[420px] overflow-auto rounded-lg p-3 text-xs"
               style={{
                 background: "var(--color-sentinel-bg-secondary)",
                 color: "var(--color-sentinel-text-primary)",

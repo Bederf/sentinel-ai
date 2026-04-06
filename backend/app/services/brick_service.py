@@ -16,7 +16,7 @@ import json
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 try:
     from rdflib import Graph, Literal, Namespace, URIRef
@@ -46,15 +46,15 @@ class BrickPointRef:
     """A point resolved from the Brick graph."""
 
     point_iri: str
-    label: Optional[str] = None
-    brick_class: Optional[str] = None
-    bacnet_ref: Optional[str] = None
-    bacnet_object_identifier: Optional[str] = None  # "analogInput,1000"
-    unit: Optional[str] = None
-    writable: Optional[bool] = None
-    point_type: Optional[str] = None
+    label: str | None = None
+    brick_class: str | None = None
+    bacnet_ref: str | None = None
+    bacnet_object_identifier: str | None = None  # "analogInput,1000"
+    unit: str | None = None
+    writable: bool | None = None
+    point_type: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "point_iri": self.point_iri,
             "label": self.label,
@@ -73,20 +73,20 @@ class BrickEquipmentContext:
 
     equipment_iri: str
     equipment_id: str
-    equipment_type: Optional[str] = None
-    label: Optional[str] = None
-    protocol: Optional[str] = None
-    manufacturer: Optional[str] = None
-    model: Optional[str] = None
-    location_iri: Optional[str] = None
-    location_path: List[Tuple[str, str]] = field(default_factory=list)
-    points: List[BrickPointRef] = field(default_factory=list)
+    equipment_type: str | None = None
+    label: str | None = None
+    protocol: str | None = None
+    manufacturer: str | None = None
+    model: str | None = None
+    location_iri: str | None = None
+    location_path: list[tuple[str, str]] = field(default_factory=list)
+    points: list[BrickPointRef] = field(default_factory=list)
     # Reserved for hybrid_query_service enrichment
-    vendor: Optional[Dict[str, Any]] = None
-    contract: Optional[Dict[str, Any]] = None
-    documents: Optional[List[Dict[str, Any]]] = None
+    vendor: dict[str, Any] | None = None
+    contract: dict[str, Any] | None = None
+    documents: list[dict[str, Any]] | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "equipment_iri": self.equipment_iri,
             "equipment_id": self.equipment_id,
@@ -129,11 +129,11 @@ class BrickService:
 
         # Load resolution index
         raw_idx = json.loads(resolution_index_path.read_text(encoding="utf-8"))
-        self.bacnet_ref_to_point: Dict[str, str] = raw_idx.get("bacnet_ref_to_point_iri", {})
-        self.bacnet_object_to_point: Dict[str, str] = raw_idx.get("bacnet_object_to_point_iri", {})
-        self.point_to_equipment: Dict[str, str] = raw_idx.get("point_iri_to_equipment_iri", {})
-        self.equipment_code_to_iri: Dict[str, str] = raw_idx.get("equipment_code_to_equipment_iri", {})
-        self.equipment_code_to_loc: Dict[str, str] = raw_idx.get("equipment_code_to_location_iri", {})
+        self.bacnet_ref_to_point: dict[str, str] = raw_idx.get("bacnet_ref_to_point_iri", {})
+        self.bacnet_object_to_point: dict[str, str] = raw_idx.get("bacnet_object_to_point_iri", {})
+        self.point_to_equipment: dict[str, str] = raw_idx.get("point_iri_to_equipment_iri", {})
+        self.equipment_code_to_iri: dict[str, str] = raw_idx.get("equipment_code_to_equipment_iri", {})
+        self.equipment_code_to_loc: dict[str, str] = raw_idx.get("equipment_code_to_location_iri", {})
 
     # -------------------------------------------------------------------
     # 1) resolve_point: bacnet_ref or object_type,instance -> equipment
@@ -141,10 +141,10 @@ class BrickService:
     def resolve_point(
         self,
         *,
-        bacnet_ref: Optional[str] = None,
-        object_type: Optional[str] = None,
-        instance: Optional[int] = None,
-    ) -> Optional[Tuple[str, str]]:
+        bacnet_ref: str | None = None,
+        object_type: str | None = None,
+        instance: int | None = None,
+    ) -> tuple[str, str] | None:
         """Resolve a BACnet point to (point_iri, equipment_iri).
 
         Args:
@@ -186,10 +186,10 @@ class BrickService:
     def resolve_equipment_id(
         self,
         *,
-        bacnet_ref: Optional[str] = None,
-        object_type: Optional[str] = None,
-        instance: Optional[int] = None,
-    ) -> Optional[str]:
+        bacnet_ref: str | None = None,
+        object_type: str | None = None,
+        instance: int | None = None,
+    ) -> str | None:
         """Convenience: resolve a point all the way to equipment_id string."""
         result = self.resolve_point(
             bacnet_ref=bacnet_ref,
@@ -216,7 +216,7 @@ class BrickService:
         equipment_id: str,
         *,
         include_points: bool = True,
-    ) -> Optional[BrickEquipmentContext]:
+    ) -> BrickEquipmentContext | None:
         """Get full Brick context for an equipment item.
 
         Args:
@@ -251,7 +251,7 @@ class BrickService:
         location_path = self._walk_location_path(location_iri) if location_iri else []
 
         # Points
-        points: List[BrickPointRef] = []
+        points: list[BrickPointRef] = []
         if include_points:
             points = self._collect_points(equipment_iri)
 
@@ -268,31 +268,31 @@ class BrickService:
             points=points,
         )
 
-    def list_equipment(self) -> List[str]:
+    def list_equipment(self) -> list[str]:
         """List all equipment IDs in the graph."""
         return sorted(self.equipment_code_to_iri.keys())
 
     # -------------------------------------------------------------------
     # Graph helpers
     # -------------------------------------------------------------------
-    def _label(self, iri: str) -> Optional[str]:
+    def _label(self, iri: str) -> str | None:
         for _, _, o in self.g.triples((URIRef(iri), RDFS.label, None)):
             if isinstance(o, Literal):
                 return str(o)
         return None
 
-    def _literal(self, iri: str, predicate: URIRef) -> Optional[str]:
+    def _literal(self, iri: str, predicate: URIRef) -> str | None:
         for _, _, o in self.g.triples((URIRef(iri), predicate, None)):
             return str(o)
         return None
 
-    def _bool_literal(self, iri: str, predicate: URIRef) -> Optional[bool]:
+    def _bool_literal(self, iri: str, predicate: URIRef) -> bool | None:
         val = self._literal(iri, predicate)
         if val is None:
             return None
         return val.strip().lower() in ("true", "1")
 
-    def _brick_class_local_name(self, iri: str) -> Optional[str]:
+    def _brick_class_local_name(self, iri: str) -> str | None:
         """Get the Brick class local name (e.g., 'Chiller') for an entity."""
         brick_ns = str(BRICK)
         for _, _, o in self.g.triples((URIRef(iri), RDF.type, None)):
@@ -301,7 +301,7 @@ class BrickService:
                 return s[len(brick_ns) :]
         return None
 
-    def _graph_search_bacnet_ref(self, bacnet_ref: str) -> Optional[str]:
+    def _graph_search_bacnet_ref(self, bacnet_ref: str) -> str | None:
         """Fallback: search graph for a point with matching bacnet_ref."""
         # Check sentinel:bacnet_ref on point nodes
         for s, _, o in self.g.triples((None, SENTINEL.bacnet_ref, Literal(bacnet_ref))):
@@ -320,7 +320,7 @@ class BrickService:
 
         return None
 
-    def _graph_equipment_for_point(self, point_iri: str) -> Optional[str]:
+    def _graph_equipment_for_point(self, point_iri: str) -> str | None:
         """Fallback: find equipment for a point via graph traversal."""
         for _, _, eq in self.g.triples((URIRef(point_iri), BRICK.isPointOf, None)):
             return str(eq)
@@ -328,9 +328,9 @@ class BrickService:
             return str(eq)
         return None
 
-    def _collect_points(self, equipment_iri: str) -> List[BrickPointRef]:
+    def _collect_points(self, equipment_iri: str) -> list[BrickPointRef]:
         """Collect all points for an equipment item."""
-        points: List[BrickPointRef] = []
+        points: list[BrickPointRef] = []
 
         for _, _, pt in self.g.triples((URIRef(equipment_iri), BRICK.hasPoint, None)):
             pt_iri = str(pt)
@@ -370,9 +370,9 @@ class BrickService:
         points.sort(key=lambda p: (p.bacnet_ref or "", p.label or "", p.point_iri))
         return points
 
-    def _walk_location_path(self, location_iri: str) -> List[Tuple[str, str]]:
+    def _walk_location_path(self, location_iri: str) -> list[tuple[str, str]]:
         """Walk from leaf location up to site root via inverse hasPart."""
-        path: List[Tuple[str, str]] = []
+        path: list[tuple[str, str]] = []
         cur = URIRef(location_iri)
         seen: set = set()
 
@@ -395,13 +395,13 @@ class BrickService:
 # ---------------------------------------------------------------------------
 # Singleton loader
 # ---------------------------------------------------------------------------
-_instance: Optional[BrickService] = None
+_instance: BrickService | None = None
 
 
 def get_brick_service(
     site_id: str = "site-002",
-    base_dir: Optional[Path] = None,
-) -> Optional[BrickService]:
+    base_dir: Path | None = None,
+) -> BrickService | None:
     """Get or create BrickService singleton for a site.
 
     Returns None if Brick artifacts don't exist yet.

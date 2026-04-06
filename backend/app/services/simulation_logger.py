@@ -4,7 +4,7 @@ import json
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -17,9 +17,9 @@ class SimulationLogger:
     def __init__(self, log_dir: Path = LOG_DIR):
         self.log_dir = log_dir
         self.log_dir.mkdir(parents=True, exist_ok=True)
-        self.run_id: Optional[str] = None
+        self.run_id: str | None = None
         self._events_file = None
-        self._meta: Optional[Dict[str, Any]] = None
+        self._meta: dict[str, Any] | None = None
         self._event_count: int = 0
 
     def start_run(
@@ -27,7 +27,7 @@ class SimulationLogger:
         run_id: str,
         scenario: str,
         site_code: str,
-        config: Dict[str, Any],
+        config: dict[str, Any],
     ) -> None:
         """Initialize logging for a new simulation run."""
         self.run_id = run_id
@@ -74,7 +74,7 @@ class SimulationLogger:
         self._events_file.flush()
         self._event_count += 1
 
-    def end_run(self) -> Optional[str]:
+    def end_run(self) -> str | None:
         """Finalize the run metadata and close files. Returns run_id."""
         if self._events_file and not self._events_file.closed:
             self._events_file.close()

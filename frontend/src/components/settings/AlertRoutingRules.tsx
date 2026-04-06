@@ -16,6 +16,7 @@ interface RoutingRule {
 }
 
 interface AlertRoutingRulesProps {
+  siteId?: string;
   onError?: (error: string) => void;
   onSuccess?: () => void;
   readOnly?: boolean;
@@ -25,7 +26,7 @@ const SEVERITY_OPTIONS = ["critical", "warning", "info"];
 const CHANNEL_OPTIONS = ["telegram", "whatsapp", "email", "sms"];
 const ROLE_OPTIONS = ["technician", "supervisor", "manager", "admin"];
 
-export function AlertRoutingRules({ onError, onSuccess, readOnly = false }: AlertRoutingRulesProps) {
+export function AlertRoutingRules({ siteId, onError, onSuccess, readOnly = false }: AlertRoutingRulesProps) {
   const [rules, setRules] = useState<RoutingRule[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -40,7 +41,8 @@ export function AlertRoutingRules({ onError, onSuccess, readOnly = false }: Aler
   const fetchRules = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await authorizedFetch("/api/alert-routing/rules");
+      const query = siteId ? `?site_id=${encodeURIComponent(siteId)}` : "";
+      const response = await authorizedFetch(`/api/alert-routing/rules${query}`);
       if (!response.ok) throw new Error("Failed to fetch routing rules");
       const data = await response.json();
       setRules(data.rules || []);
@@ -49,7 +51,7 @@ export function AlertRoutingRules({ onError, onSuccess, readOnly = false }: Aler
     } finally {
       setLoading(false);
     }
-  }, [onError]);
+  }, [onError, siteId]);
 
   useEffect(() => { fetchRules(); }, [fetchRules]);
 
@@ -69,6 +71,7 @@ export function AlertRoutingRules({ onError, onSuccess, readOnly = false }: Aler
           recipient_roles: newRoles,
           escalation_minutes: newEscalation ? parseInt(newEscalation) : null,
           escalation_to_roles: newEscalation ? ["supervisor", "admin"] : [],
+          site_ids: siteId ? [siteId] : [],
         }),
       });
       if (!response.ok) throw new Error("Failed to create rule");

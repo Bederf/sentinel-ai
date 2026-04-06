@@ -1,9 +1,9 @@
 """Vector store for Concept-specific documents."""
 
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
 import logging
 import re
+from datetime import UTC, datetime
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +23,7 @@ class ConceptVectorDBService:
             self._embedding_service = get_embedding_service()
         return self._embedding_service
 
-    def _resolve_site_uuid(self, site_id: Optional[str]) -> Optional[str]:
+    def _resolve_site_uuid(self, site_id: str | None) -> str | None:
         if not site_id:
             return None
         if re.fullmatch(r"[0-9a-fA-F-]{36}", site_id):
@@ -45,10 +45,10 @@ class ConceptVectorDBService:
         full_text: str,
         concept_document_id: str,
         concept_url: str,
-        site_id: Optional[str] = None,
+        site_id: str | None = None,
         source: str = "concept_tsv",
-        metadata: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """Insert a new Concept document."""
         resolved_site = self._resolve_site_uuid(site_id)
         result = (
@@ -114,7 +114,7 @@ class ConceptVectorDBService:
         self.client.table("concept_documents").update(
             {
                 "indexing_status": "embedded",
-                "indexed_at": datetime.now(timezone.utc).isoformat(),
+                "indexed_at": datetime.now(UTC).isoformat(),
                 "chunk_count": len(chunk_records),
             }
         ).eq("id", document_id).execute()
@@ -122,7 +122,7 @@ class ConceptVectorDBService:
         logger.info("Ingested Concept document %s: %d chunks", document_id, len(chunk_records))
         return len(chunk_records)
 
-    def _split_into_chunks(self, text: str, chunk_size: int, overlap: int) -> List[Dict[str, Any]]:
+    def _split_into_chunks(self, text: str, chunk_size: int, overlap: int) -> list[dict[str, Any]]:
         chunks = []
         words = text.split()
         i = 0

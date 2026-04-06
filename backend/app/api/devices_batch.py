@@ -32,7 +32,7 @@ class BatchDeviceRequest(BaseModel):
     """Request for batch device operations."""
 
     device_ids: List[str] = Field(
-        ..., min_items=1, max_items=100, description="List of device IDs (max 100 per request)"
+        ..., min_length=1, max_length=100, description="List of device IDs (max 100 per request)"
     )
 
 

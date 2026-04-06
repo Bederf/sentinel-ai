@@ -4,6 +4,7 @@ import { authorizedFetch } from "../../lib/api/client";
 
 interface ChannelStatus {
   channel: string;
+  provider?: string;
   status: "active" | "inactive" | "error";
   last_checked?: string;
   error?: string;
@@ -11,10 +12,11 @@ interface ChannelStatus {
 }
 
 interface ChannelStatusDashboardProps {
+  siteId?: string;
   onError?: (error: string) => void;
 }
 
-export function ChannelStatusDashboard({ onError }: ChannelStatusDashboardProps) {
+export function ChannelStatusDashboard({ siteId: _siteId, onError }: ChannelStatusDashboardProps) {
   const [channels, setChannels] = useState<ChannelStatus[]>([]);
   const [loading, setLoading] = useState(true);
   const [testing, setTesting] = useState<string | null>(null);
@@ -22,22 +24,43 @@ export function ChannelStatusDashboard({ onError }: ChannelStatusDashboardProps)
   const fetchStatus = useCallback(async () => {
     setLoading(true);
     try {
-      // Try the notification router status endpoint
-      const response = await authorizedFetch("/api/notification-router/status", { method: "POST" });
+      // Source of truth: backend notification providers status endpoint.
+      const response = await authorizedFetch("/api/notifications/providers/status", { method: "GET" });
       if (response.ok) {
-        const data = await response.json();
-        // Map router metrics to channel statuses
+        const providers = (await response.json()) as Array<{
+          channel: string;
+          provider: string;
+          enabled: boolean;
+        }>;
+        const byChannel = new Map(providers.map((p) => [p.channel.toLowerCase(), p]));
         const statuses: ChannelStatus[] = [
-          { channel: "Telegram", status: data.status === "active" ? "active" : "inactive", message_count: data.metrics?.pushes_sent || 0 },
-          { channel: "WhatsApp", status: "inactive", message_count: 0 },
+          {
+            channel: "Telegram",
+            provider: byChannel.get("telegram")?.provider,
+            status: byChannel.get("telegram")?.enabled ? "active" : "inactive",
+            message_count: 0,
+          },
+          {
+            channel: "WhatsApp",
+            provider: byChannel.get("whatsapp")?.provider,
+            status: byChannel.get("whatsapp")?.enabled ? "active" : "inactive",
+            message_count: 0,
+          },
+          // Email channel is displayed for operations visibility, but is not yet part
+          // of the notification provider status API contract.
           { channel: "Email", status: "inactive", message_count: 0 },
-          { channel: "SMS", status: "inactive", message_count: 0 },
+          {
+            channel: "SMS",
+            provider: byChannel.get("sms")?.provider,
+            status: byChannel.get("sms")?.enabled ? "active" : "inactive",
+            message_count: 0,
+          },
         ];
         setChannels(statuses);
       } else {
-        // Default channels if endpoint fails
+        // If backend status probe fails, show all channels as inactive.
         setChannels([
-          { channel: "Telegram", status: "active" },
+          { channel: "Telegram", status: "inactive" },
           { channel: "WhatsApp", status: "inactive" },
           { channel: "Email", status: "inactive" },
           { channel: "SMS", status: "inactive" },
@@ -45,7 +68,7 @@ export function ChannelStatusDashboard({ onError }: ChannelStatusDashboardProps)
       }
     } catch {
       setChannels([
-        { channel: "Telegram", status: "active" },
+        { channel: "Telegram", status: "inactive" },
         { channel: "WhatsApp", status: "inactive" },
         { channel: "Email", status: "inactive" },
         { channel: "SMS", status: "inactive" },
@@ -58,13 +81,18 @@ export function ChannelStatusDashboard({ onError }: ChannelStatusDashboardProps)
   useEffect(() => { fetchStatus(); }, [fetchStatus]);
 
   const handleTest = async (channel: string) => {
+    const channelKey = channel.toLowerCase();
+    if (channelKey === "email") {
+      onError?.("Email test is not available from this panel yet.");
+      return;
+    }
     setTesting(channel);
     try {
-      // Send test via notification router
-      const response = await authorizedFetch("/api/notification-router/test", {
+      // Send provider test via notifications API.
+      const response = await authorizedFetch("/api/notifications/providers/test", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ channel: channel.toLowerCase() }),
+        body: JSON.stringify({ channel: channelKey }),
       });
       if (!response.ok) throw new Error(`Test failed for ${channel}`);
       onError?.(`Test message sent to ${channel}`); // Using onError as notification
@@ -117,6 +145,11 @@ export function ChannelStatusDashboard({ onError }: ChannelStatusDashboardProps)
                     {statusIcon(ch.status)}
                   </div>
                   <p className="text-xs" style={{ color: st.color }}>{st.label}</p>
+                  {ch.provider && (
+                    <p className="text-[10px] mt-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                      {ch.provider}
+                    </p>
+                  )}
                   {ch.message_count !== undefined && ch.message_count > 0 && (
                     <p className="text-[10px] mt-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>
                       {ch.message_count} messages sent

@@ -212,44 +212,12 @@ class SLARepository:
         Get all contracts with active SLA terms.
 
         Returns list of contract objects with sla_terms populated.
-        For demo purposes, returns mock data.
 
         Returns:
             List of contracts with SLA terms
         """
-        # Demo implementation
-        from app.models.contract import SLAType, MeasurementPeriod
-
-        mock_contracts = [
-            {
-                "id": "con-001",
-                "code": "CON-SITE-002-2026-001",
-                "sla_terms": [
-                    {
-                        "id": "sla-001",
-                        "sla_type": SLAType.UPTIME,
-                        "target_value": 95.0,
-                        "target_unit": "percent",
-                        "measurement_period": MeasurementPeriod.MONTHLY,
-                        "penalty_type": "percentage",
-                        "penalty_value": 5.0,
-                        "is_active": True,
-                    },
-                    {
-                        "id": "sla-002",
-                        "sla_type": SLAType.RESPONSE_TIME,
-                        "target_value": 4.0,
-                        "target_unit": "hours",
-                        "measurement_period": MeasurementPeriod.MONTHLY,
-                        "penalty_type": "fixed",
-                        "penalty_value": 5000.0,
-                        "is_active": True,
-                    },
-                ],
-            }
-        ]
-
-        return mock_contracts
+        logger.warning("get_contracts_with_sla() has no live repository implementation; returning empty set")
+        return []
 
     def get_sla_term(self, sla_term_id: str) -> Optional[SLATerm]:
         """
@@ -261,34 +229,7 @@ class SLARepository:
         Returns:
             SLATerm or None if not found
         """
-        # Demo implementation
-        from app.models.contract import SLAType, MeasurementPeriod
-
-        if sla_term_id == "sla-001":
-            return SLATerm(
-                id="sla-001",
-                contract_id="con-001",
-                sla_type=SLAType.UPTIME,
-                target_value=95.0,
-                target_unit="percent",
-                measurement_period=MeasurementPeriod.MONTHLY,
-                penalty_type="percentage",
-                penalty_value=5.0,
-                is_active=True,
-            )
-        elif sla_term_id == "sla-002":
-            return SLATerm(
-                id="sla-002",
-                contract_id="con-001",
-                sla_type=SLAType.RESPONSE_TIME,
-                target_value=4.0,
-                target_unit="hours",
-                measurement_period=MeasurementPeriod.MONTHLY,
-                penalty_type="fixed",
-                penalty_value=5000.0,
-                is_active=True,
-            )
-
+        logger.warning("get_sla_term(%s) has no live repository implementation; returning None", sla_term_id)
         return None
 
     # ========================================================================
@@ -413,7 +354,7 @@ class SLARepository:
         severity: Optional[SLABreachSeverity],
     ) -> Optional[List[SLABreachEvent]]:
         """Get breach events from Supabase."""
-        # For demo, return None to use JSON fallback
+        # For local fallback mode, return None to use JSON fallback
         return None
 
     def _create_breach_supabase(
@@ -421,12 +362,12 @@ class SLARepository:
         breach: SLABreachEvent,
     ) -> Optional[SLABreachEvent]:
         """Create breach event in Supabase."""
-        # For demo, return None to use JSON fallback
+        # For local fallback mode, return None to use JSON fallback
         return None
 
     def _get_summary_supabase(self, contract_id: str) -> Optional[Dict[str, Any]]:
         """Get compliance summary from Supabase."""
-        # For demo, return None to use JSON fallback
+        # For local fallback mode, return None to use JSON fallback
         return None
 
     # ========================================================================
@@ -678,13 +619,49 @@ class SLARepository:
 
     def _get_supabase_client(self):
         """Get Supabase client."""
-        from supabase import create_client
+        import warnings
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            warnings.filterwarnings(
+                "ignore",
+                message="The 'timeout' parameter is deprecated. Please configure it in the http client instead.",
+                category=DeprecationWarning,
+            )
+            warnings.filterwarnings(
+                "ignore",
+                message="'.*' deprecated - use '.*'",
+                category=DeprecationWarning,
+            )
+            warnings.filterwarnings(
+                "ignore",
+                message="'.*' argument is deprecated, use '.*'",
+                category=DeprecationWarning,
+            )
+            from supabase import create_client
         import os
 
-        return create_client(
-            os.getenv("SUPABASE_URL"),
-            os.getenv("SUPABASE_KEY"),
-        )
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            warnings.filterwarnings(
+                "ignore",
+                message="The 'timeout' parameter is deprecated. Please configure it in the http client instead.",
+                category=DeprecationWarning,
+            )
+            warnings.filterwarnings(
+                "ignore",
+                message="'.*' deprecated - use '.*'",
+                category=DeprecationWarning,
+            )
+            warnings.filterwarnings(
+                "ignore",
+                message="'.*' argument is deprecated, use '.*'",
+                category=DeprecationWarning,
+            )
+            return create_client(
+                os.getenv("SUPABASE_URL"),
+                os.getenv("SUPABASE_KEY"),
+            )
 
 
 # ============================================================================

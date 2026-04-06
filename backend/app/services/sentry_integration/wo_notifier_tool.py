@@ -7,10 +7,11 @@ Sends work order notifications to technicians via Telegram,
 triggers data collection after "done" reply.
 """
 
-import requests
 import argparse
 import os
-from typing import Dict, Any
+from typing import Any
+
+import requests
 
 BMS_API_URL = os.getenv("SENTINEL_API_URL", "http://localhost:9095")  # SENTINEL BMS Backend
 SENTRY_SECRET = (os.getenv("SENTRY_WEBHOOK_SECRET", "") or "").strip()
@@ -26,7 +27,7 @@ def _auth_headers() -> dict[str, str]:
     return headers
 
 
-def send_notification(work_order_data: Dict[str, Any]) -> bool:
+def send_notification(work_order_data: dict[str, Any]) -> bool:
     """Send work order notification via Sentry.
 
     Args:
@@ -70,7 +71,7 @@ def send_notification(work_order_data: Dict[str, Any]) -> bool:
         return False
 
 
-def get_collection_status(service_record_code: str) -> Dict[str, Any]:
+def get_collection_status(service_record_code: str) -> dict[str, Any]:
     """Get data collection status for a service record.
 
     Args:

@@ -21,7 +21,7 @@ interface TariffManagerProps {
 }
 
 export function TariffManager({
-  siteId: _siteId = "site-002",
+  siteId = "site-002",
   onError,
   readOnly: _readOnly = false,
 }: TariffManagerProps) {
@@ -31,7 +31,7 @@ export function TariffManager({
   const fetchTariffs = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await authorizedFetch("/api/municipal-billing/tariffs");
+      const response = await authorizedFetch(`/api/municipal-billing/tariffs?site_id=${encodeURIComponent(siteId)}`);
       if (!response.ok) throw new Error("Failed to fetch tariffs");
       const data = await response.json();
       // data may be { tariffs: [...] } or direct array
@@ -42,7 +42,7 @@ export function TariffManager({
     } finally {
       setLoading(false);
     }
-  }, [onError]);
+  }, [onError, siteId]);
 
   useEffect(() => { fetchTariffs(); }, [fetchTariffs]);
 

@@ -30,6 +30,17 @@ Environment="N8N_BASIC_AUTH_PASSWORD=change-me-in-production"
 
 # Execution settings
 Environment="N8N_METRICS=false"
+Environment="N8N_BLOCK_ENV_ACCESS_IN_NODE=false"
+
+# Visitor intake workflow vars
+Environment="INTAKE_IMAP_USER=info@sentinel-ai.co.za"
+Environment="SENTRY_BOT_API_KEY=sentry-bot-RncXWQCYticUnuG06L4qnSUj-heKAeV0NnMdHOvIlKM3TNUv"
+Environment="SENTINEL_BACKEND_URL=http://127.0.0.1:9095"
+Environment="SMTP_FROM=info@sentinel-ai.co.za"
+Environment="SMTP_FROM_NAME=SENTINEL Reception"
+Environment="INTERNAL_EMAIL_DOMAINS=sentinel-ai.co.za"
+Environment="DEFAULT_BUILDING_ID=site-001"
+Environment="SENTINEL_PUBLIC_URL=https://bms.sentinel-ai.co.za"
 
 # Restart on failure
 Restart=on-failure

@@ -13,7 +13,7 @@ import logging
 import os
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import httpx
 
@@ -82,7 +82,7 @@ class ServiceNowStatus:
     status: ConnectionStatus
     message: str = ""
     instance_name: str = ""
-    discovered_tables: List[str] = field(default_factory=list)
+    discovered_tables: list[str] = field(default_factory=list)
     last_checked: str = ""
 
 
@@ -103,7 +103,7 @@ class SysparmQuery:
     """
 
     def __init__(self) -> None:
-        self._parts: List[str] = []
+        self._parts: list[str] = []
         self._current_field: str = ""
         self._order: str = ""
 
@@ -164,7 +164,7 @@ class SysparmQuery:
         self._parts.append(f"{self._current_field}ISNOTEMPTY")
         return self
 
-    def in_list(self, values: List[str]) -> "SysparmQuery":
+    def in_list(self, values: list[str]) -> "SysparmQuery":
         """Field value in list."""
         self._parts.append(f"{self._current_field}IN{','.join(values)}")
         return self
@@ -191,7 +191,7 @@ class SysparmQuery:
 # Default Fields Per Table
 # =============================================================================
 
-DEFAULT_FIELDS: Dict[str, str] = {
+DEFAULT_FIELDS: dict[str, str] = {
     "incident": "sys_id,number,short_description,description,priority,state,category,subcategory,"
     "assigned_to,assignment_group,opened_at,closed_at,resolved_at,impact,urgency",
     "sc_task": "sys_id,number,short_description,state,priority,assigned_to,assignment_group,"
@@ -214,7 +214,7 @@ DEFAULT_FIELDS: Dict[str, str] = {
 }
 
 # FM-relevant tables to discover on connection check
-FM_TABLES: List[str] = [
+FM_TABLES: list[str] = [
     "incident",
     "sc_task",
     "change_request",
@@ -247,12 +247,12 @@ class ServiceNowService:
 
     def __init__(self) -> None:
         self.config = ServiceNowConfig.from_env()
-        self._client: Optional[httpx.AsyncClient] = None
+        self._client: httpx.AsyncClient | None = None
         self._status = ServiceNowStatus(
             status=ConnectionStatus.NOT_CONFIGURED if not self.config.is_configured else ConnectionStatus.ERROR,
             message="Credentials not provided" if not self.config.is_configured else "Not yet connected",
         )
-        self._schema_cache: Dict[str, List[Dict[str, Any]]] = {}
+        self._schema_cache: dict[str, list[dict[str, Any]]] = {}
 
     # ---- Properties --------------------------------------------------------
 
@@ -343,9 +343,9 @@ class ServiceNowService:
             )
             return self._status
 
-    async def _discover_tables(self) -> List[str]:
+    async def _discover_tables(self) -> list[str]:
         """Probe FM_TABLES in parallel batches of 5 to find which exist."""
-        discovered: List[str] = []
+        discovered: list[str] = []
         batch_size = 5
 
         for i in range(0, len(FM_TABLES), batch_size):
@@ -382,7 +382,7 @@ class ServiceNowService:
         limit: int = 0,
         offset: int = 0,
         order_by: str = "",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Execute a read-only GET on the Table API.
 
         Args:
@@ -401,7 +401,7 @@ class ServiceNowService:
 
         try:
             client = self._get_client()
-            params: Dict[str, str] = {
+            params: dict[str, str] = {
                 "sysparm_limit": str(limit or self.config.page_size),
                 "sysparm_display_value": "true",
             }
@@ -446,7 +446,7 @@ class ServiceNowService:
         query: str = "",
         group_by: str = "",
         agg_fields: str = "",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Stats API for counts and breakdowns.
 
         Args:
@@ -463,7 +463,7 @@ class ServiceNowService:
 
         try:
             client = self._get_client()
-            params: Dict[str, str] = {"sysparm_count": "true"}
+            params: dict[str, str] = {"sysparm_count": "true"}
 
             if query:
                 params["sysparm_query"] = query
@@ -486,7 +486,7 @@ class ServiceNowService:
 
     # ---- Schema Inspection -------------------------------------------------
 
-    async def get_table_schema(self, table: str) -> Dict[str, Any]:
+    async def get_table_schema(self, table: str) -> dict[str, Any]:
         """Inspect table columns via sys_dictionary. Results are session-cached.
 
         Args:
@@ -527,7 +527,7 @@ class ServiceNowService:
 
     # ---- Record History / Audit Trail --------------------------------------
 
-    async def get_record_history(self, table: str, sys_id: str) -> Dict[str, Any]:
+    async def get_record_history(self, table: str, sys_id: str) -> dict[str, Any]:
         """Fetch audit trail for a specific record.
 
         Args:
@@ -564,10 +564,10 @@ class ServiceNowService:
 
     async def get_open_incidents(
         self,
-        priority: Optional[int] = None,
-        category: Optional[str] = None,
+        priority: int | None = None,
+        category: str | None = None,
         limit: int = 50,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Fetch open incidents with optional filters.
 
         Args:
@@ -595,10 +595,10 @@ class ServiceNowService:
 
     async def get_work_orders(
         self,
-        state: Optional[str] = None,
-        priority: Optional[int] = None,
+        state: str | None = None,
+        priority: int | None = None,
         limit: int = 50,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Fetch work orders / service tasks.
 
         Args:
@@ -629,7 +629,7 @@ class ServiceNowService:
             limit=limit,
         )
 
-    async def get_incident_summary(self) -> Dict[str, Any]:
+    async def get_incident_summary(self) -> dict[str, Any]:
         """Aggregate incident counts by priority and state.
 
         Returns:
@@ -665,7 +665,7 @@ class ServiceNowService:
     # ---- Helpers -----------------------------------------------------------
 
     @staticmethod
-    def _empty_response(reason: str = "") -> Dict[str, Any]:
+    def _empty_response(reason: str = "") -> dict[str, Any]:
         """Graceful empty result — never throws."""
         return {"result": [], "count": 0, "error": reason}
 
@@ -683,7 +683,7 @@ class ServiceNowService:
 # Singleton
 # =============================================================================
 
-_service: Optional[ServiceNowService] = None
+_service: ServiceNowService | None = None
 
 
 def get_servicenow_service() -> ServiceNowService:

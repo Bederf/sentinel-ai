@@ -340,7 +340,7 @@ export function ControlAuditTrail({ onError, onViewDevice }: ControlAuditTrailPr
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowFilters(!showFilters)}
-            className={`flex items-center gap-1 px-3 py-1.5 text-sm rounded-md transition-colors ${
+            className={`flex items-center gap-1 px-3 py-1.5 text-sm rounded-lg transition-colors ${
               showFilters
                 ? "bg-blue-900/30 text-blue-300 border border-blue-800"
                 : "bg-gray-900 text-gray-300 hover:bg-gray-700 border border-gray-700"
@@ -352,7 +352,7 @@ export function ControlAuditTrail({ onError, onViewDevice }: ControlAuditTrailPr
 
           <button
             onClick={handleExportCSV}
-            className="flex items-center gap-1 px-3 py-1.5 text-sm bg-gray-900 text-gray-300 rounded-md hover:bg-gray-700 transition-colors border border-gray-700"
+            className="flex items-center gap-1 px-3 py-1.5 text-sm bg-gray-900 text-gray-300 rounded-lg hover:bg-gray-700 transition-colors border border-gray-700"
             title="Export as CSV"
           >
             <Download className="w-4 h-4" />
@@ -362,7 +362,7 @@ export function ControlAuditTrail({ onError, onViewDevice }: ControlAuditTrailPr
           <button
             onClick={() => fetchAuditLogs(true)}
             disabled={refreshing}
-            className="flex items-center gap-1 px-3 py-1.5 text-sm bg-gray-900 text-gray-300 rounded-md hover:bg-gray-700 transition-colors disabled:opacity-50 border border-gray-700"
+            className="flex items-center gap-1 px-3 py-1.5 text-sm bg-gray-900 text-gray-300 rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50 border border-gray-700"
             title="Refresh audit logs"
           >
             <RefreshCw
@@ -623,14 +623,14 @@ export function ControlAuditTrail({ onError, onViewDevice }: ControlAuditTrailPr
               <button
                 onClick={handlePreviousPage}
                 disabled={page <= 1}
-                className="px-4 py-2 text-sm bg-gray-900 text-gray-300 rounded-md hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-gray-700"
+                className="px-4 py-2 text-sm bg-gray-900 text-gray-300 rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-gray-700"
               >
                 Previous
               </button>
               <button
                 onClick={handleNextPage}
                 disabled={!hasMore}
-                className="px-4 py-2 text-sm bg-gray-900 text-gray-300 rounded-md hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-gray-700"
+                className="px-4 py-2 text-sm bg-gray-900 text-gray-300 rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-gray-700"
               >
                 Next
               </button>

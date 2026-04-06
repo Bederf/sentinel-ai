@@ -130,4 +130,11 @@ export const MODULE_DESCRIPTIONS: Record<string, string> = {
   hvac: 'HVAC module',
   water: 'Water management module',
   fire: 'Fire safety module',
+  hvac_control: 'HVAC Control module',
+  energy_control: 'Energy Control module',
+  lighting_control: 'Lighting Control module',
+  solar_control: 'Solar Control module',
+  water_control: 'Water Control module',
+  security_control: 'Security Control module',
+  digital_twin_control: 'Digital Twin Control module',
 }

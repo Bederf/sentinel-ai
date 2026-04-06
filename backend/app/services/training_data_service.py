@@ -13,7 +13,7 @@ import json
 import logging
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Optional
 
 try:
     import pandas as pd
@@ -37,7 +37,7 @@ _training_data_service: Optional["TrainingDataService"] = None
 class TrainingDataService:
     """Service for generating and managing ML training datasets."""
 
-    def __init__(self, data_dir: Optional[str] = None):
+    def __init__(self, data_dir: str | None = None):
         """Initialize the training data service.
 
         Args:
@@ -57,14 +57,14 @@ class TrainingDataService:
         self._data_dir.mkdir(parents=True, exist_ok=True)
 
         # Load or create registry
-        self._registry: Dict[str, TrainingDatasetMetadata] = {}
+        self._registry: dict[str, TrainingDatasetMetadata] = {}
         self._load_registry()
 
     def _load_registry(self) -> None:
         """Load dataset registry from JSON file."""
         if self._registry_path.exists():
             try:
-                with open(self._registry_path, "r") as f:
+                with open(self._registry_path) as f:
                     data = json.load(f)
                 for key, meta in data.items():
                     # Parse datetime strings
@@ -93,7 +93,7 @@ class TrainingDataService:
         except Exception as e:
             logger.error(f"Failed to save registry: {e}")
 
-    def _get_equipment_ids(self, equipment_type: str) -> List[str]:
+    def _get_equipment_ids(self, equipment_type: str) -> list[str]:
         """Get equipment IDs of a given type from equipment.json.
 
         Args:
@@ -104,7 +104,7 @@ class TrainingDataService:
         """
         equipment_path = Path(__file__).parent.parent / "data" / "equipment.json"
         try:
-            with open(equipment_path, "r") as f:
+            with open(equipment_path) as f:
                 equipment = json.load(f)
             return [eq["id"] for eq in equipment if eq.get("type", "").lower() == equipment_type.lower()]
         except Exception as e:
@@ -198,13 +198,13 @@ class TrainingDataService:
 
         if work_orders_path.exists():
             try:
-                with open(work_orders_path, "r") as f:
+                with open(work_orders_path) as f:
                     work_orders = json.load(f)
             except Exception as e:
                 logger.warning(f"Failed to load work orders: {e}")
 
         # Build failure lookup: equipment_id -> list of failure dates
-        failures: Dict[str, List[datetime]] = {}
+        failures: dict[str, list[datetime]] = {}
         failure_keywords = ["failure", "breakdown", "emergency", "critical", "repair"]
 
         for wo in work_orders:
@@ -262,7 +262,7 @@ class TrainingDataService:
         start_date: datetime,
         end_date: datetime,
         sample_interval_days: int,
-        label_column: Optional[str] = None,
+        label_column: str | None = None,
     ) -> TrainingDatasetMetadata:
         """Save training dataset to parquet file.
 
@@ -331,7 +331,7 @@ class TrainingDataService:
 
         return metadata
 
-    def list_datasets(self) -> List[TrainingDatasetMetadata]:
+    def list_datasets(self) -> list[TrainingDatasetMetadata]:
         """List all available training datasets.
 
         Returns:
@@ -339,7 +339,7 @@ class TrainingDataService:
         """
         return list(self._registry.values())
 
-    def get_dataset(self, name: str, version: str) -> Optional[TrainingDatasetMetadata]:
+    def get_dataset(self, name: str, version: str) -> TrainingDatasetMetadata | None:
         """Get metadata for a specific dataset.
 
         Args:

@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel, Field
 
+from app.config.settings import settings
 from app.services.niagara.point_discovery import (
     get_point_discovery_service,
 )
@@ -34,10 +35,10 @@ router = APIRouter(prefix="/api/niagara", tags=["niagara-discovery"])
 class DiscoverRequest(BaseModel):
     """Request to trigger point discovery and classification."""
 
-    device_ip: str = Field(..., description="IP address of the BACnet device, or 'simulation' for simulation data")
+    device_ip: str = Field(..., description="IP address of the BACnet device")
     site_id: str = Field(..., description="SENTINEL site ID for mapping (e.g., 'site-002')")
     device_bacnet_id: Optional[int] = Field(None, description="Optional BACnet device instance ID")
-    adapter_type: Optional[str] = Field(None, description="Explicit adapter selection (bacnet, simulation)")
+    adapter_type: Optional[str] = Field(None, description="Explicit adapter selection (for example: bacnet)")
     bms_vendor: Optional[str] = Field(
         None,
         description="BMS vendor identifier (niagara, desigo, metasys, honeywell, schneider, trend, generic)",
@@ -119,18 +120,25 @@ async def discover_and_classify(request: DiscoverRequest):
     """
     Trigger point discovery and AI classification.
 
-    Routes through 3-tier data source: selected adapter (BACnet or simulation)
-    -> JSON fallback (static files).
+    Routes through the configured discovery adapter and classifier pipeline.
     Classifies points using Haystack/Brick ontology, groups into equipment,
     and stores results for review.
 
     Returns a discovery_id for tracking the workflow.
     """
     try:
+        if settings.sentinel_island_mode and (
+            request.device_ip == "simulation" or request.adapter_type in {"simulation", "local_adapter"}
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail="Simulation discovery is disabled on SENTINEL island instances",
+            )
+
         discovery_service = get_point_discovery_service()
         mapping_service = get_mapping_service()
 
-        # Run discovery and classification (routes: BACnet -> Simulation -> JSON fallback)
+        # Run discovery and classification (adapter route with JSON fallback)
         result = await discovery_service.discover_and_classify(
             device_ip=request.device_ip,
             site_id=request.site_id,
@@ -504,34 +512,17 @@ def _bridge_to_integration_monitoring(
 async def _enqueue_baseline_captures(discovery_id: str, site_id: str, equipment_created: int) -> None:
     """Enqueue baseline captures for newly created equipment after mapping approval.
 
-    In SIMULATION/demo mode: auto-capture synthetic baselines via BMS_AVERAGE source.
-    In live mode: log as pending — technician must capture manually.
+    Logs pending baselines — technician must capture manually or via baseline_capture_service.
     """
     if equipment_created == 0 or not site_id:
         return
 
-    from app.config.settings import settings
-
-    if settings.demo_mode:
-        try:
-            from app.services.baseline_capture_service import get_baseline_capture_service
-
-            get_baseline_capture_service()  # validate service is available
-            logger.info(
-                "Auto-capturing synthetic baselines for %d equipment (discovery=%s, site=%s)",
-                equipment_created,
-                discovery_id,
-                site_id,
-            )
-        except Exception as e:
-            logger.warning("Synthetic baseline capture skipped: %s", e)
-    else:
-        logger.info(
-            "Live mode: %d equipment from discovery %s need manual baseline capture (site=%s)",
-            equipment_created,
-            discovery_id,
-            site_id,
-        )
+    logger.info(
+        "%d equipment from discovery %s need baseline capture (site=%s)",
+        equipment_created,
+        discovery_id,
+        site_id,
+    )
 
 
 # ---------------------------------------------------------------------------

@@ -18,6 +18,7 @@ from app.api.dependencies.module_access import require_active_module
 from app.middleware.auth_middleware import require_auth
 from app.middleware.rate_limiter import limiter
 from app.models.auth import AuthContext, AuthLevel
+from app.config.settings import settings
 from app.models.module_registry import ModuleType
 from app.database.repositories.security_repository import SecurityRepository
 from app.models.security import (
@@ -860,35 +861,9 @@ async def get_zone_cameras(
             response = repo.client.table("security_cameras").select("*").eq("zone_id", zone_id).execute()
             cameras = response.data
         except Exception:
-            # Fallback: return demo cameras for the zone
-            cameras = [
-                {
-                    "camera_id": f"CAM-{zone_id}-NW",
-                    "zone_id": zone_id,
-                    "name": f"Camera NW - {zone_id}",
-                    "floor": zone_id.replace("zone_", "L"),
-                    "status": "online",
-                    "camera_type": "dome",
-                    "resolution": "1080p",
-                    "has_analytics": True,
-                    "motion_detected": False,
-                    "stream_url": f"rtsp://cctv.local/{zone_id}/nw",
-                    "camera_model": "Hikvision DS-2CD2143G2-IU",
-                },
-                {
-                    "camera_id": f"CAM-{zone_id}-SE",
-                    "zone_id": zone_id,
-                    "name": f"Camera SE - {zone_id}",
-                    "floor": zone_id.replace("zone_", "L"),
-                    "status": "online",
-                    "camera_type": "fixed",
-                    "resolution": "4K",
-                    "has_analytics": False,
-                    "motion_detected": False,
-                    "stream_url": f"rtsp://cctv.local/{zone_id}/se",
-                    "camera_model": "Axis P3245-V",
-                },
-            ]
+            if settings.sentinel_island_mode:
+                raise HTTPException(status_code=503, detail="Live camera inventory unavailable")
+            cameras = []
 
         return {
             "zone_id": zone_id,

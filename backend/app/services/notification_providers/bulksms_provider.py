@@ -5,8 +5,8 @@ Phase 102: Direct technician SMS messages.
 Currently uses placeholder credentials — will be configured when BulkSMS account is ready.
 """
 
-import os
 import logging
+import os
 
 import httpx
 

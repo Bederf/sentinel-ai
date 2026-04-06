@@ -16,7 +16,6 @@ HARD RULES:
 
 import logging
 import math
-from typing import List, Optional
 
 from app.models.health_rating import HealthFeaturePayload, HealthRating
 
@@ -97,7 +96,7 @@ class HealthFeatureProvider:
             baseline_deviation_max_24h=baseline_deviation,
         )
 
-    async def _compute_fresh_rating(self, equipment_id: str) -> Optional[HealthRating]:
+    async def _compute_fresh_rating(self, equipment_id: str) -> HealthRating | None:
         """Attempt to compute a fresh HealthRating when no snapshot exists."""
         try:
             calculator = self._get_calculator()
@@ -112,7 +111,7 @@ class HealthFeatureProvider:
             logger.debug(f"Could not compute fresh rating for {equipment_id}: {e}")
             return None
 
-    async def _calculate_trend_slope(self, equipment_id: str, days: int) -> Optional[float]:
+    async def _calculate_trend_slope(self, equipment_id: str, days: int) -> float | None:
         """Calculate health score trend slope over the given period.
 
         Uses linear regression on daily rollup average scores.
@@ -145,7 +144,7 @@ class HealthFeatureProvider:
             logger.debug(f"Could not calculate {days}d trend for {equipment_id}: {e}")
             return None
 
-    async def _calculate_volatility(self, equipment_id: str, days: int) -> Optional[float]:
+    async def _calculate_volatility(self, equipment_id: str, days: int) -> float | None:
         """Calculate health score volatility (stddev of daily avg scores).
 
         Args:
@@ -167,7 +166,7 @@ class HealthFeatureProvider:
             return None
 
     @staticmethod
-    def _extract_baseline_deviation(rating: HealthRating) -> Optional[float]:
+    def _extract_baseline_deviation(rating: HealthRating) -> float | None:
         """Extract baseline deviation from the rating's component data.
 
         The baseline_alignment_score is derived from deviation via:
@@ -189,7 +188,7 @@ class HealthFeatureProvider:
         return None
 
     @staticmethod
-    def _linear_slope(points: List[tuple]) -> float:
+    def _linear_slope(points: list[tuple]) -> float:
         """Simple linear regression slope from (x, y) pairs.
 
         Args:
@@ -212,7 +211,7 @@ class HealthFeatureProvider:
         return round(slope, 4)
 
     @staticmethod
-    def _stddev(values: List[float]) -> float:
+    def _stddev(values: list[float]) -> float:
         """Population standard deviation.
 
         Args:

@@ -1,25 +1,24 @@
 """Service for parsing BMS log files."""
 
 import csv
+import hashlib
 import io
 import json
 import re
-import hashlib
 from datetime import datetime
-from typing import List, Dict, Optional, Tuple
 from pathlib import Path
 
 from app.models.integration import (
-    FileFormat,
-    Severity,
     AlarmState,
+    ColumnMapping,
+    FileFormat,
     FormatDetectionResult,
-    ParseResult,
     ParsedAlarm,
     ParsedTrend,
+    ParseResult,
     ParseValidationError,
     ParseValidationWarning,
-    ColumnMapping,
+    Severity,
 )
 
 
@@ -113,7 +112,7 @@ class LogParserService:
     def parse_alarms(
         self,
         content: str,
-        mappings: List[ColumnMapping],
+        mappings: list[ColumnMapping],
         date_format: str,
         delimiter: str = ",",
         timezone: str = "Africa/Johannesburg",
@@ -122,9 +121,9 @@ class LogParserService:
 
         rows = list(csv.DictReader(io.StringIO(content), delimiter=delimiter))
 
-        parsed_alarms: List[ParsedAlarm] = []
-        errors: List[ParseValidationError] = []
-        warnings: List[ParseValidationWarning] = []
+        parsed_alarms: list[ParsedAlarm] = []
+        errors: list[ParseValidationError] = []
+        warnings: list[ParseValidationWarning] = []
         unmatched_points: set = set()
 
         # Build mapping lookup
@@ -154,7 +153,7 @@ class LogParserService:
     def parse_trends(
         self,
         content: str,
-        mappings: List[ColumnMapping],
+        mappings: list[ColumnMapping],
         date_format: str,
         delimiter: str = ",",
     ) -> ParseResult:
@@ -162,8 +161,8 @@ class LogParserService:
 
         rows = list(csv.DictReader(io.StringIO(content), delimiter=delimiter))
 
-        parsed_trends: List[ParsedTrend] = []
-        errors: List[ParseValidationError] = []
+        parsed_trends: list[ParsedTrend] = []
+        errors: list[ParseValidationError] = []
         unmatched_points: set = set()
 
         mapping_dict = {m.sentinel_field: m for m in mappings}
@@ -191,11 +190,11 @@ class LogParserService:
 
     def _parse_alarm_row(
         self,
-        row: Dict[str, str],
-        mappings: Dict[str, ColumnMapping],
+        row: dict[str, str],
+        mappings: dict[str, ColumnMapping],
         date_format: str,
         row_num: int,
-    ) -> Optional[ParsedAlarm]:
+    ) -> ParsedAlarm | None:
         """Parse a single alarm row."""
 
         # Get timestamp (required)
@@ -252,11 +251,11 @@ class LogParserService:
 
     def _parse_trend_row(
         self,
-        row: Dict[str, str],
-        mappings: Dict[str, ColumnMapping],
+        row: dict[str, str],
+        mappings: dict[str, ColumnMapping],
         date_format: str,
         row_num: int,
-    ) -> Optional[ParsedTrend]:
+    ) -> ParsedTrend | None:
         """Parse a single trend row."""
 
         ts_mapping = mappings.get("timestamp")
@@ -297,10 +296,10 @@ class LogParserService:
 
     def _get_mapped_value(
         self,
-        row: Dict[str, str],
-        mappings: Dict[str, ColumnMapping],
+        row: dict[str, str],
+        mappings: dict[str, ColumnMapping],
         field: str,
-    ) -> Optional[str]:
+    ) -> str | None:
         """Get value from row using mapping."""
         mapping = mappings.get(field)
         if not mapping:
@@ -371,7 +370,7 @@ class LogParserService:
             return "\t"
         return ","
 
-    def _detect_date_format(self, date_values: List[str]) -> Tuple[str, Optional[datetime], Optional[datetime]]:
+    def _detect_date_format(self, date_values: list[str]) -> tuple[str, datetime | None, datetime | None]:
         """Detect date format from sample values."""
 
         for fmt in self.DATE_FORMATS:
@@ -401,7 +400,7 @@ class LogParserService:
 
         return "YYYY-MM-DD HH:MI:SS", None, None
 
-    def _detect_vendor(self, point_ids: List[str]) -> Optional[str]:
+    def _detect_vendor(self, point_ids: list[str]) -> str | None:
         """Detect BMS vendor from point ID patterns."""
         combined = " ".join(point_ids)
 
@@ -412,7 +411,7 @@ class LogParserService:
 
         return None
 
-    def _find_column(self, columns: List[str], patterns: List[str]) -> Optional[str]:
+    def _find_column(self, columns: list[str], patterns: list[str]) -> str | None:
         """Find column matching any of the patterns."""
         for col in columns:
             col_lower = col.lower().strip()
@@ -420,7 +419,7 @@ class LogParserService:
                 return col
         return None
 
-    def _suggest_mappings(self, columns: List[str]) -> Dict[str, str]:
+    def _suggest_mappings(self, columns: list[str]) -> dict[str, str]:
         """Suggest SENTINEL field mappings for columns."""
         mappings = {}
 
@@ -444,7 +443,7 @@ class LogParserService:
 
         return mappings
 
-    def _parse_datetime(self, value: str, format_hint: str) -> Optional[datetime]:
+    def _parse_datetime(self, value: str, format_hint: str) -> datetime | None:
         """Parse datetime from string."""
         if not value:
             return None
@@ -457,7 +456,7 @@ class LogParserService:
 
         return None
 
-    def _parse_float(self, value: Optional[str]) -> Optional[float]:
+    def _parse_float(self, value: str | None) -> float | None:
         """Parse float from string."""
         if not value:
             return None
@@ -466,7 +465,7 @@ class LogParserService:
         except (ValueError, TypeError):
             return None
 
-    def _normalize_severity(self, value: str) -> Optional[Severity]:
+    def _normalize_severity(self, value: str) -> Severity | None:
         """Normalize severity value."""
         if not value:
             return None
@@ -484,7 +483,7 @@ class LogParserService:
 
         return None
 
-    def _normalize_state(self, value: str) -> Optional[AlarmState]:
+    def _normalize_state(self, value: str) -> AlarmState | None:
         """Normalize alarm state value."""
         if not value:
             return None

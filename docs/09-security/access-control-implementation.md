@@ -1,3 +1,18 @@
+---
+title: "Access Control Implementation"
+type: "policy"
+status: "draft"
+version: "1.0.0"
+created: "2026-03-31"
+updated: "2026-03-31"
+tags: ["sentinel", "documentation"]
+related: []
+domain: "security"
+audience: "all"
+complexity: "intermediate"
+estimated_read_time: 10
+---
+
 # Access Control Implementation
 
 **Document:** SENTINEL BMS Platform - Access Control Architecture

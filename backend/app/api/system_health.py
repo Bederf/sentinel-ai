@@ -142,7 +142,7 @@ async def get_current_health():
 
 @router.get("/health/history", response_model=HealthHistoryData)
 async def get_health_history(
-    range: str = Query("24h", regex="^(24h|7d|30d)$"),
+    range: str = Query("24h", pattern="^(24h|7d|30d)$"),
 ):
     """
     Get historical health data for trend analysis.

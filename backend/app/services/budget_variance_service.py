@@ -7,31 +7,31 @@ Phase 49-09: Variance analysis and alerts.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, Any, Optional, List
+from typing import Any
 
-from app.database.repositories.budget_repository import BudgetRepository
 from app.database.repositories.budget_alert_repository import BudgetAlertRepository
+from app.database.repositories.budget_repository import BudgetRepository
 
 
 @dataclass
 class BudgetVarianceResult:
     contract_id: str
-    budget_id: Optional[str]
+    budget_id: str | None
     period_year: int
     period_month: int
     total_budget_zar: float
     total_actual_zar: float
     variance_zar: float
     spend_percentage: float
-    severity: Optional[str]
-    message: Optional[str]
+    severity: str | None
+    message: str | None
 
 
 class BudgetVarianceService:
     """Compute variance and create alerts."""
 
     def __init__(
-        self, budget_repo: Optional[BudgetRepository] = None, alert_repo: Optional[BudgetAlertRepository] = None
+        self, budget_repo: BudgetRepository | None = None, alert_repo: BudgetAlertRepository | None = None
     ):
         self.budget_repo = budget_repo or BudgetRepository()
         self.alert_repo = alert_repo or BudgetAlertRepository()
@@ -100,9 +100,9 @@ class BudgetVarianceService:
             message=message,
         )
 
-    def evaluate_equipment_type_budgets(self, contract_id: str, year: int, month: int) -> List[Dict[str, Any]]:
+    def evaluate_equipment_type_budgets(self, contract_id: str, year: int, month: int) -> list[dict[str, Any]]:
         budgets = self.budget_repo.get_by_contract(contract_id, year=year)
-        results: List[Dict[str, Any]] = []
+        results: list[dict[str, Any]] = []
 
         for budget in budgets:
             equipment_type = budget.get("equipment_type")
@@ -162,17 +162,17 @@ class BudgetVarianceService:
     def list_alerts(
         self,
         contract_id: str,
-        year: Optional[int] = None,
-        month: Optional[int] = None,
-        status: Optional[str] = None,
-        severity: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+        year: int | None = None,
+        month: int | None = None,
+        status: str | None = None,
+        severity: str | None = None,
+    ) -> list[dict[str, Any]]:
         return self.alert_repo.list_by_contract(
             contract_id=contract_id, year=year, month=month, status=status, severity=severity
         )
 
 
-_service: Optional[BudgetVarianceService] = None
+_service: BudgetVarianceService | None = None
 
 
 def get_budget_variance_service() -> BudgetVarianceService:

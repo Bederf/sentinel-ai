@@ -9,6 +9,14 @@ tags: [deployment, setup, onboarding, handoff]
 
 Step-by-step guide for deploying SENTINEL to a new site. A new site team should be able to follow this document from a fresh server to an operational system without developer assistance.
 
+This runbook supports two deployment patterns:
+- local site hosting: Sentinel and the site adapter run on the same host/network
+- remote site connection: Sentinel runs separately and reaches the building data source through SIMBIOT over WireGuard/VPN, edge connection, BACnet, or another supported adapter path
+
+Across both patterns, the contract is the same:
+- SIMBIOT exposes building-operational data to SENTINEL
+- SENTINEL consumes the building view, not remote lifecycle internals
+
 **Estimated time:** 45-60 minutes (excluding Supabase provisioning)
 
 ---
@@ -129,7 +137,24 @@ NOTIFICATION_SMTP_HOST=smtp.gmail.com
 NOTIFICATION_SMTP_PORT=587
 NOTIFICATION_SMTP_USERNAME=alerts@yourcompany.co.za
 NOTIFICATION_SMTP_PASSWORD=<app-password>
+
+# Remote-VM / WireGuard topology
+ENABLE_SITE002_SOURCE=false
+SENTINEL_ISLAND_MODE=true
+BRIDGE_BASE_URL=http://10.99.0.1:8080
+BRIDGE_API_TOKEN=<shared-bridge-token>
 ```
+
+### Remote VM + WireGuard Checklist
+
+If the site adapter or building endpoint lives on another host/network:
+
+1. Bring up the WireGuard tunnel before `sentinel-backend`.
+2. Confirm the remote VM tunnel IP is reachable from the Sentinel host.
+3. Confirm the bridge health endpoint responds on the WireGuard IP/port.
+4. Keep `ENABLE_SITE002_SOURCE=false` so this host does not start the local `site-002` simulator.
+5. Keep `SENTINEL_ISLAND_MODE=true` so device bootstrap and simulation queue stay disabled locally.
+6. Ensure the remote site endpoint does not write directly to Supabase; Sentinel remains the single writer.
 
 **Frontend:**
 
@@ -194,6 +219,22 @@ curl -I http://localhost:9096
 ```
 
 Open browser: `http://localhost:9096`
+
+### Additional verification for remote site connections
+
+```bash
+# WireGuard peer state
+sudo wg show
+
+# Route to the remote site subnet
+ip route | grep 10.99.0.0
+
+# Site endpoint health over the chosen path
+curl -H "Authorization: Bearer <BRIDGE_API_TOKEN>" http://10.99.0.1:8080/health
+
+# Sentinel should log SIMBIOT remote ingestion mode, not local simulation fallback
+journalctl -u sentinel-backend -n 100 | grep -E "SIMBIOT|remote site bridge|data source"
+```
 
 ## Step 7: First Login & Admin Setup (5 min)
 

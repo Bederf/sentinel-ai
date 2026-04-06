@@ -7,7 +7,7 @@ and added to TODO.md when they represent unimplemented features.
 import json
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 logger = logging.getLogger(__name__)
 
@@ -21,13 +21,13 @@ def log_chat_query(query: str) -> None:
     try:
         entries = []
         if os.path.exists(FEATURE_LOG_PATH):
-            with open(FEATURE_LOG_PATH, "r") as f:
+            with open(FEATURE_LOG_PATH) as f:
                 entries = json.load(f)
 
         entries.append(
             {
                 "query": query,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
         )
 

@@ -1,3 +1,18 @@
+---
+title: "Improvement Protocol"
+type: "guide"
+status: "draft"
+version: "1.0.0"
+created: "2026-03-31"
+updated: "2026-03-31"
+tags: ["sentinel", "documentation"]
+related: []
+domain: "bms"
+audience: "all"
+complexity: "intermediate"
+estimated_read_time: 10
+---
+
 ### Improvement protocol integration
 
 Use it with your existing skills, not instead of them. This should not become “another main skill.” It should act like an execution mode or sub-workflow that gets called when a skill needs controlled improvement:
@@ -60,6 +75,7 @@ Responsibilities: apply the protocol to the actual subsystem while keeping chang
 
 D. **Diary skill** – continuity and recordkeeping  
 Responsibilities: persist the note/outcome and provide historical continuity.
+
 
 ---
 
@@ -125,3 +141,59 @@ Structure the comprehensive plan like this:
 - **Diary skill**: continuity and recordkeeping  
 
 This keeps each skill focused and prevents overlap.
+
+---
+
+**Artifact simplification mode (command wrapper safe)**
+
+Use `/simplify` style command wrappers as a thin trigger for rewriting artifacts only.
+
+Input contract:
+- current task, plan, prompt, report, or handoff draft
+- explicit constraints that must not be lost
+- known next actions (if available)
+
+Transform rules:
+- remove repetition and vague language
+- collapse branching text into the smallest correct executable form
+- preserve intent, hard constraints, and required sequencing
+- produce concrete action language
+
+Output contract:
+- concise and execution-ready
+- constraints preserved
+- clear next actions
+- no new orchestration policy introduced by the command
+
+Authority rule:
+- simplification wrappers are non-authoritative
+- if simplified output conflicts with GSD gates, GSD wins
+
+---
+
+**Failure recovery and verification protocol (GSD-native)**
+
+Treat this as a named sub-protocol under GSD master governance.
+Do not import manipulative framing or rhetoric from external prompt packs.
+
+1. **No unverified completion**
+   - Never mark work complete without evidence.
+   - Evidence should come from tests, build/lint/type checks, or observed runtime behavior.
+
+2. **Anti-spin control**
+   - After 2 failed attempts, do not repeat the same fix shape.
+   - Attempt 3 must materially change method and assumptions.
+
+3. **Root-cause-first discipline**
+   - Inspect real errors/logs/source before patching when available.
+   - Avoid guess-first patching when direct evidence exists.
+
+4. **Proactive closure checks**
+   - After fixing one issue, inspect adjacent modules and duplicate patterns.
+   - Record residual risk and required follow-up checks.
+
+5. **Escalation ladder**
+   - Attempt 1: direct evidence-based fix
+   - Attempt 2: alternate approach
+   - Attempt 3: structured diagnosis checklist
+   - Attempt 4+: broaden dependency and assumption analysis

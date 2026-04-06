@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from typing import Any
 
 from app.models.booking_record import BlockBookingConfig
@@ -43,7 +43,7 @@ def _resolve_related_ghost_signal(finding: GhostBookingFinding, *, resolution_st
             client.table("signal").update(
                 {
                     "resolution_state": resolution_state,
-                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                    "updated_at": datetime.now(UTC).isoformat(),
                     "metadata": {
                         **metadata,
                         "concierge_outcome": {
@@ -131,11 +131,11 @@ def _to_sast(dt, *, assume_utc_if_naive: bool = True):
     Booking timestamps are often already parsed as local SAST naive datetimes,
     while detection timestamps are usually stored as naive UTC.
     """
-    from datetime import timezone, timedelta
+    from datetime import timedelta
 
     sast = timezone(timedelta(hours=2))
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc if assume_utc_if_naive else sast)
+        dt = dt.replace(tzinfo=UTC if assume_utc_if_naive else sast)
     return dt.astimezone(sast)
 
 
@@ -289,6 +289,7 @@ async def send_ghost_booking_alert(
             email_sent=email_sent,
             whatsapp_sent=whatsapp_sent,
             whatsapp_message_id=whatsapp_message_id,
+            reset_reminder_cycle=not is_reminder,
         )
 
     return {

@@ -1,7 +1,5 @@
 """Shared prediction taxonomy and formula metadata."""
 
-from typing import Optional
-
 
 SEVERITY_CRITICAL = "critical"
 SEVERITY_WARNING = "warning"
@@ -15,7 +13,7 @@ CONFIDENCE_LOW = "low"
 FORMULA_VERSION_STATIC = "v1.0-static"
 
 
-def normalize_prediction_severity(value: Optional[str]) -> Optional[str]:
+def normalize_prediction_severity(value: str | None) -> str | None:
     """Normalize severity to canonical states."""
     if value is None:
         return None
@@ -29,7 +27,7 @@ def normalize_prediction_severity(value: Optional[str]) -> Optional[str]:
     return None
 
 
-def normalize_prediction_confidence(value: Optional[str]) -> Optional[str]:
+def normalize_prediction_confidence(value: str | None) -> str | None:
     """Normalize confidence to canonical states."""
     if value is None:
         return None
@@ -39,7 +37,7 @@ def normalize_prediction_confidence(value: Optional[str]) -> Optional[str]:
     return None
 
 
-def normalize_prediction_urgency(value: Optional[str]) -> Optional[str]:
+def normalize_prediction_urgency(value: str | None) -> str | None:
     """Normalize urgency to canonical states."""
     if value is None:
         return None

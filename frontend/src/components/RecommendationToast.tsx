@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import * as React from 'react';
 import { Lightbulb, X, Zap, ThermometerSun, Lamp, ChevronRight, CheckCircle2, Lock } from 'lucide-react';
 import { toast } from 'sonner';
@@ -47,22 +47,33 @@ export function useRecommendationToasts(
   pollingIntervalMs = 30000,
 ) {
   useEffect(() => {
-    if (!siteId) return;
-    const shownToastIds = new Set<string>();
+    if (!siteId || siteId === 'site-001') return;
+
+    // Persist seen IDs across polls within the session so dismissed recs don't re-toast
+    const SESSION_KEY = `sentinel_seen_recs_${siteId}`;
+    const shownToastIds = new Set<string>(
+      JSON.parse(sessionStorage.getItem(SESSION_KEY) || '[]')
+    );
+    const persist = () => sessionStorage.setItem(SESSION_KEY, JSON.stringify([...shownToastIds]));
 
     const poll = async () => {
       try {
-        const response = await authorizedFetch(`/api/recommendations/${siteId}`);
+        // Backend route: GET /modules/site/{site_id}/recommendations
+        // Returns a list directly (not {recommendations: [...]})
+        const response = await authorizedFetch(`/modules/site/${siteId}/recommendations`);
+        if (!response.ok) return;
         const data = await response.json();
+        const items: RecommendationData[] = Array.isArray(data) ? data : (data.recommendations || []);
 
-        const pending: RecommendationData[] = data.recommendations?.filter(
+        const pending = items.filter(
           (r: RecommendationData) => r.status?.toLowerCase() === 'pending'
-        ) || [];
+        );
 
         if (pending.length > 0) {
           for (const rec of pending) {
             if (!shownToastIds.has(rec.id)) {
               shownToastIds.add(rec.id);
+              persist();
 
               toast("AI Recommendation", {
                 description: `${rec.reason} — ${rec.target_equipment}`,
@@ -136,13 +147,45 @@ export function RecommendationCard({
   const iconColor = isHVAC ? '#3B82F6' : isLighting ? '#FACC15' : '#10B981';
   const savings = recommendation.expected_impact?.energy_savings_percent ?? 0;
 
+  // Swipe-to-dismiss (left swipe = read/close)
+  const touchStartX = useRef<number | null>(null);
+  const [swipeOffset, setSwipeOffset] = useState(0);
+  const [swiping, setSwiping] = useState(false);
+  const SWIPE_THRESHOLD = 80;
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+    setSwiping(true);
+  };
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (touchStartX.current === null) return;
+    const delta = e.touches[0].clientX - touchStartX.current;
+    // Only track leftward swipe (negative delta)
+    setSwipeOffset(Math.min(0, delta));
+  };
+  const handleTouchEnd = () => {
+    if (swipeOffset < -SWIPE_THRESHOLD) {
+      onClose(); // swipe-to-dismiss = mark as read
+    } else {
+      setSwipeOffset(0);
+    }
+    setSwiping(false);
+    touchStartX.current = null;
+  };
+
   return (
     <div
       className="fixed right-4 top-4 z-50 w-96 rounded-lg shadow-2xl overflow-hidden"
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
       style={{
         background: 'var(--color-sentinel-bg-panel, #1a1a2e)',
         border: '1px solid var(--color-sentinel-border, #2a2a4a)',
-        animation: 'slideInRight 0.3s ease-out',
+        animation: swiping ? 'none' : 'slideInRight 0.3s ease-out',
+        transform: `translateX(${swipeOffset}px)`,
+        transition: swiping ? 'none' : 'transform 0.2s ease-out',
+        opacity: swipeOffset < -20 ? 1 - Math.min(1, (-swipeOffset - 20) / 80) : 1,
       }}
     >
       {/* Header */}
@@ -296,6 +339,19 @@ export function RecommendationCard({
         </div>
       </div>
 
+      {/* Swipe hint — touch only */}
+      <div
+        className="flex items-center justify-center py-1.5 gap-1.5"
+        style={{
+          borderTop: '1px solid var(--color-sentinel-border, #2a2a4a)',
+          opacity: 0.4,
+        }}
+      >
+        <span style={{ fontSize: '0.6rem', color: 'var(--color-sentinel-text-secondary, #aaa)', letterSpacing: '0.05em' }}>
+          ← swipe to dismiss
+        </span>
+      </div>
+
       <style>{`
         @keyframes slideInRight {
           from { transform: translateX(100%); opacity: 0; }
@@ -313,12 +369,17 @@ export function RecommendationBadge({ siteId }: { siteId: string }) {
   const [pendingCount, setPendingCount] = React.useState(0);
 
   React.useEffect(() => {
-    if (!siteId) return;
+    if (!siteId || siteId === 'site-001') {
+      setPendingCount(0);
+      return;
+    }
     const poll = async () => {
       try {
-        const response = await authorizedFetch(`/api/recommendations/${siteId}`);
+        const response = await authorizedFetch(`/modules/site/${siteId}/recommendations`);
+        if (!response.ok) return;
         const data = await response.json();
-        const pending = data.recommendations?.filter((r: RecommendationData) => r.status?.toLowerCase() === 'pending') || [];
+        const items: RecommendationData[] = Array.isArray(data) ? data : (data.recommendations || []);
+        const pending = items.filter((r: RecommendationData) => r.status?.toLowerCase() === 'pending');
         setPendingCount(pending.length);
       } catch (error) {
         console.error('Failed to fetch recommendation count:', error);

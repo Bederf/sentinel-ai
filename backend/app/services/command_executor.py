@@ -1,11 +1,10 @@
 """Command Executor Service for simulated building control commands."""
 
-import re
+import json
 import logging
+import re
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional
-import json
 from pathlib import Path
 
 from app.services.device_abstraction import device_manager
@@ -95,7 +94,7 @@ class CommandExecutor:
             self._equipment = load_json("equipment.json")
         return self._equipment
 
-    def _find_site(self, query: str) -> Optional[dict]:
+    def _find_site(self, query: str) -> dict | None:
         """Find a site by name or ID (fuzzy match)."""
         query_lower = query.lower().strip()
 
@@ -117,7 +116,7 @@ class CommandExecutor:
 
         return None
 
-    def _find_equipment(self, query: str) -> Optional[dict]:
+    def _find_equipment(self, query: str) -> dict | None:
         """Find equipment by name or ID (fuzzy match)."""
         query_lower = query.lower().strip()
 
@@ -133,7 +132,7 @@ class CommandExecutor:
 
         return None
 
-    def parse_command(self, message: str) -> Optional[dict]:
+    def parse_command(self, message: str) -> dict | None:
         """
         Parse a message to detect if it's a control command.
 
@@ -238,7 +237,7 @@ class CommandExecutor:
             # Fall back to simulated execution
             return self._execute_temperature_simulated(temp, site)
 
-        # Use the first HVAC device for demo
+        # Use the first HVAC device for local fallback execution
         device = hvac_devices[0]
 
         # Find temperature setpoint point

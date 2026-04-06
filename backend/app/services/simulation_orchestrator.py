@@ -10,17 +10,17 @@ Pattern: Factory + Registry for instance lifecycle management
 """
 
 import logging
-from typing import Dict, Optional
+
+from app.services.health_simulation_service import get_health_simulation_service
 from app.services.lifecycle_orchestrator import (
     LifecycleOrchestrator,
     create_lifecycle_orchestrator,
 )
-from app.services.health_simulation_service import get_health_simulation_service
 
 logger = logging.getLogger(__name__)
 
 # Global registry of active simulations
-_active_simulations: Dict[str, LifecycleOrchestrator] = {}
+_active_simulations: dict[str, LifecycleOrchestrator] = {}
 
 
 def create_orchestrator(task_id: str, site_id: str | None = None) -> LifecycleOrchestrator:
@@ -55,7 +55,7 @@ def register_simulation(task_id: str, orchestrator: LifecycleOrchestrator) -> No
     logger.info(f"Registered simulation task {task_id} (total active: {len(_active_simulations)})")
 
 
-def get_simulation_by_task_id(task_id: str) -> Optional[LifecycleOrchestrator]:
+def get_simulation_by_task_id(task_id: str) -> LifecycleOrchestrator | None:
     """
     Look up a running simulation by task ID.
 
@@ -103,6 +103,6 @@ def get_active_simulation_count() -> int:
     return len(_active_simulations)
 
 
-def get_all_active_simulations() -> Dict[str, LifecycleOrchestrator]:
+def get_all_active_simulations() -> dict[str, LifecycleOrchestrator]:
     """Get copy of all active simulations (for monitoring)."""
     return _active_simulations.copy()

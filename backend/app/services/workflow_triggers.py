@@ -13,9 +13,10 @@ Phase 53-02: Automated Triggers & Workflow Automation
 
 import logging
 from datetime import datetime, timedelta
-from typing import Optional, Dict, List, Any, Tuple
-from pydantic import BaseModel, Field
 from enum import Enum
+from typing import Any
+
+from pydantic import BaseModel, Field
 
 from app.database.repositories.workflow_event_repository import (
     get_workflow_event_repository,
@@ -70,7 +71,7 @@ class BaselineComparison(BaseModel):
     baseline_id: str
     comparison_date: datetime = Field(default_factory=datetime.now)
     max_deviation_percent: float
-    deviating_metrics: Dict[str, float] = {}
+    deviating_metrics: dict[str, float] = {}
     within_threshold: bool = True
 
 
@@ -98,8 +99,8 @@ class InspectionTask(BaseModel):
     priority: str = "medium"
     scheduled_date: datetime = Field(default_factory=lambda: datetime.now() + timedelta(hours=24))
     reason: str = ""
-    anomaly_reference: Optional[str] = None
-    work_order_reference: Optional[str] = None
+    anomaly_reference: str | None = None
+    work_order_reference: str | None = None
     created_at: datetime = Field(default_factory=datetime.now)
 
     def __init__(self, **data):
@@ -119,7 +120,7 @@ class WorkOrderCreate(BaseModel):
     estimated_cost_min: float = 0.0
     estimated_cost_max: float = 0.0
     estimated_hours: float = 0.0
-    deficiency_reference: Optional[str] = None
+    deficiency_reference: str | None = None
     triggered_by: str = "workflow_automation"
     created_at: datetime = Field(default_factory=datetime.now)
 
@@ -137,7 +138,7 @@ class BaselineCaptureTask(BaseModel):
     baseline_type: str  # initial, pre_repair, post_repair
     scheduled_date: datetime = Field(default_factory=datetime.now)
     reason: str = ""
-    work_order_reference: Optional[str] = None
+    work_order_reference: str | None = None
 
     def __init__(self, **data):
         super().__init__(**data)
@@ -151,7 +152,7 @@ class EffectivenessResult(BaseModel):
     work_order_id: str
     equipment_id: str
     effectiveness_score: float
-    improvements: Dict[str, Dict[str, float]] = {}
+    improvements: dict[str, dict[str, float]] = {}
     repair_successful: bool = False
     back_to_baseline: bool = False
     validation_date: datetime = Field(default_factory=datetime.now)
@@ -164,7 +165,7 @@ class TriggerResult(BaseModel):
     trigger_type: TriggerType
     equipment_id: str
     action_taken: str
-    details: Dict[str, Any] = {}
+    details: dict[str, Any] = {}
     follow_up_scheduled: bool = False
     timestamp: datetime = Field(default_factory=datetime.now)
 
@@ -188,17 +189,17 @@ class WorkflowTriggerEngine:
 
     def __init__(self):
         """Initialize trigger engine with service connections."""
-        # In-memory storage for demo scope
-        self._inspection_tasks: Dict[str, List[InspectionTask]] = {}
-        self._work_orders: Dict[str, List[WorkOrderCreate]] = {}
-        self._baseline_tasks: Dict[str, List[BaselineCaptureTask]] = {}
-        self._effectiveness_results: Dict[str, EffectivenessResult] = {}
-        self._trigger_history: List[TriggerResult] = []
+        # In-memory storage for local/offline scope
+        self._inspection_tasks: dict[str, list[InspectionTask]] = {}
+        self._work_orders: dict[str, list[WorkOrderCreate]] = {}
+        self._baseline_tasks: dict[str, list[BaselineCaptureTask]] = {}
+        self._effectiveness_results: dict[str, EffectivenessResult] = {}
+        self._trigger_history: list[TriggerResult] = []
 
         # Trigger deduplication
-        self._last_triggered: Dict[str, datetime] = {}
-        self._recent_trigger_refs: Dict[str, datetime] = {}
-        self._cooldowns: Dict[TriggerType, timedelta] = {
+        self._last_triggered: dict[str, datetime] = {}
+        self._recent_trigger_refs: dict[str, datetime] = {}
+        self._cooldowns: dict[TriggerType, timedelta] = {
             TriggerType.ML_ANOMALY: timedelta(hours=6),
             TriggerType.BASELINE_DEVIATION: timedelta(hours=6),
             TriggerType.CRITICAL_DEFICIENCY: timedelta(hours=12),
@@ -287,7 +288,7 @@ class WorkflowTriggerEngine:
                 self._inspection_tasks[equipment_id] = []
             self._inspection_tasks[equipment_id].append(task)
 
-            # 4. Send notification (logged for demo)
+            # 4. Send notification (currently logged locally)
             await self._send_alert(
                 f"Anomaly detected for {equipment_id}. Inspection scheduled for {task.scheduled_date}."
             )
@@ -404,7 +405,7 @@ class WorkflowTriggerEngine:
                 self._trigger_history.append(result)
                 return result
 
-            # 2. Generate AI recommendation (simulated for demo)
+            # 2. Generate AI recommendation (locally assembled fallback)
             recommendation = await self._generate_maintenance_recommendation(
                 equipment_id=equipment_id, comparison=comparison
             )
@@ -637,7 +638,7 @@ class WorkflowTriggerEngine:
     # ========================================================================
 
     async def on_repair_completed(
-        self, work_order_id: str, equipment_id: str, completion_data: Dict[str, Any]
+        self, work_order_id: str, equipment_id: str, completion_data: dict[str, Any]
     ) -> TriggerResult:
         """
         Handle work order completion.
@@ -691,7 +692,7 @@ class WorkflowTriggerEngine:
                 logger.warning(f"Failed to start feedback session (non-critical): {e}")
 
             # 4. Queue effectiveness validation (will run after post-repair baseline)
-            # For demo, store scheduled time
+            # Store scheduled time in local memory
             validation_scheduled_time = datetime.now() + timedelta(hours=3)
 
             # 5. Send notification
@@ -762,7 +763,7 @@ class WorkflowTriggerEngine:
     # ========================================================================
 
     async def validate_repair_effectiveness(
-        self, equipment_id: str, work_order_id: str, pre_baseline: Dict[str, Any], post_baseline: Dict[str, Any]
+        self, equipment_id: str, work_order_id: str, pre_baseline: dict[str, Any], post_baseline: dict[str, Any]
     ) -> TriggerResult:
         """
         Validate repair effectiveness by comparing baselines.
@@ -946,23 +947,23 @@ class WorkflowTriggerEngine:
     # Query Methods
     # ========================================================================
 
-    def get_pending_inspections(self, equipment_id: str) -> List[InspectionTask]:
+    def get_pending_inspections(self, equipment_id: str) -> list[InspectionTask]:
         """Get pending inspection tasks for equipment."""
         return self._inspection_tasks.get(equipment_id, [])
 
-    def get_pending_work_orders(self, equipment_id: str) -> List[WorkOrderCreate]:
+    def get_pending_work_orders(self, equipment_id: str) -> list[WorkOrderCreate]:
         """Get pending work orders for equipment."""
         return self._work_orders.get(equipment_id, [])
 
-    def get_pending_baseline_tasks(self, equipment_id: str) -> List[BaselineCaptureTask]:
+    def get_pending_baseline_tasks(self, equipment_id: str) -> list[BaselineCaptureTask]:
         """Get pending baseline capture tasks for equipment."""
         return self._baseline_tasks.get(equipment_id, [])
 
-    def get_effectiveness_result(self, work_order_id: str) -> Optional[EffectivenessResult]:
+    def get_effectiveness_result(self, work_order_id: str) -> EffectivenessResult | None:
         """Get effectiveness result for work order."""
         return self._effectiveness_results.get(work_order_id)
 
-    def get_trigger_history(self, equipment_id: Optional[str] = None) -> List[TriggerResult]:
+    def get_trigger_history(self, equipment_id: str | None = None) -> list[TriggerResult]:
         """Get trigger history, optionally filtered by equipment."""
         if equipment_id:
             return [t for t in self._trigger_history if t.equipment_id == equipment_id]
@@ -972,7 +973,7 @@ class WorkflowTriggerEngine:
     # Private Helper Methods
     # ========================================================================
 
-    def _find_pending_inspection(self, equipment_id: str) -> Optional[InspectionTask]:
+    def _find_pending_inspection(self, equipment_id: str) -> InspectionTask | None:
         """Find pending inspection for equipment."""
         tasks = self._inspection_tasks.get(equipment_id, [])
         for task in tasks:
@@ -985,18 +986,18 @@ class WorkflowTriggerEngine:
         return f"{trigger_type.value}:{equipment_id}"
 
     def _reference_key(
-        self, trigger_type: TriggerType, equipment_id: str, reference_id: Optional[str]
-    ) -> Optional[str]:
+        self, trigger_type: TriggerType, equipment_id: str, reference_id: str | None
+    ) -> str | None:
         if not reference_id:
             return None
         return f"{trigger_type.value}:{equipment_id}:{reference_id}"
 
     def _is_duplicate_trigger(
-        self, trigger_type: TriggerType, equipment_id: str, reference_id: Optional[str] = None
-    ) -> Tuple[bool, Dict[str, Any]]:
+        self, trigger_type: TriggerType, equipment_id: str, reference_id: str | None = None
+    ) -> tuple[bool, dict[str, Any]]:
         now = datetime.now()
         cooldown = self._cooldowns.get(trigger_type)
-        details: Dict[str, Any] = {}
+        details: dict[str, Any] = {}
 
         if cooldown:
             last_triggered = self._last_triggered.get(self._cooldown_key(trigger_type, equipment_id))
@@ -1020,7 +1021,7 @@ class WorkflowTriggerEngine:
 
         return False, details
 
-    def _mark_trigger(self, trigger_type: TriggerType, equipment_id: str, reference_id: Optional[str] = None) -> None:
+    def _mark_trigger(self, trigger_type: TriggerType, equipment_id: str, reference_id: str | None = None) -> None:
         now = datetime.now()
         self._last_triggered[self._cooldown_key(trigger_type, equipment_id)] = now
         ref_key = self._reference_key(trigger_type, equipment_id, reference_id)
@@ -1039,9 +1040,9 @@ class WorkflowTriggerEngine:
 
     async def _generate_maintenance_recommendation(
         self, equipment_id: str, comparison: BaselineComparison
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Generate AI maintenance recommendation."""
-        # Simulated recommendation for demo
+        # Locally assembled recommendation
         recommendation_id = f"rec-{datetime.now().strftime('%Y%m%d%H%M%S')}"
 
         # Determine urgency based on deviation
@@ -1090,7 +1091,7 @@ class WorkflowTriggerEngine:
 
     async def _send_alert(self, message: str):
         """Send alert notification."""
-        # Log for demo - in production, this would call notification service
+        # Log locally until notification service integration is wired in
         logger.info(f"ALERT: {message}")
 
     async def _record_event(
@@ -1098,10 +1099,10 @@ class WorkflowTriggerEngine:
         trigger_type: TriggerType,
         equipment_id: str,
         action_taken: str,
-        details: Dict[str, Any],
+        details: dict[str, Any],
         success: bool,
-        work_order_id: Optional[str] = None,
-        inspection_id: Optional[str] = None,
+        work_order_id: str | None = None,
+        inspection_id: str | None = None,
     ) -> None:
         event_payload = {
             "equipment_id": equipment_id,
@@ -1119,7 +1120,7 @@ class WorkflowTriggerEngine:
         except Exception as e:
             logger.warning(f"Workflow event logging failed (non-critical): {e}")
 
-    async def _audit_log(self, trigger_type: TriggerType, equipment_id: str, action: str, details: Dict[str, Any]):
+    async def _audit_log(self, trigger_type: TriggerType, equipment_id: str, action: str, details: dict[str, Any]):
         """Log trigger action to audit log."""
         log_entry = {
             "timestamp": datetime.now().isoformat(),
@@ -1135,7 +1136,7 @@ class WorkflowTriggerEngine:
 # Singleton Instance
 # ============================================================================
 
-_trigger_engine_instance: Optional[WorkflowTriggerEngine] = None
+_trigger_engine_instance: WorkflowTriggerEngine | None = None
 
 
 def get_trigger_engine() -> WorkflowTriggerEngine:

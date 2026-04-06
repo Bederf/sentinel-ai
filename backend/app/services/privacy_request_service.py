@@ -7,9 +7,9 @@ import logging
 import threading
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -20,14 +20,14 @@ logger = logging.getLogger(__name__)
 
 
 def _utc_now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def _utc_iso(value: datetime) -> str:
-    return value.astimezone(timezone.utc).isoformat()
+    return value.astimezone(UTC).isoformat()
 
 
-def _parse_iso(value: Optional[str]) -> Optional[datetime]:
+def _parse_iso(value: str | None) -> datetime | None:
     if not value:
         return None
     normalized = value.replace("Z", "+00:00")
@@ -36,8 +36,8 @@ def _parse_iso(value: Optional[str]) -> Optional[datetime]:
     except ValueError:
         return None
     if parsed.tzinfo is None:
-        return parsed.replace(tzinfo=timezone.utc)
-    return parsed.astimezone(timezone.utc)
+        return parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
 
 
 @dataclass(frozen=True)
@@ -62,11 +62,11 @@ class PrivacyRequest(BaseModel):
     status: str = RequestStatus.PENDING
     details: str = ""
     requested_by: str
-    assigned_to: Optional[str] = None
+    assigned_to: str | None = None
     created_at: str
     due_at: str
-    closed_at: Optional[str] = None
-    outcome_summary: Optional[str] = None
+    closed_at: str | None = None
+    outcome_summary: str | None = None
     evidence_refs: list[str] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
 
@@ -74,10 +74,10 @@ class PrivacyRequest(BaseModel):
 class PrivacyRequestService:
     """JSON-backed POPIA request workflow with SLA tracking."""
 
-    _instance: Optional["PrivacyRequestService"] = None
+    _instance: PrivacyRequestService | None = None
     _instance_lock = threading.Lock()
 
-    def __new__(cls) -> "PrivacyRequestService":
+    def __new__(cls) -> PrivacyRequestService:
         if cls._instance is None:
             with cls._instance_lock:
                 if cls._instance is None:
@@ -139,8 +139,8 @@ class PrivacyRequestService:
         channel: str,
         details: str,
         requested_by: str,
-        metadata: Optional[dict[str, Any]] = None,
-        due_days: Optional[int] = None,
+        metadata: dict[str, Any] | None = None,
+        due_days: int | None = None,
     ) -> PrivacyRequest:
         with self._lock:
             now = _utc_now()
@@ -165,7 +165,7 @@ class PrivacyRequestService:
             )
             return request
 
-    def get_request(self, request_id: str) -> Optional[PrivacyRequest]:
+    def get_request(self, request_id: str) -> PrivacyRequest | None:
         self._refresh_expired()
         for item in self._requests:
             if item.request_id == request_id:
@@ -175,7 +175,7 @@ class PrivacyRequestService:
     def list_requests(
         self,
         *,
-        status: Optional[str] = None,
+        status: str | None = None,
         include_closed: bool = True,
         overdue_only: bool = False,
     ) -> list[PrivacyRequest]:
@@ -202,11 +202,11 @@ class PrivacyRequestService:
         request_id: str,
         *,
         status: str,
-        assigned_to: Optional[str] = None,
-        outcome_summary: Optional[str] = None,
-        evidence_refs: Optional[list[str]] = None,
-        metadata: Optional[dict[str, Any]] = None,
-    ) -> Optional[PrivacyRequest]:
+        assigned_to: str | None = None,
+        outcome_summary: str | None = None,
+        evidence_refs: list[str] | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> PrivacyRequest | None:
         with self._lock:
             request = self.get_request(request_id)
             if not request:

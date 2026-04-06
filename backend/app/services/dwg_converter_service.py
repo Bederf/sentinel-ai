@@ -10,8 +10,8 @@ Free for non-commercial use, handles DWG R12 through 2024.
 import asyncio
 import logging
 import os
-import tempfile
 import shutil
+import tempfile
 from pathlib import Path
 
 from app.config.settings import settings
@@ -128,7 +128,7 @@ class DWGConverterService:
                     process.communicate(),
                     timeout=self.CONVERSION_TIMEOUT,
                 )
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 process.kill()
                 await process.communicate()
                 raise DWGConversionError(f"DWG conversion timed out after {self.CONVERSION_TIMEOUT}s for {filename}")

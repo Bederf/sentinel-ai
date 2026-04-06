@@ -16,7 +16,7 @@ import logging
 import re
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +59,7 @@ class ClassifiedPoint:
         standardized_name: str = "",
         unit: str = "",
         confidence: ConfidenceLevel = ConfidenceLevel.UNKNOWN,
-        tags: Optional[List[str]] = None,
+        tags: list[str] | None = None,
         object_type: str = "",
         instance: int = 0,
         present_value: Any = None,
@@ -81,7 +81,7 @@ class ClassifiedPoint:
         self.present_value = present_value
         self.writable = writable
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "original_name": self.original_name,
             "original_description": self.original_description,
@@ -115,11 +115,11 @@ class PointClassifier:
         print(result.confidence)  # "high"
     """
 
-    def __init__(self, tags_path: Optional[str] = None):
+    def __init__(self, tags_path: str | None = None):
         self._tags_path = tags_path or str(DATA_DIR / "haystack_tags.json")
-        self._point_type_tags: Dict[str, Any] = {}
-        self._equipment_patterns: Dict[str, Any] = {}
-        self._unit_mappings: Dict[str, List[str]] = {}
+        self._point_type_tags: dict[str, Any] = {}
+        self._equipment_patterns: dict[str, Any] = {}
+        self._unit_mappings: dict[str, list[str]] = {}
         self._loaded = False
 
     def _load_tags(self) -> None:
@@ -273,8 +273,8 @@ class PointClassifier:
 
     def classify_points(
         self,
-        points: List[Dict[str, Any]],
-    ) -> List[ClassifiedPoint]:
+        points: list[dict[str, Any]],
+    ) -> list[ClassifiedPoint]:
         """Classify multiple points in batch.
 
         Args:
@@ -301,7 +301,7 @@ class PointClassifier:
             results.append(result)
         return results
 
-    def get_classification_summary(self, classified_points: List[ClassifiedPoint]) -> Dict[str, Any]:
+    def get_classification_summary(self, classified_points: list[ClassifiedPoint]) -> dict[str, Any]:
         """Generate a summary of classification results.
 
         Args:
@@ -310,10 +310,10 @@ class PointClassifier:
         Returns:
             Summary with counts by equipment type, confidence, and point type
         """
-        equipment_counts: Dict[str, int] = {}
-        confidence_counts: Dict[str, int] = {}
-        point_type_counts: Dict[str, int] = {}
-        equipment_ids: Dict[str, List[str]] = {}
+        equipment_counts: dict[str, int] = {}
+        confidence_counts: dict[str, int] = {}
+        point_type_counts: dict[str, int] = {}
+        equipment_ids: dict[str, list[str]] = {}
 
         for cp in classified_points:
             # Equipment type counts
@@ -410,7 +410,7 @@ class PointClassifier:
         "MEDGAS": "medgas",
     }
 
-    def _extract_type_from_equipment_id(self, equipment_id: str) -> Tuple[str, ConfidenceLevel]:
+    def _extract_type_from_equipment_id(self, equipment_id: str) -> tuple[str, ConfidenceLevel]:
         """Extract equipment type from the equipment ID string.
 
         Splits the ID on hyphens and dots, then looks for a known type code
@@ -429,7 +429,7 @@ class PointClassifier:
         # No known type found
         return "unknown", ConfidenceLevel.UNKNOWN
 
-    def _match_equipment_type(self, search_text: str) -> Tuple[str, ConfidenceLevel]:
+    def _match_equipment_type(self, search_text: str) -> tuple[str, ConfidenceLevel]:
         """Match equipment type using regex patterns.
 
         Returns:
@@ -462,7 +462,7 @@ class PointClassifier:
 
         return best_match, best_confidence
 
-    def _match_point_category(self, search_text: str) -> Tuple[str, str, str, ConfidenceLevel]:
+    def _match_point_category(self, search_text: str) -> tuple[str, str, str, ConfidenceLevel]:
         """Match point category using keyword tags.
 
         Returns:
@@ -652,7 +652,7 @@ class PointClassifier:
         equipment_type: str,
         point_category: str,
         point_type: PointType,
-    ) -> List[str]:
+    ) -> list[str]:
         """Build a list of Haystack-style tags for the point."""
         tags = []
 
@@ -673,9 +673,7 @@ class PointClassifier:
         tags.append("point")
         if point_type == PointType.SENSOR:
             tags.append("cur")  # current value
-        elif point_type == PointType.SETPOINT:
-            tags.append("writable")
-        elif point_type == PointType.COMMAND:
+        elif point_type == PointType.SETPOINT or point_type == PointType.COMMAND:
             tags.append("writable")
 
         return tags
@@ -685,7 +683,7 @@ class PointClassifier:
 # Singleton factory
 # ---------------------------------------------------------------------------
 
-_classifier_instance: Optional[PointClassifier] = None
+_classifier_instance: PointClassifier | None = None
 
 
 def get_point_classifier() -> PointClassifier:

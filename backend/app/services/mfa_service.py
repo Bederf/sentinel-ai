@@ -5,12 +5,13 @@ Handles TOTP secret generation, verification, and enrollment workflow.
 FSR Domain: 4.6 - Logical Access Control (MFA for privileged access)
 """
 
-import pyotp
-import bcrypt
 import logging
 import secrets
 import string
-from typing import Optional, Tuple, Dict, Any
+from typing import Any
+
+import bcrypt
+import pyotp
 
 from app.database.repositories.mfa_repository import get_mfa_repository
 from app.models.auth import SentinelRole
@@ -86,7 +87,7 @@ class MFAService:
             logger.debug(f"Could not check MFA enrollment status for {user_email}: {e}")
             return False
 
-    def get_mfa_status(self, user_email: str, role: SentinelRole) -> Dict[str, Any]:
+    def get_mfa_status(self, user_email: str, role: SentinelRole) -> dict[str, Any]:
         """
         Get complete MFA status for a user.
 
@@ -146,9 +147,9 @@ class MFAService:
     def enroll_user(
         self,
         user_email: str,
-        source_ip: Optional[str] = None,
-        user_agent: Optional[str] = None,
-    ) -> Tuple[bool, str, str]:
+        source_ip: str | None = None,
+        user_agent: str | None = None,
+    ) -> tuple[bool, str, str]:
         """
         Start MFA enrollment for a user.
 
@@ -186,9 +187,9 @@ class MFAService:
         self,
         user_email: str,
         code: str,
-        source_ip: Optional[str] = None,
-        user_agent: Optional[str] = None,
-    ) -> Tuple[bool, str]:
+        source_ip: str | None = None,
+        user_agent: str | None = None,
+    ) -> tuple[bool, str]:
         """
         Verify a TOTP code.
 
@@ -267,9 +268,9 @@ class MFAService:
         self,
         user_email: str,
         code: str,
-        source_ip: Optional[str] = None,
-        user_agent: Optional[str] = None,
-    ) -> Tuple[bool, str]:
+        source_ip: str | None = None,
+        user_agent: str | None = None,
+    ) -> tuple[bool, str]:
         """
         Enable MFA after verifying the initial code.
 
@@ -308,8 +309,8 @@ class MFAService:
         self,
         user_email: str,
         admin_email: str,
-        source_ip: Optional[str] = None,
-        user_agent: Optional[str] = None,
+        source_ip: str | None = None,
+        user_agent: str | None = None,
     ) -> bool:
         """
         Disable MFA for a user (admin action).
@@ -377,7 +378,7 @@ class MFAService:
 
 
 # Singleton instance
-_service: Optional[MFAService] = None
+_service: MFAService | None = None
 
 
 def get_mfa_service() -> MFAService:

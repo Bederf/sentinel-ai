@@ -136,7 +136,7 @@ function buildFallbackContract(base?: Partial<Contract>): Contract {
       name: "Demo Organization",
       tier: "standard",
       primary_contact_name: "Demo Contact",
-      primary_contact_email: "demo@sentinel.local",
+      primary_contact_email: "seed@sentinel.local",
       primary_contact_phone: "+27 11 000 0000",
     },
     contract: base?.contract || {

@@ -129,12 +129,12 @@ async def solve_dispatch(
 
 @router.post("/kill-switch")
 async def kill_switch():
-    """Emergency kill switch — set idle, close AEGIS, switch to simulation, log.
+    """Emergency kill switch — set idle, close AEGIS, disconnect writes, log.
 
     This is a one-shot emergency stop that:
     1. Sends idle (0 kW) to BESS
     2. Closes the AEGIS write gate
-    3. Switches connector mode to simulation
+    3. Prevents further live writes without inventing fallback telemetry
     4. Logs everything to audit trail
 
     To re-enable, set env vars and restart the backend.
@@ -162,10 +162,13 @@ async def kill_switch():
     except Exception as e:
         errors.append(f"aegis_close_failed: {e}")
 
-    # 3. Switch to simulation mode (runtime override — reverts on restart)
+    # 3. Avoid fabricating a local simulation source on production islands
     try:
-        settings.solar_connector_mode = "simulation"
-        actions.append("connector_mode: simulation")
+        if settings.sentinel_island_mode:
+            actions.append("connector_mode: unchanged (production island)")
+        else:
+            settings.solar_connector_mode = "simulation"
+            actions.append("connector_mode: simulation")
     except Exception as e:
         errors.append(f"mode_switch_failed: {e}")
 

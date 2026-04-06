@@ -14,7 +14,7 @@ Key design decisions:
 import logging
 import os
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 from xml.etree import ElementTree as ET
 
 import requests
@@ -91,8 +91,8 @@ class OBIXClient:
 
         # Authentication state
         self._authenticated = False
-        self._last_auth_time: Optional[datetime] = None
-        self._server_version: Optional[str] = None
+        self._last_auth_time: datetime | None = None
+        self._server_version: str | None = None
         self._max_retries = 2
 
     @property
@@ -101,22 +101,22 @@ class OBIXClient:
         return self._authenticated
 
     @property
-    def last_auth_time(self) -> Optional[datetime]:
+    def last_auth_time(self) -> datetime | None:
         """Get the timestamp of the last successful authentication."""
         return self._last_auth_time
 
     @property
-    def server_version(self) -> Optional[str]:
+    def server_version(self) -> str | None:
         """Get the Niagara server version if detected."""
         return self._server_version
 
     def configure(
         self,
-        base_url: Optional[str] = None,
-        username: Optional[str] = None,
-        password: Optional[str] = None,
-        use_https: Optional[bool] = None,
-        timeout: Optional[int] = None,
+        base_url: str | None = None,
+        username: str | None = None,
+        password: str | None = None,
+        use_https: bool | None = None,
+        timeout: int | None = None,
     ) -> None:
         """Reconfigure the client at runtime. Resets authentication."""
         if base_url is not None:
@@ -216,7 +216,7 @@ class OBIXClient:
         # Should not reach here, but just in case
         raise OBIXConnectionError("Max retries exceeded")
 
-    def read_point(self, point_path: str) -> Dict[str, Any]:
+    def read_point(self, point_path: str) -> dict[str, Any]:
         """
         Read a single point value via oBIX.
 
@@ -244,10 +244,10 @@ class OBIXClient:
     def read_history(
         self,
         history_path: str,
-        start: Optional[datetime] = None,
-        end: Optional[datetime] = None,
-        limit: Optional[int] = None,
-    ) -> List[Dict[str, Any]]:
+        start: datetime | None = None,
+        end: datetime | None = None,
+        limit: int | None = None,
+    ) -> list[dict[str, Any]]:
         """
         Retrieve historical data for a point via oBIX history service.
 
@@ -282,12 +282,12 @@ class OBIXClient:
 
     def read_alarms(
         self,
-        start: Optional[datetime] = None,
-        end: Optional[datetime] = None,
+        start: datetime | None = None,
+        end: datetime | None = None,
         limit: int = 100,
-        severity_filter: Optional[str] = None,
-        priority_filter: Optional[int] = None,
-    ) -> List[Dict[str, Any]]:
+        severity_filter: str | None = None,
+        priority_filter: int | None = None,
+    ) -> list[dict[str, Any]]:
         """
         Retrieve alarm history via oBIX alarm service.
 
@@ -325,7 +325,7 @@ class OBIXClient:
 
         return alarms
 
-    def check_connection(self) -> Dict[str, Any]:
+    def check_connection(self) -> dict[str, Any]:
         """
         Check oBIX connection health.
 
@@ -365,7 +365,7 @@ class OBIXClient:
     # XML Parsing helpers
     # -------------------------------------------------------------------------
 
-    def _parse_point_response(self, xml_content: bytes, point_path: str) -> Dict[str, Any]:
+    def _parse_point_response(self, xml_content: bytes, point_path: str) -> dict[str, Any]:
         """
         Parse oBIX XML point response.
 
@@ -404,7 +404,7 @@ class OBIXClient:
 
         return result
 
-    def _extract_value_from_element(self, elem: ET.Element) -> Dict[str, Any]:
+    def _extract_value_from_element(self, elem: ET.Element) -> dict[str, Any]:
         """Extract value, status, and type from an oBIX element."""
         tag = elem.tag.split("}")[-1] if "}" in elem.tag else elem.tag
         val = elem.attrib.get("val")
@@ -421,7 +421,7 @@ class OBIXClient:
             "name": name,
         }
 
-    def _convert_obix_value(self, obix_type: str, raw_value: Optional[str]) -> Any:
+    def _convert_obix_value(self, obix_type: str, raw_value: str | None) -> Any:
         """Convert oBIX string value to Python type."""
         if raw_value is None:
             return None
@@ -435,16 +435,14 @@ class OBIXClient:
                 return raw_value.lower() in ("true", "1")
             elif obix_type == "abstime":
                 return raw_value  # Keep as ISO string
-            elif obix_type == "reltime":
-                return raw_value
-            elif obix_type in ("str", "enum", "uri"):
+            elif obix_type == "reltime" or obix_type in ("str", "enum", "uri"):
                 return raw_value
             else:
                 return raw_value
         except (ValueError, TypeError):
             return raw_value
 
-    def _parse_history_response(self, xml_content: bytes) -> List[Dict[str, Any]]:
+    def _parse_history_response(self, xml_content: bytes) -> list[dict[str, Any]]:
         """
         Parse oBIX history query response.
 
@@ -490,7 +488,7 @@ class OBIXClient:
 
         return records
 
-    def _parse_history_record(self, elem: ET.Element) -> Optional[Dict[str, Any]]:
+    def _parse_history_record(self, elem: ET.Element) -> dict[str, Any] | None:
         """Parse a single history record element."""
         timestamp = None
         value = None
@@ -515,7 +513,7 @@ class OBIXClient:
             }
         return None
 
-    def _parse_alarm_response(self, xml_content: bytes) -> List[Dict[str, Any]]:
+    def _parse_alarm_response(self, xml_content: bytes) -> list[dict[str, Any]]:
         """
         Parse oBIX alarm query response.
 
@@ -562,7 +560,7 @@ class OBIXClient:
 
         return alarms
 
-    def _parse_alarm_record(self, elem: ET.Element) -> Optional[Dict[str, Any]]:
+    def _parse_alarm_record(self, elem: ET.Element) -> dict[str, Any] | None:
         """Parse a single alarm record element."""
         alarm = {
             "alarm_id": None,
@@ -598,7 +596,7 @@ class OBIXClient:
             return alarm
         return None
 
-    def _find_element_by_name(self, root: ET.Element, name: str) -> Optional[ET.Element]:
+    def _find_element_by_name(self, root: ET.Element, name: str) -> ET.Element | None:
         """Find a child element by its 'name' attribute."""
         for child in root:
             if child.attrib.get("name") == name:
@@ -614,7 +612,7 @@ class OBIXClient:
 # Singleton management
 # ---------------------------------------------------------------------------
 
-_obix_client: Optional[OBIXClient] = None
+_obix_client: OBIXClient | None = None
 
 
 def get_obix_client() -> OBIXClient:

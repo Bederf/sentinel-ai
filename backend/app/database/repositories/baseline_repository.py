@@ -52,8 +52,16 @@ class BaselineRepository:
             "created_at": datetime.now().isoformat(),
             "updated_at": datetime.now().isoformat(),
         }
-
-        result = get_supabase_client().table("equipment_baselines").insert(data).execute()
+        client = get_supabase_client()
+        try:
+            result = client.table("equipment_baselines").insert(data).execute()
+        except Exception as exc:
+            # Backward-compat: some deployed schemas don't include attachment_urls yet.
+            if "attachment_urls" in str(exc):
+                data.pop("attachment_urls", None)
+                result = client.table("equipment_baselines").insert(data).execute()
+            else:
+                raise
         return EquipmentBaseline(**result.data[0])
 
     async def get_equipment_baseline(self, baseline_id: str) -> Optional[EquipmentBaseline]:

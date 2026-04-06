@@ -79,7 +79,7 @@ def calculate_building_occupancy_percent(
     is_weekend: bool,
     is_holiday: bool = False,
     rng: _UniformRng | None = None,
-    demo_mode: bool = False,
+    seeded_variation: bool = False,
 ) -> float:
     """Return whole-building occupancy percent for control/status paths."""
     random_source = rng or random
@@ -117,7 +117,7 @@ def calculate_building_occupancy_percent(
             day_factors = {0: 1.0, 1: 0.95, 2: 0.90, 3: 0.88, 4: 0.80}
         base *= day_factors.get(day_of_week, 1.0)
 
-    if demo_mode:
+    if seeded_variation:
         base *= random_source.uniform(0.85, 1.15)
 
     return max(0.0, min(100.0, base))

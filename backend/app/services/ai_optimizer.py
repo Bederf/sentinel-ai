@@ -14,23 +14,22 @@ Equipment inventory is site-specific - different buildings have different
 equipment combinations.
 """
 
-import logging
 import json
+import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Any
 
-
+from app.config.settings import settings
+from app.models.device import Device, DevicePoint, DeviceType, ExposureDirection, ZoneType
 from app.models.optimization import (
     OptimizationRecommendation,
     SiteOptimizationStatus,
 )
-from app.models.device import Device, DeviceType, DevicePoint, ZoneType, ExposureDirection
-from app.config.settings import settings
-from app.services.model_gateway import model_gateway
 from app.services.device_abstraction import device_manager
-from app.services.safety_interlocks import safety_engine
 from app.services.lighting_service import get_lighting_service
+from app.services.model_gateway import model_gateway
+from app.services.safety_interlocks import safety_engine
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +76,7 @@ async def ensure_device_manager_initialized() -> None:
             await device_manager.initialize([])
 
 
-def load_sites() -> List[Dict[str, Any]]:
+def load_sites() -> list[dict[str, Any]]:
     """Load sites data from Supabase, with fallback to JSON file."""
     # Try Supabase first
     if not settings.use_json_storage:
@@ -127,16 +126,16 @@ class AIOptimizerService:
         """Initialize AI optimizer service."""
         # Provider selection handled by model_gateway using active routing profile
         self._sites = None
-        self._optimization_status_cache: Dict[str, SiteOptimizationStatus] = {}
+        self._optimization_status_cache: dict[str, SiteOptimizationStatus] = {}
 
     @property
-    def sites(self) -> List[Dict[str, Any]]:
+    def sites(self) -> list[dict[str, Any]]:
         """Lazy load sites data."""
         if self._sites is None:
             self._sites = load_sites()
         return self._sites
 
-    def find_site(self, site_id: str) -> Optional[Dict[str, Any]]:
+    def find_site(self, site_id: str) -> dict[str, Any] | None:
         """Find a site by ID."""
         for site in self.sites:
             if site["id"] == site_id:
@@ -146,9 +145,9 @@ class AIOptimizerService:
     async def analyze_building(
         self,
         site_id: str,
-        current_conditions: Optional[Dict[str, Any]] = None,
-        weather_forecast: Optional[Dict[str, Any]] = None,
-        energy_prices: Optional[Dict[str, Any]] = None,
+        current_conditions: dict[str, Any] | None = None,
+        weather_forecast: dict[str, Any] | None = None,
+        energy_prices: dict[str, Any] | None = None,
     ) -> OptimizationRecommendation:
         """
         Analyze building conditions and generate optimization recommendations.
@@ -285,8 +284,8 @@ class AIOptimizerService:
             Modified OptimizationRecommendation with gate metadata
         """
         try:
-            from app.services.quality_gate_evaluator import QualityGateEvaluator
             from app.config.settings import settings as app_settings
+            from app.services.quality_gate_evaluator import QualityGateEvaluator
 
             evaluator = QualityGateEvaluator()
             mode = app_settings.resolved_ingestion_mode.value
@@ -360,10 +359,8 @@ class AIOptimizerService:
 
         return recommendation
 
-    async def _gather_current_conditions(self, site_id: str) -> Dict[str, Any]:
+    async def _gather_current_conditions(self, site_id: str) -> dict[str, Any]:
         """Gather current building conditions from devices and DALI sensors."""
-        from app.services.lifecycle_orchestrator import get_effective_now
-
         try:
             devices = await device_manager.list_devices_by_site(site_id)
 
@@ -373,7 +370,7 @@ class AIOptimizerService:
                 "humidity": 55.0,
                 "occupancy": "high",
                 "equipment_status": "normal",
-                "timestamp": get_effective_now().isoformat(),
+                "timestamp": datetime.now().isoformat(),
                 "zone_occupancy": {},  # Real occupancy from DALI
                 # Track which readings are defaults vs live sensor data
                 "_data_sources": {
@@ -403,7 +400,7 @@ class AIOptimizerService:
                     if "setpoint" in point_name_lower or point_name_lower.endswith("_sp"):
                         continue
 
-                    target_key: Optional[str] = None
+                    target_key: str | None = None
 
                     if not found_humidity and (
                         "humidity" in point_name_lower or point_name_lower.endswith("_rh") or point_name_lower == "rh"
@@ -653,7 +650,7 @@ class AIOptimizerService:
                 "zone_occupancy": {},
             }
 
-    def _generate_mock_weather_forecast(self) -> Dict[str, Any]:
+    def _generate_mock_weather_forecast(self) -> dict[str, Any]:
         """Generate mock weather forecast for next 4 hours."""
         return {
             "current_temp": 28.0,
@@ -666,7 +663,7 @@ class AIOptimizerService:
             "conditions": "partly_cloudy",
         }
 
-    def _generate_mock_energy_prices(self) -> Dict[str, Any]:
+    def _generate_mock_energy_prices(self) -> dict[str, Any]:
         """Generate mock energy pricing (South African time-of-use)."""
         return {
             "current_rate": 2.28,  # R/kWh standard (City Power LPU-TOU 2025/26)
@@ -759,7 +756,7 @@ class AIOptimizerService:
             logger.debug("Feedback success rates unavailable: %s", e)
             return ""
 
-    async def _gather_ml_context(self, site_id: str, equipment_inventory: Dict[str, List[Device]]) -> Dict[str, Any]:
+    async def _gather_ml_context(self, site_id: str, equipment_inventory: dict[str, list[Device]]) -> dict[str, Any]:
         """Gather ML model outputs for injection into Claude's optimisation prompt.
 
         Collects LSTM forecasts, anomaly scores, fault classifications, and health
@@ -771,7 +768,7 @@ class AIOptimizerService:
             health_trends, feature_metrics. Each is a list of dicts or empty list
             if the service is unavailable.
         """
-        ml_context: Dict[str, Any] = {
+        ml_context: dict[str, Any] = {
             "lstm_forecasts": [],
             "anomaly_alerts": [],
             "fault_classifications": [],
@@ -899,13 +896,80 @@ class AIOptimizerService:
         except Exception as e:
             logger.debug(f"Feature engineering service unavailable: {e}")
 
-        # Log summary
-        counts = {k: len(v) if isinstance(v, list) else bool(v) for k, v in ml_context.items()}
-        logger.info(f"ML context gathered for {site_id}: {counts}")
+        # 6. Live anomaly scores — written every 5min by 178-08 shadow polling
+        try:
+            equipment_ids = [eq["equipment_id"] for eq in equipment_list]
+            ml_context["live_anomaly_scores"] = await self._pull_live_anomaly_scores(site_id, equipment_ids)
+        except Exception as e:
+            logger.debug(f"Live anomaly scores unavailable: {e}")
 
         return ml_context
 
-    def _format_ml_context_section(self, ml_context: Dict[str, Any]) -> str:
+    async def _pull_live_anomaly_scores(self, site_id: str, equipment_ids: list[str]) -> list[dict]:
+        """Pull anomaly_score and lstm_anomaly_score from equipment operating_data.
+
+        These are written every 5min by ShadowModePollingService + SentinelDataSync
+        (Phase 178-08). Only returns equipment where at least one score is present.
+        """
+        from app.database.supabase_client import get_supabase_client
+
+        if not equipment_ids:
+            return []
+
+        sb = get_supabase_client()
+
+        site_resp = sb.table("sites").select("id").eq("code", site_id).execute()
+        if not site_resp.data:
+            return []
+        site_uuid = site_resp.data[0]["id"]
+
+        resp = sb.table("equipment").select(
+            "code, operating_data, updated_at"
+        ).eq(
+            "site_id", site_uuid
+        ).in_(
+            "code", equipment_ids
+        ).execute()
+
+        results = []
+        for row in resp.data:
+            op = row.get("operating_data") or {}
+            anomaly_score = op.get("anomaly_score")
+            lstm_anomaly_score = op.get("lstm_anomaly_score")
+
+            if anomaly_score is None and lstm_anomaly_score is None:
+                continue
+
+            results.append({
+                "equipment_id": row["code"],
+                "anomaly_score": float(anomaly_score) if anomaly_score is not None else None,
+                "lstm_anomaly_score": float(lstm_anomaly_score) if lstm_anomaly_score is not None else None,
+                "as_of": row["updated_at"].isoformat()
+                if hasattr(row.get("updated_at"), "isoformat")
+                else row.get("updated_at"),
+            })
+
+        return results
+
+    def _format_live_anomaly_scores(self, live_scores: list[dict]) -> str:
+        if not live_scores:
+            return ""
+
+        lines = ["**Live Anomaly Scores (178-08 Pipeline — updated every 5min):**"]
+        for s in live_scores:
+            parts = [f"{s['equipment_id']}:"]
+            if s.get("anomaly_score") is not None:
+                level = "ELEVATED" if s["anomaly_score"] > 0.65 else "normal"
+                parts.append(f"IF_anomaly={s['anomaly_score']:.2f} ({level})")
+            if s.get("lstm_anomaly_score") is not None:
+                parts.append(f"LSTM_anomaly={s['lstm_anomaly_score']:.2f}")
+            if s.get("as_of"):
+                parts.append(f"[{s['as_of'][11:16]} UTC]")
+            lines.append(" | ".join(parts))
+
+        return "\n".join(lines)
+
+    def _format_ml_context_section(self, ml_context: dict[str, Any]) -> str:
         """Format ML context into a readable prompt section for Claude."""
         if not ml_context:
             return ""
@@ -974,6 +1038,13 @@ class AIOptimizerService:
                 lines.append(f"- Building Efficiency Score: {features['efficiency_score']:.0f}/100")
             sections.append("\n".join(lines))
 
+        # Live Anomaly Scores (178-08 pipeline — real-time per equipment)
+        live_scores = ml_context.get("live_anomaly_scores", [])
+        if live_scores:
+            formatted = self._format_live_anomaly_scores(live_scores)
+            if formatted:
+                sections.append(formatted)
+
         if not sections:
             return ""
 
@@ -985,8 +1056,8 @@ class AIOptimizerService:
 
     def _format_feedback_loop_section(
         self,
-        decision_memory_text: Optional[str],
-        feedback_rates_text: Optional[str],
+        decision_memory_text: str | None,
+        feedback_rates_text: str | None,
     ) -> str:
         """Format decision memory and feedback success rates for prompt injection.
 
@@ -1017,16 +1088,16 @@ class AIOptimizerService:
 
     def _build_optimization_prompt(
         self,
-        site: Dict[str, Any],
-        current_conditions: Dict[str, Any],
-        weather_forecast: Dict[str, Any],
-        energy_prices: Dict[str, Any],
-        equipment_inventory: Dict[str, List[Device]],
-        lighting_zones: Optional[Dict[str, Any]] = None,
-        profile: Optional[Dict[str, Any]] = None,
-        ml_context: Optional[Dict[str, Any]] = None,
-        decision_memory_text: Optional[str] = None,
-        feedback_rates_text: Optional[str] = None,
+        site: dict[str, Any],
+        current_conditions: dict[str, Any],
+        weather_forecast: dict[str, Any],
+        energy_prices: dict[str, Any],
+        equipment_inventory: dict[str, list[Device]],
+        lighting_zones: dict[str, Any] | None = None,
+        profile: dict[str, Any] | None = None,
+        ml_context: dict[str, Any] | None = None,
+        decision_memory_text: str | None = None,
+        feedback_rates_text: str | None = None,
     ) -> str:
         """Build optimization prompt for Claude with ALL available equipment.
 
@@ -1124,11 +1195,7 @@ class AIOptimizerService:
         op_start = op_hours.get("start", "08:00")
         op_end = op_hours.get("end", "18:00")
 
-        # Current time for schedule-aware decisions — use simulated time when
-        # simulator is running at accelerated speed, otherwise real wall-clock.
-        from app.services.lifecycle_orchestrator import get_effective_now
-
-        now_sast = get_effective_now()
+        now_sast = datetime.now()
         current_time_str = now_sast.strftime("%H:%M")
         current_weekday = now_sast.strftime("%A")
         is_occupied_hours = now_sast.weekday() < 5 and int(op_start.replace(":", "")) <= int(
@@ -1321,10 +1388,10 @@ Provide ONLY the JSON response, no additional text."""
         self,
         site_id: str,
         prompt: str,
-        current_conditions: Dict[str, Any],
-        equipment_inventory: Dict[str, List[Device]],
-        lighting_zones: Optional[Dict[str, Any]] = None,
-        profile: Optional[Dict[str, Any]] = None,
+        current_conditions: dict[str, Any],
+        equipment_inventory: dict[str, list[Device]],
+        lighting_zones: dict[str, Any] | None = None,
+        profile: dict[str, Any] | None = None,
     ) -> OptimizationRecommendation:
         """Analyze using Claude AI with full equipment inventory.
 
@@ -1345,6 +1412,7 @@ Provide ONLY the JSON response, no additional text."""
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=settings.optimization_max_tokens,
                 stream=False,
+                source="ai_optimizer",
             )
 
             # Parse JSON response
@@ -1396,7 +1464,7 @@ Provide ONLY the JSON response, no additional text."""
             raise
 
     def _score_and_rank_recommendations(
-        self, recommendation: OptimizationRecommendation, profile: Dict[str, Any]
+        self, recommendation: OptimizationRecommendation, profile: dict[str, Any]
     ) -> OptimizationRecommendation:
         """Score and rank recommendations using profile weights.
 
@@ -1449,33 +1517,33 @@ Provide ONLY the JSON response, no additional text."""
             logger.warning(f"Failed to score recommendations: {e}. Returning unscored.")
             return recommendation
 
-    def _find_device_by_type(self, hvac_devices: List[Device], hvac_type: str) -> Optional[Device]:
+    def _find_device_by_type(self, hvac_devices: list[Device], hvac_type: str) -> Device | None:
         """Find a device by its hvac_type (zone_controller, chiller, chw_system, etc.)."""
         for device in hvac_devices:
             if hasattr(device, "hvac_type") and device.hvac_type == hvac_type:
                 return device
         return None
 
-    def _find_devices_by_type(self, hvac_devices: List[Device], hvac_type: str) -> List[Device]:
+    def _find_devices_by_type(self, hvac_devices: list[Device], hvac_type: str) -> list[Device]:
         """Find ALL devices of a specific hvac_type."""
         return [d for d in hvac_devices if hasattr(d, "hvac_type") and d.hvac_type == hvac_type]
 
-    def _find_devices_with_point(self, hvac_devices: List[Device], point_name: str) -> List[Device]:
+    def _find_devices_with_point(self, hvac_devices: list[Device], point_name: str) -> list[Device]:
         """Find ALL devices that have a specific point."""
         return [d for d in hvac_devices if point_name in d.points]
 
-    def _find_point_on_device(self, device: Device, possible_point_names: List[str]) -> Optional[DevicePoint]:
+    def _find_point_on_device(self, device: Device, possible_point_names: list[str]) -> DevicePoint | None:
         """Find a point on a device by checking multiple possible names."""
         for point_name in possible_point_names:
             if point_name in device.points:
                 return device.points[point_name]
         return None
 
-    def _has_any_point(self, device: Device, possible_point_names: List[str]) -> bool:
+    def _has_any_point(self, device: Device, possible_point_names: list[str]) -> bool:
         """Check if device has any of the specified points."""
         return any(point_name in device.points for point_name in possible_point_names)
 
-    def _format_device_list(self, hvac_devices: List[Device]) -> str:
+    def _format_device_list(self, hvac_devices: list[Device]) -> str:
         """Format device list for Claude prompt."""
         if not hvac_devices:
             return "No HVAC devices found"
@@ -1486,7 +1554,7 @@ Provide ONLY the JSON response, no additional text."""
             lines.append(f"- {d.id}: {d.name} ({hvac_type}) at {location}")
         return "\n".join(lines)
 
-    def _format_available_points(self, hvac_devices: List[Device]) -> str:
+    def _format_available_points(self, hvac_devices: list[Device]) -> str:
         """Format available control points for Claude prompt."""
         if not hvac_devices:
             return "No control points available"
@@ -1497,7 +1565,7 @@ Provide ONLY the JSON response, no additional text."""
                 lines.append(f"- {d.id} ({d.name}): {', '.join(writable_points)}")
         return "\n".join(lines) if lines else "No writable control points found"
 
-    def _find_device_with_point(self, hvac_devices: List[Device], point_name: str) -> Optional[Device]:
+    def _find_device_with_point(self, hvac_devices: list[Device], point_name: str) -> Device | None:
         """Find a device that has a specific point."""
         for device in hvac_devices:
             if point_name in device.points:
@@ -1506,7 +1574,7 @@ Provide ONLY the JSON response, no additional text."""
 
     # Equipment Inventory Methods (Site-Specific)
 
-    def _categorize_equipment(self, devices: List[Device]) -> Dict[str, List[Device]]:
+    def _categorize_equipment(self, devices: list[Device]) -> dict[str, list[Device]]:
         """Categorize all equipment by type for site-specific optimization.
 
         Different buildings have different equipment combinations:
@@ -1517,7 +1585,7 @@ Provide ONLY the JSON response, no additional text."""
         Returns:
             Dict mapping device type to list of devices
         """
-        inventory: Dict[str, List[Device]] = {}
+        inventory: dict[str, list[Device]] = {}
 
         for device in devices:
             # Get device type key (e.g., "hvac", "lighting", "power")
@@ -1529,7 +1597,7 @@ Provide ONLY the JSON response, no additional text."""
 
         return inventory
 
-    def _summarize_inventory(self, inventory: Dict[str, List[Device]]) -> str:
+    def _summarize_inventory(self, inventory: dict[str, list[Device]]) -> str:
         """Create a summary string of equipment inventory for logging."""
         parts = []
         for device_type, devices in inventory.items():
@@ -1537,13 +1605,13 @@ Provide ONLY the JSON response, no additional text."""
                 parts.append(f"{device_type}={len(devices)}")
         return ", ".join(parts) if parts else "empty"
 
-    def _get_controllable_equipment(self, inventory: Dict[str, List[Device]]) -> Dict[str, List[Device]]:
+    def _get_controllable_equipment(self, inventory: dict[str, list[Device]]) -> dict[str, list[Device]]:
         """Filter inventory to only include equipment with writable points.
 
         This is used for recommendations - we can only recommend changes
         to equipment that has controllable parameters.
         """
-        controllable: Dict[str, List[Device]] = {}
+        controllable: dict[str, list[Device]] = {}
 
         for device_type, devices in inventory.items():
             controllable_devices = []
@@ -1557,7 +1625,7 @@ Provide ONLY the JSON response, no additional text."""
 
         return controllable
 
-    def _format_equipment_by_type(self, devices: List[Device], equipment_type: str) -> str:
+    def _format_equipment_by_type(self, devices: list[Device], equipment_type: str) -> str:
         """Format equipment list for a specific type in the AI prompt."""
         if not devices:
             return f"No {equipment_type} equipment available"
@@ -1586,7 +1654,7 @@ Provide ONLY the JSON response, no additional text."""
 
         return "\n".join(lines)
 
-    def _format_all_equipment_sections(self, inventory: Dict[str, List[Device]]) -> str:
+    def _format_all_equipment_sections(self, inventory: dict[str, list[Device]]) -> str:
         """Format all equipment types into prompt sections."""
         sections = []
 
@@ -1611,7 +1679,7 @@ Provide ONLY the JSON response, no additional text."""
 
         return "\n\n".join(sections) if sections else "No equipment available"
 
-    def _format_all_control_points(self, inventory: Dict[str, List[Device]]) -> str:
+    def _format_all_control_points(self, inventory: dict[str, list[Device]]) -> str:
         """Format all writable control points across all equipment types."""
         lines = []
 
@@ -1632,9 +1700,9 @@ Provide ONLY the JSON response, no additional text."""
 
     # Zone-Aware Optimization Helper Methods
 
-    def _group_devices_by_zone(self, hvac_devices: List[Device]) -> Dict[str, List[Device]]:
+    def _group_devices_by_zone(self, hvac_devices: list[Device]) -> dict[str, list[Device]]:
         """Group devices by their zone name for coordinated optimization."""
-        zones: Dict[str, List[Device]] = {}
+        zones: dict[str, list[Device]] = {}
         for device in hvac_devices:
             zone = (
                 getattr(device.device_location, "zone", "Unknown") if hasattr(device, "device_location") else "Unknown"
@@ -1644,9 +1712,9 @@ Provide ONLY the JSON response, no additional text."""
             zones[zone].append(device)
         return zones
 
-    def _group_devices_by_floor(self, hvac_devices: List[Device]) -> Dict[str, List[Device]]:
+    def _group_devices_by_floor(self, hvac_devices: list[Device]) -> dict[str, list[Device]]:
         """Group devices by floor level."""
-        floors: Dict[str, List[Device]] = {}
+        floors: dict[str, list[Device]] = {}
         for device in hvac_devices:
             floor = (
                 getattr(device.device_location, "floor", "Unknown") if hasattr(device, "device_location") else "Unknown"
@@ -1662,13 +1730,13 @@ Provide ONLY the JSON response, no additional text."""
             return getattr(device.device_location, "zone_priority", 3)
         return 3  # Default to middle priority
 
-    def _get_zone_type(self, device: Device) -> Optional[ZoneType]:
+    def _get_zone_type(self, device: Device) -> ZoneType | None:
         """Get the zone type for a device."""
         if hasattr(device, "device_location") and device.device_location:
             return getattr(device.device_location, "zone_type", None)
         return None
 
-    def _get_exposure(self, device: Device) -> Optional[ExposureDirection]:
+    def _get_exposure(self, device: Device) -> ExposureDirection | None:
         """Get the exposure direction for a device."""
         if hasattr(device, "device_location") and device.device_location:
             return getattr(device.device_location, "exposure", None)
@@ -1721,9 +1789,7 @@ Provide ONLY the JSON response, no additional text."""
         if outdoor_temp < 25.0:
             return 0.0
 
-        from app.services.lifecycle_orchestrator import get_effective_now
-
-        hour = get_effective_now().hour
+        hour = datetime.now().hour
         modifiers = {
             ExposureDirection.NORTH: 1.5 if 10 <= hour <= 16 else 0.5,  # Max solar gain (sun in north sky in SA)
             ExposureDirection.WEST: 1.0 if 14 <= hour <= 18 else 0.0,  # Afternoon heat
@@ -1733,7 +1799,7 @@ Provide ONLY the JSON response, no additional text."""
         }
         return modifiers.get(exposure, 0.0)
 
-    def _calculate_data_quality_penalty(self, conditions: Dict[str, Any]) -> float:
+    def _calculate_data_quality_penalty(self, conditions: dict[str, Any]) -> float:
         """Calculate a confidence penalty based on how much sensor data is defaulted.
 
         When sensors fail and we fall back to hardcoded defaults (22C indoor,
@@ -1785,13 +1851,13 @@ Provide ONLY the JSON response, no additional text."""
 
     def _sort_recommendations_by_priority(
         self,
-        recommendations: List[Dict],
-        hvac_devices: List[Device],
-    ) -> List[Dict]:
+        recommendations: list[dict],
+        hvac_devices: list[Device],
+    ) -> list[dict]:
         """Sort recommendations by zone priority (critical zones first)."""
         device_map = {d.id: d for d in hvac_devices}
 
-        def get_priority(rec: Dict) -> int:
+        def get_priority(rec: dict) -> int:
             device = device_map.get(rec.get("equipment_id"))
             if device:
                 return self._get_zone_priority(device)
@@ -1799,9 +1865,9 @@ Provide ONLY the JSON response, no additional text."""
 
         return sorted(recommendations, key=get_priority)
 
-    def _format_zone_context(self, hvac_devices: List[Device]) -> str:
+    def _format_zone_context(self, hvac_devices: list[Device]) -> str:
         """Format zone context for Claude prompt."""
-        zones_by_type: Dict[str, List[str]] = {}
+        zones_by_type: dict[str, list[str]] = {}
         for device in hvac_devices:
             zone_type = self._get_zone_type(device)
             exposure = self._get_exposure(device)
@@ -1823,7 +1889,7 @@ Provide ONLY the JSON response, no additional text."""
 
     # DALI Lighting Optimization Helper Methods
 
-    def _gather_lighting_zone_data(self, lighting_svc, site_id: str) -> Dict[str, Any]:
+    def _gather_lighting_zone_data(self, lighting_svc, site_id: str) -> dict[str, Any]:
         """Gather DALI zone occupancy and lighting data for optimization.
 
         Args:
@@ -1874,7 +1940,7 @@ Provide ONLY the JSON response, no additional text."""
 
         return zone_data
 
-    def _format_equipment_health(self, conditions: Dict[str, Any]) -> str:
+    def _format_equipment_health(self, conditions: dict[str, Any]) -> str:
         """Format equipment health section for the prompt when degraded equipment exists."""
         degraded = conditions.get("equipment_health")
         if not degraded:
@@ -1895,7 +1961,7 @@ Provide ONLY the JSON response, no additional text."""
         )
         return "\n".join(lines)
 
-    def _format_solar_bess_telemetry(self, conditions: Dict[str, Any]) -> str:
+    def _format_solar_bess_telemetry(self, conditions: dict[str, Any]) -> str:
         """Format solar/BESS telemetry section for the optimization prompt.
 
         Only included when solar data exists in conditions (backward compatible).
@@ -1933,8 +1999,8 @@ Provide ONLY the JSON response, no additional text."""
 
     def _format_lighting_section(
         self,
-        lighting_devices: List[Device],
-        lighting_zones: Dict[str, Any],
+        lighting_devices: list[Device],
+        lighting_zones: dict[str, Any],
     ) -> str:
         """Format DALI lighting section for Claude prompt.
 
@@ -2003,7 +2069,7 @@ Provide ONLY the JSON response, no additional text."""
 
         return "\n".join(lines)
 
-    def _format_lighting_device_list(self, lighting_devices: List[Device]) -> str:
+    def _format_lighting_device_list(self, lighting_devices: list[Device]) -> str:
         """Format lighting device list for Claude prompt."""
         if not lighting_devices:
             return "No lighting devices found"
@@ -2014,7 +2080,7 @@ Provide ONLY the JSON response, no additional text."""
             lines.append(f"- {d.id}: {d.name} ({lighting_type}) at {location}")
         return "\n".join(lines)
 
-    def _should_skip_zone_optimization(self, device: Device, zone_type: Optional[ZoneType]) -> bool:
+    def _should_skip_zone_optimization(self, device: Device, zone_type: ZoneType | None) -> bool:
         """Check if zone type should have restricted optimization.
 
         Server rooms and critical zones should not have cooling reduced.
@@ -2023,7 +2089,7 @@ Provide ONLY the JSON response, no additional text."""
             return True  # Never reduce cooling in server rooms
         return False
 
-    def _get_zone_specific_setpoint_limits(self, device: Device, zone_type: Optional[ZoneType]) -> tuple:
+    def _get_zone_specific_setpoint_limits(self, device: Device, zone_type: ZoneType | None) -> tuple:
         """Get zone-specific setpoint min/max limits.
 
         Returns:
@@ -2095,12 +2161,12 @@ Provide ONLY the JSON response, no additional text."""
     def _analyze_with_rules(
         self,
         site_id: str,
-        current_conditions: Dict[str, Any],
-        weather_forecast: Dict[str, Any],
-        energy_prices: Dict[str, Any],
-        equipment_inventory: Dict[str, List[Device]],
-        lighting_zones: Optional[Dict[str, Any]] = None,
-        profile: Optional[Dict[str, Any]] = None,
+        current_conditions: dict[str, Any],
+        weather_forecast: dict[str, Any],
+        energy_prices: dict[str, Any],
+        equipment_inventory: dict[str, list[Device]],
+        lighting_zones: dict[str, Any] | None = None,
+        profile: dict[str, Any] | None = None,
     ) -> OptimizationRecommendation:
         """Fallback rule-based optimization for ALL equipment types.
 
@@ -2506,8 +2572,8 @@ Provide ONLY the JSON response, no additional text."""
         #   - Tariff-aware scheduling (shift loads to off-peak)
         #   - Predictive pre-conditioning (anticipate occupancy patterns)
         #   - Cross-zone energy balancing (redistribute across building)
-        lighting_recommendations: List[Dict[str, Any]] = []
-        cross_system_recommendations: List[Dict[str, Any]] = []
+        lighting_recommendations: list[dict[str, Any]] = []
+        cross_system_recommendations: list[dict[str, Any]] = []
         lighting_savings_kw = 0.0
 
         if lighting_zones:
@@ -2883,7 +2949,7 @@ Provide ONLY the JSON response, no additional text."""
         self,
         site_id: str,
         load_shedding_stage: int,
-        current_conditions: Optional[Dict[str, Any]] = None,
+        current_conditions: dict[str, Any] | None = None,
     ) -> OptimizationRecommendation:
         """
         Generate load-shedding-aware optimization recommendations.
@@ -2978,7 +3044,7 @@ Provide ONLY the JSON response, no additional text."""
         self,
         site_id: str,
         recommendation: OptimizationRecommendation,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Validate a recommendation against safety rules.
 

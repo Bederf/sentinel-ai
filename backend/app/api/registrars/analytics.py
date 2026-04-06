@@ -14,9 +14,9 @@ from app.api import timeseries, sensor_analysis, features, data_quality
 from app.api import survival, classification, ml_feedback, repair_effectiveness
 from app.api import rag, ml_retraining, fleet_learning, mlops
 from app.api import mcp, mcp_sse, mcp_openai
-from app.api import recommendations, simulation_analytics, optimization_quality
-from app.api import system_health, solar, solar_grid, solar_performance, solar_arbitrage
-from app.api import solar_config, peak_demand, solar_annual
+from app.api import recommendations, optimization_quality
+from app.api import solar, solar_grid, solar_performance, solar_arbitrage
+from app.api import solar_config, peak_demand
 from app.api import load_forecast, dispatch_optimizer
 from app.api import agent_memory
 from app.api import dashboard_generator
@@ -35,9 +35,7 @@ def register_analytics_routers(app: FastAPI) -> None:
     app.include_router(energy.router, prefix="/api", tags=["energy"])
     app.include_router(ml_predictions.router)
     app.include_router(recommendations.router, tags=["recommendations"])
-    app.include_router(simulation_analytics.router, tags=["simulation-analytics"])
     app.include_router(optimization_quality.router, prefix="/api/optimization", tags=["optimization-quality"])
-
     # Equipment lookup and diagnostics
     app.include_router(equipment_lookup.router, prefix="/api", tags=["equipment-lookup"])
     app.include_router(technical.router, tags=["technical"])
@@ -63,17 +61,12 @@ def register_analytics_routers(app: FastAPI) -> None:
     app.include_router(fleet_learning.router, tags=["fleet-learning"])
     app.include_router(mlops.router, tags=["mlops"])
 
-    # System Health & Diagnostics
-    app.include_router(system_health.router, tags=["system-health"])
-
     # Solar & BESS
     app.include_router(solar.router, prefix="/api", tags=["solar"])
     app.include_router(solar_config.router, tags=["solar-config"])
     app.include_router(solar_grid.router, prefix="/api", tags=["solar-grid"])
     app.include_router(solar_performance.router, prefix="/api", tags=["solar-performance"])
     app.include_router(solar_arbitrage.router, prefix="/api", tags=["solar-arbitrage"])
-    app.include_router(solar_annual.router, tags=["solar-annual"])
-
     # Load Forecast & Dispatch Optimizer (v26.0: MIP-optimized BESS dispatch)
     app.include_router(load_forecast.router, tags=["load-forecast"])
     app.include_router(dispatch_optimizer.router, tags=["dispatch-optimizer"])

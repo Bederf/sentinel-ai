@@ -3,18 +3,17 @@
 Verifies that the extracted aggregate_window / compute_room_occupied_minutes
 functions produce the same results as the original inline logic.
 """
+
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
-import pytest
-
 from app.processing.occupancy_table import aggregate_window, compute_room_occupied_minutes
-
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _ts(offset_minutes: int = 0) -> str:
     """Return an ISO timestamp offset from a fixed reference time."""
@@ -31,6 +30,7 @@ def _window_end(offset_minutes: int = 480) -> datetime:
 # ---------------------------------------------------------------------------
 # compute_room_occupied_minutes
 # ---------------------------------------------------------------------------
+
 
 class TestComputeRoomOccupiedMinutes:
     def test_empty_events_returns_zeros(self):
@@ -72,8 +72,12 @@ class TestComputeRoomOccupiedMinutes:
         """Occupied for 30 minutes, then empty for 30 minutes."""
         ref = datetime(2026, 3, 25, 6, 0, 0, tzinfo=UTC)
         events = [
-            {"_ts": ref,                        "_ts_naive": ref.replace(tzinfo=None),                         "occupied": True},
-            {"_ts": ref + timedelta(minutes=30), "_ts_naive": (ref + timedelta(minutes=30)).replace(tzinfo=None), "occupied": False},
+            {"_ts": ref, "_ts_naive": ref.replace(tzinfo=None), "occupied": True},
+            {
+                "_ts": ref + timedelta(minutes=30),
+                "_ts_naive": (ref + timedelta(minutes=30)).replace(tzinfo=None),
+                "occupied": False,
+            },
         ]
         window_end = ref + timedelta(minutes=60)
         occupied, empty = compute_room_occupied_minutes(events, window_end)
@@ -84,9 +88,17 @@ class TestComputeRoomOccupiedMinutes:
         """Occupied 10 min, empty 10 min, occupied 10 min."""
         ref = datetime(2026, 3, 25, 6, 0, 0, tzinfo=UTC)
         events = [
-            {"_ts": ref,                        "_ts_naive": ref.replace(tzinfo=None),                          "occupied": True},
-            {"_ts": ref + timedelta(minutes=10), "_ts_naive": (ref + timedelta(minutes=10)).replace(tzinfo=None), "occupied": False},
-            {"_ts": ref + timedelta(minutes=20), "_ts_naive": (ref + timedelta(minutes=20)).replace(tzinfo=None), "occupied": True},
+            {"_ts": ref, "_ts_naive": ref.replace(tzinfo=None), "occupied": True},
+            {
+                "_ts": ref + timedelta(minutes=10),
+                "_ts_naive": (ref + timedelta(minutes=10)).replace(tzinfo=None),
+                "occupied": False,
+            },
+            {
+                "_ts": ref + timedelta(minutes=20),
+                "_ts_naive": (ref + timedelta(minutes=20)).replace(tzinfo=None),
+                "occupied": True,
+            },
         ]
         window_end = ref + timedelta(minutes=30)
         occupied, empty = compute_room_occupied_minutes(events, window_end)
@@ -98,6 +110,7 @@ class TestComputeRoomOccupiedMinutes:
 # aggregate_window
 # ---------------------------------------------------------------------------
 
+
 class TestAggregateWindow:
     def test_empty_events_returns_empty_rooms(self):
         result = aggregate_window([], _window_end())
@@ -106,8 +119,8 @@ class TestAggregateWindow:
 
     def test_groups_by_room_code(self):
         events = [
-            {"room_code": "R1", "timestamp": _ts(0),  "occupied": True},
-            {"room_code": "R2", "timestamp": _ts(5),  "occupied": False},
+            {"room_code": "R1", "timestamp": _ts(0), "occupied": True},
+            {"room_code": "R2", "timestamp": _ts(5), "occupied": False},
             {"room_code": "R1", "timestamp": _ts(30), "occupied": False},
         ]
         result = aggregate_window(events, _window_end())
@@ -117,7 +130,7 @@ class TestAggregateWindow:
 
     def test_event_count_per_room(self):
         events = [
-            {"room_code": "R1", "timestamp": _ts(0),  "occupied": True},
+            {"room_code": "R1", "timestamp": _ts(0), "occupied": True},
             {"room_code": "R1", "timestamp": _ts(30), "occupied": False},
             {"room_code": "R1", "timestamp": _ts(60), "occupied": True},
         ]
@@ -127,7 +140,7 @@ class TestAggregateWindow:
 
     def test_occupied_percent_between_0_and_100(self):
         events = [
-            {"room_code": "R1", "timestamp": _ts(0),   "occupied": True},
+            {"room_code": "R1", "timestamp": _ts(0), "occupied": True},
             {"room_code": "R1", "timestamp": _ts(120), "occupied": False},
         ]
         result = aggregate_window(events, _window_end(480))
@@ -146,7 +159,7 @@ class TestAggregateWindow:
 
     def test_missing_timestamp_skipped(self):
         events = [
-            {"room_code": "R1", "occupied": True},           # no timestamp
+            {"room_code": "R1", "occupied": True},  # no timestamp
             {"room_code": "R2", "timestamp": _ts(0), "occupied": False},
         ]
         result = aggregate_window(events, _window_end())

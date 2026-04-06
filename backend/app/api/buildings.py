@@ -269,64 +269,66 @@ async def list_sites(current_user: dict = None) -> dict:
 @router.get("/{site_id}")
 async def get_site(site_id: str, auth: AuthContext = Depends(require_site_access("site_id"))) -> dict:
     """
-    Get building details.
+    Get building details — Supabase is the source of truth.
 
-    Returns building metadata, desk count, zone count.
-
-    Maps friendly building names to their registered site codes
+    Returns full building config including extended metadata (floor labels, features,
+    contacts, optimization settings).
     """
-    # Map site_id to site code for JSON lookup
     site_code = _building_to_site(site_id)
 
-    building_file = DATA_PATH / site_code / "building.json"
-    if building_file.exists():
-        with open(building_file, encoding="utf-8") as handle:
-            result = json.load(handle)
-        result["id"] = site_code
+    # --- Supabase (primary) ---
+    try:
+        from app.database.supabase_client import get_supabase_client
+        client = get_supabase_client()
+        result = client.table("buildings").select("*").eq("code", site_code).single().execute()
+        if result.data:
+            b = result.data
+            # Map Supabase row → BuildingConfig shape the frontend expects
+            opt = b.get("optimization_settings") or {}
+            return {
+                "id": b["code"],
+                "code": b["code"],
+                "name": b.get("name", ""),
+                "display_name": b.get("display_name") or b.get("name", ""),
+                "address": b.get("address", ""),
+                "type": b.get("type", "commercial_office"),
+                "region": b.get("region"),
+                "floors": b.get("floor_labels") or [],
+                "sqm": b.get("sqm"),
+                "metadata": {
+                    "sqm": b.get("sqm"),
+                    "occupancy_capacity": b.get("occupancy_capacity"),
+                    "total_desks": b.get("total_desks"),
+                    "parking_bays": b.get("parking_bays"),
+                    "bms_vendor": opt.get("bms_vendor"),
+                    "operating_hours": b.get("operating_hours"),
+                    "year_built": b.get("year_built"),
+                },
+                "features": b.get("features") or {},
+                "contacts": {
+                    "facility_manager": b.get("contact_facility_manager"),
+                    "email": b.get("contact_email"),
+                    "emergency": b.get("contact_emergency") or b.get("contact_phone"),
+                },
+                "optimization": {
+                    "active_profile": opt.get("active_profile", "balanced"),
+                    "sentinel_operating_mode": opt.get("sentinel_operating_mode", opt.get("active_profile", "balanced")),
+                    "control_tier": opt.get("control_tier", "human_in_loop"),
+                    "zone_overrides": opt.get("zone_overrides", []),
+                    "schedule_overrides": opt.get("schedule_overrides", []),
+                },
+                "is_active": b.get("sentinel_processing_enabled", False),
+                "desk_count": b.get("total_desks") or b.get("equipment_count", 0),
+                "zone_count": 0,
+                "equipment_count": b.get("equipment_count", 0),
+                "latitude": b.get("latitude"),
+                "longitude": b.get("longitude"),
+            }
+    except Exception as e:
+        logger.warning(f"Supabase lookup failed for {site_code}: {e}")
 
-        desks_file = DATA_PATH / site_code / "desks.json"
-        zones_file = DATA_PATH / site_code / "zones.json"
-        registry_file = DATA_PATH / "_registry.json"
-
-        desk_count = 0
-        zone_count = 0
-        is_active = False
-
-        if desks_file.exists():
-            with open(desks_file, encoding="utf-8") as handle:
-                desks_data = json.load(handle)
-            desk_count = len(desks_data if isinstance(desks_data, list) else desks_data.get("desks", []))
-
-        if zones_file.exists():
-            with open(zones_file, encoding="utf-8") as handle:
-                zones_data = json.load(handle)
-            zone_count = len(zones_data if isinstance(zones_data, list) else zones_data.get("zones", []))
-
-        if registry_file.exists():
-            with open(registry_file, encoding="utf-8") as handle:
-                registry = json.load(handle)
-            is_active = site_code in registry.get("active_sites", [])
-
-        result["desk_count"] = desk_count
-        result["zone_count"] = zone_count
-        result["is_active"] = is_active
-        return result
-
-    loader = get_site_loader()
-    building = loader.get_site(site_code)
-    if building:
-        desks = loader.get_desks(site_code)
-        zones = loader.get_zones(site_code)
-        result = building.to_dict()
-        result["desk_count"] = len(desks)
-        result["zone_count"] = len(zones)
-        result["is_active"] = site_code in loader.get_active_site_ids()
-        return result
-
-    # Fallback: return minimal data from sites.json if available
-    # This prevents 404 for registered but not-yet-fully-onboarded sites (e.g. site-002)
+    # --- Fallback: minimal data from registered sites ---
     from app.core.site_resolver import get_registered_sites
-
     sites = get_registered_sites()
     site_entry = next((s for s in sites if s.get("code") == site_code), None)
     if site_entry:
@@ -334,15 +336,21 @@ async def get_site(site_id: str, auth: AuthContext = Depends(require_site_access
             "id": site_code,
             "code": site_code,
             "name": site_entry.get("name", f"Site {site_code}"),
+            "display_name": site_entry.get("name", f"Site {site_code}"),
             "region": site_entry.get("region"),
-            "type": site_entry.get("type"),
+            "type": site_entry.get("type", "commercial_office"),
             "address": site_entry.get("address"),
+            "floors": [],
+            "features": {},
+            "contacts": {},
+            "optimization": {"active_profile": "balanced", "sentinel_operating_mode": "balanced", "control_tier": "human_in_loop"},
+            "metadata": {},
             "desk_count": 0,
             "zone_count": 0,
             "is_active": False,
         }
 
-    raise HTTPException(status_code=404, detail=f"Building '{site_id}' (site '{site_code}') not found")
+    raise HTTPException(status_code=404, detail=f"Building '{site_id}' not found")
 
 
 @router.put("/{site_id}/config")
@@ -351,93 +359,98 @@ async def update_building_config(
     config: BuildingConfigUpdate,
     auth: AuthContext = Depends(require_role(SentinelRole.ADMIN)),
 ) -> dict:
-    """Update building configuration from Settings UI.
+    """Update building configuration from Settings UI — writes to Supabase.
 
     Accepts building metadata, optimization profile, control tier, feature flags.
-    Writes to building.json. Emits CONFIG_CHANGE audit event.
+    Supabase `sites` table is the source of truth.
     """
     site_code = _building_to_site(site_id)
-    site_path = DATA_PATH / site_code
 
-    if not site_path.exists():
-        raise HTTPException(status_code=404, detail=f"Building '{site_id}' not found")
+    try:
+        from app.database.supabase_client import get_supabase_client
+        client = get_supabase_client()
+        existing = client.table("buildings").select("*").eq("code", site_code).single().execute()
+        if not existing.data:
+            raise HTTPException(status_code=404, detail=f"Building '{site_code}' not found in Supabase")
+        current = existing.data
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Database unavailable: {e}") from e
 
-    building_file = site_path / "building.json"
-    if not building_file.exists():
-        raise HTTPException(status_code=404, detail=f"Building config for '{site_id}' not found")
+    changes: dict = {}
+    updates: dict = {}
 
-    # Load current config
-    with open(building_file) as f:
-        building_data = json.load(f)
-
-    # Track changes for audit
-    changes = {}
-
-    # Update top-level fields
-    for field in ["name", "display_name", "address"]:
-        value = getattr(config, field, None)
-        if value is not None:
-            changes[field] = {"old": building_data.get(field), "new": value}
-            building_data[field] = value
-
+    # Direct column fields
+    if config.name is not None:
+        changes["name"] = {"old": current.get("name"), "new": config.name}
+        updates["name"] = config.name
+    if config.display_name is not None:
+        changes["display_name"] = {"old": current.get("display_name"), "new": config.display_name}
+        updates["display_name"] = config.display_name
+    if config.address is not None:
+        changes["address"] = {"old": current.get("address"), "new": config.address}
+        updates["address"] = config.address
     if config.building_type is not None:
-        changes["type"] = {"old": building_data.get("type"), "new": config.building_type}
-        building_data["type"] = config.building_type
-
+        changes["type"] = {"old": current.get("type"), "new": config.building_type}
+        updates["type"] = config.building_type
     if config.floors is not None:
-        changes["floors"] = {"old": building_data.get("floors"), "new": config.floors}
-        building_data["floors"] = config.floors
-
+        changes["floor_labels"] = {"old": current.get("floor_labels"), "new": config.floors}
+        updates["floor_labels"] = config.floors
+    if config.sqm is not None:
+        changes["sqm"] = {"old": current.get("sqm"), "new": config.sqm}
+        updates["sqm"] = config.sqm
+    if config.occupancy_capacity is not None:
+        changes["occupancy_capacity"] = {"old": current.get("occupancy_capacity"), "new": config.occupancy_capacity}
+        updates["occupancy_capacity"] = config.occupancy_capacity
+    if config.total_desks is not None:
+        changes["total_desks"] = {"old": current.get("total_desks"), "new": config.total_desks}
+        updates["total_desks"] = config.total_desks
+    if config.parking_bays is not None:
+        changes["parking_bays"] = {"old": current.get("parking_bays"), "new": config.parking_bays}
+        updates["parking_bays"] = config.parking_bays
     if config.features is not None:
-        changes["features"] = {"old": building_data.get("features"), "new": config.features}
-        building_data["features"] = config.features
+        changes["features"] = {"old": current.get("features"), "new": config.features}
+        updates["features"] = config.features
 
+    # Contacts
     if config.contacts is not None:
-        changes["contacts"] = {"old": building_data.get("contacts"), "new": config.contacts}
-        building_data["contacts"] = config.contacts
+        if config.contacts.get("facility_manager") is not None:
+            updates["contact_facility_manager"] = config.contacts["facility_manager"]
+            changes["contact_facility_manager"] = {"old": current.get("contact_facility_manager"), "new": config.contacts["facility_manager"]}
+        if config.contacts.get("email") is not None:
+            updates["contact_email"] = config.contacts["email"]
+            changes["contact_email"] = {"old": current.get("contact_email"), "new": config.contacts["email"]}
+        if config.contacts.get("emergency") is not None:
+            updates["contact_emergency"] = config.contacts["emergency"]
+            changes["contact_emergency"] = {"old": current.get("contact_emergency"), "new": config.contacts["emergency"]}
 
-    # Update metadata fields
-    metadata = building_data.get("metadata", {})
-    for field in ["sqm", "occupancy_capacity", "total_desks", "parking_bays"]:
-        value = getattr(config, field, None)
-        if value is not None:
-            changes[f"metadata.{field}"] = {"old": metadata.get(field), "new": value}
-            metadata[field] = value
-    building_data["metadata"] = metadata
-
-    # Update optimization settings
-    optimization = building_data.get("optimization", {})
+    # Optimization settings stored in optimization_settings JSONB
+    current_opt = current.get("optimization_settings") or {}
+    new_opt = dict(current_opt)
     if config.optimization_profile is not None:
-        changes["optimization.active_profile"] = {
-            "old": optimization.get("active_profile"),
-            "new": config.optimization_profile,
-        }
-        optimization["active_profile"] = config.optimization_profile
+        changes["optimization.active_profile"] = {"old": current_opt.get("active_profile"), "new": config.optimization_profile}
+        new_opt["active_profile"] = config.optimization_profile
     if config.sentinel_operating_mode is not None:
-        changes["optimization.sentinel_operating_mode"] = {
-            "old": optimization.get("sentinel_operating_mode"),
-            "new": config.sentinel_operating_mode,
-        }
-        optimization["sentinel_operating_mode"] = config.sentinel_operating_mode
+        changes["optimization.sentinel_operating_mode"] = {"old": current_opt.get("sentinel_operating_mode"), "new": config.sentinel_operating_mode}
+        new_opt["sentinel_operating_mode"] = config.sentinel_operating_mode
     if config.control_tier is not None:
-        changes["optimization.control_tier"] = {
-            "old": optimization.get("control_tier"),
-            "new": config.control_tier,
-        }
-        optimization["control_tier"] = config.control_tier
-    building_data["optimization"] = optimization
+        changes["optimization.control_tier"] = {"old": current_opt.get("control_tier"), "new": config.control_tier}
+        new_opt["control_tier"] = config.control_tier
+    if new_opt != current_opt:
+        updates["optimization_settings"] = new_opt
 
     if not changes:
         return {"status": "no_changes", "site_id": site_code}
 
-    # Write updated config
-    with open(building_file, "w") as f:
-        json.dump(building_data, f, indent=2)
+    try:
+        client.table("sites").update(updates).eq("code", site_code).execute()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update building config: {e}") from e
 
     # Emit audit event
     try:
         from app.services.audit_service import emit_audit_event
-
         await emit_audit_event(
             event_type="CONFIG_CHANGE",
             entity_type="building",
@@ -448,11 +461,7 @@ async def update_building_config(
     except Exception as e:
         logger.warning(f"Failed to emit audit event: {e}")
 
-    # Force reload site data
-    loader = get_site_loader()
-    loader.load(force=True)
-
-    logger.info(f"Building config updated for {site_code}: {list(changes.keys())}")
+    logger.info(f"Building config updated for {site_code} in Supabase: {list(changes.keys())}")
 
     return {
         "status": "updated",

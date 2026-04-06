@@ -14,7 +14,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import OptimizationPage from '../OptimizationPage';
-import { SimulationProvider } from '@/contexts/SimulationContext';
 import { createTestQueryClient } from '@/test-utils/mockQueryClient';
 import {
   createMockOptimizationScenario,
@@ -71,14 +70,6 @@ vi.mock('../components/optimization/RecommendationHistory', () => ({
   RecommendationHistory: () => <div data-testid="recommendation-history">History</div>,
 }));
 
-vi.mock('../components/EnergyComparisonPanel', () => ({
-  EnergyComparisonPanel: () => <div data-testid="energy-comparison">Energy Comparison</div>,
-}));
-
-
-vi.mock('../components/ActualVsSentinelEnergyCard', () => ({
-  ActualVsSentinelEnergyCard: () => <div data-testid="actual-vs-sentinel">Actual vs SENTINEL</div>,
-}));
 
 vi.mock('../components/ROISummaryCard', () => ({
   ROISummaryCard: () => <div data-testid="roi-summary">ROI Summary</div>,
@@ -96,9 +87,7 @@ function createTestWrapper() {
   const queryClient = createTestQueryClient();
   return ({ children }: { children: React.ReactNode }) => (
     <QueryClientProvider client={queryClient}>
-      <SimulationProvider>
-        {children}
-      </SimulationProvider>
+      {children}
     </QueryClientProvider>
   );
 }

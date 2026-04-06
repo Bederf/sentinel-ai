@@ -13,10 +13,12 @@ import logging
 import time
 import uuid
 from collections import defaultdict, deque
+from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
+from datetime import UTC
 from enum import IntEnum
 from fnmatch import fnmatch
-from typing import Any, Callable, Coroutine, Deque, Dict, List, Optional, Set
+from typing import Any, Optional
 
 logger = logging.getLogger("sentinel.event_bus")
 
@@ -93,15 +95,15 @@ class SentinelEvent:
 
     event_type: str
     source: str
-    payload: Dict[str, Any]
+    payload: dict[str, Any]
     importance: Importance = Importance.INFO
-    site_id: Optional[str] = None
-    equipment_id: Optional[str] = None
-    site_name: Optional[str] = None
+    site_id: str | None = None
+    equipment_id: str | None = None
+    site_name: str | None = None
     event_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     timestamp: str = field(default_factory=lambda: _utc_iso())
-    correlation_id: Optional[str] = None
-    caused_by: Optional[str] = None
+    correlation_id: str | None = None
+    caused_by: str | None = None
 
     @property
     def domain(self) -> str:
@@ -143,7 +145,7 @@ class SentinelEvent:
             **kwargs,
         )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize event to dictionary with importance name and value."""
         return {
             "event_id": self.event_id,
@@ -167,9 +169,9 @@ class SentinelEvent:
 
 def _utc_iso() -> str:
     """Return current UTC time as ISO 8601 string."""
-    from datetime import datetime, timezone
+    from datetime import datetime
 
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 # =============================================================================
@@ -184,10 +186,10 @@ class Subscription:
     pattern: str
     handler: EventHandler
     sub_id: str = field(default_factory=lambda: str(uuid.uuid4()))
-    filter: Optional[Callable[[SentinelEvent], bool]] = None
+    filter: Callable[[SentinelEvent], bool] | None = None
     min_importance: Importance = Importance.INFO
-    site_ids: Optional[Set[str]] = None
-    domains: Optional[Set[str]] = None
+    site_ids: set[str] | None = None
+    domains: set[str] | None = None
     paused: bool = False
 
     def matches(self, event: SentinelEvent) -> bool:
@@ -242,7 +244,7 @@ class DeduplicationMiddleware:
 
     def __init__(self, window_seconds: float = 60.0):
         self.window_seconds = window_seconds
-        self._seen: Dict[str, float] = {}  # dedup_key -> last_seen_timestamp
+        self._seen: dict[str, float] = {}  # dedup_key -> last_seen_timestamp
 
     def _dedup_key(self, event: SentinelEvent) -> str:
         """Generate deduplication key from event fields."""
@@ -254,7 +256,7 @@ class DeduplicationMiddleware:
             cutoff = time.monotonic() - self.window_seconds
             self._seen = {k: v for k, v in self._seen.items() if v > cutoff}
 
-    async def __call__(self, event: SentinelEvent) -> Optional[SentinelEvent]:
+    async def __call__(self, event: SentinelEvent) -> SentinelEvent | None:
         """Process event through deduplication.
 
         Returns None if duplicate, event otherwise.
@@ -279,10 +281,10 @@ class EnrichmentMiddleware:
     Accepts a pluggable async lookup function. Default is no-op.
     """
 
-    def __init__(self, site_lookup: Optional[Callable[[str], Coroutine[Any, Any, Optional[str]]]] = None):
+    def __init__(self, site_lookup: Callable[[str], Coroutine[Any, Any, str | None]] | None = None):
         self._site_lookup = site_lookup
 
-    async def __call__(self, event: SentinelEvent) -> Optional[SentinelEvent]:
+    async def __call__(self, event: SentinelEvent) -> SentinelEvent | None:
         """Enrich event with building name if site_id is present and site_name is missing."""
         if self._site_lookup and event.site_id and not event.site_name:
             try:
@@ -304,7 +306,7 @@ class ImportanceEscalationMiddleware:
 
     def __init__(self, window_seconds: float = 300.0):
         self.window_seconds = window_seconds
-        self._counts: Dict[str, List[float]] = defaultdict(list)
+        self._counts: dict[str, list[float]] = defaultdict(list)
 
     def _event_key(self, event: SentinelEvent) -> str:
         """Generate tracking key from event fields."""
@@ -317,7 +319,7 @@ class ImportanceEscalationMiddleware:
         if not self._counts[key]:
             del self._counts[key]
 
-    async def __call__(self, event: SentinelEvent) -> Optional[SentinelEvent]:
+    async def __call__(self, event: SentinelEvent) -> SentinelEvent | None:
         """Check recurrence count and escalate importance if needed."""
         key = self._event_key(event)
         now = time.monotonic()
@@ -369,14 +371,14 @@ class EventBus:
     """
 
     def __init__(self, history_size: int = 1000):
-        self._subscriptions: Dict[str, Subscription] = {}
-        self._middleware: List[EventMiddleware] = []
-        self._history: Deque[SentinelEvent] = deque(maxlen=history_size)
+        self._subscriptions: dict[str, Subscription] = {}
+        self._middleware: list[EventMiddleware] = []
+        self._history: deque[SentinelEvent] = deque(maxlen=history_size)
         self._events_emitted: int = 0
         self._handlers_invoked: int = 0
         self._handler_errors: int = 0
-        self._by_domain: Dict[str, int] = defaultdict(int)
-        self._by_importance: Dict[str, int] = defaultdict(int)
+        self._by_domain: dict[str, int] = defaultdict(int)
+        self._by_importance: dict[str, int] = defaultdict(int)
 
     # -------------------------------------------------------------------------
     # Subscriptions
@@ -386,10 +388,10 @@ class EventBus:
         self,
         pattern: str,
         handler: EventHandler,
-        filter: Optional[Callable[[SentinelEvent], bool]] = None,
+        filter: Callable[[SentinelEvent], bool] | None = None,
         min_importance: Importance = Importance.INFO,
-        site_ids: Optional[Set[str]] = None,
-        domains: Optional[Set[str]] = None,
+        site_ids: set[str] | None = None,
+        domains: set[str] | None = None,
     ) -> str:
         """Register a new subscription.
 
@@ -498,7 +500,7 @@ class EventBus:
             event: The event to emit
         """
         # Run middleware pipeline
-        processed: Optional[SentinelEvent] = event
+        processed: SentinelEvent | None = event
         for mw in self._middleware:
             if processed is None:
                 logger.debug("Event %s suppressed by middleware", event.event_type)
@@ -533,7 +535,7 @@ class EventBus:
             try:
                 await asyncio.wait_for(sub.handler(evt), timeout=30.0)
                 self._handlers_invoked += 1
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 self._handler_errors += 1
                 logger.error(
                     "Handler timeout (30s) for sub=%s event=%s",
@@ -560,13 +562,13 @@ class EventBus:
 
     def get_history(
         self,
-        event_type: Optional[str] = None,
-        domain: Optional[str] = None,
-        site_id: Optional[str] = None,
-        correlation_id: Optional[str] = None,
-        min_importance: Optional[Importance] = None,
+        event_type: str | None = None,
+        domain: str | None = None,
+        site_id: str | None = None,
+        correlation_id: str | None = None,
+        min_importance: Importance | None = None,
         limit: int = 100,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Query rolling history buffer with optional filters.
 
         Args:
@@ -580,7 +582,7 @@ class EventBus:
         Returns:
             List of event dicts, most recent first
         """
-        results: List[Dict[str, Any]] = []
+        results: list[dict[str, Any]] = []
 
         for event in reversed(self._history):
             if event_type and event.event_type != event_type:
@@ -600,7 +602,7 @@ class EventBus:
 
         return results
 
-    def get_event_chain(self, correlation_id: str) -> List[Dict[str, Any]]:
+    def get_event_chain(self, correlation_id: str) -> list[dict[str, Any]]:
         """Get all events in a correlation chain, ordered by timestamp.
 
         Args:
@@ -615,7 +617,7 @@ class EventBus:
                 chain.append(event.to_dict())
         return chain
 
-    def get_subscriptions(self) -> List[Dict[str, Any]]:
+    def get_subscriptions(self) -> list[dict[str, Any]]:
         """List all registered subscriptions for debugging.
 
         Returns:
@@ -639,7 +641,7 @@ class EventBus:
     # -------------------------------------------------------------------------
 
     @property
-    def metrics(self) -> Dict[str, Any]:
+    def metrics(self) -> dict[str, Any]:
         """Return event bus metrics for monitoring.
 
         Returns:
@@ -661,7 +663,7 @@ class EventBus:
 # Singleton
 # =============================================================================
 
-_bus: Optional[EventBus] = None
+_bus: EventBus | None = None
 
 
 def get_event_bus(history_size: int = 1000) -> EventBus:

@@ -6,6 +6,7 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from app.config.settings import settings
 from app.services.lighting_discovery_service import (
     LightingDiscoveryService,
     SimulatedLightingDiscovery,
@@ -37,8 +38,8 @@ class DiscoverLineRequest(BaseModel):
     password: Optional[str] = None
 
 
-class SimulatedDiscoveryRequest(BaseModel):
-    """Request for simulated discovery (demo mode)."""
+class SeededDiscoveryRequest(BaseModel):
+    """Request for seeded discovery metadata."""
 
     equipment_code: str = Field(..., description="Equipment code to update")
     device_type: str = Field("led_panel", description="Device type: led_panel, led_downlight, emergency")
@@ -78,21 +79,7 @@ async def get_gateway_info(
     try:
         ip = _get_gateway_ip(gateway_ip)
     except HTTPException:
-        # Return demo data if no gateway configured
-        return {
-            "status": "demo_mode",
-            "message": "No DALI gateway configured. Showing demo data.",
-            "gateway": {
-                "ip_address": "192.168.10.50",
-                "mac_address": "00:1A:2B:3C:4D:5E",
-                "firmware_version": "2.4.1",
-                "model": "Scenecom Pro",
-                "manufacturer": "Tridonic",
-                "dali_lines": 2,
-                "total_devices": 48,
-                "online": True,
-            },
-        }
+        raise HTTPException(status_code=503, detail="No DALI gateway configured")
 
     service = LightingDiscoveryService(
         gateway_ip=ip,
@@ -125,9 +112,13 @@ async def discover_device(request: DiscoverDeviceRequest) -> dict:
     try:
         ip = _get_gateway_ip(request.gateway_ip)
     except HTTPException:
-        # Fall back to simulated discovery
+        if settings.sentinel_island_mode:
+            raise HTTPException(status_code=503, detail="No DALI gateway configured")
         return await _simulated_discovery(
-            request.equipment_code, "led_panel", request.dali_address or 1, save_to_db=True
+            request.equipment_code,
+            "led_panel",
+            request.dali_address or 1,
+            save_to_db=True,
         )
 
     service = LightingDiscoveryService(
@@ -172,24 +163,7 @@ async def discover_line(request: DiscoverLineRequest) -> dict:
     try:
         ip = _get_gateway_ip(request.gateway_ip)
     except HTTPException:
-        # Return demo data
-        return {
-            "status": "demo_mode",
-            "dali_line": request.dali_line,
-            "message": "No DALI gateway configured. Showing demo data.",
-            "devices": [
-                {
-                    "dali_address": i,
-                    "device_type": 6,
-                    "device_type_name": "LED Module",
-                    "manufacturer": "Tridonic",
-                    "actual_level": 200,
-                    "lamp_failure": False,
-                }
-                for i in range(1, 9)
-            ],
-            "count": 8,
-        }
+        raise HTTPException(status_code=503, detail="No DALI gateway configured")
 
     service = LightingDiscoveryService(
         gateway_ip=ip,
@@ -208,9 +182,9 @@ async def discover_line(request: DiscoverLineRequest) -> dict:
     }
 
 
-@router.post("/lighting/discover/simulated")
-async def discover_simulated(request: SimulatedDiscoveryRequest) -> dict:
-    """Generate simulated DALI discovery data (for demo/testing).
+@router.post("/lighting/discover/seeded")
+async def discover_seeded(request: SeededDiscoveryRequest) -> dict:
+    """Generate seeded DALI discovery data for non-production testing.
 
     Creates realistic device metadata without requiring a physical
     DALI gateway. Useful for demos and development.
@@ -227,7 +201,7 @@ async def discover_simulated(request: SimulatedDiscoveryRequest) -> dict:
 
 
 async def _simulated_discovery(equipment_code: str, device_type: str, dali_address: int, save_to_db: bool) -> dict:
-    """Internal simulated discovery helper."""
+    """Internal seeded discovery helper."""
     data = SimulatedLightingDiscovery.generate_device_info(
         equipment_code=equipment_code, device_type=device_type, dali_address=dali_address
     )
@@ -235,7 +209,7 @@ async def _simulated_discovery(equipment_code: str, device_type: str, dali_addre
     result = {
         "status": "simulated",
         "equipment_code": equipment_code,
-        "message": "Using simulated data (no gateway connected)",
+        "message": "Using seeded discovery data (no gateway connected)",
         "network_info": data["network_info"],
         "device_info": data["device_info"],
         "operating_data": data["operating_data"],

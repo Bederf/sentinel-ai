@@ -37,7 +37,7 @@ export function BMSConnectivityCard({ health }: BMSConnectivityCardProps) {
     critical: 'var(--color-sentinel-red)',
   };
 
-  // Mock subsystem data for demo
+  // Mock subsystem data for local fallback mode
   const subsystems = [
     { name: 'Niagara', status: component.score >= 80 ? 'online' : 'offline' },
     { name: 'BACnet', status: component.score >= 60 ? 'online' : 'degraded' },

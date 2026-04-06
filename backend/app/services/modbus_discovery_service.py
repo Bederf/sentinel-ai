@@ -12,7 +12,6 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import IntEnum
-from typing import Optional
 
 from app.database.repositories.equipment_metadata_repository import EquipmentMetadataRepository
 
@@ -41,14 +40,14 @@ class ModbusDeviceInfo:
     manufacturer: str = ""
     model: str = ""
     firmware_version: str = ""
-    serial_number: Optional[str] = None
+    serial_number: str | None = None
     ip_address: str = ""
     port: int = 502
     protocol: str = "modbus_tcp"  # modbus_tcp or modbus_rtu
 
     # Device-specific
-    rated_capacity: Optional[str] = None  # kVA, kW, etc.
-    runtime_hours: Optional[int] = None
+    rated_capacity: str | None = None  # kVA, kW, etc.
+    runtime_hours: int | None = None
 
     discovered_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
 
@@ -112,8 +111,8 @@ class ModbusDiscoveryService:
         self.timeout = timeout
 
     async def discover_device(
-        self, ip_address: str, unit_id: int = 1, port: Optional[int] = None, device_profile: Optional[str] = None
-    ) -> Optional[ModbusDeviceInfo]:
+        self, ip_address: str, unit_id: int = 1, port: int | None = None, device_profile: str | None = None
+    ) -> ModbusDeviceInfo | None:
         """Discover a Modbus device.
 
         Args:
@@ -160,8 +159,8 @@ class ModbusDiscoveryService:
         equipment_code: str,
         ip_address: str,
         unit_id: int = 1,
-        port: Optional[int] = None,
-        device_profile: Optional[str] = None,
+        port: int | None = None,
+        device_profile: str | None = None,
     ) -> dict:
         """Discover Modbus device and save to equipment metadata.
 
@@ -226,7 +225,7 @@ class ModbusDiscoveryService:
 
 
 class SimulatedModbusDiscovery:
-    """Simulated Modbus discovery for demo mode."""
+    """Simulated Modbus discovery for local mode."""
 
     # Device profiles for common equipment
     DEVICE_PROFILES = {
