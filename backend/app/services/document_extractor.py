@@ -1,9 +1,8 @@
 """Document text extraction service for multiple file types."""
 
-import logging
 import io
+import logging
 from pathlib import Path
-from typing import Tuple
 
 from fastapi import UploadFile
 
@@ -22,8 +21,9 @@ def extract_text_from_pdf(file_bytes: bytes) -> str:
         Extracted text content
     """
     try:
-        from PyPDF2 import PdfReader
         from io import BytesIO
+
+        from PyPDF2 import PdfReader
 
         pdf_reader = PdfReader(BytesIO(file_bytes))
         text_parts = []
@@ -38,15 +38,46 @@ def extract_text_from_pdf(file_bytes: bytes) -> str:
 
         return "\n\n".join(text_parts)
 
-    except ImportError:
-        raise ImportError("PyPDF2 is required for PDF extraction. Install with: pip install PyPDF2")
+    except ImportError as exc:
+        raise ImportError("PyPDF2 is required for PDF extraction. Install with: pip install PyPDF2") from exc
     except Exception as e:
         logger.error(f"Error extracting text from PDF: {e}")
         raise
 
 
+def _extract_text_from_pdf_native(file_bytes: bytes) -> str:
+    """Native PyPDF2 extraction — no OCR involved."""
+    return extract_text_from_pdf(file_bytes)
+
+
+def extract_text_from_pdf_docling(file_bytes: bytes) -> str:
+    """Extract text from PDF using Docling OCR/layout analysis.
+
+    Docling provides superior scanned-PDF OCR, table extraction, and key-value
+    pair detection compared to PyMuPDF+pytesseract.
+
+    Returns an empty string if docling is unavailable or extraction fails.
+    """
+    try:
+        from docling.document_converter import DocumentConverter
+    except ImportError:
+        logger.debug("Docling unavailable for PDF OCR")
+        return ""
+
+    try:
+        from io import BytesIO
+
+        converter = DocumentConverter()
+        result = converter.convert(BytesIO(file_bytes))
+        text = result.document.export_to_markdown()
+        return text.strip() if text else ""
+    except Exception as exc:
+        logger.info("Docling PDF extraction failed: %s", exc)
+        return ""
+
+
 def _extract_text_from_pdf_ocr(file_bytes: bytes) -> str:
-    """OCR fallback for low-text or scanned PDFs.
+    """OCR fallback for low-text or scanned PDFs using PyMuPDF+pytesseract.
 
     Returns an empty string if OCR dependencies are unavailable or OCR fails.
     """
@@ -72,11 +103,11 @@ def _extract_text_from_pdf_ocr(file_bytes: bytes) -> str:
 
 
 def extract_text_from_pdf_with_fallback(file_bytes: bytes) -> tuple[str, dict]:
-    """Extract PDF text natively first, then OCR when native text is low."""
-    native_text = extract_text_from_pdf(file_bytes)
+    """Extract PDF text: PyPDF2 native -> Docling OCR (if <200 chars) -> pytesseract."""
+    native_text = _extract_text_from_pdf_native(file_bytes)
     native_length = len(native_text.strip())
 
-    metadata = {
+    metadata: dict = {
         "file_type": ".pdf",
         "native_text_length": native_length,
         "low_text_threshold": PDF_LOW_TEXT_THRESHOLD,
@@ -87,6 +118,16 @@ def extract_text_from_pdf_with_fallback(file_bytes: bytes) -> tuple[str, dict]:
         metadata["extraction_mode"] = "native"
         return native_text, metadata
 
+    # Try docling OCR first (better than pytesseract for scanned/image PDFs)
+    docling_text = extract_text_from_pdf_docling(file_bytes)
+    if docling_text.strip():
+        metadata["ocr_used"] = True
+        metadata["extraction_mode"] = "docling"
+        metadata["ocr_text_length"] = len(docling_text.strip())
+        metadata["fallback_reason"] = "low_native_text_pdf"
+        return docling_text, metadata
+
+    # Final fallback: pytesseract
     ocr_text = _extract_text_from_pdf_ocr(file_bytes)
     if ocr_text.strip():
         metadata["ocr_used"] = True
@@ -110,8 +151,9 @@ def extract_text_from_docx(file_bytes: bytes) -> str:
         Extracted text content
     """
     try:
-        from docx import Document
         from io import BytesIO
+
+        from docx import Document
 
         doc = Document(BytesIO(file_bytes))
         text_parts = []
@@ -129,14 +171,14 @@ def extract_text_from_docx(file_bytes: bytes) -> str:
 
         return "\n\n".join(text_parts)
 
-    except ImportError:
-        raise ImportError("python-docx is required for DOCX extraction. Install with: pip install python-docx")
+    except ImportError as exc:
+        raise ImportError("python-docx is required for DOCX extraction. Install with: pip install python-docx") from exc
     except Exception as e:
         logger.error(f"Error extracting text from DOCX: {e}")
         raise
 
 
-async def extract_text(file: UploadFile) -> Tuple[str, dict]:
+async def extract_text(file: UploadFile) -> tuple[str, dict]:
     """Extract text from uploaded file based on file type.
 
     Supports: PDF, DOCX, TXT
