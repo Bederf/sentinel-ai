@@ -48,17 +48,22 @@ class ModelGateway:
         profile_name = _settings_module.SENTINEL_ROUTING_PROFILE
         return get_profile(profile_name)
 
-    def _resolve(self, task_class: str) -> tuple[str, str, str]:
+    def _resolve(self, task_class: str) -> tuple[str, bool, list[tuple[str, str]]]:
         """
-        Returns (mode, provider, model) for the given task_class.
+        Returns (mode, fallback_enabled, routes) for the given task_class.
+        routes is a list of (provider, model) tuples in priority order.
         """
         if task_class not in VALID_TASK_CLASSES:
             valid = ", ".join(sorted(VALID_TASK_CLASSES))
             raise ValueError(f"Unknown task_class '{task_class}'. Valid: {valid}")
         profile = self._get_active_profile()
         mode = profile["mode"]
-        route = profile["routing"][task_class]
-        return mode, route["provider"], route["model"]
+        fallback_enabled = profile.get("fallback_enabled", False)
+        route_list = profile["routing"][task_class]
+
+        # route_list is always a list of dicts now
+        routes = [(r["provider"], r["model"]) for r in route_list]
+        return mode, fallback_enabled, routes
 
     async def call(
         self,
@@ -72,6 +77,7 @@ class ModelGateway:
     ) -> str | AsyncGenerator:
         """
         Route an LLM call based on task_class and active profile.
+        Implements fallback chain retry logic for api/cloud modes.
 
         Args:
             task_class: One of heavy | medium | light | chat_ai | chat_tech
@@ -83,14 +89,25 @@ class ModelGateway:
 
         Returns:
             str if stream=False, AsyncGenerator if stream=True
+
+        Raises:
+            LocalInferenceUnavailableError if local_full mode and Ollama unavailable
+            ValueError if all fallback routes exhausted in api/cloud mode
         """
-        mode, provider, model = self._resolve(task_class)
-        logger.debug("model_gateway.call task_class=%s mode=%s provider=%s model=%s", task_class, mode, provider, model)
+        mode, fallback_enabled, routes = self._resolve(task_class)
+        logger.debug(
+            "model_gateway.call task_class=%s mode=%s fallback_enabled=%s routes=%s",
+            task_class,
+            mode,
+            fallback_enabled,
+            routes,
+        )
 
         if mode == "api":
-            return await self._call_api(
-                provider=provider,
-                model=model,
+            return await self._try_routes(
+                routes=routes,
+                fallback_enabled=fallback_enabled,
+                mode="api",
                 messages=messages,
                 system=system,
                 max_tokens=max_tokens,
@@ -99,19 +116,22 @@ class ModelGateway:
                 source=source,
             )
         elif mode == "cloud":
-            return await self._call_cloud(
-                provider=provider,
-                model=model,
+            return await self._try_routes(
+                routes=routes,
+                fallback_enabled=fallback_enabled,
+                mode="cloud",
                 messages=messages,
                 system=system,
                 max_tokens=max_tokens,
                 stream=stream,
+                tools=tools,
                 source=source,
             )
         elif mode == "local":
+            # local mode: no fallback to cloud, strict enforcement
             return await self._call_local(
-                provider=provider,
-                model=model,
+                provider=routes[0][0],
+                model=routes[0][1],
                 messages=messages,
                 system=system,
                 max_tokens=max_tokens,
@@ -120,6 +140,93 @@ class ModelGateway:
             )
         else:
             raise ValueError(f"Unknown execution mode '{mode}'")
+
+    async def _try_routes(
+        self,
+        routes: list[tuple[str, str]],
+        fallback_enabled: bool,
+        mode: str,
+        messages: list[dict],
+        system: str | None,
+        max_tokens: int,
+        stream: bool,
+        tools: list | None,
+        source: str,
+    ) -> str | AsyncGenerator:
+        """
+        Try a list of (provider, model) routes in priority order.
+        If fallback_enabled=False, only tries the first route.
+        If fallback_enabled=True, falls back to next route on failure.
+
+        Returns on first success; raises only after all routes exhausted.
+        """
+        if not routes:
+            raise ValueError("No routes available for call")
+
+        last_error = None
+        for attempt, (provider, model) in enumerate(routes, 1):
+            try:
+                if attempt > 1:
+                    logger.info(
+                        "model_gateway fallback attempt=%d provider=%s model=%s mode=%s",
+                        attempt,
+                        provider,
+                        model,
+                        mode,
+                    )
+
+                if mode == "api":
+                    return await self._call_api(
+                        provider=provider,
+                        model=model,
+                        messages=messages,
+                        system=system,
+                        max_tokens=max_tokens,
+                        stream=stream,
+                        tools=tools,
+                        source=source,
+                    )
+                elif mode == "cloud":
+                    return await self._call_cloud(
+                        provider=provider,
+                        model=model,
+                        messages=messages,
+                        system=system,
+                        max_tokens=max_tokens,
+                        stream=stream,
+                        source=source,
+                    )
+                else:
+                    raise ValueError(f"_try_routes: unsupported mode '{mode}'")
+
+            except Exception as exc:
+                last_error = exc
+                logger.warning(
+                    "model_gateway route failed attempt=%d provider=%s model=%s error=%s",
+                    attempt,
+                    provider,
+                    model,
+                    exc,
+                )
+
+                # If fallback disabled, don't try next route
+                if not fallback_enabled:
+                    raise
+
+                # If this is the last route, raise after loop
+                if attempt == len(routes):
+                    break
+
+                # Otherwise, continue to next route
+                logger.info("model_gateway trying next fallback route (attempt=%d of %d)", attempt + 1, len(routes))
+
+        # All routes exhausted
+        if last_error:
+            raise ValueError(
+                f"All {len(routes)} routes exhausted for mode={mode}. Last error: {last_error}"
+            ) from last_error
+        else:
+            raise ValueError(f"All {len(routes)} routes exhausted for mode={mode} (no error info)")
 
     async def _call_api(
         self,

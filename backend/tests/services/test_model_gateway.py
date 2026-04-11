@@ -1,4 +1,4 @@
-"""Tests for ModelGateway routing logic (Phase 163)."""
+"""Tests for ModelGateway routing logic (Phase 183 - Fallback Support)."""
 
 import pytest
 from unittest.mock import AsyncMock, patch
@@ -16,23 +16,31 @@ class TestProfileResolution:
     def setup_method(self):
         self.gw = ModelGateway()
 
-    def test_heavy_resolves_to_sonnet(self):
-        mode, provider, model = self.gw._resolve("heavy")
+    def test_heavy_resolves_with_minimax_primary_anthropic_fallback(self):
+        mode, fallback_enabled, routes = self.gw._resolve("heavy")
         assert mode == "api"
-        assert provider == "anthropic"
-        assert "sonnet" in model or "claude" in model
+        assert fallback_enabled is True
+        assert len(routes) >= 2
+        assert routes[0][0] == "minimax"  # Primary
+        assert routes[1][0] == "anthropic"  # Fallback
 
-    def test_light_resolves_to_haiku(self):
-        _, _, model = self.gw._resolve("light")
-        assert "haiku" in model
+    def test_light_resolves_with_minimax_primary(self):
+        mode, fallback_enabled, routes = self.gw._resolve("light")
+        assert mode == "api"
+        assert fallback_enabled is True
+        assert routes[0][0] == "minimax"
 
-    def test_chat_ai_resolves_to_haiku(self):
-        _, _, model = self.gw._resolve("chat_ai")
-        assert "haiku" in model
+    def test_chat_ai_resolves_with_fallback_chain(self):
+        mode, fallback_enabled, routes = self.gw._resolve("chat_ai")
+        assert mode == "api"
+        assert fallback_enabled is True
+        assert len(routes) >= 2
 
-    def test_chat_tech_resolves_to_sonnet(self):
-        _, _, model = self.gw._resolve("chat_tech")
-        assert "sonnet" in model or "claude" in model
+    def test_chat_tech_resolves_with_fallback_chain(self):
+        mode, fallback_enabled, routes = self.gw._resolve("chat_tech")
+        assert mode == "api"
+        assert fallback_enabled is True
+        assert len(routes) >= 2
 
     def test_invalid_task_class_raises_value_error(self):
         with pytest.raises(ValueError, match="invalid_class"):
@@ -40,10 +48,14 @@ class TestProfileResolution:
 
     def test_all_task_classes_valid(self):
         for tc in VALID_TASK_CLASSES:
-            mode, provider, model = self.gw._resolve(tc)
+            mode, fallback_enabled, routes = self.gw._resolve(tc)
             assert mode in {"api", "cloud", "local"}
-            assert provider
-            assert model
+            assert isinstance(fallback_enabled, bool)
+            assert isinstance(routes, list)
+            assert len(routes) > 0
+            for provider, model in routes:
+                assert isinstance(provider, str)
+                assert isinstance(model, str)
 
 
 class TestLocalInferenceUnavailableError:
@@ -70,6 +82,7 @@ class TestLocalInferenceUnavailableError:
                     system=None,
                     max_tokens=512,
                     stream=False,
+                    source="test",
                 )
 
 
@@ -114,6 +127,83 @@ class TestEscalation:
         assert passed_messages == original_context
 
 
+class TestFallbackChainRetry:
+    @pytest.mark.asyncio
+    async def test_fallback_tries_next_provider_on_primary_failure(self):
+        """When primary provider fails and fallback_enabled=True, try next provider."""
+        gw = ModelGateway()
+
+        # Mock first provider (minimax) to fail, second (anthropic) to succeed
+        with patch("app.services.model_gateway.ModelGateway._call_api") as mock_call:
+            # First call (minimax) raises, second call (anthropic) succeeds
+            mock_call.side_effect = [
+                Exception("MiniMax unavailable"),
+                "Anthropic response",
+            ]
+
+            result = await gw._try_routes(
+                routes=[("minimax", "MiniMax-M2.7"), ("anthropic", "claude-opus-4-6")],
+                fallback_enabled=True,
+                mode="api",
+                messages=[{"role": "user", "content": "test"}],
+                system=None,
+                max_tokens=1536,
+                stream=False,
+                tools=None,
+                source="test",
+            )
+
+            assert result == "Anthropic response"
+            assert mock_call.call_count == 2  # First failed, second succeeded
+
+    @pytest.mark.asyncio
+    async def test_fallback_disabled_raises_on_first_failure(self):
+        """When fallback_enabled=False, propagate original exception without trying fallbacks."""
+        gw = ModelGateway()
+
+        with patch("app.services.model_gateway.ModelGateway._call_api") as mock_call:
+            mock_call.side_effect = Exception("Provider failed")
+
+            # When fallback disabled, original exception is re-raised, not wrapped
+            with pytest.raises(Exception, match="Provider failed"):
+                await gw._try_routes(
+                    routes=[("ollama", "deepseek-r1:14b")],
+                    fallback_enabled=False,
+                    mode="api",
+                    messages=[{"role": "user", "content": "test"}],
+                    system=None,
+                    max_tokens=1536,
+                    stream=False,
+                    tools=None,
+                    source="test",
+                )
+
+            assert mock_call.call_count == 1  # Only tried first, no fallback
+
+    @pytest.mark.asyncio
+    async def test_all_routes_exhausted_raises_error(self):
+        """When all fallback routes fail, raise ValueError."""
+        gw = ModelGateway()
+
+        with patch("app.services.model_gateway.ModelGateway._call_api") as mock_call:
+            mock_call.side_effect = Exception("All providers failed")
+
+            with pytest.raises(ValueError, match="All 2 routes exhausted"):
+                await gw._try_routes(
+                    routes=[("minimax", "MiniMax-M2.7"), ("anthropic", "claude-opus-4-6")],
+                    fallback_enabled=True,
+                    mode="api",
+                    messages=[{"role": "user", "content": "test"}],
+                    system=None,
+                    max_tokens=1536,
+                    stream=False,
+                    tools=None,
+                    source="test",
+                )
+
+            assert mock_call.call_count == 2  # Tried both routes
+
+
 class TestLocalFullHardFail:
     @pytest.mark.asyncio
     async def test_local_full_profile_raises_on_ollama_failure(self):
@@ -139,18 +229,21 @@ class TestLocalFullHardFail:
 
 
 class TestProfileSwitching:
-    def test_local_full_profile_resolves_to_ollama(self):
+    def test_local_full_profile_resolves_to_ollama_no_fallback(self):
         with patch("app.config.settings.SENTINEL_ROUTING_PROFILE", "local_full"):
             with patch("app.services.model_gateway._settings_module.SENTINEL_ROUTING_PROFILE", "local_full"):
                 gw = ModelGateway()
-                mode, provider, model = gw._resolve("heavy")
+                mode, fallback_enabled, routes = gw._resolve("heavy")
                 assert mode == "local"
-                assert provider == "ollama"
-                assert "deepseek" in model
+                assert fallback_enabled is False  # Strict: no fallback
+                assert routes[0][0] == "ollama"
+                assert "deepseek" in routes[0][1]
 
-    def test_cloud_dev_profile_resolves_to_ollama_cloud(self):
+    def test_cloud_dev_profile_resolves_to_minimax_with_fallback(self):
         with patch("app.services.model_gateway._settings_module.SENTINEL_ROUTING_PROFILE", "cloud_dev"):
             gw = ModelGateway()
-            mode, provider, model = gw._resolve("medium")
-            assert mode == "cloud"
-            assert provider == "ollama_cloud"
+            mode, fallback_enabled, routes = gw._resolve("medium")
+            assert mode == "api"
+            assert fallback_enabled is True  # Fallback enabled
+            assert routes[0][0] == "minimax"  # Primary
+            assert routes[1][0] == "anthropic"  # Fallback
