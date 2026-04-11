@@ -29,22 +29,27 @@ ROUTING_PROFILES: dict[str, dict[str, Any]] = {
             "heavy": [
                 {"provider": "minimax", "model": "MiniMax-M2.7"},
                 {"provider": "anthropic", "model": "claude-opus-4-6"},
+                {"provider": "openai", "model": "gpt-4o"},
             ],
             "medium": [
                 {"provider": "minimax", "model": "MiniMax-M2.7"},
                 {"provider": "anthropic", "model": "claude-sonnet-4-6"},
+                {"provider": "openai", "model": "gpt-4-turbo"},
             ],
             "light": [
                 {"provider": "minimax", "model": "MiniMax-M2.7"},
                 {"provider": "anthropic", "model": "claude-haiku-4-5-20251001"},
+                {"provider": "openai", "model": "gpt-4o-mini"},
             ],
             "chat_ai": [
                 {"provider": "minimax", "model": "MiniMax-M2.7"},
                 {"provider": "anthropic", "model": "claude-opus-4-6"},
+                {"provider": "openai", "model": "gpt-4o"},
             ],
             "chat_tech": [
                 {"provider": "minimax", "model": "MiniMax-M2.7"},
                 {"provider": "anthropic", "model": "claude-opus-4-6"},
+                {"provider": "openai", "model": "gpt-4o"},
             ],
         },
     },
@@ -55,22 +60,27 @@ ROUTING_PROFILES: dict[str, dict[str, Any]] = {
             "heavy": [
                 {"provider": "minimax", "model": "MiniMax-M2.7"},
                 {"provider": "anthropic", "model": "claude-opus-4-6"},
+                {"provider": "openai", "model": "gpt-4o"},
             ],
             "medium": [
                 {"provider": "minimax", "model": "MiniMax-M2.7"},
                 {"provider": "anthropic", "model": "claude-sonnet-4-6"},
+                {"provider": "openai", "model": "gpt-4-turbo"},
             ],
             "light": [
                 {"provider": "minimax", "model": "MiniMax-M2.7"},
                 {"provider": "anthropic", "model": "claude-haiku-4-5-20251001"},
+                {"provider": "openai", "model": "gpt-4o-mini"},
             ],
             "chat_ai": [
                 {"provider": "minimax", "model": "MiniMax-M2.7"},
                 {"provider": "anthropic", "model": "claude-opus-4-6"},
+                {"provider": "openai", "model": "gpt-4o"},
             ],
             "chat_tech": [
                 {"provider": "minimax", "model": "MiniMax-M2.7"},
                 {"provider": "anthropic", "model": "claude-opus-4-6"},
+                {"provider": "openai", "model": "gpt-4o"},
             ],
         },
     },
