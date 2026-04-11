@@ -17,7 +17,7 @@ estimated_read_time: 10
 
 > Detects unoccupied meeting rooms during active bookings and notifies the floor concierge via WhatsApp and email.
 
-**Version:** 1.1 | **Last Updated:** 2026-03-28
+**Version:** 1.2 | **Last Updated:** 2026-04-11
 
 ---
 
@@ -54,8 +54,20 @@ GhostRoomNotifier.send_ghost_booking_alert()
 ## Detection Logic
 
 ### Booking Source
-- Primary: Supabase `block_booking_records` table (ingested from Outlook emails via n8n)
-- Fallback: `backend/app/data/block_bookings.json`
+
+**Primary:** Supabase `block_booking_records` table (ingested from Resource Scheduler emails via n8n)
+
+**n8n Ingestion Workflow:**
+- **Workflow:** "SENTINEL — Block Booking Email Ingest" (ID: `xR12CDjsX74PQp4S`)
+- **Email Address:** `rooms@sentinel-ai.co.za` (IMAP monitoring)
+- **Email Types Captured:** "New Resource Use Notification", "Cancelled Reservation", "Accepted", "Invitation", "Meeting"
+- **Payload:** Extracts `.ics` attachment (iCalendar) or raw email body
+- **Endpoint:** `POST http://127.0.0.1:9095/api/block-bookings/ingest`
+- **Status:** Active, awaiting production Fairlands bookings
+
+**Fallback:** `backend/app/data/block_bookings.json` (if Supabase unavailable)
+
+**Configuration Reference:** See [[Block-Booking-Email-Configuration]] for FNB IT setup details
 
 ### Ghost Check Criteria (all must be true)
 1. **Booking is active**: `start_time + grace_period < now < end_time`
