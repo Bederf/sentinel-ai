@@ -1,17 +1,16 @@
 """
 SENTINEL Model Routing Profiles (Phase 183 - Fallback Support).
 
-Four profiles cover deployment contexts and special use cases:
-  api_prod       — production cloud with cost-optimized fallback (MiniMax primary)
-  anthropic_primary — demo/high-quality mode (Claude primary for narrative quality)
-  cloud_dev      — development via API with fallback chains
-  local_full     — air-gapped SBC with local Ollama only (no fallback to cloud)
+Three profiles cover deployment contexts:
+  api_prod  — production cloud with provider fallback chains
+  cloud_dev — development via API with fallback chains
+  local_full — air-gapped SBC with local Ollama only (no fallback to cloud)
 
 Each routing entry is now an ordered list of [provider, model] pairs for fallback.
 The gateway tries each in sequence until one succeeds.
 
 For local_full: fallback_enabled=false enforces strict local-only operation.
-For api_prod/anthropic_primary/cloud_dev: fallback_enabled=true enables cascading fallback.
+For api_prod/cloud_dev: fallback_enabled=true enables cascading fallback.
 
 Model strings must match what settings.py currently uses.
 Update here when upgrading models.
@@ -50,37 +49,6 @@ ROUTING_PROFILES: dict[str, dict[str, Any]] = {
             "chat_tech": [
                 {"provider": "minimax", "model": "MiniMax-M2.7"},
                 {"provider": "anthropic", "model": "claude-opus-4-6"},
-                {"provider": "openai", "model": "gpt-4o"},
-            ],
-        },
-    },
-    "anthropic_primary": {
-        "mode": "api",
-        "fallback_enabled": True,
-        "routing": {
-            "heavy": [
-                {"provider": "anthropic", "model": "claude-opus-4-6"},
-                {"provider": "minimax", "model": "MiniMax-M2.7"},
-                {"provider": "openai", "model": "gpt-4o"},
-            ],
-            "medium": [
-                {"provider": "anthropic", "model": "claude-sonnet-4-6"},
-                {"provider": "minimax", "model": "MiniMax-M2.7"},
-                {"provider": "openai", "model": "gpt-4-turbo"},
-            ],
-            "light": [
-                {"provider": "anthropic", "model": "claude-haiku-4-5-20251001"},
-                {"provider": "minimax", "model": "MiniMax-M2.7"},
-                {"provider": "openai", "model": "gpt-4o-mini"},
-            ],
-            "chat_ai": [
-                {"provider": "anthropic", "model": "claude-opus-4-6"},
-                {"provider": "minimax", "model": "MiniMax-M2.7"},
-                {"provider": "openai", "model": "gpt-4o"},
-            ],
-            "chat_tech": [
-                {"provider": "anthropic", "model": "claude-opus-4-6"},
-                {"provider": "minimax", "model": "MiniMax-M2.7"},
                 {"provider": "openai", "model": "gpt-4o"},
             ],
         },
