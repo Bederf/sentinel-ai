@@ -16,7 +16,7 @@ estimated_read_time: 10
 # SENTINEL Third-Party Security Register
 
 **Document Owner:** Information Security Officer
-**Version:** 1.1
+**Version:** 1.2
 **Effective Date:** 2026-02-05
 **Review Cadence:** Register reviewed quarterly; full assessments annually
 **FSR Reference:** Domain 4.16 -- Third Party Security
@@ -73,6 +73,7 @@ This register covers all external service providers that:
 |----------|---------|-------------|----------------|----------|---------------------|----------------|-------------|-------------|---------------|-------|
 | **MRI Evolution / FSI** | CAFM Public API (work order management, asset data exchange) | Exchanges work orders, asset IDs, technician assignments, site data | Confidential | **South Africa** | FSI security assessment (vendor questionnaire) | 2025-01-01 | 2026-01-01 | **Low** | N/A (SA hosted) | South African hosted; no cross-border transfer. SIMBIOT Concept Connector dormant until FSI API credentials configured. |
 | **GitHub** | Source code hosting, CI/CD (GitHub Actions), security scanning (Dependabot, CodeQL) | Stores source code, CI/CD configuration, security scan results, dependency vulnerability reports | Confidential | **United States** (cross-border transfer) | SOC 2 Type II; ISO 27001; FedRAMP authorized | 2025-01-01 | 2026-01-01 | **Low** | N/A (no PI) | No PI in source code. Security scan results may contain vulnerability information. Private repositories with branch protection. |
+| **Microsoft Exchange Online (FNB REMS)** | Email service providing room booking system confirmation emails | Provides booking confirmation emails (CC'd to SENTINEL mailbox); SENTINEL reads via IMAP (read-only) | Confidential | **South Africa** | FNB enterprise Microsoft tenant (E3/E5); SOC 2 Type II; ISO 27001 | 2026-04-11 | 2027-04-11 | **Low** | [PIA-2026-003](pia-block-booking-email.md) | FNB IT configures CC rule. SENTINEL has read-only mailbox access via IMAP. No SENTINEL credentials on FNB systems. Data flows one-way: FNB → SENTINEL mailbox. No cross-border transfer — both systems in South Africa. |
 
 ### 3.5 Self-Hosted Components (Not Third Parties)
 
@@ -84,6 +85,7 @@ These components run entirely within SENTINEL-controlled infrastructure. No data
 | **InfluxDB** | Time-series database (telemetry) | Stores sensor readings, trend data | Self-hosted Docker container | None |
 | **Grafana / Loki / Promtail** | Centralised logging and dashboards | Stores application logs | Self-hosted Docker containers | None |
 | **Wazuh** | Intrusion detection system (IDS/SIEM) | Reads system and application logs | Self-hosted Docker container | None |
+| **n8n** | Workflow automation (email intake orchestration) | Polls FNB REMS mailbox via IMAP (read-only); does not persist email content; sends parsed booking records to SENTINEL backend API | Self-hosted Docker container on SENTINEL VPS | None (no external network calls except IMAP to FNB and HTTP POST to backend API) |
 
 ---
 
@@ -204,6 +206,7 @@ SENTINEL must promptly notify the FSR client of:
 |---------|------|--------|---------|
 | 1.0 | 2026-02-04 | SENTINEL Platform Team | Initial register creation |
 | 1.1 | 2026-02-05 | SENTINEL Platform Team | Added PIA Reference column to all provider tables; linked to PIA-2026-001 (Claude API) and PIA-2026-002 (Sentry messaging) |
+| 1.2 | 2026-04-11 | SENTINEL Platform Team | Added Microsoft Exchange Online (FNB REMS) to Section 3.4; added n8n to Section 3.5; linked to PIA-2026-003 (block booking email intake) |
 
 **Review schedule:**
 - Register reviewed quarterly (provider status, risk ratings, compliance)

@@ -66,6 +66,7 @@ SENTINEL relies primarily on:
 | **Contabo (VPS Hosting)** | Germany | All system data | Building data, equipment data, anonymised analytics | s72(1)(a) | ISO 27001; SOC 2 Type II; EU adequacy decision | N/A (infrastructure) | **Compliant** |
 | **GitHub** | USA | Source code | No PI (code only) | s72(1)(a) | SOC 2 Type II; ISO 27001; FedRAMP | N/A (no PI) | **Compliant** |
 | **Supabase** | AWS (configurable) | Database content | Names, phone numbers, consent records, audit logs | s72(1)(a) | SOC 2 Type II; ISO 27001; af-south-1 preferred | N/A (SA hosting preferred) | **Compliant** |
+| **Block Booking Email Pipeline** | South Africa | Booking records | Organiser name, email, room name, booking date/time | N/A (no cross-border transfer) | Processed within SENTINEL VPS; Supabase af-south-1 (Cape Town) | [PIA-2026-003](pia-block-booking-email.md) | **Compliant** |
 
 ### 3.2 Detailed Transfer Records
 
@@ -165,6 +166,25 @@ SENTINEL relies primarily on:
 | **PIA Reference** | N/A (South African hosting preferred; JSON fallback available) |
 | **Residual Risk** | LOW |
 | **Next Review** | 2026-01-01 |
+
+---
+
+## 3.2.7 Block Booking Email Pipeline (No Cross-Border Transfer)
+
+| Field | Details |
+|-------|---------|
+| **Recipient** | SENTINEL VPS (self-hosted) |
+| **Service** | Block booking email intake (organiser and room booking pattern detection) |
+| **Destination Country** | South Africa (SENTINEL infrastructure) |
+| **PI Transferred** | Organiser name, work email address, room name, booking date/time |
+| **Data Subjects** | FNB employees who make room bookings |
+| **Legal Basis** | Legitimate interest (facilities management); no cross-border transfer required |
+| **Safeguards** | Processed entirely within South Africa; Supabase af-south-1 (Cape Town); no cross-border transfer |
+| **PIA Reference** | `docs/09-security/pia-block-booking-email.md` (PIA-2026-003) |
+| **Residual Risk** | LOW |
+| **Next Review** | 2027-04-11 |
+
+**Assessment:** Block booking confirmation emails are processed entirely within SENTINEL VPS (South Africa) and stored in Supabase af-south-1 (Cape Town, South Africa). No personal information is transferred outside the Republic of South Africa. POPIA Section 72 (cross-border transfer) does not apply to this processing activity.
 
 ---
 
