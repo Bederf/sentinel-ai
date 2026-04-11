@@ -51,7 +51,7 @@ SENTINEL monitors meeting room booking confirmation emails from FNB's room booki
 ### 1.3 Scope
 
 - **Systems involved:** FNB REMS (Microsoft Outlook/Exchange), SENTINEL block booking module (`POST /api/block-bookings/ingest`), n8n workflow orchestration
-- **Geographic scope:** Data originates from South Africa (FNB email system); processed within SENTINEL VPS (South Africa); no cross-border transfer
+- **Geographic scope:** Data originates from South Africa (FNB email system); processed on Contabo VPS (Germany); cross-border transfer to Germany
 - **Data subjects:** FNB employees who make room bookings
 - **Timeframe:** Ongoing operational use
 - **Data retention:** Booking records: 90 days; alerts: until dismissed + 30 days
@@ -197,7 +197,7 @@ FNB REMS (Booking System)
 
 | Recipient | Country | Data Transferred | POPIA s72 Basis | Safeguards |
 |-----------|---------|------------------|-----------------|------------|
-| None (processed within South Africa) | South Africa | N/A | N/A | All processing occurs on SENTINEL VPS in South Africa; Supabase af-south-1 (Cape Town) |
+| Contabo (VPS hosting) | Germany | Booking records (organiser name, email, room name, booking date/time) | s72(1)(a) adequate safeguards via ISO 27001 + SOC 2 Type II | ISO 27001 certified; SOC 2 Type II; encrypted disk; TLS 1.3 in transit; DPA in place |
 
 ---
 
@@ -307,13 +307,13 @@ The combination of data minimisation (name and email only), transient raw email 
 
 | Requirement | Status | Evidence |
 |-------------|--------|----------|
-| Transfer only to countries with adequate protection | N/A | No cross-border transfer; all processing in South Africa |
-| Binding corporate rules in place | N/A | Not applicable; processing within SA |
-| Data subject consent obtained | N/A | Legitimate interest basis sufficient; no consent required |
-| Transfer necessary for contract performance | N/A | Not applicable; processing within SA |
-| Transfer for benefit of data subject | N/A | Not applicable; processing within SA |
+| Transfer only to countries with adequate protection | Compliant | Germany (Contabo VPS location) is EU member state with GDPR protection; ISO 27001 + SOC 2 Type II certification; DPA in place |
+| Binding corporate rules in place | N/A | Using s72(1)(a) adequate safeguards basis; BCRs not required |
+| Data subject consent obtained | N/A | Legitimate interest basis (s11(1)(d)) sufficient for facilities management; no consent required for cross-border transfer under s72(1)(a) |
+| Transfer necessary for contract performance | Yes | VPS infrastructure necessary for SENTINEL platform operation; legitimate interest in facilities management |
+| Transfer for benefit of data subject | Yes | Improved room availability and facilities management benefits employees |
 
-**POPIA Section 72 Assessment:** No cross-border transfer of personal information occurs. Block booking emails are processed entirely within SENTINEL VPS (South Africa) and stored in Supabase af-south-1 (Cape Town, South Africa). No POPIA s72 assessment is required.
+**POPIA Section 72 Assessment:** Block booking emails originating in South Africa (FNB REMS) are processed on Contabo VPS located in Germany. This constitutes a cross-border transfer of personal information. Legal basis: POPIA s72(1)(a) adequate safeguards (Germany: EU GDPR, ISO 27001, SOC 2 Type II, DPA). Safeguards: TLS 1.3 encryption in transit, disk encryption at rest, 90-day retention with automated purge, access controls, audit logging. Risk: LOW (limited data transferred, short retention, strong technical controls).
 
 ---
 

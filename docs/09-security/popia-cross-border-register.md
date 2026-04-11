@@ -66,7 +66,7 @@ SENTINEL relies primarily on:
 | **Contabo (VPS Hosting)** | Germany | All system data | Building data, equipment data, anonymised analytics | s72(1)(a) | ISO 27001; SOC 2 Type II; EU adequacy decision | N/A (infrastructure) | **Compliant** |
 | **GitHub** | USA | Source code | No PI (code only) | s72(1)(a) | SOC 2 Type II; ISO 27001; FedRAMP | N/A (no PI) | **Compliant** |
 | **Supabase** | AWS (configurable) | Database content | Names, phone numbers, consent records, audit logs | s72(1)(a) | SOC 2 Type II; ISO 27001; af-south-1 preferred | N/A (SA hosting preferred) | **Compliant** |
-| **Block Booking Email Pipeline** | South Africa | Booking records | Organiser name, email, room name, booking date/time | N/A (no cross-border transfer) | Processed within SENTINEL VPS; Supabase af-south-1 (Cape Town) | [PIA-2026-003](pia-block-booking-email.md) | **Compliant** |
+| **Contabo (Block Booking Processing)** | Germany | Booking records | Organiser name, email, room name, booking date/time | s72(1)(a) adequate safeguards (EU GDPR, ISO 27001, SOC 2 Type II) | ISO 27001; SOC 2 Type II; TLS 1.3; disk encryption; DPA | [PIA-2026-003](pia-block-booking-email.md) | **Compliant** |
 
 ### 3.2 Detailed Transfer Records
 
@@ -169,22 +169,24 @@ SENTINEL relies primarily on:
 
 ---
 
-## 3.2.7 Block Booking Email Pipeline (No Cross-Border Transfer)
+## 3.2.7 Contabo (Block Booking Email Processing)
 
 | Field | Details |
 |-------|---------|
-| **Recipient** | SENTINEL VPS (self-hosted) |
-| **Service** | Block booking email intake (organiser and room booking pattern detection) |
-| **Destination Country** | South Africa (SENTINEL infrastructure) |
-| **PI Transferred** | Organiser name, work email address, room name, booking date/time |
+| **Recipient** | Contabo GmbH (VPS hosting) |
+| **Service** | Virtual Private Server hosting SENTINEL backend (block booking email intake, pattern detection) |
+| **Destination Country** | Germany (Nuremberg data centre) |
+| **PI Transferred** | Organiser name, work email address, room name, booking date/time (stored on VPS disk) |
 | **Data Subjects** | FNB employees who make room bookings |
-| **Legal Basis** | Legitimate interest (facilities management); no cross-border transfer required |
-| **Safeguards** | Processed entirely within South Africa; Supabase af-south-1 (Cape Town); no cross-border transfer |
+| **Volume** | ~500-1000 bookings/month; 90-day retention |
+| **Legal Basis** | s72(1)(a): Adequate safeguards (Germany: EU GDPR, ISO 27001, SOC 2 Type II) |
+| **Safeguards** | ISO 27001 certified; SOC 2 Type II; encrypted disks (AES-256); TLS 1.3 in transit; DPA in place; 90-day retention with automated purge |
+| **Consent Mechanism** | Not required (s72(1)(a) adequate safeguards basis) |
 | **PIA Reference** | `docs/09-security/pia-block-booking-email.md` (PIA-2026-003) |
 | **Residual Risk** | LOW |
-| **Next Review** | 2027-04-11 |
+| **Next Review** | 2027-02-05 |
 
-**Assessment:** Block booking confirmation emails are processed entirely within SENTINEL VPS (South Africa) and stored in Supabase af-south-1 (Cape Town, South Africa). No personal information is transferred outside the Republic of South Africa. POPIA Section 72 (cross-border transfer) does not apply to this processing activity.
+**Assessment:** Block booking confirmation emails originate in South Africa (FNB REMS) and are processed on Contabo VPS in Germany. This constitutes a cross-border transfer of personal information to Germany, an EU member state with GDPR protection. Legal basis: s72(1)(a) adequate safeguards. Safeguards: ISO 27001, SOC 2 Type II, encryption in transit and at rest, DPA, limited retention period (90 days), automated purge. Risk assessed as LOW due to strong technical controls and EU adequacy protections.
 
 ---
 
