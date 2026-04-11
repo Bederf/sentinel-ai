@@ -108,7 +108,7 @@ class Settings(BaseSettings):
     xiaomi_model: str = "mimo-v2-flash"
     xiaomi_base_url: str = "https://api.mimo.xiaomi.com/v1"
     minimax_api_key: str = ""
-    minimax_model: str = "MiniMax-M2.5"
+    minimax_model: str = "MiniMax-M2.7"
     minimax_base_url: str = "https://api.minimax.io/anthropic"
     openai_api_key: str = ""
     openai_model: str = "gpt-4.1-nano"  # Tier 1: fast/cheap for routine queries
@@ -137,14 +137,6 @@ class Settings(BaseSettings):
     demo_mode: bool = False
     demo_allowed_origins: list[str] = []
     ingestion_mode: str = "simulation"  # env: INGESTION_MODE
-
-    # Site-002 data source — enables the simulation engine as a BMS data source
-    # When False: SENTINEL starts clean with zero telemetry (SBC deployment ready)
-    # When True: Loads reference devices and auto-starts lifecycle simulation
-    site002_source_enabled: bool = Field(
-        default=False,
-        validation_alias=AliasChoices("ENABLE_SITE002_SOURCE", "SITE002_SOURCE_ENABLED"),
-    )
 
     # Encryption at rest (Phase 1b FSR Compliance - Cryptography)
     encryption_enabled: bool = True
@@ -401,9 +393,20 @@ class Settings(BaseSettings):
     # LD2410C Radar Distance Filtering
     # Firmware: v2.44.25070917 | Resolution: 0.75 m | Effective range: 3.0 m
     # Mounting: ceiling, downward | Unmanned duration: 15 s
+    # Per-room override: FR-L1 (Fairlands staging, 2m×2m) → max 1.0 m
     radar_distance_filter_enabled: bool = True  # Reject readings outside valid range
     radar_distance_min_m: float = 0.2  # Ignore very close readings (noise)
     radar_distance_max_m: float = 3.0  # Max effective range (gate 4 @ 0.75 m resolution)
+    # Per-room max distances (room_code → max_m), applied on top of global max
+    # Any detection beyond a room's physical dimensions = adjacent-space bleed
+    radar_room_max_distance_m: dict[str, float] = {
+        # FR-L1 (2m×2m): 1.3m stationary readings in an "empty" room were confirmed
+        # adjacent-room bleed (LD2410C detects through thin walls). Cap at 1.0m
+        # so only genuine in-room presence (<1m from ceiling sensor) registers.
+        "FR-L1": 1.0,
+        "FR-L0": 1.0,
+        "FR-L2": 1.0,
+    }
 
     # Focus Room Sessions (Phase 2)
     focus_min_session_seconds: int = 180  # Discard sessions shorter than 3 min (noise)
@@ -411,6 +414,7 @@ class Settings(BaseSettings):
     focus_red_light_cooldown_seconds: int = 300  # Keep red light on for 5 minutes after overstay ends
     focus_relay_enabled: bool = True  # Publish relay/light control for focus room overstay
     focus_relay_topic_template: str = "sentinel/node/{node_id}/relay"
+    focus_vacancy_grace_seconds: int = 60  # Allow radar flicker up to 60s without breaking session
 
     # Cost alert threshold — sends Telegram alert when daily spend exceeds this (ZAR)
     cost_alert_daily_threshold_zar: float = 100.0
@@ -473,16 +477,20 @@ class Settings(BaseSettings):
     twilio_whatsapp_to: str = ""  # e.g. whatsapp:+27721234567
     whatsapp_webhook_url: str = ""  # n8n webhook fallback (used if Twilio not configured)
     whatsapp_group_id: str = ""  # Target WhatsApp group ID (webhook mode only)
+    # Meta Cloud API WhatsApp (Phase 178)
+    whatsapp_provider: str = ""  # "meta" or "twilio"
+    whatsapp_phone_id: str = ""  # Meta Cloud API phone ID
+    whatsapp_api_token: str = ""  # Meta Cloud API access token
+    whatsapp_business_id: str = ""  # Meta Business ID
+    whatsapp_enabled: bool = False
 
     @property
     def resolved_ingestion_mode(self) -> IngestionMode:
-        """Resolve ingestion mode based on data source config and safe fallback."""
-        if self.site002_source_enabled:
-            return IngestionMode.SIMULATION
+        """Resolve ingestion mode from configured value with safe fallback."""
         try:
             return IngestionMode(self.ingestion_mode)
         except ValueError:
-            return IngestionMode.SIMULATION
+            return IngestionMode.SHADOW_LIVE
 
     @property
     def is_live_mode(self) -> bool:

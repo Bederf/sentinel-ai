@@ -19,21 +19,21 @@ ROUTING_PROFILES: dict[str, dict[str, Any]] = {
     "api_prod": {
         "mode": "api",
         "routing": {
-            "heavy": {"provider": "minimax", "model": "MiniMax-M2.5"},
-            "medium": {"provider": "minimax", "model": "MiniMax-M2.5"},
-            "light": {"provider": "minimax", "model": "MiniMax-M2.5"},
-            "chat_ai": {"provider": "minimax", "model": "MiniMax-M2.5"},
-            "chat_tech": {"provider": "minimax", "model": "MiniMax-M2.5"},
+            "heavy": {"provider": "minimax", "model": "MiniMax-M2.7"},
+            "medium": {"provider": "minimax", "model": "MiniMax-M2.7"},
+            "light": {"provider": "minimax", "model": "MiniMax-M2.7"},
+            "chat_ai": {"provider": "minimax", "model": "MiniMax-M2.7"},
+            "chat_tech": {"provider": "minimax", "model": "MiniMax-M2.7"},
         },
     },
     "cloud_dev": {
         "mode": "api",
         "routing": {
-            "heavy": {"provider": "minimax", "model": "MiniMax-M2.5"},
-            "medium": {"provider": "minimax", "model": "MiniMax-M2.5"},
-            "light": {"provider": "minimax", "model": "MiniMax-M2.5"},
-            "chat_ai": {"provider": "minimax", "model": "MiniMax-M2.5"},
-            "chat_tech": {"provider": "minimax", "model": "MiniMax-M2.5"},
+            "heavy": {"provider": "minimax", "model": "MiniMax-M2.7"},
+            "medium": {"provider": "minimax", "model": "MiniMax-M2.7"},
+            "light": {"provider": "minimax", "model": "MiniMax-M2.7"},
+            "chat_ai": {"provider": "minimax", "model": "MiniMax-M2.7"},
+            "chat_tech": {"provider": "minimax", "model": "MiniMax-M2.7"},
         },
     },
     "local_full": {
