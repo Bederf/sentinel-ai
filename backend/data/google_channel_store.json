@@ -1,0 +1,20 @@
+{
+  "test-channel-123": {
+    "channel_id": "test-channel-123",
+    "resource_id": "test-resource-456",
+    "expiration": "2026-04-10T00:00:00Z",
+    "topic_name": "sentinel-calendar-notifications"
+  },
+  "9486ca0b-bcd4-4424-b6a9-9c9e3a16eeff": {
+    "channel_id": "9486ca0b-bcd4-4424-b6a9-9c9e3a16eeff",
+    "resource_id": "",
+    "expiration": "",
+    "topic_name": "sentinel-calendar-notifications"
+  },
+  "e9196b3a-6681-48b0-8013-30cb82eacc05": {
+    "channel_id": "e9196b3a-6681-48b0-8013-30cb82eacc05",
+    "resource_id": "h5On2IXTL8l2S7aTBCyQ0u4FPGc",
+    "expiration": "1775848657000",
+    "topic_name": "sentinel-calendar-notifications"
+  }
+}

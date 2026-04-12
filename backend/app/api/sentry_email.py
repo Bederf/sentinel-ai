@@ -1,1344 +1,390 @@
-"""Sentry Email Intake API — Phase 134.
+"""
+SENTINEL Email Intake API — Advisor Strategy Classification
 
-Receives FM emails from n8n, enriches with BMS context, detects
-duplicates/follow-ups, and uses an AI agent (Phase 134) for classification
-+ natural reply generation.  Falls back to keyword pipeline if agent fails.
+The n8n workflow handles layers 1-3 only (headers, signature, filtering).
+Classification moves to Python backend using Haiku executor + Opus advisor.
 
-Auth chain:
-  1. Middleware: ``X-Sentry-API-Key`` (required, matches ``sentry_bot_api_key``)
-  2. Endpoint: ``X-Sentry-Secret`` (required in live mode, matches ``sentry_webhook_secret``)
-  3. Feature flag: ``email_intake_enabled`` must be True
+This replaces the GPT-4.1 OpenAI node in n8n with a smarter, cheaper alternative.
 """
 
-from __future__ import annotations
-
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Header
+from pydantic import BaseModel
+from typing import Optional, List, Dict, Any
+from datetime import datetime
+from uuid import uuid4
 import hmac
 import logging
 import os
-import re
-import uuid
-from datetime import datetime
-from typing import Any, Optional
-
-from fastapi import APIRouter, BackgroundTasks, Header, HTTPException, Request
 
 from app.config.settings import settings
-from app.database.repositories.email_intake_repository import get_email_intake_repository
-from app.security.webhook_auth import (
-    check_attachment_type_allowed,
-    check_email_domain_allowed,
-    check_email_sender_rate_limit,
-    is_known_sender,
-)
-from app.models.email_intake import (
-    EmailIntakeHealthResponse,
-    EmailIntakeRequest,
-    EmailIntakeResponse,
-)
-from app.security.prompt_guard import score_prompt
-from app.services.email_reply_service import get_email_reply_service
-from app.services.issue_classifier import (
-    classify_email_subject,
-    DISCIPLINE_TO_CATEGORY,
-    extract_desk_from_message,
-    extract_floor_from_message,
-)
+from app.services.sentry_email import get_email_classifier
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/api/sentry/email", tags=["sentry-email"])
 
-# ---------------------------------------------------------------------------
-# Confidence thresholds for routing
-# ---------------------------------------------------------------------------
-AUTO_SUBMIT_THRESHOLD = 0.85
-REQUEST_INFO_THRESHOLD = 0.60
-
-# Urgency string → numeric (for priority comparisons)
-URGENCY_RANK = {"low": 1, "normal": 2, "high": 3, "critical": 4}
+router = APIRouter(prefix="/api/sentry-email", tags=["sentry-email"])
 
 
-# ---------------------------------------------------------------------------
-# Internal helpers
-# ---------------------------------------------------------------------------
+# ── Auth (mirrors sentry_webhooks.py pattern) ────────────────────
 
 
-def _subjects_similar(subject_a: str, subject_b: str, threshold: float = 0.3) -> bool:
-    """Check if two email subjects share enough keywords to be the same issue.
+def _require_sentry_email_secret(
+    provided_secret: Optional[str],
+    endpoint_name: str = "email_intake",
+) -> None:
+    """Validate webhook secret with fail-closed behaviour in live mode."""
+    configured_secret = (
+        os.getenv("SENTRY_EMAIL_WEBHOOK_SECRET", "") or os.getenv("SENTRY_WEBHOOK_SECRET", "") or ""
+    ).strip()
 
-    Used to prevent heuristic dedup from linking unrelated emails that happen
-    to come from the same sender within the duplicate window.
+    if not configured_secret:
+        if getattr(settings, "is_live_mode", False):
+            logger.error("Missing SENTRY_EMAIL_WEBHOOK_SECRET in live mode for %s", endpoint_name)
+            raise HTTPException(status_code=503, detail="Email intake misconfigured")
+        return  # Allow in simulation mode
+
+    if not provided_secret or not hmac.compare_digest(provided_secret, configured_secret):
+        raise HTTPException(status_code=403, detail="Unauthorized")
+
+
+# ── Request Model (from n8n layers 1-3 only) ─────────────────────
+
+
+class EmailIntakeRequest(BaseModel):
+    """
+    Payload from n8n after header extraction + signature parsing.
+    NO AI classification — that happens here in the backend.
     """
 
-    def _keywords(s: str) -> set[str]:
-        stop = {
-            "the",
-            "a",
-            "an",
-            "is",
-            "at",
-            "in",
-            "on",
-            "for",
-            "to",
-            "and",
-            "or",
-            "my",
-            "our",
-            "please",
-            "hi",
-            "hello",
-            "dear",
-            "regards",
-            "thanks",
-            "thank",
-            "you",
-            "good",
-            "day",
-            "morning",
-            "afternoon",
-            "fwd",
-            "re",
-        }
-        return {w.lower() for w in re.findall(r"\w{3,}", s)} - stop
+    # Requester (Layer 1: headers)
+    from_email: str
+    from_name: Optional[str] = None
+    to_email: Optional[str] = None
+    subject: str
+    body_text: str
+    body_html: Optional[str] = None
+    message_id: Optional[str] = None
+    received_at: Optional[str] = None
+    importance: str = "normal"
+    has_attachments: bool = False
+    attachment_count: int = 0
+    attachment_names: List[str] = []
+    is_internal: bool = False
 
-    words_a = _keywords(subject_a)
-    words_b = _keywords(subject_b)
-    if not words_a or not words_b:
-        return False
-    overlap = words_a & words_b
-    smaller = min(len(words_a), len(words_b))
-    return (len(overlap) / smaller) >= threshold if smaller > 0 else False
+    # Threading (Layer 1: headers)
+    is_reply: bool = False
+    in_reply_to: Optional[str] = None
+
+    # Signature extractions (Layer 3: regex)
+    sig_cost_center: Optional[str] = None
+    sig_building: Optional[str] = None
+    sig_floor: Optional[str] = None
+    sig_phone: Optional[str] = None
+    sig_f_number: Optional[str] = None
+    sig_department: Optional[str] = None
+    sig_specific_location: Optional[str] = None
+
+    # Derived by n8n
+    existing_reference: Optional[str] = None
+    site_id: Optional[str] = None
+    urgency_boost: bool = False
+    has_manager_cc: bool = False
+    cc_count: int = 0
 
 
-def _verify_webhook_secret(provided: Optional[str]) -> None:
-    """Validate ``X-Sentry-Secret`` against ``sentry_webhook_secret``."""
-    configured = (settings.sentry_webhook_secret or "").strip()
-
-    # Backward-compat: check env var in simulation mode
-    if not configured and not settings.is_live_mode:
-        configured = (os.getenv("SENTRY_WEBHOOK_SECRET", "") or "").strip()
-
-    if not configured:
-        if settings.is_live_mode:
-            raise HTTPException(status_code=503, detail="Email intake misconfigured: missing webhook secret")
-        # In local non-live mode, allow unauthenticated intake
-        return
-
-    if not provided or not hmac.compare_digest(provided, configured):
-        raise HTTPException(status_code=401, detail="Invalid webhook secret")
+class EmailIntakeResponse(BaseModel):
+    success: bool
+    intake_id: str
+    action_taken: str
+    concept_ref: Optional[str] = None
+    classification: Optional[Dict[str, Any]] = None
+    advisor_consulted: bool = False
+    message: str
 
 
-def _article(word: str) -> str:
-    """Return 'an' for vowel-starting words, 'a' otherwise."""
-    return "an" if word and word[0].lower() in "aeiou" else "a"
+# ── Main Endpoint ────────────────────────────────────────────────
 
 
-def _build_reply_template(action: str, intake: dict[str, Any]) -> str:
-    """Build a plain-text auto-reply body for n8n to send."""
-    ref = intake.get("concept_ref") or intake.get("id", "")[:8]
-    category = intake.get("issue_category", "general")
-    summary = intake.get("issue_summary", "your request")
-    from_name = intake.get("from_name", "")
+@router.post("/intake", response_model=EmailIntakeResponse)
+async def process_email_intake(
+    intake: EmailIntakeRequest,
+    background_tasks: BackgroundTasks,
+    x_sentry_api_key: Optional[str] = Header(None),
+):
+    """
+    Main intake endpoint called by n8n workflow.
 
-    # Greeting
-    greeting = f"Dear {from_name}," if from_name else "Dear Tenant,"
+    Flow:
+    1. Validate auth
+    2. Check for duplicate/follow-up (existing_reference)
+    3. Classify via Haiku + Opus advisor
+    4. Enrich with BMS data
+    5. Score completeness
+    6. Route: auto_submit / request_info / manual_review
+    7. Store audit record
+    8. Queue reply email
+    """
+    _require_sentry_email_secret(x_sentry_api_key)
 
-    if action == "linked_existing":
-        body = (
-            f"{greeting}\n\n"
-            f"Thank you for your follow-up regarding {summary}.\n\n"
-            f"This has been linked to existing reference {intake.get('existing_reference', ref)}. "
-            "Our team is already working on it and will provide an update shortly.\n\n"
-            "NEXT STEPS:\n"
-            "- A technician has been assigned and will attend to the issue\n"
-            "- You will receive a status update once work is completed\n"
-            "- Reply to this email if the situation has changed\n"
-        )
-    elif action == "duplicate":
-        body = (
-            f"{greeting}\n\n"
-            f"Thank you for your message regarding {summary}.\n\n"
-            "We already have a record of this issue and our team is working on it. "
-            "You will receive an update once there is progress.\n"
-        )
-    elif action == "request_info":
-        body = (
-            f"{greeting}\n\n"
-            f"Thank you for reporting {_article(category)} {category} issue.\n\n"
-            f"Reference: {ref}\n\n"
-            "To help us route this efficiently, could you please reply with:\n"
-            "- The specific location (floor/wing/room number)\n"
-            "- When the issue started\n"
-            "- Any additional details\n\n"
-            "Our team will begin investigating in the meantime.\n"
-        )
-    else:
-        # new_intake / auto_submit / manual_review
-        body = (
-            f"{greeting}\n\n"
-            f"Thank you for your {category} request.\n\n"
-            f"Reference: {ref}\n\n"
-            f"Issue: {summary}\n\n"
-            "This has been logged and assigned for action.\n\n"
-            "NEXT STEPS:\n"
-            "- Your request has been assigned to the facilities team\n"
-            "- A technician will be dispatched based on priority\n"
-            "- You will receive updates as the work progresses\n"
-        )
+    intake_id = str(uuid4())
 
-    # Contact info
-    body += (
-        "\nFor urgent issues, please contact the facilities help desk directly.\n\n"
-        "Kind regards,\n"
-        "SENTINEL Building Management\n"
+    logger.info(
+        f"Email intake: from={intake.from_email}, "
+        f"subject={intake.subject[:50]}, "
+        f"site={intake.site_id}, "
+        f"existing_ref={intake.existing_reference}"
     )
 
-    # Quoted original email
-    original_body = intake.get("body_plain", "")
-    original_from = intake.get("from_name") or intake.get("from_email", "")
-    original_date = intake.get("received_at", "")
-    original_subject = intake.get("subject", "")
-    if original_body or original_subject:
-        body += "\n--- Original Message ---\n"
-        if original_date or original_from:
-            body += f"On {original_date}, {original_from} wrote:\n"
-        if original_subject:
-            body += f"Subject: {original_subject}\n\n"
-        if original_body:
-            # Prefix each line with > for quoting
-            for line in original_body.splitlines()[:30]:
-                body += f"> {line}\n"
+    # ── 1. Duplicate/Follow-up Check ──
+    if intake.existing_reference:
+        # Link to existing work order — don't classify or create new
+        action_taken = "linked_existing"
+        concept_ref = intake.existing_reference
 
-    return body
+        background_tasks.add_task(_store_intake, intake_id, intake, None, {}, action_taken, concept_ref)
 
+        return EmailIntakeResponse(
+            success=True,
+            intake_id=intake_id,
+            action_taken=action_taken,
+            concept_ref=concept_ref,
+            advisor_consulted=False,
+            message=f"Linked to existing work order {concept_ref}",
+        )
 
-def _build_reply_html(action: str, intake: dict[str, Any], agent_body: str | None = None) -> str:
-    """Build a branded HTML auto-reply for n8n to send.
+    # ── 2. Classify via Advisor Strategy ──
+    classifier = get_email_classifier()
+    classification = await classifier.classify_email(
+        from_email=intake.from_email,
+        from_name=intake.from_name or "",
+        subject=intake.subject,
+        body_text=intake.body_text,
+        sig_building=intake.sig_building,
+        sig_floor=intake.sig_floor,
+        sig_cost_center=intake.sig_cost_center,
+        sig_specific_location=intake.sig_specific_location,
+        existing_reference=intake.existing_reference,
+        is_reply=intake.is_reply,
+        importance=intake.importance,
+        urgency_boost=intake.urgency_boost,
+        has_manager_cc=intake.has_manager_cc,
+    )
 
-    Args:
-        action: The action taken (auto_submit, request_info, etc.)
-        intake: The intake record dict
-        agent_body: If provided, use this AI-generated text as the body
-                    instead of the action-specific template text.
-    """
-    ref = intake.get("concept_ref") or intake.get("id", "")[:8]
-    category = intake.get("issue_category", "general")
-    summary = intake.get("issue_summary", "your request")
-    from_name = intake.get("from_name", "")
-    bms_ctx = intake.get("bms_context") or {}
+    # ── 3. BMS Enrichment ──
+    bms_context = await _enrich_with_bms(
+        site_id=intake.site_id,
+        floor=intake.sig_floor or classification.specific_location,
+        equipment_mentioned=classification.equipment_mentioned,
+    )
 
-    # Category badge colour
-    cat_colours = {
-        "hvac": "#2563eb",
-        "electrical": "#d97706",
-        "plumbing": "#0891b2",
-        "fire": "#dc2626",
-        "lighting": "#7c3aed",
-        "access": "#059669",
-        "elevator": "#6366f1",
-        "pest": "#84cc16",
-        "structural": "#78716c",
-        "general": "#6b7280",
+    # Escalate urgency if BMS shows active alerts
+    if bms_context.get("active_alerts"):
+        if classification.urgency == "low":
+            classification.urgency = "medium"
+        elif classification.urgency == "medium":
+            classification.urgency = "high"
+        logger.info(f"Urgency escalated due to BMS alerts at {intake.site_id}")
+
+    # ── 4. Completeness Scoring ──
+    field_weights = {
+        "from_name": 0.10,
+        "from_email": 0.10,
+        "cost_center": 0.15,
+        "site_id": 0.15,
+        "floor": 0.10,
+        "issue_description": 0.20,
+        "issue_category": 0.10,
+        "urgency": 0.10,
     }
-    badge_colour = cat_colours.get(category, "#6b7280")
 
-    # Body section: use agent-generated text if available, else action templates
-    if agent_body:
-        # Convert agent plain text to HTML paragraphs
-        body_section = ""
-        for para in agent_body.split("\n\n"):
-            para = para.strip()
-            if not para:
-                continue
-            body_section += f"<p>{_esc(para).replace(chr(10), '<br>')}</p>"
-    elif action == "linked_existing":
-        existing_ref = intake.get("existing_reference", ref)
-        body_section = (
-            f"<p>Thank you for your follow-up regarding <strong>{_esc(summary)}</strong>.</p>"
-            f"<p>This has been linked to existing reference <strong>{_esc(existing_ref)}</strong>. "
-            "Our team is already working on it and will provide an update shortly.</p>"
-        )
-    elif action == "duplicate":
-        body_section = (
-            f"<p>Thank you for your message regarding <strong>{_esc(summary)}</strong>.</p>"
-            "<p>We already have a record of this issue and our team is working on it. "
-            "You will receive an update once there is progress.</p>"
-        )
-    elif action == "request_info":
-        body_section = (
-            f"<p>Thank you for reporting {_article(category)} <strong>{_esc(category)}</strong> issue.</p>"
-            "<p>To help us route this efficiently, could you please reply with:</p>"
-            "<ul>"
-            "<li>The specific location (floor / wing / room number)</li>"
-            "<li>When the issue started</li>"
-            "<li>Any additional details or photos</li>"
-            "</ul>"
-            "<p>Our team will begin investigating in the meantime.</p>"
-        )
+    field_values = {
+        "from_name": intake.from_name,
+        "from_email": intake.from_email,
+        "cost_center": intake.sig_cost_center,
+        "site_id": intake.site_id,
+        "floor": intake.sig_floor or classification.specific_location,
+        "issue_description": classification.issue_description,
+        "issue_category": classification.issue_category,
+        "urgency": classification.urgency,
+    }
+
+    confidence = sum(weight for field, weight in field_weights.items() if field_values.get(field))
+    confidence = round(confidence, 2)
+
+    missing_fields = [f for f, v in field_values.items() if not v]
+
+    # ── 5. Route ──
+    concept_ref = None
+
+    if confidence >= 0.85:
+        concept_ref = await _create_concept_work_order(intake, classification, bms_context)
+        action_taken = "created_wo"
+        message = f"Work order created: {concept_ref}" if concept_ref else "Created in local pipeline"
+
+    elif confidence >= 0.60:
+        action_taken = "requested_info"
+        message = f"Missing: {', '.join(missing_fields)}"
+
     else:
-        # new_intake / auto_submit / manual_review
-        body_section = (
-            f"<p>Your <strong>{_esc(category)}</strong> request has been logged and assigned for action.</p>"
-            f"<p><strong>Issue:</strong> {_esc(summary)}</p>"
-            "<p>You will receive updates as the work progresses.</p>"
-        )
+        action_taken = "flagged_review"
+        message = "Flagged for manual helpdesk review"
 
-    # BMS context section (active alerts)
-    bms_section = ""
-    active_alerts = bms_ctx.get("active_alerts", [])
-    if active_alerts:
-        alert_rows = ""
-        for a in active_alerts[:3]:
-            sev = a.get("severity", "info")
-            sev_colour = "#dc2626" if sev == "critical" else "#d97706" if sev == "warning" else "#6b7280"
-            alert_rows += (
-                f'<tr><td style="padding:4px 8px;color:{sev_colour};font-weight:600;">'
-                f"{_esc(sev.upper())}</td>"
-                f'<td style="padding:4px 8px;">{_esc(a.get("message", ""))}</td></tr>'
-            )
-        bms_section = (
-            '<div style="margin-top:20px;padding:12px 16px;background:#fef3c7;'
-            'border-left:4px solid #d97706;border-radius:4px;">'
-            '<p style="margin:0 0 8px;font-weight:600;color:#92400e;">'
-            "Active Building Alerts</p>"
-            f'<table style="width:100%;font-size:13px;">{alert_rows}</table>'
-            "</div>"
-        )
+    # ── 6. Store Audit Record ──
+    classification_dict = classification.model_dump()
+    classification_dict["confidence"] = confidence
+    classification_dict["missing_fields"] = missing_fields
 
-    # Greeting
-    greeting = f"Dear {_esc(from_name)}," if from_name else "Dear Tenant,"
-
-    # Next steps section (for new intakes and linked_existing)
-    next_steps = ""
-    if action in ("auto_submit", "new_intake", "manual_review", "linked_existing"):
-        next_steps = (
-            '<div style="margin-top:16px;padding:12px 16px;background:#f0fdf4;'
-            'border-left:4px solid #16a34a;border-radius:4px;">'
-            '<p style="margin:0 0 8px;font-weight:600;color:#166534;">Next Steps</p>'
-            '<ul style="margin:0;padding-left:20px;color:#374151;font-size:13px;">'
-            "<li>Your request has been assigned to the facilities team</li>"
-            "<li>A technician will be dispatched based on priority</li>"
-            "<li>You will receive updates as the work progresses</li>"
-            "</ul></div>"
-        )
-
-    # Contact escalation
-    contact_section = (
-        '<p style="margin-top:16px;font-size:13px;color:#6b7280;">'
-        "For urgent issues, please contact the facilities help desk directly.</p>"
+    background_tasks.add_task(
+        _store_intake,
+        intake_id,
+        intake,
+        classification_dict,
+        bms_context,
+        action_taken,
+        concept_ref,
     )
 
-    # Quoted original email
-    original_quote = ""
-    original_body = intake.get("body_plain", "")
-    original_from = intake.get("from_name") or intake.get("from_email", "")
-    original_date = intake.get("received_at", "")
-    original_subject = intake.get("subject", "")
-    if original_body or original_subject:
-        quote_header = ""
-        if original_date or original_from:
-            quote_header = (
-                f'<p style="margin:0 0 8px;font-size:12px;color:#6b7280;">'
-                f"On {_esc(original_date)}, {_esc(original_from)} wrote:</p>"
-            )
-        # Truncate to first 30 lines
-        truncated = "\n".join(original_body.splitlines()[:30]) if original_body else ""
-        original_quote = (
-            '<div style="margin-top:24px;padding-top:16px;border-top:1px solid #e5e7eb;">'
-            f"{quote_header}"
-            '<div style="margin:0;padding:8px 12px;border-left:3px solid #d1d5db;'
-            'color:#6b7280;font-size:12px;line-height:1.5;white-space:pre-wrap;">'
-            f"{_esc(truncated)}</div></div>"
-        )
-
-    return (
-        "<!DOCTYPE html>"
-        '<html><head><meta charset="utf-8">'
-        '<meta name="viewport" content="width=device-width,initial-scale=1.0">'
-        '</head><body style="margin:0;padding:0;font-family:Arial,Helvetica,sans-serif;'
-        'background:#f3f4f6;">'
-        '<table width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;">'
-        '<tr><td align="center" style="padding:24px 16px;">'
-        '<table width="600" cellpadding="0" cellspacing="0" '
-        'style="background:#ffffff;border-radius:8px;overflow:hidden;'
-        'box-shadow:0 1px 3px rgba(0,0,0,0.1);">'
-        # Header bar
-        '<tr><td style="background:#1e3a5f;padding:20px 24px;">'
-        '<table width="100%" cellpadding="0" cellspacing="0"><tr>'
-        '<td style="color:#ffffff;font-size:20px;font-weight:700;letter-spacing:1px;">'
-        "SENTINEL</td>"
-        '<td align="right" style="color:#94a3b8;font-size:12px;">'
-        "Building Intelligence</td>"
-        "</tr></table></td></tr>"
-        # Reference banner
-        '<tr><td style="background:#f0f9ff;padding:14px 24px;'
-        'border-bottom:1px solid #e0f2fe;">'
-        '<table width="100%" cellpadding="0" cellspacing="0"><tr>'
-        f'<td style="font-size:14px;color:#1e3a5f;font-weight:600;">'
-        f"Reference: {_esc(ref)}</td>"
-        f'<td align="right"><span style="display:inline-block;padding:3px 10px;'
-        f"background:{badge_colour};color:#ffffff;border-radius:12px;"
-        f'font-size:11px;font-weight:600;text-transform:uppercase;">'
-        f"{_esc(category)}</span></td>"
-        "</tr></table></td></tr>"
-        # Body
-        '<tr><td style="padding:24px;color:#374151;font-size:14px;line-height:1.6;">'
-        f'<p style="margin-top:0;">{greeting}</p>'
-        f"{body_section}"
-        f"{bms_section}"
-        f"{next_steps}"
-        f"{contact_section}"
-        f"{original_quote}"
-        "</td></tr>"
-        # Footer with SENTINEL branding
-        '<tr><td style="background:#f9fafb;padding:16px 24px;'
-        "border-top:1px solid #e5e7eb;font-size:12px;color:#6b7280;"
-        'line-height:1.5;">'
-        '<p style="margin:0 0 4px;font-weight:600;color:#1e3a5f;">SENTINEL Building Management</p>'
-        '<p style="margin:0;">This is an automated message from the SENTINEL '
-        "building management system. Please reply to this email if you have "
-        "additional information to share.</p>"
-        "</td></tr>"
-        "</table></td></tr></table></body></html>"
-    )
-
-
-def _esc(text: str) -> str:
-    """Minimal HTML escaping for user-provided content."""
-    return str(text).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
-
-
-async def _enrich_with_bms(site_id: Optional[str], issue_category: Optional[str]) -> dict[str, Any]:
-    """Gather BMS context for the intake.
-
-    Enrichment layers:
-      1. Building name (from building code)
-      2. Active alerts for the building
-      3. Recent open work orders
-      4. Equipment health summary (at-risk count)
-      5. Agent memory notes
-    """
-    context: dict[str, Any] = {}
-    if not site_id:
-        return context
-
-    site_uuid: Optional[str] = None
-
-    # 1. Building lookup (also resolves UUID for subsequent queries)
-    try:
-        from app.database.repositories import SiteRepository
-
-        building_repo = SiteRepository()
-        building = building_repo.get_by_id(site_id)
-        if building:
-            context["site_name"] = building.get("name", site_id)
-            site_uuid = building.get("id")
-    except Exception as exc:
-        logger.debug("BMS enrichment: building lookup failed: %s", exc)
-
-    # 2. Active alerts for the building
-    if site_uuid:
-        try:
-            from app.database.repositories.alert_repository import AlertRepository
-
-            alert_repo = AlertRepository()
-            alerts = alert_repo.get_active_by_site(site_uuid)
-            if alerts:
-                context["active_alerts"] = [
-                    {
-                        "equipment_id": a.get("equipment_id"),
-                        "severity": a.get("severity"),
-                        "message": a.get("title") or a.get("message"),
-                    }
-                    for a in alerts[:5]
-                ]
-        except Exception as exc:
-            logger.debug("BMS enrichment: alerts lookup failed: %s", exc)
-
-    # 3. Recent open work orders
-    if site_uuid:
-        try:
-            from app.database.repositories.work_order_repository import (
-                WorkOrderRepository,
-            )
-
-            wo_repo = WorkOrderRepository()
-            open_wos = await wo_repo.get_all_work_orders(limit=5, status="scheduled")
-            # Filter to this building (get_all doesn't filter by building)
-            site_wos = [w for w in (open_wos or []) if w.get("site_id") == site_uuid][:3]
-            if site_wos:
-                context["recent_work_orders"] = [
-                    {
-                        "code": w.get("code"),
-                        "title": w.get("title"),
-                        "priority": w.get("priority"),
-                        "status": w.get("status"),
-                    }
-                    for w in site_wos
-                ]
-        except Exception as exc:
-            logger.debug("BMS enrichment: work orders lookup failed: %s", exc)
-
-    # 4. Equipment health summary
-    if site_uuid:
-        try:
-            from app.database.repositories import SiteRepository as BR
-
-            br = BR()
-            at_risk_count = br.get_at_risk_equipment_count(site_uuid)
-            if at_risk_count > 0:
-                context["equipment_health"] = {
-                    "at_risk_count": at_risk_count,
-                }
-        except Exception as exc:
-            logger.debug("BMS enrichment: equipment health lookup failed: %s", exc)
-
-    # 5. Agent memory notes for site
-    try:
-        from app.database.repositories.agent_memory_repository import (
-            get_agent_memory_repository,
-        )
-
-        mem_repo = get_agent_memory_repository()
-        memories = mem_repo.get_by_site(site_id, limit=3)
-        if memories:
-            context["agent_notes"] = [{"key": m.get("key"), "value": m.get("value")} for m in memories]
-    except Exception as exc:
-        logger.debug("BMS enrichment: agent memory lookup failed: %s", exc)
-
-    return context
-
-
-def _score_completeness(req: EmailIntakeRequest) -> float:
-    """Score 0.0-1.0 based on how complete the extraction is."""
-    score = req.extraction_confidence
-    # Boost if we have structured location info
-    if req.site_id:
-        score = min(1.0, score + 0.05)
-    if req.zone_hint or req.floor_hint:
-        # Desk number is more specific than a vague zone/floor hint
-        has_desk = req.zone_hint and req.zone_hint.lower().startswith("desk")
-        score = min(1.0, score + (0.10 if has_desk else 0.05))
-    if req.issue_category and req.issue_category != "general":
-        score = min(1.0, score + 0.05)
-    if req.from_name:
-        score = min(1.0, score + 0.03)
-    return round(score, 3)
-
-
-def _determine_route(completeness: float) -> str:
-    """Route: auto_submit | request_info | manual_review."""
-    if completeness >= AUTO_SUBMIT_THRESHOLD:
-        return "auto_submit"
-    if completeness >= REQUEST_INFO_THRESHOLD:
-        return "request_info"
-    return "manual_review"
-
-
-def _apply_urgency_escalation(
-    req: EmailIntakeRequest,
-    bms_context: dict[str, Any],
-) -> str:
-    """Escalate urgency if BMS shows active alerts or n8n flagged boost."""
-    urgency = req.urgency or "normal"
-
-    # n8n urgency boost (e.g. URGENT in subject, manager CC)
-    if req.urgency_boost and URGENCY_RANK.get(urgency, 2) < 3:
-        urgency = "high"
-
-    if req.has_manager_cc and URGENCY_RANK.get(urgency, 2) < 3:
-        urgency = "high"
-
-    # BMS alert escalation
-    active_alerts = bms_context.get("active_alerts", [])
-    if active_alerts:
-        critical_alerts = [a for a in active_alerts if a.get("severity") in ("critical", "emergency")]
-        if critical_alerts and URGENCY_RANK.get(urgency, 2) < 4:
-            urgency = "critical"
-        elif active_alerts and URGENCY_RANK.get(urgency, 2) < 3:
-            urgency = "high"
-
-    return urgency
-
-
-# ---------------------------------------------------------------------------
-# Work order creation from email intake
-# ---------------------------------------------------------------------------
-
-# Category → WO specialty mapping
-_CATEGORY_SPECIALTY: dict[str, str] = {
-    "hvac": "hvac",
-    "electrical": "electrical",
-    "plumbing": "plumbing",
-    "fire": "fire",
-    "lighting": "dali",
-    "access": "general",
-    "elevator": "general",
-    "pest": "general",
-    "structural": "general",
-    "general": "general",
-}
-
-# Urgency → WO priority mapping (DB allows: low, medium, high, urgent)
-_URGENCY_PRIORITY: dict[str, str] = {
-    "low": "low",
-    "normal": "medium",
-    "high": "high",
-    "critical": "urgent",
-}
-
-# WO priority rank for comparisons
-_WO_PRIORITY_RANK: dict[str, int] = {"low": 1, "medium": 2, "high": 3, "urgent": 4}
-
-
-def _priority_rank(priority: str) -> int:
-    """Return numeric rank for a WO priority string."""
-    return _WO_PRIORITY_RANK.get(priority, 0)
-
-
-async def _create_concept_work_order(intake: dict[str, Any]) -> Optional[str]:
-    """Create a real work order from an auto-submitted email intake.
-
-    Returns the WO code (e.g. ``WO-2026-0042``) or ``None`` on failure.
-    """
-    try:
-        from app.database.repositories.work_order_repository import WorkOrderRepository
-
-        wo_repo = WorkOrderRepository()
-
-        specialty = _CATEGORY_SPECIALTY.get(intake.get("issue_category", "general"), "general")
-        priority = _URGENCY_PRIORITY.get(intake.get("urgency", "normal"), "medium")
-
-        # --- Attempt technician auto-assignment (same pattern as call-log) ---
-        tech: Optional[dict[str, Any]] = None
-        site_id = intake.get("site_id")
-        if site_id:
-            try:
-                from app.database.supabase_client import get_supabase_client
-
-                sb = get_supabase_client()
-                if sb:
-                    bld = sb.table("sites").select("id").eq("code", site_id).execute()
-                    if bld.data:
-                        site_id = bld.data[0]["id"]
-                        tech_result = (
-                            sb.table("site_technicians")
-                            .select("specialty, technicians(id, name, email, phone, telegram_id)")
-                            .eq("site_id", site_id)
-                            .eq("specialty", specialty)
-                            .eq("is_primary", True)
-                            .execute()
-                        )
-                        if tech_result.data:
-                            tech = tech_result.data[0].get("technicians", {})
-                        elif specialty != "general":
-                            # Fallback to general-specialty primary tech
-                            tech_result = (
-                                sb.table("site_technicians")
-                                .select("specialty, technicians(id, name, email, phone, telegram_id)")
-                                .eq("site_id", site_id)
-                                .eq("specialty", "general")
-                                .eq("is_primary", True)
-                                .execute()
-                            )
-                            if tech_result.data:
-                                tech = tech_result.data[0].get("technicians", {})
-            except Exception as e:
-                logger.warning("WO technician lookup failed: %s", e)
-
-        # --- Build WO payload ---
-        location_hint = intake.get("zone_hint") or intake.get("floor_hint") or "Not specified"
-
-        # Use taxonomy fields for structured WO title (matches Telegram call-log format)
-        tax_discipline = intake.get("taxonomy_discipline")
-        tax_sub_category = intake.get("taxonomy_sub_category")
-        tax_specialty = intake.get("taxonomy_specialty")
-
-        if tax_discipline and tax_sub_category:
-            wo_title = f"{tax_discipline}: {tax_sub_category}"
-            # Use taxonomy specialty for tech routing if available
-            if tax_specialty:
-                specialty = tax_specialty
-            # Escalate priority if taxonomy says higher
-            tax_priority = _URGENCY_PRIORITY.get(intake.get("taxonomy_priority") or "", "")
-            if tax_priority and _priority_rank(tax_priority) > _priority_rank(priority):
-                priority = tax_priority
-        else:
-            wo_title = intake.get("issue_summary") or intake.get("subject", "Email reported issue")
-
-        wo_data: dict[str, Any] = {
-            "title": wo_title,
-            "description": (
-                f"Reported by: {intake.get('from_name', '')} <{intake.get('from_email', '')}>\n"
-                f"Subject: {intake.get('subject', '')}\n"
-                f"Category: {intake.get('issue_category', 'general')}\n"
-                f"Location hint: {location_hint}\n\n"
-                f"{(intake.get('body_plain') or '')[:2000]}"
-            ),
-            "priority": priority,
-            "status": "scheduled",
-            "created_by": f"email_intake:{intake.get('id', 'unknown')}",
-        }
-        if tech:
-            wo_data["assigned_to"] = tech.get("name")
-            wo_data["assigned_team"] = specialty
-
-        created = await wo_repo.create_work_order(wo_data)
-        if not created:
-            logger.warning("WO creation returned None for intake %s", intake.get("id"))
-            return None
-
-        wo_code = created.get("code", "")
-
-        # Link WO back to email intake record
-        repo = get_email_intake_repository()
-        repo.update_status(
-            intake["id"],
-            "submitted",
-            local_wo_id=created.get("id"),
-            concept_ref=wo_code,
-        )
-
-        logger.info("Created WO %s for email intake %s", wo_code, intake.get("id"))
-        return wo_code
-
-    except Exception as e:
-        logger.error("Failed to create WO for intake %s: %s", intake.get("id"), e)
-        return None
-
-
-# ---------------------------------------------------------------------------
-# Threaded reply helper (Phase 131.2b)
-# ---------------------------------------------------------------------------
-
-
-async def _send_reply_and_respond(
-    *,
-    action_taken: str,
-    intake_id: str,
-    record: dict[str, Any],
-    bms_context: Optional[dict[str, Any]],
-    concept_ref: Optional[str],
-    message: str,
-    urgency: str,
-    req: EmailIntakeRequest,
-) -> EmailIntakeResponse:
-    """Build reply templates, optionally send via backend SMTP, return response.
-
-    If ``email_reply_enabled`` is True and SMTP is configured, the backend
-    sends a threaded reply directly (with correct In-Reply-To / References).
-    The response includes ``reply_sent=True`` so n8n can skip its own SMTP node.
-
-    If disabled or sending fails, ``reply_sent=False`` and n8n falls back to
-    its own emailSend node (without threading).
-    """
-    # Always use the rich HTML template — pass agent text as body when available
-    agent_text = record.get("_agent_reply_text")
-    if agent_text:
-        reply_template = agent_text
-        # Inject BMS context into record for the HTML builder
-        if bms_context and "bms_context" not in record:
-            record["bms_context"] = bms_context
-        if concept_ref and "concept_ref" not in record:
-            record["concept_ref"] = concept_ref
-        reply_html = _build_reply_html(action_taken, record, agent_body=agent_text)
-    else:
-        reply_template = _build_reply_template(action_taken, record)
-        reply_html = _build_reply_html(action_taken, record)
-
-    reply_sent = False
-    reply_message_id: Optional[str] = None
-    reply_error: Optional[str] = None
-
-    # ------------------------------------------------------------------
-    # Threading pre-flight: surface misconfigurations clearly in logs
-    # ------------------------------------------------------------------
-    if not settings.email_reply_enabled:
-        logger.warning(
-            "Threading disabled: email_reply_enabled=False — reply for intake %s will be sent "
-            "by n8n WITHOUT In-Reply-To/References headers. "
-            "Set EMAIL_REPLY_ENABLED=true and configure SMTP to enable threaded replies.",
-            intake_id,
-        )
-    elif not req.message_id:
-        logger.warning(
-            "Threading degraded: intake %s has no message_id — In-Reply-To header cannot be set. "
-            "Ensure n8n extracts and forwards the original email's Message-ID header.",
-            intake_id,
-        )
-
-    svc = get_email_reply_service()
-    if svc.is_configured():
-        # Build subject with Re: prefix + WO code suffix for Outlook threading
-        original_subject = req.subject or ""
-        reply_subject = original_subject if original_subject.lower().startswith("re:") else f"Re: {original_subject}"
-        # Only append local WO-... codes to subject (not FNBFW or other external refs)
-        if concept_ref and concept_ref.startswith("WO-") and concept_ref not in reply_subject:
-            reply_subject = f"{reply_subject} [{concept_ref}]"
-
-        result = await svc.send_reply(
-            to_email=req.from_email,
-            to_name=req.from_name,
-            subject=reply_subject,
-            body_plain=reply_template,
-            body_html=reply_html,
-            in_reply_to=req.message_id,
-            references=req.references,
-        )
-
-        reply_sent = result.sent
-        reply_message_id = result.message_id
-        reply_error = result.error
-
-        # Persist threading fields on the intake record
-        repo = get_email_intake_repository()
-        update_fields: dict[str, Any] = {
-            "reply_sent": reply_sent,
-        }
-        if reply_message_id:
-            update_fields["outbound_message_id"] = reply_message_id
-        if result.references:
-            update_fields["outbound_references"] = result.references
-        if reply_sent:
-            update_fields["outbound_sent_at"] = datetime.utcnow().isoformat()
-        if req.references:
-            update_fields["references_header"] = req.references
-
-        repo.update_status(intake_id, record.get("pipeline_status", "routed"), **update_fields)
-
-        if reply_error:
-            logger.warning("Backend reply failed for %s: %s (n8n fallback)", intake_id, reply_error)
+    # ── 7. Queue Reply Email ──
+    if action_taken in ("created_wo", "requested_info"):
+        reply = _build_reply(intake, classification, concept_ref, bms_context, action_taken, missing_fields)
+        background_tasks.add_task(_queue_reply, reply)
 
     return EmailIntakeResponse(
         success=True,
         intake_id=intake_id,
         action_taken=action_taken,
         concept_ref=concept_ref,
-        bms_context=bms_context,
+        classification=classification_dict,
+        advisor_consulted=classification.advisor_consulted,
         message=message,
-        reply_template=reply_template,
-        reply_html=reply_html,
-        urgency=urgency,
-        reply_sent=reply_sent,
-        reply_message_id=reply_message_id,
-        reply_error=reply_error,
-        agent_model=record.get("extraction_model"),
     )
 
 
-# ---------------------------------------------------------------------------
-# Endpoints
-# ---------------------------------------------------------------------------
+# ── BMS Enrichment ───────────────────────────────────────────────
 
 
-@router.get("/health", response_model=EmailIntakeHealthResponse)
-async def email_intake_health():
-    """Health check for the email intake pipeline."""
-    return EmailIntakeHealthResponse(
-        status="ok",
-        enabled=settings.email_intake_enabled,
-    )
-
-
-@router.post("/intake", response_model=EmailIntakeResponse, tags=["llm_touching"])
-async def email_intake(
-    req: EmailIntakeRequest,
-    background_tasks: BackgroundTasks,
-    request: Request,
-    x_sentry_secret: Optional[str] = Header(None, alias="X-Sentry-Secret"),
-):
-    """Process an inbound FM email from n8n.
-
-    Processing order:
-    1. Feature flag + webhook secret check
-    2. Duplicate / follow-up detection
-    3. BMS enrichment
-    4. Urgency escalation
-    5. Completeness scoring + route decision
-    6. Persist + return response
-    """
-    # 1. Feature flag
-    if not settings.email_intake_enabled:
-        raise HTTPException(status_code=503, detail="Email intake pipeline is disabled")
-
-    # 2. Webhook secret
-    _verify_webhook_secret(x_sentry_secret)
-
-    # 2a. Phase 137-04: Email intake hardening
-    # Domain allowlist
-    if not check_email_domain_allowed(req.from_email):
-        logger.warning(
-            "Email intake blocked: domain not allowed sender=%s",
-            req.from_email,
-        )
-        raise HTTPException(
-            status_code=403,
-            detail="Sender domain not in allowlist",
-        )
-
-    # Per-sender rate limit
-    if not check_email_sender_rate_limit(req.from_email):
-        logger.warning(
-            "Email intake rate limited: sender=%s",
-            req.from_email,
-        )
-        raise HTTPException(
-            status_code=429,
-            detail="Sender rate limit exceeded. Try again later.",
-        )
-
-    # Attachment file type allowlist
-    if hasattr(req, "attachments") and req.attachments:
-        for attachment in req.attachments:
-            filename = (
-                attachment.get("filename", "") if isinstance(attachment, dict) else getattr(attachment, "filename", "")
-            )
-            if filename and not check_attachment_type_allowed(filename):
-                logger.warning(
-                    "Email intake blocked attachment: filename=%s sender=%s",
-                    filename,
-                    req.from_email,
-                )
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Attachment type not allowed: {filename}. Allowed: .pdf, .jpg, .jpeg, .png",
-                )
-
-    # Unknown sender quarantine
-    if not is_known_sender(req.from_email):
-        logger.info(
-            "Email intake quarantined: unknown sender=%s subject=%s",
-            req.from_email,
-            req.subject,
-        )
-        # Return a quarantine response instead of processing via LLM
-        return EmailIntakeResponse(
-            success=True,
-            intake_id=str(uuid.uuid4()),
-            action_taken="quarantined",
-            concept_ref=None,
-            reply_template="Your message has been received and is pending review by an administrator.",
-            reply_html="",
-            message="Unknown sender — quarantined for admin review",
-        )
-
-    # --- Prompt guard: score email body as webhook source ---
-    email_text = f"{req.subject or ''}\n{req.body_plain or ''}"
-    guard_result = score_prompt(email_text, "webhook")
-    if not guard_result.allow:
-        logger.warning(
-            "Email intake prompt guard BLOCKED: sender=%s score=%.2f",
-            req.from_email,
-            guard_result.score,
-        )
-        raise HTTPException(
-            status_code=400,
-            detail="Email content blocked by prompt injection guard",
-        )
-
-    if req.source == "intelligence_intake":
-        from app.services.signal_emitter import emit_email_signal
-
-        result = await emit_email_signal(
-            from_email=req.from_email,
-            from_name=req.from_name or "",
-            subject=req.subject,
-            body_plain=req.body_plain or req.body_html or "",
-            message_id=req.message_id or "",
-            in_reply_to=req.in_reply_to or "",
-            references=req.references or "",
-            to=req.to or [],
-            cc=req.cc or [],
-            received_at=req.received_at or "",
-        )
-        if result.get("status") == "ignored":
-            return EmailIntakeResponse(
-                success=True,
-                intake_id=None,
-                action_taken="manual_review",
-                concept_ref=None,
-                reply_template=None,
-                reply_html=None,
-                message="Ignored non-meeting-room intelligence email",
-                urgency="low",
-            )
-        return EmailIntakeResponse(
-            success=True,
-            intake_id=result.get("signal_id"),
-            action_taken="routed",
-            concept_ref=result.get("signal_id"),
-            reply_template=None,
-            reply_html=None,
-            message="Routed to intelligence signal pipeline",
-            urgency="normal",
-        )
-
-    repo = get_email_intake_repository()
-    intake_id = str(uuid.uuid4())
-    now_iso = datetime.utcnow().isoformat()
-
-    # ------------------------------------------------------------------
-    # 3. Duplicate / follow-up checks
-    # ------------------------------------------------------------------
-
-    # 3a. Existing reference match (e.g. FNBFW:12345)
-    if req.existing_reference:
-        existing = repo.get_latest_by_reference(req.existing_reference)
-        if existing:
-            # Link as follow-up
-            follow_up_record = {
-                "id": intake_id,
-                "from_email": req.from_email,
-                "from_name": req.from_name,
-                "subject": req.subject,
-                "body_plain": req.body_plain,
-                "message_id": req.message_id,
-                "received_at": req.received_at or now_iso,
-                "site_id": req.site_id or existing.get("site_id"),
-                "issue_category": req.issue_category or existing.get("issue_category"),
-                "issue_summary": req.issue_summary,
-                "urgency": req.urgency,
-                "existing_reference": req.existing_reference,
-                "parent_intake_id": existing.get("id"),
-                "pipeline_status": "routed",
-                "action_taken": "linked_existing",
-                "routing_reason": f"Matched existing_reference={req.existing_reference}",
-                "extraction_confidence": req.extraction_confidence,
-                "extraction_model": req.extraction_model,
-            }
-            repo.create(follow_up_record)
-
-            # Bump follow_up_count on parent
-            parent_count = (existing.get("follow_up_count") or 0) + 1
-            repo.update_status(existing["id"], existing.get("pipeline_status", "routed"), follow_up_count=parent_count)
-
-            # Current email fields win, but preserve parent's WO ref
-            merged = {**existing, **follow_up_record}
-            if existing.get("concept_ref"):
-                merged["concept_ref"] = existing["concept_ref"]
-            return await _send_reply_and_respond(
-                action_taken="linked_existing",
-                intake_id=intake_id,
-                record=merged,
-                bms_context=None,
-                concept_ref=existing.get("concept_ref"),
-                message=f"Linked to existing reference {req.existing_reference}",
-                urgency=req.urgency,
-                req=req,
-            )
-
-    # 3b. Exact message_id dedup
-    if req.message_id:
-        dup = repo.get_by_message_id(req.message_id)
-        if dup:
-            return await _send_reply_and_respond(
-                action_taken="duplicate",
-                intake_id=dup["id"],
-                record=dup,
-                bms_context=None,
-                concept_ref=dup.get("concept_ref"),
-                message="Duplicate message_id — already processed",
-                urgency=dup.get("urgency", "normal"),
-                req=req,
-            )
-
-    # 3c. Heuristic recent-window dedup (with subject similarity gate)
-    recent = repo.find_recent(
-        from_email=req.from_email,
-        site_id=req.site_id,
-        issue_category=req.issue_category,
-        hours=settings.email_intake_duplicate_window_hours,
-    )
-    if recent and not _subjects_similar(req.subject or "", recent.get("subject", "")):
-        logger.info(
-            "Dedup skip: subjects too different — %r vs %r",
-            req.subject,
-            recent.get("subject", ""),
-        )
-        recent = None  # subjects too different — treat as new intake
-    if recent:
-        # Link as follow-up rather than creating a duplicate WO
-        follow_up_record = {
-            "id": intake_id,
-            "from_email": req.from_email,
-            "from_name": req.from_name,
-            "subject": req.subject,
-            "body_plain": req.body_plain,
-            "message_id": req.message_id,
-            "received_at": req.received_at or now_iso,
-            "site_id": req.site_id,
-            "issue_category": req.issue_category,
-            "issue_summary": req.issue_summary,
-            "urgency": req.urgency,
-            "parent_intake_id": recent.get("id"),
-            "pipeline_status": "routed",
-            "action_taken": "linked_existing",
-            "routing_reason": (
-                f"Recent-window match: same sender+site+category within {settings.email_intake_duplicate_window_hours}h"
-            ),
-            "extraction_confidence": req.extraction_confidence,
-            "extraction_model": req.extraction_model,
-        }
-        repo.create(follow_up_record)
-
-        parent_count = (recent.get("follow_up_count") or 0) + 1
-        repo.update_status(recent["id"], recent.get("pipeline_status", "routed"), follow_up_count=parent_count)
-
-        # Current email fields win, but preserve parent's WO ref
-        merged_recent = {**recent, **follow_up_record}
-        if recent.get("concept_ref"):
-            merged_recent["concept_ref"] = recent["concept_ref"]
-        return await _send_reply_and_respond(
-            action_taken="linked_existing",
-            intake_id=intake_id,
-            record=merged_recent,
-            bms_context=None,
-            concept_ref=recent.get("concept_ref"),
-            message="Linked to recent intake from same sender",
-            urgency=req.urgency,
-            req=req,
-        )
-
-    # ------------------------------------------------------------------
-    # 3d. BMS enrichment (moved before agent — feeds into agent prompt)
-    # ------------------------------------------------------------------
-    req_category = req.issue_category or "general"
-    bms_context = await _enrich_with_bms(req.site_id, req_category)
-
-    # ------------------------------------------------------------------
-    # 4. AI Agent classification + reply (Phase 134)
-    # ------------------------------------------------------------------
-    agent_result = None
-    taxonomy_result = None
-
-    if settings.email_intake_agent_enabled:
-        try:
-            from app.services.email_intake_agent import get_email_intake_agent
-
-            agent = get_email_intake_agent()
-            agent_result = await agent.classify_and_reply(
-                from_name=req.from_name,
-                from_email=req.from_email,
-                subject=req.subject or "",
-                body_plain=req.body_plain,
-                site_id=req.site_id,
-                bms_context=bms_context,
-            )
-            logger.info(
-                "Agent result: %s/%s, action=%s, model=%s, latency=%dms",
-                agent_result.discipline,
-                agent_result.sub_category,
-                agent_result.action,
-                agent_result.agent_model,
-                agent_result.agent_latency_ms,
-            )
-
-            # Map agent result to request fields
-            req_category = DISCIPLINE_TO_CATEGORY.get(agent_result.discipline, req_category)
-            req.issue_category = req_category
-            req.zone_hint = req.zone_hint or (
-                f"Desk {agent_result.location_desk}" if agent_result.location_desk else None
-            )
-            req.floor_hint = req.floor_hint or agent_result.location_floor
-            req.from_phone = req.from_phone or agent_result.phone
-
-            # --- Post-agent regex safety net ---
-            # Agent may miss structured data that regex catches reliably
-            if req.subject or req.body_plain:
-                combined = f"{req.subject or ''} {req.body_plain or ''}"
-
-                # Desk extraction safety net
-                if not req.zone_hint:
-                    desk = extract_desk_from_message(combined)
-                    if desk:
-                        req.zone_hint = f"Desk {desk}"
-                        logger.info("Post-agent regex found desk: %s", desk)
-
-                # Floor extraction safety net
-                if not req.floor_hint:
-                    floor = extract_floor_from_message(combined)
-                    if floor:
-                        req.floor_hint = floor
-                        logger.info("Post-agent regex found floor: %s", floor)
-
-                # Phone extraction safety net
-                if not req.from_phone:
-                    phone_match = re.search(r"\b(0\d{9})\b", combined)
-                    if not phone_match:
-                        phone_match = re.search(r"\b(\+27\d{9})\b", combined)
-                    if phone_match:
-                        req.from_phone = phone_match.group(1)
-                        logger.info("Post-agent regex found phone: %s", req.from_phone)
-
-            # Use agent's classification as taxonomy result
-            taxonomy_result = {
-                "discipline": agent_result.discipline,
-                "sub_category": agent_result.sub_category,
-                "specialty": agent_result.specialty,
-                "priority": agent_result.priority,
-            }
-
-        except Exception as exc:
-            logger.warning("Agent call failed, falling back to keyword pipeline: %s", exc)
-            agent_result = None
-
-    # ------------------------------------------------------------------
-    # 4b. Keyword fallback (if agent disabled or failed)
-    # ------------------------------------------------------------------
-    if agent_result is None:
-        taxonomy_result = classify_email_subject(req.subject or "", req.body_plain or "")
-        if taxonomy_result:
-            req_category = DISCIPLINE_TO_CATEGORY.get(taxonomy_result["discipline"], req.issue_category)
-            if req_category != req.issue_category:
-                logger.info(
-                    "Taxonomy override: %s -> %s (sub: %s)",
-                    req.issue_category,
-                    req_category,
-                    taxonomy_result["sub_category"],
-                )
-                req.issue_category = req_category
-        else:
-            req_category = req.issue_category  # keep n8n's classification
-
-        # Location extraction from email text (fills gaps n8n missed)
-        if not req.zone_hint and (req.subject or req.body_plain):
-            combined = f"{req.subject or ''} {req.body_plain or ''}"
-            desk = extract_desk_from_message(combined)
-            if desk:
-                req.zone_hint = f"Desk {desk}"
-            floor = extract_floor_from_message(combined)
-            if floor and not req.floor_hint:
-                req.floor_hint = floor
-
-        # Phone number extraction from email body (SA mobile format)
-        if not req.from_phone and req.body_plain:
-            phone_match = re.search(r"\b(0\d{9})\b", req.body_plain)
-            if not phone_match:
-                phone_match = re.search(r"\b(\+27\d{9})\b", req.body_plain)
-            if phone_match:
-                req.from_phone = phone_match.group(1)
-
-    # ------------------------------------------------------------------
-    # 5. Urgency escalation
-    # ------------------------------------------------------------------
-    if agent_result is not None:
-        # Use agent priority, but still apply BMS alert escalation
-        _PRIORITY_TO_URGENCY = {"critical": "critical", "high": "high", "medium": "normal", "low": "low"}
-        final_urgency = _PRIORITY_TO_URGENCY.get(agent_result.priority, "normal")
-        # BMS alert escalation on top
-        active_alerts = bms_context.get("active_alerts", [])
-        if active_alerts:
-            critical_alerts = [a for a in active_alerts if a.get("severity") in ("critical", "emergency")]
-            if critical_alerts and URGENCY_RANK.get(final_urgency, 2) < 4:
-                final_urgency = "critical"
-            elif active_alerts and URGENCY_RANK.get(final_urgency, 2) < 3:
-                final_urgency = "high"
-    else:
-        final_urgency = _apply_urgency_escalation(req, bms_context)
-        if taxonomy_result:
-            _TAX_TO_URGENCY = {"critical": "critical", "high": "high", "medium": "normal", "low": "low"}
-            tax_urgency = _TAX_TO_URGENCY.get(taxonomy_result["priority"], "normal")
-            if URGENCY_RANK.get(tax_urgency, 2) > URGENCY_RANK.get(final_urgency, 2):
-                logger.info("Taxonomy priority escalation: %s -> %s", final_urgency, tax_urgency)
-                final_urgency = tax_urgency
-
-    # ------------------------------------------------------------------
-    # 6. Completeness scoring + route
-    # ------------------------------------------------------------------
-    if agent_result is not None:
-        completeness = agent_result.completeness
-        # Boost if post-agent regex found fields the agent missed
-        if req.zone_hint and not agent_result.location_desk:
-            completeness = min(1.0, completeness + 0.25)
-        if req.from_phone and not agent_result.phone:
-            completeness = min(1.0, completeness + 0.10)
-        if req.floor_hint and not agent_result.location_floor:
-            completeness = min(1.0, completeness + 0.05)
-        completeness = round(completeness, 3)
-        route = _determine_route(completeness)  # Re-derive from boosted score
-    else:
-        completeness = _score_completeness(req)
-        if taxonomy_result:
-            completeness = min(1.0, completeness + 0.10)
-            completeness = round(completeness, 3)
-        route = _determine_route(completeness)
-
-    # Map route to action_taken (WO always created, action reflects routing)
-    action_taken = route  # auto_submit | request_info | manual_review
-
-    # ------------------------------------------------------------------
-    # 7. Persist record
-    # ------------------------------------------------------------------
-    record = {
-        "id": intake_id,
-        "from_email": req.from_email,
-        "from_name": req.from_name,
-        "from_phone": req.from_phone,
-        "from_department": req.from_department,
-        "subject": req.subject,
-        "body_plain": req.body_plain,
-        "message_id": req.message_id,
-        "in_reply_to": req.in_reply_to,
-        "received_at": req.received_at or now_iso,
-        "site_id": req.site_id,
-        "zone_hint": req.zone_hint,
-        "floor_hint": req.floor_hint,
-        "issue_category": req_category,
-        "issue_summary": (agent_result.issue_summary if agent_result else None) or req.issue_summary,
-        "urgency": final_urgency,
-        "taxonomy_discipline": taxonomy_result["discipline"] if taxonomy_result else None,
-        "taxonomy_sub_category": taxonomy_result["sub_category"] if taxonomy_result else None,
-        "taxonomy_specialty": taxonomy_result["specialty"] if taxonomy_result else None,
-        "taxonomy_priority": taxonomy_result["priority"] if taxonomy_result else None,
-        "extraction_confidence": completeness,
-        "extraction_model": (agent_result.agent_model if agent_result else None) or req.extraction_model,
-        "extraction_raw": req.extraction_raw,
-        "bms_context": bms_context if bms_context else None,
-        "enrichment_ts": now_iso if bms_context else None,
-        "pipeline_status": "routed",
-        "action_taken": action_taken,
-        "routing_reason": (
-            f"completeness={completeness}, route={route}, "
-            f"agent={agent_result.agent_model if agent_result else 'keyword'}"
-        ),
-        "existing_reference": req.existing_reference,
-        "attachment_count": req.attachment_count,
-        "attachment_refs": req.attachment_refs,
-        "processed_by": "sentinel",
+async def _enrich_with_bms(
+    site_id: Optional[str],
+    floor: Optional[str],
+    equipment_mentioned: Optional[str],
+) -> Dict[str, Any]:
+    """Cross-reference with live BMS data."""
+    bms_context = {
+        "active_alerts": [],
+        "recent_work_orders": [],
+        "equipment_status": None,
+        "known_issues": [],
+        "enrichment_timestamp": datetime.utcnow().isoformat(),
     }
 
-    repo.create(record)
+    if not site_id:
+        return bms_context
 
-    # ------------------------------------------------------------------
-    # 7b. Work order creation — DISABLED
-    # Email intake classifies and replies only; WO creation is a separate
-    # downstream decision made by the FM team after triage.
-    # ------------------------------------------------------------------
-    concept_ref: Optional[str] = None
+    try:
+        # TODO: Wire to existing alert_service, equipment_service, agent_memory_repo
+        # alerts = await alert_service.get_active_alerts(site_id=site_id, floor=floor)
+        # bms_context["active_alerts"] = [...]
+        pass
+    except Exception as e:
+        logger.error(f"BMS enrichment failed: {e}")
+        bms_context["enrichment_error"] = str(e)
 
-    # ------------------------------------------------------------------
-    # 7c. Replace {ref} placeholder in agent reply with intake ID
-    # ------------------------------------------------------------------
-    if agent_result is not None:
-        ref_value = record.get("id", "")[:8]
-        agent_reply_text = agent_result.reply_text.replace("{ref}", ref_value)
-        agent_reply_html = agent_result.reply_html.replace("{ref}", ref_value)
-        # Override the template reply functions with agent-generated reply
-        record["_agent_reply_text"] = agent_reply_text
-        record["_agent_reply_html"] = agent_reply_html
+    return bms_context
 
-    # 8. Store inbound references header for thread chain tracking
-    if req.references:
-        record["references_header"] = req.references
 
-    # 9. Build response + send threaded reply if backend SMTP enabled
-    return await _send_reply_and_respond(
-        action_taken=action_taken,
-        intake_id=intake_id,
-        record=record,
-        bms_context=bms_context if bms_context else None,
-        concept_ref=concept_ref,
-        message=f"Email intake processed: {action_taken}",
-        urgency=final_urgency,
-        req=req,
-    )
+# ── Concept API Bridge ───────────────────────────────────────────
+
+
+async def _create_concept_work_order(intake, classification, bms_context) -> Optional[str]:
+    """Push work order to MRI Evolution (Concept)."""
+    # TODO: Implement when Concept API credentials available
+    logger.info(f"Concept WO placeholder: site={intake.site_id}, category={classification.issue_category}")
+    return None
+
+
+# ── Reply Builder ────────────────────────────────────────────────
+
+
+def _build_reply(intake, classification, concept_ref, bms_context, action, missing_fields) -> Dict:
+    """Build auto-reply email."""
+    if action == "created_wo":
+        bms_note = ""
+        if bms_context.get("active_alerts"):
+            bms_note = (
+                "\n\nNote: Our building systems have detected an active alert "
+                "in this area. This has been included in the technician's briefing."
+            )
+
+        return {
+            "to": intake.from_email,
+            "subject": f"RE: {intake.subject} — {'Logged as ' + concept_ref if concept_ref else 'Received'} [SENTINEL]",
+            "body": f"""Hi {intake.from_name or "there"},
+
+Your maintenance request has been logged:
+
+Reference: {concept_ref or "Pending assignment"}
+Category: {classification.issue_category}
+Priority: {classification.urgency}
+Location: {", ".join(filter(None, [intake.sig_building, intake.sig_floor, classification.specific_location]))}
+
+A technician will be assigned shortly.{bms_note}
+
+— SENTINEL Facilities Assistant""",
+        }
+    else:
+        field_labels = {
+            "cost_center": "Your cost center number",
+            "site_id": "Which building you're in",
+            "floor": "Which floor/level",
+            "issue_description": "A description of the issue",
+        }
+        missing_list = "\n".join(f"  - {field_labels.get(f, f)}" for f in missing_fields if f in field_labels)
+        return {
+            "to": intake.from_email,
+            "subject": f"RE: {intake.subject} — Info Needed [SENTINEL]",
+            "body": f"""Hi {intake.from_name or "there"},
+
+Thank you for reporting this. To log your request, I need:
+
+{missing_list}
+
+Please reply with the missing details.
+
+— SENTINEL Facilities Assistant""",
+        }
+
+
+# ── Storage ──────────────────────────────────────────────────────
+
+
+async def _store_intake(
+    intake_id: str,
+    intake: EmailIntakeRequest,
+    classification: Optional[Dict],
+    bms_context: Dict,
+    action_taken: str,
+    concept_ref: Optional[str],
+):
+    """Store email intake record in Supabase."""
+    # TODO: Wire to Supabase email_intakes table
+    logger.info(f"Stored intake {intake_id}: action={action_taken}, concept_ref={concept_ref}")
+
+
+async def _queue_reply(reply: Dict):
+    """Send reply via n8n outbound email workflow or direct SMTP."""
+    # TODO: POST to n8n outbound webhook or use SMTP directly
+    logger.info(f"Reply queued: to={reply['to']}, subject={reply['subject']}")
+
+
+# ── Health ───────────────────────────────────────────────────────
+
+
+@router.get("/health")
+async def email_intake_health():
+    return {
+        "status": "ok",
+        "module": "sentry-email",
+        "strategy": "advisor",
+        "executor": "claude-haiku-4-5",
+        "advisor": "claude-opus-4-6",
+        "timestamp": datetime.utcnow().isoformat(),
+    }
