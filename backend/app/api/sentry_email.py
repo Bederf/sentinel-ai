@@ -7,16 +7,21 @@ Classification moves to Python backend using Haiku executor + Opus advisor.
 This replaces the GPT-4.1 OpenAI node in n8n with a smarter, cheaper alternative.
 """
 
-from fastapi import APIRouter, HTTPException, BackgroundTasks, Header
-from pydantic import BaseModel
-from typing import Optional, List, Dict, Any
-from datetime import datetime
-from uuid import uuid4
 import hmac
 import logging
 import os
+from datetime import datetime
+from typing import Any
+from uuid import uuid4
+
+from fastapi import APIRouter, BackgroundTasks, Header, HTTPException
+from pydantic import BaseModel
 
 from app.config.settings import settings
+from app.database.repositories.alert_repository import AlertRepository
+from app.database.repositories.equipment_repository import EquipmentRepository
+from app.database.repositories.site_repository import SiteRepository
+from app.database.repositories.work_order_repository import WorkOrderRepository
 from app.services.sentry_email import get_email_classifier
 
 logger = logging.getLogger(__name__)
@@ -28,7 +33,7 @@ router = APIRouter(prefix="/api/sentry-email", tags=["sentry-email"])
 
 
 def _require_sentry_email_secret(
-    provided_secret: Optional[str],
+    provided_secret: str | None,
     endpoint_name: str = "email_intake",
 ) -> None:
     """Validate webhook secret with fail-closed behaviour in live mode."""
@@ -57,35 +62,35 @@ class EmailIntakeRequest(BaseModel):
 
     # Requester (Layer 1: headers)
     from_email: str
-    from_name: Optional[str] = None
-    to_email: Optional[str] = None
+    from_name: str | None = None
+    to_email: str | None = None
     subject: str
     body_text: str
-    body_html: Optional[str] = None
-    message_id: Optional[str] = None
-    received_at: Optional[str] = None
+    body_html: str | None = None
+    message_id: str | None = None
+    received_at: str | None = None
     importance: str = "normal"
     has_attachments: bool = False
     attachment_count: int = 0
-    attachment_names: List[str] = []
+    attachment_names: list[str] = []
     is_internal: bool = False
 
     # Threading (Layer 1: headers)
     is_reply: bool = False
-    in_reply_to: Optional[str] = None
+    in_reply_to: str | None = None
 
     # Signature extractions (Layer 3: regex)
-    sig_cost_center: Optional[str] = None
-    sig_building: Optional[str] = None
-    sig_floor: Optional[str] = None
-    sig_phone: Optional[str] = None
-    sig_f_number: Optional[str] = None
-    sig_department: Optional[str] = None
-    sig_specific_location: Optional[str] = None
+    sig_cost_center: str | None = None
+    sig_building: str | None = None
+    sig_floor: str | None = None
+    sig_phone: str | None = None
+    sig_f_number: str | None = None
+    sig_department: str | None = None
+    sig_specific_location: str | None = None
 
     # Derived by n8n
-    existing_reference: Optional[str] = None
-    site_id: Optional[str] = None
+    existing_reference: str | None = None
+    site_id: str | None = None
     urgency_boost: bool = False
     has_manager_cc: bool = False
     cc_count: int = 0
@@ -95,8 +100,8 @@ class EmailIntakeResponse(BaseModel):
     success: bool
     intake_id: str
     action_taken: str
-    concept_ref: Optional[str] = None
-    classification: Optional[Dict[str, Any]] = None
+    concept_ref: str | None = None
+    classification: dict[str, Any] | None = None
     advisor_consulted: bool = False
     message: str
 
@@ -108,7 +113,7 @@ class EmailIntakeResponse(BaseModel):
 async def process_email_intake(
     intake: EmailIntakeRequest,
     background_tasks: BackgroundTasks,
-    x_sentry_api_key: Optional[str] = Header(None),
+    x_sentry_api_key: str | None = Header(None),
 ):
     """
     Main intake endpoint called by n8n workflow.
@@ -263,11 +268,11 @@ async def process_email_intake(
 
 
 async def _enrich_with_bms(
-    site_id: Optional[str],
-    floor: Optional[str],
-    equipment_mentioned: Optional[str],
-) -> Dict[str, Any]:
-    """Cross-reference with live BMS data."""
+    site_id: str | None,
+    floor: str | None,
+    equipment_mentioned: str | None,
+) -> dict[str, Any]:
+    """Cross-reference with live BMS data: active alerts, recent WOs, equipment health."""
     bms_context = {
         "active_alerts": [],
         "recent_work_orders": [],
@@ -280,12 +285,103 @@ async def _enrich_with_bms(
         return bms_context
 
     try:
-        # TODO: Wire to existing alert_service, equipment_service, agent_memory_repo
-        # alerts = await alert_service.get_active_alerts(site_id=site_id, floor=floor)
-        # bms_context["active_alerts"] = [...]
-        pass
+        site_repo = SiteRepository()
+        alert_repo = AlertRepository()
+        equipment_repo = EquipmentRepository()
+        wo_repo = WorkOrderRepository()
+
+        # Step 1: Resolve site_id (code like "site-002") to site UUID
+        site = site_repo.get_by_id(site_id)
+        if not site:
+            logger.warning(f"Site {site_id} not found in database")
+            return bms_context
+
+        site_uuid = site.get("id")
+
+        # Step 2: Get active alerts for this site
+        active_alerts = alert_repo.get_active_by_site(site_uuid)
+        if active_alerts:
+            # Filter by floor if provided
+            alerts_for_floor = []
+            for alert in active_alerts:
+                alert_summary = {
+                    "id": alert.get("id"),
+                    "title": alert.get("title"),
+                    "severity": alert.get("severity"),  # critical, warning
+                    "type": alert.get("type"),  # e.g., temperature, pressure
+                    "message": alert.get("message"),
+                }
+                alerts_for_floor.append(alert_summary)
+
+            bms_context["active_alerts"] = alerts_for_floor[:10]  # Cap at 10 most recent
+
+        # Step 3: Get equipment on this site (optionally filtered by floor/location)
+        site_equipment = equipment_repo.get_all(site_id=site_uuid)
+
+        if floor and site_equipment:
+            # Filter equipment by floor mention in location
+            floor_equipment = [
+                eq for eq in site_equipment if floor and floor.lower() in str(eq.get("location", "")).lower()
+            ]
+        else:
+            floor_equipment = site_equipment[:5] if site_equipment else []
+
+        # Get health status summary for equipment on this floor
+        if floor_equipment:
+            equipment_health = []
+            for eq in floor_equipment:
+                eq_summary = {
+                    "code": eq.get("code"),
+                    "name": eq.get("name"),
+                    "type": eq.get("type"),
+                    "status": eq.get("status"),
+                    "health_score": eq.get("health_score"),
+                }
+                equipment_health.append(eq_summary)
+            bms_context["equipment_status"] = equipment_health
+
+        # Step 4: Get recent work orders for this site (past 7 days, any status)
+        recent_wos = await wo_repo.get_all_work_orders(limit=20, status=None)
+
+        if recent_wos:
+            # Filter to this site and recent
+            site_wos = [wo for wo in recent_wos if wo.get("site_id") == site_uuid]
+
+            # Also filter by floor if provided
+            if floor:
+                floor_wos = [
+                    wo
+                    for wo in site_wos
+                    if floor.lower() in str(wo.get("description", "")).lower()
+                    or floor.lower() in str(wo.get("title", "")).lower()
+                ]
+            else:
+                floor_wos = site_wos
+
+            # Return last 5 recent work orders
+            recent_summary = []
+            for wo in floor_wos[:5]:
+                wo_summary = {
+                    "code": wo.get("code"),
+                    "title": wo.get("title"),
+                    "status": wo.get("status"),
+                    "priority": wo.get("priority"),
+                    "created_at": wo.get("created_at"),
+                    "completed_at": wo.get("completed_at"),
+                }
+                recent_summary.append(wo_summary)
+
+            bms_context["recent_work_orders"] = recent_summary
+
+        logger.info(
+            f"BMS enrichment complete: site={site_id}, "
+            f"alerts={len(bms_context['active_alerts'])}, "
+            f"equipment={len(bms_context.get('equipment_status') or [])}, "
+            f"recent_wos={len(bms_context['recent_work_orders'])}"
+        )
+
     except Exception as e:
-        logger.error(f"BMS enrichment failed: {e}")
+        logger.error(f"BMS enrichment failed: {e}", exc_info=True)
         bms_context["enrichment_error"] = str(e)
 
     return bms_context
@@ -294,7 +390,7 @@ async def _enrich_with_bms(
 # ── Concept API Bridge ───────────────────────────────────────────
 
 
-async def _create_concept_work_order(intake, classification, bms_context) -> Optional[str]:
+async def _create_concept_work_order(intake, classification, bms_context) -> str | None:
     """Push work order to MRI Evolution (Concept)."""
     # TODO: Implement when Concept API credentials available
     logger.info(f"Concept WO placeholder: site={intake.site_id}, category={classification.issue_category}")
@@ -304,7 +400,7 @@ async def _create_concept_work_order(intake, classification, bms_context) -> Opt
 # ── Reply Builder ────────────────────────────────────────────────
 
 
-def _build_reply(intake, classification, concept_ref, bms_context, action, missing_fields) -> Dict:
+def _build_reply(intake, classification, concept_ref, bms_context, action, missing_fields) -> dict:
     """Build auto-reply email."""
     if action == "created_wo":
         bms_note = ""
@@ -359,17 +455,17 @@ Please reply with the missing details.
 async def _store_intake(
     intake_id: str,
     intake: EmailIntakeRequest,
-    classification: Optional[Dict],
-    bms_context: Dict,
+    classification: dict | None,
+    bms_context: dict,
     action_taken: str,
-    concept_ref: Optional[str],
+    concept_ref: str | None,
 ):
     """Store email intake record in Supabase."""
     # TODO: Wire to Supabase email_intakes table
     logger.info(f"Stored intake {intake_id}: action={action_taken}, concept_ref={concept_ref}")
 
 
-async def _queue_reply(reply: Dict):
+async def _queue_reply(reply: dict):
     """Send reply via n8n outbound email workflow or direct SMTP."""
     # TODO: POST to n8n outbound webhook or use SMTP directly
     logger.info(f"Reply queued: to={reply['to']}, subject={reply['subject']}")
