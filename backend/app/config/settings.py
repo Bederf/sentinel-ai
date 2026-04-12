@@ -352,6 +352,9 @@ class Settings(BaseSettings):
     # for resource-constrained deployments (Jetson, lightweight VPS)
     edge_mode: bool = False
 
+    # BMS source gate: enable simulator or live bridge polling for site-002 (ENABLE_SITE002_SOURCE env var)
+    site002_source_enabled: bool = Field(default=False, validation_alias="ENABLE_SITE002_SOURCE")
+
     # Sentinel island mode: enforce remote-backed data paths only (no local fallback)
     sentinel_island_mode: bool = Field(default=False, validation_alias="SENTINEL_ISLAND_MODE")
 
