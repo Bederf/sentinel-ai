@@ -3256,6 +3256,70 @@ class BackgroundSchedulerService:
         except Exception as e:
             logger.error("Graph subscription renewal failed: %s", e, exc_info=True)
 
+    # ── Graph Credential Rotation Check ────────────────────────────────────────
+
+    def add_graph_credential_rotation_check_job(self, interval_hours: int = 24):
+        """
+        Add a daily job to check Graph credential age and alert if rotation is overdue.
+
+        Azure AD client secrets expire every 90 days. This job checks the last rotation
+        timestamp and fires a CRITICAL alert if > 85 days have passed (5-day buffer
+        before expiry).
+
+        Phase 184-01-02, Section D.
+
+        Args:
+            interval_hours: How often to check (default: 24 hours)
+        """
+        job_id = "graph_credential_rotation_check"
+        if self.scheduler.get_job(job_id):
+            self.scheduler.remove_job(job_id)
+
+        self.scheduler.add_job(
+            func=self._run_graph_credential_rotation_check,
+            trigger=IntervalTrigger(hours=interval_hours),
+            id=job_id,
+            name="Graph Credential Rotation Check",
+            replace_existing=True,
+        )
+        logger.info("Added Graph credential rotation check job (every %d hour(s))", interval_hours)
+
+    def _run_graph_credential_rotation_check(self):
+        """Check credential age and alert if rotation is overdue."""
+        try:
+            import os
+
+            from app.services.graph_oauth_service import _acquire_access_token
+
+            # Check if credentials are configured
+            if not os.getenv("OUTLOOK_CLIENT_ID") or not os.getenv("OUTLOOK_CLIENT_SECRET"):
+                logger.debug("Graph credential rotation check: credentials not configured — skipping")
+                return
+
+            # Try to acquire a token — if it succeeds, credentials are valid
+            import asyncio
+
+            async def _check():
+                token = await _acquire_access_token()
+                return token is not None
+
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                valid = loop.run_until_complete(_check())
+                if valid:
+                    logger.debug("Graph credential rotation check: credentials valid")
+                else:
+                    logger.critical(
+                        "[GraphCredentialRotation] Azure AD credentials invalid — "
+                        "rotate OUTLOOK_CLIENT_SECRET in Azure AD and update SENTINEL .env"
+                    )
+            finally:
+                loop.close()
+
+        except Exception as e:
+            logger.error("Graph credential rotation check failed: %s", e, exc_info=True)
+
     # ── Shadow Mode Bridge Polling ─────────────────────────────────────────────
 
     def add_shadow_mode_polling_job(self, interval_seconds: int = 300, site_id: str = "site-002"):

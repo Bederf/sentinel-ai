@@ -559,3 +559,31 @@ def auth_headers_auditor(jwt_token_auditor: str) -> dict:
 def auth_headers_engineer(jwt_token_engineer: str) -> dict:
     """HTTP headers with ENGINEER JWT token."""
     return {"Authorization": f"Bearer {jwt_token_engineer}"}
+
+
+@pytest.fixture
+def jwt_token_bot_agent() -> str:
+    """Generate a valid JWT token for BOT_AGENT role (Phase 184)."""
+    import jwt
+    from datetime import datetime, timedelta, timezone
+    import uuid
+
+    secret = os.environ.get("JWT_SECRET_KEY", "test-only-jwt-secret-for-ci-at-least-32-chars")
+    payload = {
+        "sub": "bot-agent-test",
+        "email": "bot@sentinel.local",
+        "role": "bot_agent",
+        "iss": "sentinel.bms",
+        "aud": "sentinel.bms",
+        "token_type": "access",
+        "jti": str(uuid.uuid4()),
+        "iat": datetime.now(timezone.utc),
+        "exp": datetime.now(timezone.utc) + timedelta(hours=1),
+    }
+    return jwt.encode(payload, secret, algorithm="HS256")
+
+
+@pytest.fixture
+def auth_headers(jwt_token_bot_agent: str) -> dict:
+    """HTTP headers with BOT_AGENT JWT token (default for block booking tests)."""
+    return {"Authorization": f"Bearer {jwt_token_bot_agent}"}

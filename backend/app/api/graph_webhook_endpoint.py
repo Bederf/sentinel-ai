@@ -17,6 +17,7 @@ import logging
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request, Response
 from fastapi.responses import PlainTextResponse
 
+from app.config.settings import settings
 from app.services.graph_event_processor import process_graph_event
 from app.services.graph_subscription_service import graph_subscription_service
 
@@ -36,6 +37,9 @@ async def handle_graph_notification(request: Request, background_tasks: Backgrou
     Always returns 202 immediately for POST to avoid Graph retries.
     Uses FastAPI BackgroundTasks (not asyncio.create_task) to survive request context teardown.
     """
+    # Feature flag kill-switch (Phase 184 Fix 5)
+    if not settings.graph_integration_enabled:
+        raise HTTPException(status_code=503, detail="Graph integration disabled")
     # Mode A: Graph validation handshake (Microsoft sends GET to verify endpoint)
     validation_token = request.query_params.get("validationToken")
     if validation_token is not None:

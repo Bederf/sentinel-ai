@@ -393,6 +393,9 @@ class Settings(BaseSettings):
     space_mqtt_radar_topic: str = "sentinel/node/+/radar"  # LD2410C extended payload topic
     space_default_site_id: str = "site-002"
 
+    # Graph / Azure AD email integration (Phase 184)
+    graph_integration_enabled: bool = Field(default=False)  # Kill-switch without redeployment
+
     # LD2410C Radar Distance Filtering
     # Firmware: v2.44.25070917 | Resolution: 0.75 m | Effective range: 3.0 m
     # Mounting: ceiling, downward | Unmanned duration: 15 s

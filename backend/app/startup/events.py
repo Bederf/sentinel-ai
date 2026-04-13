@@ -597,6 +597,30 @@ async def startup_event(app: FastAPI) -> None:
     else:
         _logger.info("ℹ Email intake pipeline disabled (set EMAIL_INTAKE_ENABLED=true to activate)")
 
+    # Phase 184: Block booking config validation
+    def _validate_block_booking_config():
+        """Validate block booking configuration at startup."""
+        if not settings.block_booking_enabled:
+            _logger.info("ℹ Block booking detection disabled")
+            return
+        import json
+        from pathlib import Path
+
+        config_path = Path(__file__).parent.parent / "data" / "block_booking_sites.json"
+        if not config_path.exists():
+            _logger.warning("block_booking_sites.json not found — block booking will use env var defaults")
+            return
+        try:
+            data = json.loads(config_path.read_text())
+            if not data:
+                _logger.warning("block_booking_sites.json is empty")
+                return
+            _logger.info("✅ Block booking detection enabled (%d sites configured)", len(data))
+        except Exception as exc:
+            _logger.warning("Failed to parse block_booking_sites.json: %s", exc)
+
+    _validate_block_booking_config()
+
     # Phase 083: Recover crashed simulations from JSON store
     # Queries for any tasks marked as 'running' and resumes from checkpoint
     async def recover_crashed_simulations():

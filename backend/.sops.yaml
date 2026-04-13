@@ -1,0 +1,23 @@
+# SOPS configuration for SENTINEL backend secrets encryption (Phase 184-01-02).
+#
+# This file configures SOPS (Secrets OPerationS) to encrypt sensitive .env files.
+# It uses age encryption (modern replacement for GPG).
+#
+# Setup (one-time, on admin machine):
+#   1. Generate age key:   age-keygen -o /etc/sentinel/sops-key.txt
+#   2. Protect key file:  chmod 600 /etc/sentinel/sops-key.txt
+#   3. Encrypt .env:       sops --encrypt .env > .env.enc
+#   4. Commit .env.enc:    git add .env.enc
+#
+# Decrypt for local use:
+#   sops --decrypt .env.enc > .env
+#
+# The age public key below should match the private key at /etc/sentinel/sops-key.txt.
+# Replace the placeholder with your actual age public key:
+#   age1##############################################
+
+creation_rules:
+  - path_regex: .env$
+    age: "AGE-SIMPLER-EQUALITY-PLACEHOLDER-REPLACE-WITH-REAL-KEY"
+    # Uncomment to enforce per-file encrypted vars:
+    # encrypted_suffix: "_SECRET|_KEY|_PASSWORD|_TOKEN|_CREDENTIAL"

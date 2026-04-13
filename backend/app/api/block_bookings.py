@@ -11,10 +11,12 @@ from datetime import date, timedelta
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 
 from app.config.settings import settings
 from app.core.site_resolver import require_any_site
+from app.middleware.auth_middleware import AuthContext, require_auth, AuthLevel
+from app.middleware.rate_limiter import limiter
 from app.models.booking_record import BlockBookingConfig
 from app.services.block_booking_detector.site_resolver import normalize_site_id, resolve_site_id_for_room
 
@@ -37,9 +39,15 @@ def _default_booking_window(_site_id: str) -> tuple[date, date]:
 class BookingEmailRequest(BaseModel):
     """Inbound booking confirmation email for parsing."""
 
-    raw_email: str = Field("", description="Raw email content (RFC 822)")
-    ics_data: Optional[str] = Field(None, description="iCalendar (.ics) content — preferred over raw_email")
-    site_id: str = Field("", description="Optional site code override")
+    raw_email: str = Field("", max_length=10_000_000)
+    ics_data: Optional[str] = Field(None, max_length=100_000)
+    site_id: str = Field("", max_length=50)
+
+    @validator("ics_data")
+    def validate_ics_format(cls, v):
+        if v and not v.strip().startswith("BEGIN:VCALENDAR"):
+            raise ValueError("ICS must start with BEGIN:VCALENDAR")
+        return v
 
 
 class DismissRequest(BaseModel):
@@ -125,9 +133,11 @@ def get_block_booking_config(site_id: str) -> BlockBookingConfig:
 
 
 @router.post("/ingest")
+@limiter.limit("100/hour")
 async def ingest_booking_email(
     request: Request,
     body: BookingEmailRequest,
+    _auth: AuthContext = Depends(require_auth(AuthLevel.AUTHENTICATED)),
 ) -> dict[str, Any]:
     """Ingest a booking confirmation email and check for overlaps.
 
