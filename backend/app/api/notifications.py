@@ -178,7 +178,7 @@ async def _resolve_technician_id(technician_id: str) -> UUID:
 )
 async def list_notification_channels(
     technician_id: str,
-    channel_type: ChannelType | None = Query(None, description="Filter by channel type"),
+    channel_type: ChannelType | None = Query(None, description="Filter by channel type"),  # noqa: B008
 ):
     """
     List notification channels for a technician.
@@ -217,10 +217,10 @@ async def list_notification_channels(
     except HTTPException:
         raise
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=f"Invalid technician ID: {e!s}")
+        raise HTTPException(status_code=400, detail=f"Invalid technician ID: {e!s}") from None
     except Exception as e:
         logger.error(f"Error listing notification channels: {e}")
-        raise HTTPException(status_code=500, detail="Failed to list channels")
+        raise HTTPException(status_code=500, detail="Failed to list channels") from None
 
 
 @router.post(
@@ -281,10 +281,10 @@ async def create_notification_channel(
         )
 
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=f"Invalid technician ID: {e!s}")
+        raise HTTPException(status_code=400, detail=f"Invalid technician ID: {e!s}") from None
     except Exception as e:
         logger.error(f"Error creating notification channel: {e}")
-        raise HTTPException(status_code=500, detail="Failed to create channel")
+        raise HTTPException(status_code=500, detail="Failed to create channel") from None
 
 
 @router.get(
@@ -329,12 +329,12 @@ async def get_notification_channel(
         )
 
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=f"Invalid ID format: {e!s}")
+        raise HTTPException(status_code=400, detail=f"Invalid ID format: {e!s}") from None
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error getting notification channel: {e}")
-        raise HTTPException(status_code=500, detail="Failed to get channel")
+        raise HTTPException(status_code=500, detail="Failed to get channel") from None
 
 
 @router.patch(
@@ -391,12 +391,12 @@ async def update_notification_channel(
         )
 
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=f"Invalid ID format: {e!s}")
+        raise HTTPException(status_code=400, detail=f"Invalid ID format: {e!s}") from None
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error updating notification channel: {e}")
-        raise HTTPException(status_code=500, detail="Failed to update channel")
+        raise HTTPException(status_code=500, detail="Failed to update channel") from None
 
 
 @router.delete(
@@ -438,12 +438,12 @@ async def delete_notification_channel(
         }
 
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=f"Invalid ID format: {e!s}")
+        raise HTTPException(status_code=400, detail=f"Invalid ID format: {e!s}") from None
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error deleting notification channel: {e}")
-        raise HTTPException(status_code=500, detail="Failed to delete channel")
+        raise HTTPException(status_code=500, detail="Failed to delete channel") from None
 
 
 # ========== Notification Preferences ==========
@@ -513,7 +513,7 @@ async def get_notification_preferences(
         return _defaults
     except Exception as e:
         logger.error(f"Error getting notification preferences: {e}")
-        raise HTTPException(status_code=500, detail="Failed to get preferences")
+        raise HTTPException(status_code=500, detail="Failed to get preferences") from None
 
 
 @router.post(
@@ -576,10 +576,10 @@ async def create_notification_preferences(
         )
 
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=f"Invalid input: {e!s}")
+        raise HTTPException(status_code=400, detail=f"Invalid input: {e!s}") from None
     except Exception as e:
         logger.error(f"Error creating notification preferences: {e}")
-        raise HTTPException(status_code=500, detail="Failed to create preferences")
+        raise HTTPException(status_code=500, detail="Failed to create preferences") from None
 
 
 @router.patch(
@@ -644,12 +644,12 @@ async def update_notification_preferences(
         )
 
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=f"Invalid input: {e!s}")
+        raise HTTPException(status_code=400, detail=f"Invalid input: {e!s}") from None
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error updating notification preferences: {e}")
-        raise HTTPException(status_code=500, detail="Failed to update preferences")
+        raise HTTPException(status_code=500, detail="Failed to update preferences") from None
 
 
 # ========== Delivery Logs ==========
@@ -660,9 +660,13 @@ async def update_notification_preferences(
     response_model=list[NotificationDeliveryLogResponse],
 )
 async def get_delivery_logs(
-    technician_id: str | None = Query(None, description="Filter by technician"),
-    status: NotificationStatus | None = Query(None, description="Filter by status"),
-    limit: int = Query(100, ge=1, le=1000, description="Max results"),
+    technician_id: str | None = Query(  # noqa: B008
+        None, description="Filter by technician"
+    ),
+    status: NotificationStatus | None = Query(  # noqa: B008
+        None, description="Filter by status"
+    ),
+    limit: int = Query(100, ge=1, le=1000, description="Max results"),  # noqa: B008
 ):
     """
     Query notification delivery logs.
@@ -707,10 +711,10 @@ async def get_delivery_logs(
     except HTTPException:
         raise
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=f"Invalid filter: {e!s}")
+        raise HTTPException(status_code=400, detail=f"Invalid filter: {e!s}") from None
     except Exception as e:
         logger.error(f"Error querying delivery logs: {e}")
-        raise HTTPException(status_code=500, detail="Failed to query logs")
+        raise HTTPException(status_code=500, detail="Failed to query logs") from None
 
 
 # ========== Provider Status & Testing ==========
@@ -760,7 +764,7 @@ async def get_provider_status():
 
     except Exception as e:
         logger.error(f"Error getting provider status: {e}")
-        raise HTTPException(status_code=500, detail="Failed to get provider status")
+        raise HTTPException(status_code=500, detail="Failed to get provider status") from None
 
 
 @router.post(
@@ -791,7 +795,7 @@ async def test_provider_connection(request: ProviderTestRequest):
 
     except Exception as e:
         logger.error(f"Error testing provider: {e}")
-        raise HTTPException(status_code=500, detail=f"Provider test failed: {e!s}")
+        raise HTTPException(status_code=500, detail=f"Provider test failed: {e!s}") from None
 
 
 @router.post(
@@ -838,7 +842,7 @@ async def send_test_notification(
             notification_type="test",
         )
 
-        channel_type, delivery_log, error = result
+        channel_type, _delivery_log, error = result
 
         # Update verification attempt counter
         channel.verification_attempts += 1
@@ -859,9 +863,9 @@ async def send_test_notification(
         }
 
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=f"Invalid ID format: {e!s}")
+        raise HTTPException(status_code=400, detail=f"Invalid ID format: {e!s}") from None
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error sending test notification: {e}")
-        raise HTTPException(status_code=500, detail="Failed to send test notification")
+        raise HTTPException(status_code=500, detail="Failed to send test notification") from None

@@ -86,7 +86,7 @@ def format_ghost_email_message(finding: GhostBookingFinding, site_name: str = ""
         f"  Room:       {finding.room_name or finding.room_code}",
         f"  Room Code:  {finding.room_code}",
         f"  Date:       {booking_date}",
-        f"  Time:       {start} – {end} ({duration_min} min)",
+        f"  Time:       {start} - {end} ({duration_min} min)",
         "",
         "ORGANISER",
         "-" * 30,
@@ -213,7 +213,7 @@ def format_ghost_email_html(finding: GhostBookingFinding, site_name: str = "", *
       </tr>
       <tr style="background:#fafafa">
         <td style="padding:8px;color:#555;font-size:13px">Time</td>
-        <td style="padding:8px;font-weight:600">{start} – {end} ({duration_min} min)</td>
+        <td style="padding:8px;font-weight:600">{start} - {end} ({duration_min} min)</td>
       </tr>
       <tr>
         <td style="padding:8px;color:#555;font-size:13px">Flagged at</td>
