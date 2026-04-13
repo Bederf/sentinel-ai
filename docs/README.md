@@ -69,7 +69,7 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 - **[Security API](03-api-reference/security-api.md)** - Access control events, visitor management, zone occupancy, cameras, occupancy trends, cross-module recommendations (Phases 27, 58, 69)
 - **[Visitor Management API](03-api-reference/visitor-management-api.md)** - Reception endpoints (scan, register, issue-card), WhatsApp YES/NO webhook, RSVP accept/decline, VisitStatus lifecycle, BuildingMap (Phase 176–178)
 - **[Privacy & Consent API](03-api-reference/privacy-api.md)** - POPIA consent, cross-border gating, data subject requests (DSR), and retention automation endpoints
-- **[RLM Runner & Orchestration API](03-api-reference/rlm-api.md)** - Evidence analysis submission, result polling, audit trace, health check — runner direct and backend orchestration (Phase 113)
+- [Block Bookings API](03-api-reference/block-bookings-api.md) - Azure AD OAuth + Graph API ingestion, security-hardened (Phase 184 v1.1)
 - **[ServiceNow API](03-api-reference/servicenow-api.md)** - Read-only ITSM endpoints for incidents, work orders, table queries, schema, history, and aggregates (Phase 138)
 - **[Event Bus Monitoring API](03-api-reference/event-bus-api.md)** - Metrics, history, event chain lookup, subscription listing for the async event bus (Phase 139)
 - **[Dashboard Generator API](03-api-reference/dashboard-generator-api.md)** - Auto-generate dashboard cards, monitoring rules, health weights, and module suggestions from discovered equipment (Phase 141)

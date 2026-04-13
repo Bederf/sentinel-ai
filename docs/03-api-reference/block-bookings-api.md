@@ -1,22 +1,31 @@
 ---
 title: "Block Bookings API"
 type: "reference"
-status: "draft"
-version: "1.0.0"
+status: "active"
+version: "1.1.0"
 created: "2026-03-31"
-updated: "2026-03-31"
-tags: ["sentinel", "documentation"]
-related: []
+updated: "2026-04-13"
+tags: ["sentinel", "documentation", "security-hardened"]
+related: ["docs/09-security/control-matrix.md", "docs/improvement-loops/2026-04-13-security-gates.md"]
 domain: "bms"
 audience: "all"
 complexity: "intermediate"
-estimated_read_time: 10
+estimated_read_time: 12
+phase: 184
+milestone: v62.4
 ---
 
 # Block Bookings API
 
 **Base path:** `/api/block-bookings`
 **Module:** `block_booking` (standalone add-on, disabled by default)
+**Security:** Auth required (BOT_AGENT), rate-limited (100/hour), input-validated (Phase 184 v1.1)
+
+## Authentication & Rate Limiting
+
+All write endpoints require `Authorization: Bearer <jwt>` with `BOT_AGENT` role or higher.
+Unauthenticated requests return **401**; requests with insufficient role return **403**.
+Rate limit: **100 requests/hour** per caller (AUTH-003 limiter).
 
 ## Endpoints
 
@@ -26,15 +35,30 @@ estimated_read_time: 10
 POST /api/block-bookings/ingest
 ```
 
-Ingest a raw booking confirmation email. Parses the email, stores the booking, and triggers overlap detection.
+Ingest a raw booking confirmation email or ICS calendar data. Parses the booking, stores it, and triggers overlap detection.
 
-**Request:**
+**Request (email ingestion):**
 ```json
 {
   "raw_email": "From: user@example.com\nTo: room@resource...\n...",
   "site_id": "site-002"
 }
 ```
+
+**Request (ICS ingestion — Azure AD Graph API path):**
+```json
+{
+  "ics_data": "BEGIN:VCALENDAR\nVERSION:2.0\n...",
+  "site_id": "site-002"
+}
+```
+
+**Security constraints:**
+| Field | Type | Limit |
+|-------|------|-------|
+| `raw_email` | string | Max 10 MB |
+| `ics_data` | string | Max 100 KB, must start with `BEGIN:VCALENDAR` |
+| `site_id` | string | Max 50 characters |
 
 **Response (booking ingested):**
 ```json
