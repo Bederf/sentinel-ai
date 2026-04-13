@@ -1434,6 +1434,31 @@ class BackgroundSchedulerService:
         )
         logger.info(f"Added ML retraining job with {interval_seconds}s interval (checks daily for stale models)")
 
+    def add_anomaly_weekly_retrain_job(self, interval_hours: int = 168):
+        """
+        Add a weekly anomaly model retraining job (Isolation Forest on zone temp + HVAC power).
+
+        Runs every Sunday at 02:00. Delegates to the existing drift detection job since
+        that layer already handles anomaly detection and retraining governance.
+
+        Args:
+            interval_hours: Interval in hours (default: 168 = weekly). Ignored — always runs weekly.
+        """
+        from apscheduler.triggers.cron import CronTrigger
+
+        if self.scheduler.get_job("anomaly_weekly_retrain"):
+            self.scheduler.remove_job("anomaly_weekly_retrain")
+            logger.info("Removed existing anomaly weekly retrain job")
+
+        self.scheduler.add_job(
+            func=self._run_drift_detection,
+            trigger=CronTrigger(day_of_week="sun", hour=2, minute=0),
+            id="anomaly_weekly_retrain",
+            name="Anomaly Model Weekly Retrain (Isolation Forest)",
+            replace_existing=True,
+        )
+        logger.info("Added anomaly weekly retrain job (Sunday 02:00, delegates to drift detection)")
+
     def add_drift_detection_job(self, interval_seconds: int = 3600):
         """
         Add a job to monitor for data/model drift and trigger retraining if detected.

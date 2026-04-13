@@ -109,12 +109,16 @@ def sync_registry_to_db(registry_path: Path = _REGISTRY_PATH) -> dict[str, int]:
     if not all_rows:
         return {"upserted": 0, "skipped": parse_errors + len(models) - len(all_rows), "errors": parse_errors}
 
-    # Keep only the latest model per (equipment_type, model_type, status) group.
-    # registered_at is an ISO string so lexicographic max gives the newest entry.
+    # Keep only the latest model per (equipment_type, model_type) group, and only
+    # for 'active' status.  This avoids spurious ON CONFLICT violations from
+    # historical entries that were superseded but retained in the JSON.
     latest: dict[tuple, dict] = {}
     skipped = 0
     for row in all_rows:
-        key = (row["equipment_type"], row["model_type"], row["status"])
+        if row["status"] != "active":
+            skipped += 1
+            continue
+        key = (row["equipment_type"], row["model_type"])
         existing = latest.get(key)
         if existing is None or row["registered_at"] > existing["registered_at"]:
             if existing is not None:
@@ -151,8 +155,9 @@ def sync_registry_to_db(registry_path: Path = _REGISTRY_PATH) -> dict[str, int]:
                         %(feature_names)s, %(target_name)s, %(forecast_horizons)s,
                         %(registered_at)s::timestamp, %(registered_by)s, %(notes)s
                     )
-                    ON CONFLICT ON CONSTRAINT ml_models_equipment_type_model_type_status_key DO UPDATE SET
+                    ON CONFLICT (equipment_type, model_type) DO UPDATE SET
                         model_id         = EXCLUDED.model_id,
+                        status           = EXCLUDED.status,
                         model_path       = EXCLUDED.model_path,
                         scaler_path      = EXCLUDED.scaler_path,
                         r_squared_avg    = EXCLUDED.r_squared_avg,
