@@ -158,7 +158,93 @@ def format_ghost_whatsapp_message(finding: GhostBookingFinding, *, is_reminder: 
     return message
 
 
-def _send_email_direct_smtp(to_email: str, subject: str, body: str) -> bool:
+def format_ghost_email_html(finding: GhostBookingFinding, site_name: str = "", *, is_reminder: bool = False) -> str:
+    """Build an HTML ghost booking alert email matching the visitor confirmation style."""
+    site_label = site_name or finding.site_id
+    prefix = "REMINDER — " if is_reminder else ""
+    start_local = _to_sast(finding.booking_start, assume_utc_if_naive=False)
+    end_local = _to_sast(finding.booking_end, assume_utc_if_naive=False)
+    booking_date = start_local.strftime("%A %d %B %Y")
+    flagged_at = _to_sast(finding.detected_at).strftime("%d %b %Y %H:%M SAST")
+    start = start_local.strftime("%H:%M")
+    end = end_local.strftime("%H:%M")
+    duration_min = int((finding.booking_end - finding.booking_start).total_seconds() / 60)
+    organiser_name = finding.organiser_name or "Unknown"
+    organiser_email = finding.organiser_email or "Unknown"
+    header_color = "#c0392b" if not is_reminder else "#e67e22"
+    header_label = f"{prefix}GHOST BOOKING ALERT"
+
+    anomaly_row = ""
+    if finding.source_booking_flagged:
+        anomaly_row = (
+            "<tr>"
+            '<td colspan="2" style="padding:8px 0;color:#c0392b;font-size:13px">'
+            "&#9888; This booking was already flagged as a block-booking anomaly."
+            "</td></tr>"
+        )
+
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>{header_label}</title>
+</head>
+<body style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;color:#222">
+  <div style="background:{header_color};padding:24px;border-radius:8px 8px 0 0">
+    <h1 style="color:#fff;margin:0;font-size:20px">&#128680; {header_label}</h1>
+    <p style="color:#fdd;margin:6px 0 0;font-size:14px">{site_label}</p>
+  </div>
+
+  <div style="background:#f8f9fa;padding:24px;border:1px solid #e0e0e0;border-top:none">
+    <p style="margin:0 0 16px;font-size:14px;color:#555">
+      <strong>{finding.room_name or finding.room_code}</strong> has been booked but no presence
+      was detected for <strong>{finding.grace_period_minutes} minutes</strong> after the start time.
+    </p>
+
+    <table style="width:100%;border-collapse:collapse;margin-bottom:16px">
+      <tr style="background:#fff2f2">
+        <td style="padding:8px;color:#555;font-size:13px;width:120px">Room</td>
+        <td style="padding:8px;font-weight:600">{finding.room_name or finding.room_code} <span style="color:#999;font-weight:400">({finding.room_code})</span></td>
+      </tr>
+      <tr>
+        <td style="padding:8px;color:#555;font-size:13px">Date</td>
+        <td style="padding:8px;font-weight:600">{booking_date}</td>
+      </tr>
+      <tr style="background:#fafafa">
+        <td style="padding:8px;color:#555;font-size:13px">Time</td>
+        <td style="padding:8px;font-weight:600">{start} – {end} ({duration_min} min)</td>
+      </tr>
+      <tr>
+        <td style="padding:8px;color:#555;font-size:13px">Flagged at</td>
+        <td style="padding:8px">{flagged_at}</td>
+      </tr>
+      <tr style="background:#fafafa">
+        <td style="padding:8px;color:#555;font-size:13px">Organiser</td>
+        <td style="padding:8px">
+          {organiser_name}<br/>
+          <a href="mailto:{organiser_email}" style="color:#1a73e8;font-size:13px">{organiser_email}</a>
+        </td>
+      </tr>
+      {anomaly_row}
+    </table>
+
+    <div style="background:#fff3cd;border:1px solid #ffc107;border-radius:6px;padding:14px 16px;margin-bottom:16px">
+      <strong style="font-size:13px">Action Required</strong>
+      <ol style="margin:8px 0 0;padding-left:18px;font-size:13px;color:#555">
+        <li>Physically inspect <strong>{finding.room_code}</strong></li>
+        <li>If empty — the room can be released for other use</li>
+        <li>If occupied — no action needed (sensor may need recalibration)</li>
+      </ol>
+    </div>
+
+    <p style="font-size:12px;color:#999;margin:0">Finding ID: {finding.id} &nbsp;|&nbsp; SENTINEL Space Intelligence — {site_label}</p>
+  </div>
+</body>
+</html>"""
+
+
+def _send_email_direct_smtp(to_email: str, subject: str, body: str, body_html: str | None = None) -> bool:
     """Send ghost alert email via SMTP using rooms@ mailbox (or fallback to notification SMTP)."""
     import smtplib
     from email.mime.text import MIMEText
@@ -176,10 +262,20 @@ def _send_email_direct_smtp(to_email: str, subject: str, body: str) -> bool:
         logger.warning("No SMTP configured — cannot send ghost alert email")
         return False
 
-    msg = MIMEText(body)
-    msg["Subject"] = subject
-    msg["From"] = f"{from_name} <{username}>"
-    msg["To"] = to_email
+    if body_html:
+        from email.mime.multipart import MIMEMultipart
+
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = subject
+        msg["From"] = f"{from_name} <{username}>"
+        msg["To"] = to_email
+        msg.attach(MIMEText(body, "plain"))
+        msg.attach(MIMEText(body_html, "html"))
+    else:
+        msg = MIMEText(body)
+        msg["Subject"] = subject
+        msg["From"] = f"{from_name} <{username}>"
+        msg["To"] = to_email
 
     try:
         server = smtplib.SMTP(host, port, timeout=10)
@@ -201,13 +297,16 @@ async def _send_email(
     *,
     is_reminder: bool = False,
 ) -> bool:
-    if not config.concierge_email:
+    if not (config.concierge_email and config.concierge_email.strip()):
         return False
+    to_email = config.concierge_email.strip()
 
     subject = f"{'REMINDER — ' if is_reminder else ''}Ghost booking alert: {finding.room_code}"
     body = format_ghost_email_message(finding, site_name, is_reminder=is_reminder)
+    body_html = format_ghost_email_html(finding, site_name, is_reminder=is_reminder)
 
-    # Try n8n webhook first
+    # Try n8n webhook first (also carries WhatsApp fields so n8n can send in parallel)
+    wa_number = (config.concierge_whatsapp or "").strip().replace("whatsapp:", "")
     try:
         result = await get_n8n_service().trigger_webhook(
             webhook_path="space-ghost-room-alert",
@@ -217,9 +316,11 @@ async def _send_email(
                 "finding_id": finding.id,
                 "room_code": finding.room_code,
                 "room_name": finding.room_name,
-                "to_email": config.concierge_email,
+                "to_email": to_email,
                 "subject": subject,
-                "message": body,
+                "message": body_html,
+                "to_whatsapp": wa_number,
+                "whatsapp_message": format_ghost_whatsapp_message(finding, is_reminder=is_reminder),
                 "booking_date": finding.booking_start.date().isoformat(),
                 "flagged_at": finding.detected_at.isoformat(),
                 "organiser_email": finding.organiser_email,
@@ -235,7 +336,7 @@ async def _send_email(
         logger.warning("n8n webhook failed, falling back to direct SMTP: %s", exc)
 
     # Fallback: send directly via SMTP
-    return _send_email_direct_smtp(config.concierge_email, subject, body)
+    return _send_email_direct_smtp(to_email, subject, body, body_html)
 
 
 async def _send_whatsapp(
@@ -264,22 +365,27 @@ async def send_ghost_booking_alert(
     *,
     is_reminder: bool = False,
 ) -> dict[str, Any]:
-    """Dispatch email via n8n and WhatsApp via Twilio/Sentry."""
+    """Dispatch email + WhatsApp via n8n (parallel branches). Falls back to direct APIs."""
     email_sent = False
     whatsapp_sent = False
     whatsapp_message_id: str | None = None
 
     try:
         email_sent = await _send_email(finding, config, site_name, is_reminder=is_reminder)
+        # n8n workflow also sends WhatsApp in parallel — credit it here if a number is configured
+        if email_sent and config.concierge_whatsapp:
+            whatsapp_sent = True
     except Exception as exc:
-        logger.error("Ghost booking email dispatch failed: %s", exc)
+        logger.error("Ghost booking email/WhatsApp dispatch failed: %s", exc)
 
-    try:
-        whatsapp_result = await _send_whatsapp(finding, config, is_reminder=is_reminder)
-        whatsapp_sent = bool(whatsapp_result.get("success"))
-        whatsapp_message_id = whatsapp_result.get("message_id")
-    except Exception as exc:
-        logger.error("Ghost booking WhatsApp dispatch failed: %s", exc)
+    # Only fall back to direct WhatsApp if n8n did not handle it
+    if not whatsapp_sent:
+        try:
+            whatsapp_result = await _send_whatsapp(finding, config, is_reminder=is_reminder)
+            whatsapp_sent = bool(whatsapp_result.get("success"))
+            whatsapp_message_id = whatsapp_result.get("message_id")
+        except Exception as exc:
+            logger.error("Ghost booking WhatsApp fallback dispatch failed: %s", exc)
 
     if email_sent or whatsapp_sent:
         occupancy_store.mark_ghost_finding_notified(

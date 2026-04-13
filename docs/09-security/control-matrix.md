@@ -67,26 +67,26 @@ Any new code touching a hotspot file MUST satisfy the relevant controls below.
 
 Files that sit at real control boundaries. Any PR touching these requires explicit control verification.
 
-| File | Boundary | Risk | Critical Controls |
-|------|----------|------|------------------|
-| `middleware/auth_middleware.py` | All authentication | CRITICAL | AUTH-001, AUTH-002, AUTH-006 |
-| `models/auth.py` | Role definitions | CRITICAL | AUTH-002 |
-| `services/approval_service.py` | Approval + safety gate | CRITICAL | APPROVAL-001, APPROVAL-003, SAFETY-003 |
-| `services/safety_interlocks.py` | Device safety | CRITICAL | SAFETY-001, SAFETY-002 |
-| `services/quality_gate_evaluator.py` | Quality + enforcement | CRITICAL | QUALITY-GATE-001, QUALITY-GATE-002 |
-| `services/tier_routing_engine.py` | Tier allocation | HIGH | APPROVAL-002, RISK-001 |
-| `api/whatsapp_webhooks.py` | External webhook auth | HIGH | AUTH-005, APPROVAL-004 |
-| `api/sentry_webhooks.py` | Sentry callback auth | HIGH | AUTH-005 (H-1 fixed 2026-03-22) |
-| `api/approval_workflow.py` | Approval endpoints | HIGH | APPROVAL-001, POLICY-002 |
-| `services/audit_logger.py` | Audit trail | HIGH | AUDIT-001, AUDIT-002, CRYPTO-001 |
-| `services/consent_service.py` | POPIA consent | HIGH | CONSENT-001 (H-2 fixed 2026-03-22) |
-| `api/auth.py` | Login / token issuance | HIGH | AUTH-001, AUTH-003 |
-| `api/remote_commands.py` | Role extraction | HIGH | AUTH-002 (C-1 fixed 2026-03-22) |
-| `api/autonomous.py` | Autonomous decisions | HIGH | APPROVAL-001, POLICY-002 (C-2 fixed 2026-03-22) |
-| `api/optimization.py` | Optimization auto-execute path | HIGH | APPROVAL-001, SAFETY-003 (Phase 2 gap — safety gate active, ApprovalService integration pending) |
-| `api/metrics.py` | Prometheus exposure | MEDIUM | MONITORING-001 (GAP — unauthenticated) |
-| `startup/middleware.py` | TESTING bypass | MEDIUM | AUTH-006 (M-1 fixed 2026-03-22) |
-| `integrations/whatsapp_service.py` | Token comparison | MEDIUM | AUTH-005 (M-2 fixed 2026-03-22) |
+| File | Boundary | Risk | Physical | Critical Controls |
+|------|----------|------|----------|------------------|
+| `middleware/auth_middleware.py` | All authentication | CRITICAL | NO | AUTH-001, AUTH-002, AUTH-006 |
+| `models/auth.py` | Role definitions | CRITICAL | NO | AUTH-002 |
+| `services/approval_service.py` | Approval + safety gate | CRITICAL | YES | APPROVAL-001, APPROVAL-003, SAFETY-003 |
+| `services/safety_interlocks.py` | Device safety | CRITICAL | YES | SAFETY-001, SAFETY-002 |
+| `services/quality_gate_evaluator.py` | Quality + enforcement | CRITICAL | YES | QUALITY-GATE-001, QUALITY-GATE-002 |
+| `services/tier_routing_engine.py` | Tier allocation | HIGH | YES | APPROVAL-002, RISK-001 |
+| `api/whatsapp_webhooks.py` | External webhook auth | HIGH | NO | AUTH-005, APPROVAL-004 |
+| `api/sentry_webhooks.py` | Sentry callback auth | HIGH | NO | AUTH-005 (H-1 fixed 2026-03-22) |
+| `api/approval_workflow.py` | Approval endpoints | HIGH | YES | APPROVAL-001, POLICY-002 |
+| `services/audit_logger.py` | Audit trail | HIGH | NO | AUDIT-001, AUDIT-002, CRYPTO-001 |
+| `services/consent_service.py` | POPIA consent | HIGH | NO | CONSENT-001 (H-2 fixed 2026-03-22) |
+| `api/auth.py` | Login / token issuance | HIGH | NO | AUTH-001, AUTH-003 |
+| `api/remote_commands.py` | Role extraction | HIGH | YES | AUTH-002 (C-1 fixed 2026-03-22) |
+| `api/autonomous.py` | Autonomous decisions | HIGH | YES | APPROVAL-001, POLICY-002 (C-2 fixed 2026-03-22) |
+| `api/optimization.py` | Optimization auto-execute path | HIGH | YES | APPROVAL-001, SAFETY-003 (Phase 2 gap — safety gate active, ApprovalService integration pending) |
+| `api/metrics.py` | Prometheus exposure | MEDIUM | NO | MONITORING-001 (GAP — unauthenticated) |
+| `startup/middleware.py` | TESTING bypass | MEDIUM | NO | AUTH-006 (M-1 fixed 2026-03-22) |
+| `integrations/whatsapp_service.py` | Token comparison | MEDIUM | NO | AUTH-005 (M-2 fixed 2026-03-22) |
 
 ---
 

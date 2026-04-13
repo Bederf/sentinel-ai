@@ -103,9 +103,12 @@ class MinimaxService:
         source: str = "chat",
     ) -> AsyncGenerator[str, None]:
         """
-        Stream a completion from Minimax using the Anthropic SSE event format.
+        Open the Minimax streaming connection eagerly, validate the HTTP status
+        (raises immediately on 429/401/404 — before returning), then return an
+        async generator for content chunks.
 
-        Yields text chunks (answer content only, skipping thinking blocks).
+        The eager status check allows model_gateway._try_routes to catch rate
+        limit errors and fall through to the next provider in the fallback chain.
         """
         if not self._api_key:
             raise ValueError("MINIMAX_API_KEY not configured.")
@@ -129,51 +132,78 @@ class MinimaxService:
             "stream": True,
         }
 
+        # Open connection and check status BEFORE returning so that callers
+        # (model_gateway._try_routes) see 429/401 errors synchronously.
+        client = httpx.AsyncClient(timeout=90.0)
+        await client.__aenter__()
+
         try:
-            async with httpx.AsyncClient(timeout=90.0) as client:
-                async with client.stream("POST", url, headers=headers, json=payload) as response:
-                    if response.status_code == 401:
-                        raise ValueError("Invalid MINIMAX_API_KEY.")
-                    if response.status_code == 429:
-                        raise Exception("Minimax API rate limit exceeded.")
-                    if response.status_code == 404:
-                        raise Exception(f"Minimax endpoint not found: {url}. Check MINIMAX_BASE_URL.")
+            stream_ctx = client.stream("POST", url, headers=headers, json=payload)
+            response = await stream_ctx.__aenter__()
+        except Exception:
+            await client.__aexit__(None, None, None)
+            raise
 
-                    response.raise_for_status()
+        if response.status_code != 200:
+            err_map: dict[int, Exception] = {
+                401: ValueError("Invalid MINIMAX_API_KEY."),
+                429: Exception("Minimax API rate limit exceeded."),
+                404: Exception(f"Minimax endpoint not found: {url}. Check MINIMAX_BASE_URL."),
+            }
+            exc = err_map.get(
+                response.status_code,
+                Exception(f"Minimax API error: HTTP {response.status_code}"),
+            )
+            await stream_ctx.__aexit__(None, None, None)
+            await client.__aexit__(None, None, None)
+            raise exc
 
-                    # Parse Anthropic SSE event stream
-                    # Events: message_start, ping, content_block_start,
-                    #         content_block_delta, content_block_stop, message_delta, message_stop
-                    # Each event is "event: <type>\ndata: <json>\n"
-                    import json
-                    event_type = None
-                    async for line in response.aiter_lines():
-                        if line.startswith("event: "):
-                            event_type = line[7:].strip()
-                        elif line.startswith("data: ") and event_type:
-                            data_str = line[6:].strip()
-                            if not data_str:
-                                continue
-                            try:
-                                data = json.loads(data_str)
-                            except Exception:
-                                continue
-                            # Only yield text_delta content — skip thinking blocks
-                            if event_type == "content_block_delta":
-                                delta = data.get("delta", {})
-                                if delta.get("type") == "text_delta":
-                                    text = delta.get("text", "")
-                                    if text:
-                                        yield text
-                            elif event_type == "message_stop":
-                                break
+        return self._consume_stream(client, stream_ctx, response)
 
+    async def _consume_stream(
+        self,
+        client: httpx.AsyncClient,
+        stream_ctx: object,
+        response: httpx.Response,
+    ) -> AsyncGenerator[str, None]:
+        """Iterate an already-opened Minimax SSE stream, cleaning up on exit."""
+        import json
+
+        try:
+            # Parse Anthropic SSE event stream
+            # Events: message_start, ping, content_block_start,
+            #         content_block_delta, content_block_stop, message_delta, message_stop
+            # Each event is "event: <type>\ndata: <json>\n"
+            event_type = None
+            async for line in response.aiter_lines():
+                if line.startswith("event: "):
+                    event_type = line[7:].strip()
+                elif line.startswith("data: ") and event_type:
+                    data_str = line[6:].strip()
+                    if not data_str:
+                        continue
+                    try:
+                        data = json.loads(data_str)
+                    except Exception:
+                        continue
+                    # Only yield text_delta content — skip thinking blocks
+                    if event_type == "content_block_delta":
+                        delta = data.get("delta", {})
+                        if delta.get("type") == "text_delta":
+                            text = delta.get("text", "")
+                            if text:
+                                yield text
+                    elif event_type == "message_stop":
+                        break
         except httpx.HTTPStatusError as e:
             logger.error("Minimax HTTP error: %s", e)
             raise Exception(f"Minimax API error: HTTP {e.response.status_code}") from e
         except Exception as e:
             logger.error("Unexpected error in Minimax service: %s", e)
             raise
+        finally:
+            await stream_ctx.__aexit__(None, None, None)
+            await client.__aexit__(None, None, None)
 
     async def non_stream_response(
         self,

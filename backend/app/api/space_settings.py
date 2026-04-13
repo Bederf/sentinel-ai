@@ -254,7 +254,7 @@ def _load_site_structure() -> List[Dict[str, Any]]:
                 return value
     except Exception as exc:
         logger.warning("Canonical space site structure load failed: %s", exc)
-        return []
+    return []
 
 
 @router.get("/settings/space/sites")

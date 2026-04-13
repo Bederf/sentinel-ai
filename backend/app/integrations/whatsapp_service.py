@@ -39,7 +39,7 @@ class WhatsAppService:
                 )
 
             if self.phone_id and self.api_token:
-                self.api_url = f"https://graph.instagram.com/v18.0/{self.phone_id}/messages"
+                self.api_url = f"https://graph.facebook.com/v18.0/{self.phone_id}/messages"
                 self.enabled = True
                 logger.info(f"WhatsApp service initialized (Meta API, phone_id={self.phone_id[:20]}...)")
             else:

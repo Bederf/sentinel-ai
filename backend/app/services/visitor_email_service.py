@@ -136,6 +136,12 @@ def _build_html_email(
 
     {pin_display}
 
+    <div style="margin-top:24px;text-align:center">
+      <p style="font-size:13px;color:#555;margin:0 0 12px">Scan this QR code at the reception kiosk:</p>
+      <img src="cid:visitor_qr_code" alt="Your check-in QR code"
+           style="width:180px;height:180px;border:1px solid #e0e0e0;border-radius:4px" />
+    </div>
+
     <div style="margin-top:16px">
       <p style="font-size:12px;color:#999;margin:0">
         If you did not expect this invitation, please disregard this email.

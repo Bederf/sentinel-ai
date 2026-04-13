@@ -2,7 +2,7 @@
 title: GSD Pipeline Architecture
 category: development
 created: 2026-03-14
-updated: 2026-03-14
+updated: 2026-04-12
 phase: 155-156
 ---
 
@@ -13,7 +13,7 @@ The GSD (Get Shit Done) master pipeline orchestrates phase execution through wav
 ## Pipeline Stages
 
 ```
-Discovery → Planning → Architecture Challenge → Execution (Ralph Loop) → Paranoid Review → Documentation
+Discovery → Planning → [2b] Physical Scan → [3] Architecture Challenge → Execution (Ralph Loop) → [5] Control Validation → [6] Paranoid Review → Documentation
 ```
 
 Each stage operates on a different information source to maintain orthogonal validation.
@@ -108,6 +108,25 @@ The loop continues until all tasks complete or iteration budget exhausts.
 | Standard | 2-3 | 8-12 (tasks x 3-4) |
 | TDD | 2-3 | 10-15 (tasks x 5) |
 | Complex | 2-3 | 10-15 (tasks x 4-5) |
+
+## v1.1 Security Gate Chain (2026-04-12)
+
+Four security gates added to the pipeline. Gates run at orchestrator level — not inside Ralph Loop (complexity scoring cannot skip them).
+
+| Step | Gate | Output Fields | Hard Stop Trigger |
+|------|------|--------------|-------------------|
+| 2b | Physical Scan | `physical_impact: true/false` | None (detection only) |
+| 3 | Architecture Challenger | `exploitability_band`, `confidence_score`, `physical_safety_verified` | `physical_safety_verified: false` |
+| 5 | Control Validator | `contamination_clean`, `gate_status`, `contamination_physical_block` | `contamination_physical_block: true` or `gate_status: BLOCK` + `physical_impact` |
+| 6 | Paranoid Review | Standard findings | Only reached if all gates pass |
+
+**Hard stop policy:** Regular BLOCKERs are user-overridable. Physical safety gates are not — safety interlock bypass and credential-in-physical-path are non-negotiable halts.
+
+**Physical=YES files** (from `docs/09-security/control-matrix.md` Section B): `services/approval_service.py`, `services/safety_interlocks.py`, `services/quality_gate_evaluator.py`, `services/tier_routing_engine.py`, `api/approval_workflow.py`, `api/remote_commands.py`, `api/autonomous.py`, `api/optimization.py`
+
+**Contamination checks (Step 5):** credential leak, unsafe RNG, hardcoded network addresses, cross-wave copied blocks (sha256sum fingerprint), scratch file residue.
+
+**Gate verdicts log:** `docs/improvement-loops/{date}-gate-verdicts.md` — populated after each Physical=YES phase for calibration tracking.
 
 ## Known Pipeline Risks
 

@@ -66,9 +66,13 @@ def _parse_model_row(model_id: str, entry: dict[str, Any]) -> dict[str, Any] | N
 
 def sync_registry_to_db(registry_path: Path = _REGISTRY_PATH) -> dict[str, int]:
     """
-    Upsert all models from registry.json into the ml_models table.
+    Upsert the latest model per (equipment_type, model_type) group into ml_models.
 
-    Uses ON CONFLICT (model_id) DO UPDATE so it is safe to call repeatedly.
+    The registry accumulates every retrained version but the DB enforces a unique
+    constraint on (equipment_type, model_type, status).  We pick only the most
+    recently registered entry per group so each active slot is updated to the
+    latest model without hitting duplicate-key errors.
+
     Returns counts: {"upserted": N, "skipped": N, "errors": N}
     """
     try:
@@ -89,41 +93,45 @@ def sync_registry_to_db(registry_path: Path = _REGISTRY_PATH) -> dict[str, int]:
         return {"upserted": 0, "skipped": 0, "errors": 1}
 
     models = registry.get("models", {})
-    rows = []
     parse_errors = 0
 
+    # Parse all rows first
+    all_rows: list[dict] = []
     for model_id, entry in models.items():
         try:
             row = _parse_model_row(model_id, entry)
             if row:
-                rows.append(row)
+                all_rows.append(row)
         except Exception as e:
             logger.warning(f"Skipping model {model_id}: {e}")
             parse_errors += 1
 
-    if not rows:
-        return {"upserted": 0, "skipped": parse_errors, "errors": parse_errors}
+    if not all_rows:
+        return {"upserted": 0, "skipped": parse_errors + len(models) - len(all_rows), "errors": parse_errors}
+
+    # Keep only the latest model per (equipment_type, model_type, status) group.
+    # registered_at is an ISO string so lexicographic max gives the newest entry.
+    latest: dict[tuple, dict] = {}
+    skipped = 0
+    for row in all_rows:
+        key = (row["equipment_type"], row["model_type"], row["status"])
+        existing = latest.get(key)
+        if existing is None or row["registered_at"] > existing["registered_at"]:
+            if existing is not None:
+                skipped += 1
+            latest[key] = row
+        else:
+            skipped += 1
+
+    rows = list(latest.values())
+    logger.debug(
+        f"Registry has {len(all_rows)} entries; syncing {len(rows)} (latest per group), skipping {skipped} older versions"
+    )
 
     try:
         conn = psycopg2.connect(_DATABASE_URL)
         conn.autocommit = True
         cur = conn.cursor()
-
-        # Ensure model_id uniqueness constraint exists (idempotent)
-        cur.execute(
-            """
-            DO $$
-            BEGIN
-                IF NOT EXISTS (
-                    SELECT 1 FROM pg_indexes
-                    WHERE tablename = 'ml_models' AND indexname = 'ml_models_model_id_key'
-                ) THEN
-                    ALTER TABLE ml_models ADD CONSTRAINT ml_models_model_id_key UNIQUE (model_id);
-                END IF;
-            EXCEPTION WHEN duplicate_table THEN NULL;
-            END $$;
-            """
-        )
 
         upserted = 0
         for row in rows:
@@ -143,14 +151,16 @@ def sync_registry_to_db(registry_path: Path = _REGISTRY_PATH) -> dict[str, int]:
                         %(feature_names)s, %(target_name)s, %(forecast_horizons)s,
                         %(registered_at)s::timestamp, %(registered_by)s, %(notes)s
                     )
-                    ON CONFLICT ON CONSTRAINT ml_models_model_id_key DO UPDATE SET
-                        status          = EXCLUDED.status,
-                        r_squared_avg   = EXCLUDED.r_squared_avg,
-                        r_squared_24h   = EXCLUDED.r_squared_24h,
-                        r_squared_48h   = EXCLUDED.r_squared_48h,
-                        r_squared_72h   = EXCLUDED.r_squared_72h,
+                    ON CONFLICT ON CONSTRAINT ml_models_equipment_type_model_type_status_key DO UPDATE SET
+                        model_id         = EXCLUDED.model_id,
+                        model_path       = EXCLUDED.model_path,
+                        scaler_path      = EXCLUDED.scaler_path,
+                        r_squared_avg    = EXCLUDED.r_squared_avg,
+                        r_squared_24h    = EXCLUDED.r_squared_24h,
+                        r_squared_48h    = EXCLUDED.r_squared_48h,
+                        r_squared_72h    = EXCLUDED.r_squared_72h,
                         training_samples = EXCLUDED.training_samples,
-                        registered_at   = EXCLUDED.registered_at
+                        registered_at    = EXCLUDED.registered_at
                     """,
                     row,
                 )
@@ -162,8 +172,11 @@ def sync_registry_to_db(registry_path: Path = _REGISTRY_PATH) -> dict[str, int]:
         cur.close()
         conn.close()
 
-        logger.info(f"ml_models sync: {upserted} upserted, {parse_errors} errors from {len(models)} registry entries")
-        return {"upserted": upserted, "skipped": 0, "errors": parse_errors}
+        logger.info(
+            f"ml_models sync: {upserted} upserted, {skipped} older versions skipped, "
+            f"{parse_errors} errors (from {len(models)} registry entries)"
+        )
+        return {"upserted": upserted, "skipped": skipped, "errors": parse_errors}
 
     except Exception as e:
         logger.error(f"ml_models DB sync failed: {e}")

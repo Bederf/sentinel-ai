@@ -107,6 +107,14 @@ def scan_visit(request: ScanRequest) -> ScanResponse:
     updated_visit = service_layer.arrive_visit(visit)
     building_name = service_layer.get_building_name(updated_visit.building_id)
 
+    # Notify host on arrival scan — only fires on the CREATED→ARRIVED transition
+    if visit.status == VisitStatus.CREATED and updated_visit.status == VisitStatus.ARRIVED:
+        try:
+            notification_service = get_notification_service()
+            notification_service.notify_host_arrival(updated_visit)
+        except Exception as exc:
+            logger.warning("Host arrival notification failed for visit %s: %s", updated_visit.id, exc)
+
     return ScanResponse(
         visit=_visit_to_response(updated_visit),
         building_name=building_name,
@@ -149,13 +157,6 @@ def register_visit(request: RegisterRequest) -> RegisterResponse:
         vehicle=request.vehicle,
         id_number=request.id_number,
     )
-
-    # Notify host once visitor has completed reception registration.
-    try:
-        notification_service = get_notification_service()
-        notification_service.notify_host_arrival(updated)
-    except Exception as exc:
-        logger.warning("Host notification failed for visit %s: %s", updated.id, exc)
 
     return RegisterResponse(
         visit=_visit_to_response(updated),

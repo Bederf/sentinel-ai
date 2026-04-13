@@ -10,7 +10,6 @@ import logging
 
 from app.core.site_resolver import get_registered_sites
 from app.config.settings import settings
-from app.integrations.whatsapp_service import get_whatsapp_service
 from app.services.sentry_integration.alert_notifier import alert_notifier
 
 logger = logging.getLogger(__name__)
@@ -62,24 +61,24 @@ async def send_focus_overstay_alert(
             }
         )
 
-        # 2) WhatsApp direct send to configured concierge number
+        # 2) WhatsApp via n8n SENTINEL — WhatsApp Send workflow
         whatsapp_ok = False
         whatsapp_result: dict = {}
-        whatsapp_to = settings.twilio_whatsapp_to
-        service = get_whatsapp_service()
-        if whatsapp_to and service.enabled:
-            whatsapp_result = await service.send_text_message(
-                whatsapp_to,
-                f"*{title}*\n\n{body}",
-            )
-            whatsapp_ok = bool(whatsapp_result.get("success"))
+        whatsapp_to = (settings.twilio_whatsapp_to or "").replace("whatsapp:", "").strip()
+        if whatsapp_to:
+            try:
+                from app.services.n8n_service import get_n8n_service
+
+                whatsapp_result = await get_n8n_service().trigger_webhook(
+                    webhook_path="whatsapp-send",
+                    payload={"to": whatsapp_to, "message": f"*{title}*\n\n{body}"},
+                )
+                whatsapp_ok = bool(whatsapp_result.get("success"))
+            except Exception as wa_exc:
+                logger.warning("Focus overstay WhatsApp via n8n failed: %s", wa_exc)
+                whatsapp_result = {"success": False, "error": str(wa_exc)}
         else:
-            whatsapp_result = {
-                "success": False,
-                "error": "whatsapp_not_configured",
-                "provider": service.provider,
-                "to": whatsapp_to,
-            }
+            whatsapp_result = {"success": False, "error": "whatsapp_not_configured"}
 
         success = telegram_ok or whatsapp_ok
         result = {

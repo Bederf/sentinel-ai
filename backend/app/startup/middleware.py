@@ -50,6 +50,7 @@ _PUBLIC_PREFIXES = (
     "/api/visits/qr/",  # Visitor QR code images — token is the secret, no JWT needed
     "/api/sentry-webhooks",  # Telegram bot callbacks (authenticated via webhook secret)
     "/api/sentry/email/",  # Sentry email intake (authenticated via X-Sentry-API-Key middleware)
+    "/api/sentry-email/",  # Sentry email intake v2 — advisor strategy (authenticated via X-Sentry-API-Key in endpoint)
     "/api/emails/",  # Email cluster intake (authenticated via Bearer token in endpoint)
     "/api/whatsapp/",  # WhatsApp/Twilio webhooks (authenticated at webhook layer)
     "/api/mcp/sse",  # MCP SSE transport for Claude Desktop (authenticated at MCP layer)

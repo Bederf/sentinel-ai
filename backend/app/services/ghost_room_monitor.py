@@ -115,28 +115,37 @@ def _should_send_new_hourly_alert(booking: BookingRecord, current, now: datetime
 def _enrich_config_with_concierge(config, site_id: str, room_code: str = ""):
     """Overlay concierge contact info from concierge_store if available.
 
+    Collects ALL active concierges for the building so every assigned concierge
+    receives ghost booking alerts. Emails are comma-separated so n8n emailSend
+    delivers to all recipients in one send.
+
     Falls back to the original BlockBookingConfig (block_booking_sites.json) if
-    no concierge is found in the new store.
+    no concierges are found in the store.
     """
     try:
-        from app.services.concierge_store import find_concierge_for_room
+        from app.services.concierge_store import find_all_concierges_for_room
 
         # Try to extract building code from room_code (e.g. FA1-Room-101 -> FA1)
         building_code = site_id
         if room_code and "-" in room_code:
             building_code = room_code.split("-")[0]
 
-        concierge = find_concierge_for_room(site_id, building_code)
-        if concierge:
-            if concierge.email:
-                config.concierge_email = concierge.email
-            if concierge.mobile:
-                config.concierge_whatsapp = f"whatsapp:{concierge.mobile}"
+        concierges = find_all_concierges_for_room(site_id, building_code)
+        if concierges:
+            emails = [c.email.strip() for c in concierges if c.email and c.email.strip()]
+            if emails:
+                config.concierge_email = ",".join(emails)
+            # Use the first concierge's WhatsApp for the single-recipient WhatsApp alert
+            for c in concierges:
+                if c.mobile and c.mobile.strip():
+                    config.concierge_whatsapp = f"whatsapp:{c.mobile.strip()}"
+                    break
             logger.debug(
-                "Using concierge %s for room %s (site=%s)",
-                concierge.name,
+                "Using %d concierge(s) for room %s (site=%s): %s",
+                len(concierges),
                 room_code,
                 site_id,
+                config.concierge_email,
             )
     except Exception as exc:
         logger.debug("Concierge store lookup failed, using block_booking config: %s", exc)

@@ -383,7 +383,7 @@ class Settings(BaseSettings):
     brief_occupation_threshold_min: int = 30  # Occupied < N min total in the whole booking
     concierge_response_window_minutes: int = 15  # How long concierge has to respond before reminder
     sensor_silence_threshold_minutes: int = 30  # Sensor silent > N min = connectivity fault, not ghost
-    space_mqtt_enabled: bool = False
+    space_mqtt_enabled: bool = True
     space_mqtt_broker: str = ""
     space_mqtt_port: int = 1883
     space_mqtt_username: str = ""

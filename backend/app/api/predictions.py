@@ -128,7 +128,7 @@ async def list_predictions(
         repo.client.table("predictions")
         .select("""
         *,
-        building:buildings!inner(id, name, code),
+        building:sites!inner(id, name, code),
         equipment:equipment!inner(id, name, type)
     """)
         .eq("status", "active")
@@ -228,7 +228,7 @@ async def get_prediction(prediction_code: str) -> dict:
         repo.client.table("predictions")
         .select("""
         *,
-        building:buildings!inner(id, name, code, address),
+        building:sites!inner(id, name, code, address),
         equipment:equipment!inner(id, name, type, manufacturer, model)
     """)
         .eq("code", prediction_code)

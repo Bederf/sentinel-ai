@@ -146,3 +146,16 @@ def find_concierge_for_room(site_id: str, building_code: str, floor: int | None 
         return active[0]
 
     return None
+
+
+def find_all_concierges_for_room(site_id: str, building_code: str) -> list[ConciergeUser]:
+    """Return all active concierges assigned to a building, falling back to all site concierges.
+
+    Used for multi-recipient ghost booking alerts — every concierge assigned to the
+    building receives the notification, not just the first match.
+    """
+    concierges = list_concierges(site_id=site_id)
+    active = [c for c in concierges if c.active]
+
+    matched = [c for c in active if building_code in c.building_codes]
+    return matched if matched else active

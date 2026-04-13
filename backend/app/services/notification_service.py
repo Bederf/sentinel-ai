@@ -344,6 +344,7 @@ class NotificationService:
                 "name": self.providers[channel].provider_name,
             }
             for channel in ChannelType
+            if channel in self.providers
         }
 
 

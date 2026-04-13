@@ -368,7 +368,9 @@ class ModelGateway:
             from app.services.minimax_service import minimax_service
 
             if stream:
-                return minimax_service.stream_response(
+                # await here so the eager connection + status check runs before
+                # returning — allows _try_routes to catch 429 and fall through
+                return await minimax_service.stream_response(
                     messages=messages,
                     system_prompt=system,
                     source=source,

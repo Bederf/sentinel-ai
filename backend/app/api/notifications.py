@@ -19,23 +19,22 @@ Endpoints:
 """
 
 import logging
-from typing import List, Optional
-from uuid import UUID
 from datetime import datetime
-from pydantic import BaseModel, ConfigDict, Field
+from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.config.settings import settings
 from app.database.repositories.notification_repository import NotificationRepository
-from app.services.notification_service import NotificationService
 from app.models.notification import (
-    ChannelType,
     AlertLevel,
+    ChannelType,
     NotificationStatus,
     TechnicianNotificationChannel,
     TechnicianNotificationPreferences,
 )
+from app.services.notification_service import NotificationService
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/notifications", tags=["notifications"])
@@ -47,9 +46,9 @@ class NotificationChannelCreate(BaseModel):
     """Create/update notification channel request."""
 
     channel_type: ChannelType = Field(..., description="TELEGRAM, WHATSAPP, or SMS")
-    telegram_id: Optional[str] = Field(None, description="Telegram user ID")
-    whatsapp_number: Optional[str] = Field(None, description="WhatsApp phone number")
-    sms_number: Optional[str] = Field(None, description="SMS phone number")
+    telegram_id: str | None = Field(None, description="Telegram user ID")
+    whatsapp_number: str | None = Field(None, description="WhatsApp phone number")
+    sms_number: str | None = Field(None, description="SMS phone number")
 
 
 class NotificationChannelResponse(BaseModel):
@@ -60,11 +59,11 @@ class NotificationChannelResponse(BaseModel):
     id: str
     technician_id: str
     channel_type: str
-    telegram_id: Optional[str] = None
-    whatsapp_number: Optional[str] = None
-    sms_number: Optional[str] = None
+    telegram_id: str | None = None
+    whatsapp_number: str | None = None
+    sms_number: str | None = None
     is_verified: bool
-    verified_at: Optional[str] = None
+    verified_at: str | None = None
     verification_attempts: int
     created_at: str
     updated_at: str
@@ -74,7 +73,7 @@ class NotificationPreferencesCreate(BaseModel):
     """Create/update notification preferences request."""
 
     preferred_channel: ChannelType = Field(default=ChannelType.TELEGRAM, description="Primary notification channel")
-    enabled_channels: List[ChannelType] = Field(default=[ChannelType.TELEGRAM], description="Channels to send to")
+    enabled_channels: list[ChannelType] = Field(default=[ChannelType.TELEGRAM], description="Channels to send to")
     alert_level_min: AlertLevel = Field(default=AlertLevel.WARNING, description="Minimum alert severity to send")
     quiet_hours_enabled: bool = Field(default=True, description="Enable quiet hours")
     quiet_hours_start: str = Field(default="22:00", description="Quiet hours start (HH:MM format)")
@@ -92,7 +91,7 @@ class NotificationPreferencesResponse(BaseModel):
     id: str
     technician_id: str
     preferred_channel: str
-    enabled_channels: List[str]
+    enabled_channels: list[str]
     alert_level_min: str
     quiet_hours_enabled: bool
     quiet_hours_start: str
@@ -110,16 +109,16 @@ class NotificationDeliveryLogResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: str
-    work_order_id: Optional[str] = None
+    work_order_id: str | None = None
     technician_id: str
     notification_type: str
     channel_type: str
     recipient_identifier: str
     status: str
-    error_message: Optional[str] = None
+    error_message: str | None = None
     provider: str
-    external_message_id: Optional[str] = None
-    sent_at: Optional[str] = None
+    external_message_id: str | None = None
+    sent_at: str | None = None
     retry_count: int
     created_at: str
 
@@ -175,11 +174,11 @@ async def _resolve_technician_id(technician_id: str) -> UUID:
 
 @router.get(
     "/channels/{technician_id}",
-    response_model=List[NotificationChannelResponse],
+    response_model=list[NotificationChannelResponse],
 )
 async def list_notification_channels(
     technician_id: str,
-    channel_type: Optional[ChannelType] = Query(None, description="Filter by channel type"),
+    channel_type: ChannelType | None = Query(None, description="Filter by channel type"),
 ):
     """
     List notification channels for a technician.
@@ -215,8 +214,10 @@ async def list_notification_channels(
             for ch in channels
         ]
 
+    except HTTPException:
+        raise
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=f"Invalid technician ID: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Invalid technician ID: {e!s}")
     except Exception as e:
         logger.error(f"Error listing notification channels: {e}")
         raise HTTPException(status_code=500, detail="Failed to list channels")
@@ -280,7 +281,7 @@ async def create_notification_channel(
         )
 
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=f"Invalid technician ID: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Invalid technician ID: {e!s}")
     except Exception as e:
         logger.error(f"Error creating notification channel: {e}")
         raise HTTPException(status_code=500, detail="Failed to create channel")
@@ -328,7 +329,7 @@ async def get_notification_channel(
         )
 
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=f"Invalid ID format: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Invalid ID format: {e!s}")
     except HTTPException:
         raise
     except Exception as e:
@@ -390,7 +391,7 @@ async def update_notification_channel(
         )
 
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=f"Invalid ID format: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Invalid ID format: {e!s}")
     except HTTPException:
         raise
     except Exception as e:
@@ -437,7 +438,7 @@ async def delete_notification_channel(
         }
 
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=f"Invalid ID format: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Invalid ID format: {e!s}")
     except HTTPException:
         raise
     except Exception as e:
@@ -575,7 +576,7 @@ async def create_notification_preferences(
         )
 
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=f"Invalid input: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Invalid input: {e!s}")
     except Exception as e:
         logger.error(f"Error creating notification preferences: {e}")
         raise HTTPException(status_code=500, detail="Failed to create preferences")
@@ -643,7 +644,7 @@ async def update_notification_preferences(
         )
 
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=f"Invalid input: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Invalid input: {e!s}")
     except HTTPException:
         raise
     except Exception as e:
@@ -656,11 +657,11 @@ async def update_notification_preferences(
 
 @router.get(
     "/delivery-logs",
-    response_model=List[NotificationDeliveryLogResponse],
+    response_model=list[NotificationDeliveryLogResponse],
 )
 async def get_delivery_logs(
-    technician_id: Optional[str] = Query(None, description="Filter by technician"),
-    status: Optional[NotificationStatus] = Query(None, description="Filter by status"),
+    technician_id: str | None = Query(None, description="Filter by technician"),
+    status: NotificationStatus | None = Query(None, description="Filter by status"),
     limit: int = Query(100, ge=1, le=1000, description="Max results"),
 ):
     """
@@ -703,8 +704,10 @@ async def get_delivery_logs(
             for log in logs
         ]
 
+    except HTTPException:
+        raise
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=f"Invalid filter: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Invalid filter: {e!s}")
     except Exception as e:
         logger.error(f"Error querying delivery logs: {e}")
         raise HTTPException(status_code=500, detail="Failed to query logs")
@@ -715,7 +718,7 @@ async def get_delivery_logs(
 
 @router.get(
     "/providers/status",
-    response_model=List[ProviderStatusResponse],
+    response_model=list[ProviderStatusResponse],
 )
 async def get_provider_status():
     """
@@ -741,7 +744,11 @@ async def get_provider_status():
         # Email is a first-class operations channel in Settings UI, but not part of
         # ChannelType providers in NotificationService yet. Expose SMTP readiness
         # here so UI can render accurate status.
-        email_enabled = bool(settings.notification_smtp_host and settings.notification_smtp_username and settings.notification_smtp_password)
+        email_enabled = bool(
+            settings.notification_smtp_host
+            and settings.notification_smtp_username
+            and settings.notification_smtp_password
+        )
         provider_rows.append(
             ProviderStatusResponse(
                 channel="email",
@@ -784,7 +791,7 @@ async def test_provider_connection(request: ProviderTestRequest):
 
     except Exception as e:
         logger.error(f"Error testing provider: {e}")
-        raise HTTPException(status_code=500, detail=f"Provider test failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Provider test failed: {e!s}")
 
 
 @router.post(
@@ -852,7 +859,7 @@ async def send_test_notification(
         }
 
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=f"Invalid ID format: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Invalid ID format: {e!s}")
     except HTTPException:
         raise
     except Exception as e:
