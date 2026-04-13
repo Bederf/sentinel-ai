@@ -214,7 +214,7 @@ class TestGraphOAuthServiceConcurrent:
 
         call_count = 0
 
-        def _mock_acquire():
+        def _mock_acquire(*args, **kwargs):
             nonlocal call_count
             call_count += 1
             # Simulate slow MSAL call

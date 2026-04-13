@@ -63,8 +63,12 @@ async def _acquire_access_token() -> str | None:
                 return cached["token"]
 
         # Attempt token acquisition
-        app = _get_msal_app()
-        result = app.acquire_token_for_client(scopes=["https://graph.microsoft.com/.default"])
+        try:
+            app = _get_msal_app()
+            result = app.acquire_token_for_client(scopes=["https://graph.microsoft.com/.default"])
+        except Exception as exc:
+            logger.warning("[GraphOAuth] Token acquisition error: %s", exc)
+            return None
 
         if not result:
             logger.warning("[GraphOAuth] Token acquisition failed — check OUTLOOK_CLIENT credentials")
