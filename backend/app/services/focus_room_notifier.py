@@ -35,7 +35,7 @@ async def send_focus_overstay_alert(
     max_allowed_minutes: int,
     cooldown_minutes: int,
 ) -> dict:
-    """Dispatch a focus overstay alert via Sentry Telegram + WhatsApp (n8n workflow)."""
+    """Dispatch a focus overstay alert via Sentry Telegram + WhatsApp via NotificationService."""
     site_label = _resolve_site_label(site_id)
     title = "Focus Room Overstay Alert"
     body = (
