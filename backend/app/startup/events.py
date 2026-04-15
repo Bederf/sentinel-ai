@@ -797,9 +797,7 @@ async def startup_event(app: FastAPI) -> None:
     # Shadow mode bridge polling — runs when simulation engine is disabled.
     # Polls the live bridge (10.99.0.1:8080) every 5 minutes and feeds data to
     # SentinelMLFeeder so ML models stay current with real site telemetry.
-    # DISABLED (2026-04-12): Pausing bridge polling while email intake pipeline ships.
-    # Will re-enable after Phase 184 validation with production email data.
-    if False and not settings.site002_source_enabled and not settings.edge_mode:
+    if not settings.site002_source_enabled and not settings.edge_mode:
         try:
             scheduler_service.add_shadow_mode_polling_job(interval_seconds=300, site_id="site-002")
             _logger.info("Shadow mode bridge polling initialized (5min interval)")

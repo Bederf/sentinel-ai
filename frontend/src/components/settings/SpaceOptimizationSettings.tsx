@@ -116,7 +116,6 @@ function emptyConciergeForm(): ConciergeUserCreate {
 // ---------------------------------------------------------------------------
 
 interface SpaceOptimizationSettingsProps {
-  siteId?: string;
   onError?: (error: string) => void;
   onSuccess?: () => void;
   readOnly?: boolean;
@@ -127,7 +126,6 @@ interface SpaceOptimizationSettingsProps {
 // ---------------------------------------------------------------------------
 
 export function SpaceOptimizationSettings({
-  siteId,
   onError,
   onSuccess,
   readOnly = false,
@@ -164,7 +162,7 @@ export function SpaceOptimizationSettings({
     setLoading(true);
     try {
       const [settings, sitesData] = await Promise.all([
-        spaceSettingsApi.getSettings(siteId),
+        spaceSettingsApi.getSettings(),
         spaceSettingsApi.getSites(),
       ]);
       const gp: SpaceGracePeriods = {} as SpaceGracePeriods;
@@ -173,15 +171,14 @@ export function SpaceOptimizationSettings({
           (settings as unknown as Record<string, number>)[f.key] ?? f.default;
       }
       setGraceValues(gp);
+      setConcierges(settings.concierges || []);
       setSites(sitesData);
-      const conciergeList = await spaceSettingsApi.listConcierges(siteId);
-      setConcierges(conciergeList || []);
     } catch {
       onError?.("Failed to load space optimization settings");
     } finally {
       setLoading(false);
     }
-  }, [onError, siteId]);
+  }, [onError]);
 
   useEffect(() => {
     fetchAll();
@@ -198,9 +195,8 @@ export function SpaceOptimizationSettings({
     if (readOnly) return;
     setGraceSaving(true);
     try {
-      await spaceSettingsApi.updateSettings(graceValues);
-      const conciergeList = await spaceSettingsApi.listConcierges(siteId);
-      setConcierges(conciergeList || []);
+      const updated = await spaceSettingsApi.updateSettings(graceValues);
+      setConcierges(updated.concierges || []);
       onSuccess?.();
     } catch (err) {
       onError?.(err instanceof Error ? err.message : "Failed to save grace period settings");

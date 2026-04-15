@@ -202,7 +202,38 @@
           "tts": 3
         }
       }
-    }
+    },
+    "2026-04-13": {
+      "anthropic/claude-opus-4-6|unknown": {
+        "provider": "anthropic",
+        "model": "claude-opus-4-6",
+        "site_id": "unknown",
+        "calls": 3,
+        "input_tokens": 8708,
+        "output_tokens": 776,
+        "cache_read_tokens": 0,
+        "cache_creation_tokens": 4036,
+        "cost_usd": 0.0,
+        "sources": {
+          "gateway": 3
+        }
+      },
+      "elevenlabs/chars|unknown": {
+        "provider": "elevenlabs",
+        "model": "chars",
+        "site_id": "unknown",
+        "calls": 1,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cache_read_tokens": 0,
+        "cache_creation_tokens": 0,
+        "cost_usd": 0.03903,
+        "sources": {
+          "tts": 1
+        }
+      }
+    },
+    "2026-04-14": {}
   },
   "usd_zar_rate": 18.5,
   "escalations": [

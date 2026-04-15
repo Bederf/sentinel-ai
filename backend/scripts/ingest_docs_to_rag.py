@@ -29,6 +29,8 @@ PROJECT_ROOT = Path(__file__).parent.parent.parent
 SKIP_DIRS = {"node_modules", "venv", ".git", "__pycache__", "dist"}
 
 # Specific .planning subdirs to include (everything else in .planning is skipped)
+# Phase planning docs are NOT indexed to RAG — GSD master reads them directly from disk.
+# Only approved security/governance docs (FSR gap analysis) are indexed.
 PLANNING_INCLUDE_DIRS = {
     ".planning/phases/64-risk-governance-foundation",
 }

@@ -194,12 +194,18 @@ export function HolidayCalendar({
                 SA Public Holidays ({publicHolidays.length})
               </h3>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-1.5">
-                {publicHolidays.map((h) => (
-                  <div key={h.id} className="flex items-center gap-2 px-2 py-1.5 rounded text-xs" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
-                    <span className="font-mono" style={{ color: "var(--color-sentinel-blue)" }}>{h.date}</span>
-                    <span style={{ color: "var(--color-sentinel-text-primary)" }}>{h.name}</span>
-                  </div>
-                ))}
+                {publicHolidays.map((h) => {
+                  // For recurring MM-DD holidays, show current year so they always look fresh
+                  const displayDate = h.recurring && h.date.includes("-") && !h.date.startsWith("20")
+                    ? `${new Date().getFullYear()}-${h.date}`
+                    : h.date;
+                  return (
+                    <div key={h.id} className="flex items-center gap-2 px-2 py-1.5 rounded text-xs" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
+                      <span className="font-mono" style={{ color: "var(--color-sentinel-blue)" }}>{displayDate}</span>
+                      <span style={{ color: "var(--color-sentinel-text-primary)" }}>{h.name}</span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 

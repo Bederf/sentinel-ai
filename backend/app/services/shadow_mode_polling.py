@@ -40,25 +40,26 @@ class ShadowModePollingService:
         self._zone_to_ahu: dict[str, str] = {}
         # Sensor codes for trends polling (built from catalog)
         self._trends_sensor_codes: list[str] = []
+        # Energy accumulation state (kWh, accumulated since last DB write)
+        self._energy_accumulator: dict[str, float] = {
+            "hvac_kwh": 0.0,
+            "lighting_kwh": 0.0,
+            "other_kwh": 0.0,
+            "total_kwh": 0.0,
+        }
+        self._energy_accum_start: datetime | None = None  # Start of current accumulation period
+        self._energy_last_poll: datetime | None = None  # Last poll timestamp for kWh calc
 
     def _get_bridge_credentials(self) -> tuple[str, str]:
         """Return (base_url, api_token) from settings."""
         from app.config.settings import settings
 
-        base = getattr(settings, "simbiot_api_url", None) or getattr(
-            settings, "bridge_base_url", None
-        )
+        base = getattr(settings, "simbiot_api_url", None) or getattr(settings, "bridge_base_url", None)
         if not base:
-            raise RuntimeError(
-                "Bridge URL not configured — set SIMBIOT_API_URL or BRIDGE_BASE_URL"
-            )
-        token = getattr(settings, "simbiot_api_key", None) or getattr(
-            settings, "bridge_api_token", None
-        )
+            raise RuntimeError("Bridge URL not configured — set SIMBIOT_API_URL or BRIDGE_BASE_URL")
+        token = getattr(settings, "simbiot_api_key", None) or getattr(settings, "bridge_api_token", None)
         if not token:
-            raise RuntimeError(
-                "Bridge API token not configured — set SIMBIOT_API_KEY or BRIDGE_API_TOKEN"
-            )
+            raise RuntimeError("Bridge API token not configured — set SIMBIOT_API_KEY or BRIDGE_API_TOKEN")
         return base.rstrip("/"), token
 
     async def _load_object_catalog(self, base: str, headers: dict[str, str]) -> None:
@@ -74,9 +75,7 @@ class ShadowModePollingService:
                 data = resp.json()
 
             objs = data.get("objects", [])
-            self._object_catalog = {
-                o["object_id"]: o for o in objs
-            }
+            self._object_catalog = {o["object_id"]: o for o in objs}
             self._catalog_loaded_at = datetime.now(tz=timezone.utc)
 
             # Build zone → AHU mapping from catalog
@@ -91,7 +90,7 @@ class ShadowModePollingService:
                     # Parse "S002-AHU-B1-001" → (site, type, floor, seq)
                     parts = equip_id.split("-")
                     if len(parts) >= 4:
-                        site, typ, floor, seq = parts[0], parts[1], parts[2], parts[3]
+                        _, _typ, floor, seq = parts[0], parts[1], parts[2], parts[3]
                         zone_num = seq
                         zone_id = f"Zone-{zone_num}"
                         if zone_id not in self._zone_to_ahu:
@@ -252,6 +251,9 @@ class ShadowModePollingService:
                 agg_readings["lighting_kw"] = float(lighting_kw)
             if total_kw is not None:
                 agg_readings["total_kw"] = float(total_kw)
+            # Accumulate energy from power readings (kW → kWh)
+            if hvac_kw is not None and lighting_kw is not None and total_kw is not None:
+                self._accumulate_energy(float(hvac_kw), float(lighting_kw), float(total_kw), now)
             if flow_lpm is not None:
                 agg_readings["flow_lpm"] = float(flow_lpm)
             if pressure_bar is not None:
@@ -321,6 +323,7 @@ class ShadowModePollingService:
             # Poll up to 20 sensors per cycle to stay within time budget
             sensor_batch = self._trends_sensor_codes[:20]
             try:
+
                 async def fetch_trend(sensor_code: str) -> tuple[str, dict[str, Any] | None]:
                     try:
                         async with httpx.AsyncClient(timeout=10.0) as client:
@@ -345,6 +348,7 @@ class ShadowModePollingService:
                         return sensor_code, None
 
                 import asyncio
+
                 trend_results = await asyncio.gather(
                     *[fetch_trend(sc) for sc in sensor_batch],
                     return_exceptions=True,
@@ -363,13 +367,12 @@ class ShadowModePollingService:
                             equip_type = trends_states[equip_code]["type"]
                             if not equip_type:
                                 trends_states[equip_code]["type"] = self._equip_type_from_sensor(sensor_code)
-                            trends_states[equip_code]["sensor_readings"][reading_name] = float(
-                                sample["value"]
-                            )
+                            trends_states[equip_code]["sensor_readings"][reading_name] = float(sample["value"])
 
                 result["trends_polled"] = len(sensor_batch)
                 result["trends_with_data"] = sum(
-                    1 for code, s in zip(sensor_batch, trend_results)
+                    1
+                    for code, s in zip(sensor_batch, trend_results)
                     if not isinstance(s, Exception) and s[1] is not None
                 )
 
@@ -413,6 +416,66 @@ class ShadowModePollingService:
             f"errors={errors or 'none'}"
         )
         return result
+
+    def _accumulate_energy(self, hvac_kw: float, lighting_kw: float, total_kw: float, now: datetime) -> None:
+        """Accumulate energy from instantaneous power readings.
+
+        Accumulates kWh based on time elapsed since last poll.
+        Flushes to DB when day changes (new UTC date).
+        """
+        if self._energy_last_poll is None:
+            self._energy_accum_start = now
+            self._energy_last_poll = now
+            return
+
+        elapsed_seconds = (now - self._energy_last_poll).total_seconds()
+        elapsed_hours = elapsed_seconds / 3600.0
+
+        # Cap at 1 hour max between polls (avoid huge jumps after gaps)
+        elapsed_hours = min(elapsed_hours, 1.0)
+
+        self._energy_accumulator["hvac_kwh"] += hvac_kw * elapsed_hours
+        self._energy_accumulator["lighting_kwh"] += lighting_kw * elapsed_hours
+        self._energy_accumulator["other_kwh"] += (total_kw - hvac_kw - lighting_kw) * elapsed_hours
+        self._energy_accumulator["total_kwh"] += total_kw * elapsed_hours
+        self._energy_last_poll = now
+
+        # Check if day changed (UTC midnight)
+        current_date = now.date()
+        accum_date = self._energy_accum_start.date() if self._energy_accum_start else None
+
+        if accum_date and current_date > accum_date:
+            # New day — flush yesterday's accumulated energy to DB
+            self._flush_energy_to_db(accum_date)
+            # Reset accumulator for new day
+            self._energy_accumulator = {"hvac_kwh": 0.0, "lighting_kwh": 0.0, "other_kwh": 0.0, "total_kwh": 0.0}
+            self._energy_accum_start = now
+
+    def _flush_energy_to_db(self, accum_date, force: bool = False) -> None:
+        """Write accumulated energy to energy_consumption_history table."""
+        from app.database.repositories.energy_consumption_repository import get_energy_consumption_repository
+
+        total = self._energy_accumulator["total_kwh"]
+        # Only write if meaningful (at least 0.01 kWh — avoids spurious zero writes)
+        if not force and total < 0.01:
+            return
+
+        try:
+            repo = get_energy_consumption_repository()
+            repo.upsert(
+                site_id=self.site_id,
+                consumption_date=accum_date,
+                hvac_kwh=round(self._energy_accumulator["hvac_kwh"], 3),
+                lighting_kwh=round(self._energy_accumulator["lighting_kwh"], 3),
+                other_kwh=round(self._energy_accumulator["other_kwh"], 3),
+            )
+            logger.info(
+                f"[SHADOW] Energy flushed to DB: {accum_date} — "
+                f"total={total:.2f} kWh (hvac={self._energy_accumulator['hvac_kwh']:.2f}, "
+                f"lighting={self._energy_accumulator['lighting_kwh']:.2f})"
+            )
+        except Exception as e:
+            logger.warning(f"[SHADOW] Energy flush failed: {e}")
 
     def _resolve_sensor(self, sensor_code: str) -> tuple[str | None, str | None]:
         """Resolve a sensor_code to (equipment_code, reading_name).

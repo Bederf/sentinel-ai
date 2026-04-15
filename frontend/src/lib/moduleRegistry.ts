@@ -253,8 +253,9 @@ export const moduleRegistryApi = {
   /**
    * Get unified telemetry from all active modules
    */
-  async getUnifiedTelemetry(siteId: string): Promise<UnifiedTelemetry> {
+  async getUnifiedTelemetry(siteId: string): Promise<UnifiedTelemetry | null> {
     const response = await fetchWithAuth(`${API_BASE}/api/modules/site/${siteId}/telemetry`);
+    if (response.status === 404) return null;
     if (!response.ok) throw new Error('Failed to fetch unified telemetry');
     return response.json();
   },

@@ -14,7 +14,9 @@ from fastapi import APIRouter, Depends
 
 from app.middleware.auth_middleware import require_auth
 from app.models.auth import AuthContext, AuthLevel
+from app.config.settings import settings
 from app.services.sentry_notification_router import get_sentry_router
+from app.services.n8n_service import get_n8n_service
 
 logger = logging.getLogger("sentinel.api.notification_router")
 
@@ -27,10 +29,30 @@ async def get_notification_status(
 ):
     """Notification router status for System Health dashboard.
 
-    Shows: recipient count, push/digest metrics, pending escalations.
+    Shows: recipient count, push/digest metrics, pending escalations, and per-channel status.
     """
     sentry_router = get_sentry_router()
-    return sentry_router.get_status()
+    status = sentry_router.get_status()
+
+    # Email channel status: determined by n8n connectivity + configured recipients
+    n8n_svc = get_n8n_service()
+    n8n_status = n8n_svc.status
+    has_email_recipients = bool(settings.notification_email_recipients or settings.block_booking_concierge_email)
+    email_configured = n8n_status.status.value in ("connected", "not_configured") and has_email_recipients
+
+    status["channels"] = {
+        "telegram": {"status": "active"},  # Sentry always active if router running
+        "whatsapp": {"status": "active"},  # Sentry always active if router running
+        "email": {
+            "status": "active" if email_configured else "inactive",
+            "n8n_status": n8n_status.status.value,
+            "n8n_reachable": n8n_status.status.value == "connected",
+            "recipients_configured": has_email_recipients,
+        },
+        "sms": {"status": "inactive"},
+    }
+
+    return status
 
 
 @router.get("/escalations/pending")

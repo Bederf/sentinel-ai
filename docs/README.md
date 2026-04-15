@@ -82,6 +82,7 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 ### ✨ Features
 
 #### Core Platform Features
+- **[Complete Feature Reference](04-features/FEATURES.md)** - Full platform feature reference (Phase 55+, v13.0)
 - **[Device Control & Safety Interlocks](04-features/06-device-control-safety.md)** - Protocol-agnostic device abstraction with safety validation (Phase 6)
 - **[Autonomous Decision Engine](04-features/09-autonomous-decisions.md)** - Bounded autonomy with multi-level escalation (Phase 9)
 - **[Load Shedding Optimization](04-features/10-load-shedding-optimization.md)** - Thermal runway, pre-cooling, generator coordination (Phase 10)
@@ -184,6 +185,7 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 - [Information Security Strategy](09-security/information-security-strategy.md) - Maturity targets, remediation roadmap
 - [Information Security Policy](09-security/information-security-policy.md) - Overarching policy covering all 18 FSR domains
 - [Acceptable Usage Policy](09-security/acceptable-usage-policy.md) - Infrastructure, communication, and data handling rules
+- **[SENTINEL Unified Compliance Programme](09-security/compliance.md)** - Phases 1-3 compliance status across FSR, POPIA, NRS
 - [Audit Logging](06-safety-compliance/audit-logging.md) - Device control and login audit trail
 
 ### 🔗 Integrations
@@ -193,6 +195,7 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 - **[Tridonic DALI Discovery](07-integrations/tridonic-dali-discovery.md)** - Auto-discover DALI gateways and generate v2.0 equipment codes for bulk import (Phase 21-02)
 - **[Tridium Niagara Integration](07-integrations/tridium-niagara-integration.md)** - BACnet/IP, oBIX, AI point discovery for Niagara JACE/Supervisor
 - **[SIMBIOT Concept Connector](07-integrations/simbiot-concept-connector.md)** - MRI Evolution CAFM integration via FSI API (auto work orders, status polling, asset sync)
+- **[SIMBIOT Concept Evolution Connector](05-integrations/README.md)** - Integration module for MRI Evolution via FSI Public API
 - **[SIMBIOT Universal Adapter Pattern](05-integrations/simbiot-universal-adapter-pattern.md)** - One SBC, any building: SIMBIOT translates any BMS format (Desigo, Trane, JCI, BACnet, Modbus, simulation) to SENTINEL's fixed Supabase schema without code changes
 - **[Semantic Control Foundation — Classifier & Validation](05-integrations/162-semantic-classifier.md)** - Deterministic Haystack-inspired point classifier with weighted evidence scoring, safety-class gating, and static validation engine for blind site onboarding (Phase 162)
 - **[Asset Workflow Architecture](05-integrations/asset-workflow-architecture.md)** - SIMBIOT + Baseline + Inspection + ML integration (Phase 53-01)
@@ -234,6 +237,7 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 
 ### 🧪 Testing
 - [Testing Strategy](11-testing/testing-strategy.md) - Test architecture
+- **[Equipment Warning State Workflow Testing Guide](11-testing/TESTING_GUIDE.md)** - End-to-end test guide for equipment warning state workflow
 - [E2E Testing](11-testing/e2e-testing.md) - End-to-end tests
 - [Test Data](11-testing/test-data.md) - Test data management
 - **[Runner Eval Harness](11-testing/runner-eval-harness.md)** - 5 golden-case fixtures for RLM runner quality validation, POPIA redaction compliance, and regression testing (Phase 113)
@@ -241,31 +245,31 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 ### 🌍 South Africa Context
 - [Load Shedding Optimization](14-south-africa-context/load-shedding-optimization.md) - Eskom load shedding
 
+### 💼 Business Context
+- **[SENTINEL Executive Summary](15-business-context/INVESTOR.md)** - AI-powered facilities management platform overview for investors
+
 ## Documentation Structure
 
 ```
 docs/
-├── architecture-repository/ # TOGAF-aligned architecture repository (principles, governance, landscapes, roadmaps)
-├── ai-governance/          # AI governance pack (scope, risk mapping, controls, evidence)
+├── _archive/               # Historical/deprecated docs (SPRINT0_SIGNOFF, legacy phase docs)
+├── _templates/              # Documentation templates and standards
 ├── 01-getting-started/      # Onboarding, setup, quick start
 ├── 02-architecture/         # System design, patterns, data flow
 ├── 03-api-reference/        # REST API, MCP tools, SSE streams
 ├── 04-features/             # Feature specifications
-├── compliance/              # Regulatory compliance (EU AI Act registers, policies, audits)
-├── 05-bms-concepts/         # BMS/HVAC domain knowledge
+├── 05-integrations/         # SIMBIOT, ServiceNow, Visitor Management, Sentry
 ├── 06-safety-compliance/    # Safety interlocks, audit trails
-├── 07-integrations/         # BACnet, Modbus, CAFM, BMS, DALI
+├── 07-database/             # Database schemas, migrations
 ├── 08-ai-ml/                # Claude, Ollama, predictions
-├── 09-security/             # Security policies, privacy, audit, governance
-├── 10-operations/           # Deployment, monitoring
+├── 09-security/             # Security policies, FSR compliance, governance
+├── 10-operations/           # Deployment, monitoring, troubleshooting
 ├── 11-testing/              # Unit tests, integration tests
 ├── 12-development/          # Workflow, tooling, best practices
-├── 13-modules/              # Bolt-on module system (Energy, HVAC, Security, Lighting, Sustainability)
-├── 14-south-africa-context/ # Load shedding, Eskom
-├── 15-troubleshooting/      # Common issues, diagnostics
-├── 16-glossary/             # BMS terms, acronyms
-├── 17-appendices/           # Migration scripts, references
-└── _templates/              # Documentation templates and standards
+├── 13-modules/              # Bolt-on module system
+├── 14-regional/             # South Africa context, load shedding
+├── 15-business-context/      # Client alignment, portfolio evidence, investor docs
+└── 16-glossary/             # BMS terms, acronyms
 ```
 
 ## Documentation Standards

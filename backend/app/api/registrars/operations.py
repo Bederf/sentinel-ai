@@ -64,7 +64,6 @@ from app.api import (
     safety,
     security_health,
     semantic_classification,
-    email_intake,
     sentry_email,
     sentry_webhooks,
     visitor_intake,
@@ -174,9 +173,6 @@ def register_operations_routers(app: FastAPI) -> None:
 
     # Email intake pipeline (Phase 131)
     app.include_router(sentry_email.router, tags=["sentry-email"])
-
-    # Email cluster heatmap (Phase 177)
-    app.include_router(email_intake.router, tags=["email-intake"])
 
     # Security health check (Phase 137-09)
     app.include_router(security_health.router, tags=["security-health"])

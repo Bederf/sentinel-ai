@@ -289,7 +289,7 @@ async def get_unified_telemetry(site_id: str):
     """Get unified telemetry from all active modules."""
     telemetry = module_registry.get_unified_telemetry(site_id)
     if not telemetry:
-        raise HTTPException(status_code=404, detail="Site not configured")
+        return {"site_id": site_id, "telemetry": None}
     return telemetry
 
 
