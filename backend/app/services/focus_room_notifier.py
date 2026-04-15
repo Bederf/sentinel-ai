@@ -1,7 +1,7 @@
 """Focus room overstay notifier.
 
 Sends operator alerts when a focus room exceeds the allowed occupancy window.
-Primary Telegram path uses Sentry bot; WhatsApp uses configured WhatsApp service.
+Telegram via Sentry bot; WhatsApp via NotificationService.broadcast_alert() (Phase 102).
 """
 
 from __future__ import annotations
@@ -10,6 +10,8 @@ import logging
 
 from app.core.site_resolver import get_registered_sites
 from app.config.settings import settings
+from app.models.notification import AlertLevel
+from app.services.notification_service import notification_service
 from app.services.sentry_integration.alert_notifier import alert_notifier
 
 logger = logging.getLogger(__name__)
@@ -33,7 +35,7 @@ async def send_focus_overstay_alert(
     max_allowed_minutes: int,
     cooldown_minutes: int,
 ) -> dict:
-    """Dispatch a focus overstay alert via Sentry Telegram + WhatsApp."""
+    """Dispatch a focus overstay alert via Sentry Telegram + WhatsApp (n8n workflow)."""
     site_label = _resolve_site_label(site_id)
     title = "Focus Room Overstay Alert"
     body = (
@@ -61,21 +63,26 @@ async def send_focus_overstay_alert(
             }
         )
 
-        # 2) WhatsApp via n8n SENTINEL — WhatsApp Send workflow
+        # 2) WhatsApp via NotificationService.broadcast_alert (Phase 102)
         whatsapp_ok = False
         whatsapp_result: dict = {}
         whatsapp_to = (settings.twilio_whatsapp_to or "").replace("whatsapp:", "").strip()
         if whatsapp_to:
             try:
-                from app.services.n8n_service import get_n8n_service
-
-                whatsapp_result = await get_n8n_service().trigger_webhook(
-                    webhook_path="whatsapp-send",
-                    payload={"to": whatsapp_to, "message": f"*{title}*\n\n{body}"},
+                wa_result = await notification_service.broadcast_alert(
+                    title=title,
+                    body=body,
+                    alert_level=AlertLevel.WARNING,
+                    notification_type="focus_room_overstay",
                 )
-                whatsapp_ok = bool(whatsapp_result.get("success"))
+                whatsapp_ok = wa_result.get("success", False)
+                whatsapp_result = {
+                    "success": whatsapp_ok,
+                    "recipients_notified": wa_result.get("recipients_notified", 0),
+                    "errors": wa_result.get("errors", []),
+                }
             except Exception as wa_exc:
-                logger.warning("Focus overstay WhatsApp via n8n failed: %s", wa_exc)
+                logger.warning("Focus overstay WhatsApp via NotificationService failed: %s", wa_exc)
                 whatsapp_result = {"success": False, "error": str(wa_exc)}
         else:
             whatsapp_result = {"success": False, "error": "whatsapp_not_configured"}
