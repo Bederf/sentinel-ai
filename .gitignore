@@ -99,3 +99,9 @@ backend/app/data/space/node_room_mapping.local.json
 backend/.next/
 # Python dependency lock
 backend/uv.lock
+
+# AI usage log (runtime data, not source code)
+backend/app/data/ai_usage_log.json
+
+# Mode policy state (runtime, per-site)
+backend/app/data/policies/
