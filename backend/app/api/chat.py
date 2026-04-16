@@ -10,21 +10,23 @@ from pydantic import BaseModel, Field
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
-from app.config.settings import settings, SENTINEL_BOT_DEFAULT_CLASS
+from app.config.settings import SENTINEL_BOT_DEFAULT_CLASS, settings
 from app.middleware.auth_middleware import get_current_auth
 from app.models.auth import AuthContext
+from app.repositories.chat_context_repository import chat_context_repository
 from app.security.constants import MAX_CHAT_MESSAGE_LENGTH
 from app.security.pipeline import prompt_guard, require_role
 from app.security.sse_buffer import SecureSSEBuffer
+from app.services import slash_command_router
 from app.services.claude_service import claude_service
 from app.services.feature_request_logger import log_chat_query
 from app.services.hybrid_ai_service import hybrid_ai_service
-from app.services import slash_command_router
 from app.services.model_gateway import model_gateway
 from app.services.openai_service import openai_service
 from app.services.popia_consent_guard import should_allow_cloud_processing
-from app.repositories.chat_context_repository import chat_context_repository
+from app.services.site_ai_policy_service import get_site_ai_policy
 from app.services.work_order_service import work_order_service
+from app.services.ai_interfaces import get_chat_tools
 from app.utils.ai_provenance import get_cloud_llm_provenance, get_local_llm_provenance, provenance_headers
 
 # Track Claude credit exhaustion so we skip it on subsequent requests (tools path only)
@@ -245,7 +247,6 @@ _PLATFORM_DOC_KEYWORDS = {
     "po pia",
     "protection of personal",
     "gdpr",
-    "data privacy",
     "data protection",
     "cross-border",
     "cross border data",
@@ -274,7 +275,6 @@ _PLATFORM_DOC_KEYWORDS = {
     "xdr",
     "antivirus",
     "malware",
-    "ransomware",
     "back-up",
     "backup",
     "dr plan",
@@ -317,7 +317,6 @@ _PLATFORM_DOC_KEYWORDS = {
     "patch management",
     "patching",
     "security patch",
-    "cve",
     "common vulnerability",
     " hardening",
     "security hardening",
@@ -486,8 +485,11 @@ async def generate_sse_stream(
 
     # POPIA cross-border routing guard: fall back to local AI when cloud
     # processing consent is missing for the data subject.
-    use_local_fallback = not hybrid_ai_service.is_local_ai_only_mode() and not should_allow_cloud_processing(
-        data_subject_id
+    # Also respect per-site chat_local_ai_only policy.
+    site_policy = get_site_ai_policy(site_id) if site_id else {}
+    chat_local_only = bool(site_policy.get("chat_local_ai_only", False))
+    use_local_fallback = chat_local_only or (
+        not hybrid_ai_service.is_local_ai_only_mode() and not should_allow_cloud_processing(data_subject_id)
     )
 
     # Secure SSE buffer: filters output through the 5-stage pipeline
@@ -507,6 +509,7 @@ async def generate_sse_stream(
                 message_with_context,
                 use_tools=False,
                 data_subject_id=data_subject_id,
+                site_id=site_id,
             ):
                 safe_text = buffer.add_token(chunk)
                 if safe_text is not None:
@@ -663,6 +666,9 @@ async def chat(
     # Log query for feature tracking
     log_chat_query(user_message)
 
+    # Read per-site AI policy
+    site_policy = get_site_ai_policy(chat_request.site_id) if chat_request.site_id else {}
+
     # When Claude tools are available, let Claude handle work orders
     # (better UX: confirms details, looks up equipment, validates).
     # Only fall back to direct detection when tools are not available.
@@ -672,6 +678,8 @@ async def chat(
         tools_enabled = _mode == "api" and _provider == "anthropic" and claude_service.is_configured()
     except Exception:
         tools_enabled = claude_service.is_configured() or openai_service.is_configured()
+    # Respect per-site allow_tool_calling policy (default True if not set)
+    tools_enabled = tools_enabled and bool(site_policy.get("allow_tool_calling", True))
 
     if not tools_enabled:
         wo_detection = work_order_service.detect_work_order_request(user_message)
@@ -791,19 +799,21 @@ async def chat_tts(request: FastAPIRequest, tts_request: TTSRequest):
     )
 
 
-
 # ---------------------------------------------------------------------------
 # Voice summary — summarize AI response then speak it
 # ---------------------------------------------------------------------------
 
+
 class VoiceSummaryRequest(BaseModel):
     """Request model for summarised voice output."""
+
     text: str = Field(..., max_length=8000)
 
 
 def _strip_markdown_for_speech(text: str) -> str:
     """Remove markdown formatting to get plain text for summarization."""
     import re
+
     text = re.sub(r"```[\s\S]*?```", "", text)
     text = re.sub(r"`[^`]+`", "", text)
     text = re.sub(r"^#{1,6}\s+", "", text, flags=re.MULTILINE)
@@ -824,6 +834,7 @@ def _strip_markdown_for_speech(text: str) -> str:
 async def _summarize_for_voice(text: str) -> str:
     """Summarize text into 1-2 natural sentences for spoken output using Claude Haiku."""
     import re
+
     plain = _strip_markdown_for_speech(text)
     if len(plain) <= 350:
         match = re.search(r"^(.{0,350}[.!?])\s", plain)
@@ -831,18 +842,25 @@ async def _summarize_for_voice(text: str) -> str:
 
     try:
         from anthropic import Anthropic
+
         from app.config.settings import settings
+
         if settings.anthropic_api_key:
             client = Anthropic(api_key=settings.anthropic_api_key)
             response = client.messages.create(
                 model="claude-3-haiku-20250707",
                 max_tokens=100,
-                messages=[{"role": "user", "content": (
-                    "You are a voice assistant. Convert this AI response into "
-                    "1-2 short, natural sentences that sound good when spoken aloud. "
-                    "Be direct and concise. No formatting. Max 25 words.\n\n"
-                    f"Response:\n{plain[:3000]}\n\nSpoken summary:"
-                )}],
+                messages=[
+                    {
+                        "role": "user",
+                        "content": (
+                            "You are a voice assistant. Convert this AI response into "
+                            "1-2 short, natural sentences that sound good when spoken aloud. "
+                            "Be direct and concise. No formatting. Max 25 words.\n\n"
+                            f"Response:\n{plain[:3000]}\n\nSpoken summary:"
+                        ),
+                    }
+                ],
             )
             summary = response.content[0].text.strip().strip('"').strip("'").strip()
             summary = _strip_markdown_for_speech(summary)
@@ -866,7 +884,9 @@ async def _summarize_for_voice(text: str) -> str:
 async def chat_voice_summary(request: FastAPIRequest, vs_request: VoiceSummaryRequest):
     """Summarize an AI chat response and return it as spoken audio."""
     import base64
+
     from app.services.tts_service import get_tts_service
+
     tts = get_tts_service()
     if not tts.is_configured():
         raise HTTPException(status_code=503, detail="Text-to-speech is not configured.")
@@ -883,7 +903,6 @@ async def chat_voice_summary(request: FastAPIRequest, vs_request: VoiceSummaryRe
     data_uri = f"data:audio/mpeg;base64,{b64}"
     logger.info("Voice summary: %d chars -> %d chars spoken", len(text), len(summary))
     return {"text": summary, "audio_url": data_uri}
-
 
 
 @router.get("/work-orders")

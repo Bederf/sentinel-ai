@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from datetime import UTC, datetime, timezone
 from typing import Any
 
@@ -11,6 +12,7 @@ from app.models.space_occupancy import GhostBookingFinding
 from app.services import occupancy_store
 from app.services.ghost_booking_detector import concierge_confirm_empty, concierge_confirm_occupied
 from app.services.n8n_service import get_n8n_service
+from app.services.telegram_message_sender import InlineButton, InlineKeyboard, get_telegram_sender
 
 logger = logging.getLogger(__name__)
 
@@ -205,7 +207,9 @@ def format_ghost_email_html(finding: GhostBookingFinding, site_name: str = "", *
     <table style="width:100%;border-collapse:collapse;margin-bottom:16px">
       <tr style="background:#fff2f2">
         <td style="padding:8px;color:#555;font-size:13px;width:120px">Room</td>
-        <td style="padding:8px;font-weight:600">{finding.room_name or finding.room_code} <span style="color:#999;font-weight:400">({finding.room_code})</span></td>
+        <td style="padding:8px;font-weight:600">{
+        finding.room_name or finding.room_code
+    } <span style="color:#999;font-weight:400">({finding.room_code})</span></td>
       </tr>
       <tr>
         <td style="padding:8px;color:#555;font-size:13px">Date</td>
@@ -238,7 +242,9 @@ def format_ghost_email_html(finding: GhostBookingFinding, site_name: str = "", *
       </ol>
     </div>
 
-    <p style="font-size:12px;color:#999;margin:0">Finding ID: {finding.id} &nbsp;|&nbsp; SENTINEL Space Intelligence — {site_label}</p>
+    <p style="font-size:12px;color:#999;margin:0">
+      Finding ID: {finding.id} &nbsp;|&nbsp; SENTINEL Space Intelligence — {site_label}
+    </p>
   </div>
 </body>
 </html>"""
@@ -339,6 +345,66 @@ async def _send_email(
     return _send_email_direct_smtp(to_email, subject, body, body_html)
 
 
+async def _send_telegram(
+    finding: GhostBookingFinding,
+    config: BlockBookingConfig,
+    *,
+    is_reminder: bool = False,
+) -> dict[str, Any]:
+    """Send ghost booking alert to concierge via Telegram with inline confirm-buttons."""
+    from app.config.settings import settings
+
+    # Fall back to SENTRY_FM_CHAT_ID if per-site Telegram ID not configured
+    target_chat = (
+        config.concierge_telegram_chat_id
+        or (os.getenv("SENTRY_FM_CHAT_ID") or "").strip()
+        or str(getattr(settings, "sentry_fm_chat_id", "") or "").strip()
+        or str(getattr(settings, "telegram_alert_chat_id", "") or "").strip()
+    )
+    if not target_chat:
+        return {"success": False, "reason": "No Telegram chat ID configured"}
+
+    start_local = _to_sast(finding.booking_start, assume_utc_if_naive=False)
+    end_local = _to_sast(finding.booking_end, assume_utc_if_naive=False)
+    booking_date = start_local.strftime("%d %b %Y")
+    start = start_local.strftime("%H:%M")
+    end = end_local.strftime("%H:%M")
+
+    prefix = "REMINDER — " if is_reminder else ""
+    alert_type = "GHOST BOOKING ALERT" if not is_reminder else "GHOST BOOKING REMINDER"
+
+    message = f"""{prefix}{alert_type}
+
+Room: {finding.room_name or finding.room_code} ({finding.room_code})
+Organiser: {finding.organiser_name or finding.organiser_email}
+Date: {booking_date}
+Time: {start} - {end}
+No presence detected for {finding.grace_period_minutes} min.
+
+Is this room currently occupied?"""
+
+    kb = InlineKeyboard(
+        rows=[
+            [InlineButton("✅ Room occupied", f"ghost:occupied:{finding.id}")],
+            [InlineButton("❌ Room empty", f"ghost:empty:{finding.id}")],
+        ]
+    )
+
+    try:
+        sender = get_telegram_sender()
+        result = await sender.send_text(
+            target_chat,
+            message,
+            keyboard=kb,
+            parse_mode="HTML",
+        )
+        ok = result.get("ok", False)
+        return {"success": ok, "message_id": result.get("result", {}).get("message_id")}
+    except Exception as exc:
+        logger.warning("Ghost booking Telegram send failed: %s", exc)
+        return {"success": False, "error": str(exc)}
+
+
 async def _send_whatsapp(
     finding: GhostBookingFinding,
     config: BlockBookingConfig,
@@ -365,10 +431,12 @@ async def send_ghost_booking_alert(
     *,
     is_reminder: bool = False,
 ) -> dict[str, Any]:
-    """Dispatch email + WhatsApp via n8n (parallel branches). Falls back to direct APIs."""
+    """Dispatch email + WhatsApp + Telegram via n8n (parallel branches). Falls back to direct APIs."""
     email_sent = False
     whatsapp_sent = False
     whatsapp_message_id: str | None = None
+    telegram_sent = False
+    telegram_message_id: str | None = None
 
     try:
         email_sent = await _send_email(finding, config, site_name, is_reminder=is_reminder)
@@ -387,7 +455,15 @@ async def send_ghost_booking_alert(
         except Exception as exc:
             logger.error("Ghost booking WhatsApp fallback dispatch failed: %s", exc)
 
-    if email_sent or whatsapp_sent:
+    # Send Telegram with inline confirm buttons (always direct — no n8n path)
+    try:
+        telegram_result = await _send_telegram(finding, config, is_reminder=is_reminder)
+        telegram_sent = bool(telegram_result.get("success"))
+        telegram_message_id = telegram_result.get("message_id")
+    except Exception as exc:
+        logger.error("Ghost booking Telegram dispatch failed: %s", exc)
+
+    if email_sent or whatsapp_sent or telegram_sent:
         occupancy_store.mark_ghost_finding_notified(
             finding.id,
             concierge_email=config.concierge_email,
@@ -395,14 +471,18 @@ async def send_ghost_booking_alert(
             email_sent=email_sent,
             whatsapp_sent=whatsapp_sent,
             whatsapp_message_id=whatsapp_message_id,
+            telegram_sent=telegram_sent,
+            telegram_message_id=telegram_message_id,
             reset_reminder_cycle=not is_reminder,
         )
 
     return {
-        "success": email_sent or whatsapp_sent,
+        "success": email_sent or whatsapp_sent or telegram_sent,
         "email_sent": email_sent,
         "whatsapp_sent": whatsapp_sent,
         "whatsapp_message_id": whatsapp_message_id,
+        "telegram_sent": telegram_sent,
+        "telegram_message_id": telegram_message_id,
     }
 
 

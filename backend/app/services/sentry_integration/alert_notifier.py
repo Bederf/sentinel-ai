@@ -85,43 +85,7 @@ class AlertNotifier:
         eq_type_display = eq_type.upper() if len(eq_type) <= 4 else eq_type.replace("_", " ").title()
 
         equipment_code = alert.get("equipment_code", "")
-        # Replace dashes with underscores for Telegram command compatibility
-        # Telegram commands end at hyphens, so FCU-L12-03 becomes FCU only
-        command_code = equipment_code.replace("-", "_")
-
-        # Build dynamic command section from settings
-        settings = _load_notification_settings()
-        alert_commands = settings.get("alertCommands", DEFAULT_ALERT_COMMANDS)
-
-        # Map command keys to their Telegram command format
-        command_map = {
-            "reset": f"/reset_{command_code}",
-            "info": f"/info_{command_code}",
-            "note": f"/note_{command_code}",
-            "wo": f"/WO_{command_code}",
-            "inspect": f"/inspect_{command_code}",
-        }
-
-        commands_section = ""
-        enabled_commands = []
-
-        # Alert messages show all commands: info first (FM needs context), then actions
-        alert_command_order = [
-            ("info", "More info"),
-            ("reset", "Remote reset"),
-            ("inspect", "Send technician"),
-            ("wo", "Raise work order"),
-            ("note", "Add note"),
-        ]
-
-        for key, default_label in alert_command_order:
-            cmd_config = alert_commands.get(key, {})
-            if cmd_config.get("enabled", True):
-                label = cmd_config.get("label", default_label)
-                enabled_commands.append(f"{command_map[key]} - {label}")
-
-        if enabled_commands:
-            commands_section = "\n━━━━━━━━━━━━━━━━━━\n" + "\n".join(enabled_commands)
+        _load_notification_settings()  # ensures settings are loaded for alert rendering
 
         message = f"""{emoji} {severity} ALERT - {alert.get("site_name", "Building")}
 
@@ -132,7 +96,7 @@ class AlertNotifier:
 
 📝 {alert.get("message", "")}
 
-⏰ Time: {datetime.now().strftime("%H:%M:%S")}{commands_section}"""
+⏰ Time: {datetime.now().strftime("%H:%M:%S")}"""
 
         return message
 
