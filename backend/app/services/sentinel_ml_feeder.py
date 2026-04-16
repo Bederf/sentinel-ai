@@ -19,7 +19,7 @@ from typing import Any
 
 import numpy as np
 
-from app.services.ml_config import (  # noqa: E402
+from app.services.ml_config import (
     MIN_ANOMALY_SCORING_HOURS,
     MIN_ANOMALY_TRAINING_HOURS,
     MIN_ENERGY_TRAINING_HOURS,
@@ -156,7 +156,7 @@ class SentinelMLFeeder:
         """
         for code, state in equipment_states.items():
             equip_type = state.get("type", "").lower()
-            if not equip_type or equip_type not in SENSOR_MAPPING:
+            if not equip_type:
                 continue
 
             readings = state.get("sensor_readings", {})
@@ -164,13 +164,22 @@ class SentinelMLFeeder:
                 continue
 
             self._code_to_type[code] = equip_type
-            mapping = SENSOR_MAPPING[equip_type]
 
-            # Map BMS sensor names to ML feature names
-            for sim_key, ml_feature in mapping.items():
-                value = readings.get(sim_key)
-                if value is not None:
-                    self._buffers[equip_type][ml_feature].append(float(value))
+            # Use known mapping if available, otherwise identity-map every reading
+            # (pass through all telemetry, not just the ~20 sensors in SENSOR_MAPPING)
+            if equip_type in SENSOR_MAPPING:
+                mapping = SENSOR_MAPPING[equip_type]
+                for sim_key, ml_feature in mapping.items():
+                    value = readings.get(sim_key)
+                    if value is not None:
+                        self._buffers[equip_type][ml_feature].append(float(value))
+            else:
+                # Catch-all: store every sensor reading under its own name
+                # so no telemetry is discarded even for unmapped equipment types
+                # (CT, CRAC, split, electrical, fire, security, etc.)
+                for sim_key, value in readings.items():
+                    if value is not None:
+                        self._buffers[equip_type][sim_key].append(float(value))
 
         self._hours_ingested += 1
         self._data_sources.append(data_source)
@@ -205,15 +214,15 @@ class SentinelMLFeeder:
 
             max_z = 0.0
             for feature, values in buf.items():
-                if len(values) < 12:   # Need at least 12 readings for a meaningful mean/std
+                if len(values) < 12:  # Need at least 12 readings for a meaningful mean/std
                     continue
                 # Use last 72 readings as rolling window
                 window = values[-72:]
                 mean = sum(window) / len(window)
                 # Population std (ddof=0) — simple and stable
                 variance = sum((v - mean) ** 2 for v in window) / len(window)
-                std = variance ** 0.5
-                if std < 1e-6:   # Avoid division by zero on constant signals
+                std = variance**0.5
+                if std < 1e-6:  # Avoid division by zero on constant signals
                     continue
                 latest = values[-1]
                 z = abs((latest - mean) / std)
@@ -274,7 +283,7 @@ class SentinelMLFeeder:
 
             mean_err = sum(errors) / len(errors)
             variance = sum((e - mean_err) ** 2 for e in errors) / len(errors)
-            std_err = variance ** 0.5
+            std_err = variance**0.5
 
             # Latest prediction error
             latest_error = abs(values[-1] - values[-2]) if len(values) >= 2 else 0.0
@@ -333,9 +342,9 @@ class SentinelMLFeeder:
         results = []
 
         try:
+            import numpy as np
             from sklearn.ensemble import RandomForestClassifier
             from sklearn.feature_extraction.text import TfidfVectorizer
-            import numpy as np
 
             # Build labelled dataset from fault events
             texts = []
@@ -344,20 +353,11 @@ class SentinelMLFeeder:
 
             for event in self._fault_events:
                 # Extract fault text
-                msg = (
-                    event.get("active_text")
-                    or event.get("message_text")
-                    or event.get("description", "")
-                    or ""
-                )
+                msg = event.get("active_text") or event.get("message_text") or event.get("description", "") or ""
                 # Extract equipment code from source_object
                 src = event.get("source_object", "") or event.get("object_id", "")
                 # Extract fault category
-                category = (
-                    event.get("event_type")
-                    or event.get("alarm_class")
-                    or event.get("event_state", "unknown")
-                )
+                category = event.get("event_type") or event.get("alarm_class") or event.get("event_state", "unknown")
                 texts.append(f"{src} {msg}")
                 labels.append(str(category))
                 equipment_ids.append(src)
@@ -371,6 +371,7 @@ class SentinelMLFeeder:
 
             # Encode labels
             from sklearn.preprocessing import LabelEncoder
+
             le = LabelEncoder()
             y = le.fit_transform(labels)
 
@@ -401,16 +402,15 @@ class SentinelMLFeeder:
             joblib.dump(vectorizer, f"{model_dir}/fault_vectorizer.joblib")
             joblib.dump(le, f"{model_dir}/fault_label_encoder.joblib")
 
-            results.append({
-                "model_type": "fault_classifier",
-                "samples": len(texts),
-                "classes": list(le.classes_),
-                "n_features": X.shape[1],
-            })
-            logger.info(
-                f"[ML FEEDER] Fault Classifier: trained on {len(texts)} events, "
-                f"{len(le.classes_)} fault types"
+            results.append(
+                {
+                    "model_type": "fault_classifier",
+                    "samples": len(texts),
+                    "classes": list(le.classes_),
+                    "n_features": X.shape[1],
+                }
             )
+            logger.info(f"[ML FEEDER] Fault Classifier: trained on {len(texts)} events, {len(le.classes_)} fault types")
 
         except ImportError as e:
             logger.warning(f"[ML FEEDER] Fault Classifier skipped (sklearn unavailable): {e}")
@@ -581,8 +581,8 @@ class SentinelMLFeeder:
 
         # Autoencoder models
         try:
-            from ml.autoencoder.train import AutoencoderTrainer
             from ml.autoencoder.data_prep import AUTOENCODER_SENSOR_CONFIGS
+            from ml.autoencoder.train import AutoencoderTrainer
 
             trainer = AutoencoderTrainer()
             for eq_type in AUTOENCODER_SENSOR_CONFIGS:
@@ -622,7 +622,9 @@ class SentinelMLFeeder:
         if not force and self._hours_ingested < MIN_ENERGY_TRAINING_HOURS:
             return []
 
-        logger.info(f"[ML FEEDER] Energy baseline check: {self._hours_ingested}h available (need {MIN_ENERGY_TRAINING_HOURS}h)")
+        logger.info(
+            f"[ML FEEDER] Energy baseline check: {self._hours_ingested}h available (need {MIN_ENERGY_TRAINING_HOURS}h)"
+        )
         # TODO: implement energy baseline regression training
         return []
 
@@ -652,16 +654,19 @@ class SentinelMLFeeder:
             # Zone-level temperature anomaly
             if "room_temp" in fcu_buf and len(fcu_buf["room_temp"]) >= 72:
                 n = len(fcu_buf["room_temp"])
-                X_zone = np.column_stack([
-                    np.array(fcu_buf["room_temp"][:n]),
-                    np.array(fcu_buf.get("co2_ppm", fcu_buf["room_temp"])[:n]),
-                ])
+                X_zone = np.column_stack(
+                    [
+                        np.array(fcu_buf["room_temp"][:n]),
+                        np.array(fcu_buf.get("co2_ppm", fcu_buf["room_temp"])[:n]),
+                    ]
+                )
                 try:
                     model = IsolationForest(n_estimators=100, contamination=0.05, random_state=42)
                     model.fit(X_zone)
                     # Save model
                     import joblib
-                    path = f"/opt/bms-intelligence/backend/ml/models/anomaly/zone_temp_if.joblib"
+
+                    path = "/opt/bms-intelligence/backend/ml/models/anomaly/zone_temp_if.joblib"
                     joblib.dump(model, path)
                     results.append({"model_type": "anomaly", "sub_type": "zone_temp", "samples": n})
                     logger.info(f"[ML FEEDER] Anomaly zone_temp: trained on {n} samples")
@@ -676,7 +681,7 @@ class SentinelMLFeeder:
                 try:
                     model = IsolationForest(n_estimators=100, contamination=0.05, random_state=42)
                     model.fit(X_power)
-                    path = f"/opt/bms-intelligence/backend/ml/models/anomaly/hvac_power_if.joblib"
+                    path = "/opt/bms-intelligence/backend/ml/models/anomaly/hvac_power_if.joblib"
                     joblib.dump(model, path)
                     results.append({"model_type": "anomaly", "sub_type": "hvac_power", "samples": n})
                     logger.info(f"[ML FEEDER] Anomaly hvac_power: trained on {n} samples")

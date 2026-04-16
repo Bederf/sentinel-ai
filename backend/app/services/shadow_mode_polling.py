@@ -18,7 +18,7 @@ When 500+ events are buffered → train Fault Classifier.
 """
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import httpx
@@ -32,6 +32,7 @@ class ShadowModePollingService:
     def __init__(self, site_id: str = "site-002"):
         self.site_id = site_id
         self._poll_count = 0
+        self._last_poll_result: dict[str, Any] | None = None  # Cached result of last poll
         # Cached BACnet object catalog: maps object_id → metadata
         # Loaded once on first poll, refreshed weekly.
         self._object_catalog: dict[str, dict[str, Any]] = {}
@@ -76,7 +77,7 @@ class ShadowModePollingService:
 
             objs = data.get("objects", [])
             self._object_catalog = {o["object_id"]: o for o in objs}
-            self._catalog_loaded_at = datetime.now(tz=timezone.utc)
+            self._catalog_loaded_at = datetime.now(tz=UTC)
 
             # Build zone → AHU mapping from catalog
             # e.g. zone "Zone-001" (floor B1) → AHU "S002-AHU-B1-001"
@@ -96,36 +97,22 @@ class ShadowModePollingService:
                         if zone_id not in self._zone_to_ahu:
                             self._zone_to_ahu[zone_id] = equip_id
 
-            # Build trends sensor code list — prioritize ML-relevant sensors
-            sensor_codes = set()
+            # Build trends sensor code list — ALL sensors from the catalog.
+            # LSTM/autoencoder train on whatever is available; more sensors = better
+            # coverage. The poll loop batches to 20 per cycle to stay within time
+            # budget, so we don't need to filter here — queue everything.
+            sensor_codes: set[str] = set()
             for obj in objs:
-                equip_type = obj.get("equipment_type", "")
                 point_type = obj.get("point_type", "")
                 obj_id = obj.get("object_id", "")
-                equip_id = obj.get("equipment_id", "")
 
-                if point_type != "sensor":
-                    continue
+                if point_type == "sensor" and obj_id:
+                    # Convert "CH-1.ChwSupplyTemp" → "CH-1-ChwSupplyTemp" for bridge API
+                    sensor_codes.add(obj_id.replace(".", "-"))
 
-                # Zone temperatures (already covered by /zones, but trends gives history)
-                if equip_type == "fcu" and "room_temp" in obj_id.lower():
-                    # Already from /zones, skip duplicate
-                    pass
-                # Chiller supply temp — key for LSTM
-                elif equip_type == "chiller" and "chws" in obj_id.lower():
-                    # Convert "CH-1.ChwSupplyTemp" → "CH-1-ChwSupplyTemp" for trends
-                    sensor_codes.add(obj_id.replace(".", "-"))
-                # AHU supply air temp
-                elif equip_type == "ahu" and "supply_air_temp" in obj_id:
-                    sensor_codes.add(obj_id.replace(".", "-"))
-                # AHU fan speed
-                elif equip_type == "ahu" and "fan_speed_pct" in obj_id:
-                    sensor_codes.add(obj_id.replace(".", "-"))
-                # Outdoor conditions
-                elif "WEATHER" in obj_id and "outdoor_temp" in obj_id.lower():
-                    sensor_codes.add(obj_id.replace(".", "-"))
-                elif "WEATHER" in obj_id and "outdoor_humidity" in obj_id.lower():
-                    sensor_codes.add(obj_id.replace(".", "-"))
+            # Add explicit zone temp trends (pre-emptive, in case catalog lacks these)
+            for i in range(1, 21):
+                sensor_codes.add(f"Zone-{i:03d}-temp")
 
             # Build floor→AHU map from AHU equipment IDs in catalog
             floor_to_ahu: dict[str, str] = {}
@@ -138,10 +125,6 @@ class ShadowModePollingService:
                         floor = parts[2]  # "B1", "L1", "L2", "L3"
                         if floor not in floor_to_ahu:
                             floor_to_ahu[floor] = equip_id
-
-            # Add explicit zone temp trends
-            for i in range(1, 21):
-                sensor_codes.add(f"Zone-{i:03d}-temp")
 
             # Add AHU trends for each known floor
             for floor, ahu_id in floor_to_ahu.items():
@@ -161,7 +144,7 @@ class ShadowModePollingService:
     async def poll(self) -> dict[str, Any]:
         """Poll bridge and feed data to ML pipeline. Call this on each poll cycle."""
         self._poll_count += 1
-        now = datetime.now(tz=timezone.utc)
+        now = datetime.now(tz=UTC)
         result: dict[str, Any] = {"poll_count": self._poll_count, "errors": []}
 
         try:
@@ -379,7 +362,13 @@ class ShadowModePollingService:
             except Exception as e:
                 logger.warning(f"[SHADOW] Trends poll error: {e}")
 
-        # ── 6. Merge all states ───────────────────────────────────────────────
+        # ── 6. Sync equipment online/offline status from /points ─────────────
+        points_result = await self._sync_equipment_status(base, headers)
+        result["equipment_updated"] = points_result["updated"]
+        result["equipment_created"] = points_result.get("created", 0)
+        result["equipment_missing_from_bridge"] = points_result["missing_from_bridge"]
+
+        # ── 7. Merge all states ───────────────────────────────────────────────
         # Trends states have higher fidelity (chiller supply temp from BACnet
         # vs aggregated HVAC_kW from /telemetry), so they take priority over
         # the aggregated entries for the same equipment code.
@@ -407,15 +396,95 @@ class ShadowModePollingService:
             errors.append(f"sync: {e}")
 
         result["errors"] = errors
+        self._last_poll_result = result
+
+        # Upsert log_sources so monitoring dashboard reflects bridge activity
+        if equipment_states:
+            self._upsert_log_source(len(equipment_states))
+
         logger.info(
             f"[SHADOW] Poll {self._poll_count}: {len(equipment_states)} states, "
             f"zones={result.get('zones_polled', 0)}, faults={fault_count}, "
             f"trends={result.get('trends_with_data', 0)}, "
             f"ml_hours={result.get('ml_hours_ingested', '?')}, "
             f"fault_buf={result.get('fault_buffer_size', '?')}, "
+            f"equip_updated={result.get('equipment_updated', 0)}, "
+            f"equip_created={result.get('equipment_created', 0)}, "
             f"errors={errors or 'none'}"
         )
         return result
+
+    @property
+    def status(self) -> dict:
+        """Return bridge connection status for API reporting.
+
+        Connected if we have successfully polled at least once AND the last poll
+        reported telemetry_fetched=True.
+        """
+        if self._poll_count == 0:
+            return {"connected": False, "reason": "not_polled", "poll_count": 0, "last_poll": None}
+
+        last = self._last_poll_result or {}
+        connected = last.get("telemetry_fetched", False) and not last.get("errors")
+        reason = None if connected else last.get("errors", ["unknown"])[0] if last.get("errors") else "poll_failed"
+
+        return {
+            "connected": connected,
+            "reason": reason,
+            "poll_count": self._poll_count,
+            "last_poll": self._energy_last_poll.isoformat() if self._energy_last_poll else None,
+            "ml_hours_ingested": last.get("ml_hours_ingested"),
+            "bridge_data_source": "remote_bridge",
+        }
+
+    def _upsert_log_source(self, equipment_state_count: int) -> None:
+        """Create or update a log_sources entry reflecting bridge polling activity.
+
+        This keeps the System Health monitoring page in sync with shadow mode operation,
+        which bypasses the commissioning flow and doesn't write to log_sources directly.
+        """
+        try:
+            from app.database.repositories.integration_repository import IntegrationRepository
+
+            repo = IntegrationRepository()
+            source_name = f"Shadow Bridge ({self.site_id})"
+
+            existing = repo.get_log_source_by_name(source_name)
+            now_iso = datetime.utcnow().isoformat()
+
+            if existing:
+                repo.update_log_source(
+                    existing["id"],
+                    {
+                        "is_active": True,
+                        "last_sync_at": now_iso,
+                        "last_sync_status": "success",
+                        "last_sync_records": equipment_state_count,
+                    },
+                )
+            else:
+                # Resolve site code (e.g. "site-002") to UUID for DB
+                from app.database.repositories.site_repository import SiteRepository
+
+                site_repo = SiteRepository()
+                site_record = site_repo.client.table("sites").select("id").eq("code", self.site_id).execute()
+                site_uuid = site_record.data[0]["id"] if site_record.data else self.site_id
+                repo.create_log_source(
+                    {
+                        "site_id": site_uuid,
+                        "name": source_name,
+                        "source_type": "shadow_polling",
+                        "connection_type": "api",
+                        "is_active": True,
+                        "sync_frequency_minutes": 5,
+                        "last_sync_at": now_iso,
+                        "last_sync_status": "success",
+                        "last_sync_records": equipment_state_count,
+                    }
+                )
+            logger.debug(f"[SHADOW] log_sources upserted: {source_name}")
+        except Exception as e:
+            logger.warning(f"[SHADOW] Failed to upsert log_sources: {e}")
 
     def _accumulate_energy(self, hvac_kw: float, lighting_kw: float, total_kw: float, now: datetime) -> None:
         """Accumulate energy from instantaneous power readings.
@@ -535,6 +604,60 @@ class ShadowModePollingService:
         }
         return mapping.get(point, point)
 
+    def _parse_equipment_code(self, code: str) -> tuple[str, str]:
+        """Parse equipment code into (type, display_name).
+
+        Code format: S002-{TYPE}-{rest} where TYPE is HVAC category
+        e.g. S002-CHILLER-B1-001 → type=chiller, name=S002 Chiller B1-001
+             S002-FCU-101         → type=fcu,    name=S002 FCU 101
+             S002-MTR-B1-MAIN     → type=meter,  name=S002 Meter B1 Main
+        """
+        parts = code.split("-")
+        if len(parts) >= 2:
+            raw_type = parts[1].upper()
+        else:
+            raw_type = "UNKNOWN"
+
+        # Normalise equipment type labels
+        type_map = {
+            "CHILLER": "chiller",
+            "AHU": "ahu",
+            "FCU": "fcu",
+            "VAV": "vav",
+            "SPLIT": "split",
+            "CT": "cooling_tower",
+            "CRAC": "crac",
+            "DALI": "dali",
+            "GEN": "generator",
+            "TX": "transformer",
+            "UPS": "ups",
+            "ATS": "ats",
+            "MSB": "msb",
+            "MTR": "meter",
+            "PFC": "pfc",
+            "FDR": "feeder",
+            "MV": "mv",
+            "DB": "distribution_board",
+            "BESS": "bess",
+            "INV": "inverter",
+            "PUMP": "pump",
+            "FIRE": "fire",
+            "ACC": "access_control",
+            "CCTV": "cctv",
+            "LUM": "luminaire",
+            "ZONE": "zone",
+            "UNKNOWN": "unknown",
+        }
+        eq_type = type_map.get(raw_type, "unknown")
+        # Build human-readable name: "S002 Chiller B1-001"
+        name_parts = code.split("-")
+        if len(name_parts) >= 3:
+            name = code.replace("-", " ", 1)  # "S002-CHILLER..." → "S002 CHILLER..."
+            name = name.replace("-", " ", 1)  # "S002 CHILLER-B1..." → "S002 CHILLER B1..."
+        else:
+            name = code
+        return eq_type, name
+
     def _equip_type_from_sensor(self, sensor_code: str) -> str:
         """Infer equipment type from sensor code string."""
         if "AHU" in sensor_code:
@@ -546,6 +669,157 @@ class ShadowModePollingService:
         if "WEATHER" in sensor_code:
             return "ahu"
         return "unknown"
+
+    async def _sync_equipment_status(self, base: str, headers: dict[str, str]) -> dict[str, Any]:
+        """Sync equipment online/offline status from bridge /points endpoint.
+
+        Updates the status field in Supabase equipment table for all equipment
+        that appears in the bridge /points response. Equipment not in the bridge
+        are marked offline. Equipment on the bridge but not in DB are auto-created.
+
+        Returns:
+            Dict with 'updated' count, 'missing_from_bridge' list, and 'created' count.
+        """
+        result = {"updated": 0, "missing_from_bridge": [], "created": 0}
+        try:
+            async with httpx.AsyncClient(timeout=20.0) as client:
+                resp = await client.get(
+                    f"{base}/api/sites/{self.site_id}/points",
+                    headers=headers,
+                )
+                resp.raise_for_status()
+                data = resp.json()
+
+            # /points returns {"equipment": [{"code": {"status": "online", ...}}, ...]}
+            # The response is a list containing one dict with ALL equipment codes as keys.
+            equip_list = data.get("equipment", [])
+            if isinstance(equip_list, list) and len(equip_list) > 0:
+                equip_status_map = equip_list[0] if isinstance(equip_list[0], dict) else {}
+            else:
+                equip_status_map = {}
+
+            if not equip_status_map:
+                return result
+
+            # Get all equipment from DB for this site
+            from app.database.repositories.equipment_repository import EquipmentRepository
+            from app.database.repositories.site_repository import SiteRepository
+
+            site_repo = SiteRepository()
+            site = site_repo.get_by_id(self.site_id)
+            site_uuid = site.get("id") if site else None
+
+            if not site_uuid:
+                logger.warning(f"[SHADOW] Cannot sync equipment status — site {self.site_id} not found in DB")
+                return result
+
+            eq_repo = EquipmentRepository()
+            all_equipment = eq_repo.get_all(site_id=site_uuid)
+
+            # Build code sets and a truncated-to-full mapping.
+            # Bridge returns truncated codes (up to 15 chars) that may cut mid-word
+            # (e.g. "S002-MTR-B1-MAI" = DB "S002-MTR-B1-MAIN", "S002-MTR-R-SOL" = DB "S002-MTR-R-SOLAR").
+            # We match by checking if the bridge code is a prefix of the DB code.
+            db_full_codes = [eq.get("code") for eq in all_equipment]
+
+            # Build sets for membership tests
+            db_full_set = set(db_full_codes)
+            bridge_codes = set(equip_status_map.keys())
+            bridge_lum_codes = {c for c in bridge_codes if "-LUM-" in c}
+            # Map bridge codes → full DB codes.
+            # Strategy: exact match first, then prefix match (bridge code is prefix of DB code).
+            bridge_to_db: dict[str, str] = {}
+            for bcode in bridge_codes:
+                if bcode in db_full_set:
+                    bridge_to_db[bcode] = bcode  # exact match
+                else:
+                    # Try prefix match: bridge code as prefix of DB code
+                    matched = None
+                    for db_code in db_full_codes:
+                        if db_code.startswith(bcode):
+                            if matched is None or len(db_code) < len(matched):
+                                matched = db_code
+                    if matched:
+                        bridge_to_db[bcode] = matched
+
+            mapped_db_codes = set(bridge_to_db.values())
+
+            # Equipment in DB but not on bridge → mark offline
+            missing = db_full_set - mapped_db_codes - bridge_lum_codes
+            result["missing_from_bridge"] = sorted(missing)
+
+            # Update each equipment found on bridge (using mapped DB codes)
+            updated = 0
+            for bcode, bridge_status_data in equip_status_map.items():
+                if "-LUM-" in bcode and bcode not in bridge_to_db:
+                    continue
+
+                db_code = bridge_to_db.get(bcode)
+                if not db_code:
+                    continue
+
+                bridge_status = bridge_status_data.get("status", "offline")
+                # Normalise: bridge returns "online"/"offline" or "normal"/etc.
+                # Map to DB status values — 'normal' for online, 'offline' for offline
+                db_status = "normal" if bridge_status in ("online", "normal", "ok") else bridge_status
+
+                try:
+                    eq_repo.update(db_code, {"status": db_status})
+                    updated += 1
+                except Exception as e:
+                    logger.warning(f"[SHADOW] Failed to update {db_code} ({bcode}): {e}")
+
+            # Mark equipment not present on bridge as offline
+            for db_code in missing:
+                try:
+                    eq_repo.update(db_code, {"status": "offline"})
+                    updated += 1
+                except Exception as e:
+                    logger.warning(f"[SHADOW] Failed to mark {db_code} offline: {e}")
+
+            # Auto-create equipment that exists on bridge but not in DB
+            bridge_all_codes = set(equip_status_map.keys())
+            new_codes = bridge_all_codes - set(bridge_to_db.keys()) - bridge_lum_codes
+            created = 0
+            if new_codes:
+                for bcode in sorted(new_codes):
+                    bridge_status_data = equip_status_map.get(bcode, {})
+                    bridge_status = bridge_status_data.get("status", "offline")
+                    db_status = "normal" if bridge_status in ("online", "normal", "ok") else bridge_status
+                    eq_type, eq_name = self._parse_equipment_code(bcode)
+                    # Skip luminaries
+                    if "-LUM-" in bcode:
+                        continue
+                    try:
+                        eq_repo.create(
+                            {
+                                "code": bcode,
+                                "name": eq_name,
+                                "type": eq_type,
+                                "status": db_status,
+                                "site_id": site_uuid,
+                                "health_score": 100,
+                            }
+                        )
+                        created += 1
+                    except Exception as e:
+                        logger.warning(f"[SHADOW] Failed to create {bcode}: {e}")
+
+                if created > 0:
+                    logger.info(f"[SHADOW] Auto-created {created} equipment from bridge")
+
+            result["updated"] = updated
+            result["created"] = created
+            if updated > 0 or missing or created > 0:
+                logger.info(
+                    f"[SHADOW] Equipment status sync: {updated} updated, "
+                    f"{len(missing)} missing from bridge, {created} created"
+                )
+
+        except Exception as e:
+            logger.warning(f"[SHADOW] Equipment status sync failed: {e}")
+
+        return result
 
 
 _shadow_polling_service: ShadowModePollingService | None = None
