@@ -2189,6 +2189,150 @@ export const api = {
   },
 
   /**
+   * Get controllable equipment from Supabase via /api/device-controls/equipment
+   * Maps equipment codes to Device interface for ControlDashboard.
+   * @param siteId - Site ID (e.g., "site-002")
+   */
+  async getEquipmentDevices(siteId?: string): Promise<Device[]> {
+    const params = new URLSearchParams();
+    if (siteId) {
+      params.append("site_id", siteId);
+    }
+    const queryString = params.toString();
+    const response = await fetchApi<{
+      total: number;
+      controllable: number;
+      by_type: Record<string, unknown[]>;
+      equipment: Array<{
+        code: string;
+        name: string;
+        type: string;
+        location: string;
+        health_score: number | null;
+        status: string | null;
+      }>;
+    }>(`/api/device-controls/equipment${queryString ? `?${queryString}` : ""}`);
+
+    // Map equipment to Device interface
+    // Extract site_id from equipment code (e.g., "S002-FCU-101" -> "site-002")
+    const deviceMap = new Map<string, Device>();
+
+    for (const eq of response.equipment) {
+      // Derive site_id from equipment code prefix
+      // e.g., "S002-..." -> "site-002", "site-005-..." -> "site-005"
+      const codeParts = eq.code.split("-");
+      let siteIdFromCode = "";
+      if (codeParts[0].toLowerCase() === "site" && codeParts.length >= 2) {
+        siteIdFromCode = `${codeParts[0]}-${codeParts[1]}`.toLowerCase();
+      } else if (codeParts[0].toUpperCase().startsWith("S")) {
+        siteIdFromCode = `site-${codeParts[0].substring(1).toLowerCase()}`;
+      } else {
+        siteIdFromCode = codeParts[0].toLowerCase();
+      }
+
+      const device: Device = {
+        id: eq.code,
+        name: eq.name || eq.code,
+        device_type: eq.type || "UNKNOWN",
+        type: eq.type,
+        protocol: "BACnet",
+        location: eq.location || "",
+        site_id: siteIdFromCode,
+        description: `${eq.type || "Equipment"} - ${eq.location || "Unknown location"}`,
+        manufacturer: undefined,
+        model: undefined,
+        points: {}, // Points loaded lazily via getEquipmentDevice
+        status: eq.status === "normal" || eq.status === "online" ? "online"
+                : eq.status === "fault" || eq.status === "offline" ? "offline"
+                : eq.status === "maintenance" ? "maintenance"
+                : "offline",
+        safety_status: "unknown",
+        last_communication: undefined,
+        current_value: undefined,
+      };
+
+      deviceMap.set(eq.code, device);
+    }
+
+    return Array.from(deviceMap.values());
+  },
+
+  /**
+   * Get full equipment details including control points via /api/device-controls/{code}
+   * @param equipmentCode - Equipment code (e.g., "S002-FCU-101")
+   */
+  async getEquipmentDevice(equipmentCode: string): Promise<Device> {
+    const response = await fetchApi<{
+      code: string;
+      name: string;
+      type: string;
+      controllable: boolean;
+      health_score: number | null;
+      status: string | null;
+      location: string;
+      control_points: Record<string, {
+        description: string;
+        type: string;
+        min?: number;
+        max?: number;
+        unit: string;
+        writable: boolean;
+        enum_values?: string[] | null;
+      }>;
+    }>(`/api/device-controls/${encodeURIComponent(equipmentCode)}`);
+
+    // Derive site_id from equipment code
+    const codeParts = response.code.split("-");
+    let siteIdFromCode = "";
+    if (codeParts[0].toLowerCase() === "site" && codeParts.length >= 2) {
+      siteIdFromCode = `${codeParts[0]}-${codeParts[1]}`.toLowerCase();
+    } else if (codeParts[0].toUpperCase().startsWith("S")) {
+      siteIdFromCode = `site-${codeParts[0].substring(1).toLowerCase()}`;
+    } else {
+      siteIdFromCode = codeParts[0].toLowerCase();
+    }
+
+    // Map control_points to DevicePoint format
+    const points: Record<string, DevicePoint> = {};
+    for (const [pointName, point] of Object.entries(response.control_points || {})) {
+      points[pointName] = {
+        id: pointName,
+        name: pointName,
+        point_type: point.type,
+        description: point.description,
+        unit: point.unit,
+        min_value: point.min,
+        max_value: point.max,
+        default_value: 0,
+        current_value: undefined,
+        writable: point.writable,
+        metadata: point.enum_values ? { enum_values: point.enum_values } : undefined,
+      };
+    }
+
+    return {
+      id: response.code,
+      name: response.name || response.code,
+      device_type: response.type || "UNKNOWN",
+      type: response.type,
+      protocol: "BACnet",
+      location: response.location || "",
+      site_id: siteIdFromCode,
+      description: `${response.type || "Equipment"} - ${response.location || "Unknown location"}`,
+      manufacturer: undefined,
+      model: undefined,
+      points,
+      status: response.status === "normal" || response.status === "online" ? "online"
+              : response.status === "fault" || response.status === "offline" ? "offline"
+              : response.status === "maintenance" ? "maintenance"
+              : "offline",
+      safety_status: "unknown",
+      last_communication: undefined,
+      current_value: undefined,
+    };
+  },
+
+  /**
    * Get a specific device by ID
    * @param deviceId - Device ID
    */
@@ -2235,6 +2379,51 @@ export const api = {
       priority,
     };
     return fetchApi<DeviceControlResponse>(`/api/devices/${deviceId}/control`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  },
+
+  /**
+   * Execute a control action on equipment via /api/device-controls/{equipment_code}/execute
+   * @param equipmentCode - Equipment code (e.g., "S002-FCU-101")
+   * @param controlPoint - Point name to control
+   * @param targetValue - Value to set
+   * @param reason - Reason for the control action
+   * @param operatorId - Operator ID making the change
+   */
+  async controlEquipmentByCode(
+    equipmentCode: string,
+    controlPoint: string,
+    targetValue: number | boolean,
+    reason: string = "Manual control from ControlDashboard",
+    operatorId: string = "operator"
+  ): Promise<{
+    success: boolean;
+    equipment_code: string;
+    control_point: string;
+    target_value: number | boolean;
+    execution_status: string;
+    cov_verified: boolean;
+    timestamp: string;
+    execution_id: string;
+  }> {
+    const body = {
+      control_point: controlPoint,
+      target_value: targetValue,
+      reason,
+      operator_id: operatorId,
+    };
+    return fetchApi<{
+      success: boolean;
+      equipment_code: string;
+      control_point: string;
+      target_value: number | boolean;
+      execution_status: string;
+      cov_verified: boolean;
+      timestamp: string;
+      execution_id: string;
+    }>(`/api/device-controls/${encodeURIComponent(equipmentCode)}/execute`, {
       method: "POST",
       body: JSON.stringify(body),
     });

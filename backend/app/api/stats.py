@@ -16,6 +16,62 @@ logger = logging.getLogger(__name__)
 # Load data directory
 DATA_DIR = Path(__file__).parent.parent / "data"
 
+# Bridge equipment types to exclude from count (DALI lighting)
+_BRIDGE_EXCLUDE_TYPES = {"lum", "lighting", "dali_luminaire", "dali_lum"}
+
+
+def _get_bridge_equipment_count(site_id: str = "site-002") -> tuple[int, dict[str, int]]:
+    """Query the site bridge for real-time equipment count (excluding luminaires).
+
+    Returns:
+        Tuple of (total_equipment, equipment_types) where equipment_types is a
+        dict mapping type -> count, derived from the bridge's BACnet object catalog.
+    """
+    try:
+        import httpx
+
+        base_url = getattr(settings, "simbiot_api_url", None) or getattr(settings, "bridge_base_url", None)
+        api_token = getattr(settings, "simbiot_api_key", None) or getattr(settings, "bridge_api_token", None)
+
+        if not base_url or not api_token:
+            return 0, {}
+
+        url = f"{base_url.rstrip('/')}/api/sites/{site_id}/objects"
+        headers = {"Authorization": f"Bearer {api_token}"}
+
+        with httpx.Client(timeout=15.0) as client:
+            resp = client.get(url, headers=headers, params={"limit": 1000})
+            resp.raise_for_status()
+            data = resp.json()
+
+        objs = data if isinstance(data, list) else data.get("objects", data.get("data", []))
+        equipment_ids: set[str] = set()
+        # Track unique equipment per type (one entry per equipment_id)
+        type_to_equipment: dict[str, set[str]] = {}
+
+        for obj in objs:
+            eid = obj.get("equipment_id", "")
+            etype = (obj.get("equipment_type") or "unknown").lower()
+            obj_name = (obj.get("object_name") or "").lower()
+            obj_type = (obj.get("object_type") or "").lower()
+
+            # Skip luminaires and DALI lighting objects
+            if not eid or etype in _BRIDGE_EXCLUDE_TYPES:
+                continue
+            if "lum" in obj_type or "dali" in obj_name or "light" in obj_name:
+                continue
+
+            equipment_ids.add(eid)
+            if etype not in type_to_equipment:
+                type_to_equipment[etype] = set()
+            type_to_equipment[etype].add(eid)
+
+        type_counts = {t: len(ids) for t, ids in type_to_equipment.items()}
+        return len(equipment_ids), type_counts
+
+    except Exception:
+        return 0, {}
+
 
 def load_json(filename: str) -> list[dict] | dict:
     """Load JSON file from data directory."""
@@ -43,31 +99,54 @@ def get_stats_from_supabase() -> Optional[dict]:
         buildings_result = client.table("sites").select("id", count="exact").execute()
         total_sites = buildings_result.count or 0
 
-        # Get equipment counts by status
-        equipment_result = client.table("equipment").select("status", count="exact").execute()
-        _equipment_data = equipment_result.data or []
-
-        # Get total equipment count
-        total_equipment = 0
+        # Get total equipment count from bridge (real-time BACnet catalog, no luminaires)
+        total_equipment, bridge_types = _get_bridge_equipment_count()
         warning_count = 0
         critical_count = 0
         total_health = 0
 
-        # Query equipment with health scores
-        eq_detail = client.table("equipment").select("status,health_score").execute()
-        eq_items = eq_detail.data or []
-        total_equipment = len(eq_items)
-
-        for eq in eq_items:
-            status = eq.get("status", "normal")
-            health = eq.get("health_score", 100)
-            total_health += health
-            if status == "warning":
-                warning_count += 1
-            elif status == "critical":
-                critical_count += 1
-
-        avg_health = round(total_health / total_equipment, 1) if total_equipment > 0 else 0
+        # If bridge is unreachable, fall back to equipment table
+        if total_equipment == 0:
+            eq_detail = client.table("equipment").select("status,health_score").execute()
+            eq_items = eq_detail.data or []
+            total_equipment = len(eq_items)
+            for eq in eq_items:
+                status = eq.get("status", "normal")
+                health = eq.get("health_score", 100)
+                total_health += health
+                if status == "warning":
+                    warning_count += 1
+                elif status == "critical":
+                    critical_count += 1
+            avg_health = round(total_health / total_equipment, 1) if total_equipment > 0 else 0
+            # Build type counts from equipment table when bridge is down
+            type_stats = {}
+            eq_types = client.table("equipment").select("type,health_score,status").execute()
+            for eq in eq_types.data or []:
+                eq_type = eq.get("type", "unknown")
+                if eq_type not in type_stats:
+                    type_stats[eq_type] = {"type": eq_type, "count": 0, "total_health": 0, "warning_count": 0}
+                type_stats[eq_type]["count"] += 1
+                type_stats[eq_type]["total_health"] += eq.get("health_score", 100)
+                if eq.get("status") == "warning":
+                    type_stats[eq_type]["warning_count"] += 1
+            by_equipment_type = [
+                {
+                    "type": s["type"],
+                    "count": s["count"],
+                    "avg_health": round(s["total_health"] / s["count"], 1) if s["count"] > 0 else 0,
+                    "warning_count": s["warning_count"],
+                }
+                for s in type_stats.values()
+            ]
+            by_equipment_type.sort(key=lambda t: -t["count"])
+        else:
+            # Bridge data: equipment count from bridge, no health scores available
+            avg_health = 0
+            by_equipment_type = [
+                {"type": t, "count": c, "avg_health": 0, "warning_count": 0}
+                for t, c in sorted(bridge_types.items(), key=lambda x: -x[1])
+            ]
 
         # Get active risks from predictions (consolidated risk system)
         # Predictions with severity 'critical' or 'warning' are considered active risks
@@ -115,29 +194,6 @@ def get_stats_from_supabase() -> Optional[dict]:
 
         by_region = list(region_stats.values())
         by_region.sort(key=lambda r: -r["site_count"])
-
-        # Equipment by type (simplified - use type field)
-        eq_types = client.table("equipment").select("type,health_score,status").execute()
-        type_stats = {}
-        for eq in eq_types.data or []:
-            eq_type = eq.get("type", "Unknown")
-            if eq_type not in type_stats:
-                type_stats[eq_type] = {"type": eq_type, "count": 0, "total_health": 0, "warning_count": 0}
-            type_stats[eq_type]["count"] += 1
-            type_stats[eq_type]["total_health"] += eq.get("health_score", 100)
-            if eq.get("status") == "warning":
-                type_stats[eq_type]["warning_count"] += 1
-
-        by_equipment_type = [
-            {
-                "type": stats["type"],
-                "count": stats["count"],
-                "avg_health": round(stats["total_health"] / stats["count"], 1) if stats["count"] > 0 else 0,
-                "warning_count": stats["warning_count"],
-            }
-            for stats in type_stats.values()
-        ]
-        by_equipment_type.sort(key=lambda t: -t["count"])
 
         return {
             "total_sites": total_sites,

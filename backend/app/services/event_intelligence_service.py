@@ -525,10 +525,7 @@ class EventIntelligenceService:
             severity=severity,
             timestamp=datetime.now(UTC),
             signals=[{"point": "anomaly_score", "value": anomaly_score}],
-            description=(
-                f"{equipment_id}: ML anomaly score {anomaly_score:.2f} "
-                f"exceeds threshold {threshold}"
-            ),
+            description=(f"{equipment_id}: ML anomaly score {anomaly_score:.2f} exceeds threshold {threshold}"),
             threshold_value=threshold,
             actual_value=anomaly_score,
             metadata={"anomaly_score": anomaly_score},

@@ -24,12 +24,12 @@ function SettingsTitleBlock({ selectedSiteId }: { selectedSiteId: string | null 
 }
 
 function SettingsUnlockButton({
-  isDemoUser,
+  currentUserRole,
   setSettingsPageUnlocked,
   setShowPasswordModal,
   settingsPageUnlocked,
-}: Pick<ReturnType<typeof useSettingsController>, "isDemoUser" | "setSettingsPageUnlocked" | "setShowPasswordModal" | "settingsPageUnlocked">) {
-  if (!isDemoUser) return null;
+}: Pick<ReturnType<typeof useSettingsController>, "currentUserRole" | "setSettingsPageUnlocked" | "setShowPasswordModal" | "settingsPageUnlocked">) {
+  if (currentUserRole === "admin") return null;
 
   return (
     <button
@@ -87,7 +87,7 @@ export function SettingsHeader({
       <div className="flex items-center justify-between gap-3 mb-2">
         <SettingsTitleBlock selectedSiteId={controller.selectedSiteId} />
         <SettingsUnlockButton
-          isDemoUser={controller.isDemoUser}
+          currentUserRole={controller.currentUserRole}
           setSettingsPageUnlocked={controller.setSettingsPageUnlocked}
           setShowPasswordModal={controller.setShowPasswordModal}
           settingsPageUnlocked={controller.settingsPageUnlocked}
@@ -133,7 +133,7 @@ export function SettingsStatusBanners({
 }) {
   return (
     <>
-      {controller.isDemoUser && controller.settingsPageUnlocked ? (
+      {controller.currentUserRole !== "admin" && controller.settingsPageUnlocked ? (
         <SettingsBanner color="amber">
           <div className="flex items-center gap-2">
             <Unlock className="h-4 w-4" style={{ color: "var(--color-sentinel-amber)" }} />

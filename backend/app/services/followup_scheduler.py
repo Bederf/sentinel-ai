@@ -260,9 +260,7 @@ class FollowupSchedulerService:
 
         return self._create_escalation(equipment_id, failed_count)
 
-    def get_pending_followups(
-        self, equipment_id: str | None = None, status: str | None = None
-    ) -> list[FollowupTask]:
+    def get_pending_followups(self, equipment_id: str | None = None, status: str | None = None) -> list[FollowupTask]:
         """
         Get follow-up tasks, optionally filtered.
 

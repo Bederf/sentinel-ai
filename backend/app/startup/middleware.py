@@ -36,6 +36,7 @@ _PUBLIC_PATHS = {
     "/api/auth/mfa/verify",
     "/api/auth/verify",
     "/api/auth/verify-admin-pin",
+    "/api/auth/verify-settings-password",
     "/docs",
     "/openapi.json",
     "/redoc",
@@ -57,6 +58,7 @@ _PUBLIC_PREFIXES = (
     "/api/mcp/openai",  # MCP OpenAI endpoints for ChatGPT/M365 Copilot (authenticated at MCP layer)
     "/api/lifecycle/",  # Lifecycle simulation status endpoints (frontend health checks)
     "/api/recommendations/",  # Recommendations endpoints (can be public for UI)
+    "/api/municipal-billing/tariffs",  # Tariff schedules — read-only, scoped to site municipality
     "/api/webhooks/google/calendar",  # Google Calendar Pub/Sub push notifications (public — validated by channel ID)
     "/api/webhooks/graph/events",  # Microsoft Graph webhook notifications (public — validated by clientState)
 )

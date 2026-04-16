@@ -12,6 +12,7 @@ import { motionReduced } from './motionPreference'
 interface CockpitBuildingThreeProps {
   state: CockpitState
   className?: string
+  onZoneSelect?: (zone: import("./types").CockpitTwinZoneSignal | null) => void
 }
 
 const SLAB_HEIGHT = 0.28
@@ -181,7 +182,12 @@ function BuildingStack({
 
   const reversed = [...slabs].reverse()
   const totalHeight = reversed.length * SLAB_HEIGHT
-  let yCursor = 0
+
+  // Compute cumulative Y positions for each floor (before render)
+  const yPositions = reversed.reduce<number[]>((acc, _) => {
+    const y = acc.length === 0 ? 0 : acc[acc.length - 1] + SLAB_HEIGHT
+    return [...acc, y]
+  }, [])
 
   return (
     <group position={[0, 0, 0]}>
@@ -203,8 +209,7 @@ function BuildingStack({
 
       {reversed.map((floor, index) => {
         const h = SLAB_HEIGHT
-        const y = yCursor + h / 2
-        yCursor += h
+        const y = yPositions[index] + h / 2
         const setback = 1 - index * 0.0045
         const w = BASE_WIDTH * setback
         const d = BASE_DEPTH * setback

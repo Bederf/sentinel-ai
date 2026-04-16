@@ -66,6 +66,7 @@ class OperatorGuidance(BaseModel):
 
 class EmailClusterPayload(BaseModel):
     """Email complaint cluster for cockpit heatmap display."""
+
     cluster_id: str
     zone_id: str
     zone_name: str

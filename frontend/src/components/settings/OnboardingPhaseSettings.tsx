@@ -131,9 +131,6 @@ export function OnboardingPhaseSettings({
                 </option>
               ))}
             </select>
-            <p className="text-xs mt-2" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-              Shadow is telemetry-only learning mode. Advisory and above progressively enable SENTINEL layers.
-            </p>
           </div>
         </div>
       </div>

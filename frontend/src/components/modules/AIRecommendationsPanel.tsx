@@ -10,17 +10,21 @@ import { Card, Title, Text, Badge, Flex, Button } from '@tremor/react';
 import { useModules, useCriticalRecommendations, useCrossSystemRecommendations } from '../../contexts/ModuleHooks';
 import { PRIORITY_COLORS, MODULE_COLORS } from '../../lib/moduleRegistry';
 import type { AIRecommendation, ModuleType } from '../../lib/moduleRegistry';
+import { phaseAllows } from '../../lib/onboardingPhase';
+import type { OnboardingPhase } from '../../lib/onboardingPhase';
 
 interface AIRecommendationsPanelProps {
   compact?: boolean;
   maxItems?: number;
   moduleFilter?: ModuleType;
+  sitePhase?: OnboardingPhase | string;
 }
 
 export function AIRecommendationsPanel({
   compact = false,
   maxItems = 10,
   moduleFilter,
+  sitePhase,
 }: AIRecommendationsPanelProps) {
   const {
     recommendations,
@@ -51,6 +55,11 @@ export function AIRecommendationsPanel({
 
   // Limit items
   const displayRecs = filteredRecs.slice(0, maxItems);
+
+  // Phase gate: advisory+ required for recommendations_ui
+  if (!phaseAllows(sitePhase, "recommendations_ui")) {
+    return null;
+  }
 
   if (compact) {
     return (

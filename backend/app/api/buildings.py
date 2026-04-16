@@ -279,6 +279,7 @@ async def get_site(site_id: str, auth: AuthContext = Depends(require_site_access
     # --- Supabase (primary) ---
     try:
         from app.database.supabase_client import get_supabase_client
+
         client = get_supabase_client()
         result = client.table("buildings").select("*").eq("code", site_code).single().execute()
         if result.data:
@@ -312,7 +313,9 @@ async def get_site(site_id: str, auth: AuthContext = Depends(require_site_access
                 },
                 "optimization": {
                     "active_profile": opt.get("active_profile", "balanced"),
-                    "sentinel_operating_mode": opt.get("sentinel_operating_mode", opt.get("active_profile", "balanced")),
+                    "sentinel_operating_mode": opt.get(
+                        "sentinel_operating_mode", opt.get("active_profile", "balanced")
+                    ),
                     "control_tier": opt.get("control_tier", "human_in_loop"),
                     "zone_overrides": opt.get("zone_overrides", []),
                     "schedule_overrides": opt.get("schedule_overrides", []),
@@ -329,6 +332,7 @@ async def get_site(site_id: str, auth: AuthContext = Depends(require_site_access
 
     # --- Fallback: minimal data from registered sites ---
     from app.core.site_resolver import get_registered_sites
+
     sites = get_registered_sites()
     site_entry = next((s for s in sites if s.get("code") == site_code), None)
     if site_entry:
@@ -343,7 +347,11 @@ async def get_site(site_id: str, auth: AuthContext = Depends(require_site_access
             "floors": [],
             "features": {},
             "contacts": {},
-            "optimization": {"active_profile": "balanced", "sentinel_operating_mode": "balanced", "control_tier": "human_in_loop"},
+            "optimization": {
+                "active_profile": "balanced",
+                "sentinel_operating_mode": "balanced",
+                "control_tier": "human_in_loop",
+            },
             "metadata": {},
             "desk_count": 0,
             "zone_count": 0,
@@ -368,6 +376,7 @@ async def update_building_config(
 
     try:
         from app.database.supabase_client import get_supabase_client
+
         client = get_supabase_client()
         existing = client.table("buildings").select("*").eq("code", site_code).single().execute()
         if not existing.data:
@@ -417,22 +426,34 @@ async def update_building_config(
     if config.contacts is not None:
         if config.contacts.get("facility_manager") is not None:
             updates["contact_facility_manager"] = config.contacts["facility_manager"]
-            changes["contact_facility_manager"] = {"old": current.get("contact_facility_manager"), "new": config.contacts["facility_manager"]}
+            changes["contact_facility_manager"] = {
+                "old": current.get("contact_facility_manager"),
+                "new": config.contacts["facility_manager"],
+            }
         if config.contacts.get("email") is not None:
             updates["contact_email"] = config.contacts["email"]
             changes["contact_email"] = {"old": current.get("contact_email"), "new": config.contacts["email"]}
         if config.contacts.get("emergency") is not None:
             updates["contact_emergency"] = config.contacts["emergency"]
-            changes["contact_emergency"] = {"old": current.get("contact_emergency"), "new": config.contacts["emergency"]}
+            changes["contact_emergency"] = {
+                "old": current.get("contact_emergency"),
+                "new": config.contacts["emergency"],
+            }
 
     # Optimization settings stored in optimization_settings JSONB
     current_opt = current.get("optimization_settings") or {}
     new_opt = dict(current_opt)
     if config.optimization_profile is not None:
-        changes["optimization.active_profile"] = {"old": current_opt.get("active_profile"), "new": config.optimization_profile}
+        changes["optimization.active_profile"] = {
+            "old": current_opt.get("active_profile"),
+            "new": config.optimization_profile,
+        }
         new_opt["active_profile"] = config.optimization_profile
     if config.sentinel_operating_mode is not None:
-        changes["optimization.sentinel_operating_mode"] = {"old": current_opt.get("sentinel_operating_mode"), "new": config.sentinel_operating_mode}
+        changes["optimization.sentinel_operating_mode"] = {
+            "old": current_opt.get("sentinel_operating_mode"),
+            "new": config.sentinel_operating_mode,
+        }
         new_opt["sentinel_operating_mode"] = config.sentinel_operating_mode
     if config.control_tier is not None:
         changes["optimization.control_tier"] = {"old": current_opt.get("control_tier"), "new": config.control_tier}
@@ -451,6 +472,7 @@ async def update_building_config(
     # Emit audit event
     try:
         from app.services.audit_service import emit_audit_event
+
         await emit_audit_event(
             event_type="CONFIG_CHANGE",
             entity_type="building",
@@ -1090,10 +1112,11 @@ async def get_site_equipment(site_id: str, auth: AuthContext = Depends(require_s
                 )
                 # Determine effective controllable status:
                 # - Simulation sync (no real BMS): use type-based override when device_manager has no writable points
+                # - Shadow mode (capability_sync empty): also use type-based override for known controllable types
                 # - Real BMS sync: trust synced_controllable if available, else fall back to device_manager
-                if is_simulated_sync:
+                if is_simulated_sync or (not synced_controllable and controllable_by_type):
                     if not inferred_controllable and controllable_by_type:
-                        # Simulation sync found no real writable points — fall back to type-based assumption.
+                        # No real writable points found — fall back to type-based assumption.
                         # Real BMS sync should override this when connectivity is available.
                         inferred_controllable = True
                     effective_controllable = inferred_controllable

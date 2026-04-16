@@ -279,7 +279,12 @@ def _handle_event_created(
         logger.error("[GraphEvent] Could not create visit for event %s: %s", event_id, exc)
         return
 
-    logger.info("[GraphEvent] Created PENDING Visit %s for event %s (visitor %s) — QR held until RSVP accepted", visit.id, event_id, visitor_email)
+    logger.info(
+        "[GraphEvent] Created PENDING Visit %s for event %s (visitor %s) — QR held until RSVP accepted",
+        visit.id,
+        event_id,
+        visitor_email,
+    )
     # NOTE: QR email is NOT sent here. Visitor must accept the invite first.
     # When visitor accepts via their calendar client, Graph sends an "updated" notification
     # with the attendee PARTSTAT=ACCEPTED, which triggers RSVP processing.
@@ -312,6 +317,7 @@ async def _handle_event_updated(
         logger.info("[GraphEvent] Visit %s ACCEPTED by visitor — QR email will be sent", existing.id)
         try:
             from app.services.visitor_email_service import VisitorEmailService
+
             email_svc = VisitorEmailService()
             email_svc.send_visitor_confirmation(updated or existing)
         except Exception as exc:
@@ -341,6 +347,7 @@ async def _check_rsvp_accepted(event_id: str, visitor_email: str) -> bool:
         return False
 
     import httpx
+
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.get(

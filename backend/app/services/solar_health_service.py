@@ -1000,9 +1000,7 @@ class SolarHealthService:
             },
         )
 
-    async def _generate_bess_warranty(
-        self, site_id: str, equipment_id: str, timestamp: str
-    ) -> WarrantyPackage | None:
+    async def _generate_bess_warranty(self, site_id: str, equipment_id: str, timestamp: str) -> WarrantyPackage | None:
         """Build warranty evidence for a BESS container."""
         bess = await self._ingestion.get_bess_status(site_id)
         if not bess:

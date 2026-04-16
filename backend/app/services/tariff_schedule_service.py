@@ -123,7 +123,7 @@ class TariffScheduleService:
 
     def _load_default_tariff(self, municipality: str, tariff_name: str) -> dict[str, Any] | None:
         """Load a default tariff from bundled JSON files."""
-        tariff_path = Path("backend/app/data/solar/tariffs/city_power_2026.json")
+        tariff_path = Path(__file__).parent.parent / "data/solar/tariffs/city_power_2026.json"
         if not tariff_path.exists():
             return None
 

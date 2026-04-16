@@ -404,13 +404,13 @@ FSR assessments, OWASP, SIEM, network architecture, POPIA, or any IT concern:
 **Note:** Use your tools to fetch live building data. Do NOT guess or fabricate data — always call tools first.
 -- For a specific asset: call get_hybrid_context first (returns Brick + telemetry + ML + docs in one call)
 -- For building-wide overviews: use get_system_status, get_equipment_health, get_alerts_and_anomalies
--- For operational knowledge/questions (equipment manuals, fault codes, maintenance procedures): use search_documents{docs_instruction}
+-- For operational knowledge/questions (equipment manuals, fault codes, maintenance
+   procedures): use search_documents{docs_instruction}
 
 ----
 
 {CITATION_INSTRUCTIONS}
 """
-
 
 
 class ClaudeService:
@@ -439,6 +439,7 @@ class ClaudeService:
         include_site_context: bool = True,
         model_override: str | None = None,
         source: str = "chat",
+        site_id: str | None = None,
     ) -> AsyncGenerator[str, None]:
         """
         Stream a response from Claude.
@@ -448,6 +449,7 @@ class ClaudeService:
             system_prompt: Optional custom system prompt (defaults to FM prompt with context)
             include_site_context: Whether to include building data context
             model_override: Optional model ID to use instead of the default
+            site_id: Optional site identifier for usage tracking
 
         Yields:
             Text chunks as they arrive from Claude
@@ -500,6 +502,7 @@ class ClaudeService:
                         input_tokens=getattr(u, "input_tokens", 0),
                         output_tokens=getattr(u, "output_tokens", 0),
                         source=source,
+                        site_id=site_id or "unknown",
                         cache_read_tokens=getattr(u, "cache_read_input_tokens", 0),
                         cache_creation_tokens=getattr(u, "cache_creation_input_tokens", 0),
                     )
@@ -567,7 +570,9 @@ class ClaudeService:
         if system_prompt:
             system_text = system_prompt
         elif include_site_context:
-            system_text = build_system_prompt_for_tools(include_system_docs=include_system_docs, is_it_risk_query=is_it_risk_query)
+            system_text = build_system_prompt_for_tools(
+                include_system_docs=include_system_docs, is_it_risk_query=is_it_risk_query
+            )
         else:
             system_text = FM_SYSTEM_PROMPT_BASE
 
@@ -639,6 +644,7 @@ class ClaudeService:
                         input_tokens=getattr(u, "input_tokens", 0),
                         output_tokens=getattr(u, "output_tokens", 0),
                         source=source,
+                        site_id=site_id or "unknown",
                         cache_read_tokens=getattr(u, "cache_read_input_tokens", 0),
                         cache_creation_tokens=getattr(u, "cache_creation_input_tokens", 0),
                     )

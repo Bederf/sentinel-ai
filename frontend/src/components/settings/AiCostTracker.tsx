@@ -83,17 +83,36 @@ export function AiCostTracker({ siteId, onError }: AiCostTrackerProps) {
   const [today, setToday] = useState<TodayUsage | null>(null);
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState(30);
+  const [fetchingAllSites, setFetchingAllSites] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
+    setFetchingAllSites(false);
     try {
       const [sumRes, todayRes] = await Promise.all([
         authorizedFetch(`/api/ai-usage/summary?days=${period}${siteId ? `&site_id=${encodeURIComponent(siteId)}` : ""}`),
         authorizedFetch(`/api/ai-usage/today${siteId ? `?site_id=${encodeURIComponent(siteId)}` : ""}`),
       ]);
 
-      if (sumRes.ok) setSummary(await sumRes.json());
-      if (todayRes.ok) setToday(await todayRes.json());
+      if (sumRes.ok && todayRes.ok) {
+        const sumData = await sumRes.json();
+        const todayData = await todayRes.json();
+        // If site-specific data is all zeros, fall back to all-sites data
+        const isEmpty = (sumData.total_cost_zar === 0 && sumData.total_tokens === 0 && todayData.total_cost_zar === 0);
+        if (isEmpty && siteId) {
+          // Retry without site filter
+          const [allSumRes, allTodayRes] = await Promise.all([
+            authorizedFetch(`/api/ai-usage/summary?days=${period}`),
+            authorizedFetch(`/api/ai-usage/today`),
+          ]);
+          if (allSumRes.ok) setSummary(await allSumRes.json());
+          if (allTodayRes.ok) setToday(await allTodayRes.json());
+          setFetchingAllSites(true);
+        } else {
+          setSummary(sumData);
+          setToday(todayData);
+        }
+      }
     } catch {
       onError?.("Failed to load AI usage data");
     } finally {
@@ -132,6 +151,11 @@ export function AiCostTracker({ siteId, onError }: AiCostTrackerProps) {
               <h2 className="text-lg font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>API & Service Costs</h2>
               <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
                 Spend across AI, messaging, and external services
+                {fetchingAllSites && siteId && (
+                  <span className="ml-2 text-xs" style={{ color: "var(--color-sentinel-amber)" }}>
+                    (showing all sites — no usage tracked for selected site)
+                  </span>
+                )}
               </p>
             </div>
           </div>

@@ -153,11 +153,14 @@ class OllamaClient:
     ) -> AsyncIterator[str]:
         """Generate completion with streaming."""
         model = model or self.default_model
-        async with httpx.AsyncClient(timeout=120) as client, client.stream(
-            "POST",
-            f"{self.base_url}/api/generate",
-            json={"model": model, "prompt": prompt, "stream": True, "options": {"temperature": temperature}},
-        ) as response:
+        async with (
+            httpx.AsyncClient(timeout=120) as client,
+            client.stream(
+                "POST",
+                f"{self.base_url}/api/generate",
+                json={"model": model, "prompt": prompt, "stream": True, "options": {"temperature": temperature}},
+            ) as response,
+        ):
             async for line in response.aiter_lines():
                 if line:
                     data = json.loads(line)

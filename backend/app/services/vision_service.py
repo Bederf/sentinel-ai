@@ -125,9 +125,7 @@ Be specific about manufacturers, models, and conditions if visible."""
 
         return {"analysis": analysis, "success": True}
 
-    def identify_component(
-        self, image_data: bytes, media_type: str = "image/jpeg", context: str | None = None
-    ) -> dict:
+    def identify_component(self, image_data: bytes, media_type: str = "image/jpeg", context: str | None = None) -> dict:
         """
         Identify equipment component from image.
 

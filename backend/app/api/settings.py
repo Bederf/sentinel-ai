@@ -21,13 +21,14 @@ from app.services.site_ai_policy_service import get_site_ai_policy, set_site_ai_
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
 class SiteAiPolicyUpdate(BaseModel):
     """Site-scoped AI policy update payload."""
 
     chat_local_ai_only: bool
     allow_tool_calling: bool
     show_recommendations_in_shadow: bool
-
 
 
 # Path to settings data file

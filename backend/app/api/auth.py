@@ -12,27 +12,31 @@ import logging
 import os
 from collections import defaultdict
 from datetime import datetime, timedelta
-from typing import Optional
 
 import bcrypt
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, EmailStr, Field
 
 from app.config.settings import settings
-from app.middleware.auth_middleware import create_jwt_token, validate_jwt_token, _extract_ip_address
+from app.database.repositories.module_access_repository import get_module_access_repository
+from app.database.repositories.system_settings_repository import SystemSettingsRepository
+from app.database.repositories.user_repository import get_user_repository
+from app.database.supabase_client import get_supabase_client
+from app.middleware.auth_middleware import (
+    _extract_ip_address,
+    create_jwt_token,
+    validate_jwt_token,
+)
 from app.middleware.rate_limiter import limiter
 from app.models.auth import SentinelRole, generate_api_key
-from app.database.supabase_client import get_supabase_client
+from app.models.module_registry import ModuleType
+from app.security.step_up import (
+    _extract_device_id,
+    create_step_up_session,
+)
 from app.services.mfa_service import get_mfa_service
 from app.services.session_service import session_service
 from app.services.token_blacklist_service import token_blacklist
-from app.database.repositories.module_access_repository import get_module_access_repository
-from app.models.module_registry import ModuleType
-from app.security.step_up import (
-    create_step_up_session,
-    _extract_device_id,
-)
-from app.database.repositories.user_repository import get_user_repository
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 
@@ -48,10 +52,10 @@ _LOCKOUT_MINUTES = 15
 
 
 class ApiKeyCreateRequest(BaseModel):
-    owner: Optional[str] = None
+    owner: str | None = None
     scopes: list[str] = Field(default_factory=list)
     role: str = "auditor"
-    expires_in_days: Optional[int] = Field(default=None, ge=1, le=3650)
+    expires_in_days: int | None = Field(default=None, ge=1, le=3650)
 
 
 class RefreshTokenRequest(BaseModel):
@@ -64,12 +68,12 @@ class AccessRequestCreateRequest(BaseModel):
     """Public access request submitted from the login screen."""
 
     email: EmailStr
-    full_name: Optional[str] = None
-    company: Optional[str] = None
-    phone: Optional[str] = None
+    full_name: str | None = None
+    company: str | None = None
+    phone: str | None = None
     site_code: str = Field(..., description="Site code for access request")
     requested_modules: list[str] = Field(default_factory=list)
-    notes: Optional[str] = None
+    notes: str | None = None
 
 
 def _get_current_user_from_request(request: Request) -> dict:
@@ -403,6 +407,51 @@ async def verify_admin_pin(request: Request, body: VerifyPinRequest):
         raise HTTPException(status_code=503, detail="PIN verification misconfigured")
 
 
+@router.post("/verify-settings-password")
+@limiter.limit("5/15minutes")
+async def verify_settings_password(request: Request, body: VerifyPinRequest):
+    """Verify settings admin password against Supabase-stored hash.
+
+    Reads the bcrypt hash from the system_settings table (key: settings_admin_password).
+    Falls back to 503 if not configured.
+
+    Args:
+        request: FastAPI request
+        body: Request body containing the password
+
+    Returns:
+        200 with {"valid": true} if password matches
+        403 if password does not match
+        503 if settings_admin_password is not configured
+    """
+    source_ip = _extract_ip_address(request)
+
+    # Brute-force protection
+    _check_brute_force(f"settings_pwd:{source_ip}")
+
+    settings_repo = SystemSettingsRepository()
+    stored_hash = settings_repo.get_value("settings_admin_password")
+
+    if not stored_hash:
+        logger.error("settings_admin_password system setting is not configured")
+        raise HTTPException(
+            status_code=503,
+            detail="Settings password is not configured. Contact your administrator.",
+        )
+
+    try:
+        if bcrypt.checkpw(body.pin.encode("utf-8"), stored_hash.encode("utf-8")):
+            logger.info(f"Settings password verification success from ip={source_ip}")
+            return {"valid": True}
+        else:
+            _record_failed_attempt(f"settings_pwd:{source_ip}")
+            logger.warning(f"Settings password verification failed from ip={source_ip}")
+            raise HTTPException(status_code=403, detail="Invalid password")
+    except (ValueError, AttributeError, TypeError) as e:
+        logger.error(f"Settings password verification error ({type(e).__name__}): {e}", exc_info=True)
+        raise HTTPException(status_code=503, detail="Settings password misconfigured")
+
+
 class StepUpRequest(BaseModel):
     """Request body for step-up authentication."""
 
@@ -719,7 +768,7 @@ async def get_current_user(request: Request):
 
 
 @router.post("/logout")
-async def logout(request: Request, refresh_token: Optional[str] = None):
+async def logout(request: Request, refresh_token: str | None = None):
     """Logout endpoint - blacklist tokens to invalidate them.
 
     Phase 65-02: Now actually invalidates tokens by blacklisting them in Redis.
@@ -733,7 +782,7 @@ async def logout(request: Request, refresh_token: Optional[str] = None):
     Returns:
         Success message
     """
-    user_id: Optional[str] = None
+    user_id: str | None = None
     source_ip = _extract_ip_address(request)
 
     # SECURITY: Try to get refresh_token from request body first (Phase 75-07)

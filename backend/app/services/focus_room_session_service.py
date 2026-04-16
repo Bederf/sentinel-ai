@@ -3,7 +3,8 @@
 Converts raw occupancy events into continuous sessions for focus rooms
 that have no booking system. Sessions are:
   - Created when occupied=True arrives with no active session
-  - Closed when occupied=False arrives with an active session
+  - Held open through short vacancy gaps (gap tolerance)
+  - Closed when occupied=False arrives and gap exceeds threshold
   - Discarded if duration < min_session_seconds (noise filtering)
   - Flagged as extended_use if duration > extended_use_threshold_seconds
 
@@ -24,6 +25,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_MIN_SESSION_SECONDS = 180  # 3 minutes — discard shorter visits
 DEFAULT_EXTENDED_USE_SECONDS = 7200  # 2 hours — flag as extended
 DEFAULT_RED_LIGHT_COOLDOWN_SECONDS = 300  # 5 minutes — keep red light on after overstay ends
+DEFAULT_GAP_TOLERANCE_SECONDS = 30  # 30 seconds — door-open buffer before closing session
 
 
 def describe_focus_session_state(
@@ -77,6 +79,7 @@ def process_focus_room_event(
     room_type: str = "focus",
     min_session_seconds: Optional[int] = None,
     extended_use_seconds: Optional[int] = None,
+    gap_tolerance_seconds: Optional[int] = None,
 ) -> dict:
     """Process a single occupancy event for a focus room.
 
@@ -84,12 +87,14 @@ def process_focus_room_event(
       - session_started: new session created
       - session_closed: session ended (with duration, extended_use flag)
       - session_discarded: session was too short (noise)
-      - no_action: event didn't change state (duplicate or no active session)
+      - session_held: vacancy received but gap tolerance still open
+      - no_action: event didn't change state (duplicate or within gap tolerance)
     """
     from app.services import occupancy_store
 
     min_secs = min_session_seconds or _get_min_session_seconds()
     ext_secs = extended_use_seconds or _get_extended_use_seconds()
+    gap_secs = gap_tolerance_seconds or _get_gap_tolerance_seconds()
 
     active = occupancy_store.get_active_session(room_code)
 
@@ -113,12 +118,40 @@ def process_focus_room_event(
             "start_time": timestamp.isoformat(),
         }
 
+    elif occupied and active is not None:
+        # Occupied event — clear any vacant_since, session stays open
+        if active.vacant_since is not None:
+            occupancy_store.clear_vacant_since(active.session_id)
+            logger.debug("Focus session held open: room=%s (occupied resumed)", room_code)
+        return {"action": "no_action", "room_code": room_code}
+
     elif not occupied and active is not None:
-        # Close the active session
+        # Vacancy event — start gap timer if not already running
+        if active.vacant_since is None:
+            occupancy_store.set_vacant_since(active.session_id, timestamp)
+            logger.debug(
+                "Focus session gap started: room=%s at %s (tolerance=%ds)",
+                room_code,
+                timestamp.isoformat(),
+                gap_secs,
+            )
+            return {"action": "session_held", "room_code": room_code}
+
+        # Gap timer already running — check if tolerance exceeded
+        gap_duration = int((timestamp - active.vacant_since).total_seconds())
+        if gap_duration < gap_secs:
+            logger.debug(
+                "Focus session gap still open: room=%s gap=%ds < %ds tolerance",
+                room_code,
+                gap_duration,
+                gap_secs,
+            )
+            return {"action": "no_action", "room_code": room_code}
+
+        # Gap exceeded — close the session
         duration = int((timestamp - active.start_time).total_seconds())
 
         if duration < min_secs:
-            # Noise — discard
             occupancy_store.discard_session(active.session_id)
             logger.debug(
                 "Focus session discarded (noise): room=%s duration=%ds < %ds",
@@ -245,3 +278,12 @@ def _get_red_light_cooldown_seconds() -> int:
         return settings.focus_red_light_cooldown_seconds
     except Exception:
         return DEFAULT_RED_LIGHT_COOLDOWN_SECONDS
+
+
+def _get_gap_tolerance_seconds() -> int:
+    try:
+        from app.config.settings import settings
+
+        return settings.focus_vacancy_grace_seconds
+    except Exception:
+        return DEFAULT_GAP_TOLERANCE_SECONDS

@@ -1,6 +1,5 @@
 """Shared prediction taxonomy and formula metadata."""
 
-
 SEVERITY_CRITICAL = "critical"
 SEVERITY_WARNING = "warning"
 SEVERITY_HEALTHY = "healthy"

@@ -923,13 +923,13 @@ class AIOptimizerService:
             return []
         site_uuid = site_resp.data[0]["id"]
 
-        resp = sb.table("equipment").select(
-            "code, operating_data, updated_at"
-        ).eq(
-            "site_id", site_uuid
-        ).in_(
-            "code", equipment_ids
-        ).execute()
+        resp = (
+            sb.table("equipment")
+            .select("code, operating_data, updated_at")
+            .eq("site_id", site_uuid)
+            .in_("code", equipment_ids)
+            .execute()
+        )
 
         results = []
         for row in resp.data:
@@ -940,14 +940,16 @@ class AIOptimizerService:
             if anomaly_score is None and lstm_anomaly_score is None:
                 continue
 
-            results.append({
-                "equipment_id": row["code"],
-                "anomaly_score": float(anomaly_score) if anomaly_score is not None else None,
-                "lstm_anomaly_score": float(lstm_anomaly_score) if lstm_anomaly_score is not None else None,
-                "as_of": row["updated_at"].isoformat()
-                if hasattr(row.get("updated_at"), "isoformat")
-                else row.get("updated_at"),
-            })
+            results.append(
+                {
+                    "equipment_id": row["code"],
+                    "anomaly_score": float(anomaly_score) if anomaly_score is not None else None,
+                    "lstm_anomaly_score": float(lstm_anomaly_score) if lstm_anomaly_score is not None else None,
+                    "as_of": row["updated_at"].isoformat()
+                    if hasattr(row.get("updated_at"), "isoformat")
+                    else row.get("updated_at"),
+                }
+            )
 
         return results
 

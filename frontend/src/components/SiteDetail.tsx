@@ -1130,6 +1130,7 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
           <OverviewCockpitHost
             siteId={siteId}
             siteName={site.name}
+            onboardingPhase={sitePhase}
             activeAlerts={alerts.length}
             predictionsCount={predictions.length}
             equipmentCount={equipment.length}

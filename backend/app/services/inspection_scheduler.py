@@ -277,9 +277,7 @@ class InspectionScheduler:
             completion_notes=f"Cancelled by {cancelled_by}. Reason: {cancellation_reason}",
         )
 
-    async def update_task_assignment(
-        self, task_id: str, assigned_to: str, assigned_by: str
-    ) -> InspectionTask | None:
+    async def update_task_assignment(self, task_id: str, assigned_to: str, assigned_by: str) -> InspectionTask | None:
         """Reassign an inspection task to a different technician."""
         return await self.repository.update_task_assignment(
             task_id=task_id, assigned_to=assigned_to, assigned_by=assigned_by

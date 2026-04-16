@@ -90,6 +90,8 @@ class GhostBookingFinding:
     email_notified_at: Optional[datetime] = None
     whatsapp_notified_at: Optional[datetime] = None
     whatsapp_message_id: Optional[str] = None
+    telegram_notified_at: Optional[datetime] = None
+    telegram_message_id: Optional[str] = None
     response_message_id: Optional[str] = None
     response_text: Optional[str] = None
     # Reminder tracking — one reminder sent if concierge doesn't reply within 15 min
@@ -155,6 +157,7 @@ class FocusRoomSession:
     duration_seconds: int = 0  # Computed on close
     extended_use: bool = False  # True if duration > threshold
     created_at: datetime = field(default_factory=datetime.utcnow)
+    vacant_since: Optional[datetime] = None  # When room went vacant (gap tolerance)
 
     @property
     def is_active(self) -> bool:

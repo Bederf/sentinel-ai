@@ -341,9 +341,7 @@ class LightingDiscoveryService:
             actual_level=data.get("actual_level", data.get("level", 0)),
         )
 
-    async def discover_and_save(
-        self, equipment_code: str, dali_line: int = 1, dali_address: int | None = None
-    ) -> dict:
+    async def discover_and_save(self, equipment_code: str, dali_line: int = 1, dali_address: int | None = None) -> dict:
         """Discover device info and save to equipment metadata.
 
         Args:

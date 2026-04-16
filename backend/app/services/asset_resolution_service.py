@@ -83,9 +83,7 @@ def apply_resolution(
 
     # ---- Queue for compiler if confidence is good enough ---- #
     # Condition: asset_id exists AND (not needs_review OR MEDIUM confidence)
-    if result.asset_id and (
-        not result.needs_review or result.confidence_band == ResolutionConfidence.MEDIUM
-    ):
+    if result.asset_id and (not result.needs_review or result.confidence_band == ResolutionConfidence.MEDIUM):
         _enqueue_compiler(db, result.asset_id, document_id)
 
 
@@ -148,10 +146,8 @@ def _enqueue_compiler(db: Any, asset_id: str, document_id: str) -> None:
                 "document_id": document_id,
                 "queued_at": "now()",
             }
-        ).on_conflict(
-            constraint="compiler_queue_asset_id_trigger_event_document_id_key"
-        ).execute()
-    except Exception as exc:
+        ).on_conflict(constraint="compiler_queue_asset_id_trigger_event_document_id_key").execute()
+    except Exception:
         # If ON CONFLICT clause not supported (older Supabase), try plain insert
         try:
             db.table("compiler_queue").insert(

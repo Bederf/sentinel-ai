@@ -250,6 +250,8 @@ def _dict_to_ghost(d: dict) -> GhostBookingFinding:
         email_notified_at=_str_to_dt(d["email_notified_at"]) if d.get("email_notified_at") else None,
         whatsapp_notified_at=_str_to_dt(d["whatsapp_notified_at"]) if d.get("whatsapp_notified_at") else None,
         whatsapp_message_id=d.get("whatsapp_message_id"),
+        telegram_notified_at=_str_to_dt(d["telegram_notified_at"]) if d.get("telegram_notified_at") else None,
+        telegram_message_id=d.get("telegram_message_id"),
         response_message_id=d.get("response_message_id"),
         response_text=d.get("response_text"),
         reminder_sent=d.get("reminder_sent", False),
@@ -364,6 +366,8 @@ def mark_ghost_finding_notified(
     email_sent: bool = False,
     whatsapp_sent: bool = False,
     whatsapp_message_id: str | None = None,
+    telegram_sent: bool = False,
+    telegram_message_id: str | None = None,
     reset_reminder_cycle: bool = False,
 ) -> GhostBookingFinding | None:
     with _lock:
@@ -386,6 +390,10 @@ def mark_ghost_finding_notified(
                 r["whatsapp_notified_at"] = now_str
             if whatsapp_message_id:
                 r["whatsapp_message_id"] = whatsapp_message_id
+            if telegram_sent:
+                r["telegram_notified_at"] = now_str
+            if telegram_message_id:
+                r["telegram_message_id"] = telegram_message_id
             if reset_reminder_cycle:
                 r["reminder_sent"] = False
                 r["reminder_sent_at"] = None
@@ -601,6 +609,7 @@ def _session_to_dict(s: FocusRoomSession) -> dict:
         "duration_seconds": s.duration_seconds,
         "extended_use": s.extended_use,
         "created_at": _dt_to_str(s.created_at),
+        "vacant_since": _dt_to_str(s.vacant_since) if s.vacant_since else None,
     }
 
 
@@ -617,6 +626,7 @@ def _dict_to_session(d: dict) -> FocusRoomSession:
         duration_seconds=d.get("duration_seconds", 0),
         extended_use=d.get("extended_use", False),
         created_at=_str_to_dt(d.get("created_at", d["start_time"])),
+        vacant_since=_str_to_dt(d["vacant_since"]) if d.get("vacant_since") else None,
     )
 
 
@@ -647,6 +657,28 @@ def get_active_session(room_code: str) -> FocusRoomSession | None:
     except Exception as exc:
         logger.error("Canonical get_active_session failed: %s", exc)
         return None
+
+
+def set_vacant_since(session_id: str, since: datetime) -> None:
+    """Record the moment a gap started — session stays open but clock is ticking."""
+    with _lock:
+        try:
+            _client().table("space_focus_room_sessions").update({"vacant_since": _dt_to_str(since)}).eq(
+                "session_id", session_id
+            ).execute()
+        except Exception as exc:
+            logger.error("Canonical set_vacant_since failed: %s", exc)
+
+
+def clear_vacant_since(session_id: str) -> None:
+    """Clear gap timer when occupied=True arrives — session resumes cleanly."""
+    with _lock:
+        try:
+            _client().table("space_focus_room_sessions").update({"vacant_since": None}).eq(
+                "session_id", session_id
+            ).execute()
+        except Exception as exc:
+            logger.error("Canonical clear_vacant_since failed: %s", exc)
 
 
 def close_session(

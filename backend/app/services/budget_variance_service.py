@@ -30,9 +30,7 @@ class BudgetVarianceResult:
 class BudgetVarianceService:
     """Compute variance and create alerts."""
 
-    def __init__(
-        self, budget_repo: BudgetRepository | None = None, alert_repo: BudgetAlertRepository | None = None
-    ):
+    def __init__(self, budget_repo: BudgetRepository | None = None, alert_repo: BudgetAlertRepository | None = None):
         self.budget_repo = budget_repo or BudgetRepository()
         self.alert_repo = alert_repo or BudgetAlertRepository()
 

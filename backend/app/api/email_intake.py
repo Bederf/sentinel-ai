@@ -61,9 +61,7 @@ class EmailClusterResponse(BaseModel):
     severity: str
     summary: str
     is_new: bool
-    cockpit_visible: bool = Field(
-        description="True when cluster count >= 3 and visible in cockpit heatmap"
-    )
+    cockpit_visible: bool = Field(description="True when cluster count >= 3 and visible in cockpit heatmap")
 
 
 @router.post("/intake", response_model=EmailClusterResponse)
@@ -89,17 +87,19 @@ async def intake_email(
             )
 
     # Store email intake
-    intake_record = intake_repo.create({
-        "from_email": req.from_email,
-        "subject": req.subject,
-        "body_plain": req.body_plain,
-        "site_id": req.site_id,
-        "zone_hint": req.desk_hint,
-        "floor_hint": req.floor_hint,
-        "issue_category": req.issue_category,
-        "message_id": req.message_id,
-        "pipeline_status": "received",
-    })
+    intake_record = intake_repo.create(
+        {
+            "from_email": req.from_email,
+            "subject": req.subject,
+            "body_plain": req.body_plain,
+            "site_id": req.site_id,
+            "zone_hint": req.desk_hint,
+            "floor_hint": req.floor_hint,
+            "issue_category": req.issue_category,
+            "message_id": req.message_id,
+            "pipeline_status": "received",
+        }
+    )
 
     # Cluster
     cluster_state = cluster_service.intake_email(
@@ -116,6 +116,7 @@ async def intake_email(
     # Link intake → cluster (idempotent)
     if cluster_state.get("cluster_id") and intake_record.get("id"):
         from app.database.repositories.email_cluster_repository import EmailClusterRepository
+
         cluster_repo = EmailClusterRepository()
         cluster_repo.link_intake_to_cluster(intake_record["id"], cluster_state["cluster_id"])
 

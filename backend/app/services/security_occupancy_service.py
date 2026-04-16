@@ -254,9 +254,7 @@ class SecurityOccupancyService:
 
     # --- Cross-module coordination ---
 
-    def check_hvac_adjustment(
-        self, zone_id: str, thresholds: dict[str, Any] | None = None
-    ) -> dict[str, Any] | None:
+    def check_hvac_adjustment(self, zone_id: str, thresholds: dict[str, Any] | None = None) -> dict[str, Any] | None:
         """Check if HVAC setpoint should be relaxed based on occupancy.
 
         Uses profile-driven thresholds if provided, otherwise uses defaults.

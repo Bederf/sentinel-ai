@@ -24,9 +24,9 @@ from app.database.repositories.visit_repository import VisitRepository
 from app.models.visit import Visit, VisitStatus
 
 _LOGO_PATH = Path(__file__).parent.parent.parent / "assets" / "sentinel-logo.png"
-_QR_DARK = "#0a0f1e"   # SENTINEL navy
+_QR_DARK = "#0a0f1e"  # SENTINEL navy
 _QR_LIGHT = "#ffffff"
-_LOGO_RATIO = 0.25     # logo occupies 25% of QR width
+_LOGO_RATIO = 0.25  # logo occupies 25% of QR width
 
 
 class VisitTokenService:

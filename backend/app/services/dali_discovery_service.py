@@ -308,9 +308,7 @@ class DALIDiscoveryService:
 
         return self._parse_device_info(data, dali_line, dali_address)
 
-    def _parse_device_info(
-        self, data: dict, dali_line: int, dali_address: int | None = None
-    ) -> DALIDeviceInfo | None:
+    def _parse_device_info(self, data: dict, dali_line: int, dali_address: int | None = None) -> DALIDeviceInfo | None:
         """Parse device info from gateway response.
 
         Args:
@@ -339,9 +337,7 @@ class DALIDiscoveryService:
             actual_level=data.get("actual_level", data.get("level", 0)),
         )
 
-    async def discover_and_save(
-        self, equipment_code: str, dali_line: int = 1, dali_address: int | None = None
-    ) -> dict:
+    async def discover_and_save(self, equipment_code: str, dali_line: int = 1, dali_address: int | None = None) -> dict:
         """Discover device info and save to equipment metadata.
 
         Args:

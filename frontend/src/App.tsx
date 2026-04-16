@@ -7,6 +7,7 @@ import api, { AUTH_EXPIRED_EVENT, isExpectedApiError, type Alert, type AuthUser 
 import { useRecommendationToasts, RecommendationCard } from "./components/RecommendationToast";
 import { useBuildingsList } from "./hooks/useBuildingsList";
 import { SITE_SELECTION_CHANGED_EVENT, getStoredSelectedSite } from "./lib/siteSelection";
+import { phaseAllows } from "./lib/onboardingPhase";
 
 // Security: Prevent console logging in production (Phase 75-07)
 import { initializeSecurityProtections } from "./lib/api/security-utils";
@@ -224,9 +225,10 @@ function App() {
     setSelectedRec(null);
   }, []);
 
-  // Use recommendation toasts hook when logged in
+  // Use recommendation toasts hook when logged in — only in advisory+ (sentry_notifications gate)
   const siteId = currentUser ? effectiveSiteId : '';
-  useRecommendationToasts(siteId, handleShowRecCard);
+  const showToasts = currentUser && phaseAllows(selectedSite?.onboarding_phase, "sentry_notifications");
+  useRecommendationToasts(showToasts ? siteId : '', handleShowRecCard);
 
   // Initialize devices from the connected site on login
   useEffect(() => {
@@ -848,6 +850,7 @@ function App() {
           recommendation={selectedRec}
           onClose={() => setSelectedRec(null)}
           onApprove={handleApproveRec}
+          sitePhase={selectedSite?.onboarding_phase}
         />
       )}
 

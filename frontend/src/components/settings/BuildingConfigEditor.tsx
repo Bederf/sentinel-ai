@@ -25,12 +25,6 @@ const OPTIMIZATION_PROFILES = [
   { value: "balanced", label: "Balanced", desc: "Balance cost and comfort" },
 ];
 
-const SENTINEL_OPERATING_MODES = [
-  { value: "comfort", label: "Comfort", desc: "Bias building intelligence toward comfort risk and occupant protection" },
-  { value: "cost_saving", label: "Cost Saving", desc: "Bias building intelligence toward energy pressure and spend control" },
-  { value: "asset_preservation", label: "Asset Preservation", desc: "Bias building intelligence toward equipment stress and margin protection" },
-] as const;
-
 const CONTROL_TIERS = [
   { value: "human_in_loop", label: "Human in Loop", desc: "All actions require approval" },
   { value: "supervised", label: "Supervised", desc: "Auto-act within safe bounds, escalate edge cases" },
@@ -215,30 +209,7 @@ export function BuildingConfigEditor({
       </div>
 
       <div className="p-6 space-y-6">
-        {/* Basic Info */}
-        <div>
-          <h3 className="text-sm font-semibold mb-3" style={{ color: "var(--color-sentinel-text-primary)" }}>Sentinel Operating Mode</h3>
-          <div className="grid grid-cols-1 gap-4">
-            <div>
-              <label className="block text-xs mb-1" style={labelStyle}>Building Intelligence Bias</label>
-              <select
-                value={sentinelOperatingMode}
-                onChange={(e) => { setSentinelOperatingMode(e.target.value as "comfort" | "cost_saving" | "asset_preservation"); markDirty(); }}
-                disabled={readOnly}
-                className="w-full rounded px-3 py-2 text-sm"
-                style={inputStyle}
-              >
-                {SENTINEL_OPERATING_MODES.map((mode) => (
-                  <option key={mode.value} value={mode.value}>{mode.label}</option>
-                ))}
-              </select>
-              <p className="mt-2 text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                {SENTINEL_OPERATING_MODES.find((mode) => mode.value === sentinelOperatingMode)?.desc}
-              </p>
-            </div>
-          </div>
-        </div>
-
+        {/* Basic Information */}
         <div>
           <h3 className="text-sm font-semibold mb-3" style={{ color: "var(--color-sentinel-text-primary)" }}>Basic Information</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

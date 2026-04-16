@@ -268,7 +268,9 @@ async def startup_event(app: FastAPI) -> None:
     # Background notification tasks (escalation checker, digest scheduler)
     from app.services.notification_tasks import start_notification_tasks
 
+    _logger.warning("SHADOW_DEBUG: about to start notification tasks")
     await start_notification_tasks()
+    _logger.warning("SHADOW_DEBUG: notification tasks started")
 
     # Capture the main event loop for cross-thread scheduling (simulation tasks)
     scheduler_service.set_main_loop(asyncio.get_event_loop())
@@ -298,7 +300,9 @@ async def startup_event(app: FastAPI) -> None:
     # Optional ESP32 MQTT listener for room-presence nodes
     from app.services.space_mqtt_listener import get_space_mqtt_listener
 
+    _logger.warning("SHADOW_DEBUG: about to start Space MQTT listener")
     await get_space_mqtt_listener().start()
+    _logger.warning("SHADOW_DEBUG: Space MQTT listener started")
 
     # Optional: Fuel tank MQTT listener
     try:
@@ -597,7 +601,49 @@ async def startup_event(app: FastAPI) -> None:
     else:
         _logger.info("ℹ Email intake pipeline disabled (set EMAIL_INTAKE_ENABLED=true to activate)")
 
-    # Phase 184: Block booking config validation
+    # Phase 186: Seed settings admin password from Supabase
+    def _ensure_settings_password():
+        """Seed default admin password hash if settings_admin_password is not configured.
+
+        Phase 186: Supabase-backed settings password (replaces ADMIN_PIN_HASH env var).
+        Default PIN: SENTINEL_ADMIN — user must change it via Settings UI after first login.
+        """
+        try:
+            from app.database.repositories.system_settings_repository import SystemSettingsRepository
+            import bcrypt
+
+            repo = SystemSettingsRepository()
+            existing = repo.get_value("settings_admin_password")
+            if existing:
+                _logger.info("settings_admin_password already configured")
+                return
+
+            default_pin = "SENTINEL_ADMIN"
+            default_hash = bcrypt.hashpw(default_pin.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+
+            repo.upsert_value(
+                key="settings_admin_password",
+                value=default_hash,
+                category="security",
+                description="Bcrypt hash of the admin settings password. Change from default after first use.",
+                data_type="string",
+                is_public=False,
+                is_editable=True,
+                updated_by="system",
+            )
+            _logger.critical(
+                "\n"
+                "╔══════════════════════════════════════════════════════════╗\n"
+                "║         ⚠️  DEFAULT ADMIN PASSWORD ACTIVE  ⚠️          ║\n"
+                "║  settings_admin_password seeded with default PIN       ║\n"
+                "║  Change it via Settings → Unlock → Update               ║\n"
+                "╚══════════════════════════════════════════════════════════╝\n"
+            )
+        except Exception as exc:
+            _logger.warning(f"Failed to seed settings_admin_password: {exc}")
+
+    _ensure_settings_password()
+
     def _validate_block_booking_config():
         """Validate block booking configuration at startup."""
         if not settings.block_booking_enabled:
@@ -797,7 +843,9 @@ async def startup_event(app: FastAPI) -> None:
     # Shadow mode bridge polling — runs when simulation engine is disabled.
     # Polls the live bridge (10.99.0.1:8080) every 5 minutes and feeds data to
     # SentinelMLFeeder so ML models stay current with real site telemetry.
+    _logger.warning("SHADOW_DEBUG: reached shadow mode section")
     if not settings.site002_source_enabled and not settings.edge_mode:
+        _logger.warning("SHADOW_MODE_DEBUG: condition TRUE, about to add shadow mode job")
         try:
             scheduler_service.add_shadow_mode_polling_job(interval_seconds=300, site_id="site-002")
             _logger.info("Shadow mode bridge polling initialized (5min interval)")

@@ -60,7 +60,7 @@ export function PasswordModal({
     setError(null);
 
     try {
-      await fetchApi("/api/auth/verify-admin-pin", {
+      await fetchApi("/api/auth/verify-settings-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ pin: password }),

@@ -174,7 +174,8 @@ export function ControlDashboard({ onError, siteId: propSiteId }: ControlDashboa
         // Add delay to prevent concurrent requests hitting rate limiter on initial load
         await new Promise((resolve) => setTimeout(resolve, 800));
         // Fetch core data first, then predictions to reduce request burst on mount
-        const devicesData = await api.getDevices();
+        // Use equipment endpoint (Supabase) instead of device abstraction (empty in island mode)
+        const devicesData = await api.getEquipmentDevices();
         // Stagger subsequent requests by 250ms to avoid 429 rate limiting
         await new Promise((resolve) => setTimeout(resolve, 250));
         const sitesData = await api.getSites();
@@ -346,8 +347,8 @@ export function ControlDashboard({ onError, siteId: propSiteId }: ControlDashboa
   const handleDeviceSelect = useCallback(async (device: Device) => {
     try {
       setSelectedDevice(device);
-      // Optionally refresh device data when selected
-      const refreshedDevice = await api.getDevice(device.id);
+      // Fetch full equipment details including control points via equipment endpoint
+      const refreshedDevice = await api.getEquipmentDevice(device.id);
       try {
         const safetyStatus = await api.getDeviceSafetyStatus(device.id);
         safetyLoadedDeviceIdsRef.current.add(device.id);
@@ -369,7 +370,8 @@ export function ControlDashboard({ onError, siteId: propSiteId }: ControlDashboa
 
   const handleControlAction = useCallback(async (deviceId: string, point: string, value: number | boolean) => {
     try {
-      await api.controlDevice(deviceId, point, value);
+      // Use equipment control endpoint for devices from Supabase
+      await api.controlEquipment(deviceId, point, value);
 
       // Only refresh audit trail - don't reload all devices (causes jarring page reload)
       // The ControlPanel handles optimistic updates locally

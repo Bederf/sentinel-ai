@@ -20,7 +20,8 @@ class SiteRepository:
         "contact_email, contact_phone, "
         "optimization_enabled, optimization_status, "
         "control_enabled, control_note, "
-        "sentinel_processing_enabled"
+        "sentinel_processing_enabled, "
+        "onboarding_phase"
     )
 
     def __init__(self):

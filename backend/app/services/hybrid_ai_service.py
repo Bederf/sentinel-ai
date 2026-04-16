@@ -346,6 +346,7 @@ class HybridAIService:
         include_site_context: bool = True,
         tier: int = 2,
         source: str = "chat",
+        site_id: str | None = None,
     ) -> AsyncGenerator[str, None]:
         """Stream response from a specific provider."""
         if provider == "openai":
@@ -354,6 +355,7 @@ class HybridAIService:
                 include_site_context=include_site_context,
                 tier=tier,
                 source=source,
+                site_id=site_id,
             ):
                 yield chunk
         elif provider == "zai":
@@ -361,6 +363,7 @@ class HybridAIService:
                 messages,
                 include_site_context=include_site_context,
                 source=source,
+                site_id=site_id,
             ):
                 yield chunk
         elif provider == "xiaomi":
@@ -368,6 +371,7 @@ class HybridAIService:
                 messages,
                 include_site_context=include_site_context,
                 source=source,
+                site_id=site_id,
             ):
                 yield chunk
         else:  # anthropic
@@ -375,6 +379,7 @@ class HybridAIService:
                 messages,
                 include_site_context=include_site_context,
                 source=source,
+                site_id=site_id,
             ):
                 yield chunk
 
@@ -385,6 +390,7 @@ class HybridAIService:
         data_subject_id: str | None = None,
         tier: int = 2,
         source: str = "chat",
+        site_id: str | None = None,
     ) -> AsyncGenerator[str, None]:
         """Try primary provider, fallback to alternatives on failure."""
         provider = self.get_active_cloud_provider()
@@ -400,6 +406,7 @@ class HybridAIService:
                 include_site_context,
                 tier,
                 source,
+                site_id=site_id,
             ):
                 yield chunk
             return
@@ -423,6 +430,7 @@ class HybridAIService:
                     include_site_context,
                     tier,
                     source,
+                    site_id=site_id,
                 ):
                     yield chunk
                 return
@@ -435,6 +443,7 @@ class HybridAIService:
         self,
         provider: str,
         messages: list[dict],
+        site_id: str | None = None,
     ) -> AsyncGenerator[str, None]:
         """Stream tool-calling response from a tool-capable provider."""
         if provider == "openai":
@@ -452,7 +461,7 @@ class HybridAIService:
             ):
                 yield chunk
         else:  # anthropic
-            async for chunk in claude_service.stream_response_with_tools(messages):
+            async for chunk in claude_service.stream_response_with_tools(messages, site_id=site_id):
                 yield chunk
 
     async def stream_response(
@@ -461,6 +470,7 @@ class HybridAIService:
         use_tools: bool = False,
         data_subject_id: str | None = None,
         source: str = "chat",
+        site_id: str | None = None,
     ) -> AsyncGenerator[str, None]:
         """Stream response from configured cloud provider with fallback.
 
@@ -528,6 +538,7 @@ class HybridAIService:
                 async for chunk in self._stream_tools_from_provider(
                     provider,
                     [{"role": "user", "content": message}],
+                    site_id=site_id,
                 ):
                     yield chunk
                 return
@@ -545,6 +556,7 @@ class HybridAIService:
                             async for chunk in self._stream_tools_from_provider(
                                 "openai",
                                 [{"role": "user", "content": message}],
+                                site_id=site_id,
                             ):
                                 yield chunk
                             return
@@ -568,6 +580,7 @@ class HybridAIService:
                             async for chunk in self._stream_tools_from_provider(
                                 alt_provider,
                                 [{"role": "user", "content": message}],
+                                site_id=site_id,
                             ):
                                 yield chunk
                             return
@@ -587,7 +600,8 @@ class HybridAIService:
             include_site_context=True,
             data_subject_id=data_subject_id,
             tier=routing.get("tier", 2),
-                    source=source,
+            source=source,
+            site_id=site_id,
         ):
             yield chunk
 

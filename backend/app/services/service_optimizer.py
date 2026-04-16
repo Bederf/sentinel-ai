@@ -229,9 +229,7 @@ class ServiceOptimizer:
         return None
 
     @staticmethod
-    def _calculate_utilization_percent(
-        current_value: float | None, threshold_value: float, element_name: str
-    ) -> float:
+    def _calculate_utilization_percent(current_value: float | None, threshold_value: float, element_name: str) -> float:
         """
         Calculate utilization percentage.
 

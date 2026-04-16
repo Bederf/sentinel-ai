@@ -160,6 +160,7 @@ class OpenAIService:
         tier: int = 1,
         model_override: str | None = None,
         source: str = "chat",
+        site_id: str | None = None,
     ) -> AsyncGenerator[str, None]:
         """Return a chat completion from OpenAI as a single yielded chunk.
 
@@ -213,6 +214,7 @@ class OpenAIService:
                     input_tokens=u.get("prompt_tokens", 0),
                     output_tokens=u.get("completion_tokens", 0),
                     source=source,
+                    site_id=site_id or "unknown",
                 )
             except Exception:
                 pass
@@ -243,6 +245,7 @@ class OpenAIService:
         include_site_context: bool = True,
         tier: int = 2,
         source: str = "tools",
+        site_id: str | None = None,
     ) -> AsyncGenerator[str, None]:
         """Chat completion with iterative tool calling.
 
@@ -304,6 +307,7 @@ class OpenAIService:
                     input_tokens=u.get("prompt_tokens", 0),
                     output_tokens=u.get("completion_tokens", 0),
                     source=source,
+                    site_id=site_id or "unknown",
                 )
             except Exception:
                 pass

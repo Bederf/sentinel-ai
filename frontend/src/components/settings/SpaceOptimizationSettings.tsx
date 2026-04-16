@@ -116,6 +116,7 @@ function emptyConciergeForm(): ConciergeUserCreate {
 // ---------------------------------------------------------------------------
 
 interface SpaceOptimizationSettingsProps {
+  siteId?: string;
   onError?: (error: string) => void;
   onSuccess?: () => void;
   readOnly?: boolean;

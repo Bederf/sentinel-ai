@@ -144,10 +144,7 @@ class AssetIDResolver:
         """
         try:
             result = (
-                self.db.table("asset_resolver_aliases")
-                .select("alias, asset_id")
-                .eq("site_id", self.site_id)
-                .execute()
+                self.db.table("asset_resolver_aliases").select("alias, asset_id").eq("site_id", self.site_id).execute()
             )
             aliases: dict[str, str] = {}
             if result.data:
@@ -260,9 +257,7 @@ class AssetIDResolver:
             needs_review = band != ResolutionConfidence.HIGH
             review_reason = None
             if needs_review:
-                review_reason = (
-                    f"fuzzy match ({best_field}) score {best_score:.2f} below HIGH threshold"
-                )
+                review_reason = f"fuzzy match ({best_field}) score {best_score:.2f} below HIGH threshold"
             return ResolutionResult(
                 asset_id=best_eq["code"],
                 confidence=round(best_score, 4),
@@ -324,15 +319,15 @@ class AssetIDResolver:
         )
 
         prompt = (
-            f'You are a BMS equipment resolution assistant.\n'
+            f"You are a BMS equipment resolution assistant.\n"
             f'Return ONLY valid JSON with keys: "asset_id" (string or null), "confidence" (number 0-1), '
             f'"reason" (string).\n\n'
-            f'Document type: {document_type_esc}\n'
-            f'Equipment description to resolve: {escaped_desc}\n\n'
-            f'Available equipment at this site:\n'
-            f'{equipment_list}\n\n'
-            f'Return null for asset_id if no equipment matches the description above.\n'
-            f'JSON response:'
+            f"Document type: {document_type_esc}\n"
+            f"Equipment description to resolve: {escaped_desc}\n\n"
+            f"Available equipment at this site:\n"
+            f"{equipment_list}\n\n"
+            f"Return null for asset_id if no equipment matches the description above.\n"
+            f"JSON response:"
         )
 
         try:
@@ -442,4 +437,3 @@ class AssetIDResolver:
         apply_resolution(document_id, result, self.db)
 
         return result
-

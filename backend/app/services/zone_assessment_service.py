@@ -21,9 +21,7 @@ from app.database.repositories.desk_repository import DeskRepository
 from app.database.repositories.equipment_repository import EquipmentRepository
 from app.database.repositories.hvac_zone_repository import HVACZoneRepository
 from app.database.repositories.prediction_repository import PredictionRepository
-from app.database.repositories.zone_repository import ZoneRepository
 from app.models.complaint_assessment import (
-    ASSESSMENT_STATUSES,
     EquipmentAlert,
     EquipmentPrediction,
     EquipmentStatus,
@@ -31,8 +29,8 @@ from app.models.complaint_assessment import (
     VAVLiveReadings,
     ZoneAssessment,
 )
-from app.services.lighting_service import get_lighting_service
 from app.models.onboarding_phase import phase_allows
+from app.services.lighting_service import get_lighting_service
 
 logger = logging.getLogger(__name__)
 
@@ -217,9 +215,7 @@ class ZoneAssessmentService:
     # Step 3: Fetch equipment health + alerts + predictions
     # -------------------------------------------------------------------------
 
-    def _fetch_equipment_statuses(
-        self, equipment_ids: dict[str, str | None]
-    ) -> list[EquipmentStatus]:
+    def _fetch_equipment_statuses(self, equipment_ids: dict[str, str | None]) -> list[EquipmentStatus]:
         """Fetch health, active alerts, and active predictions for each equipment."""
         statuses: list[EquipmentStatus] = []
 
@@ -249,14 +245,16 @@ class ZoneAssessmentService:
                     eq = self._try_lookup_by_code_pattern(eq_code)
 
             if not eq:
-                statuses.append(EquipmentStatus(
-                    equipment_id=eq_code,
-                    code=eq_code,
-                    name=eq_code,
-                    type=eq_type,
-                    health_score=100,
-                    status="unknown",
-                ))
+                statuses.append(
+                    EquipmentStatus(
+                        equipment_id=eq_code,
+                        code=eq_code,
+                        name=eq_code,
+                        type=eq_type,
+                        health_score=100,
+                        status="unknown",
+                    )
+                )
                 continue
 
             eq_uuid = eq.get("id", "")
@@ -267,13 +265,15 @@ class ZoneAssessmentService:
             try:
                 active_alerts = self._alert_repo.get_active_by_equipment(eq_uuid)
                 for a in active_alerts:
-                    alerts.append(EquipmentAlert(
-                        alert_id=a.get("id", ""),
-                        title=a.get("title", ""),
-                        severity=a.get("severity", "warning"),
-                        message=a.get("message", ""),
-                        created_at=a.get("created_at", ""),
-                    ))
+                    alerts.append(
+                        EquipmentAlert(
+                            alert_id=a.get("id", ""),
+                            title=a.get("title", ""),
+                            severity=a.get("severity", "warning"),
+                            message=a.get("message", ""),
+                            created_at=a.get("created_at", ""),
+                        )
+                    )
             except Exception as e:
                 logger.warning(f"Could not fetch alerts for {eq_code_final}: {e}")
 
@@ -282,27 +282,31 @@ class ZoneAssessmentService:
             try:
                 active_preds = self._pred_repo.get_active_by_equipment(eq_uuid)
                 for p in active_preds:
-                    predictions.append(EquipmentPrediction(
-                        prediction_id=p.get("id", ""),
-                        severity=p.get("severity", "warning"),
-                        prediction_type=p.get("prediction_type", ""),
-                        probability_percent=p.get("probability_percent", 0),
-                        timeframe_days=p.get("timeframe_days"),
-                        description=p.get("description", ""),
-                    ))
+                    predictions.append(
+                        EquipmentPrediction(
+                            prediction_id=p.get("id", ""),
+                            severity=p.get("severity", "warning"),
+                            prediction_type=p.get("prediction_type", ""),
+                            probability_percent=p.get("probability_percent", 0),
+                            timeframe_days=p.get("timeframe_days"),
+                            description=p.get("description", ""),
+                        )
+                    )
             except Exception as e:
                 logger.warning(f"Could not fetch predictions for {eq_code_final}: {e}")
 
-            statuses.append(EquipmentStatus(
-                equipment_id=eq_uuid,
-                code=eq_code_final,
-                name=eq.get("name", eq_code_final),
-                type=eq_type,
-                health_score=eq.get("health_score", 100) or 100,
-                status=eq.get("status", "normal"),
-                alerts=alerts,
-                predictions=predictions,
-            ))
+            statuses.append(
+                EquipmentStatus(
+                    equipment_id=eq_uuid,
+                    code=eq_code_final,
+                    name=eq.get("name", eq_code_final),
+                    type=eq_type,
+                    health_score=eq.get("health_score", 100) or 100,
+                    status=eq.get("status", "normal"),
+                    alerts=alerts,
+                    predictions=predictions,
+                )
+            )
 
         return statuses
 
@@ -334,14 +338,24 @@ class ZoneAssessmentService:
                 loop.close()
         except Exception as e:
             logger.warning(f"Could not fetch VAV live data for {vav_id}: {e}")
-            return VAVLiveReadings(vav_id=vav_id, damper_position=None,
-                                   airflow_actual=None, airflow_setpoint=None,
-                                   discharge_temp=None, reheat_valve=None)
+            return VAVLiveReadings(
+                vav_id=vav_id,
+                damper_position=None,
+                airflow_actual=None,
+                airflow_setpoint=None,
+                discharge_temp=None,
+                reheat_valve=None,
+            )
 
         if not device_data:
-            return VAVLiveReadings(vav_id=vav_id, damper_position=None,
-                                   airflow_actual=None, airflow_setpoint=None,
-                                   discharge_temp=None, reheat_valve=None)
+            return VAVLiveReadings(
+                vav_id=vav_id,
+                damper_position=None,
+                airflow_actual=None,
+                airflow_setpoint=None,
+                discharge_temp=None,
+                reheat_valve=None,
+            )
 
         dp = device_data.get("damper_position")
         af = device_data.get("airflow_actual")
@@ -351,8 +365,8 @@ class ZoneAssessmentService:
 
         # Fault detection
         has_stuck = dp is not None and dp > 90
-        has_mismatch = (af is not None and sp is not None and abs(af - sp) > 100)
-        has_conflict = (rv is not None and rv > 30)  # reheat while zone is too hot
+        has_mismatch = af is not None and sp is not None and abs(af - sp) > 100
+        has_conflict = rv is not None and rv > 30  # reheat while zone is too hot
 
         return VAVLiveReadings(
             vav_id=vav_id,
@@ -379,6 +393,7 @@ class ZoneAssessmentService:
             return {}
 
         points = device.points or {}
+
         def _val(key: str):
             p = points.get(key)
             if p is None:
@@ -466,9 +481,7 @@ class ZoneAssessmentService:
         try:
             loop = asyncio.new_event_loop()
             try:
-                temp = loop.run_until_complete(
-                    self._read_device_point(ahu_id, "outdoor_air_temp")
-                )
+                temp = loop.run_until_complete(self._read_device_point(ahu_id, "outdoor_air_temp"))
             finally:
                 loop.close()
             return temp
@@ -478,9 +491,7 @@ class ZoneAssessmentService:
                 try:
                     loop = asyncio.new_event_loop()
                     try:
-                        temp = loop.run_until_complete(
-                            self._read_device_point(ahu_id, point)
-                        )
+                        temp = loop.run_until_complete(self._read_device_point(ahu_id, point))
                     finally:
                         loop.close()
                     if temp is not None:
@@ -519,13 +530,15 @@ class ZoneAssessmentService:
         Returns (status, root_causes, confidence)
         """
         has_equipment_issues = any(eq.has_issues for eq in equipment_statuses)
-        has_contextual = any([
-            contextual.get("solar_factor"),
-            contextual.get("outdoor_extreme"),
-            contextual.get("low_occupancy"),
-            contextual.get("high_lighting_load"),
-            contextual.get("after_hours"),
-        ])
+        has_contextual = any(
+            [
+                contextual.get("solar_factor"),
+                contextual.get("outdoor_extreme"),
+                contextual.get("low_occupancy"),
+                contextual.get("high_lighting_load"),
+                contextual.get("after_hours"),
+            ]
+        )
         root_causes: list[str] = []
 
         # Critical equipment faults always dominate
@@ -598,7 +611,9 @@ class ZoneAssessmentService:
                 elif t and t < 10:
                     root_causes.append(f"Outdoor temperature {t:.0f}°C — HVAC struggling to maintain warmth")
             if contextual.get("low_occupancy"):
-                root_causes.append(f"Low zone occupancy ({contextual.get('occupancy_pct', 0):.0f}%) — reduced internal heat load")
+                root_causes.append(
+                    f"Low zone occupancy ({contextual.get('occupancy_pct', 0):.0f}%) — reduced internal heat load"
+                )
             if contextual.get("high_lighting_load"):
                 root_causes.append(f"Lighting at {contextual.get('lighting_level', 0):.0f}% — contributes to heat load")
             if contextual.get("after_hours"):
@@ -643,16 +658,18 @@ class ZoneAssessmentService:
             # Recommend technician dispatch for faults
             faulty = [eq for eq in equipment_statuses if eq.has_issues]
             for eq in faulty[:2]:
-                recommendations.append(Recommendation(
-                    action=f"Dispatch technician to inspect {eq.name}",
-                    equipment_code=eq.code,
-                    parameter="dispatch",
-                    current_value=None,
-                    suggested_value=None,
-                    reason=f"{eq.name} has {eq.status} status — requires on-site inspection",
-                    can_supervised_adjust=can_supervised,
-                    can_auto_adjust=False,
-                ))
+                recommendations.append(
+                    Recommendation(
+                        action=f"Dispatch technician to inspect {eq.name}",
+                        equipment_code=eq.code,
+                        parameter="dispatch",
+                        current_value=None,
+                        suggested_value=None,
+                        reason=f"{eq.name} has {eq.status} status — requires on-site inspection",
+                        can_supervised_adjust=can_supervised,
+                        can_auto_adjust=False,
+                    )
+                )
             return recommendations
 
         # Solar heat gain → dim lights + boost HVAC
@@ -662,29 +679,33 @@ class ZoneAssessmentService:
             if lighting_control_active:
                 current_lighting = contextual.get("lighting_level", 50)
                 if current_lighting > 30:
-                    recommendations.append(Recommendation(
-                        action=f"Dim zone lighting to 30% to reduce heat load",
-                        equipment_code=equipment_statuses[0].code if equipment_statuses else "",
-                        parameter="brightness",
-                        current_value=current_lighting,
-                        suggested_value=30,
-                        reason="Reducing lighting reduces heat output from luminaires",
-                        can_supervised_adjust=can_supervised,
-                        can_auto_adjust=can_auto,
-                    ))
+                    recommendations.append(
+                        Recommendation(
+                            action="Dim zone lighting to 30% to reduce heat load",
+                            equipment_code=equipment_statuses[0].code if equipment_statuses else "",
+                            parameter="brightness",
+                            current_value=current_lighting,
+                            suggested_value=30,
+                            reason="Reducing lighting reduces heat output from luminaires",
+                            can_supervised_adjust=can_supervised,
+                            can_auto_adjust=can_auto,
+                        )
+                    )
             # HVAC boost
             if hvac_control_active and zone_setpoint:
                 new_setpoint = max(zone_setpoint - 2, 20)  # Don't go below 20°C
-                recommendations.append(Recommendation(
-                    action=f"Lower zone setpoint to {new_setpoint:.0f}°C (from {zone_setpoint:.0f}°C) for 2 hours",
-                    equipment_code="",
-                    parameter="temperature_setpoint",
-                    current_value=zone_setpoint,
-                    suggested_value=new_setpoint,
-                    reason="Boost cooling to offset solar heat gain",
-                    can_supervised_adjust=can_supervised,
-                    can_auto_adjust=can_auto,
-                ))
+                recommendations.append(
+                    Recommendation(
+                        action=f"Lower zone setpoint to {new_setpoint:.0f}°C (from {zone_setpoint:.0f}°C) for 2 hours",
+                        equipment_code="",
+                        parameter="temperature_setpoint",
+                        current_value=zone_setpoint,
+                        suggested_value=new_setpoint,
+                        reason="Boost cooling to offset solar heat gain",
+                        can_supervised_adjust=can_supervised,
+                        can_auto_adjust=can_auto,
+                    )
+                )
 
         # Outdoor extreme heat → reduce setpoint
         if contextual.get("outdoor_extreme") and complaint_type == "too_hot" and hvac_control_active:
@@ -692,57 +713,65 @@ class ZoneAssessmentService:
             if t > 35 and zone_setpoint:
                 new_setpoint = max(zone_setpoint - 1, 21)
                 if not any(r.parameter == "temperature_setpoint" for r in recommendations):
-                    recommendations.append(Recommendation(
-                        action=f"Lower setpoint to {new_setpoint:.0f}°C due to extreme outdoor heat ({t:.0f}°C)",
-                        equipment_code="",
-                        parameter="temperature_setpoint",
-                        current_value=zone_setpoint,
-                        suggested_value=new_setpoint,
-                        reason=f"Outdoor {t:.0f}°C is reducing HVAC effectiveness",
-                        can_supervised_adjust=can_supervised,
-                        can_auto_adjust=can_auto,
-                    ))
+                    recommendations.append(
+                        Recommendation(
+                            action=f"Lower setpoint to {new_setpoint:.0f}°C due to extreme outdoor heat ({t:.0f}°C)",
+                            equipment_code="",
+                            parameter="temperature_setpoint",
+                            current_value=zone_setpoint,
+                            suggested_value=new_setpoint,
+                            reason=f"Outdoor {t:.0f}°C is reducing HVAC effectiveness",
+                            can_supervised_adjust=can_supervised,
+                            can_auto_adjust=can_auto,
+                        )
+                    )
 
         # VAV airflow boost
         if vav and complaint_type in ("too_hot", "too_cold") and hvac_control_active:
             dp = vav.damper_position
             if dp is not None and dp < 80:
-                recommendations.append(Recommendation(
-                    action=f"Increase VAV airflow to maximum (damper at {dp:.0f}%)",
-                    equipment_code=vav.vav_id,
-                    parameter="airflow_setpoint",
-                    current_value=dp,
-                    suggested_value=100,
-                    reason="Boost airflow to improve temperature uniformity",
-                    can_supervised_adjust=can_supervised,
-                    can_auto_adjust=can_auto,
-                ))
+                recommendations.append(
+                    Recommendation(
+                        action=f"Increase VAV airflow to maximum (damper at {dp:.0f}%)",
+                        equipment_code=vav.vav_id,
+                        parameter="airflow_setpoint",
+                        current_value=dp,
+                        suggested_value=100,
+                        reason="Boost airflow to improve temperature uniformity",
+                        can_supervised_adjust=can_supervised,
+                        can_auto_adjust=can_auto,
+                    )
+                )
 
         # Low occupancy
         if contextual.get("low_occupancy") and complaint_type == "too_hot":
-            recommendations.append(Recommendation(
-                action="Verify VAV box position appropriate for low occupancy",
-                equipment_code=vav.vav_id if vav else "",
-                parameter="check",
-                current_value=None,
-                suggested_value=None,
-                reason="Low occupancy zone may need reduced airflow",
-                can_supervised_adjust=can_supervised,
-                can_auto_adjust=False,
-            ))
+            recommendations.append(
+                Recommendation(
+                    action="Verify VAV box position appropriate for low occupancy",
+                    equipment_code=vav.vav_id if vav else "",
+                    parameter="check",
+                    current_value=None,
+                    suggested_value=None,
+                    reason="Low occupancy zone may need reduced airflow",
+                    can_supervised_adjust=can_supervised,
+                    can_auto_adjust=False,
+                )
+            )
 
         # Generic HVAC
         if status == "contextual_factor" and not recommendations:
-            recommendations.append(Recommendation(
-                action="Monitor zone for 30 minutes — conditions may be transient",
-                equipment_code="",
-                parameter="monitor",
-                current_value=None,
-                suggested_value=None,
-                reason="All systems within parameters — issue may be temporary",
-                can_supervised_adjust=False,
-                can_auto_adjust=False,
-            ))
+            recommendations.append(
+                Recommendation(
+                    action="Monitor zone for 30 minutes — conditions may be transient",
+                    equipment_code="",
+                    parameter="monitor",
+                    current_value=None,
+                    suggested_value=None,
+                    reason="All systems within parameters — issue may be temporary",
+                    can_supervised_adjust=False,
+                    can_auto_adjust=False,
+                )
+            )
 
         return recommendations
 
@@ -756,6 +785,7 @@ class ZoneAssessmentService:
             return "shadow"
         try:
             from app.database.repositories.site_repository import SiteRepository
+
             repo = SiteRepository()
             site = repo.get_by_id(site_id)
             if site:

@@ -61,9 +61,14 @@ class WikiCompilerService:
             }
 
         # Fetch unprocessed entries
-        result = self.db.table("compiler_queue").select(
-            "id, asset_id, document_id, queued_at"
-        ).is_("processed_at", None).order("queued_at").limit(limit).execute()
+        result = (
+            self.db.table("compiler_queue")
+            .select("id, asset_id, document_id, queued_at")
+            .is_("processed_at", None)
+            .order("queued_at")
+            .limit(limit)
+            .execute()
+        )
 
         if not result.data:
             return {"skipped": False, "processed": 0, "failed": 0, "errors": []}
@@ -73,12 +78,17 @@ class WikiCompilerService:
 
         for entry in result.data:
             try:
-                doc_result = self.db.table("documents").select(
-                    "id, asset_id, equipment_description, document_date, "
-                    "document_type, contractor_vendor, technician_name, "
-                    "source_system, source_document_id, source_url, raw_file_path, "
-                    "tech_notes"
-                ).eq("id", entry["document_id"]).execute()
+                doc_result = (
+                    self.db.table("documents")
+                    .select(
+                        "id, asset_id, equipment_description, document_date, "
+                        "document_type, contractor_vendor, technician_name, "
+                        "source_system, source_document_id, source_url, raw_file_path, "
+                        "tech_notes"
+                    )
+                    .eq("id", entry["document_id"])
+                    .execute()
+                )
 
                 if not doc_result.data:
                     # Document gone — mark processed, no file written
@@ -122,21 +132,25 @@ class WikiCompilerService:
 
         return {"skipped": False, "processed": processed, "failed": failed, "errors": errors}
 
-    async def compile_asset_wiki(
-        self, asset_id: str, site_id: str = "S002"
-    ) -> str | None:
+    async def compile_asset_wiki(self, asset_id: str, site_id: str = "S002") -> str | None:
         """
         Force-compile a specific asset's wiki page.
 
         Called by API endpoint to manually trigger compilation.
         Returns path of compiled file, or None if no documents found.
         """
-        docs_result = self.db.table("documents").select(
-            "id, asset_id, equipment_description, document_date, "
-            "document_type, contractor_vendor, technician_name, "
-            "source_system, source_document_id, source_url, raw_file_path, "
-            "tech_notes, sub_class"
-        ).eq("asset_id", asset_id).order("document_date", desc=True).execute()
+        docs_result = (
+            self.db.table("documents")
+            .select(
+                "id, asset_id, equipment_description, document_date, "
+                "document_type, contractor_vendor, technician_name, "
+                "source_system, source_document_id, source_url, raw_file_path, "
+                "tech_notes, sub_class"
+            )
+            .eq("asset_id", asset_id)
+            .order("document_date", desc=True)
+            .execute()
+        )
 
         if not docs_result.data:
             return None
@@ -240,14 +254,15 @@ class WikiCompilerService:
         Graceful degradation: returns False if either is missing.
         """
         try:
-            result = self.db.table("information_schema.columns").select(
-                "column_name"
-            ).eq("table_name", "compiler_queue").execute()
+            result = (
+                self.db.table("information_schema.columns")
+                .select("column_name")
+                .eq("table_name", "compiler_queue")
+                .execute()
+            )
 
             if not result.data:
-                logger.warning(
-                    "[WikiCompiler] compiler_queue table not found in information_schema"
-                )
+                logger.warning("[WikiCompiler] compiler_queue table not found in information_schema")
                 return False
 
             existing_cols = {r["column_name"] for r in result.data}
@@ -272,9 +287,9 @@ class WikiCompilerService:
     def _mark_processed(self, entry_id: str) -> None:
         """Mark a compiler_queue entry as processed."""
         try:
-            self.db.table("compiler_queue").update(
-                {"processed_at": datetime.utcnow().isoformat()}
-            ).eq("id", entry_id).execute()
+            self.db.table("compiler_queue").update({"processed_at": datetime.utcnow().isoformat()}).eq(
+                "id", entry_id
+            ).execute()
         except Exception as exc:
             logger.warning(
                 "[WikiCompiler] failed to mark entry %s processed: %s",

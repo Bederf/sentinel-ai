@@ -51,6 +51,7 @@ def _resolve_site_code_to_uuid(site_id: str) -> str:
     """Convert site CODE (e.g. 'site-001') to site UUID for desk/zone table lookups."""
     try:
         from app.database.supabase_client import get_supabase_client
+
         sb = get_supabase_client()
         r = sb.table("sites").select("id,code").execute()
         for s in r.data:
@@ -67,7 +68,9 @@ class EmailClusterService:
         self.zone_repo = ZoneRepository()
         self.desk_repo = DeskRepository()
 
-    def _resolve_zone(self, site_code: str, desk_hint: str | None, floor_hint: str | None) -> Optional[tuple[dict[str, Any], str]]:
+    def _resolve_zone(
+        self, site_code: str, desk_hint: str | None, floor_hint: str | None
+    ) -> Optional[tuple[dict[str, Any], str]]:
         """Resolve desk_hint or floor_hint → (zone_record, site_uuid).
 
         Returns tuple of zone dict and the resolved site UUID.
@@ -134,7 +137,21 @@ class EmailClusterService:
         if issue_category:
             keywords.append(issue_category)
 
-        comfort_kw = ["hot", "cold", "stuffy", "drafty", "noisy", "smell", "air", "temp", "temperature", "ac", "aircon", "heating", "cooling"]
+        comfort_kw = [
+            "hot",
+            "cold",
+            "stuffy",
+            "drafty",
+            "noisy",
+            "smell",
+            "air",
+            "temp",
+            "temperature",
+            "ac",
+            "aircon",
+            "heating",
+            "cooling",
+        ]
         for kw in comfort_kw:
             if kw in text:
                 keywords.append(kw)
@@ -218,17 +235,19 @@ class EmailClusterService:
             cluster = self.cluster_repo.get_by_id(cluster["id"])
             email_count = cluster["email_count"] if cluster else 1
         else:
-            cluster = self.cluster_repo.upsert_cluster({
-                "site_id": site_id,
-                "zone_id": zone_id,
-                "zone_name": zone_name,
-                "floor": floor,
-                "complaint_type": complaint_type,
-                "keywords": keywords,
-                "email_count": 1,
-                "severity": "low",
-                "status": "open",
-            })
+            cluster = self.cluster_repo.upsert_cluster(
+                {
+                    "site_id": site_id,
+                    "zone_id": zone_id,
+                    "zone_name": zone_name,
+                    "floor": floor,
+                    "complaint_type": complaint_type,
+                    "keywords": keywords,
+                    "email_count": 1,
+                    "severity": "low",
+                    "status": "open",
+                }
+            )
             email_count = 1
             is_new = True
 
@@ -239,7 +258,11 @@ class EmailClusterService:
 
         logger.info(
             "Email cluster: site=%s zone=%s count=%d severity=%s is_new=%s",
-            site_id, zone_id, email_count, severity, is_new,
+            site_id,
+            zone_id,
+            email_count,
+            severity,
+            is_new,
         )
 
         return {

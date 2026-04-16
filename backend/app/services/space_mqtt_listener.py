@@ -33,7 +33,19 @@ class MqttPresenceEvent:
 
 
 def _load_node_room_mapping() -> dict[str, dict[str, Any]]:
-    """Load server-side node_id → room_code overrides from JSON."""
+    """Load server-side node_id → room_code overrides from Supabase (primary) or JSON (fallback)."""
+    # 1. Try Supabase
+    try:
+        from app.database.supabase_client import get_supabase_client
+
+        client = get_supabase_client()
+        response = client.table("node_room_mappings").select("*").eq("active", True).execute()
+        if response.data:
+            return {row["node_id"]: row for row in response.data}
+    except Exception:
+        pass
+
+    # 2. Fallback: JSON file
     from pathlib import Path
 
     path = Path(__file__).parent.parent / "data" / "space" / "node_room_mapping.json"

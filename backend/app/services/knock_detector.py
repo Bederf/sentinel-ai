@@ -170,9 +170,7 @@ class KnockDetector:
         else:
             return "valve_train"  # Higher frequency - valve train
 
-    def analyze_severity(
-        self, knock_result: dict[str, Any], baseline: dict[str, Any] | None = None
-    ) -> dict[str, Any]:
+    def analyze_severity(self, knock_result: dict[str, Any], baseline: dict[str, Any] | None = None) -> dict[str, Any]:
         """
         Analyze knock severity based on detection results and baseline.
 

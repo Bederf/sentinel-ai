@@ -262,26 +262,29 @@ async def handle_rsvp(
     response = request.response.lower()
 
     if response == "accepted":
-        if visit.status in (VisitStatus.CREATED, VisitStatus.ARRIVED, VisitStatus.REGISTERED,
-                           VisitStatus.APPROVED, VisitStatus.ACTIVE):
+        if visit.status in (
+            VisitStatus.CREATED,
+            VisitStatus.ARRIVED,
+            VisitStatus.REGISTERED,
+            VisitStatus.APPROVED,
+            VisitStatus.ACTIVE,
+        ):
             # Already accepted — return current state (idempotent)
             return RSVPResponse(
                 success=True,
                 visit_id=str(visit.id),
-                status=visit.status.value if hasattr(visit.status, 'value') else visit.status,
+                status=visit.status.value if hasattr(visit.status, "value") else visit.status,
                 qr_code=visit.qr_code,
                 message="Visit already accepted",
             )
 
         # Update to CREATED — this triggers QR email in n8n
         updated = repo.update_visit(visit.id, {"status": VisitStatus.CREATED})
-        logger.info(
-            "[RSVP] Visit %s ACCEPTED by %s", visit.id, request.visitor_email
-        )
+        logger.info("[RSVP] Visit %s ACCEPTED by %s", visit.id, request.visitor_email)
         return RSVPResponse(
             success=True,
             visit_id=str(updated.id),
-            status=updated.status.value if hasattr(updated.status, 'value') else updated.status,
+            status=updated.status.value if hasattr(updated.status, "value") else updated.status,
             qr_code=updated.qr_code,
             message="Visit accepted — confirmation email will be sent",
         )
@@ -291,19 +294,17 @@ async def handle_rsvp(
             return RSVPResponse(
                 success=True,
                 visit_id=str(visit.id),
-                status=visit.status.value if hasattr(visit.status, 'value') else visit.status,
+                status=visit.status.value if hasattr(visit.status, "value") else visit.status,
                 qr_code=None,
                 message="Visit already declined",
             )
 
         updated = repo.update_visit(visit.id, {"status": VisitStatus.CANCELLED})
-        logger.info(
-            "[RSVP] Visit %s DECLINED by %s", visit.id, request.visitor_email
-        )
+        logger.info("[RSVP] Visit %s DECLINED by %s", visit.id, request.visitor_email)
         return RSVPResponse(
             success=True,
             visit_id=str(updated.id),
-            status=updated.status.value if hasattr(updated.status, 'value') else updated.status,
+            status=updated.status.value if hasattr(updated.status, "value") else updated.status,
             qr_code=None,
             message="Visit declined",
         )

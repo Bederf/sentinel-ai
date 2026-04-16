@@ -37,6 +37,11 @@ class IntegrationRepository:
         response = self.client.table("log_sources").select("*").eq("id", source_id).execute()
         return response.data[0] if response.data else None
 
+    def get_log_source_by_name(self, name: str) -> Optional[Dict[str, Any]]:
+        """Get a log source by name."""
+        response = self.client.table("log_sources").select("*").eq("name", name).execute()
+        return response.data[0] if response.data else None
+
     def get_log_sources_by_ids(self, source_ids: List[str]) -> List[Dict[str, Any]]:
         """Get multiple log sources by their IDs."""
         if not source_ids:

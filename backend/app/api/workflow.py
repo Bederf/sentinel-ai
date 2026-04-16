@@ -469,7 +469,7 @@ async def get_dashboard_equipment(site_id: Optional[str] = Query(None, descripti
             try:
                 op_result = client.table("equipment").select("id, operating_data").in_("id", equipment_ids).execute()
                 for row in op_result.data or []:
-                    onboarding_meta = ((row.get("operating_data") or {}).get("onboarding") or {})
+                    onboarding_meta = (row.get("operating_data") or {}).get("onboarding") or {}
                     onboarding_by_uuid[row.get("id")] = bool(onboarding_meta.get("onboarded"))
             except Exception:
                 onboarding_by_uuid = {}

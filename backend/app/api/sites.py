@@ -1101,6 +1101,7 @@ async def get_site_telemetry(
     auth: AuthContext = Depends(require_site_access("site_id")),
 ) -> dict[str, Any]:
     """Proxy live site telemetry from the remote bridge."""
+
     def _unavailable(reason: str) -> dict[str, Any]:
         return {
             "site_id": site_id,
@@ -1306,6 +1307,23 @@ def _get_bridge_status(sentinel_enabled: bool = True) -> dict:
 
             if bridge_connected or settings.simbiot_api_url:
                 bridge_data_source = "remote_bridge"
+
+        # In island mode, also check ShadowModePollingService — it has the live bridge connection
+        # even when simbiot_service is disabled (SIMBIOT is not used in island mode).
+        if bridge_data_source == "remote_bridge" and not bridge_connected and settings.sentinel_island_mode:
+            try:
+                from app.services.shadow_mode_polling import get_shadow_mode_polling_service
+
+                shadow = get_shadow_mode_polling_service()
+                shadow_status = shadow.status
+                if isinstance(shadow_status, dict) and shadow_status.get("connected"):
+                    bridge_connected = True
+                    bridge_last_sync = shadow_status.get("last_poll")
+                    bridge_sync_error = None
+                    # bridge_data_source stays "remote_bridge"
+            except Exception as e:
+                logger.debug(f"Shadow polling status unavailable: {e}")
+
         elif (
             not settings.sentinel_island_mode
             and settings.site002_source_enabled

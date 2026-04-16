@@ -4,6 +4,8 @@ import * as React from 'react';
 import { Lightbulb, X, Zap, ThermometerSun, Lamp, ChevronRight, CheckCircle2, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 import { authorizedFetch } from '@/lib/api/client';
+import { phaseAllows } from '@/lib/onboardingPhase';
+import type { OnboardingPhase } from '@/lib/onboardingPhase';
 
 // Equipment type → control module mapping for frontend gating
 const EQUIPMENT_CONTROL_MODULE: Record<string, string> = {
@@ -107,11 +109,13 @@ export function RecommendationCard({
   onClose,
   onApprove,
   controlActive,
+  sitePhase,
 }: {
   recommendation: RecommendationData;
   onClose: () => void;
   onApprove: (id: string) => void;
   controlActive?: boolean;
+  sitePhase?: OnboardingPhase | string;
 }) {
   // Auto-detect control module status from equipment code
   const resolvedControlActive = useMemo(() => {
@@ -309,8 +313,17 @@ export function RecommendationCard({
             <span>Control module not active. Enable the control add-on to execute recommendations.</span>
           </div>
         )}
+        {isControlActive && !phaseAllows(sitePhase, "approve_reject") && (
+          <div
+            className="flex items-center gap-2 px-3 py-2 rounded text-xs"
+            style={{ background: 'rgba(59, 130, 246, 0.1)', color: '#93C5FD' }}
+          >
+            <Lock className="h-3 w-3 flex-shrink-0" />
+            <span>Advisory mode — recommendations are view-only. Upgrade to supervised to approve.</span>
+          </div>
+        )}
         <div className="flex gap-2">
-          {isControlActive ? (
+          {isControlActive && phaseAllows(sitePhase, "approve_reject") ? (
             <button
               onClick={() => { onApprove(recommendation.id); onClose(); }}
               className="flex-1 py-2 rounded text-sm font-medium flex items-center justify-center gap-1.5 transition-colors hover:brightness-110"
@@ -319,7 +332,7 @@ export function RecommendationCard({
               <CheckCircle2 className="h-3.5 w-3.5" />
               Approve & Execute
             </button>
-          ) : (
+          ) : !isControlActive ? (
             <button
               disabled
               className="flex-1 py-2 rounded text-sm font-medium flex items-center justify-center gap-1.5 opacity-50 cursor-not-allowed"
@@ -328,7 +341,7 @@ export function RecommendationCard({
               <Lock className="h-3.5 w-3.5" />
               Control Module Required
             </button>
-          )}
+          ) : null}
           <button
             onClick={onClose}
             className="px-4 py-2 rounded text-sm transition-colors hover:bg-white/10"

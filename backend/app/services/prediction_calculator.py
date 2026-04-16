@@ -389,8 +389,7 @@ class PredictionCalculator:
                     "factor": "Asset age",
                     "weight": 0.15,
                     "description": (
-                        f"{age_years} years old, {int(age_factor * 100)}% "
-                        f"through expected life ({expected_life} years)"
+                        f"{age_years} years old, {int(age_factor * 100)}% through expected life ({expected_life} years)"
                     ),
                 }
             )

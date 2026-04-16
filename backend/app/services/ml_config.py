@@ -5,19 +5,19 @@ share the same constants and formula — no magic numbers scattered across files
 """
 
 # ── Training gates ────────────────────────────────────────────────────────────
-MIN_LSTM_TRAINING_HOURS = 500     # ~3 weeks before LSTM can train
-MIN_ANOMALY_TRAINING_HOURS = 72   # ~3 days before Isolation Forest can train
-MIN_ENERGY_TRAINING_HOURS = 720   # ~30 days before energy baseline can train
-MIN_ANOMALY_SCORING_HOURS = 24   # Start scoring from 24h (sparse but valid)
+MIN_LSTM_TRAINING_HOURS = 500  # ~3 weeks before LSTM can train
+MIN_ANOMALY_TRAINING_HOURS = 72  # ~3 days before Isolation Forest can train
+MIN_ENERGY_TRAINING_HOURS = 720  # ~30 days before energy baseline can train
+MIN_ANOMALY_SCORING_HOURS = 24  # Start scoring from 24h (sparse but valid)
 
 # ── Trust weight scaling (for 08B — blended health score) ─────────────────────
-ML_TRUST_WEIGHT_MIN = 0.30        # ML contribution at 72h
-ML_TRUST_WEIGHT_MAX = 0.80        # ML contribution at 2000h+
-ML_TRUST_SCALE_HOURS = 2000       # Hours at which max trust is reached
+ML_TRUST_WEIGHT_MIN = 0.30  # ML contribution at 72h
+ML_TRUST_WEIGHT_MAX = 0.80  # ML contribution at 2000h+
+ML_TRUST_SCALE_HOURS = 2000  # Hours at which max trust is reached
 
 # ── Anomaly alert thresholds ────────────────────────────────────────────────────
-ANOMALY_ALERT_THRESHOLD_MIN = 0.87   # Conservative at 72h
-ANOMALY_ALERT_THRESHOLD_MAX = 0.75   # Standard at 2000h+
+ANOMALY_ALERT_THRESHOLD_MIN = 0.87  # Conservative at 72h
+ANOMALY_ALERT_THRESHOLD_MAX = 0.75  # Standard at 2000h+
 
 
 def get_ml_trust_weight(ml_hours_ingested: float) -> float:

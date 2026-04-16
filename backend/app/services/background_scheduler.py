@@ -3323,6 +3323,9 @@ class BackgroundSchedulerService:
     # ── Shadow Mode Bridge Polling ─────────────────────────────────────────────
 
     def add_shadow_mode_polling_job(self, interval_seconds: int = 300, site_id: str = "site-002"):
+        import logging as _shadow_log
+
+        _shadow_log.warning("SHADOW_JOB: add_shadow_mode_polling_job ENTERED")
         """
         Add a periodic job to poll the site bridge and feed live data to ML pipeline.
 
@@ -3338,11 +3341,17 @@ class BackgroundSchedulerService:
             site_id: Site to poll (default: site-002)
         """
         job_id = "shadow_mode_polling"
+        import sys as _sys
+
+        _sys.stderr.write("SHADOW_JOB_DEBUG: at job_id assignment\n")
+        _sys.stderr.flush()
         if self.scheduler.get_job(job_id):
             self.scheduler.remove_job(job_id)
             logger.info("Removed existing shadow mode polling job")
 
         first_run = datetime.now() + timedelta(seconds=30)  # 30s warmup
+        _sys.stderr.write(f"SHADOW_JOB_DEBUG: about to add job to scheduler, first_run={first_run}\n")
+        _sys.stderr.flush()
 
         self.scheduler.add_job(
             func=self._run_shadow_mode_polling,
@@ -3353,6 +3362,8 @@ class BackgroundSchedulerService:
             next_run_time=first_run,
             max_instances=1,
         )
+        _sys.stderr.write("SHADOW_JOB_DEBUG: add_job completed\n")
+        _sys.stderr.flush()
         logger.info(
             "Added shadow mode polling job: site=%s every %ds (first run at %s)",
             site_id,
@@ -3362,6 +3373,10 @@ class BackgroundSchedulerService:
 
     def _run_shadow_mode_polling(self):
         """Poll bridge and feed to ML pipeline. Runs synchronously via APScheduler."""
+        import sys as _sys_shadow
+
+        _sys_shadow.stderr.write("SHADOW_POLL_EXEC: _run_shadow_mode_polling ENTERED\n")
+        _sys_shadow.stderr.flush()
         try:
             import asyncio
 
@@ -3372,7 +3387,11 @@ class BackgroundSchedulerService:
             asyncio.set_event_loop(loop)
             try:
                 result = loop.run_until_complete(svc.poll())
+                _sys_shadow.stderr.write(f"SHADOW_POLL_EXEC: poll result={result}\n")
+                _sys_shadow.stderr.flush()
                 if result.get("errors"):
+                    _sys_shadow.stderr.write(f"SHADOW_POLL_EXEC: errors={result.get('errors')}\n")
+                    _sys_shadow.stderr.flush()
                     logger.warning(
                         "[SHADOW] poll errors: %s",
                         result["errors"],
@@ -3386,6 +3405,8 @@ class BackgroundSchedulerService:
             finally:
                 loop.close()
         except Exception as e:
+            _sys_shadow.stderr.write(f"SHADOW_POLL_EXEC: EXCEPTION={e}\n")
+            _sys_shadow.stderr.flush()
             logger.error("Shadow mode polling failed: %s", e, exc_info=True)
 
     # ── Document MRI Sync ───────────────────────────────────────────────────────

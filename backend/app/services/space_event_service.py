@@ -19,6 +19,9 @@ from app.services.ghost_booking_detector import (
 )
 from app.services.ghost_room_notifier import send_ghost_booking_alert
 
+# Track which focus-room sessions have already triggered an overstay alert — one alert per session
+_overstay_alert_sent: set[str] = set()
+
 _logger = logging.getLogger(__name__)
 
 
@@ -117,26 +120,36 @@ async def process_occupancy_event(
             source=source,
             room_type="focus",
         )
+        # Clear overstay alert flag when room becomes vacant (session ends)
+        focus_session_result = result.get("focus_session", {})
+        if focus_session_result.get("action") == "session_closed":
+            session_id = focus_session_result.get("session_id", "")
+            _overstay_alert_sent.discard(session_id)
         # Keep focus-room relay/light state in sync with overstay + cooldown policy.
         try:
             from app.services.focus_room_relay_service import sync_focus_room_relay
 
             result["focus_relay"] = sync_focus_room_relay(site_id=site_id, room_code=room_code, now=now)
             # Notify concierge/operator only on relay OFF->ON transition (time-up).
+            # One alert per occupancy session — don't re-alert if already sent for this session.
             relay_result = result["focus_relay"] if isinstance(result["focus_relay"], dict) else {}
             if relay_result.get("success") and relay_result.get("changed") and relay_result.get("relay_on"):
-                from app.config.settings import settings
-                from app.services.focus_room_notifier import send_focus_overstay_alert
+                focus_session_result = result.get("focus_session", {})
+                session_id = focus_session_result.get("session_id", "")
+                if session_id and session_id not in _overstay_alert_sent:
+                    from app.config.settings import settings
+                    from app.services.focus_room_notifier import send_focus_overstay_alert
 
-                cooldown_minutes = max(1, int((settings.focus_red_light_cooldown_seconds or 300) / 60))
-                asyncio.create_task(
-                    send_focus_overstay_alert(
-                        site_id=site_id,
-                        room_code=room_code,
-                        max_allowed_minutes=max(1, int((settings.focus_extended_use_seconds or 7200) / 60)),
-                        cooldown_minutes=cooldown_minutes,
+                    _overstay_alert_sent.add(session_id)
+                    cooldown_minutes = max(1, int((settings.focus_red_light_cooldown_seconds or 300) / 60))
+                    asyncio.create_task(
+                        send_focus_overstay_alert(
+                            site_id=site_id,
+                            room_code=room_code,
+                            max_allowed_minutes=max(1, int((settings.focus_extended_use_seconds or 7200) / 60)),
+                            cooldown_minutes=cooldown_minutes,
+                        )
                     )
-                )
         except Exception as exc:
             _logger.warning("Focus relay sync failed for %s: %s", room_code, exc)
         return result

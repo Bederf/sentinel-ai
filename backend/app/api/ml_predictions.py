@@ -446,8 +446,8 @@ async def get_model_readiness(site_id: str):
 
     Returns readiness status with model counts and equipment coverage.
     """
-    from ml.registry import get_model_registry
     from app.config.settings import settings
+    from ml.registry import get_model_registry
 
     site_id = site_id.strip().lower()
     training_enabled = settings.ml_background_training_enabled
@@ -472,15 +472,32 @@ async def get_model_readiness(site_id: str):
     covered_types = sorted({m["equipment_type"] for m in active_models if m.get("equipment_type")})
 
     last_training = None
-    if active_models:
-        last_training = max((m.get("registered_at") for m in active_models if m.get("registered_at")), default=None)
+    # Only count models that actually have trained_at — registry entries without
+    # training timestamps are placeholders, not real models
+    actually_trained = [m for m in active_models if m.get("metadata", {}).get("trained_at")]
+    covered_types = sorted({m["equipment_type"] for m in actually_trained if m.get("equipment_type")})
 
-    ready = len(active_models) > 0
+    last_training = None
+    if actually_trained:
+        last_training = max(
+            (m["metadata"]["trained_at"] for m in actually_trained if m["metadata"].get("trained_at")),
+            default=None,
+        )
+
+    # Site is ready only when at least one model has a real trained_at timestamp
+    ready = len(actually_trained) > 0
 
     if ready:
-        message = f"{len(active_models)} active model(s) trained covering {len(covered_types)} equipment type(s). Site is ready for advisory mode."
+        message = (
+            f"{len(actually_trained)} trained model(s) covering {len(covered_types)} "
+            f"equipment type(s). Site is ready for advisory mode."
+        )
     else:
-        message = "No active ML models found. Shadow training in progress — models will be registered once sufficient telemetry is collected."
+        message = (
+            f"Shadow training in progress — {len(active_models)} model entry/ies exist "
+            f"but none have completed training yet. Models will be ready once "
+            f"sufficient telemetry is collected."
+        )
 
     return ModelReadinessResponse(
         site_id=site_id,

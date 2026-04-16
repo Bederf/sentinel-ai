@@ -19,6 +19,7 @@ class TelegramIntent(str, Enum):
     CHECKLIST_REPLY = "checklist_reply"
     AD_HOC_FAULT = "ad_hoc_fault"
     DOCUMENT_INTAKE = "document_intake"
+    GHOST_ROOM = "ghost_room"
     UNKNOWN = "unknown"
 
 
@@ -82,6 +83,7 @@ _CALLBACK_FLOW_MAP = {
     "wo": TelegramIntent.WO_UPDATE,
     "inspect": TelegramIntent.TECHNICIAN_REPORT,
     "adhoc": TelegramIntent.AD_HOC_FAULT,
+    "ghost": TelegramIntent.GHOST_ROOM,
 }
 
 

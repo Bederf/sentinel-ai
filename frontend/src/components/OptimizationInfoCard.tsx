@@ -240,7 +240,10 @@ export function OptimizationInfoCard({
               <Lightbulb className="h-4 w-4" style={{ color: "var(--color-sentinel-amber)" }} />
             </button>
           )}
-          <OptimizationToggle siteId={siteId} enabled={optimizationEnabled} />
+          {/* Toggle only shown in automatic mode — supervised mode has no toggle */}
+          {isAutomatic && (
+            <OptimizationToggle siteId={siteId} enabled={optimizationEnabled} />
+          )}
         </div>
       </div>
 

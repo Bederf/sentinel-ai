@@ -128,6 +128,7 @@ class ZAIService:
         include_site_context: bool = True,
         model_override: str | None = None,
         source: str = "chat",
+        site_id: str | None = None,
     ) -> AsyncGenerator[str, None]:
         """Return a completion from Z.ai as a single streamed chunk."""
         if not self._api_key:
@@ -179,6 +180,7 @@ class ZAIService:
                     input_tokens=u.get("prompt_tokens", 0),
                     output_tokens=u.get("completion_tokens", 0),
                     source=source,
+                    site_id=site_id or "unknown",
                 )
             except Exception:
                 pass  # Never let tracking break chat

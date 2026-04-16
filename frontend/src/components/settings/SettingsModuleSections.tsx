@@ -223,7 +223,7 @@ function AddonsCard({ controller }: { controller: ReturnType<typeof useSettingsC
         {!controller.canToggleModules ? (
           <div className="mt-4 rounded-lg p-3" style={{ background: "rgba(59, 130, 246, 0.08)", border: "1px solid rgba(59, 130, 246, 0.25)" }}>
             <p className="text-xs" style={{ color: "var(--color-sentinel-amber)" }}>
-              {controller.isDemoUser
+              {controller.currentUserRole !== "admin" && !controller.settingsPageUnlocked
                 ? "Unlock settings at the top of the page to toggle modules."
                 : "You have read-only access. Contact an administrator to request module changes."}
             </p>

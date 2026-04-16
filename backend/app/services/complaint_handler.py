@@ -435,9 +435,7 @@ class ComfortComplaintHandler:
             "desks": [d.to_dict() for d in desks_in_zone],
         }
 
-    def get_complaint_history(
-        self, desk_id: str | None = None, zone_id: str | None = None
-    ) -> list[ComfortComplaint]:
+    def get_complaint_history(self, desk_id: str | None = None, zone_id: str | None = None) -> list[ComfortComplaint]:
         """Get complaint history for pattern analysis."""
         complaints = list(self._complaints.values())
 

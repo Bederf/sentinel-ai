@@ -3,7 +3,6 @@ import { useHealthThresholds } from "../../hooks/useHealthThresholds";
 import { useRiskThresholds } from "../../hooks/useRiskThresholds";
 import { useModules } from "../../contexts/ModuleHooks";
 import { useBuildingsList } from "../../hooks/useBuildingsList";
-import { AUTH_EXPIRED_EVENT } from "../../lib/api";
 import { setStoredSelectedSite } from "../../lib/siteSelection";
 import {
   BASE_PACK_LOCKED_MODULES,
@@ -47,8 +46,7 @@ function useSaveSuccessState(): SaveSuccessState {
 }
 
 function useMlTrainingSettings(
-  canManageFeatureAccess: boolean,
-  isDemoUser: boolean,
+  isAdmin: boolean,
   settingsPageUnlocked: boolean,
   onError?: (error: string) => void,
   onSaveSuccess?: (durationMs: number) => void
@@ -73,11 +71,11 @@ function useMlTrainingSettings(
   }, []);
 
   const handleMlTrainingToggle = useCallback(async () => {
-    if (isDemoUser && !settingsPageUnlocked) {
+    if (!isAdmin && !settingsPageUnlocked) {
       onError?.("Settings page is locked. Click 'Unlock to Edit' at the top to make changes.");
       return;
     }
-    if (!canManageFeatureAccess && !isDemoUser) {
+    if (!isAdmin) {
       onError?.("Only admins can change ML training settings.");
       return;
     }
@@ -102,8 +100,7 @@ function useMlTrainingSettings(
       setMlTrainingLoading(false);
     }
   }, [
-    canManageFeatureAccess,
-    isDemoUser,
+    isAdmin,
     mlTrainingEnabled,
     onError,
     onSaveSuccess,
@@ -119,9 +116,9 @@ function useMlTrainingSettings(
 
 function useFeatureToggleActions({
   activateModule,
-  canManageFeatureAccess,
+  canManageFeatureAccess: _canManageFeatureAccess,
   deactivateModule,
-  isDemoUser,
+  isAdmin,
   isModuleActive,
   onError,
   settingsPageUnlocked,
@@ -130,7 +127,7 @@ function useFeatureToggleActions({
   activateModule: ReturnType<typeof useModules>["activateModule"];
   canManageFeatureAccess: boolean;
   deactivateModule: ReturnType<typeof useModules>["deactivateModule"];
-  isDemoUser: boolean;
+  isAdmin: boolean;
   isModuleActive: ReturnType<typeof useModules>["isModuleActive"];
   onError?: (error: string) => void;
   settingsPageUnlocked: boolean;
@@ -139,11 +136,11 @@ function useFeatureToggleActions({
   const [togglingCardId, setTogglingCardId] = useState<string | null>(null);
 
   const handleFeatureToggle = useCallback(async (card: FeatureToggleCard) => {
-    if (isDemoUser && !settingsPageUnlocked) {
+    if (!isAdmin && !settingsPageUnlocked) {
       onError?.("Settings page is locked. Click 'Unlock to Edit' at the top to make changes.");
       return;
     }
-    if (!canManageFeatureAccess && !isDemoUser) {
+    if (!isAdmin) {
       onError?.("Only admins can change feature access.");
       return;
     }
@@ -168,9 +165,8 @@ function useFeatureToggleActions({
     }
   }, [
     activateModule,
-    canManageFeatureAccess,
+    isAdmin,
     deactivateModule,
-    isDemoUser,
     isModuleActive,
     onError,
     settingsPageUnlocked,
@@ -197,20 +193,18 @@ export function useSettingsController({ siteId, onError }: UseSettingsController
   const { isModuleActive, activateModule, deactivateModule, setSite: setModuleSite } = useModules();
 
   const currentUser = getStoredSentinelUser();
-  const currentUserEmail = currentUser.email || "";
   const currentUserRole = currentUser.role || "auditor";
+  const currentUserEmail = currentUser.email || "";
   const hasSessionToken = !!localStorage.getItem("sentinel_token");
-  const demoUserEmails = ["grant@grantdemo.co.za", "bederf@protonmail.com", "bederf@gmail.com"];
 
   const [selectedSiteId, setSelectedSiteId] = useState<string | null>(siteId || null);
   const [settingsPageUnlocked, setSettingsPageUnlocked] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const { saveSuccess, showSaveSuccess } = useSaveSuccessState();
 
-  const isDemoUser = !!(currentUserEmail && demoUserEmails.includes(currentUserEmail.toLowerCase()));
   const canManageFeatureAccess = currentUserRole === "admin";
-  const readOnly = !!(isDemoUser && !settingsPageUnlocked);
-  const canToggleModules = canManageFeatureAccess || (isDemoUser && settingsPageUnlocked);
+  const readOnly = currentUserRole !== "admin" && !settingsPageUnlocked;
+  const canToggleModules = currentUserRole === "admin";
   const loading = healthThresholdLoading || riskThresholdLoading;
 
   useEffect(() => {
@@ -227,15 +221,8 @@ export function useSettingsController({ siteId, onError }: UseSettingsController
     setModuleSite(selectedSiteId, selectedSiteName);
   }, [buildings, selectedSiteId, setModuleSite]);
 
-  useEffect(() => {
-    if (currentUserEmail && !hasSessionToken) {
-      window.dispatchEvent(new Event(AUTH_EXPIRED_EVENT));
-    }
-  }, [currentUserEmail, hasSessionToken]);
-
   const { handleMlTrainingToggle, mlTrainingEnabled, mlTrainingLoading } = useMlTrainingSettings(
-    canManageFeatureAccess,
-    isDemoUser,
+    currentUserRole === "admin",
     settingsPageUnlocked,
     onError,
     showSaveSuccess
@@ -244,7 +231,7 @@ export function useSettingsController({ siteId, onError }: UseSettingsController
     activateModule,
     canManageFeatureAccess,
     deactivateModule,
-    isDemoUser,
+    isAdmin: currentUserRole === "admin",
     isModuleActive,
     onError,
     settingsPageUnlocked,
@@ -302,7 +289,6 @@ export function useSettingsController({ siteId, onError }: UseSettingsController
     hasSessionToken,
     healthThresholdError,
     healthThresholds,
-    isDemoUser,
     isModuleActive,
     loading,
     mlTrainingEnabled,

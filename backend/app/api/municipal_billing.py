@@ -338,6 +338,23 @@ async def list_tariff_schedules(
 
     tariffs = [_flatten_tariff_row(row) for row in raw_tariffs]
 
+    # Fallback: if no DB tariffs found and we have a known municipality, load bundled defaults
+    if not tariffs and scoped_municipality:
+        default = svc.get_tariff(scoped_municipality, "LPU-TOU", active or date.today())
+        if default:
+            tariffs = [
+                _flatten_tariff_row(
+                    {
+                        "municipality": default.municipality,
+                        "tariff_name": default.tariff_name,
+                        "effective_date": default.effective_date.isoformat()
+                        if hasattr(default.effective_date, "isoformat")
+                        else str(default.effective_date),
+                        "tariff_data": default.tariff_data,
+                    }
+                )
+            ]
+
     return {"tariffs": tariffs}
 
 

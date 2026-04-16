@@ -985,9 +985,7 @@ class WorkflowTriggerEngine:
     def _cooldown_key(self, trigger_type: TriggerType, equipment_id: str) -> str:
         return f"{trigger_type.value}:{equipment_id}"
 
-    def _reference_key(
-        self, trigger_type: TriggerType, equipment_id: str, reference_id: str | None
-    ) -> str | None:
+    def _reference_key(self, trigger_type: TriggerType, equipment_id: str, reference_id: str | None) -> str | None:
         if not reference_id:
             return None
         return f"{trigger_type.value}:{equipment_id}:{reference_id}"

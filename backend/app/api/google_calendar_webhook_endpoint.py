@@ -170,14 +170,17 @@ async def get_google_access_token(request: Request) -> dict:
 
     api_key = request.headers.get("X-Sentry-API-Key", "")
     import os
+
     expected = os.getenv("SENTRY_BOT_API_KEY", "")
     if expected and api_key != expected:
         from fastapi import HTTPException
+
         raise HTTPException(status_code=401, detail="Unauthorized")
 
     token_data = _refresh_access_token()
     if not token_data:
         from fastapi import HTTPException
+
         raise HTTPException(status_code=503, detail="Google credentials unavailable")
 
     return {"access_token": token_data["token"]}

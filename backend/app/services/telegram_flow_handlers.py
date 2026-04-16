@@ -784,6 +784,94 @@ async def handle_unknown(
     )
 
 
+# Ghost Room Confirm Buttons Handler
+# ===================================================================
+
+
+async def handle_ghost_room(
+    chat_id: str,
+    text: str,
+    callback_data: str | None = None,
+    message_id: int | None = None,
+) -> None:
+    """Handle ghost room confirm-buttons: ghost:occupied:{id} or ghost:empty:{id}."""
+    from app.services import occupancy_store
+
+    sender = get_telegram_sender()
+
+    if not callback_data:
+        await sender.send_text(chat_id, "Invalid button press.")
+        return
+
+    parts = callback_data.split(":")
+    if len(parts) != 3 or parts[0] != "ghost":
+        await sender.send_text(chat_id, "Unknown ghost room action.")
+        return
+
+    action, finding_id = parts[1], parts[2]
+
+    # Look up finding
+    finding = occupancy_store.get_ghost_finding_by_id(finding_id)
+    if not finding:
+        await sender.send_text(chat_id, "Finding not found or already resolved.")
+        return
+
+    confirmed_by = f"telegram:{chat_id}"
+
+    if action == "occupied":
+        updated = occupancy_store.update_ghost_finding_status(
+            finding_id,
+            "verified_occupied",
+            inspected_by=confirmed_by,
+            response_message_id=str(message_id) if message_id else None,
+            response_text="Room confirmed occupied via Telegram button",
+        )
+        status_text = "occupied"
+    else:
+        updated = occupancy_store.update_ghost_finding_status(
+            finding_id,
+            "confirmed_empty",
+            inspected_by=confirmed_by,
+            response_message_id=str(message_id) if message_id else None,
+            response_text="Room confirmed empty via Telegram button",
+        )
+        status_text = "empty"
+
+    if updated is None:
+        await sender.send_text(chat_id, f"{finding.room_code} was already resolved.")
+        return
+
+    # Update inline buttons to show selection
+    kb = InlineKeyboard(rows=[[InlineButton(f"✓ {status_text.capitalize()}", callback_data)]])
+    if message_id:
+        try:
+            await sender.edit_message_reply_markup(chat_id, message_id, keyboard=kb)
+        except Exception:
+            pass  # Button may already be stale
+
+    # Remove keyboard and confirm
+    try:
+        await sender.edit_message_reply_markup(chat_id, message_id, keyboard=None)
+    except Exception:
+        pass
+
+    await sender.send_text(
+        chat_id,
+        f"Recorded: {finding.room_code} marked {status_text}. Thank you!",
+    )
+
+    # Mark related signal resolved
+    try:
+        from app.services.ghost_room_notifier import _resolve_related_ghost_signal
+        from app.models.space_occupancy import GhostBookingFinding
+
+        gf = GhostBookingFinding(**vars(finding))
+        gf.status = updated.status
+        _resolve_related_ghost_signal(gf, resolution_state="resolved")
+    except Exception as exc:
+        logger.warning("Failed to resolve ghost signal: %s", exc)
+
+
 # ===================================================================
 # Router
 # ===================================================================
@@ -803,6 +891,7 @@ async def route_to_handler(
         TelegramIntent.WO_UPDATE: handle_wo_update,
         TelegramIntent.CHECKLIST_REPLY: _handle_checklist_reply,
         TelegramIntent.AD_HOC_FAULT: handle_adhoc_fault,
+        TelegramIntent.GHOST_ROOM: handle_ghost_room,
         TelegramIntent.UNKNOWN: handle_unknown,
     }
     handler = handlers.get(intent, handle_unknown)
