@@ -364,6 +364,89 @@ class ModelGateway:
                     return ""
                 return choices[0].get("message", {}).get("content", "")
 
+        elif provider == "azure_openai":
+            import os
+
+            import httpx
+
+            from app.services.ai_usage_tracker import usage_tracker
+
+            api_key = os.environ.get("AZURE_OPENAI_API_KEY", "")
+            endpoint = os.environ.get("AZURE_OPENAI_ENDPOINT", "").rstrip("/")
+            deployment = os.environ.get("AZURE_OPENAI_DEPLOYMENT", "")
+            api_version = "2024-02-01"
+            url = f"{endpoint}/openai/deployments/{deployment}/chat/completions?api-version={api_version}"
+            headers = {
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            }
+            payload: dict = {
+                "messages": messages,
+                "max_tokens": max_tokens,
+            }
+            if system:
+                payload["messages"] = [{"role": "system", "content": system}] + list(messages)
+            if tools:
+                payload["tools"] = tools
+
+            if stream:
+
+                async def stream_gen():
+                    async with httpx.AsyncClient(timeout=120.0) as client:
+                        async with client.stream("POST", url, headers=headers, json=payload) as resp:
+                            resp.raise_for_status()
+                            async for line in resp.aiter_lines():
+                                if not line.startswith("data: "):
+                                    continue
+                                data = line[6:].strip()
+                                if data == "[DONE]":
+                                    break
+                                import json as _json
+
+                                try:
+                                    chunk = _json.loads(data)
+                                except Exception:
+                                    continue
+                                delta = chunk.get("choices", [{}])[0].get("delta", {}).get("content", "")
+                                if delta:
+                                    yield delta
+                                usage = chunk.get("usage", {})
+                                if usage:
+                                    try:
+                                        usage_tracker.record(
+                                            provider="azure_openai",
+                                            model=model,
+                                            input_tokens=usage.get("prompt_tokens", 0),
+                                            output_tokens=usage.get("completion_tokens", 0),
+                                            source=source,
+                                        )
+                                    except Exception:
+                                        pass
+
+                return stream_gen()
+            else:
+                async with httpx.AsyncClient(timeout=60.0) as client:
+                    resp = await client.post(url, headers=headers, json=payload)
+                    resp.raise_for_status()
+
+                body = resp.json()
+                try:
+                    usage = body.get("usage", {})
+                    usage_tracker.record(
+                        provider="azure_openai",
+                        model=model,
+                        input_tokens=usage.get("prompt_tokens", 0),
+                        output_tokens=usage.get("completion_tokens", 0),
+                        source=source,
+                    )
+                except Exception:
+                    pass
+
+                choices = body.get("choices", [])
+                if not choices:
+                    return ""
+                return choices[0].get("message", {}).get("content", "")
+
         elif provider == "minimax":
             from app.services.minimax_service import minimax_service
 

@@ -105,6 +105,27 @@ ROUTING_PROFILES: dict[str, dict[str, Any]] = {
             ],
         },
     },
+    "idna": {
+        "mode": "api",
+        "fallback_enabled": False,  # Single-provider; confirm with DL-Jarvis
+        "routing": {
+            "heavy": [
+                {"provider": "azure_openai", "model": "gpt-4o"},
+            ],
+            "medium": [
+                {"provider": "azure_openai", "model": "gpt-4o"},
+            ],
+            "light": [
+                {"provider": "azure_openai", "model": "gpt-4o-mini"},
+            ],
+            "chat_ai": [
+                {"provider": "azure_openai", "model": "gpt-4o"},
+            ],
+            "chat_tech": [
+                {"provider": "azure_openai", "model": "gpt-4o"},
+            ],
+        },
+    },
 }
 
 
