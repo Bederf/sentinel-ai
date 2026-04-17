@@ -1,15 +1,8 @@
 /**
- * AimTheLaw Optimized Cloudflare Worker (Edge-first caching)
- * - Edge Cache first (free)
- * - KV index avoids KV.get "not found" spam
- * - Negative caching for 404/410
- * Safeguards:
- * - Skips caching for auth'd requests
- * - Proper OPTIONS/HEAD handling
- * - Tight headers + Server-Timing
+ * SENTINEL BMS Cloudflare Worker
+ * Routes api.sentinel-ai.co.za/* → SENTINEL BMS backend (144.91.122.235:9095)
+ * All other routes → AimTheLaw backends
  */
-
-import { handleDemoRequest } from './demo-handler.js';
 
 const INDEX_KEY = "safe-cache:index";  // JSON array of cached pathnames
 const CACHE_PREFIX = "safe-cache:";    // KV value prefix
@@ -294,11 +287,6 @@ export default {
     const upgradeHeader = request.headers.get("Upgrade");
     if (upgradeHeader && upgradeHeader.toLowerCase() === "websocket") {
       return fetch(request);
-    }
-
-    // Demo request handler for Sentinel
-    if (url.pathname === "/api/demo-request" || url.pathname === "/" && method === "POST") {
-      return handleDemoRequest(request, env);
     }
 
     // CORS preflight - SECURITY: Only allow configured origins
