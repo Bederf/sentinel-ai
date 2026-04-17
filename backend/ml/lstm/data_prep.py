@@ -256,6 +256,46 @@ class EquipmentDataLoader:
             "target": "discharge_pressure",
             "description": "Pump discharge pressure prediction",
         },
+        "cooling_tower": {
+            "features": ["basin_temp", "fan_speed", "water_level", "fan_current"],
+            "target": "basin_temp",
+            "description": "Cooling tower basin temperature prediction",
+        },
+        "transformer": {
+            "features": ["winding_temp", "oil_temp", "load_pct", "tap_position"],
+            "target": "winding_temp",
+            "description": "Transformer winding temperature prediction",
+        },
+        "crac": {
+            "features": ["supply_temp", "return_temp", "humidity_pct", "compressor_current"],
+            "target": "supply_temp",
+            "description": "CRAC unit supply temperature prediction",
+        },
+        "ats": {
+            "features": ["mains_voltage", "generator_voltage", "position", "transfer_status"],
+            "target": "position",
+            "description": "ATS transfer position prediction",
+        },
+        "pfc": {
+            "features": ["power_factor", "reactive_power_kvar", "current_a", "voltage_v"],
+            "target": "power_factor",
+            "description": "PFC bank power factor prediction",
+        },
+        "bess": {
+            "features": ["soc_pct", "charge_power_kw", "discharge_power_kw", "cell_temp"],
+            "target": "soc_pct",
+            "description": "BESS state-of-charge prediction",
+        },
+        "inverter": {
+            "features": ["dc_input_power_kw", "ac_output_power_kw", "efficiency_pct", "inverter_temp"],
+            "target": "ac_output_power_kw",
+            "description": "Inverter AC output power prediction",
+        },
+        "split": {
+            "features": ["room_temp", "supply_temp", "fan_speed", "valve_position"],
+            "target": "room_temp",
+            "description": "Split unit room temperature prediction",
+        },
     }
 
     @classmethod

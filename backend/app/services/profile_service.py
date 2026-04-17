@@ -19,6 +19,17 @@ from app.models.optimization import (
 logger = logging.getLogger(__name__)
 
 
+def _normalize_site_id(site_id: str) -> str:
+    """Normalize site_id to site code (e.g. site-002 → S002)."""
+    import re
+
+    normalized = site_id.strip()
+    m = re.fullmatch(r"site-(\d+)", normalized, re.IGNORECASE)
+    if m:
+        return f"S{m.group(1).zfill(3)}"
+    return normalized
+
+
 class ProfileService:
     """Service for managing optimization profiles and site configurations."""
 
@@ -179,51 +190,81 @@ class ProfileService:
             return False
 
     def load_site_profile_config(self, site_id: str) -> SiteProfileConfig | None:
-        """Load profile configuration from building.json.
+        """Load profile configuration for a site.
 
-        Loads from cache if available, otherwise reads from file.
+        Supabase `sites.optimization_settings` is the primary authority (Phase 183).
+        Local JSON is only a backward-compatibility fallback.
 
         Args:
-            site_id: Site identifier
+            site_id: Site identifier (S002 or site-002)
 
         Returns:
-            SiteProfileConfig or None if not found
+            SiteProfileConfig (never None — always returns a default if not found)
         """
-        # Check cache first
-        if site_id in self.site_configs:
-            return self.site_configs[site_id]
+        site_code = _normalize_site_id(site_id)
+
+        # Check runtime cache first
+        if site_code in self.site_configs:
+            return self.site_configs[site_code]
+
+        # 1) Try Supabase first (primary authority since Phase 183)
+        try:
+            from app.database.supabase_client import get_supabase_client
+
+            client = get_supabase_client()
+            result = client.table("sites").select("optimization_settings").eq("code", site_code).single().execute()
+            if result.data:
+                opt = result.data.get("optimization_settings") or {}
+                if opt:
+                    config = SiteProfileConfig.from_dict(opt)
+                    config.site_id = site_code
+                    self.site_configs[site_code] = config
+                    logger.info(f"Loaded profile config for {site_code} from Supabase")
+                    return config
+        except Exception as e:
+            logger.debug(f"Could not load profile config from Supabase for {site_code}: {e}")
+
+        # 2) Fall back to local JSON (backward compatibility)
+        site_path = Path(__file__).parent.parent / "data" / "buildings" / site_code / "building.json"
+
+        if not site_path.exists():
+            # Return default config instead of None (matches existing fallback behavior)
+            config = SiteProfileConfig(
+                site_id=site_code,
+                active_profile="balanced",
+                control_tier="human_in_loop",
+            )
+            self.site_configs[site_code] = config
+            return config
 
         try:
-            site_path = Path(__file__).parent.parent / "data" / "buildings" / site_id / "building.json"
-
-            if not site_path.exists():
-                logger.warning(f"Building file not found: {site_path}")
-                return None
-
             with open(site_path) as f:
                 site_data = json.load(f)
 
             optimization_data = site_data.get("optimization", {})
             if not optimization_data:
-                # Return default config if not present
                 config = SiteProfileConfig(
-                    site_id=site_id,
+                    site_id=site_code,
                     active_profile="cost",
                     control_tier="human_in_loop",
                 )
+                self.site_configs[site_code] = config
                 return config
 
             config = SiteProfileConfig.from_dict(optimization_data)
-            config.site_id = site_id  # Ensure site_id is set
+            config.site_id = site_code
 
-            # Cache it
-            self.site_configs[site_id] = config
-
+            self.site_configs[site_code] = config
             return config
 
         except Exception as e:
             logger.error(f"Error loading profile config for {site_id}: {e}")
-            return None
+            config = SiteProfileConfig(
+                site_id=site_code,
+                active_profile="balanced",
+                control_tier="human_in_loop",
+            )
+            return config
 
     def list_profiles(self) -> list[dict[str, Any]]:
         """List all available optimization profiles.

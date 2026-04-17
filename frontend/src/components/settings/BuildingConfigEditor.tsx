@@ -25,12 +25,6 @@ const OPTIMIZATION_PROFILES = [
   { value: "balanced", label: "Balanced", desc: "Balance cost and comfort" },
 ];
 
-const CONTROL_TIERS = [
-  { value: "human_in_loop", label: "Human in Loop", desc: "All actions require approval" },
-  { value: "supervised", label: "Supervised", desc: "Auto-act within safe bounds, escalate edge cases" },
-  { value: "automatic", label: "Automatic", desc: "Full autonomy within safety envelope" },
-];
-
 function deriveSentinelOperatingMode(
   value?: string | null,
 ): "comfort" | "cost_saving" | "asset_preservation" {
@@ -65,7 +59,6 @@ export function BuildingConfigEditor({
   const [parkingBays, setParkingBays] = useState("");
   const [optimizationProfile, setOptimizationProfile] = useState("");
   const [sentinelOperatingMode, setSentinelOperatingMode] = useState<"comfort" | "cost_saving" | "asset_preservation">("comfort");
-  const [controlTier, setControlTier] = useState("");
   const [contactFM, setContactFM] = useState("");
   const [contactEmail, setContactEmail] = useState("");
   const [contactEmergency, setContactEmergency] = useState("");
@@ -90,7 +83,6 @@ export function BuildingConfigEditor({
       setSentinelOperatingMode(
         deriveSentinelOperatingMode(data.optimization?.sentinel_operating_mode || data.optimization?.active_profile),
       );
-      setControlTier(data.optimization?.control_tier || "human_in_loop");
       setContactFM(data.contacts?.facility_manager || "");
       setContactEmail(data.contacts?.email || "");
       setContactEmergency(data.contacts?.emergency || "");
@@ -129,7 +121,6 @@ export function BuildingConfigEditor({
         parking_bays: parkingBays ? parseInt(parkingBays, 10) : undefined,
         optimization_profile: optimizationProfile || undefined,
         sentinel_operating_mode: sentinelOperatingMode,
-        control_tier: controlTier || undefined,
         contacts: {
           facility_manager: contactFM || undefined,
           email: contactEmail || undefined,
@@ -347,32 +338,6 @@ export function BuildingConfigEditor({
               >
                 <div className="text-sm font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>{p.label}</div>
                 <div className="text-xs mt-0.5" style={{ color: "var(--color-sentinel-text-secondary)" }}>{p.desc}</div>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Control Tier */}
-        <div>
-          <h3 className="text-sm font-semibold mb-3" style={{ color: "var(--color-sentinel-text-primary)" }}>Control Tier</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            {CONTROL_TIERS.map((t) => (
-              <button
-                key={t.value}
-                type="button"
-                onClick={() => { if (!readOnly) { setControlTier(t.value); markDirty(); } }}
-                disabled={readOnly}
-                className="p-3 rounded-lg text-left transition-colors"
-                style={{
-                  background: controlTier === t.value
-                    ? "rgba(16, 185, 129, 0.15)"
-                    : "var(--color-sentinel-bg-secondary)",
-                  border: `1px solid ${controlTier === t.value ? "rgba(16, 185, 129, 0.4)" : "var(--glass-border)"}`,
-                  cursor: readOnly ? "not-allowed" : "pointer",
-                }}
-              >
-                <div className="text-sm font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>{t.label}</div>
-                <div className="text-xs mt-0.5" style={{ color: "var(--color-sentinel-text-secondary)" }}>{t.desc}</div>
               </button>
             ))}
           </div>

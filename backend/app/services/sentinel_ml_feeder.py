@@ -79,6 +79,55 @@ SENSOR_MAPPING: dict[str, dict[str, str]] = {
         "vibration_mms": "vibration",
         "temperature": "temperature",
     },
+    # New equipment types — previously identity-mapped only
+    "cooling_tower": {
+        "ct_basin_temp": "basin_temp",
+        "ct_fan_speed": "fan_speed",
+        "ct_water_level": "water_level",
+        "ct_fan_current": "fan_current",
+    },
+    "transformer": {
+        "tx_winding_temp": "winding_temp",
+        "tx_oil_temp": "oil_temp",
+        "tx_load_percent": "load_pct",
+        "tx_tap_position": "tap_position",
+    },
+    "crac": {
+        "crac_supply_temp": "supply_temp",
+        "crac_return_temp": "return_temp",
+        "crac_humidity_pct": "humidity_pct",
+        "crac_compressor_current": "compressor_current",
+    },
+    "ats": {
+        "ats_mains_voltage": "mains_voltage",
+        "ats_generator_voltage": "generator_voltage",
+        "ats_position": "position",
+        "ats_transfer_status": "transfer_status",
+    },
+    "pfc": {
+        "pfc_power_factor": "power_factor",
+        "pfc_reactive_power_kvar": "reactive_power_kvar",
+        "pfc_current_a": "current_a",
+        "pfc_voltage_v": "voltage_v",
+    },
+    "bess": {
+        "bess_soc_pct": "soc_pct",
+        "bess_charge_power_kw": "charge_power_kw",
+        "bess_discharge_power_kw": "discharge_power_kw",
+        "bess_cell_temp": "cell_temp",
+    },
+    "inverter": {
+        "inv_dc_input_power_kw": "dc_input_power_kw",
+        "inv_ac_output_power_kw": "ac_output_power_kw",
+        "inv_efficiency_pct": "efficiency_pct",
+        "inv_temp": "inverter_temp",
+    },
+    "split": {
+        "room_temp": "room_temp",
+        "supply_temp": "supply_temp",
+        "fan_speed": "fan_speed",
+        "valve_position": "valve_position",
+    },
 }
 
 

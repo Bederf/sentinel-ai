@@ -18,7 +18,7 @@ class SiteRepository:
         "equipment_count, floors, sqm, created_at, updated_at, "
         "year_built, operating_hours, occupancy_pattern, "
         "contact_email, contact_phone, "
-        "optimization_enabled, optimization_status, "
+        "optimization_enabled, optimization_status, optimization_settings, "
         "control_enabled, control_note, "
         "sentinel_processing_enabled, "
         "onboarding_phase"

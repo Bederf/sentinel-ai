@@ -186,6 +186,30 @@ def _severity_to_result(severity: str):
     return AuditResultType.SUCCESS
 
 
+def _resolve_user_display(user_id: str) -> str:
+    """Resolve user_id to display string (email or user_id).
+
+    Attempts to fetch the user's email from Supabase users table.
+    Falls back to the raw user_id if lookup fails or Supabase is unavailable.
+    """
+    if not user_id or user_id == "system":
+        return "system"
+
+    try:
+        from app.database.supabase_client import get_supabase_client
+
+        client = get_supabase_client()
+        result = client.table("users").select("email").eq("id", user_id).single().execute()
+        if result.data:
+            email = result.data.get("email")
+            if email:
+                return str(email)
+    except Exception:
+        pass
+
+    return user_id
+
+
 def _send_telegram_alert(
     event_type: str,
     severity: str,
@@ -202,6 +226,8 @@ def _send_telegram_alert(
     try:
         from app.services.sentry_integration.alert_notifier import alert_notifier
 
+        user_display = _resolve_user_display(user)
+
         alert_data = {
             "severity": "critical" if severity in ("critical", "high") else "warning",
             "equipment_code": "SENTINEL-SECURITY",
@@ -211,7 +237,7 @@ def _send_telegram_alert(
             "zone_name": "System",
             "message": (
                 f"Security event: {event_type}\n"
-                f"User: {user}\n"
+                f"User: {user_display}\n"
                 f"IP: {source_ip or 'unknown'}\n"
                 f"Detail: {snippet[:120] if snippet else 'N/A'}"
             ),

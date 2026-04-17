@@ -34,11 +34,13 @@ type OptimizationStatusType = OptimizationStatusResponse['optimization_status'];
 interface OptimizationInfoCardProps {
   siteId: string;
   optimizationEnabled: boolean;
+  onboardingPhase?: "shadow" | "advisory" | "supervised" | "auto";
 }
 
 export function OptimizationInfoCard({
   siteId,
   optimizationEnabled,
+  onboardingPhase,
 }: OptimizationInfoCardProps) {
   const [optimizationStatus, setOptimizationStatus] =
     useState<OptimizationStatusType>("unknown");
@@ -50,8 +52,13 @@ export function OptimizationInfoCard({
   const [showRecommendationModal, setShowRecommendationModal] = useState(false);
   const [mode, setMode] = useState<"supervised" | "automatic">("supervised");
 
-  // Use actual mode from API, not just the enabled toggle
-  const isAutomatic = mode === "automatic";
+  // Phase-aware mode label (shadow/advisory override the API mode to reflect reality)
+  const effectiveMode = (() => {
+    if (onboardingPhase === "shadow" || onboardingPhase === "advisory") return "advisory";
+    return mode;
+  })();
+  const isAdvisory = effectiveMode === "advisory";
+  const isAutoMode = effectiveMode === "automatic";
 
   // Always fetch optimization status (both modes run optimization)
   useEffect(() => {
@@ -192,16 +199,31 @@ export function OptimizationInfoCard({
               className="text-sm"
               style={{ color: "var(--color-sentinel-text-secondary)" }}
             >
-              {isAutomatic
-                ? "Auto-applying changes"
-                : "Recommendations require approval"}
+              {isAdvisory
+                ? "Monitoring & recommendations"
+                : isAutomatic
+                  ? "Auto-applying changes"
+                  : "Recommendations require approval"}
               {lastOptimization && ` \u00B7 Last: ${formatRelativeTime(lastOptimization)}`}
             </p>
           </div>
         </div>
         <div className="flex items-center gap-3">
+          {/* Advisory: amber learning badge */}
+          {isAdvisory && (
+            <div
+              className="p-2 rounded"
+              style={{
+                background: "rgba(245, 158, 11, 0.15)",
+                border: "1px solid var(--color-sentinel-amber)",
+              }}
+              title="Learning mode — monitoring and generating recommendations"
+            >
+              <Brain className="h-4 w-4" style={{ color: "var(--color-sentinel-amber)" }} />
+            </div>
+          )}
           {/* Automatic mode: show auto-applied indicator */}
-          {isAutomatic && optimizationStatus === "optimized" && (
+          {isAutoMode && optimizationStatus === "optimized" && (
             <div
               className="p-2 rounded"
               style={{
@@ -214,7 +236,7 @@ export function OptimizationInfoCard({
             </div>
           )}
           {/* Supervised mode: show success checkmark when optimized (manually approved) */}
-          {!isAutomatic && optimizationStatus === "optimized" && (
+          {!isAutoMode && !isAdvisory && optimizationStatus === "optimized" && (
             <div
               className="p-2 rounded"
               style={{
@@ -227,7 +249,7 @@ export function OptimizationInfoCard({
             </div>
           )}
           {/* Supervised mode: show recommendation button when pending */}
-          {!isAutomatic && currentRecommendation && (optimizationStatus === "recommendation_pending" || optimizationStatus === "warning") && (
+          {!isAutoMode && !isAdvisory && currentRecommendation && (optimizationStatus === "recommendation_pending" || optimizationStatus === "warning") && (
             <button
               onClick={() => setShowRecommendationModal(true)}
               className="p-2 rounded transition-all hover:scale-110 animate-pulse"
@@ -240,8 +262,8 @@ export function OptimizationInfoCard({
               <Lightbulb className="h-4 w-4" style={{ color: "var(--color-sentinel-amber)" }} />
             </button>
           )}
-          {/* Toggle only shown in automatic mode — supervised mode has no toggle */}
-          {isAutomatic && (
+          {/* Toggle only shown in automatic mode */}
+          {isAutoMode && (
             <OptimizationToggle siteId={siteId} enabled={optimizationEnabled} />
           )}
         </div>
@@ -293,7 +315,7 @@ export function OptimizationInfoCard({
             <div className="flex items-center gap-2 mb-1">
               <Clock
                 className="h-4 w-4"
-                style={{ color: isAutomatic ? "var(--color-sentinel-green)" : "var(--color-sentinel-blue)" }}
+                style={{ color: isAutoMode ? "var(--color-sentinel-green)" : isAdvisory ? "var(--color-sentinel-amber)" : "var(--color-sentinel-blue)" }}
               />
               <span
                 className="text-xs"
@@ -306,13 +328,13 @@ export function OptimizationInfoCard({
               className="text-lg font-semibold"
               style={{ color: "var(--color-sentinel-text-primary)" }}
             >
-              {isAutomatic ? "Automatic" : "Supervised"}
+              {isAdvisory ? "Advisory" : isAutoMode ? "Auto" : "Supervised"}
             </div>
             <div
               className="text-xs"
               style={{ color: "var(--color-sentinel-text-secondary)" }}
             >
-              {isAutomatic ? "AI auto-applies" : "Human approval"}
+              {isAdvisory ? "Learning & advising" : isAutoMode ? "AI auto-applies" : "Human approval"}
             </div>
           </div>
         </div>
@@ -337,7 +359,7 @@ export function OptimizationInfoCard({
                     className="text-xs font-medium"
                     style={{ color: "var(--color-sentinel-amber)" }}
                   >
-                    {isAutomatic ? "Next Optimization" : "Pending Approval"}
+                    {isAdvisory ? "Recommendation" : isAutoMode ? "Next Optimization" : "Pending Approval"}
                   </span>
                 </div>
                 <div
@@ -366,14 +388,15 @@ export function OptimizationInfoCard({
         )}
       </div>
 
-      {/* Recommendation Modal - only in supervised mode */}
-      {!isAutomatic && showRecommendationModal && currentRecommendation && (
+      {/* Recommendation Modal — open in all modes, readOnly in advisory */}
+      {showRecommendationModal && currentRecommendation && (
         <OptimizationRecommendationModal
           isOpen={showRecommendationModal}
           onClose={() => setShowRecommendationModal(false)}
           recommendation={currentRecommendation}
-          onApprove={handleApproveRecommendation}
-          onReject={handleRejectRecommendation}
+          onApprove={isAdvisory ? undefined : handleApproveRecommendation}
+          onReject={isAdvisory ? undefined : handleRejectRecommendation}
+          readOnly={isAdvisory}
         />
       )}
     </div>

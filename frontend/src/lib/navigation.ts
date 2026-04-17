@@ -23,6 +23,7 @@ import {
   Sliders,
   LayoutGrid,
   Fuel,
+  Leaf,
 } from "lucide-react";
 import type { ModuleType } from "./moduleRegistry";
 
@@ -35,7 +36,6 @@ export type View =
   | "simbiot"
   | "settings"
   | "financial"
-  | "compliance"
   | "fleet-ml";
 
 export type NavCategory = "base" | "addon" | "admin";
@@ -61,7 +61,6 @@ export const VIEW_TITLES: Record<View, string> = {
   simbiot: "SIMBIOT",
   settings: "Settings",
   financial: "Financial",
-  compliance: "Compliance & ESG",
   "fleet-ml": "Fleet ML",
 };
 
@@ -90,7 +89,6 @@ export const ADMIN_NAV_ITEMS: NavItem[] = [
  */
 export const ADDON_NAV_ITEMS: NavItem[] = [
   { id: "financial", label: "Financial", icon: DollarSign, description: "Contracts and billing", category: "addon", requiredModule: "financial" },
-  { id: "compliance", label: "Compliance", icon: Shield, description: "ESG and certification", category: "addon", requiredModule: "compliance" },
   { id: "fleet-ml", label: "Fleet ML", icon: Brain, description: "Cross-site analytics", category: "addon", requiredModule: "fleet_ml" },
 ];
 
@@ -115,7 +113,8 @@ export type BuildingTabId =
   | "digital-twin"
   | "controls"
   | "space"
-  | "fuel";
+  | "fuel"
+  | "esg";
 
 export interface BuildingTabItem {
   id: BuildingTabId;
@@ -146,6 +145,7 @@ export const BUILDING_TAB_ITEMS: BuildingTabItem[] = [
   { id: "controls", label: "Controls", icon: Sliders },
   { id: "space", label: "Space", icon: LayoutGrid, requiredModule: "space_optimization" },
   { id: "fuel", label: "Fuel", icon: Fuel, requiredModule: "fuel_monitoring" },
+  { id: "esg", label: "ESG", icon: Leaf, requiredModule: "compliance" },
 ];
 
 // ─── Helpers ──

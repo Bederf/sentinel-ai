@@ -28,19 +28,26 @@ logger = logging.getLogger(__name__)
 DATA_DIR = Path(__file__).parent.parent / "data"
 USAGE_FILE = DATA_DIR / "ai_usage_log.json"
 
-# ---- Pricing (per 1M tokens, USD) — updated 2026-03 ----
+# ---- Pricing (per 1M tokens, USD) — updated 2026-04 ----
 # Convert to ZAR at checkout using configurable rate.
+# Models must match model_gateway routing + routing_profiles.py entries exactly.
 
 PRICING_USD_PER_1M = {
     # Anthropic
-    "claude-sonnet-4-20250514": {"input": 3.00, "output": 15.00},
+    "claude-sonnet-4-6": {"input": 3.00, "output": 15.00},
     "claude-haiku-4-5-20251001": {"input": 0.80, "output": 4.00},
-    "claude-opus-4-20250514": {"input": 15.00, "output": 75.00},
+    "claude-opus-4-6": {"input": 15.00, "output": 75.00},
     # OpenAI
-    "gpt-4.1-nano": {"input": 0.10, "output": 0.40},
-    "gpt-4.1-mini": {"input": 0.40, "output": 1.60},
     "gpt-4o": {"input": 2.50, "output": 10.00},
     "gpt-4o-mini": {"input": 0.15, "output": 0.60},
+    "gpt-4.1-nano": {"input": 0.10, "output": 0.40},
+    "gpt-4.1-mini": {"input": 0.40, "output": 1.60},
+    "gpt-4-turbo": {"input": 10.00, "output": 30.00},
+    # MiniMax
+    "MiniMax-M2.7": {"input": 0.40, "output": 1.60},
+    # Azure OpenAI (uses OpenAI pricing tiers)
+    "azure_openai/gpt-4o": {"input": 2.50, "output": 10.00},
+    "azure_openai/gpt-4o-mini": {"input": 0.15, "output": 0.60},
     # ZhipuAI
     "glm-4.7-flash": {"input": 0.10, "output": 0.10},
     # Local (free)

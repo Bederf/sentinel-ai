@@ -430,6 +430,7 @@ class SiteResponse(SiteBase):
     status: Literal["normal", "warning", "critical"] = "normal"
     optimization_enabled: bool = False
     optimization_status: str = "unknown"
+    optimization_settings: Optional[dict] = None
     control_enabled: bool = False
     control_note: Optional[str] = None
     equipment_status: Optional[EquipmentStatusBreakdown] = None

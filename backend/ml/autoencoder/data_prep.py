@@ -264,7 +264,7 @@ AUTOENCODER_SENSOR_CONFIGS: Dict[str, Dict[str, Any]] = {
         "description": "AHU operating pattern anomaly detection",
     },
     "generator": {
-        "features": ["battery_voltage", "oil_pressure", "coolant_temp", "rpm", "load_pct"],
+        "features": ["battery_voltage", "oil_pressure", "coolant_temp", "load_pct"],
         "description": "Generator operating pattern anomaly detection",
     },
     "fcu": {
@@ -282,5 +282,37 @@ AUTOENCODER_SENSOR_CONFIGS: Dict[str, Dict[str, Any]] = {
     "pump": {
         "features": ["flow_rate", "discharge_pressure", "motor_current", "vibration", "temperature"],
         "description": "Pump operating pattern anomaly detection",
+    },
+    "cooling_tower": {
+        "features": ["basin_temp", "fan_speed", "water_level", "fan_current"],
+        "description": "Cooling tower operating pattern anomaly detection",
+    },
+    "transformer": {
+        "features": ["winding_temp", "oil_temp", "load_pct", "tap_position"],
+        "description": "Transformer operating pattern anomaly detection",
+    },
+    "crac": {
+        "features": ["supply_temp", "return_temp", "humidity_pct", "compressor_current"],
+        "description": "CRAC unit operating pattern anomaly detection",
+    },
+    "ats": {
+        "features": ["mains_voltage", "generator_voltage", "position", "transfer_status"],
+        "description": "ATS operating pattern anomaly detection",
+    },
+    "pfc": {
+        "features": ["power_factor", "reactive_power_kvar", "current_a", "voltage_v"],
+        "description": "PFC bank operating pattern anomaly detection",
+    },
+    "bess": {
+        "features": ["soc_pct", "charge_power_kw", "discharge_power_kw", "cell_temp"],
+        "description": "BESS operating pattern anomaly detection",
+    },
+    "inverter": {
+        "features": ["dc_input_power_kw", "ac_output_power_kw", "efficiency_pct", "inverter_temp"],
+        "description": "Inverter operating pattern anomaly detection",
+    },
+    "split": {
+        "features": ["room_temp", "supply_temp", "fan_speed", "valve_position"],
+        "description": "Split unit operating pattern anomaly detection",
     },
 }

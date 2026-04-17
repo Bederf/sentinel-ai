@@ -50,7 +50,7 @@ function glowOpacity(urgency: number): number {
   return 0.15 + urgency * 0.55;
 }
 
-function signalLabelFromType(signalType: string): string {
+function _signalLabelFromType(signalType: string): string {
   switch (signalType) {
     case "booking_conflict":
       return "Block";
@@ -66,30 +66,26 @@ function getRoomDisplayName(room: ConciergeRoom): string {
   const raw = (room.room_id || "").trim();
   if (!raw) return "";
 
-  // Prefer compact, circle-friendly labels for the map.
-  // Examples:
-  // - S002-L1-MR2 -> L1-MR2
-  // - S001-FA2-1Q4-MR28 -> FA2-1Q4-MR28
+  // Strip site prefix: S002-L1-MR2 -> L1-MR2
   const compact = raw.replace(/^S\d{3}-/i, "");
-  if (compact && compact !== raw) return compact;
+  const base = compact && compact !== raw ? compact : raw;
 
-  // Fall back to friendly name only if it's already short.
-  const friendly = room.friendly_name?.trim() || "";
-  if (friendly && friendly.length <= 18) return friendly;
-
-  return raw;
+  // Abbreviate common room types so labels fit inside circles cleanly
+  return base
+    .replace(/\bfocus\s*room\b/gi, "FR")
+    .replace(/\bmeeting\s*room\b/gi, "MR")
+    .replace(/\bconference\s*room\b/gi, "CR")
+    .replace(/\bboard\s*room\b/gi, "BR")
+    .replace(/\bopen\s*space\b/gi, "OS")
+    .replace(/\btraining\s*room\b/gi, "TR")
+    .replace(/\bhuddle\s*room\b/gi, "HR");
 }
 
-function roomLabelWithOptionalCount(room: ConciergeRoom): string {
-  const baseLabel = getRoomDisplayName(room);
-  if (room.signal_count > 0 && room.signal_count <= 9) {
-    // Keep count visually separate so labels like "L3-MR1" don't read as "L3-MR14".
-    return `${baseLabel}\n(${room.signal_count})`;
-  }
-  return baseLabel;
+function roomLabel(room: ConciergeRoom): string {
+  return getRoomDisplayName(room);
 }
 
-function labelSizeForText(value: string, minSize = 40, maxSize = 72): number {
+function _labelSizeForText(value: string, minSize = 40, maxSize = 72): number {
   const cleaned = value.replace(/\s+/g, " ").trim();
   if (!cleaned) return minSize;
   const estimated = cleaned.length * 7 + 16;
@@ -135,7 +131,7 @@ function categoryLabelFromKey(key: CategoryKey): string {
   }
 }
 
-const CATEGORY_BORDER_COLORS: Record<CategoryKey, string> = {
+const _CATEGORY_BORDER_COLORS: Record<CategoryKey, string> = {
   ghost: "#e11d48",
   block_risk: "#f59e0b",
   info: "#f59e0b",
@@ -243,7 +239,7 @@ function buildRoomNodes(rooms: ConciergeRoom[], positions: RoomPositions, dims: 
     return {
       data: {
         id: room.room_id,
-        label: roomLabelWithOptionalCount(room),
+        label: roomLabel(room),
         node_type: "room",
         signal_count: room.signal_count,
         highest_severity: room.highest_severity,
@@ -327,7 +323,7 @@ function buildChildElements(
       x: roomNode.position.x + childDistance * Math.cos(angle),
       y: roomNode.position.y + childDistance * Math.sin(angle),
     };
-    const categoryLabel = category.signals.length > 0 ? `${category.label}\n${category.signals.length}` : category.label;
+    const categoryLabel = category.label;
     const categorySize = Math.max(46, 44 + Math.min(22, category.signals.length * 2));
 
     summaryNodes.push({

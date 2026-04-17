@@ -102,6 +102,8 @@ const DigitalTwin = lazy(() => import("./digital-twin").then(m => ({ default: m.
 const SpaceOptimizationPage = lazy(() => import("./SpaceOptimizationPage").then(m => ({ default: m.SpaceOptimizationPage })));
 // Fuel
 const FuelDashboard = lazy(() => import("./fuel/FuelDashboard").then(m => ({ default: m.FuelDashboard })));
+// ESG & Sustainability
+const SustainabilityDashboard = lazy(() => import("./sustainability/SustainabilityDashboard").then(m => ({ default: m.SustainabilityDashboard })));
 
 // ─── Sub-tab types for discipline tabs ────────────────────────────
 type LightingSub = "Lighting" | "Occupancy" | "Analytics" | "Correlation";
@@ -879,6 +881,7 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
         <OptimizationInfoCard
           siteId={siteId}
           optimizationEnabled={site.optimization_enabled || false}
+          onboardingPhase={sitePhase}
         />
       )}
 
@@ -1891,6 +1894,11 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
           {/* Fuel — only visible when fuel_monitoring add-on is active */}
           {activeMainTab === "fuel" && isModuleActive('fuel_monitoring') && (
             <FuelDashboard siteId={siteId} />
+          )}
+
+          {/* ESG & Sustainability — only visible when compliance add-on is active */}
+          {activeMainTab === "esg" && isModuleActive('compliance') && (
+            <SustainabilityDashboard siteId={siteId} />
           )}
         </div>
       </Suspense>

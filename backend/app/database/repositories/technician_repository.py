@@ -2,18 +2,12 @@
 Technician Repository - Database operations for technicians and site assignments.
 """
 
-import json
 import logging
-from pathlib import Path
 from typing import Optional, List, Dict, Any
 
 from ..supabase_client import get_supabase_client
 
 logger = logging.getLogger(__name__)
-
-DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
-TECHNICIANS_JSON_PATH = DATA_DIR / "technicians.json"
-TECHNICIANS_WHATSAPP_JSON_PATH = DATA_DIR / "technicians_whatsapp.json"
 
 
 class TechnicianRepository:
@@ -256,7 +250,7 @@ class TechnicianRepository:
     async def get_technician_by_telegram_id(self, telegram_id: str) -> Optional[Dict[str, Any]]:
         """Resolve a technician and their primary site from a Telegram user ID."""
         if not self.client or not telegram_id:
-            return self._get_technician_by_telegram_id_json(telegram_id)
+            return None
 
         try:
             tech_result = (
@@ -268,7 +262,7 @@ class TechnicianRepository:
                 .execute()
             )
             if not tech_result.data:
-                return self._get_technician_by_telegram_id_json(telegram_id)
+                return None
 
             technician = tech_result.data[0]
             assignments = (
@@ -280,18 +274,11 @@ class TechnicianRepository:
 
             primary = next((row for row in assignments if row.get("is_primary")), None)
             first_assignment = primary or (assignments[0] if assignments else {})
-            technician["site_id"] = first_assignment.get("site_id")
-            if not technician.get("site_id"):
-                fallback = self._get_technician_by_telegram_id_json(telegram_id)
-                if fallback:
-                    if fallback.get("site_id"):
-                        technician["site_id"] = fallback.get("site_id")
-                    if fallback.get("site_name"):
-                        technician["site_name"] = fallback.get("site_name")
+            technician["site_id"] = first_assignment.get("site_id") or ""
             return technician
         except Exception as e:
             logger.error(f"Error getting technician by telegram_id {telegram_id}: {e}")
-            return self._get_technician_by_telegram_id_json(telegram_id)
+            return None
 
     async def get_site_assignments(self, site_id: str) -> List[Dict[str, Any]]:
         """Get all technician assignments for a site."""
@@ -320,7 +307,8 @@ class TechnicianRepository:
         Returns a combined view for the Settings UI.
         """
         if not self.client:
-            return self._get_technicians_from_json()
+            logger.warning("Supabase client not available for get_technicians_with_assignments")
+            return []
 
         try:
             # Get all technicians
@@ -355,58 +343,7 @@ class TechnicianRepository:
 
         except Exception as e:
             logger.error(f"Error getting technicians with assignments: {e}")
-            return self._get_technicians_from_json()
-
-    def _get_technicians_from_json(self) -> List[Dict[str, Any]]:
-        """JSON fallback for technician list."""
-        try:
-            techs = self._load_technicians_json_records()
-            for t in techs:
-                t.setdefault("specialties", [t.get("specialty", "general")])
-                t.setdefault("channels", [])
-                t.setdefault("site_assignments", [])
-            return techs
-        except Exception:
             return []
-
-    def _load_technicians_json_records(self) -> List[Dict[str, Any]]:
-        """Load technician seed records from either WhatsApp or generic JSON fixtures."""
-        if TECHNICIANS_WHATSAPP_JSON_PATH.exists():
-            with open(TECHNICIANS_WHATSAPP_JSON_PATH) as f:
-                data = json.load(f)
-            return data.get("technicians", [])
-
-        if TECHNICIANS_JSON_PATH.exists():
-            with open(TECHNICIANS_JSON_PATH) as f:
-                data = json.load(f)
-            if isinstance(data, list):
-                return data
-
-        return []
-
-    def _get_technician_by_telegram_id_json(self, telegram_id: str) -> Optional[Dict[str, Any]]:
-        """Resolve a technician by Telegram ID from local seed data."""
-        if not telegram_id:
-            return None
-
-        for tech in self._load_technicians_json_records():
-            if str(tech.get("telegram_id") or "").strip() != telegram_id:
-                continue
-            if tech.get("active") is False:
-                continue
-
-            resolved = dict(tech)
-            assignments = resolved.get("site_assignments") or []
-            primary = next((row for row in assignments if row.get("is_primary")), None)
-            first_assignment = primary or (assignments[0] if assignments else {})
-
-            if first_assignment.get("site_id") and not resolved.get("site_id"):
-                resolved["site_id"] = first_assignment.get("site_id")
-            if first_assignment.get("site_name") and not resolved.get("site_name"):
-                resolved["site_name"] = first_assignment.get("site_name")
-            return resolved
-
-        return None
 
     async def create_technician(
         self,
@@ -425,7 +362,8 @@ class TechnicianRepository:
         3. technician_notification_channels if telegram/whatsapp provided
         """
         if not self.client:
-            return self._create_technician_json(name, email, phone, specialties, site_id)
+            logger.warning("Supabase client not available for create_technician")
+            return None
 
         try:
             import uuid
@@ -497,42 +435,6 @@ class TechnicianRepository:
 
         except Exception as e:
             logger.error(f"Error creating technician: {e}")
-            return None
-
-    def _create_technician_json(
-        self, name: str, email: str, phone: str, specialties: List[str], site_id: str
-    ) -> Optional[Dict[str, Any]]:
-        """JSON fallback for technician creation."""
-        import json
-        import uuid
-        from pathlib import Path
-
-        json_path = Path(__file__).parent.parent / "data" / "technicians_whatsapp.json"
-        try:
-            data = {"technicians": []}
-            if json_path.exists():
-                with open(json_path) as f:
-                    data = json.load(f)
-
-            new_tech = {
-                "id": f"tech-{str(uuid.uuid4())[:8]}",
-                "name": name,
-                "email": email,
-                "whatsapp_number": phone,
-                "specialty": specialties[0] if specialties else "general",
-                "active": True,
-                "site_id": site_id,
-            }
-            data["technicians"].append(new_tech)
-
-            with open(json_path, "w") as f:
-                json.dump(data, f, indent=2)
-
-            new_tech["specialties"] = specialties
-            new_tech["channels"] = []
-            return new_tech
-        except Exception as e:
-            logger.error(f"JSON technician creation failed: {e}")
             return None
 
     async def update_technician(

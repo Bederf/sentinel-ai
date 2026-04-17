@@ -173,10 +173,18 @@ class Settings(BaseSettings):
     simbiot_password: str = ""
 
     # Notification service settings (email, Slack)
-    notification_smtp_host: str = ""
-    notification_smtp_port: int = 587
-    notification_smtp_username: str = ""
-    notification_smtp_password: str = ""
+    notification_smtp_host: str = Field(
+        default="", validation_alias=AliasChoices("NOTIFICATION_SMTP_HOST", "SMTP_HOST")
+    )
+    notification_smtp_port: int = Field(
+        default=587, validation_alias=AliasChoices("NOTIFICATION_SMTP_PORT", "SMTP_PORT")
+    )
+    notification_smtp_username: str = Field(
+        default="", validation_alias=AliasChoices("NOTIFICATION_SMTP_USERNAME", "SMTP_USER")
+    )
+    notification_smtp_password: str = Field(
+        default="", validation_alias=AliasChoices("NOTIFICATION_SMTP_PASSWORD", "SMTP_PASSWORD")
+    )
     notification_smtp_use_tls: bool = True
 
     # Rooms SMTP (ghost booking alerts — separate from work order email)
@@ -427,8 +435,10 @@ class Settings(BaseSettings):
     cost_alert_telegram_chat_id: str = ""  # Falls back to telegram_alert_chat_id if empty
 
     # Telegram alert delivery
-    telegram_bot_token: str = ""  # Bot token from BotFather
-    telegram_alert_chat_id: str = ""  # Default chat/group ID for plant alerts
+    telegram_bot_token: str = Field(default="", validation_alias=AliasChoices("SENTRY_BOT_TOKEN", "TELEGRAM_BOT_TOKEN"))
+    telegram_alert_chat_id: str = Field(
+        default="", validation_alias=AliasChoices("SENTRY_FM_CHAT_ID", "TELEGRAM_ALERT_CHAT_ID")
+    )
 
     # Fuel Tank MQTT Ingestion (Phase 148)
     fuel_mqtt_enabled: bool = False

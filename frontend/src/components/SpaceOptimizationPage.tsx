@@ -5,7 +5,7 @@
  * focus room analytics, and occupancy trend visibility.
  */
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   LayoutGrid,
   Mail,
@@ -23,6 +23,7 @@ import {
   BarChart3,
   Orbit,
 } from "lucide-react";
+import { gsap } from "gsap";
 
 import { authorizedFetch } from "@/lib/api";
 import { ConciergeDashboardPage } from "./intelligence/ConciergeDashboardPage";
@@ -132,6 +133,14 @@ export function SpaceOptimizationPage({ siteId: propSiteId }: { siteId?: string 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [entered, setEntered] = useState(false);
+
+  // GSAP animation refs
+  const headerRef = useRef<HTMLDivElement>(null);
+  const kpiGridRef = useRef<HTMLDivElement>(null);
+  const tabBarRef = useRef<HTMLDivElement>(null);
+  const tabContentRef = useRef<HTMLDivElement>(null);
+  const tabKeyRef = useRef(activeTab);
 
   const [blockAlerts, setBlockAlerts] = useState<BlockBookingAlert[]>([]);
   const [ghostFindings, setGhostFindings] = useState<GhostFinding[]>([]);
@@ -242,6 +251,79 @@ export function SpaceOptimizationPage({ siteId: propSiteId }: { siteId?: string 
     return () => clearInterval(interval);
   }, [fetchData]);
 
+  // GSAP entrance animations
+  useEffect(() => {
+    if (!entered || loading) return;
+    const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (prefersReduced) { setEntered(true); return; }
+
+    const ctx = gsap.context(() => {
+      // Header: slide in from top + fade
+      gsap.fromTo(headerRef.current,
+        { y: -24, opacity: 0 },
+        { y: 0, opacity: 1, duration: 0.55, ease: "power3.out" }
+      );
+
+      // KPI cards: staggered cascade
+      const kpiCards = kpiGridRef.current?.querySelectorAll(".kpi-card");
+      if (kpiCards?.length) {
+        gsap.fromTo(kpiCards,
+          { y: 28, opacity: 0 },
+          {
+            y: 0, opacity: 1,
+            duration: 0.45,
+            ease: "power3.out",
+            stagger: 0.07,
+            delay: 0.15,
+          }
+        );
+      }
+
+      // Tab bar
+      gsap.fromTo(tabBarRef.current,
+        { y: 12, opacity: 0 },
+        { y: 0, opacity: 1, duration: 0.4, ease: "power3.out", delay: 0.3 }
+      );
+
+      // Initial tab content
+      gsap.fromTo(tabContentRef.current,
+        { opacity: 0, y: 10 },
+        { opacity: 1, y: 0, duration: 0.35, ease: "power3.out", delay: 0.4 }
+      );
+    });
+    return () => ctx.revert();
+  }, [entered, loading]);
+
+  // Animate tab content on tab change
+  useEffect(() => {
+    if (!entered) return;
+    const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (prefersReduced) return;
+
+    if (tabKeyRef.current !== activeTab) {
+      tabKeyRef.current = activeTab;
+      gsap.to(tabContentRef.current, {
+        opacity: 0,
+        y: 8,
+        duration: 0.18,
+        ease: "power2.in",
+        onComplete: () => {
+          gsap.fromTo(tabContentRef.current,
+            { opacity: 0, y: 10 },
+            { opacity: 1, y: 0, duration: 0.3, ease: "power3.out" }
+          );
+        },
+      });
+    }
+  }, [activeTab, entered]);
+
+  // Mark entered on first data load
+  useEffect(() => {
+    if (!loading) {
+      setEntered(true);
+    }
+  }, [loading]);
+
   const handleDismissBlockAlert = async (alertId: string) => {
     try {
       const res = await authorizedFetch(`/api/block-bookings/alerts/${alertId}/dismiss`, {
@@ -328,8 +410,8 @@ export function SpaceOptimizationPage({ siteId: propSiteId }: { siteId?: string 
   }
 
   return (
-    <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-6" style={{ background: "var(--color-sentinel-bg-canvas)" }}>
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+    <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-6 opacity-0" style={{ background: "var(--color-sentinel-bg-canvas)" }} ref={(el) => { if (el) { /* outer wrapper fade handled by GSAP via headerRef ctx */ void el; } }}>
+      <div ref={headerRef} className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 opacity-0">
         <div className="flex items-center gap-3">
           <div className="p-2 rounded" style={{ background: "rgba(13, 148, 136, 0.15)" }}>
             <LayoutGrid className="h-6 w-6" style={{ color: "#0d9488" }} />
@@ -368,7 +450,7 @@ export function SpaceOptimizationPage({ siteId: propSiteId }: { siteId?: string 
         </div>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
+      <div ref={kpiGridRef} className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
         <KpiCard
           icon={<Orbit className="h-5 w-5" />}
           label="Meeting Room Intelligence"
@@ -423,12 +505,12 @@ export function SpaceOptimizationPage({ siteId: propSiteId }: { siteId?: string 
         />
       </div>
 
-      <div className="flex gap-1 border-b" style={{ borderColor: "var(--color-sentinel-border)" }}>
+      <div ref={tabBarRef} className="flex gap-1 border-b opacity-0" style={{ borderColor: "var(--color-sentinel-border)" }}>
         {tabs.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className="px-4 py-2.5 text-sm font-medium border-b-2 transition-colors"
+            className="space-optim-tab px-4 py-2.5 text-sm font-medium border-b-2 transition-colors"
             style={{
               borderColor: activeTab === tab.id ? "#0d9488" : "transparent",
               color: activeTab === tab.id ? "#0d9488" : "var(--color-sentinel-text-secondary)",
@@ -450,6 +532,7 @@ export function SpaceOptimizationPage({ siteId: propSiteId }: { siteId?: string 
         ))}
       </div>
 
+      <div ref={tabContentRef} className="opacity-0">
       {activeTab === "intelligence" && (
         <MeetingRoomIntelligencePanel siteId={siteId} />
       )}
@@ -472,6 +555,7 @@ export function SpaceOptimizationPage({ siteId: propSiteId }: { siteId?: string 
       {activeTab === "trends" && (
         <OccupancyTrendsPanel trends={hourlyTrends} />
       )}
+      </div>
     </div>
   );
 }
@@ -655,7 +739,7 @@ function KpiCard({
 }) {
   return (
     <div
-      className="rounded-md p-4"
+      className="kpi-card rounded-md p-4 opacity-0"
       style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}
     >
       <div className="flex items-center gap-2 mb-3">

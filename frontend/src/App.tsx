@@ -30,7 +30,6 @@ const SystemHealthPage = lazy(() => import("./components/SystemHealthPage"));
 const AssetWorkflowDashboard = lazy(() => import("./components/AssetWorkflowDashboard").then(m => ({ default: m.AssetWorkflowDashboard })));
 const SimbiotPage = lazy(() => import("./components/SimbiotPage").then(m => ({ default: m.SimbiotPage })));
 const FleetInsights = lazy(() => import("./components/FleetInsights").then(m => ({ default: m.FleetInsights })));
-const ESGPage = lazy(() => import("./components/sustainability/ESGPage").then(m => ({ default: m.ESGPage })));
 const ContractManagementPage = lazy(() => import("./pages/ContractManagementPage").then(m => ({ default: m.ContractManagementPage })));
 const SiteDetail = lazy(() => import("./components/SiteDetail").then(m => ({ default: m.SiteDetail })));
 
@@ -826,10 +825,6 @@ function App() {
             </div>
           ) : currentView === "financial" ? (
             <ContractManagementPage />
-          ) : currentView === "compliance" ? (
-            <div className="h-full overflow-y-auto">
-              <ESGPage selectedBuilding={undefined} />
-            </div>
           ) : currentView === "fleet-ml" ? (
             <FleetInsights />
           ) : (

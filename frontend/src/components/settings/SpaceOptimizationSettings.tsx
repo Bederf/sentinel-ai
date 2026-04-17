@@ -100,12 +100,12 @@ const GRACE_FIELDS: GraceField[] = [
 // Empty concierge form data
 // ---------------------------------------------------------------------------
 
-function emptyConciergeForm(): ConciergeUserCreate {
+function emptyConciergeForm(siteId?: string): ConciergeUserCreate {
   return {
     name: "",
     mobile: "",
     email: "",
-    site_id: "",
+    site_id: siteId || "",
     building_codes: [],
     floor_assignments: {},
   };
@@ -127,6 +127,7 @@ interface SpaceOptimizationSettingsProps {
 // ---------------------------------------------------------------------------
 
 export function SpaceOptimizationSettings({
+  siteId,
   onError,
   onSuccess,
   readOnly = false,
@@ -155,6 +156,13 @@ export function SpaceOptimizationSettings({
 
   // Delete confirmation
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // Pre-seed form site from the current site context when siteId prop is set
+  useEffect(() => {
+    if (siteId) {
+      setFormData((prev) => ({ ...prev, site_id: siteId }));
+    }
+  }, [siteId]);
 
   // -------------------------------------------
   // Fetch on mount
@@ -240,7 +248,7 @@ export function SpaceOptimizationSettings({
 
   const startAdd = () => {
     setEditingId(null);
-    setFormData(emptyConciergeForm());
+    setFormData(emptyConciergeForm(siteId));
     setFormActive(true);
     setShowAddForm(true);
   };
@@ -500,6 +508,7 @@ export function SpaceOptimizationSettings({
               selectedSite={selectedSite}
               saving={formSaving}
               isEdit={false}
+              readonlySiteId={siteId}
               onChange={setFormData}
               onActiveChange={setFormActive}
               onToggleBuilding={toggleBuilding}
@@ -554,6 +563,7 @@ export function SpaceOptimizationSettings({
                             selectedSite={selectedSite}
                             saving={formSaving}
                             isEdit
+                            readonlySiteId={siteId}
                             onChange={setFormData}
                             onActiveChange={setFormActive}
                             onToggleBuilding={toggleBuilding}
@@ -689,6 +699,7 @@ interface ConciergeFormProps {
   selectedSite: SpaceSiteStructure | undefined;
   saving: boolean;
   isEdit: boolean;
+  readonlySiteId?: string;
   onChange: (data: ConciergeUserCreate) => void;
   onActiveChange: (active: boolean) => void;
   onToggleBuilding: (code: string) => void;
@@ -705,6 +716,7 @@ function ConciergeForm({
   selectedSite,
   saving,
   isEdit,
+  readonlySiteId,
   onChange,
   onActiveChange,
   onToggleBuilding,
@@ -815,31 +827,44 @@ function ConciergeForm({
           className="block text-xs font-medium"
           style={{ color: "var(--color-sentinel-text-secondary)" }}
         >
-          Site *
+          Site {!readonlySiteId && "*"}
         </label>
-        <div className="relative w-full md:w-64">
-          <select
-            value={formData.site_id}
-            onChange={(e) => handleSiteChange(e.target.value)}
-            className="w-full appearance-none px-3 py-1.5 pr-8 rounded text-sm"
+        {readonlySiteId ? (
+          <div
+            className="px-3 py-1.5 rounded text-sm"
             style={{
               background: "var(--color-sentinel-bg-canvas)",
               border: "1px solid var(--color-sentinel-border)",
               color: "var(--color-sentinel-text-primary)",
             }}
           >
-            <option value="">Select site...</option>
-            {sites.map((s) => (
-              <option key={s.site_id} value={s.site_id}>
-                {s.site_name}
-              </option>
-            ))}
-          </select>
-          <ChevronDown
-            className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 pointer-events-none"
-            style={{ color: "var(--color-sentinel-text-secondary)" }}
-          />
-        </div>
+            {selectedSite?.site_name || readonlySiteId}
+          </div>
+        ) : (
+          <div className="relative w-full md:w-64">
+            <select
+              value={formData.site_id}
+              onChange={(e) => handleSiteChange(e.target.value)}
+              className="w-full appearance-none px-3 py-1.5 pr-8 rounded text-sm"
+              style={{
+                background: "var(--color-sentinel-bg-canvas)",
+                border: "1px solid var(--color-sentinel-border)",
+                color: "var(--color-sentinel-text-primary)",
+              }}
+            >
+              <option value="">Select site...</option>
+              {sites.map((s) => (
+                <option key={s.site_id} value={s.site_id}>
+                  {s.site_name}
+                </option>
+              ))}
+            </select>
+            <ChevronDown
+              className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 pointer-events-none"
+              style={{ color: "var(--color-sentinel-text-secondary)" }}
+            />
+          </div>
+        )}
       </div>
 
       {/* Building checkboxes */}

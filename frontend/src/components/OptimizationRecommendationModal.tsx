@@ -35,6 +35,8 @@ interface OptimizationRecommendationModalProps {
   onApprove?: (recommendationId: string) => Promise<void>;
   onReject?: (recommendationId: string, reason?: string) => Promise<void>;
   siteName?: string;
+  /** When true, hides approve/reject/defer buttons and shows advisory banner */
+  readOnly?: boolean;
 }
 
 /**
@@ -96,6 +98,7 @@ export function OptimizationRecommendationModal({
   onApprove,
   onReject,
   siteName,
+  readOnly = false,
 }: OptimizationRecommendationModalProps) {
   const [loading, setLoading] = useState(false);
   const [action, setAction] = useState<"approve" | "reject" | "defer" | null>(null);
@@ -103,9 +106,9 @@ export function OptimizationRecommendationModal({
   const [success, setSuccess] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState(30);
 
-  // Auto-dismiss countdown
+  // Auto-dismiss countdown — disabled in readOnly/advisory mode
   useEffect(() => {
-    if (!isOpen || !recommendation) {
+    if (!isOpen || !recommendation || readOnly) {
       setTimeRemaining(30);
       return;
     }
@@ -120,7 +123,7 @@ export function OptimizationRecommendationModal({
     }, 1000);
 
     return () => clearTimeout(timer);
-  }, [isOpen, timeRemaining, onClose, recommendation]);
+  }, [isOpen, timeRemaining, onClose, recommendation, readOnly]);
 
   // Reset state when modal opens/closes
   useEffect(() => {
@@ -463,53 +466,57 @@ export function OptimizationRecommendationModal({
             style={{ borderColor: "var(--color-sentinel-border)", color: "var(--color-sentinel-text-disabled)" }}
           >
             <span>Based on analysis at {formatDateTime(recommendation.timestamp)}</span>
-            <span>Valid for 15 minutes • Auto-dismiss in {timeRemaining}s</span>
+            {!readOnly && <span>Valid for 15 minutes &bull; Auto-dismiss in {timeRemaining}s</span>}
           </div>
         </div>
 
         {/* AI Disclosure — EU AI Act Article 50 */}
         <div className="flex-shrink-0 px-6 pt-2 text-center">
           <span className="text-xs italic" style={{ color: "var(--color-sentinel-text-secondary)", opacity: 0.7 }}>
-            AI-generated recommendation &middot; Review before approving
+            {readOnly
+              ? "AI-generated recommendation \u00b7 Advisory mode \u00b7 Review only"
+              : "AI-generated recommendation \u00b7 Review before approving"}
           </span>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex-shrink-0 px-6 py-4 border-t flex gap-3"
-          style={{ borderColor: "var(--glass-border)" }}
-        >
-          <button
-            onClick={handleApprove}
-            disabled={loading || success}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded bg-green-600 hover:bg-green-700 disabled:bg-green-800 disabled:opacity-50 text-white font-medium transition-colors"
+        {/* Action Buttons — hidden in advisory/readOnly mode */}
+        {!readOnly && (
+          <div className="flex-shrink-0 px-6 py-4 border-t flex gap-3"
+            style={{ borderColor: "var(--glass-border)" }}
           >
-            <CheckCircle2 className="w-4 h-4" />
-            {loading && action === "approve" ? "Applying..." : "Approve"}
-          </button>
+            <button
+              onClick={handleApprove}
+              disabled={loading || success}
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded bg-green-600 hover:bg-green-700 disabled:bg-green-800 disabled:opacity-50 text-white font-medium transition-colors"
+            >
+              <CheckCircle2 className="w-4 h-4" />
+              {loading && action === "approve" ? "Applying..." : "Approve"}
+            </button>
 
-          <button
-            onClick={handleReject}
-            disabled={loading || success}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded bg-red-600 hover:bg-red-700 disabled:bg-red-800 disabled:opacity-50 text-white font-medium transition-colors"
-          >
-            <XCircle className="w-4 h-4" />
-            {loading && action === "reject" ? "Rejecting..." : "Reject"}
-          </button>
+            <button
+              onClick={handleReject}
+              disabled={loading || success}
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded bg-red-600 hover:bg-red-700 disabled:bg-red-800 disabled:opacity-50 text-white font-medium transition-colors"
+            >
+              <XCircle className="w-4 h-4" />
+              {loading && action === "reject" ? "Rejecting..." : "Reject"}
+            </button>
 
-          <button
-            onClick={handleDefer}
-            disabled={loading || success}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded font-medium transition-colors"
-            style={{
-              background: "var(--color-sentinel-bg-secondary)",
-              color: "var(--color-sentinel-text-primary)",
-              border: "1px solid var(--color-sentinel-border)",
-            }}
-          >
-            <Clock className="w-4 h-4" />
-            Defer (15 min)
-          </button>
-        </div>
+            <button
+              onClick={handleDefer}
+              disabled={loading || success}
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded font-medium transition-colors"
+              style={{
+                background: "var(--color-sentinel-bg-secondary)",
+                color: "var(--color-sentinel-text-primary)",
+                border: "1px solid var(--color-sentinel-border)",
+              }}
+            >
+              <Clock className="w-4 h-4" />
+              Defer (15 min)
+            </button>
+          </div>
+        )}
       </div>
     </div>,
     document.body

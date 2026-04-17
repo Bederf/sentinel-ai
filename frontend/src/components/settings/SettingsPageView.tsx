@@ -119,6 +119,7 @@ function SettingsSections({
         selectedSiteId={controller.selectedSiteId ?? undefined}
         sites={controller.buildings}
         currentUserRole={controller.currentUserRole}
+        readOnly={controller.readOnly}
         onError={onError}
         onSuccess={controller.handleSuccess}
       />

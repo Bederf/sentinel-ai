@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import { Shield } from "lucide-react";
 import api from "@/lib/api";
-import { PasswordModal } from "../PasswordModal";
 import { ALL_PHASES, PHASE_COLORS, PHASE_DESCRIPTIONS, PHASE_LABELS, type OnboardingPhase } from "@/lib/onboardingPhase";
 
 interface SiteLike {
@@ -14,6 +13,7 @@ interface OnboardingPhaseSettingsProps {
   selectedSiteId?: string;
   sites: SiteLike[];
   currentUserRole: string;
+  readOnly?: boolean;
   onError?: (error: string) => void;
   onSuccess?: () => void;
 }
@@ -22,12 +22,11 @@ export function OnboardingPhaseSettings({
   selectedSiteId,
   sites,
   currentUserRole,
+  readOnly,
   onError,
   onSuccess,
 }: OnboardingPhaseSettingsProps) {
   const [updating, setUpdating] = useState(false);
-  const [showPinModal, setShowPinModal] = useState(false);
-  const [pendingPhase, setPendingPhase] = useState<OnboardingPhase | null>(null);
 
   const selectedSite = useMemo(
     () => sites.find((site) => site.id === selectedSiteId) ?? null,
@@ -36,33 +35,26 @@ export function OnboardingPhaseSettings({
   const currentPhase = (selectedSite?.onboarding_phase as OnboardingPhase) ?? "shadow";
   const isAdmin = currentUserRole === "admin";
 
-  const requestPhaseChange = (nextPhase: OnboardingPhase) => {
+  const handlePhaseChange = async (nextPhase: OnboardingPhase) => {
     if (!selectedSiteId) {
       onError?.("Select a site before changing onboarding phase.");
       return;
     }
-    if (!isAdmin) {
+    if (!isAdmin || readOnly) {
       onError?.("Only admins can change onboarding phase.");
       return;
     }
     if (nextPhase === currentPhase) {
       return;
     }
-    setPendingPhase(nextPhase);
-    setShowPinModal(true);
-  };
-
-  const confirmPhaseChange = async () => {
-    if (!selectedSiteId || !pendingPhase) return;
     setUpdating(true);
     try {
-      await api.updateSitePhase(selectedSiteId, pendingPhase);
+      await api.updateSitePhase(selectedSiteId, nextPhase);
       onSuccess?.();
     } catch (error) {
       onError?.(error instanceof Error ? error.message : "Failed to update onboarding phase.");
     } finally {
       setUpdating(false);
-      setPendingPhase(null);
     }
   };
 
@@ -76,10 +68,10 @@ export function OnboardingPhaseSettings({
             </div>
             <div>
               <h2 className="text-lg font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>
-                Site Onboarding Phase
+                Site Mode
               </h2>
               <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                Admin-only, site-gated phase control (requires admin PIN).
+                Admin-only, site-gated phase control.
               </p>
             </div>
           </div>
@@ -109,12 +101,12 @@ export function OnboardingPhaseSettings({
 
           <div>
             <label className="block text-sm font-medium mb-2" style={{ color: "var(--color-sentinel-text-primary)" }}>
-              Onboarding Phase
+              Site Mode
             </label>
             <select
               value={currentPhase}
-              disabled={updating || !isAdmin || !selectedSiteId}
-              onChange={(e) => requestPhaseChange(e.target.value as OnboardingPhase)}
+              disabled={updating || !isAdmin || readOnly || !selectedSiteId}
+              onChange={(e) => void handlePhaseChange(e.target.value as OnboardingPhase)}
               className="w-full md:w-64 rounded-md appearance-none cursor-pointer pl-3 pr-3 py-2.5 text-sm transition-colors focus:outline-none focus:ring-0"
               style={{
                 background: "var(--color-grafana-bg-secondary)",
@@ -134,20 +126,6 @@ export function OnboardingPhaseSettings({
           </div>
         </div>
       </div>
-
-      <PasswordModal
-        isOpen={showPinModal}
-        onClose={() => {
-          setShowPinModal(false);
-          setPendingPhase(null);
-        }}
-        onSuccess={() => {
-          setShowPinModal(false);
-          void confirmPhaseChange();
-        }}
-        title="Confirm Onboarding Phase Change"
-        description="Admin PIN required. This changes the selected site's SENTINEL onboarding phase."
-      />
     </>
   );
 }
