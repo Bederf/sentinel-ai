@@ -24,13 +24,10 @@ function SettingsTitleBlock({ selectedSiteId }: { selectedSiteId: string | null 
 }
 
 function SettingsUnlockButton({
-  currentUserRole,
   setSettingsPageUnlocked,
   setShowPasswordModal,
   settingsPageUnlocked,
-}: Pick<ReturnType<typeof useSettingsController>, "currentUserRole" | "setSettingsPageUnlocked" | "setShowPasswordModal" | "settingsPageUnlocked">) {
-  if (currentUserRole === "admin") return null;
-
+}: Pick<ReturnType<typeof useSettingsController>, "setSettingsPageUnlocked" | "setShowPasswordModal" | "settingsPageUnlocked">) {
   return (
     <button
       onClick={() => {
@@ -87,7 +84,6 @@ export function SettingsHeader({
       <div className="flex items-center justify-between gap-3 mb-2">
         <SettingsTitleBlock selectedSiteId={controller.selectedSiteId} />
         <SettingsUnlockButton
-          currentUserRole={controller.currentUserRole}
           setSettingsPageUnlocked={controller.setSettingsPageUnlocked}
           setShowPasswordModal={controller.setShowPasswordModal}
           settingsPageUnlocked={controller.settingsPageUnlocked}

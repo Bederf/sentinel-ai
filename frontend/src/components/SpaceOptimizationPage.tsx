@@ -301,10 +301,10 @@ export function SpaceOptimizationPage({ siteId: propSiteId }: { siteId?: string 
 
   const tabs: { id: TabId; label: string; count?: number }[] = [
     { id: "intelligence", label: "Meeting Room Intelligence" },
-    { id: "block", label: "Block Bookings", count: openBlockAlerts },
-    { id: "ghost", label: "Ghost Rooms", count: openGhostFindings },
-    { id: "rightsizing", label: "Right-Sizing", count: openRightsizing },
-    { id: "focus", label: "Focus Rooms", count: activeFocusSessions },
+    { id: "block", label: "Block Bookings" },
+    { id: "ghost", label: "Ghost Rooms" },
+    { id: "rightsizing", label: "Right-Sizing" },
+    { id: "focus", label: "Focus Rooms" },
     { id: "trends", label: "Occupancy Trends" },
   ];
 
@@ -561,7 +561,7 @@ function GhostRoomsPanel({
               <div className="flex-1 min-w-0 space-y-3">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-sm font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>
-                    {finding.room_code}
+                    {shortRoom(finding.room_code)}
                   </span>
                   <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: statusMeta.bg, color: statusMeta.color }}>
                     {statusMeta.label}
@@ -887,7 +887,7 @@ function BlockBookingsPanel({
                       {booking.ingested_at && (
                         <>
                           <span style={{ color: "var(--color-sentinel-text-secondary)" }}>Ingested</span>
-                          <span style={{ color: "var(--color-sentinel-text-primary)" }}>{new Date(booking.ingested_at).toLocaleString()}</span>
+                          <span style={{ color: "var(--color-sentinel-text-primary)" }}>{formatDateTime(booking.ingested_at)}</span>
                         </>
                       )}
                     </div>
@@ -1050,7 +1050,7 @@ function FocusRoomsPanel({
                 return (
                   <div key={room} className="flex items-center gap-3">
                     <span className="text-xs w-28 truncate" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                      {room}
+                      {shortRoom(room)}
                     </span>
                     <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.06)" }}>
                       <div className="h-full rounded-full" style={{ width: `${pct}%`, background: "#0d9488" }} />
@@ -1129,7 +1129,7 @@ function SessionCard({ session }: { session: FocusSession }) {
       </div>
       <div className="flex-1 min-w-0">
         <span className="text-sm font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>
-          {session.room_code}
+          {shortRoom(session.room_code)}
         </span>
         <div className="flex items-center gap-2">
           <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
@@ -1302,10 +1302,12 @@ function transformHourlyTrendData(data: unknown): HourlyTrend[] {
   return trends;
 }
 
+const JHB = "Africa/Johannesburg";
+
 function formatTime(iso: string): string {
   try {
     const d = new Date(iso);
-    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    return d.toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit", timeZone: JHB });
   } catch {
     return iso;
   }
@@ -1314,7 +1316,7 @@ function formatTime(iso: string): string {
 function formatDay(iso: string): string {
   try {
     const d = new Date(iso);
-    return d.toLocaleDateString([], { weekday: "short", day: "2-digit", month: "short" });
+    return d.toLocaleDateString("en-ZA", { weekday: "short", day: "2-digit", month: "short", timeZone: JHB });
   } catch {
     return iso;
   }
@@ -1323,16 +1325,23 @@ function formatDay(iso: string): string {
 function formatDateTime(iso: string): string {
   try {
     const d = new Date(iso);
-    return d.toLocaleString([], {
+    return d.toLocaleString("en-ZA", {
       year: "numeric",
       month: "short",
       day: "2-digit",
       hour: "2-digit",
       minute: "2-digit",
+      timeZone: JHB,
     });
   } catch {
     return iso;
   }
+}
+
+function shortRoom(code: string): string {
+  // Strip prefix pattern to get short form: L0-MR01 → MR01, FA2-1Q4-FR25 → FR25
+  const parts = code.split("-");
+  return parts[parts.length - 1];
 }
 
 function timeAgo(iso: string): string {
