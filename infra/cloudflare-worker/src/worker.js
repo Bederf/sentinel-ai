@@ -23,6 +23,9 @@ const MINIMAL_SECURITY_HEADERS = {
 // SECURITY: Allowed CORS origins - must match backend configuration
 const ALLOWED_ORIGINS = [
   "https://sentinel-ai.co.za",
+  "https://app.sentinel-ai.co.za",
+  "https://api.sentinel-ai.co.za",
+  "https://bms.sentinel-ai.co.za",
   "https://app.aimthelaw.co.za",
   "https://api.aimthelaw.co.za",
   "http://localhost:5173",
@@ -139,9 +142,11 @@ async function handleOrigin(request) {
 
   // Route based on hostname: SENTINEL BMS backend vs AimTheLaw backend
   if (inUrl.hostname === "api.sentinel-ai.co.za") {
-    // SENTINEL BMS — route directly to local VPS backend (port 9095)
-    outUrl.hostname = "144.91.122.235";
+    // SENTINEL BMS — route via tunnel hostname to backend port 9095
+    // (Workers can't fetch bare IPs, so use the cloudflared tunnel hostname)
+    outUrl.hostname = "bms.sentinel-ai.co.za";
     outUrl.port = "9095";
+    outUrl.protocol = "https";
   } else {
     // AimTheLaw — route to appropriate backend
     outUrl.hostname = inUrl.pathname.startsWith("/api")
