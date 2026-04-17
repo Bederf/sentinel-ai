@@ -243,12 +243,17 @@ jobs:
           retention-days: 90
 
   # ===========================================================================
-  # Job 4: Container Image Scanning (Trivy)
+  # Job 4: Container Image Scanning (Trivy) — DISABLED
   # ===========================================================================
+  # Skipped: requires ~2GB disk for Docker image pull on GitHub runners,
+  # which routinely fails with "no space left on device". Re-enable if you
+  # have a self-hosted runner or increased storage.
   container-scan:
     name: Container Scan (Trivy)
     runs-on: ubuntu-latest
-
+    # ── DISABLE TRIVY ──────────────────────────────────────────────────────
+    if: false
+    # ──────────────────────────────────────────────────────────────────────
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
