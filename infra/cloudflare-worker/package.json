@@ -1,0 +1,33 @@
+{
+  "name": "aimthelaw-minimal-worker",
+  "version": "1.0.0",
+  "description": "Minimal performance enhancement for AimTheLaw - Zero-risk edge caching",
+  "main": "src/minimal-worker.ts",
+  "scripts": {
+    "dev": "wrangler dev --env dev",
+    "deploy:staging": "wrangler deploy --env staging",
+    "deploy:production": "wrangler deploy --env production",
+    "tail:staging": "wrangler tail --env staging",
+    "tail:production": "wrangler tail --env production",
+    "validate": "wrangler validate",
+    "test": "echo 'Testing staging deployment' && curl -I https://staging-api.aimthelaw.co.za/health"
+  },
+  "keywords": [
+    "cloudflare",
+    "worker",
+    "legal-tech",
+    "edge-caching",
+    "minimal",
+    "non-breaking"
+  ],
+  "author": "AimTheLaw Development Team",
+  "license": "MIT",
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250927.0",
+    "typescript": "^5.9.2",
+    "wrangler": "^4.55.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
