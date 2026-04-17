@@ -20,50 +20,51 @@ export function useHoldToConfirm(
     if (!el) return
     confirmedRef.current = false
 
+    // Kill any previous timeline and reset position
     tlRef.current?.kill()
+    gsap.set(el, { scaleX: 0, backgroundColor: '#f59e0b', transformOrigin: 'left center' })
 
-    const totalDuration = HOLD_DURATIONS[mode]
-    const halfDuration = totalDuration / 2
+    const duration = HOLD_DURATIONS[mode]
 
-    gsap.set(el, { scaleX: 0, transformOrigin: 'left center' })
+    tlRef.current = gsap.timeline()
 
-    const tl = gsap.timeline()
-
-    // Fill from 0 → 1 over full duration
-    tl.to(el, {
+    // Phase 1: linear fill across full duration
+    tlRef.current.to(el, {
       scaleX: 1,
-      duration: totalDuration,
+      duration,
       ease: 'none',
+      transformOrigin: 'left center',
     })
 
-    // At 50%: transition fill color to orange
-    tl.to(el, { backgroundColor: '#f97316', duration: halfDuration, ease: 'none' }, 0)
+    // Phase 2: color shift to orange at 50% progress
+    tlRef.current.to(
+      el,
+      { backgroundColor: '#f97316', duration: duration * 0.3, ease: 'none' },
+      duration * 0.35, // start slightly before 50%
+    )
 
-    // At onComplete: red flash → green → call onConfirm
-    tl.call(() => {
-      gsap.set(el, { backgroundColor: '#ef4444' })
+    // Phase 3: on complete — red flash → green → confirm
+    tlRef.current.call(() => {
+      if (!progressRef.current) return
+      gsap.timeline()
+        .to(progressRef.current, { backgroundColor: '#ef4444', duration: 0.12, ease: 'none' })
+        .to(progressRef.current, { backgroundColor: '#10b981', duration: 0.2, ease: 'power1.out' })
+        .call(() => {
+          confirmedRef.current = true
+          onConfirm()
+        })
     })
-    tl.call(() => {
-      gsap.delayedCall(0.12, () => {
-        gsap.set(el, { backgroundColor: '#10b981' })
-      })
-    })
-    tl.call(() => {
-      confirmedRef.current = true
-      onConfirm()
-    })
-
-    tlRef.current = tl
-  }, [mode, onConfirm, progressRef])
+  }, [progressRef, onConfirm, mode])
 
   const onPressEnd = useCallback(() => {
-    if (confirmedRef.current) return
+    if (confirmedRef.current) return // already confirmed — don't cancel
     tlRef.current?.kill()
 
-    const el = progressRef.current
-    if (el) {
-      gsap.to(el, {
+    // Snap back — decisive cancel with physical feel
+    if (progressRef.current) {
+      gsap.to(progressRef.current, {
         scaleX: 0,
+        backgroundColor: '#f59e0b', // reset to amber
         duration: 0.32,
         ease: 'back.out(1.4)',
         transformOrigin: 'left center',
@@ -74,36 +75,47 @@ export function useHoldToConfirm(
   return { onPressStart, onPressEnd }
 }
 
-// SupervisedConfirmBar — drop-in replacement for the plain text supervised bar in CockpitView.tsx
-// Usage: <SupervisedConfirmBar onConfirm={handleConfirm} mode="supervised" />
-
 interface SupervisedConfirmBarProps {
   onConfirm: () => void
-  mode: 'advisory' | 'supervised'
+  mode?: 'advisory' | 'supervised'
 }
 
-export function SupervisedConfirmBar({ onConfirm, mode }: SupervisedConfirmBarProps) {
+export function SupervisedConfirmBar({ onConfirm, mode = 'advisory' }: SupervisedConfirmBarProps) {
   const progressRef = useRef<HTMLDivElement | null>(null)
   const { onPressStart, onPressEnd } = useHoldToConfirm(progressRef, onConfirm, mode)
 
-  const ariaLabel = mode === 'supervised'
+  const label = mode === 'supervised'
     ? 'Hold to approve SENTINEL action'
     : 'Hold to confirm'
 
+  const borderColor = mode === 'supervised'
+    ? 'border-amber-500/40'
+    : 'border-amber-500/30'
+
+  const bgColor = mode === 'supervised'
+    ? 'bg-amber-500/15'
+    : 'bg-amber-500/10'
+
   return (
     <div
-      className="mt-4 cursor-pointer select-none rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-4"
+      className={`mt-4 cursor-pointer select-none rounded-2xl border ${borderColor} ${bgColor} px-4 py-4`}
       onPointerDown={onPressStart}
       onPointerUp={onPressEnd}
       onPointerLeave={onPressEnd}
       role="button"
-      aria-label={ariaLabel}
+      aria-label={label}
     >
-      <div className="text-sm font-semibold text-amber-200">Hold to confirm</div>
+      <div className="text-sm font-semibold text-amber-200">{label}</div>
+      {mode === 'supervised' && (
+        <div className="mt-1 text-[11px] text-amber-400/70">
+          {HOLD_DURATIONS.supervised}s hold — SENTINEL will execute on release
+        </div>
+      )}
       <div className="mt-3 h-[3px] overflow-hidden rounded-full bg-amber-500/20">
         <div
           ref={progressRef}
           className="h-full rounded-full"
+          // GSAP owns fill color — no Tailwind bg class here
           style={{ transform: 'scaleX(0)', transformOrigin: 'left center', backgroundColor: '#f59e0b' }}
         />
       </div>

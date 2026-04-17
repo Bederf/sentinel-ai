@@ -17,7 +17,13 @@ export function useToneTransition(
     const color = TONE_COLORS[tone] ?? TONE_COLORS.normal
     const isEscalating = tone === 'warning' || tone === 'elevated' || tone === 'critical'
 
-    if (!metricRef.current && !badgeRef.current) return
+    // Kill any in-flight tweens on both targets before starting — prevents bleed-through
+    // on rapid state changes (e.g. warning → critical within a single poll cycle)
+    if (metricRef.current) gsap.killTweensOf(metricRef.current)
+    if (badgeRef.current) gsap.killTweensOf(badgeRef.current)
+
+    const targets = [metricRef.current, badgeRef.current].filter(Boolean)
+    if (!targets.length) return
 
     if (motionReduced()) {
       if (metricRef.current) gsap.set(metricRef.current, { color })
@@ -25,23 +31,35 @@ export function useToneTransition(
       return
     }
 
-    // Kill previous tweens to prevent bleed-through on rapid state changes
-    if (metricRef.current) gsap.killTweensOf(metricRef.current)
-    if (badgeRef.current) gsap.killTweensOf(badgeRef.current)
-
     const tl = gsap.timeline()
 
-    if (isEscalating && metricRef.current) {
-      // Scale pulse gives physical weight to escalation — scale 1 → 1.04 → 1
-      tl.to(metricRef.current, { scale: 1.04, duration: 0.38, ease: 'back.out(1.7)' }, 0)
-      tl.to(metricRef.current, { scale: 1, duration: 0.38, ease: 'back.out(1.7)' }, 0.38)
-    }
+    // Color transition on both refs
+    tl.to(targets, {
+      color,
+      duration: isEscalating ? 0.28 : 0.48,
+      ease: isEscalating ? 'power2.in' : 'power1.out',
+    })
 
-    // Color transition runs in parallel with scale pulse
-    tl.to(
-      [metricRef.current, badgeRef.current].filter(Boolean),
-      { color, duration: isEscalating ? 0.28 : 0.48, ease: isEscalating ? 'power2.in' : 'power1.out' },
-      0,
-    )
+    // Scale pulse on metricRef only — escalation adds physical weight
+    if (isEscalating && metricRef.current) {
+      tl.to(
+        metricRef.current,
+        {
+          scaleX: 1.04,
+          scaleY: 1.04,
+          duration: 0.19,
+          ease: 'power2.out',
+        },
+        0, // run in parallel with color tween
+      ).to(
+        metricRef.current,
+        {
+          scaleX: 1,
+          scaleY: 1,
+          duration: 0.19,
+          ease: 'back.out(1.7)',
+        },
+      )
+    }
   }, [tone, metricRef, badgeRef])
 }
