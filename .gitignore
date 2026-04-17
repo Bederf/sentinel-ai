@@ -103,5 +103,8 @@ backend/uv.lock
 # AI usage log (runtime data, not source code)
 backend/app/data/ai_usage_log.json
 
+# Tests (runtime — not source code)
+tests/
+
 # Mode policy state (runtime, per-site)
 backend/app/data/policies/
