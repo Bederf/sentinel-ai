@@ -9,7 +9,7 @@ from fastapi import FastAPI
 from app.api import buildings, building_state, equipment, sensors, devices, devices_batch, device_init
 from app.api import lighting, lighting_discovery, equipment_discovery, equipment_metadata
 from app.api import generators, energy_centre, modules
-from app.api import fire, hvac
+from app.api import fire
 from app.api import niagara, niagara_bacnet, niagara_discovery
 from app.api import simbiot_capabilities
 from app.api import sites_3d, digital_twin
@@ -58,9 +58,6 @@ def register_site_routers(app: FastAPI) -> None:
     # Equipment discovery
     app.include_router(lighting_discovery.router, prefix="/api", tags=["lighting-discovery"])
     app.include_router(equipment_discovery.router, prefix="/api", tags=["equipment-discovery"])
-
-    # Building systems - HVAC
-    app.include_router(hvac.router, prefix="/api", tags=["hvac"])
 
     # Building systems - Lighting
     app.include_router(lighting.router, prefix="/api/lighting", tags=["lighting"])

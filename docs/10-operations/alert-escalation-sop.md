@@ -2,6 +2,35 @@
 title: "Alert Escalation SOP"
 ---
 
+```mermaid
+flowchart TD
+    A["🚨 Alert Fires<br/>Grafana"] --> B{Severity}
+    B -->|Critical| C["L1: Automated Response"]
+    B -->|Warning| D["L2: On-Call Engineer<br/>Telegram"]
+    B -->|Info| E["L3: Next Business Day"]
+
+    C --> C1["AEGIS double-flag<br/>blocks hardware writes"]
+    C --> C2["ML blocked →<br/>advisory mode active"]
+
+    D --> D1{"Resolved<br/>in 15min?"}
+    D1 -->|Yes| F["✅ Close"]
+    D1 -->|No| G["L3: Engineering Lead<br/>Telegram DM"]
+
+    G --> G1{"Resolved<br/>in 2-4h?"}
+    G1 -->|Yes| F
+    G1 -->|No| H["L4: Facilities + CTO<br/>Email + WhatsApp"]
+
+    E --> I["📋 Log and track<br/>next business day"]
+
+    style C fill:#8b0000,color:#fff
+    style C1 fill:#8b0000,color:#fff
+    style C2 fill:#8b0000,color:#fff
+    style D fill:#cc7700,color:#fff
+    style G fill:#cc7700,color:#fff
+    style H fill:#006644,color:#fff
+    style F fill:#006644,color:#fff
+```
+
 # Alert Escalation SOP
 
 ## Overview

@@ -16,6 +16,7 @@ SENTINEL BMS Intelligence operations runbooks, procedures, and references.
 | `sprint0-hardware-test-protocol.md` | Hardware test protocol for Sprint 0 |
 | `supabase-performance-runbook.md` | Supabase performance tuning |
 | `alert-escalation-sop.md` | Alert escalation procedures and on-call rotation |
+| `KNOWN_ISSUES.md` | Pre-existing known issues with tracking status |
 | `https-ssl-setup.md` | HTTPS/SSL setup for SENTINEL endpoints |
 
 ## Operations Notes

@@ -220,6 +220,7 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 - [Hybrid AI Router](08-ai-ml/hybrid-ai-routing.md) - Ollama/cloud routing with POPIA consent gating
 - **[RAG Integration Overview](08-ai-ml/rag-integration-overview.md)** - Vector database and semantic search (Phase 44-01)
 - **[Explainable AI](08-ai-ml/explainable-ai.md)** - XAI for ML predictions and maintenance recommendations (Phase 44-02)
+- **[LLM Judge Loop](08-ai-ml/llm-judge-loop.md)** - Interim LLM-as-judge evaluation service with APScheduler (Phase 189 G5)
 
 ### 🔧 Development
 - [Tool Use Best Practices](12-development/tool-use-best-practices.md) - Development workflow

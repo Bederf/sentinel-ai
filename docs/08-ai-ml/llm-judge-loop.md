@@ -1,3 +1,24 @@
+---
+title: "LLM Judge Loop"
+---
+
+```mermaid
+flowchart TD
+    A["⏰ APScheduler<br/>every 60 min"] --> B["LLMJudgeService.evaluate_recent()"]
+    B --> C["Sample recent AI recommendations"]
+    C --> D["ExplanationEvaluator.evaluate_explanation()"]
+    D --> E{"score >= threshold?"}
+    E -->|Yes| F["✅ Log INFO: scores"]
+    E -->|No| G["⚠️ Log WARN: low score"]
+    F --> H["📊 Emit sentinel_llm_judge_score gauge"]
+    G --> H
+    H --> I["[Future] Replace with<br/>iDNa AI Testing Framework<br/>when IDNA_TESTING_FRAMEWORK_URL set"]
+
+    style A fill:#1a1a2e,color:#fff
+    style I fill:#006644,color:#fff
+    style G fill:#8b0000,color:#fff
+```
+
 # LLM Judge Loop
 
 ## Status: INTERIM
