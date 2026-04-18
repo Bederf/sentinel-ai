@@ -57,6 +57,10 @@ groups:
         labels:
           alert_type: "brute_force"
           severity: "high"
+        contact_points:
+          - sentinel-ops-slack
+          - sentinel-ops-pagerduty
+          - sentinel-ops-email
 
       # ================================================================
       # Rule 2: Suspicious Path Patterns (SQLi / Path Traversal)
@@ -100,6 +104,9 @@ groups:
         labels:
           alert_type: "injection_attempt"
           severity: "high"
+        contact_points:
+          - sentinel-ops-slack
+          - sentinel-ops-email
 
       # ================================================================
       # Rule 3: Unusual API Activity (DDoS / Abuse Detection)
@@ -145,6 +152,9 @@ groups:
         labels:
           alert_type: "api_abuse"
           severity: "medium"
+        contact_points:
+          - sentinel-ops-slack
+          - sentinel-ops-email
 
       # ================================================================
       # Rule 4: After-Hours Admin Access
@@ -192,6 +202,9 @@ groups:
         labels:
           alert_type: "afterhours_access"
           severity: "medium"
+        contact_points:
+          - sentinel-ops-slack
+          - sentinel-ops-email
 
       # ================================================================
       # Rule 5: Error Spike (Application Health)
@@ -235,6 +248,10 @@ groups:
         labels:
           alert_type: "error_spike"
           severity: "high"
+        contact_points:
+          - sentinel-ops-slack
+          - sentinel-ops-pagerduty
+          - sentinel-ops-email
 
       # ================================================================
       # Rule 6: Audit Log Gap (Tamper Detection)
@@ -278,6 +295,10 @@ groups:
         labels:
           alert_type: "audit_gap"
           severity: "critical"
+        contact_points:
+          - sentinel-ops-slack
+          - sentinel-ops-pagerduty
+          - sentinel-ops-email
 
       # ================================================================
       # Rule 7: BOLA Site Probing (Repeated Cross-Tenant Access)
@@ -323,6 +344,9 @@ groups:
         labels:
           alert_type: "bola_site_probing"
           severity: "high"
+        contact_points:
+          - sentinel-ops-slack
+          - sentinel-ops-email
 
       # ================================================================
       # Rule 8: BOLA Equipment Enumeration
@@ -368,6 +392,9 @@ groups:
         labels:
           alert_type: "bola_equipment_enum"
           severity: "high"
+        contact_points:
+          - sentinel-ops-slack
+          - sentinel-ops-email
 
       # ================================================================
       # Rule 9: BOLA Critical Burst (Auto-Block Candidate)
@@ -413,3 +440,7 @@ groups:
         labels:
           alert_type: "bola_critical_burst"
           severity: "critical"
+        contact_points:
+          - sentinel-ops-slack
+          - sentinel-ops-pagerduty
+          - sentinel-ops-email
