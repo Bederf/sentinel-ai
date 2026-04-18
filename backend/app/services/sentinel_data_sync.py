@@ -104,7 +104,7 @@ class SentinelDataSync:
 
             integration_repo = IntegrationRepository()
             freshness_data = integration_repo.get_data_quality_metrics(site_id=self.site_id)
-            data_freshness_hours = freshness_data.get("data_freshness_hours", 9999)
+            data_freshness_hours = freshness_data.get("data_freshness_hours") or 9999
         except Exception as e:
             logger.warning(f"[ML FEEDER] Could not compute freshness — proceeding without gate: {e}")
             data_freshness_hours = 0.0  # Proceed if freshness check fails (fail-open)

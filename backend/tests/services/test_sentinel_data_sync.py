@@ -143,3 +143,27 @@ class TestFreshnessGate:
 
             # Should proceed with ingest despite error (fail-open)
             sync.ml_feeder.ingest.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_freshness_gate_blocks_none_freshness(self):
+        """None data_freshness_hours (key exists with null value) is treated as stale."""
+        from unittest.mock import MagicMock, patch
+
+        with patch("app.database.repositories.integration_repository.IntegrationRepository") as mock_repo_class:
+            mock_repo = MagicMock()
+            mock_repo.get_data_quality_metrics.return_value = {
+                "data_freshness_hours": None,  # Key exists but value is null
+                "freshness_score": 0,
+            }
+            mock_repo_class.return_value = mock_repo
+
+            sync = SentinelDataSync(site_id="S002")
+            sync.ml_feeder = MagicMock()
+
+            await sync.ingest_equipment_states(
+                equipment_states={"S002-FCU-001": {"health_score": 80.0}},
+                simulated_time=datetime.now(),
+            )
+
+            # None should be treated as 9999 (stale) — fail-safe
+            sync.ml_feeder.ingest.assert_not_called()
