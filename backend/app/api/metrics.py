@@ -338,6 +338,17 @@ sentinel_retrieval_fallbacks_total = Counter(
     registry=REGISTRY,
 )
 
+# ---------------------------------------------------------------------------
+# Phase 189 — LLM Judge Loop (INTERIM)
+# ---------------------------------------------------------------------------
+
+sentinel_llm_judge_score = Gauge(
+    "sentinel_llm_judge_score",
+    "LLM judge evaluation score for recent AI explanations (0-1, higher is better)",
+    ["score_type"],  # actionability, factuality, completeness, conciseness
+    registry=REGISTRY,
+)
+
 
 _site_name_cache: dict[str, str] = {}
 

@@ -592,6 +592,24 @@ class BackgroundSchedulerService:
                         try:
                             loop.run_until_complete(recommendation_repo.create(rec))
                             created_count += 1
+                            # Emit SSE toast event for new AI recommendation
+                            try:
+                                from app.services.event_emitter import get_event_emitter
+
+                                emitter = get_event_emitter()
+                                loop.run_until_complete(
+                                    emitter.emit_recommendation_created(
+                                        recommendation_id=rec.id,
+                                        site_id=rec.site_id,
+                                        action_type=rec.action_type,
+                                        reason=rec.reason or "",
+                                        confidence=rec.confidence or "medium",
+                                        risk_level=rec.risk_level.value if rec.risk_level else "medium",
+                                        target_equipment=rec.target_equipment,
+                                    )
+                                )
+                            except Exception as emit_err:
+                                logger.warning(f"Failed to emit recommendation_created SSE event: {emit_err}")
                         except Exception as e:
                             logger.warning(f"Failed to persist recommendation for {equipment_id}: {e}")
                             error_count += 1
@@ -782,6 +800,24 @@ class BackgroundSchedulerService:
                         logger.warning(
                             f"[HEALTH-REC] {code}: health={health}% [{severity.upper()}] — recommendation created"
                         )
+                        # Emit SSE toast event for new health recommendation
+                        try:
+                            from app.services.event_emitter import get_event_emitter
+
+                            emitter = get_event_emitter()
+                            loop.run_until_complete(
+                                emitter.emit_recommendation_created(
+                                    recommendation_id=rec.id,
+                                    site_id=rec.site_id,
+                                    action_type=rec.action_type,
+                                    reason=rec.reason or "",
+                                    confidence=rec.confidence or "medium",
+                                    risk_level=rec.risk_level.value if rec.risk_level else "medium",
+                                    target_equipment=rec.target_equipment,
+                                )
+                            )
+                        except Exception as emit_err:
+                            logger.warning(f"Failed to emit recommendation_created SSE event: {emit_err}")
                     except Exception as e:
                         logger.warning(f"[HEALTH-REC] Failed to persist for {code}: {e}")
                     finally:
@@ -3154,6 +3190,58 @@ class BackgroundSchedulerService:
             usage_tracker.send_daily_report_email("info@sentinel-ai.co.za")
         except Exception as e:
             logger.error("AI cost report email failed: %s", e, exc_info=True)
+
+    # ------------------------------------------------------------------
+    # Phase 189 — LLM Judge Loop (INTERIM)
+    # ------------------------------------------------------------------
+
+    def add_llm_judge_job(self):
+        """Add LLM judge evaluation job. Runs every 60 minutes.
+
+        INTERIM: Replace with iDNa AI Testing Framework call when endpoint is available.
+        See docs/08-ai-ml/llm-judge-loop.md
+        """
+        from apscheduler.triggers.cron import CronTrigger
+
+        if self.scheduler.get_job("llm_judge_evaluation"):
+            self.scheduler.remove_job("llm_judge_evaluation")
+            logger.info("Removed existing llm judge evaluation job")
+
+        self.scheduler.add_job(
+            func=self._run_llm_judge_evaluation,
+            trigger=CronTrigger(minute=0),  # top of every hour
+            id="llm_judge_evaluation",
+            name="LLM Judge Evaluation",
+            replace_existing=True,
+        )
+        logger.info("Added LLM judge evaluation job (top of every hour)")
+
+    def _run_llm_judge_evaluation(self):
+        """Run LLM judge evaluation and emit Prometheus gauge."""
+        try:
+            import asyncio
+
+            from ml.explanations.evaluation import LLMJudgeService
+            from app.api.metrics import sentinel_llm_judge_score
+
+            service = LLMJudgeService(sample_size=10)
+            loop = asyncio.get_event_loop()
+            result = loop.run_until_complete(service.evaluate_recent())
+
+            if result is not None:
+                sentinel_llm_judge_score.labels(score_type="actionability").set(result.actionability_score or 0.0)
+                sentinel_llm_judge_score.labels(score_type="factuality").set(result.factuality_score or 0.0)
+                sentinel_llm_judge_score.labels(score_type="completeness").set(result.completeness_score or 0.0)
+                sentinel_llm_judge_score.labels(score_type="conciseness").set(result.conciseness_score or 0.0)
+                logger.info(
+                    "[LLM JUDGE] actionability=%.3f factuality=%.3f completeness=%.3f conciseness=%.3f",
+                    result.actionability_score or 0.0,
+                    result.factuality_score or 0.0,
+                    result.completeness_score or 0.0,
+                    result.conciseness_score or 0.0,
+                )
+        except Exception as e:
+            logger.error("[LLM JUDGE] Evaluation failed: %s", e, exc_info=True)
 
     # ------------------------------------------------------------------
     # Outlook calendar polling (Phase 176)

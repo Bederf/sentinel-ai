@@ -432,6 +432,70 @@ Why did you prefer one explanation over the other?
 """
 
 
+class LLMJudgeService:
+    """Periodic evaluation of recent AI explanation quality.
+
+    Samples recent recommendations, evaluates each explanation via
+    ExplanationEvaluator.evaluate_explanation(), emits Prometheus gauge.
+
+    INTERIM: Replace when iDNa AI Testing Framework endpoint is available.
+    See docs/08-ai-ml/llm-judge-loop.md for replacement trigger.
+    """
+
+    def __init__(self, sample_size: int = 10):
+        self.sample_size = sample_size
+        self._evaluator = ExplanationEvaluator()
+
+    async def evaluate_recent(self) -> Optional[ExplanationMetrics]:
+        """Fetch recent recommendations and evaluate their explanations.
+
+        Returns ExplanationMetrics for the batch, or None if no recent
+        recommendations available.
+        """
+        from app.database.repositories.recommendation_repository import (
+            RecommendationRepository,
+        )
+
+        repo = RecommendationRepository()
+        recent = await repo.get_history(
+            site_id="site-002",
+            limit=self.sample_size,
+        )
+
+        if not recent:
+            return None
+
+        results = []
+        for rec in recent:
+            if rec.explanation:
+                metrics = self._evaluator.evaluate_explanation(
+                    predicted_explanation=rec.explanation,
+                    reference_explanation=None,  # judge against baseline criteria
+                    generated_actions=rec.recommended_actions,
+                    context_documents=None,
+                )
+                results.append(metrics)
+
+        if not results:
+            return None
+
+        # Aggregate batch metrics (average)
+        avg = ExplanationMetrics(
+            actionability_score=_avg_field(results, "actionability_score"),
+            factuality_score=_avg_field(results, "factuality_score"),
+            completeness_score=_avg_field(results, "completeness_score"),
+            conciseness_score=_avg_field(results, "conciseness_score"),
+            hallucination_detected=False,  # not directly detectable in this pattern
+        )
+        return avg
+
+
+def _avg_field(results: List[ExplanationMetrics], field_name: str) -> Optional[float]:
+    """Average a numeric field across results, skipping None."""
+    values = [getattr(r, field_name) for r in results if getattr(r, field_name) is not None]
+    return sum(values) / len(values) if values else None
+
+
 def format_evaluation_results(results: List[ExplanationMetrics]) -> Dict[str, float]:
     """Format evaluation results as averages."""
     if not results:

@@ -506,6 +506,13 @@ async def startup_event(app: FastAPI) -> None:
     except Exception as e:
         _logger.warning(f"⚠️ AI cost report job initialization failed: {e}")
 
+    # LLM Judge evaluation (every 60 min, INTERIM — replace with iDNa AI Testing Framework)
+    try:
+        scheduler_service.add_llm_judge_job()
+        _logger.info("✅ LLM judge evaluation job initialized (top of every hour)")
+    except Exception as e:
+        _logger.warning(f"⚠️ LLM judge job initialization failed: {e}")
+
     # Ensure all sites have the 15 mandatory base modules (Phase 142)
     try:
         from app.services.module_registry_service import module_registry as _mod_registry
@@ -840,11 +847,11 @@ async def startup_event(app: FastAPI) -> None:
         else:
             _logger.info("Site 002 data source disabled — simulation engine inactive")
 
-    # Shadow mode bridge polling — runs when simulation engine is disabled.
+    # Shadow mode bridge polling — runs whenever edge mode is disabled.
     # Polls the live bridge (10.99.0.1:8080) every 5 minutes and feeds data to
     # SentinelMLFeeder so ML models stay current with real site telemetry.
-    _logger.warning("SHADOW_DEBUG: reached shadow mode section")
-    if not settings.site002_source_enabled and not settings.edge_mode:
+    # ML training runs in ALL modes (shadow, advisory, supervised, auto) continuously.
+    if not settings.edge_mode:
         _logger.warning("SHADOW_MODE_DEBUG: condition TRUE, about to add shadow mode job")
         try:
             scheduler_service.add_shadow_mode_polling_job(interval_seconds=300, site_id="site-002")
