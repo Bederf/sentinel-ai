@@ -590,6 +590,113 @@ def _esc_html(text: str) -> str:
     return str(text).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
 
 
+# ---------------------------------------------------------------------------
+# EmailIntakeResult — simplified result for IMAP poller (Phase 189)
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class EmailIntakeResult:
+    """Structured result from the email intake poller (Phase 189).
+
+    A simplified view of EmailIntakeAgent.AgentResult, suitable for
+    persisting via the email_intakes repository.
+    """
+
+    message_id: str
+    subject: str
+    from_name: str | None
+    from_email: str
+    body_plain: str
+    discipline: str = "General"
+    sub_category: str = "Unclassified"
+    specialty: str = "general"
+    priority: str = "medium"
+    location_desk: str | None = None
+    location_floor: str | None = None
+    location_area: str | None = None
+    phone: str | None = None
+    issue_summary: str = ""
+    completeness: float = 0.0
+    action: str = "manual_review"
+    reply_text: str = ""
+    agent_model: str = "keyword_fallback"
+    agent_latency_ms: int = 0
+
+
+def process_email(raw: dict[str, Any]) -> EmailIntakeResult | None:
+    """Synchronous wrapper — parses a raw IMAP email dict via EmailIntakeAgent.
+
+    Used by EmailIntakeService (APScheduler sync job).
+
+    Args:
+        raw: dict with keys: message_id, subject, from, body, date_str
+
+    Returns:
+        EmailIntakeResult or None if parsing fails.
+    """
+    try:
+        # Extract sender name and email from "Name <email>" format
+        from_raw = raw.get("from", "")
+        from_name: str | None = None
+        from_email = from_raw
+
+        if "<" in from_raw and ">" in from_raw:
+            name_part, email_part = from_raw.rsplit("<", 1)
+            from_email = email_part.strip("<> ").lower()
+            from_name = name_part.strip() or None
+
+        # Build a simplified result from the raw email
+        result = EmailIntakeResult(
+            message_id=raw.get("message_id", ""),
+            subject=raw.get("subject", "(no subject)"),
+            from_name=from_name,
+            from_email=from_email,
+            body_plain=raw.get("body", ""),
+        )
+
+        # Attempt LLM classification asynchronously via the existing agent
+        try:
+            agent = get_email_intake_agent()
+            # Run async agent in sync context (APScheduler jobs are sync)
+            import asyncio
+
+            agent_result = asyncio.run(
+                agent.classify_and_reply(
+                    from_name=from_name,
+                    from_email=from_email,
+                    subject=raw.get("subject", "(no subject)"),
+                    body_plain=raw.get("body", ""),
+                    site_id=None,  # site resolver will enrich later
+                    bms_context=None,
+                ),
+            )
+            # Copy LLM fields onto EmailIntakeResult
+            result.discipline = agent_result.discipline
+            result.sub_category = agent_result.sub_category
+            result.specialty = agent_result.specialty
+            result.priority = agent_result.priority
+            result.location_desk = agent_result.location_desk
+            result.location_floor = agent_result.location_floor
+            result.location_area = agent_result.location_area
+            result.phone = agent_result.phone
+            result.issue_summary = agent_result.issue_summary
+            result.completeness = agent_result.completeness
+            result.action = agent_result.action
+            result.reply_text = agent_result.reply_text
+            result.agent_model = agent_result.agent_model
+            result.agent_latency_ms = agent_result.agent_latency_ms
+        except Exception as exc:
+            # Non-fatal: log and return the raw result (keyword fallback path)
+            logger.warning("[EmailIntake] LLM classification failed for %s: %s", result.message_id, exc)
+
+        return result
+
+    except Exception as exc:
+        logger.error("[EmailIntake] process_email failed: %s", exc)
+        return None
+
+
 def _esc_jinja(s: str) -> str:
     """
     Escape Jinja2/template braces in user-supplied text to prevent

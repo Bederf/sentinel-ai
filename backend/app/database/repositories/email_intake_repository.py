@@ -82,6 +82,79 @@ class EmailIntakeRepository:
                 logger.error("EmailIntakeRepository.get_by_message_id failed: %s", exc)
         return self._get_by_message_id_json(message_id)
 
+    # ------------------------------------------------------------------
+    # Upsert (for IMAP poller — Phase 189)
+    # ------------------------------------------------------------------
+
+    def upsert_email_intake(self, result: Any, msg_hash: str) -> dict[str, Any]:
+        """Insert or update an email intake record (IMAP poller path).
+
+        Args:
+            result: EmailIntakeResult from process_email()
+            msg_hash: SHA-256 hash of the Message-ID (deduplication key)
+        """
+        record: dict[str, Any] = {
+            "discipline": result.discipline,
+            "sub_category": result.sub_category,
+            "specialty": result.specialty,
+            "priority": result.priority,
+            "location_desk": result.location_desk,
+            "location_floor": result.location_floor,
+            "location_area": result.location_area,
+            "phone": result.phone,
+            "issue_summary": result.issue_summary,
+            "completeness": result.completeness,
+            "action": result.action,
+            "reply_text": result.reply_text,
+            "agent_model": result.agent_model,
+            "agent_latency_ms": result.agent_latency_ms,
+            "msg_hash": msg_hash,
+        }
+
+        # Try upsert via message_id hash first
+        if self.client:
+            try:
+                # Check if exists by hash
+                existing = (
+                    self.client.table("email_intakes").select("id, message_id").eq("msg_hash", msg_hash).execute()
+                )
+                if existing.data:
+                    # Update existing
+                    updates = {**record, "updated_at": datetime.utcnow().isoformat()}
+                    upd = self.client.table("email_intakes").update(updates).eq("id", existing.data[0]["id"]).execute()
+                    if upd.data:
+                        return upd.data[0]
+
+                # Insert new
+                record["message_id"] = result.message_id
+                record["from_email"] = result.from_email
+                record["from_name"] = result.from_name
+                record["subject"] = result.subject
+                record["body_text"] = result.body_plain
+                record["pipeline_status"] = "received"
+                ins = self.client.table("email_intakes").insert(record).execute()
+                if ins.data:
+                    return ins.data[0]
+            except Exception as exc:
+                logger.error("EmailIntakeRepository.upsert_email_intake failed: %s", exc)
+
+        # JSON fallback (no upsert — insert only, caller checks email_exists_hash first)
+        return self._create_json(record)
+
+    def email_exists_hash(self, msg_hash: str) -> bool:
+        """Check if email already processed (deduplication by msg_hash)."""
+        if self.client:
+            try:
+                result = self.client.table("email_intakes").select("id").eq("msg_hash", msg_hash).limit(1).execute()
+                return len(result.data) > 0
+            except Exception as exc:
+                logger.error("EmailIntakeRepository.email_exists_hash failed: %s", exc)
+        # JSON fallback
+        for r in self._load_json():
+            if r.get("msg_hash") == msg_hash:
+                return True
+        return False
+
     def get_latest_by_reference(self, reference: str) -> Optional[dict[str, Any]]:
         """Return latest intake row for an existing reference code."""
         if not reference:

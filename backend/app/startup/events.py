@@ -408,6 +408,15 @@ async def startup_event(app: FastAPI) -> None:
         scheduler_service.add_outlook_polling_job(interval_minutes=5)
         _logger.info("Outlook calendar polling job initialized (every 5 minutes)")
 
+    # Phase 189: Email intake IMAP polling (every 5 minutes)
+    # Warns at startup if IMAP is not configured (poller skips silently when unconfigured)
+    if not settings.intelligence_intake_imap_host:
+        _logger.warning("[EmailIntake] intelligence_intake_imap_host not set — email intake polling disabled")
+    else:
+        if hasattr(scheduler_service, "add_email_intake_poll_job"):
+            scheduler_service.add_email_intake_poll_job(interval_minutes=5)
+            _logger.info("Email intake IMAP polling job initialized (every 5 minutes)")
+
     # Phase 177: Graph webhook subscription renewal
     if hasattr(scheduler_service, "add_graph_subscription_renewal_job"):
         scheduler_service.add_graph_subscription_renewal_job(interval_hours=1)

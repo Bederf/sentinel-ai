@@ -3589,6 +3589,28 @@ class BackgroundSchedulerService:
         )
         logger.info("compiler_worker job registered — interval=%s min", interval_minutes)
 
+    def add_email_intake_poll_job(self, interval_minutes: int = 5) -> None:
+        """
+        Add periodic job to poll the intelligence intake IMAP mailbox.
+
+        Args:
+            interval_minutes: How often to poll (default: 5 minutes)
+        """
+        job_id = "email_intake_poll"
+        if self.scheduler.get_job(job_id):
+            self.scheduler.remove_job(job_id)
+
+        self.scheduler.add_job(
+            _run_email_intake_poll,
+            "interval",
+            minutes=interval_minutes,
+            id=job_id,
+            name="Email Intake IMAP Poller",
+            replace_existing=True,
+            max_instances=1,
+        )
+        logger.info("email_intake_poll job registered — interval=%s min", interval_minutes)
+
 
 # Sync wrapper — APScheduler passes sync functions to job executors
 def _run_compiler_worker_sync():
@@ -3605,6 +3627,24 @@ def _run_compiler_worker_sync():
     except Exception as exc:
         logger.critical("[CompilerWorker] sync runner failed: %s", exc, exc_info=True)
         raise  # re-raise so APScheduler marks job as failed
+
+
+def _run_email_intake_poll():
+    """Sync wrapper — runs the EmailIntakeService.poll() in a sync context."""
+    import logging
+
+    from app.services.email_intake_service import EmailIntakeService
+
+    logger = logging.getLogger(__name__)
+    try:
+        service = EmailIntakeService()
+        results = service.poll()
+        if results:
+            logger.info("[EmailIntake] Processed %d new email(s)", len(results))
+        else:
+            logger.debug("[EmailIntake] No new emails in this poll cycle")
+    except Exception as exc:
+        logger.error("[EmailIntake] poll runner failed: %s", exc, exc_info=True)
 
 
 # Global scheduler instance
