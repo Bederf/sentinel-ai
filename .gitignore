@@ -103,8 +103,9 @@ backend/uv.lock
 # AI usage log (runtime data, not source code)
 backend/app/data/ai_usage_log.json
 
-# Tests (runtime — not source code)
-tests/
+# Repo-root tests/ (non-BMS project files — not SENTINEL source)
+# Note: backend/tests/ is the SENTINEL test suite and must NOT be ignored
+/tests/
 
 # Mode policy state (runtime, per-site)
 backend/app/data/policies/
