@@ -10,6 +10,9 @@ MIN_ANOMALY_TRAINING_HOURS = 72  # ~3 days before Isolation Forest can train
 MIN_ENERGY_TRAINING_HOURS = 720  # ~30 days before energy baseline can train
 MIN_ANOMALY_SCORING_HOURS = 24  # Start scoring from 24h (sparse but valid)
 
+# ── Data freshness gate ───────────────────────────────────────────────────────
+DATA_FRESHNESS_MAX_HOURS = 24  # Reject telemetry older than 24h before ML inference
+
 # ── Trust weight scaling (for 08B — blended health score) ─────────────────────
 ML_TRUST_WEIGHT_MIN = 0.30  # ML contribution at 72h
 ML_TRUST_WEIGHT_MAX = 0.80  # ML contribution at 2000h+

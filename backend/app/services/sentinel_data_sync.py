@@ -21,9 +21,13 @@ from typing import Any
 from app.core.site_resolver import get_primary_site_code
 
 from app.services.ml_config import (
+    DATA_FRESHNESS_MAX_HOURS,
     MIN_LSTM_TRAINING_HOURS,
     get_ml_trust_weight,
 )
+
+from app.api.metrics import sentinel_data_freshness_violations_total
+from app.services.audit_logger import audit_structured_logger
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +64,7 @@ class SentinelDataSync:
         # ML feeder — accumulates sensor data and triggers training
         from app.services.sentinel_ml_feeder import SentinelMLFeeder
 
-        self.ml_feeder = SentinelMLFeeder()
+        self.ml_feeder = SentinelMLFeeder(site_id=self.site_id)
 
     async def ingest_equipment_states(
         self,
@@ -89,33 +93,77 @@ class SentinelDataSync:
 
         # ML pipeline first — score anomaly and LSTM before writing to Supabase.
         # This ensures operating_data includes the latest scores on the same poll cycle.
+        #
+        # ── Data freshness gate ────────────────────────────────────────────────
+        # Block stale telemetry from reaching ML inference to avoid polluting
+        # models with outdated baselines. Uses integration_repository which
+        # already computes data_freshness_hours from last_sync_at timestamps.
+        freshness_threshold = DATA_FRESHNESS_MAX_HOURS  # 24h
         try:
-            self.ml_feeder.ingest(equipment_states, simulated_time, data_source=data_source)
-            ml_results = self.ml_feeder.train_if_ready()
-            if ml_results:
-                successful = [r for r in ml_results if "error" not in r]
-                logger.info(f"[ML FEEDER] Trained {len(successful)} models from SENTINEL data")
-                results["ml_models_trained"] = len(successful)
-            results["ml_hours_ingested"] = self.ml_feeder.hours_ingested
+            from app.database.repositories.integration_repository import IntegrationRepository
 
-            # 1a. Compute IF anomaly scores and inject into equipment_states.
-            anomaly_scores = self.ml_feeder.score_anomaly()
-            if anomaly_scores:
-                for code, score in anomaly_scores.items():
-                    if code in equipment_states:
-                        equipment_states[code].setdefault("sensor_readings", {})["anomaly_score"] = score
-                results["anomaly_scores_written"] = len(anomaly_scores)
-
-            # 1b. Compute LSTM-derived anomaly scores (requires 500h minimum).
-            # Written as a separate key so both signals coexist.
-            lstm_scores = self.ml_feeder.score_lstm_anomaly()
-            if lstm_scores:
-                for code, score in lstm_scores.items():
-                    if code in equipment_states:
-                        equipment_states[code].setdefault("sensor_readings", {})["lstm_anomaly_score"] = score
-                results["lstm_anomaly_scores_written"] = len(lstm_scores)
+            integration_repo = IntegrationRepository()
+            freshness_data = integration_repo.get_data_quality_metrics(site_id=self.site_id)
+            data_freshness_hours = freshness_data.get("data_freshness_hours", 9999)
         except Exception as e:
-            results["errors"].append(f"ml_feeder: {e}")
+            logger.warning(f"[ML FEEDER] Could not compute freshness — proceeding without gate: {e}")
+            data_freshness_hours = 0.0  # Proceed if freshness check fails (fail-open)
+
+        if data_freshness_hours > freshness_threshold:
+            violation_msg = (
+                f"site_id={self.site_id} "
+                f"data_freshness_hours={data_freshness_hours:.1f} "
+                f"threshold_hours={freshness_threshold} "
+                f"skip_reason=stale_telemetry_blocked_before_ml_ingest"
+            )
+            logger.warning(f"[ML FEEDER] Freshness gate rejected: {violation_msg}")
+            audit_structured_logger.warning(
+                f"event=data_freshness_violation "
+                f"site_id={self.site_id} "
+                f"data_freshness_hours={data_freshness_hours:.1f} "
+                f"threshold_hours={freshness_threshold}"
+            )
+            sentinel_data_freshness_violations_total.labels(site_id=self.site_id).inc()
+            # Do NOT call ml_feeder.ingest() — data is too stale
+        else:
+            # Fresh — proceed with ML ingestion
+            try:
+                self.ml_feeder.ingest(equipment_states, simulated_time, data_source=data_source)
+                ml_results = self.ml_feeder.train_if_ready()
+                if ml_results:
+                    successful = [r for r in ml_results if "error" not in r]
+                    logger.info(f"[ML FEEDER] Trained {len(successful)} models from SENTINEL data")
+                    results["ml_models_trained"] = len(successful)
+                results["ml_hours_ingested"] = self.ml_feeder.hours_ingested
+
+                # 1a. Compute IF anomaly scores and inject into equipment_states.
+                anomaly_scores = self.ml_feeder.score_anomaly()
+                if anomaly_scores:
+                    for code, score in anomaly_scores.items():
+                        if code in equipment_states:
+                            equipment_states[code].setdefault("sensor_readings", {})["anomaly_score"] = score
+                    results["anomaly_scores_written"] = len(anomaly_scores)
+
+                # 1b. Compute LSTM-derived anomaly scores (requires 500h minimum).
+                # Written as a separate key so both signals coexist.
+                lstm_scores = self.ml_feeder.score_lstm_anomaly()
+                if lstm_scores:
+                    for code, score in lstm_scores.items():
+                        if code in equipment_states:
+                            equipment_states[code].setdefault("sensor_readings", {})["lstm_anomaly_score"] = score
+                    results["lstm_anomaly_scores_written"] = len(lstm_scores)
+
+                # 1c. Compute autoencoder-derived anomaly scores (if trained model available).
+                ae_scores = self.ml_feeder.score_autoencoder_anomaly()
+                if ae_scores:
+                    for code, score in ae_scores.items():
+                        if code in equipment_states:
+                            equipment_states[code].setdefault("sensor_readings", {})["autoencoder_anomaly_score"] = (
+                                score
+                            )
+                    results["autoencoder_scores_written"] = len(ae_scores)
+            except Exception as e:
+                results["errors"].append(f"ml_feeder: {e}")
 
         # 2. Batch update equipment in Supabase (with ML scores now injected)
         try:

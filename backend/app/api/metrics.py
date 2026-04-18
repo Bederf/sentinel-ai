@@ -12,19 +12,18 @@ from __future__ import annotations
 
 import ipaddress
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import PlainTextResponse
-
 from prometheus_client import (
+    CONTENT_TYPE_LATEST,
     CollectorRegistry,
     Counter,
     Gauge,
     Histogram,
     Info,
     generate_latest,
-    CONTENT_TYPE_LATEST,
 )
 
 from app.config.settings import settings
@@ -80,6 +79,14 @@ sentinel_safety_violations_total = Counter(
     "sentinel_safety_violations_total",
     "Total safety boundary violations by site and severity",
     labelnames=["site_id", "severity"],
+    registry=REGISTRY,
+)
+
+# 5b. Data freshness violations (Phase 188-01 — stale telemetry blocked before ML inference)
+sentinel_data_freshness_violations_total = Counter(
+    "sentinel_data_freshness_violations_total",
+    "Number of times stale telemetry was rejected before ML inference",
+    labelnames=["site_id"],
     registry=REGISTRY,
 )
 
@@ -486,7 +493,7 @@ def _collect_fm_metrics() -> None:
 # ---------------------------------------------------------------------------
 _MODE = os.getenv("SENTINEL_MODE", settings.resolved_ingestion_mode.value)
 _VERSION = os.getenv("APP_VERSION", settings.app_version)
-_BUILD_DATE = os.getenv("BUILD_DATE", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+_BUILD_DATE = os.getenv("BUILD_DATE", datetime.now(UTC).strftime("%Y-%m-%d"))
 
 sentinel_info.info(
     {
