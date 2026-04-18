@@ -27,7 +27,9 @@ Automated systems act without human intervention:
 
 ### Level 2 - On-Call Engineer (15 min - 2 hours)
 
-Notified via Slack `#sentinel-alerts` and PagerDuty:
+Notified via Telegram (primary, via Sentry gateway bot):
+
+*WhatsApp/Twilio — pending wiring (see contact_points.yaml).*
 
 | Alert | On-Call Action |
 |-------|----------------|
@@ -39,7 +41,7 @@ Notified via Slack `#sentinel-alerts` and PagerDuty:
 ### Level 3 - Engineering Lead (2-4 hours)
 
 If Level 2 unresolved:
-- PagerDuty escalates to Engineering Lead
+- Telegram message to Engineering Lead (direct bot DM or escalation group)
 - Engineering Lead assesses scope and coordinates fix
 
 ### Level 4 - Head of Facilities + CTO (4+ hours)
@@ -47,13 +49,15 @@ If Level 2 unresolved:
 Business impact:
 - Building systems operating in degraded mode
 - SENTINEL advisory only, no automated control
-- Notify building management of status
+- Notify building management via email (sentinel-email-exec) and direct WhatsApp
 
 ## On-Call Rotation
 
-On-call schedule managed in PagerDuty `sentinel-oncall` schedule.
+On-call schedule managed via the Sentry Telegram bot escalation group.
 
-Current rotation: See PagerDuty schedule.
+Current rotation: See Sentry configuration.
+
+*Note: PagerDuty and Slack are NOT used at FNB REMS. WhatsApp/Twilio is pending wiring.*
 
 ## Alert Reference
 
@@ -73,16 +77,22 @@ Alert status: https://grafana.internal/d/sentinel-alerts
 
 | Role | Name | Contact |
 |------|------|---------|
-| On-Call Engineer | PagerDuty rotation | See PagerDuty |
-| Engineering Lead | | |
-| Facilities Manager | | |
+| On-Call Engineer | Sentry Telegram bot | Via `sentinel-telegram` contact point |
+| Engineering Lead | | Telegram DM |
+| Facilities Manager | | WhatsApp (pending) |
+| Executive Stakeholders | | Email via `sentinel-email-exec` |
 
 ## Grafana Contact Points
 
 Alert routing configured in `infrastructure/grafana/provisioning/alerting/contact_points.yaml`:
-- **Slack**: `#sentinel-alerts` via `sentinel-ops-slack`
-- **PagerDuty**: `sentinel-ops-pagerduty` (auto-escalates)
-- **Email**: `sentinel-ops-email` for audit trail
+
+| Contact Point | Type | Status |
+|---------------|------|--------|
+| `sentinel-telegram` | Telegram (Sentry gateway bot) | **ACTIVE** — primary |
+| `sentinel-whatsapp` | WhatsApp/Twilio | **PENDING** — not wired |
+| `sentinel-email-exec` | Email | **ACTIVE** — executive stakeholders |
+
+*Slack and PagerDuty are NOT used at FNB REMS — see contact_points.yaml for commented-out entries.*
 
 ## Document History
 

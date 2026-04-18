@@ -1,33 +1,66 @@
 # Grafana Contact Points — Phase 189 G8
 # Defines where alert notifications are sent based on severity
+#
+# ACTUAL STACK (FNB REMS):
+#   - Telegram: primary — via Sentry gateway bot
+#   - WhatsApp/Twilio: pending — not yet wired
+#   - Email: executive stakeholders only
+#
+# PLACEHOLDER ALERT: Slack and PagerDuty are NOT used at FNB REMS.
+# Remove these entries once the actual stack is confirmed.
 
 apiVersion: 1
 
 contactPoints:
-  - name: sentinel-ops-slack
-    type: slack
+  # ── Primary: Telegram via Sentry gateway ────────────────────────────────
+  - name: sentinel-telegram
+    type: telegram
     settings:
-      url: "${SLACK_WEBHOOK_URL}"
-      recipient: "#sentinel-alerts"
-      title: "{{ if eq .Status \"firing\" }}🚨{{ else }}✅{{ end }} SENTINEL Alert: {{ .GroupLabels.alertname }}"
-      text: |
-        {{ range .Alerts }}
-        *{{ .Labels.alertname }}*
+      url: "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage"
+      chatid: "${TELEGRAM_ALERT_CHAT_ID}"
+      message: |
+        {{ if eq .Status "firing" }}🚨{{ else }}✅{{ end }} *SENTINEL Alert*
+        *{{ .GroupLabels.alertname }}*
         Severity: {{ .Labels.severity }}
         {{ .Annotations.summary }}
         {{ if .Annotations.description }}{{ .Annotations.description }}{{ end }}
-        {{ end }}
 
-  - name: sentinel-ops-pagerduty
-    type: pagerduty
+  # ── Pending: WhatsApp / Twilio ─────────────────────────────────────────
+  # TODO(G8): Wire WhatsApp/Twilio contact point once Twilio credentials
+  # are configured. Do NOT leave this as a silent no-op — mark pending.
+  - name: sentinel-whatsapp
+    type: webhook
     settings:
-      integrationKey: "${PAGERDUTY_INTEGRATION_KEY}"
-      severity: "{{ if eq .Labels.severity \"critical\" }}critical{{ else if eq .Labels.severity \"warning\" }}error{{ else }}warning{{ end }}"
-      class: "{{ .GroupLabels.alertname }}"
-      summary: "SENTINEL Alert: {{ .Labels.alertname }}"
+      url: "${WHATSAPP_TWILIO_WEBHOOK_URL}"
+      httpMethod: POST
+      # Twilio format; adjust when WhatsApp is wired
+    # type:whatsapp  # uncomment when Grafana WhatsApp plugin is available
 
-  - name: sentinel-ops-email
+  # ── Executive: Email ──────────────────────────────────────────────────
+  - name: sentinel-email-exec
     type: email
     settings:
       addresses: "${ALERT_EMAIL_RECIPIENTS}"
-      subject: "[{{ .Status | toUpper }}] SENTINEL Alert: {{ .GroupLabels.alertname }}"
+      subject: "[{{ .Status | toUpper }}] SENTINEL: {{ .GroupLabels.alertname }}"
+      body: |
+        {{ range .Alerts }}
+        Alert: {{ .Labels.alertname }}
+        Severity: {{ .Labels.severity }}
+        Summary: {{ .Annotations.summary }}
+        {{ if .Annotations.description }}{{ .Annotations.description }}{{ end }}
+        {{ end }}
+
+# ── NOT USED at FNB REMS ──────────────────────────────────────────────────
+# Slack and PagerDuty entries below are placeholders for environments that
+# use them. Commented out to prevent accidental wiring in FNB REMS Grafana.
+#
+# - name: sentinel-ops-slack
+#   type: slack
+#   settings:
+#     url: "${SLACK_WEBHOOK_URL}"
+#     recipient: "#sentinel-alerts"
+#
+# - name: sentinel-ops-pagerduty
+#   type: pagerduty
+#   settings:
+#     integrationKey: "${PAGERDUTY_INTEGRATION_KEY}"

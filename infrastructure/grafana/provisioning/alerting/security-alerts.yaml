@@ -58,10 +58,8 @@ groups:
           alert_type: "brute_force"
           severity: "high"
         contact_points:
-          - sentinel-ops-slack
-          - sentinel-ops-pagerduty
-          - sentinel-ops-email
-
+          - sentinel-telegram
+          - sentinel-email-exec
       # ================================================================
       # Rule 2: Suspicious Path Patterns (SQLi / Path Traversal)
       # Trigger: Any request matching injection or traversal patterns
@@ -105,8 +103,8 @@ groups:
           alert_type: "injection_attempt"
           severity: "high"
         contact_points:
-          - sentinel-ops-slack
-          - sentinel-ops-email
+          - sentinel-telegram
+          - sentinel-email-exec
 
       # ================================================================
       # Rule 3: Unusual API Activity (DDoS / Abuse Detection)
@@ -153,8 +151,8 @@ groups:
           alert_type: "api_abuse"
           severity: "medium"
         contact_points:
-          - sentinel-ops-slack
-          - sentinel-ops-email
+          - sentinel-telegram
+          - sentinel-email-exec
 
       # ================================================================
       # Rule 4: After-Hours Admin Access
@@ -203,8 +201,8 @@ groups:
           alert_type: "afterhours_access"
           severity: "medium"
         contact_points:
-          - sentinel-ops-slack
-          - sentinel-ops-email
+          - sentinel-telegram
+          - sentinel-email-exec
 
       # ================================================================
       # Rule 5: Error Spike (Application Health)
@@ -249,10 +247,8 @@ groups:
           alert_type: "error_spike"
           severity: "high"
         contact_points:
-          - sentinel-ops-slack
-          - sentinel-ops-pagerduty
-          - sentinel-ops-email
-
+          - sentinel-telegram
+          - sentinel-email-exec
       # ================================================================
       # Rule 6: Audit Log Gap (Tamper Detection)
       # Trigger: No audit entries for >30 minutes during business hours
@@ -296,10 +292,8 @@ groups:
           alert_type: "audit_gap"
           severity: "critical"
         contact_points:
-          - sentinel-ops-slack
-          - sentinel-ops-pagerduty
-          - sentinel-ops-email
-
+          - sentinel-telegram
+          - sentinel-email-exec
       # ================================================================
       # Rule 7: BOLA Site Probing (Repeated Cross-Tenant Access)
       # Trigger: >5 BOLA_SITE_DENIED from same user in 10 minutes
@@ -345,8 +339,8 @@ groups:
           alert_type: "bola_site_probing"
           severity: "high"
         contact_points:
-          - sentinel-ops-slack
-          - sentinel-ops-email
+          - sentinel-telegram
+          - sentinel-email-exec
 
       # ================================================================
       # Rule 8: BOLA Equipment Enumeration
@@ -393,8 +387,8 @@ groups:
           alert_type: "bola_equipment_enum"
           severity: "high"
         contact_points:
-          - sentinel-ops-slack
-          - sentinel-ops-email
+          - sentinel-telegram
+          - sentinel-email-exec
 
       # ================================================================
       # Rule 9: BOLA Critical Burst (Auto-Block Candidate)
@@ -441,6 +435,5 @@ groups:
           alert_type: "bola_critical_burst"
           severity: "critical"
         contact_points:
-          - sentinel-ops-slack
-          - sentinel-ops-pagerduty
-          - sentinel-ops-email
+          - sentinel-telegram
+          - sentinel-email-exec
