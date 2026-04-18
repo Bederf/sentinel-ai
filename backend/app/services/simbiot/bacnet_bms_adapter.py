@@ -141,6 +141,7 @@ class BacnetBmsAdapter(BmsAdapter):
             instance=instance,
             value=request.value,
             priority=request.priority,
+            who=request.user,
         )
 
     def _ensure_connected(self) -> None:

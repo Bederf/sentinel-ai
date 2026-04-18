@@ -563,6 +563,8 @@ class NiagaraBACnetClient:
         instance: int,
         value: Any,
         priority: int = 8,
+        who: str = "sentinel",
+        correlation_id: str | None = None,
     ) -> bool:
         """Write a value to a BACnet point with priority array support.
 
@@ -572,6 +574,8 @@ class NiagaraBACnetClient:
             instance: Object instance number.
             value: Value to write.
             priority: BACnet priority (1-16, default 8 for manual commands).
+            who: User/system identity initiating the write (for audit).
+            correlation_id: Optional correlation ID for tracing.
 
         Returns:
             True if write succeeded.
@@ -579,6 +583,8 @@ class NiagaraBACnetClient:
         Raises:
             BACnetWriteError: If the write fails after retries.
         """
+        import time
+
         self._ensure_started()
 
         if not 1 <= priority <= 16:
@@ -586,12 +592,41 @@ class NiagaraBACnetClient:
 
         # BAC0 write format: "address objectType instance presentValue value - priority"
         write_string = f"{device_id} {object_type},{instance} presentValue {value} - {priority}"
+        correlation_id = correlation_id or str(uuid.uuid4())
 
-        await self._retry_operation(self._do_write, write_string, device_id=device_id)
+        start_ms = time.perf_counter()
+        write_ok = False
+        error_msg: str | None = None
+        try:
+            await self._retry_operation(
+                self._do_write, write_string, device_id=device_id, who=who, correlation_id=correlation_id
+            )
+            write_ok = True
+        except Exception as e:
+            write_ok = False
+            error_msg = str(e)
+            raise
+        finally:
+            latency_ms = (time.perf_counter() - start_ms) * 1000
+            self._audit_bacnet_write(
+                write_string=write_string,
+                value=value,
+                who=who,
+                correlation_id=correlation_id,
+                latency_ms=latency_ms,
+                success=write_ok,
+                error_msg=error_msg,
+            )
+
         logger.info(f"Wrote {object_type},{instance} = {value} (priority {priority}) on device {device_id}")
         return True
 
-    async def _do_write(self, write_string: str) -> bool:
+    async def _do_write(
+        self,
+        write_string: str,
+        who: str = "sentinel",
+        correlation_id: str = "",
+    ) -> bool:
         """Execute a single BAC0 write operation."""
         try:
             await asyncio.get_event_loop().run_in_executor(None, self._bacnet.write, write_string)
@@ -599,12 +634,61 @@ class NiagaraBACnetClient:
         except Exception as e:
             raise BACnetWriteError(f"Write failed for '{write_string}': {e}")
 
+    def _audit_bacnet_write(
+        self,
+        write_string: str,
+        value: Any,
+        who: str,
+        correlation_id: str,
+        latency_ms: float,
+        success: bool,
+        error_msg: str | None,
+    ) -> None:
+        """Create and log a BACnetWriteAudit record.
+
+        Parses write_string to extract device_id, object_type, instance, priority.
+        Never raises — audit failures are silent.
+        """
+        try:
+            from app.services.audit_logger import AuditLogger, BACnetWriteAudit
+
+            parts = write_string.split()
+            if len(parts) < 6:
+                return
+            device_id = int(parts[0])
+            object_type, instance_str = parts[1].split(",")
+            instance = int(instance_str)
+            priority = int(parts[-1])
+
+            equipment_tag = f"BAC-{device_id}-{object_type}:{instance}"
+
+            audit = BACnetWriteAudit(
+                correlation_id=correlation_id,
+                equipment_tag=equipment_tag,
+                device_id=device_id,
+                object_type=object_type,
+                instance=instance,
+                value=value,
+                priority=priority,
+                who=who,
+                timestamp=datetime.utcnow().isoformat(),
+                write_latency_ms=latency_ms,
+                success=success,
+                error_msg=error_msg,
+            )
+            AuditLogger().log_bacnet_write(audit)
+        except Exception:
+            # Never let audit failures affect the write operation
+            pass
+
     async def release_point(
         self,
         device_id: int,
         object_type: str,
         instance: int,
         priority: int = 8,
+        who: str = "sentinel",
+        correlation_id: str | None = None,
     ) -> bool:
         """Release a priority level on a point (write null to priority slot).
 
@@ -613,20 +697,43 @@ class NiagaraBACnetClient:
             object_type: BACnet object type.
             instance: Object instance number.
             priority: Priority level to release.
+            who: User/system identity initiating the release (for audit).
+            correlation_id: Optional correlation ID for tracing.
 
         Returns:
             True if release succeeded.
         """
+        import time
+
         self._ensure_started()
 
         write_string = f"{device_id} {object_type},{instance} presentValue null - {priority}"
+        correlation_id = correlation_id or str(uuid.uuid4())
+
+        start_ms = time.perf_counter()
+        write_ok = False
+        error_msg: str | None = None
         try:
             await asyncio.get_event_loop().run_in_executor(None, self._bacnet.write, write_string)
-            logger.info(f"Released priority {priority} on {object_type},{instance} device {device_id}")
-            return True
+            write_ok = True
         except Exception as e:
-            logger.error(f"Failed to release priority: {e}")
-            raise BACnetWriteError(f"Priority release failed: {e}")
+            write_ok = False
+            error_msg = str(e)
+            raise
+        finally:
+            latency_ms = (time.perf_counter() - start_ms) * 1000
+            self._audit_bacnet_write(
+                write_string=write_string,
+                value=None,
+                who=who,
+                correlation_id=correlation_id,
+                latency_ms=latency_ms,
+                success=write_ok,
+                error_msg=error_msg,
+            )
+
+        logger.info(f"Released priority {priority} on {object_type},{instance} device {device_id}")
+        return True
 
     # ------------------------------------------------------------------
     # COV subscriptions

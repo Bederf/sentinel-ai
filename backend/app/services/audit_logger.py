@@ -15,6 +15,7 @@ import logging
 import threading
 from datetime import UTC, datetime
 from pathlib import Path
+from dataclasses import dataclass
 from typing import Any
 
 from app.models.audit_log import AuditActionType, AuditLogEntry, AuditResultType
@@ -29,6 +30,47 @@ _AUDIT_ARCHIVAL_LOCK = asyncio.Lock()
 # Structured audit logger for Loki/SIEM ingestion
 # Outputs JSON-structured audit events to Python logging (collected by Promtail)
 audit_structured_logger = logging.getLogger("sentinel.audit")
+
+# BACnet audit log directory (mirrors modbus_audit/ pattern)
+BACNET_AUDIT_DIR = Path(__file__).parent.parent / "data" / "bacnet_audit"
+
+
+@dataclass
+class BACnetWriteAudit:
+    """Audit record for BACnet write operations.
+
+    Mirrors the schema of Modbus WriteResult for consistent SIEM queries.
+    """
+
+    correlation_id: str
+    equipment_tag: str  # Human-readable tag (e.g. "S002-AHU-001-SP")
+    device_id: int  # BACnet device instance
+    object_type: str  # e.g. "analogValue", "binaryOutput"
+    instance: int  # Object instance number
+    value: Any  # Written value
+    priority: int  # BACnet priority (1-16, normally 8)
+    who: str  # User/system who triggered the write
+    timestamp: str  # ISO8601 UTC
+    write_latency_ms: float  # Milliseconds for the write operation
+    success: bool  # True if write succeeded
+    error_msg: str | None = None  # Set if write failed
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "type": "bacnet_write",
+            "correlation_id": self.correlation_id,
+            "equipment_tag": self.equipment_tag,
+            "device_id": self.device_id,
+            "object_type": self.object_type,
+            "instance": self.instance,
+            "value": self.value,
+            "priority": self.priority,
+            "who": self.who,
+            "timestamp": self.timestamp,
+            "write_latency_ms": round(self.write_latency_ms, 2),
+            "success": self.success,
+            "error_msg": self.error_msg,
+        }
 
 
 class AuditLogger:
@@ -557,6 +599,45 @@ class AuditLogger:
     def flush(self) -> None:
         """Force flush buffer to disk."""
         self._flush_buffer()
+
+    def log_bacnet_write(self, audit: BACnetWriteAudit) -> None:
+        """Append a BACnet write audit record to bacnet_audit/bacnet_writes.jsonl.
+
+        Mirrors the ModbusBESSWriter._audit_log() pattern.
+        Writes are never dropped — failures are logged but do not raise.
+        """
+        BACNET_AUDIT_DIR.mkdir(parents=True, exist_ok=True)
+        log_file = BACNET_AUDIT_DIR / "bacnet_writes.jsonl"
+
+        # Structured log for Loki (sentinel.audit logger)
+        if audit.success:
+            audit_structured_logger.info(
+                f"event=bacnet_write "
+                f"correlation_id={audit.correlation_id} "
+                f"equipment_tag={audit.equipment_tag} "
+                f"device_id={audit.device_id} "
+                f"object={audit.object_type}:{audit.instance} "
+                f"value={audit.value} "
+                f"priority={audit.priority} "
+                f"who={audit.who} "
+                f"success=true"
+            )
+        else:
+            audit_structured_logger.warning(
+                f"event=bacnet_write_error "
+                f"correlation_id={audit.correlation_id} "
+                f"equipment_tag={audit.equipment_tag} "
+                f"error={audit.error_msg} "
+                f"who={audit.who} "
+                f"success=false"
+            )
+
+        # JSONL file for compliance archival
+        try:
+            with open(log_file, "a") as f:
+                f.write(json.dumps(audit.to_dict()) + "\n")
+        except Exception as e:
+            logger.error(f"Failed to write BACnet audit record: {e}")
 
     def clear(self) -> None:
         """Clear all audit logs (for testing/local reset)."""
