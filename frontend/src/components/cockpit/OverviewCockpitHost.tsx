@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import api, { authorizedFetch } from '@/lib/api'
+import type { HVACOverview } from '@/lib/hvacApi'
 import { CockpitView } from './CockpitView'
 import { CockpitBuildingThree } from './CockpitBuildingThree'
-import { mapCockpitState, type CockpitDecisionPayload } from './mapCockpitState'
-import { DEFAULT_COCKPIT_THRESHOLD_POLICY, type CockpitThresholdPolicy } from './thresholdPolicy'
+import { mapCockpitState, type BuildingStatePayload, type EnergyCentreTelemetry } from './mapCockpitState'
+import type { CockpitTwinZoneSignal, ModelReadiness } from './types'
 
 interface OverviewCockpitHostProps {
   siteId: string
@@ -25,34 +26,10 @@ function formatFreshness(lastUpdatedAt: number | null): string {
   return `Updated ${Math.floor(ageSeconds / 60)}m ago`
 }
 
-function useCockpitThresholdPolicy() {
-  const [thresholdPolicy, setThresholdPolicy] = useState<CockpitThresholdPolicy>(DEFAULT_COCKPIT_THRESHOLD_POLICY)
-
-  useEffect(() => {
-    let mounted = true
-
-    async function loadThresholdPolicy() {
-      try {
-        const [health, risk] = await Promise.all([api.getHealthThresholds(), api.getRiskThresholds()])
-        if (mounted) {
-          setThresholdPolicy({ health, risk, source: 'settings' })
-        }
-      } catch {
-        if (mounted) {
-          setThresholdPolicy(DEFAULT_COCKPIT_THRESHOLD_POLICY)
-        }
-      }
-    }
-
-    loadThresholdPolicy()
-    return () => { mounted = false }
-  }, [])
-
-  return thresholdPolicy
-}
-
-function useCockpitDecisionPayload(siteId: string) {
-  const [payload, setPayload] = useState<CockpitDecisionPayload | null>(null)
+function useBuildingStatePayload(siteId: string) {
+  const [payload, setPayload] = useState<BuildingStatePayload | null>(null)
+  const [hvacOverview, setHvacOverview] = useState<HVACOverview | null>(null)
+  const [energyTelemetry, setEnergyTelemetry] = useState<EnergyCentreTelemetry | null>(null)
   const [lastUpdatedAt, setLastUpdatedAt] = useState<number | null>(null)
 
   useEffect(() => {
@@ -108,7 +85,9 @@ function useCockpitDecisionPayload(siteId: string) {
           setLastUpdatedAt(Date.now())
         }
       } catch (error) {
-        if (error instanceof Error && error.name === 'AbortError') return
+        if (error instanceof Error && error.name === 'AbortError') {
+          return
+        }
       }
     }
 
@@ -220,22 +199,16 @@ export function OverviewCockpitHost({
     return mapCockpitState(summary, payload, hvacOverview, energyTelemetry)
   }, [siteId, siteName, onboardingPhase, posture, activeAlerts, predictionsCount, equipmentCount, lastUpdatedAt, payload, hvacOverview, energyTelemetry])
 
-  const handleApprove = useCallback(async () => {
-    try {
-      await authorizedFetch(`/api/cockpit/decision/approve/${encodeURIComponent(siteId)}`, {
-        method: 'POST',
-      })
-    } catch {
-      // Approval failure is silent — operator sees no state change; backend logs it
-    }
-  }, [siteId])
-
   return (
     <CockpitView
       state={state}
       renderMode="embedded"
-      spatialCanvas={<CockpitBuildingThree state={state} />}
+      spatialCanvas={<CockpitBuildingThree state={state} onZoneSelect={setSelectedZone} />}
       onApprove={handleApprove}
+      selectedZone={selectedZone}
+      onZoneClose={() => setSelectedZone(null)}
+      modelReadiness={modelReadiness}
+      onAdvancePhase={handleAdvancePhase}
     />
   )
 }

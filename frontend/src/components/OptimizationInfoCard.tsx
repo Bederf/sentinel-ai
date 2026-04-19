@@ -201,7 +201,7 @@ export function OptimizationInfoCard({
             >
               {isAdvisory
                 ? "Monitoring & recommendations"
-                : isAutomatic
+                : isAutoMode
                   ? "Auto-applying changes"
                   : "Recommendations require approval"}
               {lastOptimization && ` \u00B7 Last: ${formatRelativeTime(lastOptimization)}`}
