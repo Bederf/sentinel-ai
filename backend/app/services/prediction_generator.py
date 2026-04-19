@@ -25,7 +25,27 @@ from app.services.prediction_taxonomy import (
 logger = logging.getLogger(__name__)
 
 # Minimum probability threshold for creating predictions
-MIN_PROBABILITY_THRESHOLD = 60
+MIN_PROBABILITY_THRESHOLD = 25
+
+
+def health_to_probability(health_score: float) -> float:
+    """
+    Maps health score to failure probability.
+    Calibrated for warning-tier equipment (70-89% health range).
+
+    90-100% -> 5-15%   healthy, low risk
+    70-89%  -> 15-35%  warning, moderate risk
+    50-69%  -> 35-65%  poor, elevated risk
+    <50%    -> 65-95%  critical, high risk
+    """
+    if health_score >= 90:
+        return round(5 + (100 - health_score) * 1.0, 1)
+    elif health_score >= 70:
+        return round(15 + (89 - health_score) * 1.0, 1)
+    elif health_score >= 50:
+        return round(35 + (69 - health_score) * 1.5, 1)
+    else:
+        return round(min(95, 65 + (49 - health_score) * 1.5), 1)
 
 
 class PredictionGeneratorService:
@@ -154,7 +174,7 @@ class PredictionGeneratorService:
         _building = equipment.get("building", {})
 
         # Calculate probability based on health (inverse relationship)
-        probability = min(95, max(60, 100 - health_score + 10))
+        probability = health_to_probability(health_score)
 
         # Determine severity based on health status - aligned with database constraint
         # Database allows: critical, warning, healthy (NOT high, medium, low)

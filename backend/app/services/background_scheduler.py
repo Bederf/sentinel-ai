@@ -958,6 +958,7 @@ class BackgroundSchedulerService:
             f"real-fallback={interval_seconds}s "
             f"(first run at {first_run.strftime('%H:%M:%S')})"
         )
+        self.add_recommendation_digest_job()
 
     def add_outcome_verification_job(self, interval_seconds: int = 300):
         """Add a job to verify recommendation outcomes periodically.
@@ -1347,6 +1348,10 @@ class BackgroundSchedulerService:
                     )
 
                     module_registry.add_recommendation(site_code, ai_rec)
+
+                    # Fire Telegram alert for warning+ severity recommendations
+                    self._notify_recommendation_alert(site_code, ai_rec)
+
                     generated += 1
 
                 except Exception as e:
@@ -1356,6 +1361,71 @@ class BackgroundSchedulerService:
 
         except Exception as e:
             logger.error(f"Failed to run recommendation generation: {e}")
+
+    def _notify_recommendation_alert(self, site_code: str, ai_rec) -> None:
+        """Send Telegram alert for a warning+ severity recommendation (sync, called from sync job context)."""
+        import asyncio
+
+        priority = ai_rec.priority.name.lower() if hasattr(ai_rec.priority, "name") else "low"
+        if priority not in ("warning", "high", "critical"):
+            return
+
+        equipment_id = (
+            ai_rec.telemetry_context.get("equipment_id", "unknown") if ai_rec.telemetry_context else "unknown"
+        )
+        title = ai_rec.title[:100]
+        confidence = ai_rec.confidence or 0
+        enforcement = (
+            ai_rec.suggested_action.get("type", "pending_approval") if ai_rec.suggested_action else "pending_approval"
+        )
+
+        message = (
+            f"\xf0\x9f\x94\x8b *SENTINEL Advisory — {site_code.upper()}*\n"
+            f"Equipment: `{equipment_id}`\n"
+            f"Finding: {title}\n"
+            f"Confidence: {confidence:.0%}\n"
+            f"Action required: {enforcement}\n"
+            f"-> Review in Cockpit approval queue"
+        )
+
+        async def _send():
+            try:
+                from app.services.telegram_message_sender import get_telegram_sender
+
+                sender = get_telegram_sender()
+                from app.config.settings import settings
+
+                chat_id = getattr(settings, "telegram_alert_chat_id", None) or getattr(
+                    settings, "sentry_fm_chat_id", None
+                )
+                if chat_id:
+                    await sender.send_text(str(chat_id), message, parse_mode="HTML")
+            except Exception as e:
+                logger.warning(f"Failed to send Telegram alert for recommendation {equipment_id}: {e}")
+
+        try:
+            asyncio.run(_send())
+        except Exception as e:
+            logger.warning(f"Failed to send Telegram alert for recommendation {equipment_id}: {e}")
+
+    def add_recommendation_digest_job(self):
+        """Send a recommendation digest to Telegram at 07:45 SAST Mon-Fri."""
+        from apscheduler.triggers.cron import CronTrigger
+
+        from app.services.background_scheduler import _run_recommendation_digest_sync
+
+        if self.scheduler.get_job("recommendation_digest"):
+            self.scheduler.remove_job("recommendation_digest")
+
+        self.scheduler.add_job(
+            func=_run_recommendation_digest_sync,
+            trigger=CronTrigger(hour=5, minute=45, day_of_week="mon-fri"),
+            id="recommendation_digest",
+            name="Recommendation Digest (07:45 SAST)",
+            replace_existing=True,
+            misfire_grace_time=3600,
+        )
+        logger.info("recommendation_digest job registered — 07:45 SAST Mon-Fri")
 
     def add_demand_aware_coordination_job(self, interval_seconds: int = 300):
         """
@@ -3221,8 +3291,8 @@ class BackgroundSchedulerService:
         try:
             import asyncio
 
-            from ml.explanations.evaluation import LLMJudgeService
             from app.api.metrics import sentinel_llm_judge_score
+            from ml.explanations.evaluation import LLMJudgeService
 
             service = LLMJudgeService(sample_size=10)
             loop = asyncio.get_event_loop()
@@ -3645,6 +3715,54 @@ def _run_email_intake_poll():
             logger.debug("[EmailIntake] No new emails in this poll cycle")
     except Exception as exc:
         logger.error("[EmailIntake] poll runner failed: %s", exc, exc_info=True)
+
+
+def _run_recommendation_digest_sync(site_id: str = "S002"):
+    """Sync wrapper for recommendation digest — sends Telegram morning digest."""
+    import asyncio
+    import logging
+
+    from app.services.recommendation_service import get_recommendation_service
+
+    logger = logging.getLogger(__name__)
+    try:
+
+        async def _send():
+            svc = get_recommendation_service()
+            pending = await svc.get_pending_recommendations(site_id, limit=20)
+            if not pending:
+                return
+
+            from app.services.telegram_message_sender import get_telegram_sender
+
+            sender = get_telegram_sender()
+            from app.config.settings import settings
+
+            chat_id = getattr(settings, "telegram_alert_chat_id", None) or getattr(settings, "sentry_fm_chat_id", None)
+            if not chat_id:
+                return
+
+            lines = [
+                f"\xf0\x9f\x93\x9b *SENTINEL Morning Digest — {site_id.upper()}*",
+                f"{len(pending)} recommendations pending approval:\n",
+            ]
+            for rec in pending[:5]:
+                eq = rec.target_equipment or rec.action_type or "unknown"
+                reason = rec.reason[:60] if rec.reason else ""
+                sev = rec.risk_level.value if hasattr(rec.risk_level, "value") else rec.risk_level or "info"
+                lines.append(f"\u2022 `{eq}` \u2014 {reason} ({sev})")
+            if len(pending) > 5:
+                lines.append(f"_...and {len(pending) - 5} more in Cockpit_")
+            await sender.send_text(str(chat_id), "\n".join(lines), parse_mode="HTML")
+
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            loop.run_until_complete(_send())
+        finally:
+            loop.close()
+    except Exception as e:
+        logger.warning(f"Recommendation digest failed: {e}")
 
 
 # Global scheduler instance
