@@ -1359,9 +1359,7 @@ class BackgroundSchedulerService:
             logger.error(f"Failed to run recommendation generation: {e}")
 
     def _notify_recommendation_alert(self, site_code: str, ai_rec) -> None:
-        """Send Telegram alert for critical severity recommendations (sync, called from sync job context)."""
-        import asyncio
-
+        """Send Telegram alert for critical severity recommendations (fire-and-forget via thread pool)."""
         priority = ai_rec.priority.name.lower() if hasattr(ai_rec.priority, "name") else "low"
         if priority != "critical":
             return
@@ -1376,7 +1374,7 @@ class BackgroundSchedulerService:
         )
 
         message = (
-            f"\xf0\x9f\x94\x8b *SENTINEL Advisory — {site_code.upper()}*\n"
+            f"\xf0\x9f\x94\x8b *SENTINEL Advisory — {site_code.upper()}\n"
             f"Equipment: `{equipment_id}`\n"
             f"Finding: {title}\n"
             f"Confidence: {confidence:.0%}\n"
@@ -1384,25 +1382,31 @@ class BackgroundSchedulerService:
             f"-> Review in Cockpit approval queue"
         )
 
-        async def _send():
-            try:
-                from app.services.telegram_message_sender import get_telegram_sender
-
-                sender = get_telegram_sender()
-                from app.config.settings import settings
-
-                chat_id = getattr(settings, "telegram_alert_chat_id", None) or getattr(
-                    settings, "sentry_fm_chat_id", None
-                )
-                if chat_id:
-                    await sender.send_text(str(chat_id), message, parse_mode="HTML")
-            except Exception as e:
-                logger.warning(f"Failed to send Telegram alert for recommendation {equipment_id}: {e}")
-
+        # Fire-and-forget: dispatch to a background thread so it never blocks the scheduler cycle.
         try:
-            asyncio.run(_send())
+            import asyncio
+            import concurrent.futures
+
+            def _thread_target():
+                try:
+                    async def _send_async():
+                        from app.services.telegram_message_sender import get_telegram_sender
+                        sender = get_telegram_sender()
+                        from app.config.settings import settings
+                        chat_id = getattr(settings, "telegram_alert_chat_id", None) or getattr(
+                            settings, "sentry_fm_chat_id", None
+                        )
+                        if chat_id:
+                            await sender.send_text(str(chat_id), message, parse_mode="HTML")
+
+                    asyncio.run(_send_async())
+                except Exception as e:
+                    logger.warning(f"Failed to send Telegram alert for {equipment_id}: {e}")
+
+            with concurrent.futures.ThreadPoolExecutor(max_workers=4, thread_name_prefix="telegram_alert") as pool:
+                pool.submit(_thread_target)
         except Exception as e:
-            logger.warning(f"Failed to send Telegram alert for recommendation {equipment_id}: {e}")
+            logger.warning(f"Failed to dispatch Telegram alert for {equipment_id}: {e}")
 
     def add_recommendation_digest_job(self):
         """Send a recommendation digest to Telegram at 07:45 SAST Mon-Fri."""
