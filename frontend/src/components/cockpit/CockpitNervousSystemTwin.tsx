@@ -4,6 +4,7 @@ import type { CockpitState } from './types'
 import { motionReduced } from './motionPreference'
 import { CockpitBuildingThree } from './CockpitBuildingThree'
 import { cockpitToneKey } from './cockpitTwinTheme'
+import { AutoExecutionsPanel } from './AutoExecutionsPanel'
 
 interface CockpitNervousSystemTwinProps {
   state: CockpitState
@@ -84,6 +85,13 @@ export function CockpitNervousSystemTwin({ state }: CockpitNervousSystemTwinProp
           {modules.security ? <span className="text-cyan-200/90">Security mesh</span> : null}
           {modules.occupancy ? <span className="text-violet-200/90">Occupancy</span> : null}
         </div>
+
+        {/* Auto-execution rollback panel — only shown when site has advanced past shadow */}
+        {state.site.onboardingPhase !== 'shadow' && (
+          <div className="pointer-events-auto mt-4">
+            <AutoExecutionsPanel state={state} />
+          </div>
+        )}
       </div>
     </div>
   )

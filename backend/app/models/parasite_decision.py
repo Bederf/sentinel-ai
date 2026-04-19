@@ -214,6 +214,10 @@ class ParasiteDecision:
     # --- Routing provenance ---
     routing_source: Optional[str] = None  # recommendation_graph | optimization_api
 
+    # --- Audit classification ---
+    audit_level: Optional[str] = None  # "routine" or "critical"
+    context_snapshot: Optional[Dict[str, Any]] = None  # Full LLM context for critical decisions
+
     def __post_init__(self):
         """Normalize point_name / control_point."""
         # point_name is canonical; control_point is deprecated alias
@@ -297,6 +301,9 @@ class ParasiteDecision:
             "rejection_category": self.rejection_category,
             # Routing provenance
             "routing_source": self.routing_source,
+            # Audit classification
+            "audit_level": self.audit_level,
+            "context_snapshot": self.context_snapshot,
         }
         # Strip None values for cleaner storage
         return {k: v for k, v in d.items() if v is not None}
@@ -351,6 +358,8 @@ class ParasiteDecision:
             decision_details=data.get("decision_details"),
             rejection_category=data.get("rejection_category"),
             routing_source=data.get("routing_source"),
+            audit_level=data.get("audit_level"),
+            context_snapshot=data.get("context_snapshot"),
         )
 
     @classmethod

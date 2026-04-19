@@ -128,7 +128,11 @@ class ApprovalService:
             logger.debug(f"Failed to audit log quality gate block: {e}")
 
     async def execute_approval(
-        self, recommendation_id: str, approved_by: str, approval_notes: str | None = None
+        self,
+        recommendation_id: str,
+        approved_by: str,
+        approval_notes: str | None = None,
+        sentinel_tool=None,
     ) -> ApprovalResult:
         """Execute an approved recommendation with safety validation and device control.
 
@@ -282,6 +286,7 @@ class ApprovalService:
                     target_value=target_value,
                     source="advisory",
                     correlation_id=getattr(recommendation, "correlation_id", "") or "",
+                    sentinel_tool=sentinel_tool,
                 )
 
                 write_result = {"success": exec_result["success"]}
@@ -351,6 +356,19 @@ class ApprovalService:
                 pd_factors["aegis_reason"] = "AEGIS_WRITE_BLOCKED"
                 pd_factors["execution_mode"] = "blocked"
                 pd_factors["block_reason_code"] = "AEGIS_WRITE_BLOCKED"
+            tool_metadata = (
+                {
+                    "is_dangerous": sentinel_tool.is_dangerous,
+                    "is_reversible": sentinel_tool.is_reversible,
+                    "priority": sentinel_tool.priority,
+                    "demoted": sentinel_tool.demoted,
+                    "effective_tier": sentinel_tool.effective_tier,
+                    "bacnet_priority": exec_result.get("bacnet_priority"),
+                    "whitelist_passed": exec_result.get("whitelist_passed", True),
+                }
+                if sentinel_tool
+                else None
+            )
             await parasite_repo.record_decision(
                 {
                     "correlation_id": correlation_id,
@@ -364,10 +382,11 @@ class ApprovalService:
                     "point_name": control_point,
                     "control_point": control_point,
                     "target_value": target_value,
-                    "original_value": original_value,
+                    "original_value": exec_result.get("previous_value") or original_value,
                     "actor": "human_tier2",
                     "mode": settings.resolved_ingestion_mode.value,
                     "contributing_factors": pd_factors,
+                    "tool_metadata": tool_metadata,
                 }
             )
 
@@ -880,6 +899,7 @@ class ApprovalService:
         self,
         recommendation_id: str,
         routing_result: TierRoutingResult,
+        sentinel_tool=None,
     ) -> ApprovalResult:
         """Autonomously execute a Tier 3 recommendation with safety validation and auto-rollback.
 
@@ -920,6 +940,44 @@ class ApprovalService:
                     recommendation_id=recommendation_id,
                     status="failed",
                     error_message=f"Recommendation is {recommendation.status.value}, not pending",
+                )
+
+            # Trust ladder gate: Tier 3 auto-execute requires site phase >= supervised
+            # phase_allows() is the single source of truth for onboarding phase gates
+            try:
+                from app.models.onboarding_phase import effective_phase
+
+                site_phase = await effective_phase(recommendation.site_id or "unknown")
+                if not site_phase:
+                    site_phase = "shadow"
+
+                from app.models.onboarding_phase import phase_allows as _phase_allows
+
+                if not _phase_allows(site_phase, "approve_reject"):
+                    logger.warning(
+                        f"Tier 3 auto-execute blocked by onboarding phase: site={recommendation.site_id}, "
+                        f"phase={site_phase} (requires supervised or above for approve_reject)"
+                    )
+                    return ApprovalResult(
+                        success=False,
+                        recommendation_id=recommendation_id,
+                        status="failed",
+                        error_message=(
+                            f"ONBOARDING_PHASE_BLOCK: site phase is '{site_phase}' — "
+                            f"Tier 3 requires phase >= supervised. "
+                            f"Current site onboarding_phase must advance before autonomous execution is permitted."
+                        ),
+                    )
+            except Exception as e:
+                # Fail-closed: if phase lookup fails, block Tier 3 auto-execute
+                logger.error(
+                    f"Failed to resolve onboarding phase for {recommendation_id}, blocking Tier 3 (fail-closed): {e}"
+                )
+                return ApprovalResult(
+                    success=False,
+                    recommendation_id=recommendation_id,
+                    status="failed",
+                    error_message=f"ONBOARDING_PHASE_CHECK_FAILED: {e}",
                 )
 
             # Phase 109: Quality gate check — Tier 3 is blocked on shadow_live, WARN, or FAIL
@@ -1026,6 +1084,17 @@ class ApprovalService:
                         "safety_rules_triggered": safety_result.get("rules_triggered", []),
                         "rejection_category": "safety_block",
                         "confidence_score": routing_result.confidence_score,
+                        "tool_metadata": {
+                            "is_dangerous": sentinel_tool.is_dangerous,
+                            "is_reversible": sentinel_tool.is_reversible,
+                            "priority": sentinel_tool.priority,
+                            "demoted": sentinel_tool.demoted,
+                            "effective_tier": sentinel_tool.effective_tier,
+                            "bacnet_priority": None,
+                            "whitelist_passed": None,
+                        }
+                        if sentinel_tool
+                        else None,
                     }
                 )
                 return ApprovalResult(
@@ -1046,6 +1115,28 @@ class ApprovalService:
                     status="failed",
                     error_message="Recommendation action missing point or value",
                 )
+
+            # Determine audit level for forensic record
+            # Critical: high/critical risk, life-safety equipment (chiller/fire/pressure)
+            _eq_parts = equipment_id.split("-") if equipment_id else []
+            _eq_type = _eq_parts[1].upper() if len(_eq_parts) >= 2 else "unknown"
+            _risk = (
+                recommendation.risk_level.value
+                if hasattr(recommendation.risk_level, "value")
+                else str(recommendation.risk_level)
+            )
+            is_critical = _risk in ("critical", "high") or _eq_type in ("CHILLER", "FIRE", "PRESSURE", "HUMIDITY")
+            audit_level = "critical" if is_critical else "routine"
+            context_snapshot = {}
+            if audit_level == "critical":
+                context_snapshot = {
+                    "confidence_score": routing_result.confidence_score,
+                    "risk_level": _risk,
+                    "equipment_type": _eq_type,
+                    "target_value": target_value,
+                    "safety_result": safety_result,
+                    "gate_status": gate_result.overall.value if gate_result else None,
+                }
 
             # Read current value for rollback capability
             try:
@@ -1069,6 +1160,7 @@ class ApprovalService:
                 source="auto_execute",
                 correlation_id=routing_result.correlation_id,
                 decision_id=routing_result.decision_id,
+                sentinel_tool=sentinel_tool,
             )
 
             emit_decision_event(
@@ -1098,13 +1190,20 @@ class ApprovalService:
                         "site_id": recommendation.site_id or "",
                         "tier": "tier3",
                         "decision_type": "tier3_auto_execute",
-                        "write_status": "failed",
-                        "failure_reason": f"Device write failed: {exec_result.get('error')}",
+                        "write_status": (
+                            "whitelist_blocked"
+                            if (
+                                exec_result.get("whitelist_passed") is False
+                                and "WHITELIST_DENIED" in (exec_result.get("error") or "")
+                            )
+                            else "failed"
+                        ),
+                        "failure_reason": exec_result.get("error") or "Device write failed",
                         "equipment_code": equipment_id,
                         "point_name": control_point,
                         "control_point": control_point,
                         "target_value": target_value,
-                        "original_value": original_value,
+                        "original_value": exec_result.get("previous_value") or original_value,
                         "actor": "auto_tier3",
                         "mode": mode,
                         "gate_status": gate_result.overall.value if gate_result else None,
@@ -1112,6 +1211,17 @@ class ApprovalService:
                         "gate_snapshot_id": getattr(gate_result, "snapshot_id", None),
                         "safety_result": "allowed",
                         "confidence_score": routing_result.confidence_score,
+                        "tool_metadata": {
+                            "is_dangerous": sentinel_tool.is_dangerous,
+                            "is_reversible": sentinel_tool.is_reversible,
+                            "priority": sentinel_tool.priority,
+                            "demoted": sentinel_tool.demoted,
+                            "effective_tier": sentinel_tool.effective_tier,
+                            "bacnet_priority": exec_result.get("bacnet_priority"),
+                            "whitelist_passed": exec_result.get("whitelist_passed", True),
+                        }
+                        if sentinel_tool
+                        else None,
                     }
                 )
                 return ApprovalResult(
@@ -1276,7 +1386,7 @@ class ApprovalService:
                     "point_name": control_point,
                     "control_point": control_point,
                     "target_value": target_value,
-                    "original_value": original_value,
+                    "original_value": exec_result.get("previous_value") or original_value,
                     "actual_value": actual_value_read,
                     "actor": "auto_tier3",
                     "mode": mode,
@@ -1286,6 +1396,19 @@ class ApprovalService:
                     "safety_result": "allowed",
                     "confidence_score": routing_result.confidence_score,
                     "routing_source": recommendation.source or "optimization_api",
+                    "audit_level": audit_level,
+                    "context_snapshot": context_snapshot if audit_level == "critical" else {},
+                    "tool_metadata": {
+                        "is_dangerous": sentinel_tool.is_dangerous,
+                        "is_reversible": sentinel_tool.is_reversible,
+                        "priority": sentinel_tool.priority,
+                        "demoted": sentinel_tool.demoted,
+                        "effective_tier": sentinel_tool.effective_tier,
+                        "bacnet_priority": exec_result.get("bacnet_priority"),
+                        "whitelist_passed": exec_result.get("whitelist_passed", True),
+                    }
+                    if sentinel_tool
+                    else None,
                 }
             )
 

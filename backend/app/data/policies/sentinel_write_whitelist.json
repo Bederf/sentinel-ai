@@ -1,0 +1,110 @@
+{
+  "site_id": "site-002",
+  "version": "2",
+  "description": "Point-level whitelist for SENTINEL autonomous writes on site-002. Only equipment_types and points listed here can be written by the autonomous control pipeline. All other writes are blocked. Update version number when modifying rules.",
+  "catch_all_points": [
+    "setpoint",
+    "temperature_setpoint",
+    "on_off",
+    "mode",
+    "state"
+  ],
+  "rules": [
+    {
+      "equipment_type": "CHILLER",
+      "description": "Chiller plant — staging and setpoints",
+      "points": [
+        "supply_water_temperature_setpoint",
+        "chilled_water_temperature_setpoint",
+        "cooling_capacity_setpoint",
+        "chiller_stage",
+        "chiller_on_off"
+      ]
+    },
+    {
+      "equipment_type": "AHU",
+      "description": "Air handling unit — setpoints and fan control",
+      "points": [
+        "occupied_cooling_setpoint",
+        "occupied_heating_setpoint",
+        "supply_air_temperature_setpoint",
+        "fan_speed_setpoint",
+        "ahu_on_off",
+        "ahu_mode"
+      ]
+    },
+    {
+      "equipment_type": "VAV",
+      "description": "Variable air volume — zone-level temperature control",
+      "points": [
+        "zone_temperature_setpoint",
+        "discharge_air_temperature_setpoint",
+        "vav_flow_setpoint",
+        "vav_on_off"
+      ]
+    },
+    {
+      "equipment_type": "FCU",
+      "description": "Fan coil unit — zone-level temperature control",
+      "points": [
+        "temperature_setpoint",
+        "fcu_mode",
+        "fcu_on_off"
+      ]
+    },
+    {
+      "equipment_type": "DALI",
+      "description": "DALI lighting control",
+      "points": [
+        "brightness",
+        "dimming_level",
+        "dali_scene",
+        "dali_group"
+      ]
+    },
+    {
+      "equipment_type": "LIGHTING",
+      "description": "Generic lighting control (0-10V, DMX, etc.)",
+      "points": [
+        "brightness",
+        "dimming_level"
+      ]
+    },
+    {
+      "equipment_type": "BESS",
+      "description": "Battery energy storage system — dispatch commands",
+      "points": [
+        "bess_dispatch",
+        "bess_charge_limit",
+        "bess_discharge_limit",
+        "bess_mode"
+      ]
+    },
+    {
+      "equipment_type": "GEN",
+      "description": "Generator — start/stop control",
+      "points": [
+        "genset_start",
+        "genset_stop",
+        "genset_mode"
+      ]
+    },
+    {
+      "equipment_type": "PUMP",
+      "description": "Pump — on/off and staging",
+      "points": [
+        "pump_on_off",
+        "pump_speed_setpoint"
+      ]
+    },
+    {
+      "equipment_type": "BOILER",
+      "description": "Boiler — staging and setpoints",
+      "points": [
+        "boiler_on_off",
+        "boiler_stage",
+        "supply_water_temperature_setpoint"
+      ]
+    }
+  ]
+}

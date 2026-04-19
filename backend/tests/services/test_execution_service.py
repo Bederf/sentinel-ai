@@ -102,6 +102,7 @@ class TestExecuteCommandSuccess:
             device_id=EQUIPMENT_ID,
             point_name=CONTROL_POINT,
             value=TARGET_VALUE,
+            priority=8,
         )
 
     @pytest.mark.asyncio

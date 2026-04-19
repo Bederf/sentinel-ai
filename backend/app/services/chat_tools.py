@@ -2603,6 +2603,67 @@ CHAT_TOOLS = [
             },
             "required": ["device_id", "point", "value"],
         },
+        "safety_profiles": {
+            # SETPOINT — temperature, humidity, pressure setpoints
+            "SETPOINT": {
+                "is_dangerous": False,
+                "is_reversible": True,
+                "approval_hint": (
+                    "Auto-approved if confidence >= 0.85 and risk_level is low or medium; "
+                    "human approval required if risk_level is high or critical."
+                ),
+                "bacnet_priority": 8,
+            },
+            # LIGHTING — DALI, 0-10V dimming
+            "LIGHTING": {
+                "is_dangerous": False,
+                "is_reversible": True,
+                "approval_hint": (
+                    "Auto-approved if confidence >= 0.85 and risk_level is low or medium; "
+                    "human approval required if risk_level is high or critical."
+                ),
+                "bacnet_priority": 8,
+            },
+            # STAGING — chiller/boiler/AHU staging, binary on/off overrides
+            # is_dangerous=True: binary overrides can cause oscillations or comfort events
+            "STAGING": {
+                "is_dangerous": True,
+                "is_reversible": True,
+                "approval_hint": (
+                    "Human approval required for staging actions; "
+                    "they affect equipment state and can cause oscillations if misapplied."
+                ),
+                "bacnet_priority": 3,
+            },
+            # BESS — battery dispatch (charge/discharge), genset start/stop
+            # is_dangerous=True: writes to power hardware; is_reversible=False: dispatch commits to grid
+            "BESS": {
+                "is_dangerous": True,
+                "is_reversible": False,
+                "approval_hint": (
+                    "Human approval always required for BESS dispatch and genset operations; "
+                    "these affect power hardware and grid commitments."
+                ),
+                "bacnet_priority": 2,
+            },
+            # LIFE_SAFETY — fire, access control, CCTV, emergency overrides
+            "LIFE_SAFETY": {
+                "is_dangerous": True,
+                "is_reversible": False,
+                "approval_hint": (
+                    "Human approval always required for life safety actions regardless of confidence; "
+                    "these affect emergency systems."
+                ),
+                "bacnet_priority": 1,
+            },
+            # UNKNOWN — fallback for unrecognized action types
+            "UNKNOWN": {
+                "is_dangerous": False,
+                "is_reversible": False,
+                "approval_hint": "Human approval required for any unrecognized action type.",
+                "bacnet_priority": 8,
+            },
+        },
     },
     {
         "name": "get_system_status",
