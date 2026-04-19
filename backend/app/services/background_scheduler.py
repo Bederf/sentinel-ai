@@ -958,7 +958,6 @@ class BackgroundSchedulerService:
             f"real-fallback={interval_seconds}s "
             f"(first run at {first_run.strftime('%H:%M:%S')})"
         )
-        self.add_recommendation_digest_job()
 
     def add_outcome_verification_job(self, interval_seconds: int = 300):
         """Add a job to verify recommendation outcomes periodically.
@@ -1349,9 +1348,6 @@ class BackgroundSchedulerService:
 
                     module_registry.add_recommendation(site_code, ai_rec)
 
-                    # Fire Telegram alert for warning+ severity recommendations
-                    self._notify_recommendation_alert(site_code, ai_rec)
-
                     generated += 1
 
                 except Exception as e:
@@ -1363,11 +1359,11 @@ class BackgroundSchedulerService:
             logger.error(f"Failed to run recommendation generation: {e}")
 
     def _notify_recommendation_alert(self, site_code: str, ai_rec) -> None:
-        """Send Telegram alert for a warning+ severity recommendation (sync, called from sync job context)."""
+        """Send Telegram alert for critical severity recommendations (sync, called from sync job context)."""
         import asyncio
 
         priority = ai_rec.priority.name.lower() if hasattr(ai_rec.priority, "name") else "low"
-        if priority not in ("warning", "high", "critical"):
+        if priority != "critical":
             return
 
         equipment_id = (

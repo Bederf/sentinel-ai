@@ -11,8 +11,8 @@ import pytest
 
 class TestNotifyPendingRecommendations:
     @pytest.mark.asyncio
-    async def test_notify_sends_telegram_for_warning_severity(self):
-        """Warning severity rec triggers Telegram alert."""
+    async def test_notify_skips_warning_severity(self):
+        """Warning severity rec does NOT trigger Telegram alert (only critical fires)."""
         from app.services.background_scheduler import BackgroundSchedulerService
 
         svc = BackgroundSchedulerService.__new__(BackgroundSchedulerService)
@@ -25,23 +25,24 @@ class TestNotifyPendingRecommendations:
         ai_rec.confidence = 0.72
         ai_rec.suggested_action = {"type": "pending_approval"}
 
-        with patch("app.services.telegram_message_sender.get_telegram_sender") as mock_sender:
-            mock_instance = AsyncMock()
-            mock_sender.return_value = mock_instance
-            with patch("app.config.settings") as mock_settings:
-                mock_settings.telegram_alert_chat_id = "12345"
+        svc._notify_recommendation_alert("S002", ai_rec)
 
-                try:
-                    loop = asyncio.get_running_loop()
-                    with concurrent.futures.ThreadPoolExecutor() as pool:
-                        future = pool.submit(svc._notify_recommendation_alert, "S002", ai_rec)
-                        future.result()
-                except RuntimeError:
-                    svc._notify_recommendation_alert("S002", ai_rec)
+    @pytest.mark.asyncio
+    async def test_notify_skips_high_severity(self):
+        """High severity rec does NOT trigger Telegram alert (only critical fires)."""
+        from app.services.background_scheduler import BackgroundSchedulerService
 
-                mock_instance.send_text.assert_called_once()
-                call_args = mock_instance.send_text.call_args
-                assert "S002-AHU-201" in call_args[0][1]
+        svc = BackgroundSchedulerService.__new__(BackgroundSchedulerService)
+        svc.logger = MagicMock()
+
+        ai_rec = MagicMock()
+        ai_rec.priority.name.lower.return_value = "high"
+        ai_rec.telemetry_context = {"equipment_id": "S002-AHU-201"}
+        ai_rec.title = "High priority issue"
+        ai_rec.confidence = 0.72
+        ai_rec.suggested_action = {"type": "pending_approval"}
+
+        svc._notify_recommendation_alert("S002", ai_rec)
 
     @pytest.mark.asyncio
     async def test_notify_skips_info_severity(self):
