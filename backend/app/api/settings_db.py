@@ -1,7 +1,7 @@
 """Settings API - Global system configuration from Supabase."""
 
 import logging
-from typing import Any, Dict, Optional
+from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -31,13 +31,13 @@ class RiskThresholdsUpdate(BaseModel):
 class SettingUpdate(BaseModel):
     """Generic setting update model."""
 
-    value: Dict[str, Any]
-    category: Optional[str] = None
-    description: Optional[str] = None
+    value: dict[str, Any]
+    category: str | None = None
+    description: str | None = None
 
 
 @router.get("/settings")
-async def get_all_settings() -> Dict[str, Any]:
+async def get_all_settings() -> dict[str, Any]:
     """Get all system settings from Supabase.
 
     Returns both public and private settings (admin only in production).
@@ -63,11 +63,11 @@ async def get_all_settings() -> Dict[str, Any]:
 
     except Exception as e:
         logger.error(f"Error loading settings: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to load settings from database: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to load settings from database: {e!s}")
 
 
 @router.get("/settings/public")
-async def get_public_settings() -> Dict[str, Any]:
+async def get_public_settings() -> dict[str, Any]:
     """Get public settings (accessible to all users).
 
     Returns only settings where is_public = TRUE.
@@ -85,11 +85,11 @@ async def get_public_settings() -> Dict[str, Any]:
 
     except Exception as e:
         logger.error(f"Error loading public settings: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to load public settings: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to load public settings: {e!s}")
 
 
 @router.get("/settings/health-thresholds")
-async def get_health_thresholds() -> Dict[str, int]:
+async def get_health_thresholds() -> dict[str, int]:
     """Get health score thresholds from database.
 
     Returns: {healthy: 90, warning: 70, critical: 50}
@@ -114,7 +114,7 @@ async def get_health_thresholds() -> Dict[str, int]:
 
 
 @router.put("/settings/health-thresholds")
-async def update_health_thresholds(thresholds: HealthThresholdsUpdate) -> Dict[str, int]:
+async def update_health_thresholds(thresholds: HealthThresholdsUpdate) -> dict[str, int]:
     """Update health score thresholds in database.
 
     Validates:
@@ -176,11 +176,11 @@ async def update_health_thresholds(thresholds: HealthThresholdsUpdate) -> Dict[s
 
     except Exception as e:
         logger.error(f"Error updating health thresholds: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to update health thresholds: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to update health thresholds: {e!s}")
 
 
 @router.get("/settings/risk-thresholds")
-async def get_risk_thresholds() -> Dict[str, int]:
+async def get_risk_thresholds() -> dict[str, int]:
     """Get risk score thresholds from database.
 
     Returns: {medium: 31, high: 61, critical: 81}
@@ -201,7 +201,7 @@ async def get_risk_thresholds() -> Dict[str, int]:
 
 
 @router.put("/settings/risk-thresholds")
-async def update_risk_thresholds(thresholds: RiskThresholdsUpdate) -> Dict[str, int]:
+async def update_risk_thresholds(thresholds: RiskThresholdsUpdate) -> dict[str, int]:
     """Update risk score thresholds in database."""
     for field in ["medium", "high", "critical"]:
         value = getattr(thresholds, field)
@@ -250,11 +250,11 @@ async def update_risk_thresholds(thresholds: RiskThresholdsUpdate) -> Dict[str, 
 
     except Exception as e:
         logger.error(f"Error updating risk thresholds: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to update risk thresholds: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to update risk thresholds: {e!s}")
 
 
 @router.get("/settings/alert-intervals")
-async def get_alert_intervals() -> Dict[str, int]:
+async def get_alert_intervals() -> dict[str, int]:
     """Get alert throttling intervals from database.
 
     Returns: {critical: 30, warning: 60, info: 1440}
@@ -277,7 +277,7 @@ async def get_alert_intervals() -> Dict[str, int]:
 
 
 @router.put("/settings/alert-intervals")
-async def update_alert_intervals(intervals: Dict[str, int]) -> Dict[str, int]:
+async def update_alert_intervals(intervals: dict[str, int]) -> dict[str, int]:
     """Update alert throttling intervals in database.
 
     Args:
@@ -318,11 +318,11 @@ async def update_alert_intervals(intervals: Dict[str, int]) -> Dict[str, int]:
 
     except Exception as e:
         logger.error(f"Error updating alert intervals: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to update alert intervals: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to update alert intervals: {e!s}")
 
 
 @router.get("/settings/{key}")
-async def get_setting(key: str) -> Dict[str, Any]:
+async def get_setting(key: str) -> dict[str, Any]:
     """Get a specific setting by key.
 
     Args:
@@ -355,11 +355,11 @@ async def get_setting(key: str) -> Dict[str, Any]:
         raise
     except Exception as e:
         logger.error(f"Error getting setting '{key}': {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to get setting: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get setting: {e!s}")
 
 
 @router.put("/settings/{key}")
-async def update_setting(key: str, update: SettingUpdate) -> Dict[str, Any]:
+async def update_setting(key: str, update: SettingUpdate) -> dict[str, Any]:
     """Update a specific setting by key.
 
     Args:
@@ -404,4 +404,4 @@ async def update_setting(key: str, update: SettingUpdate) -> Dict[str, Any]:
         raise
     except Exception as e:
         logger.error(f"Error updating setting '{key}': {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to update setting: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to update setting: {e!s}")

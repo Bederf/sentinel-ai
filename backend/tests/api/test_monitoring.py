@@ -13,7 +13,6 @@ import pytest
 from app.models.audit_log import AuditLogEntry
 from app.services.monitoring_service import MonitoringService
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------

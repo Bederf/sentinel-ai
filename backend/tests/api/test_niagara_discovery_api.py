@@ -12,14 +12,13 @@ Tests cover:
 import pytest
 
 from app.services.chat_tools import (
-    discover_niagara_points,
-    review_point_mapping,
-    approve_point_mapping,
-    correct_point_classification,
     CHAT_TOOLS,
     TOOL_HANDLERS,
+    approve_point_mapping,
+    correct_point_classification,
+    discover_niagara_points,
+    review_point_mapping,
 )
-
 
 # ---------------------------------------------------------------------------
 # Chat Tool Tests

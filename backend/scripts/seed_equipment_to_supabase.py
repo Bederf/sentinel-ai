@@ -13,10 +13,11 @@ This script:
 Run: python backend/scripts/seed_equipment_to_supabase.py
 """
 
-import sys
 import json
-from pathlib import Path
+import sys
 import uuid
+from pathlib import Path
+
 from dotenv import load_dotenv
 
 # Load environment variables from .env

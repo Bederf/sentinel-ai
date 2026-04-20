@@ -18,7 +18,7 @@ LLM usage: Zero. The graph is entirely deterministic Python.
 """
 
 import logging
-from typing import Annotated, Optional, TypedDict
+from typing import Annotated, TypedDict
 
 from langchain_core.messages import AIMessage, HumanMessage
 from langgraph.checkpoint.memory import MemorySaver
@@ -52,18 +52,18 @@ class ComplaintState(TypedDict):
     channel: str  # "chat" | "whatsapp" | "telegram"
 
     # Extracted info
-    desk_id: Optional[str]
+    desk_id: str | None
     complaint_types: list[str]  # supports compound: ["too_cold", "noise"]
-    description: Optional[str]
+    description: str | None
 
     # Resolved context (from existing handlers)
-    desk: Optional[dict]
-    zone: Optional[dict]
-    bms_context: Optional[dict]
+    desk: dict | None
+    zone: dict | None
+    bms_context: dict | None
 
     # History & diagnosis
-    history_summary: Optional[dict]
-    diagnosis: Optional[dict]
+    history_summary: dict | None
+    diagnosis: dict | None
     response: str  # Final formatted response for channel
     needs_input: bool  # True = waiting for user reply
 

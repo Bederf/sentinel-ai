@@ -1,6 +1,7 @@
 """Tests for demand_ratchet — rolling multi-month demand billing calculator."""
 
 import pytest
+
 from app.services.demand_ratchet import (
     DemandRatchetService,
     get_demand_ratchet_service,

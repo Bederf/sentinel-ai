@@ -8,10 +8,9 @@ Phase 28: SENTINEL Compliance
 
 from datetime import datetime
 from enum import Enum
-from typing import List, Optional, Dict, Any
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-
 
 # ============================================================================
 # Enums
@@ -110,12 +109,12 @@ class ComplianceChecklistTemplate(BaseModel):
         }
     )
 
-    id: Optional[str] = None
+    id: str | None = None
     compliance_type: ComplianceType
     requirement_standard: str  # e.g., 'NFPA 10', 'IEC 62034'
     template_name: str
-    description: Optional[str] = None
-    checklist_items: List[Dict[str, Any]] = Field(
+    description: str | None = None
+    checklist_items: list[dict[str, Any]] = Field(
         default_factory=list,
         description="Array of {item_id, description, frequency, evidence_required}",
     )
@@ -123,8 +122,8 @@ class ComplianceChecklistTemplate(BaseModel):
     is_active: bool = True
     version: int = 1
     created_by: str
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
 
 # ============================================================================
@@ -152,23 +151,23 @@ class ComplianceAudit(BaseModel):
         }
     )
 
-    id: Optional[str] = None
+    id: str | None = None
     site_id: str
     compliance_type: ComplianceType
     audit_type: str  # 'scheduled', 'unannounced', 'certification'
-    auditor_id: Optional[str] = None
-    auditor_role: Optional[str] = None  # 'Fire Safety Officer', 'Legionella Assessor'
-    findings: Dict[str, Any] = Field(
+    auditor_id: str | None = None
+    auditor_role: str | None = None  # 'Fire Safety Officer', 'Legionella Assessor'
+    findings: dict[str, Any] = Field(
         default_factory=dict,
         description="{critical_issues, recommendations, cost_estimates, action_items}",
     )
     status: AuditStatus = AuditStatus.DRAFT
-    evidence_url: Optional[str] = None
-    notes: Optional[str] = None
-    audit_date: Optional[datetime] = None
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
-    closed_date: Optional[datetime] = None
+    evidence_url: str | None = None
+    notes: str | None = None
+    audit_date: datetime | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+    closed_date: datetime | None = None
 
     @field_validator("audit_type")
     @classmethod
@@ -202,23 +201,23 @@ class FireEquipmentTracking(BaseModel):
         }
     )
 
-    id: Optional[str] = None
+    id: str | None = None
     site_id: str
-    zone_id: Optional[str] = None
+    zone_id: str | None = None
     equipment_type: FireEquipmentType
     location_description: str
-    unique_identifier: Optional[str] = None  # Serial number
-    last_inspection_date: Optional[datetime] = None
-    next_inspection_date: Optional[datetime] = None
+    unique_identifier: str | None = None  # Serial number
+    last_inspection_date: datetime | None = None
+    next_inspection_date: datetime | None = None
     inspection_frequency_months: int = 12
-    charge_pressure: Optional[float] = None  # PSI
-    pressure_test_date: Optional[datetime] = None
-    certification_expiry: Optional[datetime] = None
-    certified_by: Optional[str] = None
+    charge_pressure: float | None = None  # PSI
+    pressure_test_date: datetime | None = None
+    certification_expiry: datetime | None = None
+    certified_by: str | None = None
     status: str = "active"
     created_by: str = "system"
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
     @field_validator("inspection_frequency_months")
     @classmethod
@@ -251,23 +250,23 @@ class EmergencyLightTesting(BaseModel):
         }
     )
 
-    id: Optional[str] = None
+    id: str | None = None
     site_id: str
     light_code: str
     fixture_location: str
-    control_point_id: Optional[str] = None
-    last_test_date: Optional[datetime] = None
+    control_point_id: str | None = None
+    last_test_date: datetime | None = None
     test_interval_days: int = 365
-    next_test_date: Optional[datetime] = None
+    next_test_date: datetime | None = None
     auto_test_enabled: bool = True
     auto_test_time_utc: str = "01:00"
     battery_health_percent: int = 100
-    battery_health_trend: List[Dict[str, Any]] = Field(default_factory=list)
+    battery_health_trend: list[dict[str, Any]] = Field(default_factory=list)
     battery_alert_threshold: int = 75
-    test_results_history: List[Dict[str, Any]] = Field(default_factory=list)
+    test_results_history: list[dict[str, Any]] = Field(default_factory=list)
     created_by: str = "system"
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
     @field_validator("battery_health_percent")
     @classmethod
@@ -308,33 +307,33 @@ class LegionellaRiskAssessment(BaseModel):
         }
     )
 
-    id: Optional[str] = None
+    id: str | None = None
     site_id: str
     tower_code: str
-    equipment_id: Optional[str] = None
+    equipment_id: str | None = None
     risk_level: RiskLevel = RiskLevel.MEDIUM
-    water_temperature: Optional[float] = None
-    water_test_date: Optional[datetime] = None
-    water_test_result_cfu: Optional[int] = None  # CFU/mL
-    biocide_treatment_date: Optional[datetime] = None
+    water_temperature: float | None = None
+    water_test_date: datetime | None = None
+    water_test_result_cfu: int | None = None  # CFU/mL
+    biocide_treatment_date: datetime | None = None
     biocide_treatment_interval_days: int = 30
     temperature_monitoring: bool = True
     temperature_setpoint_celsius: float = 30.0
-    control_measures: Dict[str, Any] = Field(
+    control_measures: dict[str, Any] = Field(
         default_factory=dict,
         description="{UV_systems: bool, filtration: TEXT, treatment_type: TEXT}",
     )
-    notes: Optional[str] = None
-    assessed_by: Optional[str] = None
-    assessment_date: Optional[datetime] = None
+    notes: str | None = None
+    assessed_by: str | None = None
+    assessment_date: datetime | None = None
     status: str = "at_risk"
     created_by: str = "system"
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
     @field_validator("water_temperature")
     @classmethod
-    def validate_water_temp(cls, v: Optional[float]) -> Optional[float]:
+    def validate_water_temp(cls, v: float | None) -> float | None:
         """Water temperature validation (reasonable range)."""
         if v is not None and (v < 0 or v > 100):
             raise ValueError("Water temperature must be 0-100°C")
@@ -370,22 +369,22 @@ class ElectricalCompliance(BaseModel):
         }
     )
 
-    id: Optional[str] = None
+    id: str | None = None
     site_id: str
     certificate_type: ElectricalCertificateType
-    certificate_number: Optional[str] = None
+    certificate_number: str | None = None
     issued_by: str
-    issued_by_license: Optional[str] = None
-    issued_by_contact: Optional[str] = None
+    issued_by_license: str | None = None
+    issued_by_contact: str | None = None
     issue_date: datetime
-    expiry_date: Optional[datetime] = None
+    expiry_date: datetime | None = None
     scope: str
-    equipment_codes: List[str] = Field(default_factory=list)
+    equipment_codes: list[str] = Field(default_factory=list)
     status: str = "active"
-    certificate_url: Optional[str] = None
+    certificate_url: str | None = None
     created_by: str = "system"
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
     @field_validator("issue_date")
     @classmethod
@@ -429,30 +428,30 @@ class LiftInspectionTracking(BaseModel):
         }
     )
 
-    id: Optional[str] = None
+    id: str | None = None
     site_id: str
     lift_code: str
-    equipment_id: Optional[str] = None
+    equipment_id: str | None = None
     location_description: str
     inspection_type: LiftInspectionType
-    last_inspection_date: Optional[datetime] = None
-    next_inspection_date: Optional[datetime] = None
-    inspector_name: Optional[str] = None
-    inspector_license_number: Optional[str] = None
-    inspector_company: Optional[str] = None
-    test_results: Dict[str, Any] = Field(
+    last_inspection_date: datetime | None = None
+    next_inspection_date: datetime | None = None
+    inspector_name: str | None = None
+    inspector_license_number: str | None = None
+    inspector_company: str | None = None
+    test_results: dict[str, Any] = Field(
         default_factory=dict,
         description="{brake_load_test, speed_governor, emergency_stop_time, shaft_pressure}",
     )
-    test_date: Optional[datetime] = None
-    non_compliance_items: List[str] = Field(default_factory=list)
+    test_date: datetime | None = None
+    non_compliance_items: list[str] = Field(default_factory=list)
     is_compliant: bool = True
     status: str = "pending"
-    inspection_report_url: Optional[str] = None
-    inspection_notes: Optional[str] = None
+    inspection_report_url: str | None = None
+    inspection_notes: str | None = None
     created_by: str = "system"
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
 
 # ============================================================================
@@ -486,9 +485,9 @@ class ComplianceStatus(BaseModel):
     high_risk_items_count: int = 0
     items_expiring_30days: int = 0
     overdue_inspections: int = 0
-    last_audit_date: Optional[datetime] = None
+    last_audit_date: datetime | None = None
     compliance_score_percent: int = 100
-    summary: Dict[str, Any] = Field(
+    summary: dict[str, Any] = Field(
         default_factory=dict,
         description="{ohs_status, fire_status, electrical_status, legionella_status, lift_status}",
     )

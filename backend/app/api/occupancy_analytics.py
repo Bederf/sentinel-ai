@@ -13,9 +13,9 @@ Endpoints:
 - GET  /api/occupancy/control/history       — audit trail from Supabase
 """
 
-from fastapi import APIRouter, Depends, Query, HTTPException
 from datetime import datetime
-from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.middleware.auth_middleware import require_query_site_access
 from app.services.occupancy_profile_service import calculate_zone_occupancy
@@ -287,8 +287,8 @@ async def get_occupancy_control_status():
     Shows which zones have HVAC setpoints relaxed or lighting dimmed,
     their original values, and the last occupancy reading.
     """
-    from app.services.occupancy_control_service import get_occupancy_control_service
     from app.config.settings import settings
+    from app.services.occupancy_control_service import get_occupancy_control_service
 
     service = get_occupancy_control_service()
     zones = []
@@ -316,8 +316,8 @@ async def get_occupancy_control_status():
 @control_router.get("/history")
 async def get_occupancy_control_history(
     site_id: str = Query(..., description="Site ID"),
-    zone_id: Optional[str] = Query(None, description="Filter by zone"),
-    module: Optional[str] = Query(None, description="Filter: 'hvac' or 'lighting'"),
+    zone_id: str | None = Query(None, description="Filter by zone"),
+    module: str | None = Query(None, description="Filter: 'hvac' or 'lighting'"),
     limit: int = Query(50, ge=1, le=500),
 ):
     """Query the ``occupancy_control_actions`` audit trail from Supabase.

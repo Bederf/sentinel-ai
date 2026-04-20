@@ -1,11 +1,11 @@
 from datetime import datetime, timedelta
 
 from app.api import hvac
+from app.services import prediction_calculator as prediction_calculator_module
+from app.services import prediction_generator as prediction_generator_module
 from app.services.condition_scorer import ConditionScorer
 from app.services.prediction_calculator import PredictionCalculator
-from app.services import prediction_calculator as prediction_calculator_module
 from app.services.prediction_generator import PredictionGeneratorService
-from app.services import prediction_generator as prediction_generator_module
 
 
 def test_hvac_health_formula_weighted_sum_deterministic(monkeypatch):

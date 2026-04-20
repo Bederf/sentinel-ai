@@ -5,15 +5,15 @@ Provides tools for searching and fetching source code from the local codebase.
 Tools are registered with the MCP server and callable via the standard MCP interface.
 """
 
-from typing import Any, Dict, List
 import logging
+from typing import Any
 
 from .search import (
-    search_files_by_pattern,
-    search_file_contents,
-    search_symbols,
     build_directory_tree,
     fetch_file_content,
+    search_file_contents,
+    search_files_by_pattern,
+    search_symbols,
 )
 
 logger = logging.getLogger(__name__)
@@ -106,7 +106,7 @@ TOOLS = [
 # =============================================================================
 
 
-async def code_search(**kwargs) -> Dict[str, Any]:
+async def code_search(**kwargs) -> dict[str, Any]:
     """
     Handler for code_search tool.
 
@@ -160,10 +160,10 @@ async def code_search(**kwargs) -> Dict[str, Any]:
 
     except Exception as e:
         logger.error(f"code_search error: {e}", exc_info=True)
-        return {"error": f"Search failed: {str(e)}"}
+        return {"error": f"Search failed: {e!s}"}
 
 
-async def code_fetch(**kwargs) -> Dict[str, Any]:
+async def code_fetch(**kwargs) -> dict[str, Any]:
     """
     Handler for code_fetch tool.
 
@@ -179,10 +179,10 @@ async def code_fetch(**kwargs) -> Dict[str, Any]:
         return result
     except Exception as e:
         logger.error(f"code_fetch error: {e}", exc_info=True)
-        return {"error": f"Fetch failed: {str(e)}"}
+        return {"error": f"Fetch failed: {e!s}"}
 
 
-async def code_structure(**kwargs) -> Dict[str, Any]:
+async def code_structure(**kwargs) -> dict[str, Any]:
     """
     Handler for code_structure tool.
 
@@ -197,7 +197,7 @@ async def code_structure(**kwargs) -> Dict[str, Any]:
         return result
     except Exception as e:
         logger.error(f"code_structure error: {e}", exc_info=True)
-        return {"error": f"Structure retrieval failed: {str(e)}"}
+        return {"error": f"Structure retrieval failed: {e!s}"}
 
 
 # =============================================================================
@@ -205,7 +205,7 @@ async def code_structure(**kwargs) -> Dict[str, Any]:
 # =============================================================================
 
 
-def get_code_tools() -> List[Dict[str, Any]]:
+def get_code_tools() -> list[dict[str, Any]]:
     """
     Get code tool definitions for MCP registration.
 
@@ -215,7 +215,7 @@ def get_code_tools() -> List[Dict[str, Any]]:
     return TOOLS
 
 
-def get_code_handlers() -> Dict[str, Any]:
+def get_code_handlers() -> dict[str, Any]:
     """
     Get code tool handlers for MCP invocation.
 

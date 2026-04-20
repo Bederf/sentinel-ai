@@ -8,10 +8,11 @@ Provides REST endpoints for:
 - Getting ML training data
 """
 
+from datetime import datetime
+from typing import Any
+
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
-from typing import List, Optional, Dict, Any
-from datetime import datetime
 
 router = APIRouter(prefix="/api/timeseries", tags=["timeseries"])
 
@@ -25,15 +26,15 @@ class SensorReading(BaseModel):
     equipment_id: str
     sensor_type: str
     value: float
-    timestamp: Optional[datetime] = None
-    unit: Optional[str] = None
-    tags: Optional[Dict[str, str]] = None
+    timestamp: datetime | None = None
+    unit: str | None = None
+    tags: dict[str, str] | None = None
 
 
 class BatchReadings(BaseModel):
     """Multiple sensor readings for batch write."""
 
-    readings: List[SensorReading]
+    readings: list[SensorReading]
 
 
 class WriteResponse(BaseModel):
@@ -49,7 +50,7 @@ class QueryResult(BaseModel):
 
     equipment_id: str
     sensor_type: str
-    data: List[Dict[str, Any]]
+    data: list[dict[str, Any]]
     count: int
 
 
@@ -57,9 +58,9 @@ class MLDataResult(BaseModel):
     """Result formatted for ML training."""
 
     equipment_id: str
-    sensor_types: List[str]
+    sensor_types: list[str]
     hours: int
-    data: Dict[str, List[float]]
+    data: dict[str, list[float]]
 
 
 # ============= Write Endpoints =============
@@ -124,7 +125,7 @@ async def write_batch_readings(batch: BatchReadings):
 
 
 @router.get("/query/raw", response_model=QueryResult)
-async def query_raw_data(equipment_id: str, sensor_type: str, start: datetime, end: Optional[datetime] = None):
+async def query_raw_data(equipment_id: str, sensor_type: str, start: datetime, end: datetime | None = None):
     """
     Query raw sensor data for a time range.
 

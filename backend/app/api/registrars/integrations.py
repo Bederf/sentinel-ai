@@ -6,9 +6,19 @@ lighting, SIMBIOT Concept, and energy systems.
 
 from fastapi import FastAPI
 
-from app.api import niagara, niagara_bacnet, niagara_discovery
-from app.api import lighting, energy, generators, energy_centre
-from app.api import concept, integration, solar, water
+from app.api import (
+    concept,
+    energy,
+    energy_centre,
+    generators,
+    integration,
+    lighting,
+    niagara,
+    niagara_bacnet,
+    niagara_discovery,
+    solar,
+    water,
+)
 
 
 def register_integrations_routers(app: FastAPI) -> None:

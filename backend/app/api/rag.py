@@ -5,17 +5,17 @@ AUDITOR (level 1), write operations require OPERATOR (level 2).
 Health check endpoint is unauthenticated.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
-from typing import Optional, List, Dict
 import logging
 
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
+
+from app.database.supabase_client import get_supabase_client
 from app.models.auth import AuthContext
 from app.security.pipeline import prompt_guard, require_role
+from app.services.ollama_client import get_ollama_client
 from app.services.rag_service import get_rag_service
 from app.services.vector_db import get_vector_db_service
-from app.services.ollama_client import get_ollama_client
-from app.database.supabase_client import get_supabase_client
 from app.utils.ai_provenance import get_claude_provenance
 
 logger = logging.getLogger(__name__)
@@ -27,7 +27,7 @@ router = APIRouter(prefix="/api/rag", tags=["rag"])
 
 class QueryRequest(BaseModel):
     query: str
-    equipment_type: Optional[str] = None
+    equipment_type: str | None = None
     use_hybrid: bool = True
     use_local_llm: bool = True
 
@@ -36,7 +36,7 @@ class QueryResponse(BaseModel):
     query: str
     response: str
     context_used: str
-    equipment_type: Optional[str]
+    equipment_type: str | None
     llm_used: str
 
 
@@ -46,13 +46,13 @@ class DocumentRequest(BaseModel):
     document_type: str
     equipment_type: str
     full_text: str
-    site_id: Optional[str] = None
+    site_id: str | None = None
     source: str = "internal_procedure"
-    manufacturer: Optional[str] = None
-    model: Optional[str] = None
-    summary: Optional[str] = None
-    keywords: Optional[List[str]] = None
-    failure_modes: Optional[List[str]] = None
+    manufacturer: str | None = None
+    model: str | None = None
+    summary: str | None = None
+    keywords: list[str] | None = None
+    failure_modes: list[str] | None = None
 
 
 class KnowledgeRequest(BaseModel):
@@ -60,17 +60,17 @@ class KnowledgeRequest(BaseModel):
     knowledge_type: str
     title: str
     description: str
-    code: Optional[str] = None
-    component: Optional[str] = None
-    manufacturer: Optional[str] = None
-    model: Optional[str] = None
-    symptoms: Optional[List[str]] = None
-    possible_causes: Optional[List[str]] = None
-    diagnostic_steps: Optional[List[str]] = None
-    solution: Optional[str] = None
-    parts_required: Optional[Dict] = None
-    estimated_labor_hours: Optional[float] = None
-    priority: Optional[str] = None
+    code: str | None = None
+    component: str | None = None
+    manufacturer: str | None = None
+    model: str | None = None
+    symptoms: list[str] | None = None
+    possible_causes: list[str] | None = None
+    diagnostic_steps: list[str] | None = None
+    solution: str | None = None
+    parts_required: dict | None = None
+    estimated_labor_hours: float | None = None
+    priority: str | None = None
 
 
 # Endpoints
@@ -103,10 +103,10 @@ async def query_rag(
 @router.get("/search")
 async def search_documents(
     query: str = Query(..., description="Search query"),
-    equipment_type: Optional[str] = Query(None, description="Filter by equipment type"),
-    document_type: Optional[str] = Query(None, description="Filter by document type"),
-    site_id: Optional[str] = Query(None, description="Filter by site/building"),
-    source: Optional[str] = Query(None, description="Filter by document source"),
+    equipment_type: str | None = Query(None, description="Filter by equipment type"),
+    document_type: str | None = Query(None, description="Filter by document type"),
+    site_id: str | None = Query(None, description="Filter by site/building"),
+    source: str | None = Query(None, description="Filter by document source"),
     n_results: int = Query(5, ge=1, le=20, description="Number of results"),
     similarity_threshold: float = Query(0.7, ge=0.0, le=1.0, description="Minimum similarity score"),
     auth: AuthContext = Depends(require_role(1)),
@@ -138,8 +138,8 @@ async def search_documents(
 @router.get("/search/knowledge")
 async def search_knowledge(
     query: str = Query(..., description="Search query"),
-    equipment_type: Optional[str] = Query(None, description="Filter by equipment type"),
-    knowledge_type: Optional[str] = Query(None, description="Filter by knowledge type"),
+    equipment_type: str | None = Query(None, description="Filter by equipment type"),
+    knowledge_type: str | None = Query(None, description="Filter by knowledge type"),
     n_results: int = Query(5, ge=1, le=20, description="Number of results"),
     auth: AuthContext = Depends(require_role(1)),
 ):
@@ -157,7 +157,7 @@ async def search_knowledge(
 @router.get("/search/hybrid")
 async def hybrid_search(
     query: str = Query(..., description="Search query"),
-    equipment_type: Optional[str] = Query(None, description="Filter by equipment type"),
+    equipment_type: str | None = Query(None, description="Filter by equipment type"),
     n_results: int = Query(5, ge=1, le=20, description="Number of results"),
     keyword_weight: float = Query(0.3, ge=0.0, le=1.0, description="Weight for keyword matching"),
     semantic_weight: float = Query(0.7, ge=0.0, le=1.0, description="Weight for semantic matching"),
@@ -311,8 +311,8 @@ async def add_knowledge(request: KnowledgeRequest, auth: AuthContext = Depends(r
 
 @router.get("/documents")
 async def list_documents(
-    equipment_type: Optional[str] = Query(None, description="Filter by equipment type"),
-    document_type: Optional[str] = Query(None, description="Filter by document type"),
+    equipment_type: str | None = Query(None, description="Filter by equipment type"),
+    document_type: str | None = Query(None, description="Filter by document type"),
     limit: int = Query(50, ge=1, le=200, description="Maximum number of results"),
     auth: AuthContext = Depends(require_role(1)),
 ):

@@ -20,10 +20,10 @@ Usage:
 """
 
 import asyncio
-import sys
 import json
 import logging
-from typing import Any, Dict, Optional
+import sys
+from typing import Any
 
 from app.mcp import SIMBIOTMCPServer
 
@@ -41,7 +41,7 @@ class MCPServerStdio:
         self.server = SIMBIOTMCPServer()
         self.request_id = 0
 
-    async def send_response(self, result: Any = None, error: Optional[Dict] = None, request_id: Optional[int] = None):
+    async def send_response(self, result: Any = None, error: dict | None = None, request_id: int | None = None):
         """Send a JSON-RPC response to stdout."""
         response = {
             "jsonrpc": "2.0",
@@ -69,7 +69,7 @@ class MCPServerStdio:
         sys.stdout.write(json.dumps(notification) + "\n")
         sys.stdout.flush()
 
-    async def handle_initialize(self, params: Dict, request_id: int) -> Dict:
+    async def handle_initialize(self, params: dict, request_id: int) -> dict:
         """Handle initialize request from client."""
         logger.info(f"Client initializing: {params.get('clientInfo', {})}")
 
@@ -79,12 +79,12 @@ class MCPServerStdio:
             "capabilities": {"tools": {}},
         }
 
-    async def handle_tools_list(self, request_id: int) -> Dict:
+    async def handle_tools_list(self, request_id: int) -> dict:
         """List available tools."""
         tools = self.server.list_tools()
         return {"tools": tools}
 
-    async def handle_tools_call(self, params: Dict, request_id: int) -> Dict:
+    async def handle_tools_call(self, params: dict, request_id: int) -> dict:
         """Execute a tool call."""
         tool_name = params.get("name")
         arguments = params.get("arguments", {})
@@ -93,12 +93,12 @@ class MCPServerStdio:
             result = await self.server.call_tool(tool_name, **arguments)
             return {"content": [{"type": "text", "text": json.dumps(result, indent=2)}]}
         except ValueError as e:
-            return {"content": [{"type": "text", "text": f"Error: {str(e)}"}], "isError": True}
+            return {"content": [{"type": "text", "text": f"Error: {e!s}"}], "isError": True}
         except Exception as e:
             logger.error(f"Tool execution error: {e}", exc_info=True)
-            return {"content": [{"type": "text", "text": f"Internal error: {str(e)}"}], "isError": True}
+            return {"content": [{"type": "text", "text": f"Internal error: {e!s}"}], "isError": True}
 
-    async def handle_request(self, request: Dict):
+    async def handle_request(self, request: dict):
         """Handle an incoming JSON-RPC request."""
         method = request.get("method")
         params = request.get("params", {})
@@ -130,7 +130,7 @@ class MCPServerStdio:
         except Exception as e:
             logger.error(f"Error handling request: {e}", exc_info=True)
             await self.send_response(
-                error={"code": -32603, "message": f"Internal error: {str(e)}"}, request_id=request_id
+                error={"code": -32603, "message": f"Internal error: {e!s}"}, request_id=request_id
             )
 
     async def run(self):

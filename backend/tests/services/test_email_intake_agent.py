@@ -7,8 +7,9 @@ with mocked LLM responses.
 from __future__ import annotations
 
 import json
-import pytest
 from unittest.mock import AsyncMock, patch
+
+import pytest
 
 from app.services.email_intake_agent import (
     AgentResult,
@@ -16,7 +17,6 @@ from app.services.email_intake_agent import (
     _build_taxonomy_reference,
     get_email_intake_agent,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures

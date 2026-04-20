@@ -426,14 +426,9 @@ class SecurityOccupancyService:
             - energy_impact: Estimated kWh excess consumption
             - recommendation: Action for operator
         """
-        from app.config.settings import settings
         from app.services.ccure import CCureAdapter
 
         after_hours_events = []
-
-        if settings.sentinel_island_mode:
-            logger.info("Skipping after-hours security seeded correlation in SENTINEL_ISLAND_MODE")
-            return after_hours_events
 
         adapter = CCureAdapter(seeded_mode=False)
 
@@ -562,14 +557,9 @@ class SecurityOccupancyService:
             - ups_status: UPS battery level
             - recommendation: Action for operator
         """
-        from app.config.settings import settings
         from app.services.ccure import CCureAdapter
 
         health_issues = []
-
-        if settings.sentinel_island_mode:
-            logger.info("Skipping security equipment seeded correlation in SENTINEL_ISLAND_MODE")
-            return health_issues
 
         adapter = CCureAdapter(seeded_mode=False)
 

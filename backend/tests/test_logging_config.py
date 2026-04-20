@@ -4,7 +4,7 @@ import logging
 from pathlib import Path
 from unittest.mock import patch
 
-from app.logging_config import setup_logging, _get_writable_log_dir
+from app.logging_config import _get_writable_log_dir, setup_logging
 
 
 class TestGetWritableLogDir:

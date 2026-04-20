@@ -164,10 +164,7 @@ async def kill_switch():
 
     # 3. Avoid fabricating a local simulation source on production islands
     try:
-        if settings.sentinel_island_mode:
-            actions.append("connector_mode: unchanged (production island)")
-        else:
-            settings.solar_connector_mode = "simulation"
+        settings.solar_connector_mode = "simulation"
             actions.append("connector_mode: simulation")
     except Exception as e:
         errors.append(f"mode_switch_failed: {e}")

@@ -9,8 +9,8 @@ class TestPullLiveAnomalyScores:
     @pytest.mark.asyncio
     async def test_pull_live_anomaly_scores_returns_equipment_with_scores(self):
         """Returns equipment that has at least one of anomaly_score or lstm_anomaly_score."""
-        from unittest.mock import patch, AsyncMock
-        import app.services.ai_optimizer as ao_mod
+        from unittest.mock import patch
+
 
         svc = AIOptimizerService()
 
@@ -54,7 +54,7 @@ class TestPullLiveAnomalyScores:
     async def test_pull_live_anomaly_scores_excludes_equipment_without_scores(self):
         """Equipment with both scores None is excluded from results."""
         from unittest.mock import patch
-        import app.services.ai_optimizer as ao_mod
+
 
         svc = AIOptimizerService()
 

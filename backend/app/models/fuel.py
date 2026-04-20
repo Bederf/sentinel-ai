@@ -10,9 +10,9 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import StrEnum
-from typing import Any, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -41,10 +41,10 @@ class FuelTelemetry:
     fuel_level_litres: float = 0.0
     fuel_level_mm: float = 0.0
     fuel_temp_c: float = 0.0
-    consumption_rate_lph: Optional[float] = None
+    consumption_rate_lph: float | None = None
     consumption_anomaly: bool = False
-    runtime_remaining_hrs: Optional[float] = None
-    days_to_empty: Optional[float] = None
+    runtime_remaining_hrs: float | None = None
+    days_to_empty: float | None = None
     generator_running: bool = False
     leak_detected: bool = False
     overfill_alert: bool = False
@@ -54,7 +54,7 @@ class FuelTelemetry:
     rssi: int = 0
     uptime_s: int = 0
     ts: int = 0
-    received_at: datetime = field(default_factory=lambda: datetime.now(tz=timezone.utc))
+    received_at: datetime = field(default_factory=lambda: datetime.now(tz=UTC))
 
 
 @dataclass
@@ -67,7 +67,7 @@ class FuelEvent:
     event_type: str
     payload: dict = field(default_factory=dict)
     ts: int = 0
-    received_at: datetime = field(default_factory=lambda: datetime.now(tz=timezone.utc))
+    received_at: datetime = field(default_factory=lambda: datetime.now(tz=UTC))
 
 
 @dataclass
@@ -85,7 +85,7 @@ class FuelTankConfig:
     consumption_spec_lph: float = 45.0
 
 
-def parse_fuel_telemetry(topic: str, payload: bytes | str | dict[str, Any]) -> Optional[FuelTelemetry]:
+def parse_fuel_telemetry(topic: str, payload: bytes | str | dict[str, Any]) -> FuelTelemetry | None:
     """Parse an MQTT fuel telemetry message into a FuelTelemetry dataclass.
 
     Returns None on invalid or incomplete payload (logs warning).

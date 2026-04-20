@@ -1,12 +1,12 @@
 """Tests for the Explanation Parser."""
 
 from ml.explanations.parser import (
+    ActionPriority,
     ExplanationParser,
     ParsedExplanation,
     ParsedRecommendation,
-    RecommendedAction,
     PartNeeded,
-    ActionPriority,
+    RecommendedAction,
     parse_llm_explanation,
     parse_llm_recommendation,
 )

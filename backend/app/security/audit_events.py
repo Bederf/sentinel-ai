@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
-from typing import Any, Optional
+from typing import Any
 
 from app.security.constants import REDACTED_SNIPPET_MAX_LENGTH
 
@@ -105,10 +105,10 @@ def write_security_audit(
     event_type: str,
     *,
     user: str = "system",
-    source_ip: Optional[str] = None,
-    input_hash: Optional[str] = None,
-    snippet: Optional[str] = None,
-    metadata: Optional[dict[str, Any]] = None,
+    source_ip: str | None = None,
+    input_hash: str | None = None,
+    snippet: str | None = None,
+    metadata: dict[str, Any] | None = None,
 ) -> str:
     """Write a security audit event to the existing audit system.
 
@@ -214,7 +214,7 @@ def _send_telegram_alert(
     event_type: str,
     severity: str,
     user: str,
-    source_ip: Optional[str],
+    source_ip: str | None,
     snippet: str,
 ) -> None:
     """Send a Telegram alert for critical security events via Sentry.
@@ -258,7 +258,7 @@ def audit_prompt_guard_block(
     score: float,
     source: str = "direct",
     user: str = "system",
-    source_ip: Optional[str] = None,
+    source_ip: str | None = None,
 ) -> str:
     """Audit a prompt guard block event."""
     return write_security_audit(
@@ -276,7 +276,7 @@ def audit_prompt_guard_rewrite(
     score: float,
     source: str = "direct",
     user: str = "system",
-    source_ip: Optional[str] = None,
+    source_ip: str | None = None,
 ) -> str:
     """Audit a prompt guard rewrite event."""
     return write_security_audit(
@@ -342,7 +342,7 @@ def audit_tool_denied(
 def audit_step_up_failed(
     user: str,
     device_id: str,
-    source_ip: Optional[str] = None,
+    source_ip: str | None = None,
 ) -> str:
     """Audit a failed step-up authentication attempt."""
     return write_security_audit(
@@ -356,7 +356,7 @@ def audit_step_up_failed(
 def audit_webhook_suspicious(
     webhook_type: str,
     reason: str,
-    source_ip: Optional[str] = None,
+    source_ip: str | None = None,
 ) -> str:
     """Audit a suspicious webhook request."""
     return write_security_audit(
@@ -369,7 +369,7 @@ def audit_webhook_suspicious(
 def audit_config_change(
     setting_key: str,
     user: str,
-    source_ip: Optional[str] = None,
+    source_ip: str | None = None,
 ) -> str:
     """Audit a configuration change."""
     return write_security_audit(
@@ -382,7 +382,7 @@ def audit_config_change(
 
 def audit_rate_limit_exceeded(
     path: str,
-    source_ip: Optional[str] = None,
+    source_ip: str | None = None,
 ) -> str:
     """Audit a rate limit exceeded event."""
     return write_security_audit(
@@ -399,7 +399,7 @@ def audit_bola_site_denied(
     site_id: str,
     path: str,
     method: str = "GET",
-    source_ip: Optional[str] = None,
+    source_ip: str | None = None,
 ) -> str:
     """Audit a BOLA site access denial.
 
@@ -428,7 +428,7 @@ def audit_bola_equipment_denied(
     derived_site: str,
     path: str,
     method: str = "GET",
-    source_ip: Optional[str] = None,
+    source_ip: str | None = None,
 ) -> str:
     """Audit a BOLA equipment access denial.
 

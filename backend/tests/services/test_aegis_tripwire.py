@@ -5,23 +5,24 @@ Covers:
 - _check_tripwire_repeated_hash: fires at >= 3 unapproved same-hash in 1h
 """
 
-import pytest
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
+import pytest
+
+from app.database.repositories.parasite_decision_repository import (
+    ParasiteDecisionRepository,
+)
 from app.services.aegis_bridge import (
     _check_tripwire_gate_fail,
     _check_tripwire_repeated_hash,
 )
-from app.database.repositories.parasite_decision_repository import (
-    ParasiteDecisionRepository,
-)
 
 
 def _now_iso(offset_minutes: int = 0) -> str:
-    dt = datetime.now(timezone.utc) + timedelta(minutes=offset_minutes)
+    dt = datetime.now(UTC) + timedelta(minutes=offset_minutes)
     return dt.isoformat()
 
 

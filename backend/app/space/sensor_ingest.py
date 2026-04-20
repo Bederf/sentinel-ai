@@ -12,18 +12,17 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Header, HTTPException, Query
 
+from app.space import space_repository as repo
 from app.space.models import (
     RoomStateResponse,
     SensorDeviceInfo,
     SensorEventPayload,
     SensorEventResponse,
 )
-from app.space import space_repository as repo
 from app.space.room_state_engine import evaluate_room_state
 
 logger = logging.getLogger("sentinel.space.ingest")
@@ -39,7 +38,7 @@ router = APIRouter(prefix="/api/space", tags=["space-occupancy"])
 @router.post("/events", response_model=SensorEventResponse)
 async def ingest_sensor_event(
     payload: SensorEventPayload,
-    authorization: Optional[str] = Header(None),
+    authorization: str | None = Header(None),
 ):
     """Ingest a sensor state-change or heartbeat event."""
 
@@ -62,7 +61,7 @@ async def ingest_sensor_event(
             detail=f"Room code mismatch: token registered to {device.get('room_code')}",
         )
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     site_id = device.get("site_id", "FLN02")
 
     # --- Persist raw event ---
@@ -130,7 +129,7 @@ async def ingest_sensor_event(
         booking_data=None,  # No booking integration yet
     )
 
-    alarm_id: Optional[str] = None
+    alarm_id: str | None = None
     for finding in findings:
         finding_dict = finding.model_dump()
         finding_dict["id"] = str(uuid.uuid4())
@@ -235,7 +234,7 @@ async def get_devices(site_id: str = Query("FLN02")):
 
 
 @router.get("/findings")
-async def get_findings(room_code: Optional[str] = Query(None)):
+async def get_findings(room_code: str | None = Query(None)):
     """Return active (unresolved) findings, optionally filtered by room."""
     findings = await repo.get_active_findings(room_code=room_code)
     return findings

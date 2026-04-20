@@ -5,7 +5,7 @@ for the escalation system.
 """
 
 import os
-from typing import Dict, Any
+from typing import Any
 
 # Email Configuration
 EMAIL_CONFIG = {
@@ -146,7 +146,7 @@ RATE_LIMITS = {
 }
 
 
-def get_notification_config() -> Dict[str, Any]:
+def get_notification_config() -> dict[str, Any]:
     """Get complete notification configuration."""
     return {
         "email": {

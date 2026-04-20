@@ -9,8 +9,8 @@ from unittest.mock import patch
 import pytest
 
 from app.database.repositories.room_registry_repository import (
-    RoomRegistryRepository,
     _JSON_FALLBACK_PATH,
+    RoomRegistryRepository,
 )
 
 # ---------------------------------------------------------------------------

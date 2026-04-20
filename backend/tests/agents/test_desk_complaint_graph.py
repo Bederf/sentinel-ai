@@ -14,19 +14,18 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 os.environ.setdefault("DEMO_MODE", "true")
 
-from app.agents.complaint_nlp import (  # noqa: E402
+from app.agents.complaint_nlp import (
     detect_comfort_complaint,
     extract_complaint_types,
     extract_desk_id,
     extract_duration,
 )
-from app.agents.formatters import (  # noqa: E402
+from app.agents.formatters import (
     format_for_chat,
     format_for_telegram,
     format_for_whatsapp,
 )
-from app.models.complaint import ComplaintDiagnosis, Desk, HVACZone  # noqa: E402
-
+from app.models.complaint import ComplaintDiagnosis, Desk, HVACZone
 
 # ===================================================================
 # NLP: detect_comfort_complaint

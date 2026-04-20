@@ -23,7 +23,6 @@ from app.services.niagara.point_classifier import (
 )
 from app.services.niagara.point_discovery import PointDiscoveryService
 
-
 # ------------------------------------------------------------------
 # Fixtures
 # ------------------------------------------------------------------
@@ -281,10 +280,10 @@ class TestCSVUploadAPI:
     @pytest.mark.asyncio
     async def test_csv_upload_rejects_non_csv(self):
         """Non-CSV uploads are rejected with 400."""
+        from fastapi import FastAPI
         from fastapi.testclient import TestClient
 
         from app.api.niagara_discovery import router
-        from fastapi import FastAPI
 
         app = FastAPI()
         app.include_router(router)

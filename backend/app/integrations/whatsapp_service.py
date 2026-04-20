@@ -4,11 +4,12 @@ Supports both Meta Cloud API and Twilio providers.
 """
 
 import hmac
-import httpx
+import logging
 import os
 from datetime import datetime
-from typing import Any, Dict, Optional
-import logging
+from typing import Any
+
+import httpx
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +67,7 @@ class WhatsAppService:
             else:
                 logger.warning("WhatsApp Twilio credentials not fully configured")
 
-    async def send_text_message(self, to_number: str, message: str, context_id: Optional[str] = None) -> Dict[str, Any]:
+    async def send_text_message(self, to_number: str, message: str, context_id: str | None = None) -> dict[str, Any]:
         """
         Send text message via WhatsApp.
 
@@ -91,7 +92,7 @@ class WhatsAppService:
             logger.error(f"Error sending WhatsApp message: {e}")
             return {"success": False, "error": str(e)}
 
-    async def _send_meta_text(self, to_number: str, message: str, context_id: Optional[str] = None) -> Dict[str, Any]:
+    async def _send_meta_text(self, to_number: str, message: str, context_id: str | None = None) -> dict[str, Any]:
         """Send via Meta Cloud API."""
         payload = {
             "messaging_product": "whatsapp",
@@ -131,7 +132,7 @@ class WhatsAppService:
                 "to": to_number,
             }
 
-    async def _send_twilio_text(self, to_number: str, message: str) -> Dict[str, Any]:
+    async def _send_twilio_text(self, to_number: str, message: str) -> dict[str, Any]:
         """Send via Twilio."""
         # Ensure whatsapp: prefix is present but not duplicated
         to_wa = to_number if to_number.startswith("whatsapp:") else f"whatsapp:{to_number}"
@@ -173,7 +174,7 @@ class WhatsAppService:
             logger.warning(f"Invalid webhook token attempted: {token[:10]}...")
         return is_valid
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """Get WhatsApp service status."""
         return {
             "enabled": self.enabled,
@@ -184,10 +185,10 @@ class WhatsAppService:
 
 
 # Singleton instance
-_whatsapp_service: Optional[WhatsAppService] = None
+_whatsapp_service: WhatsAppService | None = None
 
 
-def get_whatsapp_service(provider: Optional[str] = None) -> WhatsAppService:
+def get_whatsapp_service(provider: str | None = None) -> WhatsAppService:
     """Get or create WhatsApp service singleton.
 
     Auto-detects provider: explicit arg > WHATSAPP_PROVIDER env > Twilio if SID set > meta fallback.

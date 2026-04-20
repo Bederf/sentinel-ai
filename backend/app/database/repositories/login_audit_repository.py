@@ -4,10 +4,11 @@ Login Audit Repository - Database operations for login audit logging.
 Tracks all login attempts for security auditing and compliance.
 """
 
-from typing import Optional, List, Dict, Any
-from datetime import datetime, timedelta
-from ..supabase_client import get_supabase_client
 import logging
+from datetime import datetime, timedelta
+from typing import Any
+
+from ..supabase_client import get_supabase_client
 
 logger = logging.getLogger(__name__)
 
@@ -24,11 +25,11 @@ class LoginAuditRepository:
         user_id: str,
         user_role: str,
         source_ip: str,
-        user_agent: Optional[str] = None,
+        user_agent: str | None = None,
         is_new_user: bool = False,
         success: bool = True,
-        failure_reason: Optional[str] = None,
-    ) -> Optional[Dict[str, Any]]:
+        failure_reason: str | None = None,
+    ) -> dict[str, Any] | None:
         """
         Log a login attempt.
 
@@ -78,11 +79,11 @@ class LoginAuditRepository:
     def get_recent_logins(
         self,
         limit: int = 100,
-        user_email: Optional[str] = None,
-        source_ip: Optional[str] = None,
-        success_only: Optional[bool] = None,
-        hours: Optional[int] = None,
-    ) -> List[Dict[str, Any]]:
+        user_email: str | None = None,
+        source_ip: str | None = None,
+        success_only: bool | None = None,
+        hours: int | None = None,
+    ) -> list[dict[str, Any]]:
         """
         Get recent login records with optional filtering.
 
@@ -124,7 +125,7 @@ class LoginAuditRepository:
             logger.error(f"Error getting login audit: {e}")
             return []
 
-    def get_login_stats(self, hours: int = 24) -> Dict[str, Any]:
+    def get_login_stats(self, hours: int = 24) -> dict[str, Any]:
         """
         Get login statistics for the specified time period.
 
@@ -169,7 +170,7 @@ class LoginAuditRepository:
             logger.error(f"Error getting login stats: {e}")
             return {"total": 0, "successful": 0, "failed": 0, "new_users": 0, "unique_users": 0}
 
-    def get_user_login_history(self, user_email: str, limit: int = 50) -> List[Dict[str, Any]]:
+    def get_user_login_history(self, user_email: str, limit: int = 50) -> list[dict[str, Any]]:
         """
         Get login history for a specific user.
 
@@ -182,7 +183,7 @@ class LoginAuditRepository:
         """
         return self.get_recent_logins(limit=limit, user_email=user_email)
 
-    def get_suspicious_activity(self, hours: int = 24) -> Dict[str, Any]:
+    def get_suspicious_activity(self, hours: int = 24) -> dict[str, Any]:
         """
         Detect potentially suspicious login activity.
 
@@ -213,7 +214,7 @@ class LoginAuditRepository:
             records = result.data or []
 
             # Count failed logins by IP
-            failed_by_ip: Dict[str, int] = {}
+            failed_by_ip: dict[str, int] = {}
             for r in records:
                 if not r.get("success"):
                     ip = r.get("source_ip", "unknown")
@@ -223,7 +224,7 @@ class LoginAuditRepository:
             failed_ips = [{"ip": ip, "count": count} for ip, count in failed_by_ip.items() if count >= 5]
 
             # Users logging in from many IPs
-            user_ips: Dict[str, set] = {}
+            user_ips: dict[str, set] = {}
             for r in records:
                 email = r.get("user_email", "")
                 ip = r.get("source_ip", "")
@@ -254,7 +255,7 @@ class LoginAuditRepository:
 
 
 # Singleton instance
-_repository: Optional[LoginAuditRepository] = None
+_repository: LoginAuditRepository | None = None
 
 
 def get_login_audit_repository() -> LoginAuditRepository:

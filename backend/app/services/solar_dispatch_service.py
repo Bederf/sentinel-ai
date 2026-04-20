@@ -387,20 +387,11 @@ class SolarDispatchService:
 
     # === Real SOC ===
 
-    async def _get_current_soc(self, site_id: str) -> float:
+    async def get_current_soc_async(self, site_id: str) -> float:
         """Get current BESS SOC, preferring real hardware reads when in live mode.
 
-        Falls back to cached SOC only on production islands; local simulation
-        remains available for non-island development.
+        Falls back to simulated values when no hardware is connected.
         """
-        from app.config.settings import settings
-
-        if settings.sentinel_island_mode:
-            if site_id in self._last_real_soc:
-                return self._last_real_soc[site_id]
-            logger.warning("No live SOC available for %s in SENTINEL_ISLAND_MODE; using 0.0 fail-closed value", site_id)
-            return 0.0
-
         if settings.solar_connector_mode == "simulation":
             return self._simulated_soc.get(site_id, 50.0)
 
@@ -415,9 +406,6 @@ class SolarDispatchService:
         except Exception as e:
             logger.warning("Real SOC read failed for %s: %s", site_id, e)
 
-        if settings.sentinel_island_mode:
-            return self._last_real_soc.get(site_id, 0.0)
-
         return self._simulated_soc.get(site_id, 50.0)
 
     def get_current_soc_sync(self, site_id: str) -> float:
@@ -425,10 +413,6 @@ class SolarDispatchService:
 
         For use by sync callers like aegis_bridge.py.
         """
-        from app.config.settings import settings
-
-        if settings.sentinel_island_mode:
-            return self._last_real_soc.get(site_id, 0.0)
         if site_id in self._last_real_soc:
             return self._last_real_soc[site_id]
         return self._simulated_soc.get(site_id, 50.0)

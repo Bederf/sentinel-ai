@@ -8,7 +8,6 @@ from unittest.mock import patch
 
 from app.services.solar_connector_huawei import SimulatedHuaweiConnector
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -90,8 +89,8 @@ class TestConnectorFactoryMode:
 
     def test_schneider_unchanged_by_mode(self):
         """Schneider connector ignores mode setting (no real connector yet)."""
-        from app.services.solar_ingestion_service import SolarIngestionService
         from app.services.solar_connector_schneider import SimulatedSchneiderConnector
+        from app.services.solar_ingestion_service import SolarIngestionService
 
         svc = SolarIngestionService()
         inverters = [{"id": "INV-01"}]

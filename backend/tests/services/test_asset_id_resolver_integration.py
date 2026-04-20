@@ -7,8 +7,9 @@ Tests the wiring of AssetIDResolver into the document pipeline:
 - Guard: empty equipment_description → LOW quarantine (manual uploads skip resolver)
 """
 
-import pytest
 from unittest.mock import MagicMock
+
+import pytest
 
 from app.models.asset_resolution import (
     ResolutionConfidence,

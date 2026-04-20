@@ -4,8 +4,9 @@ Tests NPV calculations, TCO, replace-vs-repair decision logic,
 portfolio analysis, and scenario modeling.
 """
 
-import pytest
 from datetime import date
+
+import pytest
 
 from app.services import capex_planning_service
 

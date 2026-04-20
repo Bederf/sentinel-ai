@@ -8,17 +8,17 @@ Expected: Kill switch always returns JSON with clear success/failure,
 and always ends with gate closed + mode simulation.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
 from app.config.settings import settings
+from app.services.bess_dispatch_engine import BESSState
 from app.services.modbus_bess_writer import (
     ModbusBESSWriter,
-    get_modbus_bess_writer,
     execute_dispatch_with_write,
+    get_modbus_bess_writer,
 )
-from app.services.bess_dispatch_engine import BESSState
 
 
 @pytest.fixture(autouse=True)
@@ -164,10 +164,9 @@ class TestWhoFieldProvenance:
     @pytest.mark.asyncio
     async def test_who_from_kill_switch(self):
         """Kill switch writes should identify as operator_kill_switch."""
-        from app.api.dispatch_optimizer import kill_switch
-
         # Reset singleton to get fresh history
         import app.services.modbus_bess_writer as writer_mod
+        from app.api.dispatch_optimizer import kill_switch
 
         writer_mod._modbus_bess_writer = None
 
@@ -221,7 +220,7 @@ class TestWhoFieldProvenance:
         writer = ModbusBESSWriter()
         command = DispatchCommand(
             site_id="site-002",
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
             action="charge",
             requested_power_kw=3.0,
             actual_power_kw=3.0,
@@ -241,7 +240,7 @@ class TestWhoFieldProvenance:
         writer = ModbusBESSWriter()
         command = DispatchCommand(
             site_id="site-002",
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
             action="discharge",
             requested_power_kw=50.0,
             actual_power_kw=0.0,

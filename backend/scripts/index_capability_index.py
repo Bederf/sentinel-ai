@@ -11,14 +11,13 @@ Usage:
     python scripts/index_capability_index.py
 """
 
-import sys
 import os
-from pathlib import Path
+import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app.database.supabase_client import get_supabase_client  # noqa: E402
-from app.services.vector_db import get_vector_db_service  # noqa: E402
+from app.database.supabase_client import get_supabase_client
+from app.services.vector_db import get_vector_db_service
 
 DOC_CODE = "DOC-CAPABILITY-INDEX"
 DOC_TITLE = "SENTINEL Platform — Complete Capability Reference"
@@ -370,7 +369,7 @@ async def main():
         print(f"  [{score_str}] [{category}] '{query[:55]}' → score: {top_score:.3f}")
 
     print(f"\n{'=' * 55}")
-    print(f"Capability Index ingestion complete!")
+    print("Capability Index ingestion complete!")
     print(f"  Document code: {DOC_CODE}")
     print(f"  Chunks indexed: {chunk_count}")
     print(f"  Retrieval tests: {'ALL PASSED' if all_passed else 'SOME FAILED'}")

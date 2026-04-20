@@ -7,12 +7,11 @@ Phase 65-02: Rate limiting added to prevent brute force attacks.
 """
 
 import logging
-from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from app.middleware.auth_middleware import validate_jwt_token, _extract_ip_address
+from app.middleware.auth_middleware import _extract_ip_address, validate_jwt_token
 from app.middleware.rate_limiter import limiter
 from app.models.auth import SentinelRole
 from app.services.mfa_service import get_mfa_service
@@ -31,9 +30,9 @@ class EnrollResponse(BaseModel):
     """Response from MFA enrollment."""
 
     success: bool
-    provisioning_uri: Optional[str] = None
-    secret: Optional[str] = None  # Only returned for manual entry
-    backup_codes: Optional[list[str]] = None
+    provisioning_uri: str | None = None
+    secret: str | None = None  # Only returned for manual entry
+    backup_codes: list[str] | None = None
     message: str
 
 
@@ -56,8 +55,8 @@ class StatusResponse(BaseModel):
     mfa_required: bool
     mfa_enrolled: bool
     mfa_enabled: bool
-    last_used_at: Optional[str] = None
-    enrolled_at: Optional[str] = None
+    last_used_at: str | None = None
+    enrolled_at: str | None = None
 
 
 class DisableRequest(BaseModel):
@@ -486,8 +485,8 @@ async def disable_mfa(request: Request, body: DisableRequest):
 @router.get("/events")
 async def get_mfa_events(
     request: Request,
-    user_email: Optional[str] = None,
-    event_type: Optional[str] = None,
+    user_email: str | None = None,
+    event_type: str | None = None,
     hours: int = 24,
     limit: int = 100,
 ):

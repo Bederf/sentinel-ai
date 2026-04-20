@@ -5,10 +5,12 @@ ADMIN role always bypasses filtering and sees all buildings.
 Other roles see only buildings they've been granted access to.
 """
 
-from typing import Optional, List, Dict, Any
-from ..supabase_client import get_supabase_client
-from app.models.auth import SentinelRole
 import logging
+from typing import Any
+
+from app.models.auth import SentinelRole
+
+from ..supabase_client import get_supabase_client
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +21,7 @@ class UserSiteAccessRepository:
     def __init__(self):
         self.client = get_supabase_client()
 
-    def get_accessible_site_ids(self, user_email: str, user_role: SentinelRole) -> List[str]:
+    def get_accessible_site_ids(self, user_email: str, user_role: SentinelRole) -> list[str]:
         """
         Get list of building UUIDs the user can access.
 
@@ -56,7 +58,7 @@ class UserSiteAccessRepository:
             logger.error(f"Error getting accessible buildings for {user_email}: {e}")
             return []
 
-    def get_accessible_site_codes(self, user_email: str, user_role: SentinelRole) -> List[str]:
+    def get_accessible_site_codes(self, user_email: str, user_role: SentinelRole) -> list[str]:
         """
         Get list of building codes the user can access.
 
@@ -169,7 +171,7 @@ class UserSiteAccessRepository:
             logger.error(f"Error checking building access by code: {e}")
             return False
 
-    def grant_access(self, user_email: str, site_id: str, granted_by: str) -> Optional[Dict[str, Any]]:
+    def grant_access(self, user_email: str, site_id: str, granted_by: str) -> dict[str, Any] | None:
         """
         Grant a user access to a building.
 
@@ -239,7 +241,7 @@ class UserSiteAccessRepository:
             logger.error(f"Error revoking access: {e}")
             return False
 
-    def get_user_access_list(self, user_email: str) -> List[Dict[str, Any]]:
+    def get_user_access_list(self, user_email: str) -> list[dict[str, Any]]:
         """
         Get all building access records for a user.
 
@@ -267,7 +269,7 @@ class UserSiteAccessRepository:
             logger.error(f"Error getting user access list: {e}")
             return []
 
-    def get_building_users(self, site_id: str) -> List[Dict[str, Any]]:
+    def get_building_users(self, site_id: str) -> list[dict[str, Any]]:
         """
         Get all users with access to a building.
 
@@ -342,7 +344,7 @@ class UserSiteAccessRepository:
 
 
 # Singleton instance
-_repository: Optional[UserSiteAccessRepository] = None
+_repository: UserSiteAccessRepository | None = None
 
 
 def get_user_site_access_repository() -> UserSiteAccessRepository:

@@ -5,11 +5,11 @@ and system events. Audit logs are immutable records for compliance and
 troubleshooting.
 """
 
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, Optional
-import uuid
+from typing import Any
 
 
 class AuditActionType(str, Enum):
@@ -46,22 +46,22 @@ class AuditLogEntry:
     timestamp: datetime = field(default_factory=datetime.now)
 
     # Device details (optional)
-    device_id: Optional[str] = None  # Device involved, if applicable
-    point_name: Optional[str] = None  # Device point involved, if applicable
+    device_id: str | None = None  # Device involved, if applicable
+    point_name: str | None = None  # Device point involved, if applicable
 
     # Value changes (for device control actions)
-    old_value: Optional[Any] = None
-    new_value: Optional[Any] = None
+    old_value: Any | None = None
+    new_value: Any | None = None
 
     # Validation and error details
-    safety_validation: Optional[Dict[str, Any]] = None  # Safety validation details
-    error_message: Optional[str] = None  # Error details if failed/blocked
+    safety_validation: dict[str, Any] | None = None  # Safety validation details
+    error_message: str | None = None  # Error details if failed/blocked
 
     # Context and metadata
-    correlation_id: Optional[str] = None  # For grouping related actions
-    metadata: Dict[str, Any] = field(default_factory=dict)  # Additional context
+    correlation_id: str | None = None  # For grouping related actions
+    metadata: dict[str, Any] = field(default_factory=dict)  # Additional context
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert audit log entry to dictionary for JSON serialization."""
         return {
             "id": self.id,
@@ -80,7 +80,7 @@ class AuditLogEntry:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "AuditLogEntry":
+    def from_dict(cls, data: dict[str, Any]) -> "AuditLogEntry":
         """Create audit log entry from dictionary."""
         # Parse timestamp
         timestamp = (

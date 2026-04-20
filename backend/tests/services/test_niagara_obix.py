@@ -7,14 +7,13 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from app.services.niagara.obix_client import (
-    OBIXClient,
     OBIXAuthenticationError,
+    OBIXClient,
     OBIXConnectionError,
     OBIXPointNotFoundError,
     get_obix_client,
     reset_obix_client,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures

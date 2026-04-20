@@ -19,10 +19,11 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from enum import Enum
-from app.models.document_source import SourceSystem
 from typing import Any
 
 from pydantic import BaseModel, Field
+
+from app.models.document_source import SourceSystem
 
 
 class DocumentType(str, Enum):
@@ -79,7 +80,7 @@ class DocumentRecord(BaseModel):
         review_flags: list of flags for human review (e.g. ['expired_coc', 'missing_signature']).
     """
 
-    source_system: "SourceSystem"  # type: ignore[name-defined]
+    source_system: SourceSystem  # type: ignore[name-defined]
     source_document_id: str | None = None
     source_url: str | None = None
 

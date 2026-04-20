@@ -1,7 +1,8 @@
 """Recommendation repository write-shape tests."""
 
-from app.database.repositories.recommendation_repository import RecommendationRepository
 import pytest
+
+from app.database.repositories.recommendation_repository import RecommendationRepository
 
 
 def test_filter_supabase_payload_drops_model_only_fields():

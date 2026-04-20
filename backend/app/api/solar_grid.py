@@ -6,17 +6,19 @@ stages, frequency/voltage trending, and compliance reports.
 Pattern follows solar.py and devices.py routers.
 """
 
-from typing import Optional
+
+from datetime import UTC
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from app.middleware.rate_limiter import limiter
 
 from app.api.dependencies.module_access import require_active_module
+from app.database.supabase_client import get_supabase_client
+from app.middleware.rate_limiter import limiter
 from app.models.module_registry import ModuleType
-from app.services.grid_parameters import get_grid_parameters_service
 from app.services.grid_compliance_service import (
     get_load_shed_scheduler,
 )
-from app.database.supabase_client import get_supabase_client
+from app.services.grid_parameters import get_grid_parameters_service
 
 router = APIRouter(
     dependencies=[
@@ -64,16 +66,16 @@ async def get_grid_status(request: Request, system_id: str):
         }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get grid status: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get grid status: {e!s}")
 
 
 @limiter.limit("30/minute")
 @router.get("/solar/grid/violations")
 async def get_violations(
     request: Request,
-    system_id: Optional[str] = Query(None),
+    system_id: str | None = Query(None),
     hours: int = Query(24, ge=1, le=720),
-    severity: Optional[str] = Query(None),
+    severity: str | None = Query(None),
 ):
     """Get compliance violations for a time window.
 
@@ -91,7 +93,7 @@ async def get_violations(
         }
     """
     try:
-        from datetime import datetime, timedelta, timezone
+        from datetime import datetime, timedelta
 
         supabase = get_supabase_client()
         if supabase is None:
@@ -114,7 +116,7 @@ async def get_violations(
             query = query.eq("system_id", system_id)
 
         # Time window filter
-        cutoff_time = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
+        cutoff_time = (datetime.now(UTC) - timedelta(hours=hours)).isoformat()
         query = query.gte("timestamp", cutoff_time)
 
         if severity:
@@ -136,11 +138,11 @@ async def get_violations(
             "critical_count": critical_count,
             "warning_count": warning_count,
             "time_window_hours": hours,
-            "query_time": datetime.now(timezone.utc).isoformat(),
+            "query_time": datetime.now(UTC).isoformat(),
         }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get violations: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get violations: {e!s}")
 
 
 @limiter.limit("30/minute")
@@ -190,7 +192,7 @@ async def get_load_shedding_stage(request: Request):
         }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get load shedding stage: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get load shedding stage: {e!s}")
 
 
 @limiter.limit("30/minute")
@@ -265,7 +267,7 @@ async def get_frequency_trend(
         }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get frequency trend: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get frequency trend: {e!s}")
 
 
 @limiter.limit("30/minute")
@@ -325,15 +327,15 @@ async def get_voltage_trend(
         }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get voltage trend: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get voltage trend: {e!s}")
 
 
 @limiter.limit("30/minute")
 @router.get("/solar/grid/compliance-report")
 async def get_compliance_report(
     request: Request,
-    system_id: Optional[str] = Query(None),
-    month: Optional[str] = Query(None),  # Format: YYYY-MM
+    system_id: str | None = Query(None),
+    month: str | None = Query(None),  # Format: YYYY-MM
 ):
     """Get detailed compliance report for a system and time period.
 
@@ -353,11 +355,11 @@ async def get_compliance_report(
         }
     """
     try:
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         # Default to current month
         if not month:
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             month = now.strftime("%Y-%m")
 
         # Calculate date range
@@ -366,12 +368,12 @@ async def get_compliance_report(
             raise HTTPException(status_code=400, detail="Month must be in YYYY-MM format")
 
         year, month_num = int(month_parts[0]), int(month_parts[1])
-        start_date = datetime(year, month_num, 1, tzinfo=timezone.utc)
+        start_date = datetime(year, month_num, 1, tzinfo=UTC)
 
         if month_num == 12:
-            end_date = datetime(year + 1, 1, 1, tzinfo=timezone.utc)
+            end_date = datetime(year + 1, 1, 1, tzinfo=UTC)
         else:
-            end_date = datetime(year, month_num + 1, 1, tzinfo=timezone.utc)
+            end_date = datetime(year, month_num + 1, 1, tzinfo=UTC)
 
         supabase = get_supabase_client()
         if supabase is None:
@@ -438,7 +440,7 @@ async def get_compliance_report(
         }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to generate report: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate report: {e!s}")
 
 
 @limiter.limit("30/minute")
@@ -465,12 +467,12 @@ async def override_auto_response(
         }
     """
     try:
-        from datetime import datetime, timedelta, timezone
+        from datetime import datetime, timedelta
 
         # Log override event
         supabase = get_supabase_client()
         if supabase:
-            expires_at = (datetime.now(timezone.utc) + timedelta(seconds=duration_seconds)).isoformat()
+            expires_at = (datetime.now(UTC) + timedelta(seconds=duration_seconds)).isoformat()
 
             try:
                 await (
@@ -479,7 +481,7 @@ async def override_auto_response(
                         {
                             "system_id": system_id,
                             "action": action,
-                            "initiated_at": datetime.now(timezone.utc).isoformat(),
+                            "initiated_at": datetime.now(UTC).isoformat(),
                             "expires_at": expires_at,
                             "manual_override": True,
                         }
@@ -495,11 +497,11 @@ async def override_auto_response(
             "action": action,
             "system_id": system_id,
             "duration_seconds": duration_seconds,
-            "expires_at": (datetime.now(timezone.utc) + timedelta(seconds=duration_seconds)).isoformat(),
+            "expires_at": (datetime.now(UTC) + timedelta(seconds=duration_seconds)).isoformat(),
         }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to apply override: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to apply override: {e!s}")
 
 
 # Logging imports at the end

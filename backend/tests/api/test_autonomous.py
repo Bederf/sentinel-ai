@@ -15,13 +15,12 @@ os.environ.setdefault("DEMO_MODE", "true")
 os.environ.setdefault("TESTING", "true")
 os.environ.setdefault("JWT_SECRET_KEY", "test-only-jwt-secret-for-ci-at-least-32-chars")
 
-import pytest  # noqa: E402
-from fastapi import FastAPI  # noqa: E402
-from httpx import ASGITransport, AsyncClient  # noqa: E402
+import pytest
+from fastapi import FastAPI
+from httpx import ASGITransport, AsyncClient
 
-from app.api.autonomous import router  # noqa: E402
-from app.models.auth import AuthContext, SentinelRole  # noqa: E402
-
+from app.api.autonomous import router
+from app.models.auth import AuthContext, SentinelRole
 
 # ---------------------------------------------------------------------------
 # Minimal test app — mounts only the autonomous router so the global

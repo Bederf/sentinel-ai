@@ -4,9 +4,10 @@ Contract Repository - Database operations for FM contracts.
 Phase 48: Contract Management
 """
 
-from typing import Optional, List, Dict, Any
-from ..supabase_client import get_supabase_client
 import logging
+from typing import Any
+
+from ..supabase_client import get_supabase_client
 
 logger = logging.getLogger(__name__)
 
@@ -19,11 +20,11 @@ class ContractRepository:
 
     def get_all(
         self,
-        site_id: Optional[str] = None,
-        organization_id: Optional[str] = None,
-        status: Optional[str] = None,
+        site_id: str | None = None,
+        organization_id: str | None = None,
+        status: str | None = None,
         limit: int = 50,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         List contracts with optional filters.
 
@@ -62,7 +63,7 @@ class ContractRepository:
             logger.error(f"Error listing contracts: {e}")
             return []
 
-    def get_by_id(self, contract_id: str) -> Optional[Dict[str, Any]]:
+    def get_by_id(self, contract_id: str) -> dict[str, Any] | None:
         """Get a single contract by ID with org and building details."""
         if not self.client:
             return None
@@ -83,7 +84,7 @@ class ContractRepository:
             logger.error(f"Error getting contract {contract_id}: {e}")
             return None
 
-    def get_by_code(self, code: str) -> Optional[Dict[str, Any]]:
+    def get_by_code(self, code: str) -> dict[str, Any] | None:
         """Get a single contract by its unique code."""
         if not self.client:
             return None
@@ -104,7 +105,7 @@ class ContractRepository:
             logger.error(f"Error getting contract by code {code}: {e}")
             return None
 
-    def get_by_site(self, site_id: str) -> List[Dict[str, Any]]:
+    def get_by_site(self, site_id: str) -> list[dict[str, Any]]:
         """Get all contracts for a building."""
         if not self.client:
             return []
@@ -124,7 +125,7 @@ class ContractRepository:
             logger.error(f"Error getting contracts for building {site_id}: {e}")
             return []
 
-    def get_active(self) -> List[Dict[str, Any]]:
+    def get_active(self) -> list[dict[str, Any]]:
         """Get all active contracts."""
         if not self.client:
             return []
@@ -144,7 +145,7 @@ class ContractRepository:
             logger.error(f"Error getting active contracts: {e}")
             return []
 
-    def create(self, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def create(self, data: dict[str, Any]) -> dict[str, Any] | None:
         """
         Create a new contract.
 
@@ -171,7 +172,7 @@ class ContractRepository:
             logger.error(f"Error creating contract: {e}")
             return None
 
-    def update(self, contract_id: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def update(self, contract_id: str, data: dict[str, Any]) -> dict[str, Any] | None:
         """
         Partial update of a contract.
 
@@ -196,7 +197,7 @@ class ContractRepository:
             logger.error(f"Error updating contract {contract_id}: {e}")
             return None
 
-    def update_status(self, contract_id: str, status: str) -> Optional[Dict[str, Any]]:
+    def update_status(self, contract_id: str, status: str) -> dict[str, Any] | None:
         """
         Update contract status.
 
@@ -209,7 +210,7 @@ class ContractRepository:
         """
         return self.update(contract_id, {"status": status})
 
-    def get_contract_assets(self, contract_id: str) -> List[Dict[str, Any]]:
+    def get_contract_assets(self, contract_id: str) -> list[dict[str, Any]]:
         """
         Get assets linked to a contract via asset_contracts.
 
@@ -237,7 +238,7 @@ class ContractRepository:
             logger.error(f"Error getting assets for contract {contract_id}: {e}")
             return []
 
-    def get_equipment(self, equipment_code: str) -> Optional[Dict[str, Any]]:
+    def get_equipment(self, equipment_code: str) -> dict[str, Any] | None:
         """Get equipment record by code."""
         if not self.client:
             logger.warning("Supabase client not available")
@@ -255,8 +256,8 @@ class ContractRepository:
             return None
 
     def find_similar_contracts(
-        self, equipment_types: List[str], sla_tier: Any = None, limit: int = 5
-    ) -> List[Dict[str, Any]]:
+        self, equipment_types: list[str], sla_tier: Any = None, limit: int = 5
+    ) -> list[dict[str, Any]]:
         """
         Find similar contracts based on equipment types.
 
@@ -298,7 +299,7 @@ class ContractRepository:
 
 
 # Singleton instance
-_repository: Optional[ContractRepository] = None
+_repository: ContractRepository | None = None
 
 
 def get_contract_repository() -> ContractRepository:

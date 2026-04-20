@@ -24,11 +24,11 @@ Usage:
 """
 
 import asyncio
-import hmac
 import hashlib
+import hmac
 import logging
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import jwt as pyjwt
@@ -363,7 +363,7 @@ async def _validate_api_key(api_key: str) -> dict[str, Any] | None:
             expires_at = record.get("expires_at")
             if expires_at:
                 # Use UTC datetime consistently (Python best practice)
-                now = datetime.now(timezone.utc)
+                now = datetime.now(UTC)
                 expires_dt = datetime.fromisoformat(expires_at.replace("Z", "+00:00"))
                 if now > expires_dt:
                     return None
@@ -400,7 +400,7 @@ async def _validate_api_key(api_key: str) -> dict[str, Any] | None:
 
             # Non-blocking last_used update (runs in background thread)
             try:
-                last_used = datetime.now(timezone.utc).isoformat()
+                last_used = datetime.now(UTC).isoformat()
                 await asyncio.to_thread(
                     lambda: (
                         client.table("api_keys")

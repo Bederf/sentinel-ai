@@ -12,29 +12,29 @@ Handles:
 """
 
 import logging
-from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
+from typing import Any
 
-from fastapi import APIRouter, HTTPException, Depends, Query, Path
+from fastapi import APIRouter, Depends, HTTPException, Path, Query
 
+from app.config.settings import settings
+from app.database.repositories.parasite_decision_repository import ParasiteDecisionRepository
 from app.middleware.auth_middleware import require_auth, require_operator
 from app.models.auth import AuthContext
-from app.database.repositories.parasite_decision_repository import ParasiteDecisionRepository
 from app.services.tier_routing_engine import get_tier_routing_engine
-from app.config.settings import settings
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/parasite", tags=["parasite"])
 
 
-@router.get("/decisions", response_model=Dict[str, Any], summary="List recent PARASITE decisions")
+@router.get("/decisions", response_model=dict[str, Any], summary="List recent PARASITE decisions")
 async def list_decisions(
-    site_id: Optional[str] = Query(None, description="Filter by site ID"),
-    tier: Optional[str] = Query(None, description="Filter by tier (tier1/tier2/tier3)"),
+    site_id: str | None = Query(None, description="Filter by site ID"),
+    tier: str | None = Query(None, description="Filter by tier (tier1/tier2/tier3)"),
     limit: int = Query(50, ge=1, le=200, description="Number of decisions to return"),
     auth: AuthContext = Depends(require_auth),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """List recent PARASITE decisions with optional filtering.
 
     Args:
@@ -69,14 +69,14 @@ async def list_decisions(
         }
 
     except Exception as e:
-        logger.error(f"Error listing decisions: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error retrieving decisions: {str(e)}")
+        logger.error(f"Error listing decisions: {e!s}")
+        raise HTTPException(status_code=500, detail=f"Error retrieving decisions: {e!s}")
 
 
-@router.get("/decisions/{decision_id}", response_model=Dict[str, Any], summary="Get single decision with full context")
+@router.get("/decisions/{decision_id}", response_model=dict[str, Any], summary="Get single decision with full context")
 async def get_decision(
     decision_id: str = Path(..., description="ID of decision to retrieve"), auth: AuthContext = Depends(require_auth)
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Get a single PARASITE decision with complete context.
 
     Args:
@@ -99,14 +99,14 @@ async def get_decision(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error retrieving decision {decision_id}: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error retrieving decision: {str(e)}")
+        logger.error(f"Error retrieving decision {decision_id}: {e!s}")
+        raise HTTPException(status_code=500, detail=f"Error retrieving decision: {e!s}")
 
 
-@router.get("/stats", response_model=Dict[str, Any], summary="Aggregated decision statistics")
+@router.get("/stats", response_model=dict[str, Any], summary="Aggregated decision statistics")
 async def get_stats(
     site_id: str = Query(..., description="Site ID (required)"), auth: AuthContext = Depends(require_auth)
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Get aggregated PARASITE decision statistics for a site.
 
     Args:
@@ -153,12 +153,12 @@ async def get_stats(
         }
 
     except Exception as e:
-        logger.error(f"Error calculating stats for {site_id}: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error calculating statistics: {str(e)}")
+        logger.error(f"Error calculating stats for {site_id}: {e!s}")
+        raise HTTPException(status_code=500, detail=f"Error calculating statistics: {e!s}")
 
 
-@router.get("/routing-config", response_model=Dict[str, Any], summary="Current routing configuration")
-async def get_routing_config(auth: AuthContext = Depends(require_operator)) -> Dict[str, Any]:
+@router.get("/routing-config", response_model=dict[str, Any], summary="Current routing configuration")
+async def get_routing_config(auth: AuthContext = Depends(require_operator)) -> dict[str, Any]:
     """Get current PARASITE routing configuration.
 
     Requires OPERATOR role.
@@ -183,12 +183,12 @@ async def get_routing_config(auth: AuthContext = Depends(require_operator)) -> D
         }
 
     except Exception as e:
-        logger.error(f"Error retrieving routing config: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error retrieving configuration: {str(e)}")
+        logger.error(f"Error retrieving routing config: {e!s}")
+        raise HTTPException(status_code=500, detail=f"Error retrieving configuration: {e!s}")
 
 
-@router.get("/health", response_model=Dict[str, Any], summary="PARASITE system health")
-async def get_health(auth: AuthContext = Depends(require_auth)) -> Dict[str, Any]:
+@router.get("/health", response_model=dict[str, Any], summary="PARASITE system health")
+async def get_health(auth: AuthContext = Depends(require_auth)) -> dict[str, Any]:
     """Get PARASITE system health status.
 
     Args:
@@ -230,8 +230,8 @@ async def get_health(auth: AuthContext = Depends(require_auth)) -> Dict[str, Any
         }
 
     except Exception as e:
-        logger.error(f"Error retrieving health status: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error retrieving health status: {str(e)}")
+        logger.error(f"Error retrieving health status: {e!s}")
+        raise HTTPException(status_code=500, detail=f"Error retrieving health status: {e!s}")
 
 
 # ---------------------------------------------------------------------------
@@ -239,19 +239,19 @@ async def get_health(auth: AuthContext = Depends(require_auth)) -> Dict[str, Any
 # ---------------------------------------------------------------------------
 
 
-def _is_aegis_decision(d: Dict[str, Any]) -> bool:
+def _is_aegis_decision(d: dict[str, Any]) -> bool:
     """Check if a decision was created by the AEGIS subsystem."""
     cf = d.get("contributing_factors") or {}
     return cf.get("proposal_source") == "aegis" or cf.get("created_by") == "aegis"
 
 
-def _compute_aegis_kpis(decisions: List[Dict[str, Any]]) -> Dict[str, Any]:
+def _compute_aegis_kpis(decisions: list[dict[str, Any]]) -> dict[str, Any]:
     """Compute 24h KPI counters from a list of AEGIS decisions."""
     proposals = len(decisions)
     approved = 0
     rejected = 0
     blocked = 0
-    response_times: List[float] = []
+    response_times: list[float] = []
 
     for d in decisions:
         cf = d.get("contributing_factors") or {}
@@ -289,17 +289,17 @@ def _compute_aegis_kpis(decisions: List[Dict[str, Any]]) -> Dict[str, Any]:
 
 @router.get(
     "/aegis/dashboard",
-    response_model=Dict[str, Any],
+    response_model=dict[str, Any],
     summary="AEGIS operations dashboard",
 )
 async def aegis_dashboard(
     site_id: str = Query(..., description="Site ID (required)"),
-    execution_mode: Optional[str] = Query(None, description="Filter: blocked/shadow/live"),
-    approval_outcome: Optional[str] = Query(None, description="Filter: pending/approved/rejected"),
-    dispatch_action_type: Optional[str] = Query(None, description="Filter: charge/discharge/idle"),
-    write_status: Optional[str] = Query(None, description="Filter: blocked/success/skipped"),
+    execution_mode: str | None = Query(None, description="Filter: blocked/shadow/live"),
+    approval_outcome: str | None = Query(None, description="Filter: pending/approved/rejected"),
+    dispatch_action_type: str | None = Query(None, description="Filter: charge/discharge/idle"),
+    write_status: str | None = Query(None, description="Filter: blocked/success/skipped"),
     auth: AuthContext = Depends(require_auth),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """AEGIS operations dashboard — 24h activity, KPIs, and pending proposals.
 
     KPIs are computed from the full unfiltered AEGIS set for the last 24 hours.
@@ -361,5 +361,5 @@ async def aegis_dashboard(
         }
 
     except Exception as e:
-        logger.error(f"Error building AEGIS dashboard for {site_id}: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error building AEGIS dashboard: {str(e)}")
+        logger.error(f"Error building AEGIS dashboard for {site_id}: {e!s}")
+        raise HTTPException(status_code=500, detail=f"Error building AEGIS dashboard: {e!s}")

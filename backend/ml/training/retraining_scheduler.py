@@ -6,9 +6,9 @@ when models are stale (>30 days) or underperforming (R² < 0.65).
 """
 
 import logging
-from datetime import datetime
-from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -29,18 +29,18 @@ class RetrainResult:
     triggered_at: str
     reason: str
     success: bool = False
-    new_model_id: Optional[str] = None
-    metrics: Dict[str, float] = field(default_factory=dict)
-    error: Optional[str] = None
+    new_model_id: str | None = None
+    metrics: dict[str, float] = field(default_factory=dict)
+    error: str | None = None
 
 
 class RetrainingScheduler:
     """Monitors model staleness and triggers retraining."""
 
     def __init__(self):
-        self._history: List[RetrainResult] = []
+        self._history: list[RetrainResult] = []
 
-    def check_all_models(self) -> List[Dict[str, Any]]:
+    def check_all_models(self) -> list[dict[str, Any]]:
         """Check freshness and performance of all active models.
 
         Returns a list of dicts with model_type, equipment_type, status (fresh/stale/missing),
@@ -174,7 +174,7 @@ class RetrainingScheduler:
         self._history.append(result)
         return result
 
-    def auto_retrain_stale(self) -> List[RetrainResult]:
+    def auto_retrain_stale(self) -> list[RetrainResult]:
         """Check all models and retrain the first stale one found.
 
         Called by the background scheduler daily.
@@ -195,7 +195,7 @@ class RetrainingScheduler:
 
         return results
 
-    def get_retrain_history(self) -> List[Dict[str, Any]]:
+    def get_retrain_history(self) -> list[dict[str, Any]]:
         """Return history of retrain operations."""
         return [
             {
@@ -214,7 +214,7 @@ class RetrainingScheduler:
 
 
 # Singleton
-_scheduler: Optional[RetrainingScheduler] = None
+_scheduler: RetrainingScheduler | None = None
 
 
 def get_retraining_scheduler() -> RetrainingScheduler:

@@ -9,7 +9,6 @@ Phase 145: Operational Event Intelligence.
 """
 
 import logging
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
@@ -24,9 +23,9 @@ router = APIRouter(prefix="/api/events", tags=["event-intelligence"])
 
 @router.get("/active")
 async def get_active_events(
-    site_id: Optional[str] = Query(None, description="Filter by site ID"),
-    equipment_id: Optional[str] = Query(None, description="Filter by equipment code"),
-    auth: Optional[AuthContext] = Depends(get_current_auth),
+    site_id: str | None = Query(None, description="Filter by site ID"),
+    equipment_id: str | None = Query(None, description="Filter by equipment code"),
+    auth: AuthContext | None = Depends(get_current_auth),
 ) -> dict:
     """Get all currently active (unresolved) operational events.
 
@@ -45,7 +44,7 @@ async def get_active_events(
 @router.get("/active/{site_id}")
 async def get_active_events_for_site(
     site_id: str,
-    auth: Optional[AuthContext] = Depends(get_current_auth),
+    auth: AuthContext | None = Depends(get_current_auth),
 ) -> dict:
     """Get active operational events for a specific site.
 
@@ -64,7 +63,7 @@ async def get_active_events_for_site(
 @router.get("/summary/{site_id}")
 async def get_event_summary(
     site_id: str,
-    auth: Optional[AuthContext] = Depends(get_current_auth),
+    auth: AuthContext | None = Depends(get_current_auth),
 ) -> dict:
     """Get event summary for a site — counts by type and severity.
 
@@ -77,11 +76,11 @@ async def get_event_summary(
 
 @router.get("/history")
 async def get_event_history(
-    site_id: Optional[str] = Query(None, description="Filter by site ID"),
-    equipment_id: Optional[str] = Query(None, description="Filter by equipment code"),
-    event_type: Optional[str] = Query(None, description="Filter by event type"),
+    site_id: str | None = Query(None, description="Filter by site ID"),
+    equipment_id: str | None = Query(None, description="Filter by equipment code"),
+    event_type: str | None = Query(None, description="Filter by event type"),
     limit: int = Query(100, ge=1, le=1000, description="Maximum results"),
-    auth: Optional[AuthContext] = Depends(get_current_auth),
+    auth: AuthContext | None = Depends(get_current_auth),
 ) -> dict:
     """Query event history with optional filters.
 
@@ -104,7 +103,7 @@ async def get_event_history(
 @router.get("/{event_id}")
 async def get_event_detail(
     event_id: str,
-    auth: Optional[AuthContext] = Depends(get_current_auth),
+    auth: AuthContext | None = Depends(get_current_auth),
 ) -> dict:
     """Get details for a specific operational event by ID.
 

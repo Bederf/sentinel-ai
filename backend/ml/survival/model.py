@@ -13,7 +13,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict, List
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -43,7 +43,7 @@ class SurvivalModel:
         self.baseline_survival = None
         self._is_fitted = False
 
-    def train(self, data, duration_col: str = "duration", event_col: str = "event") -> Dict:
+    def train(self, data, duration_col: str = "duration", event_col: str = "event") -> dict:
         """
         Train Cox PH model.
 
@@ -108,7 +108,7 @@ class SurvivalModel:
             "summary": self.model.summary.to_dict(),
         }
 
-    def get_hazard_ratios(self) -> "pd.DataFrame":
+    def get_hazard_ratios(self) -> pd.DataFrame:
         """
         Get hazard ratios for all features.
 
@@ -151,7 +151,7 @@ class SurvivalModel:
 
         return hazard_ratios
 
-    def predict_survival_probability(self, features, times: List[int] = None) -> "pd.DataFrame":
+    def predict_survival_probability(self, features, times: list[int] = None) -> pd.DataFrame:
         """
         Predict survival probability at specific times.
 
@@ -262,7 +262,7 @@ class SurvivalModel:
         logger.info(f"Saved survival model to {path}")
 
     @classmethod
-    def load(cls, path: str) -> "SurvivalModel":
+    def load(cls, path: str) -> SurvivalModel:
         """
         Load model from disk.
 

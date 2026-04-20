@@ -1,15 +1,16 @@
 """Tests for ModelGateway routing logic (Phase 183 - Fallback Support)."""
 
-import pytest
-from unittest.mock import AsyncMock, patch
 import os
+from unittest.mock import AsyncMock, patch
+
+import pytest
 
 # Set profile before import so tests use a known profile
 os.environ.setdefault("SENTINEL_ROUTING_PROFILE", "api_prod")
 os.environ.setdefault("SENTINEL_EXECUTION_MODE", "api")
 
-from app.services.model_gateway import ModelGateway, LocalInferenceUnavailableError
 from app.config.routing_profiles import VALID_TASK_CLASSES
+from app.services.model_gateway import LocalInferenceUnavailableError, ModelGateway
 
 
 class TestProfileResolution:
@@ -73,17 +74,16 @@ class TestLocalInferenceUnavailableError:
         with patch(
             "app.services.hybrid_ai_service.hybrid_ai_service.query_ollama",
             side_effect=ConnectionRefusedError("Ollama unreachable"),
-        ):
-            with pytest.raises(LocalInferenceUnavailableError):
-                await gw._call_local(
-                    provider="ollama",
-                    model="qwen2.5:7b-instruct",
-                    messages=[{"role": "user", "content": "test"}],
-                    system=None,
-                    max_tokens=512,
-                    stream=False,
-                    source="test",
-                )
+        ), pytest.raises(LocalInferenceUnavailableError):
+            await gw._call_local(
+                provider="ollama",
+                model="qwen2.5:7b-instruct",
+                messages=[{"role": "user", "content": "test"}],
+                system=None,
+                max_tokens=512,
+                stream=False,
+                source="test",
+            )
 
 
 class TestEscalation:
@@ -210,7 +210,7 @@ class TestLocalFullHardFail:
         """In local_full mode, model_gateway must raise LocalInferenceUnavailableError
         when Ollama is unreachable — no silent cloud fallback."""
         import app.config.settings as settings_mod
-        from app.services.model_gateway import ModelGateway, LocalInferenceUnavailableError
+        from app.services.model_gateway import LocalInferenceUnavailableError, ModelGateway
 
         original = settings_mod.SENTINEL_ROUTING_PROFILE
         try:
@@ -218,12 +218,11 @@ class TestLocalFullHardFail:
             with patch(
                 "app.services.hybrid_ai_service.hybrid_ai_service.query_ollama",
                 side_effect=Exception("Connection refused"),
-            ):
-                with pytest.raises(LocalInferenceUnavailableError):
-                    await ModelGateway().call(
-                        task_class="medium",
-                        messages=[{"role": "user", "content": "test"}],
-                    )
+            ), pytest.raises(LocalInferenceUnavailableError):
+                await ModelGateway().call(
+                    task_class="medium",
+                    messages=[{"role": "user", "content": "test"}],
+                )
         finally:
             settings_mod.SENTINEL_ROUTING_PROFILE = original
 

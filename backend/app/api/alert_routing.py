@@ -10,7 +10,6 @@ import logging
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
@@ -28,27 +27,27 @@ RULES_FILE = DATA_PATH / "alert_routing_rules.json"
 class AlertRoutingRuleCreate(BaseModel):
     name: str
     enabled: bool = True
-    severity: List[str] = ["critical"]  # critical, warning, info
-    equipment_types: List[str] = []  # empty = all types
-    site_ids: List[str] = []  # empty = all sites
-    channels: List[str] = ["telegram"]  # telegram, whatsapp, email, sms
-    recipient_roles: List[str] = ["technician"]  # technician, supervisor, manager, admin
-    recipient_ids: List[str] = []  # specific technician IDs
-    escalation_minutes: Optional[int] = None  # None = no escalation
-    escalation_to_roles: List[str] = []
+    severity: list[str] = ["critical"]  # critical, warning, info
+    equipment_types: list[str] = []  # empty = all types
+    site_ids: list[str] = []  # empty = all sites
+    channels: list[str] = ["telegram"]  # telegram, whatsapp, email, sms
+    recipient_roles: list[str] = ["technician"]  # technician, supervisor, manager, admin
+    recipient_ids: list[str] = []  # specific technician IDs
+    escalation_minutes: int | None = None  # None = no escalation
+    escalation_to_roles: list[str] = []
 
 
 class AlertRoutingRuleUpdate(BaseModel):
-    name: Optional[str] = None
-    enabled: Optional[bool] = None
-    severity: Optional[List[str]] = None
-    equipment_types: Optional[List[str]] = None
-    site_ids: Optional[List[str]] = None
-    channels: Optional[List[str]] = None
-    recipient_roles: Optional[List[str]] = None
-    recipient_ids: Optional[List[str]] = None
-    escalation_minutes: Optional[int] = None
-    escalation_to_roles: Optional[List[str]] = None
+    name: str | None = None
+    enabled: bool | None = None
+    severity: list[str] | None = None
+    equipment_types: list[str] | None = None
+    site_ids: list[str] | None = None
+    channels: list[str] | None = None
+    recipient_roles: list[str] | None = None
+    recipient_ids: list[str] | None = None
+    escalation_minutes: int | None = None
+    escalation_to_roles: list[str] | None = None
 
 
 def _load_rules() -> list:

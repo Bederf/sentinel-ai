@@ -9,10 +9,9 @@ REST API for service sheet OCR processing:
 """
 
 import logging
-from typing import Optional
-from pydantic import BaseModel, Field
 
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from pydantic import BaseModel, Field
 
 from app.services.ocr_service import get_ocr_service
 from app.services.sentry_integration.ocr_correction_handler import get_ocr_correction_handler
@@ -30,7 +29,7 @@ class CorrectionRequest(BaseModel):
     """Request for submitting a correction."""
 
     correction: str = Field(..., description="Corrected value for the field")
-    telegram_user_id: Optional[str] = Field(None, description="Telegram user ID")
+    telegram_user_id: str | None = Field(None, description="Telegram user ID")
 
 
 class OCRProcessRequest(BaseModel):

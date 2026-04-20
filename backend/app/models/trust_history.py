@@ -8,7 +8,6 @@ stable operation and successful control actions.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -22,8 +21,8 @@ class TrustHistory(BaseModel):
     validation_runs: int = 0  # Total validation runs since first classification
     successful_actions: int = 0  # Control actions that achieved expected outcome
     failed_actions: int = 0  # Control actions that did NOT achieve expected outcome
-    last_validation_error: Optional[datetime] = None
-    last_successful_action: Optional[datetime] = None
+    last_validation_error: datetime | None = None
+    last_successful_action: datetime | None = None
     trust_score: float = 0.0  # Calculated: stability * success_rate
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)

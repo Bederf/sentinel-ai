@@ -2,10 +2,11 @@
 Work Order Repository - Database operations for work orders.
 """
 
-from typing import Optional, List, Dict, Any
-from datetime import datetime, date
-from ..supabase_client import get_supabase_client
 import logging
+from datetime import date, datetime
+from typing import Any
+
+from ..supabase_client import get_supabase_client
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +34,7 @@ class WorkOrderRepository:
     def __init__(self):
         self.client = get_supabase_client()
 
-    async def create_work_order(self, work_order: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    async def create_work_order(self, work_order: dict[str, Any]) -> dict[str, Any] | None:
         """
         Create a new work order in Supabase.
 
@@ -115,7 +116,7 @@ class WorkOrderRepository:
             logger.error(f"Error creating work order: {e}")
             return None
 
-    async def get_work_order(self, work_order_id: str) -> Optional[Dict[str, Any]]:
+    async def get_work_order(self, work_order_id: str) -> dict[str, Any] | None:
         """Get a work order by ID."""
         if not self.client:
             return None
@@ -131,11 +132,11 @@ class WorkOrderRepository:
             logger.error(f"Error getting work order {work_order_id}: {e}")
             return None
 
-    async def get_work_order_by_id(self, work_order_id: str) -> Optional[Dict[str, Any]]:
+    async def get_work_order_by_id(self, work_order_id: str) -> dict[str, Any] | None:
         """Backward-compatible alias for get_work_order()."""
         return await self.get_work_order(work_order_id)
 
-    async def get_work_order_by_code(self, code: str) -> Optional[Dict[str, Any]]:
+    async def get_work_order_by_code(self, code: str) -> dict[str, Any] | None:
         """Get a work order by its code (e.g., WO-2026-0001)."""
         if not self.client:
             return None
@@ -152,8 +153,8 @@ class WorkOrderRepository:
             return None
 
     async def get_work_orders_for_equipment(
-        self, equipment_id: str, status: Optional[str] = None, limit: int = 10
-    ) -> List[Dict[str, Any]]:
+        self, equipment_id: str, status: str | None = None, limit: int = 10
+    ) -> list[dict[str, Any]]:
         """Get work orders for a specific equipment."""
         if not self.client:
             return []
@@ -177,7 +178,7 @@ class WorkOrderRepository:
             logger.error(f"Error getting work orders for equipment {equipment_id}: {e}")
             return []
 
-    async def update_work_order(self, work_order_id: str, updates: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    async def update_work_order(self, work_order_id: str, updates: dict[str, Any]) -> dict[str, Any] | None:
         """Update a work order."""
         if not self.client:
             return None
@@ -195,12 +196,12 @@ class WorkOrderRepository:
 
     async def get_work_orders_for_equipment_list(
         self,
-        equipment_ids: List[str],
-        start_date: Optional[datetime | date] = None,
-        end_date: Optional[datetime | date] = None,
-        status: Optional[str] = None,
+        equipment_ids: list[str],
+        start_date: datetime | date | None = None,
+        end_date: datetime | date | None = None,
+        status: str | None = None,
         limit: int = 500,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get work orders for a list of equipment IDs with optional date filter."""
         if not self.client or not equipment_ids:
             return []
@@ -231,7 +232,7 @@ class WorkOrderRepository:
             logger.error(f"Error getting work orders for equipment list: {e}")
             return []
 
-    async def get_all_work_orders(self, limit: int = 100, status: Optional[str] = None) -> List[Dict[str, Any]]:
+    async def get_all_work_orders(self, limit: int = 100, status: str | None = None) -> list[dict[str, Any]]:
         """Get all work orders with optional status filter.
 
         Args:
@@ -263,7 +264,7 @@ class WorkOrderRepository:
         self,
         source: str,
         limit: int = 200,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get work orders created by a logical source.
 
         Current supported source values:
@@ -276,7 +277,7 @@ class WorkOrderRepository:
         orders = await self.get_all_work_orders(limit=limit)
 
         if source_normalized == "technician":
-            filtered: List[Dict[str, Any]] = []
+            filtered: list[dict[str, Any]] = []
             for order in orders:
                 created_by = str(order.get("created_by") or "").lower()
                 title = str(order.get("title") or "").lower()
@@ -291,7 +292,7 @@ class WorkOrderRepository:
 
 
 # Singleton instance
-_repository: Optional[WorkOrderRepository] = None
+_repository: WorkOrderRepository | None = None
 
 
 def get_work_order_repository() -> WorkOrderRepository:

@@ -10,17 +10,17 @@ Tests the full routing flow across all control tier modes:
     7. Shadow mode regression
 """
 
-import pytest
 from unittest.mock import MagicMock
 
+import pytest
+
+from app.services.mv_verification_service import (
+    VerificationTask,
+)
 from app.services.optimization_tier_router import (
     OptimizationTierRouter,
     RoutingTier,
 )
-from app.services.mv_verification_service import (
-    VerificationTask,
-)
-
 
 # ------------------------------------------------------------------
 # Fixtures

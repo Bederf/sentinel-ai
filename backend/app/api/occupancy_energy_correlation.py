@@ -10,9 +10,9 @@ Endpoints:
 - GET /occupancy-energy/savings-potential - HVAC/Lighting savings breakdown
 """
 
-from fastapi import APIRouter, Query
-from typing import Optional
 from datetime import datetime, timedelta
+
+from fastapi import APIRouter, Query
 
 router = APIRouter()
 
@@ -35,7 +35,7 @@ CARBON_INTENSITY = 0.35  # kg CO₂/kWh (SA grid)
 
 @router.get("/occupancy-energy/correlation")
 async def get_correlation_data(
-    site_id: str = "bld-002", date: Optional[str] = Query(None, description="ISO date for analysis")
+    site_id: str = "bld-002", date: str | None = Query(None, description="ISO date for analysis")
 ):
     """
     Get time-series correlation between occupancy and energy consumption.
@@ -110,7 +110,7 @@ async def get_correlation_data(
 
 
 @router.get("/occupancy-energy/scenarios")
-async def get_lights_left_on_scenarios(site_id: str = "bld-002", date: Optional[str] = Query(None)):
+async def get_lights_left_on_scenarios(site_id: str = "bld-002", date: str | None = Query(None)):
     """
     Get "Lights Left On" cost impact scenarios.
 
@@ -193,7 +193,7 @@ async def get_lights_left_on_scenarios(site_id: str = "bld-002", date: Optional[
 
 
 @router.get("/occupancy-energy/savings-potential")
-async def get_savings_potential(site_id: str = "bld-002", date: Optional[str] = Query(None)):
+async def get_savings_potential(site_id: str = "bld-002", date: str | None = Query(None)):
     """
     Get HVAC and Lighting savings breakdown.
 

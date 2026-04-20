@@ -12,9 +12,8 @@ import base64
 import io
 import random
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Optional, Tuple
 
 import qrcode
 from PIL import Image, ImageDraw
@@ -36,7 +35,7 @@ class VisitTokenService:
     PIN_MAX = 999999
     QR_ERROR_CORRECTION = ERROR_CORRECT_H
 
-    def __init__(self, repo: Optional[VisitRepository] = None) -> None:
+    def __init__(self, repo: VisitRepository | None = None) -> None:
         self._repo = repo or VisitRepository()
 
     # -------------------------------------------------------------------------
@@ -107,12 +106,12 @@ class VisitTokenService:
         building_id: str,
         meeting_start: datetime,
         meeting_end: datetime,
-        host_name: Optional[str] = None,
-        host_mobile: Optional[str] = None,
-        visitor_name: Optional[str] = None,
-        visitor_vehicle: Optional[str] = None,
+        host_name: str | None = None,
+        host_mobile: str | None = None,
+        visitor_name: str | None = None,
+        visitor_vehicle: str | None = None,
         status: VisitStatus = VisitStatus.CREATED,
-    ) -> Tuple[Visit, str]:
+    ) -> tuple[Visit, str]:
         """Create a new Visit record with token + PIN + QR code.
 
         Args:
@@ -121,7 +120,7 @@ class VisitTokenService:
         Returns:
             Tuple of (Visit model, qr_code_base64 string)
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         token = self.generate_token()
         pin = self.generate_pin()
         qr_code = self.generate_qr_code(token)
@@ -151,7 +150,7 @@ class VisitTokenService:
     # Validation
     # -------------------------------------------------------------------------
 
-    def validate_token(self, token: uuid.UUID) -> Optional[Visit]:
+    def validate_token(self, token: uuid.UUID) -> Visit | None:
         """Validate a token lookup.
 
         Returns the Visit if found, regardless of time window.
@@ -159,7 +158,7 @@ class VisitTokenService:
         """
         return self._repo.get_visit_by_token(token)
 
-    def validate_pin(self, pin: str) -> Optional[Visit]:
+    def validate_pin(self, pin: str) -> Visit | None:
         """Validate a PIN lookup (scan PIN fallback).
 
         Returns the Visit if found, regardless of time window.
@@ -173,15 +172,15 @@ class VisitTokenService:
         Valid window: meeting_start - 30 minutes <= now <= meeting_end + 60 minutes.
         This allows early arrivals and late departures.
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         meeting_start = visit.meeting_start
         if meeting_start.tzinfo is None:
-            meeting_start = meeting_start.replace(tzinfo=timezone.utc)
+            meeting_start = meeting_start.replace(tzinfo=UTC)
 
         meeting_end = visit.meeting_end
         if meeting_end.tzinfo is None:
-            meeting_end = meeting_end.replace(tzinfo=timezone.utc)
+            meeting_end = meeting_end.replace(tzinfo=UTC)
 
         window_start = meeting_start - timedelta(minutes=30)
         window_end = meeting_end + timedelta(minutes=60)

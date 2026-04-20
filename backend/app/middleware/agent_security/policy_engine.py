@@ -20,14 +20,13 @@ Storage is in-memory for the current single-worker deployment.
 
 import logging
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional
 
 from app.middleware.agent_security.models import (
+    PERMISSION_MATRIX,
     AgentAuditEntry,
     AgentSession,
     AgentToolName,
     ConfirmationToken,
-    PERMISSION_MATRIX,
     PolicyDecision,
 )
 from app.models.auth import SentinelRole
@@ -49,8 +48,8 @@ class PolicyResult:
 
     decision: PolicyDecision
     reason: str
-    confirmation_token: Optional[ConfirmationToken] = None
-    audit_entry: Optional[AgentAuditEntry] = field(default=None, repr=False)
+    confirmation_token: ConfirmationToken | None = None
+    audit_entry: AgentAuditEntry | None = field(default=None, repr=False)
 
     @property
     def is_allowed(self) -> bool:
@@ -89,8 +88,8 @@ class ToolPolicyEngine:
         #   sentinel:confirmations:{session_id} → token_hash (TTL 60s)
         #   sentinel:breaker:{agent_id} → state JSON (TTL 5min)
         #   sentinel:ratelimit:{identity}:{window} → counter (TTL = window)
-        self._pending_confirmations: Dict[str, ConfirmationToken] = {}
-        self._audit_log: List[AgentAuditEntry] = []
+        self._pending_confirmations: dict[str, ConfirmationToken] = {}
+        self._audit_log: list[AgentAuditEntry] = []
 
     # ------------------------------------------------------------------
     # Public API
@@ -102,7 +101,7 @@ class ToolPolicyEngine:
         tool: AgentToolName,
         action: str,
         target: str,
-        site_id: Optional[str] = None,
+        site_id: str | None = None,
     ) -> PolicyResult:
         """Evaluate a tool invocation against session scope and permission matrix.
 
@@ -311,7 +310,7 @@ class ToolPolicyEngine:
             reason="Confirmation token mismatch",
         )
 
-    def get_audit_log(self) -> List[AgentAuditEntry]:
+    def get_audit_log(self) -> list[AgentAuditEntry]:
         """Return a copy of the in-memory audit log.
 
         TODO(production): Replace with Redis/Supabase query.
@@ -355,7 +354,7 @@ class ToolPolicyEngine:
         tool: AgentToolName,
         action: str,
         target: str,
-        confirmation_token: Optional[ConfirmationToken] = None,
+        confirmation_token: ConfirmationToken | None = None,
     ) -> PolicyResult:
         """Create a PolicyResult and append an audit entry."""
         audit_entry = AgentAuditEntry(

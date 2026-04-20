@@ -17,14 +17,13 @@ import json
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
-from fastapi import APIRouter, File, UploadFile, Form, HTTPException, Query
+from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
 
-from app.services.sentry_integration.phyphox_handler import get_phyphox_handler
 from app.services.anomaly_reporter import get_anomaly_reporter
-from app.services.condition_scorer import get_condition_scorer
 from app.services.baseline_comparator import get_baseline_comparator
+from app.services.condition_scorer import get_condition_scorer
+from app.services.sentry_integration.phyphox_handler import get_phyphox_handler
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +47,7 @@ def _load_seed_data():
     baselines_file = data_dir / "seed_baselines.json"
     if baselines_file.exists():
         try:
-            with open(baselines_file, "r") as f:
+            with open(baselines_file) as f:
                 baselines = json.load(f)
             for equipment_id, baseline in baselines.items():
                 _baselines[equipment_id] = baseline
@@ -60,7 +59,7 @@ def _load_seed_data():
     recordings_file = data_dir / "seed_recordings.json"
     if recordings_file.exists():
         try:
-            with open(recordings_file, "r") as f:
+            with open(recordings_file) as f:
                 recordings = json.load(f)
             for equipment_id, recs in recordings.items():
                 if equipment_id not in _recordings:
@@ -78,7 +77,7 @@ async def process_sensor_data(
     file: UploadFile = File(...),
     equipment_id: str = Form(...),
     measurement_type: str = Form("vibration"),
-    service_record_id: Optional[str] = Form(None),
+    service_record_id: str | None = Form(None),
 ):
     """
     Process phyphox screenshot or export file.
@@ -131,7 +130,7 @@ async def sentry_phyphox_webhook(
     equipment_id: str = Form(...),
     chat_id: str = Form(...),
     measurement_type: str = Form("vibration"),
-    service_record_id: Optional[str] = Form(None),
+    service_record_id: str | None = Form(None),
 ):
     """
     Webhook for Sentry bot to submit phyphox data.
@@ -184,7 +183,7 @@ async def sentry_phyphox_webhook(
 @router.get("/instructions/{measurement_type}")
 async def get_technician_instructions(
     measurement_type: str,
-    equipment_type: Optional[str] = Query(None, description="Equipment type for specific guidance"),
+    equipment_type: str | None = Query(None, description="Equipment type for specific guidance"),
 ):
     """Get phyphox instructions for technicians."""
     handler = get_phyphox_handler()
@@ -197,8 +196,8 @@ async def capture_baseline(
     file: UploadFile = File(...),
     measurement_type: str = Form("vibration"),
     condition: str = Form("good"),
-    technician: Optional[str] = Form(None),
-    notes: Optional[str] = Form(None),
+    technician: str | None = Form(None),
+    notes: str | None = Form(None),
 ):
     """
     Capture baseline reading for equipment (during onboarding/condition inspection).
@@ -298,7 +297,7 @@ async def calculate_condition_score(
     equipment_id: str = Form(...),
     asset_class: str = Form("generator"),
     equipment_profile: str = Form("generator_default"),
-    file: Optional[UploadFile] = File(None),
+    file: UploadFile | None = File(None),
     use_latest: bool = Form(True),
 ):
     """

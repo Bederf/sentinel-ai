@@ -14,14 +14,13 @@ Endpoints:
 """
 
 import logging
-from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Header, Query
+from fastapi import APIRouter, Header, HTTPException, Query
 
 from app.models.remote_ops import AuthorizationLevel
+from app.services.audit_logger import AuditLogger
 from app.services.auth_service import get_authorization_service
 from app.services.remote_monitoring_service import get_remote_monitoring_service
-from app.services.audit_logger import AuditLogger
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +32,7 @@ _monitoring_service = get_remote_monitoring_service()
 _audit_logger = AuditLogger()
 
 
-def _resolve_user(x_user_id: Optional[str]) -> dict:
+def _resolve_user(x_user_id: str | None) -> dict:
     """Resolve user from X-User-Id header. Requires valid user ID."""
     if not x_user_id:
         raise HTTPException(status_code=401, detail="X-User-Id header required")
@@ -59,7 +58,7 @@ def _check_auth(user_role: str, required: AuthorizationLevel) -> None:
 @router.get("/building/{site_id}/status")
 async def get_site_status(
     site_id: str,
-    x_user_id: Optional[str] = Header(None, alias="X-User-Id"),
+    x_user_id: str | None = Header(None, alias="X-User-Id"),
 ):
     """Get building-wide status summary.
 
@@ -90,7 +89,7 @@ async def get_equipment_diagnostic(
         "quick_status",
         description="Diagnostic type: quick_status or full_diagnostic",
     ),
-    x_user_id: Optional[str] = Header(None, alias="X-User-Id"),
+    x_user_id: str | None = Header(None, alias="X-User-Id"),
 ):
     """Run a remote diagnostic on equipment.
 
@@ -126,7 +125,7 @@ async def get_equipment_diagnostic(
 @router.get("/equipment/{equipment_id}/dispatch-assessment")
 async def get_dispatch_assessment(
     equipment_id: str,
-    x_user_id: Optional[str] = Header(None, alias="X-User-Id"),
+    x_user_id: str | None = Header(None, alias="X-User-Id"),
 ):
     """Assess whether a technician dispatch is needed.
 
@@ -156,7 +155,7 @@ async def get_dispatch_assessment(
 @router.get("/user/{user_id}/sessions")
 async def get_user_sessions(
     user_id: str,
-    x_user_id: Optional[str] = Header(None, alias="X-User-Id"),
+    x_user_id: str | None = Header(None, alias="X-User-Id"),
 ):
     """Get remote session history for a user.
 
@@ -178,7 +177,7 @@ async def get_user_sessions(
 
 @router.get("/commands/allowed")
 async def get_allowed_commands(
-    x_user_id: Optional[str] = Header(None, alias="X-User-Id"),
+    x_user_id: str | None = Header(None, alias="X-User-Id"),
 ):
     """List remote commands the current user is authorized to execute.
 

@@ -5,14 +5,14 @@ REST endpoints for creating, retrieving, and managing building 3D configurations
 """
 
 import logging
-from typing import Any, Dict, Optional
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
+from app.database.repositories.site_repository import SiteRepository
 from app.middleware.auth_middleware import require_site_access
 from app.models.auth import AuthContext
-from app.database.repositories.site_repository import SiteRepository
 from app.services.site_3d_config_service import get_site_3d_config_service
 
 logger = logging.getLogger(__name__)
@@ -43,7 +43,7 @@ class BuildingStructure(BaseModel):
     """Building structure model."""
 
     name: str = Field(..., description="Building name")
-    code: Optional[str] = Field(None, description="Building code")
+    code: str | None = Field(None, description="Building code")
     numberOfFloors: int = Field(..., ge=1, le=50, description="Number of floors")
     floors: list[FloorDefinition] = Field(..., description="Floor definitions")
 
@@ -65,10 +65,10 @@ class Site3DConfigResponse(BaseModel):
     site_id: str = Field(..., description="Site UUID")
     site_code: str = Field(..., description="Site code")
     name: str = Field(..., description="Building name")
-    code: Optional[str] = Field(None, description="Building code")
-    floors: list[Dict[str, Any]] = Field(..., description="Floor definitions")
-    equipment_positions: list[Dict[str, Any]] = Field(..., description="Equipment positions")
-    zones: list[Dict[str, Any]] = Field(..., description="Zone definitions")
+    code: str | None = Field(None, description="Building code")
+    floors: list[dict[str, Any]] = Field(..., description="Floor definitions")
+    equipment_positions: list[dict[str, Any]] = Field(..., description="Equipment positions")
+    zones: list[dict[str, Any]] = Field(..., description="Zone definitions")
     created_at: str = Field(..., description="Creation timestamp")
     updated_at: str = Field(..., description="Update timestamp")
 
@@ -78,8 +78,8 @@ class Building3DViewerDataResponse(BaseModel):
 
     site_id: str = Field(..., description="Building ID")
     site_name: str = Field(..., description="Building name")
-    floors: list[Dict[str, Any]] = Field(..., description="Floor data with equipment")
-    metadata: Dict[str, Any] = Field(..., description="Metadata")
+    floors: list[dict[str, Any]] = Field(..., description="Floor data with equipment")
+    metadata: dict[str, Any] = Field(..., description="Metadata")
 
 
 # ============= Router =============
@@ -208,7 +208,7 @@ async def create_or_update_config(
         logger.error(f"Error creating 3D config: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to create configuration: {str(e)}",
+            detail=f"Failed to create configuration: {e!s}",
         )
 
 
@@ -259,7 +259,7 @@ async def get_config(site_id: str, auth: AuthContext = Depends(require_site_acce
         logger.error(f"Error retrieving 3D config: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to retrieve configuration: {str(e)}",
+            detail=f"Failed to retrieve configuration: {e!s}",
         )
 
 
@@ -322,7 +322,7 @@ async def get_viewer_data(
         logger.error(f"Error retrieving viewer data: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to retrieve viewer data: {str(e)}",
+            detail=f"Failed to retrieve viewer data: {e!s}",
         )
 
 
@@ -333,7 +333,7 @@ async def get_viewer_data(
 )
 async def get_equipment_positions(
     site_id: str, auth: AuthContext = Depends(require_site_access("site_id"))
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Retrieve stored equipment positions for frontend rendering.
 
     Returns a map of equipment_id -> {floor, x, y} for all stored positions.
@@ -370,7 +370,7 @@ async def get_equipment_positions(
         logger.error(f"Error retrieving equipment positions: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to retrieve equipment positions: {str(e)}",
+            detail=f"Failed to retrieve equipment positions: {e!s}",
         )
 
 
@@ -383,7 +383,7 @@ async def update_equipment_position(
     equipment_id: str,
     position: EquipmentPosition,
     auth: AuthContext = Depends(require_site_access("site_id")),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Update or add a single equipment position within the 3D config.
 
     If no 3D config exists for the site, creates one with this position.
@@ -448,7 +448,7 @@ async def update_equipment_position(
         logger.error(f"Error updating equipment position: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to update equipment position: {str(e)}",
+            detail=f"Failed to update equipment position: {e!s}",
         )
 
 
@@ -472,5 +472,5 @@ async def delete_config(site_id: str, auth: AuthContext = Depends(require_site_a
         logger.error(f"Error deleting 3D config: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to delete configuration: {str(e)}",
+            detail=f"Failed to delete configuration: {e!s}",
         )

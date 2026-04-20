@@ -3,18 +3,18 @@
 import logging
 from datetime import date, datetime
 from pathlib import Path
-from typing import Any, Optional, List
+from typing import Any
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
 from app.database.repositories.municipal_invoice_repository import MunicipalInvoiceRepository
-from app.services.municipal_reconciliation_service import MunicipalReconciliationService
-from app.services.tariff_schedule_service import TariffScheduleService
-from app.services.municipal_tariff_ingestion_service import MunicipalTariffIngestionService
+from app.models.module_registry import AIRecommendation, ModuleType, RecommendationPriority, RecommendationType
 from app.security.document_scanner import build_safe_path, sanitize_filename
 from app.services.module_registry_service import ModuleRegistryService
-from app.models.module_registry import AIRecommendation, ModuleType, RecommendationType, RecommendationPriority
+from app.services.municipal_reconciliation_service import MunicipalReconciliationService
+from app.services.municipal_tariff_ingestion_service import MunicipalTariffIngestionService
+from app.services.tariff_schedule_service import TariffScheduleService
 
 logger = logging.getLogger(__name__)
 
@@ -28,8 +28,8 @@ async def upload_invoice(
     municipality: str = Form(...),
     utility_type: str = Form(...),
     account_number: str = Form(...),
-    tariff_type: Optional[str] = Form(None),
-    meter_number: Optional[str] = Form(None),
+    tariff_type: str | None = Form(None),
+    meter_number: str | None = Form(None),
 ):
     """Upload municipal invoice PDF for OCR parsing and reconciliation."""
     if file.content_type != "application/pdf":
@@ -194,12 +194,12 @@ async def upload_invoice(
 
 @router.post("/invoices/upload-batch")
 async def upload_invoice_batch(
-    files: List[UploadFile] = File(...),
+    files: list[UploadFile] = File(...),
     site_id: str = Form(...),
     municipality: str = Form(...),
     utility_type: str = Form(...),
     account_number: str = Form(...),
-    tariff_type: Optional[str] = Form(None),
+    tariff_type: str | None = Form(None),
 ):
     """Bulk upload multiple invoices."""
     results = []
@@ -222,11 +222,11 @@ async def upload_invoice_batch(
 
 @router.get("/invoices")
 async def list_invoices(
-    site_id: Optional[str] = None,
-    municipality: Optional[str] = None,
-    utility_type: Optional[str] = None,
-    billing_period: Optional[str] = None,
-    reconciliation_status: Optional[str] = None,
+    site_id: str | None = None,
+    municipality: str | None = None,
+    utility_type: str | None = None,
+    billing_period: str | None = None,
+    reconciliation_status: str | None = None,
     limit: int = 50,
     offset: int = 0,
 ):
@@ -309,10 +309,10 @@ async def get_dispute_pack(invoice_id: str):
 
 @router.get("/tariffs")
 async def list_tariff_schedules(
-    site_id: Optional[str] = None,
-    municipality: Optional[str] = None,
-    utility_type: Optional[str] = None,
-    active_date: Optional[str] = None,
+    site_id: str | None = None,
+    municipality: str | None = None,
+    utility_type: str | None = None,
+    active_date: str | None = None,
 ):
     svc = TariffScheduleService()
     active = datetime.fromisoformat(active_date).date() if active_date else None
@@ -451,7 +451,7 @@ async def analyze_maximum_demand(
     site_id: str,
     period_start: str,
     period_end: str,
-    meter_id: Optional[str] = None,
+    meter_id: str | None = None,
 ):
     recon = MunicipalReconciliationService()
     analysis = recon.maximum_demand_analysis(

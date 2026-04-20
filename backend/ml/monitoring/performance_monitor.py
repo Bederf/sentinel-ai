@@ -7,7 +7,7 @@ Compares predicted failures/anomalies with real alerts and faults.
 
 import logging
 from datetime import datetime
-from typing import Dict, List, Optional, Any
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -16,13 +16,13 @@ class ModelPerformanceMonitor:
     """Monitors ML model prediction accuracy against actuals."""
 
     def __init__(self):
-        self._evaluation_history: List[Dict[str, Any]] = []
+        self._evaluation_history: list[dict[str, Any]] = []
 
     def evaluate_predictions(
         self,
         days_back: int = 7,
         site_code: str = "site-002",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Compare predictions vs actual alerts/faults.
 
         Computes accuracy, precision, recall, and F1 score.
@@ -35,8 +35,8 @@ class ModelPerformanceMonitor:
             Dict with metrics and details
         """
         try:
-            from app.database.repositories.prediction_repository import PredictionRepository
             from app.database.repositories.alert_repository import AlertRepository
+            from app.database.repositories.prediction_repository import PredictionRepository
 
             pred_repo = PredictionRepository()
             alert_repo = AlertRepository()
@@ -112,11 +112,11 @@ class ModelPerformanceMonitor:
                 },
             }
 
-    def get_performance_trend(self, limit: int = 10) -> List[Dict[str, Any]]:
+    def get_performance_trend(self, limit: int = 10) -> list[dict[str, Any]]:
         """Return recent evaluation history."""
         return self._evaluation_history[-limit:]
 
-    def get_model_health_summary(self) -> Dict[str, Any]:
+    def get_model_health_summary(self) -> dict[str, Any]:
         """Summary of all active models with age, metrics, and refresh status.
 
         Combines registry info with performance evaluations.
@@ -162,7 +162,7 @@ class ModelPerformanceMonitor:
 
 
 # Singleton
-_monitor: Optional[ModelPerformanceMonitor] = None
+_monitor: ModelPerformanceMonitor | None = None
 
 
 def get_performance_monitor() -> ModelPerformanceMonitor:

@@ -4,8 +4,9 @@ Budget Alert Repository - Variance alert operations.
 Phase 49-09: Variance analysis and alerts.
 """
 
-from typing import Optional, List, Dict, Any
 import logging
+from typing import Any
+
 from ..supabase_client import get_supabase_client
 
 logger = logging.getLogger(__name__)
@@ -17,7 +18,7 @@ class BudgetAlertRepository:
     def __init__(self):
         self.client = get_supabase_client()
 
-    def create_or_update(self, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def create_or_update(self, data: dict[str, Any]) -> dict[str, Any] | None:
         """Upsert a budget alert by contract/year/month/severity."""
         if not self.client:
             logger.warning("Supabase client not available")
@@ -41,11 +42,11 @@ class BudgetAlertRepository:
     def list_by_contract(
         self,
         contract_id: str,
-        year: Optional[int] = None,
-        month: Optional[int] = None,
-        status: Optional[str] = None,
-        severity: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+        year: int | None = None,
+        month: int | None = None,
+        status: str | None = None,
+        severity: str | None = None,
+    ) -> list[dict[str, Any]]:
         """List alerts for a contract with optional filters."""
         if not self.client:
             return []
@@ -74,7 +75,7 @@ class BudgetAlertRepository:
             logger.error(f"Error listing budget alerts: {e}")
             return []
 
-    def update_status(self, alert_id: str, status: str) -> Optional[Dict[str, Any]]:
+    def update_status(self, alert_id: str, status: str) -> dict[str, Any] | None:
         """Update alert status (open, acknowledged, resolved)."""
         if not self.client:
             return None
@@ -91,7 +92,7 @@ class BudgetAlertRepository:
             return None
 
 
-_repository: Optional[BudgetAlertRepository] = None
+_repository: BudgetAlertRepository | None = None
 
 
 def get_budget_alert_repository() -> BudgetAlertRepository:

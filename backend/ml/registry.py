@@ -13,7 +13,6 @@ import json
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -161,7 +160,7 @@ class ModelRegistry:
 
         logger.info(f"Activated model: {model_id} (registry generation {self._generation})")
 
-    def get_active_model(self, model_type: str, equipment_type: str) -> Optional[dict]:
+    def get_active_model(self, model_type: str, equipment_type: str) -> dict | None:
         """Get the currently active model for inference.
 
         Returns a copy with paths resolved to absolute.
@@ -173,7 +172,7 @@ class ModelRegistry:
             return self._resolve_model_paths(self.registry["models"][model_id])
         return None
 
-    def list_models(self, model_type: str = None, equipment_type: str = None, status: str = None) -> List[dict]:
+    def list_models(self, model_type: str = None, equipment_type: str = None, status: str = None) -> list[dict]:
         """List registered models with optional filters.
 
         Returns copies with paths resolved to absolute.
@@ -193,7 +192,7 @@ class ModelRegistry:
             reverse=True,
         )
 
-    def get_model(self, model_id: str) -> Optional[dict]:
+    def get_model(self, model_id: str) -> dict | None:
         """Get a specific model by ID.
 
         Returns a copy with paths resolved to absolute.
@@ -221,7 +220,7 @@ class ModelRegistry:
         logger.info(f"Deleted model: {model_id}")
         return True
 
-    def get_model_comparison(self, model_type: str, equipment_type: str) -> List[dict]:
+    def get_model_comparison(self, model_type: str, equipment_type: str) -> list[dict]:
         """Compare all models for a specific type/equipment."""
         models = self.list_models(model_type, equipment_type)
         return [
@@ -236,7 +235,7 @@ class ModelRegistry:
 
 
 # Singleton instance
-_registry: Optional[ModelRegistry] = None
+_registry: ModelRegistry | None = None
 
 
 def get_model_registry() -> ModelRegistry:

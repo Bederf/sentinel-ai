@@ -5,16 +5,15 @@ ADMIN-only endpoints to view login audit logs and statistics.
 """
 
 import logging
-from typing import Optional, List
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 
-from app.middleware.auth_middleware import require_auth
-from app.models.auth import AuthContext, AuthLevel
 from app.database.repositories.login_audit_repository import (
     get_login_audit_repository,
 )
+from app.middleware.auth_middleware import require_auth
+from app.models.auth import AuthContext, AuthLevel
 
 logger = logging.getLogger(__name__)
 
@@ -31,21 +30,21 @@ class LoginRecord(BaseModel):
 
     id: str
     user_email: str
-    user_id: Optional[str] = None
-    user_role: Optional[str] = None
-    source_ip: Optional[str] = None
-    user_agent: Optional[str] = None
+    user_id: str | None = None
+    user_role: str | None = None
+    source_ip: str | None = None
+    user_agent: str | None = None
     login_at: str
     is_new_user: bool = False
     success: bool = True
-    failure_reason: Optional[str] = None
+    failure_reason: str | None = None
 
 
 class LoginListResponse(BaseModel):
     """Response with list of login records."""
 
     total: int
-    records: List[LoginRecord]
+    records: list[LoginRecord]
 
 
 class LoginStatsResponse(BaseModel):
@@ -63,8 +62,8 @@ class SuspiciousActivityResponse(BaseModel):
     """Suspicious activity detection response."""
 
     period_hours: int
-    failed_ips: List[dict]
-    multi_ip_users: List[dict]
+    failed_ips: list[dict]
+    multi_ip_users: list[dict]
     new_user_surge: bool
     new_user_count: int
 
@@ -77,10 +76,10 @@ class SuspiciousActivityResponse(BaseModel):
 @router.get("/recent", response_model=LoginListResponse)
 async def get_recent_logins(
     limit: int = Query(100, ge=1, le=1000, description="Max records to return"),
-    user_email: Optional[str] = Query(None, description="Filter by user email"),
-    source_ip: Optional[str] = Query(None, description="Filter by source IP"),
-    success_only: Optional[bool] = Query(None, description="Filter by success status"),
-    hours: Optional[int] = Query(None, ge=1, le=720, description="Only logins within N hours"),
+    user_email: str | None = Query(None, description="Filter by user email"),
+    source_ip: str | None = Query(None, description="Filter by source IP"),
+    success_only: bool | None = Query(None, description="Filter by success status"),
+    hours: int | None = Query(None, ge=1, le=720, description="Only logins within N hours"),
     auth: AuthContext = Depends(require_auth(AuthLevel.ADMIN)),
 ):
     """Get recent login records with optional filtering.

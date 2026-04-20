@@ -4,9 +4,10 @@ Condition Assessment Repository - Database operations for equipment/building ass
 Phase 48: Contract Management
 """
 
-from typing import Optional, List, Dict, Any
-from ..supabase_client import get_supabase_client
 import logging
+from typing import Any
+
+from ..supabase_client import get_supabase_client
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +18,7 @@ class ConditionAssessmentRepository:
     def __init__(self):
         self.client = get_supabase_client()
 
-    def get_by_site(self, site_id: str) -> List[Dict[str, Any]]:
+    def get_by_site(self, site_id: str) -> list[dict[str, Any]]:
         """
         Get all condition assessments for a building.
 
@@ -46,7 +47,7 @@ class ConditionAssessmentRepository:
             logger.error(f"Error getting assessments for building {site_id}: {e}")
             return []
 
-    def get_latest_for_equipment(self, equipment_id: str) -> Optional[Dict[str, Any]]:
+    def get_latest_for_equipment(self, equipment_id: str) -> dict[str, Any] | None:
         """
         Get the most recent assessment for a specific equipment item.
 
@@ -77,7 +78,7 @@ class ConditionAssessmentRepository:
             logger.error(f"Error getting latest assessment for equipment {equipment_id}: {e}")
             return None
 
-    def create(self, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def create(self, data: dict[str, Any]) -> dict[str, Any] | None:
         """
         Create a new condition assessment.
 
@@ -104,7 +105,7 @@ class ConditionAssessmentRepository:
             logger.error(f"Error creating condition assessment: {e}")
             return None
 
-    def get_by_id(self, assessment_id: str) -> Optional[Dict[str, Any]]:
+    def get_by_id(self, assessment_id: str) -> dict[str, Any] | None:
         """Get a single assessment by ID."""
         if not self.client:
             return None
@@ -120,7 +121,7 @@ class ConditionAssessmentRepository:
             logger.error(f"Error getting assessment {assessment_id}: {e}")
             return None
 
-    def get_by_contract(self, contract_id: str) -> List[Dict[str, Any]]:
+    def get_by_contract(self, contract_id: str) -> list[dict[str, Any]]:
         """
         Get all assessments linked to a contract.
 
@@ -148,7 +149,7 @@ class ConditionAssessmentRepository:
             logger.error(f"Error getting assessments for contract {contract_id}: {e}")
             return []
 
-    def update(self, assessment_id: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def update(self, assessment_id: str, data: dict[str, Any]) -> dict[str, Any] | None:
         """
         Update an assessment.
 
@@ -175,7 +176,7 @@ class ConditionAssessmentRepository:
 
 
 # Singleton instance
-_repository: Optional[ConditionAssessmentRepository] = None
+_repository: ConditionAssessmentRepository | None = None
 
 
 def get_condition_assessment_repository() -> ConditionAssessmentRepository:

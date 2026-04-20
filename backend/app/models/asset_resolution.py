@@ -10,7 +10,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional
 
 
 class ResolutionMethod(str, Enum):
@@ -68,10 +67,10 @@ class ResolutionResult:
         Human-readable reason for review flag, or None.
     """
 
-    asset_id: Optional[str]
+    asset_id: str | None
     confidence: float
     confidence_band: ResolutionConfidence
     method: ResolutionMethod
-    matched_on: Optional[str]
+    matched_on: str | None
     needs_review: bool
-    review_reason: Optional[str]
+    review_reason: str | None

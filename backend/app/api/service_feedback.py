@@ -9,16 +9,17 @@ Phase 59: Service Feedback & Health Score Integration
 """
 
 import logging
-from typing import Optional, List, Any
-from fastapi import APIRouter, HTTPException, Query, UploadFile, File, Form
+from typing import Any
+
+from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
 from pydantic import BaseModel
 
-from app.services.feedback_collection_service import (
-    get_feedback_collection_service,
-    FeedbackItemType,
-)
-from app.database.repositories.work_order_repository import get_work_order_repository
 from app.database.repositories.equipment_repository import EquipmentRepository
+from app.database.repositories.work_order_repository import get_work_order_repository
+from app.services.feedback_collection_service import (
+    FeedbackItemType,
+    get_feedback_collection_service,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -45,9 +46,9 @@ class StartFeedbackResponse(BaseModel):
     equipment_code: str
     equipment_type: str
     service_type: str
-    required_items: List[str]
-    optional_items: List[str]
-    first_prompt: Optional[dict] = None
+    required_items: list[str]
+    optional_items: list[str]
+    first_prompt: dict | None = None
 
 
 class SubmitReadingRequest(BaseModel):
@@ -55,8 +56,8 @@ class SubmitReadingRequest(BaseModel):
 
     item_key: str
     value: Any
-    unit: Optional[str] = None
-    notes: Optional[str] = None
+    unit: str | None = None
+    notes: str | None = None
 
 
 class SubmitObservationRequest(BaseModel):
@@ -64,7 +65,7 @@ class SubmitObservationRequest(BaseModel):
 
     item_key: str = "observation"
     content: str
-    notes: Optional[str] = None
+    notes: str | None = None
 
 
 class FeedbackItemResponse(BaseModel):
@@ -73,11 +74,11 @@ class FeedbackItemResponse(BaseModel):
     item_key: str
     item_type: str
     value: Any
-    unit: Optional[str] = None
-    baseline_value: Optional[float] = None
-    deviation_percent: Optional[float] = None
+    unit: str | None = None
+    baseline_value: float | None = None
+    deviation_percent: float | None = None
     health_impact: str
-    notes: Optional[str] = None
+    notes: str | None = None
 
 
 class SessionStatusResponse(BaseModel):
@@ -89,10 +90,10 @@ class SessionStatusResponse(BaseModel):
     equipment_type: str
     service_type: str
     progress: dict
-    items_collected: List[str]
-    next_item: Optional[dict] = None
-    started_at: Optional[str] = None
-    completed_at: Optional[str] = None
+    items_collected: list[str]
+    next_item: dict | None = None
+    started_at: str | None = None
+    completed_at: str | None = None
 
 
 class CompleteFeedbackResponse(BaseModel):
@@ -104,10 +105,10 @@ class CompleteFeedbackResponse(BaseModel):
     health_score_change: int
     items_collected: int
     feedback_summary: dict
-    warnings: List[str] = []
-    completed_at: Optional[str] = None
-    error: Optional[str] = None
-    message: Optional[str] = None
+    warnings: list[str] = []
+    completed_at: str | None = None
+    error: str | None = None
+    message: str | None = None
 
 
 class TemplateResponse(BaseModel):
@@ -115,8 +116,8 @@ class TemplateResponse(BaseModel):
 
     equipment_type: str
     service_type: str
-    required_items: List[str]
-    optional_items: List[str]
+    required_items: list[str]
+    optional_items: list[str]
     prompts: dict
     validation_rules: dict
 
@@ -263,7 +264,7 @@ async def submit_observation(session_id: str, request: SubmitObservationRequest)
 
 @router.post("/session/{session_id}/photo", response_model=FeedbackItemResponse)
 async def submit_photo(
-    session_id: str, item_key: str = Form(...), notes: Optional[str] = Form(None), file: UploadFile = File(...)
+    session_id: str, item_key: str = Form(...), notes: str | None = Form(None), file: UploadFile = File(...)
 ):
     """
     Submit a photo for the feedback session.
@@ -302,7 +303,7 @@ async def submit_photo(
 
 @router.post("/session/{session_id}/audio", response_model=FeedbackItemResponse)
 async def submit_audio(
-    session_id: str, item_key: str = Form(...), notes: Optional[str] = Form(None), file: UploadFile = File(...)
+    session_id: str, item_key: str = Form(...), notes: str | None = Form(None), file: UploadFile = File(...)
 ):
     """
     Submit an audio recording for the feedback session.

@@ -1,15 +1,15 @@
 """Tests for adapter-backed discovery in ``PointDiscoveryService``."""
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+
+from app.services.niagara.point_classifier import ClassifiedPoint, ConfidenceLevel, PointType
 from app.services.niagara.point_discovery import (
     PointDiscoveryService,
     _infer_object_type,
     _infer_point_type,
 )
-from app.services.niagara.point_classifier import ClassifiedPoint, ConfidenceLevel, PointType
-
 
 # ---------------------------------------------------------------------------
 # Test: Simulation Point Adapter

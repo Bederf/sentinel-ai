@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
-from typing import Optional
 
 from app.models.space_occupancy import FocusRoomSession
 
@@ -30,9 +29,9 @@ DEFAULT_GAP_TOLERANCE_SECONDS = 30  # 30 seconds — door-open buffer before clo
 
 def describe_focus_session_state(
     session: FocusRoomSession,
-    now: Optional[datetime] = None,
-    extended_use_seconds: Optional[int] = None,
-    red_light_cooldown_seconds: Optional[int] = None,
+    now: datetime | None = None,
+    extended_use_seconds: int | None = None,
+    red_light_cooldown_seconds: int | None = None,
 ) -> dict[str, int | float | bool]:
     """Compute live session state for API/UI use.
 
@@ -77,9 +76,9 @@ def process_focus_room_event(
     timestamp: datetime,
     source: str = "mmwave_ld2410c",
     room_type: str = "focus",
-    min_session_seconds: Optional[int] = None,
-    extended_use_seconds: Optional[int] = None,
-    gap_tolerance_seconds: Optional[int] = None,
+    min_session_seconds: int | None = None,
+    extended_use_seconds: int | None = None,
+    gap_tolerance_seconds: int | None = None,
 ) -> dict:
     """Process a single occupancy event for a focus room.
 
@@ -191,8 +190,8 @@ def process_focus_room_event(
 
 def get_focus_room_analytics(
     site_id: str,
-    from_dt: Optional[datetime] = None,
-    to_dt: Optional[datetime] = None,
+    from_dt: datetime | None = None,
+    to_dt: datetime | None = None,
 ) -> dict:
     """Generate analytics for focus room sessions.
 

@@ -7,8 +7,9 @@ import sys
 
 sys.path.insert(0, "/opt/bms-intelligence/backend")
 
-from app.database.supabase_client import get_supabase_client  # noqa: E402
-import json  # noqa: E402
+import json
+
+from app.database.supabase_client import get_supabase_client
 
 client = get_supabase_client()
 

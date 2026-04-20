@@ -11,31 +11,31 @@ Provides endpoints for:
 - Calendar and reporting
 """
 
-from typing import List, Optional, Dict, Any
 from datetime import datetime
+from typing import Any
 
-from fastapi import APIRouter, HTTPException, Depends, Query, Path, status
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 
 from app.models.inspection import (
-    InspectionSchedule,
-    InspectionScheduleCreate,
-    InspectionTask,
-    InspectionTaskAssignmentRequest,
-    InspectionTaskRescheduleRequest,
-    InspectionTaskCompleteRequest,
-    InspectionResult,
-    InspectionResultCreate,
+    DeficiencySeverity,
     InspectionDeficiency,
     InspectionDeficiencyCreate,
     InspectionOverviewResponse,
-    InspectionTaskStatus,
-    DeficiencySeverity,
-    InspectionSubmission,
+    InspectionResult,
+    InspectionResultCreate,
+    InspectionSchedule,
+    InspectionScheduleCreate,
     InspectionScheduleSummary,
+    InspectionSubmission,
+    InspectionTask,
+    InspectionTaskAssignmentRequest,
+    InspectionTaskCompleteRequest,
+    InspectionTaskRescheduleRequest,
+    InspectionTaskStatus,
 )
-from app.services.inspection_scheduler import get_inspection_scheduler
-from app.services.auth_service import get_current_user
 from app.models.user import User
+from app.services.auth_service import get_current_user
+from app.services.inspection_scheduler import get_inspection_scheduler
 
 router = APIRouter(prefix="/api/inspection", tags=["inspection"])
 
@@ -77,7 +77,7 @@ async def create_inspection_schedule(
 
     except Exception as e:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to create schedule: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to create schedule: {e!s}"
         )
 
 
@@ -100,12 +100,12 @@ async def get_inspection_schedule(schedule_id: str, current_user: User = Depends
 
 @router.get(
     "/schedules",
-    response_model=List[InspectionSchedule],
+    response_model=list[InspectionSchedule],
     summary="List inspection schedules",
     description="List all active inspection schedules",
 )
 async def list_inspection_schedules(
-    equipment_id: Optional[str] = Query(None, description="Filter by equipment"),
+    equipment_id: str | None = Query(None, description="Filter by equipment"),
     current_user: User = Depends(get_current_user),
 ):
     """List inspection schedules."""
@@ -131,7 +131,7 @@ async def deactivate_inspection_schedule(schedule_id: str, current_user: User = 
 
     except Exception as e:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to deactivate schedule: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to deactivate schedule: {e!s}"
         )
 
 
@@ -142,12 +142,12 @@ async def deactivate_inspection_schedule(schedule_id: str, current_user: User = 
 
 @router.post(
     "/tasks/generate",
-    response_model=Dict[str, Any],
+    response_model=dict[str, Any],
     summary="Generate inspection tasks",
     description="Generate inspection tasks from active schedules",
 )
 async def generate_inspection_tasks(
-    equipment_id: Optional[str] = Query(None, description="Specific equipment (optional)"),
+    equipment_id: str | None = Query(None, description="Specific equipment (optional)"),
     current_user: User = Depends(get_current_user),
 ):
     """Generate inspection tasks from schedules."""
@@ -165,7 +165,7 @@ async def generate_inspection_tasks(
 
     except Exception as e:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to generate tasks: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to generate tasks: {e!s}"
         )
 
 
@@ -188,14 +188,14 @@ async def get_inspection_task(task_id: str, current_user: User = Depends(get_cur
 
 @router.get(
     "/tasks",
-    response_model=List[InspectionTask],
+    response_model=list[InspectionTask],
     summary="List inspection tasks",
     description="List inspection tasks with optional filters",
 )
 async def list_inspection_tasks(
-    equipment_id: Optional[str] = Query(None, description="Filter by equipment"),
-    status: Optional[InspectionTaskStatus] = Query(None, description="Filter by status"),
-    assigned_to: Optional[str] = Query(None, description="Filter by assigned technician"),
+    equipment_id: str | None = Query(None, description="Filter by equipment"),
+    status: InspectionTaskStatus | None = Query(None, description="Filter by status"),
+    assigned_to: str | None = Query(None, description="Filter by assigned technician"),
     limit: int = Query(100, ge=1, le=1000, description="Maximum results"),
     current_user: User = Depends(get_current_user),
 ):
@@ -219,14 +219,14 @@ async def list_inspection_tasks(
 
 @router.get(
     "/tasks/due/days/{days_ahead}",
-    response_model=List[InspectionTask],
+    response_model=list[InspectionTask],
     summary="Get due inspections",
     description="Get inspection tasks due within specified days",
 )
 async def get_due_inspections(
     days_ahead: int = Path(..., ge=1, le=365, description="Days ahead to check"),
-    assigned_to: Optional[str] = Query(None, description="Filter by technician"),
-    equipment_id: Optional[str] = Query(None, description="Filter by equipment"),
+    assigned_to: str | None = Query(None, description="Filter by technician"),
+    equipment_id: str | None = Query(None, description="Filter by equipment"),
     current_user: User = Depends(get_current_user),
 ):
     """Get due inspections."""
@@ -240,13 +240,13 @@ async def get_due_inspections(
 
 @router.get(
     "/tasks/overdue",
-    response_model=List[InspectionTask],
+    response_model=list[InspectionTask],
     summary="Get overdue inspections",
     description="Get overdue inspection tasks",
 )
 async def get_overdue_inspections(
-    assigned_to: Optional[str] = Query(None, description="Filter by technician"),
-    equipment_id: Optional[str] = Query(None, description="Filter by equipment"),
+    assigned_to: str | None = Query(None, description="Filter by technician"),
+    equipment_id: str | None = Query(None, description="Filter by equipment"),
     current_user: User = Depends(get_current_user),
 ):
     """Get overdue inspections."""
@@ -285,7 +285,7 @@ async def assign_inspection_task(
     description="Mark inspection task as in progress",
 )
 async def start_inspection_task(
-    task_id: str, started_by: Optional[str] = None, current_user: User = Depends(get_current_user)
+    task_id: str, started_by: str | None = None, current_user: User = Depends(get_current_user)
 ):
     """Start inspection task."""
     scheduler = get_inspection_scheduler()
@@ -384,7 +384,7 @@ async def create_inspection_result(result: InspectionResultCreate, current_user:
 
     except Exception as e:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to create result: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to create result: {e!s}"
         )
 
 
@@ -407,7 +407,7 @@ async def get_inspection_result(result_id: str, current_user: User = Depends(get
 
 @router.get(
     "/results/task/{task_id}",
-    response_model=List[InspectionResult],
+    response_model=list[InspectionResult],
     summary="Get results for task",
     description="Get all inspection results for a task",
 )
@@ -421,7 +421,7 @@ async def get_inspection_results_for_task(task_id: str, current_user: User = Dep
 
 @router.get(
     "/results/equipment/{equipment_id}",
-    response_model=List[InspectionResult],
+    response_model=list[InspectionResult],
     summary="Get results for equipment",
     description="Get inspection results for equipment",
 )
@@ -460,7 +460,8 @@ async def create_inspection_deficiency(
 
         # Workflow integration: auto-trigger for critical/safety deficiencies
         try:
-            from app.services.workflow_triggers import get_trigger_engine, InspectionDeficiency as WorkflowDeficiency
+            from app.services.workflow_triggers import InspectionDeficiency as WorkflowDeficiency
+            from app.services.workflow_triggers import get_trigger_engine
 
             if str(created_deficiency.severity) in ["critical", "safety"]:
                 trigger_engine = get_trigger_engine()
@@ -485,7 +486,7 @@ async def create_inspection_deficiency(
 
     except Exception as e:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to create deficiency: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to create deficiency: {e!s}"
         )
 
 
@@ -508,13 +509,13 @@ async def get_inspection_deficiency(deficiency_id: str, current_user: User = Dep
 
 @router.get(
     "/deficiencies/equipment/{equipment_id}",
-    response_model=List[InspectionDeficiency],
+    response_model=list[InspectionDeficiency],
     summary="Get deficiencies for equipment",
     description="Get all deficiencies for specific equipment",
 )
 async def get_deficiencies_for_equipment(
     equipment_id: str,
-    resolved: Optional[bool] = Query(None, description="Filter by resolved status"),
+    resolved: bool | None = Query(None, description="Filter by resolved status"),
     current_user: User = Depends(get_current_user),
 ):
     """Get deficiencies for equipment."""
@@ -573,12 +574,12 @@ async def escalate_deficiency(
 
 @router.get(
     "/deficiencies/unresolved/critical",
-    response_model=List[InspectionDeficiency],
+    response_model=list[InspectionDeficiency],
     summary="Get critical unresolved deficiencies",
     description="Get all critical and safety deficiencies that are unresolved",
 )
 async def get_critical_unresolved_deficiencies(
-    equipment_id: Optional[str] = Query(None, description="Filter by equipment"),
+    equipment_id: str | None = Query(None, description="Filter by equipment"),
     current_user: User = Depends(get_current_user),
 ):
     """Get critical unresolved deficiencies."""
@@ -612,7 +613,7 @@ async def get_inspection_overview(equipment_id: str, current_user: User = Depend
 
 @router.get("/statistics", summary="Get inspection statistics", description="Get inspection scheduling statistics")
 async def get_inspection_statistics(
-    equipment_id: Optional[str] = Query(None, description="Filter by equipment"),
+    equipment_id: str | None = Query(None, description="Filter by equipment"),
     current_user: User = Depends(get_current_user),
 ):
     """Get inspection statistics."""
@@ -624,7 +625,7 @@ async def get_inspection_statistics(
 
 @router.get("/deficiencies/statistics", summary="Get deficiency statistics", description="Get deficiency statistics")
 async def get_deficiency_statistics(
-    equipment_id: Optional[str] = Query(None, description="Filter by equipment"),
+    equipment_id: str | None = Query(None, description="Filter by equipment"),
     days_back: int = Query(30, ge=1, le=365, description="Days back to analyze"),
     current_user: User = Depends(get_current_user),
 ):
@@ -657,8 +658,9 @@ async def submit_weekly_inspection(submission: InspectionSubmission, current_use
     - Photo attachments linked
     - Deficiency count calculated from responses
     """
-    from app.services.checklist_service import get_checklist_service
     import uuid
+
+    from app.services.checklist_service import get_checklist_service
 
     scheduler = get_inspection_scheduler()
     checklist_service = get_checklist_service()
@@ -734,12 +736,12 @@ async def submit_weekly_inspection(submission: InspectionSubmission, current_use
 
 @router.get(
     "/schedule",
-    response_model=List[InspectionScheduleSummary],
+    response_model=list[InspectionScheduleSummary],
     summary="Get inspection schedule",
     description="Get upcoming inspections for user or equipment",
 )
 async def get_inspection_schedule_list(
-    equipment_id: Optional[str] = Query(None, description="Filter by equipment ID"),
+    equipment_id: str | None = Query(None, description="Filter by equipment ID"),
     days_ahead: int = Query(30, ge=1, le=365, description="Days ahead to include"),
     current_user: User = Depends(get_current_user),
 ):
@@ -792,7 +794,7 @@ async def get_inspection_schedule_list(
 
 @router.get(
     "/history/{equipment_id}",
-    response_model=List[InspectionTask],
+    response_model=list[InspectionTask],
     summary="Get inspection history",
     description="Get historical inspections for equipment with trending",
 )

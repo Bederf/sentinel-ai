@@ -15,7 +15,7 @@ Phase 45-03: MLOps Monitoring and Success Metrics.
 
 import logging
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -37,11 +37,11 @@ class MetricsCalculator:
     """
 
     def __init__(self):
-        self._metrics_history: List[Dict[str, Any]] = []
-        self._prediction_outcomes: List[Dict[str, Any]] = []
-        self._report_cache: Dict[str, Dict[str, Any]] = {}
+        self._metrics_history: list[dict[str, Any]] = []
+        self._prediction_outcomes: list[dict[str, Any]] = []
+        self._report_cache: dict[str, dict[str, Any]] = {}
 
-    def calculate_all_metrics(self) -> Dict[str, Any]:
+    def calculate_all_metrics(self) -> dict[str, Any]:
         """Calculate all success metrics.
 
         Returns:
@@ -112,7 +112,7 @@ class MetricsCalculator:
         self._metrics_history.append(metrics)
         return metrics
 
-    def get_metrics_trend(self, limit: int = 30) -> List[Dict[str, Any]]:
+    def get_metrics_trend(self, limit: int = 30) -> list[dict[str, Any]]:
         """Get historical metrics trend."""
         return self._metrics_history[-limit:]
 
@@ -124,7 +124,7 @@ class MetricsCalculator:
         actual_failure: bool,
         prediction_date: str,
         outcome_date: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Record a prediction outcome for metrics calculation.
 
         Args:
@@ -159,8 +159,8 @@ class MetricsCalculator:
     def generate_report(
         self,
         period: str = "weekly",
-        report_date: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        report_date: str | None = None,
+    ) -> dict[str, Any]:
         """Generate a performance report for the specified period.
 
         Args:
@@ -221,7 +221,7 @@ class MetricsCalculator:
 
         return report
 
-    def get_cached_report(self, period: str, date: str) -> Optional[Dict[str, Any]]:
+    def get_cached_report(self, period: str, date: str) -> dict[str, Any] | None:
         """Retrieve a cached report."""
         cache_key = f"{period}-{date}"
         return self._report_cache.get(cache_key)
@@ -330,7 +330,7 @@ class MetricsCalculator:
         score = (fr_score * 0.35) + (pa_score * 0.40) + (fp_score * 0.25)
         return round(min(score, 100.0), 1)
 
-    def _get_drift_summary(self) -> Dict[str, Any]:
+    def _get_drift_summary(self) -> dict[str, Any]:
         """Get summary of current drift status."""
         try:
             from ml.monitoring.drift import get_drift_detector
@@ -341,7 +341,7 @@ class MetricsCalculator:
         except Exception:
             return {"error": "drift_detector_unavailable"}
 
-    def _get_model_health(self) -> Dict[str, Any]:
+    def _get_model_health(self) -> dict[str, Any]:
         """Get model health summary."""
         try:
             from ml.monitoring.performance_monitor import get_performance_monitor
@@ -351,7 +351,7 @@ class MetricsCalculator:
         except Exception:
             return {"error": "performance_monitor_unavailable"}
 
-    def _get_alert_summary(self) -> Dict[str, Any]:
+    def _get_alert_summary(self) -> dict[str, Any]:
         """Get ML alert summary."""
         try:
             from ml.monitoring.alerts import get_ml_alert_manager
@@ -361,7 +361,7 @@ class MetricsCalculator:
         except Exception:
             return {"error": "alert_manager_unavailable"}
 
-    def _generate_recommendations(self, metrics: Dict[str, Any]) -> List[Dict[str, str]]:
+    def _generate_recommendations(self, metrics: dict[str, Any]) -> list[dict[str, str]]:
         """Generate actionable recommendations based on metrics.
 
         Args:
@@ -431,7 +431,7 @@ class MetricsCalculator:
 
 
 # Singleton
-_calculator: Optional[MetricsCalculator] = None
+_calculator: MetricsCalculator | None = None
 
 
 def get_metrics_calculator() -> MetricsCalculator:

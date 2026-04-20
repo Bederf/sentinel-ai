@@ -1,17 +1,18 @@
 """Work Orders API endpoints."""
 
-from fastapi import APIRouter, Query, HTTPException, Depends
-from pydantic import BaseModel
-from datetime import datetime
-from typing import Optional, List, Dict, Any
-import uuid
 import logging
+import uuid
+from datetime import datetime
+from typing import Any
 
-from app.services.csv_loader import WorkOrderData, AssetData
-from app.middleware.auth_middleware import require_auth, require_module
-from app.models.auth import AuthLevel, AuthContext
-from app.models.module_registry import ModuleType
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
+
 from app.database.repositories.technician_repository import get_technician_repository
+from app.middleware.auth_middleware import require_auth, require_module
+from app.models.auth import AuthContext, AuthLevel
+from app.models.module_registry import ModuleType
+from app.services.csv_loader import AssetData, WorkOrderData
 
 logger = logging.getLogger(__name__)
 
@@ -93,10 +94,10 @@ class SupabaseWorkOrderCreate(BaseModel):
 
     equipment_code: str
     title: str
-    description: Optional[str] = None
+    description: str | None = None
     priority: str = "medium"  # low, medium, high, urgent
-    scheduled_date: Optional[str] = None
-    estimated_duration_hours: Optional[int] = None
+    scheduled_date: str | None = None
+    estimated_duration_hours: int | None = None
     created_by: str = "SENTINEL"
 
 
@@ -105,26 +106,26 @@ class SupabaseWorkOrderResponse(BaseModel):
 
     id: str
     code: str
-    equipment_code: Optional[str] = None
+    equipment_code: str | None = None
     title: str
     priority: str
     status: str
-    assigned_to: Optional[str] = None
-    technician_email: Optional[str] = None
-    technician_phone: Optional[str] = None
-    technician_telegram_id: Optional[str] = None
+    assigned_to: str | None = None
+    technician_email: str | None = None
+    technician_phone: str | None = None
+    technician_telegram_id: str | None = None
     created_at: str
 
 
 class TechnicianLookupResponse(BaseModel):
     """Technician lookup response."""
 
-    id: Optional[str] = None
-    name: Optional[str] = None
-    email: Optional[str] = None
-    phone: Optional[str] = None
-    telegram_id: Optional[str] = None
-    specialty: Optional[str] = None
+    id: str | None = None
+    name: str | None = None
+    email: str | None = None
+    phone: str | None = None
+    telegram_id: str | None = None
+    specialty: str | None = None
     found: bool = False
 
 
@@ -132,7 +133,7 @@ class WorkOrderEscalationRequest(BaseModel):
     """Request model for escalating work order to service provider."""
 
     escalation_reason: str  # e.g., "cannot fix", "requires specialist", "parts unavailable"
-    notes: Optional[str] = None  # Additional escalation notes
+    notes: str | None = None  # Additional escalation notes
 
 
 @router.get("/work-orders", response_model=list[WorkOrderResponse])
@@ -212,9 +213,9 @@ async def create_supabase_work_order(
     Automatically looks up and assigns the technician for the equipment.
     Requires authentication (OPERATOR or higher).
     """
-    from app.database.repositories.work_order_repository import get_work_order_repository
-    from app.database.repositories.technician_repository import get_technician_repository
     from app.database.repositories.audit_repository import AuditRepository
+    from app.database.repositories.technician_repository import get_technician_repository
+    from app.database.repositories.work_order_repository import get_work_order_repository
 
     try:
         wo_repo = get_work_order_repository()
@@ -275,15 +276,15 @@ async def create_supabase_work_order(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to create Supabase work order: {str(e)}")
+        logger.error(f"Failed to create Supabase work order: {e!s}")
         raise HTTPException(status_code=500, detail="Failed to create work order")
 
 
-@router.get("/work-orders/supabase", response_model=List[dict])
+@router.get("/work-orders/supabase", response_model=list[dict])
 async def list_supabase_work_orders(
-    status: Optional[str] = Query(None, description="Filter by status"),
-    priority: Optional[str] = Query(None, description="Filter by priority"),
-    equipment_id: Optional[str] = Query(None, description="Filter by equipment ID (UUID)"),
+    status: str | None = Query(None, description="Filter by status"),
+    priority: str | None = Query(None, description="Filter by priority"),
+    equipment_id: str | None = Query(None, description="Filter by equipment ID (UUID)"),
     limit: int = Query(50, description="Maximum number of results"),
     auth: AuthContext = Depends(require_auth(AuthLevel.AUTHENTICATED)),
 ):
@@ -307,7 +308,7 @@ async def list_supabase_work_orders(
 
         return work_orders
     except Exception as e:
-        logger.error(f"Failed to list Supabase work orders: {str(e)}")
+        logger.error(f"Failed to list Supabase work orders: {e!s}")
         raise HTTPException(status_code=500, detail="Failed to retrieve work orders")
 
 
@@ -330,7 +331,7 @@ async def get_supabase_work_order(code: str, auth: AuthContext = Depends(require
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to get Supabase work order: {str(e)}")
+        logger.error(f"Failed to get Supabase work order: {e!s}")
         raise HTTPException(status_code=500, detail="Failed to retrieve work order")
 
 
@@ -564,8 +565,8 @@ async def escalate_work_order_to_service_provider(
     Returns:
         Updated work order with escalation details
     """
-    from app.database.repositories.work_order_repository import get_work_order_repository
     from app.database.repositories.equipment_repository import get_equipment_repository
+    from app.database.repositories.work_order_repository import get_work_order_repository
     from app.services.notification_service import NotificationService
 
     try:
@@ -629,7 +630,7 @@ async def escalate_work_order_to_service_provider(
             )
             logger.info(f"Escalation email sent to {service_provider_email} for WO {work_order_id}")
         except Exception as e:
-            logger.error(f"Failed to send escalation email: {str(e)}")
+            logger.error(f"Failed to send escalation email: {e!s}")
             # Don't fail the escalation if email fails - escalation is complete
 
         # Audit log
@@ -643,8 +644,8 @@ async def escalate_work_order_to_service_provider(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to escalate work order: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to escalate work order: {str(e)}")
+        logger.error(f"Failed to escalate work order: {e!s}")
+        raise HTTPException(status_code=500, detail=f"Failed to escalate work order: {e!s}")
 
 
 @router.get("/work-orders/{work_order_id}", response_model=WorkOrderResponse)
@@ -835,29 +836,29 @@ class TechnicianWorkOrderCreate(BaseModel):
     fault_description: str
     diagnosis: str
     priority: str = "medium"  # low, medium, high, critical
-    technician_notes: Optional[str] = None
-    parts_needed: Optional[List[str]] = None
-    estimated_duration: Optional[str] = None
+    technician_notes: str | None = None
+    parts_needed: list[str] | None = None
+    estimated_duration: str | None = None
 
 
 class TechnicianWorkOrderUpdate(BaseModel):
     """Update work order fields."""
 
-    diagnosis: Optional[str] = None
-    technician_notes: Optional[str] = None
-    parts_needed: Optional[List[str]] = None
-    status: Optional[str] = None
-    estimated_duration: Optional[str] = None
-    priority: Optional[str] = None  # low, medium, high, critical
+    diagnosis: str | None = None
+    technician_notes: str | None = None
+    parts_needed: list[str] | None = None
+    status: str | None = None
+    estimated_duration: str | None = None
+    priority: str | None = None  # low, medium, high, critical
 
 
 class TechnicianWorkOrderComplete(BaseModel):
     """Complete work order with resolution details."""
 
     resolution: str
-    parts_used: List[str] = []
+    parts_used: list[str] = []
     time_spent: str
-    technician_notes: Optional[str] = None
+    technician_notes: str | None = None
 
 
 class TechnicianWorkOrderResponse(BaseModel):
@@ -871,24 +872,24 @@ class TechnicianWorkOrderResponse(BaseModel):
     priority: str
     status: str  # draft, assigned, in_progress, complete
     created_at: datetime
-    updated_at: Optional[datetime] = None
-    technician_id: Optional[str] = None
-    technician_notes: Optional[str] = None
-    parts_needed: List[str] = []
-    estimated_duration: Optional[str] = None
-    resolution: Optional[str] = None
-    parts_used: List[str] = []
-    time_spent: Optional[str] = None
+    updated_at: datetime | None = None
+    technician_id: str | None = None
+    technician_notes: str | None = None
+    parts_needed: list[str] = []
+    estimated_duration: str | None = None
+    resolution: str | None = None
+    parts_used: list[str] = []
+    time_spent: str | None = None
 
 
 class TechnicianDashboardOrder(BaseModel):
     """Simplified order card payload used by TechnicianPortal."""
 
     id: str
-    items: List[Dict[str, Any]]
+    items: list[dict[str, Any]]
     status: str
     total_amount: float
-    created_at: Optional[str] = None
+    created_at: str | None = None
 
 
 class TechnicianDashboardResponse(BaseModel):
@@ -898,10 +899,10 @@ class TechnicianDashboardResponse(BaseModel):
     pendingApprovals: int
     ordersInProgress: int
     completedThisWeek: int
-    recentOrders: List[TechnicianDashboardOrder]
+    recentOrders: list[TechnicianDashboardOrder]
 
 
-def _is_uuid(value: Optional[str]) -> bool:
+def _is_uuid(value: str | None) -> bool:
     if not value:
         return False
     try:
@@ -911,35 +912,35 @@ def _is_uuid(value: Optional[str]) -> bool:
         return False
 
 
-def _to_db_priority(priority: Optional[str]) -> str:
+def _to_db_priority(priority: str | None) -> str:
     if not priority:
         return "medium"
     p = priority.lower()
     return "urgent" if p == "critical" else p
 
 
-def _from_db_priority(priority: Optional[str]) -> str:
+def _from_db_priority(priority: str | None) -> str:
     if not priority:
         return "medium"
     p = priority.lower()
     return "critical" if p == "urgent" else p
 
 
-def _to_db_status(status: Optional[str]) -> Optional[str]:
+def _to_db_status(status: str | None) -> str | None:
     if status is None:
         return None
     s = status.lower()
     return "completed" if s == "complete" else s
 
 
-def _from_db_status(status: Optional[str]) -> str:
+def _from_db_status(status: str | None) -> str:
     if not status:
         return "draft"
     s = status.lower()
     return "complete" if s == "completed" else s
 
 
-def _parse_duration_hours(value: Optional[str]) -> Optional[int]:
+def _parse_duration_hours(value: str | None) -> int | None:
     """Parse human text like '2-4 hours' into a single estimate (first number)."""
     if not value:
         return None
@@ -952,7 +953,7 @@ def _parse_duration_hours(value: Optional[str]) -> Optional[int]:
         return None
 
 
-def _to_string_list(value: Any) -> List[str]:
+def _to_string_list(value: Any) -> list[str]:
     if isinstance(value, list):
         return [str(v) for v in value]
     if value is None:
@@ -961,9 +962,9 @@ def _to_string_list(value: Any) -> List[str]:
 
 
 def _map_db_to_technician_work_order(
-    row: Dict[str, Any],
-    fallback_site_id: Optional[str] = None,
-) -> Dict[str, Any]:
+    row: dict[str, Any],
+    fallback_site_id: str | None = None,
+) -> dict[str, Any]:
     """Map work_orders table row into technician API shape expected by frontend."""
     return {
         "id": str(row.get("id", "")),
@@ -989,7 +990,7 @@ def _map_db_to_technician_work_order(
     }
 
 
-def _append_completion_notes(existing: Optional[str], completion_note: Optional[str]) -> Optional[str]:
+def _append_completion_notes(existing: str | None, completion_note: str | None) -> str | None:
     if not completion_note:
         return existing
     if not existing:
@@ -1007,13 +1008,13 @@ async def create_technician_work_order(
     Creates a draft work order that can be reviewed and submitted.
     Requires authentication (AUTHENTICATED or higher).
     """
-    from app.database.repositories.work_order_repository import get_work_order_repository
     from app.database.repositories.audit_repository import AuditRepository
+    from app.database.repositories.work_order_repository import get_work_order_repository
 
     try:
         repo = get_work_order_repository()
 
-        payload: Dict[str, Any] = {
+        payload: dict[str, Any] = {
             "title": f"Technician: {order.fault_description[:80]}",
             "description": order.fault_description,
             "priority": _to_db_priority(order.priority),
@@ -1051,15 +1052,15 @@ async def create_technician_work_order(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to create technician work order: {str(e)}")
+        logger.error(f"Failed to create technician work order: {e!s}")
         raise HTTPException(status_code=500, detail="Failed to create work order")
 
 
-@router.get("/work-orders/technician", response_model=List[TechnicianWorkOrderResponse])
+@router.get("/work-orders/technician", response_model=list[TechnicianWorkOrderResponse])
 async def get_technician_work_orders(
-    site_id: Optional[str] = Query(None, description="Filter by site ID"),
-    status: Optional[str] = Query(None, description="Filter by status"),
-    technician_id: Optional[str] = Query(None, description="Filter by technician"),
+    site_id: str | None = Query(None, description="Filter by site ID"),
+    status: str | None = Query(None, description="Filter by status"),
+    technician_id: str | None = Query(None, description="Filter by technician"),
     auth: AuthContext = Depends(require_auth(AuthLevel.AUTHENTICATED)),
 ):
     """
@@ -1085,7 +1086,7 @@ async def get_technician_work_orders(
         work_orders.sort(key=lambda x: x.get("created_at") or datetime.now(), reverse=True)
         return work_orders
     except Exception as e:
-        logger.error(f"Failed to get technician work orders: {str(e)}")
+        logger.error(f"Failed to get technician work orders: {e!s}")
         raise HTTPException(status_code=500, detail="Failed to retrieve work orders")
 
 
@@ -1113,7 +1114,7 @@ async def get_technician_dashboard(auth: AuthContext = Depends(require_module(Mo
     week_start = now.timestamp() - (7 * 24 * 60 * 60)
     completed_this_week = 0
 
-    recent_orders: List[TechnicianDashboardOrder] = []
+    recent_orders: list[TechnicianDashboardOrder] = []
     for order in user_orders[:10]:
         created_raw = order.get("created_at")
         created_at = created_raw.isoformat() if isinstance(created_raw, datetime) else str(created_raw or "")
@@ -1167,8 +1168,8 @@ async def update_technician_work_order(
     Can update diagnosis, notes, parts, status, or duration.
     Requires authentication (AUTHENTICATED or higher).
     """
-    from app.database.repositories.work_order_repository import get_work_order_repository
     from app.database.repositories.audit_repository import AuditRepository
+    from app.database.repositories.work_order_repository import get_work_order_repository
 
     try:
         repo = get_work_order_repository()
@@ -1231,7 +1232,7 @@ async def update_technician_work_order(
                         )
                         logger.info(f"Sent escalation email to {tech.get('email')} for WO {work_order_id}")
             except Exception as e:
-                logger.error(f"Failed to send escalation email: {str(e)}")
+                logger.error(f"Failed to send escalation email: {e!s}")
                 # Non-blocking: don't fail the API if email fails
 
         logger.info(f"Updated technician work order {work_order_id} by user {auth.user_id}")
@@ -1239,7 +1240,7 @@ async def update_technician_work_order(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to update technician work order: {str(e)}")
+        logger.error(f"Failed to update technician work order: {e!s}")
         raise HTTPException(status_code=500, detail="Failed to update work order")
 
 
@@ -1254,8 +1255,8 @@ async def complete_technician_work_order(
 
     Called by technician when job is finished.
     """
-    from app.database.repositories.work_order_repository import get_work_order_repository
     from app.database.repositories.audit_repository import AuditRepository
+    from app.database.repositories.work_order_repository import get_work_order_repository
 
     repo = get_work_order_repository()
     work_order = await repo.get_work_order_by_id(work_order_id)

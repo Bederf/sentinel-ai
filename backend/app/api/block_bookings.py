@@ -8,14 +8,14 @@ from __future__ import annotations
 
 import logging
 from datetime import date, timedelta
-from typing import Any, Optional
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field, validator
 
 from app.config.settings import settings
 from app.core.site_resolver import require_any_site
-from app.middleware.auth_middleware import AuthContext, require_auth, AuthLevel
+from app.middleware.auth_middleware import AuthContext, AuthLevel, require_auth
 from app.middleware.rate_limiter import limiter
 from app.models.booking_record import BlockBookingConfig
 from app.services.block_booking_detector.site_resolver import normalize_site_id, resolve_site_id_for_room
@@ -40,7 +40,7 @@ class BookingEmailRequest(BaseModel):
     """Inbound booking confirmation email for parsing."""
 
     raw_email: str = Field("", max_length=10_000_000)
-    ics_data: Optional[str] = Field(None, max_length=100_000)
+    ics_data: str | None = Field(None, max_length=100_000)
     site_id: str = Field("", max_length=50)
 
     @validator("ics_data")
@@ -59,13 +59,13 @@ class DismissRequest(BaseModel):
 class ConfigUpdateRequest(BaseModel):
     """Update block booking config."""
 
-    min_rooms_for_alert: Optional[int] = None
-    full_day_threshold_hours: Optional[float] = None
-    lookahead_days: Optional[int] = None
-    enabled: Optional[bool] = None
-    concierge_email: Optional[str] = None
-    concierge_whatsapp: Optional[str] = None
-    concierge_telegram_chat_id: Optional[str] = None
+    min_rooms_for_alert: int | None = None
+    full_day_threshold_hours: float | None = None
+    lookahead_days: int | None = None
+    enabled: bool | None = None
+    concierge_email: str | None = None
+    concierge_whatsapp: str | None = None
+    concierge_telegram_chat_id: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -328,8 +328,8 @@ async def dismiss_alert(
 @router.get("/bookings")
 async def list_bookings(
     site_id: str = Depends(require_any_site),
-    from_date: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
-    to_date: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
+    from_date: str | None = Query(None, description="Start date (YYYY-MM-DD)"),
+    to_date: str | None = Query(None, description="End date (YYYY-MM-DD)"),
 ) -> dict[str, Any]:
     """List ingested bookings for a site within a date range."""
     from app.services.block_booking_detector.booking_store import get_booking_store

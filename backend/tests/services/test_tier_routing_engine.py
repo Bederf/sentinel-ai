@@ -4,10 +4,11 @@ Tests the confidence-based tier routing engine that routes AI recommendations
 to appropriate autonomy tiers (Tier 1/2/3) based on confidence, risk level, and thresholds.
 """
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock
 
-from app.services.tier_routing_engine import TierRoutingEngine, TierLevel
+import pytest
+
+from app.services.tier_routing_engine import TierLevel, TierRoutingEngine
 
 
 @pytest.mark.asyncio

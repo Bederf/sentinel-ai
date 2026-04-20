@@ -8,14 +8,13 @@ Also includes comprehensive prediction endpoint that combines all ML models.
 """
 
 import logging
-from typing import Dict, List
 
 from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel, Field
 
 from app.services.classification_service import get_classification_service
-from app.services.ml_inference import get_lstm_service, get_anomaly_service
+from app.services.ml_inference import get_anomaly_service, get_lstm_service
 from app.services.survival_service import SurvivalService
-from pydantic import BaseModel, Field
 from app.utils.ai_provenance import attach_ai_provenance, get_ml_provenance
 
 logger = logging.getLogger(__name__)
@@ -31,8 +30,8 @@ class FailurePredictionResponse(BaseModel):
     equipment_type: str
     predicted_failure: str
     confidence: float = Field(ge=0.0, le=1.0)
-    all_failure_probabilities: Dict[str, float]
-    contributing_factors: List[Dict]
+    all_failure_probabilities: dict[str, float]
+    contributing_factors: list[dict]
     timestamp: str
 
 
@@ -45,7 +44,7 @@ class FleetFailureRisk(BaseModel):
     confidence: float
     app_version: str | None = None
     config_checksum: str | None = None
-    ai_provenance: Dict | None = None
+    ai_provenance: dict | None = None
 
 
 class FeatureImportanceItem(BaseModel):
@@ -60,7 +59,7 @@ class ModelInfo(BaseModel):
 
     equipment_type: str
     model_path: str
-    metadata: Dict
+    metadata: dict
 
 
 # Endpoints
@@ -85,10 +84,10 @@ async def get_failure_type_prediction(equipment_id: str):
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         logger.error(f"Error predicting failure type: {e}")
-        raise HTTPException(status_code=500, detail=f"Prediction error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Prediction error: {e!s}")
 
 
-@router.get("/fleet/risks", response_model=List[FleetFailureRisk])
+@router.get("/fleet/risks", response_model=list[FleetFailureRisk])
 async def get_fleet_failure_risks(min_confidence: float = Query(default=0.5, ge=0.0, le=1.0)):
     """Get failure type predictions for all equipment.
 
@@ -105,10 +104,10 @@ async def get_fleet_failure_risks(min_confidence: float = Query(default=0.5, ge=
         )
     except Exception as e:
         logger.error(f"Error getting fleet risks: {e}")
-        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error: {e!s}")
 
 
-@router.get("/feature-importance/{equipment_type}", response_model=List[FeatureImportanceItem])
+@router.get("/feature-importance/{equipment_type}", response_model=list[FeatureImportanceItem])
 async def get_feature_importance(equipment_type: str, top_n: int = Query(default=20, ge=1, le=100)):
     """Get feature importance for an equipment type.
 
@@ -126,7 +125,7 @@ async def get_feature_importance(equipment_type: str, top_n: int = Query(default
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         logger.error(f"Error getting feature importance: {e}")
-        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error: {e!s}")
 
 
 @router.get("/models/{equipment_type}", response_model=ModelInfo)
@@ -146,10 +145,10 @@ async def get_model_info(equipment_type: str):
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         logger.error(f"Error getting model info: {e}")
-        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error: {e!s}")
 
 
-@router.get("/models", response_model=List[ModelInfo])
+@router.get("/models", response_model=list[ModelInfo])
 async def list_available_models():
     """List all available classification models.
 
@@ -161,7 +160,7 @@ async def list_available_models():
         return service.list_available_models()
     except Exception as e:
         logger.error(f"Error listing models: {e}")
-        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error: {e!s}")
 
 
 @router.get("/health")
@@ -189,8 +188,8 @@ class ComprehensivePredictionResponse(BaseModel):
 
     equipment_id: str
     equipment_type: str
-    predictions: Dict
-    overall_risk: Dict
+    predictions: dict
+    overall_risk: dict
 
 
 @router.get("/comprehensive/{equipment_id}")
@@ -272,7 +271,7 @@ async def get_comprehensive_prediction(equipment_id: str):
     return attach_ai_provenance(results, get_ml_provenance("comprehensive-ml-ensemble-v1"))
 
 
-def calculate_overall_risk(predictions: Dict) -> Dict:
+def calculate_overall_risk(predictions: dict) -> dict:
     """Calculate overall risk from all predictions.
 
     Args:

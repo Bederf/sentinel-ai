@@ -1,9 +1,10 @@
 """Service record models for Phase 41 ML Engineer Knowledge Capture."""
 
-from pydantic import BaseModel, ConfigDict, Field
-from typing import Optional, List, Dict, Any
 from datetime import datetime
 from enum import Enum
+from typing import Any
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ServiceType(str, Enum):
@@ -45,13 +46,13 @@ class ServiceReading(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-    id: Optional[str] = None
+    id: str | None = None
     reading_type: str  # hour_meter, battery_voltage, oil_level, etc.
     value: str
-    unit: Optional[str] = None
-    numeric_value: Optional[float] = None
+    unit: str | None = None
+    numeric_value: float | None = None
     source: SourceType = SourceType.MANUAL
-    confidence: Optional[float] = Field(None, ge=0, le=1)
+    confidence: float | None = Field(None, ge=0, le=1)
 
 
 class ServiceAttachment(BaseModel):
@@ -59,15 +60,15 @@ class ServiceAttachment(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-    id: Optional[str] = None
+    id: str | None = None
     attachment_type: AttachmentType
     file_path: str
-    file_name: Optional[str] = None
-    file_size_bytes: Optional[int] = None
-    mime_type: Optional[str] = None
-    extracted_data: Optional[Dict[str, Any]] = None
-    analysis_status: Optional[str] = "pending"
-    created_at: Optional[datetime] = None
+    file_name: str | None = None
+    file_size_bytes: int | None = None
+    mime_type: str | None = None
+    extracted_data: dict[str, Any] | None = None
+    analysis_status: str | None = "pending"
+    created_at: datetime | None = None
 
 
 class ServiceObservation(BaseModel):
@@ -75,15 +76,15 @@ class ServiceObservation(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-    id: Optional[str] = None
+    id: str | None = None
     observation_type: str  # voice_note or text
     content: str
-    audio_file_path: Optional[str] = None
-    duration_seconds: Optional[float] = None
-    sentiment: Optional[str] = None
-    key_phrases: Optional[List[str]] = None
-    issue_flags: Optional[List[str]] = None
-    created_at: Optional[datetime] = None
+    audio_file_path: str | None = None
+    duration_seconds: float | None = None
+    sentiment: str | None = None
+    key_phrases: list[str] | None = None
+    issue_flags: list[str] | None = None
+    created_at: datetime | None = None
 
 
 class DiagnosticContext(BaseModel):
@@ -91,17 +92,17 @@ class DiagnosticContext(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-    fault_type: Optional[str] = None  # e.g., "fcu_valve_stuck"
-    fault_code: Optional[str] = None  # e.g., "E04"
-    fault_description: Optional[str] = None  # e.g., "FCU valve stuck at 15%"
-    original_reading: Optional[float] = None  # e.g., 25.0 (temp was 25°C)
-    setpoint: Optional[float] = None  # e.g., 21.0
-    deviation: Optional[float] = None  # e.g., 4.0
-    faulty_equipment: Optional[str] = None  # e.g., "S002-FCU-L0-C"
-    zone_id: Optional[str] = None  # e.g., "Zone-L0-C"
-    recommended_actions: List[str] = Field(default_factory=list)
-    parts_required: List[str] = Field(default_factory=list)
-    severity: Optional[str] = None  # critical, warning, info
+    fault_type: str | None = None  # e.g., "fcu_valve_stuck"
+    fault_code: str | None = None  # e.g., "E04"
+    fault_description: str | None = None  # e.g., "FCU valve stuck at 15%"
+    original_reading: float | None = None  # e.g., 25.0 (temp was 25°C)
+    setpoint: float | None = None  # e.g., 21.0
+    deviation: float | None = None  # e.g., 4.0
+    faulty_equipment: str | None = None  # e.g., "S002-FCU-L0-C"
+    zone_id: str | None = None  # e.g., "Zone-L0-C"
+    recommended_actions: list[str] = Field(default_factory=list)
+    parts_required: list[str] = Field(default_factory=list)
+    severity: str | None = None  # critical, warning, info
 
 
 class ServiceRecord(BaseModel):
@@ -109,26 +110,26 @@ class ServiceRecord(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-    id: Optional[str] = None
+    id: str | None = None
     code: str
-    work_order_id: Optional[str] = None
+    work_order_id: str | None = None
     equipment_id: str
-    site_id: Optional[str] = None
+    site_id: str | None = None
     service_type: ServiceType
     technician_id: str
     technician_name: str
-    started_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
     status: ServiceStatus = ServiceStatus.NOTIFIED
-    telegram_chat_id: Optional[str] = None
-    telegram_message_id: Optional[str] = None
-    current_prompt: Optional[str] = None
-    items_collected: List[str] = Field(default_factory=list)
-    diagnostic_context: Optional[DiagnosticContext] = None  # Original alert context
-    confirmed_fault: Optional[str] = None  # Technician's confirmed root cause
-    actual_repair: Optional[str] = None  # What was actually done
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+    telegram_chat_id: str | None = None
+    telegram_message_id: str | None = None
+    current_prompt: str | None = None
+    items_collected: list[str] = Field(default_factory=list)
+    diagnostic_context: DiagnosticContext | None = None  # Original alert context
+    confirmed_fault: str | None = None  # Technician's confirmed root cause
+    actual_repair: str | None = None  # What was actually done
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
 
 class ServiceRecordDetail(ServiceRecord):
@@ -136,31 +137,31 @@ class ServiceRecordDetail(ServiceRecord):
 
     model_config = ConfigDict(from_attributes=True)
 
-    readings: List[ServiceReading] = Field(default_factory=list)
-    attachments: List[ServiceAttachment] = Field(default_factory=list)
-    observations: List[ServiceObservation] = Field(default_factory=list)
+    readings: list[ServiceReading] = Field(default_factory=list)
+    attachments: list[ServiceAttachment] = Field(default_factory=list)
+    observations: list[ServiceObservation] = Field(default_factory=list)
 
 
 class ServiceRecordCreate(BaseModel):
     """DTO for creating a service record."""
 
-    work_order_id: Optional[str] = None
+    work_order_id: str | None = None
     equipment_id: str
-    site_id: Optional[str] = None
+    site_id: str | None = None
     service_type: ServiceType
     technician_id: str
     technician_name: str
-    telegram_chat_id: Optional[str] = None
+    telegram_chat_id: str | None = None
 
 
 class ServiceRecordUpdate(BaseModel):
     """DTO for updating a service record."""
 
-    status: Optional[ServiceStatus] = None
-    started_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
-    current_prompt: Optional[str] = None
-    items_collected: Optional[List[str]] = None
+    status: ServiceStatus | None = None
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    current_prompt: str | None = None
+    items_collected: list[str] | None = None
 
 
 # ML Data Templates
@@ -169,9 +170,9 @@ class MLDataTemplate(BaseModel):
 
     equipment_type: str
     service_type: ServiceType
-    required: List[str]
-    optional: List[str] = Field(default_factory=list)
-    prompts: Dict[str, str]
+    required: list[str]
+    optional: list[str] = Field(default_factory=list)
+    prompts: dict[str, str]
 
 
 # Example template structure

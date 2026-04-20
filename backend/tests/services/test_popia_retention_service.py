@@ -1,7 +1,7 @@
 """Unit tests for POPIA retention enforcement service."""
 
-from datetime import datetime, timedelta, timezone
 import json
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -9,7 +9,7 @@ from app.services.popia_retention_service import POPIARetentionService, Retentio
 
 
 def _iso_days_ago(days: int) -> str:
-    return (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    return (datetime.now(UTC) - timedelta(days=days)).isoformat()
 
 
 @pytest.mark.unit

@@ -1,7 +1,8 @@
 """Repository for audit log operations."""
 
-from typing import List, Optional, Dict, Any
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any
+
 from app.database.supabase_client import get_supabase_client
 
 
@@ -16,10 +17,10 @@ class AuditRepository:
         self,
         limit: int = 100,
         offset: int = 0,
-        user_id: Optional[str] = None,
-        action: Optional[str] = None,
-        device_id: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+        user_id: str | None = None,
+        action: str | None = None,
+        device_id: str | None = None,
+    ) -> list[dict[str, Any]]:
         """Get audit log entries with optional filtering.
 
         Args:
@@ -50,7 +51,7 @@ class AuditRepository:
         response = query.execute()
         return response.data
 
-    def get_by_id(self, entry_id: str) -> Optional[Dict[str, Any]]:
+    def get_by_id(self, entry_id: str) -> dict[str, Any] | None:
         """Get audit log entry by UUID.
 
         Args:
@@ -65,7 +66,7 @@ class AuditRepository:
             return response.data[0]
         return None
 
-    def get_by_correlation_id(self, correlation_id: str) -> List[Dict[str, Any]]:
+    def get_by_correlation_id(self, correlation_id: str) -> list[dict[str, Any]]:
         """Get audit log entries by correlation ID.
 
         Args:
@@ -84,7 +85,7 @@ class AuditRepository:
 
         return response.data
 
-    def get_by_device(self, device_uuid: str, limit: int = 50) -> List[Dict[str, Any]]:
+    def get_by_device(self, device_uuid: str, limit: int = 50) -> list[dict[str, Any]]:
         """Get audit log entries for a device.
 
         Args:
@@ -105,7 +106,7 @@ class AuditRepository:
 
         return response.data
 
-    def create(self, audit_data: Dict[str, Any]) -> Dict[str, Any]:
+    def create(self, audit_data: dict[str, Any]) -> dict[str, Any]:
         """Create a new audit log entry.
 
         Args:
@@ -116,7 +117,7 @@ class AuditRepository:
         """
         # Set timestamp if not provided
         if "timestamp" not in audit_data:
-            audit_data["timestamp"] = datetime.now(timezone.utc).isoformat()
+            audit_data["timestamp"] = datetime.now(UTC).isoformat()
 
         response = self.client.table("audit_log").insert(audit_data).execute()
         return response.data[0]
@@ -129,11 +130,11 @@ class AuditRepository:
         new_value: Any,
         user_name: str,
         result: str = "SUCCESS",
-        safety_validation: Optional[Dict[str, Any]] = None,
-        error_message: Optional[str] = None,
-        correlation_id: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        safety_validation: dict[str, Any] | None = None,
+        error_message: str | None = None,
+        correlation_id: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """Log a device control action.
 
         Args:
@@ -170,13 +171,13 @@ class AuditRepository:
     def log_safety_validation(
         self,
         device_id: str,
-        safety_rules_checked: List[str],
-        safety_rules_passed: List[str],
-        safety_rules_failed: List[str],
+        safety_rules_checked: list[str],
+        safety_rules_passed: list[str],
+        safety_rules_failed: list[str],
         user_name: str,
         result: str = "SUCCESS",
-        correlation_id: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        correlation_id: str | None = None,
+    ) -> dict[str, Any]:
         """Log a safety validation check.
 
         Args:
@@ -205,7 +206,7 @@ class AuditRepository:
 
         return self.create(audit_data)
 
-    def get_recent_by_user(self, user_id: str, limit: int = 20) -> List[Dict[str, Any]]:
+    def get_recent_by_user(self, user_id: str, limit: int = 20) -> list[dict[str, Any]]:
         """Get recent audit log entries for a user.
 
         Args:
@@ -217,7 +218,7 @@ class AuditRepository:
         """
         return self.get_all(limit=limit, user_id=user_id)
 
-    def get_failed_actions(self, limit: int = 50) -> List[Dict[str, Any]]:
+    def get_failed_actions(self, limit: int = 50) -> list[dict[str, Any]]:
         """Get failed audit log entries.
 
         Args:
@@ -240,11 +241,11 @@ class AuditRepository:
     def log_security_event(
         self,
         event_type: str,
-        user_id: Optional[str] = None,
-        details: Optional[Dict[str, Any]] = None,
-        ip_address: Optional[str] = None,
+        user_id: str | None = None,
+        details: dict[str, Any] | None = None,
+        ip_address: str | None = None,
         result: str = "SUCCESS",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Log a security event (Phase 65-04).
 
         Supported event types:

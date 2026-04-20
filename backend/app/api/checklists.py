@@ -11,18 +11,19 @@ Provides endpoints for:
 - OEM template lookup with cascade matching
 """
 
-from typing import List, Optional, Dict, Any
-from fastapi import APIRouter, HTTPException, Depends, Query, Path, status
+from typing import Any
+
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 from pydantic import BaseModel, Field
 
-from app.services.checklist_generator_service import (
-    get_checklist_generator_service,
-)
 from app.database.repositories.checklist_template_repository import (
     get_checklist_template_repository,
 )
-from app.services.auth_service import get_current_user
 from app.models.user import User
+from app.services.auth_service import get_current_user
+from app.services.checklist_generator_service import (
+    get_checklist_generator_service,
+)
 
 router = APIRouter(prefix="/api/checklists", tags=["checklists"])
 
@@ -47,9 +48,9 @@ class ChecklistItemResponse(BaseModel):
     item_type: str
     category: str
     required: bool
-    tolerance_min: Optional[float] = None
-    tolerance_max: Optional[float] = None
-    unit: Optional[str] = None
+    tolerance_min: float | None = None
+    tolerance_max: float | None = None
+    unit: str | None = None
 
 
 class ChecklistTemplateResponse(BaseModel):
@@ -59,15 +60,15 @@ class ChecklistTemplateResponse(BaseModel):
     template_name: str
     equipment_type: str
     inspection_type: str
-    manufacturer: Optional[str] = None
-    model: Optional[str] = None
-    frequency_type: Optional[str] = None
-    estimated_duration_minutes: Optional[int] = None
-    checklist_items: List[ChecklistItemResponse] = []
-    required_tools: Optional[List[str]] = None
-    required_skills: Optional[List[str]] = None
-    safety_requirements: Optional[List[str]] = None
-    ppe_required: Optional[List[str]] = None
+    manufacturer: str | None = None
+    model: str | None = None
+    frequency_type: str | None = None
+    estimated_duration_minutes: int | None = None
+    checklist_items: list[ChecklistItemResponse] = []
+    required_tools: list[str] | None = None
+    required_skills: list[str] | None = None
+    safety_requirements: list[str] | None = None
+    ppe_required: list[str] | None = None
     version: int = 1
     is_active: bool = True
 
@@ -77,17 +78,17 @@ class ChecklistGenerateResponse(BaseModel):
 
     status: str = Field("success", description="Status of generation: success, error, skipped")
     equipment_code: str
-    generated_templates: List[Dict[str, Any]] = Field(
+    generated_templates: list[dict[str, Any]] = Field(
         default_factory=list, description="List of generated templates with id and template_name"
     )
-    message: Optional[str] = None
+    message: str | None = None
 
 
 class ChecklistOemLookupResponse(BaseModel):
     """Response from OEM template lookup."""
 
-    template: Optional[ChecklistTemplateResponse] = None
-    message: Optional[str] = None
+    template: ChecklistTemplateResponse | None = None
+    message: str | None = None
 
 
 # ============================================================================
@@ -144,7 +145,7 @@ async def generate_checklists_for_equipment(
     except Exception as e:
         # Log error without exposing stack trace
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to generate checklists: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to generate checklists: {e!s}"
         )
 
 
@@ -174,7 +175,7 @@ async def get_checklist_template(
 
 @router.get(
     "/equipment/{equipment_type}",
-    response_model=List[ChecklistTemplateResponse],
+    response_model=list[ChecklistTemplateResponse],
     summary="List templates for equipment type",
     description="Get all active checklist templates for a specific equipment type",
 )
@@ -199,8 +200,8 @@ async def list_templates_for_equipment_type(
 async def lookup_oem_template(
     equipment_type: str = Query(..., description="Equipment type (e.g., chiller)"),
     manufacturer: str = Query(..., description="Manufacturer name (e.g., Carrier)"),
-    model: Optional[str] = Query(None, description="Model identifier (e.g., 30HXC0800)"),
-    inspection_type: Optional[str] = Query(None, description="Inspection type (routine, preventive, annual)"),
+    model: str | None = Query(None, description="Model identifier (e.g., 30HXC0800)"),
+    inspection_type: str | None = Query(None, description="Inspection type (routine, preventive, annual)"),
     current_user: User = Depends(get_current_user),
 ):
     """Lookup OEM-specific template with cascade matching.
@@ -230,7 +231,7 @@ async def lookup_oem_template(
 
 @router.get(
     "",
-    response_model=List[ChecklistTemplateResponse],
+    response_model=list[ChecklistTemplateResponse],
     summary="List all templates",
     description="Get all active checklist templates",
 )

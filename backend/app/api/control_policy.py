@@ -4,7 +4,6 @@ Phase 145: Control Policy Engine.
 """
 
 import logging
-from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
 
@@ -48,7 +47,7 @@ async def get_policy(equipment_type: str):
 
 
 @router.get("/envelopes/active")
-async def get_active_envelopes(site_id: Optional[str] = Query(None)):
+async def get_active_envelopes(site_id: str | None = Query(None)):
     """Get active (executed, not rolled back) command envelopes."""
     from app.services.control_policy_engine import get_control_policy_engine
 

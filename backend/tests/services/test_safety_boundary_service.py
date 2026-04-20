@@ -1,11 +1,12 @@
 """Tests for safety boundary service functionality."""
 
-import pytest
 from datetime import datetime
 from unittest.mock import MagicMock
 
-from app.services.safety_boundary_service import safety_boundary_service
+import pytest
+
 from app.models.autonomous_decision import BoundaryStatus, EscalationLevel
+from app.services.safety_boundary_service import safety_boundary_service
 
 
 @pytest.fixture

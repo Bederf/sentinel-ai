@@ -11,6 +11,7 @@ Output: PNG images for each floor in backend/app/data/demo_floor_plans/
 """
 
 from pathlib import Path
+
 from PIL import Image, ImageDraw
 
 # Site-002 Demo Building Configuration

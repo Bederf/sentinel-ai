@@ -5,20 +5,22 @@ Provides real-time demand monitoring and multi-module peak shaving recommendatio
 Coordinates HVAC, Solar/BESS, and Energy modules for NMD headroom management.
 """
 
-from fastapi import APIRouter, Depends, HTTPException
-from typing import Optional, List, Dict, Any
-from pydantic import BaseModel
 import logging
+from typing import Any
 
-# # from app.services.demand_aware_coordinator import get_demand_aware_coordinator
-from app.services.solar_demand_service import get_solar_demand_service
-from app.services.solar_config_service import get_site_solar_config
-from app.services.demand_ratchet import get_demand_ratchet_service
-from app.services.module_registry_service import module_registry
-from app.services.approval_service import get_approval_service
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+
 from app.middleware.auth_middleware import require_site_access
 from app.models.auth import AuthContext
 from app.models.module_registry import ModuleType
+from app.services.approval_service import get_approval_service
+from app.services.demand_ratchet import get_demand_ratchet_service
+from app.services.module_registry_service import module_registry
+from app.services.solar_config_service import get_site_solar_config
+
+# # from app.services.demand_aware_coordinator import get_demand_aware_coordinator
+from app.services.solar_demand_service import get_solar_demand_service
 
 logger = logging.getLogger(__name__)
 
@@ -38,8 +40,8 @@ class DemandStatusResponse(BaseModel):
     headroom_percent: float
     headroom_level: str  # "normal", "caution", "warning", "critical"
     demand_trend: str  # "rising", "stable", "falling"
-    active_modules: List[str]  # Which modules are active at this site
-    available_reductions: Dict[str, Dict[str, Any]]  # Per-module reduction options
+    active_modules: list[str]  # Which modules are active at this site
+    available_reductions: dict[str, dict[str, Any]]  # Per-module reduction options
     last_updated: str
 
 
@@ -48,10 +50,10 @@ class ModuleActionResponse(BaseModel):
 
     module: str
     action: str
-    duration_min: Optional[int] = None
-    reduction_kw: Optional[float] = None
-    estimated_savings_r: Optional[float] = None
-    comfort_impact: Optional[str] = None
+    duration_min: int | None = None
+    reduction_kw: float | None = None
+    estimated_savings_r: float | None = None
+    comfort_impact: str | None = None
 
 
 class MultiModuleRecommendationResponse(BaseModel):
@@ -62,8 +64,8 @@ class MultiModuleRecommendationResponse(BaseModel):
     type: str
     urgency: str  # "normal", "caution", "warning", "critical"
     priority: str
-    modules_involved: List[str]
-    module_actions: List[ModuleActionResponse]
+    modules_involved: list[str]
+    module_actions: list[ModuleActionResponse]
     estimated_reduction_kw: float
     estimated_savings_r: float
     reasoning: str
@@ -75,7 +77,7 @@ class ApproveRecommendationRequest(BaseModel):
 
     recommendation_id: str
     approved_by: str
-    approval_notes: Optional[str] = None
+    approval_notes: str | None = None
 
 
 class ForecastIntervalResponse(BaseModel):
@@ -96,7 +98,7 @@ class DemandForecastResponse(BaseModel):
 
     site_id: str
     forecast_start: str
-    forecast_hours: List[ForecastIntervalResponse]
+    forecast_hours: list[ForecastIntervalResponse]
     peak_hour: int
     peak_demand_kw: float
     peak_headroom_kw: float
@@ -296,7 +298,7 @@ async def get_demand_forecast(site_id: str, auth: AuthContext = Depends(require_
 # ==================== Recommendation Endpoints ====================
 
 
-@router.get("/{site_id}/recommendations", response_model=List[MultiModuleRecommendationResponse])
+@router.get("/{site_id}/recommendations", response_model=list[MultiModuleRecommendationResponse])
 async def get_peak_shaving_recommendations(site_id: str, auth: AuthContext = Depends(require_site_access("site_id"))):
     """
     Get available multi-module peak shaving recommendations.

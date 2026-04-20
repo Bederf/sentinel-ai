@@ -16,10 +16,9 @@ Phase 48: Contract Management
 
 from datetime import date, datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
-
 
 # ============================================================================
 # Enums (matching CHECK constraints in 018_commercial_schema.sql)
@@ -219,8 +218,8 @@ class CostLineItem(BaseModel):
     quantity: float = Field(..., ge=0, description="Quantity (hours, units, etc.)")
     unit_price_zar: float = Field(..., ge=0, description="Unit price in ZAR with 2 decimal precision")
     total_zar: float = Field(..., ge=0, description="Total price = quantity * unit_price")
-    equipment_type: Optional[str] = Field(None, description="Equipment type for template linking")
-    work_order_id: Optional[str] = Field(None, description="Associated work order")
+    equipment_type: str | None = Field(None, description="Equipment type for template linking")
+    work_order_id: str | None = Field(None, description="Associated work order")
     recorded_at: datetime = Field(default_factory=datetime.now, description="Timestamp when recorded")
 
 
@@ -236,7 +235,7 @@ class BudgetTemplate(BaseModel):
     callouts_per_year: int = Field(..., ge=0, description="Average emergency callouts per year")
     parts_replacement_cycle_months: int = Field(..., ge=1, description="Typical parts replacement cycle in months")
     labor_rate_zar: float = Field(..., ge=0, description="Standard labor rate per hour in ZAR")
-    typical_monthly_breakdown: Dict[str, float] = Field(
+    typical_monthly_breakdown: dict[str, float] = Field(
         ..., description="Monthly budget breakdown by category: labor_budget_zar, parts_budget_zar, etc."
     )
 
@@ -282,36 +281,36 @@ class OrganizationCreate(BaseModel):
 
     code: str = Field(..., description="Unique org code, e.g. 'SITE-002'")
     name: str = Field(..., description="Full legal name")
-    trading_name: Optional[str] = None
-    registration_number: Optional[str] = None
-    vat_number: Optional[str] = None
-    primary_contact_name: Optional[str] = None
-    primary_contact_email: Optional[str] = None
-    primary_contact_phone: Optional[str] = None
-    billing_email: Optional[str] = None
-    physical_address: Optional[str] = None
-    postal_address: Optional[str] = None
-    industry: Optional[str] = None
-    tier: Optional[OrganizationTier] = None
-    status: Optional[OrganizationStatus] = OrganizationStatus.ACTIVE
+    trading_name: str | None = None
+    registration_number: str | None = None
+    vat_number: str | None = None
+    primary_contact_name: str | None = None
+    primary_contact_email: str | None = None
+    primary_contact_phone: str | None = None
+    billing_email: str | None = None
+    physical_address: str | None = None
+    postal_address: str | None = None
+    industry: str | None = None
+    tier: OrganizationTier | None = None
+    status: OrganizationStatus | None = OrganizationStatus.ACTIVE
 
 
 class OrganizationUpdate(BaseModel):
     """Partial update for an organization."""
 
-    name: Optional[str] = None
-    trading_name: Optional[str] = None
-    registration_number: Optional[str] = None
-    vat_number: Optional[str] = None
-    primary_contact_name: Optional[str] = None
-    primary_contact_email: Optional[str] = None
-    primary_contact_phone: Optional[str] = None
-    billing_email: Optional[str] = None
-    physical_address: Optional[str] = None
-    postal_address: Optional[str] = None
-    industry: Optional[str] = None
-    tier: Optional[OrganizationTier] = None
-    status: Optional[OrganizationStatus] = None
+    name: str | None = None
+    trading_name: str | None = None
+    registration_number: str | None = None
+    vat_number: str | None = None
+    primary_contact_name: str | None = None
+    primary_contact_email: str | None = None
+    primary_contact_phone: str | None = None
+    billing_email: str | None = None
+    physical_address: str | None = None
+    postal_address: str | None = None
+    industry: str | None = None
+    tier: OrganizationTier | None = None
+    status: OrganizationStatus | None = None
 
 
 class Organization(BaseModel):
@@ -322,20 +321,20 @@ class Organization(BaseModel):
     id: str
     code: str
     name: str
-    trading_name: Optional[str] = None
-    registration_number: Optional[str] = None
-    vat_number: Optional[str] = None
-    primary_contact_name: Optional[str] = None
-    primary_contact_email: Optional[str] = None
-    primary_contact_phone: Optional[str] = None
-    billing_email: Optional[str] = None
-    physical_address: Optional[str] = None
-    postal_address: Optional[str] = None
-    industry: Optional[str] = None
-    tier: Optional[OrganizationTier] = None
-    status: Optional[OrganizationStatus] = OrganizationStatus.ACTIVE
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+    trading_name: str | None = None
+    registration_number: str | None = None
+    vat_number: str | None = None
+    primary_contact_name: str | None = None
+    primary_contact_email: str | None = None
+    primary_contact_phone: str | None = None
+    billing_email: str | None = None
+    physical_address: str | None = None
+    postal_address: str | None = None
+    industry: str | None = None
+    tier: OrganizationTier | None = None
+    status: OrganizationStatus | None = OrganizationStatus.ACTIVE
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
 
 # ============================================================================
@@ -349,41 +348,41 @@ class ContractCreate(BaseModel):
     code: str = Field(..., description="Unique contract code, e.g. 'CON-SITE-002-2026-001'")
     organization_id: str
     site_id: str
-    contract_type: Optional[ContractType] = None
+    contract_type: ContractType | None = None
     start_date: date
-    end_date: Optional[date] = None
+    end_date: date | None = None
     auto_renew: bool = False
     notice_period_days: int = 90
     monthly_fee_zar: float
     annual_escalation_pct: float = 6.0
     payment_terms_days: int = 30
-    coverage_hours: Optional[Dict[str, Any]] = None
+    coverage_hours: dict[str, Any] | None = None
     included_callouts_per_month: int = 0
-    callout_rate_zar: Optional[float] = None
-    after_hours_rate_zar: Optional[float] = None
-    notes: Optional[str] = None
-    special_conditions: Optional[str] = None
+    callout_rate_zar: float | None = None
+    after_hours_rate_zar: float | None = None
+    notes: str | None = None
+    special_conditions: str | None = None
 
 
 class ContractUpdate(BaseModel):
     """Partial update for a contract."""
 
-    contract_type: Optional[ContractType] = None
-    end_date: Optional[date] = None
-    auto_renew: Optional[bool] = None
-    notice_period_days: Optional[int] = None
-    monthly_fee_zar: Optional[float] = None
-    annual_escalation_pct: Optional[float] = None
-    payment_terms_days: Optional[int] = None
-    coverage_hours: Optional[Dict[str, Any]] = None
-    included_callouts_per_month: Optional[int] = None
-    callout_rate_zar: Optional[float] = None
-    after_hours_rate_zar: Optional[float] = None
-    status: Optional[ContractStatus] = None
-    approved_by: Optional[str] = None
-    approved_at: Optional[datetime] = None
-    notes: Optional[str] = None
-    special_conditions: Optional[str] = None
+    contract_type: ContractType | None = None
+    end_date: date | None = None
+    auto_renew: bool | None = None
+    notice_period_days: int | None = None
+    monthly_fee_zar: float | None = None
+    annual_escalation_pct: float | None = None
+    payment_terms_days: int | None = None
+    coverage_hours: dict[str, Any] | None = None
+    included_callouts_per_month: int | None = None
+    callout_rate_zar: float | None = None
+    after_hours_rate_zar: float | None = None
+    status: ContractStatus | None = None
+    approved_by: str | None = None
+    approved_at: datetime | None = None
+    notes: str | None = None
+    special_conditions: str | None = None
 
 
 class Contract(BaseModel):
@@ -395,25 +394,25 @@ class Contract(BaseModel):
     code: str
     organization_id: str
     site_id: str
-    contract_type: Optional[ContractType] = None
+    contract_type: ContractType | None = None
     start_date: date
-    end_date: Optional[date] = None
+    end_date: date | None = None
     auto_renew: bool = False
     notice_period_days: int = 90
     monthly_fee_zar: float
     annual_escalation_pct: float = 6.0
     payment_terms_days: int = 30
-    coverage_hours: Optional[Dict[str, Any]] = None
+    coverage_hours: dict[str, Any] | None = None
     included_callouts_per_month: int = 0
-    callout_rate_zar: Optional[float] = None
-    after_hours_rate_zar: Optional[float] = None
+    callout_rate_zar: float | None = None
+    after_hours_rate_zar: float | None = None
     status: ContractStatus = ContractStatus.DRAFT
-    approved_by: Optional[str] = None
-    approved_at: Optional[datetime] = None
-    notes: Optional[str] = None
-    special_conditions: Optional[str] = None
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+    approved_by: str | None = None
+    approved_at: datetime | None = None
+    notes: str | None = None
+    special_conditions: str | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
 
 # ============================================================================
@@ -430,9 +429,9 @@ class SLATermCreate(BaseModel):
     target_unit: str = Field(..., description="e.g. 'percent', 'hours', 'minutes'")
     priority: SLAPriority = SLAPriority.ALL
     measurement_period: MeasurementPeriod = MeasurementPeriod.MONTHLY
-    penalty_type: Optional[PenaltyType] = None
-    penalty_value: Optional[float] = None
-    penalty_cap_pct: Optional[float] = None
+    penalty_type: PenaltyType | None = None
+    penalty_value: float | None = None
+    penalty_cap_pct: float | None = None
     grace_period_hours: int = 0
     is_active: bool = True
 
@@ -440,15 +439,15 @@ class SLATermCreate(BaseModel):
 class SLATermUpdate(BaseModel):
     """Partial update for an SLA term."""
 
-    target_value: Optional[float] = None
-    target_unit: Optional[str] = None
-    priority: Optional[SLAPriority] = None
-    measurement_period: Optional[MeasurementPeriod] = None
-    penalty_type: Optional[PenaltyType] = None
-    penalty_value: Optional[float] = None
-    penalty_cap_pct: Optional[float] = None
-    grace_period_hours: Optional[int] = None
-    is_active: Optional[bool] = None
+    target_value: float | None = None
+    target_unit: str | None = None
+    priority: SLAPriority | None = None
+    measurement_period: MeasurementPeriod | None = None
+    penalty_type: PenaltyType | None = None
+    penalty_value: float | None = None
+    penalty_cap_pct: float | None = None
+    grace_period_hours: int | None = None
+    is_active: bool | None = None
 
 
 class SLATerm(BaseModel):
@@ -463,13 +462,13 @@ class SLATerm(BaseModel):
     target_unit: str
     priority: SLAPriority = SLAPriority.ALL
     measurement_period: MeasurementPeriod = MeasurementPeriod.MONTHLY
-    penalty_type: Optional[PenaltyType] = None
-    penalty_value: Optional[float] = None
-    penalty_cap_pct: Optional[float] = None
+    penalty_type: PenaltyType | None = None
+    penalty_value: float | None = None
+    penalty_cap_pct: float | None = None
     grace_period_hours: int = 0
     is_active: bool = True
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
 
 # ============================================================================
@@ -482,14 +481,14 @@ class AssetContractCreate(BaseModel):
 
     contract_id: str
     equipment_id: str
-    allocated_fee_zar: Optional[float] = None
-    fee_allocation_pct: Optional[float] = None
+    allocated_fee_zar: float | None = None
+    fee_allocation_pct: float | None = None
     coverage_type: CoverageType = CoverageType.FULL
-    annual_parts_cap_zar: Optional[float] = None
-    annual_labor_cap_zar: Optional[float] = None
+    annual_parts_cap_zar: float | None = None
+    annual_labor_cap_zar: float | None = None
     criticality: CriticalityTier = CriticalityTier.MEDIUM
-    exclusions: Optional[str] = None
-    notes: Optional[str] = None
+    exclusions: str | None = None
+    notes: str | None = None
 
 
 class AssetContract(BaseModel):
@@ -500,16 +499,16 @@ class AssetContract(BaseModel):
     id: str
     contract_id: str
     equipment_id: str
-    allocated_fee_zar: Optional[float] = None
-    fee_allocation_pct: Optional[float] = None
+    allocated_fee_zar: float | None = None
+    fee_allocation_pct: float | None = None
     coverage_type: CoverageType = CoverageType.FULL
-    annual_parts_cap_zar: Optional[float] = None
-    annual_labor_cap_zar: Optional[float] = None
+    annual_parts_cap_zar: float | None = None
+    annual_labor_cap_zar: float | None = None
     criticality: CriticalityTier = CriticalityTier.MEDIUM
-    exclusions: Optional[str] = None
-    notes: Optional[str] = None
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+    exclusions: str | None = None
+    notes: str | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
 
 # ============================================================================
@@ -521,25 +520,25 @@ class ConditionAssessmentCreate(BaseModel):
     """Data required to create a condition assessment."""
 
     code: str = Field(..., description="Unique code, e.g. 'CA-001-2026-001'")
-    site_id: Optional[str] = None
-    equipment_id: Optional[str] = None
-    contract_id: Optional[str] = None
+    site_id: str | None = None
+    equipment_id: str | None = None
+    contract_id: str | None = None
     assessment_type: AssessmentType
     assessment_date: date
     assessor_name: str
-    assessor_company: Optional[str] = None
-    overall_score: Optional[int] = Field(None, ge=1, le=5)
-    mechanical_score: Optional[int] = Field(None, ge=1, le=5)
-    electrical_score: Optional[int] = Field(None, ge=1, le=5)
-    controls_score: Optional[int] = Field(None, ge=1, le=5)
-    documentation_score: Optional[int] = Field(None, ge=1, le=5)
-    findings: Optional[str] = None
-    defects: Optional[List[Dict[str, Any]]] = None
-    recommendations: Optional[List[Dict[str, Any]]] = None
-    photos: Optional[List[Dict[str, Any]]] = None
-    estimated_failure_risk: Optional[FailureRisk] = None
-    estimated_annual_cost_zar: Optional[float] = None
-    recommended_budget_zar: Optional[float] = None
+    assessor_company: str | None = None
+    overall_score: int | None = Field(None, ge=1, le=5)
+    mechanical_score: int | None = Field(None, ge=1, le=5)
+    electrical_score: int | None = Field(None, ge=1, le=5)
+    controls_score: int | None = Field(None, ge=1, le=5)
+    documentation_score: int | None = Field(None, ge=1, le=5)
+    findings: str | None = None
+    defects: list[dict[str, Any]] | None = None
+    recommendations: list[dict[str, Any]] | None = None
+    photos: list[dict[str, Any]] | None = None
+    estimated_failure_risk: FailureRisk | None = None
+    estimated_annual_cost_zar: float | None = None
+    recommended_budget_zar: float | None = None
 
 
 class ConditionAssessment(BaseModel):
@@ -549,30 +548,30 @@ class ConditionAssessment(BaseModel):
 
     id: str
     code: str
-    site_id: Optional[str] = None
-    equipment_id: Optional[str] = None
-    contract_id: Optional[str] = None
+    site_id: str | None = None
+    equipment_id: str | None = None
+    contract_id: str | None = None
     assessment_type: AssessmentType
     assessment_date: date
     assessor_name: str
-    assessor_company: Optional[str] = None
-    overall_score: Optional[int] = Field(None, ge=1, le=5)
-    mechanical_score: Optional[int] = Field(None, ge=1, le=5)
-    electrical_score: Optional[int] = Field(None, ge=1, le=5)
-    controls_score: Optional[int] = Field(None, ge=1, le=5)
-    documentation_score: Optional[int] = Field(None, ge=1, le=5)
-    findings: Optional[str] = None
-    defects: Optional[List[Dict[str, Any]]] = None
-    recommendations: Optional[List[Dict[str, Any]]] = None
-    photos: Optional[List[Dict[str, Any]]] = None
-    estimated_failure_risk: Optional[FailureRisk] = None
-    estimated_annual_cost_zar: Optional[float] = None
-    recommended_budget_zar: Optional[float] = None
+    assessor_company: str | None = None
+    overall_score: int | None = Field(None, ge=1, le=5)
+    mechanical_score: int | None = Field(None, ge=1, le=5)
+    electrical_score: int | None = Field(None, ge=1, le=5)
+    controls_score: int | None = Field(None, ge=1, le=5)
+    documentation_score: int | None = Field(None, ge=1, le=5)
+    findings: str | None = None
+    defects: list[dict[str, Any]] | None = None
+    recommendations: list[dict[str, Any]] | None = None
+    photos: list[dict[str, Any]] | None = None
+    estimated_failure_risk: FailureRisk | None = None
+    estimated_annual_cost_zar: float | None = None
+    recommended_budget_zar: float | None = None
     status: AssessmentStatus = AssessmentStatus.DRAFT
-    approved_by: Optional[str] = None
-    approved_at: Optional[datetime] = None
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+    approved_by: str | None = None
+    approved_at: datetime | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
 
 # ============================================================================
@@ -585,9 +584,9 @@ class BudgetCreate(BaseModel):
 
     code: str = Field(..., description="Unique code, e.g. 'BUD-SITE-002-SANDTON-2026'")
     contract_id: str
-    equipment_type: Optional[str] = None
+    equipment_type: str | None = None
     budget_year: int
-    budget_month: Optional[int] = Field(None, ge=1, le=12)
+    budget_month: int | None = Field(None, ge=1, le=12)
     labor_budget_zar: float = 0.0
     parts_budget_zar: float = 0.0
     consumables_budget_zar: float = 0.0
@@ -595,28 +594,28 @@ class BudgetCreate(BaseModel):
     callout_budget_zar: float = 0.0
     warning_threshold_pct: float = 80.0
     critical_threshold_pct: float = 100.0
-    notes: Optional[str] = None
+    notes: str | None = None
 
 
 class BudgetUpdate(BaseModel):
     """Partial update for a budget entry (typically actuals updates)."""
 
-    labor_budget_zar: Optional[float] = None
-    parts_budget_zar: Optional[float] = None
-    consumables_budget_zar: Optional[float] = None
-    subcontractor_budget_zar: Optional[float] = None
-    callout_budget_zar: Optional[float] = None
-    labor_actual_zar: Optional[float] = None
-    parts_actual_zar: Optional[float] = None
-    consumables_actual_zar: Optional[float] = None
-    subcontractor_actual_zar: Optional[float] = None
-    callout_actual_zar: Optional[float] = None
-    warning_threshold_pct: Optional[float] = None
-    critical_threshold_pct: Optional[float] = None
-    status: Optional[BudgetStatus] = None
-    approved_by: Optional[str] = None
-    approved_at: Optional[datetime] = None
-    notes: Optional[str] = None
+    labor_budget_zar: float | None = None
+    parts_budget_zar: float | None = None
+    consumables_budget_zar: float | None = None
+    subcontractor_budget_zar: float | None = None
+    callout_budget_zar: float | None = None
+    labor_actual_zar: float | None = None
+    parts_actual_zar: float | None = None
+    consumables_actual_zar: float | None = None
+    subcontractor_actual_zar: float | None = None
+    callout_actual_zar: float | None = None
+    warning_threshold_pct: float | None = None
+    critical_threshold_pct: float | None = None
+    status: BudgetStatus | None = None
+    approved_by: str | None = None
+    approved_at: datetime | None = None
+    notes: str | None = None
 
 
 class Budget(BaseModel):
@@ -627,30 +626,30 @@ class Budget(BaseModel):
     id: str
     code: str
     contract_id: str
-    equipment_type: Optional[str] = None
+    equipment_type: str | None = None
     budget_year: int
-    budget_month: Optional[int] = None
+    budget_month: int | None = None
     labor_budget_zar: float = 0.0
     parts_budget_zar: float = 0.0
     consumables_budget_zar: float = 0.0
     subcontractor_budget_zar: float = 0.0
     callout_budget_zar: float = 0.0
-    total_budget_zar: Optional[float] = None  # GENERATED column
+    total_budget_zar: float | None = None  # GENERATED column
     labor_actual_zar: float = 0.0
     parts_actual_zar: float = 0.0
     consumables_actual_zar: float = 0.0
     subcontractor_actual_zar: float = 0.0
     callout_actual_zar: float = 0.0
-    total_actual_zar: Optional[float] = None  # GENERATED column
-    variance_zar: Optional[float] = None  # GENERATED column
+    total_actual_zar: float | None = None  # GENERATED column
+    variance_zar: float | None = None  # GENERATED column
     warning_threshold_pct: float = 80.0
     critical_threshold_pct: float = 100.0
     status: BudgetStatus = BudgetStatus.DRAFT
-    approved_by: Optional[str] = None
-    approved_at: Optional[datetime] = None
-    notes: Optional[str] = None
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+    approved_by: str | None = None
+    approved_at: datetime | None = None
+    notes: str | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
 
 # ============================================================================
@@ -670,17 +669,17 @@ class SLAPerformance(BaseModel):
     period_end: date
     target_value: float
     actual_value: float
-    met_target: Optional[bool] = None  # GENERATED column
+    met_target: bool | None = None  # GENERATED column
     penalty_applied: bool = False
-    penalty_amount_zar: Optional[float] = None
+    penalty_amount_zar: float | None = None
     penalty_waived: bool = False
-    waiver_reason: Optional[str] = None
+    waiver_reason: str | None = None
     incidents_count: int = 0
-    total_downtime_hours: Optional[float] = None
-    details: Optional[Dict[str, Any]] = None
+    total_downtime_hours: float | None = None
+    details: dict[str, Any] | None = None
     status: SLAPerformanceStatus = SLAPerformanceStatus.PENDING
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
 
 class SLAPerformanceWithCompliance(BaseModel):
@@ -696,24 +695,24 @@ class SLAPerformanceWithCompliance(BaseModel):
     period_end: date
     target_value: float
     actual_value: float
-    met_target: Optional[bool] = None
+    met_target: bool | None = None
     penalty_applied: bool = False
-    penalty_amount_zar: Optional[float] = None
+    penalty_amount_zar: float | None = None
     penalty_waived: bool = False
-    waiver_reason: Optional[str] = None
+    waiver_reason: str | None = None
     incidents_count: int = 0
-    total_downtime_hours: Optional[float] = None
-    details: Optional[Dict[str, Any]] = None
+    total_downtime_hours: float | None = None
+    details: dict[str, Any] | None = None
     status: SLAPerformanceStatus = SLAPerformanceStatus.PENDING
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
     # Phase 50 additions
     metric_type: SLAMetricType
     compliance_percentage: float  # actual/target * 100
     compliance_status: SLAComplianceStatus
     breach_count: int = 0
-    breach_details: List[Dict[str, Any]] = Field(default_factory=list)
+    breach_details: list[dict[str, Any]] = Field(default_factory=list)
     clawback_amount_zar: float = 0.0
 
 
@@ -722,10 +721,10 @@ class SLABreachEvent(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-    id: Optional[str] = None
+    id: str | None = None
     contract_id: str
     sla_term_id: str
-    work_order_id: Optional[str] = None
+    work_order_id: str | None = None
     metric_type: SLAMetricType
     breach_severity: SLABreachSeverity
     target_value: float
@@ -734,7 +733,7 @@ class SLABreachEvent(BaseModel):
     occurred_at: datetime
     detected_at: datetime
     clawback_amount_zar: float = 0.0
-    notes: Optional[str] = None
+    notes: str | None = None
 
 
 # ============================================================================
@@ -755,25 +754,25 @@ class ContractProfitability(BaseModel):
     callout_revenue_zar: float = 0.0
     parts_markup_zar: float = 0.0
     other_revenue_zar: float = 0.0
-    total_revenue_zar: Optional[float] = None  # GENERATED column
+    total_revenue_zar: float | None = None  # GENERATED column
     labor_cost_zar: float = 0.0
     parts_cost_zar: float = 0.0
     subcontractor_cost_zar: float = 0.0
     travel_cost_zar: float = 0.0
     other_direct_cost_zar: float = 0.0
-    total_direct_cost_zar: Optional[float] = None  # GENERATED column
-    gross_margin_zar: Optional[float] = None  # GENERATED column
+    total_direct_cost_zar: float | None = None  # GENERATED column
+    gross_margin_zar: float | None = None  # GENERATED column
     sla_penalties_zar: float = 0.0
-    net_margin_zar: Optional[float] = None  # GENERATED column
+    net_margin_zar: float | None = None  # GENERATED column
     work_order_count: int = 0
     callout_count: int = 0
-    ppm_completion_pct: Optional[float] = None
-    sla_compliance_pct: Optional[float] = None
+    ppm_completion_pct: float | None = None
+    sla_compliance_pct: float | None = None
     status: ProfitabilityStatus = ProfitabilityStatus.PRELIMINARY
-    finalized_by: Optional[str] = None
-    finalized_at: Optional[datetime] = None
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+    finalized_by: str | None = None
+    finalized_at: datetime | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
 
 # ============================================================================
@@ -802,7 +801,7 @@ class ContractProfitabilityDetail(BaseModel):
     contract_id: str
     contract_name: str
     site_id: str
-    site_name: Optional[str] = None
+    site_name: str | None = None
 
     # Revenue components
     monthly_revenue_zar: float
@@ -823,8 +822,8 @@ class ContractProfitabilityDetail(BaseModel):
     status: str  # "profitable", "break_even", "loss"
 
     # Trend analysis
-    mom_change_pct: Optional[float] = None  # Month-over-month change
-    ytd_margin_zar: Optional[float] = None  # Year-to-date margin
+    mom_change_pct: float | None = None  # Month-over-month change
+    ytd_margin_zar: float | None = None  # Year-to-date margin
 
     # Asset metrics
     asset_count: int = 0
@@ -850,7 +849,7 @@ class LossLeaderAnalysis(BaseModel):
     contract_name: str
     loss_amount_zar: float
     loss_percentage: float
-    root_causes: List[str] = Field(
+    root_causes: list[str] = Field(
         default_factory=list, description="Identified root causes, e.g., ['high_labor_costs', 'frequent_breakdowns']"
     )
     recommendation: str = Field(..., description="Actionable recommendation to address losses")

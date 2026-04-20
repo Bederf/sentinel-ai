@@ -10,7 +10,7 @@ Phase 45-03: MLOps Monitoring and Success Metrics.
 import logging
 import math
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +21,7 @@ EQUIPMENT_TYPES = ["chiller", "ahu", "fcu", "vav", "generator", "ups", "pump"]
 MODEL_TYPES = ["lstm", "autoencoder"]
 
 
-def _ks_statistic(sample_a: List[float], sample_b: List[float]) -> float:
+def _ks_statistic(sample_a: list[float], sample_b: list[float]) -> float:
     """Compute two-sample Kolmogorov-Smirnov statistic.
 
     Simplified implementation using empirical CDFs without scipy.
@@ -56,7 +56,7 @@ def _ks_statistic(sample_a: List[float], sample_b: List[float]) -> float:
     return round(max_diff, 4)
 
 
-def _generate_training_stats(equipment_type: str) -> Dict[str, List[float]]:
+def _generate_training_stats(equipment_type: str) -> dict[str, list[float]]:
     """Generate simulated training distribution statistics.
 
     In production, these would be saved during model training.
@@ -101,7 +101,7 @@ def _generate_training_stats(equipment_type: str) -> Dict[str, List[float]]:
     return base_distributions.get(equipment_type, default)
 
 
-def _generate_current_stats(equipment_type: str, drift_amount: float = 0.0) -> Dict[str, List[float]]:
+def _generate_current_stats(equipment_type: str, drift_amount: float = 0.0) -> dict[str, list[float]]:
     """Generate simulated current distribution statistics.
 
     Args:
@@ -136,14 +136,14 @@ class DriftDetector:
     """
 
     def __init__(self):
-        self._detection_history: List[Dict[str, Any]] = []
-        self._feature_baselines: Dict[str, Dict[str, List[float]]] = {}
+        self._detection_history: list[dict[str, Any]] = []
+        self._feature_baselines: dict[str, dict[str, list[float]]] = {}
 
     def detect_feature_drift(
         self,
         equipment_type: str,
         threshold: float = KS_DRIFT_THRESHOLD,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Compare current feature distributions to training distribution.
 
         Args:
@@ -156,8 +156,8 @@ class DriftDetector:
         training_stats = self._get_training_stats(equipment_type)
         current_stats = self._get_current_stats(equipment_type)
 
-        drift_scores: Dict[str, float] = {}
-        drifted_features: List[str] = []
+        drift_scores: dict[str, float] = {}
+        drifted_features: list[str] = []
 
         for feature in training_stats:
             if feature not in current_stats:
@@ -187,7 +187,7 @@ class DriftDetector:
         self,
         model_type: str,
         threshold: float = MODEL_DRIFT_THRESHOLD,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Detect degradation in model predictions over time.
 
         Compares recent accuracy (last 7 days) to historical baseline.
@@ -222,7 +222,7 @@ class DriftDetector:
         self._detection_history.append(result)
         return result
 
-    def detect_all_drift(self) -> Dict[str, Any]:
+    def detect_all_drift(self) -> dict[str, Any]:
         """Run drift detection across all equipment types and model types.
 
         Returns:
@@ -268,24 +268,24 @@ class DriftDetector:
             "model_drift": model_results,
         }
 
-    def get_detection_history(self, limit: int = 20) -> List[Dict[str, Any]]:
+    def get_detection_history(self, limit: int = 20) -> list[dict[str, Any]]:
         """Return recent drift detection results."""
         return self._detection_history[-limit:]
 
-    def set_training_baseline(self, equipment_type: str, features: Dict[str, List[float]]) -> None:
+    def set_training_baseline(self, equipment_type: str, features: dict[str, list[float]]) -> None:
         """Store training-time feature distributions as baseline.
 
         In production, called after model training completes.
         """
         self._feature_baselines[equipment_type] = features
 
-    def _get_training_stats(self, equipment_type: str) -> Dict[str, List[float]]:
+    def _get_training_stats(self, equipment_type: str) -> dict[str, list[float]]:
         """Get training-time statistics for equipment type."""
         if equipment_type in self._feature_baselines:
             return self._feature_baselines[equipment_type]
         return _generate_training_stats(equipment_type)
 
-    def _get_current_stats(self, equipment_type: str) -> Dict[str, List[float]]:
+    def _get_current_stats(self, equipment_type: str) -> dict[str, list[float]]:
         """Get current feature statistics for equipment type."""
         return _generate_current_stats(equipment_type, drift_amount=0.05)
 
@@ -316,7 +316,7 @@ class DriftDetector:
 
 
 # Singleton
-_detector: Optional[DriftDetector] = None
+_detector: DriftDetector | None = None
 
 
 def get_drift_detector() -> DriftDetector:

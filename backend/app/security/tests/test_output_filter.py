@@ -3,7 +3,6 @@
 from app.security.output_filter import FilterResult, run_output_filter_pipeline
 from app.security.sse_buffer import SecureSSEBuffer
 
-
 # =====================================================================
 # Stage 1: Secret patterns
 # =====================================================================

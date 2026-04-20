@@ -7,13 +7,13 @@ device control actions, safety overrides, and BMS commands.
 Structured JSON logging output is collected by Promtail and shipped to Loki.
 """
 
+import ipaddress
 import json
 import logging
 import time
 import uuid
-import ipaddress
-from datetime import datetime, timezone
-from typing import Optional, Dict, Any
+from datetime import UTC, datetime
+from typing import Any
 
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -24,7 +24,7 @@ from starlette.types import ASGIApp
 security_logger = logging.getLogger("sentinel.security")
 
 # Deduplication window for repeated events from same source
-_RECENT_EVENTS: Dict[str, float] = {}
+_RECENT_EVENTS: dict[str, float] = {}
 _DEDUP_WINDOW_SEC = 2.0
 
 
@@ -240,7 +240,7 @@ class SecurityLoggingMiddleware(BaseHTTPMiddleware):
             )
             raise
 
-    def _extract_ip(self, request: Request) -> Optional[str]:
+    def _extract_ip(self, request: Request) -> str | None:
         """Extract client IP from request with proxy/Cloudflare support."""
         # Cloudflare Tunnel passes real IP in CF-Connecting-IP
         cf_ip = request.headers.get("CF-Connecting-IP")
@@ -273,7 +273,7 @@ class SecurityLoggingMiddleware(BaseHTTPMiddleware):
             return False
 
     def _check_suspicious_request(
-        self, path: str, method: str, source_ip: Optional[str], user_agent: str, correlation_id: str
+        self, path: str, method: str, source_ip: str | None, user_agent: str, correlation_id: str
     ) -> None:
         """Check for suspicious request patterns and log if detected."""
         user_agent_lower = user_agent.lower()
@@ -334,21 +334,21 @@ class SecurityLoggingMiddleware(BaseHTTPMiddleware):
         self,
         event_type: str,
         severity: str,
-        source_ip: Optional[str] = None,
+        source_ip: str | None = None,
         user_agent: str = "",
         path: str = "",
         method: str = "",
-        status_code: Optional[int] = None,
-        duration_ms: Optional[float] = None,
+        status_code: int | None = None,
+        duration_ms: float | None = None,
         correlation_id: str = "",
-        details: Optional[Dict[str, Any]] = None,
+        details: dict[str, Any] | None = None,
     ) -> None:
         """Log a structured security event to the security logger.
 
         Output format is JSON for Promtail/Loki ingestion.
         """
         event = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "event_type": event_type,
             "severity": severity,
             "source_ip": source_ip,
@@ -404,12 +404,12 @@ class SecurityLoggingMiddleware(BaseHTTPMiddleware):
 def log_security_event(
     event_type: str,
     severity: str = "info",
-    source_ip: Optional[str] = None,
+    source_ip: str | None = None,
     user_agent: str = "",
     path: str = "",
     method: str = "",
-    status_code: Optional[int] = None,
-    details: Optional[Dict[str, Any]] = None,
+    status_code: int | None = None,
+    details: dict[str, Any] | None = None,
 ) -> None:
     """Convenience function for explicit security event logging from services.
 
@@ -431,7 +431,7 @@ def log_security_event(
         details: Additional event-specific details
     """
     event = {
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "event_type": event_type,
         "severity": severity,
         "source_ip": source_ip,

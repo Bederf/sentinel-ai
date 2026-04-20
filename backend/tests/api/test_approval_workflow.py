@@ -8,16 +8,18 @@ Gap 3 (HIGH): Approval endpoint role not proven in tests.
 """
 
 import os
+
 import pytest
 
 os.environ.setdefault("DEMO_MODE", "true")
 os.environ.setdefault("TESTING", "true")
 os.environ.setdefault("JWT_SECRET_KEY", "test-only-jwt-secret-for-ci-at-least-32-chars")
 
-from app.models.auth import SentinelRole, AuthContext  # noqa: E402
-from httpx import AsyncClient, ASGITransport  # noqa: E402
-from app.middleware.auth_middleware import create_jwt_token  # noqa: E402
-from app.main import app  # noqa: E402
+from httpx import ASGITransport, AsyncClient
+
+from app.main import app
+from app.middleware.auth_middleware import create_jwt_token
+from app.models.auth import AuthContext, SentinelRole
 
 
 # Helper: Create JWT tokens for different roles

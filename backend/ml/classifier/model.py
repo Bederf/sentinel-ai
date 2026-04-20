@@ -5,13 +5,12 @@ failure types (compressor, bearing, motor, etc.) for equipment.
 """
 
 import logging
-from typing import Dict, List
 
 import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import cross_val_score
+from sklearn.preprocessing import LabelEncoder
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +43,7 @@ class FailureClassifier:
         self.feature_names = None
         self.class_names = None
 
-    def train(self, X: pd.DataFrame, y: pd.Series, cv_folds: int = 5) -> Dict:
+    def train(self, X: pd.DataFrame, y: pd.Series, cv_folds: int = 5) -> dict:
         """Train classifier with cross-validation.
 
         Args:
@@ -85,7 +84,7 @@ class FailureClassifier:
             "feature_importance": importance.head(20).to_dict("records"),  # Top 20
         }
 
-    def predict(self, X: pd.DataFrame) -> List[Dict]:
+    def predict(self, X: pd.DataFrame) -> list[dict]:
         """Predict failure type with probabilities.
 
         Args:
@@ -136,7 +135,7 @@ class FailureClassifier:
 
         return importance.head(top_n)
 
-    def explain_prediction(self, X: pd.DataFrame, prediction_idx: int = 0) -> List[Dict]:
+    def explain_prediction(self, X: pd.DataFrame, prediction_idx: int = 0) -> list[dict]:
         """Explain a specific prediction using feature contributions.
 
         Args:

@@ -6,9 +6,9 @@ for rejection pattern analysis.
 
 import json
 import logging
-from pathlib import Path
-from typing import Any, Dict, List, Optional
 from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Any
 
 from app.config.settings import settings
 
@@ -29,7 +29,7 @@ class RejectionRepository:
         """Initialize the repository."""
         self._client = None
         self._use_json = settings.use_json_storage
-        self._rejections: Dict[str, Dict[str, Any]] = {}
+        self._rejections: dict[str, dict[str, Any]] = {}
         self._load_json_data()
 
     def _load_json_data(self) -> None:
@@ -37,7 +37,7 @@ class RejectionRepository:
         try:
             rejection_file = DATA_DIR / "rejections.json"
             if rejection_file.exists():
-                with open(rejection_file, "r") as f:
+                with open(rejection_file) as f:
                     data = json.load(f)
                     self._rejections = data.get("rejections", {})
                     logger.info(f"Loaded {len(self._rejections)} rejections from JSON")
@@ -98,7 +98,7 @@ class RejectionRepository:
             logger.error(f"Error storing rejection in Supabase: {e}")
             raise
 
-    async def get_recent(self, site_id: str, action_type: str, days: int = 30) -> List:
+    async def get_recent(self, site_id: str, action_type: str, days: int = 30) -> list:
         """Get recent rejections for pattern detection.
 
         Args:
@@ -118,7 +118,7 @@ class RejectionRepository:
             logger.error(f"Error retrieving recent rejections: {e}")
             return []
 
-    def _get_recent_json(self, site_id: str, action_type: str, days: int = 30) -> List:
+    def _get_recent_json(self, site_id: str, action_type: str, days: int = 30) -> list:
         """Get recent rejections from JSON."""
         try:
             cutoff_date = datetime.utcnow() - timedelta(days=days)
@@ -148,7 +148,7 @@ class RejectionRepository:
             logger.error(f"Error retrieving recent rejections from JSON: {e}")
             return []
 
-    async def _get_recent_supabase(self, site_id: str, action_type: str, days: int = 30) -> List:
+    async def _get_recent_supabase(self, site_id: str, action_type: str, days: int = 30) -> list:
         """Get recent rejections from Supabase."""
         try:
             cutoff_date = (datetime.utcnow() - timedelta(days=days)).isoformat()
@@ -190,7 +190,7 @@ class RejectionRepository:
 
 
 # Singleton instance
-_rejection_repo: Optional[RejectionRepository] = None
+_rejection_repo: RejectionRepository | None = None
 
 
 def get_rejection_repository() -> RejectionRepository:

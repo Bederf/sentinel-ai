@@ -10,10 +10,9 @@ Provides REST API for AI-powered image analysis:
 """
 
 import logging
-from typing import Optional
-from pydantic import BaseModel, Field
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from pydantic import BaseModel, Field
 
 from app.security.pipeline import prompt_guard
 from app.services.vision_service import get_vision_service
@@ -32,7 +31,7 @@ class AnalyzeRequest(BaseModel):
 
     image: str = Field(..., description="Base64-encoded image data")
     media_type: str = Field(default="image/jpeg", description="Image MIME type")
-    prompt: Optional[str] = Field(None, description="Custom analysis prompt")
+    prompt: str | None = Field(None, description="Custom analysis prompt")
 
 
 class ComponentRequest(BaseModel):
@@ -40,7 +39,7 @@ class ComponentRequest(BaseModel):
 
     image: str = Field(..., description="Base64-encoded image data")
     media_type: str = Field(default="image/jpeg", description="Image MIME type")
-    context: Optional[str] = Field(None, description="Equipment context")
+    context: str | None = Field(None, description="Equipment context")
 
 
 class DiagnoseRequest(BaseModel):
@@ -48,7 +47,7 @@ class DiagnoseRequest(BaseModel):
 
     image: str = Field(..., description="Base64-encoded image data")
     media_type: str = Field(default="image/jpeg", description="Image MIME type")
-    equipment_context: Optional[str] = Field(None, description="Equipment context")
+    equipment_context: str | None = Field(None, description="Equipment context")
 
 
 class ErrorDisplayRequest(BaseModel):
@@ -56,7 +55,7 @@ class ErrorDisplayRequest(BaseModel):
 
     image: str = Field(..., description="Base64-encoded image data")
     media_type: str = Field(default="image/jpeg", description="Image MIME type")
-    manufacturer: Optional[str] = Field(None, description="Equipment manufacturer")
+    manufacturer: str | None = Field(None, description="Equipment manufacturer")
 
 
 def _validate_media_type(media_type: str) -> str:
@@ -252,7 +251,7 @@ async def read_error_display(
 async def upload_and_analyze(
     file: UploadFile = File(...),
     analysis_type: str = Form(default="analyze"),
-    context: Optional[str] = Form(default=None),
+    context: str | None = Form(default=None),
 ):
     """
     Upload image file and analyze.

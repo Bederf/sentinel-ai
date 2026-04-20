@@ -13,7 +13,6 @@ import random
 from datetime import datetime
 from pathlib import Path
 
-from app.config.settings import settings
 from app.models.generator import DieselTank, Generator, GeneratorGroup, GeneratorHealth, PredictiveIndicator
 
 logger = logging.getLogger(__name__)
@@ -27,10 +26,7 @@ class GeneratorService:
         self._groups: dict[str, GeneratorGroup] = {}
         self._tanks: dict[str, DieselTank] = {}
         self._health_cache: dict[str, GeneratorHealth] = {}
-        if settings.sentinel_island_mode:
-            logger.info("GeneratorService: skipping local seeded data in SENTINEL_ISLAND_MODE")
-        else:
-            self._load_seed_data()
+        self._load_seed_data()
 
     def _load_seed_data(self):
         """Load local seeded generator data from JSON."""

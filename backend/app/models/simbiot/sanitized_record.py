@@ -21,8 +21,8 @@ Boundary Definition:
 """
 
 from dataclasses import dataclass
-from typing import Any, Optional, List, Dict
 from datetime import datetime
+from typing import Any
 
 
 @dataclass
@@ -72,27 +72,27 @@ class SanitizedIntermediateRecord:
     # ========================================================================
     # EQUIPMENT CONTEXT (From source, not yet validated)
     # ========================================================================
-    equipment_id: Optional[str] = None
+    equipment_id: str | None = None
     """Equipment identifier this point belongs to (if determinable)."""
 
-    equipment_type: Optional[str] = None
+    equipment_type: str | None = None
     """Type of equipment (if determinable from source data)."""
 
-    location_hierarchy: List[str] = None
+    location_hierarchy: list[str] = None
     """Location path if determinable from source (e.g., ['site-001', 'building-1'])."""
 
     # ========================================================================
     # TRANSFORMATION METADATA (What happened during sanitization?)
     # ========================================================================
-    transformations_applied: List[str] = None
+    transformations_applied: list[str] = None
     """List of transformations applied during sanitization.
     Examples: ['unit_normalized', 'name_cleaned', 'type_inferred']"""
 
-    warnings: List[str] = None
+    warnings: list[str] = None
     """Non-fatal issues detected during sanitization.
     Examples: ['unusual_unit_format', 'suspicious_name_pattern', 'missing_metadata']"""
 
-    rejection_reason: Optional[str] = None
+    rejection_reason: str | None = None
     """Reason this record was rejected (None if accepted)."""
 
     is_rejected: bool = False
@@ -151,7 +151,7 @@ class SanitizedIntermediateRecord:
             and len(self.warnings) <= 3  # Allow up to 3 warnings
         )
 
-    def get_sanitization_summary(self) -> Dict[str, Any]:
+    def get_sanitization_summary(self) -> dict[str, Any]:
         """Get a summary of the sanitization process."""
         return {
             "source_record_id": self.source_record_id,
@@ -169,7 +169,7 @@ class SanitizedIntermediateRecord:
     # SERIALIZATION (For storage and transmission)
     # ========================================================================
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             "source_record_id": self.source_record_id,
@@ -190,7 +190,7 @@ class SanitizedIntermediateRecord:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "SanitizedIntermediateRecord":
+    def from_dict(cls, data: dict[str, Any]) -> "SanitizedIntermediateRecord":
         """Create from dictionary (for deserialization)."""
         return cls(
             source_record_id=data["source_record_id"],

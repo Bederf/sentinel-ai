@@ -20,28 +20,26 @@ Provides real-time and historical data for solar installations:
   - Financial reporting: monthly savings, YTD summary, carbon offset (34-09)
 """
 
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from app.middleware.rate_limiter import limiter
 
-from app.config.settings import settings
 from app.api.dependencies.module_access import require_active_module
+from app.middleware.rate_limiter import limiter
 from app.models.module_registry import ModuleType
 from app.models.solar import BESSContainer
-from app.services.solar_ingestion_service import get_solar_ingestion_service
-from app.services.solar_performance_service import get_solar_performance_service
-from app.services.solar_compliance_service import get_solar_compliance_service
 from app.services.solar_arbitrage_engine import get_solar_arbitrage_engine
-from app.services.solar_dispatch_service import get_solar_dispatch_service
+from app.services.solar_compliance_service import get_solar_compliance_service
+from app.services.solar_config_service import get_site_solar_config
 from app.services.solar_demand_service import get_solar_demand_service
-from app.services.solar_selfconsumption_service import get_solar_selfconsumption_service
+from app.services.solar_dispatch_service import get_solar_dispatch_service
+from app.services.solar_financial_service import get_solar_financial_service
 from app.services.solar_forecast_service import get_solar_forecast_service
 from app.services.solar_generator_coordinator import get_solar_generator_coordinator
 from app.services.solar_health_service import get_solar_health_service
+from app.services.solar_ingestion_service import get_solar_ingestion_service
 from app.services.solar_maintenance_service import get_solar_maintenance_service
-from app.services.solar_financial_service import get_solar_financial_service
-from app.services.solar_config_service import get_site_solar_config
+from app.services.solar_performance_service import get_solar_performance_service
+from app.services.solar_selfconsumption_service import get_solar_selfconsumption_service
 from app.utils.ai_provenance import attach_runtime_metadata
 
 router = APIRouter(
@@ -120,10 +118,6 @@ async def get_bess_status(request: Request, site_id: str):
     svc = get_solar_ingestion_service()
     bess = await svc.get_bess_status(site_id)
 
-    if not bess and settings.sentinel_island_mode:
-        raise HTTPException(status_code=404, detail=f"BESS telemetry unavailable for live site '{site_id}'")
-
-    # Fallback to mock data for local simulator/dev mode when no device connected
     if not bess:
         # Try to load BESS config from site configs
         sites = svc.get_registered_sites()
@@ -206,8 +200,8 @@ async def get_meter_readings(request: Request, site_id: str):
 @router.get("/solar/sites/{site_id}/readings")
 async def get_readings(
     site_id: str,
-    type: Optional[str] = Query(None, description="Filter by reading type (power, energy, soc, etc.)"),
-    equipment_type: Optional[str] = Query(None, description="Filter by equipment type (inverter, bess, meter)"),
+    type: str | None = Query(None, description="Filter by reading type (power, energy, soc, etc.)"),
+    equipment_type: str | None = Query(None, description="Filter by equipment type (inverter, bess, meter)"),
 ):
     """Get normalised readings, optionally filtered by reading type and equipment type."""
     svc = get_solar_ingestion_service()
@@ -280,7 +274,7 @@ async def get_inverter_peer_comparison(request: Request, site_id: str):
 @router.get("/solar/sites/{site_id}/performance/strings")
 async def get_string_anomalies(
     site_id: str,
-    inverter_id: Optional[str] = Query(None, description="Filter to specific inverter"),
+    inverter_id: str | None = Query(None, description="Filter to specific inverter"),
 ):
     """Get string-level detail with anomaly flags.
 
@@ -440,8 +434,8 @@ async def get_compliance_report(
 @router.get("/solar/sites/{site_id}/compliance/events")
 async def get_compliance_events(
     site_id: str,
-    from_ts: Optional[str] = Query(None, alias="from", description="Start timestamp (ISO 8601)"),
-    to_ts: Optional[str] = Query(None, alias="to", description="End timestamp (ISO 8601)"),
+    from_ts: str | None = Query(None, alias="from", description="Start timestamp (ISO 8601)"),
+    to_ts: str | None = Query(None, alias="to", description="End timestamp (ISO 8601)"),
 ):
     """Get compliance event log filtered by time range.
 

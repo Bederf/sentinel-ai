@@ -14,24 +14,24 @@ Manager control additions:
 """
 
 import base64
-from datetime import datetime
 import hmac
-import httpx
 import logging
 import os
-from typing import Any, Dict, Optional
+from datetime import UTC, datetime
+from typing import Any
 
+import httpx
 from fastapi import APIRouter, Header, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field
 
 from app.config.settings import settings
 from app.database.repositories.service_record_repository import ServiceRecordRepository
+from app.security.prompt_guard import score_prompt
 from app.services.ocr_service import get_ocr_service
 from app.services.popia_consent_guard import (
-    evaluate_ingress_processing_consent,
     enforce_active_processing_consent,
+    evaluate_ingress_processing_consent,
 )
-from app.security.prompt_guard import score_prompt
 from app.services.sentry_auth_service import get_sentry_jwt_headers
 from app.services.sentry_integration.config import get_sentry_webhook_secret
 from app.services.sentry_integration.ocr_correction_handler import get_ocr_correction_handler
@@ -41,7 +41,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/sentry", tags=["sentry"])
 
 
-async def _transcribe_voice_note(voice_file_id: str) -> Optional[str]:
+async def _transcribe_voice_note(voice_file_id: str) -> str | None:
     """Download a Telegram voice note and transcribe it via ElevenLabs STT.
 
     Args:
@@ -119,7 +119,7 @@ RESET_BLOCKED_TYPES = {"FIRE", "GEN"}
 
 
 def _require_sentry_secret(
-    provided_secret: Optional[str],
+    provided_secret: str | None,
     *,
     endpoint_name: str,
     allow_public_in_simulation: bool = False,
@@ -147,7 +147,7 @@ def _require_sentry_secret(
 
 
 def _require_operator_password(
-    provided_password: Optional[str],
+    provided_password: str | None,
     *,
     endpoint_name: str,
 ) -> None:
@@ -192,14 +192,14 @@ class EquipmentResetRequest(BaseModel):
 
     equipment_code: str = Field(..., description="Equipment code (e.g., S002-FCU-L1-A)")
     user_id: str = Field(..., description="User initiating the reset")
-    reason: Optional[str] = Field(None, description="Reason for reset")
-    operator_password: Optional[str] = Field(None, description="SENTINEL operator password for sensitive operations")
+    reason: str | None = Field(None, description="Reason for reset")
+    operator_password: str | None = Field(None, description="SENTINEL operator password for sensitive operations")
 
 
 @router.post("/work-order/response", status_code=status.HTTP_200_OK, tags=["llm_touching"])
 async def handle_work_order_response(
-    data: Dict[str, Any],
-    x_sentry_secret: Optional[str] = Header(None),
+    data: dict[str, Any],
+    x_sentry_secret: str | None = Header(None),
 ):
     """Handle technician response to work order notification.
 
@@ -273,7 +273,7 @@ async def handle_work_order_response(
     return result
 
 
-@router.get("/work-order/status/{service_record_code}", response_model=Dict[str, Any])
+@router.get("/work-order/status/{service_record_code}", response_model=dict[str, Any])
 async def get_data_collection_status(service_record_code: str):
     """Get data collection status for a service record.
 
@@ -289,8 +289,8 @@ async def get_data_collection_status(service_record_code: str):
 
 @router.post("/work-order/notify", status_code=status.HTTP_200_OK)
 async def notify_technician_of_work_order(
-    data: Dict[str, Any],
-    x_sentry_secret: Optional[str] = Header(None),
+    data: dict[str, Any],
+    x_sentry_secret: str | None = Header(None),
 ):
     """Send work order notification to technician via Sentry.
 
@@ -344,7 +344,7 @@ async def notify_technician_of_work_order(
 async def mark_service_record_complete(
     service_record_code: str,
     force: bool = Query(True, description="Allow completion even if some evidence items are missing"),
-    x_sentry_secret: Optional[str] = Header(None),
+    x_sentry_secret: str | None = Header(None),
 ):
     """Mark service record as complete manually.
 
@@ -380,7 +380,7 @@ async def mark_service_record_complete(
 @router.post("/equipment/reset", status_code=status.HTTP_200_OK)
 async def reset_equipment_fault(
     request: EquipmentResetRequest,
-    x_sentry_secret: Optional[str] = Header(None),
+    x_sentry_secret: str | None = Header(None),
 ):
     """Remote fault reset for equipment via Sentry Telegram bot.
 
@@ -491,7 +491,7 @@ async def reset_equipment_fault(
         return {
             "success": False,
             "blocked": False,
-            "reason": f"Reset failed: {str(e)}",
+            "reason": f"Reset failed: {e!s}",
             "equipment_code": equipment_code,
         }
 
@@ -522,7 +522,7 @@ class CorrectionResponse(BaseModel):
 @router.post("/ocr/process-service-sheet", status_code=status.HTTP_200_OK)
 async def process_service_sheet_ocr(
     data: ServiceSheetUpload,
-    x_sentry_secret: Optional[str] = Header(None),
+    x_sentry_secret: str | None = Header(None),
 ):
     """Process uploaded service sheet through OCR pipeline.
 
@@ -591,7 +591,7 @@ async def process_service_sheet_ocr(
 @router.post("/ocr/correction", status_code=status.HTTP_200_OK)
 async def submit_ocr_correction(
     data: CorrectionResponse,
-    x_sentry_secret: Optional[str] = Header(None),
+    x_sentry_secret: str | None = Header(None),
 ):
     """Submit correction for OCR-extracted value.
 
@@ -639,7 +639,7 @@ async def get_ocr_correction_status(service_record_id: str):
 @router.get("/work-order/pending")
 async def get_pending_work_orders(
     request: Request,
-    x_sentry_secret: Optional[str] = Header(None),
+    x_sentry_secret: str | None = Header(None),
 ):
     """Get pending work orders that need Telegram notifications.
 
@@ -694,7 +694,7 @@ async def get_pending_work_orders(
 
 @router.post("/process-pending-notifications", status_code=status.HTTP_200_OK)
 async def process_pending_sentry_notifications(
-    x_sentry_secret: Optional[str] = Header(None),
+    x_sentry_secret: str | None = Header(None),
 ):
     """Inspect pending notifications for Sentry delivery.
 
@@ -827,17 +827,17 @@ class SentryInspectionResultRequest(BaseModel):
     equipment_code: str = Field(..., description="Equipment code (e.g., S002-FCU-301)")
     work_order_code: str = Field(..., description="WO code (e.g., WO-2026-0030)")
     technician_name: str = Field(..., description="Name of technician who performed inspection")
-    telegram_user_id: Optional[str] = Field(None, description="Telegram user ID for audit")
+    telegram_user_id: str | None = Field(None, description="Telegram user ID for audit")
     items: list[SentryInspectionItem] = Field(..., description="Checklist item results")
-    ai_diagnosis: Optional[str] = Field(None, description="AI-curated diagnosis summary")
-    recommendations: Optional[str] = Field(None, description="AI recommendations for FM")
-    operator_password: Optional[str] = Field(None, description="SENTINEL operator password for sensitive operations")
+    ai_diagnosis: str | None = Field(None, description="AI-curated diagnosis summary")
+    recommendations: str | None = Field(None, description="AI recommendations for FM")
+    operator_password: str | None = Field(None, description="SENTINEL operator password for sensitive operations")
 
 
 @router.post("/inspection-result", status_code=status.HTTP_200_OK)
 async def sentry_submit_inspection_result(
     req: SentryInspectionResultRequest,
-    x_sentry_secret: Optional[str] = Header(None),
+    x_sentry_secret: str | None = Header(None),
 ):
     """Submit inspection results from Sentry bot after technician guided debrief.
 
@@ -909,9 +909,9 @@ async def sentry_submit_inspection_result(
             overall_status = "pass"
 
         # Create inspection task first (required FK for result)
-        from datetime import datetime, timezone
+        from datetime import datetime
 
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         task_data = {
             "task_name": f"Inspection — {req.equipment_code}",
             "task_description": f"Telegram inspection via {req.work_order_code}",
@@ -932,7 +932,7 @@ async def sentry_submit_inspection_result(
         result_data = {
             "task_id": task_id,
             "inspected_by": who,
-            "inspection_date": datetime.now(timezone.utc).isoformat(),
+            "inspection_date": datetime.now(UTC).isoformat(),
             "overall_status": overall_status,
             "item_results": item_results,
             "deficiencies_found": deficiency_count,
@@ -968,7 +968,7 @@ async def sentry_submit_inspection_result(
                 {
                     "status": "completed",
                     "completed_by": who,
-                    "completed_at": datetime.now(timezone.utc).isoformat(),
+                    "completed_at": datetime.now(UTC).isoformat(),
                     "resolution_notes": req.ai_diagnosis,
                 },
             )
@@ -1013,15 +1013,15 @@ class SentryWorkOrderRequest(BaseModel):
     description: str = Field(..., description="Full description")
     priority: str = Field("medium", description="low, medium, high, urgent, critical")
     created_by: str = Field("SENTINEL", description="Creator identifier")
-    telegram_user_id: Optional[str] = Field(None, description="Telegram user ID for audit provenance")
-    assigned_to: Optional[str] = Field(None, description="Override auto-assignment: technician name")
-    operator_password: Optional[str] = Field(None, description="SENTINEL operator password for sensitive operations")
+    telegram_user_id: str | None = Field(None, description="Telegram user ID for audit provenance")
+    assigned_to: str | None = Field(None, description="Override auto-assignment: technician name")
+    operator_password: str | None = Field(None, description="SENTINEL operator password for sensitive operations")
 
 
 @router.post("/create-work-order", status_code=status.HTTP_200_OK)
 async def sentry_create_work_order(
     req: SentryWorkOrderRequest,
-    x_sentry_secret: Optional[str] = Header(None),
+    x_sentry_secret: str | None = Header(None),
 ):
     """Create a work order in Supabase, authenticated via Sentry webhook secret.
 
@@ -1031,8 +1031,8 @@ async def sentry_create_work_order(
     _require_sentry_secret(x_sentry_secret, endpoint_name="create_work_order")
     _require_operator_password(req.operator_password, endpoint_name="create_work_order")
 
-    from app.database.repositories.work_order_repository import get_work_order_repository
     from app.database.repositories.technician_repository import get_technician_repository
+    from app.database.repositories.work_order_repository import get_work_order_repository
 
     try:
         wo_repo = get_work_order_repository()
@@ -1125,7 +1125,7 @@ class CallLogRequest(BaseModel):
     reporter_phone: str = Field("", description="Reporter mobile number (WhatsApp/SMS)")
     channel: str = Field("telegram", description="Source channel (telegram|whatsapp|mobile|email)")
     original_message: str = Field("", description="Raw message from user")
-    operator_password: Optional[str] = Field(None, description="SENTINEL operator password for sensitive operations")
+    operator_password: str | None = Field(None, description="SENTINEL operator password for sensitive operations")
 
 
 class CallLogEscalationRequest(BaseModel):
@@ -1137,7 +1137,7 @@ class CallLogEscalationRequest(BaseModel):
     reason: str = Field("", description="Why it was escalated")
     site_id: str = Field(..., description="Site identifier")
     timestamp: str = Field("", description="ISO timestamp of the complaint")
-    operator_password: Optional[str] = Field(None, description="SENTINEL operator password for sensitive operations")
+    operator_password: str | None = Field(None, description="SENTINEL operator password for sensitive operations")
 
 
 class CallLogLocationMemoryLookupResponse(BaseModel):
@@ -1160,7 +1160,7 @@ class CallLogLocationMemoryLookupResponse(BaseModel):
 @router.post("/call-log", status_code=status.HTTP_200_OK)
 async def sentry_call_log(
     req: CallLogRequest,
-    x_sentry_secret: Optional[str] = Header(None),
+    x_sentry_secret: str | None = Header(None),
 ):
     """Log a facilities defect from general staff and create an inspection work order.
 
@@ -1332,7 +1332,7 @@ async def sentry_call_log(
 async def lookup_call_log_location_memory(
     reporter_phone: str = Query("", description="Reporter mobile number"),
     reporter_telegram_id: str = Query("", description="Reporter Telegram user ID"),
-    x_sentry_secret: Optional[str] = Header(None),
+    x_sentry_secret: str | None = Header(None),
 ):
     """Lookup the reporter's last confirmed location for call logging.
 
@@ -1389,7 +1389,7 @@ async def lookup_call_log_location_memory(
 @router.post("/call-log/escalate", status_code=status.HTTP_200_OK)
 async def sentry_call_log_escalate(
     req: CallLogEscalationRequest,
-    x_sentry_secret: Optional[str] = Header(None),
+    x_sentry_secret: str | None = Header(None),
 ):
     """Escalate an unmatched complaint to the facilities supervisor.
 
@@ -1483,12 +1483,12 @@ class TelegramMessagePayload(BaseModel):
     display_name: str = ""
     text: str = ""
     has_photo: bool = False
-    photo_file_id: Optional[str] = None
+    photo_file_id: str | None = None
     has_document: bool = False
-    document_file_id: Optional[str] = None
+    document_file_id: str | None = None
     has_voice: bool = False
-    voice_file_id: Optional[str] = None
-    message_id: Optional[int] = None
+    voice_file_id: str | None = None
+    message_id: int | None = None
 
 
 class TelegramCallbackPayload(BaseModel):
@@ -1504,7 +1504,7 @@ class TelegramCallbackPayload(BaseModel):
 @router.post("/telegram/message", status_code=status.HTTP_200_OK)
 async def handle_telegram_message(
     payload: TelegramMessagePayload,
-    x_sentry_secret: Optional[str] = Header(None),
+    x_sentry_secret: str | None = Header(None),
 ):
     """Handle incoming Telegram free-text message via conversation flow.
 
@@ -1592,8 +1592,8 @@ async def handle_telegram_message(
             }
 
     # Classify and route
-    from app.services.telegram_intent_classifier import classify_intent
     from app.services.telegram_flow_handlers import route_to_handler
+    from app.services.telegram_intent_classifier import classify_intent
 
     session = mgr.get_session(payload.chat_id)
     has_session = session is not None
@@ -1621,7 +1621,7 @@ async def handle_telegram_message(
 @router.post("/telegram/callback", status_code=status.HTTP_200_OK)
 async def handle_telegram_callback(
     payload: TelegramCallbackPayload,
-    x_sentry_secret: Optional[str] = Header(None),
+    x_sentry_secret: str | None = Header(None),
 ):
     """Handle incoming Telegram callback_query (inline button tap).
 
@@ -1657,8 +1657,8 @@ async def handle_telegram_callback(
 
     # Classify and route
     from app.services.telegram_conversation_manager import get_conversation_manager
-    from app.services.telegram_intent_classifier import classify_intent
     from app.services.telegram_flow_handlers import route_to_handler
+    from app.services.telegram_intent_classifier import classify_intent
 
     mgr = get_conversation_manager()
     session = mgr.get_session(payload.chat_id)
@@ -1695,13 +1695,13 @@ class GatewayLogEntry(BaseModel):
 
     tool: str = Field(..., description="Tool name (bms_query, bms_wo, bms_inspect, bms_reset, bms_note)")
     command: str = Field(..., description="Command or action (info, summary, create_wo, reset, etc.)")
-    equipment_code: Optional[str] = Field(None, description="Equipment code if applicable")
+    equipment_code: str | None = Field(None, description="Equipment code if applicable")
     telegram_user_id: str = Field("unknown", description="Telegram user who triggered the action")
     success: bool = Field(True, description="Whether the tool invocation succeeded")
-    error: Optional[str] = Field(None, description="Error message if failed")
-    duration_ms: Optional[int] = Field(None, description="Tool execution time in ms")
-    result_summary: Optional[str] = Field(None, description="Short result (e.g. WO code created)")
-    metadata: Optional[Dict[str, Any]] = Field(None, description="Additional context")
+    error: str | None = Field(None, description="Error message if failed")
+    duration_ms: int | None = Field(None, description="Tool execution time in ms")
+    result_summary: str | None = Field(None, description="Short result (e.g. WO code created)")
+    metadata: dict[str, Any] | None = Field(None, description="Additional context")
 
 
 # In-memory ring buffer for gateway logs (last 1000 entries)
@@ -1712,8 +1712,8 @@ _GATEWAY_LOG_MAX = 1000
 @router.post("/gateway-log")
 async def log_gateway_activity(
     entry: GatewayLogEntry,
-    x_sentry_api_key: Optional[str] = Header(None),
-    x_sentry_secret: Optional[str] = Header(None),
+    x_sentry_api_key: str | None = Header(None),
+    x_sentry_secret: str | None = Header(None),
 ) -> dict:
     """Record a gateway tool invocation for observability.
 
@@ -1721,11 +1721,10 @@ async def log_gateway_activity(
     after each command execution.
     """
     _require_sentry_secret(x_sentry_secret, endpoint_name="gateway_log", allow_public_in_simulation=True)
-    from datetime import timezone
 
     record = {
         "id": len(_gateway_log) + 1,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "tool": entry.tool,
         "command": entry.command,
         "equipment_code": entry.equipment_code,
@@ -1757,10 +1756,10 @@ async def log_gateway_activity(
 @router.get("/gateway-log")
 async def get_gateway_log(
     limit: int = Query(50, ge=1, le=500),
-    tool: Optional[str] = Query(None),
-    equipment_code: Optional[str] = Query(None),
-    telegram_user_id: Optional[str] = Query(None),
-    success_only: Optional[bool] = Query(None),
+    tool: str | None = Query(None),
+    equipment_code: str | None = Query(None),
+    telegram_user_id: str | None = Query(None),
+    success_only: bool | None = Query(None),
 ) -> dict:
     """Query recent gateway activity log entries."""
     entries = list(reversed(_gateway_log))

@@ -1,6 +1,7 @@
 """Unit tests for EquipmentIDConverter."""
 
 import pytest
+
 from app.services.equipment_id_converter import EquipmentIDConverter
 
 

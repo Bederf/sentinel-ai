@@ -7,13 +7,13 @@ Phase 137-09: CONFIG_CHANGE audit events on all PUT endpoints.
 import json
 import logging
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
-from app.models.auth import AuthContext
 from app.middleware.auth_middleware import require_site_access
+from app.models.auth import AuthContext
 from app.security.audit_events import audit_config_change
 from app.security.pipeline import require_role
 from app.services.site_ai_policy_service import get_site_ai_policy, set_site_ai_policy
@@ -36,7 +36,7 @@ DATA_DIR = Path(__file__).parent.parent / "data"
 SETTINGS_FILE = DATA_DIR / "settings.json"
 
 
-def load_settings() -> Dict[str, Any]:
+def load_settings() -> dict[str, Any]:
     """Load settings from JSON file."""
     if not SETTINGS_FILE.exists():
         # Create default settings if file doesn't exist
@@ -50,34 +50,34 @@ def load_settings() -> Dict[str, Any]:
         return default_settings
 
     try:
-        with open(SETTINGS_FILE, "r") as f:
+        with open(SETTINGS_FILE) as f:
             return json.load(f)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to load settings: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to load settings: {e!s}")
 
 
-def save_settings(settings_data: Dict[str, Any]) -> None:
+def save_settings(settings_data: dict[str, Any]) -> None:
     """Save settings to JSON file."""
     try:
         SETTINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
         with open(SETTINGS_FILE, "w") as f:
             json.dump(settings_data, f, indent=2)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to save settings: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to save settings: {e!s}")
 
 
 @router.get("/settings")
-async def get_all_settings(auth: AuthContext = Depends(require_role(1))) -> Dict[str, Any]:
+async def get_all_settings(auth: AuthContext = Depends(require_role(1))) -> dict[str, Any]:
     """Get all settings. Requires AUDITOR (level 1)."""
     return load_settings()
 
 
 @router.put("/settings")
 async def update_all_settings(
-    settings_data: Dict[str, Any],
+    settings_data: dict[str, Any],
     request: Request,
     auth: AuthContext = Depends(require_role(4)),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Update all settings. Requires ADMIN (level 4)."""
     # Validate settings structure
     if "healthThresholds" in settings_data:
@@ -156,7 +156,7 @@ VALID_ALERT_COMMANDS = {"reset", "info", "note", "wo"}
 
 
 @router.get("/settings/notifications")
-async def get_notification_settings(auth: AuthContext = Depends(require_role(1))) -> Dict[str, Any]:
+async def get_notification_settings(auth: AuthContext = Depends(require_role(1))) -> dict[str, Any]:
     """Get notification settings including alert command config. Requires AUDITOR (level 1)."""
     settings_data = load_settings()
     return settings_data.get("notifications", DEFAULT_NOTIFICATION_SETTINGS)
@@ -164,10 +164,10 @@ async def get_notification_settings(auth: AuthContext = Depends(require_role(1))
 
 @router.put("/settings/notifications")
 async def update_notification_settings(
-    notifications: Dict[str, Any],
+    notifications: dict[str, Any],
     request: Request,
     auth: AuthContext = Depends(require_role(4)),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Update notification settings. Requires ADMIN (level 4).
 
     Validates alertCommands structure: each command must have 'enabled' (bool)
@@ -229,7 +229,7 @@ async def update_notification_settings(
 
 
 @router.get("/settings/health-thresholds")
-async def get_health_thresholds(auth: AuthContext = Depends(require_role(1))) -> Dict[str, int]:
+async def get_health_thresholds(auth: AuthContext = Depends(require_role(1))) -> dict[str, int]:
     """Get health score thresholds. Requires AUDITOR (level 1)."""
     settings_data = load_settings()
     return settings_data.get("healthThresholds", {"healthy": 90, "warning": 70, "critical": 0})
@@ -237,10 +237,10 @@ async def get_health_thresholds(auth: AuthContext = Depends(require_role(1))) ->
 
 @router.put("/settings/health-thresholds")
 async def update_health_thresholds(
-    thresholds: Dict[str, int],
+    thresholds: dict[str, int],
     request: Request,
     auth: AuthContext = Depends(require_role(4)),
-) -> Dict[str, int]:
+) -> dict[str, int]:
     """Update health score thresholds. Requires ADMIN (level 4)."""
     # Validate required fields
     required_fields = ["healthy", "warning", "critical"]
@@ -281,7 +281,7 @@ async def update_health_thresholds(
 
 
 @router.get("/settings/risk-thresholds")
-async def get_risk_thresholds(auth: AuthContext = Depends(require_role(1))) -> Dict[str, int]:
+async def get_risk_thresholds(auth: AuthContext = Depends(require_role(1))) -> dict[str, int]:
     """Get risk score thresholds. Requires AUDITOR (level 1)."""
     settings_data = load_settings()
     return settings_data.get("riskThresholds", {"medium": 31, "high": 61, "critical": 81})
@@ -289,10 +289,10 @@ async def get_risk_thresholds(auth: AuthContext = Depends(require_role(1))) -> D
 
 @router.put("/settings/risk-thresholds")
 async def update_risk_thresholds(
-    thresholds: Dict[str, int],
+    thresholds: dict[str, int],
     request: Request,
     auth: AuthContext = Depends(require_role(4)),
-) -> Dict[str, int]:
+) -> dict[str, int]:
     """Update risk score thresholds. Requires ADMIN (level 4)."""
     required_fields = ["medium", "high", "critical"]
     for field in required_fields:
@@ -325,7 +325,7 @@ async def update_risk_thresholds(
 
 
 @router.get("/settings/ml-training")
-async def get_ml_training_status(auth: AuthContext = Depends(require_role(1))) -> Dict[str, Any]:
+async def get_ml_training_status(auth: AuthContext = Depends(require_role(1))) -> dict[str, Any]:
     """Get ML background training status."""
     from app.config.settings import settings as app_settings
 
@@ -338,10 +338,10 @@ async def get_ml_training_status(auth: AuthContext = Depends(require_role(1))) -
 
 @router.put("/settings/ml-training")
 async def toggle_ml_training(
-    body: Dict[str, bool],
+    body: dict[str, bool],
     request: Request,
     auth: AuthContext = Depends(require_role(4)),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Toggle ML background training. Requires ADMIN. Takes effect on next restart."""
     enabled = body.get("enabled", False)
 
@@ -364,7 +364,7 @@ async def toggle_ml_training(
 async def get_site_ai_policy_settings(
     site_id: str,
     auth: AuthContext = Depends(require_site_access("site_id")),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Get site-scoped AI runtime policy. Requires site access."""
     return get_site_ai_policy(site_id)
 
@@ -375,7 +375,7 @@ async def update_site_ai_policy_settings(
     payload: SiteAiPolicyUpdate,
     request: Request,
     auth: AuthContext = Depends(require_role(4)),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Update site-scoped AI runtime policy. Requires ADMIN."""
     stored = set_site_ai_policy(site_id, payload.model_dump())
     source_ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else None)

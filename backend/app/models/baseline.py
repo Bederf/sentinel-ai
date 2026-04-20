@@ -4,12 +4,11 @@ Baseline Models - Pydantic models for baseline assessment system
 Phase 44: Asset Baseline Assessment
 """
 
-from typing import List, Optional, Dict, Any
 from datetime import datetime
 from enum import Enum
+from typing import Any
 
-from pydantic import BaseModel, Field, ConfigDict
-
+from pydantic import BaseModel, ConfigDict, Field
 
 # ============================================================================
 # Enums
@@ -118,11 +117,11 @@ class EquipmentBaselineBase(BaseModel):
     captured_by: str = Field(..., description="Engineer name or 'automated'")
     baseline_type: BaselineType = Field(default=BaselineType.INITIAL, description="Type of baseline")
     status: BaselineStatus = Field(default=BaselineStatus.ACTIVE, description="Baseline status")
-    baseline_values: Dict[str, Any] = Field(..., description="Baseline measurement values (JSON)")
-    measurement_conditions: Dict[str, Any] = Field(default_factory=dict, description="Measurement context")
+    baseline_values: dict[str, Any] = Field(..., description="Baseline measurement values (JSON)")
+    measurement_conditions: dict[str, Any] = Field(default_factory=dict, description="Measurement context")
     source_type: BaselineSource = Field(default=BaselineSource.MANUAL, description="Data source")
-    notes: Optional[str] = Field(None, description="Engineer notes")
-    attachment_urls: Optional[List[str]] = Field(None, description="URLs to documentation/photos")
+    notes: str | None = Field(None, description="Engineer notes")
+    attachment_urls: list[str] | None = Field(None, description="URLs to documentation/photos")
 
 
 class EquipmentBaselineCreate(EquipmentBaselineBase):
@@ -174,12 +173,12 @@ class EquipmentElementBase(BaseModel):
     equipment_id: str = Field(..., description="Parent equipment identifier")
     element_id: str = Field(..., description="Element identifier (unique within equipment)")
     element_type: ElementType = Field(..., description="Type of element")
-    element_name: Optional[str] = Field(None, description="Human-readable name")
-    manufacturer: Optional[str] = Field(None, description="Element manufacturer")
-    model: Optional[str] = Field(None, description="Element model")
-    serial_number: Optional[str] = Field(None, description="Serial number")
-    installation_date: Optional[str] = Field(None, description="When element was installed")
-    expected_life_days: Optional[int] = Field(None, description="Expected lifespan")
+    element_name: str | None = Field(None, description="Human-readable name")
+    manufacturer: str | None = Field(None, description="Element manufacturer")
+    model: str | None = Field(None, description="Element model")
+    serial_number: str | None = Field(None, description="Serial number")
+    installation_date: str | None = Field(None, description="When element was installed")
+    expected_life_days: int | None = Field(None, description="Expected lifespan")
     criticality: Criticality = Field(default=Criticality.MEDIUM, description="Maintenance priority")
 
 
@@ -228,11 +227,11 @@ class ElementBaselineBase(BaseModel):
     baseline_type: BaselineType = Field(default=BaselineType.INITIAL, description="Type of baseline")
     status: BaselineStatus = Field(default=BaselineStatus.ACTIVE, description="Baseline status")
     measurement_type: MeasurementType = Field(..., description="Type of measurement")
-    baseline_values: Dict[str, Any] = Field(..., description="Baseline measurement values")
-    measurement_conditions: Dict[str, Any] = Field(default_factory=dict, description="Measurement context")
+    baseline_values: dict[str, Any] = Field(..., description="Baseline measurement values")
+    measurement_conditions: dict[str, Any] = Field(default_factory=dict, description="Measurement context")
     source_type: BaselineSource = Field(default=BaselineSource.MOBILE_SENSOR, description="Data source")
-    notes: Optional[str] = Field(None, description="Measurement notes")
-    attachment_urls: Optional[List[str]] = Field(None, description="URLs to photos/measurements")
+    notes: str | None = Field(None, description="Measurement notes")
+    attachment_urls: list[str] | None = Field(None, description="URLs to photos/measurements")
 
 
 class ElementBaselineCreate(ElementBaselineBase):
@@ -283,15 +282,15 @@ class BaselineComparisonBase(BaseModel):
     comparison_type: str = Field(..., description="Type: equipment_baseline or element_baseline")
     baseline_id: str = Field(..., description="Reference to baseline record")
     equipment_id: str = Field(..., description="Equipment identifier")
-    element_id: Optional[str] = Field(None, description="Element identifier if element comparison")
+    element_id: str | None = Field(None, description="Element identifier if element comparison")
     comparison_date: datetime = Field(default_factory=datetime.now, description="When comparison was made")
-    comparison_results: Dict[str, ComparisonResult] = Field(..., description="Detailed comparison results")
+    comparison_results: dict[str, ComparisonResult] = Field(..., description="Detailed comparison results")
     overall_status: DeviationStatus = Field(..., description="Overall deviation status")
     max_deviation_percent: float = Field(..., description="Maximum deviation found")
     data_source: str = Field(..., description="Source of current readings")
-    comparison_notes: Optional[str] = Field(None, description="Notes about comparison")
+    comparison_notes: str | None = Field(None, description="Notes about comparison")
     alert_generated: bool = Field(default=False, description="Whether alert was generated")
-    alert_id: Optional[str] = Field(None, description="Alert ID if generated")
+    alert_id: str | None = Field(None, description="Alert ID if generated")
 
 
 class BaselineComparisonCreate(BaselineComparisonBase):
@@ -368,20 +367,20 @@ class BaselineReportResponse(BaseModel):
     """Response for baseline report."""
 
     equipment_id: str
-    active_baseline: Optional[EquipmentBaseline]
-    element_baselines: List[ElementBaseline]
-    recent_comparisons: List[BaselineComparison]
-    summary: Dict[str, Any]
+    active_baseline: EquipmentBaseline | None
+    element_baselines: list[ElementBaseline]
+    recent_comparisons: list[BaselineComparison]
+    summary: dict[str, Any]
 
 
 class DeviationSummary(BaseModel):
     """Summary of baseline deviations."""
 
     equipment_id: str
-    last_comparison_date: Optional[datetime]
+    last_comparison_date: datetime | None
     overall_status: DeviationStatus
     max_deviation_percent: float
-    deviations: Dict[str, ComparisonResult]
+    deviations: dict[str, ComparisonResult]
 
 
 # ============================================================================
@@ -394,10 +393,10 @@ class ManualBaselineCaptureRequest(BaseModel):
 
     captured_by: str = Field(..., description="Engineer name")
     baseline_type: BaselineType = Field(default=BaselineType.INITIAL, description="Type of baseline")
-    baseline_values: Dict[str, Any] = Field(..., description="Manual measurement values")
-    measurement_conditions: Optional[Dict[str, Any]] = Field(None, description="Measurement context")
-    notes: Optional[str] = Field(None, description="Engineer notes")
-    attachment_urls: Optional[List[str]] = Field(None, description="URLs to photos")
+    baseline_values: dict[str, Any] = Field(..., description="Manual measurement values")
+    measurement_conditions: dict[str, Any] | None = Field(None, description="Measurement context")
+    notes: str | None = Field(None, description="Engineer notes")
+    attachment_urls: list[str] | None = Field(None, description="URLs to photos")
 
 
 class ElementBaselineCaptureRequest(BaseModel):
@@ -407,15 +406,15 @@ class ElementBaselineCaptureRequest(BaseModel):
     captured_by: str = Field(..., description="Engineer name")
     measurement_type: MeasurementType = Field(..., description="Type of measurement")
     baseline_type: BaselineType = Field(default=BaselineType.INITIAL, description="Type of baseline")
-    baseline_values: Dict[str, Any] = Field(..., description="Measurement values")
-    measurement_conditions: Optional[Dict[str, Any]] = Field(None, description="Measurement context")
-    notes: Optional[str] = Field(None, description="Measurement notes")
-    attachment_urls: Optional[List[str]] = Field(None, description="URLs to photos")
+    baseline_values: dict[str, Any] = Field(..., description="Measurement values")
+    measurement_conditions: dict[str, Any] | None = Field(None, description="Measurement context")
+    notes: str | None = Field(None, description="Measurement notes")
+    attachment_urls: list[str] | None = Field(None, description="URLs to photos")
 
 
 class BaselineComparisonRequest(BaseModel):
     """Request for baseline comparison."""
 
     equipment_id: str = Field(..., description="Equipment to compare")
-    current_values: Optional[Dict[str, Any]] = Field(None, description="Current readings (if None, fetch from BMS)")
+    current_values: dict[str, Any] | None = Field(None, description="Current readings (if None, fetch from BMS)")
     data_source: str = Field(default="bms_sensor", description="Source of current values")

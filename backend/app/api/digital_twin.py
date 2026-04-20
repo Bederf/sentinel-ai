@@ -8,9 +8,8 @@ Also provides SSE endpoint for real-time equipment status streaming.
 import logging
 import uuid
 from datetime import datetime, timedelta
-from typing import Dict, Optional, Tuple
 
-from fastapi import APIRouter, HTTPException, Query, Request, status, File, UploadFile, Form
+from fastapi import APIRouter, File, Form, HTTPException, Query, Request, UploadFile, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
@@ -44,8 +43,8 @@ class EquipmentLocation(BaseModel):
     floor: str = Field(..., description="Floor level (B1, G, L1, etc.)")
     x: float = Field(..., description="X coordinate (meters)")
     y: float = Field(..., description="Y coordinate (meters)")
-    zone: Optional[str] = Field(None, description="Zone assignment (A, B, etc.)")
-    confidence: Optional[float] = Field(None, description="Extraction confidence (0-1)")
+    zone: str | None = Field(None, description="Zone assignment (A, B, etc.)")
+    confidence: float | None = Field(None, description="Extraction confidence (0-1)")
 
 
 class FloorDefinition(BaseModel):
@@ -63,7 +62,7 @@ class ZoneDefinition(BaseModel):
     zone_id: str = Field(..., description="Zone identifier")
     floor: str = Field(..., description="Floor level")
     zone_type: str = Field(..., description="Zone type (open_office, mechanical, etc.)")
-    equipment: Optional[list[str]] = Field(None, description="Equipment IDs in this zone")
+    equipment: list[str] | None = Field(None, description="Equipment IDs in this zone")
 
 
 class BuildingConfigResponse(BaseModel):
@@ -74,7 +73,7 @@ class BuildingConfigResponse(BaseModel):
     floors: list[FloorDefinition] = Field(..., description="Floor definitions")
     equipment: list[EquipmentLocation] = Field(..., description="Equipment locations")
     zones: list[ZoneDefinition] = Field(..., description="Zone definitions")
-    extraction_metadata: Dict = Field(..., description="Extraction method, accuracy, counts")
+    extraction_metadata: dict = Field(..., description="Extraction method, accuracy, counts")
 
 
 # ============= Router =============
@@ -135,7 +134,7 @@ async def extract_from_image(
         except Exception as e:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Invalid base64 image encoding: {str(e)}",
+                detail=f"Invalid base64 image encoding: {e!s}",
             )
 
         if len(image_bytes) > 20 * 1024 * 1024:  # 20MB limit
@@ -188,7 +187,7 @@ async def extract_from_image(
         logger.error(f"Extract from image failed: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Extraction failed: {str(e)}",
+            detail=f"Extraction failed: {e!s}",
         )
 
 
@@ -235,7 +234,7 @@ async def get_stub_config(
         logger.error(f"Demo config generation failed: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Demo config failed: {str(e)}",
+            detail=f"Demo config failed: {e!s}",
         )
 
 
@@ -345,7 +344,7 @@ async def extract_from_dxf(
         logger.error(f"DXF extraction failed: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"DXF parsing failed: {str(e)}",
+            detail=f"DXF parsing failed: {e!s}",
         )
 
 
@@ -449,7 +448,7 @@ async def batch_extract(
         logger.error(f"Batch extraction failed: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Batch processing failed: {str(e)}",
+            detail=f"Batch processing failed: {e!s}",
         )
 
 
@@ -506,7 +505,7 @@ async def validate_config(
         logger.error(f"Validation failed: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Validation failed: {str(e)}",
+            detail=f"Validation failed: {e!s}",
         )
 
 
@@ -540,7 +539,7 @@ async def get_energy_flows(
         logger.error(f"Energy flow calculation failed: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Energy flow calculation failed: {str(e)}",
+            detail=f"Energy flow calculation failed: {e!s}",
         )
 
 
@@ -569,7 +568,7 @@ async def get_historical_state(
         logger.error(f"Historical state query failed: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Historical state query failed: {str(e)}",
+            detail=f"Historical state query failed: {e!s}",
         )
 
 
@@ -578,7 +577,7 @@ async def get_historical_state(
 # =============================================================================
 
 # In-memory ticket store for SSE auth (same pattern as events.py)
-_DT_SSE_TICKETS: Dict[str, Tuple[datetime, str]] = {}  # ticket -> (expires_at, user_id)
+_DT_SSE_TICKETS: dict[str, tuple[datetime, str]] = {}  # ticket -> (expires_at, user_id)
 _DT_TICKET_TTL_SECONDS = 30
 _DT_MAX_TICKETS = 500
 
@@ -606,7 +605,7 @@ def _dt_create_ticket(user_id: str) -> str:
     return ticket
 
 
-def _dt_validate_ticket(ticket: str) -> Optional[str]:
+def _dt_validate_ticket(ticket: str) -> str | None:
     """Validate and consume a single-use SSE ticket."""
     _dt_cleanup_expired_tickets()
 

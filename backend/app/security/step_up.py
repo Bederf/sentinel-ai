@@ -19,7 +19,6 @@ import logging
 import os
 import time
 from collections import defaultdict
-from typing import Optional
 
 import bcrypt
 from fastapi import HTTPException, Request, status
@@ -248,7 +247,7 @@ def require_step_up():
 
     async def _dependency(request: Request) -> None:
         # Get auth context from request state (set by require_auth upstream)
-        auth_ctx: Optional[AuthContext] = getattr(request.state, "auth", None)
+        auth_ctx: AuthContext | None = getattr(request.state, "auth", None)
 
         if auth_ctx is None:
             # If no auth context, try to authenticate

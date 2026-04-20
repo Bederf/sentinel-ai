@@ -6,9 +6,9 @@ for recommendation verification.
 
 import json
 import logging
-from pathlib import Path
-from typing import Any, Dict, Optional
 from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Any
 
 from app.config.settings import settings
 from app.models.outcome import Outcome
@@ -30,7 +30,7 @@ class OutcomeRepository:
         """Initialize the repository."""
         self._client = None
         self._use_json = settings.use_json_storage
-        self._outcomes: Dict[str, Dict[str, Any]] = {}
+        self._outcomes: dict[str, dict[str, Any]] = {}
         self._load_json_data()
 
     def _load_json_data(self) -> None:
@@ -38,7 +38,7 @@ class OutcomeRepository:
         try:
             outcome_file = DATA_DIR / "outcomes.json"
             if outcome_file.exists():
-                with open(outcome_file, "r") as f:
+                with open(outcome_file) as f:
                     data = json.load(f)
                     self._outcomes = data.get("outcomes", {})
                     logger.info(f"Loaded {len(self._outcomes)} outcomes from JSON")
@@ -104,7 +104,7 @@ class OutcomeRepository:
             logger.error(f"Error storing outcome in Supabase: {e}")
             raise
 
-    async def get_by_recommendation(self, rec_id: str) -> Optional[Outcome]:
+    async def get_by_recommendation(self, rec_id: str) -> Outcome | None:
         """Retrieve outcome for a recommendation.
 
         Args:
@@ -122,7 +122,7 @@ class OutcomeRepository:
             logger.error(f"Error retrieving outcome: {e}")
             return None
 
-    def _get_by_recommendation_json(self, rec_id: str) -> Optional[Outcome]:
+    def _get_by_recommendation_json(self, rec_id: str) -> Outcome | None:
         """Get outcome from JSON."""
         try:
             data = self._outcomes.get(rec_id)
@@ -133,7 +133,7 @@ class OutcomeRepository:
             logger.error(f"Error retrieving outcome from JSON: {e}")
             return None
 
-    async def _get_by_recommendation_supabase(self, rec_id: str) -> Optional[Outcome]:
+    async def _get_by_recommendation_supabase(self, rec_id: str) -> Outcome | None:
         """Get outcome from Supabase."""
         try:
             result = self.client.table("outcomes").select("*").eq("recommendation_id", rec_id).execute()
@@ -221,7 +221,7 @@ class OutcomeRepository:
 
 
 # Singleton instance
-_outcome_repo: Optional[OutcomeRepository] = None
+_outcome_repo: OutcomeRepository | None = None
 
 
 def get_outcome_repository() -> OutcomeRepository:

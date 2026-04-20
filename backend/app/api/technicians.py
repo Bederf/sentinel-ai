@@ -6,14 +6,13 @@ Used by the Settings UI Technician Registry panel.
 """
 
 import logging
-from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
+from app.database.repositories.technician_repository import get_technician_repository
 from app.middleware.auth_middleware import require_role
 from app.models.auth import AuthContext, SentinelRole
-from app.database.repositories.technician_repository import get_technician_repository
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/technicians", tags=["technicians"])
@@ -42,24 +41,24 @@ class TechnicianCreate(BaseModel):
     name: str
     email: str
     phone: str
-    specialties: List[str] = ["general"]
-    site_id: Optional[str] = None
-    telegram_id: Optional[str] = None
+    specialties: list[str] = ["general"]
+    site_id: str | None = None
+    telegram_id: str | None = None
 
 
 class TechnicianUpdate(BaseModel):
-    name: Optional[str] = None
-    email: Optional[str] = None
-    phone: Optional[str] = None
-    active: Optional[bool] = None
-    telegram_id: Optional[str] = None
-    specialties: Optional[List[str]] = None
-    site_id: Optional[str] = None
+    name: str | None = None
+    email: str | None = None
+    phone: str | None = None
+    active: bool | None = None
+    telegram_id: str | None = None
+    specialties: list[str] | None = None
+    site_id: str | None = None
 
 
 @router.get("")
 async def list_technicians(
-    site_id: Optional[str] = None,
+    site_id: str | None = None,
     auth: AuthContext = Depends(require_role(SentinelRole.ADMIN, SentinelRole.OPERATOR)),
 ) -> dict:
     """List all technicians with their site assignments and channels."""

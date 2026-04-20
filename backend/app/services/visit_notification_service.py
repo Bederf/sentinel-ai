@@ -8,7 +8,7 @@ Orchestrates WhatsApp notifications for the visit lifecycle:
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from app.integrations.whatsapp_service import WhatsAppService
 
@@ -18,10 +18,10 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 # Singleton instance
-_notification_service: Optional["VisitNotificationService"] = None
+_notification_service: VisitNotificationService | None = None
 
 
-def get_notification_service() -> "VisitNotificationService":
+def get_notification_service() -> VisitNotificationService:
     """Get or create the notification service singleton."""
     global _notification_service
     if _notification_service is None:
@@ -50,7 +50,7 @@ class VisitNotificationService:
         # Fallback: return the building_id as-is
         return building_id
 
-    def _get_host_mobile(self, host_email: str, host_mobile: Optional[str]) -> Optional[str]:
+    def _get_host_mobile(self, host_email: str, host_mobile: str | None) -> str | None:
         """Get host mobile number from AD or pre-registered data.
 
         Returns pre-registered mobile if available, otherwise queries AD.
@@ -82,7 +82,7 @@ class VisitNotificationService:
             logger.error(f"[VisitNotification] WhatsApp send failed: {e}")
             return False
 
-    def notify_host_arrival(self, visit: "Visit") -> bool:
+    def notify_host_arrival(self, visit: Visit) -> bool:
         """Send WhatsApp notification to host when visitor scans at reception.
 
         This is a sync wrapper. Use _notify_host_arrival_async for async contexts.
@@ -103,7 +103,7 @@ class VisitNotificationService:
             loop.create_task(self._notify_host_arrival_async(visit))
             return True
 
-    async def _notify_host_arrival_async(self, visit: "Visit") -> bool:
+    async def _notify_host_arrival_async(self, visit: Visit) -> bool:
         """Async implementation of host arrival notification."""
         host_mobile = self._get_host_mobile(visit.host_email, visit.host_mobile)
         if not host_mobile:
@@ -130,7 +130,7 @@ class VisitNotificationService:
         )
         return success
 
-    def notify_access_issued(self, visit: "Visit") -> bool:
+    def notify_access_issued(self, visit: Visit) -> bool:
         """Send WhatsApp notification that access card was issued.
 
         This is a sync wrapper. Use _notify_access_issued_async for async contexts.
@@ -149,7 +149,7 @@ class VisitNotificationService:
             loop.create_task(self._notify_access_issued_async(visit))
             return True
 
-    async def _notify_access_issued_async(self, visit: "Visit") -> bool:
+    async def _notify_access_issued_async(self, visit: Visit) -> bool:
         """Async implementation of access issued notification."""
         host_mobile = self._get_host_mobile(visit.host_email, visit.host_mobile)
         if not host_mobile:

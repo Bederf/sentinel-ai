@@ -13,7 +13,6 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # effective_phase — resolution order
 # ---------------------------------------------------------------------------
@@ -242,8 +241,7 @@ class TestPhaseAllowsBoundary:
         assert phase_allows("supervised", "approve_reject") is True
 
     def test_auto_allows_all(self):
-        from app.models.onboarding_phase import phase_allows
-        from app.models.onboarding_phase import _FEATURE_GATES
+        from app.models.onboarding_phase import _FEATURE_GATES, phase_allows
 
         for feature in _FEATURE_GATES:
             assert phase_allows("auto", feature) is True, f"auto should allow {feature}"

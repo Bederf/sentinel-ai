@@ -9,11 +9,12 @@ Phase 109-03: ML Feedback Loop Closure — outcome hardening + health metrics.
 """
 
 from datetime import datetime
+from typing import Any
+
 from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, Field
-from typing import Any, Dict, Optional
-from app.middleware.rate_limiter import limiter
 
+from app.middleware.rate_limiter import limiter
 
 # --- Pydantic request/response models for hardened endpoints ---
 
@@ -28,12 +29,12 @@ class OutcomeMetricRequest(BaseModel):
     action_time: datetime = Field(..., description="When the action was taken (ISO format)")
     outcome_time: datetime = Field(..., description="When the outcome was measured (ISO format)")
     quality_gate_status_at_action: str = Field(..., description="Quality gate status at action time (PASS/WARN/FAIL)")
-    predicted: Optional[Dict[str, Any]] = Field(None, description="Predicted impact dict")
-    actual: Optional[Dict[str, Any]] = Field(None, description="Actual measured impact dict")
-    accuracy: Optional[float] = Field(None, ge=0.0, le=1.0, description="Accuracy score 0-1")
-    quality_snapshot_id: Optional[str] = Field(None, description="UUID of quality gate evaluation")
-    ingestion_mode_at_action: Optional[str] = Field(None, description="Ingestion mode at action time")
-    notes: Optional[str] = Field(None, description="Additional notes")
+    predicted: dict[str, Any] | None = Field(None, description="Predicted impact dict")
+    actual: dict[str, Any] | None = Field(None, description="Actual measured impact dict")
+    accuracy: float | None = Field(None, ge=0.0, le=1.0, description="Accuracy score 0-1")
+    quality_snapshot_id: str | None = Field(None, description="UUID of quality gate evaluation")
+    ingestion_mode_at_action: str | None = Field(None, description="Ingestion mode at action time")
+    notes: str | None = Field(None, description="Additional notes")
 
 
 class MLOpsHealthExtended(BaseModel):
@@ -46,15 +47,15 @@ class MLOpsHealthExtended(BaseModel):
     total_targets: int = Field(..., description="Total number of targets")
     critical_alerts: int = Field(..., description="Critical alert count")
     drift_detected: bool = Field(..., description="Whether drift is detected")
-    metrics_summary: Dict[str, Any] = Field(default_factory=dict)
-    alert_summary: Dict[str, Any] = Field(default_factory=dict)
+    metrics_summary: dict[str, Any] = Field(default_factory=dict)
+    alert_summary: dict[str, Any] = Field(default_factory=dict)
     # Phase 109-03: feedback loop metrics
     feedback_capture_rate_7d_pct: float = Field(
         0.0, description="Percentage of executed recommendations with outcome feedback in last 7 days"
     )
     label_lag_p95_hours: float = Field(0.0, description="95th percentile hours between action and outcome measurement")
     drift_critical_alerts_24h: int = Field(0, description="Count of critical drift alerts in last 24 hours")
-    mode_health_mapping: Dict[str, str] = Field(
+    mode_health_mapping: dict[str, str] = Field(
         default_factory=dict,
         description="Per-metric health status (pass/warn/fail) against current mode thresholds",
     )
@@ -112,9 +113,9 @@ async def get_drift_history(limit: int = Query(20, description="Max results")):
 @router.get("/alerts")
 async def get_ml_alerts(
     request: Request,
-    severity: Optional[str] = Query(None, description="Filter: info, warning, critical"),
-    alert_type: Optional[str] = Query(None, description="Filter by alert type"),
-    acknowledged: Optional[bool] = Query(None, description="Filter by acknowledged status"),
+    severity: str | None = Query(None, description="Filter: info, warning, critical"),
+    alert_type: str | None = Query(None, description="Filter by alert type"),
+    acknowledged: bool | None = Query(None, description="Filter by acknowledged status"),
     limit: int = Query(50, description="Max results"),
 ):
     """Get ML system alerts with optional filters."""
@@ -197,9 +198,9 @@ async def get_trigger_config():
 
 @router.put("/triggers/config")
 async def update_trigger_config(
-    auto_retrain_enabled: Optional[bool] = Query(None),
-    feature_drift_threshold: Optional[int] = Query(None),
-    cooldown_minutes: Optional[int] = Query(None),
+    auto_retrain_enabled: bool | None = Query(None),
+    feature_drift_threshold: int | None = Query(None),
+    cooldown_minutes: int | None = Query(None),
 ):
     """Update trigger configuration."""
     from ml.monitoring.triggers import get_retraining_trigger
@@ -295,7 +296,7 @@ async def record_prediction_outcome(body: OutcomeMetricRequest):
 @router.get("/reports/{period}")
 async def generate_report(
     period: str,
-    report_date: Optional[str] = Query(None, description="End date (ISO format)"),
+    report_date: str | None = Query(None, description="End date (ISO format)"),
 ):
     """Generate a performance report.
 
@@ -354,7 +355,7 @@ async def get_mlops_health():
     feedback_capture_rate = 0.0
     label_lag_p95 = 0.0
     drift_critical_24h = 0
-    mode_health_mapping: Dict[str, str] = {}
+    mode_health_mapping: dict[str, str] = {}
 
     try:
         from app.services.ml_feedback_service import get_ml_feedback_service
@@ -376,8 +377,9 @@ async def get_mlops_health():
         pass
 
     try:
-        from app.services.audit_logger import AuditLogger
         from datetime import timedelta
+
+        from app.services.audit_logger import AuditLogger
 
         audit = AuditLogger()
         cutoff = datetime.now() - timedelta(hours=24)

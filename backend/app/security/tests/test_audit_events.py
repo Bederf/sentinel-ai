@@ -31,7 +31,6 @@ from app.security.audit_events import (
 )
 from app.security.constants import LOG_MAX_ENTRIES, REDACTED_SNIPPET_MAX_LENGTH
 
-
 # ---------------------------------------------------------------------------
 # Event set definitions
 # ---------------------------------------------------------------------------
@@ -65,7 +64,7 @@ class TestEventSets:
             "PERMISSION_CHANGE",
             "RATE_LIMIT_EXCEEDED",
         }
-        assert SECURITY_EVENTS == expected
+        assert expected == SECURITY_EVENTS
 
     def test_expected_alert_events(self):
         expected = {
@@ -77,7 +76,7 @@ class TestEventSets:
             "CONFIG_CHANGE",
             "PERMISSION_CHANGE",
         }
-        assert ALERT_EVENTS == expected
+        assert expected == ALERT_EVENTS
 
 
 # ---------------------------------------------------------------------------

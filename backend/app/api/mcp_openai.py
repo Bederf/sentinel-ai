@@ -21,10 +21,10 @@ Ref:
 
 import json
 import logging
-from typing import Any, Dict, Optional
 from datetime import datetime
+from typing import Any
 
-from fastapi import APIRouter, Request, Header
+from fastapi import APIRouter, Header, Request
 from fastapi.responses import JSONResponse, Response
 
 from app.mcp.openai_connector_server import get_openai_connector_server
@@ -44,7 +44,7 @@ CORS_HEADERS = {
 }
 
 
-def as_single_text_content(payload: Dict[str, Any]) -> Dict[str, Any]:
+def as_single_text_content(payload: dict[str, Any]) -> dict[str, Any]:
     """
     Format response as exactly one text content item with JSON-encoded string.
 
@@ -58,7 +58,7 @@ def as_single_text_content(payload: Dict[str, Any]) -> Dict[str, Any]:
     return {"content": [{"type": "text", "text": json.dumps(payload)}]}
 
 
-def as_single_text_error(error_message: str) -> Dict[str, Any]:
+def as_single_text_error(error_message: str) -> dict[str, Any]:
     """Format error as single text content item."""
     return {"content": [{"type": "text", "text": json.dumps({"error": error_message})}], "isError": True}
 
@@ -76,7 +76,7 @@ class MCPStreamableHTTPHandler:
     def __init__(self):
         self.server = get_openai_connector_server()
 
-    async def handle_initialize(self, params: Dict) -> Dict:
+    async def handle_initialize(self, params: dict) -> dict:
         """Handle MCP initialize request."""
         client_info = params.get("clientInfo", {})
         logger.info(f"MCP Initialize: {client_info.get('name', 'unknown')} v{client_info.get('version', '?')}")
@@ -87,13 +87,13 @@ class MCPStreamableHTTPHandler:
             "capabilities": {"tools": {}},
         }
 
-    async def handle_tools_list(self) -> Dict:
+    async def handle_tools_list(self) -> dict:
         """List available tools."""
         tools = self.server.list_tools()
         logger.debug(f"MCP tools/list: returning {len(tools)} tools")
         return {"tools": tools}
 
-    async def handle_tools_call(self, params: Dict) -> Dict:
+    async def handle_tools_call(self, params: dict) -> dict:
         """
         Execute tool call with OpenAI connector response format.
 
@@ -114,9 +114,9 @@ class MCPStreamableHTTPHandler:
 
         except Exception as e:
             logger.error(f"MCP internal error: {e}", exc_info=True)
-            return as_single_text_error(f"Internal error: {str(e)}")
+            return as_single_text_error(f"Internal error: {e!s}")
 
-    async def handle_request(self, request_body: Dict) -> Dict:
+    async def handle_request(self, request_body: dict) -> dict:
         """
         Handle incoming JSON-RPC request.
 
@@ -161,12 +161,12 @@ class MCPStreamableHTTPHandler:
             return {
                 "jsonrpc": "2.0",
                 "id": request_id,
-                "error": {"code": -32603, "message": f"Internal error: {str(e)}"},
+                "error": {"code": -32603, "message": f"Internal error: {e!s}"},
             }
 
 
 # Singleton handler
-_mcp_handler: Optional[MCPStreamableHTTPHandler] = None
+_mcp_handler: MCPStreamableHTTPHandler | None = None
 
 
 def get_mcp_handler() -> MCPStreamableHTTPHandler:
@@ -183,7 +183,7 @@ def get_mcp_handler() -> MCPStreamableHTTPHandler:
 
 
 @router.post("/mcp")
-async def mcp_streamable_http_endpoint(request: Request, accept: Optional[str] = Header(default="application/json")):
+async def mcp_streamable_http_endpoint(request: Request, accept: str | None = Header(default="application/json")):
     """
     Streamable HTTP MCP endpoint.
 

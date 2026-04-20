@@ -8,15 +8,14 @@ Phase 63-06: FSR privacy controls — consent API endpoints.
 """
 
 import logging
-from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from app.services.consent_service import (
+    CONSENT_TEMPLATES,
     get_consent_service,
     hash_identifier,
-    CONSENT_TEMPLATES,
 )
 
 logger = logging.getLogger(__name__)
@@ -36,9 +35,9 @@ class RecordConsentRequest(BaseModel):
     platform: str = Field(..., description="Platform: whatsapp, telegram, or web")
     consent_type: str = Field(..., description="Consent type: pi_processing, data_retention, or cross_border_transfer")
     consent_given: bool = Field(..., description="True if consent is given, False if declined")
-    consent_text: Optional[str] = Field(None, description="Exact consent text shown to user (defaults to template)")
-    ip_address: Optional[str] = Field(None, description="IP address of data subject")
-    metadata: Optional[dict] = Field(None, description="Platform-specific metadata")
+    consent_text: str | None = Field(None, description="Exact consent text shown to user (defaults to template)")
+    ip_address: str | None = Field(None, description="IP address of data subject")
+    metadata: dict | None = Field(None, description="Platform-specific metadata")
 
 
 class WithdrawConsentRequest(BaseModel):
@@ -46,7 +45,7 @@ class WithdrawConsentRequest(BaseModel):
 
     data_subject_id: str = Field(..., description="Phone number or user identifier")
     consent_type: str = Field(..., description="Consent type to withdraw")
-    metadata: Optional[dict] = Field(None, description="Withdrawal metadata (reason)")
+    metadata: dict | None = Field(None, description="Withdrawal metadata (reason)")
 
 
 class ConsentCheckResponse(BaseModel):
@@ -197,8 +196,8 @@ async def get_consent_stats():
 
 @router.get("/export", response_model=list)
 async def export_consent_records(
-    start_date: Optional[str] = Query(None, description="ISO 8601 start date"),
-    end_date: Optional[str] = Query(None, description="ISO 8601 end date"),
+    start_date: str | None = Query(None, description="ISO 8601 start date"),
+    end_date: str | None = Query(None, description="ISO 8601 end date"),
 ):
     """Export consent records for FSR audit.
 

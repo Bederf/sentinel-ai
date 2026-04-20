@@ -31,13 +31,20 @@ LLM usage: Zero. The graph is entirely deterministic Python.
 """
 
 import logging
-from typing import Annotated, Optional, TypedDict
+from typing import Annotated, TypedDict
 
 from langchain_core.messages import AIMessage, HumanMessage
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph
 from langgraph.graph.message import add_messages
 
+from app.agents.recommendation_formatters import (
+    format_advisory_for_chat,
+    format_advisory_for_system,
+    format_approval_request_telegram,
+    format_approval_request_whatsapp,
+    format_execution_result,
+)
 from app.agents.recommendation_tools import (
     check_equipment_health,
     check_maintenance_calendar,
@@ -50,13 +57,6 @@ from app.agents.recommendation_tools import (
     route_through_tier_engine,
     submit_feedback_to_model,
     update_recommendation_status,
-)
-from app.agents.recommendation_formatters import (
-    format_advisory_for_chat,
-    format_advisory_for_system,
-    format_approval_request_telegram,
-    format_approval_request_whatsapp,
-    format_execution_result,
 )
 
 logger = logging.getLogger(__name__)
@@ -78,28 +78,28 @@ class RecommendationAgentState(TypedDict):
     trigger: str  # "scheduled" | "manual" | "health_alert"
 
     # Recommendation being processed
-    recommendation_id: Optional[str]
-    recommendation: Optional[dict]  # Full Recommendation.to_dict()
+    recommendation_id: str | None
+    recommendation: dict | None  # Full Recommendation.to_dict()
 
     # Validation
     is_relevant: bool
     relevance_reason: str
 
     # Impact assessment
-    impact: Optional[dict]  # cost_zar, energy_kwh, comfort_delta, risk
+    impact: dict | None  # cost_zar, energy_kwh, comfort_delta, risk
     similar_faults: list  # Cross-referenced similar past faults
 
     # Schedule check
     schedule_conflict: bool
-    conflict_details: Optional[str]
+    conflict_details: str | None
 
     # Tier routing
-    tier_result: Optional[dict]  # TierRoutingResult fields
-    tier: Optional[str]  # "tier1" | "tier2" | "tier3"
+    tier_result: dict | None  # TierRoutingResult fields
+    tier: str | None  # "tier1" | "tier2" | "tier3"
 
     # Execution
-    execution_result: Optional[dict]  # ApprovalResult fields
-    approval_status: Optional[str]  # "pending" | "approved" | "rejected"
+    execution_result: dict | None  # ApprovalResult fields
+    approval_status: str | None  # "pending" | "approved" | "rejected"
 
     # Feedback
     feedback_submitted: bool

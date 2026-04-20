@@ -15,7 +15,6 @@ Endpoints:
 """
 
 import logging
-from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
@@ -40,10 +39,10 @@ class EvaluateDispatchRequest(BaseModel):
 class AdditionalTask(BaseModel):
     """An additional task to include in a dispatch."""
 
-    task_id: Optional[str] = None
+    task_id: str | None = None
     task_type: str = Field(default="work_order", description="Task type")
     description: str = Field(..., description="Task description")
-    equipment_id: Optional[str] = None
+    equipment_id: str | None = None
     priority: str = Field(default="medium", description="Priority: critical, high, medium, low")
     estimated_minutes: int = Field(default=30, description="Estimated duration in minutes")
 
@@ -53,8 +52,8 @@ class CreateDispatchRequest(BaseModel):
 
     site_id: str = Field(..., description="Target site ID (e.g. site-002)")
     equipment_id: str = Field(..., description="Primary equipment ID triggering dispatch")
-    technician_id: Optional[str] = Field(None, description="Technician ID (auto-assigned if omitted)")
-    additional_tasks: Optional[List[AdditionalTask]] = Field(None, description="Extra tasks to include")
+    technician_id: str | None = Field(None, description="Technician ID (auto-assigned if omitted)")
+    additional_tasks: list[AdditionalTask] | None = Field(None, description="Extra tasks to include")
 
 
 class CompleteTaskItem(BaseModel):
@@ -68,7 +67,7 @@ class CompleteTaskItem(BaseModel):
 class CompleteDispatchRequest(BaseModel):
     """Body for POST /api/dispatch/{dispatch_id}/complete."""
 
-    tasks_completed: Optional[List[CompleteTaskItem]] = Field(None, description="Tasks completed with results")
+    tasks_completed: list[CompleteTaskItem] | None = Field(None, description="Tasks completed with results")
     overall_notes: str = Field(default="", description="Overall dispatch notes")
 
 

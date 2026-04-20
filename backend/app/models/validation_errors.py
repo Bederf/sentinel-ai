@@ -7,7 +7,6 @@ Provides typed error categories and structured reports for the static validation
 from __future__ import annotations
 
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel
 
@@ -30,11 +29,11 @@ class ValidationError(BaseModel):
     category: ValidationErrorCategory
     severity: str  # "error" or "warning"
     message: str
-    point_id: Optional[str] = None
-    tag: Optional[str] = None
-    actual_value: Optional[float] = None
-    expected_bounds: Optional[dict] = None
-    suggestion: Optional[str] = None
+    point_id: str | None = None
+    tag: str | None = None
+    actual_value: float | None = None
+    expected_bounds: dict | None = None
+    suggestion: str | None = None
 
 
 class ValidationReport(BaseModel):

@@ -5,11 +5,11 @@ import logging
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Literal
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
-import httpx
 
 from app.config.settings import settings
 from app.database.repositories import SiteRepository
@@ -55,7 +55,7 @@ def load_alerts() -> list[dict]:
     return []
 
 
-def _load_building_json(site_id: str) -> Optional[dict]:
+def _load_building_json(site_id: str) -> dict | None:
     """Load building.json for a site (canonical building metadata).
 
     Building metadata (contacts, BMS vendor, features) is external to SENTINEL
@@ -296,7 +296,7 @@ def calculate_site_status(site_alerts: list[dict]) -> Literal["normal", "warning
     return "normal"
 
 
-def calculate_site_status_from_equipment(equipment_status: Optional[dict]) -> Literal["normal", "warning", "critical"]:
+def calculate_site_status_from_equipment(equipment_status: dict | None) -> Literal["normal", "warning", "critical"]:
     """Calculate site status from equipment warning/critical state."""
     if not equipment_status:
         return "normal"
@@ -315,8 +315,8 @@ def db_to_site_dict(
     db_building: dict,
     equipment_count: int = 0,
     alert_count: int = 0,
-    asset_summary: Optional[dict] = None,
-    equipment_status: Optional[dict] = None,
+    asset_summary: dict | None = None,
+    equipment_status: dict | None = None,
 ) -> dict:
     """Convert database building record to API-compatible site dict.
 
@@ -397,16 +397,16 @@ class SiteBase(BaseModel):
     address: str = ""
     region: str = ""
     type: str = "unknown"
-    sqm: Optional[int] = 0
-    floors: Optional[int] = 0
-    year_built: Optional[int] = 0
-    operating_hours: Optional[OperatingHours] = None
+    sqm: int | None = 0
+    floors: int | None = 0
+    year_built: int | None = 0
+    operating_hours: OperatingHours | None = None
     timezone: str = "Africa/Johannesburg"  # IANA timezone
-    occupancy_pattern: Optional[str] = ""
-    latitude: Optional[float] = 0.0
-    longitude: Optional[float] = 0.0
-    contact_email: Optional[str] = ""
-    contact_phone: Optional[str] = ""
+    occupancy_pattern: str | None = ""
+    latitude: float | None = 0.0
+    longitude: float | None = 0.0
+    contact_email: str | None = ""
+    contact_phone: str | None = ""
 
 
 class EquipmentStatusBreakdown(BaseModel):
@@ -430,18 +430,18 @@ class SiteResponse(SiteBase):
     status: Literal["normal", "warning", "critical"] = "normal"
     optimization_enabled: bool = False
     optimization_status: str = "unknown"
-    optimization_settings: Optional[dict] = None
+    optimization_settings: dict | None = None
     control_enabled: bool = False
-    control_note: Optional[str] = None
-    equipment_status: Optional[EquipmentStatusBreakdown] = None
+    control_note: str | None = None
+    equipment_status: EquipmentStatusBreakdown | None = None
     sentinel_processing_enabled: bool = True
     onboarding_phase: str = "shadow"
-    last_phase_transition: Optional[dict] = None  # most recent phase_transition_log row
+    last_phase_transition: dict | None = None  # most recent phase_transition_log row
     # SIMBIOT ingestion status
     bridge_connected: bool = False
     bridge_data_source: str = "none"  # "remote_bridge" | "local_adapter" | "none"
-    bridge_last_sync: Optional[str] = None  # ISO timestamp
-    bridge_sync_error: Optional[str] = None  # Error message if applicable
+    bridge_last_sync: str | None = None  # ISO timestamp
+    bridge_sync_error: str | None = None  # Error message if applicable
 
 
 class SiteListResponse(BaseModel):
@@ -452,10 +452,10 @@ class SiteListResponse(BaseModel):
 
 
 def get_sites_from_supabase(
-    region: Optional[str] = None,
-    site_type: Optional[str] = None,
-    user_email: Optional[str] = None,
-    user_role: Optional[SentinelRole] = None,
+    region: str | None = None,
+    site_type: str | None = None,
+    user_email: str | None = None,
+    user_role: SentinelRole | None = None,
 ) -> tuple[list[dict], bool]:
     """Try to get sites from Supabase. Returns (sites, success).
 
@@ -528,7 +528,7 @@ def get_sites_from_supabase(
         return [], False
 
 
-def get_site_from_supabase(site_id: str) -> tuple[Optional[dict], bool]:
+def get_site_from_supabase(site_id: str) -> tuple[dict | None, bool]:
     """Try to get a single site from Supabase. Returns (site, success)."""
     if settings.use_json_storage:
         return None, False
@@ -569,8 +569,8 @@ def get_site_from_supabase(site_id: str) -> tuple[Optional[dict], bool]:
 
 @router.get("/sites", response_model=SiteListResponse)
 async def list_sites(
-    region: Optional[str] = Query(None, description="Filter by region"),
-    site_type: Optional[str] = Query(None, alias="type", description="Filter by type"),
+    region: str | None = Query(None, description="Filter by region"),
+    site_type: str | None = Query(None, alias="type", description="Filter by type"),
     auth: AuthContext = Depends(require_auth(AuthLevel.AUTHENTICATED)),
 ) -> SiteListResponse:
     """List all sites with optional filtering.
@@ -680,16 +680,13 @@ class TemplateBuilding(BaseModel):
     description: str
 
 
-@router.get("/sites/template-buildings", response_model=List[TemplateBuilding])
-async def list_template_buildings() -> List[TemplateBuilding]:
+@router.get("/sites/template-buildings", response_model=list[TemplateBuilding])
+async def list_template_buildings() -> list[TemplateBuilding]:
     """List template buildings available for onboarding/discovery seeding.
 
     Scans buildings directory for sites that have equipment files.
     These can be used as template data sources during onboarding.
     """
-    if settings.sentinel_island_mode:
-        return []
-
     registry_path = SITES_DIR / "_registry.json"
 
     if not registry_path.exists():
@@ -743,7 +740,7 @@ class CreateSiteRequest(BaseModel):
     address: str = Field("", description="Site address")
     region: str = Field("Gauteng", description="Region/province")
     type: str = Field("office", description="Building type (office, retail, hospital, industrial)")
-    floors: List[str] = Field(default_factory=list, description="Floor list e.g. ['B1', 'G', 'L1', 'L2']")
+    floors: list[str] = Field(default_factory=list, description="Floor list e.g. ['B1', 'G', 'L1', 'L2']")
     sqm: int = Field(0, description="Total floor area in square meters")
 
 
@@ -940,12 +937,12 @@ def _seed_municipal_tariff_and_account(client, site_id: str, region: str) -> Non
     # Load default tariff data if available (City Power JSON)
     tariff_data = {}
     try:
-        from pathlib import Path
         import json
+        from pathlib import Path
 
         tariff_path = Path(__file__).parent.parent / "data" / "solar" / "tariffs" / "city_power_2026.json"
         if tariff_path.exists() and "City Power" in municipality:
-            with open(tariff_path, "r") as f:
+            with open(tariff_path) as f:
                 tariff_data = json.load(f)
     except Exception as exc:
         logger.info("Tariff JSON load failed: %s", exc)
@@ -1112,8 +1109,6 @@ async def get_site_telemetry(
             "error": reason,
         }
 
-    if not settings.sentinel_island_mode:
-        raise HTTPException(status_code=404, detail="Telemetry route is only available on connected-site instances")
     if not settings.simbiot_api_url:
         logger.warning("Telemetry bridge unavailable for %s: remote bridge is not configured", site_id)
         return _unavailable("remote_bridge_not_configured")
@@ -1143,8 +1138,6 @@ async def get_site_status(
     auth: AuthContext = Depends(require_site_access("site_id")),
 ) -> dict[str, Any]:
     """Proxy live site status from the remote bridge."""
-    if not settings.sentinel_island_mode:
-        raise HTTPException(status_code=404, detail="Status route is only available on connected-site instances")
     if not settings.simbiot_api_url:
         raise HTTPException(status_code=503, detail="Remote bridge is not configured")
 
@@ -1165,8 +1158,8 @@ async def get_site_status(
 
 class PhaseUpdateRequest(BaseModel):
     phase: Literal["shadow", "advisory", "supervised", "auto"]
-    reason: Optional[str] = None
-    changed_by: Optional[str] = None  # user email; defaults to "system" if omitted
+    reason: str | None = None
+    changed_by: str | None = None  # user email; defaults to "system" if omitted
 
 
 class PhaseUpdateResponse(BaseModel):
@@ -1309,9 +1302,9 @@ def _get_bridge_status(sentinel_enabled: bool = True) -> dict:
             if bridge_connected or settings.simbiot_api_url:
                 bridge_data_source = "remote_bridge"
 
-        # In island mode, also check ShadowModePollingService — it has the live bridge connection
-        # even when simbiot_service is disabled (SIMBIOT is not used in island mode).
-        if bridge_data_source == "remote_bridge" and not bridge_connected and settings.sentinel_island_mode:
+        # Also check ShadowModePollingService — it has the live bridge connection
+        # even when simbiot_service is not configured.
+        if bridge_data_source == "remote_bridge" and not bridge_connected:
             try:
                 from app.services.shadow_mode_polling import get_shadow_mode_polling_service
 
@@ -1325,9 +1318,8 @@ def _get_bridge_status(sentinel_enabled: bool = True) -> dict:
             except Exception as e:
                 logger.debug(f"Shadow polling status unavailable: {e}")
 
-        elif (
-            not settings.sentinel_island_mode
-            and settings.site002_source_enabled
+        if (
+            settings.site002_source_enabled
             and settings.ingestion_mode == "simulation"
         ):
             bridge_data_source = "local_adapter"
@@ -1455,7 +1447,7 @@ async def get_site(
 class BatchSiteRequest(BaseModel):
     """Request for batch site retrieval."""
 
-    site_ids: List[str] = Field(
+    site_ids: list[str] = Field(
         ..., min_length=1, max_length=100, description="List of site IDs to retrieve (max 100 per request)"
     )
 
@@ -1463,8 +1455,8 @@ class BatchSiteRequest(BaseModel):
 class BatchSiteResponse(BaseModel):
     """Response from batch site retrieval."""
 
-    results: Dict[str, Any] = Field(default_factory=dict, description="Dict of site_id -> SiteResponse data")
-    errors: Dict[str, str] = Field(
+    results: dict[str, Any] = Field(default_factory=dict, description="Dict of site_id -> SiteResponse data")
+    errors: dict[str, str] = Field(
         default_factory=dict, description="Dict of site_id -> error message for missing/failed sites"
     )
 
@@ -1497,8 +1489,8 @@ async def batch_get_sites(payload: BatchSiteRequest) -> BatchSiteResponse:
     if len(unique_site_ids) > 100:
         raise HTTPException(status_code=400, detail="Maximum 100 unique site IDs per request")
 
-    results: Dict[str, Any] = {}
-    errors: Dict[str, str] = {}
+    results: dict[str, Any] = {}
+    errors: dict[str, str] = {}
 
     # Load shared data once
     alerts = load_alerts()

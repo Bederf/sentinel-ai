@@ -11,9 +11,9 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from app.services.event_bus import Importance, SentinelEvent
 
@@ -53,7 +53,7 @@ _SEVERITY_TO_IMPORTANCE = {
 
 def _generate_event_id() -> str:
     """Generate a unique event ID in the format EVT-{timestamp}-{short_uuid}."""
-    ts = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+    ts = datetime.now(UTC).strftime("%Y%m%d%H%M%S")
     short = uuid.uuid4().hex[:8]
     return f"EVT-{ts}-{short}"
 
@@ -74,14 +74,14 @@ class OperationalEvent:
     site_id: str
     severity: EventSeverity
     timestamp: datetime
-    signals: List[Dict[str, Any]]  # Raw signals that triggered this event
+    signals: list[dict[str, Any]]  # Raw signals that triggered this event
     description: str  # Human-readable description
-    trend: Optional[str] = None  # "rising", "falling", "stable"
-    duration_minutes: Optional[float] = None  # How long the condition has persisted
-    threshold_value: Optional[float] = None  # The threshold that was breached
-    actual_value: Optional[float] = None  # Current value
-    correlation_id: Optional[str] = None  # Links to event chain
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    trend: str | None = None  # "rising", "falling", "stable"
+    duration_minutes: float | None = None  # How long the condition has persisted
+    threshold_value: float | None = None  # The threshold that was breached
+    actual_value: float | None = None  # Current value
+    correlation_id: str | None = None  # Links to event chain
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_sentinel_event(self) -> SentinelEvent:
         """Convert to SentinelEvent for emission on the event bus.
@@ -116,7 +116,7 @@ class OperationalEvent:
             correlation_id=self.correlation_id,
         )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize the event to a dictionary for API responses.
 
         Returns:

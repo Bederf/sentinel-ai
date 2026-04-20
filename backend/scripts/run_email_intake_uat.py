@@ -17,7 +17,6 @@ from pathlib import Path
 from typing import Any
 from urllib import error, request
 
-
 DEFAULT_FIXTURE = Path("backend/tests/fixtures/email_intake_uat_cases.json")
 INTAKE_PATH = "/api/sentry/email/intake"
 

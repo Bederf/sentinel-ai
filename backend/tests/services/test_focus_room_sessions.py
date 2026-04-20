@@ -11,8 +11,7 @@ from unittest.mock import patch
 
 import pytest
 
-from app.models.space_occupancy import OccupancyEvent
-from app.models.space_occupancy import FocusRoomSession
+from app.models.space_occupancy import FocusRoomSession, OccupancyEvent
 from tests.services.fake_space_store import FakeSpaceSupabase
 
 # ---------------------------------------------------------------------------

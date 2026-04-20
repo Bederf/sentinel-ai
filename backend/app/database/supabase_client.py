@@ -2,7 +2,7 @@
 
 import os
 import warnings
-from typing import Optional
+
 from app.config.settings import settings
 
 
@@ -13,7 +13,7 @@ class _DummySupabaseClient:
         )
 
 
-_supabase_client: Optional[object] = None
+_supabase_client: object | None = None
 
 
 def get_supabase_client():

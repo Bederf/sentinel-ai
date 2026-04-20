@@ -1,14 +1,15 @@
 """Safety API endpoints for safety rule validation and management."""
 
-from fastapi import APIRouter, HTTPException
-from typing import Dict, Any, Optional
-from datetime import datetime
 import logging
+from datetime import datetime
+from typing import Any
 
-from app.services.safety_interlocks import safety_engine
+from fastapi import APIRouter, HTTPException
+
+from app.models.autonomous_decision import EscalationLevel
 from app.services.device_abstraction import device_manager
 from app.services.escalation_engine import escalation_engine
-from app.models.autonomous_decision import EscalationLevel
+from app.services.safety_interlocks import safety_engine
 
 logger = logging.getLogger(__name__)
 
@@ -27,9 +28,9 @@ async def safety_health():
 
 @router.get("/rules")
 async def get_safety_rules(
-    device_type: Optional[str] = None,
-    device_id: Optional[str] = None,
-    enabled: Optional[bool] = None,
+    device_type: str | None = None,
+    device_id: str | None = None,
+    enabled: bool | None = None,
 ):
     """Get all safety rules with optional filtering."""
     if not safety_engine._initialized:
@@ -64,7 +65,7 @@ async def get_safety_rule(rule_id: str):
 
 
 @router.post("/validate")
-async def validate_control_action(request: Dict[str, Any]):
+async def validate_control_action(request: dict[str, Any]):
     """
     Validate a control action against safety rules.
 
@@ -99,7 +100,7 @@ async def validate_control_action(request: Dict[str, Any]):
 
 
 @router.post("/rules")
-async def create_safety_rule(rule_data: Dict[str, Any]):
+async def create_safety_rule(rule_data: dict[str, Any]):
     """Create a new safety rule."""
     if not safety_engine._initialized:
         await safety_engine.initialize()
@@ -115,11 +116,11 @@ async def create_safety_rule(rule_data: Dict[str, Any]):
         }
     except Exception as e:
         logger.error(f"Failed to create safety rule: {e}")
-        raise HTTPException(status_code=400, detail=f"Failed to create safety rule: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Failed to create safety rule: {e!s}")
 
 
 @router.put("/rules/{rule_id}")
-async def update_safety_rule(rule_id: str, rule_data: Dict[str, Any]):
+async def update_safety_rule(rule_id: str, rule_data: dict[str, Any]):
     """Update an existing safety rule."""
     if not safety_engine._initialized:
         await safety_engine.initialize()
@@ -203,7 +204,7 @@ async def get_device_applicable_rules(device_id: str):
 
 
 @router.patch("/rules/{rule_id}/toggle")
-async def toggle_safety_rule(rule_id: str, request: Dict[str, Any]):
+async def toggle_safety_rule(rule_id: str, request: dict[str, Any]):
     """Toggle a safety rule's enabled status."""
     if not safety_engine._initialized:
         await safety_engine.initialize()
@@ -244,7 +245,7 @@ async def get_escalation_status():
 
 
 @router.post("/escalation/acknowledge")
-async def acknowledge_escalation(request: Dict[str, Any]):
+async def acknowledge_escalation(request: dict[str, Any]):
     """
     Acknowledge an escalation alert.
 
@@ -280,7 +281,7 @@ async def acknowledge_escalation(request: Dict[str, Any]):
 
 @router.get("/escalation/history")
 async def get_escalation_history(
-    limit: Optional[int] = 100, escalation_level: Optional[int] = None, acknowledged: Optional[bool] = None
+    limit: int | None = 100, escalation_level: int | None = None, acknowledged: bool | None = None
 ):
     """Get escalation history with optional filtering."""
     if not escalation_engine._initialized:
@@ -302,7 +303,7 @@ async def get_escalation_history(
 
 
 @router.post("/escalation/test")
-async def test_escalation(request: Dict[str, Any]):
+async def test_escalation(request: dict[str, Any]):
     """
     Test escalation system by creating a test escalation.
 
@@ -338,10 +339,9 @@ async def test_escalation(request: Dict[str, Any]):
 @router.get("/escalation/test-email")
 async def test_email_notification():
     """Test email notification system."""
-    from app.services.notification_service import notification_service
-
     # Create a test escalation event
     from app.models.autonomous_decision import EscalationEvent, EscalationLevel
+    from app.services.notification_service import notification_service
 
     test_event = EscalationEvent(
         id="test_email_event",
@@ -385,8 +385,8 @@ async def emergency_stop():
     2. Restore all devices to safe state
     3. Send emergency notifications
     """
-    from app.services.emergency_handler import emergency_handler
     from app.models.autonomous_decision import EscalationEvent, EscalationLevel
+    from app.services.emergency_handler import emergency_handler
 
     if not emergency_handler._initialized:
         await emergency_handler.initialize()

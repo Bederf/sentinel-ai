@@ -8,10 +8,9 @@ Provides REST API for user dashboard customization:
 """
 
 import logging
-from typing import List, Optional
-from pydantic import BaseModel, Field
 
-from fastapi import APIRouter, HTTPException, Header
+from fastapi import APIRouter, Header, HTTPException
+from pydantic import BaseModel, Field
 
 from app.database.repositories.preferences_repository import PreferencesRepository
 
@@ -33,12 +32,12 @@ DEFAULT_SECTIONS = ["kpi-row", "site-protection", "energy-analytics", "risk-pred
 class DashboardPreferences(BaseModel):
     """Dashboard preferences model."""
 
-    visible_kpi_cards: List[str] = Field(default=DEFAULT_KPI_CARDS)
-    visible_sections: List[str] = Field(default=DEFAULT_SECTIONS)
-    kpi_card_order: List[str] = Field(default=DEFAULT_KPI_CARDS)
-    section_order: List[str] = Field(default=DEFAULT_SECTIONS)
+    visible_kpi_cards: list[str] = Field(default=DEFAULT_KPI_CARDS)
+    visible_sections: list[str] = Field(default=DEFAULT_SECTIONS)
+    kpi_card_order: list[str] = Field(default=DEFAULT_KPI_CARDS)
+    section_order: list[str] = Field(default=DEFAULT_SECTIONS)
     default_energy_period: int = Field(default=30, ge=7, le=90)
-    default_energy_site_id: Optional[str] = None
+    default_energy_site_id: str | None = None
 
 
 class DashboardPreferencesResponse(BaseModel):
@@ -46,11 +45,11 @@ class DashboardPreferencesResponse(BaseModel):
 
     user_id: str
     preferences: DashboardPreferences
-    created_at: Optional[str] = None
-    updated_at: Optional[str] = None
+    created_at: str | None = None
+    updated_at: str | None = None
 
 
-def get_user_id(x_user_id: Optional[str] = None) -> str:
+def get_user_id(x_user_id: str | None = None) -> str:
     """Get user ID from header or generate default."""
     if x_user_id:
         return x_user_id
@@ -59,7 +58,7 @@ def get_user_id(x_user_id: Optional[str] = None) -> str:
 
 
 @router.get("/dashboard", response_model=DashboardPreferencesResponse)
-async def get_dashboard_preferences(x_user_id: Optional[str] = Header(None, alias="X-User-ID")):
+async def get_dashboard_preferences(x_user_id: str | None = Header(None, alias="X-User-ID")):
     """
     Get user's dashboard preferences.
 
@@ -104,7 +103,7 @@ async def get_dashboard_preferences(x_user_id: Optional[str] = Header(None, alia
 
 @router.put("/dashboard", response_model=DashboardPreferencesResponse)
 async def update_dashboard_preferences(
-    preferences: DashboardPreferences, x_user_id: Optional[str] = Header(None, alias="X-User-ID")
+    preferences: DashboardPreferences, x_user_id: str | None = Header(None, alias="X-User-ID")
 ):
     """
     Update user's dashboard preferences.
@@ -134,11 +133,11 @@ async def update_dashboard_preferences(
 
     except Exception as e:
         logger.error(f"Error saving dashboard preferences: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to save preferences: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to save preferences: {e!s}")
 
 
 @router.delete("/dashboard", response_model=dict)
-async def reset_dashboard_preferences(x_user_id: Optional[str] = Header(None, alias="X-User-ID")):
+async def reset_dashboard_preferences(x_user_id: str | None = Header(None, alias="X-User-ID")):
     """
     Reset user's dashboard preferences to defaults.
 
@@ -160,7 +159,7 @@ async def reset_dashboard_preferences(x_user_id: Optional[str] = Header(None, al
 
     except Exception as e:
         logger.error(f"Error resetting dashboard preferences: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to reset preferences: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to reset preferences: {e!s}")
 
 
 @router.get("/dashboard/defaults", response_model=DashboardPreferences)

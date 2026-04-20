@@ -12,13 +12,12 @@ import json
 import sys
 import uuid
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import Any
 
 # Add backend to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from app.database.supabase_client import get_supabase_client  # noqa: E402
-
+from app.database.supabase_client import get_supabase_client
 
 # Floor mapping: legacy → correct
 FLOOR_MAP = {
@@ -47,7 +46,7 @@ ZONE_CENTERS = {
 }
 
 
-def load_zones_json(site_code: str) -> List[Dict[str, Any]]:
+def load_zones_json(site_code: str) -> list[dict[str, Any]]:
     """Load zones from zones.json."""
     data_path = Path(__file__).parent.parent / "app" / "data" / "sites" / site_code / "zones.json"
     with open(data_path) as f:
@@ -55,7 +54,7 @@ def load_zones_json(site_code: str) -> List[Dict[str, Any]]:
     return data.get("zones", [])
 
 
-def load_desks_json(site_code: str) -> List[Dict[str, Any]]:
+def load_desks_json(site_code: str) -> list[dict[str, Any]]:
     """Load desks from desks.json.bak."""
     data_path = Path(__file__).parent.parent / "app" / "data" / "sites" / site_code / "desks.json.bak"
     with open(data_path) as f:
@@ -77,7 +76,7 @@ def get_site_uuid(client, site_code: str) -> str:
     raise ValueError(f"Building {site_code} not found")
 
 
-def transform_desks(desks: List[Dict], site_id: str) -> List[Dict]:
+def transform_desks(desks: list[dict], site_id: str) -> list[dict]:
     """
     Transform desks:
     - Correct floor names
@@ -132,7 +131,7 @@ def transform_desks(desks: List[Dict], site_id: str) -> List[Dict]:
     return transformed
 
 
-def transform_zones(zones: List[Dict], site_id: str) -> List[Dict]:
+def transform_zones(zones: list[dict], site_id: str) -> list[dict]:
     """Transform zones for Supabase."""
     transformed = []
     for zone in zones:

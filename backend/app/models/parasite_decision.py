@@ -12,7 +12,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 class OperatingMode(str, Enum):
@@ -116,11 +116,11 @@ class SafetyRuleHit:
         self.rule_id = rule_id
         self.severity = severity
 
-    def to_dict(self) -> Dict[str, str]:
+    def to_dict(self) -> dict[str, str]:
         return {"rule_id": self.rule_id, "severity": self.severity}
 
     @classmethod
-    def from_dict(cls, data: Dict[str, str]) -> "SafetyRuleHit":
+    def from_dict(cls, data: dict[str, str]) -> "SafetyRuleHit":
         return cls(rule_id=data["rule_id"], severity=data["severity"])
 
 
@@ -146,37 +146,37 @@ class ParasiteDecision:
 
     # --- Identity ---
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
-    correlation_id: Optional[str] = None
-    recommendation_id: Optional[str] = None
+    correlation_id: str | None = None
+    recommendation_id: str | None = None
     site_id: str = ""  # Must be non-empty in live_control
-    equipment_code: Optional[str] = None
-    device_id: Optional[str] = None  # Canonical control identity
+    equipment_code: str | None = None
+    device_id: str | None = None  # Canonical control identity
 
     # --- Decision context (A) ---
-    mode: Optional[str] = None  # OperatingMode value
-    gate_status: Optional[str] = None  # GateStatus value
-    enforcement: Optional[str] = None  # EnforcementAction value
-    gate_snapshot_id: Optional[str] = None  # Links to exact 14-metric snapshot
+    mode: str | None = None  # OperatingMode value
+    gate_status: str | None = None  # GateStatus value
+    enforcement: str | None = None  # EnforcementAction value
+    gate_snapshot_id: str | None = None  # Links to exact 14-metric snapshot
 
     # --- Safety context (B) ---
-    safety_check_version: Optional[str] = None  # Ruleset hash or version
-    safety_rules_evaluated: List[str] = field(default_factory=list)  # Rule IDs checked
-    safety_rules_triggered: List[Dict[str, str]] = field(default_factory=list)  # [{rule_id, severity}]
-    safety_result: Optional[str] = None  # SafetyResult value
+    safety_check_version: str | None = None  # Ruleset hash or version
+    safety_rules_evaluated: list[str] = field(default_factory=list)  # Rule IDs checked
+    safety_rules_triggered: list[dict[str, str]] = field(default_factory=list)  # [{rule_id, severity}]
+    safety_result: str | None = None  # SafetyResult value
 
     # --- Execution context (C) ---
-    actor: Optional[str] = None  # Actor value
-    approval_id: Optional[str] = None  # Links tier2 to UI approval record
-    command_id: Optional[str] = None  # Links set_value/read_value calls
-    tier: Optional[str] = None  # tier1, tier2, tier3
-    decision_type: Optional[str] = None  # tier2_approved, tier3_auto_execute, etc.
-    write_status: Optional[str] = None  # WriteStatus value
+    actor: str | None = None  # Actor value
+    approval_id: str | None = None  # Links tier2 to UI approval record
+    command_id: str | None = None  # Links set_value/read_value calls
+    tier: str | None = None  # tier1, tier2, tier3
+    decision_type: str | None = None  # tier2_approved, tier3_auto_execute, etc.
+    write_status: str | None = None  # WriteStatus value
     write_attempt_count: int = 1
-    failure_reason: Optional[str] = None
+    failure_reason: str | None = None
 
     # --- Target identity (D) ---
-    point_name: Optional[str] = None  # Canonical name
-    control_point: Optional[str] = None  # Deprecated alias for point_name
+    point_name: str | None = None  # Canonical name
+    control_point: str | None = None  # Deprecated alias for point_name
 
     # --- Values ---
     original_value: Any = None  # Pre-write reading (JSON-typed)
@@ -184,39 +184,39 @@ class ParasiteDecision:
     actual_value: Any = None  # Post-write read-back (JSON-typed)
 
     # --- COV verification ---
-    cov_verified: Optional[bool] = None
+    cov_verified: bool | None = None
     cov_tolerance: Any = None  # Float or dict of per-point tolerances
-    cov_latency_ms: Optional[int] = None
+    cov_latency_ms: int | None = None
 
     # --- Timing ---
-    device_response_latency_ms: Optional[int] = None
-    confidence_score: Optional[float] = None
+    device_response_latency_ms: int | None = None
+    confidence_score: float | None = None
     created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
     updated_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
 
     # --- Outcome and learning (E) ---
-    outcome: Optional[Dict[str, Any]] = None
-    outcome_matched_prediction: Optional[bool] = None
-    outcome_measured_at: Optional[str] = None
-    predicted_impact: Optional[Dict[str, Any]] = None  # {energy_kwh, comfort_delta, runtime_delta, cost}
-    measured_impact: Optional[Dict[str, Any]] = None  # Same keys as predicted_impact
+    outcome: dict[str, Any] | None = None
+    outcome_matched_prediction: bool | None = None
+    outcome_measured_at: str | None = None
+    predicted_impact: dict[str, Any] | None = None  # {energy_kwh, comfort_delta, runtime_delta, cost}
+    measured_impact: dict[str, Any] | None = None  # Same keys as predicted_impact
 
     # --- Rollback ---
     rolled_back: bool = False
-    rollback_reason: Optional[str] = None
-    rollback_at: Optional[str] = None
+    rollback_reason: str | None = None
+    rollback_at: str | None = None
 
     # --- Classification ---
-    contributing_factors: Optional[Dict[str, Any]] = None
-    decision_details: Optional[Dict[str, Any]] = None
-    rejection_category: Optional[str] = None  # RejectionCategory value
+    contributing_factors: dict[str, Any] | None = None
+    decision_details: dict[str, Any] | None = None
+    rejection_category: str | None = None  # RejectionCategory value
 
     # --- Routing provenance ---
-    routing_source: Optional[str] = None  # recommendation_graph | optimization_api
+    routing_source: str | None = None  # recommendation_graph | optimization_api
 
     # --- Audit classification ---
-    audit_level: Optional[str] = None  # "routine" or "critical"
-    context_snapshot: Optional[Dict[str, Any]] = None  # Full LLM context for critical decisions
+    audit_level: str | None = None  # "routine" or "critical"
+    context_snapshot: dict[str, Any] | None = None  # Full LLM context for critical decisions
 
     def __post_init__(self):
         """Normalize point_name / control_point."""
@@ -237,7 +237,7 @@ class ParasiteDecision:
         _safe_json_value(self.actual_value)
         _safe_json_value(self.cov_tolerance)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for persistence.
 
         Validates serialization safety before returning.
@@ -309,7 +309,7 @@ class ParasiteDecision:
         return {k: v for k, v in d.items() if v is not None}
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "ParasiteDecision":
+    def from_dict(cls, data: dict[str, Any]) -> "ParasiteDecision":
         """Create from dictionary (Supabase row or JSON record)."""
         return cls(
             id=data.get("id", str(uuid.uuid4())),
@@ -363,7 +363,7 @@ class ParasiteDecision:
         )
 
     @classmethod
-    def from_legacy_dict(cls, data: Dict[str, Any]) -> "ParasiteDecision":
+    def from_legacy_dict(cls, data: dict[str, Any]) -> "ParasiteDecision":
         """Create from legacy format (existing record_decision call sites).
 
         Maps old field conventions to new canonical names.

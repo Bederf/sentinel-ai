@@ -5,18 +5,17 @@ ADMIN-only endpoints to grant/revoke user access to buildings.
 """
 
 import logging
-from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, EmailStr
 
-from app.middleware.auth_middleware import require_auth
-from app.models.auth import AuthContext, AuthLevel, SentinelRole
+from app.database.repositories import SiteRepository
+from app.database.repositories.module_access_repository import get_module_access_repository
 from app.database.repositories.user_site_access_repository import (
     get_user_site_access_repository,
 )
-from app.database.repositories.module_access_repository import get_module_access_repository
-from app.database.repositories import SiteRepository
+from app.middleware.auth_middleware import require_auth
+from app.models.auth import AuthContext, AuthLevel, SentinelRole
 
 logger = logging.getLogger(__name__)
 
@@ -49,23 +48,23 @@ class BuildingAccessInfo(BaseModel):
     site_id: str
     site_code: str
     site_name: str
-    region: Optional[str] = None
-    granted_by: Optional[str] = None
-    granted_at: Optional[str] = None
+    region: str | None = None
+    granted_by: str | None = None
+    granted_at: str | None = None
 
 
 class UserAccessResponse(BaseModel):
     """Response with user's building access list."""
 
     user_email: str
-    buildings: List[BuildingAccessInfo]
+    buildings: list[BuildingAccessInfo]
 
 
 class BuildingUsersResponse(BaseModel):
     """Response with users who have access to a building."""
 
     site_code: str
-    users: List[dict]
+    users: list[dict]
 
 
 class ModuleGrantRequest(BaseModel):
@@ -73,15 +72,15 @@ class ModuleGrantRequest(BaseModel):
 
     user_email: EmailStr
     site_code: str
-    modules: List[str]
+    modules: list[str]
 
 
 class AccessRequestDecisionRequest(BaseModel):
     """Admin approval/rejection decision for a pending access request."""
 
     approve: bool = True
-    granted_modules: Optional[List[str]] = None
-    review_notes: Optional[str] = None
+    granted_modules: list[str] | None = None
+    review_notes: str | None = None
 
 
 # =====================================================
@@ -240,7 +239,7 @@ async def get_building_users(
 
 @router.get("/requests")
 async def list_access_requests(
-    status: Optional[str] = None,
+    status: str | None = None,
     auth: AuthContext = Depends(require_auth(AuthLevel.ADMIN)),
 ):
     """List module access requests submitted from the frontend."""

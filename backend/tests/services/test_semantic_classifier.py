@@ -17,7 +17,6 @@ from app.models.semantic_tag import EvidenceSource, SafetyClass
 from app.services.simbiot.classifiers.confidence_calculator import ConfidenceCalculator
 from app.services.simbiot.classifiers.rule_based_classifier import RuleBasedPointClassifier
 
-
 # ------------------------------------------------------------------
 # Fixtures
 # ------------------------------------------------------------------

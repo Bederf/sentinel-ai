@@ -16,7 +16,6 @@ HARD RULES:
 
 import logging
 import uuid
-from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import JSONResponse
@@ -163,10 +162,10 @@ async def get_equipment_health_rating_history(
 @router.get("/sites/{site_id}/assets/health-summary")
 async def get_site_health_summary(
     site_id: str,
-    status: Optional[str] = Query(None, description="Filter by health status (e.g. 'critical')"),
-    confidence: Optional[str] = Query(None, description="Filter by confidence (e.g. 'low')"),
-    has_baseline: Optional[bool] = Query(None, description="Filter by baseline presence"),
-    trend: Optional[str] = Query(None, description="Filter by trend direction (e.g. 'degrading')"),
+    status: str | None = Query(None, description="Filter by health status (e.g. 'critical')"),
+    confidence: str | None = Query(None, description="Filter by confidence (e.g. 'low')"),
+    has_baseline: bool | None = Query(None, description="Filter by baseline presence"),
+    trend: str | None = Query(None, description="Filter by trend direction (e.g. 'degrading')"),
 ) -> dict:
     """Get health summary for all equipment at a site.
 
@@ -308,8 +307,8 @@ async def recompute_health_assessment(request: RecomputeRequest) -> dict:
 
     # Audit log the request
     try:
-        from app.services.audit_logger import AuditLogger
         from app.models.audit_log import AuditResultType
+        from app.services.audit_logger import AuditLogger
 
         audit = AuditLogger()
         audit.log_control_action(

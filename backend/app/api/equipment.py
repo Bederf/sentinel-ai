@@ -4,20 +4,18 @@ import json
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 
-
-from app.config.settings import settings
+from app.core.site_resolver import get_primary_site_code
 from app.database.repositories.equipment_repository import EquipmentRepository
 from app.database.repositories.sensor_repository import SensorRepository
-from app.services.csv_loader import AssetData, AlarmData as CSVAlarmData
-from app.services.health_threshold_service import get_health_thresholds
 from app.middleware.auth_middleware import require_equipment_access, require_query_site_access
 from app.models.auth import AuthContext
-from app.core.site_resolver import get_primary_site_code
+from app.services.csv_loader import AlarmData as CSVAlarmData
+from app.services.csv_loader import AssetData
+from app.services.health_threshold_service import get_health_thresholds
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -61,9 +59,7 @@ def _derive_status(condition: str, health_score: int) -> str:
     thresholds = get_health_thresholds()
 
     # Poor condition always critical, otherwise use health score
-    if condition.lower() == "poor":
-        return "critical"
-    elif health_score < thresholds["critical"]:
+    if condition.lower() == "poor" or health_score < thresholds["critical"]:
         return "critical"
     elif condition.lower() == "fair" or health_score < thresholds["warning"]:
         return "warning"
@@ -118,10 +114,6 @@ async def load_equipment() -> list[dict]:
             return equipment_list
     except Exception as e:
         logger.error(f"Failed to load from Supabase: {e}")
-
-    if settings.sentinel_island_mode:
-        logger.warning("Remote equipment source unavailable; refusing local fallback in SENTINEL_ISLAND_MODE")
-        return []
 
     # Fallback to CSV/JSON if Supabase fails
     try:
@@ -215,12 +207,6 @@ async def load_equipment() -> list[dict]:
 
 async def load_sensors() -> list[dict]:
     """Load sensors from canonical sources only."""
-    if settings.sentinel_island_mode:
-        logger.warning(
-            "Sensor API has no remote-backed source configured; refusing local fallback in SENTINEL_ISLAND_MODE"
-        )
-        return []
-
     sensors_file = DATA_DIR / "sensors.json"
     if sensors_file.exists():
         try:
@@ -236,12 +222,6 @@ async def load_sensors() -> list[dict]:
 
 async def load_alerts() -> list[dict]:
     """Load alerts from canonical sources only."""
-    if settings.sentinel_island_mode:
-        logger.warning(
-            "Alert API has no remote-backed source configured; refusing local fallback in SENTINEL_ISLAND_MODE"
-        )
-        return []
-
     try:
         # Load from CSV using the csv_loader service
         alarms = CSVAlarmData.load()
@@ -345,13 +325,7 @@ def get_safety_limits_for_point(device_type: str, point_name: str, safety_rules:
         point_match = False
         if rule_point_name:
             # Direct match
-            if rule_point_name.lower() == point_name.lower():
-                point_match = True
-            # Partial match for setpoints
-            elif "setpoint" in point_name.lower() and "setpoint" in rule_point_name.lower():
-                point_match = True
-            # Temperature setpoint matching
-            elif "temp" in point_name.lower() and "temp" in rule_point_name.lower():
+            if rule_point_name.lower() == point_name.lower() or ("setpoint" in point_name.lower() and "setpoint" in rule_point_name.lower()) or ("temp" in point_name.lower() and "temp" in rule_point_name.lower()):
                 point_match = True
         elif rule.get("rule_type") == "temperature_range" and "temp" in point_name.lower():
             # Generic temperature rule without specific point applies to temp setpoints
@@ -417,11 +391,11 @@ class EquipmentListResponse(BaseModel):
 
 @router.get("/equipment", response_model=EquipmentListResponse)
 async def list_equipment(
-    site_id: Optional[str] = Query(None, description="Filter by site ID"),
-    equipment_type: Optional[str] = Query(None, alias="type", description="Filter by equipment type"),
-    status: Optional[str] = Query(None, description="Filter by status (normal, warning, critical)"),
-    min_health: Optional[int] = Query(None, ge=0, le=100, description="Minimum health score"),
-    max_health: Optional[int] = Query(None, ge=0, le=100, description="Maximum health score"),
+    site_id: str | None = Query(None, description="Filter by site ID"),
+    equipment_type: str | None = Query(None, alias="type", description="Filter by equipment type"),
+    status: str | None = Query(None, description="Filter by status (normal, warning, critical)"),
+    min_health: int | None = Query(None, ge=0, le=100, description="Minimum health score"),
+    max_health: int | None = Query(None, ge=0, le=100, description="Maximum health score"),
     auth: AuthContext = Depends(require_query_site_access("site_id")),
 ) -> EquipmentListResponse:
     """
@@ -761,6 +735,7 @@ async def control_equipment(
         Control result with success/failure status
     """
     from datetime import datetime
+
     from app.database.repositories.audit_repository import AuditRepository
 
     try:
@@ -895,7 +870,7 @@ class EquipmentStatsResponse(BaseModel):
 
 @router.get("/equipment-stats", response_model=EquipmentStatsResponse)
 async def get_equipment_stats(
-    site_id: Optional[str] = Query(None, description="Filter by site ID"),
+    site_id: str | None = Query(None, description="Filter by site ID"),
 ) -> EquipmentStatsResponse:
     """
     Get equipment statistics.

@@ -16,13 +16,11 @@ import hashlib
 import secrets
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import List, Optional
 from uuid import uuid4
 
 from pydantic import BaseModel, Field
 
 from app.models.auth import SentinelRole
-
 
 # ---------------------------------------------------------------------------
 # Enums
@@ -130,7 +128,7 @@ class AgentSession(BaseModel):
     owner_id: str
     role: str  # SentinelRole value (including "bot_agent")
     tenant_id: str
-    site_ids: List[str] = Field(default_factory=list)
+    site_ids: list[str] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     expires_at: datetime = Field(default_factory=lambda: datetime.utcnow() + timedelta(hours=1))
 
@@ -220,8 +218,8 @@ class AgentAuditEntry(BaseModel):
     target: str  # Resource path or identifier
     policy_decision: str  # PolicyDecision value
     confirmation_required: bool = False
-    confirmation_token_hash: Optional[str] = None
-    confirmation_result: Optional[str] = None  # "verified" | "expired" | "mismatch"
-    error: Optional[str] = None
-    ip_address: Optional[str] = None
-    channel: Optional[str] = None  # "api" | "telegram" | "mcp"
+    confirmation_token_hash: str | None = None
+    confirmation_result: str | None = None  # "verified" | "expired" | "mismatch"
+    error: str | None = None
+    ip_address: str | None = None
+    channel: str | None = None  # "api" | "telegram" | "mcp"

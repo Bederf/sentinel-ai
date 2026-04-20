@@ -6,8 +6,8 @@ Implements Supabase + JSON fallback pattern for user preferences persistence.
 import json
 import logging
 import os
-from typing import Optional, Dict, Any, TYPE_CHECKING
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 from app.database.supabase_client import get_supabase_client
 
@@ -54,16 +54,16 @@ class PreferencesRepository:
                 json.dump({}, f, indent=2)
             logger.info(f"Created JSON preferences file: {self.json_file}")
 
-    def _load_json_data(self) -> Dict[str, Any]:
+    def _load_json_data(self) -> dict[str, Any]:
         """Load all preferences from JSON file."""
         try:
-            with open(self.json_file, "r") as f:
+            with open(self.json_file) as f:
                 return json.load(f)
         except Exception as e:
             logger.error(f"Error loading JSON preferences: {e}")
             return {}
 
-    def _save_json_data(self, data: Dict[str, Any]) -> None:
+    def _save_json_data(self, data: dict[str, Any]) -> None:
         """Save all preferences to JSON file."""
         try:
             with open(self.json_file, "w") as f:
@@ -71,7 +71,7 @@ class PreferencesRepository:
         except Exception as e:
             logger.error(f"Error saving JSON preferences: {e}")
 
-    async def get_by_user_id(self, user_id: str) -> Optional[Dict[str, Any]]:
+    async def get_by_user_id(self, user_id: str) -> dict[str, Any] | None:
         """Get preferences by user ID.
 
         Args:
@@ -93,7 +93,7 @@ class PreferencesRepository:
             logger.error(f"Error retrieving preferences for user {user_id}: {e}")
             return None
 
-    async def upsert(self, user_id: str, preferences: "DashboardPreferences") -> Dict[str, Any]:
+    async def upsert(self, user_id: str, preferences: "DashboardPreferences") -> dict[str, Any]:
         """Create or update preferences for a user.
 
         Args:
@@ -161,7 +161,7 @@ class PreferencesRepository:
             logger.error(f"Error deleting preferences for user {user_id}: {e}")
             return False
 
-    async def get_defaults(self) -> Dict[str, Any]:
+    async def get_defaults(self) -> dict[str, Any]:
         """Get default preferences.
 
         Returns:

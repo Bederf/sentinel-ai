@@ -1,7 +1,8 @@
 """Repository for integration/log source operations."""
 
-from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
+from typing import Any
+
 from app.database.supabase_client import get_supabase_client
 
 
@@ -15,10 +16,10 @@ class IntegrationRepository:
 
     def get_log_sources(
         self,
-        site_id: Optional[str] = None,
-        source_type: Optional[str] = None,
-        is_active: Optional[bool] = None,
-    ) -> List[Dict[str, Any]]:
+        site_id: str | None = None,
+        source_type: str | None = None,
+        is_active: bool | None = None,
+    ) -> list[dict[str, Any]]:
         """Get log sources with optional filtering."""
         query = self.client.table("log_sources").select("*")
 
@@ -32,29 +33,29 @@ class IntegrationRepository:
         response = query.order("created_at", desc=True).execute()
         return response.data
 
-    def get_log_source(self, source_id: str) -> Optional[Dict[str, Any]]:
+    def get_log_source(self, source_id: str) -> dict[str, Any] | None:
         """Get log source by ID."""
         response = self.client.table("log_sources").select("*").eq("id", source_id).execute()
         return response.data[0] if response.data else None
 
-    def get_log_source_by_name(self, name: str) -> Optional[Dict[str, Any]]:
+    def get_log_source_by_name(self, name: str) -> dict[str, Any] | None:
         """Get a log source by name."""
         response = self.client.table("log_sources").select("*").eq("name", name).execute()
         return response.data[0] if response.data else None
 
-    def get_log_sources_by_ids(self, source_ids: List[str]) -> List[Dict[str, Any]]:
+    def get_log_sources_by_ids(self, source_ids: list[str]) -> list[dict[str, Any]]:
         """Get multiple log sources by their IDs."""
         if not source_ids:
             return []
         response = self.client.table("log_sources").select("id,name").in_("id", source_ids).execute()
         return response.data or []
 
-    def create_log_source(self, data: Dict[str, Any]) -> Dict[str, Any]:
+    def create_log_source(self, data: dict[str, Any]) -> dict[str, Any]:
         """Create a new log source."""
         response = self.client.table("log_sources").insert(data).execute()
         return response.data[0]
 
-    def update_log_source(self, source_id: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def update_log_source(self, source_id: str, data: dict[str, Any]) -> dict[str, Any] | None:
         """Update a log source."""
         response = self.client.table("log_sources").update(data).eq("id", source_id).execute()
         return response.data[0] if response.data else None
@@ -69,7 +70,7 @@ class IntegrationRepository:
         source_id: str,
         status: str,
         records: int = 0,
-        error: Optional[str] = None,
+        error: str | None = None,
     ) -> None:
         """Update last sync status for a log source."""
         self.client.table("log_sources").update(
@@ -83,7 +84,7 @@ class IntegrationRepository:
 
     # ==================== Column Mappings ====================
 
-    def get_column_mappings(self, source_id: str) -> List[Dict[str, Any]]:
+    def get_column_mappings(self, source_id: str) -> list[dict[str, Any]]:
         """Get column mappings for a log source."""
         response = self.client.table("column_mappings").select("*").eq("log_source_id", source_id).execute()
         return response.data
@@ -91,8 +92,8 @@ class IntegrationRepository:
     def save_column_mappings(
         self,
         source_id: str,
-        mappings: List[Dict[str, Any]],
-    ) -> List[Dict[str, Any]]:
+        mappings: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
         """Save column mappings (replace all for source)."""
         # Delete existing
         self.client.table("column_mappings").delete().eq("log_source_id", source_id).execute()
@@ -110,9 +111,9 @@ class IntegrationRepository:
     def get_point_mappings(
         self,
         site_id: str,
-        confidence: Optional[str] = None,
+        confidence: str | None = None,
         verified_only: bool = False,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get point-to-asset mappings for a building."""
         query = self.client.table("point_asset_mappings").select("*").eq("site_id", site_id)
 
@@ -126,12 +127,12 @@ class IntegrationRepository:
 
     def get_all_point_mappings(
         self,
-        site_id: Optional[str] = None,
-        confidence: Optional[str] = None,
+        site_id: str | None = None,
+        confidence: str | None = None,
         verified_only: bool = False,
         limit: int = 100,
         offset: int = 0,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Get point-to-asset mappings across all buildings with pagination.
 
         Returns dict with 'points' list and 'total' count.
@@ -153,7 +154,7 @@ class IntegrationRepository:
             "total": response.count or len(response.data),
         }
 
-    def get_point_mapping(self, site_id: str, point_id: str) -> Optional[Dict[str, Any]]:
+    def get_point_mapping(self, site_id: str, point_id: str) -> dict[str, Any] | None:
         """Get mapping for a specific point."""
         response = (
             self.client.table("point_asset_mappings")
@@ -164,7 +165,7 @@ class IntegrationRepository:
         )
         return response.data[0] if response.data else None
 
-    def upsert_point_mapping(self, site_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
+    def upsert_point_mapping(self, site_id: str, data: dict[str, Any]) -> dict[str, Any]:
         """Create or update point mapping."""
         data["site_id"] = site_id
         response = self.client.table("point_asset_mappings").upsert(data, on_conflict="site_id,bms_point_id").execute()
@@ -173,7 +174,7 @@ class IntegrationRepository:
     def bulk_upsert_point_mappings(
         self,
         site_id: str,
-        mappings: List[Dict[str, Any]],
+        mappings: list[dict[str, Any]],
     ) -> int:
         """Bulk upsert point mappings."""
         for m in mappings:
@@ -184,7 +185,7 @@ class IntegrationRepository:
         )
         return len(response.data)
 
-    def verify_point_mapping(self, mapping_id: str, cafm_asset_id: str) -> Dict[str, Any]:
+    def verify_point_mapping(self, mapping_id: str, cafm_asset_id: str) -> dict[str, Any]:
         """Manually verify/correct a point mapping."""
         response = (
             self.client.table("point_asset_mappings")
@@ -202,10 +203,10 @@ class IntegrationRepository:
 
     def get_unmatched_points(
         self,
-        site_id: Optional[str] = None,
+        site_id: str | None = None,
         limit: int = 10,
         offset: int = 0,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Get unmatched points for the monitoring dashboard.
 
@@ -245,7 +246,7 @@ class IntegrationRepository:
 
     # ==================== Ingested Data ====================
 
-    def insert_alarms(self, alarms: List[Dict[str, Any]]) -> int:
+    def insert_alarms(self, alarms: list[dict[str, Any]]) -> int:
         """Insert parsed alarms (with deduplication)."""
         if not alarms:
             return 0
@@ -256,7 +257,7 @@ class IntegrationRepository:
         )
         return len(response.data)
 
-    def insert_trends(self, trends: List[Dict[str, Any]]) -> int:
+    def insert_trends(self, trends: list[dict[str, Any]]) -> int:
         """Insert parsed trends (with deduplication)."""
         if not trends:
             return 0
@@ -272,8 +273,8 @@ class IntegrationRepository:
         self,
         site_id: str,
         limit: int = 100,
-        severity: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+        severity: str | None = None,
+    ) -> list[dict[str, Any]]:
         """Get recent alarms for a building."""
         query = self.client.table("ingested_alarms").select("*").eq("site_id", site_id)
 
@@ -285,7 +286,7 @@ class IntegrationRepository:
 
     # ==================== Sync Jobs ====================
 
-    def create_sync_job(self, source_id: str, file_name: Optional[str] = None) -> Dict[str, Any]:
+    def create_sync_job(self, source_id: str, file_name: str | None = None) -> dict[str, Any]:
         """Create a new sync job record."""
         response = (
             self.client.table("sync_jobs")
@@ -308,8 +309,8 @@ class IntegrationRepository:
         inserted: int,
         skipped: int,
         failed: int,
-        error_message: Optional[str] = None,
-        processing_time_ms: Optional[int] = None,
+        error_message: str | None = None,
+        processing_time_ms: int | None = None,
     ) -> None:
         """Complete a sync job with results."""
         self.client.table("sync_jobs").update(
@@ -329,7 +330,7 @@ class IntegrationRepository:
         self,
         source_id: str,
         limit: int = 20,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get recent sync jobs for a source."""
         response = (
             self.client.table("sync_jobs")
@@ -347,7 +348,7 @@ class IntegrationRepository:
         self,
         site_id: str,
         source_id: str,
-        assets: List[Dict[str, Any]],
+        assets: list[dict[str, Any]],
     ) -> int:
         """Upsert synced CAFM assets."""
         for a in assets:
@@ -358,19 +359,19 @@ class IntegrationRepository:
         response = self.client.table("cafm_assets").upsert(assets, on_conflict="site_id,cafm_id").execute()
         return len(response.data)
 
-    def get_cafm_assets(self, site_id: str) -> List[Dict[str, Any]]:
+    def get_cafm_assets(self, site_id: str) -> list[dict[str, Any]]:
         """Get CAFM assets for a building."""
         response = self.client.table("cafm_assets").select("*").eq("site_id", site_id).order("asset_tag").execute()
         return response.data
 
     # ==================== Reference Data ====================
 
-    def get_alarm_taxonomy(self) -> List[Dict[str, Any]]:
+    def get_alarm_taxonomy(self) -> list[dict[str, Any]]:
         """Get alarm code taxonomy."""
         response = self.client.table("alarm_taxonomy").select("*").execute()
         return response.data
 
-    def get_severity_mappings(self, source_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_severity_mappings(self, source_id: str | None = None) -> list[dict[str, Any]]:
         """Get severity mappings (global or per-source)."""
         query = self.client.table("severity_mappings").select("*")
         if source_id:
@@ -385,7 +386,7 @@ class IntegrationRepository:
 
     # ==================== Monitoring Aggregations ====================
 
-    def get_integration_health(self, site_id: Optional[str] = None) -> Dict[str, Any]:
+    def get_integration_health(self, site_id: str | None = None) -> dict[str, Any]:
         """
         Get integration health summary.
 
@@ -477,7 +478,7 @@ class IntegrationRepository:
             "recent_errors_count": recent_errors_count,
         }
 
-    def get_quality_metrics(self, site_id: str) -> Dict[str, Any]:
+    def get_quality_metrics(self, site_id: str) -> dict[str, Any]:
         """
         Get data quality metrics for a building.
 
@@ -598,9 +599,9 @@ class IntegrationRepository:
 
     def get_sync_jobs_summary(
         self,
-        site_id: Optional[str] = None,
+        site_id: str | None = None,
         days: int = 7,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Get sync job summary for the last N days.
 
@@ -640,9 +641,9 @@ class IntegrationRepository:
     # ==================== Building Status / Go-Live Workflow ====================
 
     # In-memory storage for building status (MVP - no new migration needed)
-    _site_status_store: Dict[str, Dict[str, Any]] = {}
+    _site_status_store: dict[str, dict[str, Any]] = {}
 
-    def get_site_status(self, site_id: str) -> Optional[Dict[str, Any]]:
+    def get_site_status(self, site_id: str) -> dict[str, Any] | None:
         """Get building status record."""
         return self._site_status_store.get(site_id)
 
@@ -650,8 +651,8 @@ class IntegrationRepository:
         self,
         site_id: str,
         status: str,
-        notes: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        notes: str | None = None,
+    ) -> dict[str, Any]:
         """Update building status (upsert)."""
         record = {
             "site_id": site_id,
@@ -663,7 +664,7 @@ class IntegrationRepository:
         self._site_status_store[site_id] = record
         return record
 
-    def get_validation_checklist(self, site_id: str) -> Dict[str, Any]:
+    def get_validation_checklist(self, site_id: str) -> dict[str, Any]:
         """
         Run all validation checks and return a checklist.
 

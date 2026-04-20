@@ -14,17 +14,16 @@ Covers:
 - Test: raw_text < 50 chars → equipment_description = None
 """
 
+from datetime import date
 from unittest.mock import AsyncMock, MagicMock, patch
-from datetime import date, datetime
 
 import pytest
 
-from app.models.document_record import DocumentRecord, DocumentType, ExtractionStatus
-from app.models.document_source import DocumentSource, SourceSystem
 from app.models.asset_resolution import ResolutionConfidence, ResolutionMethod, ResolutionResult
+from app.models.document_record import DocumentRecord, DocumentType, ExtractionStatus
+from app.models.document_source import SourceSystem
 from app.services.document_adapter_manual import ManualUploadAdapter
 from app.services.llm_extraction_service import LLMExtractionService
-
 
 # --------------------------------------------------------------------------- #
 # Helpers
@@ -134,7 +133,6 @@ class TestUpsertWritesEquipmentDescription:
 
         # Use wraps to preserve real table() behavior while allowing call tracking.
         # The real Supabase client's table() returns different objects per call.
-        from app.services.document_source_adapter import _get_supabase
 
         with patch("app.services.document_source_adapter._get_supabase") as mock_get:
             mock_db = MagicMock()
@@ -289,27 +287,26 @@ class TestUploadPipelineOrdering:
                 call_order.append("upsert")
                 return "doc-123"
 
-            with patch.object(ManualUploadAdapter, "_upsert", mock_upsert):
-                with patch(
-                    "app.services.llm_extraction_service.LLMExtractionService.extract_equipment_description",
-                    mock_extract,
-                ):
-                    adapter = ManualUploadAdapter()
-                    response = _make_response()
-                    form = _make_form()
+            with patch.object(ManualUploadAdapter, "_upsert", mock_upsert), patch(
+                "app.services.llm_extraction_service.LLMExtractionService.extract_equipment_description",
+                mock_extract,
+            ):
+                adapter = ManualUploadAdapter()
+                response = _make_response()
+                form = _make_form()
 
-                    # Simulate what upload_technician_document does:
-                    # Step 1: LLM extraction
-                    raw_text = "This is a very long document text with equipment information about the chiller system."
-                    extractor = MagicMock()
-                    extractor.extract_equipment_description = mock_extract
-                    equipment_description = await extractor.extract_equipment_description(raw_text)
+                # Simulate what upload_technician_document does:
+                # Step 1: LLM extraction
+                raw_text = "This is a very long document text with equipment information about the chiller system."
+                extractor = MagicMock()
+                extractor.extract_equipment_description = mock_extract
+                equipment_description = await extractor.extract_equipment_description(raw_text)
 
-                    # Step 2: normalise_upload with equipment_description
-                    doc_record = adapter.normalise_upload(response, form, "S002", equipment_description)
+                # Step 2: normalise_upload with equipment_description
+                doc_record = adapter.normalise_upload(response, form, "S002", equipment_description)
 
-                    # Step 3: _upsert
-                    await adapter._upsert(doc_record)
+                # Step 3: _upsert
+                await adapter._upsert(doc_record)
 
             assert call_order == ["llm_extraction", "upsert"], (
                 f"Expected ['llm_extraction', 'upsert'] but got {call_order}. "

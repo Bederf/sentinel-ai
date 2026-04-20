@@ -6,17 +6,18 @@ Phase 53: SENTINEL Asset Management Workflow Integration
 These test scenarios validate end-to-end workflows across all integrated systems.
 """
 
-import pytest
 import asyncio
 from datetime import datetime
-from app.services.workflow_orchestrator import (
-    get_workflow_orchestrator,
-    WorkflowState,
-    OnboardAssetRequest,
-    MLAnomalyTrigger,
-    RepairValidationRequest,
-)
 
+import pytest
+
+from app.services.workflow_orchestrator import (
+    MLAnomalyTrigger,
+    OnboardAssetRequest,
+    RepairValidationRequest,
+    WorkflowState,
+    get_workflow_orchestrator,
+)
 
 # ============================================================================
 # Scenario 1: Happy Path - Full Lifecycle

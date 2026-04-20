@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -35,6 +34,6 @@ class DesigoBuildingAlarm(BaseModel):
     )
     received_at: datetime = Field(..., description="When the email was received")
     notified: bool = Field(default=False, description="Whether notification was sent")
-    notified_at: Optional[datetime] = Field(default=None, description="When notification was sent")
+    notified_at: datetime | None = Field(default=None, description="When notification was sent")
     cleared: bool = Field(default=False, description="Whether alarm has been cleared")
-    cleared_at: Optional[datetime] = Field(default=None, description="When alarm was cleared")
+    cleared_at: datetime | None = Field(default=None, description="When alarm was cleared")

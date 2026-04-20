@@ -9,9 +9,10 @@ Verifies:
 5. FK constraints
 """
 
-import pytest
 from datetime import datetime
 from uuid import uuid4
+
+import pytest
 
 
 @pytest.mark.asyncio
@@ -56,7 +57,7 @@ class TestAssetEvidenceSchema:
         # Note: actual column types from Supabase may differ slightly
         # (e.g., 'timestamp with time zone' vs 'timestamp')
         assert len(columns) == 19, f"Expected 19 columns, got {len(columns)}"
-        for col_name in expected_columns.keys():
+        for col_name in expected_columns:
             assert col_name in columns, f"Column {col_name} not found"
 
     async def test_enums_exist(self, supabase_client):

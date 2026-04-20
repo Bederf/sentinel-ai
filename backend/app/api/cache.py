@@ -1,8 +1,8 @@
 """Cache management API endpoints."""
 
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from typing import Optional
 
 from app.middleware.auth_middleware import require_auth
 from app.models.auth import AuthContext, AuthLevel, SentinelRole
@@ -27,7 +27,7 @@ class CacheFlushResponse(BaseModel):
 
     success: bool
     message: str
-    keys_deleted: Optional[int] = None
+    keys_deleted: int | None = None
 
 
 @router.get("/health")
@@ -49,7 +49,7 @@ async def cache_stats(auth: AuthContext = Depends(require_auth(AuthLevel.AUTHENT
 
 @router.post("/flush", response_model=CacheFlushResponse)
 async def flush_cache(
-    pattern: Optional[str] = None, auth: AuthContext = Depends(require_auth(AuthLevel.ADMIN))
+    pattern: str | None = None, auth: AuthContext = Depends(require_auth(AuthLevel.ADMIN))
 ) -> CacheFlushResponse:
     """Flush cache entries (admin only).
 

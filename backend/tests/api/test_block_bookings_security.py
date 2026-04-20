@@ -15,9 +15,10 @@ import os
 os.environ.setdefault("DEMO_MODE", "true")
 os.environ.setdefault("TESTING", "true")
 
-import pytest  # noqa: E402
-from fastapi.testclient import TestClient  # noqa: E402
-from unittest.mock import patch  # noqa: E402
+from unittest.mock import patch
+
+import pytest
+from fastapi.testclient import TestClient
 
 
 @pytest.fixture

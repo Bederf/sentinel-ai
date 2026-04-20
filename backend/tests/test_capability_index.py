@@ -6,7 +6,6 @@ categories so that hybrid search will retrieve it for any client query.
 
 from __future__ import annotations
 
-
 # Question patterns clients actually ask (from real usage)
 # All patterns are checked in lowercase against the capability index text.
 # Some client phrasing is normalised (e.g. "can it be hacked" not exact phrase match).
@@ -92,7 +91,8 @@ CLIENT_QUESTION_PATTERNS = {
 
 def _load_capability_index() -> str:
     """Load the capability index text from the indexing script."""
-    import sys, os
+    import os
+    import sys
 
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     from scripts.index_capability_index import CAPABILITY_INDEX_TEXT

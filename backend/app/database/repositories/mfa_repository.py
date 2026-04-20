@@ -5,10 +5,11 @@ Handles storage and retrieval of TOTP secrets for multi-factor authentication.
 FSR Domain: 4.6 - Logical Access Control (MFA for privileged access)
 """
 
-from typing import Optional, List, Dict, Any
-from datetime import datetime, timedelta
-from ..supabase_client import get_supabase_client
 import logging
+from datetime import datetime, timedelta
+from typing import Any
+
+from ..supabase_client import get_supabase_client
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +24,7 @@ class MFARepository:
     # MFA SECRETS OPERATIONS
     # =========================================================================
 
-    def get_mfa_secret(self, user_email: str) -> Optional[Dict[str, Any]]:
+    def get_mfa_secret(self, user_email: str) -> dict[str, Any] | None:
         """
         Get MFA secret record for a user.
 
@@ -58,7 +59,7 @@ class MFARepository:
         self,
         user_email: str,
         totp_secret: str,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """
         Create or update MFA secret for a user.
 
@@ -300,10 +301,10 @@ class MFARepository:
         self,
         user_email: str,
         event_type: str,
-        source_ip: Optional[str] = None,
-        user_agent: Optional[str] = None,
-        event_data: Optional[Dict[str, Any]] = None,
-    ) -> Optional[Dict[str, Any]]:
+        source_ip: str | None = None,
+        user_agent: str | None = None,
+        event_data: dict[str, Any] | None = None,
+    ) -> dict[str, Any] | None:
         """
         Log an MFA-related security event.
 
@@ -346,11 +347,11 @@ class MFARepository:
 
     def get_mfa_events(
         self,
-        user_email: Optional[str] = None,
-        event_type: Optional[str] = None,
+        user_email: str | None = None,
+        event_type: str | None = None,
         hours: int = 24,
         limit: int = 100,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Get MFA events with optional filtering.
 
@@ -394,7 +395,7 @@ class MFARepository:
     def replace_backup_codes(
         self,
         user_id: str,
-        code_hashes: List[str],
+        code_hashes: list[str],
     ) -> bool:
         """Replace all backup codes for a user with a new set."""
         if not self.client:
@@ -423,7 +424,7 @@ class MFARepository:
         self,
         user_id: str,
         include_used: bool = False,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get backup code rows for a user."""
         if not self.client:
             return []
@@ -481,7 +482,7 @@ class MFARepository:
 
 
 # Singleton instance
-_repository: Optional[MFARepository] = None
+_repository: MFARepository | None = None
 
 
 def get_mfa_repository() -> MFARepository:

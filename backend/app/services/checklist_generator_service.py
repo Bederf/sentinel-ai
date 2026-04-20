@@ -88,7 +88,7 @@ class ChecklistGeneratorService:
                     return oem_templates
 
         # Local simulator mode: return pre-built templates
-        if settings.site002_source_enabled and not settings.sentinel_island_mode:
+        if settings.site002_source_enabled:
             return self._generate_demo_templates(equipment_type, manufacturer, model, capacity)
 
         # Build and call Claude API

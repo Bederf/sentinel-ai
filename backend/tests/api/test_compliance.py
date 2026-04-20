@@ -7,9 +7,9 @@ Legionella, Electrical, Lift, and Audit workflows.
 Phase 28: SENTINEL Compliance
 """
 
-import pytest
 from datetime import datetime, timedelta
 
+import pytest
 
 # ============================================================================
 # OHS Compliance Tests

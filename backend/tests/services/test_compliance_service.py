@@ -7,12 +7,13 @@ scheduling calculations, and compliance validations.
 Phase 28: SENTINEL Compliance
 """
 
-import pytest
 from datetime import datetime, timedelta
 from unittest.mock import MagicMock
 
-from app.services.compliance_service import ComplianceService
+import pytest
+
 from app.models.compliance import RiskLevel
+from app.services.compliance_service import ComplianceService
 
 
 @pytest.fixture

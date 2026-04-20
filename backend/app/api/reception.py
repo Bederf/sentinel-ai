@@ -17,8 +17,6 @@ from fastapi import APIRouter, HTTPException, status
 
 from app.api.visit_service import VisitService
 from app.models.visit import VisitStatus
-from app.services.visit_notification_service import get_notification_service
-from app.services.visit_policy_engine import VisitPolicyEngine
 from app.schemas.visit import (
     IssueCardRequest,
     IssueCardResponse,
@@ -28,6 +26,8 @@ from app.schemas.visit import (
     ScanResponse,
     VisitResponse,
 )
+from app.services.visit_notification_service import get_notification_service
+from app.services.visit_policy_engine import VisitPolicyEngine
 
 logger = logging.getLogger(__name__)
 

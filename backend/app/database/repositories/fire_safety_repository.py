@@ -8,8 +8,8 @@ Dynamic state (alarms, dampers, pressurization) persisted to both stores.
 import json
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional
 from pathlib import Path
+from typing import Any, Optional
 
 from app.config.settings import settings
 
@@ -29,7 +29,7 @@ class FireSafetyRepository:
     def __init__(self):
         self._client = None
         self._use_json = settings.use_json_storage
-        self._config_cache: Optional[Dict[str, Any]] = None
+        self._config_cache: dict[str, Any] | None = None
 
     @property
     def client(self):
@@ -46,7 +46,7 @@ class FireSafetyRepository:
 
     # --- JSON helpers ---
 
-    def _load_config(self) -> Dict[str, Any]:
+    def _load_config(self) -> dict[str, Any]:
         """Load static fire system configuration from JSON."""
         if self._config_cache is not None:
             return self._config_cache
@@ -56,7 +56,7 @@ class FireSafetyRepository:
                 return self._config_cache
         return {}
 
-    def _load_state(self) -> Dict[str, Any]:
+    def _load_state(self) -> dict[str, Any]:
         """Load dynamic fire system state from JSON."""
         if STATE_FILE.exists():
             with open(STATE_FILE) as f:
@@ -71,14 +71,14 @@ class FireSafetyRepository:
             "action_log": [],
         }
 
-    def _save_state(self, state: Dict[str, Any]) -> None:
+    def _save_state(self, state: dict[str, Any]) -> None:
         """Save dynamic fire system state to JSON."""
         with open(STATE_FILE, "w") as f:
             json.dump(state, f, indent=2, default=str)
 
     # --- Zone operations (static config) ---
 
-    def get_zones(self, site_id: str | None = None) -> List[Dict[str, Any]]:
+    def get_zones(self, site_id: str | None = None) -> list[dict[str, Any]]:
         """Get all fire zones for a building."""
         if not self._use_json and self.client:
             try:
@@ -92,14 +92,14 @@ class FireSafetyRepository:
         config = self._load_config()
         return config.get("zones", [])
 
-    def get_zone(self, zone_id: str) -> Optional[Dict[str, Any]]:
+    def get_zone(self, zone_id: str) -> dict[str, Any] | None:
         """Get a single fire zone by ID."""
         zones = self.get_zones()
         return next((z for z in zones if z.get("zone_id") == zone_id), None)
 
     # --- Alarm operations (dynamic) ---
 
-    def get_active_alarms(self, site_id: str | None = None) -> List[Dict[str, Any]]:
+    def get_active_alarms(self, site_id: str | None = None) -> list[dict[str, Any]]:
         """Get active (uncleared) fire alarms."""
         if not self._use_json and self.client:
             try:
@@ -113,7 +113,7 @@ class FireSafetyRepository:
         state = self._load_state()
         return [a for a in state.get("alarms", []) if not a.get("cleared", False)]
 
-    def get_all_alarms(self, site_id: str | None = None) -> List[Dict[str, Any]]:
+    def get_all_alarms(self, site_id: str | None = None) -> list[dict[str, Any]]:
         """Get all fire alarms (including cleared)."""
         if not self._use_json and self.client:
             try:
@@ -126,7 +126,7 @@ class FireSafetyRepository:
         state = self._load_state()
         return state.get("alarms", [])
 
-    def create_alarm(self, alarm_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def create_alarm(self, alarm_data: dict[str, Any]) -> dict[str, Any] | None:
         """Create a new fire alarm (dual-write)."""
         # Try Supabase first
         if not self._use_json and self.client:
@@ -143,7 +143,7 @@ class FireSafetyRepository:
         self._save_state(state)
         return alarm_data
 
-    def update_alarm(self, alarm_id: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def update_alarm(self, alarm_id: str, data: dict[str, Any]) -> dict[str, Any] | None:
         """Update a fire alarm (dual-write)."""
         if not self._use_json and self.client:
             try:
@@ -164,7 +164,7 @@ class FireSafetyRepository:
 
     # --- Damper operations (dynamic) ---
 
-    def get_dampers(self, site_id: str | None = None) -> List[Dict[str, Any]]:
+    def get_dampers(self, site_id: str | None = None) -> list[dict[str, Any]]:
         """Get all smoke damper positions and status."""
         if not self._use_json and self.client:
             try:
@@ -182,7 +182,7 @@ class FireSafetyRepository:
         config = self._load_config()
         return config.get("dampers", [])
 
-    def update_damper(self, damper_id: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def update_damper(self, damper_id: str, data: dict[str, Any]) -> dict[str, Any] | None:
         """Update a smoke damper (dual-write)."""
         if not self._use_json and self.client:
             try:
@@ -201,7 +201,7 @@ class FireSafetyRepository:
 
     # --- Pressurization operations (dynamic) ---
 
-    def get_pressurization(self, site_id: str | None = None) -> List[Dict[str, Any]]:
+    def get_pressurization(self, site_id: str | None = None) -> list[dict[str, Any]]:
         """Get stairwell pressurization readings."""
         if not self._use_json and self.client:
             try:
@@ -219,7 +219,7 @@ class FireSafetyRepository:
         config = self._load_config()
         return config.get("pressurization", [])
 
-    def update_pressurization(self, stairwell_id: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def update_pressurization(self, stairwell_id: str, data: dict[str, Any]) -> dict[str, Any] | None:
         """Update stairwell pressurization (dual-write)."""
         if not self._use_json and self.client:
             try:
@@ -237,7 +237,7 @@ class FireSafetyRepository:
 
     # --- Cause-effect matrix (static config) ---
 
-    def get_cause_effect_matrix(self, site_id: str | None = None) -> List[Dict[str, Any]]:
+    def get_cause_effect_matrix(self, site_id: str | None = None) -> list[dict[str, Any]]:
         """Get the cause-effect matrix for fire coordination."""
         if not self._use_json and self.client:
             try:
@@ -253,7 +253,7 @@ class FireSafetyRepository:
 
     # --- Action log (audit trail, dual-write) ---
 
-    def log_action(self, action_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def log_action(self, action_data: dict[str, Any]) -> dict[str, Any] | None:
         """Log a fire coordination action (dual-write)."""
         action_data.setdefault("created_at", datetime.utcnow().isoformat())
 
@@ -274,7 +274,7 @@ class FireSafetyRepository:
         self._save_state(state)
         return action_data
 
-    def get_action_log(self, site_id: str | None = None, limit: int = 50) -> List[Dict[str, Any]]:
+    def get_action_log(self, site_id: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
         """Get recent fire action log entries."""
         if not self._use_json and self.client:
             try:
@@ -296,12 +296,12 @@ class FireSafetyRepository:
 
     # --- Panel info (from config) ---
 
-    def get_panel_info(self) -> Dict[str, Any]:
+    def get_panel_info(self) -> dict[str, Any]:
         """Get fire alarm panel information."""
         config = self._load_config()
         return config.get("panel", {})
 
-    def get_local_state(self) -> Dict[str, Any]:
+    def get_local_state(self) -> dict[str, Any]:
         """Get pre-configured local fallback state."""
         config = self._load_config()
         return config.get("local_state", config.get("demo_state", {}))

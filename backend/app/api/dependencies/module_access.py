@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
-from typing import Callable, Awaitable
+from collections.abc import Awaitable, Callable, Sequence
 
 from fastapi import HTTPException, Request
 

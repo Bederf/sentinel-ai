@@ -3,15 +3,14 @@
 import pytest
 
 from app.services.energy_flow_calculator import (
-    EnergyFlowCalculator,
+    FLOW_COLORS,
     EnergyFlow,
-    get_energy_flow_calculator,
+    EnergyFlowCalculator,
     _extract_type,
     _extract_zone,
     _get_power_kw,
-    FLOW_COLORS,
+    get_energy_flow_calculator,
 )
-
 
 # ── Fixtures ─────────────────────────────────────────────────────────
 

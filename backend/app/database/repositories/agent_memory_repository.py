@@ -3,7 +3,7 @@
 import logging
 import uuid
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from app.database.supabase_client import get_supabase_client
 
@@ -29,9 +29,9 @@ class AgentMemoryRepository:
     def get_by_site(
         self,
         site_id: str,
-        context_type: Optional[str] = None,
+        context_type: str | None = None,
         limit: int = 50,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get memories for a site, optionally filtered by context_type."""
         try:
             query = (
@@ -53,7 +53,7 @@ class AgentMemoryRepository:
         self,
         equipment_code: str,
         limit: int = 20,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get memories for a specific piece of equipment."""
         try:
             response = (
@@ -69,7 +69,7 @@ class AgentMemoryRepository:
             logger.error("Canonical agent_memory equipment read failed: %s", e)
             return []
 
-    def get_by_id(self, memory_id: str) -> Optional[Dict[str, Any]]:
+    def get_by_id(self, memory_id: str) -> dict[str, Any] | None:
         """Get a single memory by ID."""
         try:
             response = self.client.table("agent_memory").select("*").eq("id", memory_id).execute()
@@ -79,7 +79,7 @@ class AgentMemoryRepository:
             logger.error("Canonical agent_memory get_by_id failed: %s", e)
             return None
 
-    def upsert(self, memory: Dict[str, Any]) -> Dict[str, Any]:
+    def upsert(self, memory: dict[str, Any]) -> dict[str, Any]:
         """Create or update a memory (upsert on site_id + equipment_code + key)."""
         ctx = memory.get("context_type")
         if ctx and ctx not in VALID_CONTEXT_TYPES:
@@ -129,7 +129,7 @@ class AgentMemoryRepository:
             return False
 
 
-_agent_memory_repo: Optional[AgentMemoryRepository] = None
+_agent_memory_repo: AgentMemoryRepository | None = None
 
 
 def get_agent_memory_repository() -> AgentMemoryRepository:

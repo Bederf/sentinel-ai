@@ -4,7 +4,6 @@ Phase 145: Decision Memory Layer.
 """
 
 import logging
-from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
@@ -23,15 +22,15 @@ class RecordDecisionRequest(BaseModel):
     diagnosis_source: str = "ai_reasoning"
     action_type: str = ""
     action_details: dict = {}
-    correlation_id: Optional[str] = None
-    recommendation_id: Optional[str] = None
-    event_id: Optional[str] = None
+    correlation_id: str | None = None
+    recommendation_id: str | None = None
+    event_id: str | None = None
 
 
 class RecordOutcomeRequest(BaseModel):
     outcome: str  # DecisionOutcome value
-    outcome_details: Optional[str] = None
-    work_order_id: Optional[str] = None
+    outcome_details: str | None = None
+    work_order_id: str | None = None
 
 
 @router.post("/record")
@@ -82,9 +81,9 @@ async def record_outcome(record_id: str, req: RecordOutcomeRequest):
 
 @router.get("/history")
 async def get_decision_history(
-    site_id: Optional[str] = Query(None),
-    equipment_id: Optional[str] = Query(None),
-    event_type: Optional[str] = Query(None),
+    site_id: str | None = Query(None),
+    equipment_id: str | None = Query(None),
+    event_type: str | None = Query(None),
     limit: int = Query(50, le=200),
 ):
     """Get decision history with filters."""
@@ -151,7 +150,7 @@ async def get_recommendation(
 
 
 @router.get("/stats")
-async def get_stats(site_id: Optional[str] = Query(None)):
+async def get_stats(site_id: str | None = Query(None)):
     """Get decision memory statistics."""
     from app.services.decision_memory_service import get_decision_memory_service
 

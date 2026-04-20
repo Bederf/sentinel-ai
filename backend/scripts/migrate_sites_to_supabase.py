@@ -12,9 +12,9 @@ Usage:
     python scripts/migrate_sites_to_supabase.py [--dry-run]
 """
 
-import sys
-import json
 import csv
+import json
+import sys
 import uuid
 from pathlib import Path
 

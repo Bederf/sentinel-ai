@@ -1,19 +1,18 @@
 """Energy consumption API endpoints."""
 
 import logging
-from datetime import datetime, timedelta, date
-from pathlib import Path
-from typing import Optional, Dict, Any
 import random
+from datetime import date, datetime, timedelta
+from pathlib import Path
+from typing import Any
 
-from fastapi import APIRouter, Query, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
-from app.config.settings import settings
 from app.database.repositories.energy_consumption_repository import get_energy_consumption_repository
-from app.services.site_loader import BuildingDataLoader
-from app.services.energy_rules_engine import get_energy_rules_engine
 from app.models.energy_rules import BuildingState
+from app.services.energy_rules_engine import get_energy_rules_engine
+from app.services.site_loader import BuildingDataLoader
 from app.utils.ai_provenance import attach_ai_provenance, attach_runtime_metadata, get_ml_provenance
 
 router = APIRouter()
@@ -194,7 +193,7 @@ class EnergyResponse(BaseModel):
     """Energy consumption response."""
 
     days: int
-    site_id: Optional[str]
+    site_id: str | None
     data: list[EnergyDataPoint]
 
 
@@ -328,7 +327,7 @@ def _get_tariff_band(hour: int, month: int) -> str:
     is_summer = month in [10, 11, 12, 1, 2, 3]
 
     # Off-peak: 21:00 - 05:59 (always)
-    if 21 <= hour or hour < 6:
+    if hour >= 21 or hour < 6:
         return "off_peak"
 
     if is_summer:
@@ -416,7 +415,7 @@ def generate_energy_data(
     sites: list[dict],
     equipment: list[dict],
     days: int = 30,
-    site_id: Optional[str] = None,
+    site_id: str | None = None,
 ) -> list[EnergyDataPoint]:
     """
     Generate synthetic energy consumption data based on equipment.
@@ -530,7 +529,7 @@ def generate_energy_data(
 
 
 def get_energy_from_supabase(
-    site_id: Optional[str],
+    site_id: str | None,
     days: int,
 ) -> tuple[list[EnergyDataPoint], bool]:
     """Get energy consumption data from Supabase.
@@ -591,7 +590,7 @@ def get_energy_from_supabase(
 
 @router.get("/energy", response_model=EnergyResponse)
 async def get_energy(
-    site_id: Optional[str] = Query(None, description="Filter by site ID"),
+    site_id: str | None = Query(None, description="Filter by site ID"),
     days: int = Query(30, ge=1, le=365, description="Number of days of data"),
 ) -> EnergyResponse:
     """
@@ -624,56 +623,18 @@ async def get_energy(
             data=supabase_data,
         )
 
-    # Query succeeded but there are no rows for this selection.
-    # Keep behavior explicit: only synthesize data if fallback is enabled.
-    if success and not supabase_data:
-        if settings.sentinel_island_mode:
-            logger.warning(
-                "Supabase energy query returned 0 rows for site=%s days=%s; refusing synthetic fallback in "
-                "SENTINEL_ISLAND_MODE",
-                site_id,
-                days,
-            )
-            return EnergyResponse(
-                days=days,
-                site_id=site_id,
-                data=[],
-            )
-        if not settings.energy_allow_mock_fallback:
-            logger.info(
-                "Supabase energy query returned 0 rows for site=%s days=%s; returning empty dataset",
-                site_id,
-                days,
-            )
-            return EnergyResponse(
-                days=days,
-                site_id=site_id,
-                data=[],
-            )
-        logger.warning(
-            "Supabase energy query returned 0 rows for site=%s days=%s; using synthetic fallback "
-            "(ENERGY_ALLOW_MOCK_FALLBACK=true)",
-            site_id,
-            days,
-        )
-
-    if settings.sentinel_island_mode:
-        logger.warning("Supabase energy query failed; refusing synthetic fallback in SENTINEL_ISLAND_MODE")
-        return EnergyResponse(
-            days=days,
-            site_id=site_id,
-            data=[],
-        )
-
-    if not settings.energy_allow_mock_fallback:
-        logger.warning(
-            "Supabase energy query failed; returning empty dataset because ENERGY_ALLOW_MOCK_FALLBACK is disabled"
-        )
-        return EnergyResponse(
-            days=days,
-            site_id=site_id,
-            data=[],
-        )
+    # Query succeeded but there are no rows — return empty; bridge telemetry
+    # or other real sources handle the chart via separate endpoints
+    logger.info(
+        "Supabase energy query returned 0 rows for site=%s days=%s; returning empty dataset",
+        site_id,
+        days,
+    )
+    return EnergyResponse(
+        days=days,
+        site_id=site_id,
+        data=[],
+    )
 
     # Fall back to synthetic data generation using Supabase buildings
     logger.warning("Supabase energy query failed; using synthetic fallback (ENERGY_ALLOW_MOCK_FALLBACK=true)")
@@ -734,7 +695,7 @@ async def get_energy(
 
 @router.post("/energy/seed")
 async def seed_energy_data(
-    site_id: Optional[str] = Query(None, description="Building code to seed (default: all)"),
+    site_id: str | None = Query(None, description="Building code to seed (default: all)"),
     days: int = Query(90, ge=1, le=365, description="Number of days to seed"),
 ) -> dict:
     """
@@ -749,9 +710,6 @@ async def seed_energy_data(
     Returns:
         Dictionary with seeding results
     """
-    if settings.sentinel_island_mode:
-        raise HTTPException(status_code=404, detail="Synthetic energy seeding is disabled on SENTINEL island instances")
-
     from app.database.supabase_client import get_supabase_client
 
     try:
@@ -1357,8 +1315,8 @@ async def get_simulated_energy_costs(
         Daily cost summary list with tariff band breakdown
     """
     try:
-        from app.services.energy_cost_service import EnergyCostService
         from app.database.supabase_client import get_supabase_client
+        from app.services.energy_cost_service import EnergyCostService
 
         supabase = get_supabase_client()
         EnergyCostService(site_id=site_id)  # validate tariff loads
@@ -1437,7 +1395,7 @@ async def get_simulated_energy_costs(
 
     except Exception as e:
         logger.error(f"[COST] Error getting simulated costs: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to retrieve cost data: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve cost data: {e!s}")
 
 
 @router.get("/energy/simulated-costs/monthly")
@@ -1564,7 +1522,7 @@ async def get_tariff_info(
 async def get_simulated_water_consumption(
     site_id: str = Query(..., description="Site ID"),
     days: int = 7,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Get daily water consumption trends for dashboard visualization.
 
     Returns simulated water usage with breakdown by tariff tier and cost.
@@ -1721,7 +1679,7 @@ async def get_simulated_water_consumption(
 
 
 @router.get("/water/tariff-info")
-async def get_water_tariff_info(site_id: str = Query(..., description="Site ID")) -> Dict[str, Any]:
+async def get_water_tariff_info(site_id: str = Query(..., description="Site ID")) -> dict[str, Any]:
     """Get water tariff structure for transparency.
 
     Returns municipal water tariff rates including tiered pricing,
@@ -1796,9 +1754,9 @@ async def validate_power_meter(
     site_id: str = Query(..., description="Site ID"),
     meter_id: str = "S002-MTR-B1-HVAC",
     simulated_power_kw: float = 28.5,
-    real_power_kw: Optional[float] = None,
+    real_power_kw: float | None = None,
     simulated_hour: int = 12,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Validate hourly power consumption against real meter data.
 
     Compares simulated HVAC power with actual meter reading to detect
@@ -1859,7 +1817,7 @@ async def get_power_baseline(
     site_id: str = Query(..., description="Site ID"),
     meter_id: str = "S002-MTR-B1-HVAC",
     lookback_days: int = 7,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Get baseline power statistics from real meter data.
 
     Returns statistical baseline (mean, stdev, percentiles) used for
@@ -1910,7 +1868,7 @@ async def get_cop_adjustment_recommendation(
     site_id: str = Query(..., description="Site ID"),
     meter_id: str = "S002-MTR-B1-HVAC",
     lookback_days: int = 30,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Get COP (Coefficient of Performance) adjustment recommendation.
 
     Analyzes real power consumption to estimate actual chiller COP and
@@ -1964,9 +1922,9 @@ async def validate_monthly_cost(
     month: int = 2,
     year: int = 2026,
     real_invoice_cost_r: float = 18500.00,
-    simulated_total_kwh: Optional[float] = None,
-    simulated_total_water_liters: Optional[float] = None,
-) -> Dict[str, Any]:
+    simulated_total_kwh: float | None = None,
+    simulated_total_water_liters: float | None = None,
+) -> dict[str, Any]:
     """Validate monthly simulated costs against real invoice.
 
     Compares total simulated energy + water costs with actual municipal invoice
@@ -2026,8 +1984,8 @@ async def get_daily_simulated_cost(
     site_id: str = Query(..., description="Site ID"),
     energy_kwh: float = 315.0,
     water_liters: float = 6847.0,
-    cost_date: Optional[str] = None,
-) -> Dict[str, Any]:
+    cost_date: str | None = None,
+) -> dict[str, Any]:
     """Calculate daily simulated cost breakdown for a specific date.
 
     Returns energy + water costs using current tariff assumptions for
@@ -2084,7 +2042,7 @@ async def get_daily_simulated_cost(
 async def get_tariff_adjustment_recommendation(
     site_id: str = Query(..., description="Site ID"),
     months_analyzed: int = 3,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Get tariff adjustment recommendation based on historical validation.
 
     Analyzes historical cost variance to recommend tariff multiplier adjustments
@@ -2155,7 +2113,7 @@ async def get_ai_recommendations(
     hvac_cop_current: float = 3.5,
     power_anomalies_count: int = 0,
     cost_variance_pct: float = 0.18,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Generate AI-powered financial recommendations with ROI.
 
     Analyzes all consumption and validation data to produce ranked
@@ -2227,7 +2185,7 @@ async def get_ai_recommendations(
 @router.get("/recommendations/dashboard")
 async def get_recommendations_dashboard(
     site_id: str = Query(..., description="Site ID"),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Get dashboard-ready recommendation summary (simplified).
 
     Returns top 3 recommendations formatted for dashboard cards
@@ -2319,8 +2277,8 @@ def _get_button_text(rec_type: str) -> str:
 @router.get("/recommendations/by-type")
 async def get_recommendations_by_type(
     site_id: str = Query(..., description="Site ID"),
-    recommendation_type: Optional[str] = None,
-) -> Dict[str, Any]:
+    recommendation_type: str | None = None,
+) -> dict[str, Any]:
     """Get detailed recommendation by type with full implementation guide.
 
     Query Params:

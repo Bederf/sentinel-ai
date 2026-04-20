@@ -13,18 +13,17 @@ import os
 os.environ.setdefault("DEMO_MODE", "true")
 os.environ.setdefault("LIGHTWEIGHT_APP", "1")
 
-import time  # noqa: E402
-from unittest.mock import patch  # noqa: E402
+import time
+from unittest.mock import patch
 
-import pytest  # noqa: E402
+import pytest
 
-from app.middleware.agent_security.circuit_breaker import (  # noqa: E402
+from app.middleware.agent_security.circuit_breaker import (
     AgentRateLimiter,
     BreakerState,
     CircuitBreaker,
     QuotaTier,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures — fresh instances per test to avoid cross-test contamination

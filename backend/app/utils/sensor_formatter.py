@@ -5,11 +5,12 @@ Provides utilities to enrich sensor data with zone assignments and desk informat
 by parsing equipment metadata and linking to zone/desk data.
 """
 
-from typing import Dict, Any, List
+from typing import Any
+
 from app.database.supabase_client import get_supabase_client
 
 
-def format_sensor_with_zone(sensor_data: Dict[str, Any]) -> Dict[str, Any]:
+def format_sensor_with_zone(sensor_data: dict[str, Any]) -> dict[str, Any]:
     """
     Format a sensor equipment record to include zone and desk information.
 
@@ -37,7 +38,7 @@ def format_sensor_with_zone(sensor_data: Dict[str, Any]) -> Dict[str, Any]:
     return formatted
 
 
-async def get_sensors_with_zones(site_id: str) -> List[Dict[str, Any]]:
+async def get_sensors_with_zones(site_id: str) -> list[dict[str, Any]]:
     """
     Get all sensors for a building with zone assignments.
 
@@ -60,7 +61,7 @@ async def get_sensors_with_zones(site_id: str) -> List[Dict[str, Any]]:
     return sensors
 
 
-def get_desks_in_zone(zone_id: str) -> List[Dict[str, Any]]:
+def get_desks_in_zone(zone_id: str) -> list[dict[str, Any]]:
     """
     Get all desks in a specific zone.
 
@@ -77,7 +78,7 @@ def get_desks_in_zone(zone_id: str) -> List[Dict[str, Any]]:
     return result.data or []
 
 
-async def format_sensor_with_zone_and_desks(sensor_data: Dict[str, Any]) -> Dict[str, Any]:
+async def format_sensor_with_zone_and_desks(sensor_data: dict[str, Any]) -> dict[str, Any]:
     """
     Enrich a DALI sensor dict with zone and desk information from Equipment table.
 

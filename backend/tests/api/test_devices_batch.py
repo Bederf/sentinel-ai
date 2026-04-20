@@ -13,13 +13,14 @@ Scenarios tested:
 - Individual device endpoints still work (backward compatibility)
 """
 
+from typing import Any
+
 import pytest
-from typing import Dict, Any
 
 # Test fixtures and helper functions
 
 
-def create_test_device_batch_request(device_ids: list[str]) -> Dict[str, Any]:
+def create_test_device_batch_request(device_ids: list[str]) -> dict[str, Any]:
     """Create a batch device request."""
     return {"device_ids": device_ids}
 

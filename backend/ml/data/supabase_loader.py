@@ -23,7 +23,7 @@ Usage:
 
 import logging
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import numpy as np
 
@@ -49,7 +49,7 @@ def _get_supabase_client():
         return None
 
 
-def _invert_sensor_mapping(equipment_type: str) -> Dict[str, str]:
+def _invert_sensor_mapping(equipment_type: str) -> dict[str, str]:
     """Invert SENSOR_MAPPING: ml_feature_name -> bms_point_name.
 
     The mapping in sentinel_ml_feeder is bms_name -> ml_name.
@@ -60,7 +60,7 @@ def _invert_sensor_mapping(equipment_type: str) -> Dict[str, str]:
     return {ml_name: bms_name for bms_name, ml_name in mapping.items()}
 
 
-def _get_bms_sensor_types(equipment_type: str) -> List[str]:
+def _get_bms_sensor_types(equipment_type: str) -> list[str]:
     """Get the list of BMS sensor_type values stored in Supabase for an equipment type."""
     mapping = SENSOR_MAPPING.get(equipment_type, {})
     return list(mapping.keys())
@@ -69,7 +69,7 @@ def _get_bms_sensor_types(equipment_type: str) -> List[str]:
 class SupabaseTrainingDataLoader:
     """Load training data from Supabase equipment_sensor_readings table."""
 
-    def __init__(self, site_id: Optional[str] = None):
+    def __init__(self, site_id: str | None = None):
         """
         Args:
             site_id: Optional site filter (site_id in the table). If None, loads all sites.
@@ -80,10 +80,10 @@ class SupabaseTrainingDataLoader:
     def _query_readings(
         self,
         equipment_type: str,
-        sensor_types: List[str],
-        min_date: Optional[datetime] = None,
+        sensor_types: list[str],
+        min_date: datetime | None = None,
         limit: int = 50000,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Query equipment_sensor_readings for a given type's sensors.
 
         We identify equipment by matching codes that contain the type prefix.
@@ -120,9 +120,9 @@ class SupabaseTrainingDataLoader:
 
     def _pivot_to_dataframe(
         self,
-        rows: List[Dict[str, Any]],
+        rows: list[dict[str, Any]],
         equipment_type: str,
-    ) -> Optional[pd.DataFrame]:
+    ) -> pd.DataFrame | None:
         """Pivot long-format sensor readings into wide-format DataFrame.
 
         Input rows: [{equipment_id, sensor_type, value, recorded_at}, ...]
@@ -193,7 +193,7 @@ class SupabaseTrainingDataLoader:
         equipment_type: str,
         min_hours: int = 500,
         lookback_days: int = 365,
-    ) -> Optional[pd.DataFrame]:
+    ) -> pd.DataFrame | None:
         """Load sensor data as a wide-format DataFrame for LSTM training.
 
         Args:
@@ -258,7 +258,7 @@ class SupabaseTrainingDataLoader:
         equipment_type: str,
         min_hours: int = 200,
         lookback_days: int = 365,
-    ) -> Optional[np.ndarray]:
+    ) -> np.ndarray | None:
         """Load sensor data as a numpy array (hours, features) for autoencoder.
 
         Args:
@@ -295,7 +295,7 @@ class SupabaseTrainingDataLoader:
 
         return data.values
 
-    def get_data_summary(self) -> Dict[str, Any]:
+    def get_data_summary(self) -> dict[str, Any]:
         """Get a summary of available training data per equipment type."""
         summary = {}
         for eq_type in EquipmentDataLoader.list_equipment_types():

@@ -9,17 +9,17 @@ Usage:
     python -m ml.lstm.train --all --epochs 50
 """
 
-import logging
 import argparse
+import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import Any
 
 import numpy as np
 
-from .data_prep import LSTMDataPrep, EquipmentDataLoader
-from .model import SensorLSTM
 from ..registry import get_model_registry
+from .data_prep import EquipmentDataLoader, LSTMDataPrep
+from .model import SensorLSTM
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 class LSTMTrainer:
     """Training pipeline for LSTM forecasting models."""
 
-    def __init__(self, model_dir: str = None, window_size: int = 168, forecast_horizons: List[int] = None):
+    def __init__(self, model_dir: str = None, window_size: int = 168, forecast_horizons: list[int] = None):
         """
         Initialize trainer.
 
@@ -54,7 +54,7 @@ class LSTMTrainer:
         test_size: float = 0.2,
         use_demo_data: bool = True,
         verbose: int = 1,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Train LSTM model for a specific equipment type.
 
@@ -198,7 +198,7 @@ class LSTMTrainer:
 
         return result
 
-    def _calculate_metrics(self, y_true: np.ndarray, y_pred: np.ndarray) -> Dict[str, float]:
+    def _calculate_metrics(self, y_true: np.ndarray, y_pred: np.ndarray) -> dict[str, float]:
         """Calculate prediction metrics for each forecast horizon."""
         from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
@@ -225,7 +225,7 @@ class LSTMTrainer:
         batch_size: int = 32,
         test_size: float = 0.2,
         verbose: int = 0,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Train LSTM model with pre-prepared data (from SimulationMLFeeder).
 
         Args:
@@ -329,7 +329,7 @@ class LSTMTrainer:
             "final_val_loss": history.get("val_loss", [None])[-1],
         }
 
-    def train_all(self, epochs: int = 100, use_demo_data: bool = True) -> List[Dict[str, Any]]:
+    def train_all(self, epochs: int = 100, use_demo_data: bool = True) -> list[dict[str, Any]]:
         """Train models for all equipment types."""
         results = []
 

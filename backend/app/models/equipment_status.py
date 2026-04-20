@@ -5,7 +5,6 @@ updates and predictive fault overlays to the frontend.
 """
 
 from datetime import datetime
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -18,8 +17,8 @@ class EquipmentStatusUpdate(BaseModel):
     type: str = Field(..., description="Equipment type (e.g., ahu, chiller)")
     health_score: float = Field(..., ge=0, le=100, description="Current health score 0-100")
     status: str = Field(..., description="Current status (online, offline, fault, warning)")
-    power_kw: Optional[float] = Field(None, description="Current power consumption in kW")
-    temperatures: Optional[dict] = Field(None, description="Temperature readings (supply, return, etc.)")
+    power_kw: float | None = Field(None, description="Current power consumption in kW")
+    temperatures: dict | None = Field(None, description="Temperature readings (supply, return, etc.)")
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 
 
@@ -31,7 +30,7 @@ class PredictiveFault(BaseModel):
     severity: str = Field(..., description="Severity level: critical (<7d) or warning (<30d)")
     timeframe_days: int = Field(..., ge=0, description="Days until predicted failure")
     confidence: float = Field(..., ge=0, le=1, description="Model confidence 0.0-1.0")
-    model_name: Optional[str] = Field(None, description="ML model that generated this prediction")
+    model_name: str | None = Field(None, description="ML model that generated this prediction")
 
 
 class EquipmentStatusFrame(BaseModel):

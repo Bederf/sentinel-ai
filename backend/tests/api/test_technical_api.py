@@ -1,7 +1,8 @@
 """Tests for technical support API surfaces."""
 
-import pytest
 from unittest.mock import patch
+
+import pytest
 
 from app.services.hybrid_query_service import HybridContext
 

@@ -9,19 +9,20 @@ Verifies:
 5. Supersession handling
 """
 
-import pytest
 from datetime import datetime
 from uuid import uuid4
+
+import pytest
+from backend.app.models.asset_evidence import (
+    ArtifactType,
+    AssetEvidenceService,
+    CreateAssetEvidenceInput,
+    EvidenceClass,
+    SourceType,
+)
 from backend.app.services.asset_evidence_service import (
     EvidenceClassifier,
     PayloadNormalizer,
-)
-from backend.app.models.asset_evidence import (
-    SourceType,
-    ArtifactType,
-    EvidenceClass,
-    AssetEvidenceService,
-    CreateAssetEvidenceInput,
 )
 
 

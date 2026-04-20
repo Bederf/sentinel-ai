@@ -8,16 +8,17 @@ Provides endpoints for managing recommendations through the control tier workflo
 """
 
 import logging
-from typing import Any, Dict, Optional
-from fastapi import APIRouter, Depends, Request, HTTPException, Query, Body
+from typing import Any
+
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 
+from app.config.settings import IngestionMode, settings
 from app.middleware.auth_middleware import require_site_access
 from app.middleware.rate_limiter import limiter
 from app.models.auth import AuthContext
-from app.config.settings import IngestionMode, settings
-from app.services.site_ai_policy_service import get_site_ai_policy
 from app.services.recommendation_service import get_recommendation_service
+from app.services.site_ai_policy_service import get_site_ai_policy
 from app.utils.ai_provenance import attach_ai_provenance, get_ml_provenance
 
 logger = logging.getLogger(__name__)
@@ -28,7 +29,7 @@ router = APIRouter(prefix="/api/recommendations", tags=["Recommendations"])
 class ApproveRequest(BaseModel):
     """Request body for approving a recommendation."""
 
-    reason: Optional[str] = None
+    reason: str | None = None
 
 
 class RejectRequest(BaseModel):
@@ -43,9 +44,9 @@ class CreateRecommendationRequest(BaseModel):
     site_id: str
     action_type: str
     target_equipment: str
-    action: Dict[str, Any]
+    action: dict[str, Any]
     reason: str
-    expected_impact: Optional[Dict[str, Any]] = None
+    expected_impact: dict[str, Any] | None = None
     confidence: str = "medium"
     profile: str = ""
     multi_objective_score: float = 0.0
@@ -109,7 +110,7 @@ async def get_pending_recommendations(
 async def get_recommendation_history(
     request: Request,
     site_id: str,
-    filters: Dict[str, Any] = Body(default={"status": None, "risk_level": None}),
+    filters: dict[str, Any] = Body(default={"status": None, "risk_level": None}),
     limit: int = Query(50, ge=1, le=500),
     auth: AuthContext = Depends(require_site_access("site_id")),
 ):
@@ -423,6 +424,7 @@ async def trigger_recommendation_processing(
     """
     try:
         from langchain_core.messages import HumanMessage
+
         from app.agents import get_recommendation_graph
 
         agent = get_recommendation_graph()

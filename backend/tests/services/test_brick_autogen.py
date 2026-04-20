@@ -1,20 +1,21 @@
 """Tests for Brick Ontology Auto-Generation Service."""
 
 import json
-import pytest
 from pathlib import Path
+
+import pytest
 
 # Skip entire module if rdflib not available
 rdflib = pytest.importorskip("rdflib")
 
 from app.services.brick_autogen_service import (  # noqa: E402
+    EQUIPMENT_TYPE_TO_BRICK,
     BrickAutogenService,
     ResolutionIndex,
-    load_discovery_enrichment,
-    build_brick_for_site,
     _safe_iri_part,
     _stable_hash,
-    EQUIPMENT_TYPE_TO_BRICK,
+    build_brick_for_site,
+    load_discovery_enrichment,
 )
 
 BACKEND_DIR = Path(__file__).parent.parent.parent

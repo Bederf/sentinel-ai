@@ -228,19 +228,18 @@ class TestAIStreaming:
 
         # Try streaming request
         try:
-            with httpx.Client(timeout=3.0) as client:
-                with client.stream(
-                    "POST", "http://localhost:9095/api/chat", json={"query": "What is BMS?"}
-                ) as response:
-                    assert response.status_code in [200, 401, 500]
+            with httpx.Client(timeout=3.0) as client, client.stream(
+                "POST", "http://localhost:9095/api/chat", json={"query": "What is BMS?"}
+            ) as response:
+                assert response.status_code in [200, 401, 500]
 
-                    if response.status_code == 200:
-                        # Should receive streaming data
-                        chunks = []
-                        for chunk in response.iter_lines():
-                            if chunk:
-                                chunks.append(chunk)
-                        assert len(chunks) > 0
+                if response.status_code == 200:
+                    # Should receive streaming data
+                    chunks = []
+                    for chunk in response.iter_lines():
+                        if chunk:
+                            chunks.append(chunk)
+                    assert len(chunks) > 0
         except Exception:
             pytest.skip("Streaming test requires running server")
 

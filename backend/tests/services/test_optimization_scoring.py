@@ -4,6 +4,7 @@ Tests that scoring is properly integrated into AI optimizer and API responses.
 """
 
 import pytest
+
 from app.models.optimization import OptimizationRecommendation
 
 

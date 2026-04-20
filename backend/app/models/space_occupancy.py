@@ -13,7 +13,6 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 
 
 class RightSizingPattern(str, Enum):
@@ -46,11 +45,11 @@ class OccupancyEvent:
     source: str = ""  # e.g. "mmwave_ld2410c"
     received_at: datetime = field(default_factory=datetime.utcnow)
     # Radar telemetry (optional — populated when MQTT payload includes them)
-    moving: Optional[bool] = None
-    stationary: Optional[bool] = None
-    distance_m: Optional[float] = None
-    moving_gate: Optional[int] = None
-    static_gate: Optional[int] = None
+    moving: bool | None = None
+    stationary: bool | None = None
+    distance_m: float | None = None
+    moving_gate: int | None = None
+    static_gate: int | None = None
 
 
 @dataclass
@@ -79,28 +78,28 @@ class GhostBookingFinding:
     grace_period_minutes: int = 0
     detected_at: datetime = field(default_factory=datetime.utcnow)
     notification_sent: bool = False
-    notification_sent_at: Optional[datetime] = None
+    notification_sent_at: datetime | None = None
     status: str = "open"  # 'open' | 'pending_inspection' | 'verified_occupied' | 'confirmed_empty' | 'dismissed'
-    resolved_at: Optional[datetime] = None
+    resolved_at: datetime | None = None
     # Concierge inspection fields
-    inspected_by: Optional[str] = None  # Concierge name/ID who confirmed
-    inspected_at: Optional[datetime] = None
-    concierge_email: Optional[str] = None
-    concierge_whatsapp: Optional[str] = None
-    email_notified_at: Optional[datetime] = None
-    whatsapp_notified_at: Optional[datetime] = None
-    whatsapp_message_id: Optional[str] = None
-    telegram_notified_at: Optional[datetime] = None
-    telegram_message_id: Optional[str] = None
-    response_message_id: Optional[str] = None
-    response_text: Optional[str] = None
+    inspected_by: str | None = None  # Concierge name/ID who confirmed
+    inspected_at: datetime | None = None
+    concierge_email: str | None = None
+    concierge_whatsapp: str | None = None
+    email_notified_at: datetime | None = None
+    whatsapp_notified_at: datetime | None = None
+    whatsapp_message_id: str | None = None
+    telegram_notified_at: datetime | None = None
+    telegram_message_id: str | None = None
+    response_message_id: str | None = None
+    response_text: str | None = None
     # Reminder tracking — one reminder sent if concierge doesn't reply within 15 min
     reminder_sent: bool = False
-    reminder_sent_at: Optional[datetime] = None
+    reminder_sent_at: datetime | None = None
     # Legacy fields retained for backward compatibility with older stored records.
-    cost_centre: Optional[str] = None
-    charge_amount: Optional[float] = None
-    charge_reason: Optional[str] = None
+    cost_centre: str | None = None
+    charge_amount: float | None = None
+    charge_reason: str | None = None
 
 
 @dataclass
@@ -128,7 +127,7 @@ class RightSizingFinding:
     pattern_type: str = ""  # RightSizingPattern value
     detected_at: datetime = field(default_factory=datetime.utcnow)
     notification_sent: bool = False
-    notification_sent_at: Optional[datetime] = None
+    notification_sent_at: datetime | None = None
     status: str = "open"  # 'open' | 'acknowledged' | 'dismissed'
 
 
@@ -153,11 +152,11 @@ class FocusRoomSession:
     sensor_id: str = ""
     source: str = "mmwave_ld2410c"
     start_time: datetime = field(default_factory=datetime.utcnow)
-    end_time: Optional[datetime] = None  # None = session still active
+    end_time: datetime | None = None  # None = session still active
     duration_seconds: int = 0  # Computed on close
     extended_use: bool = False  # True if duration > threshold
     created_at: datetime = field(default_factory=datetime.utcnow)
-    vacant_since: Optional[datetime] = None  # When room went vacant (gap tolerance)
+    vacant_since: datetime | None = None  # When room went vacant (gap tolerance)
 
     @property
     def is_active(self) -> bool:

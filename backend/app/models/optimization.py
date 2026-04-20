@@ -7,7 +7,7 @@ building telemetry and generates optimal HVAC setpoint recommendations.
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import List, Dict, Any, Optional
+from typing import Any
 
 
 class ControlTier(str, Enum):
@@ -34,7 +34,7 @@ class ZoneProfileOverride:
     profile: str  # "sweat_assets" | "comfort" | "cost"
     reason: str
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "zone_id": self.zone_id,
@@ -43,7 +43,7 @@ class ZoneProfileOverride:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "ZoneProfileOverride":
+    def from_dict(cls, data: dict[str, Any]) -> "ZoneProfileOverride":
         """Create instance from dictionary."""
         return cls(
             zone_id=data.get("zone_id", ""),
@@ -62,7 +62,7 @@ class ScheduleProfileOverride:
     profile: str  # "sweat_assets" | "comfort" | "cost"
     reason: str
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "day_of_week": self.day_of_week,
@@ -73,7 +73,7 @@ class ScheduleProfileOverride:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "ScheduleProfileOverride":
+    def from_dict(cls, data: dict[str, Any]) -> "ScheduleProfileOverride":
         """Create instance from dictionary."""
         return cls(
             day_of_week=data.get("day_of_week", ""),
@@ -91,10 +91,10 @@ class SiteProfileConfig:
     site_id: str
     active_profile: str  # "sweat_assets" | "comfort" | "cost"
     control_tier: str  # "monitor" | "human_in_loop" | "auto_execute"
-    zone_overrides: List[ZoneProfileOverride] = field(default_factory=list)
-    schedule_overrides: List[ScheduleProfileOverride] = field(default_factory=list)
+    zone_overrides: list[ZoneProfileOverride] = field(default_factory=list)
+    schedule_overrides: list[ScheduleProfileOverride] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "site_id": self.site_id,
@@ -105,7 +105,7 @@ class SiteProfileConfig:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "SiteProfileConfig":
+    def from_dict(cls, data: dict[str, Any]) -> "SiteProfileConfig":
         """Create instance from dictionary."""
         return cls(
             site_id=data.get("site_id", ""),
@@ -137,26 +137,26 @@ class OptimizationRecommendation:
 
     site_id: str
     timestamp: str
-    recommendations: List[Dict[str, Any]] = field(default_factory=list)
-    projected_savings: Dict[str, Any] = field(default_factory=dict)
+    recommendations: list[dict[str, Any]] = field(default_factory=list)
+    projected_savings: dict[str, Any] = field(default_factory=dict)
     confidence: float = 0.0
     reasoning: str = ""
     # Phase 3: Cross-system coordination
-    cross_system_recommendations: Optional[List[Dict[str, Any]]] = None
-    lighting_summary: Optional[Dict[str, Any]] = None
+    cross_system_recommendations: list[dict[str, Any]] | None = None
+    lighting_summary: dict[str, Any] | None = None
     # Phase 72.2: Profile-aware optimization
-    profile: Optional[str] = None  # Active profile name (e.g., "cost", "comfort", "asset_sweating")
+    profile: str | None = None  # Active profile name (e.g., "cost", "comfort", "asset_sweating")
     profile_applied: bool = False  # Whether profile was applied to recommendations
     # Phase 72.3: Multi-objective scoring
-    scoring_summary: Optional[Dict[str, Any]] = None  # Scoring statistics: total_recommendations, top_score, avg_score
+    scoring_summary: dict[str, Any] | None = None  # Scoring statistics: total_recommendations, top_score, avg_score
     # Data quality tracking: which sensors were live vs defaulted
-    data_quality: Optional[Dict[str, Any]] = None
+    data_quality: dict[str, Any] | None = None
     # Phase 109: Quality gate status and enforcement metadata
-    quality_gate_status: Optional[str] = None  # "pass" / "warn" / "fail"
-    quality_gate_enforcement: Optional[str] = None  # "normal" / "cap_confidence" / "suppress_tier3" / "block_writes"
-    quality_gate_reason_codes: Optional[List[str]] = None  # Machine-readable reason codes
+    quality_gate_status: str | None = None  # "pass" / "warn" / "fail"
+    quality_gate_enforcement: str | None = None  # "normal" / "cap_confidence" / "suppress_tier3" / "block_writes"
+    quality_gate_reason_codes: list[str] | None = None  # Machine-readable reason codes
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         result = {
             "site_id": self.site_id,
@@ -183,7 +183,7 @@ class OptimizationRecommendation:
         return result
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "OptimizationRecommendation":
+    def from_dict(cls, data: dict[str, Any]) -> "OptimizationRecommendation":
         """Create instance from dictionary."""
         return cls(
             site_id=data.get("site_id", ""),
@@ -207,10 +207,10 @@ class OptimizationSettings:
 
     enabled: bool = False
     mode: str = "supervised"  # "automatic" or "supervised"
-    last_analysis: Optional[str] = None
+    last_analysis: str | None = None
     analysis_interval_minutes: int = 15
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "enabled": self.enabled,
@@ -220,7 +220,7 @@ class OptimizationSettings:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "OptimizationSettings":
+    def from_dict(cls, data: dict[str, Any]) -> "OptimizationSettings":
         """Create instance from dictionary."""
         return cls(
             enabled=data.get("enabled", False),
@@ -238,10 +238,10 @@ class OptimizationHistoryEntry:
     action: str  # "analyzed", "approved", "rejected", "error"
     result: str  # "success", "warning", "error"
     user: str = "system"
-    details: Dict[str, Any] = field(default_factory=dict)
-    routing_summary: Optional[Dict[str, Any]] = None  # Phase 82-02: tier routing metadata
+    details: dict[str, Any] = field(default_factory=dict)
+    routing_summary: dict[str, Any] | None = None  # Phase 82-02: tier routing metadata
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         result = {
             "timestamp": self.timestamp,
@@ -255,7 +255,7 @@ class OptimizationHistoryEntry:
         return result
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "OptimizationHistoryEntry":
+    def from_dict(cls, data: dict[str, Any]) -> "OptimizationHistoryEntry":
         """Create instance from dictionary."""
         return cls(
             timestamp=data.get("timestamp", datetime.now().isoformat()),
@@ -274,12 +274,12 @@ class SiteOptimizationStatus:
     site_id: str
     status: OptimizationStatus
     settings: OptimizationSettings
-    last_recommendation: Optional[OptimizationRecommendation] = None
-    last_optimization: Optional[str] = None
-    history: List[OptimizationHistoryEntry] = field(default_factory=list)
-    error_message: Optional[str] = None
+    last_recommendation: OptimizationRecommendation | None = None
+    last_optimization: str | None = None
+    history: list[OptimizationHistoryEntry] = field(default_factory=list)
+    error_message: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "site_id": self.site_id,
@@ -292,7 +292,7 @@ class SiteOptimizationStatus:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "SiteOptimizationStatus":
+    def from_dict(cls, data: dict[str, Any]) -> "SiteOptimizationStatus":
         """Create instance from dictionary."""
         status_str = data.get("status", "unknown")
         status = OptimizationStatus(status_str) if isinstance(status_str, str) else status_str

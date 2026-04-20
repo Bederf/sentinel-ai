@@ -9,8 +9,8 @@ Endpoints:
 """
 
 import logging
+
 from fastapi import APIRouter, HTTPException
-from typing import Dict, List
 
 from app.services.survival_service import get_survival_service
 
@@ -20,7 +20,7 @@ router = APIRouter(prefix="/api/survival", tags=["survival"])
 
 
 @router.get("/equipment/{equipment_id}")
-async def get_survival_prediction(equipment_id: str) -> Dict:
+async def get_survival_prediction(equipment_id: str) -> dict:
     """
     Get survival prediction for equipment.
 
@@ -51,7 +51,7 @@ async def get_survival_prediction(equipment_id: str) -> Dict:
 
 
 @router.get("/fleet/summary")
-async def get_fleet_risk_summary() -> Dict:
+async def get_fleet_risk_summary() -> dict:
     """
     Get risk summary across all equipment.
 
@@ -73,7 +73,7 @@ async def get_fleet_risk_summary() -> Dict:
 
 
 @router.get("/hazard-ratios")
-async def get_hazard_ratios() -> List[Dict]:
+async def get_hazard_ratios() -> list[dict]:
     """
     Get hazard ratios for all features from the trained model.
 
@@ -98,7 +98,7 @@ async def get_hazard_ratios() -> List[Dict]:
 
 
 @router.get("/summary")
-async def get_training_summary() -> Dict:
+async def get_training_summary() -> dict:
     """
     Get training data and model summary.
 

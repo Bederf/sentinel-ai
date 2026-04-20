@@ -8,7 +8,8 @@ Provides endpoints for:
 """
 
 import logging
-from typing import List, Dict, Any
+from typing import Any
+
 from fastapi import APIRouter, Depends, HTTPException, Path
 from pydantic import BaseModel, Field
 
@@ -41,7 +42,7 @@ class ZoneConfig(BaseModel):
 class ZoneIngestionRequest(BaseModel):
     """Request body for zone ingestion."""
 
-    zones: List[ZoneConfig] = Field(..., description="List of zone configurations")
+    zones: list[ZoneConfig] = Field(..., description="List of zone configurations")
 
 
 class Coordinates(BaseModel):
@@ -68,7 +69,7 @@ class DeskConfig(BaseModel):
 class DeskIngestionRequest(BaseModel):
     """Request body for desk ingestion."""
 
-    desks: List[DeskConfig] = Field(..., description="List of desk configurations")
+    desks: list[DeskConfig] = Field(..., description="List of desk configurations")
 
 
 class IngestionResponse(BaseModel):
@@ -99,7 +100,7 @@ class AllCentroidsResponse(BaseModel):
 
     site_id: str = Field(..., description="Building UUID")
     centroid_count: int = Field(..., description="Number of zones with centroids")
-    centroids: Dict[str, ZoneCentroid] = Field(..., description="Map of zone_id → centroid")
+    centroids: dict[str, ZoneCentroid] = Field(..., description="Map of zone_id → centroid")
 
 
 # ============================================================================
@@ -311,7 +312,7 @@ async def get_all_zone_centroids(
 async def validate_zone_structure(
     site_id: str = Path(..., description="Building UUID"),
     auth: AuthContext = Depends(require_site_access("site_id")),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Validate zone and desk structure for a building.
 
     Performs consistency checks:

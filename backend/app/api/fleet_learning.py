@@ -7,8 +7,8 @@ local fine-tuning, benchmarking, and cross-site insights.
 Phase 45-02: Fleet Learning and Cross-Site Insights.
 """
 
+
 from fastapi import APIRouter, HTTPException, Query
-from typing import Optional
 
 router = APIRouter(prefix="/api/fleet", tags=["fleet-learning"])
 
@@ -27,7 +27,7 @@ async def get_fleet_summary():
 
 @router.get("/failure-patterns")
 async def get_failure_patterns(
-    equipment_type: Optional[str] = Query(None, description="Filter by equipment type (CHILLER, AHU, etc.)"),
+    equipment_type: str | None = Query(None, description="Filter by equipment type (CHILLER, AHU, etc.)"),
 ):
     """Get anonymized failure patterns across fleet."""
     from ml.fleet.aggregator import get_fleet_aggregator
@@ -40,8 +40,8 @@ async def get_failure_patterns(
 @router.get("/similar-failures")
 async def get_similar_failures(
     equipment_type: str = Query(..., description="Equipment type to match"),
-    failure_type: Optional[str] = Query(None, description="Specific failure type"),
-    exclude_site: Optional[str] = Query(None, description="Site to exclude from results (privacy)"),
+    failure_type: str | None = Query(None, description="Specific failure type"),
+    exclude_site: str | None = Query(None, description="Site to exclude from results (privacy)"),
 ):
     """Find similar equipment failures across fleet."""
     from ml.fleet.aggregator import get_fleet_aggregator
@@ -69,7 +69,7 @@ async def get_risk_distribution():
 
 @router.get("/benchmarks")
 async def get_benchmarks(
-    equipment_type: Optional[str] = Query(None, description="Filter by equipment type"),
+    equipment_type: str | None = Query(None, description="Filter by equipment type"),
 ):
     """Get fleet benchmarking data for equipment types."""
     from ml.fleet.aggregator import get_fleet_aggregator
@@ -83,7 +83,7 @@ async def get_benchmarks(
 async def benchmark_site(
     site_code: str = Query(..., description="Site to benchmark"),
     site_health: float = Query(..., description="Current site health score (0-100)"),
-    equipment_type: Optional[str] = Query(None, description="Filter by equipment type"),
+    equipment_type: str | None = Query(None, description="Filter by equipment type"),
 ):
     """Compare a site's performance against fleet average."""
     from ml.fleet.aggregator import get_fleet_aggregator
@@ -101,8 +101,8 @@ async def benchmark_site(
 
 @router.get("/global-models")
 async def list_global_models(
-    model_type: Optional[str] = Query(None, description="Filter: lstm, autoencoder"),
-    equipment_type: Optional[str] = Query(None, description="Filter: chiller, ahu, etc."),
+    model_type: str | None = Query(None, description="Filter: lstm, autoencoder"),
+    equipment_type: str | None = Query(None, description="Filter: chiller, ahu, etc."),
 ):
     """List all trained global fleet models."""
     from ml.fleet.global_model import get_global_model_trainer
@@ -168,9 +168,9 @@ async def get_global_training_history():
 
 @router.get("/fine-tuned")
 async def list_fine_tuned_models(
-    site_code: Optional[str] = Query(None, description="Filter by site"),
-    model_type: Optional[str] = Query(None, description="Filter: lstm, autoencoder"),
-    equipment_type: Optional[str] = Query(None, description="Filter: chiller, ahu, etc."),
+    site_code: str | None = Query(None, description="Filter by site"),
+    model_type: str | None = Query(None, description="Filter: lstm, autoencoder"),
+    equipment_type: str | None = Query(None, description="Filter: chiller, ahu, etc."),
 ):
     """List all fine-tuned models."""
     from ml.fleet.fine_tuning import get_local_fine_tuner
@@ -216,7 +216,7 @@ async def fine_tune_model(
 
 @router.get("/fine-tuned/improvement")
 async def get_improvement_summary(
-    site_code: Optional[str] = Query(None, description="Filter by site"),
+    site_code: str | None = Query(None, description="Filter by site"),
 ):
     """Get summary of fine-tuning improvements."""
     from ml.fleet.fine_tuning import get_local_fine_tuner
@@ -227,7 +227,7 @@ async def get_improvement_summary(
 
 @router.get("/fine-tuned/history")
 async def get_fine_tune_history(
-    site_code: Optional[str] = Query(None, description="Filter by site"),
+    site_code: str | None = Query(None, description="Filter by site"),
 ):
     """Get history of fine-tuning operations."""
     from ml.fleet.fine_tuning import get_local_fine_tuner

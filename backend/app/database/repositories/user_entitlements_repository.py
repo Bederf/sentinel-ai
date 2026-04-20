@@ -1,10 +1,9 @@
 """User entitlements repository backed by the canonical DB store."""
 
 import logging
-from typing import Optional
 
 from app.database.supabase_client import get_supabase_client
-from app.models.user_entitlements import UserEntitlementProfile, PRESET_ENTITLEMENTS
+from app.models.user_entitlements import PRESET_ENTITLEMENTS, UserEntitlementProfile
 
 logger = logging.getLogger(__name__)
 
@@ -12,7 +11,7 @@ logger = logging.getLogger(__name__)
 class UserEntitlementsRepository:
     """Repository for user module entitlements."""
 
-    async def get_user_entitlements(self, user_email: str) -> Optional[UserEntitlementProfile]:
+    async def get_user_entitlements(self, user_email: str) -> UserEntitlementProfile | None:
         """Get module entitlements for a user from the canonical DB store."""
         try:
             client = get_supabase_client()
@@ -38,7 +37,7 @@ class UserEntitlementsRepository:
         return None
 
     async def set_user_entitlements(
-        self, user_email: str, modules: list[str], user_id: Optional[str] = None
+        self, user_email: str, modules: list[str], user_id: str | None = None
     ) -> UserEntitlementProfile:
         """Set/update module entitlements for a user in the canonical DB store."""
         user_id = user_id or user_email
@@ -50,8 +49,8 @@ class UserEntitlementsRepository:
         return UserEntitlementProfile(user_id=user_id, user_email=user_email, entitlements=modules, last_updated="")
 
     async def apply_preset_to_user(
-        self, user_email: str, preset_name: str, user_id: Optional[str] = None
-    ) -> Optional[UserEntitlementProfile]:
+        self, user_email: str, preset_name: str, user_id: str | None = None
+    ) -> UserEntitlementProfile | None:
         """Apply a preset (grant, bederf, full) to a user."""
         if preset_name not in PRESET_ENTITLEMENTS:
             logger.error("Unknown preset: %s", preset_name)

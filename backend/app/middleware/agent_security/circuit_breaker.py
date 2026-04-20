@@ -30,7 +30,6 @@ import logging
 import time
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +61,7 @@ class RateLimitResult:
 
     allowed: bool
     reason: str
-    retry_after_seconds: Optional[float] = None
+    retry_after_seconds: float | None = None
 
 
 @dataclass
@@ -79,7 +78,7 @@ class BreakerCheckResult:
 # ---------------------------------------------------------------------------
 
 # Structure: { tier: { resource: (limit, window_seconds) } }
-_QUOTA_DEFS: Dict[QuotaTier, Dict[str, tuple]] = {
+_QUOTA_DEFS: dict[QuotaTier, dict[str, tuple]] = {
     QuotaTier.PER_USER: {
         "tool_calls": (30, 60),  # 30 calls per minute
         "tokens": (50_000, 60),  # 50K tokens per minute
@@ -118,11 +117,11 @@ class AgentRateLimiter:
 
     def __init__(self) -> None:
         # { (identity, resource): [timestamp, ...] }
-        self._windows: Dict[tuple, List[float]] = {}
+        self._windows: dict[tuple, list[float]] = {}
         # { (identity, resource): accumulated_count } for tokens (additive)
-        self._token_windows: Dict[tuple, List[tuple]] = {}
+        self._token_windows: dict[tuple, list[tuple]] = {}
         # { identity: current_count } for concurrent slots
-        self._concurrent: Dict[str, int] = {}
+        self._concurrent: dict[str, int] = {}
 
     # ------------------------------------------------------------------
     # Public API
@@ -276,15 +275,15 @@ class CircuitBreaker:
 
     def __init__(self) -> None:
         # Per-agent state
-        self._states: Dict[str, BreakerState] = {}
-        self._opened_at: Dict[str, float] = {}
-        self._failure_timestamps: Dict[str, List[float]] = {}
+        self._states: dict[str, BreakerState] = {}
+        self._opened_at: dict[str, float] = {}
+        self._failure_timestamps: dict[str, list[float]] = {}
         # { agent_id: { tool_call_key: consecutive_retry_count } }
-        self._retry_counts: Dict[str, Dict[str, int]] = {}
+        self._retry_counts: dict[str, dict[str, int]] = {}
         # { (agent_id, tool_call_key): [timestamp, ...] } for loop detection
-        self._call_timestamps: Dict[tuple, List[float]] = {}
+        self._call_timestamps: dict[tuple, list[float]] = {}
         # Reason for the trip (for diagnostics)
-        self._trip_reasons: Dict[str, str] = {}
+        self._trip_reasons: dict[str, str] = {}
 
     # ------------------------------------------------------------------
     # Public API
@@ -419,7 +418,7 @@ class CircuitBreaker:
             agent_id,
         )
 
-    def get_status(self, agent_id: str) -> Dict:
+    def get_status(self, agent_id: str) -> dict:
         """Get breaker status for an agent (diagnostics/health endpoint)."""
         state = self._get_state(agent_id)
         return {

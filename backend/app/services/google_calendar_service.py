@@ -21,11 +21,10 @@ import logging
 import os
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Optional
 
 import httpx
-from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request as GoogleRequest
+from google.oauth2.credentials import Credentials
 
 from app.database.repositories.visit_repository import BuildingMapRepository, VisitRepository
 from app.models.visit import Visit, VisitStatus
@@ -45,7 +44,7 @@ INTERNAL_DOMAINS = {"fnb.co.za", "sentinel.bms", "sentinel-ai.co.za"}
 # ---------------------------------------------------------------------------
 
 
-def _load_credentials() -> Optional[Credentials]:
+def _load_credentials() -> Credentials | None:
     """Load Google OAuth2 credentials from the sentry gateway token file."""
     if not CREDENTIALS_PATH.exists():
         logger.warning("Google credentials not found at %s", CREDENTIALS_PATH)
@@ -58,7 +57,7 @@ def _load_credentials() -> Optional[Credentials]:
         return None
 
 
-def _refresh_access_token() -> Optional[dict]:
+def _refresh_access_token() -> dict | None:
     """Refresh the access token using the stored refresh token."""
     creds = _load_credentials()
     if not creds:

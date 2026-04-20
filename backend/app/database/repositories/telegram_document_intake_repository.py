@@ -11,7 +11,7 @@ import logging
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from app.database.supabase_client import get_supabase_client
 
@@ -50,7 +50,7 @@ class TelegramDocumentIntakeRepository:
 
         return self._create_json(record)
 
-    def get_by_id(self, intake_id: str) -> Optional[dict[str, Any]]:
+    def get_by_id(self, intake_id: str) -> dict[str, Any] | None:
         """Look up a single intake record."""
         if not intake_id:
             return None
@@ -116,7 +116,7 @@ class TelegramDocumentIntakeRepository:
         return payload
 
 
-_repository: Optional[TelegramDocumentIntakeRepository] = None
+_repository: TelegramDocumentIntakeRepository | None = None
 
 
 def get_telegram_document_intake_repository() -> TelegramDocumentIntakeRepository:

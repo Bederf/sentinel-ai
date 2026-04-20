@@ -1,8 +1,9 @@
 """Repository for prediction operations."""
 
-from typing import List, Optional, Dict, Any
+from typing import Any
+
 from app.database.supabase_client import get_supabase_client
-from app.services.cache_service import cache, CacheKeys, CacheService, CacheInvalidation
+from app.services.cache_service import CacheInvalidation, CacheKeys, CacheService, cache
 
 
 class PredictionRepository:
@@ -23,11 +24,11 @@ class PredictionRepository:
 
     def get_all(
         self,
-        site_id: Optional[str] = None,
-        equipment_id: Optional[str] = None,
-        status: Optional[str] = None,
-        severity: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+        site_id: str | None = None,
+        equipment_id: str | None = None,
+        status: str | None = None,
+        severity: str | None = None,
+    ) -> list[dict[str, Any]]:
         """Get all predictions with optional filtering.
 
         Args:
@@ -56,7 +57,7 @@ class PredictionRepository:
         response = query.execute()
         return response.data
 
-    def get_by_id(self, prediction_id: str) -> Optional[Dict[str, Any]]:
+    def get_by_id(self, prediction_id: str) -> dict[str, Any] | None:
         """Get prediction by its code.
 
         Args:
@@ -71,7 +72,7 @@ class PredictionRepository:
             return response.data[0]
         return None
 
-    def get_by_uuid(self, uuid: str) -> Optional[Dict[str, Any]]:
+    def get_by_uuid(self, uuid: str) -> dict[str, Any] | None:
         """Get prediction by its UUID.
 
         Args:
@@ -86,7 +87,7 @@ class PredictionRepository:
             return response.data[0]
         return None
 
-    def get_active_by_site(self, site_uuid: str) -> List[Dict[str, Any]]:
+    def get_active_by_site(self, site_uuid: str) -> list[dict[str, Any]]:
         """Get active predictions for a building.
 
         Args:
@@ -111,7 +112,7 @@ class PredictionRepository:
         cache.set(CacheKeys.predictions_active(site_uuid), result, CacheService.TTL_DYNAMIC)
         return result
 
-    def get_active_by_equipment(self, equipment_uuid: str) -> List[Dict[str, Any]]:
+    def get_active_by_equipment(self, equipment_uuid: str) -> list[dict[str, Any]]:
         """Get active predictions for equipment.
 
         Args:
@@ -130,7 +131,7 @@ class PredictionRepository:
 
         return response.data
 
-    def get_critical_predictions(self) -> List[Dict[str, Any]]:
+    def get_critical_predictions(self) -> list[dict[str, Any]]:
         """Get all critical active predictions.
 
         Returns:
@@ -146,7 +147,7 @@ class PredictionRepository:
 
         return response.data
 
-    def get_high_probability_predictions(self, threshold: int = 70) -> List[Dict[str, Any]]:
+    def get_high_probability_predictions(self, threshold: int = 70) -> list[dict[str, Any]]:
         """Get predictions with high probability.
 
         Args:
@@ -165,7 +166,7 @@ class PredictionRepository:
 
         return response.data
 
-    def create(self, prediction_data: Dict[str, Any]) -> Dict[str, Any]:
+    def create(self, prediction_data: dict[str, Any]) -> dict[str, Any]:
         """Create a new prediction.
 
         Args:
@@ -179,7 +180,7 @@ class PredictionRepository:
         CacheInvalidation.on_prediction_change(site_id=prediction_data.get("site_id"))
         return result
 
-    def update(self, prediction_id: str, prediction_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def update(self, prediction_id: str, prediction_data: dict[str, Any]) -> dict[str, Any] | None:
         """Update a prediction.
 
         Args:
@@ -200,7 +201,7 @@ class PredictionRepository:
             return response.data[0]
         return None
 
-    def acknowledge(self, prediction_id: str) -> Optional[Dict[str, Any]]:
+    def acknowledge(self, prediction_id: str) -> dict[str, Any] | None:
         """Acknowledge a prediction.
 
         Args:
@@ -211,7 +212,7 @@ class PredictionRepository:
         """
         return self.update(prediction_id, {"status": "acknowledged"})
 
-    def resolve(self, prediction_id: str) -> Optional[Dict[str, Any]]:
+    def resolve(self, prediction_id: str) -> dict[str, Any] | None:
         """Resolve a prediction.
 
         Args:
@@ -222,7 +223,7 @@ class PredictionRepository:
         """
         return self.update(prediction_id, {"status": "resolved"})
 
-    def mark_false_positive(self, prediction_id: str) -> Optional[Dict[str, Any]]:
+    def mark_false_positive(self, prediction_id: str) -> dict[str, Any] | None:
         """Mark a prediction as false positive.
 
         Args:
@@ -275,7 +276,7 @@ class PredictionRepository:
 
         return len(response.data) > 0
 
-    def get_active_equipment_ids(self) -> List[str]:
+    def get_active_equipment_ids(self) -> list[str]:
         """Get list of equipment IDs that have active predictions.
 
         Returns:

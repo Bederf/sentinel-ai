@@ -24,7 +24,7 @@ import hashlib
 import logging
 import re
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -34,8 +34,8 @@ class RedactionResult:
     """Result of PII redaction operation."""
 
     redacted_text: str
-    redaction_map: Dict[str, str]  # Maps placeholders back to original values
-    pii_found: List[str]  # Types of PII detected
+    redaction_map: dict[str, str]  # Maps placeholders back to original values
+    pii_found: list[str]  # Types of PII detected
     redaction_count: int
 
 
@@ -53,7 +53,7 @@ class PIIGuard:
         """Initialize PII patterns."""
         self.patterns = self._build_patterns()
 
-    def _build_patterns(self) -> Dict[str, re.Pattern]:
+    def _build_patterns(self) -> dict[str, re.Pattern]:
         """Build regex patterns for PII detection."""
         return {
             # South African ID number: 13 digits (YYMMDDGSSSCAZ)
@@ -82,7 +82,7 @@ class PIIGuard:
     def redact(
         self,
         text: str,
-        preserve_types: Optional[List[str]] = None,
+        preserve_types: list[str] | None = None,
     ) -> RedactionResult:
         """Redact PII from text with reversible mapping.
 
@@ -126,7 +126,7 @@ class PIIGuard:
             redaction_count=redaction_count,
         )
 
-    def restore(self, redacted_text: str, redaction_map: Dict[str, str]) -> str:
+    def restore(self, redacted_text: str, redaction_map: dict[str, str]) -> str:
         """Restore original PII values from redacted text.
 
         Args:
@@ -195,7 +195,7 @@ class PIIGuard:
         except (ValueError, IndexError):
             return False
 
-    def scan_for_pii(self, text: str) -> Dict[str, Any]:
+    def scan_for_pii(self, text: str) -> dict[str, Any]:
         """Scan text for PII without redacting.
 
         Args:
@@ -241,8 +241,8 @@ pii_guard = PIIGuard()
 
 
 def redact_request_pii(
-    request_data: Dict[str, Any],
-) -> Tuple[Dict[str, Any], Dict[str, str]]:
+    request_data: dict[str, Any],
+) -> tuple[dict[str, Any], dict[str, str]]:
     """Redact PII from request data before LLM processing.
 
     Args:
@@ -263,7 +263,7 @@ def redact_request_pii(
     return redacted_data, result.redaction_map
 
 
-def restore_response_pii(response_data: Dict[str, Any], redaction_map: Dict[str, str]) -> Dict[str, Any]:
+def restore_response_pii(response_data: dict[str, Any], redaction_map: dict[str, str]) -> dict[str, Any]:
     """Restore PII in response data after LLM processing.
 
     Args:

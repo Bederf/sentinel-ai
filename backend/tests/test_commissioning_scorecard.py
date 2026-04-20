@@ -14,19 +14,19 @@ import os
 os.environ.setdefault("DEMO_MODE", "true")
 os.environ.setdefault("TESTING", "true")
 
-import pytest  # noqa: E402
-from datetime import datetime  # noqa: E402
-from unittest.mock import patch, MagicMock, AsyncMock  # noqa: E402
+from datetime import datetime
+from unittest.mock import AsyncMock, MagicMock, patch
 
-from app.models.commissioning import (  # noqa: E402
-    CommissioningGateId,
+import pytest
+
+from app.models.commissioning import (
     CommissioningGate,
-    TruthCheckEntry,
+    CommissioningGateId,
     CommissioningScorecard,
+    TruthCheckEntry,
 )
-from app.models.integration import BuildingStatus  # noqa: E402
-from app.services.commissioning_service import CommissioningService  # noqa: E402
-
+from app.models.integration import BuildingStatus
+from app.services.commissioning_service import CommissioningService
 
 # ==================== Helpers ====================
 
@@ -573,6 +573,7 @@ class TestAPIEndpoints:
     @pytest.fixture
     def client(self):
         from fastapi.testclient import TestClient
+
         from app.main import app
 
         return TestClient(app)

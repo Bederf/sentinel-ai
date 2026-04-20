@@ -12,21 +12,21 @@ Handles CRUD operations for:
 Phase 28: SENTINEL Compliance
 """
 
-from datetime import datetime, timedelta
-from typing import List, Optional, Dict, Any
-import uuid
 import logging
+import uuid
+from datetime import datetime, timedelta
+from typing import Any
 
+from app.database.supabase_client import get_supabase_client
 from app.models.compliance import (
     ComplianceAudit,
+    ComplianceStatus,
+    ElectricalCompliance,
     FireEquipmentTracking,
     LegionellaRiskAssessment,
-    ElectricalCompliance,
-    ComplianceStatus,
     RiskLevel,
 )
-from app.models.inspection import InspectionSchedule, InspectionTask, InspectionResult
-from app.database.supabase_client import get_supabase_client
+from app.models.inspection import InspectionResult, InspectionSchedule, InspectionTask
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +43,7 @@ class ComplianceRepository:
     # OHS Compliance Methods
     # ========================================================================
 
-    async def get_ohs_checklist_template(self, site_code: str) -> Optional[Dict[str, Any]]:
+    async def get_ohs_checklist_template(self, site_code: str) -> dict[str, Any] | None:
         """Get OHS checklist template for site."""
         try:
             result = (
@@ -60,7 +60,7 @@ class ComplianceRepository:
             logger.error(f"Failed to get OHS template: {e}")
             return None
 
-    async def create_inspection_task(self, template: Dict[str, Any], zone_id: str) -> InspectionTask:
+    async def create_inspection_task(self, template: dict[str, Any], zone_id: str) -> InspectionTask:
         """Create inspection task from template."""
         task_data = {
             "id": str(uuid.uuid4()),
@@ -75,7 +75,7 @@ class ComplianceRepository:
         result = self.supabase.table("inspection_tasks").insert(task_data).execute()
         return InspectionTask(**result.data[0])
 
-    async def create_inspection_result(self, task_id: str, findings: Dict[str, Any]) -> InspectionResult:
+    async def create_inspection_result(self, task_id: str, findings: dict[str, Any]) -> InspectionResult:
         """Create inspection result from findings."""
         result_data = {
             "id": str(uuid.uuid4()),
@@ -93,7 +93,7 @@ class ComplianceRepository:
     # Fire Equipment Methods
     # ========================================================================
 
-    async def get_fire_equipment(self, site_code: str, zone_id: Optional[str] = None) -> List[FireEquipmentTracking]:
+    async def get_fire_equipment(self, site_code: str, zone_id: str | None = None) -> list[FireEquipmentTracking]:
         """Get fire equipment at site/zone."""
         try:
             query = self.supabase.table("fire_equipment_tracking").select("*").eq("site_id", site_code)
@@ -130,7 +130,7 @@ class ComplianceRepository:
         equipment_id: str,
         pressure: float,
         test_date: datetime,
-        certified_by: Optional[str] = None,
+        certified_by: str | None = None,
     ) -> FireEquipmentTracking:
         """Update fire equipment pressure test record."""
         update_data = {
@@ -151,8 +151,8 @@ class ComplianceRepository:
     # ========================================================================
 
     async def create_emergency_light_schedules(
-        self, light_codes: List[str], auto_test: bool = True
-    ) -> List[InspectionSchedule]:
+        self, light_codes: list[str], auto_test: bool = True
+    ) -> list[InspectionSchedule]:
         """Create daily auto-test schedules for emergency lights."""
         schedules = []
 
@@ -176,7 +176,7 @@ class ComplianceRepository:
 
     async def record_emergency_light_test(
         self, light_code: str, battery_health_percent: int, test_result: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Record emergency light test result."""
         test_record = {
             "date": datetime.now().isoformat(),
@@ -389,7 +389,7 @@ class ComplianceRepository:
 
         return InspectionSchedule(**result.data[0])
 
-    async def record_lift_test_results(self, lift_code: str, test_results: Dict[str, Any]) -> Dict[str, Any]:
+    async def record_lift_test_results(self, lift_code: str, test_results: dict[str, Any]) -> dict[str, Any]:
         """Record lift inspection test results."""
         is_compliant = (
             test_results.get("brake_load_test") == "pass"
@@ -420,8 +420,8 @@ class ComplianceRepository:
     async def create_compliance_audit(
         self,
         audit_type: str,
-        findings: Dict[str, Any],
-        auditor_info: Dict[str, Any],
+        findings: dict[str, Any],
+        auditor_info: dict[str, Any],
     ) -> ComplianceAudit:
         """Create compliance audit record."""
         audit_data = {
@@ -443,10 +443,10 @@ class ComplianceRepository:
     async def get_compliance_audits(
         self,
         site_code: str,
-        compliance_type: Optional[str] = None,
-        status: Optional[str] = None,
+        compliance_type: str | None = None,
+        status: str | None = None,
         limit: int = 50,
-    ) -> List[ComplianceAudit]:
+    ) -> list[ComplianceAudit]:
         """Get compliance audit history."""
         query = self.supabase.table("compliance_audits").select("*").eq("site_id", site_code)
 

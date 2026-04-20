@@ -3,10 +3,10 @@
 import pytest
 
 from app.services.query_expansion_service import (
-    QueryExpansionService,
-    get_query_expansion_service,
     EQUIPMENT_CODE_RE,
     MAX_VARIANTS,
+    QueryExpansionService,
+    get_query_expansion_service,
 )
 
 

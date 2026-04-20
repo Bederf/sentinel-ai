@@ -6,95 +6,95 @@ reconciliation alerts, and dispute packs.
 
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
 
 
 class MunicipalAccount(BaseModel):
-    id: Optional[str] = None
+    id: str | None = None
     site_id: str
     municipality: str
     utility_type: str
     account_number: str
-    tariff_type: Optional[str] = None
-    main_meter_id: Optional[str] = None
-    active_from: Optional[date] = None
-    active_until: Optional[date] = None
+    tariff_type: str | None = None
+    main_meter_id: str | None = None
+    active_from: date | None = None
+    active_until: date | None = None
     is_active: bool = True
-    billing_email: Optional[str] = None
-    payment_method: Optional[str] = None
+    billing_email: str | None = None
+    payment_method: str | None = None
 
 
 class MunicipalInvoice(BaseModel):
-    id: Optional[str] = None
+    id: str | None = None
     municipal_account_id: str
     site_id: str
     invoice_number: str
-    invoice_date: Optional[date] = None
-    due_date: Optional[date] = None
-    billing_period_start: Optional[date] = None
-    billing_period_end: Optional[date] = None
+    invoice_date: date | None = None
+    due_date: date | None = None
+    billing_period_start: date | None = None
+    billing_period_end: date | None = None
 
-    consumption_kwh: Optional[Decimal] = None
-    previous_reading: Optional[Decimal] = None
-    current_reading: Optional[Decimal] = None
-    meter_number: Optional[str] = None
+    consumption_kwh: Decimal | None = None
+    previous_reading: Decimal | None = None
+    current_reading: Decimal | None = None
+    meter_number: str | None = None
 
-    demand_kva: Optional[Decimal] = None
-    peak_demand_kw: Optional[Decimal] = None
+    demand_kva: Decimal | None = None
+    peak_demand_kw: Decimal | None = None
 
-    energy_charge_zar: Optional[Decimal] = None
-    network_charge_zar: Optional[Decimal] = None
-    demand_charge_zar: Optional[Decimal] = None
-    service_charge_zar: Optional[Decimal] = None
-    vat_zar: Optional[Decimal] = None
-    total_amount_zar: Optional[Decimal] = None
+    energy_charge_zar: Decimal | None = None
+    network_charge_zar: Decimal | None = None
+    demand_charge_zar: Decimal | None = None
+    service_charge_zar: Decimal | None = None
+    vat_zar: Decimal | None = None
+    total_amount_zar: Decimal | None = None
 
-    tou_breakdown: Optional[Dict[str, Any]] = None
+    tou_breakdown: dict[str, Any] | None = None
 
-    raw_pdf_path: Optional[str] = None
-    ocr_confidence: Optional[Decimal] = None
-    ocr_status: Optional[str] = None
+    raw_pdf_path: str | None = None
+    ocr_confidence: Decimal | None = None
+    ocr_status: str | None = None
 
-    invoice_confidence_score: Optional[Decimal] = None
-    invoice_confidence_flags: Optional[List[str]] = None
+    invoice_confidence_score: Decimal | None = None
+    invoice_confidence_flags: list[str] | None = None
 
-    bms_consumption_kwh: Optional[Decimal] = None
-    variance_pct: Optional[Decimal] = None
-    reconciliation_status: Optional[str] = None
+    bms_consumption_kwh: Decimal | None = None
+    variance_pct: Decimal | None = None
+    reconciliation_status: str | None = None
 
-    dispute_pack: Optional[Dict[str, Any]] = None
+    dispute_pack: dict[str, Any] | None = None
 
-    approved_by: Optional[str] = None
-    approved_at: Optional[datetime] = None
+    approved_by: str | None = None
+    approved_at: datetime | None = None
 
 
 class MunicipalTariffSchedule(BaseModel):
-    id: Optional[str] = None
+    id: str | None = None
     municipality: str
     tariff_name: str
     utility_type: str
     effective_date: date
-    expiry_date: Optional[date] = None
-    tariff_data: Dict[str, Any]
+    expiry_date: date | None = None
+    tariff_data: dict[str, Any]
     nersa_approved: bool = False
-    source_url: Optional[str] = None
-    notes: Optional[str] = None
+    source_url: str | None = None
+    notes: str | None = None
 
 
 class MunicipalReconciliationAlert(BaseModel):
-    id: Optional[str] = None
+    id: str | None = None
     invoice_id: str
     alert_type: str
     severity: str
-    expected_value: Optional[Decimal] = None
-    actual_value: Optional[Decimal] = None
-    variance_pct: Optional[Decimal] = None
-    variance_amount_zar: Optional[Decimal] = None
+    expected_value: Decimal | None = None
+    actual_value: Decimal | None = None
+    variance_pct: Decimal | None = None
+    variance_amount_zar: Decimal | None = None
     status: str = Field(default="open")
-    resolution_notes: Optional[str] = None
-    resolved_at: Optional[datetime] = None
+    resolution_notes: str | None = None
+    resolved_at: datetime | None = None
 
 
 class DisputePack(BaseModel):
@@ -102,11 +102,11 @@ class DisputePack(BaseModel):
     municipality: str
     utility_type: str
     billing_period: str
-    invoice_confidence: Dict[str, Any]
-    bms_summary: Dict[str, Any]
-    invoice_summary: Dict[str, Any]
-    variance: Dict[str, Any]
-    tariff_recalculation: Dict[str, Any]
-    evidence: Dict[str, Any]
-    recommended_action: Dict[str, Any]
-    dispute_letter_template: Dict[str, Any]
+    invoice_confidence: dict[str, Any]
+    bms_summary: dict[str, Any]
+    invoice_summary: dict[str, Any]
+    variance: dict[str, Any]
+    tariff_recalculation: dict[str, Any]
+    evidence: dict[str, Any]
+    recommended_action: dict[str, Any]
+    dispute_letter_template: dict[str, Any]

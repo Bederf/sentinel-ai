@@ -4,11 +4,11 @@ Implements dual-write pattern: Supabase (primary) + JSON file (backup).
 Gracefully falls back to JSON-only when Supabase is unavailable.
 """
 
-from typing import List, Optional, Dict, Any
-from datetime import datetime, date, timedelta
 import json
 import logging
+from datetime import date, datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 from app.database.supabase_client import get_supabase_client
 
@@ -29,15 +29,15 @@ class WaterConsumptionRepository:
         site_dir.mkdir(parents=True, exist_ok=True)
         return site_dir / "water_consumption.json"
 
-    def _load_json_backup(self, site: str) -> Dict[str, Any]:
+    def _load_json_backup(self, site: str) -> dict[str, Any]:
         """Load consumption data from JSON backup."""
         json_path = self._get_json_backup_path(site)
         if not json_path.exists():
             return {"consumption": [], "alerts": []}
-        with open(json_path, "r") as f:
+        with open(json_path) as f:
             return json.load(f)
 
-    def _save_json_backup(self, site: str, data: Dict[str, Any]) -> None:
+    def _save_json_backup(self, site: str, data: dict[str, Any]) -> None:
         """Save consumption data to JSON backup."""
         json_path = self._get_json_backup_path(site)
         with open(json_path, "w") as f:
@@ -51,10 +51,10 @@ class WaterConsumptionRepository:
         flow_rate_lpm: float,
         timestamp: datetime,
         pulse_count: int = 0,
-        temperature: Optional[float] = None,
-        pressure: Optional[float] = None,
-        zone_id: Optional[str] = None,
-    ) -> Optional[Dict[str, Any]]:
+        temperature: float | None = None,
+        pressure: float | None = None,
+        zone_id: str | None = None,
+    ) -> dict[str, Any] | None:
         """Create a new water consumption record.
 
         Args:
@@ -97,7 +97,7 @@ class WaterConsumptionRepository:
             print(f"Supabase error, using JSON fallback: {e}")
             return self._create_consumption_json(site, consumption_data)
 
-    def _backup_consumption(self, site: str, record: Dict[str, Any]) -> None:
+    def _backup_consumption(self, site: str, record: dict[str, Any]) -> None:
         """Append consumption record to JSON backup."""
         try:
             backup_data = self._load_json_backup(site)
@@ -106,7 +106,7 @@ class WaterConsumptionRepository:
         except Exception as e:
             print(f"Warning: JSON backup failed: {e}")
 
-    def _create_consumption_json(self, site: str, data: Dict[str, Any]) -> Dict[str, Any]:
+    def _create_consumption_json(self, site: str, data: dict[str, Any]) -> dict[str, Any]:
         """Create consumption record in JSON-only mode."""
         backup_data = self._load_json_backup(site)
         backup_data["consumption"].append(data)
@@ -116,10 +116,10 @@ class WaterConsumptionRepository:
     def get_consumption_by_site(
         self,
         site: str,
-        start_date: Optional[date] = None,
-        end_date: Optional[date] = None,
+        start_date: date | None = None,
+        end_date: date | None = None,
         limit: int = 1000,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get consumption data for a site.
 
         Args:
@@ -161,7 +161,7 @@ class WaterConsumptionRepository:
         start_date: date,
         end_date: date,
         limit: int,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get consumption from JSON backup."""
         backup_data = self._load_json_backup(site)
         records = backup_data.get("consumption", [])
@@ -180,10 +180,10 @@ class WaterConsumptionRepository:
     def get_consumption_by_meter(
         self,
         meter_id: str,
-        start_date: Optional[date] = None,
-        end_date: Optional[date] = None,
+        start_date: date | None = None,
+        end_date: date | None = None,
         limit: int = 1000,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get consumption data for a specific meter.
 
         Args:
@@ -223,7 +223,7 @@ class WaterConsumptionRepository:
             )
             return [r for r in all_records if r["meter_id"] == meter_id]
 
-    def get_latest_consumption(self, site: str, meter_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    def get_latest_consumption(self, site: str, meter_id: str | None = None) -> dict[str, Any] | None:
         """Get the most recent consumption reading.
 
         Args:
@@ -260,7 +260,7 @@ class WaterConsumptionRepository:
         threshold_lpm: float,
         duration_minutes: float,
         description: str,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """Create a water leak alert.
 
         Args:
@@ -307,7 +307,7 @@ class WaterConsumptionRepository:
             print(f"Supabase error, using JSON fallback: {e}")
             return self._create_alert_json(site, alert_data)
 
-    def _backup_alert(self, site: str, record: Dict[str, Any]) -> None:
+    def _backup_alert(self, site: str, record: dict[str, Any]) -> None:
         """Append alert to JSON backup."""
         try:
             backup_data = self._load_json_backup(site)
@@ -316,7 +316,7 @@ class WaterConsumptionRepository:
         except Exception as e:
             print(f"Warning: JSON backup failed: {e}")
 
-    def _create_alert_json(self, site: str, data: Dict[str, Any]) -> Dict[str, Any]:
+    def _create_alert_json(self, site: str, data: dict[str, Any]) -> dict[str, Any]:
         """Create alert in JSON-only mode."""
         backup_data = self._load_json_backup(site)
         backup_data.setdefault("alerts", []).append(data)
@@ -326,11 +326,11 @@ class WaterConsumptionRepository:
     def get_alerts(
         self,
         site: str,
-        severity: Optional[str] = None,
-        start_date: Optional[date] = None,
-        end_date: Optional[date] = None,
-        status: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+        severity: str | None = None,
+        start_date: date | None = None,
+        end_date: date | None = None,
+        status: str | None = None,
+    ) -> list[dict[str, Any]]:
         """Get water alerts for a site.
 
         Args:
@@ -363,11 +363,11 @@ class WaterConsumptionRepository:
     def _get_alerts_json(
         self,
         site: str,
-        severity: Optional[str],
-        start_date: Optional[date],
-        end_date: Optional[date],
-        status: Optional[str],
-    ) -> List[Dict[str, Any]]:
+        severity: str | None,
+        start_date: date | None,
+        end_date: date | None,
+        status: str | None,
+    ) -> list[dict[str, Any]]:
         """Get alerts from JSON backup."""
         backup_data = self._load_json_backup(site)
         records = backup_data.get("alerts", [])
@@ -391,7 +391,7 @@ class WaterConsumptionRepository:
         filtered.sort(key=lambda x: x["timestamp"], reverse=True)
         return filtered
 
-    def get_active_alerts(self, site: str) -> List[Dict[str, Any]]:
+    def get_active_alerts(self, site: str) -> list[dict[str, Any]]:
         """Get all active (unresolved) alerts.
 
         Args:
@@ -407,7 +407,7 @@ class WaterConsumptionRepository:
         alert_id: str,
         resolved_by: str,
         resolution_notes: str,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """Mark an alert as resolved.
 
         Args:
@@ -433,7 +433,7 @@ class WaterConsumptionRepository:
             # Fallback to JSON
             return self._resolve_alert_json(alert_id, update_data)
 
-    def _resolve_alert_json(self, alert_id: str, update_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def _resolve_alert_json(self, alert_id: str, update_data: dict[str, Any]) -> dict[str, Any] | None:
         """Resolve alert in JSON backup."""
         # Find the site for this alert
         for site_dir in self.json_backup_dir.iterdir():
@@ -452,7 +452,7 @@ class WaterConsumptionRepository:
         self,
         zone_id: str,
         lookback_hours: int = 24,
-    ) -> List[float]:
+    ) -> list[float]:
         """Get historical flow data for a zone.
 
         Args:
@@ -494,7 +494,7 @@ class WaterConsumptionRepository:
             flows.sort()
             return flows
 
-    def get_alert_thresholds(self, site: str) -> Dict[str, float]:
+    def get_alert_thresholds(self, site: str) -> dict[str, float]:
         """Get alert thresholds for a site.
 
         Args:
@@ -520,7 +520,7 @@ class WaterConsumptionRepository:
             # Return defaults if not found or Supabase error
             return self._get_default_thresholds()
 
-    def _get_default_thresholds(self) -> Dict[str, float]:
+    def _get_default_thresholds(self) -> dict[str, float]:
         """Get default threshold values."""
         return {
             "continuous_flow_lpm": 10.0,
@@ -531,7 +531,7 @@ class WaterConsumptionRepository:
             "temperature_max_celsius": 60.0,
         }
 
-    async def set_alert_thresholds(self, site: str, thresholds: Dict[str, float]) -> bool:
+    async def set_alert_thresholds(self, site: str, thresholds: dict[str, float]) -> bool:
         """Save alert thresholds for a site.
 
         Args:
@@ -568,7 +568,7 @@ class WaterConsumptionRepository:
         self,
         site: str,
         days: int = 30,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Get daily consumption summary.
 
         Args:
@@ -604,10 +604,10 @@ class WaterConsumptionRepository:
     def get_consumption_by_zone(
         self,
         zone_id: str,
-        start_date: Optional[date] = None,
-        end_date: Optional[date] = None,
+        start_date: date | None = None,
+        end_date: date | None = None,
         limit: int = 10000,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get consumption records for a specific zone.
 
         Args:
@@ -646,7 +646,7 @@ class WaterConsumptionRepository:
         zone_id: str,
         start_date: date,
         end_date: date,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get consumption by zone from JSON backup."""
         results = []
         # Search all sites for this zone
@@ -673,10 +673,10 @@ class WaterConsumptionRepository:
     def get_zones_for_site(
         self,
         site: str,
-        start_date: Optional[date] = None,
-        end_date: Optional[date] = None,
+        start_date: date | None = None,
+        end_date: date | None = None,
         limit: int = 100000,
-    ) -> List[str]:
+    ) -> list[str]:
         """Get list of unique zones with consumption data at a site.
 
         Args:
@@ -701,7 +701,7 @@ class WaterConsumptionRepository:
         site_id: str,
         limit: int = 10,
         days: int = 30,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get top N zones by consumption for a building.
 
         Args:
@@ -724,7 +724,7 @@ class WaterConsumptionRepository:
         )
 
         # Group by zone_id and sum consumption
-        zone_consumption: Dict[str, Dict[str, Any]] = {}
+        zone_consumption: dict[str, dict[str, Any]] = {}
         for record in records:
             zone_id = record.get("zone_id")
             if not zone_id:

@@ -1,12 +1,13 @@
 """Tests for the enhanced documentation RAG pipeline."""
 
 import re
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 
 from app.services.doc_rag_service import (
-    search_documentation,
     get_doc_rag_system_prompt,
+    search_documentation,
 )
 
 # --- Helpers inlined (removed from doc_rag_service in Phase 67 refactor) ---

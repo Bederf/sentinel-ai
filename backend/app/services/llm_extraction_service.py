@@ -69,7 +69,7 @@ class LLMExtractionResult:
     raw_response: str = ""
 
     @classmethod
-    def failed(cls, raw_response: str = "") -> "LLMExtractionResult":
+    def failed(cls, raw_response: str = "") -> LLMExtractionResult:
         """Return a failed extraction result (graceful degradation)."""
         return cls(
             confidence=0.0,

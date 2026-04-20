@@ -8,7 +8,6 @@ from app.services.docling_extraction_service import (
     DoclingExtractionService,
 )
 
-
 # -------------------------------------------------------------------
 # DoclingExtractionResult dataclass tests
 # -------------------------------------------------------------------

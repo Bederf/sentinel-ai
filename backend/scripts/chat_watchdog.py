@@ -5,22 +5,21 @@ Reads backend/app/data/chat_queries.json, filters trivial queries,
 deduplicates via hash, and appends new items to TODO-auto.md.
 """
 
-import json
 import hashlib
+import json
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import List, Dict, Set
 
 
-def load_chat_queries() -> List[Dict[str, str]]:
+def load_chat_queries() -> list[dict[str, str]]:
     """Load chat queries from JSON file."""
     queries_path = Path(__file__).parent.parent / "app" / "data" / "chat_queries.json"
     if not queries_path.exists():
         print(f"Warning: {queries_path} not found")
         return []
 
-    with open(queries_path, "r") as f:
+    with open(queries_path) as f:
         return json.load(f)
 
 
@@ -70,7 +69,7 @@ def hash_query(query: str) -> str:
     return hashlib.sha256(normalized.encode()).hexdigest()[:16]  # 16 chars for readability
 
 
-def load_existing_hashes(todo_path: Path) -> Set[str]:
+def load_existing_hashes(todo_path: Path) -> set[str]:
     """Extract hashes from existing TODO-auto.md entries."""
     if not todo_path.exists():
         return set()
@@ -79,7 +78,7 @@ def load_existing_hashes(todo_path: Path) -> Set[str]:
     hash_pattern = re.compile(r"hash:\s*([a-f0-9]{16})")
 
     try:
-        with open(todo_path, "r") as f:
+        with open(todo_path) as f:
             content = f.read()
             for match in hash_pattern.finditer(content):
                 existing_hashes.add(match.group(1))

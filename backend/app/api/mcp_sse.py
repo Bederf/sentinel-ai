@@ -24,7 +24,6 @@ import logging
 import secrets
 import time
 import uuid
-from typing import Dict, Optional, Tuple
 from urllib.parse import urlparse
 
 from fastapi import APIRouter, HTTPException
@@ -66,7 +65,7 @@ _ALLOWED_JSONRPC_FIELDS = frozenset({"jsonrpc", "method", "params", "id"})
 # ---------------------------------------------------------------------------
 
 
-def _validate_jsonrpc_envelope(data: dict) -> Tuple[bool, Optional[str], int]:
+def _validate_jsonrpc_envelope(data: dict) -> tuple[bool, str | None, int]:
     """Validate a JSON-RPC 2.0 envelope.
 
     Returns:
@@ -136,7 +135,7 @@ def _validate_host_origin(request) -> None:
 # MCP Tickets — single-use session handover tokens
 # ---------------------------------------------------------------------------
 
-_MCP_TICKETS: Dict[str, Dict] = {}
+_MCP_TICKETS: dict[str, dict] = {}
 
 
 def _create_mcp_ticket(auth_ctx: AuthContext) -> str:
@@ -153,7 +152,7 @@ def _create_mcp_ticket(auth_ctx: AuthContext) -> str:
     return ticket_id
 
 
-def _validate_mcp_ticket(ticket: str) -> Optional[AuthContext]:
+def _validate_mcp_ticket(ticket: str) -> AuthContext | None:
     """Validate and consume a single-use MCP ticket.
 
     Returns the AuthContext if the ticket is valid and unused, else None.
@@ -181,11 +180,11 @@ class MCPServerSSE:
     def __init__(self):
         self.server = SIMBIOTMCPServer()
 
-    async def send_sse(self, data: Dict):
+    async def send_sse(self, data: dict):
         """Format data as SSE event."""
         return f"event: message\ndata: {json.dumps(data)}\n\n"
 
-    async def handle_initialize(self, params: Dict) -> Dict:
+    async def handle_initialize(self, params: dict) -> dict:
         """Handle initialize request."""
         logger.info(f"SSE client initializing: {params.get('clientInfo', {})}")
 
@@ -195,12 +194,12 @@ class MCPServerSSE:
             "capabilities": {"tools": {}},
         }
 
-    async def handle_tools_list(self) -> Dict:
+    async def handle_tools_list(self) -> dict:
         """List available tools."""
         tools = self.server.list_tools()
         return {"tools": tools}
 
-    async def handle_tools_call(self, params: Dict, auth_ctx=None) -> Dict:
+    async def handle_tools_call(self, params: dict, auth_ctx=None) -> dict:
         """Execute a tool call."""
         tool_name = params.get("name")
         arguments = params.get("arguments", {})
@@ -230,7 +229,7 @@ class MCPServerSSE:
                 "isError": True,
             }
 
-    async def handle_request(self, request: Dict) -> Optional[Dict]:
+    async def handle_request(self, request: dict) -> dict | None:
         """Handle an incoming JSON-RPC request."""
         method = request.get("method")
         params = request.get("params", {})
@@ -307,7 +306,7 @@ class MCPServerSSE:
 
 
 # Singleton instance
-_sse_server: Optional[MCPServerSSE] = None
+_sse_server: MCPServerSSE | None = None
 
 
 def get_sse_server() -> MCPServerSSE:
@@ -351,7 +350,7 @@ async def mcp_sse_endpoint():
 
 
 @router.post("/request")
-async def mcp_request_endpoint(request: Dict):
+async def mcp_request_endpoint(request: dict):
     """
     HTTP POST endpoint for MCP requests (alternative to SSE).
 

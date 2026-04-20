@@ -15,19 +15,18 @@ import csv
 import io
 import logging
 from datetime import date, datetime, timedelta
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import HTMLResponse, StreamingResponse
 from pydantic import BaseModel
 
 from app.api.dependencies.module_access import require_active_module
+from app.database.supabase_client import get_supabase_client
 from app.middleware.auth_middleware import require_site_access
 from app.models.auth import AuthContext
 from app.models.module_registry import ModuleType
-from app.services.sustainability_service import sustainability_service
 from app.services.carbon_calculator import get_carbon_calculator
-from app.database.supabase_client import get_supabase_client
+from app.services.sustainability_service import sustainability_service
 
 router = APIRouter(
     prefix="/sustainability",
@@ -47,20 +46,20 @@ class GreenStarUpdateRequest(BaseModel):
     """Request to update a Green Star category score."""
 
     achieved_points: int
-    notes: Optional[str] = None
+    notes: str | None = None
 
 
 class ConfigUpdateRequest(BaseModel):
     """Request to update sustainability config."""
 
-    site_sqm: Optional[float] = None
-    occupancy_capacity: Optional[int] = None
-    target_reduction_pct: Optional[float] = None
-    monthly_water_kl: Optional[float] = None
-    monthly_waste_tons: Optional[float] = None
-    working_days_per_month: Optional[int] = None
-    avg_occupancy_pct: Optional[float] = None
-    emission_factors: Optional[dict] = None
+    site_sqm: float | None = None
+    occupancy_capacity: int | None = None
+    target_reduction_pct: float | None = None
+    monthly_water_kl: float | None = None
+    monthly_waste_tons: float | None = None
+    working_days_per_month: int | None = None
+    avg_occupancy_pct: float | None = None
+    emission_factors: dict | None = None
 
 
 @router.get("/{site_id}/summary")
@@ -234,8 +233,8 @@ class DailyMetricsUpdateRequest(BaseModel):
 @router.get("/buildings/{site_id}/emissions/monthly")
 async def get_monthly_emissions(
     site_id: str,
-    start_date: Optional[date] = Query(None),
-    end_date: Optional[date] = Query(None),
+    start_date: date | None = Query(None),
+    end_date: date | None = Query(None),
     auth: AuthContext = Depends(require_site_access("site_id")),
 ):
     """

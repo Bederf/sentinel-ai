@@ -9,9 +9,9 @@ Phase 45-02: Fleet Learning and Cross-Site Insights.
 """
 
 import logging
-from datetime import datetime
-from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -23,13 +23,13 @@ class GlobalTrainResult:
     model_type: str
     equipment_type: str
     training_started: str
-    training_completed: Optional[str] = None
+    training_completed: str | None = None
     sites_included: int = 0
     samples_used: int = 0
     success: bool = False
-    metrics: Dict[str, float] = field(default_factory=dict)
-    global_model_id: Optional[str] = None
-    error: Optional[str] = None
+    metrics: dict[str, float] = field(default_factory=dict)
+    global_model_id: str | None = None
+    error: str | None = None
 
 
 class GlobalModelTrainer:
@@ -47,8 +47,8 @@ class GlobalModelTrainer:
     """
 
     def __init__(self):
-        self._training_history: List[GlobalTrainResult] = []
-        self._global_models: Dict[str, Dict[str, Any]] = {}
+        self._training_history: list[GlobalTrainResult] = []
+        self._global_models: dict[str, dict[str, Any]] = {}
         self._seed_global_models()
 
     def _seed_global_models(self):
@@ -162,7 +162,7 @@ class GlobalModelTrainer:
         self,
         model_type: str,
         equipment_type: str,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """Get a trained global model.
 
         Args:
@@ -177,9 +177,9 @@ class GlobalModelTrainer:
 
     def list_global_models(
         self,
-        model_type: Optional[str] = None,
-        equipment_type: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+        model_type: str | None = None,
+        equipment_type: str | None = None,
+    ) -> list[dict[str, Any]]:
         """List all available global models.
 
         Args:
@@ -198,7 +198,7 @@ class GlobalModelTrainer:
 
         return sorted(models, key=lambda m: m.get("trained_at", ""), reverse=True)
 
-    def get_training_history(self) -> List[Dict[str, Any]]:
+    def get_training_history(self) -> list[dict[str, Any]]:
         """Get history of global model training runs."""
         return [
             {
@@ -220,8 +220,8 @@ class GlobalModelTrainer:
         self,
         model_type: str,
         equipment_type: str,
-        local_metrics: Dict[str, float],
-    ) -> Dict[str, Any]:
+        local_metrics: dict[str, float],
+    ) -> dict[str, Any]:
         """Compare global model performance against a local model.
 
         Args:
@@ -271,7 +271,7 @@ class GlobalModelTrainer:
 
 
 # Singleton
-_trainer: Optional[GlobalModelTrainer] = None
+_trainer: GlobalModelTrainer | None = None
 
 
 def get_global_model_trainer() -> GlobalModelTrainer:

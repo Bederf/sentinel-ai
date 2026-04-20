@@ -9,7 +9,6 @@ import logging
 from datetime import datetime
 from pathlib import Path
 
-from app.config.settings import settings
 from app.models.energy_centre import (
     ATSUnit,
     EnergyCentre,
@@ -39,10 +38,7 @@ class EnergyCentreService:
         self._ups_systems: dict[str, UPSSystem] = {}
         self._feeders: dict[str, dict] = {}
         self._scada_config: dict = {}
-        if settings.sentinel_island_mode:
-            logger.info("EnergyCentreService: skipping local seeded data in SENTINEL_ISLAND_MODE")
-        else:
-            self._load_seed_data()
+        self._load_seed_data()
 
     def _load_seed_data(self):
         """Load local seeded energy centre data from JSON."""

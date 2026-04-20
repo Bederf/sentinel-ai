@@ -1,7 +1,8 @@
 """Repository for generator, tank, and group operations."""
 
-from typing import List, Optional, Dict, Any
 import logging
+from typing import Any
+
 from app.database.supabase_client import get_supabase_client
 
 logger = logging.getLogger(__name__)
@@ -24,7 +25,7 @@ class GeneratorRepository:
     # Helper Methods
     # =========================================================================
 
-    def get_site_uuid(self, site_code: str) -> Optional[str]:
+    def get_site_uuid(self, site_code: str) -> str | None:
         """Get building UUID from building code."""
         response = self.client.table("sites").select("id").eq("code", site_code).execute()
 
@@ -36,7 +37,7 @@ class GeneratorRepository:
     # Diesel Tanks
     # =========================================================================
 
-    def get_tanks(self, site_code: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_tanks(self, site_code: str | None = None) -> list[dict[str, Any]]:
         """Get all diesel tanks, optionally filtered by building."""
         query = self.client.table("diesel_tanks").select("*")
 
@@ -48,7 +49,7 @@ class GeneratorRepository:
         response = query.execute()
         return response.data
 
-    def get_tank_by_id(self, tank_id: str) -> Optional[Dict[str, Any]]:
+    def get_tank_by_id(self, tank_id: str) -> dict[str, Any] | None:
         """Get diesel tank by tank_id."""
         response = self.client.table("diesel_tanks").select("*").eq("tank_id", tank_id).execute()
 
@@ -56,12 +57,12 @@ class GeneratorRepository:
             return response.data[0]
         return None
 
-    def upsert_tank(self, tank_data: Dict[str, Any]) -> Dict[str, Any]:
+    def upsert_tank(self, tank_data: dict[str, Any]) -> dict[str, Any]:
         """Insert or update a diesel tank."""
         response = self.client.table("diesel_tanks").upsert(tank_data, on_conflict="tank_id").execute()
         return response.data[0] if response.data else {}
 
-    def upsert_tanks(self, tanks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def upsert_tanks(self, tanks: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Insert or update multiple diesel tanks."""
         if not tanks:
             return []
@@ -74,7 +75,7 @@ class GeneratorRepository:
         response = self.client.table("diesel_tanks").delete().eq("tank_id", tank_id).execute()
         return len(response.data) > 0
 
-    def update_tank_level(self, tank_id: str, level_liters: int, level_pct: float) -> Optional[Dict[str, Any]]:
+    def update_tank_level(self, tank_id: str, level_liters: int, level_pct: float) -> dict[str, Any] | None:
         """Update diesel tank level."""
         response = (
             self.client.table("diesel_tanks")
@@ -96,7 +97,7 @@ class GeneratorRepository:
     # Generator Groups
     # =========================================================================
 
-    def get_groups(self, site_code: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_groups(self, site_code: str | None = None) -> list[dict[str, Any]]:
         """Get all generator groups, optionally filtered by building."""
         query = self.client.table("generator_groups").select("*")
 
@@ -108,7 +109,7 @@ class GeneratorRepository:
         response = query.execute()
         return response.data
 
-    def get_group_by_id(self, group_id: str) -> Optional[Dict[str, Any]]:
+    def get_group_by_id(self, group_id: str) -> dict[str, Any] | None:
         """Get generator group by group_id."""
         response = self.client.table("generator_groups").select("*").eq("group_id", group_id).execute()
 
@@ -116,7 +117,7 @@ class GeneratorRepository:
             return response.data[0]
         return None
 
-    def get_group_uuid(self, group_id: str) -> Optional[str]:
+    def get_group_uuid(self, group_id: str) -> str | None:
         """Get generator group UUID from group_id."""
         response = self.client.table("generator_groups").select("id").eq("group_id", group_id).execute()
 
@@ -124,7 +125,7 @@ class GeneratorRepository:
             return response.data[0]["id"]
         return None
 
-    def get_tank_uuid(self, tank_id: str) -> Optional[str]:
+    def get_tank_uuid(self, tank_id: str) -> str | None:
         """Get diesel tank UUID from tank_id."""
         response = self.client.table("diesel_tanks").select("id").eq("tank_id", tank_id).execute()
 
@@ -132,12 +133,12 @@ class GeneratorRepository:
             return response.data[0]["id"]
         return None
 
-    def upsert_group(self, group_data: Dict[str, Any]) -> Dict[str, Any]:
+    def upsert_group(self, group_data: dict[str, Any]) -> dict[str, Any]:
         """Insert or update a generator group."""
         response = self.client.table("generator_groups").upsert(group_data, on_conflict="group_id").execute()
         return response.data[0] if response.data else {}
 
-    def upsert_groups(self, groups: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def upsert_groups(self, groups: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Insert or update multiple generator groups."""
         if not groups:
             return []
@@ -152,7 +153,7 @@ class GeneratorRepository:
 
     def update_group_status(
         self, group_id: str, generators_running: int, total_load_kw: float, ats_position: str
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """Update generator group operational status."""
         response = (
             self.client.table("generator_groups")
@@ -175,7 +176,7 @@ class GeneratorRepository:
     # Generators
     # =========================================================================
 
-    def get_generators(self, site_code: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_generators(self, site_code: str | None = None) -> list[dict[str, Any]]:
         """Get all generators, optionally filtered by building."""
         query = self.client.table("generators").select("*")
 
@@ -187,7 +188,7 @@ class GeneratorRepository:
         response = query.execute()
         return response.data
 
-    def get_generators_by_group(self, group_id: str) -> List[Dict[str, Any]]:
+    def get_generators_by_group(self, group_id: str) -> list[dict[str, Any]]:
         """Get all generators in a group."""
         group_uuid = self.get_group_uuid(group_id)
         if not group_uuid:
@@ -197,7 +198,7 @@ class GeneratorRepository:
 
         return response.data
 
-    def get_generator_by_id(self, generator_id: str) -> Optional[Dict[str, Any]]:
+    def get_generator_by_id(self, generator_id: str) -> dict[str, Any] | None:
         """Get generator by generator_id."""
         response = self.client.table("generators").select("*").eq("generator_id", generator_id).execute()
 
@@ -205,12 +206,12 @@ class GeneratorRepository:
             return response.data[0]
         return None
 
-    def upsert_generator(self, gen_data: Dict[str, Any]) -> Dict[str, Any]:
+    def upsert_generator(self, gen_data: dict[str, Any]) -> dict[str, Any]:
         """Insert or update a generator."""
         response = self.client.table("generators").upsert(gen_data, on_conflict="generator_id").execute()
         return response.data[0] if response.data else {}
 
-    def upsert_generators(self, generators: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def upsert_generators(self, generators: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Insert or update multiple generators."""
         if not generators:
             return []
@@ -225,7 +226,7 @@ class GeneratorRepository:
 
     def update_generator_status(
         self, generator_id: str, status: str, engine_running: bool = False, on_load: bool = False
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """Update generator operational status."""
         response = (
             self.client.table("generators")
@@ -246,7 +247,7 @@ class GeneratorRepository:
 
     def update_generator_engine(
         self, generator_id: str, rpm: int, oil_pressure_kpa: float, coolant_temp_c: float, fuel_rate_lph: float
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """Update generator engine parameters."""
         response = (
             self.client.table("generators")
@@ -277,7 +278,7 @@ class GeneratorRepository:
         current_l3: float,
         power_kw: float,
         frequency: float,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """Update generator electrical output."""
         response = (
             self.client.table("generators")
@@ -305,7 +306,7 @@ class GeneratorRepository:
     # Bulk Operations
     # =========================================================================
 
-    def delete_all_by_site(self, site_code: str) -> Dict[str, int]:
+    def delete_all_by_site(self, site_code: str) -> dict[str, int]:
         """Delete all generator data for a building.
 
         Deletes in order: generators -> groups -> tanks (FK dependencies).
@@ -332,7 +333,7 @@ class GeneratorRepository:
             "tanks": len(tank_response.data),
         }
 
-    def get_full_plant(self, site_code: str) -> Dict[str, Any]:
+    def get_full_plant(self, site_code: str) -> dict[str, Any]:
         """Get complete generator plant configuration for a building.
 
         Returns:

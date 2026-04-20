@@ -13,12 +13,12 @@ These tests ensure:
 6. Simulation completes successfully in reasonable time
 """
 
-import pytest
 import asyncio
 from datetime import datetime
-from typing import Dict, Any, List
+from typing import Any
 from unittest.mock import Mock, patch
 
+import pytest
 from httpx import AsyncClient
 
 
@@ -222,7 +222,7 @@ def bederf_site_id() -> str:
 
 
 @pytest.fixture
-def sentinel_annual_scenario() -> Dict[str, Any]:
+def sentinel_annual_scenario() -> dict[str, Any]:
     """Unified 365-day sentinel_annual scenario configuration."""
     return {
         "scenario": "sentinel_annual",
@@ -253,7 +253,7 @@ class TestHourlyEventProcessing:
         self,
         async_client: AsyncClient,
         grant_site_id: str,
-        sentinel_annual_scenario: Dict[str, Any],
+        sentinel_annual_scenario: dict[str, Any],
         mock_supabase_for_lifecycle,
     ):
         """Verify hourly events occur at expected hours (0, 6, 8, 10, 11, 14, 18, 22)."""
@@ -284,7 +284,7 @@ class TestHourlyEventProcessing:
         events = status_data.get("recent_events", [])
 
         # Group events by hour
-        events_by_hour: Dict[int, List[Dict]] = {}
+        events_by_hour: dict[int, list[dict]] = {}
         for event in events:
             hour = event.get("simulated_hour", -1)
             if hour not in events_by_hour:
@@ -303,7 +303,7 @@ class TestHourlyEventProcessing:
             assert hour in expected_hours, f"Unexpected event hour: {hour}"
 
     @pytest.mark.asyncio
-    async def test_daily_event_count(self, async_client: AsyncClient, sentinel_annual_scenario: Dict[str, Any]):
+    async def test_daily_event_count(self, async_client: AsyncClient, sentinel_annual_scenario: dict[str, Any]):
         """Verify daily event count is approximately 8 events per day."""
         # Start simulation
         response = await async_client.post(
@@ -339,7 +339,7 @@ class TestHourlyEventProcessing:
             assert 7 <= avg_events_per_day <= 10, f"Expected ~8 events/day, got {avg_events_per_day:.1f}"
 
     @pytest.mark.asyncio
-    async def test_event_type_variety(self, async_client: AsyncClient, sentinel_annual_scenario: Dict[str, Any]):
+    async def test_event_type_variety(self, async_client: AsyncClient, sentinel_annual_scenario: dict[str, Any]):
         """Verify event types include occupancy, setpoint, and optimization events."""
         response = await async_client.post(
             "/api/lifecycle/start",
@@ -387,7 +387,7 @@ class TestSeasonalVariations:
     """
 
     @pytest.mark.asyncio
-    async def test_temperature_cycle(self, async_client: AsyncClient, sentinel_annual_scenario: Dict[str, Any]):
+    async def test_temperature_cycle(self, async_client: AsyncClient, sentinel_annual_scenario: dict[str, Any]):
         """Verify temperature cycles between ~14°C (winter) and ~28°C (summer)."""
         response = await async_client.post(
             "/api/lifecycle/start",
@@ -416,7 +416,7 @@ class TestSeasonalVariations:
             assert 10 <= ambient_temp <= 35, f"Temperature {ambient_temp}°C outside expected seasonal range"
 
     @pytest.mark.asyncio
-    async def test_seasonal_name_changes(self, async_client: AsyncClient, sentinel_annual_scenario: Dict[str, Any]):
+    async def test_seasonal_name_changes(self, async_client: AsyncClient, sentinel_annual_scenario: dict[str, Any]):
         """Verify daily summaries include seasonal name (Summer, Winter, Spring, Autumn)."""
         response = await async_client.post(
             "/api/lifecycle/start",
@@ -456,7 +456,7 @@ class TestSeasonalVariations:
         assert len(found_seasons) >= 2, f"Expected multiple seasons in simulation, found: {found_seasons}"
 
     @pytest.mark.asyncio
-    async def test_rainfall_pattern(self, async_client: AsyncClient, sentinel_annual_scenario: Dict[str, Any]):
+    async def test_rainfall_pattern(self, async_client: AsyncClient, sentinel_annual_scenario: dict[str, Any]):
         """Verify rainfall patterns appear (Oct-Mar should be wetter)."""
         response = await async_client.post(
             "/api/lifecycle/start",
@@ -502,7 +502,7 @@ class TestAIRecommendations:
 
     @pytest.mark.asyncio
     async def test_ai_optimization_event_generation(
-        self, async_client: AsyncClient, sentinel_annual_scenario: Dict[str, Any]
+        self, async_client: AsyncClient, sentinel_annual_scenario: dict[str, Any]
     ):
         """Verify ai_optimization events are generated at hours 6, 10, 14."""
         response = await async_client.post(
@@ -543,7 +543,7 @@ class TestAIRecommendations:
 
     @pytest.mark.asyncio
     async def test_recommendation_payload_validity(
-        self, async_client: AsyncClient, sentinel_annual_scenario: Dict[str, Any]
+        self, async_client: AsyncClient, sentinel_annual_scenario: dict[str, Any]
     ):
         """Verify ai_optimization events have valid recommendation payloads."""
         response = await async_client.post(
@@ -583,7 +583,7 @@ class TestAIRecommendations:
 
     @pytest.mark.asyncio
     async def test_daily_recommendation_count(
-        self, async_client: AsyncClient, sentinel_annual_scenario: Dict[str, Any]
+        self, async_client: AsyncClient, sentinel_annual_scenario: dict[str, Any]
     ):
         """Verify ~3 recommendations per day over 365 days."""
         response = await async_client.post(
@@ -633,7 +633,7 @@ class TestCheckpointRecovery:
 
     @pytest.mark.asyncio
     async def test_checkpoint_save_on_interval(
-        self, async_client: AsyncClient, sentinel_annual_scenario: Dict[str, Any]
+        self, async_client: AsyncClient, sentinel_annual_scenario: dict[str, Any]
     ):
         """Verify checkpoints are saved every 6 simulated hours."""
         response = await async_client.post(
@@ -669,7 +669,7 @@ class TestCheckpointRecovery:
 
     @pytest.mark.asyncio
     async def test_pause_resume_preserves_state(
-        self, async_client: AsyncClient, sentinel_annual_scenario: Dict[str, Any]
+        self, async_client: AsyncClient, sentinel_annual_scenario: dict[str, Any]
     ):
         """Verify pause/resume preserves simulation state correctly."""
         # Start simulation
@@ -749,7 +749,7 @@ class TestProgressTracking:
 
     @pytest.mark.asyncio
     async def test_progress_percentage_accuracy(
-        self, async_client: AsyncClient, sentinel_annual_scenario: Dict[str, Any]
+        self, async_client: AsyncClient, sentinel_annual_scenario: dict[str, Any]
     ):
         """Verify progress percentage increases monotonically and stays 0-100%."""
         response = await async_client.post(
@@ -787,7 +787,7 @@ class TestProgressTracking:
 
     @pytest.mark.asyncio
     async def test_progress_reaches_completion(
-        self, async_client: AsyncClient, sentinel_annual_scenario: Dict[str, Any]
+        self, async_client: AsyncClient, sentinel_annual_scenario: dict[str, Any]
     ):
         """Verify simulation reaches 100% completion."""
         response = await async_client.post(
@@ -829,7 +829,7 @@ class TestSentinelAnnualScenario:
 
     @pytest.mark.asyncio
     async def test_hvac_setpoint_recommendations(
-        self, async_client: AsyncClient, sentinel_annual_scenario: Dict[str, Any]
+        self, async_client: AsyncClient, sentinel_annual_scenario: dict[str, Any]
     ):
         """Verify HVAC setpoint change recommendations are present."""
         response = await async_client.post(
@@ -864,7 +864,7 @@ class TestSentinelAnnualScenario:
 
     @pytest.mark.asyncio
     async def test_dali_lighting_recommendations(
-        self, async_client: AsyncClient, sentinel_annual_scenario: Dict[str, Any]
+        self, async_client: AsyncClient, sentinel_annual_scenario: dict[str, Any]
     ):
         """Verify DALI lighting optimization is included in recommendations."""
         response = await async_client.post(
@@ -900,7 +900,7 @@ class TestSentinelAnnualScenario:
 
     @pytest.mark.asyncio
     async def test_solar_bess_dispatch_events(
-        self, async_client: AsyncClient, sentinel_annual_scenario: Dict[str, Any]
+        self, async_client: AsyncClient, sentinel_annual_scenario: dict[str, Any]
     ):
         """Verify solar generation and BESS dispatch events are present."""
         response = await async_client.post(
@@ -941,7 +941,7 @@ class TestSimulationStress:
 
     @pytest.mark.asyncio
     async def test_simulation_completes_within_time_budget(
-        self, async_client: AsyncClient, sentinel_annual_scenario: Dict[str, Any]
+        self, async_client: AsyncClient, sentinel_annual_scenario: dict[str, Any]
     ):
         """Verify 365-day simulation completes within specified duration."""
         import time
@@ -979,7 +979,7 @@ class TestSimulationStress:
         assert elapsed < max_allowed, f"Simulation took {elapsed:.1f}s, exceeded max {max_allowed}s"
 
     @pytest.mark.asyncio
-    async def test_concurrent_simulations(self, async_client: AsyncClient, sentinel_annual_scenario: Dict[str, Any]):
+    async def test_concurrent_simulations(self, async_client: AsyncClient, sentinel_annual_scenario: dict[str, Any]):
         """Verify same scenario can run concurrently on two sites without interference."""
         # Start sentinel_annual on two different sites
         site1_response = await async_client.post(
@@ -1054,7 +1054,7 @@ class TestSimulationErrorHandling:
 
     @pytest.mark.asyncio
     async def test_invalid_start_hour_rejected(
-        self, async_client: AsyncClient, sentinel_annual_scenario: Dict[str, Any]
+        self, async_client: AsyncClient, sentinel_annual_scenario: dict[str, Any]
     ):
         """Verify invalid start hour is rejected."""
         response = await async_client.post(

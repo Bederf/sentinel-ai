@@ -13,9 +13,9 @@ from .global_model import GlobalModelTrainer, get_global_model_trainer
 
 __all__ = [
     "FleetAggregator",
-    "get_fleet_aggregator",
     "GlobalModelTrainer",
-    "get_global_model_trainer",
     "LocalFineTuner",
+    "get_fleet_aggregator",
+    "get_global_model_trainer",
     "get_local_fine_tuner",
 ]

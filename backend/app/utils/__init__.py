@@ -2,7 +2,8 @@
 
 import asyncio
 import logging
-from typing import TypeVar, Callable
+from collections.abc import Callable
+from typing import TypeVar
 
 logger = logging.getLogger(__name__)
 

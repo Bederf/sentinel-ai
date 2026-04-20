@@ -17,17 +17,17 @@ Endpoints tested:
    11. GET  /api/recommendations/by-type
 """
 
-import os
 import asyncio
+import os
 
 import pytest
 from fastapi import FastAPI
-from httpx import AsyncClient, ASGITransport
+from httpx import ASGITransport, AsyncClient
 
 os.environ.setdefault("DEMO_MODE", "true")
 os.environ.setdefault("TESTING", "true")
 
-from app.api.energy import router as energy_router  # noqa: E402
+from app.api.energy import router as energy_router
 
 # Build a minimal app with only the energy router so we don't need
 # cv2, apscheduler, anthropic, etc.

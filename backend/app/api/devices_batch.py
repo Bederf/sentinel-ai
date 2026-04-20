@@ -11,10 +11,10 @@ Implements:
 """
 
 import logging
-from typing import Dict, List, Any
-from pydantic import BaseModel, Field
+from typing import Any
 
-from fastapi import APIRouter, HTTPException, Body, Request
+from fastapi import APIRouter, Body, HTTPException, Request
+from pydantic import BaseModel, Field
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
@@ -31,7 +31,7 @@ limiter = Limiter(key_func=get_remote_address)
 class BatchDeviceRequest(BaseModel):
     """Request for batch device operations."""
 
-    device_ids: List[str] = Field(
+    device_ids: list[str] = Field(
         ..., min_length=1, max_length=100, description="List of device IDs (max 100 per request)"
     )
 
@@ -39,10 +39,10 @@ class BatchDeviceRequest(BaseModel):
 class BatchDeviceResponse(BaseModel):
     """Response from batch device operations."""
 
-    results: Dict[str, Any] = Field(
+    results: dict[str, Any] = Field(
         default_factory=dict, description="Dict of device_id -> result (keyed for O(1) lookup)"
     )
-    errors: Dict[str, str] = Field(
+    errors: dict[str, str] = Field(
         default_factory=dict, description="Dict of device_id -> error message for missing/failed devices"
     )
 
@@ -82,8 +82,8 @@ async def batch_safety_status(
     if len(unique_device_ids) > 100:
         raise HTTPException(status_code=400, detail="Maximum 100 unique device IDs per request")
 
-    results: Dict[str, Any] = {}
-    errors: Dict[str, str] = {}
+    results: dict[str, Any] = {}
+    errors: dict[str, str] = {}
 
     # Fetch safety status for all devices in parallel
     for device_id in unique_device_ids:
@@ -135,8 +135,8 @@ async def batch_latest_readings(
     if len(unique_device_ids) > 100:
         raise HTTPException(status_code=400, detail="Maximum 100 unique device IDs per request")
 
-    results: Dict[str, Any] = {}
-    errors: Dict[str, str] = {}
+    results: dict[str, Any] = {}
+    errors: dict[str, str] = {}
 
     # Fetch latest readings for all devices in parallel
     for device_id in unique_device_ids:
@@ -189,8 +189,8 @@ async def batch_condition(
     if len(unique_device_ids) > 100:
         raise HTTPException(status_code=400, detail="Maximum 100 unique device IDs per request")
 
-    results: Dict[str, Any] = {}
-    errors: Dict[str, str] = {}
+    results: dict[str, Any] = {}
+    errors: dict[str, str] = {}
 
     # Fetch condition for all devices in parallel
     for device_id in unique_device_ids:

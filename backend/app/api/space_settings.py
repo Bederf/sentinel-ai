@@ -10,7 +10,7 @@ Phase 155: CONFIG_CHANGE audit events on all PUT/POST/DELETE endpoints.
 
 import logging
 from dataclasses import asdict
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # Default grace period settings (from config/settings.py)
-DEFAULT_SPACE_SETTINGS: Dict[str, Any] = {
+DEFAULT_SPACE_SETTINGS: dict[str, Any] = {
     "ghost_booking_grace_minutes": 5,
     "concierge_response_window_minutes": 15,
     "sensor_silence_threshold_minutes": 30,
@@ -42,7 +42,7 @@ DEFAULT_SPACE_SETTINGS: Dict[str, Any] = {
 }
 
 # Valid setting keys and their allowed ranges
-_SETTING_RANGES: Dict[str, tuple] = {
+_SETTING_RANGES: dict[str, tuple] = {
     "ghost_booking_grace_minutes": (1, 120),
     "concierge_response_window_minutes": (1, 120),
     "sensor_silence_threshold_minutes": (5, 240),
@@ -53,7 +53,7 @@ _SETTING_RANGES: Dict[str, tuple] = {
 }
 
 
-def _load_space_settings() -> Dict[str, Any]:
+def _load_space_settings() -> dict[str, Any]:
     """Load space settings from canonical system_settings, falling back to defaults."""
     try:
         supabase = get_supabase_client()
@@ -76,7 +76,7 @@ def _load_space_settings() -> Dict[str, Any]:
     }
 
 
-def _save_space_settings(data: Dict[str, Any]) -> None:
+def _save_space_settings(data: dict[str, Any]) -> None:
     """Save space settings to canonical system_settings."""
     supabase = get_supabase_client()
     supabase.table("system_settings").upsert(
@@ -106,9 +106,9 @@ def get_space_setting(key: str) -> Any:
 
 @router.get("/settings/space")
 async def get_space_settings(
-    site_id: Optional[str] = Query(None, description="Optional site scope for concierge users"),
+    site_id: str | None = Query(None, description="Optional site scope for concierge users"),
     auth: AuthContext = Depends(require_role(1)),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Get all space optimization settings including concierge list.
 
     Requires AUDITOR (level 1).
@@ -121,10 +121,10 @@ async def get_space_settings(
 
 @router.put("/settings/space")
 async def update_space_settings(
-    body: Dict[str, Any],
+    body: dict[str, Any],
     request: Request,
     auth: AuthContext = Depends(require_role(4)),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Update grace period settings. Requires ADMIN (level 4).
 
     Only accepts known grace period keys. Concierge data is managed
@@ -172,9 +172,9 @@ async def update_space_settings(
 
 @router.get("/settings/space/concierges")
 async def list_concierges_endpoint(
-    site_id: Optional[str] = Query(None, description="Filter by site ID"),
+    site_id: str | None = Query(None, description="Filter by site ID"),
     auth: AuthContext = Depends(require_role(1)),
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """List all concierge users. Requires AUDITOR (level 1)."""
     concierges = list_concierges(site_id=site_id)
     return [asdict(c) for c in concierges]
@@ -182,10 +182,10 @@ async def list_concierges_endpoint(
 
 @router.post("/settings/space/concierges", status_code=201)
 async def create_concierge_endpoint(
-    body: Dict[str, Any],
+    body: dict[str, Any],
     request: Request,
     auth: AuthContext = Depends(require_role(4)),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Create a new concierge user. Requires ADMIN (level 4)."""
     # Validate required fields
     if not body.get("name"):
@@ -205,10 +205,10 @@ async def create_concierge_endpoint(
 @router.put("/settings/space/concierges/{concierge_id}")
 async def update_concierge_endpoint(
     concierge_id: str,
-    body: Dict[str, Any],
+    body: dict[str, Any],
     request: Request,
     auth: AuthContext = Depends(require_role(4)),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Update an existing concierge user. Requires ADMIN (level 4)."""
     updated = update_concierge(concierge_id, body)
     if not updated:
@@ -226,7 +226,7 @@ async def delete_concierge_endpoint(
     concierge_id: str,
     request: Request,
     auth: AuthContext = Depends(require_role(4)),
-) -> Dict[str, str]:
+) -> dict[str, str]:
     """Delete a concierge user. Requires ADMIN (level 4)."""
     deleted = delete_concierge(concierge_id)
     if not deleted:
@@ -244,7 +244,7 @@ async def delete_concierge_endpoint(
 # ---------------------------------------------------------------------------
 
 
-def _load_site_structure() -> List[Dict[str, Any]]:
+def _load_site_structure() -> list[dict[str, Any]]:
     try:
         supabase = get_supabase_client()
         result = supabase.table("system_settings").select("value").eq("key", "space_site_structure").limit(1).execute()
@@ -260,7 +260,7 @@ def _load_site_structure() -> List[Dict[str, Any]]:
 @router.get("/settings/space/sites")
 async def get_site_structure(
     auth: AuthContext = Depends(require_role(1)),
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Return site/building/floor structure for concierge assignment dropdowns.
 
     Requires AUDITOR (level 1).

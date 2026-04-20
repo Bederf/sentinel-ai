@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import json
-import pytest
 from pathlib import Path
+
+import pytest
 
 from app.ml.models.model_drift_calculator import ModelDriftCalculator
 

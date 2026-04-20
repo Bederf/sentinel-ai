@@ -7,7 +7,7 @@ and data files.
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -16,7 +16,6 @@ from fastapi.testclient import TestClient
 
 from app.api.fuel import router
 from app.models.fuel import FuelTankConfig, FuelTelemetry
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -65,7 +64,7 @@ def sample_telemetry():
         consumption_rate_lph=12.5,
         days_to_empty=12.1,
         ts=1710100000,
-        received_at=datetime(2026, 3, 11, 10, 0, 0, tzinfo=timezone.utc),
+        received_at=datetime(2026, 3, 11, 10, 0, 0, tzinfo=UTC),
     )
 
 

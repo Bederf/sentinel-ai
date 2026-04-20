@@ -26,7 +26,6 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Optional
 
 from app.security.constants import CITATION_PATTERN, TRUST_LEVELS
 
@@ -195,7 +194,7 @@ CITATION_SYSTEM_PROMPT_ADDON = (
 def validate_citations(
     response_text: str,
     retrieval_doc_ids: list[str],
-    retrieval_doc_titles: Optional[list[str]] = None,
+    retrieval_doc_titles: list[str] | None = None,
 ) -> tuple[bool, list[str], list[str]]:
     """Validate that cited document references exist in the retrieval set.
 
@@ -226,12 +225,10 @@ def validate_citations(
             valid.append(ref_stripped)
         else:
             # Try partial matching (doc ID prefix)
-            if any(ref_stripped.startswith(doc_id[:8]) for doc_id in retrieval_doc_ids):
-                valid.append(ref_stripped)
-            elif retrieval_doc_titles and any(
+            if any(ref_stripped.startswith(doc_id[:8]) for doc_id in retrieval_doc_ids) or (retrieval_doc_titles and any(
                 title.lower() in ref_stripped.lower() or ref_stripped.lower() in title.lower()
                 for title in retrieval_doc_titles
-            ):
+            )):
                 valid.append(ref_stripped)
             else:
                 invalid.append(ref_stripped)

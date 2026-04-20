@@ -11,12 +11,12 @@ Target: 40+ tests covering:
 - Separation invariants (no risk writes, no local status)
 """
 
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
 import pytest
 
-from app.services.health_rating_calculator import HealthRatingCalculator, WEIGHTS
 from app.services.health_data_quality_gate import HealthDataQualityGate
-
+from app.services.health_rating_calculator import WEIGHTS, HealthRatingCalculator
 
 # ======================================================================
 # Fixtures
@@ -506,12 +506,12 @@ class TestSnapshotServiceOperations:
 
     async def test_store_and_retrieve(self):
         """Store a snapshot and retrieve it."""
-        from app.services.health_snapshot_service import HealthSnapshotService
         from app.models.health_rating import (
-            HealthRating,
             HealthComponentBreakdown,
             HealthDataQualityResult,
+            HealthRating,
         )
+        from app.services.health_snapshot_service import HealthSnapshotService
 
         svc = HealthSnapshotService()
         svc._use_memory = True

@@ -7,7 +7,6 @@ equipment types, time ranges) for routing to the appropriate service.
 import re
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional
 
 
 class Intent(str, Enum):
@@ -29,8 +28,8 @@ class ClassifiedQuery:
     intent: Intent
     confidence: float
     equipment_ids: list[str] = field(default_factory=list)
-    equipment_type: Optional[str] = None
-    time_range: Optional[str] = None
+    equipment_type: str | None = None
+    time_range: str | None = None
     original_query: str = ""
 
 
@@ -214,7 +213,7 @@ class IntentClassifier:
         """Extract equipment IDs (v2.0 format) from query."""
         return [m.upper() for m in _EQUIPMENT_ID_PATTERN.findall(query)]
 
-    def _extract_equipment_type(self, query: str) -> Optional[str]:
+    def _extract_equipment_type(self, query: str) -> str | None:
         """Extract equipment type keyword from query."""
         query_lower = query.lower()
         # Check multi-word phrases first (longer match wins)
@@ -223,7 +222,7 @@ class IntentClassifier:
                 return _EQUIPMENT_TYPES[keyword]
         return None
 
-    def _extract_time_range(self, query: str) -> Optional[str]:
+    def _extract_time_range(self, query: str) -> str | None:
         """Extract time range from query."""
         for pattern_str, unit in _TIME_PATTERNS.items():
             match = re.search(pattern_str, query, re.IGNORECASE)

@@ -4,7 +4,7 @@ Used by MIPDispatchOptimizer to return structured optimal schedules.
 """
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List
+from typing import Any
 
 
 @dataclass
@@ -22,7 +22,7 @@ class DispatchInterval:
     tariff_band: str
     interval_cost_zar: float
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "timestamp": self.timestamp,
             "charge_kw": round(self.charge_kw, 1),
@@ -44,7 +44,7 @@ class OptimalDispatchSchedule:
     site_id: str
     generated_at: str  # ISO timestamp
     solver_status: str  # optimal / feasible / timeout / infeasible / rules_fallback
-    intervals: List[DispatchInterval] = field(default_factory=list)
+    intervals: list[DispatchInterval] = field(default_factory=list)
     total_cost_zar: float = 0.0
     peak_grid_import_kw: float = 0.0
     total_energy_kwh: float = 0.0
@@ -54,7 +54,7 @@ class OptimalDispatchSchedule:
     demand_charge_zar: float = 0.0
     degradation_cost_zar: float = 0.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "site_id": self.site_id,
             "generated_at": self.generated_at,

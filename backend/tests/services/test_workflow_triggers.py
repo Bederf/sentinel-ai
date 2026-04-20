@@ -14,12 +14,12 @@ Phase 53-02: Automated Triggers & Workflow Automation
 import pytest
 
 from app.services.workflow_triggers import (
-    WorkflowTriggerEngine,
-    get_trigger_engine,
     AnomalyAlert,
     BaselineComparison,
     InspectionDeficiency,
     TriggerType,
+    WorkflowTriggerEngine,
+    get_trigger_engine,
 )
 
 

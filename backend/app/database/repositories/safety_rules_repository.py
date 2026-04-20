@@ -2,8 +2,8 @@
 
 import json
 import logging
-from typing import List, Optional, Dict, Any
 from pathlib import Path
+from typing import Any
 
 from app.config.settings import settings
 
@@ -34,7 +34,7 @@ class SafetyRulesRepository:
                 self._use_json = True
         return self._client
 
-    def _load_json_rules(self) -> List[Dict[str, Any]]:
+    def _load_json_rules(self) -> list[dict[str, Any]]:
         """Load rules from JSON file (fallback)."""
         filepath = DATA_DIR / "safety_rules.json"
         if filepath.exists():
@@ -42,13 +42,13 @@ class SafetyRulesRepository:
                 return json.load(f)
         return []
 
-    def _save_json_rules(self, rules: List[Dict[str, Any]]) -> None:
+    def _save_json_rules(self, rules: list[dict[str, Any]]) -> None:
         """Save rules to JSON file (fallback)."""
         filepath = DATA_DIR / "safety_rules.json"
         with open(filepath, "w") as f:
             json.dump(rules, f, indent=2)
 
-    def _db_to_rule(self, db_record: Dict[str, Any]) -> Dict[str, Any]:
+    def _db_to_rule(self, db_record: dict[str, Any]) -> dict[str, Any]:
         """Convert database record to rule format."""
         params = db_record.get("parameters", {})
         if isinstance(params, str):
@@ -74,7 +74,7 @@ class SafetyRulesRepository:
 
         return rule
 
-    def _rule_to_db(self, rule: Dict[str, Any]) -> Dict[str, Any]:
+    def _rule_to_db(self, rule: dict[str, Any]) -> dict[str, Any]:
         """Convert rule format to database record."""
         # Extract parameters based on rule_type
         params = {}
@@ -132,7 +132,7 @@ class SafetyRulesRepository:
             "parameters": params,
         }
 
-    def get_all(self, enabled_only: bool = False) -> List[Dict[str, Any]]:
+    def get_all(self, enabled_only: bool = False) -> list[dict[str, Any]]:
         """Get all safety rules."""
         if self._use_json or not self.client:
             rules = self._load_json_rules()
@@ -151,7 +151,7 @@ class SafetyRulesRepository:
             logger.error(f"Failed to get safety rules from Supabase: {e}")
             return self._load_json_rules()
 
-    def get_by_id(self, rule_id: str) -> Optional[Dict[str, Any]]:
+    def get_by_id(self, rule_id: str) -> dict[str, Any] | None:
         """Get a rule by ID."""
         if self._use_json or not self.client:
             rules = self._load_json_rules()
@@ -169,9 +169,9 @@ class SafetyRulesRepository:
     def get_for_device(
         self,
         device_type: str,
-        device_id: Optional[str] = None,
-        point_name: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+        device_id: str | None = None,
+        point_name: str | None = None,
+    ) -> list[dict[str, Any]]:
         """Get rules applicable to a device."""
         all_rules = self.get_all(enabled_only=True)
 
@@ -193,7 +193,7 @@ class SafetyRulesRepository:
 
         return applicable
 
-    def create(self, rule_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def create(self, rule_data: dict[str, Any]) -> dict[str, Any] | None:
         """Create a new safety rule."""
         if self._use_json or not self.client:
             rules = self._load_json_rules()
@@ -211,7 +211,7 @@ class SafetyRulesRepository:
             logger.error(f"Failed to create safety rule: {e}")
             return None
 
-    def update(self, rule_id: str, rule_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def update(self, rule_id: str, rule_data: dict[str, Any]) -> dict[str, Any] | None:
         """Update an existing safety rule."""
         if self._use_json or not self.client:
             rules = self._load_json_rules()
@@ -254,6 +254,6 @@ class SafetyRulesRepository:
             logger.error(f"Failed to delete safety rule {rule_id}: {e}")
             return False
 
-    def toggle_enabled(self, rule_id: str, enabled: bool) -> Optional[Dict[str, Any]]:
+    def toggle_enabled(self, rule_id: str, enabled: bool) -> dict[str, Any] | None:
         """Toggle a rule's enabled status."""
         return self.update(rule_id, {"enabled": enabled})

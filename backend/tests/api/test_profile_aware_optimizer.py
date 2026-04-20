@@ -1,7 +1,8 @@
 """Tests for profile-aware AI optimizer recommendations."""
 
-import pytest
 from unittest.mock import MagicMock
+
+import pytest
 
 from app.models.optimization import OptimizationRecommendation
 from app.services.ai_optimizer import AIOptimizerService, ensure_device_manager_initialized

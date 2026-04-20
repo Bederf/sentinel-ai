@@ -1,6 +1,4 @@
-from datetime import datetime
 
-import pytest
 
 from app.services.sentinel_data_sync import _blend_health_score
 
@@ -92,8 +90,8 @@ class TestLSTMAnomalyScoreKeySeparation:
 
     def test_score_lstm_anomaly_requires_min_hours(self):
         """score_lstm_anomaly returns empty dict when hours < ML_GATE_LSTM_HOURS."""
-        from app.services.sentinel_ml_feeder import SentinelMLFeeder
         from app.services.ml_config import MIN_LSTM_TRAINING_HOURS
+        from app.services.sentinel_ml_feeder import SentinelMLFeeder
 
         feeder = SentinelMLFeeder()
         feeder._hours_ingested = MIN_LSTM_TRAINING_HOURS - 1

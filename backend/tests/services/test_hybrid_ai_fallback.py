@@ -15,10 +15,11 @@ Fallback chains:
   - zai → openai → anthropic
 """
 
-import pytest
 from unittest.mock import MagicMock, patch
-from anthropic import APIError, APIConnectionError, APITimeoutError, RateLimitError
+
 import httpx
+import pytest
+from anthropic import APIConnectionError, APIError, APITimeoutError, RateLimitError
 
 from app.services.hybrid_ai_service import HybridAIService
 
@@ -112,7 +113,7 @@ class TestCloudFallback:
 
         async def _always_fail(provider, messages, include_site_context=True, tier=2):
             raise Exception(f"{provider} unavailable")
-            yield  # Make it an async generator  # noqa: E501  (unreachable but needed for type)
+            yield  # Make it an async generator
 
         with patch.object(hybrid_ai, "_stream_from_provider", side_effect=_always_fail):
             chunks = []

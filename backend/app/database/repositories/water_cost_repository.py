@@ -4,11 +4,11 @@ Implements dual-write pattern: Supabase (primary) + JSON file (backup).
 Manages tariff configurations and cost calculations with tiered billing support.
 """
 
-from typing import List, Optional, Dict, Any
-from datetime import datetime, timedelta
 import json
 import logging
+from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 from app.database.supabase_client import get_supabase_client
 from app.models.water_meter import WaterTariff
@@ -31,19 +31,19 @@ class WaterCostRepository:
         site_dir.mkdir(parents=True, exist_ok=True)
         return site_dir / f"water_{data_type}.json"
 
-    def _load_json_backup(self, site: str, data_type: str = "tariffs") -> Dict[str, Any]:
+    def _load_json_backup(self, site: str, data_type: str = "tariffs") -> dict[str, Any]:
         """Load tariff or cost data from JSON backup."""
         json_path = self._get_json_backup_path(site, data_type)
         if not json_path.exists():
             return {data_type: []}
         try:
-            with open(json_path, "r") as f:
+            with open(json_path) as f:
                 return json.load(f)
         except Exception as e:
             logger.error(f"Error loading JSON backup from {json_path}: {e}")
             return {data_type: []}
 
-    def _save_json_backup(self, site: str, data: Dict[str, Any], data_type: str = "tariffs") -> None:
+    def _save_json_backup(self, site: str, data: dict[str, Any], data_type: str = "tariffs") -> None:
         """Save tariff or cost data to JSON backup."""
         json_path = self._get_json_backup_path(site, data_type)
         try:
@@ -52,7 +52,7 @@ class WaterCostRepository:
         except Exception as e:
             logger.error(f"Error saving JSON backup to {json_path}: {e}")
 
-    async def get_active_tariff(self, site: str, date_ref: Optional[datetime] = None) -> Optional[WaterTariff]:
+    async def get_active_tariff(self, site: str, date_ref: datetime | None = None) -> WaterTariff | None:
         """Get tariff effective on given date.
 
         Args:
@@ -118,7 +118,7 @@ class WaterCostRepository:
 
         return None
 
-    async def list_tariffs(self, site: str) -> List[WaterTariff]:
+    async def list_tariffs(self, site: str) -> list[WaterTariff]:
         """Get all tariffs for a site.
 
         Args:
@@ -177,7 +177,7 @@ class WaterCostRepository:
             self._save_json_backup(tariff.site, backup, "tariffs")
             return tariff
 
-    async def get_zone_costs(self, zone_id: str, start: datetime, end: datetime) -> Dict[str, Any]:
+    async def get_zone_costs(self, zone_id: str, start: datetime, end: datetime) -> dict[str, Any]:
         """Get cost summary for a zone in period.
 
         Args:
@@ -232,7 +232,7 @@ class WaterCostRepository:
                 "total_cost": 0.0,
             }
 
-    async def get_site_costs(self, site: str, start: datetime, end: datetime) -> Dict[str, Any]:
+    async def get_site_costs(self, site: str, start: datetime, end: datetime) -> dict[str, Any]:
         """Get cost summary for entire site in period.
 
         Args:
@@ -310,7 +310,7 @@ class WaterCostRepository:
                 "by_zone": [],
             }
 
-    async def get_cost_forecast(self, site: str, days: int = 30) -> Dict[str, Any]:
+    async def get_cost_forecast(self, site: str, days: int = 30) -> dict[str, Any]:
         """Project future costs based on recent consumption.
 
         Args:
@@ -371,7 +371,7 @@ class WaterCostRepository:
                 "projected_annual": 0.0,
             }
 
-    def calculate_cost(self, consumption_liters: float, tariff: WaterTariff) -> Dict[str, float]:
+    def calculate_cost(self, consumption_liters: float, tariff: WaterTariff) -> dict[str, float]:
         """Calculate cost breakdown using tiered tariff.
 
         Args:

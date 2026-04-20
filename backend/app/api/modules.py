@@ -4,19 +4,19 @@ Module Registry API - Bolt-on Module System Endpoints
 Manages module activation, integration, and AI recommendations.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from typing import List, Optional
-from pydantic import BaseModel
+import logging
 from datetime import datetime
 
-from app.services.module_registry_service import module_registry
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from pydantic import BaseModel
+
+from app.core.site_resolver import get_primary_site_code
 from app.database.repositories.module_access_repository import get_module_access_repository
-from app.models.module_registry import ModuleType, RecommendationPriority, RecommendationType, AIRecommendation
+from app.database.supabase_client import get_supabase_client
 from app.middleware.auth_middleware import require_auth
 from app.models.auth import AuthContext, AuthLevel
-from app.core.site_resolver import get_primary_site_code
-from app.database.supabase_client import get_supabase_client
-import logging
+from app.models.module_registry import AIRecommendation, ModuleType, RecommendationPriority, RecommendationType
+from app.services.module_registry_service import module_registry
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +30,7 @@ class ActivateModuleRequest(BaseModel):
     site_id: str
     site_name: str
     module_type: str
-    config: Optional[dict] = None
+    config: dict | None = None
 
 
 class ModuleResponse(BaseModel):
@@ -40,7 +40,7 @@ class ModuleResponse(BaseModel):
     status: str
     activated_at: str
     health_score: float
-    last_telemetry: Optional[str] = None
+    last_telemetry: str | None = None
 
 
 class ModuleDefinitionResponse(BaseModel):
@@ -48,9 +48,9 @@ class ModuleDefinitionResponse(BaseModel):
     name: str
     version: str
     description: str
-    capabilities: List[dict]
-    integrates_with: List[str]
-    ai_features: List[str]
+    capabilities: list[dict]
+    integrates_with: list[str]
+    ai_features: list[str]
 
 
 class RecommendationRequest(BaseModel):
@@ -60,9 +60,9 @@ class RecommendationRequest(BaseModel):
     title: str
     description: str
     confidence: float = 0.8
-    related_modules: List[str] = []
+    related_modules: list[str] = []
     telemetry_context: dict = {}
-    suggested_action: Optional[dict] = None
+    suggested_action: dict | None = None
     auto_actionable: bool = False
 
 
@@ -75,7 +75,7 @@ class RecommendationResponse(BaseModel):
     title: str
     description: str
     confidence: float
-    related_modules: List[str]
+    related_modules: list[str]
     auto_actionable: bool
     acknowledged: bool
     resolved: bool
@@ -84,9 +84,9 @@ class RecommendationResponse(BaseModel):
 class IntegrationSummaryResponse(BaseModel):
     site_id: str
     site_name: str
-    active_modules: List[dict]
-    active_integrations: List[dict]
-    potential_integrations: List[dict]
+    active_modules: list[dict]
+    active_integrations: list[dict]
+    potential_integrations: list[dict]
     ai_enabled: bool
     pending_recommendations: int
 
@@ -94,7 +94,7 @@ class IntegrationSummaryResponse(BaseModel):
 # ==================== Module Management Endpoints ====================
 
 
-@router.get("/available", response_model=List[ModuleDefinitionResponse])
+@router.get("/available", response_model=list[ModuleDefinitionResponse])
 async def get_available_modules():
     """Get all available module definitions."""
     modules = module_registry.get_available_modules()
@@ -139,7 +139,7 @@ async def get_module_definition(module_type: str):
     )
 
 
-@router.get("/site/{site_id}/active", response_model=List[ModuleResponse])
+@router.get("/site/{site_id}/active", response_model=list[ModuleResponse])
 async def get_active_modules(site_id: str, request: Request):
     """Get all active modules for a site."""
     modules = module_registry.get_active_modules(site_id)
@@ -170,7 +170,7 @@ async def get_active_modules(site_id: str, request: Request):
     ]
 
 
-@router.get("/status/{site_id}", response_model=List[ModuleResponse])
+@router.get("/status/{site_id}", response_model=list[ModuleResponse])
 async def get_modules_status(site_id: str, request: Request):
     """Get module status for a site (alias for /site/{site_id}/active)."""
     modules = module_registry.get_active_modules(site_id)
@@ -313,11 +313,11 @@ async def update_module_health(
 # ==================== AI Recommendations Endpoints ====================
 
 
-@router.get("/site/{site_id}/recommendations", response_model=List[RecommendationResponse])
+@router.get("/site/{site_id}/recommendations", response_model=list[RecommendationResponse])
 async def get_recommendations(
     site_id: str,
-    modules: Optional[str] = Query(None, description="Comma-separated module types to filter"),
-    priorities: Optional[str] = Query(None, description="Comma-separated priorities to filter"),
+    modules: str | None = Query(None, description="Comma-separated module types to filter"),
+    priorities: str | None = Query(None, description="Comma-separated priorities to filter"),
     include_resolved: bool = False,
     limit: int = Query(50, ge=1, le=200),
 ):

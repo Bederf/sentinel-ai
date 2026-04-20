@@ -12,17 +12,17 @@ Usage:
     result = await server.call_tool("read_device_point", device_id="S001-CHILLER-B1-001", point_name="chw_supply_temp")
 """
 
-from typing import Optional, Dict, List, Any
 import asyncio
 import hashlib
 import inspect
-import logging
 import json
+import logging
 import re
 import uuid
-from pathlib import Path
-from datetime import datetime, timedelta
 from collections import defaultdict
+from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Any
 
 from app.core.site_resolver import get_primary_site_code
 from app.services.device_abstraction import device_manager
@@ -31,7 +31,7 @@ from app.services.site_loader import get_site_loader
 logger = logging.getLogger(__name__)
 
 
-def _live_mode_guard(tool_name: str) -> Optional[Dict[str, Any]]:
+def _live_mode_guard(tool_name: str) -> dict[str, Any] | None:
     """Return LIVE_DATA_REQUIRED error if in live mode, else None."""
     from app.config.settings import settings
 
@@ -52,37 +52,37 @@ DEVICES_FILE = Path(__file__).parent.parent / "services" / "bms_simulator" / "da
 ALERTS_FILE = DATA_DIR / "alerts.json"
 
 
-def _load_sites() -> List[Dict[str, Any]]:
+def _load_sites() -> list[dict[str, Any]]:
     """Load sites from JSON file."""
     try:
-        with open(SITES_FILE, "r") as f:
+        with open(SITES_FILE) as f:
             return json.load(f)
     except Exception as e:
         logger.error(f"Failed to load sites: {e}")
         return []
 
 
-def _load_devices() -> List[Dict[str, Any]]:
+def _load_devices() -> list[dict[str, Any]]:
     """Load devices from JSON file."""
     try:
-        with open(DEVICES_FILE, "r") as f:
+        with open(DEVICES_FILE) as f:
             return json.load(f)
     except Exception as e:
         logger.error(f"Failed to load devices: {e}")
         return []
 
 
-def _load_alerts() -> List[Dict[str, Any]]:
+def _load_alerts() -> list[dict[str, Any]]:
     """Load alerts from JSON file."""
     try:
-        with open(ALERTS_FILE, "r") as f:
+        with open(ALERTS_FILE) as f:
             return json.load(f)
     except Exception as e:
         logger.error(f"Failed to load alerts: {e}")
         return []
 
 
-def _calculate_site_health(devices: List[Dict[str, Any]]) -> Dict[str, Any]:
+def _calculate_site_health(devices: list[dict[str, Any]]) -> dict[str, Any]:
     """Calculate site health metrics from devices."""
     if not devices:
         return {"health_score": 100, "critical_alarms": 0, "warnings": 0}
@@ -114,7 +114,7 @@ def _calculate_site_health(devices: List[Dict[str, Any]]) -> Dict[str, Any]:
 # ============================================================================
 
 
-async def get_sites_tool(status_filter: str = "all", region: Optional[str] = None) -> Dict[str, Any]:
+async def get_sites_tool(status_filter: str = "all", region: str | None = None) -> dict[str, Any]:
     """
     List sites with status summary.
 
@@ -139,7 +139,7 @@ async def get_sites_tool(status_filter: str = "all", region: Optional[str] = Non
     devices = _load_devices()
 
     # Group devices by site
-    devices_by_site: Dict[str, List[Dict[str, Any]]] = {}
+    devices_by_site: dict[str, list[dict[str, Any]]] = {}
     for device in devices:
         site_id = device.get("site_id", "unknown")
         if site_id not in devices_by_site:
@@ -173,11 +173,7 @@ async def get_sites_tool(status_filter: str = "all", region: Optional[str] = Non
             continue
 
         # Apply status filter
-        if status_filter == "critical" and health_metrics["critical_alarms"] == 0:
-            continue
-        elif status_filter == "warning" and health_metrics["warnings"] == 0 and health_metrics["critical_alarms"] == 0:
-            continue
-        elif status_filter == "healthy" and (health_metrics["critical_alarms"] > 0 or health_metrics["warnings"] > 0):
+        if (status_filter == "critical" and health_metrics["critical_alarms"] == 0) or (status_filter == "warning" and health_metrics["warnings"] == 0 and health_metrics["critical_alarms"] == 0) or (status_filter == "healthy" and (health_metrics["critical_alarms"] > 0 or health_metrics["warnings"] > 0)):
             continue
 
         sites.append(site)
@@ -186,8 +182,8 @@ async def get_sites_tool(status_filter: str = "all", region: Optional[str] = Non
 
 
 async def get_assets_tool(
-    site_id: str, asset_type: Optional[str] = None, criticality: Optional[str] = None
-) -> Dict[str, Any]:
+    site_id: str, asset_type: str | None = None, criticality: str | None = None
+) -> dict[str, Any]:
     """
     List assets for a site.
 
@@ -263,7 +259,7 @@ async def get_assets_tool(
     return {"assets": assets, "site_id": site_id, "total": len(assets)}
 
 
-async def get_asset_detail_tool(asset_id: str, include: Optional[List[str]] = None) -> Dict[str, Any]:
+async def get_asset_detail_tool(asset_id: str, include: list[str] | None = None) -> dict[str, Any]:
     """
     Get comprehensive asset details.
 
@@ -382,7 +378,7 @@ async def get_asset_detail_tool(asset_id: str, include: Optional[List[str]] = No
     return result
 
 
-async def get_devices_tool(site_id: Optional[str] = None, device_type: Optional[str] = None) -> Dict[str, Any]:
+async def get_devices_tool(site_id: str | None = None, device_type: str | None = None) -> dict[str, Any]:
     """
     List BMS devices.
 
@@ -461,7 +457,7 @@ async def get_devices_tool(site_id: Optional[str] = None, device_type: Optional[
     return {"devices": device_list, "total": len(device_list), "source": "json_file"}
 
 
-async def read_device_point_tool(device_id: str, point_name: str) -> Dict[str, Any]:
+async def read_device_point_tool(device_id: str, point_name: str) -> dict[str, Any]:
     """
     Read a device point value.
 
@@ -531,7 +527,7 @@ async def read_device_point_tool(device_id: str, point_name: str) -> Dict[str, A
 
 async def write_device_point_tool(
     device_id: str, point_name: str, value: Any, priority: int = 8, user: str = "mcp_tool"
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Write a device point value (SAFETY CRITICAL).
 
@@ -632,14 +628,14 @@ async def write_device_point_tool(
 
 
 async def get_alarms_tool(
-    site_id: Optional[str] = None,
-    asset_id: Optional[str] = None,
-    severity: Optional[List[str]] = None,
+    site_id: str | None = None,
+    asset_id: str | None = None,
+    severity: list[str] | None = None,
     state: str = "all",
-    from_time: Optional[str] = None,
-    to_time: Optional[str] = None,
+    from_time: str | None = None,
+    to_time: str | None = None,
     limit: int = 50,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Get alarms with filtering.
 
@@ -692,11 +688,7 @@ async def get_alarms_tool(
 
         # Apply state filter
         alert_status = alert.get("status", "active")
-        if state == "active" and alert_status != "active":
-            continue
-        elif state == "acknowledged" and not alert.get("acknowledged", False):
-            continue
-        elif state == "cleared" and alert_status != "cleared":
+        if (state == "active" and alert_status != "active") or (state == "acknowledged" and not alert.get("acknowledged", False)) or (state == "cleared" and alert_status != "cleared"):
             continue
 
         # Apply time filters
@@ -739,7 +731,7 @@ async def get_alarms_tool(
     return {"alarms": limited_alarms, "total": total, "filtered": len(limited_alarms)}
 
 
-async def search_alarms_tool(query: str, site_id: Optional[str] = None, limit: int = 20) -> Dict[str, Any]:
+async def search_alarms_tool(query: str, site_id: str | None = None, limit: int = 20) -> dict[str, Any]:
     """
     Natural language alarm search with pattern analysis.
 
@@ -829,7 +821,7 @@ async def search_alarms_tool(query: str, site_id: Optional[str] = None, limit: i
             matched_alerts.append(alert)
 
     # Group by asset for pattern analysis
-    asset_groups: Dict[str, List[Dict]] = defaultdict(list)
+    asset_groups: dict[str, list[dict]] = defaultdict(list)
     for alert in matched_alerts:
         asset_key = alert.get("equipment_id") or alert.get("equipment_name") or "unknown"
         asset_groups[asset_key].append(alert)
@@ -899,10 +891,10 @@ async def search_alarms_tool(query: str, site_id: Optional[str] = None, limit: i
 async def get_trends_tool(
     asset_id: str,
     parameter: str,
-    from_time: Optional[str] = None,
-    to_time: Optional[str] = None,
+    from_time: str | None = None,
+    to_time: str | None = None,
     interval: str = "1hour",
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Get historical trend data for an asset parameter.
 
@@ -1022,7 +1014,7 @@ async def get_trends_tool(
     }
 
 
-async def get_health_score_tool(asset_id: Optional[str] = None, site_id: Optional[str] = None) -> Dict[str, Any]:
+async def get_health_score_tool(asset_id: str | None = None, site_id: str | None = None) -> dict[str, Any]:
     """
     Get health score breakdown for an asset or site.
 
@@ -1184,8 +1176,8 @@ async def get_health_score_tool(asset_id: Optional[str] = None, site_id: Optiona
 
 
 async def get_work_orders_tool(
-    site_id: Optional[str] = None, asset_id: Optional[str] = None, status: str = "all", limit: int = 50
-) -> Dict[str, Any]:
+    site_id: str | None = None, asset_id: str | None = None, status: str = "all", limit: int = 50
+) -> dict[str, Any]:
     """
     Get work orders.
 
@@ -1298,9 +1290,9 @@ async def create_work_order_tool(
     asset_id: str,
     description: str,
     priority: str = "medium",
-    suggested_parts: Optional[List[str]] = None,
+    suggested_parts: list[str] | None = None,
     user: str = "mcp_tool",
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Create a work order (SAFETY CRITICAL - includes audit logging).
 
@@ -1399,11 +1391,11 @@ async def create_work_order_tool(
 
 
 async def get_contracts_tool(
-    site_id: Optional[str] = None,
-    organization_code: Optional[str] = None,
-    status: Optional[str] = None,
+    site_id: str | None = None,
+    organization_code: str | None = None,
+    status: str | None = None,
     include_sla: bool = False,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Get contracts with optional filters.
 
@@ -1436,7 +1428,7 @@ async def get_contracts_tool(
                 continue
 
             try:
-                with open(contract_file, "r") as f:
+                with open(contract_file) as f:
                     contract_data = json.load(f)
             except Exception as e:
                 logger.warning(f"Failed to load contract for {site_dir.name}: {e}")
@@ -1483,10 +1475,10 @@ async def add_site_contract_tool(
     monthly_fee_zar: float,
     start_date: str,
     end_date: str,
-    sla_terms: Optional[List[Dict[str, Any]]] = None,
-    budget: Optional[Dict[str, Any]] = None,
-    condition_assessment: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
+    sla_terms: list[dict[str, Any]] | None = None,
+    budget: dict[str, Any] | None = None,
+    condition_assessment: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """
     Create a detailed contract for a site.
 
@@ -1565,7 +1557,7 @@ async def add_site_contract_tool(
     site_file = site_path / "site.json"
     if site_file.exists():
         try:
-            with open(site_file, "r") as f:
+            with open(site_file) as f:
                 site_data = json.load(f)
 
             site_data["client_name"] = organization_name
@@ -1591,8 +1583,8 @@ async def add_site_contract_tool(
 
 
 async def get_contract_profitability_tool(
-    site_code: Optional[str] = None, year: Optional[int] = None, month: Optional[int] = None
-) -> Dict[str, Any]:
+    site_code: str | None = None, year: int | None = None, month: int | None = None
+) -> dict[str, Any]:
     """
     Get contract profitability snapshot.
 
@@ -1627,7 +1619,7 @@ async def get_contract_profitability_tool(
                 continue
 
             try:
-                with open(contract_file, "r") as f:
+                with open(contract_file) as f:
                     contract_data = json.load(f)
             except Exception as e:
                 logger.warning(f"Failed to load contract for {site_dir.name}: {e}")
@@ -1695,8 +1687,8 @@ async def process_municipal_bill_tool(
     municipality: str,
     utility_type: str,
     account_number: str,
-    tariff_type: Optional[str] = None,
-) -> Dict[str, Any]:
+    tariff_type: str | None = None,
+) -> dict[str, Any]:
     """
     Process South African municipal utility bill PDF.
 
@@ -1716,6 +1708,7 @@ async def process_municipal_bill_tool(
         Dictionary with extracted data, invoice ID, confidence score
     """
     from pathlib import Path
+
     from app.services.municipal_pdf_extraction_service import MunicipalPdfExtractionService
 
     # Validate PDF exists
@@ -1831,15 +1824,15 @@ async def process_municipal_bill_tool(
         logger.error(f"Error processing municipal bill: {exc}", exc_info=True)
         return {
             "error": "processing_failed",
-            "message": f"Failed to process PDF: {str(exc)}",
+            "message": f"Failed to process PDF: {exc!s}",
             "site_id": site_id,
             "pdf_file": pdf_file_path,
         }
 
 
 async def get_utility_costs_tool(
-    site_id: str, period_start: Optional[str] = None, period_end: Optional[str] = None
-) -> Dict[str, Any]:
+    site_id: str, period_start: str | None = None, period_end: str | None = None
+) -> dict[str, Any]:
     """
     Get utility cost analysis for a site from municipal bills.
 
@@ -1856,6 +1849,7 @@ async def get_utility_costs_tool(
         Cost analysis with totals, averages, and trends
     """
     from datetime import date, timedelta
+
     from app.database.repositories.municipal_invoice_repository import MunicipalInvoiceRepository
 
     try:
@@ -1929,7 +1923,7 @@ async def get_utility_costs_tool(
         logger.error(f"Error getting utility costs: {exc}", exc_info=True)
         return {
             "error": "query_failed",
-            "message": f"Failed to query utility costs: {str(exc)}",
+            "message": f"Failed to query utility costs: {exc!s}",
             "site_id": site_id,
         }
 
@@ -1939,7 +1933,7 @@ async def get_utility_costs_tool(
 # ============================================================================
 
 
-async def list_managed_sites_tool() -> Dict[str, Any]:
+async def list_managed_sites_tool() -> dict[str, Any]:
     """List all managed sites."""
     loader = get_site_loader()
     loader.load(force=True)
@@ -1967,13 +1961,13 @@ async def create_site_tool(
     site_id: str,
     name: str,
     address: str = "",
-    floors: List[str] = None,
-    features: Dict[str, bool] = None,
-    client_name: Optional[str] = None,
-    monthly_fee_zar: Optional[float] = None,
-    contract_start: Optional[str] = None,
-    contract_end: Optional[str] = None,
-) -> Dict[str, Any]:
+    floors: list[str] = None,
+    features: dict[str, bool] = None,
+    client_name: str | None = None,
+    monthly_fee_zar: float | None = None,
+    contract_start: str | None = None,
+    contract_end: str | None = None,
+) -> dict[str, Any]:
     """Create a new site configuration.
 
     Writes to both Supabase (primary) and JSON files (backup).
@@ -2135,7 +2129,7 @@ async def create_site_tool(
 async def activate_site_tool(
     site_id: str,
     set_default: bool = False,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Activate a site (add to registry)."""
     import json
     from pathlib import Path
@@ -2183,7 +2177,7 @@ async def activate_site_tool(
     }
 
 
-async def get_site_config_tool(site_id: str) -> Dict[str, Any]:
+async def get_site_config_tool(site_id: str) -> dict[str, Any]:
     """Get a site's full configuration."""
     # Resolve to primary registered site if not specified
     site_id = site_id or get_primary_site_code() or "unknown"
@@ -2222,8 +2216,8 @@ async def get_site_config_tool(site_id: str) -> Dict[str, Any]:
 
 async def add_site_zones_tool(
     site_id: str,
-    zones: List[Dict[str, Any]],
-) -> Dict[str, Any]:
+    zones: list[dict[str, Any]],
+) -> dict[str, Any]:
     """
     Add HVAC zones to a site with equipment mappings.
 
@@ -2363,8 +2357,8 @@ async def add_site_zones_tool(
 
 async def add_site_desks_tool(
     site_id: str,
-    desks: List[Dict[str, Any]],
-) -> Dict[str, Any]:
+    desks: list[dict[str, Any]],
+) -> dict[str, Any]:
     """
     Add desks to a site with zone mappings, DALI lighting, and environmental context.
 
@@ -2514,9 +2508,9 @@ async def add_site_desks_tool(
 
 async def add_site_devices_tool(
     site_id: str,
-    devices: List[Dict[str, Any]],
+    devices: list[dict[str, Any]],
     site_code: str = None,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Add BMS devices to the system for a site.
 
@@ -2604,10 +2598,10 @@ async def add_site_devices_tool(
 
 async def import_point_list_tool(
     site_id: str,
-    point_list: List[Dict[str, Any]],
+    point_list: list[dict[str, Any]],
     site_code: str = None,
     bms_vendor: str = None,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Import BACnet point list and auto-generate device/zone structure.
 
@@ -2927,9 +2921,9 @@ async def import_point_list_tool(
 
 async def import_controller_list_tool(
     site_id: str,
-    controllers: List[Dict[str, Any]],
+    controllers: list[dict[str, Any]],
     site_code: str = None,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Import BMS controller information and create device structure.
 
@@ -3004,7 +2998,7 @@ async def import_controller_list_tool(
 async def control_dali_device_tool(
     equipment_code: str,
     action: str,
-    value: Optional[Any] = None,
+    value: Any | None = None,
     reason: str = "",
     priority: int = 8,
 ) -> dict:
@@ -3113,7 +3107,7 @@ async def control_dali_device_tool(
     except Exception as e:
         return {
             "success": False,
-            "error": f"Control command failed: {str(e)}",
+            "error": f"Control command failed: {e!s}",
             "equipment_code": equipment_code,
         }
 
@@ -3127,10 +3121,10 @@ async def discover_tridonic_gateway_tool(
     site_id: str,
     gateway_ip: str,
     gateway_type: str = "tridonic",
-    username: Optional[str] = None,
-    password: Optional[str] = None,
+    username: str | None = None,
+    password: str | None = None,
     use_simulated: bool = False,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Discover Tridonic DALI gateway and enumerate all devices.
 
@@ -4218,8 +4212,8 @@ ASSET_METRIC_TEMPLATES = {
 
 async def get_asset_metrics_template_tool(
     site_id: str,
-    equipment_types: List[str] = None,
-) -> Dict[str, Any]:
+    equipment_types: list[str] = None,
+) -> dict[str, Any]:
     """
     Get asset metric templates for a site during onboarding.
 
@@ -4276,7 +4270,7 @@ async def get_asset_metrics_template_tool(
                     if device.get("site_id") == site_id:
                         device_type = device.get("device_type", "").lower()
                         # Map device types to templates
-                        for template_type in ASSET_METRIC_TEMPLATES.keys():
+                        for template_type in ASSET_METRIC_TEMPLATES:
                             if template_type in device_type:
                                 equipment_types.add(template_type)
                                 break
@@ -4311,9 +4305,9 @@ async def get_asset_metrics_template_tool(
 
 async def configure_asset_metrics_tool(
     site_id: str,
-    metric_config: Dict[str, Any],
+    metric_config: dict[str, Any],
     save_to_file: bool = True,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Configure asset metrics for a site after onboarding.
 
@@ -4354,8 +4348,8 @@ async def configure_asset_metrics_tool(
         Configuration summary with next steps
     """
     import json
-    from pathlib import Path
     from datetime import datetime
+    from pathlib import Path
 
     sites_path = Path(__file__).parent.parent / "data" / "sites"
     site_path = sites_path / site_id
@@ -4450,7 +4444,7 @@ async def configure_asset_metrics_tool(
 # ============================================================================
 
 
-async def get_solar_overview_tool(site_id: str | None = None) -> Dict[str, Any]:
+async def get_solar_overview_tool(site_id: str | None = None) -> dict[str, Any]:
     """Get solar site overview — generation, BESS SOC, grid status, PR.
 
     MCP Tool: get_solar_overview
@@ -4470,7 +4464,7 @@ async def get_solar_overview_tool(site_id: str | None = None) -> Dict[str, Any]:
         return {"error": str(e)}
 
 
-async def get_bess_status_tool(site_id: str | None = None) -> Dict[str, Any]:
+async def get_bess_status_tool(site_id: str | None = None) -> dict[str, Any]:
     """Get BESS status — SOC, mode, health, dispatch schedule.
 
     MCP Tool: get_bess_status
@@ -4504,7 +4498,7 @@ async def get_bess_status_tool(site_id: str | None = None) -> Dict[str, Any]:
 async def get_solar_savings_tool(
     site_id: str | None = None,
     period: str = "ytd",
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Get financial summary — daily/monthly/YTD savings breakdown.
 
     MCP Tool: get_solar_savings
@@ -4524,7 +4518,7 @@ async def get_solar_savings_tool(
 async def get_solar_forecast_tool(
     site_id: str | None = None,
     hours: int = 24,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Get next 24h generation forecast with confidence.
 
     MCP Tool: get_solar_forecast
@@ -4541,7 +4535,7 @@ async def get_solar_forecast_tool(
         return {"error": str(e)}
 
 
-async def get_solar_diagnostics_tool(site_id: str | None = None) -> Dict[str, Any]:
+async def get_solar_diagnostics_tool(site_id: str | None = None) -> dict[str, Any]:
     """Get solar diagnostics — top issues, underperformers, maintenance.
 
     MCP Tool: get_solar_diagnostics
@@ -5608,7 +5602,7 @@ class SIMBIOTMCPServer:
     def __init__(self):
         """Initialize SIMBIOT MCP server."""
         # Import registry tools (code search, code fetch, code_structure)
-        from app.mcp.tools.registry import get_all_tools, get_all_handlers
+        from app.mcp.tools.registry import get_all_handlers, get_all_tools
 
         # Merge MCP_TOOLS with registry tools
         self.tools = MCP_TOOLS + get_all_tools()
@@ -5680,7 +5674,7 @@ class SIMBIOTMCPServer:
         current_hash = self._compute_manifest_hash()
         return current_hash == self._manifest_hash
 
-    def list_tools(self) -> List[Dict[str, Any]]:
+    def list_tools(self) -> list[dict[str, Any]]:
         """List available MCP tools with their schemas."""
         return self.tools
 
@@ -5693,9 +5687,9 @@ class SIMBIOTMCPServer:
           _approval_token: pre-approved token for high-risk tools
         """
         from app.mcp.tool_permissions import (
+            HIGH_RISK_TOOLS,
             MUTATING_TOOLS,
             PUBLIC_TOOLS,
-            HIGH_RISK_TOOLS,
             check_mcp_tool_access,
             extract_site_id_from_args,
         )
@@ -5724,8 +5718,8 @@ class SIMBIOTMCPServer:
         # Reads are fail-open: policy engine errors don't block read tools.
         if tool_name in MUTATING_TOOLS:
             try:
-                from app.services.control_policy_engine import get_control_policy_engine
                 from app.models.control_policy import ControlMode
+                from app.services.control_policy_engine import get_control_policy_engine
 
                 policy_engine = get_control_policy_engine()
                 control_mode = policy_engine.get_control_mode()
@@ -5837,8 +5831,8 @@ class SIMBIOTMCPServer:
         envelope = None
         if tool_name in MUTATING_TOOLS:
             try:
-                from app.services.control_policy_engine import get_control_policy_engine
                 from app.models.control_policy import ControlMode
+                from app.services.control_policy_engine import get_control_policy_engine
 
                 policy_engine = get_control_policy_engine()
                 control_mode = policy_engine.get_control_mode()
@@ -5899,7 +5893,7 @@ class SIMBIOTMCPServer:
                 )
 
             return result
-        except asyncio.TimeoutError:
+        except TimeoutError:
             if envelope is not None:
                 envelope.executed = False
                 envelope.execution_result = False
@@ -5908,7 +5902,7 @@ class SIMBIOTMCPServer:
                 "code": "TIMEOUT",
             }
 
-    def get_tool_schema(self, tool_name: str) -> Optional[Dict[str, Any]]:
+    def get_tool_schema(self, tool_name: str) -> dict[str, Any] | None:
         """Get JSON schema for a specific tool."""
         for tool in self.tools:
             if tool["name"] == tool_name:

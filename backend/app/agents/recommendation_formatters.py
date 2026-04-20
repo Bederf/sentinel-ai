@@ -12,7 +12,7 @@ Channels:
 LLM usage: Zero. All formatting is pure Python string building.
 """
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 
 def _equipment_label(equipment_code: str) -> str:
@@ -73,9 +73,9 @@ def _tier_label(tier: str) -> str:
 
 
 def format_advisory_for_chat(
-    rec: Dict[str, Any],
-    impact: Dict[str, Any],
-    tier_result: Optional[Dict[str, Any]] = None,
+    rec: dict[str, Any],
+    impact: dict[str, Any],
+    tier_result: dict[str, Any] | None = None,
 ) -> str:
     """Format Tier 1 advisory for dashboard/chat display.
 
@@ -116,9 +116,9 @@ def format_advisory_for_chat(
 
 
 def format_advisory_for_system(
-    rec: Dict[str, Any],
-    impact: Dict[str, Any],
-    tier_result: Optional[Dict[str, Any]] = None,
+    rec: dict[str, Any],
+    impact: dict[str, Any],
+    tier_result: dict[str, Any] | None = None,
 ) -> str:
     """Format Tier 1 advisory for system log.
 
@@ -145,9 +145,9 @@ def format_advisory_for_system(
 
 
 def format_approval_request_whatsapp(
-    rec: Dict[str, Any],
-    impact: Dict[str, Any],
-    tier_result: Optional[Dict[str, Any]] = None,
+    rec: dict[str, Any],
+    impact: dict[str, Any],
+    tier_result: dict[str, Any] | None = None,
 ) -> str:
     """Format Tier 2 approval request for WhatsApp.
 
@@ -192,9 +192,9 @@ def format_approval_request_whatsapp(
 
 
 def format_approval_request_telegram(
-    rec: Dict[str, Any],
-    impact: Dict[str, Any],
-    tier_result: Optional[Dict[str, Any]] = None,
+    rec: dict[str, Any],
+    impact: dict[str, Any],
+    tier_result: dict[str, Any] | None = None,
 ) -> str:
     """Format Tier 2 approval request for Telegram.
 
@@ -244,8 +244,8 @@ def format_approval_request_telegram(
 
 
 def format_execution_result(
-    rec: Dict[str, Any],
-    result: Dict[str, Any],
+    rec: dict[str, Any],
+    result: dict[str, Any],
     channel: str = "system",
 ) -> str:
     """Format execution result for any channel.
@@ -283,7 +283,7 @@ def _format_exec_system(
     success: bool,
     cov: bool,
     status: str,
-    result: Dict[str, Any],
+    result: dict[str, Any],
 ) -> str:
     icon = "OK" if success else "FAIL"
     cov_str = "COV_OK" if cov else "COV_FAIL"
@@ -323,7 +323,7 @@ def _format_exec_chat(
     success: bool,
     cov: bool,
     status: str,
-    result: Dict[str, Any],
+    result: dict[str, Any],
 ) -> str:
     icon = "Success" if success else "Failed"
     lines = [
@@ -344,7 +344,7 @@ def _format_exec_chat(
 
 
 def format_batch_summary(
-    results: list[Dict[str, Any]],
+    results: list[dict[str, Any]],
     channel: str = "system",
 ) -> str:
     """Format a batch processing summary.

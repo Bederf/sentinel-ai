@@ -625,8 +625,9 @@ async def startup_event(app: FastAPI) -> None:
         Default PIN: SENTINEL_ADMIN — user must change it via Settings UI after first login.
         """
         try:
-            from app.database.repositories.system_settings_repository import SystemSettingsRepository
             import bcrypt
+
+            from app.database.repositories.system_settings_repository import SystemSettingsRepository
 
             repo = SystemSettingsRepository()
             existing = repo.get_value("settings_admin_password")

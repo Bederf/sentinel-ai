@@ -8,12 +8,11 @@ import pytest
 
 from app.models.load_forecast import LoadForecast, LoadInterval
 from app.services.load_forecast_service import (
+    _SEASONAL_TEMPS,
     LoadForecastService,
     _simulated_site_load,
     _synthetic_solar_kw,
-    _SEASONAL_TEMPS,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures

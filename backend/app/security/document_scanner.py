@@ -26,7 +26,6 @@ import subprocess
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
 
 from app.security.constants import (
     ALLOWED_MAGIC_BYTES,
@@ -85,7 +84,7 @@ class ScanResult:
 # ---------------------------------------------------------------------------
 
 
-def detect_file_type(content: bytes) -> Optional[str]:
+def detect_file_type(content: bytes) -> str | None:
     """Detect file type from magic bytes.
 
     Returns the type name (``"JPEG"``, ``"PNG"``, ``"PDF"``) or ``None``

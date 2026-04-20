@@ -8,8 +8,8 @@ from fastapi import FastAPI  # noqa: E402
 
 from app.config.settings import settings  # noqa: E402
 from app.logging_config import setup_logging  # noqa: E402
-from app.startup.middleware import register_middleware, register_exception_handlers  # noqa: E402
 from app.startup.events import app_lifespan  # noqa: E402
+from app.startup.middleware import register_exception_handlers, register_middleware  # noqa: E402
 from app.startup.routes import register_all_routes  # noqa: E402
 
 # Configure structured logging (file handlers for Promtail/Loki)

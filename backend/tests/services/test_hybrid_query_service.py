@@ -1,7 +1,9 @@
 """Tests for Hybrid Knowledge Layer Query Service."""
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+
 from app.services.hybrid_query_service import (
     HybridContext,
     HybridQueryService,
@@ -223,16 +225,15 @@ class TestHybridQueryService:
         with patch(
             "app.services.hybrid_query_service.HybridQueryService._gather_brick_context",
             new_callable=AsyncMock,
+        ), patch(
+            "app.database.repositories.equipment_repository.get_equipment_repository",
+            return_value=mock_repo,
         ):
-            with patch(
-                "app.database.repositories.equipment_repository.get_equipment_repository",
-                return_value=mock_repo,
-            ):
-                ctx = await svc.query(
-                    equipment_id="S002-CHILLER-B1-001",
-                    include_documents=False,
-                    include_ml=False,
-                )
+            ctx = await svc.query(
+                equipment_id="S002-CHILLER-B1-001",
+                include_documents=False,
+                include_ml=False,
+            )
 
         assert ctx.telemetry.get("operating_data", {}).get("runtime_hours") == 12000
         assert "telemetry" in ctx.sources_used
@@ -258,13 +259,12 @@ class TestHybridQueryService:
         with patch(
             "app.services.concept_document_search.get_concept_document_search_service",
             return_value=mock_search_svc,
-        ):
-            with patch.object(svc, "_record_retrieval_telemetry") as mock_record:
-                await svc._gather_document_context(
-                    ctx=ctx,
-                    equipment_id="S002-GEN-B1-001",
-                    question="latest generator report",
-                )
+        ), patch.object(svc, "_record_retrieval_telemetry") as mock_record:
+            await svc._gather_document_context(
+                ctx=ctx,
+                equipment_id="S002-GEN-B1-001",
+                question="latest generator report",
+            )
 
         assert ctx.retrieval_telemetry is not None
         assert ctx.retrieval_telemetry["retrieval_path"] == "canonical_doc_rag"

@@ -5,14 +5,14 @@ Manages user licensing and module access based on subscription/purchase.
 Users can only access modules they have been granted.
 """
 
-from fastapi import APIRouter, Depends, HTTPException
-from typing import List
-
-from app.models.auth import AuthContext, AuthLevel
-from app.middleware.auth_middleware import require_auth
-from app.database.repositories.user_entitlements_repository import get_user_entitlements_repository
-from app.models.user_entitlements import PRESET_ENTITLEMENTS
 import logging
+
+from fastapi import APIRouter, Depends, HTTPException
+
+from app.database.repositories.user_entitlements_repository import get_user_entitlements_repository
+from app.middleware.auth_middleware import require_auth
+from app.models.auth import AuthContext, AuthLevel
+from app.models.user_entitlements import PRESET_ENTITLEMENTS
 
 logger = logging.getLogger(__name__)
 
@@ -88,7 +88,7 @@ async def get_user_entitlements(user_email: str, auth: AuthContext = Depends(req
 
 @router.post("/{user_email}")
 async def set_user_entitlements(
-    user_email: str, modules: List[str], auth: AuthContext = Depends(require_auth(AuthLevel.ADMIN))
+    user_email: str, modules: list[str], auth: AuthContext = Depends(require_auth(AuthLevel.ADMIN))
 ) -> dict:
     """Set modules for a user (admin only).
 

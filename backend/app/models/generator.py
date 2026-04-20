@@ -6,7 +6,7 @@ Supports N+1 redundancy, diesel fuel tracking, and predictive maintenance.
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import List, Dict, Any, Optional
+from typing import Any
 
 
 class GeneratorStatus(str, Enum):
@@ -49,13 +49,13 @@ class DieselTank:
     current_level_pct: float
     low_level_alarm_pct: float = 20.0
     reorder_level_pct: float = 30.0
-    last_fill_date: Optional[str] = None
-    last_fill_liters: Optional[float] = None
+    last_fill_date: str | None = None
+    last_fill_liters: float | None = None
     daily_consumption_avg: float = 0.0  # Average L/day based on runtime
-    days_remaining: Optional[float] = None  # Estimated days until empty
-    supplier: Optional[str] = None
+    days_remaining: float | None = None  # Estimated days until empty
+    supplier: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "tank_id": self.tank_id,
@@ -80,15 +80,15 @@ class GeneratorEngine:
     rpm: int = 0
     oil_pressure_kpa: float = 0.0
     coolant_temp_c: float = 0.0
-    oil_temp_c: Optional[float] = None
-    exhaust_temp_c: Optional[float] = None
-    turbo_pressure_kpa: Optional[float] = None
+    oil_temp_c: float | None = None
+    exhaust_temp_c: float | None = None
+    turbo_pressure_kpa: float | None = None
     run_hours: float = 0.0
     total_starts: int = 0
     current_runtime_sec: int = 0
     fuel_rate_lph: float = 0.0  # Liters per hour
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "rpm": self.rpm,
@@ -123,7 +123,7 @@ class GeneratorElectrical:
     power_factor: float = 0.0
     total_kwh: float = 0.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "voltage_l1": self.voltage_l1,
@@ -153,7 +153,7 @@ class GeneratorAlarm:
     timestamp: str
     acknowledged: bool = False
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "code": self.code,
@@ -203,26 +203,26 @@ class Generator:
 
     # Fuel
     fuel_level_pct: float = 100.0
-    fuel_tank_id: Optional[str] = None  # Reference to shared tank
+    fuel_tank_id: str | None = None  # Reference to shared tank
 
     # Sub-structures (populated from telemetry)
-    engine: Optional[Dict] = None
-    electrical: Optional[Dict] = None
-    alarms: List[Dict] = field(default_factory=list)
+    engine: dict | None = None
+    electrical: dict | None = None
+    alarms: list[dict] = field(default_factory=list)
 
     # Maintenance
     next_service_hours: float = 500.0
-    last_service_date: Optional[str] = None
+    last_service_date: str | None = None
 
     # Redundancy group
-    group_id: Optional[str] = None  # For N+1 grouping
+    group_id: str | None = None  # For N+1 grouping
     priority: int = 1  # Start priority within group (1=primary)
 
     # Communication
-    last_poll: Optional[str] = None
+    last_poll: str | None = None
     poll_errors: int = 0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "generator_id": self.generator_id,
@@ -259,7 +259,7 @@ class Generator:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Generator":
+    def from_dict(cls, data: dict[str, Any]) -> "Generator":
         """Create instance from dictionary."""
         return cls(
             generator_id=data.get("generator_id", ""),
@@ -311,7 +311,7 @@ class GeneratorGroup:
     transfer_mode: str = "open"  # "open", "closed", "soft_load"
 
     # Generator references
-    generator_ids: List[str] = field(default_factory=list)
+    generator_ids: list[str] = field(default_factory=list)
 
     # Current state
     generators_running: int = 0
@@ -324,9 +324,9 @@ class GeneratorGroup:
     mains_healthy: bool = True
 
     # Shared fuel
-    diesel_tank_id: Optional[str] = None
+    diesel_tank_id: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "group_id": self.group_id,
@@ -347,7 +347,7 @@ class GeneratorGroup:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "GeneratorGroup":
+    def from_dict(cls, data: dict[str, Any]) -> "GeneratorGroup":
         """Create instance from dictionary."""
         return cls(
             group_id=data.get("group_id", ""),
@@ -374,13 +374,13 @@ class PredictiveIndicator:
 
     parameter: str
     current_value: float
-    threshold_low: Optional[float] = None
-    threshold_high: Optional[float] = None
+    threshold_low: float | None = None
+    threshold_high: float | None = None
     trend: str = "stable"  # "improving", "stable", "degrading", "critical"
-    days_to_threshold: Optional[int] = None
-    recommendation: Optional[str] = None
+    days_to_threshold: int | None = None
+    recommendation: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "parameter": self.parameter,
@@ -400,10 +400,10 @@ class GeneratorHealth:
     generator_id: str
     overall_score: float  # 0-100
     status: str  # "healthy", "attention", "warning", "critical"
-    indicators: List[PredictiveIndicator] = field(default_factory=list)
-    last_assessment: Optional[str] = None
+    indicators: list[PredictiveIndicator] = field(default_factory=list)
+    last_assessment: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "generator_id": self.generator_id,

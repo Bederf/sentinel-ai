@@ -6,7 +6,7 @@ import json
 import logging
 from datetime import date
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from app.database.supabase_client import get_supabase_client
 
@@ -26,22 +26,22 @@ class TariffScheduleRepository:
         self._json_path = Path("backend/app/data/municipal_tariff_schedules.json")
         self._json_path.parent.mkdir(parents=True, exist_ok=True)
 
-    def _load_json(self) -> Dict[str, Any]:
+    def _load_json(self) -> dict[str, Any]:
         if not self._json_path.exists():
             return {"tariffs": []}
-        with open(self._json_path, "r") as f:
+        with open(self._json_path) as f:
             return json.load(f)
 
-    def _save_json(self, data: Dict[str, Any]) -> None:
+    def _save_json(self, data: dict[str, Any]) -> None:
         with open(self._json_path, "w") as f:
             json.dump(data, f, indent=2, default=str)
 
     def list_tariffs(
         self,
-        municipality: Optional[str] = None,
-        utility_type: Optional[str] = None,
-        active_date: Optional[date] = None,
-    ) -> List[Dict[str, Any]]:
+        municipality: str | None = None,
+        utility_type: str | None = None,
+        active_date: date | None = None,
+    ) -> list[dict[str, Any]]:
         if self.client:
             try:
                 query = self.client.table("municipal_tariff_schedules").select("*")
@@ -76,8 +76,8 @@ class TariffScheduleRepository:
         self,
         municipality: str,
         tariff_name: str,
-        active_date: Optional[date] = None,
-    ) -> Optional[Dict[str, Any]]:
+        active_date: date | None = None,
+    ) -> dict[str, Any] | None:
         if self.client:
             try:
                 query = (
@@ -102,7 +102,7 @@ class TariffScheduleRepository:
                 return tariff
         return None
 
-    def upsert_tariff(self, payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def upsert_tariff(self, payload: dict[str, Any]) -> dict[str, Any] | None:
         if self.client:
             try:
                 result = self.client.table("municipal_tariff_schedules").upsert(payload).execute()

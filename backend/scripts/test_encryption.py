@@ -126,7 +126,7 @@ def test_audit_logger_encryption():
     # Verify encryption on disk
     print("Verifying encryption in storage:")
     if log_file.exists():
-        with open(log_file, "r") as f:
+        with open(log_file) as f:
             data = json.load(f)
 
         print(f"  Total entries: {data['entry_count']}")
@@ -233,7 +233,7 @@ def main():
 
         return 0
 
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         print_section("Error")
         print(f"✗ Test failed: {e}")
         import traceback

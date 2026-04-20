@@ -11,7 +11,7 @@ Prefix: /contracts (registered as /api/contracts in main.py)
 
 import logging
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
@@ -43,7 +43,7 @@ class StatusChangeRequest(BaseModel):
     """Request body for contract status change."""
 
     status: str
-    reason: Optional[str] = None
+    reason: str | None = None
 
 
 # ============================================================================
@@ -53,7 +53,7 @@ class StatusChangeRequest(BaseModel):
 
 @router.get("/organizations")
 async def list_organizations(
-    tier: Optional[str] = Query(None, description="Filter by tier (platinum, gold, silver, bronze)"),
+    tier: str | None = Query(None, description="Filter by tier (platinum, gold, silver, bronze)"),
 ):
     """
     List all organizations with optional tier filter.
@@ -126,9 +126,9 @@ async def update_organization(org_id: str, data: OrganizationUpdate):
 
 @router.get("/")
 async def list_contracts(
-    site_id: Optional[str] = Query(None, description="Filter by building UUID"),
-    organization_id: Optional[str] = Query(None, description="Filter by organization UUID"),
-    status: Optional[str] = Query(None, description="Filter by status (draft, active, expired, etc.)"),
+    site_id: str | None = Query(None, description="Filter by building UUID"),
+    organization_id: str | None = Query(None, description="Filter by organization UUID"),
+    status: str | None = Query(None, description="Filter by status (draft, active, expired, etc.)"),
     limit: int = Query(100, ge=1, le=500, description="Maximum results"),
 ):
     """
@@ -241,7 +241,7 @@ async def change_contract_status(contract_id: str, body: StatusChangeRequest):
                 status_code=400,
                 detail=f"Cannot terminate contract in status '{contract.get('status')}'",
             )
-        update_data: Dict[str, Any] = {"status": "terminated"}
+        update_data: dict[str, Any] = {"status": "terminated"}
         if body.reason:
             existing_notes = contract.get("notes") or ""
             update_data["notes"] = existing_notes + f"\n[TERMINATED {datetime.utcnow().isoformat()}] {body.reason}"
@@ -444,7 +444,7 @@ async def unassign_equipment(contract_id: str, equipment_id: str):
 @router.get("/{contract_id}/budgets")
 async def list_budgets(
     contract_id: str,
-    year: Optional[int] = Query(None, description="Filter by budget year"),
+    year: int | None = Query(None, description="Filter by budget year"),
 ):
     """
     List budget entries for a contract.
@@ -519,10 +519,10 @@ async def capture_budget_actuals(
 @router.get("/{contract_id}/budget-variance/alerts")
 async def list_budget_variance_alerts(
     contract_id: str,
-    year: Optional[int] = Query(None, description="Budget year"),
-    month: Optional[int] = Query(None, description="Budget month"),
-    status: Optional[str] = Query(None, description="Alert status (open, acknowledged, resolved)"),
-    severity: Optional[str] = Query(None, description="Severity (warning, critical)"),
+    year: int | None = Query(None, description="Budget year"),
+    month: int | None = Query(None, description="Budget month"),
+    status: str | None = Query(None, description="Alert status (open, acknowledged, resolved)"),
+    severity: str | None = Query(None, description="Severity (warning, critical)"),
 ):
     """
     List budget variance alerts for a contract.
@@ -571,7 +571,7 @@ async def update_budget_alert_status(
 async def get_budget_report(
     contract_id: str,
     year: int = Query(..., ge=2000, le=2100, description="Budget year"),
-    month: Optional[int] = Query(None, ge=1, le=12, description="Optional month filter"),
+    month: int | None = Query(None, ge=1, le=12, description="Optional month filter"),
 ):
     """
     Get budget report with monthly breakdown and totals.
@@ -587,15 +587,16 @@ async def get_budget_report(
 async def export_budget_report(
     contract_id: str,
     year: int = Query(..., ge=2000, le=2100, description="Budget year"),
-    month: Optional[int] = Query(None, ge=1, le=12, description="Optional month filter"),
+    month: int | None = Query(None, ge=1, le=12, description="Optional month filter"),
     format: str = Query("csv", description="Export format: csv or pdf"),
 ):
     """
     Export budget report as CSV or PDF.
     """
     from fastapi.responses import Response
-    from app.services.budget_reporting_service import get_budget_reporting_service
+
     from app.services.budget_export_service import export_budget_report_csv, export_budget_report_pdf
+    from app.services.budget_reporting_service import get_budget_reporting_service
 
     service = get_budget_reporting_service()
     report = service.build_report(contract_id, year, month=month)
@@ -664,7 +665,7 @@ async def create_budget_from_template(
     contract_id: str = Query(..., description="Contract UUID"),
     equipment_type: str = Query(..., description="Equipment type for template lookup"),
     year: int = Query(..., description="Budget year", ge=2020, le=2100),
-    month: Optional[int] = Query(None, description="Budget month (1-12), if None creates annual budget", ge=1, le=12),
+    month: int | None = Query(None, description="Budget month (1-12), if None creates annual budget", ge=1, le=12),
 ):
     """
     Create a budget entry using equipment-type template defaults.
@@ -711,7 +712,7 @@ async def create_budget_from_template(
 
 @router.get("/assessments")
 async def list_assessments(
-    site_id: Optional[str] = Query(None, description="Filter by building UUID"),
+    site_id: str | None = Query(None, description="Filter by building UUID"),
 ):
     """
     List all condition assessments.
@@ -763,8 +764,8 @@ async def get_equipment_assessment(equipment_id: str):
 
 @router.get("/profitability/portfolio")
 async def get_portfolio_profitability(
-    period_start: Optional[str] = Query(None, description="Period start (YYYY-MM-DD)"),
-    period_end: Optional[str] = Query(None, description="Period end (YYYY-MM-DD)"),
+    period_start: str | None = Query(None, description="Period start (YYYY-MM-DD)"),
+    period_end: str | None = Query(None, description="Period end (YYYY-MM-DD)"),
 ):
     """
     Get portfolio-wide profitability metrics.
@@ -773,6 +774,7 @@ async def get_portfolio_profitability(
     across all active contracts for the specified period.
     """
     from datetime import date, timedelta
+
     from app.services.profitability_service import get_profitability_service
 
     # Default to current month
@@ -798,8 +800,8 @@ async def get_portfolio_profitability(
 @router.get("/profitability/contract/{contract_id}")
 async def get_contract_profitability(
     contract_id: str,
-    period_start: Optional[str] = Query(None, description="Period start (YYYY-MM-DD)"),
-    period_end: Optional[str] = Query(None, description="Period end (YYYY-MM-DD)"),
+    period_start: str | None = Query(None, description="Period start (YYYY-MM-DD)"),
+    period_end: str | None = Query(None, description="Period end (YYYY-MM-DD)"),
 ):
     """
     Get detailed profitability for a single contract.
@@ -808,6 +810,7 @@ async def get_contract_profitability(
     trend data, and asset metrics for the specified contract.
     """
     from datetime import date, timedelta
+
     from app.services.profitability_service import get_profitability_service
 
     # Default to current month
@@ -832,8 +835,8 @@ async def get_contract_profitability(
 
 @router.get("/profitability/loss-leaders")
 async def get_loss_leaders(
-    period_start: Optional[str] = Query(None, description="Period start (YYYY-MM-DD)"),
-    period_end: Optional[str] = Query(None, description="Period end (YYYY-MM-DD)"),
+    period_start: str | None = Query(None, description="Period start (YYYY-MM-DD)"),
+    period_end: str | None = Query(None, description="Period end (YYYY-MM-DD)"),
 ):
     """
     Get list of loss-making contracts with root cause analysis.
@@ -842,6 +845,7 @@ async def get_loss_leaders(
     actionable recommendations, and cumulative loss tracking.
     """
     from datetime import date, timedelta
+
     from app.services.profitability_service import get_profitability_service
 
     # Default to current month
@@ -886,8 +890,8 @@ async def get_profitability_trends(
 async def get_asset_roi(
     contract_id: str,
     equipment_id: str,
-    period_start: Optional[str] = Query(None, description="Period start (YYYY-MM-DD)"),
-    period_end: Optional[str] = Query(None, description="Period end (YYYY-MM-DD)"),
+    period_start: str | None = Query(None, description="Period start (YYYY-MM-DD)"),
+    period_end: str | None = Query(None, description="Period end (YYYY-MM-DD)"),
 ):
     """
     Get ROI calculation for a specific asset within a contract.
@@ -896,6 +900,7 @@ async def get_asset_roi(
     for individual equipment.
     """
     from datetime import date, timedelta
+
     from app.services.profitability_service import get_profitability_service
 
     # Default to current month
@@ -921,9 +926,9 @@ async def get_asset_roi(
 @router.get("/profitability/assets/{contract_id}")
 async def get_contract_asset_roi_list(
     contract_id: str,
-    period_start: Optional[str] = Query(None, description="Period start (YYYY-MM-DD)"),
-    period_end: Optional[str] = Query(None, description="Period end (YYYY-MM-DD)"),
-    limit: Optional[int] = Query(15, ge=1, le=100, description="Max assets to return"),
+    period_start: str | None = Query(None, description="Period start (YYYY-MM-DD)"),
+    period_end: str | None = Query(None, description="Period end (YYYY-MM-DD)"),
+    limit: int | None = Query(15, ge=1, le=100, description="Max assets to return"),
 ):
     """
     Get ROI list for all assets in a contract.
@@ -931,6 +936,7 @@ async def get_contract_asset_roi_list(
     Returns per-asset ROI details, sorted by ROI descending.
     """
     from datetime import date, timedelta
+
     from app.services.profitability_service import get_profitability_service
 
     # Default to current month
@@ -956,8 +962,8 @@ async def get_contract_asset_roi_list(
 @router.get("/profitability/report/{contract_id}")
 async def get_contract_profitability_report(
     contract_id: str,
-    period_start: Optional[str] = Query(None, description="Period start (YYYY-MM-DD)"),
-    period_end: Optional[str] = Query(None, description="Period end (YYYY-MM-DD)"),
+    period_start: str | None = Query(None, description="Period start (YYYY-MM-DD)"),
+    period_end: str | None = Query(None, description="Period end (YYYY-MM-DD)"),
     asset_limit: int = Query(15, ge=1, le=100, description="Max assets to include"),
 ):
     """
@@ -967,6 +973,7 @@ async def get_contract_profitability_report(
     and data-quality flags for the period.
     """
     from datetime import date, timedelta
+
     from app.services.profitability_service import get_profitability_service
 
     # Default to current month
@@ -993,17 +1000,19 @@ async def get_contract_profitability_report(
 async def export_contract_profitability_report(
     contract_id: str,
     format: str = Query("csv", description="Export format: csv or pdf"),
-    period_start: Optional[str] = Query(None, description="Period start (YYYY-MM-DD)"),
-    period_end: Optional[str] = Query(None, description="Period end (YYYY-MM-DD)"),
+    period_start: str | None = Query(None, description="Period start (YYYY-MM-DD)"),
+    period_end: str | None = Query(None, description="Period end (YYYY-MM-DD)"),
     asset_limit: int = Query(15, ge=1, le=100, description="Max assets to include"),
 ):
     """
     Export a contract profitability report as CSV or PDF.
     """
     from datetime import date, timedelta
+
     from fastapi.responses import Response
-    from app.services.profitability_service import get_profitability_service
+
     from app.services.profitability_export_service import export_report_csv, export_report_pdf
+    from app.services.profitability_service import get_profitability_service
 
     # Default to current month
     if not period_start:
@@ -1072,7 +1081,7 @@ async def get_sla_performance(
 @router.get("/sla/breaches/{contract_id}")
 async def get_sla_breaches(
     contract_id: str,
-    severity: Optional[str] = Query(None, description="Filter by severity: minor, major, critical"),
+    severity: str | None = Query(None, description="Filter by severity: minor, major, critical"),
 ):
     """
     Get SLA breach events for a contract.
@@ -1137,8 +1146,9 @@ async def recalculate_sla(
     Useful after work order updates or manual corrections.
     """
     from datetime import date
-    from app.services.sla_compliance_service import get_sla_compliance_service
+
     from app.database.repositories import get_sla_repository
+    from app.services.sla_compliance_service import get_sla_compliance_service
 
     service = get_sla_compliance_service()
     repo = get_sla_repository()

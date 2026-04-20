@@ -12,12 +12,12 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 
+from app.api.whatsapp_visit_webhook import router as visit_reply_router
 from app.handlers.whatsapp_handler import get_whatsapp_handler
 from app.integrations.whatsapp_service import get_whatsapp_service
 from app.security.prompt_guard import score_prompt
 from app.security.webhook_auth import verify_whatsapp_webhook as verify_whatsapp_signature
 from app.services.popia_consent_guard import evaluate_ingress_processing_consent
-from app.api.whatsapp_visit_webhook import router as visit_reply_router
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/whatsapp", tags=["whatsapp"])

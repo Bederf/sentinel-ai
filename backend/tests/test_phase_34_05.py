@@ -11,17 +11,17 @@ import time
 import pytest
 
 import app.services.bess_dispatch_engine as bde_module
+from app.ml.models.dispatch_predictor import (
+    get_dispatch_predictor,
+)
 from app.services.arbitrage_optimizer import (
-    get_price_forecaster,
     get_arbitrage_analyzer,
+    get_price_forecaster,
 )
 from app.services.bess_dispatch_engine import (
     BESSState,
     ConstraintType,
     get_bess_dispatch_engine,
-)
-from app.ml.models.dispatch_predictor import (
-    get_dispatch_predictor,
 )
 
 

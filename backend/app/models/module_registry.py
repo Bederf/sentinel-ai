@@ -10,8 +10,8 @@ Each module operates standalone but integrates when multiple are activated.
 """
 
 from dataclasses import dataclass, field
-from typing import List, Dict, Any, Optional
 from enum import Enum
+from typing import Any
 
 
 class ModuleType(str, Enum):
@@ -118,7 +118,7 @@ class ModuleCapability:
     capability_id: str
     name: str
     description: str
-    requires_integration: List[str] = field(default_factory=list)  # Other modules needed
+    requires_integration: list[str] = field(default_factory=list)  # Other modules needed
 
 
 @dataclass
@@ -129,10 +129,10 @@ class ModuleDefinition:
     name: str
     version: str
     description: str
-    capabilities: List[ModuleCapability] = field(default_factory=list)
-    integrates_with: List[ModuleType] = field(default_factory=list)
-    telemetry_points: List[str] = field(default_factory=list)
-    ai_features: List[str] = field(default_factory=list)
+    capabilities: list[ModuleCapability] = field(default_factory=list)
+    integrates_with: list[ModuleType] = field(default_factory=list)
+    telemetry_points: list[str] = field(default_factory=list)
+    ai_features: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -144,10 +144,10 @@ class ModuleInstance:
     module_type: ModuleType
     status: ModuleStatus
     activated_at: str
-    config: Dict[str, Any] = field(default_factory=dict)
+    config: dict[str, Any] = field(default_factory=dict)
     health_score: float = 100.0
-    last_telemetry: Optional[str] = None
-    error_message: Optional[str] = None
+    last_telemetry: str | None = None
+    error_message: str | None = None
 
 
 @dataclass
@@ -159,7 +159,7 @@ class CrossModuleLink:
     target_module: ModuleType
     integration_type: str  # e.g., "load_shedding", "occupancy_sync", "alert_correlation"
     enabled: bool = True
-    config: Dict[str, Any] = field(default_factory=dict)
+    config: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -174,9 +174,9 @@ class AIRecommendation:
     title: str
     description: str
     confidence: float  # 0-1
-    related_modules: List[ModuleType] = field(default_factory=list)
-    telemetry_context: Dict[str, Any] = field(default_factory=dict)
-    suggested_action: Optional[Dict[str, Any]] = None
+    related_modules: list[ModuleType] = field(default_factory=list)
+    telemetry_context: dict[str, Any] = field(default_factory=dict)
+    suggested_action: dict[str, Any] | None = None
     auto_actionable: bool = False
     acknowledged: bool = False
     resolved: bool = False
@@ -189,10 +189,10 @@ class ModuleIntegrationEvent:
     event_id: str
     timestamp: str
     source_module: ModuleType
-    target_modules: List[ModuleType]
+    target_modules: list[ModuleType]
     event_type: str  # e.g., "data_share", "action_request", "alert_propagation"
-    payload: Dict[str, Any] = field(default_factory=dict)
-    result: Optional[str] = None
+    payload: dict[str, Any] = field(default_factory=dict)
+    result: str | None = None
 
 
 @dataclass
@@ -201,14 +201,14 @@ class SiteModuleConfig:
 
     site_id: str
     site_name: str
-    active_modules: List[ModuleInstance] = field(default_factory=list)
-    cross_module_links: List[CrossModuleLink] = field(default_factory=list)
+    active_modules: list[ModuleInstance] = field(default_factory=list)
+    cross_module_links: list[CrossModuleLink] = field(default_factory=list)
     ai_enabled: bool = True
     auto_integration: bool = True  # Auto-create links when modules added
 
 
 # Pre-defined module definitions
-MODULE_DEFINITIONS: Dict[ModuleType, ModuleDefinition] = {
+MODULE_DEFINITIONS: dict[ModuleType, ModuleDefinition] = {
     ModuleType.LOGGING: ModuleDefinition(
         module_type=ModuleType.LOGGING,
         name="Logging",
@@ -696,7 +696,7 @@ MODULE_DEFINITIONS: Dict[ModuleType, ModuleDefinition] = {
 
 
 # Cross-module integration definitions
-INTEGRATION_DEFINITIONS: Dict[str, Dict[str, Any]] = {
+INTEGRATION_DEFINITIONS: dict[str, dict[str, Any]] = {
     "hvac_energy_loadshed": {
         "name": "HVAC Load Shedding",
         "description": "Reduce HVAC load when on generator power",

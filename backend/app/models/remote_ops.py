@@ -5,9 +5,10 @@ Enables field technicians and dispatchers to check building status remotely
 before dispatching, eliminating up to 50% of unnecessary callouts.
 """
 
-from enum import IntEnum
-from typing import Optional, List, Dict, Any
 from datetime import datetime
+from enum import IntEnum
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 
@@ -36,7 +37,7 @@ class RemoteCommandType(str):
 
 
 # Command type to minimum authorization level mapping
-COMMAND_AUTHORIZATION: Dict[str, AuthorizationLevel] = {
+COMMAND_AUTHORIZATION: dict[str, AuthorizationLevel] = {
     "status_check": AuthorizationLevel.VIEW_ONLY,
     "setpoint_adjust": AuthorizationLevel.TECHNICIAN,
     "schedule_override": AuthorizationLevel.TECHNICIAN,
@@ -52,7 +53,7 @@ class RemoteCommand(BaseModel):
 
     command_type: str
     required_level: AuthorizationLevel
-    description: Optional[str] = None
+    description: str | None = None
 
     @classmethod
     def from_command_type(cls, command_type: str) -> "RemoteCommand":
@@ -79,22 +80,22 @@ class RemoteDiagnosticReport(BaseModel):
     timestamp: datetime = Field(default_factory=datetime.now)
     diagnostic_type: str
     status_summary: str
-    readings: Dict[str, Any] = Field(default_factory=dict)
-    anomalies: List[str] = Field(default_factory=list)
-    recommendations: List[str] = Field(default_factory=list)
+    readings: dict[str, Any] = Field(default_factory=dict)
+    anomalies: list[str] = Field(default_factory=list)
+    recommendations: list[str] = Field(default_factory=list)
     requires_dispatch: bool = False
-    dispatch_reason: Optional[str] = None
-    safety_status: Optional[Dict[str, Any]] = None
+    dispatch_reason: str | None = None
+    safety_status: dict[str, Any] | None = None
 
 
 class RemoteSessionAction(BaseModel):
     """A single action within a remote session."""
 
     action_type: str
-    target: Optional[str] = None
-    details: Optional[str] = None
+    target: str | None = None
+    details: str | None = None
     timestamp: datetime = Field(default_factory=datetime.now)
-    result: Optional[str] = None
+    result: str | None = None
 
 
 class RemoteSessionLog(BaseModel):
@@ -103,9 +104,9 @@ class RemoteSessionLog(BaseModel):
     session_id: str
     user_id: str
     user_role: str
-    actions: List[RemoteSessionAction] = Field(default_factory=list)
+    actions: list[RemoteSessionAction] = Field(default_factory=list)
     started_at: datetime = Field(default_factory=datetime.now)
-    ended_at: Optional[datetime] = None
+    ended_at: datetime | None = None
 
 
 class DispatchDecision(BaseModel):
@@ -115,7 +116,7 @@ class DispatchDecision(BaseModel):
     reason: str
     urgency: str = Field(default="low", description="Urgency level: critical, high, medium, low")
     estimated_onsite_time_minutes: int = 0
-    remote_actions_taken: List[str] = Field(default_factory=list)
-    bundled_tasks: List[str] = Field(default_factory=list)
-    equipment_id: Optional[str] = None
+    remote_actions_taken: list[str] = Field(default_factory=list)
+    bundled_tasks: list[str] = Field(default_factory=list)
+    equipment_id: str | None = None
     assessed_at: datetime = Field(default_factory=datetime.now)

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 import math
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, Query
@@ -251,7 +251,7 @@ async def get_popia_evidence(
 
     svc = POPIAEvidencePackService()
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     y = year or now.year
     m = month or now.month
 

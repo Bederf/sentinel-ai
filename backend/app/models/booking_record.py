@@ -10,7 +10,6 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass, field
 from datetime import date, datetime
-from typing import Optional
 
 
 @dataclass
@@ -46,10 +45,10 @@ class BlockBookingAlert:
     booking_ids: list[str] = field(default_factory=list)
     detected_at: datetime = field(default_factory=datetime.utcnow)
     notification_sent: bool = False
-    notification_sent_at: Optional[datetime] = None
+    notification_sent_at: datetime | None = None
     dismissed: bool = False
-    dismissed_at: Optional[datetime] = None
-    dismissed_by: Optional[str] = None
+    dismissed_at: datetime | None = None
+    dismissed_by: str | None = None
 
 
 @dataclass
@@ -61,6 +60,6 @@ class BlockBookingConfig:
     full_day_threshold_hours: float = 6.0
     lookahead_days: int = 14
     enabled: bool = True
-    concierge_email: Optional[str] = None
-    concierge_whatsapp: Optional[str] = None
-    concierge_telegram_chat_id: Optional[str] = None
+    concierge_email: str | None = None
+    concierge_whatsapp: str | None = None
+    concierge_telegram_chat_id: str | None = None

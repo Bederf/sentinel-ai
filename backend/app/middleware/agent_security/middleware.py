@@ -10,7 +10,6 @@ Non-bot requests pass through unchanged.
 """
 
 import logging
-from typing import List, Optional, Tuple
 
 from fastapi import Request
 from fastapi.responses import JSONResponse
@@ -38,7 +37,7 @@ logger = logging.getLogger(__name__)
 # Path → Tool mapping
 # ---------------------------------------------------------------------------
 
-PATH_TOOL_MAP: List[Tuple[str, AgentToolName]] = [
+PATH_TOOL_MAP: list[tuple[str, AgentToolName]] = [
     # BMS_READ — read-only telemetry and building data
     ("/api/equipment/search", AgentToolName.BMS_READ),
     ("/api/equipment/telemetry", AgentToolName.BMS_READ),
@@ -69,7 +68,7 @@ PATH_TOOL_MAP: List[Tuple[str, AgentToolName]] = [
 ]
 
 # Paths that bypass agent security entirely
-BYPASS_PREFIXES: Tuple[str, ...] = (
+BYPASS_PREFIXES: tuple[str, ...] = (
     "/api/auth/",
     "/api/health",
     "/health",
@@ -79,7 +78,7 @@ BYPASS_PREFIXES: Tuple[str, ...] = (
 )
 
 # Agent-sensitive prefixes for startup route cross-check
-AGENT_SENSITIVE_PREFIXES: Tuple[str, ...] = (
+AGENT_SENSITIVE_PREFIXES: tuple[str, ...] = (
     "/api/equipment/",
     "/api/work-orders/",
     "/api/devices/",
@@ -94,7 +93,7 @@ AGENT_SENSITIVE_PREFIXES: Tuple[str, ...] = (
 # ---------------------------------------------------------------------------
 
 
-def _resolve_tool(path: str) -> Optional[AgentToolName]:
+def _resolve_tool(path: str) -> AgentToolName | None:
     """Map a request path to an AgentToolName via prefix matching.
 
     Returns None for bypass paths or paths not in PATH_TOOL_MAP.
@@ -121,7 +120,7 @@ def _resolve_quota_tier(role) -> QuotaTier:
     return QuotaTier.PER_AGENT
 
 
-def _build_session(auth_context, site_id: Optional[str] = None) -> AgentSession:
+def _build_session(auth_context, site_id: str | None = None) -> AgentSession:
     """Build an AgentSession from an AuthContext."""
     site_ids = []
     if site_id:
@@ -135,7 +134,7 @@ def _build_session(auth_context, site_id: Optional[str] = None) -> AgentSession:
     )
 
 
-def _extract_site_id(request: Request) -> Optional[str]:
+def _extract_site_id(request: Request) -> str | None:
     """Try to extract a site_id from path params or query string."""
     # Check query parameters
     site_id = request.query_params.get("site_id")

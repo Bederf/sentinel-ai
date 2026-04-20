@@ -1,8 +1,8 @@
 """Repository for municipal demand history (local fallback/BMS aggregates)."""
 
-from typing import List, Optional, Dict, Any
-from datetime import date
 import logging
+from datetime import date
+from typing import Any
 
 from app.database.supabase_client import get_supabase_client
 
@@ -20,8 +20,8 @@ class MunicipalDemandRepository:
         site_id: str,
         start_date: date,
         end_date: date,
-        meter_id: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+        meter_id: str | None = None,
+    ) -> list[dict[str, Any]]:
         query = (
             self.client.table("municipal_demand_history")
             .select("*")
@@ -44,8 +44,8 @@ class MunicipalDemandRepository:
         site_id: str,
         start_date: date,
         end_date: date,
-        meter_id: Optional[str] = None,
-    ) -> Optional[Dict[str, Any]]:
+        meter_id: str | None = None,
+    ) -> dict[str, Any] | None:
         query = (
             self.client.table("municipal_demand_history")
             .select("*")

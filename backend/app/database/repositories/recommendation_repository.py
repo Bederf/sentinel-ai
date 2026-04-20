@@ -1,7 +1,7 @@
 """Repository for recommendation tracking operations."""
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from app.models.recommendation import Recommendation, RecommendationStatus
 from app.services.cache_service import cache
@@ -59,7 +59,7 @@ class RecommendationRepository:
                 self._client = None
         return self._client
 
-    def _filter_supabase_payload(self, rec_dict: Dict[str, Any]) -> Dict[str, Any]:
+    def _filter_supabase_payload(self, rec_dict: dict[str, Any]) -> dict[str, Any]:
         """Drop model-only keys that do not exist in the live recommendations table."""
         return {key: value for key, value in rec_dict.items() if key in self._WRITE_COLUMNS}
 
@@ -72,12 +72,12 @@ class RecommendationRepository:
         logger.error("Error creating recommendation %s: canonical DB write failed", rec.id)
         raise RuntimeError("Failed to persist recommendation to canonical DB store")
 
-    async def get(self, rec_id: str) -> Optional[Recommendation]:
+    async def get(self, rec_id: str) -> Recommendation | None:
         """Get recommendation by ID."""
         rec_dict = await self._supabase_get(rec_id)
         return Recommendation.from_dict(rec_dict) if rec_dict else None
 
-    async def get_by_id(self, rec_id: str) -> Optional[Recommendation]:
+    async def get_by_id(self, rec_id: str) -> Recommendation | None:
         """Alias for get() for consistency with other repositories."""
         return await self.get(rec_id)
 
@@ -86,7 +86,7 @@ class RecommendationRepository:
         site_id: str,
         status: RecommendationStatus,
         limit: int = 10,
-    ) -> List[Recommendation]:
+    ) -> list[Recommendation]:
         """Get recommendations with status, newest first."""
         recs = await self._supabase_get_by_status(site_id, status, limit)
         return [Recommendation.from_dict(rec) for rec in recs]
@@ -94,10 +94,10 @@ class RecommendationRepository:
     async def get_history(
         self,
         site_id: str,
-        status_filter: Optional[str] = None,
-        risk_level_filter: Optional[str] = None,
+        status_filter: str | None = None,
+        risk_level_filter: str | None = None,
         limit: int = 50,
-    ) -> List[Recommendation]:
+    ) -> list[Recommendation]:
         """Get historical recommendations for a site with optional filters."""
         recs = await self._supabase_get_history(site_id, status_filter, risk_level_filter, limit)
         return [Recommendation.from_dict(rec) for rec in recs]
@@ -146,7 +146,7 @@ class RecommendationRepository:
 
         return ""
 
-    async def _supabase_insert(self, rec_dict: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    async def _supabase_insert(self, rec_dict: dict[str, Any]) -> dict[str, Any] | None:
         """Insert recommendation to Supabase."""
         if not self.client:
             return None
@@ -161,7 +161,7 @@ class RecommendationRepository:
             logger.error("Supabase insert failed: %s", e)
             return None
 
-    async def _supabase_get(self, rec_id: str) -> Optional[Dict[str, Any]]:
+    async def _supabase_get(self, rec_id: str) -> dict[str, Any] | None:
         """Get recommendation from Supabase."""
         if not self.client:
             return None
@@ -179,7 +179,7 @@ class RecommendationRepository:
         site_id: str,
         status: RecommendationStatus,
         limit: int,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Query recommendations from Supabase by status."""
         if not self.client:
             return []
@@ -198,7 +198,7 @@ class RecommendationRepository:
             logger.error("Supabase query failed: %s", e)
             return []
 
-    async def _supabase_update(self, rec_id: str, rec_dict: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    async def _supabase_update(self, rec_id: str, rec_dict: dict[str, Any]) -> dict[str, Any] | None:
         """Update recommendation in Supabase."""
         if not self.client:
             return None
@@ -216,10 +216,10 @@ class RecommendationRepository:
     async def _supabase_get_history(
         self,
         site_id: str,
-        status_filter: Optional[str],
-        risk_level_filter: Optional[str],
+        status_filter: str | None,
+        risk_level_filter: str | None,
         limit: int,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Query historical recommendations from Supabase with filters."""
         if not self.client:
             return []
@@ -243,7 +243,7 @@ class RecommendationRepository:
             return []
 
 
-_repository: Optional[RecommendationRepository] = None
+_repository: RecommendationRepository | None = None
 
 
 def get_recommendation_repository() -> RecommendationRepository:

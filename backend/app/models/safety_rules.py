@@ -6,9 +6,9 @@ This module defines safety rules that can prevent unsafe operations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Dict, Any, Optional
 from datetime import datetime
+from enum import Enum
+from typing import Any
 
 
 class RuleSeverity(Enum):
@@ -39,11 +39,11 @@ class SafetyRule(ABC):
     rule_type: RuleType
     severity: RuleSeverity
     description: str = ""
-    device_type: Optional[str] = None  # Optional: specific device type
-    device_id: Optional[str] = None  # Optional: specific device ID
-    point_name: Optional[str] = None  # Optional: specific point name
+    device_type: str | None = None  # Optional: specific device type
+    device_id: str | None = None  # Optional: specific device ID
+    point_name: str | None = None  # Optional: specific point name
     enabled: bool = True
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
     created_at: str = ""
     updated_at: str = ""
 
@@ -54,7 +54,7 @@ class SafetyRule(ABC):
             self.updated_at = datetime.now().isoformat()
 
     @abstractmethod
-    def check(self, device: Any, value: Any) -> Dict[str, Any]:
+    def check(self, device: Any, value: Any) -> dict[str, Any]:
         """
         Check if the rule is violated.
 
@@ -72,7 +72,7 @@ class SafetyRule(ABC):
         """
         pass
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert rule to dictionary for serialization."""
         return {
             "id": self.id,
@@ -90,7 +90,7 @@ class SafetyRule(ABC):
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "SafetyRule":
+    def from_dict(cls, data: dict[str, Any]) -> "SafetyRule":
         """Create rule instance from dictionary."""
         rule_type = RuleType(data["rule_type"])
         _severity = RuleSeverity(data["severity"])
@@ -118,7 +118,7 @@ class TemperatureRangeRule(SafetyRule):
     max_temp: float = 28.0  # Default from Phase 2 decision
     unit: str = "°C"
 
-    def check(self, device: Any, value: Any) -> Dict[str, Any]:
+    def check(self, device: Any, value: Any) -> dict[str, Any]:
         """Check if temperature is within safe range."""
         try:
             temp = float(value)
@@ -152,7 +152,7 @@ class TemperatureRangeRule(SafetyRule):
                 "rule_name": self.name,
             }
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary with temperature-specific fields."""
         base_dict = super().to_dict()
         base_dict.update(
@@ -165,7 +165,7 @@ class TemperatureRangeRule(SafetyRule):
         return base_dict
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "TemperatureRangeRule":
+    def from_dict(cls, data: dict[str, Any]) -> "TemperatureRangeRule":
         """Create from dictionary."""
         return cls(
             id=data["id"],
@@ -194,7 +194,7 @@ class PressureLimitRule(SafetyRule):
     min_pressure: float = 0.0  # kPa
     unit: str = "kPa"
 
-    def check(self, device: Any, value: Any) -> Dict[str, Any]:
+    def check(self, device: Any, value: Any) -> dict[str, Any]:
         """Check if pressure is within safe limits."""
         try:
             pressure = float(value)
@@ -234,7 +234,7 @@ class PressureLimitRule(SafetyRule):
                 "rule_name": self.name,
             }
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary with pressure-specific fields."""
         base_dict = super().to_dict()
         base_dict.update(
@@ -247,7 +247,7 @@ class PressureLimitRule(SafetyRule):
         return base_dict
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "PressureLimitRule":
+    def from_dict(cls, data: dict[str, Any]) -> "PressureLimitRule":
         """Create from dictionary."""
         return cls(
             id=data["id"],
@@ -276,9 +276,9 @@ class InterlockRule(SafetyRule):
     trigger_point: str = ""  # Point on trigger device
     trigger_value: Any = None  # Value that triggers the interlock
     action: str = "disable"  # disable, enable, set_value
-    action_value: Optional[Any] = None
+    action_value: Any | None = None
 
-    def check(self, device: Any, value: Any) -> Dict[str, Any]:
+    def check(self, device: Any, value: Any) -> dict[str, Any]:
         """Check if interlock condition is active."""
         # This rule requires checking the state of another device
         # For now, return a placeholder result
@@ -292,7 +292,7 @@ class InterlockRule(SafetyRule):
             "interlock_active": False,  # Assume not active for local fallback
         }
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary with interlock-specific fields."""
         base_dict = super().to_dict()
         base_dict.update(
@@ -307,7 +307,7 @@ class InterlockRule(SafetyRule):
         return base_dict
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "InterlockRule":
+    def from_dict(cls, data: dict[str, Any]) -> "InterlockRule":
         """Create from dictionary."""
         return cls(
             id=data["id"],
@@ -337,7 +337,7 @@ class RuntimeLimitRule(SafetyRule):
     min_runtime_minutes: int = 5  # Minimum run time before restart
     max_starts_per_hour: int = 4  # Maximum starts per hour
 
-    def check(self, device: Any, value: Any) -> Dict[str, Any]:
+    def check(self, device: Any, value: Any) -> dict[str, Any]:
         """Check runtime and start frequency limits."""
         # For local fallback, assume device has runtime data in metadata
         runtime = device.metadata.get("runtime_minutes", 0) if hasattr(device, "metadata") else 0
@@ -371,7 +371,7 @@ class RuntimeLimitRule(SafetyRule):
             "rule_name": self.name,
         }
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary with runtime-specific fields."""
         base_dict = super().to_dict()
         base_dict.update(
@@ -383,7 +383,7 @@ class RuntimeLimitRule(SafetyRule):
         return base_dict
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "RuntimeLimitRule":
+    def from_dict(cls, data: dict[str, Any]) -> "RuntimeLimitRule":
         """Create from dictionary."""
         return cls(
             id=data["id"],
@@ -410,7 +410,7 @@ class BrightnessLimitRule(SafetyRule):
     max_brightness: int = 100  # Percentage
     min_brightness: int = 0  # Percentage
 
-    def check(self, device: Any, value: Any) -> Dict[str, Any]:
+    def check(self, device: Any, value: Any) -> dict[str, Any]:
         """Check if brightness is within limits."""
         try:
             brightness = int(value)
@@ -450,7 +450,7 @@ class BrightnessLimitRule(SafetyRule):
                 "rule_name": self.name,
             }
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary with brightness-specific fields."""
         base_dict = super().to_dict()
         base_dict.update(
@@ -462,7 +462,7 @@ class BrightnessLimitRule(SafetyRule):
         return base_dict
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "BrightnessLimitRule":
+    def from_dict(cls, data: dict[str, Any]) -> "BrightnessLimitRule":
         """Create from dictionary."""
         return cls(
             id=data["id"],
@@ -488,7 +488,7 @@ class CustomRule(SafetyRule):
 
     validation_logic: str = ""  # Could be Python code or expression
 
-    def check(self, device: Any, value: Any) -> Dict[str, Any]:
+    def check(self, device: Any, value: Any) -> dict[str, Any]:
         """Execute custom validation logic."""
         # For local fallback, always allow with warning about custom logic
         return {
@@ -499,7 +499,7 @@ class CustomRule(SafetyRule):
             "rule_name": self.name,
         }
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary with custom-specific fields."""
         base_dict = super().to_dict()
         base_dict.update(
@@ -510,7 +510,7 @@ class CustomRule(SafetyRule):
         return base_dict
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "CustomRule":
+    def from_dict(cls, data: dict[str, Any]) -> "CustomRule":
         """Create from dictionary."""
         return cls(
             id=data["id"],

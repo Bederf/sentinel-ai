@@ -12,8 +12,7 @@ Pattern follows cross_system_analyzer.py for anomaly detection logic.
 import logging
 import statistics
 from dataclasses import dataclass, field
-from datetime import datetime, timezone, timedelta
-from typing import Dict, List, Optional, Tuple
+from datetime import UTC, datetime, timedelta
 
 from app.models.solar import SolarString
 
@@ -64,15 +63,15 @@ class StringBaseline:
     power_kw_std: float = 0.02
 
     # History
-    voltage_history: List[float] = field(default_factory=list)
-    current_history: List[float] = field(default_factory=list)
-    power_history: List[float] = field(default_factory=list)
+    voltage_history: list[float] = field(default_factory=list)
+    current_history: list[float] = field(default_factory=list)
+    power_history: list[float] = field(default_factory=list)
 
     # Timestamps
-    baseline_start: Optional[str] = None
-    last_updated: Optional[str] = None
+    baseline_start: str | None = None
+    last_updated: str | None = None
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         return {
             "string_id": self.string_id,
             "inverter_id": self.inverter_id,
@@ -111,13 +110,13 @@ class StringHealthScore:
     power_deviation_pct: float = 0.0
 
     # Failure detection
-    failure_type: Optional[str] = None  # dead, shorted, degraded, bypass_diode, healthy
+    failure_type: str | None = None  # dead, shorted, degraded, bypass_diode, healthy
     failure_confidence: float = 0.0  # 0-1
 
     # Recommendations
     recommendation: str = ""
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         return {
             "string_id": self.string_id,
             "inverter_id": self.inverter_id,
@@ -150,14 +149,14 @@ class StringAnalyzer:
 
     def __init__(self):
         """Initialize string analyzer."""
-        self._baselines: Dict[str, StringBaseline] = {}
-        self._anomaly_history: Dict[str, List[StringHealthScore]] = {}
-        self._persistent_anomalies: Dict[str, datetime] = {}  # string_id -> first_anomaly_time
+        self._baselines: dict[str, StringBaseline] = {}
+        self._anomaly_history: dict[str, list[StringHealthScore]] = {}
+        self._persistent_anomalies: dict[str, datetime] = {}  # string_id -> first_anomaly_time
 
     def analyze_string_health(
         self,
         string: SolarString,
-        baseline: Optional[StringBaseline] = None,
+        baseline: StringBaseline | None = None,
     ) -> StringHealthScore:
         """
         Analyze health of a single PV string.
@@ -229,7 +228,7 @@ class StringAnalyzer:
         health_score_obj = StringHealthScore(
             string_id=string.string_id,
             inverter_id=string.inverter_id,
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
             health_score=health_score,
             health_status=health_status,
             voltage_v=string.dc_voltage_v,
@@ -253,7 +252,7 @@ class StringAnalyzer:
         self,
         string: SolarString,
         baseline: StringBaseline,
-    ) -> Tuple[Optional[str], float]:
+    ) -> tuple[str | None, float]:
         """
         Detect specific string failure type.
 
@@ -305,7 +304,7 @@ class StringAnalyzer:
         voltage_deviation: float,
         current_deviation: float,
         power_deviation: float,
-        failure_type: Optional[str],
+        failure_type: str | None,
         irradiance_w_m2: float,
     ) -> float:
         """
@@ -357,7 +356,7 @@ class StringAnalyzer:
 
         return min(100, score)
 
-    def _generate_recommendation(self, failure_type: Optional[str], health_score: float) -> str:
+    def _generate_recommendation(self, failure_type: str | None, health_score: float) -> str:
         """Generate actionable recommendation based on failure type."""
         recommendations = {
             "dead": (
@@ -402,7 +401,7 @@ class StringAnalyzer:
                 voltage_v_avg=45.0,
                 current_a_avg=5.0,
                 power_kw_avg=0.2,
-                baseline_start=datetime.now(timezone.utc).isoformat(),
+                baseline_start=datetime.now(UTC).isoformat(),
             )
 
         return self._baselines[string.string_id]
@@ -420,7 +419,7 @@ class StringAnalyzer:
         self._anomaly_history[string_id].append(health_score_obj)
 
         # Keep only last 24 hours
-        cutoff_time = datetime.now(timezone.utc) - timedelta(hours=24)
+        cutoff_time = datetime.now(UTC) - timedelta(hours=24)
         self._anomaly_history[string_id] = [
             a for a in self._anomaly_history[string_id] if datetime.fromisoformat(a.timestamp) > cutoff_time
         ]
@@ -428,10 +427,10 @@ class StringAnalyzer:
         # Check for persistence
         if health_score_obj.health_status != "healthy":
             if string_id not in self._persistent_anomalies:
-                self._persistent_anomalies[string_id] = datetime.now(timezone.utc)
+                self._persistent_anomalies[string_id] = datetime.now(UTC)
             else:
                 elapsed_hours = (
-                    datetime.now(timezone.utc) - self._persistent_anomalies[string_id]
+                    datetime.now(UTC) - self._persistent_anomalies[string_id]
                 ).total_seconds() / 3600
                 if elapsed_hours > ANOMALY_PERSISTENCE_HOURS:
                     logger.warning(
@@ -502,7 +501,7 @@ class StringAnalyzer:
                 statistics.stdev(baseline.power_history) if len(baseline.power_history) > 1 else 0.02
             )
 
-        baseline.last_updated = datetime.now(timezone.utc).isoformat()
+        baseline.last_updated = datetime.now(UTC).isoformat()
 
         logger.debug(
             f"Updated degradation baseline for {string_id}: "
@@ -513,16 +512,16 @@ class StringAnalyzer:
 
         return baseline
 
-    def get_persistent_anomalies(self) -> Dict[str, Dict]:
+    def get_persistent_anomalies(self) -> dict[str, dict]:
         """Get all strings with persistent anomalies (>4h)."""
         persistent = {}
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         for string_id, first_time in self._persistent_anomalies.items():
             elapsed_hours = (now - first_time).total_seconds() / 3600
             if elapsed_hours > ANOMALY_PERSISTENCE_HOURS:
                 # Get latest anomaly for this string
-                if string_id in self._anomaly_history and self._anomaly_history[string_id]:
+                if self._anomaly_history.get(string_id):
                     latest = self._anomaly_history[string_id][-1]
                     persistent[string_id] = {
                         "string_id": string_id,
@@ -537,7 +536,7 @@ class StringAnalyzer:
 
 # === Singleton accessor ===
 
-_string_analyzer: Optional[StringAnalyzer] = None
+_string_analyzer: StringAnalyzer | None = None
 
 
 def get_string_analyzer() -> StringAnalyzer:

@@ -11,17 +11,17 @@ import os
 os.environ.setdefault("DEMO_MODE", "true")
 os.environ.setdefault("LIGHTWEIGHT_APP", "1")
 
-import pytest  # noqa: E402
-from unittest.mock import AsyncMock, MagicMock, patch  # noqa: E402
+from unittest.mock import AsyncMock, MagicMock, patch
 
-from app.middleware.agent_security.verification import (  # noqa: E402
+import pytest
+
+from app.middleware.agent_security.verification import (
     VerificationEvidence,
     VerificationResult,
     VerificationStatus,
     _verification_registry,
     verification_runner,
 )
-
 
 # ---------------------------------------------------------------------------
 # 1. test_verification_registry_populated

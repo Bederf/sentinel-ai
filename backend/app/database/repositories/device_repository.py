@@ -4,8 +4,9 @@ This repository handles CRUD operations for the devices table,
 which represents the BMS control layer (protocol-agnostic device abstraction).
 """
 
-from typing import List, Optional, Dict, Any
 import logging
+from typing import Any
+
 from app.database.supabase_client import get_supabase_client
 
 logger = logging.getLogger(__name__)
@@ -19,8 +20,8 @@ class DeviceRepository:
         self.client = get_supabase_client()
 
     def get_all(
-        self, site_id: Optional[str] = None, device_type: Optional[str] = None, status: Optional[str] = None
-    ) -> List[Dict[str, Any]]:
+        self, site_id: str | None = None, device_type: str | None = None, status: str | None = None
+    ) -> list[dict[str, Any]]:
         """Get all devices with optional filtering.
 
         Args:
@@ -43,7 +44,7 @@ class DeviceRepository:
         response = query.execute()
         return response.data
 
-    def get_by_id(self, site_id: str, device_id: str) -> Optional[Dict[str, Any]]:
+    def get_by_id(self, site_id: str, device_id: str) -> dict[str, Any] | None:
         """Get device by building and device_id composite key.
 
         Args:
@@ -59,7 +60,7 @@ class DeviceRepository:
             return response.data[0]
         return None
 
-    def get_by_uuid(self, uuid: str) -> Optional[Dict[str, Any]]:
+    def get_by_uuid(self, uuid: str) -> dict[str, Any] | None:
         """Get device by its UUID.
 
         Args:
@@ -74,7 +75,7 @@ class DeviceRepository:
             return response.data[0]
         return None
 
-    def get_by_site_code(self, site_code: str) -> List[Dict[str, Any]]:
+    def get_by_site_code(self, site_code: str) -> list[dict[str, Any]]:
         """Get devices by building code.
 
         Args:
@@ -96,7 +97,7 @@ class DeviceRepository:
 
         return response.data
 
-    def get_by_equipment(self, equipment_id: str) -> List[Dict[str, Any]]:
+    def get_by_equipment(self, equipment_id: str) -> list[dict[str, Any]]:
         """Get devices linked to specific equipment.
 
         Args:
@@ -109,7 +110,7 @@ class DeviceRepository:
 
         return response.data
 
-    def get_by_zone(self, zone_id: str) -> List[Dict[str, Any]]:
+    def get_by_zone(self, zone_id: str) -> list[dict[str, Any]]:
         """Get devices in a specific HVAC zone.
 
         Args:
@@ -122,7 +123,7 @@ class DeviceRepository:
 
         return response.data
 
-    def get_with_details(self, site_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_with_details(self, site_id: str | None = None) -> list[dict[str, Any]]:
         """Get devices with enriched building/equipment/zone details.
 
         Uses the v_devices_with_equipment view for efficient joins.
@@ -141,7 +142,7 @@ class DeviceRepository:
         response = query.execute()
         return response.data
 
-    def get_fault_devices(self, site_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_fault_devices(self, site_id: str | None = None) -> list[dict[str, Any]]:
         """Get all devices with fault status.
 
         Args:
@@ -158,7 +159,7 @@ class DeviceRepository:
         response = query.execute()
         return response.data
 
-    def get_offline_devices(self, site_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_offline_devices(self, site_id: str | None = None) -> list[dict[str, Any]]:
         """Get all offline devices.
 
         Args:
@@ -175,7 +176,7 @@ class DeviceRepository:
         response = query.execute()
         return response.data
 
-    def create(self, device_data: Dict[str, Any]) -> Dict[str, Any]:
+    def create(self, device_data: dict[str, Any]) -> dict[str, Any]:
         """Create a new device.
 
         Args:
@@ -187,7 +188,7 @@ class DeviceRepository:
         response = self.client.table("devices").insert(device_data).execute()
         return response.data[0]
 
-    def upsert(self, device_data: Dict[str, Any]) -> Dict[str, Any]:
+    def upsert(self, device_data: dict[str, Any]) -> dict[str, Any]:
         """Insert or update a device.
 
         Uses composite unique constraint (site_id, device_id).
@@ -201,7 +202,7 @@ class DeviceRepository:
         response = self.client.table("devices").upsert(device_data, on_conflict="site_id,device_id").execute()
         return response.data[0] if response.data else {}
 
-    def upsert_many(self, devices: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def upsert_many(self, devices: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Insert or update multiple devices.
 
         Args:
@@ -216,7 +217,7 @@ class DeviceRepository:
         response = self.client.table("devices").upsert(devices, on_conflict="site_id,device_id").execute()
         return response.data
 
-    def update(self, site_id: str, device_id: str, device_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def update(self, site_id: str, device_id: str, device_data: dict[str, Any]) -> dict[str, Any] | None:
         """Update a device.
 
         Args:
@@ -235,7 +236,7 @@ class DeviceRepository:
             return response.data[0]
         return None
 
-    def update_by_uuid(self, uuid: str, device_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def update_by_uuid(self, uuid: str, device_data: dict[str, Any]) -> dict[str, Any] | None:
         """Update a device by UUID.
 
         Args:
@@ -277,7 +278,7 @@ class DeviceRepository:
         response = self.client.table("devices").delete().eq("id", uuid).execute()
         return len(response.data) > 0
 
-    def update_status(self, site_id: str, device_id: str, status: str) -> Optional[Dict[str, Any]]:
+    def update_status(self, site_id: str, device_id: str, status: str) -> dict[str, Any] | None:
         """Update device status.
 
         Args:
@@ -290,7 +291,7 @@ class DeviceRepository:
         """
         return self.update(site_id, device_id, {"status": status})
 
-    def update_last_seen(self, site_id: str, device_id: str) -> Optional[Dict[str, Any]]:
+    def update_last_seen(self, site_id: str, device_id: str) -> dict[str, Any] | None:
         """Update device last_seen timestamp to NOW.
 
         Uses the optimized update_device_last_seen function.
@@ -310,7 +311,7 @@ class DeviceRepository:
             logger.error(f"Failed to update last_seen for device {device_id}: {e}")
             return None
 
-    def update_points(self, site_id: str, device_id: str, points: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def update_points(self, site_id: str, device_id: str, points: dict[str, Any]) -> dict[str, Any] | None:
         """Update device points (control/monitoring points).
 
         Args:
@@ -323,7 +324,7 @@ class DeviceRepository:
         """
         return self.update(site_id, device_id, {"points": points})
 
-    def get_site_summary(self, site_id: str) -> Optional[Dict[str, Any]]:
+    def get_site_summary(self, site_id: str) -> dict[str, Any] | None:
         """Get device summary for a building.
 
         Uses the v_site_device_summary view.

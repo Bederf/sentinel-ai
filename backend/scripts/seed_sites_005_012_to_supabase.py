@@ -13,12 +13,12 @@ This script:
 """
 
 import json
+import logging
 import os
 import sys
 import uuid
 from pathlib import Path
-from typing import Dict, List, Any
-import logging
+from typing import Any
 
 # Setup logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -30,14 +30,14 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from app.database.supabase_client import get_supabase_client  # noqa: E402
 
 
-def load_building_json(site_id: str) -> Dict[str, Any]:
+def load_building_json(site_id: str) -> dict[str, Any]:
     """Load building.json for a site."""
     building_file = Path(f"app/data/buildings/{site_id}/building.json")
     with open(building_file) as f:
         return json.load(f)
 
 
-def load_equipment_files(site_id: str) -> List[Dict[str, Any]]:
+def load_equipment_files(site_id: str) -> list[dict[str, Any]]:
     """Load all equipment JSON files for a site."""
     equipment_dir = Path(f"app/data/buildings/{site_id}/equipment")
     equipment_list = []
@@ -49,7 +49,7 @@ def load_equipment_files(site_id: str) -> List[Dict[str, Any]]:
     return equipment_list
 
 
-def prepare_building_for_supabase(building_data: Dict[str, Any]) -> Dict[str, Any]:
+def prepare_building_for_supabase(building_data: dict[str, Any]) -> dict[str, Any]:
     """Transform building JSON to Supabase schema."""
     return {
         "id": str(uuid.uuid4()),  # Generate UUID if not present
@@ -72,7 +72,7 @@ def prepare_building_for_supabase(building_data: Dict[str, Any]) -> Dict[str, An
     }
 
 
-def prepare_equipment_for_supabase(equipment_data: Dict[str, Any], site_uuid: str) -> Dict[str, Any]:
+def prepare_equipment_for_supabase(equipment_data: dict[str, Any], site_uuid: str) -> dict[str, Any]:
     """Transform equipment JSON to Supabase schema."""
 
     # Extract equipment type from equipment_id

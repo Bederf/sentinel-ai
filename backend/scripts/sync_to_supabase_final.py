@@ -10,13 +10,13 @@ Requires Supabase credentials in .env:
   SUPABASE_SERVICE_ROLE_KEY
 """
 
+import argparse
 import json
+import os
 import sys
 import uuid
 from pathlib import Path
-from typing import List, Dict, Optional
-import argparse
-import os
+
 from dotenv import load_dotenv
 
 # Load environment
@@ -26,7 +26,7 @@ load_dotenv()
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 
-def get_site_uuid(client, site_code: str) -> Optional[str]:
+def get_site_uuid(client, site_code: str) -> str | None:
     """Get building UUID from building code."""
     try:
         response = client.table("sites").select("id").eq("code", site_code).execute()
@@ -37,7 +37,7 @@ def get_site_uuid(client, site_code: str) -> Optional[str]:
     return None
 
 
-def load_zones_json(site_code: str) -> List[Dict]:
+def load_zones_json(site_code: str) -> list[dict]:
     """Load zones from corrected zones.json."""
     path = Path(__file__).parent.parent / "app/data/buildings" / site_code / "zones.json"
     with open(path) as f:
@@ -45,14 +45,14 @@ def load_zones_json(site_code: str) -> List[Dict]:
     return data.get("zones", [])
 
 
-def load_desks_json(site_code: str) -> List[Dict]:
+def load_desks_json(site_code: str) -> list[dict]:
     """Load desks from corrected desks.json."""
     path = Path(__file__).parent.parent / "app/data/buildings" / site_code / "desks.json"
     with open(path) as f:
         return json.load(f)
 
 
-def prepare_zones(zones: List[Dict], site_id: str) -> List[Dict]:
+def prepare_zones(zones: list[dict], site_id: str) -> list[dict]:
     """Prepare zones for Supabase insert."""
     result = []
     for zone in zones:
@@ -72,7 +72,7 @@ def prepare_zones(zones: List[Dict], site_id: str) -> List[Dict]:
     return result
 
 
-def prepare_desks(desks: List[Dict], site_id: str) -> List[Dict]:
+def prepare_desks(desks: list[dict], site_id: str) -> list[dict]:
     """Prepare desks for Supabase insert."""
     result = []
     for desk in desks:

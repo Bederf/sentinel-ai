@@ -20,13 +20,15 @@ Usage:
 
 from __future__ import annotations
 
-import logging
 import json
+import logging
 import time
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
+from datetime import UTC
 from enum import Enum
 from pathlib import Path
-from typing import Any, Awaitable, Callable, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -77,8 +79,8 @@ class VerificationEvidence:
     timestamp: str
     action: str
     target: str
-    expected_state: Dict[str, Any]
-    actual_state: Dict[str, Any]
+    expected_state: dict[str, Any]
+    actual_state: dict[str, Any]
     status: VerificationStatus
     detail: str
     duration_ms: float
@@ -89,7 +91,7 @@ class VerificationResult:
     """Aggregated outcome of all verification steps for one action."""
 
     overall_status: VerificationStatus
-    steps: List[VerificationEvidence] = field(default_factory=list)
+    steps: list[VerificationEvidence] = field(default_factory=list)
 
     @property
     def all_passed(self) -> bool:
@@ -99,7 +101,7 @@ class VerificationResult:
     @property
     def summary(self) -> str:
         """Human-readable one-liner."""
-        counts: Dict[str, int] = {}
+        counts: dict[str, int] = {}
         for s in self.steps:
             counts[s.status.value] = counts.get(s.status.value, 0) + 1
         parts = [f"{v} {k.lower()}" for k, v in counts.items()]
@@ -111,8 +113,8 @@ class VerificationResult:
 # ---------------------------------------------------------------------------
 
 # Maps "tool:action" -> async verify function(args) -> VerificationEvidence
-VerifierFunc = Callable[[Dict[str, Any]], Awaitable[VerificationEvidence]]
-_verification_registry: Dict[str, VerifierFunc] = {}
+VerifierFunc = Callable[[dict[str, Any]], Awaitable[VerificationEvidence]]
+_verification_registry: dict[str, VerifierFunc] = {}
 
 
 def register_verifier(tool: str, action: str):
@@ -146,17 +148,17 @@ def _hex_token() -> str:
 
 
 def _now_iso() -> str:
-    from datetime import datetime, timezone
+    from datetime import datetime
 
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _evidence(
     *,
     action: str,
     target: str,
-    expected: Dict[str, Any],
-    actual: Dict[str, Any],
+    expected: dict[str, Any],
+    actual: dict[str, Any],
     status: VerificationStatus,
     detail: str,
     duration_ms: float,
@@ -186,7 +188,7 @@ class VerificationRunner:
         self,
         tool: str,
         action: str,
-        args: Dict[str, Any],
+        args: dict[str, Any],
     ) -> VerificationResult:
         """Run the registered verifier for *tool*:*action*.
 
@@ -255,7 +257,7 @@ class VerificationRunner:
 
 
 @register_verifier("work_orders", "create")
-async def _verify_wo_create(args: Dict[str, Any]) -> VerificationEvidence:
+async def _verify_wo_create(args: dict[str, Any]) -> VerificationEvidence:
     """Read back a newly-created work order and compare key fields."""
     t0 = time.monotonic()
     wo_id = args.get("work_order_id", "")
@@ -263,7 +265,7 @@ async def _verify_wo_create(args: Dict[str, Any]) -> VerificationEvidence:
     expected_site_id = args.get("site_id", "")
     expected_priority = args.get("priority", "")
 
-    actual: Dict[str, Any] = {}
+    actual: dict[str, Any] = {}
 
     try:
         if _WorkOrderRepository is None:
@@ -303,7 +305,7 @@ async def _verify_wo_create(args: Dict[str, Any]) -> VerificationEvidence:
         "status": wo.get("status", ""),
     }
 
-    mismatches: List[str] = []
+    mismatches: list[str] = []
     if expected_title and actual["title"] != expected_title:
         mismatches.append(f"title: expected={expected_title!r}, actual={actual['title']!r}")
     if expected_site_id and actual["site_id"] != expected_site_id:
@@ -341,7 +343,7 @@ async def _verify_wo_create(args: Dict[str, Any]) -> VerificationEvidence:
 
 
 @register_verifier("work_orders", "close")
-async def _verify_wo_close(args: Dict[str, Any]) -> VerificationEvidence:
+async def _verify_wo_close(args: dict[str, Any]) -> VerificationEvidence:
     """Read back a work order and verify its status is closed."""
     t0 = time.monotonic()
     wo_id = args.get("work_order_id", "")
@@ -400,7 +402,7 @@ async def _verify_wo_close(args: Dict[str, Any]) -> VerificationEvidence:
 
 
 @register_verifier("equipment_control", "setpoint")
-async def _verify_setpoint(args: Dict[str, Any]) -> VerificationEvidence:
+async def _verify_setpoint(args: dict[str, Any]) -> VerificationEvidence:
     """Read back a control point and compare to the target setpoint.
 
     Allows a tolerance of +/-0.5 for temperature setpoints.
@@ -411,7 +413,7 @@ async def _verify_setpoint(args: Dict[str, Any]) -> VerificationEvidence:
     target_value = args.get("target_value")
     tolerance = float(args.get("tolerance", 0.5))
 
-    actual_value: Optional[float] = None
+    actual_value: float | None = None
 
     try:
         if _BACnetClient is None:
@@ -496,7 +498,7 @@ async def _verify_setpoint(args: Dict[str, Any]) -> VerificationEvidence:
 
 
 @register_verifier("email_smtp", "send")
-async def _verify_email_send(args: Dict[str, Any]) -> VerificationEvidence:
+async def _verify_email_send(args: dict[str, Any]) -> VerificationEvidence:
     """Verify an email was sent by checking the canonical notification delivery log."""
     t0 = time.monotonic()
     message_id = args.get("message_id", "")
@@ -552,7 +554,7 @@ async def _verify_email_send(args: Dict[str, Any]) -> VerificationEvidence:
 
 
 @register_verifier("database_write", "insert")
-async def _verify_db_insert(args: Dict[str, Any]) -> VerificationEvidence:
+async def _verify_db_insert(args: dict[str, Any]) -> VerificationEvidence:
     """Verify a database row was inserted via Supabase or JSON fallback."""
     t0 = time.monotonic()
     table_name = args.get("table", "")
@@ -560,7 +562,7 @@ async def _verify_db_insert(args: Dict[str, Any]) -> VerificationEvidence:
     row_id = expected_row.get("id", args.get("row_id", ""))
 
     # Try Supabase first, then JSON fallback
-    actual_row: Optional[Dict[str, Any]] = None
+    actual_row: dict[str, Any] | None = None
 
     try:
         client = _get_supabase_client() if _get_supabase_client else None
@@ -602,7 +604,7 @@ async def _verify_db_insert(args: Dict[str, Any]) -> VerificationEvidence:
         )
 
     # Compare expected fields against actual
-    mismatches: List[str] = []
+    mismatches: list[str] = []
     for key, expected_val in expected_row.items():
         actual_val = actual_row.get(key)
         if actual_val != expected_val:

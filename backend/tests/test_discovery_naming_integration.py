@@ -11,11 +11,11 @@ Tests the complete workflow:
 
 import pytest
 
+from app.services.equipment_id_converter import EquipmentIDConverter
 from app.services.niagara.mapping_service import (
     PointMappingService,
 )
-from app.services.niagara.point_classifier import ClassifiedPoint, PointType, ConfidenceLevel
-from app.services.equipment_id_converter import EquipmentIDConverter
+from app.services.niagara.point_classifier import ClassifiedPoint, ConfidenceLevel, PointType
 from app.services.zone_mapping_service import ZoneMappingService
 
 

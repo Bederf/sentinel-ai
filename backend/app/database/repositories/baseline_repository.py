@@ -10,12 +10,12 @@ Handles CRUD operations for:
 Phase 44: Asset Baseline Assessment
 """
 
-from typing import List, Optional, Dict, Any
 import uuid
 from datetime import datetime, timedelta
+from typing import Any
 
-from app.models.baseline import EquipmentBaseline, ElementBaseline, BaselineComparison, EquipmentElement
 from app.database.supabase_client import get_supabase_client
+from app.models.baseline import BaselineComparison, ElementBaseline, EquipmentBaseline, EquipmentElement
 
 
 class BaselineRepository:
@@ -30,11 +30,11 @@ class BaselineRepository:
         equipment_id: str,
         captured_by: str,
         baseline_type: str,
-        baseline_values: Dict[str, Any],
-        measurement_conditions: Optional[Dict[str, Any]] = None,
+        baseline_values: dict[str, Any],
+        measurement_conditions: dict[str, Any] | None = None,
         source_type: str = "manual",
-        notes: Optional[str] = None,
-        attachment_urls: Optional[List[str]] = None,
+        notes: str | None = None,
+        attachment_urls: list[str] | None = None,
     ) -> EquipmentBaseline:
         """Create a new equipment baseline record."""
         data = {
@@ -64,14 +64,14 @@ class BaselineRepository:
                 raise
         return EquipmentBaseline(**result.data[0])
 
-    async def get_equipment_baseline(self, baseline_id: str) -> Optional[EquipmentBaseline]:
+    async def get_equipment_baseline(self, baseline_id: str) -> EquipmentBaseline | None:
         """Get equipment baseline by ID."""
         result = get_supabase_client().table("equipment_baselines").select("*").eq("id", baseline_id).execute()
         if result.data:
             return EquipmentBaseline(**result.data[0])
         return None
 
-    async def get_active_equipment_baseline(self, equipment_id: str) -> Optional[EquipmentBaseline]:
+    async def get_active_equipment_baseline(self, equipment_id: str) -> EquipmentBaseline | None:
         """Get the most recent active baseline for equipment."""
         result = (
             get_supabase_client()
@@ -87,7 +87,7 @@ class BaselineRepository:
             return EquipmentBaseline(**result.data[0])
         return None
 
-    async def get_equipment_baseline_history(self, equipment_id: str, limit: int = 10) -> List[EquipmentBaseline]:
+    async def get_equipment_baseline_history(self, equipment_id: str, limit: int = 10) -> list[EquipmentBaseline]:
         """Get baseline history for equipment."""
         result = (
             get_supabase_client()
@@ -137,12 +137,12 @@ class BaselineRepository:
         equipment_id: str,
         element_id: str,
         element_type: str,
-        element_name: Optional[str] = None,
-        manufacturer: Optional[str] = None,
-        model: Optional[str] = None,
-        serial_number: Optional[str] = None,
-        installation_date: Optional[str] = None,
-        expected_life_days: Optional[int] = None,
+        element_name: str | None = None,
+        manufacturer: str | None = None,
+        model: str | None = None,
+        serial_number: str | None = None,
+        installation_date: str | None = None,
+        expected_life_days: int | None = None,
         criticality: str = "medium",
     ) -> EquipmentElement:
         """Create a new equipment element."""
@@ -167,7 +167,7 @@ class BaselineRepository:
         result = get_supabase_client().table("equipment_elements").insert(data).execute()
         return EquipmentElement(**result.data[0])
 
-    async def get_element(self, equipment_id: str, element_id: str) -> Optional[EquipmentElement]:
+    async def get_element(self, equipment_id: str, element_id: str) -> EquipmentElement | None:
         """Get equipment element by equipment_id and element_id."""
         result = (
             get_supabase_client()
@@ -198,7 +198,7 @@ class BaselineRepository:
             criticality="medium",  # Default, can be updated
         )
 
-    async def get_equipment_elements(self, equipment_id: str) -> List[EquipmentElement]:
+    async def get_equipment_elements(self, equipment_id: str) -> list[EquipmentElement]:
         """Get all elements for equipment."""
         result = (
             get_supabase_client()
@@ -210,7 +210,7 @@ class BaselineRepository:
         )
         return [EquipmentElement(**row) for row in result.data]
 
-    async def get_element_by_id(self, element_id: str) -> Optional[EquipmentElement]:
+    async def get_element_by_id(self, element_id: str) -> EquipmentElement | None:
         """Get equipment element by its UUID."""
         result = get_supabase_client().table("equipment_elements").select("*").eq("id", element_id).execute()
         if result.data:
@@ -227,10 +227,10 @@ class BaselineRepository:
         captured_by: str,
         baseline_type: str,
         measurement_type: str,
-        baseline_values: Dict[str, Any],
-        measurement_conditions: Optional[Dict[str, Any]] = None,
-        notes: Optional[str] = None,
-        attachment_urls: Optional[List[str]] = None,
+        baseline_values: dict[str, Any],
+        measurement_conditions: dict[str, Any] | None = None,
+        notes: str | None = None,
+        attachment_urls: list[str] | None = None,
     ) -> ElementBaseline:
         """Create a new element baseline record."""
         data = {
@@ -253,7 +253,7 @@ class BaselineRepository:
         result = get_supabase_client().table("element_baselines").insert(data).execute()
         return ElementBaseline(**result.data[0])
 
-    async def get_active_element_baseline(self, element_id: str) -> Optional[ElementBaseline]:
+    async def get_active_element_baseline(self, element_id: str) -> ElementBaseline | None:
         """Get most recent active baseline for element."""
         result = (
             get_supabase_client()
@@ -269,7 +269,7 @@ class BaselineRepository:
             return ElementBaseline(**result.data[0])
         return None
 
-    async def get_element_baseline_history(self, element_id: str, limit: int = 10) -> List[ElementBaseline]:
+    async def get_element_baseline_history(self, element_id: str, limit: int = 10) -> list[ElementBaseline]:
         """Get baseline history for element."""
         result = (
             get_supabase_client()
@@ -291,14 +291,14 @@ class BaselineRepository:
         comparison_type: str,
         baseline_id: str,
         equipment_id: str,
-        comparison_results: Dict[str, Any],
+        comparison_results: dict[str, Any],
         overall_status: str,
         max_deviation_percent: float,
         data_source: str,
-        element_id: Optional[str] = None,
-        comparison_notes: Optional[str] = None,
+        element_id: str | None = None,
+        comparison_notes: str | None = None,
         alert_generated: bool = False,
-        alert_id: Optional[str] = None,
+        alert_id: str | None = None,
     ) -> BaselineComparison:
         """Create a new baseline comparison record."""
         data = {
@@ -321,7 +321,7 @@ class BaselineRepository:
         result = get_supabase_client().table("baseline_comparisons").insert(data).execute()
         return BaselineComparison(**result.data[0])
 
-    async def get_recent_comparisons(self, equipment_id: str, limit: int = 10) -> List[BaselineComparison]:
+    async def get_recent_comparisons(self, equipment_id: str, limit: int = 10) -> list[BaselineComparison]:
         """Get recent baseline comparisons for equipment."""
         result = (
             get_supabase_client()
@@ -335,8 +335,8 @@ class BaselineRepository:
         return [BaselineComparison(**row) for row in result.data]
 
     async def get_critical_deviations(
-        self, equipment_id: Optional[str] = None, days: int = 30
-    ) -> List[BaselineComparison]:
+        self, equipment_id: str | None = None, days: int = 30
+    ) -> list[BaselineComparison]:
         """Get critical deviation comparisons."""
         query = (
             get_supabase_client()
@@ -357,7 +357,7 @@ class BaselineRepository:
     # Summary and Reporting
     # ============================================================================
 
-    async def get_baseline_summary(self, equipment_id: str) -> Dict[str, Any]:
+    async def get_baseline_summary(self, equipment_id: str) -> dict[str, Any]:
         """Get baseline summary statistics for equipment."""
         # Get active baseline
         active_baseline = await self.get_active_equipment_baseline(equipment_id)
@@ -385,7 +385,7 @@ class BaselineRepository:
     # Bulk Query Operations (used by AssetHealthService)
     # ============================================================================
 
-    async def get_bulk_baseline_status(self, equipment_ids: List[str]) -> Dict[str, Dict]:
+    async def get_bulk_baseline_status(self, equipment_ids: list[str]) -> dict[str, dict]:
         """Get baseline status for multiple equipment items in a single query.
 
         Returns dict keyed by equipment_id with baseline status info.
@@ -404,7 +404,7 @@ class BaselineRepository:
                 .execute()
             )
 
-            status_map: Dict[str, Dict] = {}
+            status_map: dict[str, dict] = {}
             for row in result.data:
                 eq_id = row["equipment_id"]
                 if eq_id not in status_map:
@@ -422,7 +422,7 @@ class BaselineRepository:
         except Exception:
             return {}
 
-    async def get_bulk_max_deviation_24h(self, equipment_ids: List[str]) -> Dict[str, Dict]:
+    async def get_bulk_max_deviation_24h(self, equipment_ids: list[str]) -> dict[str, dict]:
         """Get maximum baseline deviation in the last 24 hours for multiple equipment.
 
         Returns dict keyed by equipment_id with deviation info.
@@ -442,7 +442,7 @@ class BaselineRepository:
                 .execute()
             )
 
-            deviation_map: Dict[str, Dict] = {}
+            deviation_map: dict[str, dict] = {}
             for row in result.data:
                 eq_id = row["equipment_id"]
                 dev_pct = abs(row.get("deviation_percent") or 0)

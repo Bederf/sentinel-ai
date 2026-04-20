@@ -11,8 +11,7 @@ Policy rules:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
-from typing import Optional
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from app.database.repositories.visit_repository import VisitRepository
@@ -26,7 +25,7 @@ class PolicyResult:
     allowed: bool
     reason: str
     status_code: int
-    visit: Optional[Visit] = None
+    visit: Visit | None = None
 
 
 class VisitPolicyEngine:
@@ -36,7 +35,7 @@ class VisitPolicyEngine:
     C-CURE or the repository directly.
     """
 
-    def __init__(self, repo: Optional[VisitRepository] = None) -> None:
+    def __init__(self, repo: VisitRepository | None = None) -> None:
         self._repo = repo or VisitRepository()
 
     # -------------------------------------------------------------------------
@@ -45,8 +44,8 @@ class VisitPolicyEngine:
 
     def check_scan_policy(
         self,
-        token: Optional[UUID] = None,
-        pin: Optional[str] = None,
+        token: UUID | None = None,
+        pin: str | None = None,
     ) -> PolicyResult:
         """Check whether a scan (QR token or PIN) grants entry.
 
@@ -70,7 +69,7 @@ class VisitPolicyEngine:
             )
 
         # Rule 2/3: lookup
-        visit: Optional[Visit] = None
+        visit: Visit | None = None
         if token:
             visit = self._repo.get_visit_by_token(token)
         else:
@@ -85,10 +84,10 @@ class VisitPolicyEngine:
             )
 
         # Rule 4: expired (past meeting_end + 60 min)
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         meeting_end = visit.meeting_end
         if meeting_end.tzinfo is None:
-            meeting_end = meeting_end.replace(tzinfo=timezone.utc)
+            meeting_end = meeting_end.replace(tzinfo=UTC)
         expiry_threshold = meeting_end + timedelta(minutes=60)
         if now > expiry_threshold:
             return PolicyResult(
@@ -101,7 +100,7 @@ class VisitPolicyEngine:
         # Rule 5: too early (now < meeting_start - 30 min)
         meeting_start = visit.meeting_start
         if meeting_start.tzinfo is None:
-            meeting_start = meeting_start.replace(tzinfo=timezone.utc)
+            meeting_start = meeting_start.replace(tzinfo=UTC)
         window_start = meeting_start - timedelta(minutes=30)
         if now < window_start:
             return PolicyResult(

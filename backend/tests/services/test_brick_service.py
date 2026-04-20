@@ -1,15 +1,16 @@
 """Tests for Brick Ontology Runtime Service."""
 
 import json
-import pytest
 from pathlib import Path
+
+import pytest
 
 rdflib = pytest.importorskip("rdflib")
 
 from app.services.brick_service import (  # noqa: E402
-    BrickService,
     BrickEquipmentContext,
     BrickPointRef,
+    BrickService,
     get_brick_service,
 )
 

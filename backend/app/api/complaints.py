@@ -7,7 +7,6 @@ The hero endpoint: POST /api/complaints/submit?desk_id=25&complaint_type=too_hot
 Returns instant AI diagnosis with BMS context and actionable suggestions.
 """
 
-from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException
 
@@ -21,8 +20,8 @@ router = APIRouter(prefix="/api/complaints", tags=["Comfort Complaints"])
 async def submit_complaint(
     desk_id: str,
     complaint_type: str = "too_hot",
-    user_name: Optional[str] = None,
-    description: Optional[str] = None,
+    user_name: str | None = None,
+    description: str | None = None,
 ) -> dict:
     """
     Submit a comfort complaint and get instant AI diagnosis.
@@ -111,10 +110,10 @@ async def get_zone_context(zone_id: str) -> dict:
 
 @router.get("/history")
 async def get_complaint_history(
-    desk_id: Optional[str] = None,
-    zone_id: Optional[str] = None,
+    desk_id: str | None = None,
+    zone_id: str | None = None,
     hours: int = 24,
-) -> List[dict]:
+) -> list[dict]:
     """
     Get complaint history for pattern analysis.
 
@@ -138,9 +137,9 @@ async def get_complaint_history(
 
 @router.get("/desks")
 async def list_desks(
-    floor: Optional[str] = None,
-    zone_id: Optional[str] = None,
-) -> List[dict]:
+    floor: str | None = None,
+    zone_id: str | None = None,
+) -> list[dict]:
     """
     List all desks with optional filters.
 
@@ -161,7 +160,7 @@ async def list_desks(
 
 
 @router.get("/zones")
-async def list_hvac_zones() -> List[dict]:
+async def list_hvac_zones() -> list[dict]:
     """
     List all HVAC zones with current status.
 

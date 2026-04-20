@@ -2,8 +2,9 @@
 Workflow Event Repository - Workflow event logging.
 """
 
-from typing import Optional, List, Dict, Any
 import logging
+from typing import Any
+
 from ..supabase_client import get_supabase_client
 
 logger = logging.getLogger(__name__)
@@ -15,7 +16,7 @@ class WorkflowEventRepository:
     def __init__(self):
         self.client = get_supabase_client()
 
-    def create(self, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def create(self, data: dict[str, Any]) -> dict[str, Any] | None:
         if not self.client:
             logger.warning("Supabase client not available")
             return None
@@ -30,8 +31,8 @@ class WorkflowEventRepository:
             return None
 
     def list(
-        self, equipment_id: Optional[str] = None, trigger_type: Optional[str] = None, limit: int = 100
-    ) -> List[Dict[str, Any]]:
+        self, equipment_id: str | None = None, trigger_type: str | None = None, limit: int = 100
+    ) -> list[dict[str, Any]]:
         if not self.client:
             return []
 
@@ -49,7 +50,7 @@ class WorkflowEventRepository:
             return []
 
 
-_repository: Optional[WorkflowEventRepository] = None
+_repository: WorkflowEventRepository | None = None
 
 
 def get_workflow_event_repository() -> WorkflowEventRepository:

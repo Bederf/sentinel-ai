@@ -4,7 +4,6 @@ These templates are designed to produce structured output that can be parsed
 into actionable maintenance recommendations.
 """
 
-from typing import Optional
 
 # Base template for prediction explanation
 PREDICTION_EXPLANATION_TEMPLATE = (
@@ -238,7 +237,7 @@ def format_contributing_factors(factors: list) -> str:
 
 
 def format_prediction_for_template(
-    equipment_id: str, equipment_type: str, predictions: dict, equipment_info: Optional[dict] = None
+    equipment_id: str, equipment_type: str, predictions: dict, equipment_info: dict | None = None
 ) -> dict:
     """Format prediction data for template insertion.
 

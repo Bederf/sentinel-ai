@@ -11,8 +11,8 @@ from pathlib import Path
 # Add backend to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from app.services.floor_plan_sanitizer import get_floor_plan_sanitizer
 from app.services.digital_twin_service import get_digital_twin_service
+from app.services.floor_plan_sanitizer import get_floor_plan_sanitizer
 
 
 def test_floor_plan(floor_code, floor_path):

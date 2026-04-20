@@ -6,12 +6,12 @@ It extracts features from time before failure and labels them with failure types
 
 import logging
 from datetime import datetime, timedelta
-from typing import Dict, List, Tuple
 
 import pandas as pd
+
+from app.database.repositories.equipment_repository import EquipmentRepository
 from app.services.feature_service import FeatureComputeService
 from app.services.influxdb_service import get_influxdb_service
-from app.database.repositories.equipment_repository import EquipmentRepository
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +42,7 @@ class ClassifierDataPrep:
         self.influxdb = get_influxdb_service()
         self.equipment_repo = EquipmentRepository()
 
-    def prepare_training_data(self, equipment_type: str) -> Tuple[pd.DataFrame, pd.Series]:
+    def prepare_training_data(self, equipment_type: str) -> tuple[pd.DataFrame, pd.Series]:
         """Prepare features and labels for classification.
 
         Args:
@@ -105,7 +105,7 @@ class ClassifierDataPrep:
 
         return X, y
 
-    def _get_labeled_failures(self, equipment_id: str) -> List[Dict]:
+    def _get_labeled_failures(self, equipment_id: str) -> list[dict]:
         """Get labeled failures for equipment.
 
         For MVP, generates synthetic failure data based on work orders.
@@ -138,7 +138,7 @@ class ClassifierDataPrep:
 
         return failures
 
-    def _generate_synthetic_failures(self, equipment_id: str) -> List[Dict]:
+    def _generate_synthetic_failures(self, equipment_id: str) -> list[dict]:
         """Generate synthetic failure data for demo purposes.
 
         Creates 3-5 failures per equipment over the past 90 days.
@@ -166,7 +166,7 @@ class ClassifierDataPrep:
 
         return failures
 
-    def _get_features_before_failure(self, equipment_id: str, failure_time: datetime, equipment_type: str) -> Dict:
+    def _get_features_before_failure(self, equipment_id: str, failure_time: datetime, equipment_type: str) -> dict:
         """Get features 7 days before failure for classification.
 
         Args:
@@ -201,7 +201,7 @@ class ClassifierDataPrep:
             # Return default features
             return self._get_default_features(equipment_type)
 
-    def _get_default_features(self, equipment_type: str) -> Dict:
+    def _get_default_features(self, equipment_type: str) -> dict:
         """Get default feature values when actual features unavailable.
 
         Provides reasonable defaults for demo/training when real data missing.
@@ -266,8 +266,8 @@ class ClassifierDataPrep:
         return defaults
 
     def _generate_synthetic_data(
-        self, equipment_type: str, failure_types: List[str], n_samples: int = 100
-    ) -> List[Dict]:
+        self, equipment_type: str, failure_types: list[str], n_samples: int = 100
+    ) -> list[dict]:
         """Generate synthetic training data for demo purposes.
 
         Args:

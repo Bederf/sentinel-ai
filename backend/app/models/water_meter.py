@@ -9,7 +9,7 @@ This module defines data models for water meter integration including:
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Dict, Any, Optional
+from typing import Any
 from uuid import uuid4
 
 
@@ -79,9 +79,9 @@ class WaterMeter:
     register_address: int = 0
     max_flow_rate_lpm: float = 100.0
     baseline_flow_lpm: float = 2.0
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "meter_id": self.meter_id,
@@ -98,7 +98,7 @@ class WaterMeter:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "WaterMeter":
+    def from_dict(cls, data: dict[str, Any]) -> "WaterMeter":
         """Create instance from dictionary."""
         return cls(
             meter_id=data["meter_id"],
@@ -140,16 +140,16 @@ class WaterConsumption:
     volume_liters: float
     flow_rate_lpm: float
     pulse_count: int = 0
-    temperature: Optional[float] = None
-    pressure: Optional[float] = None
-    zone_id: Optional[str] = None
-    zone_name: Optional[str] = None
-    unit_cost_per_liter: Optional[float] = None
-    total_cost: Optional[float] = None
-    cost_center: Optional[str] = None
-    billing_period_id: Optional[str] = None
+    temperature: float | None = None
+    pressure: float | None = None
+    zone_id: str | None = None
+    zone_name: str | None = None
+    unit_cost_per_liter: float | None = None
+    total_cost: float | None = None
+    cost_center: str | None = None
+    billing_period_id: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "meter_id": self.meter_id,
@@ -168,7 +168,7 @@ class WaterConsumption:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "WaterConsumption":
+    def from_dict(cls, data: dict[str, Any]) -> "WaterConsumption":
         """Create instance from dictionary."""
         return cls(
             meter_id=data["meter_id"],
@@ -219,11 +219,11 @@ class WaterAlert:
     threshold_lpm: float
     duration_minutes: float
     description: str
-    resolved_at: Optional[datetime] = None
-    resolved_by: Optional[str] = None
-    resolution_notes: Optional[str] = None
+    resolved_at: datetime | None = None
+    resolved_by: str | None = None
+    resolution_notes: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "alert_id": self.alert_id,
@@ -243,7 +243,7 @@ class WaterAlert:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "WaterAlert":
+    def from_dict(cls, data: dict[str, Any]) -> "WaterAlert":
         """Create instance from dictionary."""
         return cls(
             alert_id=data["alert_id"],
@@ -289,7 +289,7 @@ class WaterTrend:
     baseline_comparison_percent: float
     trend_direction: str
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "site": self.site,
@@ -327,7 +327,7 @@ class WaterTariff:
     site: str = ""
     name: str = ""
     effective_date: datetime = field(default_factory=datetime.now)
-    end_date: Optional[datetime] = None
+    end_date: datetime | None = None
     tier_1_liters: float = 0.0
     tier_1_rate_per_liter: float = 0.0
     tier_2_liters: float = 1000.0
@@ -336,7 +336,7 @@ class WaterTariff:
     fixed_monthly_charge: float = 0.0
     notes: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "id": self.id,
@@ -354,7 +354,7 @@ class WaterTariff:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "WaterTariff":
+    def from_dict(cls, data: dict[str, Any]) -> "WaterTariff":
         """Create instance from dictionary."""
         return cls(
             id=data.get("id", str(uuid4())),
@@ -399,7 +399,7 @@ class WaterCost:
     id: str = field(default_factory=lambda: str(uuid4()))
     site: str = ""
     consumption_id: str = ""
-    zone_id: Optional[str] = None
+    zone_id: str | None = None
     period_date: datetime = field(default_factory=datetime.now)
     consumption_liters: float = 0.0
     tariff_id: str = ""
@@ -410,7 +410,7 @@ class WaterCost:
     total_cost: float = 0.0
     calculated_at: datetime = field(default_factory=datetime.now)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "id": self.id,
@@ -429,7 +429,7 @@ class WaterCost:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "WaterCost":
+    def from_dict(cls, data: dict[str, Any]) -> "WaterCost":
         """Create instance from dictionary."""
         return cls(
             id=data.get("id", str(uuid4())),

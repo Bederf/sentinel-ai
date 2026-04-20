@@ -8,7 +8,6 @@ and connection management.
 
 import logging
 from datetime import datetime
-from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
 
@@ -154,9 +153,9 @@ async def read_obix_point(point_path: str):
 @router.get("/history", response_model=OBIXHistoryResponse)
 async def read_obix_history(
     point_path: str = Query(..., description="History path (e.g., histories/temperature1)"),
-    start: Optional[datetime] = Query(None, description="Start datetime (ISO 8601)"),
-    end: Optional[datetime] = Query(None, description="End datetime (ISO 8601)"),
-    limit: Optional[int] = Query(None, description="Maximum records", ge=1, le=10000),
+    start: datetime | None = Query(None, description="Start datetime (ISO 8601)"),
+    end: datetime | None = Query(None, description="End datetime (ISO 8601)"),
+    limit: int | None = Query(None, description="Maximum records", ge=1, le=10000),
 ):
     """
     Retrieve historical data for a point via oBIX history service.
@@ -211,10 +210,10 @@ async def read_obix_history(
 
 @router.get("/alarms", response_model=OBIXAlarmResponse)
 async def read_obix_alarms(
-    start: Optional[datetime] = Query(None, description="Start datetime filter"),
-    end: Optional[datetime] = Query(None, description="End datetime filter"),
-    severity: Optional[str] = Query(None, description="Filter by severity (critical, warning, info)"),
-    priority: Optional[int] = Query(None, description="Filter by priority (1-5)", ge=1, le=5),
+    start: datetime | None = Query(None, description="Start datetime filter"),
+    end: datetime | None = Query(None, description="End datetime filter"),
+    severity: str | None = Query(None, description="Filter by severity (critical, warning, info)"),
+    priority: int | None = Query(None, description="Filter by priority (1-5)", ge=1, le=5),
     limit: int = Query(100, description="Maximum alarms to return", ge=1, le=1000),
 ):
     """

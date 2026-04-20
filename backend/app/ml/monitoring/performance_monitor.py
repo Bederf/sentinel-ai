@@ -10,10 +10,10 @@ This enables dashboard visualization of model accuracy based on real simulation 
 
 import json
 import logging
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Optional, Dict, Any, List
-from dataclasses import dataclass
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +37,7 @@ class PerformanceMonitor:
         self.log_dir = log_dir
         self.log_dir.mkdir(parents=True, exist_ok=True)
 
-    def evaluate_predictions(self, days_back: int = 7, site_code: str | None = None) -> Dict[str, Any]:
+    def evaluate_predictions(self, days_back: int = 7, site_code: str | None = None) -> dict[str, Any]:
         """
         Evaluate prediction accuracy against actual simulation outcomes.
 
@@ -128,7 +128,7 @@ class PerformanceMonitor:
             },
         }
 
-    def get_model_health_summary(self) -> Dict[str, Any]:
+    def get_model_health_summary(self) -> dict[str, Any]:
         """Get health summary of all active models.
 
         Evaluates recent model performance and returns overall health status.
@@ -170,7 +170,7 @@ class PerformanceMonitor:
                 "error": str(e),
             }
 
-    def _find_recent_runs(self, cutoff_time: datetime, site_code: str) -> List[Path]:
+    def _find_recent_runs(self, cutoff_time: datetime, site_code: str) -> list[Path]:
         """Find simulation run metadata files newer than cutoff_time."""
         recent_runs = []
 
@@ -197,7 +197,7 @@ class PerformanceMonitor:
 
         return recent_runs
 
-    def _read_events_jsonl(self, jsonl_file: Path) -> List[Dict[str, Any]]:
+    def _read_events_jsonl(self, jsonl_file: Path) -> list[dict[str, Any]]:
         """Read JSONL events file line by line."""
         events = []
 
@@ -215,7 +215,7 @@ class PerformanceMonitor:
 
         return events
 
-    def _calculate_metrics(self, confusion: ConfusionMatrix) -> Dict[str, float]:
+    def _calculate_metrics(self, confusion: ConfusionMatrix) -> dict[str, float]:
         """Calculate Accuracy, Precision, Recall, F1 from confusion matrix."""
         tp = confusion.true_positives
         fp = confusion.false_positives
@@ -242,7 +242,7 @@ class PerformanceMonitor:
             "f1_score": round(f1_score, 4),
         }
 
-    def _empty_performance_result(self) -> Dict[str, Any]:
+    def _empty_performance_result(self) -> dict[str, Any]:
         """Return empty result when no data available."""
         return {
             "evaluated_at": datetime.now().isoformat(),
@@ -267,7 +267,7 @@ class PerformanceMonitor:
 
 
 # Singleton instance
-_monitor: Optional[PerformanceMonitor] = None
+_monitor: PerformanceMonitor | None = None
 
 
 def get_performance_monitor() -> PerformanceMonitor:

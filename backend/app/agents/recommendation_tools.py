@@ -9,12 +9,12 @@ LLM usage: Zero. All functions are pure Python service calls.
 
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
-def _candidate_site_ids(site_id: str) -> List[str]:
+def _candidate_site_ids(site_id: str) -> list[str]:
     """Return normalized site-id variants for cross-service compatibility."""
     if not site_id:
         return []
@@ -34,7 +34,7 @@ def _candidate_site_ids(site_id: str) -> List[str]:
         candidates.append(f"site-{sid[1:]}")
 
     # Preserve order, remove duplicates
-    deduped: List[str] = []
+    deduped: list[str] = []
     for item in candidates:
         if item and item not in deduped:
             deduped.append(item)
@@ -69,7 +69,7 @@ def _is_control_module_active(site_id: str) -> bool:
     return False
 
 
-async def _get_recommendation_by_id(recommendation_id: str) -> Optional[Any]:
+async def _get_recommendation_by_id(recommendation_id: str) -> Any | None:
     """Load recommendation model from repository."""
     from app.database.repositories import get_recommendation_repository
 
@@ -87,7 +87,7 @@ async def _get_recommendation_by_id(recommendation_id: str) -> Optional[Any]:
     return None
 
 
-async def get_pending_recommendations(site_id: str, limit: int = 5) -> List[Dict[str, Any]]:
+async def get_pending_recommendations(site_id: str, limit: int = 5) -> list[dict[str, Any]]:
     """Fetch pending recommendations for a site.
 
     Wraps RecommendationService.get_pending_recommendations().
@@ -106,7 +106,7 @@ async def get_pending_recommendations(site_id: str, limit: int = 5) -> List[Dict
     return [r.to_dict() for r in recs]
 
 
-async def check_equipment_health(equipment_code: str) -> Dict[str, Any]:
+async def check_equipment_health(equipment_code: str) -> dict[str, Any]:
     """Check current health score for equipment.
 
     Args:
@@ -121,7 +121,7 @@ async def check_equipment_health(equipment_code: str) -> Dict[str, Any]:
     return {"health_score": 100, "is_healthy": True, "details": {}}
 
 
-async def check_maintenance_calendar(equipment_code: str) -> Dict[str, Any]:
+async def check_maintenance_calendar(equipment_code: str) -> dict[str, Any]:
     """Check if there's an open work order for this equipment.
 
     Wraps WorkOrderRepository to detect schedule conflicts.
@@ -152,7 +152,7 @@ async def check_maintenance_calendar(equipment_code: str) -> Dict[str, Any]:
     return {"has_conflict": False, "work_orders": [], "reason": ""}
 
 
-async def estimate_cost_impact(recommendation: Dict[str, Any]) -> Dict[str, Any]:
+async def estimate_cost_impact(recommendation: dict[str, Any]) -> dict[str, Any]:
     """Estimate the cost/energy/comfort impact of a recommendation.
 
     Uses expected_impact from the recommendation and enriches with
@@ -186,7 +186,7 @@ async def estimate_cost_impact(recommendation: Dict[str, Any]) -> Dict[str, Any]
     return impact
 
 
-async def cross_reference_similar_faults(equipment_code: str, fault_type: str) -> List[Dict[str, Any]]:
+async def cross_reference_similar_faults(equipment_code: str, fault_type: str) -> list[dict[str, Any]]:
     """Find similar past faults for the same equipment or type.
 
     Wraps recommendation history to find patterns.
@@ -234,8 +234,8 @@ async def cross_reference_similar_faults(equipment_code: str, fault_type: str) -
 
 
 async def route_through_tier_engine(
-    recommendation: Dict[str, Any],
-) -> Dict[str, Any]:
+    recommendation: dict[str, Any],
+) -> dict[str, Any]:
     """Route recommendation through PARASITE tier engine.
 
     Wraps TierRoutingEngine.route_recommendation().
@@ -282,7 +282,7 @@ async def route_through_tier_engine(
     }
 
 
-async def execute_tier3_auto(recommendation_id: str, tier_result: Dict[str, Any]) -> Dict[str, Any]:
+async def execute_tier3_auto(recommendation_id: str, tier_result: dict[str, Any]) -> dict[str, Any]:
     """Auto-execute a Tier 3 recommendation.
 
     Wraps ApprovalService.auto_execute_recommendation().
@@ -342,8 +342,8 @@ async def execute_tier3_auto(recommendation_id: str, tier_result: Dict[str, Any]
 
 
 async def execute_approved_recommendation(
-    recommendation_id: str, approved_by: str, notes: Optional[str] = None
-) -> Dict[str, Any]:
+    recommendation_id: str, approved_by: str, notes: str | None = None
+) -> dict[str, Any]:
     """Execute an approved (Tier 2) recommendation.
 
     Wraps ApprovalService.execute_approval().
@@ -389,7 +389,7 @@ async def execute_approved_recommendation(
     }
 
 
-async def reject_recommendation(recommendation_id: str, rejected_by: str, reason: str) -> Dict[str, Any]:
+async def reject_recommendation(recommendation_id: str, rejected_by: str, reason: str) -> dict[str, Any]:
     """Reject a Tier 2 recommendation.
 
     Wraps ApprovalService.reject_approval().
@@ -491,7 +491,7 @@ async def submit_feedback_to_model(
         return False
 
 
-def check_recommendation_freshness(recommendation: Dict[str, Any], max_age_minutes: int = 30) -> Dict[str, Any]:
+def check_recommendation_freshness(recommendation: dict[str, Any], max_age_minutes: int = 30) -> dict[str, Any]:
     """Check if a recommendation is still fresh (not stale/expired).
 
     Pure function — no service dependency.

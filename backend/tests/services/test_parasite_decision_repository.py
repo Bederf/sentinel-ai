@@ -7,9 +7,10 @@ Covers the four methods added for AEGIS Phase 0 follow-up:
 - get_decisions_by_site (with optional since)
 """
 
-import pytest
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
+
+import pytest
 
 from app.database.repositories.parasite_decision_repository import (
     ParasiteDecisionRepository,
@@ -35,7 +36,7 @@ def _make_decision(
     **extra,
 ) -> dict:
     """Build a minimal decision dict for testing."""
-    now = created_at or datetime.now(timezone.utc).isoformat()
+    now = created_at or datetime.now(UTC).isoformat()
     d = {
         "id": id,
         "site_id": site_id,
@@ -89,13 +90,13 @@ async def test_count_pending_measurements(repo):
 @pytest.mark.asyncio
 async def test_get_decisions_since(repo):
     """Should return only decisions newer than the given timestamp."""
-    old_ts = (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat()
-    recent_ts = (datetime.now(timezone.utc) - timedelta(minutes=10)).isoformat()
+    old_ts = (datetime.now(UTC) - timedelta(hours=2)).isoformat()
+    recent_ts = (datetime.now(UTC) - timedelta(minutes=10)).isoformat()
 
     await repo.record_decision(_make_decision(id="old", created_at=old_ts))
     await repo.record_decision(_make_decision(id="new", created_at=recent_ts))
 
-    cutoff = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+    cutoff = (datetime.now(UTC) - timedelta(hours=1)).isoformat()
     results = await repo.get_decisions_since(cutoff)
 
     assert len(results) == 1
@@ -105,14 +106,14 @@ async def test_get_decisions_since(repo):
 @pytest.mark.asyncio
 async def test_get_decisions_by_site_with_since(repo):
     """Should filter by site_id AND since timestamp."""
-    old_ts = (datetime.now(timezone.utc) - timedelta(hours=3)).isoformat()
-    recent_ts = (datetime.now(timezone.utc) - timedelta(minutes=5)).isoformat()
+    old_ts = (datetime.now(UTC) - timedelta(hours=3)).isoformat()
+    recent_ts = (datetime.now(UTC) - timedelta(minutes=5)).isoformat()
 
     await repo.record_decision(_make_decision(id="s1", site_id="site-002", created_at=recent_ts))
     await repo.record_decision(_make_decision(id="s2", site_id="site-002", created_at=old_ts))
     await repo.record_decision(_make_decision(id="s3", site_id="site-003", created_at=recent_ts))
 
-    cutoff = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+    cutoff = (datetime.now(UTC) - timedelta(hours=1)).isoformat()
     results = await repo.get_decisions_by_site("site-002", since=cutoff)
 
     assert len(results) == 1

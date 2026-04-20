@@ -19,8 +19,8 @@ from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Query
 
-from app.database.supabase_client import get_supabase_client
 from app.core.site_resolver import get_primary_site_code
+from app.database.supabase_client import get_supabase_client
 from app.services.occupancy_profile_service import calculate_zone_occupancy
 
 router = APIRouter()

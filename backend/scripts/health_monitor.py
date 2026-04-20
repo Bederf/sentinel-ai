@@ -28,7 +28,7 @@ import logging
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import httpx
 from dotenv import load_dotenv
@@ -59,9 +59,9 @@ class SentinelHealthMonitor:
     def __init__(
         self,
         api_url: str = API_URL,
-        service_role_key: Optional[str] = None,
-        username: Optional[str] = None,
-        password: Optional[str] = None,
+        service_role_key: str | None = None,
+        username: str | None = None,
+        password: str | None = None,
     ):
         """
         Initialize health monitor.
@@ -76,8 +76,8 @@ class SentinelHealthMonitor:
         self.service_role_key = service_role_key or SERVICE_ROLE_KEY
         self.username = username
         self.password = password
-        self.jwt_token: Optional[str] = None
-        self.client: Optional[httpx.AsyncClient] = None
+        self.jwt_token: str | None = None
+        self.client: httpx.AsyncClient | None = None
 
     async def __aenter__(self):
         """Async context manager entry."""
@@ -89,7 +89,7 @@ class SentinelHealthMonitor:
         if self.client:
             await self.client.aclose()
 
-    def _get_headers(self) -> Dict[str, str]:
+    def _get_headers(self) -> dict[str, str]:
         """Build request headers with authentication."""
         headers = {"Content-Type": "application/json"}
 
@@ -105,7 +105,7 @@ class SentinelHealthMonitor:
 
         return headers
 
-    async def login(self, username: Optional[str] = None, password: Optional[str] = None) -> bool:
+    async def login(self, username: str | None = None, password: str | None = None) -> bool:
         """
         Authenticate with username/password to get JWT token.
 
@@ -149,7 +149,7 @@ class SentinelHealthMonitor:
             logger.error(f"Login request failed: {e}")
             return False
 
-    async def get_site_summary(self, site_code: Optional[str] = None) -> List[Dict]:
+    async def get_site_summary(self, site_code: str | None = None) -> list[dict]:
         """
         Fetch site summary with alerts and health overview.
 
@@ -180,7 +180,7 @@ class SentinelHealthMonitor:
             logger.error(f"Failed to fetch site summary: {e}")
             raise
 
-    async def get_equipment_details(self, equipment_id: str) -> Dict[str, Any]:
+    async def get_equipment_details(self, equipment_id: str) -> dict[str, Any]:
         """
         Fetch individual equipment details.
 
@@ -215,7 +215,7 @@ class SentinelHealthMonitor:
                 logger.error(f"Failed to fetch equipment {equipment_id}: {e}")
             raise
 
-    async def get_alerts_by_site(self, site_id: str, limit: int = 50) -> List[Dict]:
+    async def get_alerts_by_site(self, site_id: str, limit: int = 50) -> list[dict]:
         """
         Fetch alerts for a site.
 
@@ -246,10 +246,10 @@ class SentinelHealthMonitor:
 
     async def monitor_health(
         self,
-        site_code: Optional[str] = None,
+        site_code: str | None = None,
         critical_only: bool = False,
         output_format: str = "text",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Comprehensive health monitoring.
 
@@ -427,7 +427,7 @@ Examples:
             sys.exit(1)
 
 
-def _format_text_output(results: Dict[str, Any]) -> str:
+def _format_text_output(results: dict[str, Any]) -> str:
     """Format monitoring results as human-readable text."""
     lines = [
         f"\n{'=' * 70}",

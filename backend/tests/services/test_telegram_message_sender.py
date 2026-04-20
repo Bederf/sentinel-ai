@@ -1,7 +1,8 @@
 """Tests for TelegramMessageSender."""
 
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
 
 from app.services.telegram_message_sender import (
     ConfigurationError,

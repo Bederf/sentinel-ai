@@ -12,18 +12,18 @@ Usage:
     python -m ml.autoencoder.train --all --epochs 50
 """
 
-import logging
 import argparse
+import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import Any
 
 import numpy as np
 from sklearn.model_selection import train_test_split
 
-from .data_prep import AutoencoderDataPrep, AUTOENCODER_SENSOR_CONFIGS
-from .model import SensorAutoencoder
 from ..registry import get_model_registry
+from .data_prep import AUTOENCODER_SENSOR_CONFIGS, AutoencoderDataPrep
+from .model import SensorAutoencoder
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +57,7 @@ class AutoencoderTrainer:
         latent_dim: int = 16,
         use_demo_data: bool = True,
         verbose: int = 1,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Train autoencoder for a specific equipment type.
 
@@ -229,8 +229,8 @@ class AutoencoderTrainer:
         return result
 
     def _evaluate_detection(
-        self, model: SensorAutoencoder, X_all: np.ndarray, anomaly_indices: List[int]
-    ) -> Dict[str, float]:
+        self, model: SensorAutoencoder, X_all: np.ndarray, anomaly_indices: list[int]
+    ) -> dict[str, float]:
         """
         Evaluate anomaly detection performance.
 
@@ -279,7 +279,7 @@ class AutoencoderTrainer:
         test_size: float = 0.2,
         latent_dim: int = 16,
         verbose: int = 0,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Train autoencoder with pre-prepared data (from SimulationMLFeeder).
 
         Args:
@@ -384,7 +384,7 @@ class AutoencoderTrainer:
             "threshold": model.threshold,
         }
 
-    def train_all(self, epochs: int = 100, use_demo_data: bool = True) -> List[Dict[str, Any]]:
+    def train_all(self, epochs: int = 100, use_demo_data: bool = True) -> list[dict[str, Any]]:
         """Train models for all equipment types."""
         results = []
 

@@ -1,7 +1,8 @@
 """Tests for startup validation, Phase 168-01: Demo mode production safety checks."""
 
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 
 from app.startup.events import startup_event
 

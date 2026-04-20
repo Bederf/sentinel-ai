@@ -26,7 +26,7 @@ def load_demo_data():
     # Load baselines
     baselines_file = data_dir / "demo_baselines.json"
     if baselines_file.exists():
-        with open(baselines_file, "r") as f:
+        with open(baselines_file) as f:
             baselines = json.load(f)
 
         for equipment_id, baseline in baselines.items():
@@ -39,7 +39,7 @@ def load_demo_data():
     # Load recordings
     recordings_file = data_dir / "demo_recordings.json"
     if recordings_file.exists():
-        with open(recordings_file, "r") as f:
+        with open(recordings_file) as f:
             recordings = json.load(f)
 
         total_recordings = 0

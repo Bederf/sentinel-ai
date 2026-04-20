@@ -13,20 +13,19 @@ Endpoints:
 """
 
 from datetime import datetime
-from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from app.models.data_quality import (
-    DataGap,
-    EquipmentDataQuality,
-    DataQualityAlert,
     BuildingDataQualityReport,
+    DataGap,
+    DataQualityAlert,
+    EquipmentDataQuality,
     TrainingReadiness,
 )
-from app.services.data_quality_service import get_data_quality_service
 from app.services.data_quality_alerts import get_data_quality_alert_service
+from app.services.data_quality_service import get_data_quality_service
 
 router = APIRouter(prefix="/api/data-quality", tags=["data-quality"])
 
@@ -125,10 +124,10 @@ async def get_daily_report(
     return report
 
 
-@router.get("/alerts", response_model=List[DataQualityAlert])
+@router.get("/alerts", response_model=list[DataQualityAlert])
 async def get_alerts(
-    equipment_id: Optional[str] = Query(None, description="Filter by equipment"),
-    alert_type: Optional[str] = Query(None, description="Filter by alert type"),
+    equipment_id: str | None = Query(None, description="Filter by equipment"),
+    alert_type: str | None = Query(None, description="Filter by alert type"),
     include_resolved: bool = Query(False, description="Include resolved alerts"),
     limit: int = Query(50, ge=1, le=500, description="Maximum alerts to return"),
 ):
@@ -202,7 +201,7 @@ async def resolve_alert(
     return {"status": "resolved", "equipment_id": equipment_id}
 
 
-@router.get("/gaps/equipment/{equipment_id}", response_model=List[DataGap])
+@router.get("/gaps/equipment/{equipment_id}", response_model=list[DataGap])
 async def get_equipment_gaps(
     equipment_id: str,
     equipment_type: str = Query(default="unknown", description="Equipment type"),
@@ -229,7 +228,7 @@ async def check_training_readiness(
     minimum_equipment: int = Query(default=5, ge=1, description="Minimum equipment count"),
     minimum_days: int = Query(default=30, ge=7, le=365, description="Minimum days of data"),
     minimum_quality: float = Query(default=80.0, ge=0, le=100, description="Minimum quality score"),
-    mode: Optional[str] = Query(
+    mode: str | None = Query(
         default=None,
         description="Ingestion mode for threshold selection (simulation/shadow_live/live_control). "
         "If not provided, reads from settings.",

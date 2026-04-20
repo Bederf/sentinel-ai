@@ -3,7 +3,6 @@
 import json
 import logging
 from pathlib import Path
-from typing import Optional
 
 from fastapi import APIRouter
 from pydantic import BaseModel
@@ -82,7 +81,7 @@ def load_json(filename: str) -> list[dict] | dict:
     return []
 
 
-def get_stats_from_supabase() -> Optional[dict]:
+def get_stats_from_supabase() -> dict | None:
     """Get stats from Supabase database.
 
     Returns None if Supabase is not available or configured for JSON storage.
@@ -298,7 +297,7 @@ class StatsResponse(BaseModel):
     data_range_days: int
 
     # Optional fields for frontend compatibility
-    uptime_percent: Optional[float] = None
+    uptime_percent: float | None = None
     pending_anomalies: int = 0
 
 

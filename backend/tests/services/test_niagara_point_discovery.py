@@ -12,8 +12,9 @@ Tests cover:
 """
 
 import json
-import pytest
 from pathlib import Path
+
+import pytest
 
 from app.services.niagara.point_classifier import (
     ConfidenceLevel,
@@ -26,7 +27,6 @@ from app.services.niagara.point_discovery import (
     PointDiscoveryService,
     get_point_discovery_service,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures

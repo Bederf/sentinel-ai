@@ -13,9 +13,9 @@ import asyncio
 import json
 import logging
 import threading
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from dataclasses import dataclass
 from typing import Any
 
 from app.models.audit_log import AuditActionType, AuditLogEntry, AuditResultType

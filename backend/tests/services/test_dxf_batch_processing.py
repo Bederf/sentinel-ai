@@ -4,14 +4,14 @@ Tests batch parsing, file limit enforcement, size limit enforcement,
 mixed format handling, and validation endpoint.
 """
 
-import tempfile
 import os
+import tempfile
 
 import pytest
 
 ezdxf = pytest.importorskip("ezdxf", reason="ezdxf not installed")
 
-from app.services.dxf_parser_service import get_dxf_parser_service, BatchResult  # noqa: E402
+from app.services.dxf_parser_service import BatchResult, get_dxf_parser_service  # noqa: E402
 
 
 def _make_dxf_bytes(equipment_label="CH-1", layer="AE-HVAC", insert=(50, 40, 0)):
@@ -173,6 +173,7 @@ class TestBatchAPIEndpoint:
     async def test_file_limit_enforcement(self):
         """Batch rejects more than 20 files at API level."""
         from fastapi.testclient import TestClient
+
         from app.main import app
 
         client = TestClient(app)
@@ -193,6 +194,7 @@ class TestBatchAPIEndpoint:
     async def test_file_size_limit_enforcement(self):
         """Batch rejects files larger than 10MB."""
         from fastapi.testclient import TestClient
+
         from app.main import app
 
         client = TestClient(app)
@@ -214,6 +216,7 @@ class TestBatchAPIEndpoint:
     async def test_unsupported_file_type_rejected(self):
         """Batch rejects non-DXF/DWG files."""
         from fastapi.testclient import TestClient
+
         from app.main import app
 
         client = TestClient(app)
@@ -233,6 +236,7 @@ class TestBatchAPIEndpoint:
     async def test_validation_endpoint_returns_report(self):
         """GET /validate returns a validation report."""
         from fastapi.testclient import TestClient
+
         from app.main import app
 
         client = TestClient(app)

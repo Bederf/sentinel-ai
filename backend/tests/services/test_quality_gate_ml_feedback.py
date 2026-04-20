@@ -14,12 +14,12 @@ import os
 os.environ.setdefault("DEMO_MODE", "true")
 os.environ.setdefault("LIGHTWEIGHT_APP", "1")
 
-import pytest  # noqa: E402
-from datetime import datetime  # noqa: E402
-from unittest.mock import patch, MagicMock  # noqa: E402
+from datetime import datetime
+from unittest.mock import MagicMock, patch
 
-from app.models.outcome import Outcome  # noqa: E402
+import pytest
 
+from app.models.outcome import Outcome
 
 # ============================================================================
 # Outcome Model Tests
@@ -177,6 +177,7 @@ class TestMLOpsOutcomeEndpoint:
         """Create test client with just the mlops router."""
         from fastapi import FastAPI
         from fastapi.testclient import TestClient
+
         from app.api.mlops import router
 
         app = FastAPI()
@@ -272,6 +273,7 @@ class TestMLOpsHealthExtended:
         """Create test client with just the mlops router."""
         from fastapi import FastAPI
         from fastapi.testclient import TestClient
+
         from app.api.mlops import router
 
         app = FastAPI()

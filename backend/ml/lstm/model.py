@@ -6,7 +6,8 @@ Predicts sensor values at 24h, 48h, and 72h horizons.
 """
 
 import logging
-from typing import Tuple, Dict, Any
+from typing import Any
+
 import numpy as np
 
 logger = logging.getLogger(__name__)
@@ -39,7 +40,7 @@ class SensorLSTM:
         window_size: int = 168,
         n_features: int = 1,
         n_outputs: int = 3,
-        lstm_units: Tuple[int, int, int] = (128, 64, 32),
+        lstm_units: tuple[int, int, int] = (128, 64, 32),
         dropout_rate: float = 0.2,
         learning_rate: float = 0.001,
     ):
@@ -114,7 +115,7 @@ class SensorLSTM:
         batch_size: int = 32,
         patience: int = 10,
         verbose: int = 1,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Train the LSTM model.
 
@@ -190,7 +191,7 @@ class SensorLSTM:
 
         return self.model.predict(X, verbose=0)
 
-    def evaluate(self, X_test: np.ndarray, y_test: np.ndarray) -> Dict[str, float]:
+    def evaluate(self, X_test: np.ndarray, y_test: np.ndarray) -> dict[str, float]:
         """
         Evaluate model on test data.
 
@@ -239,7 +240,7 @@ class SensorLSTM:
         self.model.summary(print_fn=lambda x: stream.write(x + "\n"))
         return stream.getvalue()
 
-    def get_config(self) -> Dict[str, Any]:
+    def get_config(self) -> dict[str, Any]:
         """Get model configuration."""
         return {
             "window_size": self.window_size,

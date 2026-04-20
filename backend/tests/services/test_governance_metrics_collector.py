@@ -9,10 +9,10 @@ from prometheus_client import generate_latest
 
 from app.api.metrics import REGISTRY
 from app.services.governance_metrics_collector import (
-    governance_metrics,
-    _normalise_route,
-    _normalise_retrieval_path,
     _normalise_fallback_label,
+    _normalise_retrieval_path,
+    _normalise_route,
+    governance_metrics,
 )
 
 
@@ -99,8 +99,8 @@ class TestGovernanceMetricsCollector:
     def test_record_ai_usage_increments_tokens_and_cost(self):
         """Token and cost counters increment correctly."""
         from app.api.metrics import (
-            sentinel_ai_tokens_by_route_total,
             sentinel_ai_cost_by_route_total,
+            sentinel_ai_tokens_by_route_total,
         )
 
         before_tokens = sentinel_ai_tokens_by_route_total.labels(

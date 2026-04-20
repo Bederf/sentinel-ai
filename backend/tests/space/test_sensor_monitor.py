@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-import os
 import asyncio
-from datetime import datetime, timedelta, timezone
+import os
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, patch
-
 
 os.environ.setdefault("DEMO_MODE", "true")
 os.environ.setdefault("TESTING", "true")
@@ -20,7 +19,7 @@ def _run(coro):
 
 def _now():
     """Fresh timestamp for each test to avoid stale module-level NOW."""
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 @patch("app.space.sensor_monitor.repo")

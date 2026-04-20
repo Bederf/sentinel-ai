@@ -9,7 +9,6 @@ Note: Uses synchronous Supabase client calls to match existing middleware patter
 import hashlib
 import logging
 from datetime import datetime
-from typing import Optional
 
 from app.database.supabase_client import get_supabase_client
 from app.models.auth import SentinelRole
@@ -33,7 +32,7 @@ class APIKeysRepository:
         """Initialize with Supabase client."""
         self.client = get_supabase_client()
 
-    def validate_api_key(self, key: str) -> Optional[dict]:
+    def validate_api_key(self, key: str) -> dict | None:
         """Validate an API key against the database.
 
         Checks:
@@ -83,7 +82,7 @@ class APIKeysRepository:
             _logger.debug(f"API key validation error: {e}")
             return None
 
-    def get_api_key_metadata(self, api_key_id: str) -> Optional[dict]:
+    def get_api_key_metadata(self, api_key_id: str) -> dict | None:
         """Retrieve metadata for an API key.
 
         Args:
@@ -113,8 +112,8 @@ class APIKeysRepository:
         display_name: str,
         owner_role: SentinelRole,
         created_by: str,
-        expires_at: Optional[datetime] = None,
-    ) -> Optional[dict]:
+        expires_at: datetime | None = None,
+    ) -> dict | None:
         """Create a new API key in the database.
 
         Args:
@@ -221,7 +220,7 @@ class APIKeysRepository:
 
 
 # Singleton instance
-_api_keys_repository: Optional[APIKeysRepository] = None
+_api_keys_repository: APIKeysRepository | None = None
 
 
 def get_api_keys_repository() -> APIKeysRepository:

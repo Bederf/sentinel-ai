@@ -6,10 +6,9 @@ Phase 45: Routine Inspection & Maintenance
 
 from datetime import datetime
 from enum import Enum
-from typing import List, Optional, Dict, Any
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
-
 
 # ============================================================================
 # Enums
@@ -80,26 +79,26 @@ class InspectionScheduleBase(BaseModel):
     """Base model for inspection schedules."""
 
     equipment_id: str = Field(..., description="Equipment to inspect")
-    element_id: Optional[str] = Field(None, description="Specific element to inspect (optional)")
+    element_id: str | None = Field(None, description="Specific element to inspect (optional)")
 
     schedule_name: str = Field(..., description="Name of the inspection schedule")
-    schedule_description: Optional[str] = Field(None, description="Description of the schedule")
+    schedule_description: str | None = Field(None, description="Description of the schedule")
 
     frequency_type: InspectionScheduleFrequency = Field(..., description="Frequency of inspections")
-    frequency_days: Optional[int] = Field(None, description="Custom frequency in days")
+    frequency_days: int | None = Field(None, description="Custom frequency in days")
 
-    day_of_week: Optional[int] = Field(None, description="For weekly: 0=Sunday, 1=Monday, etc.")
-    day_of_month: Optional[int] = Field(None, description="For monthly: 1-31")
+    day_of_week: int | None = Field(None, description="For weekly: 0=Sunday, 1=Monday, etc.")
+    day_of_month: int | None = Field(None, description="For monthly: 1-31")
 
     estimated_duration_minutes: int = Field(default=60, description="Estimated inspection duration")
-    preferred_time_of_day: Optional[str] = Field(None, description="Preferred time: morning, afternoon, any")
+    preferred_time_of_day: str | None = Field(None, description="Preferred time: morning, afternoon, any")
 
-    assigned_to: Optional[str] = Field(None, description="Assigned technician")
-    required_skills: Optional[List[str]] = Field(None, description="Required skills")
+    assigned_to: str | None = Field(None, description="Assigned technician")
+    required_skills: list[str] | None = Field(None, description="Required skills")
 
     is_active: bool = Field(default=True, description="Whether schedule is active")
-    last_generated_date: Optional[datetime] = Field(None, description="Last task generation date")
-    next_due_date: Optional[datetime] = Field(None, description="Next scheduled due date")
+    last_generated_date: datetime | None = Field(None, description="Last task generation date")
+    next_due_date: datetime | None = Field(None, description="Next scheduled due date")
 
 
 class InspectionScheduleCreate(InspectionScheduleBase):
@@ -151,11 +150,11 @@ class InspectionChecklistTemplateBase(BaseModel):
     is_active: bool = Field(default=True, description="Whether template is active")
     version: int = Field(default=1, description="Template version")
 
-    checklist_items: List[Dict[str, Any]] = Field(default_factory=list, description="Array of checklist items")
-    required_tools: Optional[List[str]] = Field(None, description="Required tools")
-    required_skills: Optional[List[str]] = Field(None, description="Required skills")
-    safety_requirements: Optional[List[str]] = Field(None, description="Safety requirements")
-    ppe_required: Optional[List[str]] = Field(None, description="Required PPE")
+    checklist_items: list[dict[str, Any]] = Field(default_factory=list, description="Array of checklist items")
+    required_tools: list[str] | None = Field(None, description="Required tools")
+    required_skills: list[str] | None = Field(None, description="Required skills")
+    safety_requirements: list[str] | None = Field(None, description="Safety requirements")
+    ppe_required: list[str] | None = Field(None, description="Required PPE")
 
 
 class InspectionChecklistTemplateCreate(InspectionChecklistTemplateBase):
@@ -180,34 +179,34 @@ class InspectionChecklistTemplate(InspectionChecklistTemplateBase):
 class InspectionTaskBase(BaseModel):
     """Base model for inspection tasks."""
 
-    schedule_id: Optional[str] = Field(None, description="Source schedule ID")
+    schedule_id: str | None = Field(None, description="Source schedule ID")
 
     task_name: str = Field(..., description="Name of the inspection task")
-    task_description: Optional[str] = Field(None, description="Task description")
+    task_description: str | None = Field(None, description="Task description")
 
     equipment_id: str = Field(..., description="Equipment to inspect")
-    element_id: Optional[str] = Field(None, description="Specific element to inspect")
+    element_id: str | None = Field(None, description="Specific element to inspect")
 
     scheduled_date: datetime = Field(..., description="Scheduled date")
     due_date: datetime = Field(..., description="Due date")
 
-    assigned_to: Optional[str] = Field(None, description="Assigned technician")
-    assigned_by: Optional[str] = Field(None, description="Who assigned the task")
+    assigned_to: str | None = Field(None, description="Assigned technician")
+    assigned_by: str | None = Field(None, description="Who assigned the task")
 
     status: InspectionTaskStatus = Field(default=InspectionTaskStatus.SCHEDULED, description="Task status")
 
-    completed_date: Optional[datetime] = Field(None, description="Completion date")
-    completed_by: Optional[str] = Field(None, description="Who completed the task")
-    completion_notes: Optional[str] = Field(None, description="Completion notes")
+    completed_date: datetime | None = Field(None, description="Completion date")
+    completed_by: str | None = Field(None, description="Who completed the task")
+    completion_notes: str | None = Field(None, description="Completion notes")
 
-    estimated_duration_minutes: Optional[int] = Field(None, description="Estimated duration")
-    actual_duration_minutes: Optional[int] = Field(None, description="Actual duration")
+    estimated_duration_minutes: int | None = Field(None, description="Estimated duration")
+    actual_duration_minutes: int | None = Field(None, description="Actual duration")
 
     priority: InspectionPriority = Field(default=InspectionPriority.NORMAL, description="Task priority")
     is_critical: bool = Field(default=False, description="Whether this is a critical inspection")
 
-    checklist_template_id: Optional[str] = Field(None, description="Checklist template used")
-    baseline_reference_id: Optional[str] = Field(None, description="Reference baseline for comparison")
+    checklist_template_id: str | None = Field(None, description="Checklist template used")
+    baseline_reference_id: str | None = Field(None, description="Reference baseline for comparison")
 
 
 class InspectionTaskCreate(InspectionTaskBase):
@@ -256,22 +255,22 @@ class InspectionResultBase(BaseModel):
 
     overall_status: InspectionOverallStatus = Field(..., description="Overall inspection status")
 
-    item_results: List[Dict[str, Any]] = Field(default_factory=list, description="Results for each checklist item")
-    measurements: Optional[Dict[str, Any]] = Field(None, description="Measurements captured")
+    item_results: list[dict[str, Any]] = Field(default_factory=list, description="Results for each checklist item")
+    measurements: dict[str, Any] | None = Field(None, description="Measurements captured")
 
     deficiencies_found: int = Field(default=0, description="Number of deficiencies found")
     critical_findings: int = Field(default=0, description="Number of critical findings")
 
-    ambient_conditions: Optional[Dict[str, Any]] = Field(None, description="Environmental conditions")
+    ambient_conditions: dict[str, Any] | None = Field(None, description="Environmental conditions")
 
-    started_at: Optional[datetime] = Field(None, description="When inspection started")
-    completed_at: Optional[datetime] = Field(None, description="When inspection completed")
+    started_at: datetime | None = Field(None, description="When inspection started")
+    completed_at: datetime | None = Field(None, description="When inspection completed")
 
-    general_notes: Optional[str] = Field(None, description="General notes and observations")
-    recommendations: Optional[str] = Field(None, description="Recommendations")
+    general_notes: str | None = Field(None, description="General notes and observations")
+    recommendations: str | None = Field(None, description="Recommendations")
 
-    photo_urls: Optional[List[str]] = Field(None, description="URLs to inspection photos")
-    recommended_next_inspection_date: Optional[datetime] = Field(None, description="Recommended next inspection date")
+    photo_urls: list[str] | None = Field(None, description="URLs to inspection photos")
+    recommended_next_inspection_date: datetime | None = Field(None, description="Recommended next inspection date")
 
 
 class InspectionResultCreate(InspectionResultBase):
@@ -326,32 +325,32 @@ class InspectionDeficiencyBase(BaseModel):
     result_id: str = Field(..., description="Source result ID")
     task_id: str = Field(..., description="Source task ID")
     equipment_id: str = Field(..., description="Equipment with deficiency")
-    element_id: Optional[str] = Field(None, description="Element with deficiency")
+    element_id: str | None = Field(None, description="Element with deficiency")
 
     deficiency_title: str = Field(..., description="Title/summary of deficiency")
-    deficiency_description: Optional[str] = Field(None, description="Detailed description")
+    deficiency_description: str | None = Field(None, description="Detailed description")
 
     severity: DeficiencySeverity = Field(..., description="Severity level")
-    category: Optional[DeficiencyCategory] = Field(None, description="Category")
+    category: DeficiencyCategory | None = Field(None, description="Category")
 
-    location_detail: Optional[str] = Field(None, description="Specific location on equipment")
-    checklist_item_id: Optional[str] = Field(None, description="Checklist item where found")
+    location_detail: str | None = Field(None, description="Specific location on equipment")
+    checklist_item_id: str | None = Field(None, description="Checklist item where found")
 
-    impact_description: Optional[str] = Field(None, description="Description of impact")
-    urgency: Optional[str] = Field(None, description="Urgency level")
+    impact_description: str | None = Field(None, description="Description of impact")
+    urgency: str | None = Field(None, description="Urgency level")
 
-    recommended_action: Optional[str] = Field(None, description="Recommended corrective action")
-    estimated_repair_cost_min: Optional[float] = Field(None, description="Min estimated repair cost")
-    estimated_repair_cost_max: Optional[float] = Field(None, description="Max estimated repair cost")
-    estimated_repair_hours: Optional[int] = Field(None, description="Estimated repair hours")
+    recommended_action: str | None = Field(None, description="Recommended corrective action")
+    estimated_repair_cost_min: float | None = Field(None, description="Min estimated repair cost")
+    estimated_repair_cost_max: float | None = Field(None, description="Max estimated repair cost")
+    estimated_repair_hours: int | None = Field(None, description="Estimated repair hours")
 
     is_resolved: bool = Field(default=False, description="Whether deficiency is resolved")
-    resolved_date: Optional[datetime] = Field(None, description="Resolution date")
-    resolved_by: Optional[str] = Field(None, description="Who resolved it")
-    resolution_notes: Optional[str] = Field(None, description="Resolution notes")
+    resolved_date: datetime | None = Field(None, description="Resolution date")
+    resolved_by: str | None = Field(None, description="Who resolved it")
+    resolution_notes: str | None = Field(None, description="Resolution notes")
 
-    work_order_id: Optional[str] = Field(None, description="Associated work order ID")
-    photo_urls: Optional[List[str]] = Field(None, description="Photo evidence URLs")
+    work_order_id: str | None = Field(None, description="Associated work order ID")
+    photo_urls: list[str] | None = Field(None, description="Photo evidence URLs")
 
 
 class InspectionDeficiencyCreate(InspectionDeficiencyBase):
@@ -414,11 +413,11 @@ class InspectionMeasurementBase(BaseModel):
     measured_by: str = Field(..., description="Who took the measurement")
 
     # Baseline comparison (optional)
-    baseline_value: Optional[float] = Field(None, description="Baseline value for comparison")
-    baseline_deviation_percent: Optional[float] = Field(None, description="Deviation from baseline as percentage")
-    deviation_status: Optional[str] = Field(None, description="Status: normal, warning, critical")
+    baseline_value: float | None = Field(None, description="Baseline value for comparison")
+    baseline_deviation_percent: float | None = Field(None, description="Deviation from baseline as percentage")
+    deviation_status: str | None = Field(None, description="Status: normal, warning, critical")
 
-    notes: Optional[str] = Field(None, description="Additional notes")
+    notes: str | None = Field(None, description="Additional notes")
 
 
 class InspectionMeasurementCreate(InspectionMeasurementBase):
@@ -478,8 +477,8 @@ class InspectionTaskCompleteRequest(BaseModel):
     """Request to complete inspection task."""
 
     completed_by: str = Field(..., description="Who completed the inspection")
-    completion_notes: Optional[str] = Field(None, description="Completion notes")
-    actual_duration_minutes: Optional[int] = Field(None, description="Actual duration in minutes")
+    completion_notes: str | None = Field(None, description="Completion notes")
+    actual_duration_minutes: int | None = Field(None, description="Actual duration in minutes")
 
 
 class InspectionCalendarRequest(BaseModel):
@@ -487,14 +486,14 @@ class InspectionCalendarRequest(BaseModel):
 
     start_date: datetime = Field(..., description="Calendar start date")
     end_date: datetime = Field(..., description="Calendar end date")
-    assigned_to: Optional[str] = Field(None, description="Filter by technician")
-    equipment_id: Optional[str] = Field(None, description="Filter by equipment")
+    assigned_to: str | None = Field(None, description="Filter by technician")
+    equipment_id: str | None = Field(None, description="Filter by equipment")
 
 
 class BulkTaskGenerationRequest(BaseModel):
     """Request for bulk task generation."""
 
-    equipment_ids: List[str] = Field(..., description="List of equipment IDs")
+    equipment_ids: list[str] = Field(..., description="List of equipment IDs")
     baseline_type: str = Field(default="periodic", description="Type of baseline to use")
 
 
@@ -523,7 +522,7 @@ class InspectionTaskSummary(BaseModel):
     """Summary of inspection task statistics."""
 
     total_tasks_generated: int
-    tasks_by_status: Dict[str, int]
+    tasks_by_status: dict[str, int]
     overdue_tasks: int
     completed_last_30_days: int
     total_schedules: int
@@ -534,7 +533,7 @@ class InspectionDeficiencySummary(BaseModel):
     """Summary of deficiency statistics."""
 
     total_deficiencies: int
-    by_severity: Dict[str, int]
+    by_severity: dict[str, int]
     resolved: int
     unresolved: int
 
@@ -549,8 +548,8 @@ class InspectionPhoto(BaseModel):
 
     file_url: str = Field(..., description="URL to uploaded photo")
     file_name: str = Field(..., description="Original file name")
-    description: Optional[str] = Field(None, description="Photo description/context")
-    element_id: Optional[str] = Field(None, description="Associated element ID")
+    description: str | None = Field(None, description="Photo description/context")
+    element_id: str | None = Field(None, description="Associated element ID")
 
 
 class InspectionSubmission(BaseModel):
@@ -582,12 +581,12 @@ class InspectionSubmission(BaseModel):
 
     equipment_id: str = Field(..., description="Equipment being inspected")
     template_id: str = Field(..., description="Checklist template ID")
-    checklist_responses: Dict[str, Any] = Field(..., description="Item ID to response mapping")
-    photos: List[InspectionPhoto] = Field(default_factory=list, description="Photo attachments")
+    checklist_responses: dict[str, Any] = Field(..., description="Item ID to response mapping")
+    photos: list[InspectionPhoto] = Field(default_factory=list, description="Photo attachments")
     duration_minutes: int = Field(default=15, description="Actual inspection duration")
-    notes: Optional[str] = Field(None, description="General inspection notes")
+    notes: str | None = Field(None, description="General inspection notes")
     submitted_by: str = Field(default="technician", description="Who submitted the inspection")
-    submitted_at: Optional[datetime] = Field(None, description="Submission timestamp")
+    submitted_at: datetime | None = Field(None, description="Submission timestamp")
 
 
 class InspectionScheduleSummary(BaseModel):
@@ -597,10 +596,10 @@ class InspectionScheduleSummary(BaseModel):
     equipment_id: str
     schedule_name: str
     frequency_type: str
-    frequency_interval: Optional[int] = None
+    frequency_interval: int | None = None
     inspection_type: str
-    checklist_template_id: Optional[str] = None
+    checklist_template_id: str | None = None
     priority: str
     duration_minutes: int
-    next_due_date: Optional[datetime] = None
+    next_due_date: datetime | None = None
     is_active: bool = True

@@ -5,9 +5,9 @@ from __future__ import annotations
 import json
 import logging
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from app.database.supabase_client import get_supabase_client
 
@@ -52,7 +52,7 @@ class EmailClusterRepository:
 
         return self._upsert_json(record)
 
-    def get_by_id(self, cluster_id: str) -> Optional[dict[str, Any]]:
+    def get_by_id(self, cluster_id: str) -> dict[str, Any] | None:
         if self.client:
             try:
                 r = self.client.table("email_clusters").select("*").eq("id", cluster_id).execute()
@@ -67,7 +67,7 @@ class EmailClusterRepository:
         site_id: str,
         zone_id: str,
         complaint_type: str,
-    ) -> Optional[dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """Find an open cluster matching zone + type. Adjacency is handled by caller."""
         if self.client:
             try:

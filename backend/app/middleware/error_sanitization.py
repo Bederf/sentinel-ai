@@ -10,7 +10,6 @@ FSR Domain: 4.7 - Logical Access Control (information disclosure prevention)
 """
 
 import logging
-from typing import Optional
 
 from fastapi import HTTPException, status
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -29,7 +28,7 @@ class ErrorSanitizationMiddleware(BaseHTTPMiddleware):
     In production, sensitive information is stripped from error responses.
     """
 
-    def __init__(self, app, debug_mode: Optional[bool] = None):
+    def __init__(self, app, debug_mode: bool | None = None):
         super().__init__(app)
         self.debug_mode = debug_mode if debug_mode is not None else settings.debug
 

@@ -9,9 +9,9 @@ Phase 45-02: Fleet Learning and Cross-Site Insights.
 """
 
 import logging
-from datetime import datetime
-from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +54,7 @@ class FailurePattern:
     count: int = 0
     avg_age_at_failure_years: float = 0.0
     avg_health_at_detection: float = 0.0
-    common_precursors: List[str] = field(default_factory=list)
+    common_precursors: list[str] = field(default_factory=list)
     avg_repair_cost_zar: float = 0.0
     avg_downtime_hours: float = 0.0
     sites_affected: int = 0  # Count only, no identifiers
@@ -83,10 +83,10 @@ class FleetAggregator:
     """
 
     def __init__(self):
-        self._failure_patterns: Dict[str, FailurePattern] = {}
-        self._site_data: Dict[str, Dict[str, Any]] = {}
-        self._benchmarks: Dict[str, FleetBenchmark] = {}
-        self._last_aggregation: Optional[str] = None
+        self._failure_patterns: dict[str, FailurePattern] = {}
+        self._site_data: dict[str, dict[str, Any]] = {}
+        self._benchmarks: dict[str, FleetBenchmark] = {}
+        self._last_aggregation: str | None = None
         self._seed_demo_data()
 
     def _seed_demo_data(self):
@@ -300,8 +300,8 @@ class FleetAggregator:
 
     def aggregate_failure_patterns(
         self,
-        equipment_type: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+        equipment_type: str | None = None,
+    ) -> list[dict[str, Any]]:
         """Aggregate anonymized failure patterns across fleet.
 
         Args:
@@ -336,9 +336,9 @@ class FleetAggregator:
     def get_similar_failures(
         self,
         equipment_type: str,
-        failure_type: Optional[str] = None,
-        exclude_site: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+        failure_type: str | None = None,
+        exclude_site: str | None = None,
+    ) -> list[dict[str, Any]]:
         """Find similar equipment failures across fleet.
 
         Privacy: excludes the requesting site's data from results.
@@ -386,7 +386,7 @@ class FleetAggregator:
         matches.sort(key=lambda m: m["fleet_occurrences"], reverse=True)
         return matches
 
-    def get_fleet_summary(self) -> Dict[str, Any]:
+    def get_fleet_summary(self) -> dict[str, Any]:
         """Get fleet-wide summary statistics.
 
         Returns anonymized, aggregated fleet overview.
@@ -440,8 +440,8 @@ class FleetAggregator:
 
     def get_benchmarks(
         self,
-        equipment_type: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+        equipment_type: str | None = None,
+    ) -> list[dict[str, Any]]:
         """Get fleet benchmarking data.
 
         Args:
@@ -473,8 +473,8 @@ class FleetAggregator:
         self,
         site_code: str,
         site_health: float,
-        equipment_type: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        equipment_type: str | None = None,
+    ) -> dict[str, Any]:
         """Compare a site's performance against fleet average.
 
         Args:
@@ -530,7 +530,7 @@ class FleetAggregator:
             "benchmarks": benchmarks,
         }
 
-    def get_risk_distribution(self) -> Dict[str, Any]:
+    def get_risk_distribution(self) -> dict[str, Any]:
         """Get fleet-wide risk distribution.
 
         Returns distribution of equipment by risk level across fleet.
@@ -572,7 +572,7 @@ class FleetAggregator:
 
 
 # Singleton
-_aggregator: Optional[FleetAggregator] = None
+_aggregator: FleetAggregator | None = None
 
 
 def get_fleet_aggregator() -> FleetAggregator:

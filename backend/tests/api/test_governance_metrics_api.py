@@ -95,8 +95,8 @@ class TestCostByRouteEndpoint:
     def test_cost_by_route_seeded(self, test_client):
         """Seed token/cost counters and verify they appear with USD→ZAR conversion."""
         from app.api.metrics import (
-            sentinel_ai_tokens_by_route_total,
             sentinel_ai_cost_by_route_total,
+            sentinel_ai_tokens_by_route_total,
         )
 
         sentinel_ai_tokens_by_route_total.labels(route="chat", site_id="site-002", provider="claude").inc(100)

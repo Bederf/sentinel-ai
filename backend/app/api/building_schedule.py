@@ -8,11 +8,11 @@ import json
 import logging
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
 from app.api.buildings import _building_to_site
-from app.middleware.auth_middleware import require_site_access, require_role
+from app.middleware.auth_middleware import require_role, require_site_access
 from app.models.auth import AuthContext, SentinelRole
 
 logger = logging.getLogger(__name__)

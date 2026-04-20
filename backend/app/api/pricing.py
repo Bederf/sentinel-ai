@@ -5,24 +5,24 @@ Phase 52-01: Risk-Based Pricing Tools
 REST API for pricing calculations, equipment types, and SLA tiers.
 """
 
-from fastapi import APIRouter, HTTPException, Query
-from typing import Dict, Any
 from decimal import Decimal
+from typing import Any
+
+from fastapi import APIRouter, HTTPException, Query
 
 from app.models.pricing import (
+    PricingBenchmarkResponse,
     QuoteRequest,
     QuoteResponse,
+    RenegotiationAnalysis,
+    RenewalPricingRequest,
+    RenewalPricingResponse,
+    RenewalQuote,
     SLATier,
     WhatIfRequest,
     WhatIfResponse,
-    RenewalPricingRequest,
-    RenewalPricingResponse,
-    PricingBenchmarkResponse,
-    RenewalQuote,
-    RenegotiationAnalysis,
 )
 from app.services.pricing_engine import get_pricing_engine
-
 
 router = APIRouter(prefix="/api/pricing", tags=["pricing"])
 
@@ -47,7 +47,7 @@ async def calculate_quote(request: QuoteRequest) -> QuoteResponse:
         quote = engine.calculate_price(request)
         return quote
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Pricing calculation failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Pricing calculation failed: {e!s}")
 
 
 @router.post("/what-if", response_model=WhatIfResponse)
@@ -60,7 +60,7 @@ async def pricing_what_if(request: WhatIfRequest) -> WhatIfResponse:
         response = engine.calculate_what_if(request.base, request.scenarios)
         return response
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"What-if analysis failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"What-if analysis failed: {e!s}")
 
 
 @router.post("/renewal", response_model=RenewalPricingResponse)
@@ -72,7 +72,7 @@ async def calculate_renewal_pricing(request: RenewalPricingRequest) -> RenewalPr
         engine = get_pricing_engine()
         return engine.calculate_renewal_pricing(request)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Renewal pricing failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Renewal pricing failed: {e!s}")
 
 
 @router.get("/benchmarks/{contract_id}", response_model=PricingBenchmarkResponse)
@@ -84,14 +84,14 @@ async def get_pricing_benchmarks(contract_id: str) -> PricingBenchmarkResponse:
         engine = get_pricing_engine()
         return engine.get_benchmarks_for_contract(contract_id)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Benchmarking failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Benchmarking failed: {e!s}")
 
 
 @router.post("/calculate-price-range")
 async def calculate_price_range(
     request: QuoteRequest,
     variance_pct: float = Query(default=10.0, ge=0, le=50, description="Variance percentage for range"),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Calculate price range with specified variance.
 
@@ -112,11 +112,11 @@ async def calculate_price_range(
             "variance_pct": variance_pct,
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Price range calculation failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Price range calculation failed: {e!s}")
 
 
 @router.get("/equipment-types")
-async def get_equipment_types() -> Dict[str, Any]:
+async def get_equipment_types() -> dict[str, Any]:
     """
     Get available equipment types for pricing.
 
@@ -144,7 +144,7 @@ async def get_equipment_types() -> Dict[str, Any]:
 
 
 @router.get("/sla-tiers")
-async def get_sla_tiers() -> Dict[str, Any]:
+async def get_sla_tiers() -> dict[str, Any]:
     """
     Get available SLA tiers with pricing.
 
@@ -172,7 +172,7 @@ async def get_sla_tiers() -> Dict[str, Any]:
 
 
 @router.get("/config")
-async def get_pricing_config() -> Dict[str, Any]:
+async def get_pricing_config() -> dict[str, Any]:
     """
     Get current pricing configuration.
 
@@ -198,7 +198,7 @@ async def get_pricing_config() -> Dict[str, Any]:
 
 
 @router.post("/quote-history")
-async def store_quote_history(request: QuoteRequest, quote_data: Dict[str, Any]) -> Dict[str, Any]:
+async def store_quote_history(request: QuoteRequest, quote_data: dict[str, Any]) -> dict[str, Any]:
     """
     Store generated quote for history and retrieval.
 
@@ -217,7 +217,7 @@ async def store_quote_history(request: QuoteRequest, quote_data: Dict[str, Any])
 
 
 @router.get("/quote-history/{quote_id}")
-async def retrieve_quote_history(quote_id: str) -> Dict[str, Any]:
+async def retrieve_quote_history(quote_id: str) -> dict[str, Any]:
     """
     Retrieve previously generated quote.
 
@@ -248,14 +248,14 @@ async def get_renewal_price(contract_id: str) -> RenewalQuote:
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Renewal pricing calculation failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Renewal pricing calculation failed: {e!s}")
 
 
 @router.get("/benchmarks-equipment/{equipment_type}")
 async def get_equipment_benchmarks(
     equipment_type: str,
     sla_tier: str = Query(default="standard", description="SLA tier: basic|standard|premium|enterprise"),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Get market comparable pricing for equipment type and SLA tier.
 
@@ -306,7 +306,7 @@ async def get_equipment_benchmarks(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Benchmark query failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Benchmark query failed: {e!s}")
 
 
 @router.post("/renegotiation/{contract_id}", response_model=RenegotiationAnalysis)
@@ -336,11 +336,11 @@ async def analyze_renegotiation(
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Renegotiation analysis failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Renegotiation analysis failed: {e!s}")
 
 
 @router.get("/win-loss-analysis")
-async def get_win_loss_analysis() -> Dict[str, Any]:
+async def get_win_loss_analysis() -> dict[str, Any]:
     """
     Get portfolio-level win/loss statistics.
 
@@ -365,13 +365,13 @@ async def get_win_loss_analysis() -> Dict[str, Any]:
             "note": "Data will populate from pricing_history and win_loss_analysis tables",
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Win/loss analysis failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Win/loss analysis failed: {e!s}")
 
 
 @router.get("/portfolio-benchmarks")
 async def get_portfolio_benchmarks(
     include_details: bool = Query(default=False, description="Include detailed breakdown"),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Compare all contracts in portfolio to market benchmarks.
 
@@ -399,11 +399,11 @@ async def get_portfolio_benchmarks(
             "note": "Data will populate from portfolio_pricing_summary view",
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Portfolio benchmarking failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Portfolio benchmarking failed: {e!s}")
 
 
 @router.get("/health")
-async def pricing_health() -> Dict[str, Any]:
+async def pricing_health() -> dict[str, Any]:
     """
     Health check for pricing service.
 

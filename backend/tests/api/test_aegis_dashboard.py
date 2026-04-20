@@ -3,10 +3,11 @@
 Endpoint: GET /api/parasite/aegis/dashboard
 """
 
-import pytest
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from unittest.mock import patch
+
+import pytest
 
 from app.database.repositories.parasite_decision_repository import (
     ParasiteDecisionRepository,
@@ -14,7 +15,7 @@ from app.database.repositories.parasite_decision_repository import (
 
 
 def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _make_aegis_decision(

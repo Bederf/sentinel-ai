@@ -52,23 +52,23 @@ try:
 except Exception:
     pass
 
-import pytest  # noqa: E402
-import json  # noqa: E402
 import asyncio  # noqa: E402
+import json  # noqa: E402
+from collections.abc import AsyncGenerator, Generator  # noqa: E402
 from pathlib import Path  # noqa: E402
-from typing import AsyncGenerator, Generator  # noqa: E402
 from unittest.mock import Mock, patch  # noqa: E402
 
-from fastapi.testclient import TestClient  # noqa: E402
-from httpx import AsyncClient, ASGITransport  # noqa: E402
+import pytest  # noqa: E402
 from fastapi import FastAPI  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
+from httpx import ASGITransport, AsyncClient  # noqa: E402
 
 if os.getenv("LIGHTWEIGHT_APP", "").lower() == "true":
+    from app.api import audit as audit_api
     from app.api import devices as devices_api
     from app.api import health as health_api
-    from app.api import sites as sites_api
-    from app.api import audit as audit_api
     from app.api import safety as safety_api
+    from app.api import sites as sites_api
     from app.api import stats as stats_api
     from app.api import workflow as workflow_api
 
@@ -100,9 +100,11 @@ else:
 if os.getenv("TESTING", "").lower() == "true":
     app.router.on_startup.clear()
     app.router.on_shutdown.clear()
+from datetime import UTC
+
+from app.services.audit_logger import AuditLogger  # noqa: E402
 from app.services.device_abstraction import DeviceManager  # noqa: E402
 from app.services.safety_interlocks import SafetyEngine  # noqa: E402
-from app.services.audit_logger import AuditLogger  # noqa: E402
 
 # Test data directory
 TEST_DATA_DIR = Path(__file__).parent.parent / "app" / "data"
@@ -448,8 +450,9 @@ def disable_background_scheduler():
 @pytest.fixture
 def jwt_token_admin() -> str:
     """Generate a valid JWT token for ADMIN role."""
+    from datetime import datetime, timedelta
+
     import jwt
-    from datetime import datetime, timedelta, timezone
 
     secret = os.environ.get("JWT_SECRET_KEY", "test-only-jwt-secret-for-ci-at-least-32-chars")
     import uuid
@@ -462,8 +465,8 @@ def jwt_token_admin() -> str:
         "aud": "sentinel.bms",
         "token_type": "access",
         "jti": str(uuid.uuid4()),
-        "iat": datetime.now(timezone.utc),
-        "exp": datetime.now(timezone.utc) + timedelta(hours=1),
+        "iat": datetime.now(UTC),
+        "exp": datetime.now(UTC) + timedelta(hours=1),
     }
     return jwt.encode(payload, secret, algorithm="HS256")
 
@@ -471,8 +474,9 @@ def jwt_token_admin() -> str:
 @pytest.fixture
 def jwt_token_operator() -> str:
     """Generate a valid JWT token for OPERATOR role."""
+    from datetime import datetime, timedelta
+
     import jwt
-    from datetime import datetime, timedelta, timezone
 
     secret = os.environ.get("JWT_SECRET_KEY", "test-only-jwt-secret-for-ci-at-least-32-chars")
     import uuid
@@ -485,8 +489,8 @@ def jwt_token_operator() -> str:
         "aud": "sentinel.bms",
         "token_type": "access",
         "jti": str(uuid.uuid4()),
-        "iat": datetime.now(timezone.utc),
-        "exp": datetime.now(timezone.utc) + timedelta(hours=1),
+        "iat": datetime.now(UTC),
+        "exp": datetime.now(UTC) + timedelta(hours=1),
     }
     return jwt.encode(payload, secret, algorithm="HS256")
 
@@ -494,8 +498,9 @@ def jwt_token_operator() -> str:
 @pytest.fixture
 def jwt_token_auditor() -> str:
     """Generate a valid JWT token for AUDITOR role."""
+    from datetime import datetime, timedelta
+
     import jwt
-    from datetime import datetime, timedelta, timezone
 
     secret = os.environ.get("JWT_SECRET_KEY", "test-only-jwt-secret-for-ci-at-least-32-chars")
     import uuid
@@ -508,8 +513,8 @@ def jwt_token_auditor() -> str:
         "aud": "sentinel.bms",
         "token_type": "access",
         "jti": str(uuid.uuid4()),
-        "iat": datetime.now(timezone.utc),
-        "exp": datetime.now(timezone.utc) + timedelta(hours=1),
+        "iat": datetime.now(UTC),
+        "exp": datetime.now(UTC) + timedelta(hours=1),
     }
     return jwt.encode(payload, secret, algorithm="HS256")
 
@@ -517,8 +522,9 @@ def jwt_token_auditor() -> str:
 @pytest.fixture
 def jwt_token_engineer() -> str:
     """Generate a valid JWT token for ENGINEER role."""
+    from datetime import datetime, timedelta
+
     import jwt
-    from datetime import datetime, timedelta, timezone
 
     secret = os.environ.get("JWT_SECRET_KEY", "test-only-jwt-secret-for-ci-at-least-32-chars")
     import uuid
@@ -531,8 +537,8 @@ def jwt_token_engineer() -> str:
         "aud": "sentinel.bms",
         "token_type": "access",
         "jti": str(uuid.uuid4()),
-        "iat": datetime.now(timezone.utc),
-        "exp": datetime.now(timezone.utc) + timedelta(hours=1),
+        "iat": datetime.now(UTC),
+        "exp": datetime.now(UTC) + timedelta(hours=1),
     }
     return jwt.encode(payload, secret, algorithm="HS256")
 
@@ -564,9 +570,10 @@ def auth_headers_engineer(jwt_token_engineer: str) -> dict:
 @pytest.fixture
 def jwt_token_bot_agent() -> str:
     """Generate a valid JWT token for BOT_AGENT role (Phase 184)."""
-    import jwt
-    from datetime import datetime, timedelta, timezone
     import uuid
+    from datetime import datetime, timedelta
+
+    import jwt
 
     secret = os.environ.get("JWT_SECRET_KEY", "test-only-jwt-secret-for-ci-at-least-32-chars")
     payload = {
@@ -577,8 +584,8 @@ def jwt_token_bot_agent() -> str:
         "aud": "sentinel.bms",
         "token_type": "access",
         "jti": str(uuid.uuid4()),
-        "iat": datetime.now(timezone.utc),
-        "exp": datetime.now(timezone.utc) + timedelta(hours=1),
+        "iat": datetime.now(UTC),
+        "exp": datetime.now(UTC) + timedelta(hours=1),
     }
     return jwt.encode(payload, secret, algorithm="HS256")
 

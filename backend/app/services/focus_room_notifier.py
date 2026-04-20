@@ -8,8 +8,8 @@ from __future__ import annotations
 
 import logging
 
-from app.core.site_resolver import get_registered_sites
 from app.config.settings import settings
+from app.core.site_resolver import get_registered_sites
 from app.models.notification import AlertLevel
 from app.services.notification_service import notification_service
 from app.services.sentry_integration.alert_notifier import alert_notifier

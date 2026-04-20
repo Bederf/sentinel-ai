@@ -10,7 +10,7 @@ Phase 45-03: MLOps Monitoring and Success Metrics.
 import logging
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +46,7 @@ class MLAlert:
         title: str,
         message: str,
         source: str = "",
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ):
         self.id = f"mla-{int(datetime.now().timestamp() * 1000)}"
         self.alert_type = alert_type
@@ -57,9 +57,9 @@ class MLAlert:
         self.metadata = metadata or {}
         self.created_at = datetime.now().isoformat()
         self.acknowledged = False
-        self.acknowledged_at: Optional[str] = None
+        self.acknowledged_at: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize alert to dict."""
         return {
             "id": self.id,
@@ -83,15 +83,15 @@ class MLAlertManager:
     """
 
     def __init__(self):
-        self._alerts: List[MLAlert] = []
+        self._alerts: list[MLAlert] = []
         self._max_alerts = 500
 
-    def check_and_alert(self) -> List[Dict[str, Any]]:
+    def check_and_alert(self) -> list[dict[str, Any]]:
         """Run all alert checks and return new alerts generated.
 
         Checks drift detection, model staleness, and performance.
         """
-        new_alerts: List[MLAlert] = []
+        new_alerts: list[MLAlert] = []
 
         # Check feature drift
         new_alerts.extend(self._check_feature_drift())
@@ -110,11 +110,11 @@ class MLAlertManager:
 
     def get_alerts(
         self,
-        severity: Optional[str] = None,
-        alert_type: Optional[str] = None,
-        acknowledged: Optional[bool] = None,
+        severity: str | None = None,
+        alert_type: str | None = None,
+        acknowledged: bool | None = None,
         limit: int = 50,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get alerts with optional filters.
 
         Args:
@@ -155,7 +155,7 @@ class MLAlertManager:
                 return True
         return False
 
-    def get_alert_summary(self) -> Dict[str, Any]:
+    def get_alert_summary(self) -> dict[str, Any]:
         """Get summary of current alert status."""
         total = len(self._alerts)
         unacknowledged = sum(1 for a in self._alerts if not a.acknowledged)
@@ -190,9 +190,9 @@ class MLAlertManager:
             else:
                 self._alerts.pop(0)
 
-    def _check_feature_drift(self) -> List[MLAlert]:
+    def _check_feature_drift(self) -> list[MLAlert]:
         """Check for feature drift across equipment types."""
-        alerts: List[MLAlert] = []
+        alerts: list[MLAlert] = []
         try:
             from ml.monitoring.drift import get_drift_detector
 
@@ -224,9 +224,9 @@ class MLAlertManager:
 
         return alerts
 
-    def _check_model_drift(self) -> List[MLAlert]:
+    def _check_model_drift(self) -> list[MLAlert]:
         """Check for model prediction drift."""
-        alerts: List[MLAlert] = []
+        alerts: list[MLAlert] = []
         try:
             from ml.monitoring.drift import get_drift_detector
 
@@ -257,9 +257,9 @@ class MLAlertManager:
 
         return alerts
 
-    def _check_model_staleness(self) -> List[MLAlert]:
+    def _check_model_staleness(self) -> list[MLAlert]:
         """Check for stale or underperforming models."""
-        alerts: List[MLAlert] = []
+        alerts: list[MLAlert] = []
         try:
             from ml.training.retraining_scheduler import get_retraining_scheduler
 
@@ -302,7 +302,7 @@ class MLAlertManager:
 
 
 # Singleton
-_manager: Optional[MLAlertManager] = None
+_manager: MLAlertManager | None = None
 
 
 def get_ml_alert_manager() -> MLAlertManager:

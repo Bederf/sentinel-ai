@@ -25,12 +25,11 @@ from app.security.tool_policy import (
     WRITE_TOOLS,
     check_mcp_admin_tool_access,
     generate_tool_summary,
+    get_raw_result,
     get_tool_tier,
     sanitize_tool_result,
-    get_raw_result,
     validate_bms_ip,
 )
-
 
 # ---------------------------------------------------------------------------
 # Tier classification
@@ -70,7 +69,7 @@ class TestDefaultDeny:
 
     def test_registered_tools_is_union(self):
         expected = ANALYSIS_TOOLS | CONTROL_TOOLS | WRITE_TOOLS
-        assert REGISTERED_TOOLS == expected
+        assert expected == REGISTERED_TOOLS
 
     def test_all_safe_tools_are_analysis(self):
         """Safe-to-echo tools must be a subset of analysis tools."""

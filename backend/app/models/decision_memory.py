@@ -10,9 +10,9 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 class DecisionOutcome(str, Enum):
@@ -27,16 +27,16 @@ class DecisionOutcome(str, Enum):
 
 
 def _now_utc() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def _generate_record_id() -> str:
-    ts = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+    ts = datetime.now(UTC).strftime("%Y%m%d%H%M%S")
     return f"DM-{ts}-{uuid.uuid4().hex[:8]}"
 
 
 def _detect_season() -> str:
-    month = datetime.now(timezone.utc).month
+    month = datetime.now(UTC).month
     if month in (12, 1, 2):
         return "summer"  # Southern hemisphere
     elif month in (3, 4, 5):
@@ -47,7 +47,7 @@ def _detect_season() -> str:
 
 
 def _detect_time_of_day() -> str:
-    hour = datetime.now(timezone.utc).hour
+    hour = datetime.now(UTC).hour
     if 6 <= hour < 12:
         return "morning"
     elif 12 <= hour < 17:
@@ -77,18 +77,18 @@ class DecisionRecord:
 
     # Action
     action_type: str = ""
-    action_details: Dict[str, Any] = field(default_factory=dict)
-    action_executed_at: Optional[datetime] = None
-    action_executed_by: Optional[str] = None
+    action_details: dict[str, Any] = field(default_factory=dict)
+    action_executed_at: datetime | None = None
+    action_executed_by: str | None = None
 
     # Outcome
     outcome: DecisionOutcome = DecisionOutcome.PENDING
-    outcome_details: Optional[str] = None
-    outcome_evaluated_at: Optional[datetime] = None
-    resolution_time_minutes: Optional[float] = None
+    outcome_details: str | None = None
+    outcome_evaluated_at: datetime | None = None
+    resolution_time_minutes: float | None = None
 
     # Context
-    signals_snapshot: List[Dict[str, Any]] = field(default_factory=list)
+    signals_snapshot: list[dict[str, Any]] = field(default_factory=list)
     season: str = field(default_factory=_detect_season)
     time_of_day: str = field(default_factory=_detect_time_of_day)
 
@@ -97,13 +97,13 @@ class DecisionRecord:
     updated_at: datetime = field(default_factory=_now_utc)
 
     # Correlation
-    correlation_id: Optional[str] = None
-    recommendation_id: Optional[str] = None
-    work_order_id: Optional[str] = None
-    event_id: Optional[str] = None
+    correlation_id: str | None = None
+    recommendation_id: str | None = None
+    work_order_id: str | None = None
+    event_id: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
-        def _dt(v: Optional[datetime]) -> Optional[str]:
+    def to_dict(self) -> dict[str, Any]:
+        def _dt(v: datetime | None) -> str | None:
             return v.isoformat() if isinstance(v, datetime) else v
 
         return {
@@ -136,8 +136,8 @@ class DecisionRecord:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> DecisionRecord:
-        def _parse_dt(val: Any) -> Optional[datetime]:
+    def from_dict(cls, data: dict[str, Any]) -> DecisionRecord:
+        def _parse_dt(val: Any) -> datetime | None:
             if isinstance(val, datetime):
                 return val
             if isinstance(val, str) and val:
@@ -201,7 +201,7 @@ class DecisionPattern:
     likely_diagnosis: str = ""
     diagnosis_confidence: float = 0.0
     recommended_action: str = ""
-    action_details: Dict[str, Any] = field(default_factory=dict)
+    action_details: dict[str, Any] = field(default_factory=dict)
 
     # Statistics
     total_occurrences: int = 0
@@ -210,16 +210,16 @@ class DecisionPattern:
     avg_resolution_time_minutes: float = 0.0
 
     # Applicability
-    applicable_sites: List[str] = field(default_factory=list)
-    seasonal_pattern: Optional[str] = None
+    applicable_sites: list[str] = field(default_factory=list)
+    seasonal_pattern: str | None = None
 
     # Timestamps
     created_at: datetime = field(default_factory=_now_utc)
     updated_at: datetime = field(default_factory=_now_utc)
-    last_matched_at: Optional[datetime] = None
+    last_matched_at: datetime | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
-        def _dt(v: Optional[datetime]) -> Optional[str]:
+    def to_dict(self) -> dict[str, Any]:
+        def _dt(v: datetime | None) -> str | None:
             return v.isoformat() if isinstance(v, datetime) else v
 
         return {
@@ -242,8 +242,8 @@ class DecisionPattern:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> DecisionPattern:
-        def _parse_dt(val: Any) -> Optional[datetime]:
+    def from_dict(cls, data: dict[str, Any]) -> DecisionPattern:
+        def _parse_dt(val: Any) -> datetime | None:
             if isinstance(val, datetime):
                 return val
             if isinstance(val, str) and val:

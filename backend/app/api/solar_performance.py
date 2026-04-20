@@ -8,14 +8,14 @@ Endpoints for:
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from app.middleware.rate_limiter import limiter
 
 from app.api.dependencies.module_access import require_active_module
+from app.middleware.rate_limiter import limiter
+from app.ml.solar_anomaly_detector import get_string_analyzer
 from app.models.module_registry import ModuleType
 from app.models.solar import SolarString
 from app.services.solar_ingestion_service import get_solar_ingestion_service
 from app.services.solar_performance_analyzer import get_solar_performance_analyzer
-from app.ml.solar_anomaly_detector import get_string_analyzer
 
 router = APIRouter(
     dependencies=[

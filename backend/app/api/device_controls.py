@@ -18,25 +18,26 @@ Approval Workflow Integration:
 """
 
 import logging
-from typing import Optional, Dict, Any
 from datetime import datetime
-from fastapi import APIRouter, HTTPException, Query, Depends
+from typing import Any
 
+from fastapi import APIRouter, Depends, HTTPException, Query
+
+from app.database.repositories.equipment_repository import EquipmentRepository
+from app.database.repositories.recommendation_repository import (
+    RecommendationRepository,
+    get_recommendation_repository,
+)
 from app.middleware.auth_middleware import require_equipment_access
 from app.models.auth import AuthContext, AuthLevel
+from app.models.recommendation import (
+    ActionRiskLevel,
+    Recommendation,
+    RecommendationStatus,
+)
 from app.security.step_up import require_step_up
 from app.services.device_control_service import (
     get_device_control_service,
-)
-from app.database.repositories.equipment_repository import EquipmentRepository
-from app.database.repositories.recommendation_repository import (
-    get_recommendation_repository,
-    RecommendationRepository,
-)
-from app.models.recommendation import (
-    Recommendation,
-    RecommendationStatus,
-    ActionRiskLevel,
 )
 
 logger = logging.getLogger(__name__)
@@ -48,9 +49,9 @@ equipment_repo = EquipmentRepository()
 
 @router.get("/equipment")
 async def list_controllable_equipment(
-    site_id: Optional[str] = Query(None),
-    zone_id: Optional[str] = Query(None),
-) -> Dict[str, Any]:
+    site_id: str | None = Query(None),
+    zone_id: str | None = Query(None),
+) -> dict[str, Any]:
     """
     List all controllable equipment in the system.
 
@@ -115,7 +116,7 @@ async def list_controllable_equipment(
 @router.get("/{equipment_code}")
 async def get_device_controls(
     equipment_code: str, auth: AuthContext = Depends(require_equipment_access("equipment_code"))
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Get device details and available control points.
 
@@ -178,7 +179,7 @@ async def get_device_controls(
         raise
     except Exception as e:
         logger.error(f"Error in get_device_controls: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {e!s}")
 
 
 @router.post("/{equipment_code}/validate")
@@ -187,7 +188,7 @@ async def validate_control_value(
     control_point: str,
     value: Any,
     auth: AuthContext = Depends(require_equipment_access("equipment_code")),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Validate a control value before submission.
 
@@ -215,7 +216,7 @@ async def validate_control_value(
 @router.get("/{equipment_code}/status")
 async def get_device_status(
     equipment_code: str, auth: AuthContext = Depends(require_equipment_access("equipment_code"))
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Get current control state and readings.
 
@@ -243,7 +244,7 @@ async def recommend_control(
     suggested_value: Any,
     rec_repo: RecommendationRepository = Depends(lambda: get_recommendation_repository()),
     auth: AuthContext = Depends(require_equipment_access("equipment_code")),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Generate a control recommendation (typically from complaint system).
 
@@ -317,7 +318,7 @@ async def recommend_control(
         }
     except Exception as e:
         logger.error(f"Error creating recommendation: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to create recommendation: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to create recommendation: {e!s}")
 
 
 @router.post("/{equipment_code}/execute")
@@ -330,7 +331,7 @@ async def execute_control(
     auth: AuthContext = Depends(require_equipment_access("equipment_code", AuthLevel.OPERATOR)),
     _step_up: None = Depends(require_step_up()),
     rec_repo: RecommendationRepository = Depends(lambda: get_recommendation_repository()),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Execute a control action (must be pre-approved via approval workflow).
 
@@ -407,7 +408,7 @@ async def execute_control(
         }
     except Exception as e:
         logger.error(f"Error executing control: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to execute control: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to execute control: {e!s}")
 
 
 @router.get("/{equipment_code}/history")
@@ -416,7 +417,7 @@ async def get_control_history(
     limit: int = Query(50, ge=1, le=500),
     rec_repo: RecommendationRepository = Depends(lambda: get_recommendation_repository()),
     auth: AuthContext = Depends(require_equipment_access("equipment_code")),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Get history of control actions on this equipment.
 
@@ -463,4 +464,4 @@ async def get_control_history(
         }
     except Exception as e:
         logger.error(f"Error querying control history: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to retrieve control history: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve control history: {e!s}")

@@ -13,7 +13,6 @@ from app.security.document_scanner import (
     validate_and_scan_upload,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers: minimal valid file content for each type
 # ---------------------------------------------------------------------------

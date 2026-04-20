@@ -10,20 +10,19 @@ Provides real-time and historical data for water meter installations:
 """
 
 import logging
-from datetime import datetime, date, timedelta
-from typing import Optional, List, Dict
+from datetime import date, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from app.middleware.rate_limiter import limiter
 
 from app.api.dependencies.module_access import require_active_module
-from app.models.module_registry import ModuleType
-from app.services.water_ingestion_service import get_water_ingestion_service
-from app.services.water_alert_service import get_water_alert_service, WaterAlertThresholds
-from app.services.water_cost_service import get_water_cost_service
 from app.database.repositories.water_consumption_repository import WaterConsumptionRepository
 from app.database.repositories.water_cost_repository import WaterCostRepository
+from app.middleware.rate_limiter import limiter
+from app.models.module_registry import ModuleType
 from app.models.water_meter import WaterTariff
+from app.services.water_alert_service import WaterAlertThresholds, get_water_alert_service
+from app.services.water_cost_service import get_water_cost_service
+from app.services.water_ingestion_service import get_water_ingestion_service
 
 logger = logging.getLogger(__name__)
 
@@ -79,9 +78,9 @@ async def get_current_flow(request: Request, site: str):
 async def get_consumption(
     request: Request,
     site: str,
-    start_date: Optional[str] = Query(None, description="Start date (ISO format)"),
-    end_date: Optional[str] = Query(None, description="End date (ISO format)"),
-    meter_id: Optional[str] = Query(None, description="Filter by meter ID"),
+    start_date: str | None = Query(None, description="Start date (ISO format)"),
+    end_date: str | None = Query(None, description="End date (ISO format)"),
+    meter_id: str | None = Query(None, description="Filter by meter ID"),
     limit: int = Query(1000, ge=1, le=10000, description="Maximum records to return"),
 ):
     """Get water consumption data for a site.
@@ -252,10 +251,10 @@ async def get_consumption_trends(
 async def get_alerts(
     request: Request,
     site: str,
-    severity: Optional[str] = Query(None, description="Filter by severity: low, medium, high, critical"),
-    start_date: Optional[str] = Query(None, description="Start date (ISO format)"),
-    end_date: Optional[str] = Query(None, description="End date (ISO format)"),
-    status: Optional[str] = Query(None, description="Filter by status: active, resolved, acknowledged"),
+    severity: str | None = Query(None, description="Filter by severity: low, medium, high, critical"),
+    start_date: str | None = Query(None, description="Start date (ISO format)"),
+    end_date: str | None = Query(None, description="End date (ISO format)"),
+    status: str | None = Query(None, description="Filter by status: active, resolved, acknowledged"),
 ):
     """Get water leak alerts for a site.
 
@@ -426,8 +425,8 @@ async def get_site_ingestion_status(request: Request, site: str):
 async def get_zone_consumption(
     request: Request,
     zone_id: str,
-    start: Optional[str] = Query(None, description="Start date (ISO format)"),
-    end: Optional[str] = Query(None, description="End date (ISO format)"),
+    start: str | None = Query(None, description="Start date (ISO format)"),
+    end: str | None = Query(None, description="End date (ISO format)"),
 ):
     """Get aggregated consumption for a zone.
 
@@ -468,8 +467,8 @@ async def get_floor_consumption(
     request: Request,
     site: str,
     floor: str,
-    start: Optional[str] = Query(None, description="Start date (ISO format)"),
-    end: Optional[str] = Query(None, description="End date (ISO format)"),
+    start: str | None = Query(None, description="Start date (ISO format)"),
+    end: str | None = Query(None, description="End date (ISO format)"),
 ):
     """Get aggregated consumption for all zones on a floor.
 
@@ -616,12 +615,12 @@ async def get_zone_vs_building(
 async def get_advanced_alerts(
     request: Request,
     site: str = Query(..., description="Building site code"),
-    alert_type: Optional[str] = Query(None, description="Filter by alert type"),
-    severity: Optional[str] = Query(None, description="Filter by severity"),
-    zone_id: Optional[str] = Query(None, description="Filter by zone ID"),
-    start: Optional[str] = Query(None, description="Start date (ISO format)"),
-    end: Optional[str] = Query(None, description="End date (ISO format)"),
-    status: Optional[str] = Query(None, description="Filter by status"),
+    alert_type: str | None = Query(None, description="Filter by alert type"),
+    severity: str | None = Query(None, description="Filter by severity"),
+    zone_id: str | None = Query(None, description="Filter by zone ID"),
+    start: str | None = Query(None, description="Start date (ISO format)"),
+    end: str | None = Query(None, description="End date (ISO format)"),
+    status: str | None = Query(None, description="Filter by status"),
     limit: int = Query(100, ge=1, le=1000, description="Maximum records to return"),
 ):
     """Get advanced water alerts with filtering by type, severity, zone, and time range.
@@ -814,7 +813,7 @@ async def get_zone_anomaly_history(
 
 @limiter.limit("30/minute")
 @router.get("/water/tariffs/{site}")
-async def get_site_tariffs(request: Request, site: str) -> Dict:
+async def get_site_tariffs(request: Request, site: str) -> dict:
     """Get all tariff configurations for a site.
 
     Args:
@@ -843,8 +842,8 @@ async def get_site_tariffs(request: Request, site: str) -> Dict:
 async def create_tariff(
     request: Request,
     site: str,
-    tariff_data: Dict,
-) -> Dict:
+    tariff_data: dict,
+) -> dict:
     """Create new tariff configuration for a site.
 
     Args:
@@ -877,9 +876,9 @@ async def create_tariff(
 async def get_site_costs(
     request: Request,
     site: str,
-    start: Optional[str] = Query(None, description="Start date (ISO format)"),
-    end: Optional[str] = Query(None, description="End date (ISO format)"),
-) -> Dict:
+    start: str | None = Query(None, description="Start date (ISO format)"),
+    end: str | None = Query(None, description="End date (ISO format)"),
+) -> dict:
     """Get cost summary for a site in date range.
 
     Args:
@@ -911,9 +910,9 @@ async def get_site_costs(
 async def get_zone_costs(
     request: Request,
     zone_id: str,
-    start: Optional[str] = Query(None, description="Start date (ISO format)"),
-    end: Optional[str] = Query(None, description="End date (ISO format)"),
-) -> Dict:
+    start: str | None = Query(None, description="Start date (ISO format)"),
+    end: str | None = Query(None, description="End date (ISO format)"),
+) -> dict:
     """Get cost summary for a zone in date range.
 
     Args:
@@ -945,8 +944,8 @@ async def get_zone_costs(
 async def forecast_monthly(
     request: Request,
     site: str = Query(..., description="Building site code"),
-    zone_id: Optional[str] = Query(None, description="Optional zone filter"),
-) -> Dict:
+    zone_id: str | None = Query(None, description="Optional zone filter"),
+) -> dict:
     """Forecast monthly water cost based on recent consumption.
 
     Args:
@@ -972,8 +971,8 @@ async def forecast_monthly(
 async def forecast_annual(
     request: Request,
     site: str = Query(..., description="Building site code"),
-    zone_id: Optional[str] = Query(None, description="Optional zone filter"),
-) -> Dict:
+    zone_id: str | None = Query(None, description="Optional zone filter"),
+) -> dict:
     """Forecast annual water cost based on recent consumption.
 
     Args:
@@ -1000,7 +999,7 @@ async def zone_cost_comparison(
     request: Request,
     site: str = Query(..., description="Building site code"),
     days: int = Query(30, ge=1, le=365, description="Look-back period in days"),
-) -> Dict:
+) -> dict:
     """Compare water costs across zones at a site.
 
     Args:
@@ -1033,7 +1032,7 @@ async def calculate_cost_impact(
     site: str = Query(..., description="Building site code"),
     reduction_liters: float = Query(..., ge=0, description="Consumption reduction target"),
     period_days: int = Query(30, ge=1, le=365, description="Base period for analysis"),
-) -> Dict:
+) -> dict:
     """Simulate cost savings from consumption reduction.
 
     Args:
@@ -1063,7 +1062,7 @@ async def calculate_cost_impact(
 async def create_work_order_from_water_alert(
     request: Request,
     alert_id: str,
-) -> Dict:
+) -> dict:
     """Create work order from a water leak alert.
 
     Args:
@@ -1105,7 +1104,7 @@ async def create_work_order_from_water_alert(
 async def get_water_work_order_details(
     request: Request,
     work_order_id: str,
-) -> Dict:
+) -> dict:
     """Get details of a water maintenance work order.
 
     Args:
@@ -1140,8 +1139,8 @@ async def acknowledge_work_order_alert(
     request: Request,
     work_order_id: str,
     acknowledged_by: str = Query(..., description="User or system acknowledging"),
-    notes: Optional[str] = Query(None, description="Acknowledgment notes"),
-) -> Dict:
+    notes: str | None = Query(None, description="Acknowledgment notes"),
+) -> dict:
     """Acknowledge a water alert linked to a work order.
 
     Args:
@@ -1176,7 +1175,7 @@ async def acknowledge_work_order_alert(
 async def get_unacknowledged_water_alerts(
     request: Request,
     site: str = Query(..., description="Building site code"),
-) -> List[Dict]:
+) -> list[dict]:
     """Get critical water alerts without acknowledgment.
 
     Args:
@@ -1220,7 +1219,7 @@ async def escalate_water_alert(
     request: Request,
     alert_id: str,
     escalation_reason: str = Query(..., description="Reason for escalation"),
-) -> Dict:
+) -> dict:
     """Escalate a water alert to supervisor.
 
     Args:
@@ -1255,7 +1254,7 @@ async def water_work_order_status(
     request: Request,
     site: str = Query(..., description="Building site code"),
     days: int = Query(7, ge=1, le=365, description="Report period in days"),
-) -> Dict:
+) -> dict:
     """Get water work order status report for a site.
 
     Args:

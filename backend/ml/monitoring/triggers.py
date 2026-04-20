@@ -9,7 +9,7 @@ Phase 45-03: MLOps Monitoring and Success Metrics.
 
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -29,8 +29,8 @@ class RetrainingTrigger:
     """
 
     def __init__(self):
-        self._trigger_history: List[Dict[str, Any]] = []
-        self._last_trigger: Dict[str, str] = {}  # model_key -> iso timestamp
+        self._trigger_history: list[dict[str, Any]] = []
+        self._last_trigger: dict[str, str] = {}  # model_key -> iso timestamp
         self._config = {
             "feature_drift_threshold": FEATURE_DRIFT_TRIGGER_THRESHOLD,
             "model_drift_trigger": MODEL_DRIFT_TRIGGER,
@@ -38,14 +38,14 @@ class RetrainingTrigger:
             "auto_retrain_enabled": True,
         }
 
-    def evaluate_and_trigger(self) -> Dict[str, Any]:
+    def evaluate_and_trigger(self) -> dict[str, Any]:
         """Run drift detection and trigger retraining if needed.
 
         Returns:
             Summary of evaluation and any triggered retraining.
         """
-        triggered: List[Dict[str, Any]] = []
-        skipped: List[Dict[str, str]] = []
+        triggered: list[dict[str, Any]] = []
+        skipped: list[dict[str, str]] = []
 
         # Check feature drift for all equipment types
         feature_triggers = self._evaluate_feature_drift()
@@ -84,15 +84,15 @@ class RetrainingTrigger:
             "config": self._config,
         }
 
-    def get_trigger_history(self, limit: int = 20) -> List[Dict[str, Any]]:
+    def get_trigger_history(self, limit: int = 20) -> list[dict[str, Any]]:
         """Get history of retraining triggers."""
         return self._trigger_history[-limit:]
 
-    def get_config(self) -> Dict[str, Any]:
+    def get_config(self) -> dict[str, Any]:
         """Get current trigger configuration."""
         return {**self._config}
 
-    def update_config(self, updates: Dict[str, Any]) -> Dict[str, Any]:
+    def update_config(self, updates: dict[str, Any]) -> dict[str, Any]:
         """Update trigger configuration.
 
         Args:
@@ -107,11 +107,11 @@ class RetrainingTrigger:
                 self._config[key] = value
         return self.get_config()
 
-    def _evaluate_feature_drift(self) -> List[Dict[str, Any]]:
+    def _evaluate_feature_drift(self) -> list[dict[str, Any]]:
         """Evaluate feature drift and identify models needing retraining."""
-        triggers: List[Dict[str, Any]] = []
+        triggers: list[dict[str, Any]] = []
         try:
-            from ml.monitoring.drift import get_drift_detector, EQUIPMENT_TYPES
+            from ml.monitoring.drift import EQUIPMENT_TYPES, get_drift_detector
 
             detector = get_drift_detector()
 
@@ -137,15 +137,15 @@ class RetrainingTrigger:
 
         return triggers
 
-    def _evaluate_model_drift(self) -> List[Dict[str, Any]]:
+    def _evaluate_model_drift(self) -> list[dict[str, Any]]:
         """Evaluate model drift and identify models needing retraining."""
-        triggers: List[Dict[str, Any]] = []
+        triggers: list[dict[str, Any]] = []
 
         if not self._config["model_drift_trigger"]:
             return triggers
 
         try:
-            from ml.monitoring.drift import get_drift_detector, MODEL_TYPES
+            from ml.monitoring.drift import MODEL_TYPES, get_drift_detector
 
             detector = get_drift_detector()
 
@@ -164,7 +164,7 @@ class RetrainingTrigger:
 
         return triggers
 
-    def _trigger_retrain(self, model_type: str, equipment_type: str, reason: str) -> Dict[str, Any]:
+    def _trigger_retrain(self, model_type: str, equipment_type: str, reason: str) -> dict[str, Any]:
         """Trigger a model retraining operation.
 
         Args:
@@ -234,7 +234,7 @@ class RetrainingTrigger:
 
 
 # Singleton
-_trigger: Optional[RetrainingTrigger] = None
+_trigger: RetrainingTrigger | None = None
 
 
 def get_retraining_trigger() -> RetrainingTrigger:

@@ -9,7 +9,7 @@ Test cases:
 
 from __future__ import annotations
 
-from app.services.chat_tools import get_chat_tools, _SYSTEM_DOCS_GATED_TOOLS
+from app.services.chat_tools import _SYSTEM_DOCS_GATED_TOOLS, get_chat_tools
 
 
 def _tool_names(tools: list[dict]) -> set[str]:

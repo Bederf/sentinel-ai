@@ -9,7 +9,7 @@ Logs MCP tool invocations to the audit system with:
 """
 
 import logging
-from typing import Any, Optional
+from typing import Any
 
 from app.middleware.audit_middleware import _sanitize_log_data
 from app.services.audit_logger import AuditLogger
@@ -52,7 +52,7 @@ def build_policy_decision(
     tool_name: str,
     user_id: str,
     auth_method: str,
-    site_id: Optional[str],
+    site_id: str | None,
     result: str,
     reason_code: str = "",
 ) -> dict[str, Any]:
@@ -104,8 +104,8 @@ def log_mcp_tool_call(
     arguments: dict,
     result_code: str,
     duration_ms: float,
-    site_id: Optional[str] = None,
-    request_id: Optional[str] = None,
+    site_id: str | None = None,
+    request_id: str | None = None,
     auth_method: str = "unknown",
     policy_result: str = "allow",
     policy_reason: str = "",

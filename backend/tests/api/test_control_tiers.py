@@ -6,16 +6,17 @@ Tests the three control tiers:
 - Tier 3 (Auto-Execute): Low-risk auto-executed, high-risk pending
 """
 
-import pytest
 from unittest.mock import AsyncMock, patch
 
+import pytest
+
+from app.models.optimization import SiteProfileConfig
 from app.models.recommendation import (
+    ActionRiskLevel,
     Recommendation,
     RecommendationStatus,
-    ActionRiskLevel,
 )
 from app.services.recommendation_service import RecommendationService
-from app.models.optimization import SiteProfileConfig
 
 
 @pytest.mark.asyncio

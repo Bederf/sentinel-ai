@@ -10,7 +10,7 @@ This module defines the data models for monitoring data quality:
 
 from datetime import datetime
 from enum import Enum
-from typing import List, Optional
+
 from pydantic import BaseModel, Field
 
 
@@ -57,8 +57,8 @@ class SensorHealth(BaseModel):
     )
     actual_readings_24h: int = Field(default=0, ge=0, description="Actual readings received in 24h")
     completeness_pct: float = Field(default=0.0, ge=0.0, le=100.0, description="Data completeness percentage (0-100)")
-    last_reading_at: Optional[datetime] = Field(None, description="Timestamp of most recent reading")
-    gaps: List[DataGap] = Field(default_factory=list, description="List of detected data gaps")
+    last_reading_at: datetime | None = Field(None, description="Timestamp of most recent reading")
+    gaps: list[DataGap] = Field(default_factory=list, description="List of detected data gaps")
     status: DataQualityLevel = Field(default=DataQualityLevel.POOR, description="Quality level for this sensor")
 
     @property
@@ -84,7 +84,7 @@ class EquipmentDataQuality(BaseModel):
     site_id: str = Field(default="", description="Building this equipment belongs to")
     overall_quality: DataQualityLevel = Field(default=DataQualityLevel.POOR, description="Overall data quality level")
     quality_score: float = Field(default=0.0, ge=0.0, le=100.0, description="Quality score (0-100)")
-    sensor_health: List[SensorHealth] = Field(default_factory=list, description="Health metrics per sensor")
+    sensor_health: list[SensorHealth] = Field(default_factory=list, description="Health metrics per sensor")
     total_expected_24h: int = Field(default=0, ge=0, description="Total expected readings across all sensors")
     total_actual_24h: int = Field(default=0, ge=0, description="Total actual readings across all sensors")
     completeness_pct: float = Field(default=0.0, ge=0.0, le=100.0, description="Overall data completeness percentage")
@@ -126,8 +126,8 @@ class DataQualityAlert(BaseModel):
     sensor_type: str = Field(..., description="Affected sensor type")
     message: str = Field(..., description="Human-readable alert message")
     detected_at: datetime = Field(default_factory=datetime.utcnow, description="When the issue was detected")
-    resolved_at: Optional[datetime] = Field(None, description="When the issue was resolved (None if still active)")
-    details: Optional[dict] = Field(None, description="Additional details (gap duration, drift magnitude, etc.)")
+    resolved_at: datetime | None = Field(None, description="When the issue was resolved (None if still active)")
+    details: dict | None = Field(None, description="Additional details (gap duration, drift magnitude, etc.)")
 
     @property
     def is_active(self) -> bool:
@@ -135,7 +135,7 @@ class DataQualityAlert(BaseModel):
         return self.resolved_at is None
 
     @property
-    def duration_minutes(self) -> Optional[float]:
+    def duration_minutes(self) -> float | None:
         """Duration of the alert in minutes (if resolved)."""
         if self.resolved_at is None:
             return None
@@ -156,7 +156,7 @@ class BuildingDataQualityReport(BaseModel):
     equipment_count: int = Field(default=0, ge=0, description="Number of equipment")
     overall_quality: DataQualityLevel = Field(default=DataQualityLevel.POOR, description="Building-wide quality level")
     average_quality_score: float = Field(default=0.0, ge=0.0, le=100.0, description="Average quality score")
-    equipment_quality: List[EquipmentDataQuality] = Field(
+    equipment_quality: list[EquipmentDataQuality] = Field(
         default_factory=list, description="Quality metrics per equipment"
     )
     active_alerts: int = Field(default=0, ge=0, description="Number of active alerts")
@@ -190,11 +190,11 @@ class TrainingReadiness(BaseModel):
     minimum_required: int = Field(default=5, ge=1, description="Minimum equipment required for training")
     days_of_data: int = Field(default=0, ge=0, description="Days of historical data")
     minimum_days_required: int = Field(default=30, ge=1, description="Minimum days required for training")
-    issues: List[str] = Field(default_factory=list, description="Issues preventing training readiness")
-    recommendations: List[str] = Field(default_factory=list, description="Recommendations to improve readiness")
-    mode: Optional[str] = Field(None, description="Ingestion mode used for threshold selection")
-    thresholds_used: Optional[dict] = Field(
+    issues: list[str] = Field(default_factory=list, description="Issues preventing training readiness")
+    recommendations: list[str] = Field(default_factory=list, description="Recommendations to improve readiness")
+    mode: str | None = Field(None, description="Ingestion mode used for threshold selection")
+    thresholds_used: dict | None = Field(
         None,
         description="Mode-specific thresholds applied: min_quality, min_days, min_equipment",
     )
-    gaps: List[str] = Field(default_factory=list, description="Which thresholds were not met")
+    gaps: list[str] = Field(default_factory=list, description="Which thresholds were not met")

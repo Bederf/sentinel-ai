@@ -8,13 +8,14 @@ Provides endpoints for:
 
 import logging
 import re
-from typing import List, Dict, Optional, Any
+from typing import Any
+
 from fastapi import APIRouter, Depends, HTTPException, Path, Query
 
-from app.middleware.auth_middleware import require_site_access
-from app.models.auth import AuthContext
 from app.database.repositories.desk_repository import DeskRepository
 from app.database.repositories.zone_repository import ZoneRepository
+from app.middleware.auth_middleware import require_site_access
+from app.models.auth import AuthContext
 
 logger = logging.getLogger(__name__)
 
@@ -70,9 +71,9 @@ class CentroidsMapResponse(dict):
 @router.get("/{site_id}/desks")
 async def get_desks(
     site_id: str = Path(..., description="Building UUID or code (e.g., 'site-002' or UUID)"),
-    floor: Optional[str] = Query(None, description="Optional floor filter (L0, L1, L2, etc.)"),
+    floor: str | None = Query(None, description="Optional floor filter (L0, L1, L2, etc.)"),
     auth: AuthContext = Depends(require_site_access("site_id")),
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Get desk data for a building.
 
     Optionally filtered by floor. Returns all desks with their positions,
@@ -144,7 +145,7 @@ async def get_desks_by_zone(
     site_id: str = Path(..., description="Building UUID or code (e.g., 'site-002' or UUID)"),
     zone_id: str = Path(..., description="Zone ID (e.g., Zone-L1-A)"),
     auth: AuthContext = Depends(require_site_access("site_id")),
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Get all desks in a specific zone.
 
     Returns all desks for a given zone with their positions and context.
@@ -190,7 +191,7 @@ async def get_zone_centroid(
     site_id: str = Path(..., description="Building UUID or code (e.g., 'site-002' or UUID)"),
     zone_id: str = Path(..., description="Zone ID (e.g., Zone-L1-A)"),
     auth: AuthContext = Depends(require_site_access("site_id")),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Get centroid for a specific zone.
 
     The centroid is the average X, Z position of all desks in the zone.
@@ -260,7 +261,7 @@ async def get_zone_centroid(
 async def get_all_zone_centroids(
     site_id: str = Path(..., description="Building UUID or code (e.g., 'site-002' or UUID)"),
     auth: AuthContext = Depends(require_site_access("site_id")),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Get centroids for all zones in a building.
 
     Efficient operation: returns pre-calculated centroids for all zones.
@@ -344,7 +345,7 @@ async def get_all_zone_centroids(
 async def get_desk_statistics(
     site_id: str = Path(..., description="Building UUID or code (e.g., 'site-002' or UUID)"),
     auth: AuthContext = Depends(require_site_access("site_id")),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Get desk statistics for a building.
 
     Provides summary information about desks and zones:

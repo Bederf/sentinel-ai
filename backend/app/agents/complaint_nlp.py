@@ -9,8 +9,6 @@ Extracts structured info from free-text messages like:
 """
 
 import re
-from typing import Optional
-
 
 # --- Complaint type detection ---
 
@@ -143,7 +141,7 @@ def detect_comfort_complaint(text: str) -> bool:
     return False
 
 
-def extract_desk_id(text: str, bare_number_ok: bool = False) -> Optional[str]:
+def extract_desk_id(text: str, bare_number_ok: bool = False) -> str | None:
     """
     Extract desk ID from free-text message.
 
@@ -199,7 +197,7 @@ def extract_complaint_types(text: str) -> list[str]:
     return found
 
 
-def extract_duration(text: str) -> Optional[str]:
+def extract_duration(text: str) -> str | None:
     """
     Extract duration/timing context from complaint message.
 

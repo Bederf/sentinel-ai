@@ -14,16 +14,16 @@ prediction accuracy for continuous ML model improvement.
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 
 from app.models.ml_feedback import (
     MLFeedbackRecord,
-    TrainingDataPoint,
-    PredictionAccuracy,
     MLFeedbackSummary,
+    PredictionAccuracy,
     RecordFeedbackRequest,
+    TrainingDataPoint,
 )
 from app.services.ml_feedback_service import get_ml_feedback_service
 
@@ -70,10 +70,10 @@ async def record_feedback(request: RecordFeedbackRequest) -> MLFeedbackRecord:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/training-data", response_model=List[TrainingDataPoint])
+@router.get("/training-data", response_model=list[TrainingDataPoint])
 async def get_training_data(
-    equipment_type: Optional[str] = Query(None, description="Filter by equipment type (e.g., chiller, ahu, fcu)"),
-) -> List[TrainingDataPoint]:
+    equipment_type: str | None = Query(None, description="Filter by equipment type (e.g., chiller, ahu, fcu)"),
+) -> list[TrainingDataPoint]:
     """
     Generate training dataset for ML model retraining.
 
@@ -118,8 +118,8 @@ async def get_prediction_accuracy(model_type: str) -> PredictionAccuracy:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/equipment/{equipment_id}", response_model=List[MLFeedbackRecord])
-async def get_equipment_feedback(equipment_id: str) -> List[MLFeedbackRecord]:
+@router.get("/equipment/{equipment_id}", response_model=list[MLFeedbackRecord])
+async def get_equipment_feedback(equipment_id: str) -> list[MLFeedbackRecord]:
     """
     Get all ML feedback records for a specific equipment.
 
@@ -159,8 +159,8 @@ async def get_feedback_summary() -> MLFeedbackSummary:
 
 @router.get("/module-summary")
 async def get_module_feedback_summary(
-    site_id: Optional[str] = Query(None, description="Optional site filter (e.g., site-002)"),
-) -> Dict[str, Any]:
+    site_id: str | None = Query(None, description="Optional site filter (e.g., site-002)"),
+) -> dict[str, Any]:
     """Get module outcome summary for integrated cross-module feedback."""
     try:
         service = get_ml_feedback_service()

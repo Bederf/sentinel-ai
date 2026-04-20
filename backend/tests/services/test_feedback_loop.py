@@ -3,24 +3,25 @@
 Tests outcome verification, accuracy calculation, and learning from rejections.
 """
 
-import pytest
-from unittest.mock import patch, AsyncMock
 from datetime import datetime, timedelta
+from unittest.mock import AsyncMock, patch
 
-from app.services.outcome_tracker import OutcomeTracker
-from app.models.outcome import Outcome
-from app.services.rejection_learning_service import (
-    RejectionLearningService,
-    RejectionRecord,
-    EquipmentConstraint,
-)
-from app.models.recommendation import (
-    Recommendation,
-    RecommendationStatus,
-    ActionRiskLevel,
-)
+import pytest
+
 from app.database.repositories.outcome_repository import OutcomeRepository
 from app.database.repositories.rejection_repository import RejectionRepository
+from app.models.outcome import Outcome
+from app.models.recommendation import (
+    ActionRiskLevel,
+    Recommendation,
+    RecommendationStatus,
+)
+from app.services.outcome_tracker import OutcomeTracker
+from app.services.rejection_learning_service import (
+    EquipmentConstraint,
+    RejectionLearningService,
+    RejectionRecord,
+)
 
 
 class TestOutcomeTracker:
@@ -282,16 +283,15 @@ class TestRejectionLearning:
                     learning_service,
                     "_add_action_constraint",
                     new_callable=AsyncMock,
-                ) as mock_add_constraint:
-                    with patch.object(
-                        learning_service.profile_service,
-                        "load_site_profile_config",
-                        return_value=None,
-                    ):
-                        await learning_service.process_rejection(rec, "Too cold")
+                ) as mock_add_constraint, patch.object(
+                    learning_service.profile_service,
+                    "load_site_profile_config",
+                    return_value=None,
+                ):
+                    await learning_service.process_rejection(rec, "Too cold")
 
-                        # Should call add_action_constraint when pattern detected (>= 3 rejections)
-                        mock_add_constraint.assert_called_once()
+                    # Should call add_action_constraint when pattern detected (>= 3 rejections)
+                    mock_add_constraint.assert_called_once()
 
 
 class TestOutcomeRepository:
@@ -460,12 +460,11 @@ class TestFeedbackLoopIntegration:
                     learning_service,
                     "_add_action_constraint",
                     new_callable=AsyncMock,
-                ) as mock_constraint:
-                    with patch.object(
-                        learning_service.profile_service,
-                        "load_site_profile_config",
-                        return_value=None,
-                    ):
-                        await learning_service.process_rejection(rec, "Too cold")
-                        # Should call add_action_constraint with 3+ rejections
-                        mock_constraint.assert_called_once()
+                ) as mock_constraint, patch.object(
+                    learning_service.profile_service,
+                    "load_site_profile_config",
+                    return_value=None,
+                ):
+                    await learning_service.process_rejection(rec, "Too cold")
+                    # Should call add_action_constraint with 3+ rejections
+                    mock_constraint.assert_called_once()

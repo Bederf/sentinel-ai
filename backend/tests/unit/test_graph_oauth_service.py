@@ -31,33 +31,32 @@ class TestGraphOAuthService:
                 "OUTLOOK_CLIENT_SECRET": "test-client-secret",
                 "OUTLOOK_TENANT_ID": "test-tenant-id",
             },
-        ):
-            with patch("app.services.graph_oauth_service._get_msal_app") as mock_get_app:
-                mock_app = MagicMock()
-                mock_app.acquire_token_for_client.return_value = mock_result
-                mock_get_app.return_value = mock_app
+        ), patch("app.services.graph_oauth_service._get_msal_app") as mock_get_app:
+            mock_app = MagicMock()
+            mock_app.acquire_token_for_client.return_value = mock_result
+            mock_get_app.return_value = mock_app
 
-                # Reset module state
-                import app.services.graph_oauth_service as svc
+            # Reset module state
+            import app.services.graph_oauth_service as svc
 
-                svc._token_cache = {}
-                svc._msal_app = None
+            svc._token_cache = {}
+            svc._msal_app = None
 
-                result = None
+            result = None
 
-                async def _run():
-                    nonlocal result
-                    result = await svc._acquire_access_token()
-                    return result
+            async def _run():
+                nonlocal result
+                result = await svc._acquire_access_token()
+                return result
 
-                import asyncio
+            import asyncio
 
-                asyncio.run(_run())
+            asyncio.run(_run())
 
-                assert result == "test-token-abc123"
-                mock_app.acquire_token_for_client.assert_called_once_with(
-                    scopes=["https://graph.microsoft.com/.default"]
-                )
+            assert result == "test-token-abc123"
+            mock_app.acquire_token_for_client.assert_called_once_with(
+                scopes=["https://graph.microsoft.com/.default"]
+            )
 
     def test_token_caching_returns_cached_token(self) -> None:
         """Second call within TTL uses cached token (no MSAL call)."""
@@ -105,29 +104,28 @@ class TestGraphOAuthService:
                 "OUTLOOK_CLIENT_SECRET": "test-client-secret",
                 "OUTLOOK_TENANT_ID": "test-tenant-id",
             },
-        ):
-            with patch("app.services.graph_oauth_service._get_msal_app") as mock_get_app:
-                mock_app = MagicMock()
-                mock_app.acquire_token_for_client.return_value = {}  # Empty = failure
-                mock_get_app.return_value = mock_app
+        ), patch("app.services.graph_oauth_service._get_msal_app") as mock_get_app:
+            mock_app = MagicMock()
+            mock_app.acquire_token_for_client.return_value = {}  # Empty = failure
+            mock_get_app.return_value = mock_app
 
-                import app.services.graph_oauth_service as svc
+            import app.services.graph_oauth_service as svc
 
-                svc._token_cache = {}
-                svc._msal_app = None
+            svc._token_cache = {}
+            svc._msal_app = None
 
-                result = None
+            result = None
 
-                async def _run():
-                    nonlocal result
-                    result = await svc._acquire_access_token()
-                    return result
+            async def _run():
+                nonlocal result
+                result = await svc._acquire_access_token()
+                return result
 
-                import asyncio
+            import asyncio
 
-                asyncio.run(_run())
+            asyncio.run(_run())
 
-                assert result is None
+            assert result is None
 
     def test_expired_token_triggers_refresh(self) -> None:
         """Cached token that is expired (< 60s buffer) triggers new acquisition."""
@@ -145,29 +143,28 @@ class TestGraphOAuthService:
                 "OUTLOOK_CLIENT_SECRET": "test-client-secret",
                 "OUTLOOK_TENANT_ID": "test-tenant-id",
             },
-        ):
-            with patch("app.services.graph_oauth_service._get_msal_app") as mock_get_app:
-                mock_app = MagicMock()
-                mock_app.acquire_token_for_client.return_value = fresh_token
-                mock_get_app.return_value = mock_app
+        ), patch("app.services.graph_oauth_service._get_msal_app") as mock_get_app:
+            mock_app = MagicMock()
+            mock_app.acquire_token_for_client.return_value = fresh_token
+            mock_get_app.return_value = mock_app
 
-                import app.services.graph_oauth_service as svc
+            import app.services.graph_oauth_service as svc
 
-                svc._token_cache = {"access_token": expired_token}
-                svc._msal_app = None
+            svc._token_cache = {"access_token": expired_token}
+            svc._msal_app = None
 
-                result = None
+            result = None
 
-                async def _run():
-                    nonlocal result
-                    result = await svc._acquire_access_token()
-                    return result
+            async def _run():
+                nonlocal result
+                result = await svc._acquire_access_token()
+                return result
 
-                import asyncio
+            import asyncio
 
-                asyncio.run(_run())
+            asyncio.run(_run())
 
-                assert result == "fresh-token"
+            assert result == "fresh-token"
                 # Should have called MSAL since cache was expired
 
     def test_clear_token_cache(self) -> None:
@@ -230,24 +227,23 @@ class TestGraphOAuthServiceConcurrent:
                 "OUTLOOK_CLIENT_SECRET": "test-client-secret",
                 "OUTLOOK_TENANT_ID": "test-tenant-id",
             },
-        ):
-            with patch("app.services.graph_oauth_service._get_msal_app") as mock_get_app:
-                mock_app = MagicMock()
-                mock_app.acquire_token_for_client.side_effect = _mock_acquire
-                mock_get_app.return_value = mock_app
+        ), patch("app.services.graph_oauth_service._get_msal_app") as mock_get_app:
+            mock_app = MagicMock()
+            mock_app.acquire_token_for_client.side_effect = _mock_acquire
+            mock_get_app.return_value = mock_app
 
-                import app.services.graph_oauth_service as svc
+            import app.services.graph_oauth_service as svc
 
-                svc._token_cache = {}
-                svc._msal_app = None
+            svc._token_cache = {}
+            svc._msal_app = None
 
-                # Launch 3 concurrent calls
-                async def _call():
-                    return await svc._acquire_access_token()
+            # Launch 3 concurrent calls
+            async def _call():
+                return await svc._acquire_access_token()
 
-                results = await asyncio.gather(_call(), _call(), _call())
+            results = await asyncio.gather(_call(), _call(), _call())
 
-                # All should get a token (first one fills cache; others wait)
-                assert all(r is not None for r in results)
-                # MSAL should be called exactly once (Lock serialization)
-                assert call_count == 1
+            # All should get a token (first one fills cache; others wait)
+            assert all(r is not None for r in results)
+            # MSAL should be called exactly once (Lock serialization)
+            assert call_count == 1

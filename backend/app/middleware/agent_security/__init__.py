@@ -12,26 +12,6 @@ Usage:
         ...  # proceed
 """
 
-from app.middleware.agent_security.models import (
-    AgentAuditEntry,
-    AgentSession,
-    AgentToolName,
-    ConfirmationToken,
-    PERMISSION_MATRIX,
-    PolicyDecision,
-)
-from app.middleware.agent_security.policy_engine import (
-    PolicyResult,
-    ToolPolicyEngine,
-    policy_engine,
-)
-from app.middleware.agent_security.verification import (
-    VerificationEvidence,
-    VerificationResult,
-    VerificationRunner,
-    VerificationStatus,
-    verification_runner,
-)
 from app.middleware.agent_security.circuit_breaker import (
     AgentRateLimiter,
     BreakerCheckResult,
@@ -46,18 +26,38 @@ from app.middleware.agent_security.middleware import (
     AgentSecurityMiddleware,
     check_unmapped_routes,
 )
+from app.middleware.agent_security.models import (
+    PERMISSION_MATRIX,
+    AgentAuditEntry,
+    AgentSession,
+    AgentToolName,
+    ConfirmationToken,
+    PolicyDecision,
+)
+from app.middleware.agent_security.policy_engine import (
+    PolicyResult,
+    ToolPolicyEngine,
+    policy_engine,
+)
+from app.middleware.agent_security.verification import (
+    VerificationEvidence,
+    VerificationResult,
+    VerificationRunner,
+    VerificationStatus,
+    verification_runner,
+)
 
 __all__ = [
-    "AgentSecurityMiddleware",
+    "PERMISSION_MATRIX",
     "AgentAuditEntry",
     "AgentRateLimiter",
+    "AgentSecurityMiddleware",
     "AgentSession",
     "AgentToolName",
     "BreakerCheckResult",
     "BreakerState",
     "CircuitBreaker",
     "ConfirmationToken",
-    "PERMISSION_MATRIX",
     "PolicyDecision",
     "PolicyResult",
     "QuotaTier",

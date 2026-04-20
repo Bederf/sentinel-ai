@@ -5,7 +5,7 @@ Registers routers for remote operations, dispatch, and monitoring.
 
 from fastapi import FastAPI
 
-from app.api import remote_ops, remote_commands, dispatch
+from app.api import dispatch, remote_commands, remote_ops
 
 
 def register_remote_ops_routers(app: FastAPI) -> None:

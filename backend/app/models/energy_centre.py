@@ -6,8 +6,7 @@ Typical South African commercial building configuration.
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import List, Dict, Any, Optional
-
+from typing import Any
 
 # === Enums ===
 
@@ -77,24 +76,24 @@ class ATSUnit:
     # Breaker states (for motorized ACB type)
     mains_breaker: str = "closed"  # open, closed, tripped
     gen_breaker: str = "open"
-    bus_coupler: Optional[str] = None  # For split-bus configurations
+    bus_coupler: str | None = None  # For split-bus configurations
 
     # Transfer metrics
     last_transfer_time_ms: int = 0  # Time taken for last transfer
     transfer_count: int = 0  # Total transfer operations
-    last_transfer_timestamp: Optional[str] = None
-    last_transfer_reason: Optional[str] = None  # "mains_fail", "test", "scheduled"
+    last_transfer_timestamp: str | None = None
+    last_transfer_reason: str | None = None  # "mains_fail", "test", "scheduled"
 
     # Interlocks
     mechanical_interlock_ok: bool = True
     electrical_interlock_ok: bool = True
 
     # Communication
-    controller_ip: Optional[str] = None
+    controller_ip: str | None = None
     protocol: str = "modbus"  # modbus, bacnet, proprietary
-    last_poll: Optional[str] = None
+    last_poll: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "ats_id": self.ats_id,
             "name": self.name,
@@ -152,17 +151,17 @@ class MVIncomer:
     healthy: bool = True
 
     # Protection relay (e.g., Siemens SIPROTEC, ABB REF615)
-    protection_relay_model: Optional[str] = None
+    protection_relay_model: str | None = None
     overcurrent_pickup_a: float = 800.0
     earth_fault_pickup_a: float = 50.0
-    last_trip_timestamp: Optional[str] = None
-    last_trip_code: Optional[str] = None
+    last_trip_timestamp: str | None = None
+    last_trip_code: str | None = None
 
     # Eskom supply point
-    supply_point_id: Optional[str] = None  # NRS number
-    tariff_type: Optional[str] = None  # Megaflex, Miniflex, etc.
+    supply_point_id: str | None = None  # NRS number
+    tariff_type: str | None = None  # Megaflex, Miniflex, etc.
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "incomer_id": self.incomer_id,
             "name": self.name,
@@ -212,9 +211,9 @@ class Transformer:
     load_percent: float = 0.0
 
     # Temperatures
-    oil_temp_c: Optional[float] = None
-    winding_temp_c: Optional[float] = None
-    ambient_temp_c: Optional[float] = None
+    oil_temp_c: float | None = None
+    winding_temp_c: float | None = None
+    ambient_temp_c: float | None = None
 
     # Tap changer
     tap_position: int = 0  # -2, -1, 0, +1, +2 typical
@@ -231,7 +230,7 @@ class Transformer:
     cooling_type: str = "ONAN"  # ONAN, ONAF, etc.
     fans_running: int = 0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "transformer_id": self.transformer_id,
             "name": self.name,
@@ -301,9 +300,9 @@ class LVSwitchboard:
 
     # Health
     healthy: bool = True
-    temperature_c: Optional[float] = None
+    temperature_c: float | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "switchboard_id": self.switchboard_id,
             "name": self.name,
@@ -347,10 +346,10 @@ class PowerMeter:
 
     # Meter info
     manufacturer: str = "Schneider"  # Schneider ION, Satec, Elster
-    model: Optional[str] = None
-    serial_number: Optional[str] = None
+    model: str | None = None
+    serial_number: str | None = None
     ct_ratio: str = "2000/5"
-    vt_ratio: Optional[str] = None  # For MV metering
+    vt_ratio: str | None = None  # For MV metering
 
     # Instantaneous readings
     voltage_l1_n: float = 230.0
@@ -376,23 +375,23 @@ class PowerMeter:
 
     # Demand
     max_demand_kw: float = 0.0
-    max_demand_timestamp: Optional[str] = None
+    max_demand_timestamp: str | None = None
 
     # Power quality (if supported)
-    thd_voltage_pct: Optional[float] = None  # Total harmonic distortion
-    thd_current_pct: Optional[float] = None
-    voltage_unbalance_pct: Optional[float] = None
+    thd_voltage_pct: float | None = None  # Total harmonic distortion
+    thd_current_pct: float | None = None
+    voltage_unbalance_pct: float | None = None
 
     # Tariff (for billing meters)
-    tariff_type: Optional[str] = None  # Megaflex, Miniflex, Nightsave
-    tou_period: Optional[str] = None  # peak, standard, off-peak
+    tariff_type: str | None = None  # Megaflex, Miniflex, Nightsave
+    tou_period: str | None = None  # peak, standard, off-peak
 
     # Communication
     protocol: str = "modbus"
-    ip_address: Optional[str] = None
-    last_poll: Optional[str] = None
+    ip_address: str | None = None
+    last_poll: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "meter_id": self.meter_id,
             "name": self.name,
@@ -457,7 +456,7 @@ class PFCBank:
     current_power_factor: float = 0.95
 
     # Controller
-    controller_model: Optional[str] = None  # Epcos, Schneider Varlogic
+    controller_model: str | None = None  # Epcos, Schneider Varlogic
     auto_mode: bool = True
 
     # Health
@@ -465,7 +464,7 @@ class PFCBank:
     capacitor_temps_ok: bool = True
     fuse_status_ok: bool = True
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "pfc_id": self.pfc_id,
             "name": self.name,
@@ -519,10 +518,10 @@ class UPSSystem:
     battery_current: float = 0.0
     battery_charge_pct: float = 100.0
     battery_runtime_min: float = 30.0
-    battery_temp_c: Optional[float] = None
+    battery_temp_c: float | None = None
     battery_health_pct: float = 100.0
-    battery_test_date: Optional[str] = None
-    battery_replace_date: Optional[str] = None  # Recommended replacement
+    battery_test_date: str | None = None
+    battery_replace_date: str | None = None  # Recommended replacement
 
     # Status
     mode: str = "online"  # online, battery, bypass, standby, fault
@@ -531,14 +530,14 @@ class UPSSystem:
     overload: bool = False
 
     # Alarms
-    alarms: List[str] = field(default_factory=list)
+    alarms: list[str] = field(default_factory=list)
 
     # Communication
     protocol: str = "snmp"  # snmp, modbus
-    ip_address: Optional[str] = None
-    last_poll: Optional[str] = None
+    ip_address: str | None = None
+    last_poll: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "ups_id": self.ups_id,
             "name": self.name,
@@ -587,14 +586,14 @@ class EnergyCentre:
     location: str
 
     # Equipment references
-    mv_incomer_ids: List[str] = field(default_factory=list)
-    transformer_ids: List[str] = field(default_factory=list)
-    lv_switchboard_ids: List[str] = field(default_factory=list)
-    ats_ids: List[str] = field(default_factory=list)
-    generator_group_ids: List[str] = field(default_factory=list)
-    pfc_ids: List[str] = field(default_factory=list)
-    ups_ids: List[str] = field(default_factory=list)
-    meter_ids: List[str] = field(default_factory=list)
+    mv_incomer_ids: list[str] = field(default_factory=list)
+    transformer_ids: list[str] = field(default_factory=list)
+    lv_switchboard_ids: list[str] = field(default_factory=list)
+    ats_ids: list[str] = field(default_factory=list)
+    generator_group_ids: list[str] = field(default_factory=list)
+    pfc_ids: list[str] = field(default_factory=list)
+    ups_ids: list[str] = field(default_factory=list)
+    meter_ids: list[str] = field(default_factory=list)
 
     # Overall status
     mains_healthy: bool = True
@@ -602,7 +601,7 @@ class EnergyCentre:
     total_load_kw: float = 0.0
     total_capacity_kw: float = 0.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "centre_id": self.centre_id,
             "name": self.name,

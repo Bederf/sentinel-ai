@@ -49,9 +49,9 @@ class RequestMetricsMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next) -> Response:
         from app.api.metrics import (
-            sentinel_http_requests_total,
             sentinel_http_request_duration_seconds,
             sentinel_http_requests_in_progress,
+            sentinel_http_requests_total,
         )
 
         path = _normalize_path(request.url.path)

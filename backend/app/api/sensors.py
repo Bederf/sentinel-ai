@@ -2,7 +2,6 @@
 
 import json
 from pathlib import Path
-from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
@@ -55,8 +54,8 @@ class SensorBase(BaseModel):
 class SensorResponse(SensorBase):
     """Sensor response with latest reading."""
 
-    latest_value: Optional[float] = None
-    latest_timestamp: Optional[str] = None
+    latest_value: float | None = None
+    latest_timestamp: str | None = None
 
 
 class SensorListResponse(BaseModel):
@@ -105,9 +104,9 @@ class EnergyResponse(BaseModel):
 
 @router.get("/sensors", response_model=SensorListResponse)
 async def list_sensors(
-    site_id: Optional[str] = Query(None, description="Filter by site ID"),
-    equipment_id: Optional[str] = Query(None, description="Filter by equipment ID"),
-    sensor_type: Optional[str] = Query(None, alias="type", description="Filter by sensor type"),
+    site_id: str | None = Query(None, description="Filter by site ID"),
+    equipment_id: str | None = Query(None, description="Filter by equipment ID"),
+    sensor_type: str | None = Query(None, alias="type", description="Filter by sensor type"),
 ) -> SensorListResponse:
     """
     List all sensors with optional filtering.
@@ -189,8 +188,8 @@ async def get_sensor(sensor_id: str) -> SensorResponse:
 @router.get("/sensors/{sensor_id}/readings", response_model=ReadingsResponse)
 async def get_sensor_readings(
     sensor_id: str,
-    start_date: Optional[str] = Query(None, description="Start date (ISO format)"),
-    end_date: Optional[str] = Query(None, description="End date (ISO format)"),
+    start_date: str | None = Query(None, description="Start date (ISO format)"),
+    end_date: str | None = Query(None, description="End date (ISO format)"),
     limit: int = Query(720, ge=1, le=10000, description="Max readings to return"),
 ) -> ReadingsResponse:
     """
@@ -239,8 +238,8 @@ async def get_sensor_readings(
 @router.get("/sites/{site_id}/energy", response_model=EnergyResponse)
 async def get_site_energy(
     site_id: str,
-    start_date: Optional[str] = Query(None, description="Start date (ISO format)"),
-    end_date: Optional[str] = Query(None, description="End date (ISO format)"),
+    start_date: str | None = Query(None, description="Start date (ISO format)"),
+    end_date: str | None = Query(None, description="End date (ISO format)"),
     resolution: str = Query("hourly", description="Resolution: hourly or daily"),
 ) -> EnergyResponse:
     """

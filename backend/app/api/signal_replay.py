@@ -8,7 +8,6 @@ POST /api/signals/replay
 """
 
 import logging
-from typing import Optional
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -20,7 +19,7 @@ router = APIRouter(prefix="/api/signals", tags=["signal-replay"])
 
 class ReplayRequest(BaseModel):
     case: str = "fairlands"
-    time_window: Optional[dict] = None
+    time_window: dict | None = None
     verbose: bool = False
 
 

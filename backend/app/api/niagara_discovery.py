@@ -8,19 +8,18 @@ commissioning with chat-based review.
 
 import logging
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel, Field
 
-from app.config.settings import settings
-from app.services.niagara.point_discovery import (
-    get_point_discovery_service,
-)
 from app.services.niagara.mapping_service import (
     get_mapping_service,
 )
 from app.services.niagara.point_classifier import get_point_classifier
+from app.services.niagara.point_discovery import (
+    get_point_discovery_service,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -37,9 +36,9 @@ class DiscoverRequest(BaseModel):
 
     device_ip: str = Field(..., description="IP address of the BACnet device")
     site_id: str = Field(..., description="SENTINEL site ID for mapping (e.g., 'site-002')")
-    device_bacnet_id: Optional[int] = Field(None, description="Optional BACnet device instance ID")
-    adapter_type: Optional[str] = Field(None, description="Explicit adapter selection (for example: bacnet)")
-    bms_vendor: Optional[str] = Field(
+    device_bacnet_id: int | None = Field(None, description="Optional BACnet device instance ID")
+    adapter_type: str | None = Field(None, description="Explicit adapter selection (for example: bacnet)")
+    bms_vendor: str | None = Field(
         None,
         description="BMS vendor identifier (niagara, desigo, metasys, honeywell, schneider, trend, generic)",
     )
@@ -52,7 +51,7 @@ class DiscoverResponse(BaseModel):
     points_count: int = Field(0, description="Number of points discovered")
     equipment_count: int = Field(0, description="Number of equipment entities identified")
     status: str = Field("", description="Discovery status")
-    summary: Dict[str, Any] = Field(default_factory=dict, description="Classification summary")
+    summary: dict[str, Any] = Field(default_factory=dict, description="Classification summary")
 
 
 class MappingSummary(BaseModel):
@@ -60,11 +59,11 @@ class MappingSummary(BaseModel):
 
     discovery_id: str
     status: str
-    equipment: List[Dict[str, Any]] = Field(default_factory=list)
-    validation: Dict[str, Any] = Field(default_factory=dict)
+    equipment: list[dict[str, Any]] = Field(default_factory=list)
+    validation: dict[str, Any] = Field(default_factory=dict)
     total_points: int = 0
     equipment_count: int = 0
-    confidence_breakdown: Dict[str, int] = Field(default_factory=dict)
+    confidence_breakdown: dict[str, int] = Field(default_factory=dict)
     needs_review: int = 0
 
 
@@ -80,18 +79,18 @@ class CorrectRequest(BaseModel):
     """Request to correct a point classification."""
 
     point_id: str = Field(..., description="Original point name to correct")
-    equipment_id: Optional[str] = Field(None, description="New equipment ID to assign point to")
-    point_type: Optional[str] = Field(
+    equipment_id: str | None = Field(None, description="New equipment ID to assign point to")
+    point_type: str | None = Field(
         None, description="Corrected point type (sensor, setpoint, command, status, alarm)"
     )
-    equipment_type: Optional[str] = Field(None, description="Corrected equipment type (chiller, ahu, fcu, etc.)")
+    equipment_type: str | None = Field(None, description="Corrected equipment type (chiller, ahu, fcu, etc.)")
 
 
 class CorrectResponse(BaseModel):
     """Response from point correction."""
 
     success: bool
-    corrections: List[str] = Field(default_factory=list)
+    corrections: list[str] = Field(default_factory=list)
     message: str = ""
 
 
@@ -107,7 +106,7 @@ class WorkflowState(str, Enum):
 
 
 # In-memory workflow state tracker
-_workflow_states: Dict[str, Dict[str, Any]] = {}
+_workflow_states: dict[str, dict[str, Any]] = {}
 
 
 # ---------------------------------------------------------------------------
@@ -127,14 +126,6 @@ async def discover_and_classify(request: DiscoverRequest):
     Returns a discovery_id for tracking the workflow.
     """
     try:
-        if settings.sentinel_island_mode and (
-            request.device_ip == "simulation" or request.adapter_type in {"simulation", "local_adapter"}
-        ):
-            raise HTTPException(
-                status_code=400,
-                detail="Simulation discovery is disabled on SENTINEL island instances",
-            )
-
         discovery_service = get_point_discovery_service()
         mapping_service = get_mapping_service()
 
@@ -198,8 +189,8 @@ class CSVDiscoverResponse(BaseModel):
     equipment_count: int = Field(0, description="Number of equipment entities identified")
     lighting_points: int = Field(0, description="Number of lighting-specific points detected")
     status: str = Field("", description="Discovery status")
-    summary: Dict[str, Any] = Field(default_factory=dict, description="Classification summary")
-    lighting_summary: Dict[str, Any] = Field(
+    summary: dict[str, Any] = Field(default_factory=dict, description="Classification summary")
+    lighting_summary: dict[str, Any] = Field(
         default_factory=dict, description="Lighting-specific classification breakdown"
     )
 
@@ -320,7 +311,7 @@ async def get_mapping_summary(discovery_id: str):
     validation = mapping_service.validate_mappings(mappings)
 
     # Calculate confidence breakdown
-    confidence_counts: Dict[str, int] = {}
+    confidence_counts: dict[str, int] = {}
     total_points = 0
     for mapping in mappings.values():
         for p in mapping.points:
@@ -424,7 +415,7 @@ DALI_EQUIPMENT_TYPES = {"dali_controller", "luminaire", "light_sensor"}
 def _register_dali_if_discovered(
     discovery_id: str,
     site_id: str,
-    mappings: Dict[str, Any],
+    mappings: dict[str, Any],
 ):
     """Check approved mappings for lighting equipment and auto-register with LightingService."""
     if not site_id:

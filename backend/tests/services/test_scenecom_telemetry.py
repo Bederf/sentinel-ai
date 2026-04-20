@@ -21,7 +21,6 @@ import pytest
 
 from app.services.lighting_simulation_engine import LightingSimulationEngine
 
-
 # ------------------------------------------------------------------
 # Fixtures
 # ------------------------------------------------------------------

@@ -3,8 +3,8 @@
 Provides unified system health monitoring and SIMBIOT-powered diagnostics.
 """
 
-from typing import Optional, List
-from fastapi import APIRouter, Query, HTTPException, BackgroundTasks
+
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from app.services.system_health_service import SystemHealthService
@@ -22,8 +22,8 @@ class ComponentHealth(BaseModel):
     name: str
     status: str  # "healthy", "degraded", "critical"
     score: int = Field(..., ge=0, le=100)
-    message: Optional[str] = None
-    details: Optional[dict] = None
+    message: str | None = None
+    details: dict | None = None
 
 
 class SystemHealthSnapshot(BaseModel):
@@ -33,8 +33,8 @@ class SystemHealthSnapshot(BaseModel):
     overall_status: str  # "healthy", "degraded", "critical"
     overall_score: int = Field(..., ge=0, le=100)
     components: dict[str, ComponentHealth]
-    active_alerts: List[dict] = []
-    recommendations: List[str] = []
+    active_alerts: list[dict] = []
+    recommendations: list[str] = []
 
 
 class DiagnosticResult(BaseModel):
@@ -44,16 +44,16 @@ class DiagnosticResult(BaseModel):
     timestamp: str
     target: str
     status: str  # "pending", "running", "completed", "failed"
-    duration_seconds: Optional[int] = None
-    device_inventory: Optional[dict] = None
-    site_config: Optional[dict] = None
-    alarms_found: Optional[List[dict]] = None
-    health_scores: Optional[dict] = None
-    asset_details: Optional[List[dict]] = None
-    issues_found: List[str] = []
-    recommendations: List[str] = []
-    next_steps: List[str] = []
-    error_message: Optional[str] = None
+    duration_seconds: int | None = None
+    device_inventory: dict | None = None
+    site_config: dict | None = None
+    alarms_found: list[dict] | None = None
+    health_scores: dict | None = None
+    asset_details: list[dict] | None = None
+    issues_found: list[str] = []
+    recommendations: list[str] = []
+    next_steps: list[str] = []
+    error_message: str | None = None
 
 
 class ErrorLog(BaseModel):
@@ -65,16 +65,16 @@ class ErrorLog(BaseModel):
     severity: str  # "warning", "error", "critical"
     component: str
     message: str
-    details: Optional[dict] = None
+    details: dict | None = None
     resolved: bool
-    resolved_at: Optional[str] = None
+    resolved_at: str | None = None
 
 
 class ErrorLogResponse(BaseModel):
     """Paginated error logs response."""
 
     total: int
-    logs: List[ErrorLog]
+    logs: list[ErrorLog]
     page: int
     page_size: int
 
@@ -83,7 +83,7 @@ class HealthHistoryData(BaseModel):
     """Historical health data for trend analysis."""
 
     range: str  # "24h", "7d", "30d"
-    snapshots: List[dict]
+    snapshots: list[dict]
     metrics: dict
     snapshot_count: int
 
@@ -92,7 +92,7 @@ class DiagnosticsRequest(BaseModel):
     """Request to run diagnostics."""
 
     target: str = "full_system"  # "full_system", "building:{code}", "component:{name}"
-    site_code: Optional[str] = None
+    site_code: str | None = None
 
 
 # ==================== Endpoints ====================
@@ -137,7 +137,7 @@ async def get_current_health():
             ],
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Health check failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Health check failed: {e!s}")
 
 
 @router.get("/health/history", response_model=HealthHistoryData)
@@ -164,7 +164,7 @@ async def get_health_history(
             snapshot_count=history["snapshot_count"],
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to fetch history: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch history: {e!s}")
 
 
 @router.get("/health/extended")
@@ -177,7 +177,7 @@ async def get_extended_health():
     try:
         return await service.get_extended_health()
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Extended health check failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Extended health check failed: {e!s}")
 
 
 @router.post("/diagnostics")
@@ -214,7 +214,7 @@ async def run_diagnostics(
             "status": "pending",
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to start diagnostics: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to start diagnostics: {e!s}")
 
 
 @router.get("/diagnostics/{diagnostic_id}", response_model=DiagnosticResult)
@@ -253,14 +253,14 @@ async def get_diagnostic_results(diagnostic_id: str):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to fetch diagnostics: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch diagnostics: {e!s}")
 
 
 @router.get("/error-logs", response_model=ErrorLogResponse)
 async def get_error_logs(
-    category: Optional[str] = Query(None, description="Filter by category"),
-    severity: Optional[str] = Query(None, description="Filter by severity"),
-    resolved: Optional[bool] = Query(None, description="Filter by resolved status"),
+    category: str | None = Query(None, description="Filter by category"),
+    severity: str | None = Query(None, description="Filter by severity"),
+    resolved: bool | None = Query(None, description="Filter by resolved status"),
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
 ):
@@ -293,7 +293,7 @@ async def get_error_logs(
             page_size=result["page_size"],
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to fetch error logs: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch error logs: {e!s}")
 
 
 # ==================== Internal Endpoints ====================
@@ -327,7 +327,7 @@ async def log_error(
         )
         return {"error_id": error_id}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to log error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to log error: {e!s}")
 
 
 @router.post("/maintenance/auto-resolve-errors")
@@ -362,7 +362,7 @@ async def trigger_store_snapshot(background_tasks: BackgroundTasks):
 
 
 @router.get("/monitoring")
-async def get_monitoring_snapshot(site_id: Optional[str] = Query(None)):
+async def get_monitoring_snapshot(site_id: str | None = Query(None)):
     """Unified monitoring snapshot — ingestion, control, alerts, quality gate."""
     from app.services.monitoring_service import MonitoringService
 

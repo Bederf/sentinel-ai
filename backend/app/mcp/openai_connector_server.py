@@ -22,9 +22,9 @@ Usage:
 
 import json
 import logging
-from typing import Any, Dict, List, Optional
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +42,7 @@ BASE_URL = None
 def _load_json(filepath: Path) -> Any:
     """Load JSON file safely."""
     try:
-        with open(filepath, "r") as f:
+        with open(filepath) as f:
             return json.load(f)
     except Exception as e:
         logger.warning(f"Failed to load {filepath}: {e}")
@@ -66,7 +66,7 @@ class SupabaseDataLoader:
     def __init__(self, client):
         self.client = client
 
-    def load_buildings(self) -> List[Dict[str, Any]]:
+    def load_buildings(self) -> list[dict[str, Any]]:
         """Load buildings from Supabase."""
         try:
             response = self.client.table("sites").select("*").execute()
@@ -75,7 +75,7 @@ class SupabaseDataLoader:
             logger.error(f"Failed to load buildings from Supabase: {e}")
             return []
 
-    def load_equipment(self) -> List[Dict[str, Any]]:
+    def load_equipment(self) -> list[dict[str, Any]]:
         """Load equipment from Supabase with building info (paginated)."""
         try:
             all_equipment = []
@@ -105,7 +105,7 @@ class SupabaseDataLoader:
             logger.error(f"Failed to load equipment from Supabase: {e}")
             return []
 
-    def load_alerts(self) -> List[Dict[str, Any]]:
+    def load_alerts(self) -> list[dict[str, Any]]:
         """Load alerts from Supabase with related info."""
         try:
             response = (
@@ -120,7 +120,7 @@ class SupabaseDataLoader:
             logger.error(f"Failed to load alerts from Supabase: {e}")
             return []
 
-    def load_predictions(self) -> List[Dict[str, Any]]:
+    def load_predictions(self) -> list[dict[str, Any]]:
         """Load predictions from Supabase with related info (paginated)."""
         try:
             all_predictions = []
@@ -152,7 +152,7 @@ class SupabaseDataLoader:
             logger.error(f"Failed to load predictions from Supabase: {e}")
             return []
 
-    def load_work_orders(self) -> List[Dict[str, Any]]:
+    def load_work_orders(self) -> list[dict[str, Any]]:
         """Load work orders from Supabase."""
         try:
             response = (
@@ -167,7 +167,7 @@ class SupabaseDataLoader:
             logger.error(f"Failed to load work orders from Supabase: {e}")
             return []
 
-    def load_documents(self) -> List[Dict[str, Any]]:
+    def load_documents(self) -> list[dict[str, Any]]:
         """Load technical documents from Supabase."""
         try:
             response = (
@@ -186,7 +186,7 @@ class SupabaseDataLoader:
             return []
 
 
-def _build_building_document(building: Dict, source: str = "supabase") -> Dict[str, Any]:
+def _build_building_document(building: dict, source: str = "supabase") -> dict[str, Any]:
     """Build searchable document for a building."""
     site_id = building.get("code") or building.get("id", "unknown")
 
@@ -227,7 +227,7 @@ def _build_building_document(building: Dict, source: str = "supabase") -> Dict[s
     }
 
 
-def _build_equipment_document(equipment: Dict, source: str = "supabase") -> Dict[str, Any]:
+def _build_equipment_document(equipment: dict, source: str = "supabase") -> dict[str, Any]:
     """Build searchable document for equipment."""
     equip_id = equipment.get("code") or equipment.get("id", "unknown")
     site_name = ""
@@ -279,7 +279,7 @@ def _build_equipment_document(equipment: Dict, source: str = "supabase") -> Dict
     }
 
 
-def _build_alert_document(alert: Dict, source: str = "supabase") -> Dict[str, Any]:
+def _build_alert_document(alert: dict, source: str = "supabase") -> dict[str, Any]:
     """Build searchable document for an alert."""
     alert_id = alert.get("id", "unknown")
     equipment_name = ""
@@ -324,7 +324,7 @@ def _build_alert_document(alert: Dict, source: str = "supabase") -> Dict[str, An
     }
 
 
-def _build_prediction_document(prediction: Dict, source: str = "supabase") -> Dict[str, Any]:
+def _build_prediction_document(prediction: dict, source: str = "supabase") -> dict[str, Any]:
     """Build searchable document for a prediction."""
     pred_id = prediction.get("code") or prediction.get("id", "unknown")
     equipment_name = ""
@@ -394,7 +394,7 @@ def _build_prediction_document(prediction: Dict, source: str = "supabase") -> Di
     }
 
 
-def _build_work_order_document(wo: Dict, source: str = "supabase") -> Dict[str, Any]:
+def _build_work_order_document(wo: dict, source: str = "supabase") -> dict[str, Any]:
     """Build searchable document for a work order."""
     wo_id = wo.get("code") or wo.get("id", "unknown")
     equipment_name = ""
@@ -443,7 +443,7 @@ def _build_work_order_document(wo: Dict, source: str = "supabase") -> Dict[str, 
     }
 
 
-def _build_tech_document(doc: Dict, source: str = "supabase") -> Dict[str, Any]:
+def _build_tech_document(doc: dict, source: str = "supabase") -> dict[str, Any]:
     """Build searchable document for technical documentation."""
     doc_id = doc.get("code") or doc.get("id", "unknown")
 
@@ -481,7 +481,7 @@ def _build_tech_document(doc: Dict, source: str = "supabase") -> Dict[str, Any]:
     }
 
 
-def _build_searchable_documents() -> List[Dict[str, Any]]:
+def _build_searchable_documents() -> list[dict[str, Any]]:
     """
     Build searchable document index from Supabase (primary) or JSON files (fallback).
     """
@@ -554,7 +554,7 @@ def _build_searchable_documents() -> List[Dict[str, Any]]:
     return documents
 
 
-def _simple_text_search(query: str, documents: List[Dict], limit: int = 10) -> List[Dict]:
+def _simple_text_search(query: str, documents: list[dict], limit: int = 10) -> list[dict]:
     """
     Simple text search across documents.
 
@@ -609,9 +609,9 @@ class OpenAIConnectorMCPServer:
     """
 
     def __init__(self):
-        self._documents: Optional[List[Dict]] = None
-        self._document_index: Optional[Dict[str, Dict]] = None
-        self._last_refresh: Optional[datetime] = None
+        self._documents: list[dict] | None = None
+        self._document_index: dict[str, dict] | None = None
+        self._last_refresh: datetime | None = None
         self._refresh_interval_seconds = 300  # Refresh every 5 minutes
 
     def _ensure_index(self, force_refresh: bool = False):
@@ -636,7 +636,7 @@ class OpenAIConnectorMCPServer:
                 type_counts[t] = type_counts.get(t, 0) + 1
             logger.info(f"OpenAI Connector: Indexed {len(self._documents)} documents - {type_counts}")
 
-    def list_tools(self) -> List[Dict[str, Any]]:
+    def list_tools(self) -> list[dict[str, Any]]:
         """List available tools (search and fetch only)."""
         return [
             {
@@ -677,7 +677,7 @@ class OpenAIConnectorMCPServer:
             },
         ]
 
-    async def search(self, query: str) -> Dict[str, Any]:
+    async def search(self, query: str) -> dict[str, Any]:
         """
         Search for documents matching query.
 
@@ -699,7 +699,7 @@ class OpenAIConnectorMCPServer:
 
         return {"results": results}
 
-    async def fetch(self, id: str) -> Dict[str, Any]:
+    async def fetch(self, id: str) -> dict[str, Any]:
         """
         Fetch full document content by ID.
 
@@ -736,7 +736,7 @@ class OpenAIConnectorMCPServer:
             "metadata": doc.get("metadata", {}),
         }
 
-    async def call_tool(self, tool_name: str, **kwargs) -> Dict[str, Any]:
+    async def call_tool(self, tool_name: str, **kwargs) -> dict[str, Any]:
         """Execute a tool by name."""
         if tool_name == "search":
             return await self.search(kwargs.get("query", ""))
@@ -749,7 +749,7 @@ class OpenAIConnectorMCPServer:
         """Force refresh the document index."""
         self._ensure_index(force_refresh=True)
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get index statistics."""
         self._ensure_index()
 
@@ -770,7 +770,7 @@ class OpenAIConnectorMCPServer:
 
 
 # Singleton instance
-_openai_connector_server: Optional[OpenAIConnectorMCPServer] = None
+_openai_connector_server: OpenAIConnectorMCPServer | None = None
 
 
 def get_openai_connector_server() -> OpenAIConnectorMCPServer:

@@ -18,7 +18,6 @@ from app.models.semantic_tag import SafetyClass
 from app.models.trust_history import TrustHistory, TrustProfile
 from app.services.simbiot.trust_scoring_service import TrustScoringService
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------

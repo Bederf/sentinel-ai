@@ -4,8 +4,9 @@ Verifies integration of NiagaraBACnetClient with SENTINEL's
 device abstraction layer via NiagaraBACnetAdapter.
 """
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from app.models.device import (
     Device,
@@ -30,7 +31,6 @@ from app.services.niagara.bacnet_client import (
     BACnetWriteError,
     DiscoveredPoint,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures

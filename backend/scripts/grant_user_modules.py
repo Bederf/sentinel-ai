@@ -17,14 +17,14 @@ Example - Grant DALI (lighting) module to Grant Demo:
         --granted-by system
 """
 
-import sys
 import argparse
+import sys
 from pathlib import Path
 
 # Add backend to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from app.database.repositories.module_access_repository import get_module_access_repository  # noqa: E402
+from app.database.repositories.module_access_repository import get_module_access_repository
 
 
 def main():

@@ -15,10 +15,10 @@ Usage
 from __future__ import annotations
 
 import json
+import logging
 import re
 import string
-import logging
-from typing import Any, Optional
+from typing import Any
 
 from rapidfuzz import fuzz
 
@@ -74,7 +74,7 @@ class AssetIDResolver:
             raise ValueError("site_id must be a non-empty string")
         self.db = db
         self.site_id = site_id
-        self._equipment_cache: Optional[list[dict[str, Any]]] = None
+        self._equipment_cache: list[dict[str, Any]] | None = None
 
     # ------------------------------------------------------------------ #
     # Internal helpers
@@ -162,7 +162,7 @@ class AssetIDResolver:
     async def resolve(
         self,
         equipment_description: str,
-        document_type: Optional[str] = None,
+        document_type: str | None = None,
         gateway: Any = None,
     ) -> ResolutionResult:
         """
@@ -227,8 +227,8 @@ class AssetIDResolver:
 
         # ---- Stage 3: fuzzy match via rapidfuzz token_set_ratio ---- #
         best_score = 0.0
-        best_eq: Optional[dict[str, Any]] = None
-        best_field: Optional[str] = None
+        best_eq: dict[str, Any] | None = None
+        best_field: str | None = None
 
         for eq in equipment:
             searchable_fields = [
@@ -287,7 +287,7 @@ class AssetIDResolver:
         self,
         equipment_description: str,
         equipment: list[dict[str, Any]],
-        document_type: Optional[str],
+        document_type: str | None,
         gateway: Any = None,
     ) -> ResolutionResult:
         """

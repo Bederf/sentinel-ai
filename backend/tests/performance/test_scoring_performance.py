@@ -3,8 +3,9 @@
 Ensures that scoring doesn't create unacceptable latency in recommendations.
 """
 
-import time
 import random
+import time
+
 from app.services.recommendation_scorer import RecommendationScorer
 
 

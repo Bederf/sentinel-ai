@@ -4,8 +4,10 @@ Tests for the Energy Rules Engine Service
 Validates rule evaluation, learning curve progression, and system breakdown.
 """
 
-import pytest
 from datetime import date, timedelta
+
+import pytest
+
 from app.models.energy_rules import BuildingState
 from app.services.energy_rules_engine import EnergyRulesEngine, get_energy_rules_engine
 

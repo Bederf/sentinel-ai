@@ -10,15 +10,14 @@ Implements:
 """
 
 import logging
-from typing import Dict, List
-from pydantic import BaseModel, Field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, HTTPException, Request
+from pydantic import BaseModel, Field
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
-from app.database.repositories import SiteRepository, AlertRepository, PredictionRepository
+from app.database.repositories import AlertRepository, PredictionRepository, SiteRepository
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -67,7 +66,7 @@ class SiteSummary(BaseModel):
     site_id: str
     site_name: str
     equipment_count: int
-    equipment_by_type: Dict[str, int] = Field(default_factory=dict)
+    equipment_by_type: dict[str, int] = Field(default_factory=dict)
     safety: SafetySummary
     alerts: AlertSummary
     predictions: PredictionSummary
@@ -90,7 +89,7 @@ class SiteAlerts(BaseModel):
     """Paginated alerts for a site."""
 
     site_id: str
-    alerts: List[AlertItem]
+    alerts: list[AlertItem]
     total_count: int
     offset: int
     limit: int
@@ -152,7 +151,7 @@ async def get_site_summary(request: Request, site_id: str) -> SiteSummary:
         equipment_count = len(equipment_list) if equipment_list else 0
 
         # Count equipment by type
-        equipment_by_type: Dict[str, int] = {}
+        equipment_by_type: dict[str, int] = {}
         safety_counts = {"total": equipment_count, "safe": 0, "warning": 0, "blocked": 0, "alarm": 0}
 
         for equipment in equipment_list or []:
@@ -222,7 +221,7 @@ async def get_site_summary(request: Request, site_id: str) -> SiteSummary:
             safety=SafetySummary(**safety_counts),
             alerts=AlertSummary(**alert_counts),
             predictions=PredictionSummary(**prediction_counts),
-            last_updated=datetime.now(timezone.utc).isoformat(),
+            last_updated=datetime.now(UTC).isoformat(),
         )
     except HTTPException:
         raise

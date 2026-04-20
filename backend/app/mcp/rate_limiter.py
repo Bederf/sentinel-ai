@@ -11,7 +11,6 @@ import logging
 import time
 from collections import defaultdict
 from contextlib import asynccontextmanager
-from typing import Optional
 
 from app.config.settings import settings
 from app.mcp.tool_permissions import MUTATING_TOOLS
@@ -59,7 +58,7 @@ def _prune_window(timestamps: list[float], window_seconds: float = 60.0) -> list
 def check_rate_limit(
     identity: str,
     tool_name: str,
-) -> tuple[bool, Optional[str], Optional[int]]:
+) -> tuple[bool, str | None, int | None]:
     """Check whether the identity is within rate limits for this tool.
 
     Args:
@@ -125,7 +124,7 @@ async def acquire_concurrency_permit(identity: str):
     sem = _get_semaphore(identity)
     try:
         await asyncio.wait_for(sem.acquire(), timeout=30.0)
-    except asyncio.TimeoutError:
+    except TimeoutError:
         raise RuntimeError(f"Concurrency limit reached for identity={identity} (max={_MAX_CONCURRENT_PER_IDENTITY})")
     try:
         yield

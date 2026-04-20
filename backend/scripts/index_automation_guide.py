@@ -10,16 +10,16 @@ Usage:
     python backend/scripts/index_automation_guide.py
 """
 
-import sys
 import asyncio
 import logging
+import sys
 from pathlib import Path
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from app.database.supabase_client import get_supabase_client  # noqa: E402
-from app.services.vector_db import get_vector_db_service  # noqa: E402
+from app.database.supabase_client import get_supabase_client
+from app.services.vector_db import get_vector_db_service
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -35,7 +35,7 @@ async def index_guide():
         return False
 
     logger.info(f"Reading guide from {guide_path}")
-    with open(guide_path, "r") as f:
+    with open(guide_path) as f:
         full_text = f.read()
 
     client = get_supabase_client()

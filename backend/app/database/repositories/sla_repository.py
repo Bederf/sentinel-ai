@@ -17,7 +17,7 @@ import logging
 from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from app.models.contract import (
     SLABreachEvent,
@@ -75,7 +75,7 @@ class SLARepository:
         self,
         contract_id: str,
         months: int = 12,
-    ) -> List[SLAPerformanceWithCompliance]:
+    ) -> list[SLAPerformanceWithCompliance]:
         """
         Get historical performance data for a contract.
 
@@ -129,8 +129,8 @@ class SLARepository:
     def get_breach_events(
         self,
         contract_id: str,
-        severity: Optional[SLABreachSeverity] = None,
-    ) -> List[SLABreachEvent]:
+        severity: SLABreachSeverity | None = None,
+    ) -> list[SLABreachEvent]:
         """
         Get breach events for a contract.
 
@@ -180,7 +180,7 @@ class SLARepository:
     # Compliance Summary
     # ========================================================================
 
-    def get_compliance_summary(self, contract_id: str) -> Dict[str, Any]:
+    def get_compliance_summary(self, contract_id: str) -> dict[str, Any]:
         """
         Get overall compliance summary for a contract.
 
@@ -207,7 +207,7 @@ class SLARepository:
         # Fallback to JSON storage
         return self._get_summary_json(contract_id)
 
-    def get_contracts_with_sla(self) -> List[Any]:
+    def get_contracts_with_sla(self) -> list[Any]:
         """
         Get all contracts with active SLA terms.
 
@@ -219,7 +219,7 @@ class SLARepository:
         logger.warning("get_contracts_with_sla() has no live repository implementation; returning empty set")
         return []
 
-    def get_sla_term(self, sla_term_id: str) -> Optional[SLATerm]:
+    def get_sla_term(self, sla_term_id: str) -> SLATerm | None:
         """
         Get SLA term by ID.
 
@@ -239,7 +239,7 @@ class SLARepository:
     def _create_performance_supabase(
         self,
         perf: SLAPerformanceWithCompliance,
-    ) -> Optional[SLAPerformanceWithCompliance]:
+    ) -> SLAPerformanceWithCompliance | None:
         """Create performance record in Supabase."""
         try:
             # Check if Supabase is configured
@@ -283,7 +283,7 @@ class SLARepository:
         self,
         contract_id: str,
         months: int,
-    ) -> Optional[List[SLAPerformanceWithCompliance]]:
+    ) -> list[SLAPerformanceWithCompliance] | None:
         """Get performance history from Supabase."""
         try:
             if not self._is_supabase_configured():
@@ -351,8 +351,8 @@ class SLARepository:
     def _get_breaches_supabase(
         self,
         contract_id: str,
-        severity: Optional[SLABreachSeverity],
-    ) -> Optional[List[SLABreachEvent]]:
+        severity: SLABreachSeverity | None,
+    ) -> list[SLABreachEvent] | None:
         """Get breach events from Supabase."""
         # For local fallback mode, return None to use JSON fallback
         return None
@@ -360,12 +360,12 @@ class SLARepository:
     def _create_breach_supabase(
         self,
         breach: SLABreachEvent,
-    ) -> Optional[SLABreachEvent]:
+    ) -> SLABreachEvent | None:
         """Create breach event in Supabase."""
         # For local fallback mode, return None to use JSON fallback
         return None
 
-    def _get_summary_supabase(self, contract_id: str) -> Optional[Dict[str, Any]]:
+    def _get_summary_supabase(self, contract_id: str) -> dict[str, Any] | None:
         """Get compliance summary from Supabase."""
         # For local fallback mode, return None to use JSON fallback
         return None
@@ -380,16 +380,16 @@ class SLARepository:
             self._json_path.parent.mkdir(parents=True, exist_ok=True)
             self._write_json_data({"performance": [], "breaches": []})
 
-    def _read_json_data(self) -> Dict[str, Any]:
+    def _read_json_data(self) -> dict[str, Any]:
         """Read data from JSON file."""
         try:
-            with open(self._json_path, "r") as f:
+            with open(self._json_path) as f:
                 return json.load(f)
         except Exception as e:
             logger.error(f"Failed to read JSON data: {e}")
             return {"performance": [], "breaches": []}
 
-    def _write_json_data(self, data: Dict[str, Any]):
+    def _write_json_data(self, data: dict[str, Any]):
         """Write data to JSON file."""
         try:
             with open(self._json_path, "w") as f:
@@ -443,7 +443,7 @@ class SLARepository:
         self,
         contract_id: str,
         months: int,
-    ) -> List[SLAPerformanceWithCompliance]:
+    ) -> list[SLAPerformanceWithCompliance]:
         """Get performance history from JSON storage."""
         data = self._read_json_data()
 
@@ -479,8 +479,8 @@ class SLARepository:
     def _get_breaches_json(
         self,
         contract_id: str,
-        severity: Optional[SLABreachSeverity],
-    ) -> List[SLABreachEvent]:
+        severity: SLABreachSeverity | None,
+    ) -> list[SLABreachEvent]:
         """Get breach events from JSON storage."""
         # Demo implementation - return empty list
         return []
@@ -499,7 +499,7 @@ class SLARepository:
         # TODO: Store in JSON file
         return breach
 
-    def _get_summary_json(self, contract_id: str) -> Dict[str, Any]:
+    def _get_summary_json(self, contract_id: str) -> dict[str, Any]:
         """Get compliance summary from JSON storage."""
         data = self._read_json_data()
 
@@ -545,7 +545,7 @@ class SLARepository:
     # Mapping Helpers
     # ========================================================================
 
-    def _map_performance_row(self, row: Dict[str, Any]) -> SLAPerformanceWithCompliance:
+    def _map_performance_row(self, row: dict[str, Any]) -> SLAPerformanceWithCompliance:
         """Map database row to SLAPerformanceWithCompliance."""
         details = row.get("details", {})
 
@@ -576,7 +576,7 @@ class SLARepository:
             clawback_amount_zar=row.get("penalty_amount_zar", 0.0),
         )
 
-    def _map_performance_dict(self, p: Dict[str, Any]) -> SLAPerformanceWithCompliance:
+    def _map_performance_dict(self, p: dict[str, Any]) -> SLAPerformanceWithCompliance:
         """Map dict to SLAPerformanceWithCompliance."""
         details = p.get("details", {})
 
@@ -668,7 +668,7 @@ class SLARepository:
 # Singleton Factory
 # ============================================================================
 
-_sla_repository_instance: Optional[SLARepository] = None
+_sla_repository_instance: SLARepository | None = None
 
 
 def get_sla_repository() -> SLARepository:

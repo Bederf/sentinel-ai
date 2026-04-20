@@ -4,9 +4,9 @@ Energy Rules Engine Models
 Defines data structures for the rules-based energy optimization system.
 """
 
-from pydantic import BaseModel
-from typing import List, Dict
 from enum import Enum
+
+from pydantic import BaseModel
 
 
 class LearningCurvePhase(str, Enum):
@@ -40,7 +40,7 @@ class RuleResult(BaseModel):
     savings_percent: float  # Savings percentage (0-35%)
     active: bool  # Whether rule fired and contributed savings
     reason: str  # Explanation of why rule is/isn't active
-    conditions_met: Dict[str, bool]  # Which conditions were satisfied
+    conditions_met: dict[str, bool]  # Which conditions were satisfied
 
 
 class SystemBreakdown(BaseModel):
@@ -59,7 +59,7 @@ class RulesEngineOutput(BaseModel):
     delta_percent: float  # Savings as percentage (0-35%)
     delta_zar: float  # Estimated savings in ZAR
     by_system: SystemBreakdown  # Breakdown by HVAC/Lighting/Power
-    rules_applied: List[RuleResult]  # List of all evaluated rules
+    rules_applied: list[RuleResult]  # List of all evaluated rules
     confidence: float  # ML confidence level (0.78-0.92)
     method: str  # "rules_based" | "hardcoded"
     learning_phase: LearningCurvePhase  # Current learning curve phase

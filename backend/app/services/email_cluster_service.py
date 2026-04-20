@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Any, Optional
+from typing import Any
 
 from app.database.repositories.desk_repository import DeskRepository
 from app.database.repositories.email_cluster_repository import EmailClusterRepository
@@ -70,7 +70,7 @@ class EmailClusterService:
 
     def _resolve_zone(
         self, site_code: str, desk_hint: str | None, floor_hint: str | None
-    ) -> Optional[tuple[dict[str, Any], str]]:
+    ) -> tuple[dict[str, Any], str] | None:
         """Resolve desk_hint or floor_hint → (zone_record, site_uuid).
 
         Returns tuple of zone dict and the resolved site UUID.

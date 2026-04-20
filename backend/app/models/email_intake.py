@@ -8,10 +8,9 @@ EmailIntakeResponse is returned to n8n for auto-reply templating.
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import BaseModel
-
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -60,37 +59,37 @@ class EmailIntakeRequest(BaseModel):
 
     # Requester identity
     from_email: str
-    from_name: Optional[str] = None
-    from_phone: Optional[str] = None
-    from_department: Optional[str] = None
+    from_name: str | None = None
+    from_phone: str | None = None
+    from_department: str | None = None
 
     # Email metadata
     subject: str
-    body_plain: Optional[str] = None
-    body_html: Optional[str] = None
-    message_id: Optional[str] = None
-    in_reply_to: Optional[str] = None
-    received_at: Optional[str] = None  # ISO timestamp
-    to: Optional[list[str]] = None
-    cc: Optional[list[str]] = None
-    source: Optional[str] = None
+    body_plain: str | None = None
+    body_html: str | None = None
+    message_id: str | None = None
+    in_reply_to: str | None = None
+    received_at: str | None = None  # ISO timestamp
+    to: list[str] | None = None
+    cc: list[str] | None = None
+    source: str | None = None
 
     # AI extraction (optional — Phase 134 moves classification to backend agent)
-    site_id: Optional[str] = None
-    zone_hint: Optional[str] = None
-    floor_hint: Optional[str] = None
-    issue_category: Optional[str] = "general"
-    issue_summary: Optional[str] = None
+    site_id: str | None = None
+    zone_hint: str | None = None
+    floor_hint: str | None = None
+    issue_category: str | None = "general"
+    issue_summary: str | None = None
     urgency: str = "normal"
     extraction_confidence: float = 0.70
-    extraction_model: Optional[str] = None
-    extraction_raw: Optional[dict[str, Any]] = None
+    extraction_model: str | None = None
+    extraction_raw: dict[str, Any] | None = None
 
     # Email threading (RFC 822)
-    references: Optional[str] = None  # References header from inbound email
+    references: str | None = None  # References header from inbound email
 
     # Follow-up / reference linking
-    existing_reference: Optional[str] = None  # e.g. FNBFW:12345
+    existing_reference: str | None = None  # e.g. FNBFW:12345
 
     # Urgency signals from n8n parser (optional — Phase 134)
     urgency_boost: bool = False
@@ -99,7 +98,7 @@ class EmailIntakeRequest(BaseModel):
 
     # Attachments
     attachment_count: int = 0
-    attachment_refs: Optional[list[dict[str, Any]]] = None
+    attachment_refs: list[dict[str, Any]] | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -111,22 +110,22 @@ class EmailIntakeResponse(BaseModel):
     """Returned to n8n so it can send the auto-reply."""
 
     success: bool
-    intake_id: Optional[str] = None
+    intake_id: str | None = None
     action_taken: str  # new_intake | linked_existing | duplicate | ...
-    concept_ref: Optional[str] = None
-    bms_context: Optional[dict[str, Any]] = None
+    concept_ref: str | None = None
+    bms_context: dict[str, Any] | None = None
     message: str = ""
-    reply_template: Optional[str] = None  # plain-text reply body for n8n
-    reply_html: Optional[str] = None  # branded HTML reply for n8n
+    reply_template: str | None = None  # plain-text reply body for n8n
+    reply_html: str | None = None  # branded HTML reply for n8n
     urgency: str = "normal"
 
     # Backend SMTP reply status (Phase 131.2b)
     reply_sent: bool = False  # True if backend sent threaded reply via SMTP
-    reply_message_id: Optional[str] = None  # Outbound Message-ID header
-    reply_error: Optional[str] = None  # Error message if backend reply failed
+    reply_message_id: str | None = None  # Outbound Message-ID header
+    reply_error: str | None = None  # Error message if backend reply failed
 
     # Phase 134: AI agent metadata
-    agent_model: Optional[str] = None  # e.g. "gpt-4.1-nano", "claude", "keyword_fallback"
+    agent_model: str | None = None  # e.g. "gpt-4.1-nano", "claude", "keyword_fallback"
 
 
 # ---------------------------------------------------------------------------

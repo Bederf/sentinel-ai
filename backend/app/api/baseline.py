@@ -10,29 +10,28 @@ Provides endpoints for:
 - Baseline history and reporting
 """
 
-from typing import List, Optional, Dict, Any
+from typing import Any, Optional
 
-from fastapi import APIRouter, HTTPException, Depends, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.middleware.auth_middleware import require_equipment_access
 from app.models.auth import AuthContext
-
 from app.models.baseline import (
-    EquipmentBaseline,
-    ElementBaseline,
-    BaselineComparison,
-    EquipmentElement,
-    ManualBaselineCaptureRequest,
-    ElementBaselineCaptureRequest,
     BaselineCaptureResponse,
+    BaselineComparison,
     BaselineComparisonResponse,
     BaselineReportResponse,
     DeviationStatus,
+    ElementBaseline,
+    ElementBaselineCaptureRequest,
+    EquipmentBaseline,
+    EquipmentElement,
+    ManualBaselineCaptureRequest,
 )
-from app.services.baseline_service import get_baseline_service
-from app.services.baseline_report_service import get_baseline_report_service
-from app.services.auth_service import get_current_user
 from app.models.user import User
+from app.services.auth_service import get_current_user
+from app.services.baseline_report_service import get_baseline_report_service
+from app.services.baseline_service import get_baseline_service
 
 router = APIRouter(prefix="/api/equipment", tags=["baseline"])
 
@@ -80,7 +79,7 @@ async def capture_equipment_baseline(
 
     except Exception as e:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to capture baseline: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to capture baseline: {e!s}"
         )
 
 
@@ -116,7 +115,7 @@ async def capture_automated_baseline(
 
     except Exception as e:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to capture automated baseline: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to capture automated baseline: {e!s}"
         )
 
 
@@ -145,7 +144,7 @@ async def get_active_baseline(
 
 @router.get(
     "/{equipment_id}/baseline/history",
-    response_model=List[EquipmentBaseline],
+    response_model=list[EquipmentBaseline],
     summary="Get baseline history",
     description="List all historical baselines for equipment",
 )
@@ -198,7 +197,7 @@ async def archive_baseline(
 )
 async def compare_to_baseline(
     equipment_id: str,
-    current_values: Optional[Dict[str, Any]] = None,
+    current_values: dict[str, Any] | None = None,
     data_source: str = "bms_sensor",
     current_user: User = Depends(get_current_user),
     auth: AuthContext = Depends(require_equipment_access("equipment_id")),
@@ -229,12 +228,12 @@ async def compare_to_baseline(
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Comparison failed: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Comparison failed: {e!s}")
 
 
 @router.get(
     "/{equipment_id}/baseline/comparisons",
-    response_model=List[BaselineComparison],
+    response_model=list[BaselineComparison],
     summary="Get comparison history",
     description="List recent baseline comparison results",
 )
@@ -253,7 +252,7 @@ async def get_comparison_history(
 
 @router.get(
     "/{equipment_id}/baseline/deviations/critical",
-    response_model=List[BaselineComparison],
+    response_model=list[BaselineComparison],
     summary="Get critical deviations",
     description="List baseline comparisons with critical deviations in last 30 days",
 )
@@ -315,13 +314,13 @@ async def capture_element_baseline(
 
     except Exception as e:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to capture element baseline: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to capture element baseline: {e!s}"
         )
 
 
 @router.get(
     "/{equipment_id}/elements",
-    response_model=List[EquipmentElement],
+    response_model=list[EquipmentElement],
     summary="List equipment elements",
     description="Get all elements defined for equipment",
 )
@@ -394,7 +393,7 @@ async def get_baseline_report(
 
     except Exception as e:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to generate report: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to generate report: {e!s}"
         )
 
 
@@ -490,7 +489,7 @@ async def generate_pdf_report(
     description="Initiate automated baseline capture for list of equipment IDs",
 )
 async def capture_baselines_bulk(
-    equipment_ids: List[str], baseline_type: str = "periodic", current_user: User = Depends(get_current_user)
+    equipment_ids: list[str], baseline_type: str = "periodic", current_user: User = Depends(get_current_user)
 ):
     """Capture automated baselines for multiple equipment."""
     service = get_baseline_service()

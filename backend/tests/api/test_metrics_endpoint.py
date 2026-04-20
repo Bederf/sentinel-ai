@@ -118,6 +118,7 @@ class TestMetricsAuthenticationGateway:
     def test_metrics_endpoint_requires_auth(self):
         """GET /metrics without auth should return 401."""
         from fastapi.testclient import TestClient
+
         from app.main import app
 
         client = TestClient(app)
@@ -129,6 +130,7 @@ class TestMetricsAuthenticationGateway:
     def test_metrics_endpoint_with_valid_auditor_token(self):
         """GET /metrics with valid AUDITOR token should return 200."""
         from fastapi.testclient import TestClient
+
         from app.main import app
         from app.middleware.auth_middleware import create_jwt_token
         from app.models.auth import SentinelRole
@@ -152,6 +154,7 @@ class TestMetricsAuthenticationGateway:
     def test_metrics_endpoint_with_valid_admin_token(self):
         """GET /metrics with valid ADMIN token should return 200."""
         from fastapi.testclient import TestClient
+
         from app.main import app
         from app.middleware.auth_middleware import create_jwt_token
         from app.models.auth import SentinelRole
@@ -175,6 +178,7 @@ class TestMetricsAuthenticationGateway:
     def test_metrics_endpoint_with_invalid_token(self):
         """GET /metrics with invalid token should return 401."""
         from fastapi.testclient import TestClient
+
         from app.main import app
 
         client = TestClient(app)
@@ -187,6 +191,7 @@ class TestMetricsAuthenticationGateway:
     def test_metrics_endpoint_with_operator_token(self):
         """GET /metrics with OPERATOR token should return 200 (OPERATOR >= AUDITOR in auth)."""
         from fastapi.testclient import TestClient
+
         from app.main import app
         from app.middleware.auth_middleware import create_jwt_token
         from app.models.auth import SentinelRole

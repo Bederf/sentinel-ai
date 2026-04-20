@@ -7,9 +7,9 @@ Provides CLI and programmatic training for survival analysis models.
 import argparse
 import json
 import logging
+import sys
 from datetime import datetime
 from pathlib import Path
-import sys
 
 import numpy as np
 
@@ -122,6 +122,7 @@ class SurvivalTrainer:
             CV results with mean c-index and std
         """
         from sklearn.model_selection import KFold
+
         from .model import SurvivalModel
 
         df = self.data_prep.prepare_survival_data()

@@ -1,22 +1,23 @@
 """Service record API endpoints for Phase 41 ML Engineer Knowledge Capture."""
 
-from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Form
-from typing import List, Optional, Dict, Any
 from datetime import datetime
+from typing import Any
 
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+
+from app.database.repositories.service_record_repository import ServiceRecordRepository
 from app.models.service_record import (
-    ServiceRecord,
-    ServiceRecordDetail,
-    ServiceRecordCreate,
-    ServiceRecordUpdate,
-    ServiceReading,
+    AttachmentType,
     ServiceAttachment,
     ServiceObservation,
-    AttachmentType,
+    ServiceReading,
+    ServiceRecord,
+    ServiceRecordCreate,
+    ServiceRecordDetail,
+    ServiceRecordUpdate,
     ServiceStatus,
     ServiceType,
 )
-from app.database.repositories.service_record_repository import ServiceRecordRepository
 from app.services.ml_template_service import MLTemplateService
 
 router = APIRouter(prefix="/api/service-records", tags=["service-records"])
@@ -73,11 +74,11 @@ async def get_service_record(
     return record
 
 
-@router.get("", response_model=List[ServiceRecord])
+@router.get("", response_model=list[ServiceRecord])
 async def list_service_records(
-    equipment_id: Optional[str] = None,
-    technician_id: Optional[str] = None,
-    status: Optional[ServiceStatus] = None,
+    equipment_id: str | None = None,
+    technician_id: str | None = None,
+    status: ServiceStatus | None = None,
     repository: ServiceRecordRepository = Depends(),
 ):
     """List service records with optional filtering."""
@@ -93,7 +94,7 @@ async def list_service_records(
     return records
 
 
-@router.get("/by-wo/{work_order_id}", response_model=List[ServiceRecord])
+@router.get("/by-wo/{work_order_id}", response_model=list[ServiceRecord])
 async def get_service_records_by_wo(
     work_order_id: str,
     repository: ServiceRecordRepository = Depends(),
@@ -219,7 +220,7 @@ async def get_ml_collection_status(
     }
 
 
-@router.post("/{record_id}/complete", response_model=Dict[str, Any])
+@router.post("/{record_id}/complete", response_model=dict[str, Any])
 async def complete_service_record(
     record_id: str,
     repository: ServiceRecordRepository = Depends(),

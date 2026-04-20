@@ -11,7 +11,6 @@ and render equipment health tables, contextual factors, and control-gated sugges
 """
 
 import re
-from typing import Optional
 
 from app.models.complaint import ComplaintDiagnosis
 
@@ -197,7 +196,7 @@ def _parse_diagnosis_text(diagnosis_text: str) -> dict:
 
 def format_for_chat(
     diagnosis: ComplaintDiagnosis,
-    history: Optional[dict] = None,
+    history: dict | None = None,
 ) -> str:
     """
     Format diagnosis for Chat UI (markdown).
@@ -350,7 +349,7 @@ def format_for_chat(
 
 def format_for_whatsapp(
     diagnosis: ComplaintDiagnosis,
-    history: Optional[dict] = None,
+    history: dict | None = None,
 ) -> str:
     """
     Format diagnosis for WhatsApp.
@@ -453,7 +452,7 @@ def format_for_whatsapp(
 
 def format_for_telegram(
     diagnosis: ComplaintDiagnosis,
-    history: Optional[dict] = None,
+    history: dict | None = None,
 ) -> str:
     """
     Format diagnosis for Telegram (Sentry/Sentry bot).

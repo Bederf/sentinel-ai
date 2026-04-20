@@ -5,13 +5,13 @@ based on simulation event logs and real-world outcomes.
 """
 
 from .performance_monitor import (
-    PerformanceMonitor,
     ConfusionMatrix,
+    PerformanceMonitor,
     get_performance_monitor,
 )
 
 __all__ = [
-    "PerformanceMonitor",
     "ConfusionMatrix",
+    "PerformanceMonitor",
     "get_performance_monitor",
 ]

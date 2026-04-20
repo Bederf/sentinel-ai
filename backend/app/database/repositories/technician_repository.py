@@ -3,7 +3,7 @@ Technician Repository - Database operations for technicians and site assignments
 """
 
 import logging
-from typing import Optional, List, Dict, Any
+from typing import Any
 
 from ..supabase_client import get_supabase_client
 
@@ -16,7 +16,7 @@ class TechnicianRepository:
     def __init__(self):
         self.client = get_supabase_client()
 
-    async def get_technician_for_equipment(self, equipment_id: str) -> Optional[Dict[str, Any]]:
+    async def get_technician_for_equipment(self, equipment_id: str) -> dict[str, Any] | None:
         """
         Get the assigned technician for a piece of equipment.
         Uses the get_technician_for_equipment Supabase function.
@@ -135,7 +135,7 @@ class TechnicianRepository:
             logger.error(f"Error parsing {equipment_code}: {e}")
             return "general"
 
-    async def get_technician_for_equipment_code(self, equipment_code: str) -> Optional[Dict[str, Any]]:
+    async def get_technician_for_equipment_code(self, equipment_code: str) -> dict[str, Any] | None:
         """
         Get the assigned technician for equipment by code.
 
@@ -230,7 +230,7 @@ class TechnicianRepository:
             logger.error(f"Error getting technician for equipment code {equipment_code}: {e}")
             return None
 
-    async def get_all_technicians(self, active_only: bool = True) -> List[Dict[str, Any]]:
+    async def get_all_technicians(self, active_only: bool = True) -> list[dict[str, Any]]:
         """Get all technicians."""
         if not self.client:
             return []
@@ -247,7 +247,7 @@ class TechnicianRepository:
             logger.error(f"Error getting technicians: {e}")
             return []
 
-    async def get_technician_by_telegram_id(self, telegram_id: str) -> Optional[Dict[str, Any]]:
+    async def get_technician_by_telegram_id(self, telegram_id: str) -> dict[str, Any] | None:
         """Resolve a technician and their primary site from a Telegram user ID."""
         if not self.client or not telegram_id:
             return None
@@ -280,7 +280,7 @@ class TechnicianRepository:
             logger.error(f"Error getting technician by telegram_id {telegram_id}: {e}")
             return None
 
-    async def get_site_assignments(self, site_id: str) -> List[Dict[str, Any]]:
+    async def get_site_assignments(self, site_id: str) -> list[dict[str, Any]]:
         """Get all technician assignments for a site."""
         if not self.client:
             return []
@@ -301,7 +301,7 @@ class TechnicianRepository:
 
     # ==================== CRUD (Phase: Technician Registry UI) ====================
 
-    async def get_technicians_with_assignments(self, site_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    async def get_technicians_with_assignments(self, site_id: str | None = None) -> list[dict[str, Any]]:
         """Get all technicians with their site assignments and notification channels.
 
         Returns a combined view for the Settings UI.
@@ -350,10 +350,10 @@ class TechnicianRepository:
         name: str,
         email: str,
         phone: str,
-        specialties: List[str],
+        specialties: list[str],
         site_id: str,
-        telegram_id: Optional[str] = None,
-    ) -> Optional[Dict[str, Any]]:
+        telegram_id: str | None = None,
+    ) -> dict[str, Any] | None:
         """Create a new technician with site assignment(s).
 
         Creates:
@@ -440,8 +440,8 @@ class TechnicianRepository:
     async def update_technician(
         self,
         tech_id: str,
-        updates: Dict[str, Any],
-    ) -> Optional[Dict[str, Any]]:
+        updates: dict[str, Any],
+    ) -> dict[str, Any] | None:
         """Update technician fields (name, email, phone, active)."""
         if not self.client:
             return None
@@ -462,7 +462,7 @@ class TechnicianRepository:
         self,
         tech_id: str,
         site_id: str,
-        specialties: List[str],
+        specialties: list[str],
     ) -> bool:
         """Replace all specialty assignments for a technician at a site."""
         if not self.client:
@@ -500,7 +500,7 @@ class TechnicianRepository:
 
 
 # Singleton instance
-_repository: Optional[TechnicianRepository] = None
+_repository: TechnicianRepository | None = None
 
 
 def get_technician_repository() -> TechnicianRepository:

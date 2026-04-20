@@ -3,7 +3,7 @@
 SCADA-style monitoring for generator sets with DeepSea DSE controllers.
 """
 
-from typing import Optional
+
 from fastapi import APIRouter, HTTPException, Query
 
 from app.services.generator_service import get_generator_service
@@ -13,8 +13,8 @@ router = APIRouter(prefix="/generators", tags=["generators"])
 
 @router.get("")
 async def list_generators(
-    site_id: Optional[str] = Query(None, description="Filter by site"),
-    group_id: Optional[str] = Query(None, description="Filter by generator group"),
+    site_id: str | None = Query(None, description="Filter by site"),
+    group_id: str | None = Query(None, description="Filter by generator group"),
 ):
     """List all generators with optional filters."""
     service = get_generator_service()
@@ -60,7 +60,7 @@ async def get_generator_health(generator_id: str):
 
 @router.get("/groups/list")
 async def list_groups(
-    site_id: Optional[str] = Query(None, description="Filter by site"),
+    site_id: str | None = Query(None, description="Filter by site"),
 ):
     """List all generator groups."""
     service = get_generator_service()

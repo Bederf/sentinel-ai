@@ -13,15 +13,16 @@ All control writes go through BMSControlBridge → DeviceManager → adapter.
 Tests mock the bridge to isolate the service's decision logic.
 """
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock
 
+import pytest
+
+from app.services.bms_control_bridge import WriteResult
 from app.services.occupancy_control_service import (
     OccupancyControlService,
     ZoneControlState,
     get_occupancy_control_service,
 )
-from app.services.bms_control_bridge import WriteResult
 
 
 def _ok_write_result(**overrides) -> WriteResult:

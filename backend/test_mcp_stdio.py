@@ -4,10 +4,10 @@ Test stdio MCP server.
 Run with: python test_mcp_stdio.py
 """
 
-import subprocess
 import json
-import sys
 import os
+import subprocess
+import sys
 
 # Set up environment
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))

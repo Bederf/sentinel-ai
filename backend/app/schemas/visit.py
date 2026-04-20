@@ -3,11 +3,9 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
 from uuid import UUID
 
 from pydantic import BaseModel, EmailStr, Field
-
 
 # ==============================================================================
 # Request Schemas
@@ -19,13 +17,13 @@ class VisitCreate(BaseModel):
 
     visitor_email: EmailStr
     host_email: EmailStr
-    host_name: Optional[str] = None
-    host_mobile: Optional[str] = None
+    host_name: str | None = None
+    host_mobile: str | None = None
     building_id: str
     meeting_start: datetime
     meeting_end: datetime
-    visitor_name: Optional[str] = None
-    visitor_vehicle: Optional[str] = None
+    visitor_name: str | None = None
+    visitor_vehicle: str | None = None
 
 
 class ScanRequest(BaseModel):
@@ -33,8 +31,8 @@ class ScanRequest(BaseModel):
 
     model_config = {"extra": "forbid"}
 
-    token: Optional[UUID] = None
-    pin: Optional[str] = Field(default=None, pattern=r"^\d{6}$")  # exactly 6 digits
+    token: UUID | None = None
+    pin: str | None = Field(default=None, pattern=r"^\d{6}$")  # exactly 6 digits
 
 
 class RegisterRequest(BaseModel):
@@ -45,8 +43,8 @@ class RegisterRequest(BaseModel):
     token: UUID
     visitor_name: str = Field(min_length=1, max_length=200)
     photo: str = Field(min_length=1, description="base64 encoded photo")
-    vehicle: Optional[str] = Field(default=None, max_length=100)
-    id_number: Optional[str] = Field(default=None, max_length=50)
+    vehicle: str | None = Field(default=None, max_length=100)
+    id_number: str | None = Field(default=None, max_length=50)
 
 
 class IssueCardRequest(BaseModel):
@@ -70,19 +68,19 @@ class VisitResponse(BaseModel):
     token: UUID
     pin: str
     visitor_email: str
-    visitor_name: Optional[str] = None
+    visitor_name: str | None = None
     host_email: str
-    host_name: Optional[str] = None
-    host_mobile: Optional[str] = None
+    host_name: str | None = None
+    host_mobile: str | None = None
     building_id: str
     meeting_start: datetime
     meeting_end: datetime
     status: str
-    visitor_photo: Optional[str] = None
-    visitor_vehicle: Optional[str] = None
-    visitor_id_number: Optional[str] = None
-    access_card_id: Optional[str] = None
-    qr_code: Optional[str] = None
+    visitor_photo: str | None = None
+    visitor_vehicle: str | None = None
+    visitor_id_number: str | None = None
+    access_card_id: str | None = None
+    qr_code: str | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -93,7 +91,7 @@ class ScanResponse(BaseModel):
     """Response from /reception/scan — includes host + meeting info."""
 
     visit: VisitResponse
-    building_name: Optional[str] = None
+    building_name: str | None = None
     time_window_valid: bool
 
 

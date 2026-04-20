@@ -34,7 +34,7 @@ class ToolSecurityProfile:
     rate_class: str = "read"  # "read", "mutate", "search"
     min_role: SentinelRole | None = None
     required_module: ModuleType | None = None
-    audit_fields: frozenset = field(default_factory=lambda: frozenset({"site_id", "site_id", "device_id", "asset_id"}))
+    audit_fields: frozenset = field(default_factory=lambda: frozenset({"site_id", "device_id", "asset_id"}))
     output_allowed_fields: frozenset | None = None  # None = no output filter
     secret_zero_risk: bool = False
 
@@ -433,7 +433,7 @@ def get_audit_fields(tool_name: str) -> set[str]:
     profile = TOOL_REGISTRY.get(tool_name)
     if profile:
         return set(profile.audit_fields)
-    return {"site_id", "site_id", "device_id", "asset_id"}
+    return {"site_id", "device_id", "asset_id"}
 
 
 def is_secret_zero_risk(tool_name: str) -> bool:

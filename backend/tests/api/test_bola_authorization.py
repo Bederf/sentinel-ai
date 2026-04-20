@@ -15,18 +15,18 @@ This prevents OWASP API Security #1: Broken Object Level Authorization.
 """
 
 import os
-import pytest
 from unittest.mock import patch
 
-from httpx import AsyncClient, ASGITransport
+import pytest
+from httpx import ASGITransport, AsyncClient
 
 os.environ.setdefault("DEMO_MODE", "true")
 os.environ.setdefault("TESTING", "true")
 os.environ.setdefault("JWT_SECRET_KEY", "test-only-jwt-secret-for-ci-at-least-32-chars")
 
-from app.main import app  # noqa: E402
-from app.config.demo_configs import USER_DEMO_CONFIGS, DemoConfig  # noqa: E402
-from app.models.auth import AuthContext, SentinelRole  # noqa: E402
+from app.config.demo_configs import USER_DEMO_CONFIGS, DemoConfig
+from app.main import app
+from app.models.auth import AuthContext, SentinelRole
 
 # ---------------------------------------------------------------------------
 # Test user configuration

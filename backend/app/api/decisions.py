@@ -14,7 +14,7 @@ from __future__ import annotations
 import asyncio
 import json as _json
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any, Literal
 
 from fastapi import APIRouter, HTTPException, Query
@@ -56,7 +56,7 @@ class TriggerResponse(BaseModel):
 _ALL_MODULES = ["hvac", "energy", "lighting", "solar", "occupancy", "fire", "security", "water"]
 
 _TRIGGER_MAP: dict[str, dict[str, str]] = {
-    "none": {m: "hidden" for m in _ALL_MODULES},
+    "none": dict.fromkeys(_ALL_MODULES, "hidden"),
     "floor": {
         "hvac": "detailed",
         "occupancy": "summary",
@@ -77,7 +77,7 @@ _aggregator = DecisionMomentAggregator()
 
 def cache_decision_payload(site_id: str, payload_dict: dict) -> None:
     """Called by the event bus subscriber to pre-warm the cache."""
-    _payload_cache[site_id] = (payload_dict, datetime.now(timezone.utc))
+    _payload_cache[site_id] = (payload_dict, datetime.now(UTC))
     logger.info("Decision payload cached for site %s", site_id)
 
 
@@ -104,7 +104,7 @@ def get_cached_payload(site_id: str) -> dict | None:
     if not entry:
         return None
     payload_dict, cached_at = entry
-    age = (datetime.now(timezone.utc) - cached_at).total_seconds()
+    age = (datetime.now(UTC) - cached_at).total_seconds()
     return payload_dict if age < _CACHE_TTL_SECONDS else None
 
 
@@ -129,7 +129,7 @@ async def get_current_decision(
     # Return cached payload if fresh
     if site_id in _payload_cache:
         cached_dict, cached_at = _payload_cache[site_id]
-        age_seconds = (datetime.now(timezone.utc) - cached_at).total_seconds()
+        age_seconds = (datetime.now(UTC) - cached_at).total_seconds()
         if age_seconds < _CACHE_TTL_SECONDS:
             return JSONResponse(content={"data": cached_dict, "source": "cache", "age_seconds": int(age_seconds)})
 
@@ -154,11 +154,11 @@ async def get_current_decision(
         )
         payload_dict = payload.to_dict()
         # Cache on-demand result too
-        _payload_cache[site_id] = (payload_dict, datetime.now(timezone.utc))
+        _payload_cache[site_id] = (payload_dict, datetime.now(UTC))
         return JSONResponse(content={"data": payload_dict, "source": "on_demand"})
     except Exception as e:
         logger.error("Decision assembly failed for %s: %s", site_id, e)
-        raise HTTPException(status_code=500, detail=f"Decision assembly failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Decision assembly failed: {e!s}")
 
 
 @router.post("/trigger/{site_id}", response_model=TriggerResponse)
@@ -176,7 +176,7 @@ async def resolve_trigger(site_id: str, req: TriggerRequest) -> TriggerResponse:
     No auth required — returns display state only, no sensitive data.
     """
     # Base: all hidden
-    result: dict[str, str] = {m: "hidden" for m in _ALL_MODULES}
+    result: dict[str, str] = dict.fromkeys(_ALL_MODULES, "hidden")
 
     # Apply trigger map
     if req.trigger_type == "none":
@@ -215,7 +215,7 @@ async def resolve_trigger(site_id: str, req: TriggerRequest) -> TriggerResponse:
     # Load persistent admin overrides from buildings.profile.module_display
     # 3-tier fallback: Supabase → graceful skip (admin overrides are optional)
     try:
-        from app.database.supabase_client import get_supabase_client  # noqa: PLC0415
+        from app.database.supabase_client import get_supabase_client
 
         client = get_supabase_client()
         resp = client.table("buildings").select("profile").eq("id", site_id).single().execute()
@@ -253,7 +253,7 @@ async def stream_decisions(site_id: str):
       - Re-renders on every 'message' event
       - Falls back to REST polling (/api/decisions/current/{site_id}) if EventSource errors
     """
-    from app.services.event_bus import get_event_bus, Importance
+    from app.services.event_bus import Importance, get_event_bus
 
     async def event_generator():
         # Send current cached payload immediately on connect (instant first render)
@@ -310,7 +310,7 @@ async def stream_decisions(site_id: str):
                 try:
                     payload = await asyncio.wait_for(queue.get(), timeout=1.0)
                     yield f"data: {_json.dumps(payload)}\n\n"
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     pass  # Loop back — check heartbeat, wait again
 
         except asyncio.CancelledError:

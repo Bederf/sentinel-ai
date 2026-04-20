@@ -2,7 +2,7 @@
 
 import pytest
 
-from ml.conversation.intent import IntentClassifier, Intent, ClassifiedQuery
+from ml.conversation.intent import ClassifiedQuery, Intent, IntentClassifier
 
 
 @pytest.fixture

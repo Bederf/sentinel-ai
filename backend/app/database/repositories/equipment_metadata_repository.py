@@ -2,7 +2,6 @@
 
 import json
 from datetime import datetime
-from typing import Optional
 
 from app.database.supabase_client import get_supabase_client
 
@@ -14,7 +13,7 @@ class EquipmentMetadataRepository:
         """Initialize the repository with a Supabase client."""
         self.client = get_supabase_client()
 
-    def get_equipment_metadata(self, equipment_id: str) -> Optional[dict]:
+    def get_equipment_metadata(self, equipment_id: str) -> dict | None:
         """Get full metadata for equipment by ID or code.
 
         Args:
@@ -42,7 +41,7 @@ class EquipmentMetadataRepository:
             return response.data[0]
         return None
 
-    def update_notes(self, equipment_id: str, notes: str, changed_by: str, change_reason: Optional[str] = None) -> dict:
+    def update_notes(self, equipment_id: str, notes: str, changed_by: str, change_reason: str | None = None) -> dict:
         """Update equipment notes with audit trail.
 
         Args:
@@ -179,9 +178,9 @@ class EquipmentMetadataRepository:
     def update_from_discovery(
         self,
         equipment_id: str,
-        network_info: Optional[dict] = None,
-        device_info: Optional[dict] = None,
-        operating_data: Optional[dict] = None,
+        network_info: dict | None = None,
+        device_info: dict | None = None,
+        operating_data: dict | None = None,
     ) -> dict:
         """Update equipment from auto-discovery (DALI, BACnet, etc.).
 
@@ -252,7 +251,7 @@ class EquipmentMetadataRepository:
         return response.data or []
 
     def set_commissioning_info(
-        self, equipment_id: str, commissioning_date: Optional[str] = None, warranty_expiry: Optional[str] = None
+        self, equipment_id: str, commissioning_date: str | None = None, warranty_expiry: str | None = None
     ) -> dict:
         """Set commissioning and warranty dates.
 

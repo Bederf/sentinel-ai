@@ -1,7 +1,8 @@
 """Repository for HVAC zone operations."""
 
-from typing import List, Optional, Dict, Any
 import logging
+from typing import Any
+
 from app.database.supabase_client import get_supabase_client
 
 logger = logging.getLogger(__name__)
@@ -14,7 +15,7 @@ class HVACZoneRepository:
         """Initialize the repository with a Supabase client."""
         self.client = get_supabase_client()
 
-    def get_all(self, site_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_all(self, site_id: str | None = None) -> list[dict[str, Any]]:
         """Get all HVAC zones with optional building filter.
 
         Args:
@@ -31,7 +32,7 @@ class HVACZoneRepository:
         response = query.execute()
         return response.data
 
-    def get_by_site_code(self, site_code: str) -> List[Dict[str, Any]]:
+    def get_by_site_code(self, site_code: str) -> list[dict[str, Any]]:
         """Get HVAC zones by building code.
 
         Args:
@@ -52,7 +53,7 @@ class HVACZoneRepository:
 
         return response.data
 
-    def get_by_zone_id(self, zone_id: str) -> Optional[Dict[str, Any]]:
+    def get_by_zone_id(self, zone_id: str) -> dict[str, Any] | None:
         """Get HVAC zone by zone_id.
 
         Args:
@@ -67,7 +68,7 @@ class HVACZoneRepository:
             return response.data[0]
         return None
 
-    def get_by_uuid(self, uuid: str) -> Optional[Dict[str, Any]]:
+    def get_by_uuid(self, uuid: str) -> dict[str, Any] | None:
         """Get HVAC zone by UUID.
 
         Args:
@@ -82,7 +83,7 @@ class HVACZoneRepository:
             return response.data[0]
         return None
 
-    def get_site_uuid(self, site_code: str) -> Optional[str]:
+    def get_site_uuid(self, site_code: str) -> str | None:
         """Get building UUID from building code.
 
         Args:
@@ -97,7 +98,7 @@ class HVACZoneRepository:
             return response.data[0]["id"]
         return None
 
-    def upsert(self, zone_data: Dict[str, Any]) -> Dict[str, Any]:
+    def upsert(self, zone_data: dict[str, Any]) -> dict[str, Any]:
         """Insert or update an HVAC zone.
 
         Args:
@@ -109,7 +110,7 @@ class HVACZoneRepository:
         response = self.client.table("hvac_zones").upsert(zone_data, on_conflict="zone_id").execute()
         return response.data[0] if response.data else {}
 
-    def upsert_many(self, zones: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def upsert_many(self, zones: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Insert or update multiple HVAC zones.
 
         Args:
@@ -124,7 +125,7 @@ class HVACZoneRepository:
         response = self.client.table("hvac_zones").upsert(zones, on_conflict="zone_id").execute()
         return response.data
 
-    def create(self, zone_data: Dict[str, Any]) -> Dict[str, Any]:
+    def create(self, zone_data: dict[str, Any]) -> dict[str, Any]:
         """Create a new HVAC zone.
 
         Args:
@@ -136,7 +137,7 @@ class HVACZoneRepository:
         response = self.client.table("hvac_zones").insert(zone_data).execute()
         return response.data[0]
 
-    def update(self, zone_id: str, zone_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def update(self, zone_id: str, zone_data: dict[str, Any]) -> dict[str, Any] | None:
         """Update an HVAC zone.
 
         Args:
@@ -182,7 +183,7 @@ class HVACZoneRepository:
 
         return len(response.data)
 
-    def update_setpoint(self, zone_id: str, setpoint: float) -> Optional[Dict[str, Any]]:
+    def update_setpoint(self, zone_id: str, setpoint: float) -> dict[str, Any] | None:
         """Update zone setpoint temperature.
 
         Args:
@@ -194,7 +195,7 @@ class HVACZoneRepository:
         """
         return self.update(zone_id, {"setpoint": setpoint})
 
-    def update_status(self, zone_id: str, status: str) -> Optional[Dict[str, Any]]:
+    def update_status(self, zone_id: str, status: str) -> dict[str, Any] | None:
         """Update zone status.
 
         Args:
@@ -206,7 +207,7 @@ class HVACZoneRepository:
         """
         return self.update(zone_id, {"status": status})
 
-    def update_current_temp(self, zone_id: str, temp: float) -> Optional[Dict[str, Any]]:
+    def update_current_temp(self, zone_id: str, temp: float) -> dict[str, Any] | None:
         """Update current zone temperature.
 
         Args:

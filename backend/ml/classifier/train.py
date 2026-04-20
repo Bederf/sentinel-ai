@@ -7,7 +7,6 @@ failure type classifiers.
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import List
 
 from ml.classifier.data_prep import ClassifierDataPrep
 from ml.classifier.model import FailureClassifier
@@ -117,7 +116,7 @@ class ClassifierTrainer:
             "feature_importance": metrics["feature_importance"][:5],  # Top 5
         }
 
-    def train_all(self, n_estimators: int = 100, max_depth: int = 10) -> List[dict]:
+    def train_all(self, n_estimators: int = 100, max_depth: int = 10) -> list[dict]:
         """Train classifiers for all equipment types.
 
         Args:

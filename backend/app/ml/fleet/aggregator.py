@@ -9,7 +9,7 @@ Phase 45-02: Fleet Learning and Cross-Site Insights.
 
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -31,10 +31,10 @@ class FleetAggregator:
     """Aggregates anonymized failure patterns across fleet."""
 
     def __init__(self):
-        self._aggregation_cache: Dict[str, Any] = {}
-        self._last_aggregation: Optional[str] = None
+        self._aggregation_cache: dict[str, Any] = {}
+        self._last_aggregation: str | None = None
 
-    def get_fleet_summary(self) -> Dict[str, Any]:
+    def get_fleet_summary(self) -> dict[str, Any]:
         """Get fleet-wide summary statistics.
 
         Returns:
@@ -102,7 +102,7 @@ class FleetAggregator:
             "last_aggregation": datetime.now().isoformat(),
         }
 
-    def aggregate_failure_patterns(self, equipment_type: Optional[str] = None) -> List[Dict[str, Any]]:
+    def aggregate_failure_patterns(self, equipment_type: str | None = None) -> list[dict[str, Any]]:
         """Get anonymized failure patterns across fleet.
 
         Args:
@@ -210,9 +210,9 @@ class FleetAggregator:
     def get_similar_failures(
         self,
         equipment_type: str,
-        failure_type: Optional[str] = None,
-        exclude_site: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+        failure_type: str | None = None,
+        exclude_site: str | None = None,
+    ) -> list[dict[str, Any]]:
         """Find similar equipment failures across fleet.
 
         Args:
@@ -231,7 +231,7 @@ class FleetAggregator:
         # In local mode, return all matches (in production, exclude site-specific data)
         return patterns
 
-    def get_risk_distribution(self) -> Dict[str, Any]:
+    def get_risk_distribution(self) -> dict[str, Any]:
         """Get fleet-wide equipment risk distribution.
 
         Returns:
@@ -249,7 +249,7 @@ class FleetAggregator:
             "total_sites": 5,
         }
 
-    def get_benchmarks(self, equipment_type: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_benchmarks(self, equipment_type: str | None = None) -> list[dict[str, Any]]:
         """Get fleet benchmarking data for equipment types.
 
         Args:
@@ -330,8 +330,8 @@ class FleetAggregator:
         self,
         site_code: str,
         site_health: float,
-        equipment_type: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        equipment_type: str | None = None,
+    ) -> dict[str, Any]:
         """Compare a site's performance against fleet average.
 
         Args:
@@ -374,7 +374,7 @@ class FleetAggregator:
 
 
 # Singleton instance
-_aggregator: Optional[FleetAggregator] = None
+_aggregator: FleetAggregator | None = None
 
 
 def get_fleet_aggregator() -> FleetAggregator:

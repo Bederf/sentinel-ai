@@ -3,16 +3,16 @@
 All tests mock pymodbus to avoid real hardware dependency.
 """
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from app.models.solar import DataSource
 from app.services.solar_connector_huawei import (
-    RealHuaweiConnector,
-    HUAWEI_SUN2000_REGISTERS,
     HUAWEI_LUNA2000_REGISTERS,
+    HUAWEI_SUN2000_REGISTERS,
+    RealHuaweiConnector,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures

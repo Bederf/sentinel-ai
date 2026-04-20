@@ -1,7 +1,7 @@
 """Tests for POPIA cross-border routing guard in chat APIs."""
 
-from unittest.mock import AsyncMock
 import uuid
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -10,7 +10,7 @@ import pytest
 async def test_chat_uses_local_fallback_when_cross_border_consent_missing(client, monkeypatch):
     """Cloud routing should be blocked without cross-border consent."""
 
-    async def _local_stream(_message, use_tools=False, data_subject_id=None):  # noqa: ARG001
+    async def _local_stream(_message, use_tools=False, data_subject_id=None):
         yield "LOCAL_FALLBACK_RESPONSE"
 
     monkeypatch.setattr("app.api.chat.should_allow_cloud_processing", lambda _subject: False)

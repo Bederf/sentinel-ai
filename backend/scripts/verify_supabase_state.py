@@ -5,6 +5,7 @@ Quick verification of Supabase state to check if equipment has been seeded.
 
 import sys
 from pathlib import Path
+
 from dotenv import load_dotenv
 
 # Load .env file

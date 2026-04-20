@@ -4,7 +4,7 @@ Used by LoadForecastService to return structured forecast data.
 """
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 @dataclass
@@ -18,7 +18,7 @@ class LoadInterval:
     is_peak_hour: bool = False
     tariff_band: str = "standard"
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "timestamp": self.timestamp,
             "demand_kw": round(self.demand_kw, 1),
@@ -36,14 +36,14 @@ class LoadForecast:
     site_id: str
     generated_at: str  # ISO timestamp
     model: str  # gradient_boosting
-    intervals: List[LoadInterval] = field(default_factory=list)
+    intervals: list[LoadInterval] = field(default_factory=list)
     peak_demand_kw: float = 0.0
     avg_demand_kw: float = 0.0
     total_energy_kwh: float = 0.0
-    accuracy: Optional[Dict[str, float]] = None
+    accuracy: dict[str, float] | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
-        result: Dict[str, Any] = {
+    def to_dict(self) -> dict[str, Any]:
+        result: dict[str, Any] = {
             "site_id": self.site_id,
             "generated_at": self.generated_at,
             "model": self.model,

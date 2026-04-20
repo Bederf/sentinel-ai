@@ -1,8 +1,10 @@
 """Repository for alert operations."""
 
-from typing import List, Optional, Dict, Any
+from datetime import UTC
+from typing import Any, Optional
+
 from app.database.supabase_client import get_supabase_client
-from app.services.cache_service import cache, CacheKeys, CacheService, CacheInvalidation, track_query
+from app.services.cache_service import CacheInvalidation, CacheKeys, CacheService, cache, track_query
 
 
 class AlertRepository:
@@ -20,11 +22,11 @@ class AlertRepository:
 
     def get_all(
         self,
-        site_id: Optional[str] = None,
-        equipment_id: Optional[str] = None,
-        status: Optional[str] = None,
-        severity: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+        site_id: str | None = None,
+        equipment_id: str | None = None,
+        status: str | None = None,
+        severity: str | None = None,
+    ) -> list[dict[str, Any]]:
         """Get all alerts with optional filtering.
 
         Args:
@@ -50,7 +52,7 @@ class AlertRepository:
         response = query.execute()
         return response.data
 
-    def get_by_id(self, alert_id: str) -> Optional[Dict[str, Any]]:
+    def get_by_id(self, alert_id: str) -> dict[str, Any] | None:
         """Get alert by its UUID.
 
         Args:
@@ -65,7 +67,7 @@ class AlertRepository:
             return response.data[0]
         return None
 
-    def get_active_by_site(self, site_uuid: str) -> List[Dict[str, Any]]:
+    def get_active_by_site(self, site_uuid: str) -> list[dict[str, Any]]:
         """Get active alerts for a building.
 
         Args:
@@ -91,7 +93,7 @@ class AlertRepository:
         cache.set(CacheKeys.alerts_active(site_uuid), result, CacheService.TTL_DYNAMIC)
         return result
 
-    def get_active_by_equipment(self, equipment_uuid: str) -> List[Dict[str, Any]]:
+    def get_active_by_equipment(self, equipment_uuid: str) -> list[dict[str, Any]]:
         """Get active alerts for equipment.
 
         Args:
@@ -110,7 +112,7 @@ class AlertRepository:
 
         return response.data
 
-    def get_active_alerts_for_equipment(self, equipment_code: str) -> List[Dict[str, Any]]:
+    def get_active_alerts_for_equipment(self, equipment_code: str) -> list[dict[str, Any]]:
         """Check if active alerts exist for equipment by code (for deduplication).
 
         Searches for active alerts whose title contains the equipment code.
@@ -136,7 +138,7 @@ class AlertRepository:
         except Exception:
             return []
 
-    def get_critical_alerts(self) -> List[Dict[str, Any]]:
+    def get_critical_alerts(self) -> list[dict[str, Any]]:
         """Get all critical active alerts.
 
         Returns:
@@ -152,7 +154,7 @@ class AlertRepository:
 
         return response.data
 
-    def create(self, alert_data: Dict[str, Any]) -> Dict[str, Any]:
+    def create(self, alert_data: dict[str, Any]) -> dict[str, Any]:
         """Create a new alert.
 
         Args:
@@ -166,7 +168,7 @@ class AlertRepository:
         CacheInvalidation.on_alert_change(site_id=alert_data.get("site_id"))
         return result
 
-    def update(self, alert_id: str, alert_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def update(self, alert_id: str, alert_data: dict[str, Any]) -> dict[str, Any] | None:
         """Update an alert.
 
         Args:
@@ -183,7 +185,7 @@ class AlertRepository:
             return response.data[0]
         return None
 
-    def acknowledge(self, alert_id: str, acknowledged_by: str) -> Optional[Dict[str, Any]]:
+    def acknowledge(self, alert_id: str, acknowledged_by: str) -> dict[str, Any] | None:
         """Acknowledge an alert.
 
         Args:
@@ -193,18 +195,18 @@ class AlertRepository:
         Returns:
             Updated alert or None if not found
         """
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         return self.update(
             alert_id,
             {
                 "status": "acknowledged",
                 "acknowledged_by": acknowledged_by,
-                "acknowledged_at": datetime.now(timezone.utc).isoformat(),
+                "acknowledged_at": datetime.now(UTC).isoformat(),
             },
         )
 
-    def resolve(self, alert_id: str) -> Optional[Dict[str, Any]]:
+    def resolve(self, alert_id: str) -> dict[str, Any] | None:
         """Resolve an alert.
 
         Args:

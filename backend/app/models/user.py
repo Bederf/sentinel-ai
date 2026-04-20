@@ -5,7 +5,7 @@ Phase TODO: Implement proper user management
 Currently provides stub implementation for development.
 """
 
-from typing import Optional
+
 from pydantic import BaseModel
 
 
@@ -14,9 +14,9 @@ class User(BaseModel):
 
     id: str
     username: str
-    email: Optional[str] = None
+    email: str | None = None
     role: str = "technician"
-    full_name: Optional[str] = None
+    full_name: str | None = None
     is_active: bool = True
 
 
@@ -24,19 +24,19 @@ class UserCreate(BaseModel):
     """Model for creating a new user."""
 
     username: str
-    email: Optional[str] = None
+    email: str | None = None
     password: str
-    full_name: Optional[str] = None
+    full_name: str | None = None
     role: str = "technician"
 
 
 class UserUpdate(BaseModel):
     """Model for updating a user."""
 
-    email: Optional[str] = None
-    full_name: Optional[str] = None
-    role: Optional[str] = None
-    is_active: Optional[bool] = None
+    email: str | None = None
+    full_name: str | None = None
+    role: str | None = None
+    is_active: bool | None = None
 
 
 class UserInDB(User):

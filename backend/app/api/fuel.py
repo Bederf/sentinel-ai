@@ -18,9 +18,8 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import asdict
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
 
@@ -60,7 +59,7 @@ def _telemetry_to_dict(t) -> dict:
 
 
 @router.get("/tanks")
-async def list_tanks(site_id: Optional[str] = Query(None, description="Filter by site ID")):
+async def list_tanks(site_id: str | None = Query(None, description="Filter by site ID")):
     """List all fuel tanks, optionally filtered by site_id."""
     store = _get_fuel_store()
     tanks = store.get_all_tanks(site_id=site_id)
@@ -107,7 +106,7 @@ async def get_tank_history(
 
     # Read from JSON telemetry file (append-only JSONL)
     records: list[dict] = []
-    cutoff_ts = int((datetime.now(tz=timezone.utc).timestamp() - hours * 3600))
+    cutoff_ts = int(datetime.now(tz=UTC).timestamp() - hours * 3600)
     if _TELEMETRY_FILE.exists():
         try:
             with open(_TELEMETRY_FILE) as fh:
@@ -129,8 +128,8 @@ async def get_tank_history(
 
 @router.get("/events")
 async def list_events(
-    site_id: Optional[str] = Query(None, description="Filter by site ID"),
-    event_type: Optional[str] = Query(None, description="Filter by event type"),
+    site_id: str | None = Query(None, description="Filter by site ID"),
+    event_type: str | None = Query(None, description="Filter by event type"),
     limit: int = Query(50, description="Max events to return", ge=1, le=500),
 ):
     """List fuel events, optionally filtered by site_id and event_type."""
@@ -165,7 +164,7 @@ async def list_events(
 
 @router.get("/generator-runtime")
 async def get_generator_runtime(
-    site_id: Optional[str] = Query(None, description="Filter by site ID"),
+    site_id: str | None = Query(None, description="Filter by site ID"),
     limit: int = Query(50, description="Max sessions to return", ge=1, le=500),
 ):
     """Get generator runtime sessions from fuel events."""
@@ -198,7 +197,7 @@ async def get_generator_runtime(
 
 @router.get("/refill-log")
 async def get_refill_log(
-    site_id: Optional[str] = Query(None, description="Filter by site ID"),
+    site_id: str | None = Query(None, description="Filter by site ID"),
     limit: int = Query(50, description="Max refills to return", ge=1, le=500),
 ):
     """Get refill events from fuel events store."""

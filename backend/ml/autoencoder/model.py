@@ -11,7 +11,8 @@ Anomaly detection via reconstruction error:
 """
 
 import logging
-from typing import Tuple, Dict, Any
+from typing import Any
+
 import numpy as np
 
 logger = logging.getLogger(__name__)
@@ -41,7 +42,7 @@ class SensorAutoencoder:
         window_size: int = 24,
         n_features: int = 5,
         latent_dim: int = 16,
-        lstm_units: Tuple[int, int] = (64, 32),
+        lstm_units: tuple[int, int] = (64, 32),
         dropout_rate: float = 0.2,
     ):
         """
@@ -123,7 +124,7 @@ class SensorAutoencoder:
         batch_size: int = 32,
         patience: int = 10,
         verbose: int = 1,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Train autoencoder on NORMAL data only.
 
@@ -234,7 +235,7 @@ class SensorAutoencoder:
         """
         return self.get_reconstruction_error(X)
 
-    def is_anomaly(self, X: np.ndarray, threshold: float = None) -> Tuple[np.ndarray, np.ndarray]:
+    def is_anomaly(self, X: np.ndarray, threshold: float = None) -> tuple[np.ndarray, np.ndarray]:
         """
         Detect anomalies in input windows.
 
@@ -327,7 +328,7 @@ class SensorAutoencoder:
         self.model.summary(print_fn=lambda x: stream.write(x + "\n"))
         return stream.getvalue()
 
-    def get_config(self) -> Dict[str, Any]:
+    def get_config(self) -> dict[str, Any]:
         """Get model configuration."""
         return {
             "window_size": self.window_size,

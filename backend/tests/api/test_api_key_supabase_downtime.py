@@ -6,8 +6,9 @@ when Supabase is unavailable. No fallback to in-memory store.
 Control: AUTH-004 (production-ready API key validation)
 """
 
-import pytest
 from unittest.mock import patch
+
+import pytest
 
 from app.middleware.auth_middleware import _validate_api_key
 

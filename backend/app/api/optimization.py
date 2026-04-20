@@ -14,7 +14,6 @@ from pydantic import BaseModel
 from app.config.settings import settings
 from app.database.repositories import SiteRepository
 from app.database.repositories.recommendation_repository import RecommendationRepository
-from app.models.recommendation import Recommendation, RecommendationStatus
 from app.middleware.rate_limiter import limiter
 from app.models.audit_log import AuditResultType
 from app.models.module_registry import ModuleType
@@ -22,6 +21,7 @@ from app.models.optimization import (
     OptimizationHistoryEntry,
     OptimizationStatus,
 )
+from app.models.recommendation import Recommendation, RecommendationStatus
 from app.services.ai_optimizer import get_ai_optimizer
 from app.services.approval_service import get_approval_service
 from app.services.audit_logger import AuditLogger

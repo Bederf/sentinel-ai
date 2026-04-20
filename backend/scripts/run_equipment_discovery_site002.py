@@ -11,17 +11,17 @@ Bulk discovers all equipment for site-002, populating metadata including:
 Uses simulated data to avoid network dependencies.
 """
 
-import sys
 import asyncio
+import sys
 
 # Add backend to path
 sys.path.insert(0, "/opt/bms-intelligence/backend")
 
-from app.database.repositories.site_repository import SiteRepository  # noqa: E402
-from app.services.lighting_discovery_service import SimulatedLightingDiscovery  # noqa: E402
-from app.services.bacnet_discovery_service import SimulatedBACnetDiscovery  # noqa: E402
-from app.services.modbus_discovery_service import SimulatedModbusDiscovery  # noqa: E402
-from app.database.repositories.equipment_metadata_repository import EquipmentMetadataRepository  # noqa: E402
+from app.database.repositories.equipment_metadata_repository import EquipmentMetadataRepository
+from app.database.repositories.site_repository import SiteRepository
+from app.services.bacnet_discovery_service import SimulatedBACnetDiscovery
+from app.services.lighting_discovery_service import SimulatedLightingDiscovery
+from app.services.modbus_discovery_service import SimulatedModbusDiscovery
 
 
 def detect_protocol(equipment_code: str, equipment_type: str) -> str:
@@ -143,7 +143,7 @@ async def discover_equipment_for_site(site_code: str):
             success_count += 1
 
         except Exception as e:
-            print(f"❌ [{idx:2d}/{len(equipment_list)}] {eq_code} - Error: {str(e)}")
+            print(f"❌ [{idx:2d}/{len(equipment_list)}] {eq_code} - Error: {e!s}")
             error_count += 1
 
     # Summary

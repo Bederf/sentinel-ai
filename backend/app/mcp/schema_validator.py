@@ -9,7 +9,7 @@ for credential-like fields that must never reach the model path.
 import json
 import logging
 import re
-from typing import Any, Optional
+from typing import Any
 
 import jsonschema
 
@@ -47,7 +47,7 @@ MAX_ARRAY_ITEMS = 1_000  # Per-field array limit
 MAX_OUTPUT_SIZE_BYTES = 500_000  # 500KB output cap
 
 
-def _check_sizes(value: Any, path: str = "") -> Optional[str]:
+def _check_sizes(value: Any, path: str = "") -> str | None:
     """Recursively check string/array sizes. Returns error message or None."""
     if isinstance(value, str) and len(value) > MAX_STRING_LENGTH:
         return f"Field '{path}' exceeds max string length ({len(value)} > {MAX_STRING_LENGTH})"
@@ -70,7 +70,7 @@ def validate_tool_input(
     tool_name: str,
     arguments: dict,
     schema: dict,
-) -> tuple[bool, Optional[str]]:
+) -> tuple[bool, str | None]:
     """Validate args against JSON schema + size limits.
 
     Args:
@@ -105,7 +105,7 @@ def validate_tool_input(
 def scan_arguments_for_injection(
     tool_name: str,
     arguments: dict,
-) -> tuple[bool, Optional[str]]:
+) -> tuple[bool, str | None]:
     """Scan string arguments for prompt injection patterns.
 
     Reuses the existing ``PromptInjectionDetector`` from

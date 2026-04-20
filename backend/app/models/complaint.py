@@ -5,10 +5,11 @@ Pydantic models for desk-to-zone mapping and comfort complaint handling.
 Enables intelligent complaint handling by linking desk locations to HVAC zones.
 """
 
-from datetime import datetime
-from typing import Dict, List, Optional, Any, Literal
-from pydantic import BaseModel, Field
 import uuid
+from datetime import datetime
+from typing import Any, Literal
+
+from pydantic import BaseModel, Field
 
 
 class Desk(BaseModel):
@@ -30,27 +31,27 @@ class Desk(BaseModel):
 
     # Environmental context
     near_window: bool = False
-    orientation: Optional[str] = None  # "N", "S", "E", "W", "NE", "NW", "SE", "SW" - for solar analysis
-    near_diffuser: Optional[str] = None  # e.g., "DIFF-25" if under a supply diffuser
+    orientation: str | None = None  # "N", "S", "E", "W", "NE", "NW", "SE", "SW" - for solar analysis
+    near_diffuser: str | None = None  # e.g., "DIFF-25" if under a supply diffuser
     near_printer: bool = False
 
     # Organizational
-    department: Optional[str] = None
-    occupant: Optional[str] = None  # Who sits here
+    department: str | None = None
+    occupant: str | None = None  # Who sits here
 
     # Floor plan position
-    x_coord: Optional[float] = None
-    y_coord: Optional[float] = None
+    x_coord: float | None = None
+    y_coord: float | None = None
 
     # DALI-2 Scenecom integration (Tridonic)
-    dali_zone: Optional[str] = None  # DALI zone/group (e.g., "Zone-L2-C" - often matches HVAC zone)
-    sensor_id: Optional[str] = None  # PIR occupancy sensor (e.g., "S002-PIR-L2-C-001")
-    luminaire_ids: Optional[List[str]] = (
+    dali_zone: str | None = None  # DALI zone/group (e.g., "Zone-L2-C" - often matches HVAC zone)
+    sensor_id: str | None = None  # PIR occupancy sensor (e.g., "S002-PIR-L2-C-001")
+    luminaire_ids: list[str] | None = (
         None  # Luminaires serving this desk (e.g., ["S002-LUM-L2-001", "S002-LUM-L2-002"])
     )
-    dali_controller: Optional[str] = None  # Scenecom controller (e.g., "S002-DALI-L2-01")
+    dali_controller: str | None = None  # Scenecom controller (e.g., "S002-DALI-L2-01")
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "desk_id": self.desk_id,
@@ -72,7 +73,7 @@ class Desk(BaseModel):
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Desk":
+    def from_dict(cls, data: dict[str, Any]) -> "Desk":
         """Create instance from dictionary.
 
         Handles both JSON schema (near_diffuser as string ID) and
@@ -115,20 +116,20 @@ class HVACZone(BaseModel):
     """
 
     zone_id: str  # e.g., "Zone-L2-C"
-    zone_name: Optional[str] = None  # e.g., "Level 2 Zone C"
-    floor: Optional[str] = None
-    fcu_id: Optional[str] = None  # e.g., "S002-FCU-L2-C"
-    vav_id: Optional[str] = None
-    ahu_id: Optional[str] = None
-    temp_sensor: Optional[str] = None  # e.g., "S002-TS-L2-C"
-    co2_sensor: Optional[str] = None
-    typical_occupancy: Optional[int] = None
-    area_sqm: Optional[float] = None
+    zone_name: str | None = None  # e.g., "Level 2 Zone C"
+    floor: str | None = None
+    fcu_id: str | None = None  # e.g., "S002-FCU-L2-C"
+    vav_id: str | None = None
+    ahu_id: str | None = None
+    temp_sensor: str | None = None  # e.g., "S002-TS-L2-C"
+    co2_sensor: str | None = None
+    typical_occupancy: int | None = None
+    area_sqm: float | None = None
     setpoint: float = 22.0
     current_temp: float = 22.0
     status: str = "running"  # 'running', 'off', 'fault'
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "zone_id": self.zone_id,
@@ -147,7 +148,7 @@ class HVACZone(BaseModel):
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "HVACZone":
+    def from_dict(cls, data: dict[str, Any]) -> "HVACZone":
         """Create instance from dictionary."""
         return cls(
             zone_id=data.get("zone_id", ""),
@@ -176,12 +177,12 @@ class ComfortComplaint(BaseModel):
     complaint_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     timestamp: datetime = Field(default_factory=datetime.now)
     desk_id: str
-    user_name: Optional[str] = None
+    user_name: str | None = None
     complaint_type: Literal["too_hot", "too_cold", "stuffy", "drafty", "other"]
-    description: Optional[str] = None
+    description: str | None = None
     status: Literal["open", "diagnosed", "resolved", "escalated"] = "open"
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "complaint_id": self.complaint_id,
@@ -194,7 +195,7 @@ class ComfortComplaint(BaseModel):
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "ComfortComplaint":
+    def from_dict(cls, data: dict[str, Any]) -> "ComfortComplaint":
         """Create instance from dictionary."""
         timestamp = data.get("timestamp")
         if isinstance(timestamp, str):
@@ -226,11 +227,11 @@ class ComplaintDiagnosis(BaseModel):
     diagnosis: str  # From CrossSystemAnalyzer
     root_cause: str
     confidence: Literal["high", "medium", "low"]
-    suggestions: List[str]
-    auto_action_taken: Optional[str] = None
+    suggestions: list[str]
+    auto_action_taken: str | None = None
     needs_dispatch: bool = False
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "complaint_id": self.complaint_id,
@@ -245,7 +246,7 @@ class ComplaintDiagnosis(BaseModel):
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "ComplaintDiagnosis":
+    def from_dict(cls, data: dict[str, Any]) -> "ComplaintDiagnosis":
         """Create instance from dictionary."""
         return cls(
             complaint_id=data.get("complaint_id", ""),

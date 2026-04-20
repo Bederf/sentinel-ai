@@ -8,8 +8,9 @@ Note: TestClient is incompatible with httpx 0.28.x + starlette 0.36.x,
 so API endpoint functions are tested directly with mocked dependencies.
 """
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from app.services.niagara.bacnet_client import (
     BACnetReadError,
@@ -19,7 +20,6 @@ from app.services.niagara.bacnet_client import (
     DiscoveredDevice,
     DiscoveredPoint,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -137,9 +137,10 @@ class TestDeviceDiscoveryEndpoint:
 
     @pytest.mark.asyncio
     async def test_discover_client_not_started(self, mock_bacnet_client):
+        from fastapi import HTTPException
+
         from app.api.niagara_bacnet import discover_devices
         from app.models.niagara import BACnetDiscoverRequest
-        from fastapi import HTTPException
 
         mock_bacnet_client.is_running = False
 
@@ -245,8 +246,9 @@ class TestPointDiscoveryEndpoint:
 
     @pytest.mark.asyncio
     async def test_discover_points_client_not_started(self, mock_bacnet_client):
-        from app.api.niagara_bacnet import discover_device_points
         from fastapi import HTTPException
+
+        from app.api.niagara_bacnet import discover_device_points
 
         mock_bacnet_client.is_running = False
 
@@ -303,8 +305,9 @@ class TestPointReadEndpoint:
 
     @pytest.mark.asyncio
     async def test_read_point_timeout(self, mock_bacnet_client):
-        from app.api.niagara_bacnet import read_point
         from fastapi import HTTPException
+
+        from app.api.niagara_bacnet import read_point
 
         mock_bacnet_client.read_point = AsyncMock(side_effect=BACnetTimeoutError("Timed out"))
 
@@ -320,8 +323,9 @@ class TestPointReadEndpoint:
 
     @pytest.mark.asyncio
     async def test_read_point_read_error(self, mock_bacnet_client):
-        from app.api.niagara_bacnet import read_point
         from fastapi import HTTPException
+
+        from app.api.niagara_bacnet import read_point
 
         mock_bacnet_client.read_point = AsyncMock(side_effect=BACnetReadError("Read failed"))
 
@@ -337,8 +341,9 @@ class TestPointReadEndpoint:
 
     @pytest.mark.asyncio
     async def test_read_point_not_started(self, mock_bacnet_client):
-        from app.api.niagara_bacnet import read_point
         from fastapi import HTTPException
+
+        from app.api.niagara_bacnet import read_point
 
         mock_bacnet_client.is_running = False
 
@@ -405,9 +410,10 @@ class TestPointWriteEndpoint:
 
     @pytest.mark.asyncio
     async def test_write_point_error(self, mock_bacnet_client):
+        from fastapi import HTTPException
+
         from app.api.niagara_bacnet import write_point
         from app.models.niagara import BACnetPointWriteRequest
-        from fastapi import HTTPException
 
         mock_bacnet_client.write_point = AsyncMock(side_effect=BACnetWriteError("Write rejected"))
 
@@ -423,9 +429,10 @@ class TestPointWriteEndpoint:
 
     @pytest.mark.asyncio
     async def test_write_point_timeout(self, mock_bacnet_client):
+        from fastapi import HTTPException
+
         from app.api.niagara_bacnet import write_point
         from app.models.niagara import BACnetPointWriteRequest
-        from fastapi import HTTPException
 
         mock_bacnet_client.write_point = AsyncMock(side_effect=BACnetTimeoutError("Timed out"))
 
@@ -451,7 +458,7 @@ class TestCOVSubscriptionEndpoints:
     @pytest.mark.asyncio
     async def test_create_subscription(self, mock_bacnet_client):
         from app.api.niagara_bacnet import create_cov_subscription
-        from app.models.niagara import BACnetCOVSubscribeRequest, BACnetCOVPoint
+        from app.models.niagara import BACnetCOVPoint, BACnetCOVSubscribeRequest
 
         mock_sub = COVSubscription(
             subscription_id="test-sub-123",
@@ -521,8 +528,9 @@ class TestCOVSubscriptionEndpoints:
 
     @pytest.mark.asyncio
     async def test_cancel_subscription_not_found(self, mock_bacnet_client):
-        from app.api.niagara_bacnet import cancel_cov_subscription
         from fastapi import HTTPException
+
+        from app.api.niagara_bacnet import cancel_cov_subscription
 
         mock_bacnet_client.cancel_subscription = AsyncMock(return_value=False)
 
@@ -588,7 +596,7 @@ class TestModelValidation:
         assert req.priority == 8
 
     def test_cov_subscribe_request(self):
-        from app.models.niagara import BACnetCOVSubscribeRequest, BACnetCOVPoint
+        from app.models.niagara import BACnetCOVPoint, BACnetCOVSubscribeRequest
 
         req = BACnetCOVSubscribeRequest(
             device_id=1000,

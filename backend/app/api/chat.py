@@ -18,6 +18,7 @@ from app.security.constants import MAX_CHAT_MESSAGE_LENGTH
 from app.security.pipeline import prompt_guard, require_role
 from app.security.sse_buffer import SecureSSEBuffer
 from app.services import slash_command_router
+from app.services.ai_interfaces import get_chat_tools
 from app.services.claude_service import claude_service
 from app.services.feature_request_logger import log_chat_query
 from app.services.hybrid_ai_service import hybrid_ai_service
@@ -26,7 +27,6 @@ from app.services.openai_service import openai_service
 from app.services.popia_consent_guard import should_allow_cloud_processing
 from app.services.site_ai_policy_service import get_site_ai_policy
 from app.services.work_order_service import work_order_service
-from app.services.ai_interfaces import get_chat_tools
 from app.utils.ai_provenance import get_cloud_llm_provenance, get_local_llm_provenance, provenance_headers
 
 # Track Claude credit exhaustion so we skip it on subsequent requests (tools path only)

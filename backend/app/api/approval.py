@@ -10,15 +10,15 @@ This endpoint implements the 14-step approval execution flow:
 """
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from fastapi import APIRouter, HTTPException, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 
-from app.middleware.auth_middleware import _authenticate_request, AuthContext
+from app.database.repositories.parasite_decision_repository import ParasiteDecisionRepository
+from app.middleware.auth_middleware import AuthContext, _authenticate_request
 from app.models.approval_request import ApprovalRequest, ApprovalResponse
 from app.services.approval_service import ApprovalService
 from app.services.audit_logger import AuditLogger
-from app.database.repositories.parasite_decision_repository import ParasiteDecisionRepository
 
 router = APIRouter(prefix="/api/v1", tags=["approval"])
 
@@ -68,7 +68,7 @@ async def execute_decision(
     try:
         decision = await decision_repo.get_decision_by_id(req.decision_id)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Database error: {e!s}")
 
     if not decision:
         raise HTTPException(status_code=404, detail="Decision not found")
@@ -120,7 +120,7 @@ async def execute_decision(
                 "decision_id": req.decision_id,
                 "error": str(e),
                 "user_id": auth.user_id,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
         )
         raise HTTPException(

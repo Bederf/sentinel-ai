@@ -1,9 +1,9 @@
 """Models for autonomous decisions and decision history."""
 
-from enum import Enum
-from datetime import datetime
-from typing import Dict, Any, List, Optional
 from dataclasses import dataclass, field
+from datetime import datetime
+from enum import Enum
+from typing import Any
 
 from app.models.audit_log import AuditResultType
 
@@ -41,15 +41,15 @@ class AutonomousDecision:
     current_value: float
     target_value: float
     decision_rationale: str
-    rule_triggered: Optional[str]
-    safety_validation: Dict[str, Any]
+    rule_triggered: str | None
+    safety_validation: dict[str, Any]
     status: DecisionStatus
-    result: Optional[AuditResultType]
-    execution_time_ms: Optional[float]
+    result: AuditResultType | None
+    execution_time_ms: float | None
     escalation_level: EscalationLevel
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert decision to dictionary for serialization."""
         return {
             "id": self.id,
@@ -70,7 +70,7 @@ class AutonomousDecision:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "AutonomousDecision":
+    def from_dict(cls, data: dict[str, Any]) -> "AutonomousDecision":
         """Create decision from dictionary."""
         return cls(
             id=data["id"],
@@ -98,14 +98,14 @@ class BoundaryStatus:
     device_id: str
     point_name: str
     current_value: float
-    boundary_min: Optional[float]
-    boundary_max: Optional[float]
+    boundary_min: float | None
+    boundary_max: float | None
     approach_percentage: float  # 0-100, how close to boundary
     escalation_level: EscalationLevel
-    warnings: List[str]
+    warnings: list[str]
     last_updated: datetime
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "device_id": self.device_id,
@@ -130,18 +130,18 @@ class EscalationEvent:
     device_name: str
     point_name: str
     current_value: float
-    boundary_min: Optional[float]
-    boundary_max: Optional[float]
+    boundary_min: float | None
+    boundary_max: float | None
     approach_percentage: float
     escalation_level: EscalationLevel
     acknowledged: bool
-    acknowledged_by: Optional[str]
-    acknowledged_at: Optional[datetime]
+    acknowledged_by: str | None
+    acknowledged_at: datetime | None
     auto_resolved: bool
-    warnings: List[str]
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    warnings: list[str]
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "id": self.id,
@@ -172,10 +172,10 @@ class AutonomousSystemStatus:
     total_decisions_today: int
     success_rate: float
     current_escalation_level: EscalationLevel
-    last_decision_time: Optional[datetime]
+    last_decision_time: datetime | None
     safety_score: float
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "enabled": self.enabled,

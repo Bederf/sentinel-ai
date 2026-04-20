@@ -1,7 +1,8 @@
 """Integration tests for profile-based optimization end-to-end."""
 
-import pytest
 from unittest.mock import patch
+
+import pytest
 from httpx import ASGITransport, AsyncClient
 
 from app.main import app

@@ -11,7 +11,7 @@ import logging
 import random
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -29,16 +29,16 @@ class TrainingResult:
     equipment_type: str
     sites_included: int
     samples_used: int
-    metrics: Dict[str, float]
-    error: Optional[str] = None
+    metrics: dict[str, float]
+    error: str | None = None
 
 
 class GlobalModelTrainer:
     """Trains global models on aggregated fleet data."""
 
     def __init__(self):
-        self._training_history: List[Dict[str, Any]] = []
-        self._global_models: Dict[str, Dict[str, Any]] = {}
+        self._training_history: list[dict[str, Any]] = []
+        self._global_models: dict[str, dict[str, Any]] = {}
         self._initialize_seed_models()
 
     def _initialize_seed_models(self) -> None:
@@ -139,9 +139,9 @@ class GlobalModelTrainer:
 
     def list_global_models(
         self,
-        model_type: Optional[str] = None,
-        equipment_type: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+        model_type: str | None = None,
+        equipment_type: str | None = None,
+    ) -> list[dict[str, Any]]:
         """List all trained global fleet models.
 
         Args:
@@ -266,8 +266,8 @@ class GlobalModelTrainer:
         self,
         model_type: str,
         equipment_type: str,
-        local_metrics: Dict[str, float],
-    ) -> Dict[str, Any]:
+        local_metrics: dict[str, float],
+    ) -> dict[str, Any]:
         """Compare global model vs local model performance.
 
         Args:
@@ -313,7 +313,7 @@ class GlobalModelTrainer:
             ),
         }
 
-    def get_training_history(self, limit: int = 50) -> List[Dict[str, Any]]:
+    def get_training_history(self, limit: int = 50) -> list[dict[str, Any]]:
         """Get global model training history.
 
         Args:
@@ -326,7 +326,7 @@ class GlobalModelTrainer:
 
 
 # Singleton instance
-_trainer: Optional[GlobalModelTrainer] = None
+_trainer: GlobalModelTrainer | None = None
 
 
 def get_global_model_trainer() -> GlobalModelTrainer:

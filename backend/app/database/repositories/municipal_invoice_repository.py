@@ -9,7 +9,7 @@ import json
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 from uuid import uuid4
 
 from app.database.supabase_client import get_supabase_client
@@ -32,13 +32,13 @@ class MunicipalInvoiceRepository:
 
     # === JSON fallback helpers ===
 
-    def _load_json(self) -> Dict[str, Any]:
+    def _load_json(self) -> dict[str, Any]:
         if not self._json_path.exists():
             return {"accounts": [], "invoices": [], "alerts": []}
-        with open(self._json_path, "r") as f:
+        with open(self._json_path) as f:
             return json.load(f)
 
-    def _save_json(self, data: Dict[str, Any]) -> None:
+    def _save_json(self, data: dict[str, Any]) -> None:
         with open(self._json_path, "w") as f:
             json.dump(data, f, indent=2, default=str)
 
@@ -50,9 +50,9 @@ class MunicipalInvoiceRepository:
         municipality: str,
         utility_type: str,
         account_number: str,
-        tariff_type: Optional[str] = None,
-        main_meter_id: Optional[str] = None,
-    ) -> Optional[Dict[str, Any]]:
+        tariff_type: str | None = None,
+        main_meter_id: str | None = None,
+    ) -> dict[str, Any] | None:
         """Fetch an existing municipal account or create a new one."""
         if self.client:
             try:
@@ -109,7 +109,7 @@ class MunicipalInvoiceRepository:
 
     # === Invoices ===
 
-    def create_invoice(self, payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def create_invoice(self, payload: dict[str, Any]) -> dict[str, Any] | None:
         """Create a new invoice record."""
         if self.client:
             try:
@@ -127,7 +127,7 @@ class MunicipalInvoiceRepository:
         self._save_json(data)
         return payload
 
-    def update_invoice(self, invoice_id: str, payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def update_invoice(self, invoice_id: str, payload: dict[str, Any]) -> dict[str, Any] | None:
         """Update an invoice record by ID."""
         if self.client:
             try:
@@ -146,7 +146,7 @@ class MunicipalInvoiceRepository:
                 return updated
         return None
 
-    def get_by_id(self, invoice_id: str) -> Optional[Dict[str, Any]]:
+    def get_by_id(self, invoice_id: str) -> dict[str, Any] | None:
         """Get invoice by ID."""
         if self.client:
             try:
@@ -164,14 +164,14 @@ class MunicipalInvoiceRepository:
 
     def list_invoices(
         self,
-        site_id: Optional[str] = None,
-        municipality: Optional[str] = None,
-        utility_type: Optional[str] = None,
-        billing_period: Optional[str] = None,
-        reconciliation_status: Optional[str] = None,
+        site_id: str | None = None,
+        municipality: str | None = None,
+        utility_type: str | None = None,
+        billing_period: str | None = None,
+        reconciliation_status: str | None = None,
         limit: int = 50,
         offset: int = 0,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """List invoices with filters."""
         if self.client:
             try:
@@ -210,7 +210,7 @@ class MunicipalInvoiceRepository:
 
         return filtered[offset : offset + limit]
 
-    def approve_invoice(self, invoice_id: str, approved_by: str) -> Optional[Dict[str, Any]]:
+    def approve_invoice(self, invoice_id: str, approved_by: str) -> dict[str, Any] | None:
         """Mark invoice as approved."""
         return self.update_invoice(
             invoice_id,
@@ -222,7 +222,7 @@ class MunicipalInvoiceRepository:
 
     # === Alerts ===
 
-    def create_alert(self, payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def create_alert(self, payload: dict[str, Any]) -> dict[str, Any] | None:
         if self.client:
             try:
                 result = self.client.table("municipal_reconciliation_alerts").insert(payload).execute()

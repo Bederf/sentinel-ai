@@ -1,7 +1,8 @@
 """Tests for the query handler service (Phase 44-03)."""
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from app.services.query_handler import QueryHandler
 

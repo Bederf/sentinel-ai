@@ -22,8 +22,8 @@ from app.models.complaint import (
     Desk,
     HVACZone,
 )
-from app.services.zone_assessment_service import get_zone_assessment_service
 from app.services.cross_system_analyzer import get_cross_system_analyzer
+from app.services.zone_assessment_service import get_zone_assessment_service
 
 logger = logging.getLogger(__name__)
 

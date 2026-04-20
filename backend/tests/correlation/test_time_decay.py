@@ -2,7 +2,7 @@
 
 import math
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 
 from app.services.correlation.candidate_generator import CandidateSignal
@@ -59,26 +59,26 @@ class TestApplyTimeDecay:
 
 class TestComputeDaysElapsed:
     def test_basic_days_elapsed(self):
-        now = datetime(2026, 3, 14, tzinfo=timezone.utc)
-        signal_date = datetime(2026, 1, 5, tzinfo=timezone.utc)
+        now = datetime(2026, 3, 14, tzinfo=UTC)
+        signal_date = datetime(2026, 1, 5, tzinfo=UTC)
         days = compute_days_elapsed(signal_date, now)
         assert 67 < days < 69  # ~68 days
 
     def test_same_day_zero_elapsed(self):
-        now = datetime(2026, 3, 14, 12, 0, 0, tzinfo=timezone.utc)
+        now = datetime(2026, 3, 14, 12, 0, 0, tzinfo=UTC)
         days = compute_days_elapsed(now, now)
         assert days == 0.0
 
     def test_naive_datetime_assumed_utc(self):
         """Naive datetimes should be treated as UTC."""
-        now = datetime(2026, 3, 14, tzinfo=timezone.utc)
+        now = datetime(2026, 3, 14, tzinfo=UTC)
         naive = datetime(2026, 3, 13)  # naive, 1 day before
         days = compute_days_elapsed(naive, now)
         assert 0.9 < days < 1.1
 
     def test_defaults_to_now(self):
         """Without reference_date, should use current time."""
-        old = datetime(2020, 1, 1, tzinfo=timezone.utc)
+        old = datetime(2020, 1, 1, tzinfo=UTC)
         days = compute_days_elapsed(old)
         assert days > 365  # Definitely more than a year ago
 
@@ -91,10 +91,10 @@ class TestDecayCandidateConfidence:
             severity="medium",
             confidence=Decimal("0.85"),
             location_ref="Fairlands/FA1/1Q4/MR10",
-            created_at=datetime(2026, 1, 5, tzinfo=timezone.utc),
+            created_at=datetime(2026, 1, 5, tzinfo=UTC),
             metadata={},
         )
-        ref = datetime(2026, 3, 14, tzinfo=timezone.utc)
+        ref = datetime(2026, 3, 14, tzinfo=UTC)
         decayed = decay_candidate_confidence(candidate, reference_date=ref)
         # ~68 days elapsed, exp(-0.68) ~ 0.507, * 0.85 ~ 0.43
         assert 0.35 < decayed < 0.55
@@ -106,10 +106,10 @@ class TestDecayCandidateConfidence:
             severity="critical",
             confidence=Decimal("0.95"),
             location_ref="Fairlands/*/*/*",
-            created_at=datetime(2026, 3, 6, tzinfo=timezone.utc),
+            created_at=datetime(2026, 3, 6, tzinfo=UTC),
             metadata={},
         )
-        ref = datetime(2026, 3, 14, tzinfo=timezone.utc)
+        ref = datetime(2026, 3, 14, tzinfo=UTC)
         decayed = decay_candidate_confidence(candidate, reference_date=ref)
         # ~8 days elapsed, exp(-0.08) ~ 0.923, * 0.95 ~ 0.877
         assert 0.85 < decayed < 0.95

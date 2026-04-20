@@ -6,20 +6,48 @@ Registers routers for AI/ML, predictions, diagnostics, and analytics.
 
 from fastapi import FastAPI
 
+from app.api import (
+    agent_memory,
+    chat,
+    classification,
+    dashboard_generator,
+    data_quality,
+    diagnosis,
+    dispatch_optimizer,
+    energy,
+    equipment_lookup,
+    features,
+    fleet_learning,
+    hybrid_chat,
+    load_forecast,
+    local_chat,
+    mcp,
+    mcp_openai,
+    mcp_sse,
+    ml_feedback,
+    ml_predictions,
+    ml_retraining,
+    mlops,
+    ocr,
+    optimization,
+    optimization_quality,
+    peak_demand,
+    predictions,
+    rag,
+    recommendations,
+    repair_effectiveness,
+    sensor_analysis,
+    solar,
+    solar_arbitrage,
+    solar_config,
+    solar_grid,
+    solar_performance,
+    survival,
+    technical,
+    timeseries,
+    vision,
+)
 from app.config.settings import settings
-from app.api import chat, hybrid_chat, local_chat
-from app.api import predictions, optimization, energy, ml_predictions
-from app.api import equipment_lookup, diagnosis, vision, ocr, technical
-from app.api import timeseries, sensor_analysis, features, data_quality
-from app.api import survival, classification, ml_feedback, repair_effectiveness
-from app.api import rag, ml_retraining, fleet_learning, mlops
-from app.api import mcp, mcp_sse, mcp_openai
-from app.api import recommendations, optimization_quality
-from app.api import solar, solar_grid, solar_performance, solar_arbitrage
-from app.api import solar_config, peak_demand
-from app.api import load_forecast, dispatch_optimizer
-from app.api import agent_memory
-from app.api import dashboard_generator
 
 
 def register_analytics_routers(app: FastAPI) -> None:

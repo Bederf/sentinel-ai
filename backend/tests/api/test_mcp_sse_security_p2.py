@@ -561,8 +561,9 @@ class TestP8ApprovalPath:
         mock_registry.is_module_active.return_value = True
 
         from unittest.mock import AsyncMock as _AsyncMock
-        from app.models.control_policy import ControlMode
+
         from app.mcp.simbiot_server import SIMBIOTMCPServer
+        from app.models.control_policy import ControlMode
 
         server = SIMBIOTMCPServer()
         ctx = _admin_ctx()
@@ -594,9 +595,10 @@ class TestP8ApprovalPath:
         mock_registry.is_module_active.return_value = True
 
         from unittest.mock import AsyncMock as _AsyncMock
-        from app.models.control_policy import ControlMode
+
         from app.mcp.approval_store import create_approval_token
         from app.mcp.simbiot_server import SIMBIOTMCPServer
+        from app.models.control_policy import ControlMode
 
         server = SIMBIOTMCPServer()
         ctx = _admin_ctx()
@@ -724,6 +726,7 @@ class TestP3_5InjectionScanning:
 
         # Mock control policy to FULL_CONTROL with passing envelope
         from unittest.mock import AsyncMock as _AsyncMock
+
         from app.models.control_policy import ControlMode
 
         mock_envelope = MagicMock()

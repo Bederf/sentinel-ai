@@ -2,10 +2,11 @@
 
 import logging
 import time
-from typing import List, Optional, Dict, Any
+from typing import Any
+
 from app.database.supabase_client import get_supabase_client
 from app.models.auth import SentinelRole
-from app.services.cache_service import cache, CacheKeys, CacheService, CacheInvalidation, track_query
+from app.services.cache_service import CacheInvalidation, CacheKeys, CacheService, cache, track_query
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +54,7 @@ class SiteRepository:
         if last_error:
             raise last_error
 
-    def get_all(self, region: Optional[str] = None, site_type: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_all(self, region: str | None = None, site_type: str | None = None) -> list[dict[str, Any]]:
         """Get all buildings with optional filtering.
 
         Args:
@@ -85,7 +86,7 @@ class SiteRepository:
 
         return result
 
-    def get_by_id(self, site_id: str) -> Optional[Dict[str, Any]]:
+    def get_by_id(self, site_id: str) -> dict[str, Any] | None:
         """Get a building by its code.
 
         Args:
@@ -108,7 +109,7 @@ class SiteRepository:
             return result
         return None
 
-    def get_by_uuid(self, uuid: str) -> Optional[Dict[str, Any]]:
+    def get_by_uuid(self, uuid: str) -> dict[str, Any] | None:
         """Get a building by its UUID.
 
         Args:
@@ -184,7 +185,7 @@ class SiteRepository:
 
         return response.count or 0
 
-    def get_equipment(self, site_id: str) -> List[Dict[str, Any]]:
+    def get_equipment(self, site_id: str) -> list[dict[str, Any]]:
         """Get all equipment for a building.
 
         Args:
@@ -212,7 +213,7 @@ class SiteRepository:
 
         return response.data or []
 
-    def create(self, site_data: Dict[str, Any]) -> Dict[str, Any]:
+    def create(self, site_data: dict[str, Any]) -> dict[str, Any]:
         """Create a new building.
 
         Args:
@@ -226,7 +227,7 @@ class SiteRepository:
         CacheInvalidation.on_building_change()
         return result
 
-    def update(self, site_id: str, site_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def update(self, site_id: str, site_data: dict[str, Any]) -> dict[str, Any] | None:
         """Update a building.
 
         Args:
@@ -268,7 +269,7 @@ class SiteRepository:
             return True
         return False
 
-    def get_asset_summary(self, site_uuid: str) -> Optional[Dict[str, Any]]:
+    def get_asset_summary(self, site_uuid: str) -> dict[str, Any] | None:
         """Get categorized asset counts from Supabase view.
 
         Args:
@@ -287,7 +288,7 @@ class SiteRepository:
             # View may not exist (migrations not applied)
             return None
 
-    def get_asset_summary_by_code(self, site_code: str) -> Optional[Dict[str, Any]]:
+    def get_asset_summary_by_code(self, site_code: str) -> dict[str, Any] | None:
         """Get categorized asset counts by building code.
 
         Args:
@@ -307,8 +308,8 @@ class SiteRepository:
             return None
 
     def get_all_for_user(
-        self, user_email: str, user_role: SentinelRole, region: Optional[str] = None, site_type: Optional[str] = None
-    ) -> List[Dict[str, Any]]:
+        self, user_email: str, user_role: SentinelRole, region: str | None = None, site_type: str | None = None
+    ) -> list[dict[str, Any]]:
         """Get all buildings accessible to a user with optional filtering.
 
         ADMIN role sees all buildings.

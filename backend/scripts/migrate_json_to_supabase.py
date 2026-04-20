@@ -11,15 +11,17 @@ Usage:
 
 import json
 import sys
-from pathlib import Path
 import uuid
+from pathlib import Path
 
 # Add backend to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from supabase import create_client, Client  # noqa: E402
-from dotenv import load_dotenv  # noqa: E402
-import os  # noqa: E402
+import os
+
+from dotenv import load_dotenv
+
+from supabase import Client, create_client
 
 # Load environment
 load_dotenv()

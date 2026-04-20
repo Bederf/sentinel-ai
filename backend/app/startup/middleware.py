@@ -5,9 +5,9 @@ from main.py to improve maintainability and separation of concerns.
 """
 
 import hmac
+import logging
 from collections import defaultdict
 from datetime import datetime, timedelta
-import logging
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,13 +16,13 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
 from app.config.settings import settings
-from app.middleware.auth_middleware import _authenticate_request, _extract_ip_address
-from app.middleware.rate_limiter import limiter
-from app.middleware.audit_middleware import AuditMiddleware
-from app.middleware.security_logging import SecurityLoggingMiddleware
-from app.middleware.error_sanitization import ErrorSanitizationMiddleware
 from app.middleware.agent_security.middleware import AgentSecurityMiddleware, check_unmapped_routes
+from app.middleware.audit_middleware import AuditMiddleware
+from app.middleware.auth_middleware import _authenticate_request, _extract_ip_address
+from app.middleware.error_sanitization import ErrorSanitizationMiddleware
+from app.middleware.rate_limiter import limiter
 from app.middleware.request_metrics import RequestMetricsMiddleware
+from app.middleware.security_logging import SecurityLoggingMiddleware
 
 _logger = logging.getLogger("sentinel.security")
 

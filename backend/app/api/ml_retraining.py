@@ -5,8 +5,8 @@ Endpoints for model retraining, performance monitoring, and A/B testing.
 Phase 45-01: Online Learning & Automated Retraining.
 """
 
+
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Query, Request
-from typing import Optional
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
@@ -38,7 +38,7 @@ async def get_model_status(request: Request):
 @limiter.limit("1000/minute")
 async def get_training_data_status(
     request: Request,
-    site_id: Optional[str] = Query(None, description="Filter by site ID"),
+    site_id: str | None = Query(None, description="Filter by site ID"),
 ):
     """Check available training data per equipment type.
 
@@ -215,7 +215,7 @@ async def promote_ab_test(request: Request, test_id: str):
 @limiter.limit("1000/minute")
 async def list_ab_tests(
     request: Request,
-    status: Optional[str] = Query(None, description="Filter by status: running, completed, promoted, cancelled"),
+    status: str | None = Query(None, description="Filter by status: running, completed, promoted, cancelled"),
 ):
     """List all A/B tests.
 

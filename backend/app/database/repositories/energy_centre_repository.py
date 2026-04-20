@@ -1,7 +1,8 @@
 """Repository for energy centre and component operations."""
 
-from typing import List, Optional, Dict, Any
 import logging
+from typing import Any
+
 from app.database.supabase_client import get_supabase_client
 
 logger = logging.getLogger(__name__)
@@ -30,7 +31,7 @@ class EnergyCentreRepository:
     # Helper Methods
     # =========================================================================
 
-    def get_site_uuid(self, site_code: str) -> Optional[str]:
+    def get_site_uuid(self, site_code: str) -> str | None:
         """Get building UUID from building code."""
         response = self.client.table("sites").select("id").eq("code", site_code).execute()
 
@@ -38,7 +39,7 @@ class EnergyCentreRepository:
             return response.data[0]["id"]
         return None
 
-    def get_ec_uuid(self, centre_id: str) -> Optional[str]:
+    def get_ec_uuid(self, centre_id: str) -> str | None:
         """Get energy centre UUID from centre_id."""
         response = self.client.table("energy_centres").select("id").eq("centre_id", centre_id).execute()
 
@@ -46,7 +47,7 @@ class EnergyCentreRepository:
             return response.data[0]["id"]
         return None
 
-    def get_ec_uuid_by_site(self, site_code: str) -> Optional[str]:
+    def get_ec_uuid_by_site(self, site_code: str) -> str | None:
         """Get energy centre UUID by building code."""
         site_uuid = self.get_site_uuid(site_code)
         if not site_uuid:
@@ -62,7 +63,7 @@ class EnergyCentreRepository:
     # Energy Centres
     # =========================================================================
 
-    def get_energy_centre(self, site_code: str) -> Optional[Dict[str, Any]]:
+    def get_energy_centre(self, site_code: str) -> dict[str, Any] | None:
         """Get energy centre for a building."""
         site_uuid = self.get_site_uuid(site_code)
         if not site_uuid:
@@ -74,7 +75,7 @@ class EnergyCentreRepository:
             return response.data[0]
         return None
 
-    def get_energy_centre_by_id(self, centre_id: str) -> Optional[Dict[str, Any]]:
+    def get_energy_centre_by_id(self, centre_id: str) -> dict[str, Any] | None:
         """Get energy centre by centre_id."""
         response = self.client.table("energy_centres").select("*").eq("centre_id", centre_id).execute()
 
@@ -82,7 +83,7 @@ class EnergyCentreRepository:
             return response.data[0]
         return None
 
-    def upsert_energy_centre(self, ec_data: Dict[str, Any]) -> Dict[str, Any]:
+    def upsert_energy_centre(self, ec_data: dict[str, Any]) -> dict[str, Any]:
         """Insert or update an energy centre."""
         response = self.client.table("energy_centres").upsert(ec_data, on_conflict="centre_id").execute()
         return response.data[0] if response.data else {}
@@ -96,7 +97,7 @@ class EnergyCentreRepository:
     # MV Incomers
     # =========================================================================
 
-    def get_mv_incomers(self, centre_id: str) -> List[Dict[str, Any]]:
+    def get_mv_incomers(self, centre_id: str) -> list[dict[str, Any]]:
         """Get MV incomers for an energy centre."""
         ec_uuid = self.get_ec_uuid(centre_id)
         if not ec_uuid:
@@ -106,12 +107,12 @@ class EnergyCentreRepository:
 
         return response.data
 
-    def upsert_mv_incomer(self, data: Dict[str, Any]) -> Dict[str, Any]:
+    def upsert_mv_incomer(self, data: dict[str, Any]) -> dict[str, Any]:
         """Insert or update an MV incomer."""
         response = self.client.table("mv_incomers").upsert(data, on_conflict="incomer_id").execute()
         return response.data[0] if response.data else {}
 
-    def upsert_mv_incomers(self, incomers: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def upsert_mv_incomers(self, incomers: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Insert or update multiple MV incomers."""
         if not incomers:
             return []
@@ -122,7 +123,7 @@ class EnergyCentreRepository:
     # Transformers
     # =========================================================================
 
-    def get_transformers(self, centre_id: str) -> List[Dict[str, Any]]:
+    def get_transformers(self, centre_id: str) -> list[dict[str, Any]]:
         """Get transformers for an energy centre."""
         ec_uuid = self.get_ec_uuid(centre_id)
         if not ec_uuid:
@@ -132,12 +133,12 @@ class EnergyCentreRepository:
 
         return response.data
 
-    def upsert_transformer(self, data: Dict[str, Any]) -> Dict[str, Any]:
+    def upsert_transformer(self, data: dict[str, Any]) -> dict[str, Any]:
         """Insert or update a transformer."""
         response = self.client.table("transformers").upsert(data, on_conflict="transformer_id").execute()
         return response.data[0] if response.data else {}
 
-    def upsert_transformers(self, transformers: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def upsert_transformers(self, transformers: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Insert or update multiple transformers."""
         if not transformers:
             return []
@@ -148,7 +149,7 @@ class EnergyCentreRepository:
     # LV Switchboards
     # =========================================================================
 
-    def get_switchboards(self, centre_id: str) -> List[Dict[str, Any]]:
+    def get_switchboards(self, centre_id: str) -> list[dict[str, Any]]:
         """Get LV switchboards for an energy centre."""
         ec_uuid = self.get_ec_uuid(centre_id)
         if not ec_uuid:
@@ -158,19 +159,19 @@ class EnergyCentreRepository:
 
         return response.data
 
-    def upsert_switchboard(self, data: Dict[str, Any]) -> Dict[str, Any]:
+    def upsert_switchboard(self, data: dict[str, Any]) -> dict[str, Any]:
         """Insert or update an LV switchboard."""
         response = self.client.table("lv_switchboards").upsert(data, on_conflict="switchboard_id").execute()
         return response.data[0] if response.data else {}
 
-    def upsert_switchboards(self, switchboards: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def upsert_switchboards(self, switchboards: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Insert or update multiple switchboards."""
         if not switchboards:
             return []
         response = self.client.table("lv_switchboards").upsert(switchboards, on_conflict="switchboard_id").execute()
         return response.data
 
-    def get_switchboard_uuid(self, switchboard_id: str) -> Optional[str]:
+    def get_switchboard_uuid(self, switchboard_id: str) -> str | None:
         """Get switchboard UUID from switchboard_id."""
         response = self.client.table("lv_switchboards").select("id").eq("switchboard_id", switchboard_id).execute()
 
@@ -182,7 +183,7 @@ class EnergyCentreRepository:
     # ATS Units
     # =========================================================================
 
-    def get_ats_units(self, centre_id: str) -> List[Dict[str, Any]]:
+    def get_ats_units(self, centre_id: str) -> list[dict[str, Any]]:
         """Get ATS units for an energy centre."""
         ec_uuid = self.get_ec_uuid(centre_id)
         if not ec_uuid:
@@ -192,12 +193,12 @@ class EnergyCentreRepository:
 
         return response.data
 
-    def upsert_ats_unit(self, data: Dict[str, Any]) -> Dict[str, Any]:
+    def upsert_ats_unit(self, data: dict[str, Any]) -> dict[str, Any]:
         """Insert or update an ATS unit."""
         response = self.client.table("ats_units").upsert(data, on_conflict="ats_id").execute()
         return response.data[0] if response.data else {}
 
-    def upsert_ats_units(self, ats_units: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def upsert_ats_units(self, ats_units: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Insert or update multiple ATS units."""
         if not ats_units:
             return []
@@ -208,7 +209,7 @@ class EnergyCentreRepository:
     # Power Meters
     # =========================================================================
 
-    def get_power_meters(self, centre_id: str) -> List[Dict[str, Any]]:
+    def get_power_meters(self, centre_id: str) -> list[dict[str, Any]]:
         """Get power meters for an energy centre."""
         ec_uuid = self.get_ec_uuid(centre_id)
         if not ec_uuid:
@@ -218,12 +219,12 @@ class EnergyCentreRepository:
 
         return response.data
 
-    def upsert_power_meter(self, data: Dict[str, Any]) -> Dict[str, Any]:
+    def upsert_power_meter(self, data: dict[str, Any]) -> dict[str, Any]:
         """Insert or update a power meter."""
         response = self.client.table("power_meters").upsert(data, on_conflict="meter_id").execute()
         return response.data[0] if response.data else {}
 
-    def upsert_power_meters(self, meters: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def upsert_power_meters(self, meters: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Insert or update multiple power meters."""
         if not meters:
             return []
@@ -234,7 +235,7 @@ class EnergyCentreRepository:
     # PFC Banks
     # =========================================================================
 
-    def get_pfc_banks(self, centre_id: str) -> List[Dict[str, Any]]:
+    def get_pfc_banks(self, centre_id: str) -> list[dict[str, Any]]:
         """Get PFC banks for an energy centre."""
         ec_uuid = self.get_ec_uuid(centre_id)
         if not ec_uuid:
@@ -244,12 +245,12 @@ class EnergyCentreRepository:
 
         return response.data
 
-    def upsert_pfc_bank(self, data: Dict[str, Any]) -> Dict[str, Any]:
+    def upsert_pfc_bank(self, data: dict[str, Any]) -> dict[str, Any]:
         """Insert or update a PFC bank."""
         response = self.client.table("pfc_banks").upsert(data, on_conflict="pfc_id").execute()
         return response.data[0] if response.data else {}
 
-    def upsert_pfc_banks(self, pfc_banks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def upsert_pfc_banks(self, pfc_banks: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Insert or update multiple PFC banks."""
         if not pfc_banks:
             return []
@@ -260,7 +261,7 @@ class EnergyCentreRepository:
     # UPS Systems
     # =========================================================================
 
-    def get_ups_systems(self, centre_id: str) -> List[Dict[str, Any]]:
+    def get_ups_systems(self, centre_id: str) -> list[dict[str, Any]]:
         """Get UPS systems for an energy centre."""
         ec_uuid = self.get_ec_uuid(centre_id)
         if not ec_uuid:
@@ -270,12 +271,12 @@ class EnergyCentreRepository:
 
         return response.data
 
-    def upsert_ups_system(self, data: Dict[str, Any]) -> Dict[str, Any]:
+    def upsert_ups_system(self, data: dict[str, Any]) -> dict[str, Any]:
         """Insert or update a UPS system."""
         response = self.client.table("ups_systems").upsert(data, on_conflict="ups_id").execute()
         return response.data[0] if response.data else {}
 
-    def upsert_ups_systems(self, ups_systems: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def upsert_ups_systems(self, ups_systems: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Insert or update multiple UPS systems."""
         if not ups_systems:
             return []
@@ -286,7 +287,7 @@ class EnergyCentreRepository:
     # Feeders
     # =========================================================================
 
-    def get_feeders(self, centre_id: str) -> List[Dict[str, Any]]:
+    def get_feeders(self, centre_id: str) -> list[dict[str, Any]]:
         """Get feeders for an energy centre."""
         ec_uuid = self.get_ec_uuid(centre_id)
         if not ec_uuid:
@@ -296,12 +297,12 @@ class EnergyCentreRepository:
 
         return response.data
 
-    def upsert_feeder(self, data: Dict[str, Any]) -> Dict[str, Any]:
+    def upsert_feeder(self, data: dict[str, Any]) -> dict[str, Any]:
         """Insert or update a feeder."""
         response = self.client.table("feeders").upsert(data, on_conflict="feeder_id").execute()
         return response.data[0] if response.data else {}
 
-    def upsert_feeders(self, feeders: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def upsert_feeders(self, feeders: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Insert or update multiple feeders."""
         if not feeders:
             return []
@@ -312,7 +313,7 @@ class EnergyCentreRepository:
     # Full Energy Centre Operations
     # =========================================================================
 
-    def get_full_energy_centre(self, site_code: str) -> Dict[str, Any]:
+    def get_full_energy_centre(self, site_code: str) -> dict[str, Any]:
         """Get complete energy centre configuration for a building.
 
         Returns:
@@ -336,7 +337,7 @@ class EnergyCentreRepository:
             "feeders": self.get_feeders(centre_id),
         }
 
-    def delete_all_by_site(self, site_code: str) -> Dict[str, int]:
+    def delete_all_by_site(self, site_code: str) -> dict[str, int]:
         """Delete all energy centre data for a building.
 
         Deletes energy_centre which cascades to all components.

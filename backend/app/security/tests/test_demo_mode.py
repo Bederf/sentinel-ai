@@ -5,11 +5,12 @@ After the demo-auth removal, setting DEMO_MODE=true should have no effect
 on authentication — all requests must carry valid JWT tokens.
 """
 
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from unittest.mock import MagicMock, patch, AsyncMock
 from fastapi import HTTPException
 
-from app.models.auth import SentinelRole, AuthLevel
+from app.models.auth import AuthLevel, SentinelRole
 
 
 class TestDemoModeNoBypass:

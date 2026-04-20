@@ -6,7 +6,6 @@ import uuid
 from datetime import date, datetime
 from unittest.mock import MagicMock
 
-
 from app.models.booking_record import (
     BlockBookingAlert,
     BlockBookingConfig,
@@ -17,7 +16,6 @@ from app.services.block_booking_detector.email_parser import (
     parse_booking_confirmation,
 )
 from app.services.block_booking_detector.overlap_detector import detect_overlaps
-
 
 # ---------------------------------------------------------------------------
 # Fixtures

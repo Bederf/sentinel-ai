@@ -12,13 +12,13 @@ Covers:
 
 import json
 from datetime import datetime, timedelta
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
-from ml.training.retraining_scheduler import RetrainingScheduler
 from ml.ab_testing.ab_test_manager import ABTestManager
 from ml.registry import ModelRegistry
+from ml.training.retraining_scheduler import RetrainingScheduler
 
 
 @pytest.fixture

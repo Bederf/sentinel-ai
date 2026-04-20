@@ -9,8 +9,7 @@ Follows the dataclass pattern established in energy_centre.py.
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Dict, Any, List, Optional
-
+from typing import Any
 
 # === Enums ===
 
@@ -102,13 +101,13 @@ class SolarPlant:
     # Configuration
     panel_model: str = ""
     panel_rating_w: float = 0.0
-    commissioning_date: Optional[str] = None
+    commissioning_date: str | None = None
     latitude: float = -26.2  # Johannesburg default
     longitude: float = 28.0
     orientation: float = 0.0  # Azimuth degrees (0 = north)
     tilt: float = 20.0  # Degrees from horizontal
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "plant_id": self.plant_id,
             "name": self.name,
@@ -146,7 +145,7 @@ class SolarInverter:
     mppt_count: int = 1
     firmware_version: str = ""
     protocol: str = "modbus_tcp"
-    ip_address: Optional[str] = None
+    ip_address: str | None = None
     port: int = 502
     unit_id: int = 1
 
@@ -160,13 +159,13 @@ class SolarInverter:
     power_factor: float = 1.0
     daily_yield_kwh: float = 0.0
     total_yield_mwh: float = 0.0
-    alarms: List[str] = field(default_factory=list)
-    last_poll: Optional[str] = None
+    alarms: list[str] = field(default_factory=list)
+    last_poll: str | None = None
 
     # Map backend status values to frontend-expected values
     _STATUS_MAP = {"online": "normal", "standby": "offline"}
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         frontend_status = self._STATUS_MAP.get(self.status, self.status)
         return {
             "inverter_id": self.inverter_id,
@@ -224,7 +223,7 @@ class SolarString:
     dc_power_kw: float = 0.0
     irradiance_w_m2: float = 0.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "string_id": self.string_id,
             "inverter_id": self.inverter_id,
@@ -270,10 +269,10 @@ class BESSContainer:
     cell_max_v: float = 3.4
     cell_imbalance_mv: float = 20.0
     cycles_count: int = 0
-    alarms: List[str] = field(default_factory=list)
-    last_poll: Optional[str] = None
+    alarms: list[str] = field(default_factory=list)
+    last_poll: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "bess_id": self.container_id,
             "site_id": self.site_id,
@@ -320,7 +319,7 @@ class BESSRack:
     cell_count: int = 0
     status: str = "online"  # online/warning/fault/offline
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "rack_id": self.rack_id,
             "container_id": self.container_id,
@@ -357,7 +356,7 @@ class GridMeter:
     daily_import_kwh: float = 0.0
     daily_export_kwh: float = 0.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "meter_id": self.meter_id,
             "site_id": self.site_id,
@@ -393,7 +392,7 @@ class NormalisedReading:
     quality_flag: str = "good"  # good/stale/interpolated/suspect
     source: str = "modbus"  # modbus/cloud_api/bms/simulated
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "timestamp": self.timestamp,
             "equipment_id": self.equipment_id,
@@ -414,11 +413,11 @@ class ConnectorStatus:
     """Status of a manufacturer connector."""
 
     connected: bool = False
-    last_poll: Optional[str] = None
+    last_poll: str | None = None
     error_count: int = 0
     stale_threshold_seconds: int = 60
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "connected": self.connected,
             "last_poll": self.last_poll,
@@ -464,8 +463,8 @@ class FrequencyBand:
     band_name: str  # "normal", "recovery", "emergency"
     min_hz: float
     max_hz: float
-    trip_low_hz: Optional[float] = None  # Mandatory disconnect point
-    trip_high_hz: Optional[float] = None
+    trip_low_hz: float | None = None  # Mandatory disconnect point
+    trip_high_hz: float | None = None
     disconnect_delay_ms: int = 200  # Max time before mandatory disconnect
 
 
@@ -477,8 +476,8 @@ class VoltageBand:
     nominal_v: float
     min_v: float
     max_v: float
-    trip_low_v: Optional[float] = None
-    trip_high_v: Optional[float] = None
+    trip_low_v: float | None = None
+    trip_high_v: float | None = None
     disconnect_delay_ms: int = 500
 
 
@@ -502,12 +501,12 @@ class ComplianceViolation:
     limit_value: float
     violation_type: str  # exceeds_max, below_min, ramp_too_fast
     severity: str  # critical, warning, info
-    auto_action: Optional[str] = None  # "curtailment", "standby", "droop", etc.
-    duration_ms: Optional[int] = None  # Time until resolution
+    auto_action: str | None = None  # "curtailment", "standby", "droop", etc.
+    duration_ms: int | None = None  # Time until resolution
     resolved: bool = False
-    resolution_time: Optional[str] = None
+    resolution_time: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "timestamp": self.timestamp,
             "system_id": self.system_id,
@@ -532,14 +531,14 @@ class GridComplianceStatus:
     compliant: bool
     last_check: str  # ISO 8601 datetime
     next_check: str  # ISO 8601 datetime
-    active_violations: List[ComplianceViolation] = field(default_factory=list)
+    active_violations: list[ComplianceViolation] = field(default_factory=list)
     frequency_hz: float = 50.0
     voltage_v: float = 400.0
     current_a: float = 0.0
     power_factor: float = 1.0
     temperature_c: float = 25.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "system_id": self.system_id,
             "grid_code": self.grid_code,
@@ -566,10 +565,10 @@ class LoadShedEvent:
     previous_stage: int
     current_stage: int
     dispatch_action: str  # "bess_discharge", "solar_curtailment", "standby", "ramp_up"
-    affected_systems: List[str] = field(default_factory=list)  # equipment IDs
+    affected_systems: list[str] = field(default_factory=list)  # equipment IDs
     expected_reduction_kw: float = 0.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "timestamp": self.timestamp,
             "frequency_hz": self.frequency_hz,

@@ -8,13 +8,12 @@ Pre-seeded with SA public holidays.
 import json
 import logging
 import uuid
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from app.api.buildings import _building_to_site
-from app.middleware.auth_middleware import require_site_access, require_role
+from app.middleware.auth_middleware import require_role, require_site_access
 from app.models.auth import AuthContext, SentinelRole
 from app.services.site_holiday_service import DATA_PATH, SA_PUBLIC_HOLIDAYS, get_site_holiday_service
 
@@ -53,7 +52,7 @@ def _save_holidays(site_id: str, holidays: list) -> None:
 @router.get("/api/buildings/{site_id}/holidays")
 async def list_holidays(
     site_id: str,
-    year: Optional[int] = None,
+    year: int | None = None,
     auth: AuthContext = Depends(require_site_access("site_id")),
 ) -> dict:
     """List holidays for a site. Returns SA public holidays + custom holidays."""

@@ -9,7 +9,6 @@ Phase 59-02: Remote Operations
 """
 
 import logging
-from typing import List, Optional, Union
 
 from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, Field
@@ -36,8 +35,8 @@ class ExecuteCommandRequest(BaseModel):
             "equipment_start_stop, fault_reset, fire_panel_reset, door_unlock"
         ),
     )
-    point: Optional[str] = Field(None, description="Device point to write (optional for status_check)")
-    value: Optional[Union[float, int, bool, str]] = Field(
+    point: str | None = Field(None, description="Device point to write (optional for status_check)")
+    value: float | int | bool | str | None = Field(
         None, description="Value to write (optional for status_check)"
     )
     reason: str = Field("", description="Reason for the command (recommended)")
@@ -48,14 +47,14 @@ class BatchCommandItem(BaseModel):
 
     device_id: str
     command_type: str
-    point: Optional[str] = None
-    value: Optional[Union[float, int, bool, str]] = None
+    point: str | None = None
+    value: float | int | bool | str | None = None
 
 
 class BatchCommandRequest(BaseModel):
     """Body for POST /api/remote/commands/batch."""
 
-    commands: List[BatchCommandItem] = Field(..., min_length=1, description="Commands to execute atomically")
+    commands: list[BatchCommandItem] = Field(..., min_length=1, description="Commands to execute atomically")
     reason: str = Field("", description="Reason for the batch")
 
 
@@ -144,7 +143,7 @@ async def rollback_command(command_id: str, request: Request):
 
 @router.get("/overrides", response_model=list)
 async def list_active_overrides(
-    site_id: Optional[str] = Query(None, description="Filter by site ID"),
+    site_id: str | None = Query(None, description="Filter by site ID"),
 ):
     """List all active overrides with expiry times.
 
@@ -157,8 +156,8 @@ async def list_active_overrides(
 
 @router.get("/commands/history", response_model=list)
 async def get_command_history(
-    user_id: Optional[str] = Query(None, description="Filter by user ID"),
-    device_id: Optional[str] = Query(None, description="Filter by device ID"),
+    user_id: str | None = Query(None, description="Filter by user ID"),
+    device_id: str | None = Query(None, description="Filter by device ID"),
     limit: int = Query(20, ge=1, le=100, description="Max results"),
 ):
     """Get recent remote command history.
@@ -180,7 +179,7 @@ async def execute_batch_commands(body: BatchCommandRequest, request: Request):
     svc = get_remote_command_service()
 
     # Phase 1: Pre-validate every command
-    validation_errors: List[dict] = []
+    validation_errors: list[dict] = []
     for idx, cmd in enumerate(body.commands):
         # Check authorization
         from app.models.remote_ops import COMMAND_AUTHORIZATION, AuthorizationLevel
@@ -231,7 +230,7 @@ async def execute_batch_commands(body: BatchCommandRequest, request: Request):
         }
 
     # Phase 2: Execute all commands
-    results: List[dict] = []
+    results: list[dict] = []
     for cmd in body.commands:
         result = await svc.execute_remote_command(
             user_id=user_id,

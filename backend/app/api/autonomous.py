@@ -1,14 +1,15 @@
 """Autonomous System API endpoints for autonomous decision management."""
 
-from fastapi import APIRouter, Depends, HTTPException
-from typing import Dict, Any, Optional
 import logging
+from typing import Any
+
+from fastapi import APIRouter, Depends, HTTPException
 
 from app.models.auth import AuthContext
 from app.security.pipeline import require_role
 from app.services.autonomous_decision_engine import autonomous_decision_engine
-from app.services.safety_boundary_service import safety_boundary_service
 from app.services.device_abstraction import device_manager
+from app.services.safety_boundary_service import safety_boundary_service
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +56,7 @@ async def disable_autonomous_mode(auth: AuthContext = Depends(require_role(2))):
 
 @router.get("/decisions")
 async def get_autonomous_decisions(
-    limit: Optional[int] = 100, offset: Optional[int] = 0, device_id: Optional[str] = None, status: Optional[str] = None
+    limit: int | None = 100, offset: int | None = 0, device_id: str | None = None, status: str | None = None
 ):
     """Get autonomous decision history."""
     if not autonomous_decision_engine._initialized:
@@ -132,11 +133,11 @@ async def approve_autonomous_decision(decision_id: str, auth: AuthContext = Depe
         }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to execute decision: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to execute decision: {e!s}")
 
 
 @router.get("/boundaries")
-async def get_boundary_status(device_id: Optional[str] = None):
+async def get_boundary_status(device_id: str | None = None):
     """Get current boundary status for all or a specific device."""
     if not safety_boundary_service:
         logger.warning("SafetyBoundaryService not properly initialized")
@@ -169,7 +170,7 @@ async def get_boundary_status(device_id: Optional[str] = None):
 
 
 @router.post("/boundaries/update")
-async def update_boundary_config(request: Dict[str, Any], auth: AuthContext = Depends(require_role(2))):
+async def update_boundary_config(request: dict[str, Any], auth: AuthContext = Depends(require_role(2))):
     """Update boundary configuration for a device/point."""
     device_id = request.get("device_id")
     point_name = request.get("point_name")
@@ -193,11 +194,11 @@ async def update_boundary_config(request: Dict[str, Any], auth: AuthContext = De
             raise HTTPException(status_code=500, detail="Failed to update boundary configuration")
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error updating boundary: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error updating boundary: {e!s}")
 
 
 @router.get("/performance")
-async def get_autonomous_performance(days: Optional[int] = 7):
+async def get_autonomous_performance(days: int | None = 7):
     """Get autonomous system performance metrics."""
     if not autonomous_decision_engine._initialized:
         await autonomous_decision_engine.initialize()
@@ -294,4 +295,4 @@ async def test_autonomous_decision(auth: AuthContext = Depends(require_role(2)))
         return {"success": True, "message": "Test decision executed successfully", "decision": decision.to_dict()}
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Test decision failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Test decision failed: {e!s}")

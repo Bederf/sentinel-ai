@@ -4,6 +4,7 @@ Tests multi-objective scoring and ranking logic with different profile weights.
 """
 
 import pytest
+
 from app.services.recommendation_scorer import RecommendationScorer
 
 

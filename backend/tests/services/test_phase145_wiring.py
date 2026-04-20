@@ -4,17 +4,18 @@ Validates that the three Phase 145 layers are correctly wired into
 the scheduler, tool gating, and hybrid context assembly.
 """
 
-import pytest
+from datetime import UTC
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+
 from app.models.control_policy import ControlMode
+from app.models.decision_memory import DecisionPattern
 from app.models.operational_event import (
     EventSeverity,
     OperationalEvent,
     OperationalEventType,
 )
-from app.models.decision_memory import DecisionPattern
-
 
 # -----------------------------------------------------------------
 # Step 1: Event Intelligence -> Background Scheduler
@@ -46,16 +47,15 @@ class TestEventIntelligenceSchedulerWiring:
         with patch(
             "app.core.site_resolver.get_registered_site_ids",
             return_value=["site-002", "site-005"],
+        ), patch(
+            "app.services.event_intelligence_service.get_event_intelligence_service",
+            return_value=mock_ei_svc,
         ):
-            with patch(
-                "app.services.event_intelligence_service.get_event_intelligence_service",
-                return_value=mock_ei_svc,
-            ):
-                await svc._run_event_intelligence_async()
+            await svc._run_event_intelligence_async()
 
-                assert mock_ei_svc.process_site.call_count == 2
-                mock_ei_svc.process_site.assert_any_call("site-002")
-                mock_ei_svc.process_site.assert_any_call("site-005")
+            assert mock_ei_svc.process_site.call_count == 2
+            mock_ei_svc.process_site.assert_any_call("site-002")
+            mock_ei_svc.process_site.assert_any_call("site-005")
 
     @pytest.mark.asyncio
     async def test_event_intelligence_handles_no_sites(self):
@@ -93,14 +93,13 @@ class TestEventIntelligenceSchedulerWiring:
         with patch(
             "app.core.site_resolver.get_registered_site_ids",
             return_value=["site-002", "site-005"],
+        ), patch(
+            "app.services.event_intelligence_service.get_event_intelligence_service",
+            return_value=mock_ei_svc,
         ):
-            with patch(
-                "app.services.event_intelligence_service.get_event_intelligence_service",
-                return_value=mock_ei_svc,
-            ):
-                await svc._run_event_intelligence_async()
-                # Both sites should have been attempted
-                assert call_count == 2
+            await svc._run_event_intelligence_async()
+            # Both sites should have been attempted
+            assert call_count == 2
 
 
 # -----------------------------------------------------------------
@@ -309,7 +308,8 @@ class TestHybridContextDecisionMemoryWiring:
         svc = HybridQueryService(site_id="site-002")
         ctx = HybridContext(site_id="site-002")
 
-        from datetime import datetime, timezone
+        from datetime import datetime
+
         from app.models.operational_event import _generate_event_id
 
         mock_event = OperationalEvent(
@@ -318,7 +318,7 @@ class TestHybridContextDecisionMemoryWiring:
             equipment_id="S002-CHILLER-B1-001",
             site_id="site-002",
             severity=EventSeverity.HIGH,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             signals=[{"point": "chw_supply_temp", "value": 12.0, "setpoint": 7.0}],
             description="CHW supply 5°C above setpoint",
             duration_minutes=18.5,

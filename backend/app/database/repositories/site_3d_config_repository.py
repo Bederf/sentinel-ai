@@ -8,7 +8,7 @@ import json
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from app.database.supabase_client import get_supabase_client
 
@@ -31,11 +31,11 @@ class Site3DConfigRepository:
         site_id: str,
         site_code: str,
         name: str,
-        floors: List[Dict[str, Any]],
-        equipment_positions: Optional[List[Dict[str, Any]]] = None,
-        code: Optional[str] = None,
+        floors: list[dict[str, Any]],
+        equipment_positions: list[dict[str, Any]] | None = None,
+        code: str | None = None,
         created_by: str = "system",
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """Create a new site 3D configuration.
 
         Args:
@@ -82,7 +82,7 @@ class Site3DConfigRepository:
             logger.error(f"Failed to create 3D config: {e}")
             return None
 
-    def get_by_site_id(self, site_id: str) -> Optional[Dict[str, Any]]:
+    def get_by_site_id(self, site_id: str) -> dict[str, Any] | None:
         """Retrieve 3D configuration by building ID.
 
         Args:
@@ -112,11 +112,11 @@ class Site3DConfigRepository:
     def update(
         self,
         site_id: str,
-        floors: Optional[List[Dict[str, Any]]] = None,
-        equipment_positions: Optional[List[Dict[str, Any]]] = None,
-        zones: Optional[List[Dict[str, Any]]] = None,
+        floors: list[dict[str, Any]] | None = None,
+        equipment_positions: list[dict[str, Any]] | None = None,
+        zones: list[dict[str, Any]] | None = None,
         updated_by: str = "system",
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """Update an existing 3D configuration.
 
         Args:
@@ -137,7 +137,7 @@ class Site3DConfigRepository:
                 return None
 
             # Build update payload
-            update_payload: Dict[str, Any] = {"updated_by": updated_by}
+            update_payload: dict[str, Any] = {"updated_by": updated_by}
             if floors is not None:
                 update_payload["floors"] = floors
             if equipment_positions is not None:
@@ -197,7 +197,7 @@ class Site3DConfigRepository:
             logger.error(f"Failed to delete 3D config: {e}")
             return False
 
-    def _save_to_json(self, site_id: str, config: Dict[str, Any]) -> None:
+    def _save_to_json(self, site_id: str, config: dict[str, Any]) -> None:
         """Save configuration to JSON file (fallback storage).
 
         Args:
@@ -225,7 +225,7 @@ class Site3DConfigRepository:
         except Exception as e:
             logger.error(f"Failed to save 3D config to JSON: {e}")
 
-    def _load_from_json(self, site_id: str) -> Optional[Dict[str, Any]]:
+    def _load_from_json(self, site_id: str) -> dict[str, Any] | None:
         """Load configuration from JSON file (fallback storage).
 
         Args:
@@ -252,7 +252,7 @@ class Site3DConfigRepository:
 
 
 # Singleton instance
-_site_3d_config_repository: Optional[Site3DConfigRepository] = None
+_site_3d_config_repository: Site3DConfigRepository | None = None
 
 
 def get_site_3d_config_repository() -> Site3DConfigRepository:

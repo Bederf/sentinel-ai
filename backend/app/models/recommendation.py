@@ -4,11 +4,11 @@ Defines recommendation status, risk classification, and lifecycle tracking.
 Used by RecommendationService to manage approval workflow and execution.
 """
 
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, Optional
-import uuid
+from typing import Any
 
 
 class RecommendationStatus(str, Enum):
@@ -71,26 +71,26 @@ class Recommendation:
     action_type: str = ""
     risk_level: ActionRiskLevel = ActionRiskLevel.MEDIUM
     target_equipment: str = ""
-    action: Dict[str, Any] = field(default_factory=dict)
+    action: dict[str, Any] = field(default_factory=dict)
     reason: str = ""
-    expected_impact: Dict[str, Any] = field(default_factory=dict)
+    expected_impact: dict[str, Any] = field(default_factory=dict)
     confidence: str = "medium"  # "high" | "medium" | "low"
     confidence_score: float = 0.0  # Numeric confidence (0.0-1.0) for tier routing
     profile: str = ""
     multi_objective_score: float = 0.0
     status: RecommendationStatus = RecommendationStatus.PENDING
     requires_approval: bool = False
-    approved_by: Optional[str] = None
-    approval_reason: Optional[str] = None
-    executed_at: Optional[datetime] = None
-    execution_result: Optional[Dict[str, Any]] = None
-    rejection_reason: Optional[str] = None
+    approved_by: str | None = None
+    approval_reason: str | None = None
+    executed_at: datetime | None = None
+    execution_result: dict[str, Any] | None = None
+    rejection_reason: str | None = None
     source: str = ""  # "ai_optimizer", "health_alert", "financial_roi", "anomaly_detector", "rule_engine"
     source_type: str = ""  # "ml_model", "rule_based", "user_input"
     correlation_id: str = field(default_factory=lambda: str(uuid.uuid4()))
-    outcome_validated: Optional[bool] = None
-    outcome_notes: Optional[str] = None
-    outcome_validated_at: Optional[datetime] = None
+    outcome_validated: bool | None = None
+    outcome_notes: str | None = None
+    outcome_validated_at: datetime | None = None
 
     def get_numeric_confidence(self) -> float:
         """Return numeric confidence, converting string if needed.
@@ -110,7 +110,7 @@ class Recommendation:
         mapping = {"high": 0.90, "medium": 0.75, "low": 0.50}
         return mapping.get(self.confidence, 0.50)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize to dictionary for JSON storage.
 
         Converts datetime objects to ISO format strings and enums to values.
@@ -148,7 +148,7 @@ class Recommendation:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Recommendation":
+    def from_dict(cls, data: dict[str, Any]) -> "Recommendation":
         """Deserialize from dictionary.
 
         Converts ISO format strings back to datetime objects and values to enums.

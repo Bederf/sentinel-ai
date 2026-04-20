@@ -1,6 +1,7 @@
 """Tests for encryption service."""
 
 import pytest
+
 from app.services.encryption_service import EncryptionService, get_encryption_service, reset_encryption_service
 
 
@@ -154,8 +155,8 @@ class TestAuditLoggerEncryption:
 
     def test_audit_logger_with_encryption(self):
         """Test that audit logger encrypts sensitive fields."""
-        from app.services.audit_logger import AuditLogger
         from app.models.audit_log import AuditResultType
+        from app.services.audit_logger import AuditLogger
 
         # Create a logger with encryption enabled
         logger = AuditLogger()
@@ -181,7 +182,7 @@ class TestAuditLoggerEncryption:
 
         log_file = Path(__file__).parent.parent / "app" / "data" / "audit_log.json"
         if log_file.exists():
-            with open(log_file, "r") as f:
+            with open(log_file) as f:
                 data = json.load(f)
                 if data["entries"]:
                     first_entry = data["entries"][0]

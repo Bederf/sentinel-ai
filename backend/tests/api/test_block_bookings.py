@@ -7,14 +7,14 @@ import os
 os.environ.setdefault("DEMO_MODE", "true")
 os.environ.setdefault("TESTING", "true")
 
-import uuid  # noqa: E402
-from datetime import datetime  # noqa: E402
-from unittest.mock import MagicMock, patch  # noqa: E402
+import uuid
+from datetime import datetime
+from unittest.mock import MagicMock, patch
 
-import pytest  # noqa: E402
-from fastapi.testclient import TestClient  # noqa: E402
+import pytest
+from fastapi.testclient import TestClient
 
-from app.models.booking_record import BlockBookingAlert, BookingRecord  # noqa: E402
+from app.models.booking_record import BlockBookingAlert, BookingRecord
 
 
 @pytest.fixture

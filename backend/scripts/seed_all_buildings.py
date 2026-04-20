@@ -12,7 +12,6 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.database.supabase_client import get_supabase_client
 
-
 # Building configurations with desk multipliers
 # Retail buildings have fewer desks, offices/hospitals have more
 BUILDING_CONFIG = {

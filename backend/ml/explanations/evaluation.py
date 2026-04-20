@@ -7,10 +7,11 @@ Provides metrics for assessing explanation quality:
 """
 
 import logging
-from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
-import numpy as np
 from datetime import datetime
+from typing import Any
+
+import numpy as np
 
 # Optional imports for advanced metrics
 try:
@@ -43,30 +44,30 @@ class ExplanationMetrics:
     """Metrics for evaluating explanation quality."""
 
     # Semantic similarity metrics
-    bert_precision: Optional[float] = None
-    bert_recall: Optional[float] = None
-    bert_f1: Optional[float] = None
-    rouge_1: Optional[float] = None
-    rouge_2: Optional[float] = None
-    rouge_l: Optional[float] = None
-    bleu_score: Optional[float] = None
+    bert_precision: float | None = None
+    bert_recall: float | None = None
+    bert_f1: float | None = None
+    rouge_1: float | None = None
+    rouge_2: float | None = None
+    rouge_l: float | None = None
+    bleu_score: float | None = None
 
     # Content metrics
-    actionability_score: Optional[float] = None  # 0-1 based on extractable actions
-    factuality_score: Optional[float] = None  # Based on RAG grounding
-    completeness_score: Optional[float] = None  # Coverage of key aspects
-    conciseness_score: Optional[float] = None  # Inverse of verbosity
+    actionability_score: float | None = None  # 0-1 based on extractable actions
+    factuality_score: float | None = None  # Based on RAG grounding
+    completeness_score: float | None = None  # Coverage of key aspects
+    conciseness_score: float | None = None  # Inverse of verbosity
 
     # Human evaluation metrics (when available)
-    usefulness_rating: Optional[float] = None  # 1-5 scale
-    clarity_rating: Optional[float] = None  # 1-5 scale
-    trustworthiness_rating: Optional[float] = None  # 1-5 scale
+    usefulness_rating: float | None = None  # 1-5 scale
+    clarity_rating: float | None = None  # 1-5 scale
+    trustworthiness_rating: float | None = None  # 1-5 scale
 
     # Metadata
     timestamp: str = field(default_factory=lambda: datetime.utcnow().isoformat())
     evaluator_version: str = "1.0.0"
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {k: v for k, v in self.__dict__.items() if not k.startswith("_")}
 
@@ -95,9 +96,9 @@ class ExplanationEvaluator:
     def evaluate_explanation(
         self,
         predicted_explanation: str,
-        reference_explanation: Optional[str] = None,
-        generated_actions: Optional[List[Dict]] = None,
-        context_documents: Optional[List[Dict]] = None,
+        reference_explanation: str | None = None,
+        generated_actions: list[dict] | None = None,
+        context_documents: list[dict] | None = None,
     ) -> ExplanationMetrics:
         """
         Evaluate a generated explanation against references.
@@ -138,7 +139,7 @@ class ExplanationEvaluator:
 
         return metrics
 
-    def _calculate_similarity(self, predicted: str, reference: str) -> Dict[str, Optional[float]]:
+    def _calculate_similarity(self, predicted: str, reference: str) -> dict[str, float | None]:
         """Calculate semantic similarity between texts."""
         metrics = {}
 
@@ -190,7 +191,7 @@ class ExplanationEvaluator:
 
         return metrics
 
-    def _calculate_actionability(self, actions: List[Dict]) -> float:
+    def _calculate_actionability(self, actions: list[dict]) -> float:
         """
         Calculate actionability score (0-1).
 
@@ -228,7 +229,7 @@ class ExplanationEvaluator:
         # Average across all actions
         return total_score / len(actions)
 
-    def _calculate_factuality(self, explanation: str, context_docs: List[Dict]) -> float:
+    def _calculate_factuality(self, explanation: str, context_docs: list[dict]) -> float:
         """
         Calculate factuality score based on RAG grounding.
 
@@ -446,7 +447,7 @@ class LLMJudgeService:
         self.sample_size = sample_size
         self._evaluator = ExplanationEvaluator()
 
-    async def evaluate_recent(self) -> Optional[ExplanationMetrics]:
+    async def evaluate_recent(self) -> ExplanationMetrics | None:
         """Fetch recent recommendations and evaluate their explanations.
 
         Returns ExplanationMetrics for the batch, or None if no recent
@@ -490,13 +491,13 @@ class LLMJudgeService:
         return avg
 
 
-def _avg_field(results: List[ExplanationMetrics], field_name: str) -> Optional[float]:
+def _avg_field(results: list[ExplanationMetrics], field_name: str) -> float | None:
     """Average a numeric field across results, skipping None."""
     values = [getattr(r, field_name) for r in results if getattr(r, field_name) is not None]
     return sum(values) / len(values) if values else None
 
 
-def format_evaluation_results(results: List[ExplanationMetrics]) -> Dict[str, float]:
+def format_evaluation_results(results: list[ExplanationMetrics]) -> dict[str, float]:
     """Format evaluation results as averages."""
     if not results:
         return {}

@@ -11,15 +11,15 @@ Usage:
     result = await server.call_tool("lookup_fault_code", manufacturer="Carrier", fault_code="E4")
 """
 
-from typing import Optional, Dict, List, Any
 import logging
+from typing import Any
 
 from app.services.equipment_lookup import EquipmentLookup
 
 logger = logging.getLogger(__name__)
 
 # Singleton lookup instance
-_lookup_instance: Optional[EquipmentLookup] = None
+_lookup_instance: EquipmentLookup | None = None
 
 
 def get_lookup() -> EquipmentLookup:
@@ -36,8 +36,8 @@ def get_lookup() -> EquipmentLookup:
 
 
 async def lookup_fault_code_tool(
-    manufacturer: str, fault_code: str, model: Optional[str] = None, equipment_type: Optional[str] = None
-) -> Dict[str, Any]:
+    manufacturer: str, fault_code: str, model: str | None = None, equipment_type: str | None = None
+) -> dict[str, Any]:
     """
     Look up a fault code for specific equipment and get diagnosis, fix, and parts.
 
@@ -71,11 +71,11 @@ async def lookup_fault_code_tool(
 
 
 async def lookup_parts_tool(
-    part_number: Optional[str] = None,
-    part_description: Optional[str] = None,
-    manufacturer: Optional[str] = None,
+    part_number: str | None = None,
+    part_description: str | None = None,
+    manufacturer: str | None = None,
     include_alternatives: bool = True,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """
     Search for parts across South African suppliers.
 
@@ -169,8 +169,8 @@ async def lookup_parts_tool(
 
 
 async def search_equipment_issue_tool(
-    query: str, manufacturer: Optional[str] = None, model: Optional[str] = None
-) -> Dict[str, Any]:
+    query: str, manufacturer: str | None = None, model: str | None = None
+) -> dict[str, Any]:
     """
     Natural language search for equipment issues.
 
@@ -377,7 +377,7 @@ class EquipmentMCPServer:
             "search_equipment_issue": search_equipment_issue_tool,
         }
 
-    def list_tools(self) -> List[Dict[str, Any]]:
+    def list_tools(self) -> list[dict[str, Any]]:
         """List available MCP tools with their schemas."""
         return self.tools
 
@@ -401,7 +401,7 @@ class EquipmentMCPServer:
 
         return await handler(**kwargs)
 
-    def get_tool_schema(self, tool_name: str) -> Optional[Dict[str, Any]]:
+    def get_tool_schema(self, tool_name: str) -> dict[str, Any] | None:
         """Get JSON schema for a specific tool."""
         for tool in self.tools:
             if tool["name"] == tool_name:

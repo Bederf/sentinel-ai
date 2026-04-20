@@ -11,11 +11,11 @@ Run as:
     python backend/scripts/migrate_zone_desk_data.py --site site-002
 """
 
+import argparse
 import json
 import sys
-import argparse
 from pathlib import Path
-from typing import List, Dict, Any, Optional, Tuple
+from typing import Any
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
@@ -56,7 +56,7 @@ def calculate_desk_coordinates(
     desk_index_in_zone: int,
     zone_letter: str,
     floor: str,
-) -> Dict[str, float]:
+) -> dict[str, float]:
     """
     Calculate 3D position for a desk based on its location in the zone grid.
 
@@ -103,11 +103,11 @@ def calculate_desk_coordinates(
     }
 
 
-def load_zones_backup(backup_path: Path) -> List[Dict[str, Any]]:
+def load_zones_backup(backup_path: Path) -> list[dict[str, Any]]:
     """Load and migrate zones from zones.json.bak."""
     print(f"Loading zones from {backup_path}...")
 
-    with open(backup_path, "r") as f:
+    with open(backup_path) as f:
         data = json.load(f)
 
     # Handle both array and object formats
@@ -145,11 +145,11 @@ def load_zones_backup(backup_path: Path) -> List[Dict[str, Any]]:
     return zones
 
 
-def load_desks_backup(backup_path: Path) -> List[Dict[str, Any]]:
+def load_desks_backup(backup_path: Path) -> list[dict[str, Any]]:
     """Load and migrate desks from desks.json.bak."""
     print(f"Loading desks from {backup_path}...")
 
-    with open(backup_path, "r") as f:
+    with open(backup_path) as f:
         data = json.load(f)
 
     # Handle both array and object formats
@@ -201,7 +201,7 @@ def load_desks_backup(backup_path: Path) -> List[Dict[str, Any]]:
     return desks
 
 
-def get_site_uuid(supabase_client: Any, site_code: str) -> Optional[str]:
+def get_site_uuid(supabase_client: Any, site_code: str) -> str | None:
     """Get building UUID from building code."""
     response = supabase_client.table("sites").select("id").eq("code", site_code).execute()
 
@@ -210,7 +210,7 @@ def get_site_uuid(supabase_client: Any, site_code: str) -> Optional[str]:
     return None
 
 
-def validate_zones_and_desks(zones: List[Dict], desks: List[Dict]) -> Tuple[bool, List[str]]:
+def validate_zones_and_desks(zones: list[dict], desks: list[dict]) -> tuple[bool, list[str]]:
     """Validate zone and desk data integrity."""
     errors = []
 
@@ -267,7 +267,7 @@ def validate_zones_and_desks(zones: List[Dict], desks: List[Dict]) -> Tuple[bool
     return len(errors) == 0, errors
 
 
-def insert_zones(supabase_client: Any, site_id: str, zones: List[Dict[str, Any]]) -> bool:
+def insert_zones(supabase_client: Any, site_id: str, zones: list[dict[str, Any]]) -> bool:
     """Upsert zones into Supabase (insert or update if exists)."""
     print(f"\nUpserting {len(zones)} zones...")
 
@@ -284,7 +284,7 @@ def insert_zones(supabase_client: Any, site_id: str, zones: List[Dict[str, Any]]
         return False
 
 
-def insert_desks(supabase_client: Any, site_id: str, desks: List[Dict[str, Any]]) -> bool:
+def insert_desks(supabase_client: Any, site_id: str, desks: list[dict[str, Any]]) -> bool:
     """Insert/update desks into Supabase."""
     print(f"\nInserting/updating {len(desks)} desks...")
 

@@ -6,7 +6,8 @@ Engineers can configure how health scores are calculated per equipment type.
 
 import json
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Any
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -50,20 +51,20 @@ class EquipmentHealthConfig(BaseModel):
     service_interval_days: int = Field(..., ge=1, le=365)
     weights: HealthWeights
     thresholds: HealthThresholds
-    fault_weights: Optional[Dict[str, float]] = None
+    fault_weights: dict[str, float] | None = None
 
 
 class HealthConfigUpdate(BaseModel):
     """Request model for updating health config."""
 
-    expected_life_years: Optional[int] = Field(None, ge=1, le=100)
-    service_interval_days: Optional[int] = Field(None, ge=1, le=365)
-    weights: Optional[HealthWeights] = None
-    thresholds: Optional[HealthThresholds] = None
-    fault_weights: Optional[Dict[str, float]] = None
+    expected_life_years: int | None = Field(None, ge=1, le=100)
+    service_interval_days: int | None = Field(None, ge=1, le=365)
+    weights: HealthWeights | None = None
+    thresholds: HealthThresholds | None = None
+    fault_weights: dict[str, float] | None = None
 
 
-def load_config() -> Dict[str, Any]:
+def load_config() -> dict[str, Any]:
     """Load health calculation config from JSON file."""
     if not CONFIG_PATH.exists():
         return {}
@@ -71,7 +72,7 @@ def load_config() -> Dict[str, Any]:
         return json.load(f)
 
 
-def save_config(config: Dict[str, Any]) -> None:
+def save_config(config: dict[str, Any]) -> None:
     """Save health calculation config to JSON file."""
     with open(CONFIG_PATH, "w") as f:
         json.dump(config, f, indent=2)

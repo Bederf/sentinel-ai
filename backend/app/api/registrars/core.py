@@ -6,11 +6,24 @@ Registers core API routers for authentication, settings, sites, and health.
 
 from fastapi import FastAPI
 
-from app.api import health, sites, settings as settings_api, settings_db, system_health
-from app.api import auth, user_access, login_audit, mfa, cache, sites_aggregation, events, user_entitlements
+from app.api import (
+    auth,
+    cache,
+    events,
+    governance_metrics_api,
+    health,
+    login_audit,
+    mfa,
+    settings_db,
+    sites,
+    sites_aggregation,
+    space_settings,
+    system_health,
+    user_access,
+    user_entitlements,
+)
 from app.api import metrics as prometheus_metrics
-from app.api import space_settings
-from app.api import governance_metrics_api
+from app.api import settings as settings_api
 
 
 def register_core_routers(app: FastAPI) -> None:

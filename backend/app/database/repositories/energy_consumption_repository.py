@@ -1,7 +1,8 @@
 """Repository for energy consumption history operations."""
 
-from typing import List, Optional, Dict, Any
-from datetime import datetime, date, timedelta
+from datetime import date, datetime, timedelta
+from typing import Any
+
 from app.database.supabase_client import get_supabase_client
 
 
@@ -16,7 +17,7 @@ class EnergyConsumptionRepository:
         self,
         site_id: str,
         days: int = 30,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get energy consumption history for a building.
 
         Args:
@@ -47,7 +48,7 @@ class EnergyConsumptionRepository:
     def get_all_sites(
         self,
         days: int = 30,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get energy consumption history for all buildings.
 
         Args:
@@ -78,7 +79,7 @@ class EnergyConsumptionRepository:
         site_id: str,
         start_date: date,
         end_date: date,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get energy consumption for a building within a date range.
 
         Args:
@@ -101,7 +102,7 @@ class EnergyConsumptionRepository:
 
         return response.data
 
-    def get_latest_date(self, site_id: str) -> Optional[date]:
+    def get_latest_date(self, site_id: str) -> date | None:
         """Get the latest consumption date for a building.
 
         Args:
@@ -127,7 +128,7 @@ class EnergyConsumptionRepository:
         self,
         site_id: str,
         days: int = 30,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Get daily summary statistics for a building.
 
         Args:
@@ -171,7 +172,7 @@ class EnergyConsumptionRepository:
         hvac_kwh: float,
         lighting_kwh: float,
         other_kwh: float,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Insert or update energy consumption record.
 
         Args:
@@ -199,8 +200,8 @@ class EnergyConsumptionRepository:
 
     def batch_upsert(
         self,
-        records: List[Dict[str, Any]],
-    ) -> List[Dict[str, Any]]:
+        records: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
         """Insert or update multiple energy consumption records.
 
         Args:

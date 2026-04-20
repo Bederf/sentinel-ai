@@ -26,7 +26,7 @@ Skip markers:
 import asyncio
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -222,18 +222,18 @@ class TestPhaseB_ReadOnly:
         register map version for this firmware.
         """
         _skip_unless_hardware()
-        from app.services.solar_ingestion_service import get_solar_ingestion_service
         from app.services.solar_connector_huawei import (
-            HUAWEI_SUN2000_REGISTERS,
             HUAWEI_LUNA2000_REGISTERS,
+            HUAWEI_SUN2000_REGISTERS,
         )
+        from app.services.solar_ingestion_service import get_solar_ingestion_service
 
         svc = get_solar_ingestion_service()
         overview = await svc.poll_site("site-002")
         inverters = overview.get("inverters", [])
 
         firmware_report = {
-            "captured_at": datetime.now(timezone.utc).isoformat(),
+            "captured_at": datetime.now(UTC).isoformat(),
             "register_map_version": "v27.0",
             "sun2000_register_count": len(HUAWEI_SUN2000_REGISTERS),
             "luna2000_register_count": len(HUAWEI_LUNA2000_REGISTERS),
@@ -550,7 +550,7 @@ class TestPhaseF_SignOff:
         report = {
             "protocol": "Sprint 0 Hardware Integration Test",
             "version": "v27.0",
-            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "generated_at": datetime.now(UTC).isoformat(),
             "site_id": "site-002",
             "edge_box": {
                 "modbus_ip": settings.modbus_bess_ip,
@@ -599,8 +599,8 @@ class TestPhaseG_BillingSanity:
         the MIP optimizer would produce costs in the correct range.
         """
         _skip_unless_hardware()
-        from app.services.solar_config_service import get_site_solar_config
         from app.services.mip_dispatch_optimizer import _tariff_for_hour
+        from app.services.solar_config_service import get_site_solar_config
 
         cfg = get_site_solar_config("site-002")
 

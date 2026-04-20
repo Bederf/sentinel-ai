@@ -20,22 +20,21 @@ Endpoints:
 import json
 import logging
 from pathlib import Path
-from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException, Query
 
 from app.models.condition import (
-    EquipmentTrendSummary,
-    ElementTrend,
-    DegradationRate,
     AnalyzeChangesRequest,
-    TrendDirection,
-    EquipmentRUL,
-    ServiceRecommendation,
     AssetUtilization,
+    DegradationRate,
+    ElementTrend,
+    EquipmentRUL,
+    EquipmentTrendSummary,
     MaintenanceCostComparison,
     OptimizedSchedule,
     OptimizeScheduleRequest,
+    ServiceRecommendation,
+    TrendDirection,
 )
 from app.services.element_trend_service import get_element_trend_service
 from app.services.rul_calculator import get_rul_calculator
@@ -63,7 +62,7 @@ async def get_equipment_trends(
         return summary
     except Exception as e:
         logger.error(f"Error calculating trends for {equipment_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Error calculating trends: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error calculating trends: {e!s}")
 
 
 @router.get(
@@ -117,12 +116,12 @@ async def get_element_trend(
 
     except Exception as e:
         logger.error(f"Error calculating trend for {equipment_id}/{element_name}: {e}")
-        raise HTTPException(status_code=500, detail=f"Error calculating element trend: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error calculating element trend: {e!s}")
 
 
 @router.get(
     "/degradation-rates/{equipment_id}",
-    response_model=List[DegradationRate],
+    response_model=list[DegradationRate],
     summary="Get degradation rates",
     description="Returns degradation rates for all monitored elements of an equipment item.",
 )
@@ -134,7 +133,7 @@ async def get_degradation_rates(
         service = get_element_trend_service()
         summary = await service.get_equipment_trend_summary(equipment_id, days=days)
 
-        rates: List[DegradationRate] = []
+        rates: list[DegradationRate] = []
         for trend in summary.element_trends:
             if trend.degradation_rate_per_day is not None:
                 rate = DegradationRate(
@@ -150,7 +149,7 @@ async def get_degradation_rates(
 
     except Exception as e:
         logger.error(f"Error calculating degradation rates for {equipment_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Error calculating degradation rates: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error calculating degradation rates: {e!s}")
 
 
 @router.post(
@@ -222,7 +221,7 @@ async def analyze_changes(request: AnalyzeChangesRequest):
 
     except Exception as e:
         logger.error(f"Error analyzing changes for {request.equipment_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Error analyzing changes: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error analyzing changes: {e!s}")
 
 
 # ============================================================================
@@ -247,12 +246,12 @@ async def get_equipment_rul(
         return rul
     except Exception as e:
         logger.error(f"Error calculating RUL for {equipment_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Error calculating RUL: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error calculating RUL: {e!s}")
 
 
 @router.get(
     "/recommendations/{equipment_id}",
-    response_model=List[ServiceRecommendation],
+    response_model=list[ServiceRecommendation],
     summary="Get service recommendations",
     description="Returns prioritized service recommendations for degrading elements.",
 )
@@ -266,17 +265,17 @@ async def get_recommendations(
         return attach_runtime_metadata(recommendations)
     except Exception as e:
         logger.error(f"Error generating recommendations for {equipment_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Error generating recommendations: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error generating recommendations: {e!s}")
 
 
 @router.get(
     "/fleet-risk",
-    response_model=List[EquipmentRUL],
+    response_model=list[EquipmentRUL],
     summary="Get fleet-wide risk overview",
     description="Returns RUL for all equipment, sorted by days until first threshold ascending.",
 )
 async def get_fleet_risk(
-    risk_level: Optional[str] = Query(
+    risk_level: str | None = Query(
         default=None, description="Filter by minimum risk level (low, medium, high, critical)"
     ),
     limit: int = Query(default=20, ge=1, le=100, description="Maximum results to return"),
@@ -288,7 +287,7 @@ async def get_fleet_risk(
         equipment_list = []
 
         if equipment_path.exists():
-            with open(equipment_path, "r") as f:
+            with open(equipment_path) as f:
                 equipment_list = json.load(f)
         else:
             logger.warning(f"Equipment data not found at {equipment_path}")
@@ -297,7 +296,7 @@ async def get_fleet_risk(
         calculator = get_rul_calculator()
 
         # Calculate RUL for each equipment
-        all_ruls: List[EquipmentRUL] = []
+        all_ruls: list[EquipmentRUL] = []
         for eq in equipment_list:
             eq_id = eq.get("id", "")
             if not eq_id:
@@ -329,7 +328,7 @@ async def get_fleet_risk(
 
     except Exception as e:
         logger.error(f"Error calculating fleet risk: {e}")
-        raise HTTPException(status_code=500, detail=f"Error calculating fleet risk: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error calculating fleet risk: {e!s}")
 
 
 # ============================================================================
@@ -358,12 +357,12 @@ async def optimize_service_schedule(request: OptimizeScheduleRequest):
         return schedule
     except Exception as e:
         logger.error(f"Error optimizing service schedule: {e}")
-        raise HTTPException(status_code=500, detail=f"Error optimizing service schedule: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error optimizing service schedule: {e!s}")
 
 
 @router.get(
     "/utilization/{equipment_id}",
-    response_model=List[AssetUtilization],
+    response_model=list[AssetUtilization],
     summary="Get asset utilization",
     description=(
         "Returns utilization percentages for all monitored elements of an equipment item. "
@@ -383,7 +382,7 @@ async def get_utilization(equipment_id: str):
         return utilizations
     except Exception as e:
         logger.error(f"Error calculating utilization for {equipment_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Error calculating utilization: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error calculating utilization: {e!s}")
 
 
 @router.get(
@@ -411,7 +410,7 @@ async def get_cost_comparison(
         return comparison
     except Exception as e:
         logger.error(f"Error comparing costs for {equipment_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Error comparing maintenance costs: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error comparing maintenance costs: {e!s}")
 
 
 # ============================================================================

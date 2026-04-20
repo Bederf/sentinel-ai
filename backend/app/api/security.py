@@ -9,29 +9,27 @@ Provides real-time security monitoring across buildings with:
 
 import logging
 from datetime import datetime, timedelta
-from typing import Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 
 from app.api.dependencies.module_access import require_active_module
+from app.database.repositories.security_repository import SecurityRepository
 from app.middleware.auth_middleware import require_auth
 from app.middleware.rate_limiter import limiter
 from app.models.auth import AuthContext, AuthLevel
-from app.config.settings import settings
 from app.models.module_registry import ModuleType
-from app.database.repositories.security_repository import SecurityRepository
 from app.models.security import (
     AccessEvent,
     AccessStatus,
     AccessType,
-    Visitor,
-    SecurityAlert,
-    VisitorStatus,
-    AlertType,
     AlertSeverity,
     AlertStatus,
+    AlertType,
+    SecurityAlert,
     SecurityOverview,
+    Visitor,
+    VisitorStatus,
 )
 from app.utils.ai_provenance import attach_runtime_metadata
 
@@ -60,7 +58,7 @@ class RegisterVisitorRequest(BaseModel):
     name: str
     company: str
     host_contact: str
-    access_points: List[str]
+    access_points: list[str]
     purpose: str
 
 
@@ -197,7 +195,7 @@ async def get_access_events(
     request: Request,
     site: str = Query(..., description="Building site code"),
     after_hours: bool = Query(False, description="Filter after-hours access only"),
-    location: Optional[str] = Query(None, description="Filter by access point location"),
+    location: str | None = Query(None, description="Filter by access point location"),
     limit: int = Query(100, ge=1, le=1000),
 ):
     """Get paginated access event list with optional filtering."""
@@ -499,7 +497,7 @@ async def revoke_visitor(
 async def get_alerts(
     request: Request,
     site: str = Query(...),
-    severity: Optional[str] = Query(None, description="Filter by severity: critical, warning, info"),
+    severity: str | None = Query(None, description="Filter by severity: critical, warning, info"),
     limit: int = Query(50),
 ):
     """Get security alerts with optional severity filtering."""
@@ -724,7 +722,7 @@ class AccessEventCreate(BaseModel):
     equipment_id: str
     person_id: str
     direction: str  # entry | exit
-    timestamp: Optional[str] = None
+    timestamp: str | None = None
     zone_id: str = ""
 
 
@@ -861,8 +859,6 @@ async def get_zone_cameras(
             response = repo.client.table("security_cameras").select("*").eq("zone_id", zone_id).execute()
             cameras = response.data
         except Exception:
-            if settings.sentinel_island_mode:
-                raise HTTPException(status_code=503, detail="Live camera inventory unavailable")
             cameras = []
 
         return {

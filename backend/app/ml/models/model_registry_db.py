@@ -13,10 +13,10 @@ Provides:
 """
 
 import logging
-from typing import Optional, Dict, Any
-from datetime import datetime
 from dataclasses import dataclass
+from datetime import datetime
 from enum import Enum
+from typing import Any
 
 from app.database.supabase_client import get_supabase_client
 
@@ -41,10 +41,10 @@ class ModelConfig:
     model_type: str  # "lstm", "autoencoder", etc.
     equipment_type: str
     model_path: str
-    scaler_path: Optional[str]
-    r_squared_avg: Optional[float]
+    scaler_path: str | None
+    r_squared_avg: float | None
     status: str  # ModelStatus value
-    notes: Optional[str]
+    notes: str | None
 
     def is_available(self) -> bool:
         """Check if model is available for use."""
@@ -59,7 +59,7 @@ class ThresholdConfig:
     tier2_confidence_min: float  # Advisory recommendations
     tier3_confidence_min: float  # Auto-execute recommendations
     status: str
-    reason: Optional[str]
+    reason: str | None
 
     def is_enabled(self) -> bool:
         """Check if thresholds allow recommendations."""
@@ -90,19 +90,19 @@ class ModelRegistryDB:
     def __init__(self):
         """Initialize registry with Supabase client."""
         self.supabase = get_supabase_client()
-        self._models_cache: Dict[str, ModelConfig] = {}
-        self._models_cache_time: Optional[datetime] = None
-        self._thresholds_cache: Dict[str, ThresholdConfig] = {}
-        self._thresholds_cache_time: Optional[datetime] = None
+        self._models_cache: dict[str, ModelConfig] = {}
+        self._models_cache_time: datetime | None = None
+        self._thresholds_cache: dict[str, ThresholdConfig] = {}
+        self._thresholds_cache_time: datetime | None = None
 
-    def _is_cache_valid(self, cache_time: Optional[datetime]) -> bool:
+    def _is_cache_valid(self, cache_time: datetime | None) -> bool:
         """Check if cache is still valid."""
         if not cache_time:
             return False
         age = (datetime.now() - cache_time).total_seconds()
         return age < self.CACHE_TTL_SECONDS
 
-    async def get_model(self, equipment_type: str) -> Optional[ModelConfig]:
+    async def get_model(self, equipment_type: str) -> ModelConfig | None:
         """
         Get active model for equipment type.
 
@@ -152,10 +152,10 @@ class ModelRegistryDB:
             return model
 
         except Exception as e:
-            logger.error(f"Error loading model for {equipment_type}: {str(e)}")
+            logger.error(f"Error loading model for {equipment_type}: {e!s}")
             return None
 
-    async def get_thresholds(self, equipment_type: str) -> Optional[ThresholdConfig]:
+    async def get_thresholds(self, equipment_type: str) -> ThresholdConfig | None:
         """
         Get confidence thresholds for equipment type.
 
@@ -212,17 +212,17 @@ class ModelRegistryDB:
             return thresholds
 
         except Exception as e:
-            logger.error(f"Error loading thresholds for {equipment_type}: {str(e)}")
+            logger.error(f"Error loading thresholds for {equipment_type}: {e!s}")
             # Return safe default
             return ThresholdConfig(
                 equipment_type=equipment_type,
                 tier2_confidence_min=1.0,
                 tier3_confidence_min=1.0,
                 status="disabled",
-                reason=f"Error loading: {str(e)}",
+                reason=f"Error loading: {e!s}",
             )
 
-    async def get_threshold_value(self, equipment_type: str, tier: int = 2) -> Optional[float]:
+    async def get_threshold_value(self, equipment_type: str, tier: int = 2) -> float | None:
         """
         Get confidence threshold for specific tier.
 
@@ -255,7 +255,7 @@ class ModelRegistryDB:
         thresholds = await self.get_thresholds(equipment_type)
         return thresholds.is_enabled() if thresholds else False
 
-    async def get_all_active_models(self) -> Dict[str, ModelConfig]:
+    async def get_all_active_models(self) -> dict[str, ModelConfig]:
         """
         Get all active models.
 
@@ -288,10 +288,10 @@ class ModelRegistryDB:
             return models
 
         except Exception as e:
-            logger.error(f"Error loading all models: {str(e)}")
+            logger.error(f"Error loading all models: {e!s}")
             return {}
 
-    async def get_all_thresholds(self) -> Dict[str, ThresholdConfig]:
+    async def get_all_thresholds(self) -> dict[str, ThresholdConfig]:
         """
         Get all threshold configurations.
 
@@ -320,7 +320,7 @@ class ModelRegistryDB:
             return thresholds
 
         except Exception as e:
-            logger.error(f"Error loading all thresholds: {str(e)}")
+            logger.error(f"Error loading all thresholds: {e!s}")
             return {}
 
     def clear_cache(self):
@@ -331,7 +331,7 @@ class ModelRegistryDB:
         self._thresholds_cache_time = None
         logger.info("Cleared model registry cache")
 
-    async def get_registry_summary(self) -> Dict[str, Any]:
+    async def get_registry_summary(self) -> dict[str, Any]:
         """Get summary of all registered models and thresholds."""
         try:
             models = await self.get_all_active_models()
@@ -356,12 +356,12 @@ class ModelRegistryDB:
             }
 
         except Exception as e:
-            logger.error(f"Error getting registry summary: {str(e)}")
+            logger.error(f"Error getting registry summary: {e!s}")
             return {"error": str(e)}
 
 
 # Singleton instance
-_registry_instance: Optional[ModelRegistryDB] = None
+_registry_instance: ModelRegistryDB | None = None
 
 
 async def get_model_registry() -> ModelRegistryDB:
@@ -373,13 +373,13 @@ async def get_model_registry() -> ModelRegistryDB:
 
 
 # Convenience functions for backward compatibility
-async def get_model(equipment_type: str) -> Optional[ModelConfig]:
+async def get_model(equipment_type: str) -> ModelConfig | None:
     """Get model configuration for equipment type."""
     registry = await get_model_registry()
     return await registry.get_model(equipment_type)
 
 
-async def get_threshold(equipment_type: str, tier: int = 2) -> Optional[float]:
+async def get_threshold(equipment_type: str, tier: int = 2) -> float | None:
     """Get confidence threshold for equipment type and tier."""
     registry = await get_model_registry()
     return await registry.get_threshold_value(equipment_type, tier)

@@ -11,19 +11,19 @@ Usage:
 """
 
 import asyncio
-import sys
+import hashlib
 import os
 import re
-import hashlib
+import sys
 import time
 from pathlib import Path
 
 # Add backend to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app.database.supabase_client import get_supabase_client  # noqa: E402
-from app.services.embedding_service import get_embedding_service  # noqa: E402
-from app.services.vector_db import get_vector_db_service  # noqa: E402
+from app.database.supabase_client import get_supabase_client
+from app.services.embedding_service import get_embedding_service
+from app.services.vector_db import get_vector_db_service
 
 # Project root
 PROJECT_ROOT = Path(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
@@ -117,9 +117,7 @@ def extract_summary(content: str, max_length: int = 500) -> str:
             if stripped_line and not stripped_line.startswith("#"):
                 started = True
                 summary_lines.append(stripped_line)
-        elif stripped_line == "" and summary_lines:
-            break
-        elif stripped_line.startswith("#"):
+        elif (stripped_line == "" and summary_lines) or stripped_line.startswith("#"):
             break
         else:
             summary_lines.append(stripped_line)

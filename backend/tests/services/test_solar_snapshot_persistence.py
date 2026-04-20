@@ -174,6 +174,7 @@ class TestMeterDifferentiation:
     def orchestrator(self):
         """Create a minimal object with attributes needed by _generate_sensor_readings."""
         import random
+
         from app.services.lifecycle_orchestrator import LifecycleOrchestrator
 
         # Create raw instance without __init__ (avoids Supabase/ML imports)
@@ -246,6 +247,7 @@ class TestSolarCapacityUnification:
     def orchestrator(self):
         """Create raw orchestrator for capacity testing."""
         import random
+
         from app.services.lifecycle_orchestrator import LifecycleOrchestrator
 
         orc = object.__new__(LifecycleOrchestrator)

@@ -11,7 +11,7 @@ import logging
 import random
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -29,19 +29,19 @@ class FineTuningResult:
     model_type: str
     equipment_type: str
     global_model_id: str
-    global_metrics: Dict[str, float]
-    fine_tuned_metrics: Dict[str, float]
-    improvement: Dict[str, float]
+    global_metrics: dict[str, float]
+    fine_tuned_metrics: dict[str, float]
+    improvement: dict[str, float]
     samples_used: int
-    error: Optional[str] = None
+    error: str | None = None
 
 
 class LocalFineTuner:
     """Fine-tunes global models for specific sites."""
 
     def __init__(self):
-        self._fine_tune_history: List[Dict[str, Any]] = []
-        self._fine_tuned_models: Dict[str, Dict[str, Any]] = {}
+        self._fine_tune_history: list[dict[str, Any]] = []
+        self._fine_tuned_models: dict[str, dict[str, Any]] = {}
         self._initialize_seed_models()
 
     def _initialize_seed_models(self) -> None:
@@ -124,10 +124,10 @@ class LocalFineTuner:
 
     def list_fine_tuned_models(
         self,
-        site_code: Optional[str] = None,
-        model_type: Optional[str] = None,
-        equipment_type: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+        site_code: str | None = None,
+        model_type: str | None = None,
+        equipment_type: str | None = None,
+    ) -> list[dict[str, Any]]:
         """List all fine-tuned models.
 
         Args:
@@ -279,7 +279,7 @@ class LocalFineTuner:
         logger.info(f"Fine-tuned model for {site_code}: {model_id}")
         return result
 
-    def get_improvement_summary(self, site_code: Optional[str] = None) -> Dict[str, Any]:
+    def get_improvement_summary(self, site_code: str | None = None) -> dict[str, Any]:
         """Get summary of fine-tuning improvements.
 
         Args:
@@ -312,7 +312,7 @@ class LocalFineTuner:
             "best_model": best_model,
         }
 
-    def get_fine_tune_history(self, site_code: Optional[str] = None, limit: int = 50) -> List[Dict[str, Any]]:
+    def get_fine_tune_history(self, site_code: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
         """Get history of fine-tuning operations.
 
         Args:
@@ -331,7 +331,7 @@ class LocalFineTuner:
 
 
 # Singleton instance
-_tuner: Optional[LocalFineTuner] = None
+_tuner: LocalFineTuner | None = None
 
 
 def get_local_fine_tuner() -> LocalFineTuner:

@@ -16,10 +16,10 @@ import json
 import logging
 import shutil
 import tempfile
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from filelock import FileLock
 
@@ -56,9 +56,9 @@ class VisitAuditLogger:
         if not AUDIT_LOG_PATH.exists():
             return {"events": []}
         try:
-            with open(AUDIT_LOG_PATH, "r") as f:
+            with open(AUDIT_LOG_PATH) as f:
                 return json.load(f)
-        except (json.JSONDecodeError, IOError) as exc:
+        except (OSError, json.JSONDecodeError) as exc:
             logger.warning("Failed to read visit_audit_log.json: %s", exc)
             return {"events": []}
 
@@ -79,8 +79,8 @@ class VisitAuditLogger:
     def log_event(
         self,
         event_type: VisitEventType,
-        visit_id: Optional[str] = None,
-        details: Optional[dict[str, Any]] = None,
+        visit_id: str | None = None,
+        details: dict[str, Any] | None = None,
     ) -> None:
         """Record an audit event.
 
@@ -90,7 +90,7 @@ class VisitAuditLogger:
             details: Additional structured data about the event
         """
         event = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "event_type": event_type.value,
             "visit_id": str(visit_id) if visit_id else None,
             "details": details or {},

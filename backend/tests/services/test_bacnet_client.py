@@ -8,12 +8,13 @@ Verifies:
 """
 
 import json
-import pytest
 from datetime import datetime
 from unittest.mock import MagicMock
 
-from app.services.audit_logger import AuditLogger, BACnetWriteAudit
+import pytest
+
 import app.services.audit_logger as audit_module
+from app.services.audit_logger import AuditLogger, BACnetWriteAudit
 
 
 class TestBACnetWriteAuditDataclass:
@@ -169,7 +170,7 @@ class TestBACnetClientAuditInstrumentation:
     @pytest.mark.asyncio
     async def test_write_failure_logs_error_in_audit(self, mocker):
         """write_point() that fails logs success=False and error_msg in _audit_bacnet_write."""
-        from app.services.niagara.bacnet_client import NiagaraBACnetClient, BACnetWriteError
+        from app.services.niagara.bacnet_client import BACnetWriteError, NiagaraBACnetClient
 
         client = NiagaraBACnetClient(ip="127.0.0.1", port=47808)
         client._bacnet = MagicMock()

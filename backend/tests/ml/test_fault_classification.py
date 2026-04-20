@@ -15,15 +15,14 @@ from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
 import pandas as pd
+import pytest
 
-from ml.classifier.train import ClassifierTrainer
-from ml.classifier.model import FailureClassifier
 from ml.classifier.data_prep import ClassifierDataPrep
+from ml.classifier.model import FailureClassifier
+from ml.classifier.train import ClassifierTrainer
 from ml.registry import ModelRegistry
-from ml.training.retraining_scheduler import RetrainingScheduler, MODEL_TYPES
-
+from ml.training.retraining_scheduler import MODEL_TYPES, RetrainingScheduler
 
 # === Fixtures ===
 
@@ -267,8 +266,9 @@ class TestTrainAllIncludesClassifier:
     def test_train_all_has_classifier_key(self):
         """train_all_models response includes 'classifier' key."""
         # Import the endpoint module to check the code structure
-        from app.api.ml_predictions import train_all_models
         import inspect
+
+        from app.api.ml_predictions import train_all_models
 
         source = inspect.getsource(train_all_models)
         assert "classifier" in source

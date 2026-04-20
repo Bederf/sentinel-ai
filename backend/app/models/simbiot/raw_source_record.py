@@ -22,8 +22,8 @@ Boundary with Canonical Model:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Dict, Optional
 from datetime import datetime
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from app.services.simbiot.bms_adapter import BmsConnectionStatus, BmsPointValue
@@ -117,7 +117,7 @@ class RawSourceRecord:
     # ========================================================================
     # METADATA (What else did the source tell us?)
     # ========================================================================
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
     """All additional attributes provided by the source system.
     This is a catch-all for any source-specific metadata that doesn't fit
     into the standardized fields above."""
@@ -128,10 +128,10 @@ class RawSourceRecord:
     site_id: str
     """Site identifier this data belongs to."""
 
-    building_id: Optional[str] = None
+    building_id: str | None = None
     """Building identifier within the site (if applicable)."""
 
-    device_id: Optional[str] = None
+    device_id: str | None = None
     """Device identifier that this point belongs to."""
 
     # ========================================================================
@@ -149,11 +149,11 @@ class RawSourceRecord:
     @classmethod
     def from_bms_point_value(
         cls,
-        bms_point: "BmsPointValue",
-        connection_status: "BmsConnectionStatus",
+        bms_point: BmsPointValue,
+        connection_status: BmsConnectionStatus,
         source_system: str,
         adapter_version: str,
-    ) -> "RawSourceRecord":
+    ) -> RawSourceRecord:
         """Create RawSourceRecord from existing BMS adapter structures.
 
         This factory method provides convenient integration with the existing
@@ -224,7 +224,7 @@ class RawSourceRecord:
             # For any other type, return the type name
             return type(value).__name__.lower()
 
-    def get_provenance_summary(self) -> Dict[str, str]:
+    def get_provenance_summary(self) -> dict[str, str]:
         """Get a summary of provenance information for logging/debugging.
 
         Returns:
@@ -263,7 +263,7 @@ class RawSourceRecord:
     # SERIALIZATION (For storage and transmission)
     # ========================================================================
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization.
 
         Returns:
@@ -291,7 +291,7 @@ class RawSourceRecord:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "RawSourceRecord":
+    def from_dict(cls, data: dict[str, Any]) -> RawSourceRecord:
         """Create from dictionary (for deserialization).
 
         Args:

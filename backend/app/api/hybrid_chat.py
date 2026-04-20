@@ -1,7 +1,7 @@
 """Hybrid Chat API endpoint - Routes between Ollama and Claude."""
 
 import logging
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
 
 from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse

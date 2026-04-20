@@ -6,8 +6,9 @@ TDD approach: RED → GREEN → REFACTOR
 Phase 170-03: Control Actuation Loop — Verification
 """
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from app.services.telemetry_service import verify_telemetry_change_async
 
@@ -173,8 +174,9 @@ async def test_sso_endpoint_accepts_correlation_id():
 
     Verifies the endpoint signature and that correlation_id is properly handled.
     """
-    from app.api.events import event_stream_endpoint
     import inspect
+
+    from app.api.events import event_stream_endpoint
 
     # Verify endpoint signature includes correlation_id
     sig = inspect.signature(event_stream_endpoint)

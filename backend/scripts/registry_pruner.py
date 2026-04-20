@@ -13,7 +13,7 @@ Usage:
 import argparse
 import json
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 DEFAULT_REGISTRY = Path(__file__).parent.parent / "ml" / "models" / "registry.json"
@@ -59,7 +59,7 @@ def stamp_archived_entries(inactive_models: dict) -> dict:
     Returns:
         New dict with copied+stamped entries.
     """
-    archived_at = datetime.now(timezone.utc).isoformat()
+    archived_at = datetime.now(UTC).isoformat()
     stamped = {}
     for model_id, entry in inactive_models.items():
         stamped[model_id] = {**entry, "archived_at": archived_at}
@@ -89,7 +89,7 @@ def append_to_backup(backup: dict, stamped_inactive: dict, registry_path: Path) 
         registry_path: Path of the source registry (used for provenance).
     """
     batch = {
-        "archived_at": datetime.now(timezone.utc).isoformat(),
+        "archived_at": datetime.now(UTC).isoformat(),
         "pruned_from": registry_path.name,
         "model_count": len(stamped_inactive),
         "models": stamped_inactive,

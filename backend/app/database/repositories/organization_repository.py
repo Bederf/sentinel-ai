@@ -4,9 +4,10 @@ Organization Repository - Database operations for FM client organizations.
 Phase 48: Contract Management
 """
 
-from typing import Optional, List, Dict, Any
-from ..supabase_client import get_supabase_client
 import logging
+from typing import Any
+
+from ..supabase_client import get_supabase_client
 
 logger = logging.getLogger(__name__)
 
@@ -18,8 +19,8 @@ class OrganizationRepository:
         self.client = get_supabase_client()
 
     def get_all(
-        self, tier: Optional[str] = None, status: Optional[str] = None, limit: int = 50
-    ) -> List[Dict[str, Any]]:
+        self, tier: str | None = None, status: str | None = None, limit: int = 50
+    ) -> list[dict[str, Any]]:
         """
         List organizations with optional filters.
 
@@ -50,7 +51,7 @@ class OrganizationRepository:
             logger.error(f"Error listing organizations: {e}")
             return []
 
-    def get_by_id(self, org_id: str) -> Optional[Dict[str, Any]]:
+    def get_by_id(self, org_id: str) -> dict[str, Any] | None:
         """Get a single organization by ID."""
         if not self.client:
             return None
@@ -66,7 +67,7 @@ class OrganizationRepository:
             logger.error(f"Error getting organization {org_id}: {e}")
             return None
 
-    def get_by_code(self, code: str) -> Optional[Dict[str, Any]]:
+    def get_by_code(self, code: str) -> dict[str, Any] | None:
         """Get a single organization by its unique code."""
         if not self.client:
             return None
@@ -82,7 +83,7 @@ class OrganizationRepository:
             logger.error(f"Error getting organization by code {code}: {e}")
             return None
 
-    def create(self, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def create(self, data: dict[str, Any]) -> dict[str, Any] | None:
         """
         Create a new organization.
 
@@ -109,7 +110,7 @@ class OrganizationRepository:
             logger.error(f"Error creating organization: {e}")
             return None
 
-    def update(self, org_id: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def update(self, org_id: str, data: dict[str, Any]) -> dict[str, Any] | None:
         """
         Partial update of an organization.
 
@@ -136,7 +137,7 @@ class OrganizationRepository:
 
 
 # Singleton instance
-_repository: Optional[OrganizationRepository] = None
+_repository: OrganizationRepository | None = None
 
 
 def get_organization_repository() -> OrganizationRepository:

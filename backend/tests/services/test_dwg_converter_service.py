@@ -4,15 +4,14 @@ Tests ODA binary detection, conversion subprocess, timeout handling,
 and graceful degradation when binary is not available.
 """
 
-import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from app.services.dwg_converter_service import (
+    DWGConversionError,
     DWGConverterNotAvailable,
     DWGConverterService,
-    DWGConversionError,
     get_dwg_converter_service,
 )
 
@@ -124,10 +123,10 @@ class TestDWGConversion:
     async def test_convert_handles_timeout(self, mock_available, mock_subprocess, mock_rmtree):
         """Conversion raises DWGConversionError on timeout."""
         mock_proc = AsyncMock()
-        mock_proc.communicate.side_effect = asyncio.TimeoutError()
+        mock_proc.communicate.side_effect = TimeoutError()
         mock_proc.kill = MagicMock()
         # After kill, communicate returns empty
-        mock_proc.communicate = AsyncMock(side_effect=[asyncio.TimeoutError(), (b"", b"")])
+        mock_proc.communicate = AsyncMock(side_effect=[TimeoutError(), (b"", b"")])
         mock_subprocess.return_value = mock_proc
 
         service = DWGConverterService()
@@ -139,7 +138,7 @@ class TestDWGConversion:
             patch("app.services.dwg_converter_service.asyncio.wait_for") as mock_wait,
         ):
             mock_mkdtemp.side_effect = ["/tmp/dwg_in_xxx", "/tmp/dwg_out_xxx"]
-            mock_wait.side_effect = asyncio.TimeoutError()
+            mock_wait.side_effect = TimeoutError()
             mock_proc.communicate = AsyncMock(return_value=(b"", b""))
 
             with pytest.raises(DWGConversionError, match="timed out"):

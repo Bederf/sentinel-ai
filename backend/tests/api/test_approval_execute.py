@@ -8,10 +8,11 @@ This tests the endpoint request/response contract and auth/RBAC logic without
 needing to mock all internal dependencies.
 """
 
-import pytest
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, patch
+
+import pytest
 
 
 @pytest.fixture
@@ -25,7 +26,7 @@ def mock_decision():
         "command_value": 22.0,
         "tier": 1,  # MEDIUM
         "status": "pending",
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": datetime.now(UTC).isoformat(),
     }
 
 
@@ -40,7 +41,7 @@ def mock_decision_critical():
         "command_value": False,
         "tier": 3,  # CRITICAL
         "status": "pending",
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": datetime.now(UTC).isoformat(),
     }
 
 
@@ -62,19 +63,18 @@ async def test_approval_returns_403_for_viewer(client, auth_headers_auditor, moc
         "app.database.repositories.parasite_decision_repository.ParasiteDecisionRepository.get_decision_by_id",
         new_callable=AsyncMock,
         return_value=mock_decision,
-    ):
-        with patch(
-            "app.services.approval_service.ApprovalService.execute_decision_with_audit",
-            new_callable=AsyncMock,
-        ) as mock_execute:
-            # Endpoint should reject before calling service
-            resp = await client.post(
-                "/api/v1/approval/execute/site-002",
-                json={"decision_id": "dec-1", "approval_outcome": "approved"},
-                headers=auth_headers_auditor,
-            )
-            assert resp.status_code == 403
-            assert not mock_execute.called
+    ), patch(
+        "app.services.approval_service.ApprovalService.execute_decision_with_audit",
+        new_callable=AsyncMock,
+    ) as mock_execute:
+        # Endpoint should reject before calling service
+        resp = await client.post(
+            "/api/v1/approval/execute/site-002",
+            json={"decision_id": "dec-1", "approval_outcome": "approved"},
+            headers=auth_headers_auditor,
+        )
+        assert resp.status_code == 403
+        assert not mock_execute.called
 
 
 @pytest.mark.asyncio
@@ -96,28 +96,27 @@ async def test_approval_returns_accepted_immediately(client, auth_headers_operat
         "app.services.approval_service.ApprovalService.execute_decision_with_audit",
         new_callable=AsyncMock,
         return_value=mock_response,
+    ), patch(
+        "app.database.repositories.parasite_decision_repository.ParasiteDecisionRepository.get_decision_by_id",
+        new_callable=AsyncMock,
+        return_value=mock_decision,
     ):
-        with patch(
-            "app.database.repositories.parasite_decision_repository.ParasiteDecisionRepository.get_decision_by_id",
-            new_callable=AsyncMock,
-            return_value=mock_decision,
-        ):
-            start = time.time()
-            resp = await client.post(
-                "/api/v1/approval/execute/site-002",
-                json={"decision_id": "dec-1", "approval_outcome": "approved"},
-                headers=auth_headers_operator,
-            )
-            elapsed = time.time() - start
+        start = time.time()
+        resp = await client.post(
+            "/api/v1/approval/execute/site-002",
+            json={"decision_id": "dec-1", "approval_outcome": "approved"},
+            headers=auth_headers_operator,
+        )
+        elapsed = time.time() - start
 
-            # Response must come back in < 500ms
-            assert elapsed < 0.5, f"Response took {elapsed}s, expected < 0.5s"
-            assert resp.status_code == 200
-            data = resp.json()
-            assert data["status"] == "ACCEPTED"
-            assert "decision_id" in data
-            assert "correlation_id" in data
-            assert data["estimated_verification_time_seconds"] == 30
+        # Response must come back in < 500ms
+        assert elapsed < 0.5, f"Response took {elapsed}s, expected < 0.5s"
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] == "ACCEPTED"
+        assert "decision_id" in data
+        assert "correlation_id" in data
+        assert data["estimated_verification_time_seconds"] == 30
 
 
 @pytest.mark.asyncio
@@ -169,19 +168,18 @@ async def test_approval_engineer_can_approve_critical(client, auth_headers_engin
         "app.services.approval_service.ApprovalService.execute_decision_with_audit",
         new_callable=AsyncMock,
         return_value=mock_response,
+    ), patch(
+        "app.database.repositories.parasite_decision_repository.ParasiteDecisionRepository.get_decision_by_id",
+        new_callable=AsyncMock,
+        return_value=mock_decision_critical,
     ):
-        with patch(
-            "app.database.repositories.parasite_decision_repository.ParasiteDecisionRepository.get_decision_by_id",
-            new_callable=AsyncMock,
-            return_value=mock_decision_critical,
-        ):
-            resp = await client.post(
-                "/api/v1/approval/execute/site-002",
-                json={"decision_id": "dec-crit", "approval_outcome": "approved"},
-                headers=auth_headers_engineer,
-            )
-            assert resp.status_code == 200
-            assert resp.json()["status"] == "ACCEPTED"
+        resp = await client.post(
+            "/api/v1/approval/execute/site-002",
+            json={"decision_id": "dec-crit", "approval_outcome": "approved"},
+            headers=auth_headers_engineer,
+        )
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "ACCEPTED"
 
 
 @pytest.mark.asyncio
@@ -199,19 +197,18 @@ async def test_approval_admin_can_approve_any_tier(client, auth_headers_admin, m
         "app.services.approval_service.ApprovalService.execute_decision_with_audit",
         new_callable=AsyncMock,
         return_value=mock_response,
+    ), patch(
+        "app.database.repositories.parasite_decision_repository.ParasiteDecisionRepository.get_decision_by_id",
+        new_callable=AsyncMock,
+        return_value=mock_decision_critical,
     ):
-        with patch(
-            "app.database.repositories.parasite_decision_repository.ParasiteDecisionRepository.get_decision_by_id",
-            new_callable=AsyncMock,
-            return_value=mock_decision_critical,
-        ):
-            resp = await client.post(
-                "/api/v1/approval/execute/site-002",
-                json={"decision_id": "dec-crit", "approval_outcome": "approved"},
-                headers=auth_headers_admin,
-            )
-            assert resp.status_code == 200
-            assert resp.json()["status"] == "ACCEPTED"
+        resp = await client.post(
+            "/api/v1/approval/execute/site-002",
+            json={"decision_id": "dec-crit", "approval_outcome": "approved"},
+            headers=auth_headers_admin,
+        )
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "ACCEPTED"
 
 
 @pytest.mark.asyncio
@@ -221,23 +218,22 @@ async def test_approval_endpoint_route_exists(client, auth_headers_operator):
         "app.database.repositories.parasite_decision_repository.ParasiteDecisionRepository.get_decision_by_id",
         new_callable=AsyncMock,
         return_value={"id": "dec-1", "site_id": "site-002", "tier": 1},
+    ), patch(
+        "app.services.approval_service.ApprovalService.execute_decision_with_audit",
+        new_callable=AsyncMock,
+        return_value={
+            "status": "ACCEPTED",
+            "decision_id": "dec-1",
+            "correlation_id": "corr-xyz",
+            "message": "OK",
+            "estimated_verification_time_seconds": 30,
+        },
     ):
-        with patch(
-            "app.services.approval_service.ApprovalService.execute_decision_with_audit",
-            new_callable=AsyncMock,
-            return_value={
-                "status": "ACCEPTED",
-                "decision_id": "dec-1",
-                "correlation_id": "corr-xyz",
-                "message": "OK",
-                "estimated_verification_time_seconds": 30,
-            },
-        ):
-            # Should not raise 404 route not found
-            resp = await client.post(
-                "/api/v1/approval/execute/site-002",
-                json={"decision_id": "dec-1", "approval_outcome": "approved"},
-                headers=auth_headers_operator,
-            )
-            # Either 200 or some expected error (not 404)
-            assert resp.status_code in [200, 422, 409, 500]
+        # Should not raise 404 route not found
+        resp = await client.post(
+            "/api/v1/approval/execute/site-002",
+            json={"decision_id": "dec-1", "approval_outcome": "approved"},
+            headers=auth_headers_operator,
+        )
+        # Either 200 or some expected error (not 404)
+        assert resp.status_code in [200, 422, 409, 500]

@@ -175,12 +175,13 @@ async def get_equipment_trust_summary(equipment_id: str, site_id: str) -> Equipm
 
     Useful for dashboards that need a single readiness score per equipment unit.
     """
+    import json
+
     from app.database.repositories.trust_history_repository import (
         DATA_DIR,
         TrustHistoryRepository,
     )
     from app.models.trust_history import TrustHistory
-    import json
 
     repo = TrustHistoryRepository()
     profiles: list[TrustHistory] = []

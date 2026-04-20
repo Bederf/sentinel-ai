@@ -12,11 +12,11 @@ import logging
 
 from fastapi import APIRouter, Depends
 
+from app.config.settings import settings
 from app.middleware.auth_middleware import require_auth
 from app.models.auth import AuthContext, AuthLevel
-from app.config.settings import settings
-from app.services.sentry_notification_router import get_sentry_router
 from app.services.n8n_service import get_n8n_service
+from app.services.sentry_notification_router import get_sentry_router
 
 logger = logging.getLogger("sentinel.api.notification_router")
 

@@ -6,7 +6,7 @@ Models for controllers, sensors (PIR/daylight), luminaires, and zone aggregation
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import List, Dict, Any, Optional
+from typing import Any
 
 
 class ControllerStatus(str, Enum):
@@ -53,10 +53,10 @@ class DALIController:
     channel_count: int = 64
     sensors_connected: int = 0
     luminaires_connected: int = 0
-    last_poll: Optional[str] = None
-    created_at: Optional[str] = None
+    last_poll: str | None = None
+    created_at: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "controller_id": self.controller_id,
@@ -76,7 +76,7 @@ class DALIController:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "DALIController":
+    def from_dict(cls, data: dict[str, Any]) -> "DALIController":
         """Create instance from dictionary."""
         return cls(
             controller_id=data.get("controller_id", ""),
@@ -109,15 +109,15 @@ class DALISensor:
     occupancy: bool = False
     lux_level: float = 0.0
     has_daylight: bool = True
-    desk_id: Optional[str] = None
-    x_coord: Optional[float] = None
-    y_coord: Optional[float] = None
-    last_updated: Optional[str] = None
+    desk_id: str | None = None
+    x_coord: float | None = None
+    y_coord: float | None = None
+    last_updated: str | None = None
     # Scenecom extended fields
     daylight_setpoint: float = 500.0  # Target lux for daylight harvesting
     motion_count: int = 0  # Cumulative motion events (for analytics)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "sensor_id": self.sensor_id,
@@ -138,7 +138,7 @@ class DALISensor:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "DALISensor":
+    def from_dict(cls, data: dict[str, Any]) -> "DALISensor":
         """Create instance from dictionary."""
         return cls(
             sensor_id=data.get("sensor_id", ""),
@@ -176,14 +176,14 @@ class DALILuminaire:
     power_consumption: float = 0.0  # Watts
     rated_power: float = 40.0
     fault_status: bool = False
-    fault_code: Optional[str] = None
+    fault_code: str | None = None
     lamp_hours: int = 0
-    last_updated: Optional[str] = None
+    last_updated: str | None = None
     # Scenecom extended fields
-    color_temp_kelvin: Optional[int] = None  # Tunable white: 2700K-6500K (None if not supported)
-    emergency_battery_pct: Optional[int] = None  # Emergency fitting battery % (None if not emergency)
+    color_temp_kelvin: int | None = None  # Tunable white: 2700K-6500K (None if not supported)
+    emergency_battery_pct: int | None = None  # Emergency fitting battery % (None if not emergency)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "luminaire_id": self.luminaire_id,
@@ -207,7 +207,7 @@ class DALILuminaire:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "DALILuminaire":
+    def from_dict(cls, data: dict[str, Any]) -> "DALILuminaire":
         """Create instance from dictionary."""
         return cls(
             luminaire_id=data.get("luminaire_id", ""),
@@ -244,9 +244,9 @@ class ZoneOccupancy:
     max_lux_level: float = 0.0
     floor: str = ""
     status: str = "empty"
-    last_updated: Optional[str] = None
+    last_updated: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "zone_id": self.zone_id,
@@ -275,12 +275,12 @@ class ZoneLighting:
     faulty_count: int = 0
     floor: str = ""
     energy_waste_detected: bool = False
-    energy_waste_reason: Optional[str] = None
+    energy_waste_reason: str | None = None
     # Scenecom extended fields
-    active_scene: Optional[int] = None  # Current scene number (1-8), None if manual
-    active_scene_name: Optional[str] = None  # Scene name (e.g., "Working", "Presentation")
+    active_scene: int | None = None  # Current scene number (1-8), None if manual
+    active_scene_name: str | None = None  # Scene name (e.g., "Working", "Presentation")
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "zone_id": self.zone_id,
@@ -304,7 +304,7 @@ class FloorSummary:
 
     floor: str
     floor_name: str = ""
-    zones: List[ZoneOccupancy] = field(default_factory=list)
+    zones: list[ZoneOccupancy] = field(default_factory=list)
     total_zones: int = 0
     total_sensors: int = 0
     occupied_sensors: int = 0
@@ -313,7 +313,7 @@ class FloorSummary:
     faulty_luminaires: int = 0
     total_power_watts: float = 0.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "floor": self.floor,
@@ -338,7 +338,7 @@ class BuildingOccupancy:
     timestamp: str
     total_occupancy_percent: float
     total_zones: int
-    floors: List[FloorSummary] = field(default_factory=list)
+    floors: list[FloorSummary] = field(default_factory=list)
     total_floors: int = 0
     total_sensors: int = 0
     occupied_sensors: int = 0
@@ -347,7 +347,7 @@ class BuildingOccupancy:
     total_power_watts: float = 0.0
     energy_waste_zones: int = 0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "site_id": self.site_id,
@@ -390,7 +390,7 @@ class DALIStats:
     faulty_luminaires: int = 0
     current_power_watts: float = 0.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "site_id": self.site_id,

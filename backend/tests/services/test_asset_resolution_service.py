@@ -12,7 +12,7 @@ Covers:
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -23,7 +23,6 @@ from app.models.asset_resolution import (
 )
 from app.services.asset_id_resolver import AssetIDResolver
 from app.services.asset_resolution_service import apply_resolution
-
 
 # --------------------------------------------------------------------------- #
 # Fixtures

@@ -8,7 +8,8 @@ This module defines the data models for:
 """
 
 from datetime import datetime
-from typing import Dict, List, Optional, Literal
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 
@@ -42,10 +43,10 @@ class FeatureSet(BaseModel):
     """
 
     equipment_type: str = Field(..., description="Equipment type (chiller, ahu, generator)")
-    features: List[FeatureDefinition] = Field(..., description="List of feature definitions")
+    features: list[FeatureDefinition] = Field(..., description="List of feature definitions")
 
     @property
-    def feature_names(self) -> List[str]:
+    def feature_names(self) -> list[str]:
         """Get list of all feature names."""
         return [f.name for f in self.features]
 
@@ -65,9 +66,9 @@ class ComputedFeatures(BaseModel):
     equipment_id: str = Field(..., description="Equipment identifier")
     equipment_type: str = Field(..., description="Equipment type")
     timestamp: datetime = Field(default_factory=datetime.utcnow, description="Computation timestamp")
-    features: Dict[str, Optional[float]] = Field(default_factory=dict, description="Feature name to value mapping")
-    missing_sensors: List[str] = Field(default_factory=list, description="Sensors with insufficient data")
-    computation_time_ms: Optional[float] = Field(None, description="Time taken to compute features in milliseconds")
+    features: dict[str, float | None] = Field(default_factory=dict, description="Feature name to value mapping")
+    missing_sensors: list[str] = Field(default_factory=list, description="Sensors with insufficient data")
+    computation_time_ms: float | None = Field(None, description="Time taken to compute features in milliseconds")
 
     @property
     def valid_feature_count(self) -> int:
@@ -85,9 +86,9 @@ class ComputedFeatures(BaseModel):
 class FeatureBatchRequest(BaseModel):
     """Request to compute features for multiple equipment."""
 
-    equipment_ids: List[str] = Field(..., min_length=1, description="Equipment IDs to compute")
+    equipment_ids: list[str] = Field(..., min_length=1, description="Equipment IDs to compute")
     equipment_type: str = Field(..., description="Equipment type (all must be same type)")
-    as_of: Optional[datetime] = Field(None, description="Compute features as of this time")
+    as_of: datetime | None = Field(None, description="Compute features as of this time")
 
 
 class FeatureBatchResponse(BaseModel):
@@ -95,7 +96,7 @@ class FeatureBatchResponse(BaseModel):
 
     equipment_type: str = Field(..., description="Equipment type")
     as_of: datetime = Field(..., description="Features computed as of this time")
-    results: List[ComputedFeatures] = Field(..., description="Computed features per equipment")
+    results: list[ComputedFeatures] = Field(..., description="Computed features per equipment")
     total_computation_time_ms: float = Field(..., description="Total computation time")
 
     @property
@@ -119,9 +120,9 @@ class TrainingDatasetMetadata(BaseModel):
     row_count: int = Field(..., description="Number of rows in dataset")
     equipment_count: int = Field(..., description="Number of unique equipment")
     feature_count: int = Field(..., description="Number of features")
-    feature_names: List[str] = Field(..., description="List of feature names")
-    label_column: Optional[str] = Field(None, description="Label column name if labeled")
-    label_positive_count: Optional[int] = Field(None, description="Positive label count")
+    feature_names: list[str] = Field(..., description="List of feature names")
+    label_column: str | None = Field(None, description="Label column name if labeled")
+    label_positive_count: int | None = Field(None, description="Positive label count")
     file_path: str = Field(..., description="Path to parquet file")
     file_size_bytes: int = Field(default=0, description="File size in bytes")
 
@@ -143,8 +144,8 @@ class FeatureDefinitionsResponse(BaseModel):
     """Response containing all feature definitions."""
 
     version: str = Field(..., description="Feature definitions version")
-    common_features: List[FeatureDefinition] = Field(..., description="Common features")
-    equipment_specific: Dict[str, List[FeatureDefinition]] = Field(
+    common_features: list[FeatureDefinition] = Field(..., description="Common features")
+    equipment_specific: dict[str, list[FeatureDefinition]] = Field(
         ..., description="Equipment-specific features by type"
     )
 

@@ -6,8 +6,8 @@ Tests the EquipmentLookup service with fault code database lookups.
 """
 
 import asyncio
-import sys
 import os
+import sys
 
 # Add backend to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))

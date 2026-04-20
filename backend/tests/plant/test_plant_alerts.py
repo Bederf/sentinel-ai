@@ -10,7 +10,6 @@ from fastapi.testclient import TestClient
 
 from app.plant.models import AlarmSeverity, DesigoBuildingAlarm
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -53,9 +52,9 @@ def client():
 
     # Re-import to pick up env override.  We import the router directly
     # rather than the full app to keep tests lightweight and isolated.
-    from app.plant.plant_alerts import router
-
     from fastapi import FastAPI
+
+    from app.plant.plant_alerts import router
 
     test_app = FastAPI()
     test_app.include_router(router)

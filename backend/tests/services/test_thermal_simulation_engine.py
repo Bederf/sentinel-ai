@@ -7,8 +7,9 @@ Verifies that:
 - Temperature behavior is realistic (inertia, HVAC response, thermal mass)
 """
 
+from unittest.mock import AsyncMock, Mock
+
 import pytest
-from unittest.mock import Mock, AsyncMock
 
 from app.services.thermal_simulation_engine import (
     ThermalSimulationEngine,
@@ -232,20 +233,20 @@ class TestIntegration:
         for hour in range(24):
             # Morning: occupancy increasing
             if hour == 8:
-                occupancy_data = {z: 80.0 for z in occupancy_data.keys()}
+                occupancy_data = dict.fromkeys(occupancy_data.keys(), 80.0)
                 occupancy_data["Zone-R"] = 0.0
 
             # Afternoon: high occupancy
             if hour == 14:
-                occupancy_data = {z: 85.0 for z in occupancy_data.keys()}
+                occupancy_data = dict.fromkeys(occupancy_data.keys(), 85.0)
 
             # Evening: decreasing occupancy
             if hour == 18:
-                occupancy_data = {z: 20.0 for z in occupancy_data.keys()}
+                occupancy_data = dict.fromkeys(occupancy_data.keys(), 20.0)
 
             # Night: empty
             if hour == 22:
-                occupancy_data = {z: 0.0 for z in occupancy_data.keys()}
+                occupancy_data = dict.fromkeys(occupancy_data.keys(), 0.0)
 
             # Reset temps for consistency
             thermal_engine._zone_cache = {

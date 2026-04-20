@@ -1,30 +1,32 @@
 """API endpoints for integration setup and log ingestion."""
 
-import time
 import csv
 import io
+import time
 import uuid
-from typing import List, Optional, Literal
 from datetime import datetime
-from fastapi import APIRouter, HTTPException, UploadFile, File, Query
+from typing import Literal
+
+from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel, Field
 
 from app.models.integration import (
+    BuildingStatus,
+    BulkMatchResult,
+    ColumnMapping,
+    ColumnMappingCreate,
+    FormatDetectionResult,
     LogSource,
     LogSourceCreate,
     LogSourceUpdate,
-    ColumnMapping,
-    ColumnMappingCreate,
+    ParseResult,
     PointAssetMapping,
     PointAssetMappingCreate,
-    FormatDetectionResult,
-    ParseResult,
-    BulkMatchResult,
-    ColumnMapping as CMModel,
-    BuildingStatus,
     ValidationChecklist,
 )
-
+from app.models.integration import (
+    ColumnMapping as CMModel,
+)
 
 # ==================== Monitoring Response Models ====================
 
@@ -37,8 +39,8 @@ class IntegrationAlert(BaseModel):
     severity: str  # 'warning', 'critical'
     message: str
     timestamp: str = ""
-    value: Optional[float] = None
-    threshold: Optional[float] = None
+    value: float | None = None
+    threshold: float | None = None
 
 
 class DALISourceHealth(BaseModel):
@@ -54,7 +56,7 @@ class DALISourceHealth(BaseModel):
     sensors_online: int = 0
     sensors_total: int = 0
     luminaires_total: int = 0
-    last_poll: Optional[str] = None
+    last_poll: str | None = None
     description: str = ""
 
 
@@ -63,13 +65,13 @@ class IntegrationHealthSummary(BaseModel):
 
     sources_count: int
     active_sources: int
-    last_sync: Optional[datetime] = None
+    last_sync: datetime | None = None
     total_records_ingested: int
     total_points_mapped: int
     unmatched_points: int
     recent_errors_count: int
-    alerts: List[IntegrationAlert] = Field(default_factory=list)
-    dali_sources: List[DALISourceHealth] = Field(default_factory=list)
+    alerts: list[IntegrationAlert] = Field(default_factory=list)
+    dali_sources: list[DALISourceHealth] = Field(default_factory=list)
 
 
 class DataQualityMetrics(BaseModel):
@@ -88,16 +90,16 @@ class SyncJobSummary(BaseModel):
 
     id: str
     log_source_id: str
-    source_name: Optional[str] = None
+    source_name: str | None = None
     status: str
-    records_processed: Optional[int] = None
-    records_inserted: Optional[int] = None
-    records_failed: Optional[int] = None
-    records_skipped: Optional[int] = None
-    processing_time_ms: Optional[int] = None
-    started_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
-    file_name: Optional[str] = None
+    records_processed: int | None = None
+    records_inserted: int | None = None
+    records_failed: int | None = None
+    records_skipped: int | None = None
+    processing_time_ms: int | None = None
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    file_name: str | None = None
 
 
 # ==================== Building Status Response Models ====================
@@ -107,7 +109,7 @@ class BuildingStatusUpdate(BaseModel):
     """Request to update building status."""
 
     status: str  # BuildingStatus enum value
-    notes: Optional[str] = None
+    notes: str | None = None
 
 
 class ActivationResult(BaseModel):
@@ -117,7 +119,7 @@ class ActivationResult(BaseModel):
     site_id: str
     new_status: str  # BuildingStatus enum value
     message: str
-    validation_errors: List[str] = Field(default_factory=list)
+    validation_errors: list[str] = Field(default_factory=list)
 
 
 class BuildingStatusResponse(BaseModel):
@@ -125,19 +127,18 @@ class BuildingStatusResponse(BaseModel):
 
     site_id: str
     status: str  # BuildingStatus enum value
-    last_validated_at: Optional[datetime] = None
-    notes: Optional[str] = None
+    last_validated_at: datetime | None = None
+    notes: str | None = None
 
 
+from app.core.site_resolver import get_primary_site_code  # noqa: E402
+from app.database.repositories.equipment_repository import EquipmentRepository  # noqa: E402
 from app.database.repositories.integration_repository import IntegrationRepository  # noqa: E402
 from app.database.repositories.site_repository import SiteRepository  # noqa: E402
-from app.database.repositories.equipment_repository import EquipmentRepository  # noqa: E402
+from app.models.commissioning import TruthCheckSubmission  # noqa: E402
+from app.services.commissioning_service import CommissioningService  # noqa: E402
 from app.services.log_parser import LogParserService  # noqa: E402
 from app.services.point_matcher import PointMatcherService  # noqa: E402
-from app.core.site_resolver import get_primary_site_code  # noqa: E402
-from app.services.commissioning_service import CommissioningService  # noqa: E402
-from app.models.commissioning import TruthCheckSubmission  # noqa: E402
-
 
 router = APIRouter(prefix="/api/integration", tags=["Integration"])
 
@@ -177,11 +178,11 @@ def resolve_site_uuid(site_id: str) -> str:
 # ==================== Log Sources ====================
 
 
-@router.get("/sources", response_model=List[LogSource])
+@router.get("/sources", response_model=list[LogSource])
 async def list_log_sources(
-    site_id: Optional[str] = None,
-    source_type: Optional[str] = None,
-    is_active: Optional[bool] = None,
+    site_id: str | None = None,
+    source_type: str | None = None,
+    is_active: bool | None = None,
 ):
     """List configured log sources."""
     resolved_id = resolve_site_uuid(site_id) if site_id else None
@@ -281,14 +282,14 @@ async def detect_file_format(file: UploadFile = File(...)):
 # ==================== Column Mappings ====================
 
 
-@router.get("/sources/{source_id}/mappings", response_model=List[ColumnMapping])
+@router.get("/sources/{source_id}/mappings", response_model=list[ColumnMapping])
 async def get_column_mappings(source_id: str):
     """Get column mappings for a log source."""
     return integration_repo.get_column_mappings(source_id)
 
 
-@router.post("/sources/{source_id}/mappings", response_model=List[ColumnMapping])
-async def save_column_mappings(source_id: str, mappings: List[ColumnMappingCreate]):
+@router.post("/sources/{source_id}/mappings", response_model=list[ColumnMapping])
+async def save_column_mappings(source_id: str, mappings: list[ColumnMappingCreate]):
     """
     Save column mappings for a log source.
 
@@ -353,7 +354,7 @@ async def match_points_to_assets(
 @router.post("/buildings/{site_id}/point-mappings")
 async def save_point_mappings(
     site_id: str,
-    mappings: List[PointAssetMappingCreate],
+    mappings: list[PointAssetMappingCreate],
 ):
     """Save point-to-asset mappings after review."""
     resolved_id = resolve_site_uuid(site_id)
@@ -370,8 +371,8 @@ async def verify_point_mapping(mapping_id: str, cafm_asset_id: str):
 
 @router.get("/point-mappings")
 async def get_all_point_mappings(
-    site_id: Optional[str] = Query(None, description="Filter by building ID"),
-    confidence: Optional[str] = Query(None, description="Filter by confidence level (high, medium, low, unmatched)"),
+    site_id: str | None = Query(None, description="Filter by building ID"),
+    confidence: str | None = Query(None, description="Filter by confidence level (high, medium, low, unmatched)"),
     verified_only: bool = Query(False, description="Only return verified mappings"),
     limit: int = Query(100, ge=1, le=500, description="Maximum number of results"),
     offset: int = Query(0, ge=0, description="Pagination offset"),
@@ -392,10 +393,10 @@ async def get_all_point_mappings(
     )
 
 
-@router.get("/buildings/{site_id}/point-mappings", response_model=List[PointAssetMapping])
+@router.get("/buildings/{site_id}/point-mappings", response_model=list[PointAssetMapping])
 async def get_point_mappings(
     site_id: str,
-    confidence: Optional[str] = None,
+    confidence: str | None = None,
     verified_only: bool = False,
 ):
     """Get point-to-asset mappings for a building."""
@@ -564,7 +565,7 @@ async def get_alarm_taxonomy():
 
 
 @router.get("/reference/severity-mappings")
-async def get_severity_mappings(source_id: Optional[str] = None):
+async def get_severity_mappings(source_id: str | None = None):
     """Get severity mappings (global or per-source)."""
     return integration_repo.get_severity_mappings(source_id)
 
@@ -583,7 +584,7 @@ async def get_cafm_assets(site_id: str):
 async def get_recent_alarms(
     site_id: str,
     limit: int = Query(100, ge=1, le=1000),
-    severity: Optional[str] = None,
+    severity: str | None = None,
 ):
     """Get recent ingested alarms for a building."""
     resolved_id = resolve_site_uuid(site_id)
@@ -595,7 +596,7 @@ async def get_recent_alarms(
 
 @router.get("/health", response_model=IntegrationHealthSummary)
 async def get_integration_health(
-    site_id: Optional[str] = Query(None, description="Filter by building ID"),
+    site_id: str | None = Query(None, description="Filter by building ID"),
 ):
     """
     Get integration health summary for monitoring dashboard.
@@ -612,7 +613,7 @@ async def get_integration_health(
     health = integration_repo.get_integration_health(resolved_id)
 
     # Generate alerts based on conditions
-    alerts: List[IntegrationAlert] = []
+    alerts: list[IntegrationAlert] = []
 
     # Stale data alert (>24 hours since last sync)
     if health["last_sync"]:
@@ -678,7 +679,7 @@ async def get_integration_health(
             )
 
     # Get DALI source health
-    dali_sources: List[DALISourceHealth] = []
+    dali_sources: list[DALISourceHealth] = []
     try:
         from app.services.lighting_service import get_lighting_service
 
@@ -730,9 +731,9 @@ async def get_quality_metrics(site_id: str):
     )
 
 
-@router.get("/sync-jobs", response_model=List[SyncJobSummary])
+@router.get("/sync-jobs", response_model=list[SyncJobSummary])
 async def get_sync_jobs_summary(
-    site_id: Optional[str] = Query(None, description="Filter by building ID"),
+    site_id: str | None = Query(None, description="Filter by building ID"),
     days: int = Query(7, ge=1, le=30, description="Number of days to look back"),
 ):
     """
@@ -972,7 +973,7 @@ async def suspend_building(
 
 @router.get("/unmatched-points")
 async def get_unmatched_points(
-    site_id: Optional[str] = Query(None, description="Filter by building ID"),
+    site_id: str | None = Query(None, description="Filter by building ID"),
     limit: int = Query(10, ge=1, le=100, description="Number of results"),
     offset: int = Query(0, ge=0, description="Pagination offset"),
 ):
@@ -1167,7 +1168,7 @@ async def promote_to_live(site_id: str):
     Requires: all gates passed, >= 2 consecutive pass days, passing truth check,
     and current ingestion mode must be shadow_live.
     """
-    from app.config.settings import settings, IngestionMode
+    from app.config.settings import IngestionMode, settings
 
     current_mode = settings.resolved_ingestion_mode
     if current_mode != IngestionMode.SHADOW_LIVE:

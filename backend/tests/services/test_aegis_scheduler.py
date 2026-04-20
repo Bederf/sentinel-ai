@@ -5,7 +5,7 @@ wired into the background scheduler.
 """
 
 import csv
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -112,7 +112,7 @@ class TestAegisEvidenceCollectorJob:
         # Verify the method exists and is callable
         assert callable(svc._run_aegis_evidence_collector_async)
         # Verify tracker CSV format is valid
-        with open(tracker, "r") as f:
+        with open(tracker) as f:
             reader = csv.DictReader(f)
             rows = list(reader)
             assert len(rows) == 1
@@ -131,7 +131,7 @@ class TestAegisEvidenceCollectorJob:
         decisions = [
             {
                 "id": "test-decision-1",
-                "created_at": datetime.now(timezone.utc).isoformat(),
+                "created_at": datetime.now(UTC).isoformat(),
                 "approval_outcome": "approved",
                 "write_status": "success",
                 "block_reason_code": None,
@@ -188,7 +188,7 @@ class TestAegisEvidenceCollectorJob:
         tracker = Path(__file__).parent.parent.parent.parent / ("docs/10-operations/aegis-phase0-14day-tracker.csv")
         assert tracker.exists(), f"Tracker CSV not found: {tracker}"
 
-        with open(tracker, "r") as f:
+        with open(tracker) as f:
             reader = csv.DictReader(f)
             fieldnames = reader.fieldnames
             assert "day" in fieldnames
@@ -201,7 +201,7 @@ class TestAegisEvidenceCollectorJob:
     def test_tracker_has_14_rows(self):
         """Tracker CSV has exactly 14 data rows (1 header + 14 days)."""
         tracker = Path(__file__).parent.parent.parent.parent / ("docs/10-operations/aegis-phase0-14day-tracker.csv")
-        with open(tracker, "r") as f:
+        with open(tracker) as f:
             lines = [line.strip() for line in f.readlines() if line.strip()]
         # 1 header + 14 data rows = 15 lines
         assert len(lines) == 15, f"Expected 15 lines (header + 14 days), got {len(lines)}"

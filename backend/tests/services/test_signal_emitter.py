@@ -196,7 +196,7 @@ class TestThreadId:
         from app.services.signal_emitter import _thread_id_from_references
 
         tid = _thread_id_from_references("", "<reply@ex.com>", "")
-        expected = hashlib.sha256("<reply@ex.com>".encode()).hexdigest()[:16]
+        expected = hashlib.sha256(b"<reply@ex.com>").hexdigest()[:16]
         assert tid == expected
 
     def test_thread_id_from_message_id_fallback(self):

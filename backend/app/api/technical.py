@@ -10,9 +10,9 @@ from pydantic import BaseModel, Field
 
 from app.config.access_profiles import get_access_profile_for_email, has_profile_site_access
 from app.database.repositories.user_site_access_repository import UserSiteAccessRepository
-from app.middleware.auth_middleware import require_auth, AuthLevel
-from app.models.auth import AuthContext, SentinelRole
+from app.middleware.auth_middleware import AuthLevel, require_auth
 from app.models.audit_log import AuditResultType
+from app.models.auth import AuthContext, SentinelRole
 from app.services.audit_logger import AuditLogger
 from app.services.concept_document_search import (
     ConceptDocumentSearchUnavailable,

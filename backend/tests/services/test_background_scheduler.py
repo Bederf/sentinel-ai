@@ -236,8 +236,8 @@ class TestJobDataAccess:
 
     def test_process_sentry_notifications_uses_repository_import_path(self, monkeypatch, caplog):
         """Sentry notification polling should resolve the repository import."""
-        from app.services.background_scheduler import scheduler_service
         from app.database.repositories.service_record_repository import ServiceRecordRepository
+        from app.services.background_scheduler import scheduler_service
 
         async def _fake_list(self, filters=None):
             assert filters == {"status": "notified"}

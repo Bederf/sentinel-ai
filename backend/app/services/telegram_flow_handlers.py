@@ -862,8 +862,8 @@ async def handle_ghost_room(
 
     # Mark related signal resolved
     try:
-        from app.services.ghost_room_notifier import _resolve_related_ghost_signal
         from app.models.space_occupancy import GhostBookingFinding
+        from app.services.ghost_room_notifier import _resolve_related_ghost_signal
 
         gf = GhostBookingFinding(**vars(finding))
         gf.status = updated.status

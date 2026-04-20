@@ -10,10 +10,8 @@ ML predictions and real-world maintenance results.
 """
 
 from datetime import datetime
-from typing import Dict, Optional
 
 from pydantic import BaseModel, Field
-
 
 # ============================================================================
 # Core Data Models
@@ -32,14 +30,14 @@ class MLFeedbackRecord(BaseModel):
     )
     repair_successful: bool = Field(default=False, description="Whether the repair was successful")
     effectiveness_score: float = Field(default=0.0, description="Repair effectiveness score (%)")
-    prediction_id: Optional[str] = Field(None, description="Links to ML prediction that triggered this")
-    predicted_failure_type: Optional[str] = Field(None, description="What was predicted to fail")
-    actual_failure_type: Optional[str] = Field(None, description="What actually failed")
-    prediction_was_correct: Optional[bool] = Field(None, description="Whether prediction matched actual outcome")
-    time_to_failure_predicted: Optional[int] = Field(None, description="Predicted days to failure")
-    time_to_failure_actual: Optional[int] = Field(None, description="Actual days to failure")
+    prediction_id: str | None = Field(None, description="Links to ML prediction that triggered this")
+    predicted_failure_type: str | None = Field(None, description="What was predicted to fail")
+    actual_failure_type: str | None = Field(None, description="What actually failed")
+    prediction_was_correct: bool | None = Field(None, description="Whether prediction matched actual outcome")
+    time_to_failure_predicted: int | None = Field(None, description="Predicted days to failure")
+    time_to_failure_actual: int | None = Field(None, description="Actual days to failure")
     recorded_at: datetime = Field(default_factory=datetime.now, description="When feedback was recorded")
-    metadata: Dict = Field(default_factory=dict, description="Additional metadata")
+    metadata: dict = Field(default_factory=dict, description="Additional metadata")
 
 
 class TrainingDataPoint(BaseModel):
@@ -47,11 +45,11 @@ class TrainingDataPoint(BaseModel):
 
     equipment_id: str = Field(..., description="Equipment identifier")
     equipment_type: str = Field(..., description="Type of equipment (chiller, ahu, fcu, etc.)")
-    features: Dict[str, float] = Field(default_factory=dict, description="Flattened sensor readings and feature values")
+    features: dict[str, float] = Field(default_factory=dict, description="Flattened sensor readings and feature values")
     label: str = Field(..., description="Outcome label: failed, repaired, healthy")
-    failure_type: Optional[str] = Field(None, description="Specific failure type if applicable")
-    days_to_failure: Optional[int] = Field(None, description="Days until failure occurred")
-    repair_effectiveness: Optional[float] = Field(None, description="Effectiveness of repair (0-100)")
+    failure_type: str | None = Field(None, description="Specific failure type if applicable")
+    days_to_failure: int | None = Field(None, description="Days until failure occurred")
+    repair_effectiveness: float | None = Field(None, description="Effectiveness of repair (0-100)")
     source: str = Field(default="repair_outcome", description="Data source: repair_outcome, inspection, baseline")
 
 
@@ -76,18 +74,18 @@ class MLFeedbackSummary(BaseModel):
     repair_outcomes_recorded: int = Field(default=0, description="Number of repair outcomes recorded")
     predictions_evaluated: int = Field(default=0, description="Number of predictions evaluated")
     avg_prediction_accuracy: float = Field(default=0.0, description="Average accuracy across all models")
-    model_accuracies: Dict[str, PredictionAccuracy] = Field(
+    model_accuracies: dict[str, PredictionAccuracy] = Field(
         default_factory=dict, description="Accuracy metrics per model type"
     )
     training_data_points: int = Field(default=0, description="Total training data points generated")
     module_feedback_records: int = Field(default=0, description="Number of module_outcome records")
-    module_feedback_counts: Dict[str, int] = Field(
+    module_feedback_counts: dict[str, int] = Field(
         default_factory=dict, description="Feedback record counts by module type"
     )
-    module_success_rates: Dict[str, float] = Field(
+    module_success_rates: dict[str, float] = Field(
         default_factory=dict, description="Module outcome success rates (%) by module type"
     )
-    last_retrain_date: Optional[datetime] = Field(None, description="Last ML model retrain date")
+    last_retrain_date: datetime | None = Field(None, description="Last ML model retrain date")
 
 
 # ============================================================================
@@ -102,5 +100,5 @@ class RecordFeedbackRequest(BaseModel):
     work_order_id: str = Field(..., description="Work order ID")
     effectiveness_score: float = Field(..., ge=0, le=100, description="Repair effectiveness score (%)")
     repair_successful: bool = Field(..., description="Whether the repair was successful")
-    failure_type: Optional[str] = Field(None, description="Type of failure that was repaired")
-    prediction_id: Optional[str] = Field(None, description="ML prediction ID that triggered this repair")
+    failure_type: str | None = Field(None, description="Type of failure that was repaired")
+    prediction_id: str | None = Field(None, description="ML prediction ID that triggered this repair")

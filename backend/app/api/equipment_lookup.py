@@ -9,12 +9,12 @@ Endpoints:
     POST /api/equipment-lookup/search - Natural language search
 """
 
-import re
 import logging
-from typing import Optional, List, Dict, Any
-from pydantic import BaseModel
+import re
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel
 
 from app.services.equipment_lookup import EquipmentLookup
 
@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/equipment-lookup", tags=["equipment-lookup"])
 
 # Initialize lookup service (singleton)
-_lookup_instance: Optional[EquipmentLookup] = None
+_lookup_instance: EquipmentLookup | None = None
 
 
 def get_lookup() -> EquipmentLookup:
@@ -43,15 +43,15 @@ class ProbableCause(BaseModel):
 
     cause: str
     likelihood: str
-    component: Optional[str] = None
-    check: Optional[str] = None
+    component: str | None = None
+    check: str | None = None
 
 
 class RecommendedFix(BaseModel):
     """Recommended fix for a fault."""
 
-    immediate: List[str] = []
-    scenarios: Dict[str, str] = {}
+    immediate: list[str] = []
+    scenarios: dict[str, str] = {}
 
 
 class FaultInfo(BaseModel):
@@ -61,41 +61,41 @@ class FaultInfo(BaseModel):
     name: str
     severity: str
     description: str
-    probable_causes: List[ProbableCause] = []
-    recommended_fix: Optional[RecommendedFix] = None
-    safety_notes: Optional[str] = None
+    probable_causes: list[ProbableCause] = []
+    recommended_fix: RecommendedFix | None = None
+    safety_notes: str | None = None
 
 
 class SupplierResult(BaseModel):
     """Part supplier search result."""
 
     supplier: str
-    name: Optional[str] = None
-    part_number: Optional[str] = None
-    price: Optional[str] = None
-    lead_time: Optional[str] = None
+    name: str | None = None
+    part_number: str | None = None
+    price: str | None = None
+    lead_time: str | None = None
     available: bool = True
-    url: Optional[str] = None
+    url: str | None = None
 
 
 class GenericAlternative(BaseModel):
     """Generic alternative for OEM part."""
 
     category: str
-    generic_part_number: Optional[str] = None
-    manufacturer: Optional[str] = None
-    description: Optional[str] = None
-    suppliers: List[str] = []
+    generic_part_number: str | None = None
+    manufacturer: str | None = None
+    description: str | None = None
+    suppliers: list[str] = []
 
 
 class PartResult(BaseModel):
     """Part search result."""
 
     part_name: str
-    part_number: Optional[str] = None
-    manufacturer: Optional[str] = None
-    suppliers: List[SupplierResult] = []
-    generic_alternative: Optional[GenericAlternative] = None
+    part_number: str | None = None
+    manufacturer: str | None = None
+    suppliers: list[SupplierResult] = []
+    generic_alternative: GenericAlternative | None = None
 
 
 class ForumResult(BaseModel):
@@ -103,22 +103,22 @@ class ForumResult(BaseModel):
 
     source: str
     url: str
-    title: Optional[str] = None
-    snippet: Optional[str] = None
-    description: Optional[str] = None
-    coverage: List[str] = []
+    title: str | None = None
+    snippet: str | None = None
+    description: str | None = None
+    coverage: list[str] = []
 
 
 class FaultCodeResponse(BaseModel):
     """Response for fault code lookup."""
 
-    fault: Optional[FaultInfo] = None
+    fault: FaultInfo | None = None
     manufacturer: str
-    model: Optional[str] = None
-    parts: List[PartResult] = []
-    forum_solutions: List[ForumResult] = []
-    sources: List[str] = []
-    scraped_data: Optional[Dict[str, Any]] = None
+    model: str | None = None
+    parts: list[PartResult] = []
+    forum_solutions: list[ForumResult] = []
+    sources: list[str] = []
+    scraped_data: dict[str, Any] | None = None
 
 
 class SearchSuggestion(BaseModel):
@@ -133,13 +133,13 @@ class SearchResponse(BaseModel):
     """Response for natural language search."""
 
     query_type: str
-    fault: Optional[FaultInfo] = None
-    manufacturer: Optional[str] = None
-    model: Optional[str] = None
-    suggestions: List[SearchSuggestion] = []
-    parts: List[PartResult] = []
-    forum_solutions: List[ForumResult] = []
-    note: Optional[str] = None
+    fault: FaultInfo | None = None
+    manufacturer: str | None = None
+    model: str | None = None
+    suggestions: list[SearchSuggestion] = []
+    parts: list[PartResult] = []
+    forum_solutions: list[ForumResult] = []
+    note: str | None = None
 
 
 # ============================================================================
@@ -151,8 +151,8 @@ class SearchResponse(BaseModel):
 async def get_fault_code(
     manufacturer: str = Query(..., description="Equipment manufacturer (e.g., Carrier, Trane, Daikin)"),
     fault_code: str = Query(..., description="Fault code (e.g., E4, FAULT_001, ALARM_1)"),
-    model: Optional[str] = Query(None, description="Equipment model (e.g., 30XA, RTAC)"),
-    equipment_type: Optional[str] = Query(None, description="Equipment type (chiller, ahu, vsd)"),
+    model: str | None = Query(None, description="Equipment model (e.g., 30XA, RTAC)"),
+    equipment_type: str | None = Query(None, description="Equipment type (chiller, ahu, vsd)"),
 ) -> FaultCodeResponse:
     """
     Look up fault code and get diagnosis, fix, and parts.
@@ -240,13 +240,13 @@ async def get_fault_code(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/parts", response_model=List[PartResult])
+@router.get("/parts", response_model=list[PartResult])
 async def search_parts(
-    part_number: Optional[str] = Query(None, description="OEM or generic part number"),
-    part_description: Optional[str] = Query(None, description="Part description to search"),
-    manufacturer: Optional[str] = Query(None, description="Filter by manufacturer"),
+    part_number: str | None = Query(None, description="OEM or generic part number"),
+    part_description: str | None = Query(None, description="Part description to search"),
+    manufacturer: str | None = Query(None, description="Filter by manufacturer"),
     include_alternatives: bool = Query(True, description="Include generic alternatives"),
-) -> List[PartResult]:
+) -> list[PartResult]:
     """
     Search for parts across South African suppliers.
 
@@ -296,8 +296,8 @@ async def search_parts(
 @router.post("/search", response_model=SearchResponse)
 async def search_equipment_issue(
     query: str = Query(..., description="Natural language query"),
-    manufacturer: Optional[str] = Query(None, description="Filter by manufacturer"),
-    model: Optional[str] = Query(None, description="Filter by model"),
+    manufacturer: str | None = Query(None, description="Filter by manufacturer"),
+    model: str | None = Query(None, description="Filter by model"),
 ) -> SearchResponse:
     """
     Natural language search for equipment issues.
@@ -335,8 +335,8 @@ async def search_equipment_issue(
 
 
 async def _search_by_part_number(
-    lookup: EquipmentLookup, part_number: str, manufacturer: Optional[str] = None
-) -> List[PartResult]:
+    lookup: EquipmentLookup, part_number: str, manufacturer: str | None = None
+) -> list[PartResult]:
     """Search suppliers by exact part number."""
     results = []
     query = part_number
@@ -371,8 +371,8 @@ async def _search_by_part_number(
 
 
 async def _search_by_description(
-    lookup: EquipmentLookup, description: str, manufacturer: Optional[str] = None
-) -> List[PartResult]:
+    lookup: EquipmentLookup, description: str, manufacturer: str | None = None
+) -> list[PartResult]:
     """Search suppliers by part description."""
     results = []
 
@@ -429,7 +429,7 @@ async def _search_by_description(
 
 
 async def _natural_language_search(
-    lookup: EquipmentLookup, query: str, manufacturer: Optional[str] = None, model: Optional[str] = None
+    lookup: EquipmentLookup, query: str, manufacturer: str | None = None, model: str | None = None
 ) -> SearchResponse:
     """
     Parse natural language query and return relevant results.
@@ -523,7 +523,7 @@ async def _natural_language_search(
 
 
 async def _keyword_search(
-    lookup: EquipmentLookup, query: str, manufacturer: Optional[str], model: Optional[str]
+    lookup: EquipmentLookup, query: str, manufacturer: str | None, model: str | None
 ) -> SearchResponse:
     """Fallback keyword search when no fault code detected."""
 

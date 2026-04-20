@@ -6,10 +6,9 @@ COV subscriptions, and oBIX REST API endpoints.
 """
 
 from datetime import datetime
-from typing import Any, List, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
-
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -53,9 +52,9 @@ class OBIXHistoryRequest(BaseModel):
     """Request parameters for historical data query."""
 
     point_path: str = Field(..., description="History path (e.g., histories/temperature1)")
-    start_datetime: Optional[datetime] = Field(None, description="Start of query range")
-    end_datetime: Optional[datetime] = Field(None, description="End of query range")
-    limit: Optional[int] = Field(None, description="Maximum records to return", ge=1, le=10000)
+    start_datetime: datetime | None = Field(None, description="Start of query range")
+    end_datetime: datetime | None = Field(None, description="End of query range")
+    limit: int | None = Field(None, description="Maximum records to return", ge=1, le=10000)
 
 
 class OBIXHistoryData(BaseModel):
@@ -71,7 +70,7 @@ class OBIXHistoryResponse(BaseModel):
 
     point_path: str = Field(..., description="History path queried")
     count: int = Field(0, description="Number of records returned")
-    records: List[OBIXHistoryData] = Field(default_factory=list)
+    records: list[OBIXHistoryData] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -82,8 +81,8 @@ class OBIXHistoryResponse(BaseModel):
 class OBIXAlarm(BaseModel):
     """A single oBIX alarm record."""
 
-    alarm_id: Optional[str] = Field(None, description="Alarm identifier")
-    timestamp: Optional[str] = Field(None, description="Alarm timestamp (ISO 8601)")
+    alarm_id: str | None = Field(None, description="Alarm identifier")
+    timestamp: str | None = Field(None, description="Alarm timestamp (ISO 8601)")
     severity: str = Field("unknown", description="Alarm severity (critical, warning, info)")
     priority: int = Field(5, description="Alarm priority (1=highest, 5=lowest)")
     source: str = Field("", description="Alarm source path")
@@ -94,10 +93,10 @@ class OBIXAlarm(BaseModel):
 class OBIXAlarmRequest(BaseModel):
     """Request parameters for alarm history query."""
 
-    start_datetime: Optional[datetime] = Field(None, description="Start of query range")
-    end_datetime: Optional[datetime] = Field(None, description="End of query range")
-    severity_filter: Optional[str] = Field(None, description="Filter by severity")
-    priority_filter: Optional[int] = Field(None, description="Filter by priority level", ge=1, le=5)
+    start_datetime: datetime | None = Field(None, description="Start of query range")
+    end_datetime: datetime | None = Field(None, description="End of query range")
+    severity_filter: str | None = Field(None, description="Filter by severity")
+    priority_filter: int | None = Field(None, description="Filter by priority level", ge=1, le=5)
     limit: int = Field(100, description="Maximum alarms to return", ge=1, le=1000)
 
 
@@ -105,7 +104,7 @@ class OBIXAlarmResponse(BaseModel):
     """Response for an alarm query."""
 
     count: int = Field(0, description="Number of alarms returned")
-    alarms: List[OBIXAlarm] = Field(default_factory=list)
+    alarms: list[OBIXAlarm] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -117,8 +116,8 @@ class OBIXConnectionStatus(BaseModel):
     """oBIX connection health status."""
 
     connected: bool = Field(False, description="Whether currently connected")
-    last_auth: Optional[str] = Field(None, description="Last authentication timestamp")
-    server_version: Optional[str] = Field(None, description="Niagara server version")
+    last_auth: str | None = Field(None, description="Last authentication timestamp")
+    server_version: str | None = Field(None, description="Niagara server version")
     base_url: str = Field("", description="Server base URL")
     message: str = Field("", description="Status message")
 
@@ -155,14 +154,14 @@ class BACnetDiscoverRequest(BaseModel):
     """Request parameters for BACnet device discovery."""
 
     timeout: float = Field(5.0, description="Discovery timeout in seconds", ge=1.0, le=30.0)
-    host: Optional[str] = Field(None, description="Optional host/IP to match discovered devices against")
+    host: str | None = Field(None, description="Optional host/IP to match discovered devices against")
 
 
 class BACnetDiscoverResponse(BaseModel):
     """Response for BACnet device discovery."""
 
     count: int = Field(0, description="Number of devices discovered")
-    devices: List[BACnetDeviceInfo] = Field(default_factory=list)
+    devices: list[BACnetDeviceInfo] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -178,14 +177,14 @@ class BACnetPointInfo(BaseModel):
     name: str = Field("", description="Point display name")
     description: str = Field("", description="Point description")
     units: str = Field("", description="Engineering units")
-    present_value: Optional[Any] = Field(None, description="Current value")
+    present_value: Any | None = Field(None, description="Current value")
     writable: bool = Field(False, description="Whether the point is writable")
 
 
 class BACnetPointDiscoveryRequest(BaseModel):
     """Request parameters for point discovery on a device."""
 
-    object_types: Optional[List[str]] = Field(
+    object_types: list[str] | None = Field(
         None,
         description="Filter by object types (e.g., ['analogInput', 'analogValue'])",
     )
@@ -197,7 +196,7 @@ class BACnetPointDiscoveryResponse(BaseModel):
 
     device_id: int = Field(..., description="BACnet device instance number")
     count: int = Field(0, description="Number of points discovered")
-    points: List[BACnetPointInfo] = Field(default_factory=list)
+    points: list[BACnetPointInfo] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -212,7 +211,7 @@ class BACnetPointReadResponse(BaseModel):
     object_type: str = Field(..., description="BACnet object type")
     instance: int = Field(..., description="Object instance number")
     property_name: str = Field("presentValue", description="Property read")
-    value: Optional[Any] = Field(None, description="Point value")
+    value: Any | None = Field(None, description="Point value")
     timestamp: str = Field("", description="Read timestamp (ISO 8601)")
 
 
@@ -251,7 +250,7 @@ class BACnetCOVSubscribeRequest(BaseModel):
     """Request to create a COV subscription."""
 
     device_id: int = Field(..., description="BACnet device instance number")
-    points: List[BACnetCOVPoint] = Field(..., description="Points to subscribe to")
+    points: list[BACnetCOVPoint] = Field(..., description="Points to subscribe to")
     lifetime: int = Field(60, description="Subscription lifetime in seconds", ge=10, le=3600)
 
 
@@ -260,7 +259,7 @@ class BACnetCOVSubscriptionResponse(BaseModel):
 
     subscription_id: str = Field(..., description="Unique subscription identifier")
     device_id: int = Field(..., description="BACnet device instance number")
-    points: List[BACnetCOVPoint] = Field(default_factory=list)
+    points: list[BACnetCOVPoint] = Field(default_factory=list)
     lifetime: int = Field(60, description="Subscription lifetime in seconds")
     created_at: str = Field("", description="Creation timestamp (ISO 8601)")
     expires_at: str = Field("", description="Expiration timestamp (ISO 8601)")
@@ -271,7 +270,7 @@ class BACnetCOVSubscriptionListResponse(BaseModel):
     """Response listing active COV subscriptions."""
 
     count: int = Field(0, description="Number of active subscriptions")
-    subscriptions: List[BACnetCOVSubscriptionResponse] = Field(default_factory=list)
+    subscriptions: list[BACnetCOVSubscriptionResponse] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -283,7 +282,7 @@ class BACnetTestConnectionRequest(BaseModel):
     """Request to test BACnet connectivity."""
 
     timeout: int = Field(5, description="Discovery timeout in seconds", ge=1, le=30)
-    host: Optional[str] = Field(None, description="Optional host/IP to match discovered devices against")
+    host: str | None = Field(None, description="Optional host/IP to match discovered devices against")
 
 
 class BACnetClientStatus(BaseModel):
@@ -291,6 +290,6 @@ class BACnetClientStatus(BaseModel):
 
     started: bool = Field(False, description="Whether the client is running")
     port: int = Field(47808, description="BACnet port")
-    ip: Optional[str] = Field(None, description="Bound IP address")
+    ip: str | None = Field(None, description="Bound IP address")
     active_subscriptions: int = Field(0, description="Number of active COV subscriptions")
     cached_devices: int = Field(0, description="Number of cached device point lists")

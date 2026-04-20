@@ -4,11 +4,11 @@ Parses the formatted output from explanation templates into structured
 dictionaries that can be used in the UI or stored in the database.
 """
 
-import re
 import logging
-from typing import Dict, List, Optional, Any
+import re
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -37,8 +37,8 @@ class PartNeeded:
     """A part needed for maintenance."""
 
     name: str
-    quantity: Optional[str] = None
-    part_number: Optional[str] = None
+    quantity: str | None = None
+    part_number: str | None = None
 
     def to_dict(self) -> dict:
         return {"name": self.name, "quantity": self.quantity, "part_number": self.part_number}
@@ -49,14 +49,14 @@ class ParsedExplanation:
     """Structured explanation parsed from LLM output."""
 
     summary: str = ""
-    key_factors: List[str] = field(default_factory=list)
-    recommended_actions: List[RecommendedAction] = field(default_factory=list)
-    parts_needed: List[PartNeeded] = field(default_factory=list)
+    key_factors: list[str] = field(default_factory=list)
+    recommended_actions: list[RecommendedAction] = field(default_factory=list)
+    parts_needed: list[PartNeeded] = field(default_factory=list)
     labor_estimate: str = ""
     additional_notes: str = ""
     raw_text: str = ""
     parse_success: bool = True
-    parse_errors: List[str] = field(default_factory=list)
+    parse_errors: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         return {
@@ -75,15 +75,15 @@ class ParsedExplanation:
 class ParsedRecommendation:
     """Structured recommendation parsed from maintenance template."""
 
-    immediate_actions: List[str] = field(default_factory=list)
-    scheduled_maintenance: List[Dict[str, str]] = field(default_factory=list)
-    preventive_measures: List[str] = field(default_factory=list)
-    spare_parts: List[PartNeeded] = field(default_factory=list)
-    technician_skills: List[str] = field(default_factory=list)
+    immediate_actions: list[str] = field(default_factory=list)
+    scheduled_maintenance: list[dict[str, str]] = field(default_factory=list)
+    preventive_measures: list[str] = field(default_factory=list)
+    spare_parts: list[PartNeeded] = field(default_factory=list)
+    technician_skills: list[str] = field(default_factory=list)
     estimated_downtime: str = ""
     raw_text: str = ""
     parse_success: bool = True
-    parse_errors: List[str] = field(default_factory=list)
+    parse_errors: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         return {
@@ -206,7 +206,7 @@ class ExplanationParser:
         return result
 
     @classmethod
-    def _extract_sections(cls, text: str, section_names: List[str]) -> Dict[str, str]:
+    def _extract_sections(cls, text: str, section_names: list[str]) -> dict[str, str]:
         """Extract named sections from text.
 
         Args:
@@ -260,7 +260,7 @@ class ExplanationParser:
         return text.strip()
 
     @classmethod
-    def _parse_list_items(cls, text: str) -> List[str]:
+    def _parse_list_items(cls, text: str) -> list[str]:
         """Parse bulleted list items from text.
 
         Args:
@@ -287,7 +287,7 @@ class ExplanationParser:
         return items
 
     @classmethod
-    def _parse_actions(cls, text: str) -> List[RecommendedAction]:
+    def _parse_actions(cls, text: str) -> list[RecommendedAction]:
         """Parse recommended actions with priorities.
 
         Args:
@@ -331,7 +331,7 @@ class ExplanationParser:
         return actions
 
     @classmethod
-    def _parse_parts(cls, text: str) -> List[PartNeeded]:
+    def _parse_parts(cls, text: str) -> list[PartNeeded]:
         """Parse parts needed list.
 
         Args:
@@ -363,7 +363,7 @@ class ExplanationParser:
         return parts
 
     @classmethod
-    def _parse_scheduled_items(cls, text: str) -> List[Dict[str, str]]:
+    def _parse_scheduled_items(cls, text: str) -> list[dict[str, str]]:
         """Parse scheduled maintenance items with timeline.
 
         Args:
@@ -398,7 +398,7 @@ class ExplanationParser:
         return items
 
     @classmethod
-    def _parse_detailed_parts(cls, text: str) -> List[PartNeeded]:
+    def _parse_detailed_parts(cls, text: str) -> list[PartNeeded]:
         """Parse parts with full details (name | part number | quantity).
 
         Args:
@@ -435,7 +435,7 @@ class ExplanationParser:
         return parts
 
 
-def parse_llm_explanation(text: str) -> Dict[str, Any]:
+def parse_llm_explanation(text: str) -> dict[str, Any]:
     """Convenience function to parse explanation and return dict.
 
     Args:
@@ -447,7 +447,7 @@ def parse_llm_explanation(text: str) -> Dict[str, Any]:
     return ExplanationParser.parse_explanation(text).to_dict()
 
 
-def parse_llm_recommendation(text: str) -> Dict[str, Any]:
+def parse_llm_recommendation(text: str) -> dict[str, Any]:
     """Convenience function to parse recommendation and return dict.
 
     Args:

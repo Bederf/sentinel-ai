@@ -115,8 +115,8 @@ class TestCleanInstallAdapters:
     @pytest.mark.asyncio
     async def test_device_abstraction_skips_unknown_protocol(self):
         """device_abstraction skips unknown protocol devices gracefully."""
-        from app.services.device_abstraction import DeviceManager
         from app.models.device import create_device_from_dict
+        from app.services.device_abstraction import DeviceManager
 
         manager = DeviceManager.__new__(DeviceManager)
         manager._devices = {}
@@ -155,7 +155,7 @@ class TestIngestionModeDecoupling:
 
     def test_site002_enabled_forces_simulation(self):
         """site002_source_enabled=True forces SIMULATION ingestion mode."""
-        from app.config.settings import Settings, IngestionMode
+        from app.config.settings import IngestionMode, Settings
 
         s = Settings(
             demo_mode=False,
@@ -166,7 +166,7 @@ class TestIngestionModeDecoupling:
 
     def test_site002_disabled_uses_env_ingestion_mode(self):
         """site002_source_enabled=False uses the configured ingestion_mode."""
-        from app.config.settings import Settings, IngestionMode
+        from app.config.settings import IngestionMode, Settings
 
         s = Settings(
             demo_mode=False,

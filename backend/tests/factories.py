@@ -2,9 +2,8 @@
 Test data factories for creating mock objects in tests.
 """
 
-from typing import Optional
-from datetime import datetime
 import uuid
+from datetime import datetime
 
 
 class DeviceFactory:
@@ -12,8 +11,8 @@ class DeviceFactory:
 
     @staticmethod
     def create(
-        device_id: Optional[str] = None,
-        name: Optional[str] = None,
+        device_id: str | None = None,
+        name: str | None = None,
         device_type: str = "hvac",
         protocol: str = "mock",
         **kwargs,
@@ -97,7 +96,7 @@ class SiteFactory:
     """Factory for creating test Site instances."""
 
     @staticmethod
-    def create(site_id: Optional[str] = None, name: Optional[str] = None, **kwargs) -> dict:
+    def create(site_id: str | None = None, name: str | None = None, **kwargs) -> dict:
         """Create a test site dictionary."""
         return {
             "id": site_id or f"test-site-{uuid.uuid4().hex[:8]}",
@@ -116,7 +115,7 @@ class SafetyRuleFactory:
 
     @staticmethod
     def create_temperature_range(
-        rule_id: Optional[str] = None,
+        rule_id: str | None = None,
         device_type: str = "hvac",
         min_temp: float = 16.0,
         max_temp: float = 28.0,
@@ -141,7 +140,7 @@ class SafetyRuleFactory:
 
     @staticmethod
     def create_runtime_limit(
-        rule_id: Optional[str] = None, device_type: str = "hvac", min_runtime_minutes: int = 5, **kwargs
+        rule_id: str | None = None, device_type: str = "hvac", min_runtime_minutes: int = 5, **kwargs
     ) -> dict:
         """Create a runtime limit safety rule."""
         return {
@@ -164,7 +163,7 @@ class AuditLogFactory:
     """Factory for creating test AuditLogEntry instances."""
 
     @staticmethod
-    def create(log_id: Optional[str] = None, action: str = "DEVICE_CONTROL", result: str = "SUCCESS", **kwargs) -> dict:
+    def create(log_id: str | None = None, action: str = "DEVICE_CONTROL", result: str = "SUCCESS", **kwargs) -> dict:
         """Create a test audit log entry."""
         return {
             "id": log_id or f"test-audit-{uuid.uuid4().hex[:8]}",

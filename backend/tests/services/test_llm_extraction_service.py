@@ -7,14 +7,14 @@ _esc helper, and C1 JSON injection prevention.
 from __future__ import annotations
 
 import json
-import pytest
 from unittest.mock import AsyncMock, Mock
+
+import pytest
 
 from app.services.llm_extraction_service import (
     LLMExtractionResult,
     LLMExtractionService,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures

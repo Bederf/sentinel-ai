@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 logger = logging.getLogger("sentinel.space.repository")
 
@@ -15,7 +15,7 @@ def _get_client():
     return get_supabase_client()
 
 
-async def get_device_by_token(token: str) -> Optional[dict]:
+async def get_device_by_token(token: str) -> dict | None:
     """Look up a sensor device by its bearer token."""
     try:
         client = _get_client()
@@ -40,12 +40,12 @@ async def get_all_devices(site_id: str = "FLN02") -> list[dict]:
 
 async def update_device_last_seen(
     sensor_id: str,
-    rssi: Optional[int] = None,
-    uptime: Optional[int] = None,
-    firmware: Optional[str] = None,
+    rssi: int | None = None,
+    uptime: int | None = None,
+    firmware: str | None = None,
 ) -> None:
     """Update last-seen metadata on a sensor device."""
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     try:
         client = _get_client()
         payload: dict[str, Any] = {"last_seen_at": now}
@@ -78,7 +78,7 @@ async def upsert_room_current_state(state: dict) -> None:
         logger.error("Canonical upsert_room_current_state failed: %s", exc)
 
 
-async def get_room_current_state(room_code: str) -> Optional[dict]:
+async def get_room_current_state(room_code: str) -> dict | None:
     """Fetch the current state for a single room."""
     try:
         client = _get_client()
@@ -112,7 +112,7 @@ async def insert_finding(finding: dict) -> None:
 
 async def resolve_finding(room_code: str, finding_type: str) -> None:
     """Mark all active findings of a given type as resolved for a room."""
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     try:
         client = _get_client()
         client.table("space_room_state_findings").update({"resolved": True, "resolved_at": now}).eq(
@@ -122,7 +122,7 @@ async def resolve_finding(room_code: str, finding_type: str) -> None:
         logger.error("Canonical resolve_finding failed: %s", exc)
 
 
-async def get_active_findings(room_code: Optional[str] = None) -> list[dict]:
+async def get_active_findings(room_code: str | None = None) -> list[dict]:
     """Return unresolved findings, optionally filtered by room."""
     try:
         client = _get_client()

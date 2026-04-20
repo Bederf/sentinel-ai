@@ -21,23 +21,22 @@ Endpoints:
 """
 
 import logging
-from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException
 
 from app.models.repair_effectiveness import (
-    RepairEffectivenessRequest,
-    RepairOutcome,
     EffectivenessScore,
     HealthScoreUpdate,
+    RepairEffectivenessRequest,
     RepairHistoryEntry,
+    RepairOutcome,
+)
+from app.services.followup_scheduler import (
+    CostBenefitAnalysis,
+    FollowupTask,
+    get_followup_scheduler,
 )
 from app.services.repair_effectiveness_service import get_repair_effectiveness_service
-from app.services.followup_scheduler import (
-    get_followup_scheduler,
-    FollowupTask,
-    CostBenefitAnalysis,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -125,8 +124,8 @@ async def get_equipment_health(equipment_id: str) -> HealthScoreUpdate:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/history/{equipment_id}", response_model=List[RepairHistoryEntry])
-async def get_repair_history(equipment_id: str) -> List[RepairHistoryEntry]:
+@router.get("/history/{equipment_id}", response_model=list[RepairHistoryEntry])
+async def get_repair_history(equipment_id: str) -> list[RepairHistoryEntry]:
     """
     Get repair history for equipment.
 
@@ -174,8 +173,8 @@ async def get_effectiveness_summary():
 # ============================================================================
 
 
-@router.get("/followups", response_model=List[FollowupTask])
-async def get_followups(equipment_id: Optional[str] = None, status: Optional[str] = None) -> List[FollowupTask]:
+@router.get("/followups", response_model=list[FollowupTask])
+async def get_followups(equipment_id: str | None = None, status: str | None = None) -> list[FollowupTask]:
     """
     Get pending follow-up tasks.
 

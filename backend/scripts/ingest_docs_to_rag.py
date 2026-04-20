@@ -10,17 +10,16 @@ Usage:
 """
 
 import asyncio
-import sys
 import os
+import sys
 from pathlib import Path
-from typing import List
 
 # Add backend to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app.database.supabase_client import get_supabase_client  # noqa: E402
-from app.services.embedding_service import get_embedding_service  # noqa: E402
-from app.services.vector_db import get_vector_db_service  # noqa: E402
+from app.database.supabase_client import get_supabase_client
+from app.services.embedding_service import get_embedding_service
+from app.services.vector_db import get_vector_db_service
 
 # Project root
 PROJECT_ROOT = Path(__file__).parent.parent.parent
@@ -58,7 +57,7 @@ PRIORITY_DOCS = [
 ]
 
 
-def find_md_files(root: Path, skip_dirs: set) -> List[Path]:
+def find_md_files(root: Path, skip_dirs: set) -> list[Path]:
     """Find all .md files in project, excluding specified directories.
 
     System-documentation mode:
@@ -121,9 +120,7 @@ def get_doc_category(filepath: Path) -> str:
         return "regional"
     elif "docs/15-business-context" in path_str:
         return "business"
-    elif ".planning/phases/64-risk-governance" in path_str:
-        return "security"
-    elif "SECURITY-PRIVACY" in path_str:
+    elif ".planning/phases/64-risk-governance" in path_str or "SECURITY-PRIVACY" in path_str:
         return "security"
     elif "FEATURES.md" in path_str:
         return "features"

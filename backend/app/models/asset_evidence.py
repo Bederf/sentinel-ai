@@ -5,12 +5,11 @@ Pydantic models for evidence data validation and serialization.
 Supports classification, normalization, and CRUD operations.
 """
 
-from enum import Enum
-from typing import Optional
 from datetime import datetime
+from enum import Enum
 from uuid import UUID
-from pydantic import BaseModel, ConfigDict, Field
 
+from pydantic import BaseModel, ConfigDict, Field
 
 # ============================================================================
 # Enums (matching Supabase enum types)
@@ -80,8 +79,8 @@ class CreateAssetEvidenceInput(BaseModel):
     source_type: SourceType
     artifact_type: ArtifactType
     evidence_class: EvidenceClass
-    document_id: Optional[UUID] = None
-    source_ref: Optional[str] = None
+    document_id: UUID | None = None
+    source_ref: str | None = None
     event_timestamp: datetime
     raw_payload: dict = Field(default_factory=dict)
     normalized_payload: dict = Field(default_factory=dict)
@@ -89,7 +88,7 @@ class CreateAssetEvidenceInput(BaseModel):
     assessment_relevance: bool = True
     provenance_type: ProvenanceType
     provenance_uri: str
-    uploader_user_id: Optional[UUID] = None
+    uploader_user_id: UUID | None = None
 
 
 class AssetEvidence(BaseModel):
@@ -103,8 +102,8 @@ class AssetEvidence(BaseModel):
     source_type: SourceType
     artifact_type: ArtifactType
     evidence_class: EvidenceClass
-    document_id: Optional[UUID] = None
-    source_ref: Optional[str] = None
+    document_id: UUID | None = None
+    source_ref: str | None = None
     event_timestamp: datetime
     raw_payload: dict
     normalized_payload: dict
@@ -112,10 +111,10 @@ class AssetEvidence(BaseModel):
     assessment_relevance: bool
     provenance_type: ProvenanceType
     provenance_uri: str
-    uploader_user_id: Optional[UUID] = None
-    uploader_user_email: Optional[str] = None
+    uploader_user_id: UUID | None = None
+    uploader_user_email: str | None = None
     created_at: datetime
-    supersedes_evidence_id: Optional[UUID] = None
+    supersedes_evidence_id: UUID | None = None
 
 
 class AssetEvidenceFilter(BaseModel):
@@ -123,12 +122,12 @@ class AssetEvidenceFilter(BaseModel):
 
     model_config = ConfigDict(use_enum_values=False)
 
-    site_id: Optional[UUID] = None
-    equipment_id: Optional[UUID] = None
-    source_type: Optional[SourceType] = None
-    evidence_class: Optional[EvidenceClass] = None
-    start_date: Optional[datetime] = None
-    end_date: Optional[datetime] = None
+    site_id: UUID | None = None
+    equipment_id: UUID | None = None
+    source_type: SourceType | None = None
+    evidence_class: EvidenceClass | None = None
+    start_date: datetime | None = None
+    end_date: datetime | None = None
     active_only: bool = True  # supersedes_evidence_id IS NULL
 
 
@@ -137,10 +136,10 @@ class AssetEvidencePatch(BaseModel):
 
     model_config = ConfigDict(use_enum_values=False)
 
-    confidence_score: Optional[float] = Field(None, ge=0.0, le=1.0)
-    assessment_relevance: Optional[bool] = None
-    normalized_payload: Optional[dict] = None
-    supersedes_evidence_id: Optional[UUID] = None
+    confidence_score: float | None = Field(None, ge=0.0, le=1.0)
+    assessment_relevance: bool | None = None
+    normalized_payload: dict | None = None
+    supersedes_evidence_id: UUID | None = None
 
 
 class AssetEvidenceSupersession(BaseModel):
@@ -150,7 +149,7 @@ class AssetEvidenceSupersession(BaseModel):
 
     old_evidence_id: UUID
     new_evidence_id: UUID
-    reason: Optional[str] = None
+    reason: str | None = None
 
 
 def __getattr__(name: str):

@@ -4,14 +4,14 @@ Implements dual-write pattern: Supabase (primary) + JSON file (backup).
 Gracefully falls back to JSON-only when Supabase is unavailable.
 """
 
-from typing import List, Optional, Dict, Any
-from datetime import datetime, timedelta
 import json
 import logging
+from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Any, Optional
 
 from app.database.supabase_client import get_supabase_client
-from app.models.security import AccessEvent, SecurityAlert, AccessStatus, VisitorStatus, AlertStatus
+from app.models.security import AccessEvent, AccessStatus, AlertStatus, SecurityAlert, VisitorStatus
 
 logger = logging.getLogger(__name__)
 
@@ -29,19 +29,19 @@ class SecurityRepository:
         self.json_backup_dir.mkdir(parents=True, exist_ok=True)
         return self.json_backup_dir / f"{data_type}.json"
 
-    def _load_json_backup(self, data_type: str) -> Dict[str, Any]:
+    def _load_json_backup(self, data_type: str) -> dict[str, Any]:
         """Load data from JSON backup."""
         json_path = self._get_json_backup_path(data_type)
         if not json_path.exists():
             return {}
         try:
-            with open(json_path, "r") as f:
+            with open(json_path) as f:
                 return json.load(f)
         except Exception as e:
             logger.warning(f"Failed to load JSON backup for {data_type}: {e}")
             return {}
 
-    def _save_json_backup(self, data_type: str, data: Dict[str, Any]) -> None:
+    def _save_json_backup(self, data_type: str, data: dict[str, Any]) -> None:
         """Save data to JSON backup."""
         json_path = self._get_json_backup_path(data_type)
         try:
@@ -60,8 +60,8 @@ class SecurityRepository:
         limit: int = 100,
         offset: int = 0,
         after_hours: bool = False,
-        location: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+        location: str | None = None,
+    ) -> list[dict[str, Any]]:
         """List access events for a site."""
         try:
             query = self.client.table("access_events").select("*").eq("site_id", site)
@@ -95,7 +95,7 @@ class SecurityRepository:
 
             return events[:limit]
 
-    def get_event_by_id(self, event_id: str) -> Optional[Dict[str, Any]]:
+    def get_event_by_id(self, event_id: str) -> dict[str, Any] | None:
         """Get single access event by ID."""
         try:
             response = self.client.table("access_events").select("*").eq("event_id", event_id).execute()
@@ -109,7 +109,7 @@ class SecurityRepository:
                         return event
             return None
 
-    def create_event(self, event: AccessEvent) -> Optional[Dict[str, Any]]:
+    def create_event(self, event: AccessEvent) -> dict[str, Any] | None:
         """Create access event."""
         event_data = event.to_dict()
 
@@ -141,7 +141,7 @@ class SecurityRepository:
     # Access Points
     # ========================================================================
 
-    def get_access_points(self, site: str) -> List[Dict[str, Any]]:
+    def get_access_points(self, site: str) -> list[dict[str, Any]]:
         """List all access points for a site."""
         try:
             response = self.client.table("access_points").select("*").eq("site_id", site).execute()
@@ -158,7 +158,7 @@ class SecurityRepository:
             backup = self._load_json_backup("access_points")
             return backup.get(site, [])
 
-    def get_access_point_by_id(self, point_id: str) -> Optional[Dict[str, Any]]:
+    def get_access_point_by_id(self, point_id: str) -> dict[str, Any] | None:
         """Get single access point by ID."""
         try:
             response = self.client.table("access_points").select("*").eq("point_id", point_id).execute()
@@ -176,7 +176,7 @@ class SecurityRepository:
     # Visitors
     # ========================================================================
 
-    def list_visitors(self, site: str, limit: int = 50) -> List[Dict[str, Any]]:
+    def list_visitors(self, site: str, limit: int = 50) -> list[dict[str, Any]]:
         """List active visitors for a site."""
         try:
             response = (
@@ -201,7 +201,7 @@ class SecurityRepository:
             backup = self._load_json_backup("visitors")
             return backup.get(site, [])
 
-    def record_visit_checkin(self, visitor_id: str) -> Optional[Dict[str, Any]]:
+    def record_visit_checkin(self, visitor_id: str) -> dict[str, Any] | None:
         """Record visitor check-in."""
         now = datetime.now()
         try:
@@ -216,7 +216,7 @@ class SecurityRepository:
             logger.warning(f"Failed to record check-in for {visitor_id}: {e}")
             return None
 
-    def record_visit_checkout(self, visitor_id: str) -> Optional[Dict[str, Any]]:
+    def record_visit_checkout(self, visitor_id: str) -> dict[str, Any] | None:
         """Record visitor check-out."""
         now = datetime.now()
         try:
@@ -238,9 +238,9 @@ class SecurityRepository:
     def get_alerts(
         self,
         site: str,
-        severity: Optional[str] = None,
+        severity: str | None = None,
         limit: int = 50,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get security alerts."""
         try:
             query = self.client.table("security_alerts").select("*").eq("site_id", site)
@@ -268,7 +268,7 @@ class SecurityRepository:
 
             return alerts[:limit]
 
-    def create_alert(self, alert: SecurityAlert) -> Optional[Dict[str, Any]]:
+    def create_alert(self, alert: SecurityAlert) -> dict[str, Any] | None:
         """Create security alert."""
         alert_data = alert.to_dict()
 
@@ -296,7 +296,7 @@ class SecurityRepository:
             self._save_json_backup("security_alerts", backup)
             return alert_data
 
-    def acknowledge_alert(self, alert_id: str, acknowledged_by: str) -> Optional[Dict[str, Any]]:
+    def acknowledge_alert(self, alert_id: str, acknowledged_by: str) -> dict[str, Any] | None:
         """Acknowledge an alert."""
         now = datetime.now()
         try:
@@ -321,7 +321,7 @@ class SecurityRepository:
     # Occupancy (for cross-module integration)
     # ========================================================================
 
-    def get_occupancy(self, site: str) -> Dict[str, Any]:
+    def get_occupancy(self, site: str) -> dict[str, Any]:
         """Get current building occupancy from badge events and visitors."""
         try:
             # Get recent badge access (last 30 min)
@@ -371,7 +371,7 @@ class SecurityRepository:
     # ========================================================================
 
     @staticmethod
-    def _is_after_hours(timestamp_str: Optional[str]) -> bool:
+    def _is_after_hours(timestamp_str: str | None) -> bool:
         """Check if timestamp is during after-hours (18:00-06:00)."""
         if not timestamp_str:
             return False

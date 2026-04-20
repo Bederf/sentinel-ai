@@ -8,7 +8,6 @@ import logging
 from datetime import datetime
 from typing import Any
 
-from app.config.settings import settings
 from app.core.site_resolver import get_primary_site_code
 from app.database.supabase_client import get_supabase_client
 
@@ -85,10 +84,6 @@ class DeviceStatusInitializer:
 
     async def _init_solar_devices(self, site_id: str, site_uuid: str, capacity_kwp: float) -> int:
         """Initialize solar devices when a local simulator is explicitly enabled."""
-        if settings.sentinel_island_mode:
-            logger.info("Skipping local solar device hydration in SENTINEL_ISLAND_MODE")
-            return 0
-
         try:
             from app.services.solar_connector_simulation import SimulatedSolarConnector
 

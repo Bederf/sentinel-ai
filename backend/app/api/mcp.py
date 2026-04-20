@@ -10,10 +10,11 @@ Endpoints:
 - GET  /api/mcp/simbiot/tools/{tool_name} - Get specific tool schema
 """
 
+import logging
+from typing import Any
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from typing import Dict, Any, Optional, List
-import logging
 
 from app.mcp import SIMBIOTMCPServer
 
@@ -21,7 +22,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/mcp/simbiot", tags=["MCP"])
 
 # Singleton server instance
-_server: Optional[SIMBIOTMCPServer] = None
+_server: SIMBIOTMCPServer | None = None
 
 
 def get_server() -> SIMBIOTMCPServer:
@@ -41,7 +42,7 @@ class ToolCallRequest(BaseModel):
     """Request body for tool execution."""
 
     tool_name: str
-    arguments: Dict[str, Any] = {}
+    arguments: dict[str, Any] = {}
 
 
 class ToolCallResponse(BaseModel):
@@ -49,7 +50,7 @@ class ToolCallResponse(BaseModel):
 
     tool_name: str
     result: Any
-    error: Optional[str] = None
+    error: str | None = None
 
 
 class MCPServerInfo(BaseModel):
@@ -59,7 +60,7 @@ class MCPServerInfo(BaseModel):
     version: str
     description: str
     tool_count: int
-    capabilities: Dict[str, bool]
+    capabilities: dict[str, bool]
 
 
 # ============================================================================
@@ -68,7 +69,7 @@ class MCPServerInfo(BaseModel):
 
 
 @router.get("/tools")
-async def list_tools() -> List[Dict[str, Any]]:
+async def list_tools() -> list[dict[str, Any]]:
     """
     List all SIMBIOT MCP tools with their JSON schemas.
 
@@ -129,7 +130,7 @@ async def server_info() -> MCPServerInfo:
 
 
 @router.get("/tools/{tool_name}")
-async def get_tool_schema(tool_name: str) -> Dict[str, Any]:
+async def get_tool_schema(tool_name: str) -> dict[str, Any]:
     """
     Get JSON schema for a specific tool.
 

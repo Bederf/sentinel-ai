@@ -7,15 +7,15 @@ import pytest
 
 ezdxf = pytest.importorskip("ezdxf", reason="ezdxf not installed")
 
+from app.services.dxf_parser_service import get_dxf_parser_service  # noqa: E402
 from app.services.geometry_utils import (  # noqa: E402
     BoundingBox,
-    normalize_coordinates,
-    infer_floor_from_z_coordinate,
-    euclidean_distance,
     cluster_points,
+    euclidean_distance,
     get_cluster_centroid,
+    infer_floor_from_z_coordinate,
+    normalize_coordinates,
 )
-from app.services.dxf_parser_service import get_dxf_parser_service  # noqa: E402
 
 
 class TestGeometryUtils:
@@ -247,8 +247,9 @@ class TestDXFParserIntegration:
     @pytest.fixture
     def sample_dxf_bytes(self):
         """Generate minimal valid DXF for testing."""
-        import ezdxf
         import tempfile
+
+        import ezdxf
 
         doc = ezdxf.new("R2010")
         msp = doc.modelspace()
@@ -324,8 +325,9 @@ class TestDXFParserIntegration:
 
     def test_parse_dxf_file_loading(self):
         """Test DXF file loading."""
-        import ezdxf
         import tempfile
+
+        import ezdxf
 
         doc = ezdxf.new("R2010")
         msp = doc.modelspace()

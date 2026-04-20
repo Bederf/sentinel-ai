@@ -6,21 +6,41 @@ Registers routers for buildings, equipment, devices, and building systems.
 
 from fastapi import FastAPI
 
-from app.api import buildings, building_state, equipment, sensors, devices, devices_batch, device_init
-from app.api import lighting, lighting_discovery, equipment_discovery, equipment_metadata
-from app.api import generators, energy_centre, modules
-from app.api import fire
-from app.api import niagara, niagara_bacnet, niagara_discovery
-from app.api import simbiot_capabilities
-from app.api import sites_3d, digital_twin
-from app.api import zone_ingestion, desks, documents
-from app.api import device_controls
-from app.api import occupancy_analytics, occupancy_energy_correlation
-from app.api import iaq
-from app.api import building_schedule, holiday_calendar
-from app.api import cockpit
-from app.space.sensor_ingest import router as space_occupancy_router
+from app.api import (
+    building_schedule,
+    building_state,
+    buildings,
+    cockpit,
+    desks,
+    device_controls,
+    device_init,
+    devices,
+    devices_batch,
+    digital_twin,
+    documents,
+    energy_centre,
+    equipment,
+    equipment_discovery,
+    equipment_metadata,
+    fire,
+    generators,
+    holiday_calendar,
+    iaq,
+    lighting,
+    lighting_discovery,
+    modules,
+    niagara,
+    niagara_bacnet,
+    niagara_discovery,
+    occupancy_analytics,
+    occupancy_energy_correlation,
+    sensors,
+    simbiot_capabilities,
+    sites_3d,
+    zone_ingestion,
+)
 from app.api.equipment_knowledge import router as equipment_knowledge_router
+from app.space.sensor_ingest import router as space_occupancy_router
 
 
 def register_site_routers(app: FastAPI) -> None:

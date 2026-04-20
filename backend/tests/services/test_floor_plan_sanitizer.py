@@ -17,6 +17,7 @@ PIL = pytest.importorskip("PIL", reason="Pillow not installed")
 cv2 = pytest.importorskip("cv2", reason="opencv-python not installed")
 
 from PIL import Image, ImageDraw  # noqa: E402
+
 from app.services.floor_plan_sanitizer import FloorPlanSanitizer  # noqa: E402
 
 

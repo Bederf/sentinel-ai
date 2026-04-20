@@ -1,8 +1,9 @@
 """Pydantic models for integration/log ingestion."""
 
 from datetime import datetime
-from typing import List, Optional, Dict, Any
 from enum import Enum
+from typing import Any
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -56,9 +57,9 @@ class LogSourceBase(BaseModel):
     name: str
     source_type: SourceType
     connection_type: ConnectionType
-    file_pattern: Optional[str] = None
-    folder_path: Optional[str] = None
-    file_format: Optional[FileFormat] = None
+    file_pattern: str | None = None
+    folder_path: str | None = None
+    file_format: FileFormat | None = None
     delimiter: str = ","
     date_format: str = "YYYY-MM-DD HH:MI:SS"
     timezone: str = "Africa/Johannesburg"
@@ -70,26 +71,26 @@ class LogSourceCreate(LogSourceBase):
 
 
 class LogSourceUpdate(BaseModel):
-    name: Optional[str] = None
-    file_pattern: Optional[str] = None
-    folder_path: Optional[str] = None
-    file_format: Optional[FileFormat] = None
-    delimiter: Optional[str] = None
-    date_format: Optional[str] = None
-    timezone: Optional[str] = None
-    sync_frequency_minutes: Optional[int] = None
-    is_active: Optional[bool] = None
+    name: str | None = None
+    file_pattern: str | None = None
+    folder_path: str | None = None
+    file_format: FileFormat | None = None
+    delimiter: str | None = None
+    date_format: str | None = None
+    timezone: str | None = None
+    sync_frequency_minutes: int | None = None
+    is_active: bool | None = None
 
 
 class LogSource(LogSourceBase):
     model_config = ConfigDict(from_attributes=True)
     id: str
     site_id: str
-    vendor_pattern: Optional[str] = None
+    vendor_pattern: str | None = None
     is_active: bool = False
-    last_sync_at: Optional[datetime] = None
-    last_sync_status: Optional[str] = None
-    last_sync_records: Optional[int] = None
+    last_sync_at: datetime | None = None
+    last_sync_status: str | None = None
+    last_sync_records: int | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -98,8 +99,8 @@ class LogSource(LogSourceBase):
 class ColumnMappingCreate(BaseModel):
     source_column: str
     sentinel_field: str
-    transform: Optional[str] = None
-    transform_params: Optional[Dict[str, Any]] = None
+    transform: str | None = None
+    transform_params: dict[str, Any] | None = None
 
 
 class ColumnMapping(ColumnMappingCreate):
@@ -111,10 +112,10 @@ class ColumnMapping(ColumnMappingCreate):
 # Point-Asset Mapping
 class PointAssetMappingCreate(BaseModel):
     bms_point_id: str
-    extracted_asset_id: Optional[str] = None
-    cafm_asset_id: Optional[str] = None
-    parameter_name: Optional[str] = None
-    parameter_type: Optional[str] = None
+    extracted_asset_id: str | None = None
+    cafm_asset_id: str | None = None
+    parameter_name: str | None = None
+    parameter_type: str | None = None
     match_confidence: MatchConfidence = MatchConfidence.UNMATCHED
 
 
@@ -132,18 +133,18 @@ class ParsedAlarm(BaseModel):
 
     occurred_at: datetime
     point_id: str
-    asset_id: Optional[str] = None
-    alarm_code: Optional[str] = None
-    sentinel_code: Optional[str] = None
-    description: Optional[str] = None
-    value: Optional[float] = None
-    threshold: Optional[float] = None
-    unit: Optional[str] = None
-    severity: Optional[Severity] = None
-    state: Optional[AlarmState] = None
-    acknowledged_by: Optional[str] = None
-    notes: Optional[str] = None
-    raw_data: Dict[str, Any] = Field(default_factory=dict)
+    asset_id: str | None = None
+    alarm_code: str | None = None
+    sentinel_code: str | None = None
+    description: str | None = None
+    value: float | None = None
+    threshold: float | None = None
+    unit: str | None = None
+    severity: Severity | None = None
+    state: AlarmState | None = None
+    acknowledged_by: str | None = None
+    notes: str | None = None
+    raw_data: dict[str, Any] = Field(default_factory=dict)
 
 
 class ParsedTrend(BaseModel):
@@ -151,10 +152,10 @@ class ParsedTrend(BaseModel):
 
     recorded_at: datetime
     point_id: str
-    asset_id: Optional[str] = None
-    parameter_name: Optional[str] = None
+    asset_id: str | None = None
+    parameter_name: str | None = None
     value: float
-    unit: Optional[str] = None
+    unit: str | None = None
     quality: str = "good"
 
 
@@ -165,13 +166,13 @@ class FormatDetectionResult(BaseModel):
     file_format: FileFormat
     delimiter: str
     date_format: str
-    vendor_pattern: Optional[str] = None
-    columns: List[str]
+    vendor_pattern: str | None = None
+    columns: list[str]
     row_count: int
-    date_range_start: Optional[datetime] = None
-    date_range_end: Optional[datetime] = None
-    sample_rows: List[Dict[str, Any]] = Field(default_factory=list)
-    suggested_mappings: Dict[str, str] = Field(default_factory=dict)
+    date_range_start: datetime | None = None
+    date_range_end: datetime | None = None
+    sample_rows: list[dict[str, Any]] = Field(default_factory=list)
+    suggested_mappings: dict[str, str] = Field(default_factory=dict)
 
 
 # Validation Results
@@ -179,7 +180,7 @@ class ParseValidationError(BaseModel):
     row: int
     field: str
     message: str
-    value: Optional[str] = None
+    value: str | None = None
 
 
 class ParseValidationWarning(BaseModel):
@@ -195,11 +196,11 @@ class ParseResult(BaseModel):
     valid_rows: int
     error_count: int
     warning_count: int
-    errors: List[ParseValidationError] = Field(default_factory=list)
-    warnings: List[ParseValidationWarning] = Field(default_factory=list)
-    parsed_alarms: List[ParsedAlarm] = Field(default_factory=list)
-    parsed_trends: List[ParsedTrend] = Field(default_factory=list)
-    unmatched_points: List[str] = Field(default_factory=list)
+    errors: list[ParseValidationError] = Field(default_factory=list)
+    warnings: list[ParseValidationWarning] = Field(default_factory=list)
+    parsed_alarms: list[ParsedAlarm] = Field(default_factory=list)
+    parsed_trends: list[ParsedTrend] = Field(default_factory=list)
+    unmatched_points: list[str] = Field(default_factory=list)
 
 
 # Asset Matching Results
@@ -208,11 +209,11 @@ class AssetMatchResult(BaseModel):
 
     bms_point_id: str
     extracted_asset_id: str
-    parameter_name: Optional[str] = None
-    cafm_asset_id: Optional[str] = None
-    cafm_asset_description: Optional[str] = None
+    parameter_name: str | None = None
+    cafm_asset_id: str | None = None
+    cafm_asset_description: str | None = None
     confidence: MatchConfidence
-    alternatives: List[Dict[str, str]] = Field(default_factory=list)
+    alternatives: list[dict[str, str]] = Field(default_factory=list)
 
 
 class BulkMatchResult(BaseModel):
@@ -222,7 +223,7 @@ class BulkMatchResult(BaseModel):
     matched_exact: int
     matched_fuzzy: int
     unmatched: int
-    matches: List[AssetMatchResult] = Field(default_factory=list)
+    matches: list[AssetMatchResult] = Field(default_factory=list)
 
 
 # ==================== Building Status / Go-Live Workflow ====================
@@ -247,19 +248,19 @@ class ChecklistItem(BaseModel):
     name: str
     description: str
     status: str  # 'pass', 'fail', 'warning', 'not_checked'
-    value: Optional[Any] = None
-    threshold: Optional[Any] = None
-    details: Optional[str] = None
+    value: Any | None = None
+    threshold: Any | None = None
+    details: str | None = None
 
 
 class ValidationChecklist(BaseModel):
     """Complete go-live validation checklist."""
 
     site_id: str
-    site_name: Optional[str] = None
+    site_name: str | None = None
     status: BuildingStatus
     checked_at: datetime
-    items: List[ChecklistItem]
-    summary: Dict[str, int]  # {passed: int, failed: int, warnings: int}
+    items: list[ChecklistItem]
+    summary: dict[str, int]  # {passed: int, failed: int, warnings: int}
     can_activate: bool
-    blocking_issues: List[str] = Field(default_factory=list)
+    blocking_issues: list[str] = Field(default_factory=list)

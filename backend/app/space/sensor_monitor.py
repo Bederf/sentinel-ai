@@ -7,10 +7,10 @@ Runs every 60 seconds to detect sensors that have gone offline
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from app.space.room_state_engine import SENSOR_OFFLINE_THRESHOLD_SECONDS
 from app.space import space_repository as repo
+from app.space.room_state_engine import SENSOR_OFFLINE_THRESHOLD_SECONDS
 
 logger = logging.getLogger("sentinel.space.monitor")
 
@@ -22,7 +22,7 @@ async def check_sensor_health(site_id: str = "FLN02") -> dict:
         Summary dict with counts of checked, offline_detected, recovered.
     """
     devices = await repo.get_all_devices(site_id=site_id)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     checked = 0
     offline_detected = 0
@@ -49,7 +49,7 @@ async def check_sensor_health(site_id: str = "FLN02") -> dict:
             last_seen = last_seen_raw
 
         if last_seen.tzinfo is None:
-            last_seen = last_seen.replace(tzinfo=timezone.utc)
+            last_seen = last_seen.replace(tzinfo=UTC)
 
         elapsed = (now - last_seen).total_seconds()
         current_state = await repo.get_room_current_state(room_code)

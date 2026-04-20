@@ -17,7 +17,7 @@ class FakeSpaceSupabase:
             "space_focus_room_sessions": [],
         }
 
-    def table(self, name: str) -> "FakeTableQuery":
+    def table(self, name: str) -> FakeTableQuery:
         if name not in self.tables:
             self.tables[name] = []
         return FakeTableQuery(self.tables[name])

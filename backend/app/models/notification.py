@@ -9,9 +9,8 @@ Three tables:
 
 from dataclasses import dataclass, field
 from datetime import datetime, time
-from typing import Optional
-from uuid import UUID
 from enum import Enum
+from uuid import UUID
 
 
 class ChannelType(str, Enum):
@@ -52,13 +51,13 @@ class TechnicianNotificationChannel:
     channel_type: ChannelType
 
     # Contact details (one populated based on channel_type)
-    telegram_id: Optional[str] = None  # Telegram user ID (e.g., "123456789")
-    whatsapp_number: Optional[str] = None  # WhatsApp phone (e.g., "+27123456789")
-    sms_number: Optional[str] = None  # SMS phone (e.g., "+27123456789")
+    telegram_id: str | None = None  # Telegram user ID (e.g., "123456789")
+    whatsapp_number: str | None = None  # WhatsApp phone (e.g., "+27123456789")
+    sms_number: str | None = None  # SMS phone (e.g., "+27123456789")
 
     # Verification
     is_verified: bool = False  # Has technician confirmed this channel works?
-    verified_at: Optional[datetime] = None
+    verified_at: datetime | None = None
     verification_attempts: int = 0
 
     # Channel-specific settings (future: do_not_disturb, preferences, etc.)
@@ -151,7 +150,7 @@ class NotificationDeliveryLog:
     id: UUID
 
     # References (optional for orphan handling)
-    work_order_id: Optional[UUID] = None
+    work_order_id: UUID | None = None
     technician_id: UUID = field(default_factory=UUID)
 
     # Notification content
@@ -165,13 +164,13 @@ class NotificationDeliveryLog:
 
     # Delivery status
     status: NotificationStatus = NotificationStatus.PENDING
-    error_message: Optional[str] = None
-    error_code: Optional[str] = None  # 'invalid_number', 'rate_limit', 'auth_failed', etc.
+    error_message: str | None = None
+    error_code: str | None = None  # 'invalid_number', 'rate_limit', 'auth_failed', etc.
 
     # Tracking
-    external_message_id: Optional[str] = None  # Provider's message ID
-    sent_at: Optional[datetime] = None
-    delivered_at: Optional[datetime] = None
+    external_message_id: str | None = None  # Provider's message ID
+    sent_at: datetime | None = None
+    delivered_at: datetime | None = None
 
     # Provider details
     provider: str = ""  # 'sentry', 'meta', 'bulksms'
@@ -179,7 +178,7 @@ class NotificationDeliveryLog:
 
     # Retry tracking
     retry_count: int = 0
-    last_retry_at: Optional[datetime] = None
+    last_retry_at: datetime | None = None
     max_retries: int = 3
 
     # Metadata

@@ -9,23 +9,21 @@ Tests cover:
 - Point cache management
 """
 
-import asyncio
-import pytest
 from unittest.mock import MagicMock
 
+import pytest
+
+import app.services.niagara.bacnet_client as bacnet_module
 from app.services.niagara.bacnet_client import (
-    NiagaraBACnetClient,
     BACnetException,
-    BACnetTimeoutError,
     BACnetObjectType,
+    BACnetTimeoutError,
     COVSubscription,
     DiscoveredDevice,
     DiscoveredPoint,
+    NiagaraBACnetClient,
     get_bacnet_client,
 )
-
-import app.services.niagara.bacnet_client as bacnet_module
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -476,7 +474,7 @@ class TestRetryLogic:
         """Timeout errors should raise BACnetTimeoutError."""
 
         async def timeout_op(*args, **kwargs):
-            raise asyncio.TimeoutError()
+            raise TimeoutError()
 
         with pytest.raises(BACnetTimeoutError):
             await started_client._retry_operation(timeout_op, max_retries=1)

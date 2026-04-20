@@ -164,8 +164,8 @@ async def check_shadow_exit_criteria(site_id: str) -> dict:
           - criteria: list of {name, passed, detail} per gate
           - blocked_by: str — name of first failed gate (for UI display)
     """
-    from app.services.ml_config import get_ml_trust_weight
     from app.database.repositories.parasite_decision_repository import ParasiteDecisionRepository
+    from app.services.ml_config import get_ml_trust_weight
 
     results: list[dict] = []
     all_passed = True

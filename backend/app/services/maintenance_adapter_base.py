@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from app.models.maintenance_event import MaintenanceEvent
@@ -84,7 +84,7 @@ class MaintenanceAdapter(ABC):
         data = event.model_dump(exclude={"metadata"})
         data["source_system"] = self.source_system
         data["metadata"] = event.metadata
-        data["last_synced_at"] = datetime.now(timezone.utc).isoformat()
+        data["last_synced_at"] = datetime.now(UTC).isoformat()
         if data.get("site_id"):
             data["site_id"] = str(data["site_id"])
 
@@ -97,7 +97,7 @@ class MaintenanceAdapter(ABC):
 
     def _check_sla_breach(self, event: MaintenanceEvent) -> None:
         """Detect SLA breaches and write breach events to sla_breach_events."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         if not event.created_at_source:
             return
 
@@ -157,7 +157,7 @@ class MaintenanceAdapter(ABC):
         return None
 
     def _update_sync_state(self, site_id: str | None, ingested: int, updated: int, errors: int) -> None:
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         self.db.table(self.adapter_table).upsert(
             {
                 "adapter_source": self.source_system,

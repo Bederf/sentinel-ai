@@ -7,7 +7,6 @@ Endpoints:
 """
 
 import logging
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
@@ -23,7 +22,7 @@ router = APIRouter(prefix="/api/load-forecast", tags=["load-forecast"])
 @router.get("/{site_id}")
 async def get_load_forecast(
     site_id: str,
-    intervals: Optional[int] = Query(96, ge=1, le=672, description="Number of 15-min intervals (max 672 = 7 days)"),
+    intervals: int | None = Query(96, ge=1, le=672, description="Number of 15-min intervals (max 672 = 7 days)"),
     auth: AuthContext = Depends(require_site_access("site_id")),
 ):
     """Get 15-minute building load forecast.

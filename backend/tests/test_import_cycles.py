@@ -8,6 +8,7 @@ Run with: pytest backend/tests/test_import_cycles.py -v
 
 import sys
 from pathlib import Path
+
 import pytest
 
 

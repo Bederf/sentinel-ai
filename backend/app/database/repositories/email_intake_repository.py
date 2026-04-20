@@ -10,7 +10,7 @@ import logging
 import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from app.database.supabase_client import get_supabase_client
 
@@ -58,7 +58,7 @@ class EmailIntakeRepository:
     # Read
     # ------------------------------------------------------------------
 
-    def get_by_id(self, intake_id: str) -> Optional[dict[str, Any]]:
+    def get_by_id(self, intake_id: str) -> dict[str, Any] | None:
         """Return a single intake by primary key."""
         if self.client:
             try:
@@ -69,7 +69,7 @@ class EmailIntakeRepository:
                 logger.error("EmailIntakeRepository.get_by_id failed: %s", exc)
         return self._get_by_id_json(intake_id)
 
-    def get_by_message_id(self, message_id: str) -> Optional[dict[str, Any]]:
+    def get_by_message_id(self, message_id: str) -> dict[str, Any] | None:
         """Return intake by RFC 822 Message-ID (exact dedup)."""
         if not message_id:
             return None
@@ -155,7 +155,7 @@ class EmailIntakeRepository:
                 return True
         return False
 
-    def get_latest_by_reference(self, reference: str) -> Optional[dict[str, Any]]:
+    def get_latest_by_reference(self, reference: str) -> dict[str, Any] | None:
         """Return latest intake row for an existing reference code."""
         if not reference:
             return None
@@ -178,10 +178,10 @@ class EmailIntakeRepository:
     def find_recent(
         self,
         from_email: str,
-        site_id: Optional[str],
-        issue_category: Optional[str],
+        site_id: str | None,
+        issue_category: str | None,
         hours: int = 24,
-    ) -> Optional[dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """Heuristic dedup: same sender + site + category within window."""
         if not from_email:
             return None
@@ -267,19 +267,19 @@ class EmailIntakeRepository:
         self._save_json(records)
         return record
 
-    def _get_by_id_json(self, intake_id: str) -> Optional[dict[str, Any]]:
+    def _get_by_id_json(self, intake_id: str) -> dict[str, Any] | None:
         for r in self._load_json():
             if r.get("id") == intake_id:
                 return r
         return None
 
-    def _get_by_message_id_json(self, message_id: str) -> Optional[dict[str, Any]]:
+    def _get_by_message_id_json(self, message_id: str) -> dict[str, Any] | None:
         for r in self._load_json():
             if r.get("message_id") == message_id:
                 return r
         return None
 
-    def _get_latest_by_reference_json(self, reference: str) -> Optional[dict[str, Any]]:
+    def _get_latest_by_reference_json(self, reference: str) -> dict[str, Any] | None:
         matches = [r for r in self._load_json() if r.get("existing_reference") == reference]
         if not matches:
             return None
@@ -289,10 +289,10 @@ class EmailIntakeRepository:
     def _find_recent_json(
         self,
         from_email: str,
-        site_id: Optional[str],
-        issue_category: Optional[str],
+        site_id: str | None,
+        issue_category: str | None,
         hours: int,
-    ) -> Optional[dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         cutoff = (datetime.utcnow() - timedelta(hours=hours)).isoformat()
         candidates = []
         for r in self._load_json():
@@ -324,7 +324,7 @@ class EmailIntakeRepository:
 # Singleton
 # ---------------------------------------------------------------------------
 
-_repository: Optional[EmailIntakeRepository] = None
+_repository: EmailIntakeRepository | None = None
 
 
 def get_email_intake_repository() -> EmailIntakeRepository:

@@ -6,17 +6,18 @@ for tracking related actions.
 """
 
 import logging
-import uuid
 import re
-from typing import Callable, Dict, Any
+import uuid
+from collections.abc import Callable
 from datetime import datetime
+from typing import Any
 
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
 
-from app.services.audit_logger import AuditLogger
 from app.models.audit_log import AuditResultType
+from app.services.audit_logger import AuditLogger
 
 logger = logging.getLogger(__name__)
 
@@ -355,7 +356,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
         else:
             return "API_REQUEST"
 
-    async def _extract_request_data(self, request: Request) -> Dict[str, Any]:
+    async def _extract_request_data(self, request: Request) -> dict[str, Any]:
         """Extract request data for auditing.
 
         Phase 58-04 M-4: All extracted data is run through _sanitize_log_data

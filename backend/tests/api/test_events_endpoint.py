@@ -24,8 +24,9 @@ async def test_events_endpoint_accepts_correlation_id(client):
 
     Verifies endpoint signature accepts correlation_id parameter.
     """
-    from app.api.events import event_stream_endpoint
     import inspect
+
+    from app.api.events import event_stream_endpoint
 
     sig = inspect.signature(event_stream_endpoint)
     assert "correlation_id" in sig.parameters, "event_stream_endpoint must accept correlation_id parameter"
@@ -37,8 +38,8 @@ async def test_events_endpoint_sse_format():
 
     SSE format: event: {type}\ndata: {json}\n\n
     """
-    from app.middleware.event_stream import event_stream
     from app.api.events import event_stream_endpoint
+    from app.middleware.event_stream import event_stream
 
     # This is tested indirectly via the telemetry verification tests
     # which mock event_stream.emit() and verify the format
@@ -54,8 +55,9 @@ async def test_events_endpoint_stream_closes_after_terminal_event():
     The event_stream_endpoint generator breaks the loop and closes the
     connection when it receives a terminal event.
     """
-    from app.api.events import event_stream_endpoint
     import inspect
+
+    from app.api.events import event_stream_endpoint
 
     # Check the function source to verify terminal event handling
     source = inspect.getsource(event_stream_endpoint)
@@ -84,8 +86,9 @@ async def test_event_stream_manager_subscribe():
 @pytest.mark.asyncio
 async def test_event_stream_manager_emit():
     """Verify event_stream.emit() sends events to subscribed channel."""
-    from app.middleware.event_stream import event_stream
     import asyncio
+
+    from app.middleware.event_stream import event_stream
 
     correlation_id = "test-corr-456"
 
@@ -156,8 +159,9 @@ async def test_event_stream_multiple_subscribers_same_correlation():
     If both frontend and backend monitoring subscribe to the same
     correlation_id, they should receive the same events.
     """
-    from app.middleware.event_stream import event_stream
     import asyncio
+
+    from app.middleware.event_stream import event_stream
 
     correlation_id = "test-corr-multi"
 

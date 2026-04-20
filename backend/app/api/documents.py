@@ -1,12 +1,11 @@
 """Document upload and management API endpoints."""
 
+import hashlib
 import logging
 import uuid
-import hashlib
 from datetime import datetime
-from typing import Optional
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, Request
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
@@ -15,14 +14,14 @@ from app.database.supabase_client import get_supabase_client
 from app.middleware.auth_middleware import require_auth
 from app.models.auth import AuthContext, AuthLevel, SentinelRole
 from app.security.document_scanner import validate_and_scan_upload
+from app.services.asset_id_resolver import AssetIDResolver
+from app.services.document_adapter_manual import ManualUploadAdapter
+from app.services.document_extractor import extract_text
+from app.services.llm_extraction_service import LLMExtractionService
 from app.services.simbiot_service import simbiot_service
 from app.services.site_document_storage_policy_service import get_site_document_storage_policy_service
-from app.services.document_extractor import extract_text
 from app.services.storage_service import get_storage_service
 from app.services.vector_db import get_vector_db_service
-from app.services.document_adapter_manual import ManualUploadAdapter
-from app.services.asset_id_resolver import AssetIDResolver
-from app.services.llm_extraction_service import LLMExtractionService
 
 logger = logging.getLogger(__name__)
 
@@ -141,7 +140,7 @@ def _validate_iso_date(value: str, field_name: str) -> str:
         raise HTTPException(status_code=400, detail=f"Invalid {field_name}. Expected YYYY-MM-DD.") from exc
 
 
-def _resolve_site_for_authenticated_upload(auth: AuthContext, site_id_override: Optional[str]) -> str:
+def _resolve_site_for_authenticated_upload(auth: AuthContext, site_id_override: str | None) -> str:
     """Resolve upload site from authenticated user context.
 
     Non-admin users are site-bound to their assigned sites. If exactly one site
@@ -245,7 +244,7 @@ async def upload_document(
     request: Request,
     file: UploadFile = File(...),
     site_id: str = Form(...),
-    title: Optional[str] = Form(None),
+    title: str | None = Form(None),
     document_type: str = Form("building_manual"),
 ) -> dict:
     """Upload a building-scoped document for RAG indexing.
@@ -432,8 +431,8 @@ async def upload_technician_document(
     category_discipline: str = Form(...),
     document_creation_date: str = Form(...),
     trigger_date: str = Form(...),
-    title: Optional[str] = Form(None),
-    site_id: Optional[str] = Form(None),
+    title: str | None = Form(None),
+    site_id: str | None = Form(None),
     auth: AuthContext = Depends(require_auth(AuthLevel.AUTHENTICATED)),
 ) -> dict:
     """Technician-focused document upload with strict metadata validation.

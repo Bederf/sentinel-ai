@@ -6,7 +6,6 @@ When a user logs in, their entitlements determine which modules are active in th
 """
 
 from dataclasses import dataclass, field
-from typing import List, Optional
 
 
 @dataclass
@@ -20,9 +19,9 @@ class UserModuleEntitlement:
     user_email: str
     module_type: str
     activated_at: str  # ISO format datetime
-    expires_at: Optional[str] = None  # ISO format, None = no expiry
+    expires_at: str | None = None  # ISO format, None = no expiry
     is_active: bool = True
-    notes: Optional[str] = None
+    notes: str | None = None
 
 
 @dataclass
@@ -35,18 +34,18 @@ class UserEntitlementProfile:
 
     user_id: str
     user_email: str
-    entitlements: List[str] = field(default_factory=list)  # List of module type strings
+    entitlements: list[str] = field(default_factory=list)  # List of module type strings
     last_updated: str = ""  # ISO format
 
     def has_module(self, module_type: str) -> bool:
         """Check if user is entitled to a specific module."""
         return module_type in self.entitlements
 
-    def has_all_modules(self, module_types: List[str]) -> bool:
+    def has_all_modules(self, module_types: list[str]) -> bool:
         """Check if user is entitled to all specified modules."""
         return all(m in self.entitlements for m in module_types)
 
-    def has_any_module(self, module_types: List[str]) -> bool:
+    def has_any_module(self, module_types: list[str]) -> bool:
         """Check if user is entitled to any of the specified modules."""
         return any(m in self.entitlements for m in module_types)
 

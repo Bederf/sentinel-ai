@@ -6,7 +6,7 @@ Includes quality gate context captured at action time for ML feedback loop closu
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any
 
 
 @dataclass
@@ -31,20 +31,20 @@ class Outcome:
     """
 
     recommendation_id: str
-    predicted: Dict[str, Any]
-    actual: Dict[str, Any]
+    predicted: dict[str, Any]
+    actual: dict[str, Any]
     accuracy: float
     verified_at: datetime
     notes: str = ""
-    quality_gate_status_at_action: Optional[str] = None
-    quality_snapshot_id: Optional[str] = None
-    ingestion_mode_at_action: Optional[str] = None
-    action_time: Optional[datetime] = None
-    outcome_time: Optional[datetime] = None
+    quality_gate_status_at_action: str | None = None
+    quality_snapshot_id: str | None = None
+    ingestion_mode_at_action: str | None = None
+    action_time: datetime | None = None
+    outcome_time: datetime | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize to dictionary for JSON storage."""
-        result: Dict[str, Any] = {
+        result: dict[str, Any] = {
             "recommendation_id": self.recommendation_id,
             "predicted": self.predicted,
             "actual": self.actual,
@@ -64,7 +64,7 @@ class Outcome:
         return result
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Outcome":
+    def from_dict(cls, data: dict[str, Any]) -> "Outcome":
         """Deserialize from dictionary."""
         verified_at = data.get("verified_at")
         if isinstance(verified_at, str):
@@ -75,7 +75,7 @@ class Outcome:
         else:
             verified_at = datetime.utcnow()
 
-        def _parse_optional_dt(val: Any) -> Optional[datetime]:
+        def _parse_optional_dt(val: Any) -> datetime | None:
             if val is None:
                 return None
             if isinstance(val, datetime):

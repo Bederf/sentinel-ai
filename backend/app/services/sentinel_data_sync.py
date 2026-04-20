@@ -18,16 +18,14 @@ import os
 from datetime import datetime
 from typing import Any
 
+from app.api.metrics import sentinel_data_freshness_violations_total
 from app.core.site_resolver import get_primary_site_code
-
+from app.services.audit_logger import audit_structured_logger
 from app.services.ml_config import (
     DATA_FRESHNESS_MAX_HOURS,
     MIN_LSTM_TRAINING_HOURS,
     get_ml_trust_weight,
 )
-
-from app.api.metrics import sentinel_data_freshness_violations_total
-from app.services.audit_logger import audit_structured_logger
 
 logger = logging.getLogger(__name__)
 

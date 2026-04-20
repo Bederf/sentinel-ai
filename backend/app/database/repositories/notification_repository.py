@@ -6,17 +6,17 @@ in the canonical DB store.
 """
 
 import logging
-from typing import Optional, List, Dict, Any
-from uuid import UUID
 from datetime import datetime
+from typing import Any
+from uuid import UUID
 
 from app.database.supabase_client import get_supabase_client
 from app.models.notification import (
     ChannelType,
-    TechnicianNotificationChannel,
-    TechnicianNotificationPreferences,
     NotificationDeliveryLog,
     NotificationStatus,
+    TechnicianNotificationChannel,
+    TechnicianNotificationPreferences,
 )
 
 logger = logging.getLogger(__name__)
@@ -44,7 +44,7 @@ class NotificationRepository:
         self,
         alert_level: str = "critical",
         notification_type: str = "plant_alert",
-    ) -> List[UUID]:
+    ) -> list[UUID]:
         """Get technician IDs subscribed to alerts at this level."""
         try:
             result = self.client.table("technician_notification_preferences").select("technician_id").execute()
@@ -65,8 +65,8 @@ class NotificationRepository:
     async def get_notification_channels(
         self,
         technician_id: UUID,
-        channel_types: Optional[List[ChannelType]] = None,
-    ) -> List[TechnicianNotificationChannel]:
+        channel_types: list[ChannelType] | None = None,
+    ) -> list[TechnicianNotificationChannel]:
         """Get notification channels for a technician.
 
         Args:
@@ -94,7 +94,7 @@ class NotificationRepository:
 
     async def get_notification_channel(
         self, technician_id: UUID, channel_id: UUID
-    ) -> Optional[TechnicianNotificationChannel]:
+    ) -> TechnicianNotificationChannel | None:
         """Get a specific notification channel.
 
         Args:
@@ -170,7 +170,7 @@ class NotificationRepository:
 
     # ========== Notification Preferences ==========
 
-    async def get_notification_preferences(self, technician_id: UUID) -> Optional[TechnicianNotificationPreferences]:
+    async def get_notification_preferences(self, technician_id: UUID) -> TechnicianNotificationPreferences | None:
         """Get notification preferences for a technician.
 
         Args:
@@ -298,10 +298,10 @@ class NotificationRepository:
 
     async def get_delivery_logs(
         self,
-        technician_id: Optional[UUID] = None,
-        status: Optional[NotificationStatus] = None,
+        technician_id: UUID | None = None,
+        status: NotificationStatus | None = None,
         limit: int = 100,
-    ) -> List[NotificationDeliveryLog]:
+    ) -> list[NotificationDeliveryLog]:
         """Get notification delivery logs.
 
         Args:
@@ -332,7 +332,7 @@ class NotificationRepository:
     # ========== Conversion Helpers ==========
 
     @staticmethod
-    def _channel_dict_to_model(data: Dict[str, Any]) -> TechnicianNotificationChannel:
+    def _channel_dict_to_model(data: dict[str, Any]) -> TechnicianNotificationChannel:
         """Convert dictionary to TechnicianNotificationChannel model."""
         return TechnicianNotificationChannel(
             id=UUID(data.get("id")) if data.get("id") else UUID(int=0),
@@ -350,7 +350,7 @@ class NotificationRepository:
         )
 
     @staticmethod
-    def _channel_model_to_dict(model: TechnicianNotificationChannel) -> Dict[str, Any]:
+    def _channel_model_to_dict(model: TechnicianNotificationChannel) -> dict[str, Any]:
         """Convert TechnicianNotificationChannel model to dictionary."""
         return {
             "id": str(model.id),
@@ -368,7 +368,7 @@ class NotificationRepository:
         }
 
     @staticmethod
-    def _preferences_dict_to_model(data: Dict[str, Any]) -> TechnicianNotificationPreferences:
+    def _preferences_dict_to_model(data: dict[str, Any]) -> TechnicianNotificationPreferences:
         """Convert dictionary to TechnicianNotificationPreferences model."""
         from datetime import time
 
@@ -391,7 +391,7 @@ class NotificationRepository:
         )
 
     @staticmethod
-    def _preferences_model_to_dict(model: TechnicianNotificationPreferences) -> Dict[str, Any]:
+    def _preferences_model_to_dict(model: TechnicianNotificationPreferences) -> dict[str, Any]:
         """Convert TechnicianNotificationPreferences model to dictionary."""
         return {
             "id": str(model.id),
@@ -410,7 +410,7 @@ class NotificationRepository:
         }
 
     @staticmethod
-    def _delivery_log_dict_to_model(data: Dict[str, Any]) -> NotificationDeliveryLog:
+    def _delivery_log_dict_to_model(data: dict[str, Any]) -> NotificationDeliveryLog:
         """Convert dictionary to NotificationDeliveryLog model."""
         return NotificationDeliveryLog(
             id=UUID(data.get("id")) if data.get("id") else UUID(int=0),
@@ -437,7 +437,7 @@ class NotificationRepository:
         )
 
     @staticmethod
-    def _delivery_log_model_to_dict(model: NotificationDeliveryLog) -> Dict[str, Any]:
+    def _delivery_log_model_to_dict(model: NotificationDeliveryLog) -> dict[str, Any]:
         """Convert NotificationDeliveryLog model to dictionary."""
         return {
             "id": str(model.id),

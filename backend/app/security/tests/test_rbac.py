@@ -7,19 +7,18 @@ Validates numeric level-based role checks and site-scoped authorization.
 import json
 from unittest.mock import patch
 
-from fastapi import FastAPI, Depends
+from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
 
 from app.models.auth import AuthContext, SentinelRole
 from app.security.constants import ROLE_LEVELS
 from app.security.pipeline import (
+    _check_site_access,
+    _get_user_role_level,
+    clear_site_access_cache,
     require_role,
     require_site_access,
-    _get_user_role_level,
-    _check_site_access,
-    clear_site_access_cache,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -319,13 +318,12 @@ class TestCheckSiteAccessJsonFallback:
         clear_site_access_cache()
 
         # Patch the module-level path and force Supabase to fail
-        with patch("app.security.pipeline._SITE_ACCESS_CONFIG_PATH", config_file):
-            with patch(
-                "app.database.repositories.user_site_access_repository.get_user_site_access_repository",
-                side_effect=Exception("No DB"),
-            ):
-                ctx = _make_auth_ctx(SentinelRole.OPERATOR, email="operator@example.com")
-                assert _check_site_access(ctx, "site-002") is True
+        with patch("app.security.pipeline._SITE_ACCESS_CONFIG_PATH", config_file), patch(
+            "app.database.repositories.user_site_access_repository.get_user_site_access_repository",
+            side_effect=Exception("No DB"),
+        ):
+            ctx = _make_auth_ctx(SentinelRole.OPERATOR, email="operator@example.com")
+            assert _check_site_access(ctx, "site-002") is True
 
         clear_site_access_cache()
 
@@ -342,13 +340,12 @@ class TestCheckSiteAccessJsonFallback:
 
         clear_site_access_cache()
 
-        with patch("app.security.pipeline._SITE_ACCESS_CONFIG_PATH", config_file):
-            with patch(
-                "app.database.repositories.user_site_access_repository.get_user_site_access_repository",
-                side_effect=Exception("No DB"),
-            ):
-                ctx = _make_auth_ctx(SentinelRole.OPERATOR, email="operator@example.com")
-                assert _check_site_access(ctx, "site-999") is False
+        with patch("app.security.pipeline._SITE_ACCESS_CONFIG_PATH", config_file), patch(
+            "app.database.repositories.user_site_access_repository.get_user_site_access_repository",
+            side_effect=Exception("No DB"),
+        ):
+            ctx = _make_auth_ctx(SentinelRole.OPERATOR, email="operator@example.com")
+            assert _check_site_access(ctx, "site-999") is False
 
         clear_site_access_cache()
 
@@ -365,12 +362,11 @@ class TestCheckSiteAccessJsonFallback:
 
         clear_site_access_cache()
 
-        with patch("app.security.pipeline._SITE_ACCESS_CONFIG_PATH", config_file):
-            with patch(
-                "app.database.repositories.user_site_access_repository.get_user_site_access_repository",
-                side_effect=Exception("No DB"),
-            ):
-                ctx = _make_auth_ctx(SentinelRole.OPERATOR, email="unknown@example.com")
-                assert _check_site_access(ctx, "site-002") is False
+        with patch("app.security.pipeline._SITE_ACCESS_CONFIG_PATH", config_file), patch(
+            "app.database.repositories.user_site_access_repository.get_user_site_access_repository",
+            side_effect=Exception("No DB"),
+        ):
+            ctx = _make_auth_ctx(SentinelRole.OPERATOR, email="unknown@example.com")
+            assert _check_site_access(ctx, "site-002") is False
 
         clear_site_access_cache()

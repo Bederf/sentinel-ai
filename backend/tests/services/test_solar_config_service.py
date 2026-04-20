@@ -1,10 +1,11 @@
 """Tests for solar_config_service — single source of truth for solar/BESS/tariff parameters."""
 
 import pytest
+
 from app.services.solar_config_service import (
-    get_site_solar_config,
-    clear_config_cache,
     SiteConfig,
+    clear_config_cache,
+    get_site_solar_config,
 )
 
 

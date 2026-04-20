@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import json
-import pytest
 from pathlib import Path
+
+import pytest
 
 from app.services.popia_evidence_pack_service import POPIAEvidencePackService
 

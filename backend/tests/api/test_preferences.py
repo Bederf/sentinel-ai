@@ -15,12 +15,12 @@ import os
 os.environ.setdefault("DEMO_MODE", "true")
 os.environ.setdefault("TESTING", "true")
 
-import pytest  # noqa: E402
-from fastapi.testclient import TestClient  # noqa: E402
+import pytest
+from fastapi.testclient import TestClient
 
-from app.main import app  # noqa: E402
-from app.database.repositories.preferences_repository import PreferencesRepository  # noqa: E402
-from app.api.preferences import DashboardPreferences, DEFAULT_KPI_CARDS, DEFAULT_SECTIONS  # noqa: E402
+from app.api.preferences import DEFAULT_KPI_CARDS, DEFAULT_SECTIONS, DashboardPreferences
+from app.database.repositories.preferences_repository import PreferencesRepository
+from app.main import app
 
 
 @pytest.fixture

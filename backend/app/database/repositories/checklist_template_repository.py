@@ -8,8 +8,8 @@ Provides Supabase CRUD for the inspection_checklist_templates table
 by manufacturer name matching.
 """
 
-from typing import List, Optional, Dict, Any
 import logging
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +29,7 @@ class ChecklistTemplateRepository:
         self.client = get_supabase_client()
         self._table = "inspection_checklist_templates"
 
-    def create_template(self, template_data: Dict[str, Any]) -> Dict[str, Any]:
+    def create_template(self, template_data: dict[str, Any]) -> dict[str, Any]:
         """Create a new checklist template.
 
         Args:
@@ -52,7 +52,7 @@ class ChecklistTemplateRepository:
             logger.error(f"Failed to create checklist template: {e}")
             return {}
 
-    def get_template(self, template_id: str) -> Optional[Dict[str, Any]]:
+    def get_template(self, template_id: str) -> dict[str, Any] | None:
         """Get a checklist template by UUID.
 
         Args:
@@ -68,7 +68,7 @@ class ChecklistTemplateRepository:
             logger.warning(f"Failed to get checklist template {template_id}: {e}")
             return None
 
-    def get_templates_for_equipment_type(self, equipment_type: str, is_active: bool = True) -> List[Dict[str, Any]]:
+    def get_templates_for_equipment_type(self, equipment_type: str, is_active: bool = True) -> list[dict[str, Any]]:
         """Get all templates for an equipment type.
 
         Args:
@@ -93,7 +93,7 @@ class ChecklistTemplateRepository:
 
     def get_oem_template(
         self, equipment_type: str, manufacturer: str, model: str = None, inspection_type: str = None
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """Get OEM-specific template by manufacturer name matching.
 
         Searches for templates where template_name contains the manufacturer
@@ -147,7 +147,7 @@ class ChecklistTemplateRepository:
             logger.warning(f"Failed to get OEM template for {manufacturer} {equipment_type}: {e}")
             return None
 
-    def upsert_template(self, template_data: Dict[str, Any]) -> Dict[str, Any]:
+    def upsert_template(self, template_data: dict[str, Any]) -> dict[str, Any]:
         """Upsert a template (insert or update on conflict).
 
         Conflict is determined by template_name + equipment_type uniqueness.
@@ -177,7 +177,7 @@ class ChecklistTemplateRepository:
             except Exception:
                 return {}
 
-    def update_template(self, template_id: str, updates: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def update_template(self, template_id: str, updates: dict[str, Any]) -> dict[str, Any] | None:
         """Update a template by UUID.
 
         Auto-increments version if checklist_items are being updated.
@@ -202,7 +202,7 @@ class ChecklistTemplateRepository:
             logger.error(f"Failed to update checklist template {template_id}: {e}")
             return None
 
-    def list_all_templates(self, is_active: bool = True) -> List[Dict[str, Any]]:
+    def list_all_templates(self, is_active: bool = True) -> list[dict[str, Any]]:
         """List all templates with optional active filter.
 
         Args:
@@ -241,7 +241,7 @@ class ChecklistTemplateRepository:
 # Singleton Factory
 # ============================================================================
 
-_instance: Optional[ChecklistTemplateRepository] = None
+_instance: ChecklistTemplateRepository | None = None
 
 
 def get_checklist_template_repository() -> ChecklistTemplateRepository:

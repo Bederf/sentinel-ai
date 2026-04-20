@@ -1,12 +1,11 @@
 """Predictions API endpoints - AI-driven failure predictions from Supabase."""
 
 import json
-from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query, Request
 
-from app.middleware.rate_limiter import limiter
 from app.database.repositories.prediction_repository import PredictionRepository
+from app.middleware.rate_limiter import limiter
 from app.services.prediction_generator import get_prediction_generator
 from app.services.prediction_taxonomy import (
     normalize_prediction_confidence,
@@ -102,10 +101,10 @@ def format_prediction_for_frontend(pred: dict) -> dict:
 @router.get("/predictions")
 async def list_predictions(
     request: Request,
-    site_code: Optional[str] = Query(None, description="Filter by building code (e.g., site-002)"),
-    equipment_type: Optional[str] = Query(None, description="Filter by equipment type"),
-    severity: Optional[str] = Query(None, description="Filter by severity (critical/warning/healthy)"),
-    min_probability: Optional[int] = Query(None, description="Minimum probability percentage"),
+    site_code: str | None = Query(None, description="Filter by building code (e.g., site-002)"),
+    equipment_type: str | None = Query(None, description="Filter by equipment type"),
+    severity: str | None = Query(None, description="Filter by severity (critical/warning/healthy)"),
+    min_probability: int | None = Query(None, description="Minimum probability percentage"),
 ) -> dict:
     """
     List all AI-driven failure predictions from Supabase.

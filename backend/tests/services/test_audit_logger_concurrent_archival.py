@@ -9,14 +9,15 @@ Phase: 168-03 (Audit Archival Race Condition & Partial Failure Fix)
 """
 
 import asyncio
-import pytest
-from datetime import datetime, timedelta
 import json
-from unittest.mock import patch, MagicMock
+from datetime import datetime, timedelta
+from unittest.mock import MagicMock, patch
 
-from app.services.audit_logger import AuditLogger, _AUDIT_ARCHIVAL_LOCK
+import pytest
+
 import app.services.audit_logger as audit_logger_module
-from app.models.audit_log import AuditLogEntry, AuditActionType, AuditResultType
+from app.models.audit_log import AuditActionType, AuditLogEntry, AuditResultType
+from app.services.audit_logger import _AUDIT_ARCHIVAL_LOCK, AuditLogger
 
 
 @pytest.mark.asyncio
@@ -123,7 +124,7 @@ class TestConcurrentAuditArchival:
         assert archived_count_2 == 0, f"Second archival should find nothing, got {archived_count_2}"
 
         # Verify active log is empty (only first call's deletion matters)
-        with open(audit_logger.log_file, "r") as f:
+        with open(audit_logger.log_file) as f:
             data = json.load(f)
             remaining = data.get("entries", [])
             assert len(remaining) == 0, f"Active log should be empty after concurrent archival, got {len(remaining)}"
@@ -226,7 +227,7 @@ class TestConcurrentAuditArchival:
         assert archived_count == 2, f"Expected 2 archived entries, got {archived_count}"
 
         # Active log should have: 1 failed old entry
-        with open(audit_logger.log_file, "r") as f:
+        with open(audit_logger.log_file) as f:
             data = json.load(f)
             remaining = data.get("entries", [])
 
@@ -270,7 +271,7 @@ class TestConcurrentAuditArchival:
         assert archived_count == 0, f"Expected 0 archived entries on total failure, got {archived_count}"
 
         # All 3 entries should still be in active log
-        with open(audit_logger.log_file, "r") as f:
+        with open(audit_logger.log_file) as f:
             data = json.load(f)
             remaining = data.get("entries", [])
             assert len(remaining) == 3, (
@@ -310,7 +311,7 @@ class TestConcurrentAuditArchival:
         assert archived_count == 3, f"Expected 3 archived entries, got {archived_count}"
 
         # Active log should have only the recent entry (entry-100)
-        with open(audit_logger.log_file, "r") as f:
+        with open(audit_logger.log_file) as f:
             data = json.load(f)
             remaining = data.get("entries", [])
             assert len(remaining) == 1, f"Expected 1 entry in active log (only recent), got {len(remaining)}"
@@ -356,7 +357,7 @@ class TestConcurrentAuditArchival:
         assert archived_count_1 == 2, f"First attempt should archive 2, got {archived_count_1}"
 
         # Verify active log has 1 failed entry
-        with open(audit_logger.log_file, "r") as f:
+        with open(audit_logger.log_file) as f:
             data = json.load(f)
             remaining = data.get("entries", [])
             assert len(remaining) == 1, f"After first attempt, should have 1 failed entry, got {len(remaining)}"
@@ -382,7 +383,7 @@ class TestConcurrentAuditArchival:
         assert archived_count_2 == 1, f"Second attempt should archive 1 (the failed one), got {archived_count_2}"
 
         # Active log should be empty
-        with open(audit_logger.log_file, "r") as f:
+        with open(audit_logger.log_file) as f:
             data = json.load(f)
             remaining = data.get("entries", [])
             assert len(remaining) == 0, f"After second attempt, active log should be empty, got {len(remaining)}"

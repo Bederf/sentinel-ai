@@ -17,9 +17,10 @@ FSR Domain: 4.11 - Incident Response (emergency access controls)
 """
 
 import logging
+from collections.abc import Callable
 from datetime import datetime
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
 from fastapi import Request
 from fastapi.responses import JSONResponse
@@ -49,10 +50,10 @@ class EmergencyControlsService:
 
     def __init__(self):
         self._mode: EmergencyMode = EmergencyMode.NORMAL
-        self._activated_at: Optional[datetime] = None
-        self._activated_by: Optional[str] = None
-        self._reason: Optional[str] = None
-        self._history: List[Dict[str, Any]] = []
+        self._activated_at: datetime | None = None
+        self._activated_by: str | None = None
+        self._reason: str | None = None
+        self._history: list[dict[str, Any]] = []
 
         # Paths that are always allowed (even during shutdown)
         self._always_allowed = {
@@ -84,7 +85,7 @@ class EmergencyControlsService:
         return self._mode != EmergencyMode.NORMAL
 
     @property
-    def status(self) -> Dict[str, Any]:
+    def status(self) -> dict[str, Any]:
         """Current emergency control status."""
         return {
             "mode": self._mode.value,
@@ -99,7 +100,7 @@ class EmergencyControlsService:
         mode: EmergencyMode,
         activated_by: str,
         reason: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Activate an emergency control mode.
 
         Args:
@@ -132,7 +133,7 @@ class EmergencyControlsService:
 
         return self.status
 
-    def deactivate(self, deactivated_by: str) -> Dict[str, Any]:
+    def deactivate(self, deactivated_by: str) -> dict[str, Any]:
         """Deactivate emergency controls and return to normal.
 
         Args:
@@ -167,7 +168,7 @@ class EmergencyControlsService:
 
         return self.status
 
-    def get_history(self, limit: int = 20) -> List[Dict[str, Any]]:
+    def get_history(self, limit: int = 20) -> list[dict[str, Any]]:
         """Get emergency control activation history.
 
         Args:
@@ -178,7 +179,7 @@ class EmergencyControlsService:
         """
         return list(reversed(self._history[-limit:]))
 
-    def check_request(self, request: Request) -> Optional[JSONResponse]:
+    def check_request(self, request: Request) -> JSONResponse | None:
         """Check if a request should be blocked by emergency controls.
 
         Args:
@@ -274,7 +275,7 @@ class EmergencyControlsService:
 # Singleton Instance
 # =============================================================================
 
-_emergency_service: Optional[EmergencyControlsService] = None
+_emergency_service: EmergencyControlsService | None = None
 
 
 def get_emergency_controls() -> EmergencyControlsService:

@@ -2,7 +2,6 @@
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -66,11 +65,11 @@ class CommissioningScorecard(BaseModel):
     """Full commissioning scorecard for a building."""
 
     site_id: str
-    site_name: Optional[str] = None
+    site_name: str | None = None
     ingestion_mode: str
     checked_at: datetime
     gates: list[CommissioningGate]
-    truth_check: Optional[TruthCheckResult] = None
+    truth_check: TruthCheckResult | None = None
     summary: dict[str, int]  # {passed, failed, total}
     all_gates_passed: bool
     consecutive_pass_days: int
@@ -84,7 +83,7 @@ class PromotionResult(BaseModel):
     success: bool
     site_id: str
     previous_mode: str
-    new_mode: Optional[str] = None
+    new_mode: str | None = None
     message: str
-    scorecard: Optional[CommissioningScorecard] = None
+    scorecard: CommissioningScorecard | None = None
     blocking_reasons: list[str] = Field(default_factory=list)

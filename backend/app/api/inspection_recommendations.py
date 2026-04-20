@@ -5,11 +5,12 @@ Powered by InspectionAnalyzer service that uses contextual analysis.
 """
 
 import logging
+
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
-from app.services.inspection_analyzer import get_inspection_analyzer
 from app.database.supabase_client import get_supabase_client
+from app.services.inspection_analyzer import get_inspection_analyzer
 from app.utils.ai_provenance import get_ml_provenance
 
 logger = logging.getLogger(__name__)
@@ -186,8 +187,9 @@ async def create_repair_work_order_from_inspection(
 
     # Emit event for real-time update
     try:
-        from app.services.event_emitter import get_event_emitter
         import asyncio
+
+        from app.services.event_emitter import get_event_emitter
 
         emitter = get_event_emitter()
         asyncio.create_task(

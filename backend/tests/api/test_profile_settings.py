@@ -4,9 +4,9 @@ import json
 from pathlib import Path
 
 from app.models.optimization import (
+    ScheduleProfileOverride,
     SiteProfileConfig,
     ZoneProfileOverride,
-    ScheduleProfileOverride,
 )
 from app.services.profile_service import ProfileService, get_profile_service
 

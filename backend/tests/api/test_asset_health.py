@@ -14,7 +14,6 @@ import pytest
 from app.models.asset_health import AssetHealthBaseline
 from app.services.asset_health_service import AssetHealthService
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -130,7 +129,8 @@ def _mock_asset_svc():
 @pytest.mark.asyncio
 async def test_site_assets_returns_200_with_contract():
     """GET /api/sites/{id}/assets/health-baseline returns 200 with expected shape."""
-    from httpx import AsyncClient, ASGITransport
+    from httpx import ASGITransport, AsyncClient
+
     from tests.conftest import app
 
     with patch("app.api.asset_health.get_asset_health_service", return_value=_mock_asset_svc()):
@@ -148,7 +148,8 @@ async def test_site_assets_returns_200_with_contract():
 @pytest.mark.asyncio
 async def test_site_assets_includes_all_equipment():
     """All site equipment items should be returned in assets list."""
-    from httpx import AsyncClient, ASGITransport
+    from httpx import ASGITransport, AsyncClient
+
     from tests.conftest import app
 
     with patch("app.api.asset_health.get_asset_health_service", return_value=_mock_asset_svc()):
@@ -164,7 +165,8 @@ async def test_site_assets_includes_all_equipment():
 @pytest.mark.asyncio
 async def test_equipment_detail_returns_200():
     """GET /api/equipment/{id}/health-baseline returns 200 for known equipment."""
-    from httpx import AsyncClient, ASGITransport
+    from httpx import ASGITransport, AsyncClient
+
     from tests.conftest import app
 
     with patch("app.api.asset_health.get_asset_health_service", return_value=_mock_asset_svc()):
@@ -183,7 +185,8 @@ async def test_equipment_detail_returns_200():
 @pytest.mark.asyncio
 async def test_equipment_detail_404_unknown():
     """GET /api/equipment/{id}/health-baseline returns 404 for unknown equipment."""
-    from httpx import AsyncClient, ASGITransport
+    from httpx import ASGITransport, AsyncClient
+
     from tests.conftest import app
 
     with patch("app.api.asset_health.get_asset_health_service", return_value=_mock_asset_svc()):

@@ -7,9 +7,10 @@ Run after starting backend: ./start-backend.sh
 """
 
 import asyncio
-import sys
 import json
-from typing import Any, Dict, Optional
+import sys
+from typing import Any
+
 import httpx
 
 BASE_URL = "http://localhost:9095"
@@ -25,7 +26,7 @@ class Colors:
 
 
 async def test_endpoint(
-    name: str, method: str = "GET", endpoint: str = "", expected_fields: Optional[list] = None
+    name: str, method: str = "GET", endpoint: str = "", expected_fields: list | None = None
 ) -> bool:
     """Test a single endpoint."""
     try:
@@ -73,7 +74,7 @@ async def test_endpoint(
         return False
 
 
-async def run_all_tests() -> Dict[str, Any]:
+async def run_all_tests() -> dict[str, Any]:
     """Run all Fleet Learning API tests."""
     print(f"\n{Colors.CYAN}{'=' * 60}")
     print("Fleet Learning API Test Suite")

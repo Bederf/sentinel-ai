@@ -2,15 +2,14 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+import logging
 from datetime import datetime
+from typing import Any
 
+from app.config.access_profiles import has_profile_module_access, has_profile_site_access
 from app.database.supabase_client import get_supabase_client
 from app.models.auth import SentinelRole
 from app.models.module_registry import ModuleType
-from app.config.access_profiles import has_profile_module_access, has_profile_site_access
-
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -46,8 +45,8 @@ class ModuleAccessRepository:
         return email.strip().lower()
 
     @staticmethod
-    def _normalize_modules(module_types: List[str]) -> List[str]:
-        normalized: List[str] = []
+    def _normalize_modules(module_types: list[str]) -> list[str]:
+        normalized: list[str] = []
         for module_type in module_types:
             candidate = module_type.strip().lower()
             if not candidate:
@@ -64,12 +63,12 @@ class ModuleAccessRepository:
         *,
         user_email: str,
         site_code: str,
-        requested_modules: List[str],
-        full_name: Optional[str] = None,
-        company: Optional[str] = None,
-        phone: Optional[str] = None,
-        request_notes: Optional[str] = None,
-    ) -> Optional[Dict[str, Any]]:
+        requested_modules: list[str],
+        full_name: str | None = None,
+        company: str | None = None,
+        phone: str | None = None,
+        request_notes: str | None = None,
+    ) -> dict[str, Any] | None:
         if not self.client:
             return None
 
@@ -111,9 +110,9 @@ class ModuleAccessRepository:
     def list_access_requests(
         self,
         *,
-        status: Optional[str] = None,
+        status: str | None = None,
         limit: int = 100,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         if not self.client:
             return []
         try:
@@ -126,7 +125,7 @@ class ModuleAccessRepository:
             logger.error("Failed listing access requests: %s", exc)
             return []
 
-    def get_access_request(self, request_id: str) -> Optional[Dict[str, Any]]:
+    def get_access_request(self, request_id: str) -> dict[str, Any] | None:
         if not self.client:
             return None
         try:
@@ -142,13 +141,13 @@ class ModuleAccessRepository:
         request_id: str,
         status: str,
         reviewed_by: str,
-        review_notes: Optional[str] = None,
-        granted_modules: Optional[List[str]] = None,
-    ) -> Optional[Dict[str, Any]]:
+        review_notes: str | None = None,
+        granted_modules: list[str] | None = None,
+    ) -> dict[str, Any] | None:
         if not self.client:
             return None
 
-        payload: Dict[str, Any] = {
+        payload: dict[str, Any] = {
             "status": status,
             "reviewed_by": reviewed_by,
             "review_notes": review_notes,
@@ -169,7 +168,7 @@ class ModuleAccessRepository:
         *,
         user_email: str,
         site_code: str,
-        module_types: List[str],
+        module_types: list[str],
         granted_by: str,
         replace_existing: bool = True,
     ) -> bool:
@@ -211,7 +210,7 @@ class ModuleAccessRepository:
             )
             return False
 
-    def get_user_modules(self, *, user_email: str, site_code: str) -> List[str]:
+    def get_user_modules(self, *, user_email: str, site_code: str) -> list[str]:
         if not self.client:
             return []
 
@@ -232,10 +231,10 @@ class ModuleAccessRepository:
     def get_effective_modules(
         self,
         *,
-        user_email: Optional[str],
+        user_email: str | None,
         user_role: SentinelRole,
         site_code: str,
-    ) -> List[str]:
+    ) -> list[str]:
         if user_role == SentinelRole.ADMIN:
             return [module.value for module in ModuleType]
         effective = set(BASE_MODULES)
@@ -246,7 +245,7 @@ class ModuleAccessRepository:
     def has_module_access(
         self,
         *,
-        user_email: Optional[str],
+        user_email: str | None,
         user_role: SentinelRole,
         site_code: str,
         module_type: ModuleType,

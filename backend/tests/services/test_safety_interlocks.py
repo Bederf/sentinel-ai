@@ -3,9 +3,10 @@ Unit tests for safety interlocks service.
 """
 
 import pytest
-from app.services.safety_interlocks import SafetyEngine, safety_engine
+
 from app.models.device import create_device_from_dict
-from tests.factories import SafetyRuleFactory, DeviceFactory
+from app.services.safety_interlocks import SafetyEngine, safety_engine
+from tests.factories import DeviceFactory, SafetyRuleFactory
 
 
 @pytest.mark.unit

@@ -4,9 +4,10 @@ SLA Terms Repository - Database operations for contract SLA definitions.
 Phase 48: Contract Management
 """
 
-from typing import Optional, List, Dict, Any
-from ..supabase_client import get_supabase_client
 import logging
+from typing import Any
+
+from ..supabase_client import get_supabase_client
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +18,7 @@ class SLATermsRepository:
     def __init__(self):
         self.client = get_supabase_client()
 
-    def get_by_contract(self, contract_id: str) -> List[Dict[str, Any]]:
+    def get_by_contract(self, contract_id: str) -> list[dict[str, Any]]:
         """
         Get all SLA terms for a contract.
 
@@ -42,7 +43,7 @@ class SLATermsRepository:
             logger.error(f"Error getting SLA terms for contract {contract_id}: {e}")
             return []
 
-    def create(self, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def create(self, data: dict[str, Any]) -> dict[str, Any] | None:
         """
         Create a single SLA term.
 
@@ -69,7 +70,7 @@ class SLATermsRepository:
             logger.error(f"Error creating SLA term: {e}")
             return None
 
-    def create_many(self, terms: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def create_many(self, terms: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """
         Bulk insert SLA terms.
 
@@ -97,7 +98,7 @@ class SLATermsRepository:
             logger.error(f"Error bulk creating SLA terms: {e}")
             return []
 
-    def update(self, term_id: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def update(self, term_id: str, data: dict[str, Any]) -> dict[str, Any] | None:
         """
         Update an SLA term.
 
@@ -168,7 +169,7 @@ class SLATermsRepository:
 
 
 # Singleton instance
-_repository: Optional[SLATermsRepository] = None
+_repository: SLATermsRepository | None = None
 
 
 def get_sla_terms_repository() -> SLATermsRepository:

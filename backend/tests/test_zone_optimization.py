@@ -12,16 +12,16 @@ from datetime import datetime
 from unittest.mock import patch
 
 from app.models.device import (
-    DeviceType,
-    DeviceLocation,
     DeviceEquipment,
+    DeviceLocation,
     DevicePoint,
+    DeviceType,
+    ExposureDirection,
+    HVACDevice,
     PointType,
     ProtocolType,
     ZoneType,
-    ExposureDirection,
     create_device_from_dict,
-    HVACDevice,
 )
 from app.services.ai_optimizer import AIOptimizerService
 

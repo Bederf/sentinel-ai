@@ -3,12 +3,13 @@ WhatsApp event handlers for SENTRY notifications.
 Maps BMS events to WhatsApp messages for technicians and facility managers.
 """
 
-from typing import Dict, Any, Optional, List
-from app.integrations.whatsapp_service import get_whatsapp_service
 import json
 import logging
-from datetime import datetime
 import os
+from datetime import datetime
+from typing import Any
+
+from app.integrations.whatsapp_service import get_whatsapp_service
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +22,7 @@ class WhatsAppHandler:
         self.technician_mapping = self._load_technician_mapping()
         self.enabled = self.service.enabled
 
-    def _load_technician_mapping(self) -> Dict[str, Dict[str, Any]]:
+    def _load_technician_mapping(self) -> dict[str, dict[str, Any]]:
         """Load technician WhatsApp phone numbers and details."""
         try:
             # Try to load from config file
@@ -33,7 +34,7 @@ class WhatsAppHandler:
 
             for config_path in config_paths:
                 if os.path.exists(config_path):
-                    with open(config_path, "r") as f:
+                    with open(config_path) as f:
                         data = json.load(f)
                         mapping = {}
                         for tech in data.get("technicians", []):
@@ -52,7 +53,7 @@ class WhatsAppHandler:
             logger.error(f"Error loading technician mapping: {e}")
             return {}
 
-    async def send_work_order_assignment(self, work_order: Dict[str, Any], technician_id: str) -> bool:
+    async def send_work_order_assignment(self, work_order: dict[str, Any], technician_id: str) -> bool:
         """
         Notify technician of work order assignment via WhatsApp.
 
@@ -96,7 +97,7 @@ class WhatsAppHandler:
             logger.error(f"Error sending work order via WhatsApp: {e}")
             return False
 
-    async def send_critical_alert(self, alert: Dict[str, Any], recipient_ids: List[str]) -> int:
+    async def send_critical_alert(self, alert: dict[str, Any], recipient_ids: list[str]) -> int:
         """
         Send critical alert to multiple technicians/managers.
 
@@ -138,7 +139,7 @@ class WhatsAppHandler:
         return count
 
     async def send_daily_summary(
-        self, facility_id: str, facility_name: str, summary: Dict[str, Any], manager_id: Optional[str] = None
+        self, facility_id: str, facility_name: str, summary: dict[str, Any], manager_id: str | None = None
     ) -> bool:
         """Send daily operations summary to facility manager."""
         if not self.enabled:
@@ -199,12 +200,12 @@ class WhatsAppHandler:
             logger.error(f"Error sending status update: {e}")
             return False
 
-    def get_technician_phone(self, technician_id: str) -> Optional[str]:
+    def get_technician_phone(self, technician_id: str) -> str | None:
         """Get WhatsApp phone number for a technician."""
         tech_info = self.technician_mapping.get(technician_id)
         return tech_info.get("phone") if tech_info else None
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """Get WhatsApp handler status."""
         return {
             "enabled": self.enabled,
@@ -214,7 +215,7 @@ class WhatsAppHandler:
 
 
 # Singleton
-_handler: Optional[WhatsAppHandler] = None
+_handler: WhatsAppHandler | None = None
 
 
 def get_whatsapp_handler() -> WhatsAppHandler:

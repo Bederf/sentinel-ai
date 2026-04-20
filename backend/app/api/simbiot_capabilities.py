@@ -6,8 +6,6 @@ policy systems can render/write from one BMS-agnostic contract.
 
 from __future__ import annotations
 
-from typing import Optional
-
 from fastapi import APIRouter, HTTPException, Query
 
 from app.core.site_resolver import get_registered_site_ids
@@ -21,9 +19,9 @@ router = APIRouter(prefix="/api/simbiot", tags=["simbiot-capabilities"])
 async def get_site_capabilities(
     site_id: str,
     bms_vendor: str = Query("bacnet", description="BMS vendor/adapter alias"),
-    host: Optional[str] = Query(None, description="Optional BMS host/IP"),
-    port: Optional[int] = Query(None, description="Optional BMS port"),
-    device_id: Optional[str] = Query(None, description="Optional single-device filter"),
+    host: str | None = Query(None, description="Optional BMS host/IP"),
+    port: int | None = Query(None, description="Optional BMS port"),
+    device_id: str | None = Query(None, description="Optional single-device filter"),
     commissioning: bool = Query(True, description="Allow onboarding-time capability discovery"),
 ) -> dict:
     """Return normalized capability map for a site."""
@@ -121,8 +119,8 @@ async def get_site_capabilities(
 async def sync_site_capabilities(
     site_id: str,
     bms_vendor: str = Query("bacnet", description="BMS vendor/adapter alias"),
-    host: Optional[str] = Query(None, description="Optional BMS host/IP"),
-    port: Optional[int] = Query(None, description="Optional BMS port"),
+    host: str | None = Query(None, description="Optional BMS host/IP"),
+    port: int | None = Query(None, description="Optional BMS port"),
     commissioning: bool = Query(True, description="Allow onboarding-time capability discovery"),
 ) -> dict:
     """Backfill existing site equipment with latest SIMBIOT capability snapshot."""

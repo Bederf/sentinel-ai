@@ -19,9 +19,10 @@ Tests cover:
 - Hardcoded fallback still works
 """
 
-import pytest
 from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from app.services.lifecycle_orchestrator import LifecycleOrchestrator
 

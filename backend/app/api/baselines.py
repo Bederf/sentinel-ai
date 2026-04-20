@@ -8,30 +8,29 @@ Phase 54-01: Equipment Baseline Assessment - Wave 1
 """
 
 import logging
-from typing import List, Optional, Dict, Any
 from datetime import datetime
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-
-from app.middleware.auth_middleware import require_equipment_access
-from app.models.auth import AuthContext
 from pydantic import BaseModel, Field
 
+from app.database.repositories.baseline_repository import BaselineRepository
+from app.middleware.auth_middleware import require_equipment_access
+from app.models.auth import AuthContext
 from app.models.baseline import (
-    EquipmentBaseline,
+    BaselineSource,
+    BaselineType,
     ComparisonResult,
     DeviationStatus,
-    BaselineType,
-    BaselineSource,
+    EquipmentBaseline,
 )
-from app.database.repositories.baseline_repository import BaselineRepository
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/equipment/baseline", tags=["baselines"])
 
 # Global repository instance
-_baseline_repo: Optional[BaselineRepository] = None
+_baseline_repo: BaselineRepository | None = None
 
 
 def get_baseline_repository() -> BaselineRepository:
@@ -52,17 +51,17 @@ class BaselineCaptureRequest(BaseModel):
 
     captured_by: str = Field(..., description="Technician name or system identifier")
     baseline_type: BaselineType = Field(default=BaselineType.INITIAL, description="Type of baseline")
-    baseline_values: Dict[str, Any] = Field(..., description="Baseline measurement values", min_length=1)
-    measurement_conditions: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Measurement context")
+    baseline_values: dict[str, Any] = Field(..., description="Baseline measurement values", min_length=1)
+    measurement_conditions: dict[str, Any] | None = Field(default_factory=dict, description="Measurement context")
     source_type: BaselineSource = Field(default=BaselineSource.MANUAL, description="Data source")
-    notes: Optional[str] = Field(None, description="Capture notes")
-    attachment_urls: Optional[List[str]] = Field(default_factory=list, description="Documentation URLs")
+    notes: str | None = Field(None, description="Capture notes")
+    attachment_urls: list[str] | None = Field(default_factory=list, description="Documentation URLs")
 
 
 class CurrentDataRequest(BaseModel):
     """Request containing current readings for comparison."""
 
-    current_values: Dict[str, float] = Field(..., description="Current equipment readings")
+    current_values: dict[str, float] = Field(..., description="Current equipment readings")
     data_source: str = Field(default="bms_sensor", description="Source of current data")
 
 
@@ -75,8 +74,8 @@ class ComparisonResponse(BaseModel):
     comparison_date: datetime
     overall_status: DeviationStatus
     max_deviation_percent: float
-    deviations: Dict[str, ComparisonResult]
-    comparison_notes: Optional[str] = None
+    deviations: dict[str, ComparisonResult]
+    comparison_notes: str | None = None
 
 
 # ============================================================================
@@ -157,12 +156,12 @@ async def get_latest_baseline(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/{equipment_id}/history", response_model=List[EquipmentBaseline])
+@router.get("/{equipment_id}/history", response_model=list[EquipmentBaseline])
 async def get_baseline_history(
     equipment_id: str,
     limit: int = Query(10, ge=1, le=100, description="Number of records to return"),
     auth: AuthContext = Depends(require_equipment_access("equipment_id")),
-) -> List[EquipmentBaseline]:
+) -> list[EquipmentBaseline]:
     """
     Get baseline history for equipment.
 
@@ -201,7 +200,8 @@ async def compare_to_baseline(
     """
     try:
         from app.services.baseline_comparison_service import get_baseline_comparison_service
-        from app.services.workflow_triggers import get_trigger_engine, BaselineComparison as WorkflowBaselineComparison
+        from app.services.workflow_triggers import BaselineComparison as WorkflowBaselineComparison
+        from app.services.workflow_triggers import get_trigger_engine
 
         # Get comparison service
         comparison_service = get_baseline_comparison_service()
@@ -275,7 +275,7 @@ async def compare_to_baseline(
 @router.get("/{equipment_id}/summary")
 async def get_baseline_summary(
     equipment_id: str, auth: AuthContext = Depends(require_equipment_access("equipment_id"))
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Get baseline summary statistics for equipment.
 
@@ -300,7 +300,7 @@ async def get_baseline_summary(
 @router.get("/{equipment_id}/report")
 async def get_baseline_report(
     equipment_id: str,
-    baseline_id: Optional[str] = Query(None, description="Specific baseline ID (uses latest if None)"),
+    baseline_id: str | None = Query(None, description="Specific baseline ID (uses latest if None)"),
     auth: AuthContext = Depends(require_equipment_access("equipment_id")),
 ):
     """
@@ -314,9 +314,11 @@ async def get_baseline_report(
     - Technician notes section
     """
     try:
-        from fastapi.responses import Response
-        from app.services.baseline_comparison_service import get_baseline_comparison_service
         from datetime import datetime
+
+        from fastapi.responses import Response
+
+        from app.services.baseline_comparison_service import get_baseline_comparison_service
 
         comparison_service = get_baseline_comparison_service()
         repo = get_baseline_repository()
@@ -358,6 +360,6 @@ async def get_baseline_report(
 
 
 @router.get("/health", tags=["baselines"])
-async def health_check() -> Dict[str, str]:
+async def health_check() -> dict[str, str]:
     """Baseline API health check."""
     return {"service": "equipment-baseline-api", "status": "healthy", "version": "1.0.0"}

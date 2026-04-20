@@ -10,13 +10,13 @@ Phase 141-01: Core API routes.
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from app.services.auth_service import get_current_user
 from app.models.user import User
+from app.services.auth_service import get_current_user
 from app.services.dashboard_generator import get_dashboard_generator
 
 logger = logging.getLogger("sentinel.dashboard_generator")
@@ -33,16 +33,16 @@ class EquipmentItem(BaseModel):
     """Equipment item for classification / generation."""
 
     code: str = Field(..., description="Equipment code (e.g., S002-CHILLER-B1-001)")
-    type: Optional[str] = Field(None, description="Optional explicit type string")
-    name: Optional[str] = Field(None, description="Equipment display name")
-    status: Optional[str] = Field(None, description="Current status")
-    health_score: Optional[int] = Field(None, description="Current health score (0-100)")
+    type: str | None = Field(None, description="Optional explicit type string")
+    name: str | None = Field(None, description="Equipment display name")
+    status: str | None = Field(None, description="Current status")
+    health_score: int | None = Field(None, description="Current health score (0-100)")
 
 
 class GenerateRequest(BaseModel):
     """Optional body for generate endpoint."""
 
-    equipment_list: Optional[List[EquipmentItem]] = Field(
+    equipment_list: list[EquipmentItem] | None = Field(
         None, description="Equipment list. If omitted, loads from repository."
     )
 
@@ -50,7 +50,7 @@ class GenerateRequest(BaseModel):
 class ClassifyRequest(BaseModel):
     """Body for classify endpoint."""
 
-    equipment_list: List[EquipmentItem] = Field(..., description="Equipment list to classify")
+    equipment_list: list[EquipmentItem] = Field(..., description="Equipment list to classify")
 
 
 # --------------------------------------------------------------------------
@@ -58,7 +58,7 @@ class ClassifyRequest(BaseModel):
 # --------------------------------------------------------------------------
 
 
-def _count_classes(classified: List[Dict[str, Any]]) -> Dict[str, int]:
+def _count_classes(classified: list[dict[str, Any]]) -> dict[str, int]:
     """Count equipment per class from classified list.
 
     Args:
@@ -67,7 +67,7 @@ def _count_classes(classified: List[Dict[str, Any]]) -> Dict[str, int]:
     Returns:
         Dict mapping class value to count.
     """
-    counts: Dict[str, int] = {}
+    counts: dict[str, int] = {}
     for item in classified:
         cls_val = item.get("equipment_class", "unknown")
         if hasattr(cls_val, "value"):
@@ -84,7 +84,7 @@ def _count_classes(classified: List[Dict[str, Any]]) -> Dict[str, int]:
 @router.post("/generate/{site_id}")
 async def generate_dashboard(
     site_id: str,
-    body: Optional[GenerateRequest] = None,
+    body: GenerateRequest | None = None,
     current_user: User = Depends(get_current_user),
 ):
     """Generate full dashboard configuration for a site.

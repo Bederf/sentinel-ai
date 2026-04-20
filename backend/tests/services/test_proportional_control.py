@@ -11,7 +11,7 @@ Validates that:
 import pytest
 
 from app.services.building_schedule import SiteSchedule
-from app.services.lifecycle_orchestrator import LifecycleOrchestrator, RAMP_RATES
+from app.services.lifecycle_orchestrator import RAMP_RATES, LifecycleOrchestrator
 
 
 @pytest.fixture

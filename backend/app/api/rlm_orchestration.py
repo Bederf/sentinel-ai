@@ -8,7 +8,6 @@ Phase: 113-03
 """
 
 import logging
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
@@ -36,7 +35,7 @@ class AnalyseRequest(BaseModel):
     """Request body for POST /api/rlm/cases/{case_id}/analyse."""
 
     question: str = Field(..., min_length=1, max_length=2000)
-    model: Optional[str] = Field(default=None, max_length=100)
+    model: str | None = Field(default=None, max_length=100)
 
 
 class AnalyseResponse(BaseModel):

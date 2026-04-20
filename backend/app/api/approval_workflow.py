@@ -1,16 +1,16 @@
 """Approval workflow for parts orders."""
 
-import os
 import asyncio
 import logging
-from typing import List, Optional
-from enum import Enum
-from datetime import datetime
-from pydantic import BaseModel
-from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
+import os
 import smtplib
-from email.mime.text import MIMEText
+from datetime import datetime
 from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from enum import Enum
+
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from pydantic import BaseModel
 
 from app.middleware.auth_middleware import require_auth
 from app.models.auth import AuthContext
@@ -34,9 +34,9 @@ class ApprovalRequest(BaseModel):
     order_id: str
     requester_id: str
     amount: float
-    items: List[dict]
+    items: list[dict]
     justification: str
-    site_id: Optional[str] = None
+    site_id: str | None = None
 
 
 class ApprovalResponse(BaseModel):
@@ -44,9 +44,9 @@ class ApprovalResponse(BaseModel):
 
     order_id: str
     status: ApprovalStatus
-    approver_id: Optional[str] = None
-    approval_timestamp: Optional[datetime] = None
-    rejection_reason: Optional[str] = None
+    approver_id: str | None = None
+    approval_timestamp: datetime | None = None
+    rejection_reason: str | None = None
 
 
 class NotificationService:
@@ -61,7 +61,7 @@ class NotificationService:
         self.frontend_url = os.getenv("FRONTEND_URL", "http://localhost:9096")
         self.enabled = bool(self.smtp_user)
 
-    async def send_approval_email(self, approval: ApprovalRequest, approvers: List[str]) -> None:
+    async def send_approval_email(self, approval: ApprovalRequest, approvers: list[str]) -> None:
         """Send approval request email to supervisors."""
         if not self.enabled:
             logger.info(f"Email notifications disabled. Would send to: {approvers}")
@@ -220,7 +220,7 @@ class ApprovalWorkflow:
 
         return approval
 
-    async def _get_approvers(self, site_id: str) -> List[str]:
+    async def _get_approvers(self, site_id: str) -> list[str]:
         """Get list of supervisors for site."""
         # TODO: Query database for supervisors at site
         # For now, return placeholder

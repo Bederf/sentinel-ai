@@ -8,33 +8,33 @@ Phase 53-02: Automated Triggers & Workflow Automation
 
 import logging
 from datetime import datetime
-from typing import Optional, List
+
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from app.database.repositories.baseline_repository import BaselineRepository
+from app.database.repositories.equipment_repository import EquipmentRepository
+from app.database.repositories.inspection_repository import InspectionRepository
+from app.database.repositories.prediction_repository import PredictionRepository
+from app.database.repositories.work_order_repository import get_work_order_repository
+from app.database.repositories.workflow_event_repository import get_workflow_event_repository
+from app.database.supabase_client import get_supabase_client
 from app.services.workflow_orchestrator import (
-    get_workflow_orchestrator,
+    InspectionTriggerResponse,
+    MLAnomalyTrigger,
     OnboardAssetRequest,
     OnboardAssetResponse,
-    WorkflowStatusResponse,
-    MLAnomalyTrigger,
-    InspectionTriggerResponse,
     RepairValidationRequest,
     RepairValidationResponse,
+    WorkflowStatusResponse,
+    get_workflow_orchestrator,
 )
 from app.services.workflow_triggers import (
-    get_trigger_engine,
     AnomalyAlert,
     BaselineComparison,
     InspectionDeficiency,
+    get_trigger_engine,
 )
-from app.database.supabase_client import get_supabase_client
-from app.database.repositories.equipment_repository import EquipmentRepository
-from app.database.repositories.prediction_repository import PredictionRepository
-from app.database.repositories.baseline_repository import BaselineRepository
-from app.database.repositories.inspection_repository import InspectionRepository
-from app.database.repositories.work_order_repository import get_work_order_repository
-from app.database.repositories.workflow_event_repository import get_workflow_event_repository
 
 logger = logging.getLogger(__name__)
 
@@ -102,14 +102,14 @@ class TriggerHistoryResponse(BaseModel):
     """Response containing trigger history."""
 
     count: int
-    triggers: List[dict]
+    triggers: list[dict]
 
 
 class WorkflowEventResponse(BaseModel):
     """Response containing workflow events."""
 
     count: int
-    events: List[dict]
+    events: list[dict]
 
 
 # ============================================================================
@@ -290,7 +290,7 @@ async def trigger_validate_effectiveness(request: ValidateEffectivenessRequest):
 
 
 @router.get("/triggers/history", response_model=TriggerHistoryResponse)
-async def get_trigger_history(equipment_id: Optional[str] = Query(None, description="Filter by equipment ID")):
+async def get_trigger_history(equipment_id: str | None = Query(None, description="Filter by equipment ID")):
     """
     Get trigger history, optionally filtered by equipment.
     """
@@ -357,8 +357,8 @@ async def get_effectiveness_result(work_order_id: str):
 
 @router.get("/events", response_model=WorkflowEventResponse)
 async def get_workflow_events(
-    equipment_id: Optional[str] = Query(None, description="Filter by equipment ID"),
-    trigger_type: Optional[str] = Query(None, description="Filter by trigger type"),
+    equipment_id: str | None = Query(None, description="Filter by equipment ID"),
+    trigger_type: str | None = Query(None, description="Filter by trigger type"),
     limit: int = Query(100, ge=1, le=500, description="Max number of events to return"),
 ):
     """
@@ -389,17 +389,17 @@ class DashboardWorkflowState(BaseModel):
 
     equipment_id: str
     current_state: str
-    state_history: List[dict]
+    state_history: list[dict]
     baseline_summary: dict
     inspection_status: dict
-    ml_prediction: Optional[dict]
-    active_repairs: List[dict]
+    ml_prediction: dict | None
+    active_repairs: list[dict]
 
 
 class DashboardResponse(BaseModel):
     """Response for workflow dashboard."""
 
-    equipment: List[DashboardEquipmentItem]
+    equipment: list[DashboardEquipmentItem]
     workflow_states: dict  # keyed by equipment_id
 
 
@@ -429,7 +429,7 @@ def determine_workflow_state(
 
 
 @router.get("/dashboard/equipment", response_model=DashboardResponse)
-async def get_dashboard_equipment(site_id: Optional[str] = Query(None, description="Filter by site/building code")):
+async def get_dashboard_equipment(site_id: str | None = Query(None, description="Filter by site/building code")):
     """
     Get equipment workflow data for the dashboard.
 
@@ -621,7 +621,7 @@ async def get_dashboard_equipment(site_id: Optional[str] = Query(None, descripti
 
     except Exception as e:
         logger.error(f"Error fetching dashboard data: {e}")
-        raise HTTPException(status_code=500, detail=f"Error fetching dashboard data: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error fetching dashboard data: {e!s}")
 
 
 # ============================================================================

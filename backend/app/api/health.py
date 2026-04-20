@@ -1,8 +1,9 @@
 """Health check endpoint."""
 
+from typing import Any
+
 from fastapi import APIRouter
 from pydantic import BaseModel
-from typing import Dict, Any
 
 from app.config.settings import settings
 
@@ -23,7 +24,7 @@ class ControlHealthResponse(BaseModel):
     status: str
     version: str
     config_checksum: str
-    services: Dict[str, Any]
+    services: dict[str, Any]
 
 
 @router.get("/health", response_model=HealthResponse)
@@ -51,9 +52,9 @@ async def control_health_check() -> ControlHealthResponse:
     Returns:
         ControlHealthResponse with detailed service status.
     """
+    from app.services.audit_logger import AuditLogger
     from app.services.device_abstraction import device_manager
     from app.services.safety_interlocks import safety_engine
-    from app.services.audit_logger import AuditLogger
 
     services = {}
 

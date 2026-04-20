@@ -5,14 +5,16 @@ dashboard shows current metrics instead of all devices offline.
 """
 
 import logging
-from fastapi import APIRouter, Depends, Request, HTTPException
-from app.middleware.auth_middleware import require_auth, AuthLevel
-from app.models.auth import AuthContext
-from app.services.device_status_initializer import initialize_connected_site_devices
+
+from fastapi import APIRouter, Depends, HTTPException, Request
+
 from app.core.site_resolver import get_primary_site_code
 from app.database.repositories.user_site_access_repository import (
     get_user_site_access_repository,
 )
+from app.middleware.auth_middleware import AuthLevel, require_auth
+from app.models.auth import AuthContext
+from app.services.device_status_initializer import initialize_connected_site_devices
 
 logger = logging.getLogger(__name__)
 

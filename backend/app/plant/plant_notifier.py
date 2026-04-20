@@ -8,8 +8,8 @@ from __future__ import annotations
 
 import logging
 
-from app.plant.models import AlarmSeverity, DesigoBuildingAlarm
 from app.models.notification import AlertLevel
+from app.plant.models import AlarmSeverity, DesigoBuildingAlarm
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +21,7 @@ _SEVERITY_TO_ALERT_LEVEL = {
 }
 
 # Re-export format_plant_alert from old module for backward compat
-from app.plant.whatsapp_notifier import format_plant_alert  # noqa: E402, F401
+from app.plant.whatsapp_notifier import format_plant_alert  # noqa: E402
 
 
 async def send_plant_alert(alarm: DesigoBuildingAlarm) -> bool:

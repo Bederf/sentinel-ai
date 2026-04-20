@@ -8,17 +8,18 @@ QualityGateEvaluator to control gate results deterministically.
 """
 
 import os
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 from datetime import datetime
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 # Set env vars before any app imports
 os.environ.setdefault("DEMO_MODE", "true")
 os.environ.setdefault("LIGHTWEIGHT_APP", "1")
 
-from httpx import ASGITransport, AsyncClient  # noqa: E402
+from httpx import ASGITransport, AsyncClient
 
-from app.services.quality_gate_policy import (  # noqa: E402
+from app.services.quality_gate_policy import (
     EnforcementAction,
     GateStatus,
     MetricRuleResult,
@@ -297,8 +298,8 @@ async def test_approve_blocked_live_control_fail():
 @pytest.mark.asyncio
 async def test_approve_allowed_live_control_pass():
     """ApprovalService.execute_approval proceeds when gate PASSes in live_control."""
-    from app.services.approval_service import ApprovalService
     from app.models.recommendation import RecommendationStatus
+    from app.services.approval_service import ApprovalService
 
     svc = ApprovalService.__new__(ApprovalService)
     svc.safety_engine = MagicMock()
@@ -569,7 +570,7 @@ async def test_monitoring_includes_quality_gate():
 @pytest.mark.asyncio
 async def test_json_in_live_triggers_fail():
     """When manual_source_pct > 0 in live_control mode, quality gate should FAIL."""
-    from app.services.quality_gate_evaluator import QualityGateEvaluator, _LIVE_DEFAULTS
+    from app.services.quality_gate_evaluator import _LIVE_DEFAULTS, QualityGateEvaluator
 
     evaluator = QualityGateEvaluator()
 
@@ -644,8 +645,8 @@ async def test_shadow_live_auto_execute_blocked():
 @pytest.mark.asyncio
 async def test_simulation_mode_does_not_block():
     """In simulation mode, quality gate does not block Tier 2 approvals."""
-    from app.services.approval_service import ApprovalService
     from app.models.recommendation import RecommendationStatus
+    from app.services.approval_service import ApprovalService
 
     svc = ApprovalService.__new__(ApprovalService)
     svc.safety_engine = MagicMock()

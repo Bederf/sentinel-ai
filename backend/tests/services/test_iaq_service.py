@@ -4,14 +4,14 @@ import pytest
 
 from app.services.iaq_service import (
     IAQService,
-    score_zone,
+    _generate_alerts,
     _score_co2,
     _score_humidity,
-    _score_temperature,
-    _score_voc,
     _score_pm25,
     _score_status,
-    _generate_alerts,
+    _score_temperature,
+    _score_voc,
+    score_zone,
 )
 
 
@@ -360,7 +360,8 @@ class TestIAQService:
 
 @pytest.mark.asyncio
 async def test_iaq_zones_endpoint():
-    from httpx import AsyncClient, ASGITransport
+    from httpx import ASGITransport, AsyncClient
+
     from tests.conftest import app
 
     transport = ASGITransport(app=app)
@@ -375,7 +376,8 @@ async def test_iaq_zones_endpoint():
 
 @pytest.mark.asyncio
 async def test_iaq_zone_detail_endpoint():
-    from httpx import AsyncClient, ASGITransport
+    from httpx import ASGITransport, AsyncClient
+
     from tests.conftest import app
 
     transport = ASGITransport(app=app)
@@ -390,7 +392,8 @@ async def test_iaq_zone_detail_endpoint():
 
 @pytest.mark.asyncio
 async def test_iaq_zone_not_found():
-    from httpx import AsyncClient, ASGITransport
+    from httpx import ASGITransport, AsyncClient
+
     from tests.conftest import app
 
     transport = ASGITransport(app=app)
@@ -401,7 +404,8 @@ async def test_iaq_zone_not_found():
 
 @pytest.mark.asyncio
 async def test_iaq_alerts_endpoint():
-    from httpx import AsyncClient, ASGITransport
+    from httpx import ASGITransport, AsyncClient
+
     from tests.conftest import app
 
     transport = ASGITransport(app=app)
@@ -415,7 +419,8 @@ async def test_iaq_alerts_endpoint():
 
 @pytest.mark.asyncio
 async def test_iaq_compliance_well():
-    from httpx import AsyncClient, ASGITransport
+    from httpx import ASGITransport, AsyncClient
+
     from tests.conftest import app
 
     transport = ASGITransport(app=app)
@@ -428,7 +433,8 @@ async def test_iaq_compliance_well():
 
 @pytest.mark.asyncio
 async def test_iaq_compliance_esg():
-    from httpx import AsyncClient, ASGITransport
+    from httpx import ASGITransport, AsyncClient
+
     from tests.conftest import app
 
     transport = ASGITransport(app=app)
@@ -441,7 +447,8 @@ async def test_iaq_compliance_esg():
 
 @pytest.mark.asyncio
 async def test_iaq_compliance_invalid_type():
-    from httpx import AsyncClient, ASGITransport
+    from httpx import ASGITransport, AsyncClient
+
     from tests.conftest import app
 
     transport = ASGITransport(app=app)

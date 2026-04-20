@@ -5,15 +5,15 @@ stairwell pressurization, and cause-effect matrix. Plus coordination
 endpoints for HVAC shutdown, smoke management, and alarm lifecycle.
 """
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
-from typing import Optional
-import logging
 
 from app.api.dependencies.module_access import require_active_module
 from app.models.module_registry import ModuleType
-from app.services.fire_system_service import get_fire_system_service
 from app.services.fire_hvac_coordinator import get_fire_hvac_coordinator
+from app.services.fire_system_service import get_fire_system_service
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +85,7 @@ async def get_fire_status():
 
 
 @router.get("/alarms")
-async def get_fire_alarms(zone_id: Optional[str] = Query(None, description="Filter by zone ID")):
+async def get_fire_alarms(zone_id: str | None = Query(None, description="Filter by zone ID")):
     """Get active fire alarms with optional zone filter."""
     svc = get_fire_system_service()
     alarms = svc.get_active_alarms()

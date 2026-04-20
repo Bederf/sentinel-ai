@@ -15,9 +15,9 @@ from fastapi.testclient import TestClient
 # Ensure email intake is ENABLED for tests
 os.environ.setdefault("EMAIL_INTAKE_ENABLED", "true")
 
-from app.main import app  # noqa: E402
-from app.config.settings import settings  # noqa: E402
-from app.security.webhook_auth import _set_allowed_domains_for_testing  # noqa: E402
+from app.config.settings import settings
+from app.main import app
+from app.security.webhook_auth import _set_allowed_domains_for_testing
 
 client = TestClient(app)
 

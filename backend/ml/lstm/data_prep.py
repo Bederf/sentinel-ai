@@ -5,12 +5,13 @@ Creates sliding window sequences from sensor data for forecasting.
 """
 
 import logging
-from typing import List, Tuple, Dict, Any
+from typing import Any
+
 import numpy as np
 
 try:
-    from sklearn.preprocessing import StandardScaler
     import pandas as pd
+    from sklearn.preprocessing import StandardScaler
 except ImportError:
     raise ImportError("Install ML dependencies: pip install -r ml/requirements.txt")
 
@@ -23,7 +24,7 @@ class LSTMDataPrep:
     def __init__(
         self,
         window_size: int = 168,  # 7 days of hourly data
-        forecast_horizons: List[int] = None,
+        forecast_horizons: list[int] = None,
     ):
         """
         Initialize data preparation.
@@ -37,7 +38,7 @@ class LSTMDataPrep:
         self.scaler = StandardScaler()
         self._scaler_fitted = False
 
-    def create_sequences(self, data: np.ndarray, target_col: int = 0) -> Tuple[np.ndarray, np.ndarray]:
+    def create_sequences(self, data: np.ndarray, target_col: int = 0) -> tuple[np.ndarray, np.ndarray]:
         """
         Create sliding window sequences for training.
 
@@ -65,8 +66,8 @@ class LSTMDataPrep:
         return np.array(X), np.array(y)
 
     def prepare_from_dataframe(
-        self, df: pd.DataFrame, feature_cols: List[str], target_col: str, timestamp_col: str = "timestamp"
-    ) -> Tuple[np.ndarray, np.ndarray]:
+        self, df: pd.DataFrame, feature_cols: list[str], target_col: str, timestamp_col: str = "timestamp"
+    ) -> tuple[np.ndarray, np.ndarray]:
         """
         Prepare training data from a pandas DataFrame.
 
@@ -165,7 +166,7 @@ class LSTMDataPrep:
 
     def generate_demo_data(
         self, n_samples: int = 5000, n_features: int = 3, noise_level: float = 0.1
-    ) -> Tuple[np.ndarray, np.ndarray]:
+    ) -> tuple[np.ndarray, np.ndarray]:
         """
         Generate synthetic demo data for testing/development.
 
@@ -214,7 +215,7 @@ class EquipmentDataLoader:
     """Load sensor data for specific equipment types from database."""
 
     # Sensor configurations per equipment type
-    SENSOR_CONFIGS: Dict[str, Dict[str, Any]] = {
+    SENSOR_CONFIGS: dict[str, dict[str, Any]] = {
         "chiller": {
             "features": [
                 "chw_supply_temp",
@@ -299,13 +300,13 @@ class EquipmentDataLoader:
     }
 
     @classmethod
-    def get_config(cls, equipment_type: str) -> Dict[str, Any]:
+    def get_config(cls, equipment_type: str) -> dict[str, Any]:
         """Get sensor configuration for equipment type."""
         if equipment_type not in cls.SENSOR_CONFIGS:
             raise ValueError(f"Unknown equipment type: {equipment_type}. Available: {list(cls.SENSOR_CONFIGS.keys())}")
         return cls.SENSOR_CONFIGS[equipment_type]
 
     @classmethod
-    def list_equipment_types(cls) -> List[str]:
+    def list_equipment_types(cls) -> list[str]:
         """List available equipment types."""
         return list(cls.SENSOR_CONFIGS.keys())

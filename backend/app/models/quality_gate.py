@@ -4,7 +4,6 @@ API response models for the quality gate evaluation endpoint.
 Used by the /api/quality-gate/* routes to serialize gate results.
 """
 
-from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -15,8 +14,8 @@ class QualityMetricDetail(BaseModel):
     metric: str = Field(description="Metric name (e.g. 'freshness_minutes')")
     value: float = Field(description="Current metric value")
     state: str = Field(description="Evaluation state: pass/warn/fail/na")
-    pass_bound: Optional[float] = Field(default=None, description="Threshold for PASS")
-    warn_bound: Optional[float] = Field(default=None, description="Threshold for WARN")
+    pass_bound: float | None = Field(default=None, description="Threshold for PASS")
+    warn_bound: float | None = Field(default=None, description="Threshold for WARN")
 
 
 class QualityGateResponse(BaseModel):
@@ -25,10 +24,10 @@ class QualityGateResponse(BaseModel):
     overall_status: str = Field(description="Overall gate: pass/warn/fail")
     enforcement_action: str = Field(description="Enforcement: normal/cap_confidence/suppress_tier3/block_writes")
     mode: str = Field(description="Ingestion mode used for evaluation")
-    metrics: List[QualityMetricDetail] = Field(default_factory=list, description="Per-metric evaluation details")
-    failed_rules: List[str] = Field(default_factory=list, description="Metric names that failed")
-    warn_rules: List[str] = Field(default_factory=list, description="Metric names that warned")
-    reason_codes: List[str] = Field(default_factory=list, description="Machine-readable reason codes for failures")
+    metrics: list[QualityMetricDetail] = Field(default_factory=list, description="Per-metric evaluation details")
+    failed_rules: list[str] = Field(default_factory=list, description="Metric names that failed")
+    warn_rules: list[str] = Field(default_factory=list, description="Metric names that warned")
+    reason_codes: list[str] = Field(default_factory=list, description="Machine-readable reason codes for failures")
     evaluated_at: str = Field(description="ISO timestamp of evaluation")
 
 
@@ -39,7 +38,7 @@ class QualityGateStatusResponse(BaseModel):
     ingestion_mode: str = Field(description="Current ingestion mode")
     thresholds_used: str = Field(description="Mode whose thresholds were applied")
     metric_values: dict = Field(default_factory=dict, description="Raw metric values collected")
-    rule_results: List[QualityMetricDetail] = Field(default_factory=list, description="Per-metric evaluation results")
+    rule_results: list[QualityMetricDetail] = Field(default_factory=list, description="Per-metric evaluation results")
     overall_status: str = Field(description="Overall gate: pass/warn/fail")
     enforcement_action: str = Field(description="Enforcement action applied")
-    reason_codes: List[str] = Field(default_factory=list, description="Machine-readable reason codes")
+    reason_codes: list[str] = Field(default_factory=list, description="Machine-readable reason codes")

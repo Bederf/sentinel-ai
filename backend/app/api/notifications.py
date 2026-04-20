@@ -660,13 +660,13 @@ async def update_notification_preferences(
     response_model=list[NotificationDeliveryLogResponse],
 )
 async def get_delivery_logs(
-    technician_id: str | None = Query(  # noqa: B008
+    technician_id: str | None = Query(
         None, description="Filter by technician"
     ),
     status: NotificationStatus | None = Query(  # noqa: B008
         None, description="Filter by status"
     ),
-    limit: int = Query(100, ge=1, le=1000, description="Max results"),  # noqa: B008
+    limit: int = Query(100, ge=1, le=1000, description="Max results"),
 ):
     """
     Query notification delivery logs.

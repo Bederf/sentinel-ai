@@ -9,7 +9,6 @@ Auth gating:
 """
 
 import logging
-from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
 
@@ -60,7 +59,7 @@ async def get_health_summary(
 @router.get("/workflows")
 async def list_workflows(
     active_only: bool = Query(False, description="Only show active workflows"),
-    tag: Optional[str] = Query(None, description="Filter by tag name"),
+    tag: str | None = Query(None, description="Filter by tag name"),
     auth: AuthContext = Depends(require_auth(AuthLevel.AUTHENTICATED)),
 ):
     """List all n8n workflows."""
@@ -85,8 +84,8 @@ async def get_workflow(
 
 @router.get("/executions")
 async def list_executions(
-    workflow_id: Optional[str] = Query(None, description="Filter by workflow"),
-    status: Optional[str] = Query(None, description="Filter: success, error, waiting"),
+    workflow_id: str | None = Query(None, description="Filter by workflow"),
+    status: str | None = Query(None, description="Filter: success, error, waiting"),
     limit: int = Query(20, ge=1, le=100),
     auth: AuthContext = Depends(require_auth(AuthLevel.AUTHENTICATED)),
 ):

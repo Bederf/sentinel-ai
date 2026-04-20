@@ -10,9 +10,9 @@ Evaluates room state against 5 rules:
 
 from __future__ import annotations
 
-import os
 import logging
-from datetime import datetime, timezone
+import os
+from datetime import UTC, datetime
 
 from app.space.models import RoomStateFinding, SensorEventPayload
 
@@ -45,7 +45,7 @@ async def evaluate_room_state(
     Returns:
         A list of findings (may be empty when everything is normal).
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     site_id = current_state.get("site_id", "FLN02") if current_state else "FLN02"
     findings: list[RoomStateFinding] = []
 
@@ -79,7 +79,7 @@ async def evaluate_room_state(
                 last_contact = last_contact_raw
             if last_contact:
                 if last_contact.tzinfo is None:
-                    last_contact = last_contact.replace(tzinfo=timezone.utc)
+                    last_contact = last_contact.replace(tzinfo=UTC)
                 elapsed = (now - last_contact).total_seconds()
                 if elapsed > SENSOR_OFFLINE_THRESHOLD_SECONDS:
                     findings.append(
@@ -170,13 +170,13 @@ def _parse_dt(value: str | datetime) -> datetime | None:
     """Safely parse a datetime value."""
     if isinstance(value, datetime):
         if value.tzinfo is None:
-            return value.replace(tzinfo=timezone.utc)
+            return value.replace(tzinfo=UTC)
         return value
     if isinstance(value, str):
         try:
             dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
             if dt.tzinfo is None:
-                dt = dt.replace(tzinfo=timezone.utc)
+                dt = dt.replace(tzinfo=UTC)
             return dt
         except (ValueError, TypeError):
             return None

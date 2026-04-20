@@ -11,11 +11,11 @@ Templates derived from existing equipment files.
 """
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 EQUIP_DIR = Path(__file__).resolve().parent.parent / "app" / "data" / "sites" / "site-002" / "equipment"
-NOW = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")
+NOW = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%f")
 
 
 def fcu_template(code: str, name: str) -> dict:

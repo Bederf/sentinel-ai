@@ -9,12 +9,11 @@ from app.services.prediction_taxonomy import (
     urgency_from_severity,
 )
 
-
 FIXTURE_PATH = Path(__file__).resolve().parents[1] / "fixtures" / "formula_golden_outputs.json"
 
 
 def _load_fixture() -> dict:
-    with open(FIXTURE_PATH, "r", encoding="utf-8") as f:
+    with open(FIXTURE_PATH, encoding="utf-8") as f:
         return json.load(f)
 
 

@@ -10,13 +10,15 @@ Tests the complete integration of:
 Verifies that all components work together correctly.
 """
 
-import pytest
 import time
+
+import pytest
+
 from app.models.audit_log import AuditResultType
-from app.services.device_abstraction import device_manager
-from app.services.safety_interlocks import safety_engine
 from app.models.safety_rules import RuleType
 from app.services.audit_logger import AuditLogger
+from app.services.device_abstraction import device_manager
+from app.services.safety_interlocks import safety_engine
 
 
 @pytest.fixture

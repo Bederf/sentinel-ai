@@ -5,16 +5,15 @@ Async CRUD operations for asset evidence with immutability enforcement.
 Supports querying, supersession chain traversal, and RLS integration.
 """
 
-from typing import List, Optional
-from uuid import UUID
 import logging
+from uuid import UUID
 
+from backend.app.database import get_supabase_client
 from backend.app.models.asset_evidence import (
     AssetEvidence,
-    CreateAssetEvidenceInput,
     AssetEvidenceFilter,
+    CreateAssetEvidenceInput,
 )
-from backend.app.database import get_supabase_client
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +69,7 @@ class AssetEvidenceRepository:
             logger.error(f"Failed to create asset evidence: {e}")
             raise
 
-    async def get(self, evidence_id: UUID) -> Optional[AssetEvidence]:
+    async def get(self, evidence_id: UUID) -> AssetEvidence | None:
         """
         Retrieve evidence by ID.
 
@@ -101,7 +100,7 @@ class AssetEvidenceRepository:
         limit: int = 100,
         offset: int = 0,
         active_only: bool = False,
-    ) -> List[AssetEvidence]:
+    ) -> list[AssetEvidence]:
         """
         Get all evidence for equipment, ordered by event_timestamp DESC.
 
@@ -135,7 +134,7 @@ class AssetEvidenceRepository:
         limit: int = 100,
         offset: int = 0,
         active_only: bool = False,
-    ) -> List[AssetEvidence]:
+    ) -> list[AssetEvidence]:
         """
         Get all evidence for site, ordered by event_timestamp DESC.
 
@@ -168,7 +167,7 @@ class AssetEvidenceRepository:
         filter: AssetEvidenceFilter,
         limit: int = 100,
         offset: int = 0,
-    ) -> List[AssetEvidence]:
+    ) -> list[AssetEvidence]:
         """
         Flexible evidence query with optional filters.
 
@@ -212,7 +211,7 @@ class AssetEvidenceRepository:
         self,
         old_evidence_id: UUID,
         new_evidence_id: UUID,
-        reason: Optional[str] = None,
+        reason: str | None = None,
     ) -> AssetEvidence:
         """
         Mark old evidence as superseded by new evidence.
@@ -248,7 +247,7 @@ class AssetEvidenceRepository:
             logger.error(f"Failed to supersede evidence: {e}")
             raise
 
-    async def get_supersession_chain(self, evidence_id: UUID) -> List[AssetEvidence]:
+    async def get_supersession_chain(self, evidence_id: UUID) -> list[AssetEvidence]:
         """
         Get the chain of supersessions for a piece of evidence.
 
@@ -290,7 +289,7 @@ class AssetEvidenceRepository:
             logger.error(f"Failed to traverse supersession chain from {evidence_id}: {e}")
             raise
 
-    async def get_active_for_equipment(self, equipment_id: UUID) -> List[AssetEvidence]:
+    async def get_active_for_equipment(self, equipment_id: UUID) -> list[AssetEvidence]:
         """
         Get active (non-superseded) evidence for equipment.
 
@@ -304,7 +303,7 @@ class AssetEvidenceRepository:
         """
         return await self.list_by_equipment(equipment_id, active_only=True)
 
-    async def get_active_for_site(self, site_id: UUID) -> List[AssetEvidence]:
+    async def get_active_for_site(self, site_id: UUID) -> list[AssetEvidence]:
         """
         Get active (non-superseded) evidence for site.
 

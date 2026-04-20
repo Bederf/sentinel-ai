@@ -6,11 +6,11 @@ Covers the three required cases:
 3. Failure — device write fails, success=False, audit still written
 """
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from app.services.execution_service import execute_command
+import pytest
 
+from app.services.execution_service import execute_command
 
 SITE_ID = "site-001"
 EQUIPMENT_ID = "S001-AHU-B1-001"

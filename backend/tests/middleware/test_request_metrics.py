@@ -51,6 +51,7 @@ class TestRequestMetricsMiddleware:
     def app(self):
         """Create a minimal FastAPI app with the middleware."""
         from fastapi import FastAPI
+
         from app.middleware.request_metrics import RequestMetricsMiddleware
 
         app = FastAPI()

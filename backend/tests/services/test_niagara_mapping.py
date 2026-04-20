@@ -11,22 +11,22 @@ Tests cover:
 """
 
 import json
-import pytest
 from pathlib import Path
 
-from app.services.niagara.point_classifier import (
-    ClassifiedPoint,
-    ConfidenceLevel,
-    PointClassifier,
-    PointType,
-)
+import pytest
+
 from app.services.niagara.mapping_service import (
     EquipmentMapping,
     MappingValidationResult,
     PointMappingService,
     get_mapping_service,
 )
-
+from app.services.niagara.point_classifier import (
+    ClassifiedPoint,
+    ConfidenceLevel,
+    PointClassifier,
+    PointType,
+)
 
 # ---------------------------------------------------------------------------
 # Fixtures

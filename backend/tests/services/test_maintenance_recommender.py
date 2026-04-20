@@ -1,12 +1,14 @@
 """Tests for the Maintenance Recommender Service."""
 
+from unittest.mock import AsyncMock, Mock, patch
+
 import pytest
-from unittest.mock import Mock, patch, AsyncMock
+
 from app.services.maintenance_recommender import (
-    MaintenanceRecommender,
-    MaintenanceRecommendation,
-    DEFAULT_MAINTENANCE_ACTIONS,
     COMMON_SPARE_PARTS,
+    DEFAULT_MAINTENANCE_ACTIONS,
+    MaintenanceRecommendation,
+    MaintenanceRecommender,
     get_maintenance_recommender,
 )
 

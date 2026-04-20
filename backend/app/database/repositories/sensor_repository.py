@@ -1,6 +1,7 @@
 """Repository for sensor operations."""
 
-from typing import List, Optional, Dict, Any
+from typing import Any
+
 from app.database.supabase_client import get_supabase_client
 
 
@@ -11,7 +12,7 @@ class SensorRepository:
         """Initialize the repository with a Supabase client."""
         self.client = get_supabase_client()
 
-    def get_all(self, equipment_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_all(self, equipment_id: str | None = None) -> list[dict[str, Any]]:
         """Get all sensors with optional filtering.
 
         Args:
@@ -28,7 +29,7 @@ class SensorRepository:
         response = query.execute()
         return response.data
 
-    def get_by_id(self, sensor_id: str) -> Optional[Dict[str, Any]]:
+    def get_by_id(self, sensor_id: str) -> dict[str, Any] | None:
         """Get sensor by its code.
 
         Args:
@@ -43,7 +44,7 @@ class SensorRepository:
             return response.data[0]
         return None
 
-    def get_by_uuid(self, uuid: str) -> Optional[Dict[str, Any]]:
+    def get_by_uuid(self, uuid: str) -> dict[str, Any] | None:
         """Get sensor by its UUID.
 
         Args:
@@ -58,7 +59,7 @@ class SensorRepository:
             return response.data[0]
         return None
 
-    def get_by_equipment(self, equipment_uuid: str) -> List[Dict[str, Any]]:
+    def get_by_equipment(self, equipment_uuid: str) -> list[dict[str, Any]]:
         """Get sensors for equipment.
 
         Args:
@@ -71,7 +72,7 @@ class SensorRepository:
 
         return response.data
 
-    def get_by_type(self, sensor_type: str) -> List[Dict[str, Any]]:
+    def get_by_type(self, sensor_type: str) -> list[dict[str, Any]]:
         """Get sensors by type.
 
         Args:
@@ -84,7 +85,7 @@ class SensorRepository:
 
         return response.data
 
-    def create(self, sensor_data: Dict[str, Any]) -> Dict[str, Any]:
+    def create(self, sensor_data: dict[str, Any]) -> dict[str, Any]:
         """Create a new sensor.
 
         Args:
@@ -96,7 +97,7 @@ class SensorRepository:
         response = self.client.table("sensors").insert(sensor_data).execute()
         return response.data[0]
 
-    def update(self, sensor_id: str, sensor_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def update(self, sensor_id: str, sensor_data: dict[str, Any]) -> dict[str, Any] | None:
         """Update a sensor.
 
         Args:

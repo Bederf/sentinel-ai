@@ -5,23 +5,22 @@ comparison, caching, edge cases.
 """
 
 import math
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
 from app.models.dispatch_schedule import DispatchInterval
 from app.services.mip_dispatch_optimizer import (
-    MIPDispatchOptimizer,
-    _tariff_for_hour,
-    _TARIFF_RATES,
-    _PEAK_HOURS,
-    _OFF_PEAK_HOURS,
-    _DEFAULT_TARIFF_RATES,
-    _DEFAULT_PEAK_HOURS,
     _DEFAULT_OFF_PEAK_HOURS,
+    _DEFAULT_PEAK_HOURS,
+    _DEFAULT_TARIFF_RATES,
+    _OFF_PEAK_HOURS,
+    _PEAK_HOURS,
+    _TARIFF_RATES,
+    MIPDispatchOptimizer,
     _build_ls_schedule_from_eskom,
+    _tariff_for_hour,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -258,9 +257,9 @@ class TestRulesFallback:
     """Test the rules-based fallback."""
 
     def test_fallback_returns_96_intervals(self, optimizer, flat_load):
-        from datetime import datetime, timezone, timedelta
+        from datetime import datetime, timedelta
 
-        sast = datetime.now(timezone.utc) + timedelta(hours=2)
+        sast = datetime.now(UTC) + timedelta(hours=2)
 
         schedule = optimizer._rules_fallback(
             "site-002",
@@ -275,7 +274,7 @@ class TestRulesFallback:
         assert len(schedule.intervals) == 96
 
     def test_fallback_charges_off_peak(self, optimizer):
-        sast = datetime(2026, 2, 24, 0, 0, tzinfo=timezone.utc)  # midnight SAST
+        sast = datetime(2026, 2, 24, 0, 0, tzinfo=UTC)  # midnight SAST
         load = [1000.0] * 96
         tariff = [_TARIFF_RATES["off_peak"]] * 24 + [_TARIFF_RATES["standard"]] * 48 + [_TARIFF_RATES["off_peak"]] * 24
         bands = ["off_peak"] * 24 + ["standard"] * 48 + ["off_peak"] * 24
@@ -294,7 +293,7 @@ class TestRulesFallback:
         assert schedule.intervals[0].charge_kw > 0
 
     def test_fallback_status_is_rules_fallback(self, optimizer, flat_load):
-        sast = datetime.now(timezone.utc) + timedelta(hours=2)
+        sast = datetime.now(UTC) + timedelta(hours=2)
         schedule = optimizer._rules_fallback(
             "site-002",
             96,
@@ -493,13 +492,13 @@ class TestBuildLsSchedule:
         return AreaEvent(start=start, end=end, note=f"Stage {stage}", stage=stage)
 
     def test_empty_events_returns_all_false(self):
-        sast_start = datetime(2026, 2, 24, 6, 0, tzinfo=timezone.utc)
+        sast_start = datetime(2026, 2, 24, 6, 0, tzinfo=UTC)
         schedule = _build_ls_schedule_from_eskom([], sast_start)
         assert len(schedule) == 96
         assert all(not v for v in schedule)
 
     def test_single_event_marks_correct_slots(self):
-        sast_start = datetime(2026, 2, 24, 6, 0, tzinfo=timezone.utc)
+        sast_start = datetime(2026, 2, 24, 6, 0, tzinfo=UTC)
         # Event from 08:00 to 10:30 (2.5 hours = 10 slots)
         event = self._make_event(
             "2026-02-24T08:00:00+00:00",
@@ -518,7 +517,7 @@ class TestBuildLsSchedule:
         assert schedule[18] is False
 
     def test_stage_zero_ignored(self):
-        sast_start = datetime(2026, 2, 24, 6, 0, tzinfo=timezone.utc)
+        sast_start = datetime(2026, 2, 24, 6, 0, tzinfo=UTC)
         event = self._make_event(
             "2026-02-24T08:00:00+00:00",
             "2026-02-24T10:00:00+00:00",
@@ -528,7 +527,7 @@ class TestBuildLsSchedule:
         assert all(not v for v in schedule)
 
     def test_multiple_events(self):
-        sast_start = datetime(2026, 2, 24, 0, 0, tzinfo=timezone.utc)
+        sast_start = datetime(2026, 2, 24, 0, 0, tzinfo=UTC)
         events = [
             self._make_event("2026-02-24T02:00:00+00:00", "2026-02-24T04:00:00+00:00"),
             self._make_event("2026-02-24T10:00:00+00:00", "2026-02-24T12:00:00+00:00"),
@@ -541,7 +540,7 @@ class TestBuildLsSchedule:
         assert schedule[20] is False  # 05:00
 
     def test_invalid_event_times_skipped(self):
-        sast_start = datetime(2026, 2, 24, 6, 0, tzinfo=timezone.utc)
+        sast_start = datetime(2026, 2, 24, 6, 0, tzinfo=UTC)
         from app.services.eskomsepush_service import AreaEvent
 
         event = AreaEvent(start="invalid", end="also-invalid", note="Stage 2", stage=2)

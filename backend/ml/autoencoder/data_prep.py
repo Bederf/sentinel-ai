@@ -7,12 +7,13 @@ failure periods from training data. High reconstruction error = anomaly.
 
 import logging
 from datetime import datetime, timedelta
-from typing import List, Tuple, Dict, Any
+from typing import Any
+
 import numpy as np
 
 try:
-    from sklearn.preprocessing import StandardScaler
     import pandas as pd
+    from sklearn.preprocessing import StandardScaler
 except ImportError:
     raise ImportError("Install ML dependencies: pip install -r ml/requirements.txt")
 
@@ -40,7 +41,7 @@ class AutoencoderDataPrep:
         self.scaler = StandardScaler()
         self._scaler_fitted = False
 
-    def create_windows(self, data: np.ndarray, exclude_periods: List[Tuple[int, int]] = None) -> np.ndarray:
+    def create_windows(self, data: np.ndarray, exclude_periods: list[tuple[int, int]] = None) -> np.ndarray:
         """
         Create sliding windows from time-series data.
 
@@ -77,9 +78,9 @@ class AutoencoderDataPrep:
     def prepare_normal_data(
         self,
         df: pd.DataFrame,
-        feature_cols: List[str],
+        feature_cols: list[str],
         timestamp_col: str = "timestamp",
-        failure_dates: List[datetime] = None,
+        failure_dates: list[datetime] = None,
         exclude_days_before: int = 7,
         exclude_days_after: int = 3,
     ) -> np.ndarray:
@@ -174,7 +175,7 @@ class AutoencoderDataPrep:
 
     def generate_demo_data(
         self, n_hours: int = 2000, n_features: int = 5, n_anomalies: int = 5, anomaly_magnitude: float = 3.0
-    ) -> Tuple[np.ndarray, np.ndarray, List[int]]:
+    ) -> tuple[np.ndarray, np.ndarray, list[int]]:
         """
         Generate synthetic demo data with known anomalies.
 
@@ -248,7 +249,7 @@ class AutoencoderDataPrep:
 
 
 # Sensor configurations per equipment type
-AUTOENCODER_SENSOR_CONFIGS: Dict[str, Dict[str, Any]] = {
+AUTOENCODER_SENSOR_CONFIGS: dict[str, dict[str, Any]] = {
     "chiller": {
         "features": [
             "chw_supply_temp",

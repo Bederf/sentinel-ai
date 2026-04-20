@@ -3,6 +3,7 @@ Unit tests for device abstraction service.
 """
 
 import pytest
+
 from app.services.device_abstraction import DeviceManager, device_manager
 
 

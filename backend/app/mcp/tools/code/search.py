@@ -4,10 +4,10 @@ Code Search Helpers
 Provides functions for searching the codebase by file patterns, content, and symbols.
 """
 
+import fnmatch
 import re
 from pathlib import Path
-from typing import List, Dict, Any, Optional
-import fnmatch
+from typing import Any
 
 # Root of the BMS intelligence codebase
 CODEBASE_ROOT = Path("/opt/bms-intelligence")
@@ -65,7 +65,7 @@ def _should_include_file(path: Path) -> bool:
     return path.suffix.lower() in SEARCHABLE_EXTENSIONS
 
 
-def search_files_by_pattern(pattern: str, base_path: Optional[str] = None, limit: int = 50) -> List[Dict[str, Any]]:
+def search_files_by_pattern(pattern: str, base_path: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
     """
     Search for files matching glob pattern.
 
@@ -110,14 +110,14 @@ def search_files_by_pattern(pattern: str, base_path: Optional[str] = None, limit
                         }
                     )
     except Exception as e:
-        return [{"error": f"Search failed: {str(e)}"}]
+        return [{"error": f"Search failed: {e!s}"}]
 
     return sorted(matches, key=lambda x: x["path"])
 
 
 def search_file_contents(
-    query: str, base_path: Optional[str] = None, is_regex: bool = False, limit: int = 20
-) -> List[Dict[str, Any]]:
+    query: str, base_path: str | None = None, is_regex: bool = False, limit: int = 20
+) -> list[dict[str, Any]]:
     """
     Search file contents for keyword or regex pattern.
 
@@ -149,7 +149,7 @@ def search_file_contents(
                 continue
 
             try:
-                with open(path, "r", encoding="utf-8", errors="ignore") as f:
+                with open(path, encoding="utf-8", errors="ignore") as f:
                     lines = f.readlines()
 
                 file_matches = []
@@ -185,15 +185,15 @@ def search_file_contents(
                 pass  # Skip files we can't read
 
     except Exception as e:
-        return [{"error": f"Content search failed: {str(e)}"}]
+        return [{"error": f"Content search failed: {e!s}"}]
 
     return matches
 
 
 def search_symbols(
     symbol_name: str,
-    base_path: Optional[str] = None,
-) -> List[Dict[str, Any]]:
+    base_path: str | None = None,
+) -> list[dict[str, Any]]:
     """
     Search for function/class definitions by name.
 
@@ -227,7 +227,7 @@ def search_symbols(
                 continue
 
             try:
-                with open(path, "r", encoding="utf-8", errors="ignore") as f:
+                with open(path, encoding="utf-8", errors="ignore") as f:
                     lines = f.readlines()
 
                 for line_no, line in enumerate(lines, 1):
@@ -261,14 +261,14 @@ def search_symbols(
                 pass  # Skip files we can't read
 
     except Exception as e:
-        return [{"error": f"Symbol search failed: {str(e)}"}]
+        return [{"error": f"Symbol search failed: {e!s}"}]
 
     return matches[:20]  # Limit results
 
 
 def build_directory_tree(
-    base_path: Optional[str] = None, depth: int = 2, exclude_patterns: Optional[List[str]] = None
-) -> Dict[str, Any]:
+    base_path: str | None = None, depth: int = 2, exclude_patterns: list[str] | None = None
+) -> dict[str, Any]:
     """
     Build directory tree structure.
 
@@ -331,7 +331,7 @@ def build_directory_tree(
     }
 
 
-def fetch_file_content(file_path: str) -> Dict[str, Any]:
+def fetch_file_content(file_path: str) -> dict[str, Any]:
     """
     Fetch full content of a file.
 
@@ -357,7 +357,7 @@ def fetch_file_content(file_path: str) -> Dict[str, Any]:
         return {"error": f"Not a file: {file_path}"}
 
     try:
-        with open(full_path, "r", encoding="utf-8") as f:
+        with open(full_path, encoding="utf-8") as f:
             content = f.read()
 
         # Detect language from extension
@@ -388,4 +388,4 @@ def fetch_file_content(file_path: str) -> Dict[str, Any]:
             "extension": ext,
         }
     except Exception as e:
-        return {"error": f"Failed to read file: {str(e)}"}
+        return {"error": f"Failed to read file: {e!s}"}

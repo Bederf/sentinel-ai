@@ -4,9 +4,10 @@ Tests that DXF parsing completes within acceptable time limits
 for realistic floor plans with 100+ equipment.
 """
 
-import pytest
-import time
 import io
+import time
+
+import pytest
 
 ezdxf = pytest.importorskip("ezdxf", reason="ezdxf not installed")
 
@@ -27,8 +28,8 @@ class TestDXFParserPerformance:
         Returns:
             DXF file content as bytes
         """
-        import tempfile
         import os
+        import tempfile
 
         doc = ezdxf.new("R2010")
         msp = doc.modelspace()

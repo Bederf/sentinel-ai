@@ -8,18 +8,18 @@ Handles:
 """
 
 import logging
-from fastapi import APIRouter, HTTPException, Depends, Path
-from typing import Optional
 
-from app.middleware.auth_middleware import require_auth
-from app.models.auth import AuthContext
-from app.security.step_up import require_step_up
-from app.models.approval import ApprovalRequest, RejectionRequest, ApprovalResponse, ApprovalStatus
+from fastapi import APIRouter, Depends, HTTPException, Path
+
 from app.core.site_resolver import get_primary_site_code
-from app.services.approval_service import get_approval_service
 from app.database.repositories.recommendation_repository import RecommendationRepository
-from app.models.recommendation import RecommendationStatus
+from app.middleware.auth_middleware import require_auth
+from app.models.approval import ApprovalRequest, ApprovalResponse, ApprovalStatus, RejectionRequest
+from app.models.auth import AuthContext
 from app.models.module_registry import ModuleType
+from app.models.recommendation import RecommendationStatus
+from app.security.step_up import require_step_up
+from app.services.approval_service import get_approval_service
 
 logger = logging.getLogger(__name__)
 
@@ -117,8 +117,8 @@ async def approve_recommendation(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error approving recommendation {recommendation_id}: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to approve recommendation: {str(e)}")
+        logger.error(f"Error approving recommendation {recommendation_id}: {e!s}")
+        raise HTTPException(status_code=500, detail=f"Failed to approve recommendation: {e!s}")
 
 
 @router.post(
@@ -176,8 +176,8 @@ async def reject_recommendation(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error rejecting recommendation {recommendation_id}: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to reject recommendation: {str(e)}")
+        logger.error(f"Error rejecting recommendation {recommendation_id}: {e!s}")
+        raise HTTPException(status_code=500, detail=f"Failed to reject recommendation: {e!s}")
 
 
 @router.get(
@@ -220,8 +220,8 @@ async def get_approval_status(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error getting approval status for {recommendation_id}: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to get approval status: {str(e)}")
+        logger.error(f"Error getting approval status for {recommendation_id}: {e!s}")
+        raise HTTPException(status_code=500, detail=f"Failed to get approval status: {e!s}")
 
 
 @router.post(
@@ -231,7 +231,7 @@ async def get_approval_status(
 )
 async def rollback_approval(
     recommendation_id: str = Path(..., description="ID of recommendation to rollback"),
-    rollback_reason: Optional[str] = None,
+    rollback_reason: str | None = None,
     auth: AuthContext = Depends(require_auth),
     _step_up: None = Depends(require_step_up()),
 ) -> ApprovalResponse:
@@ -293,8 +293,8 @@ async def rollback_approval(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error rolling back recommendation {recommendation_id}: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to rollback recommendation: {str(e)}")
+        logger.error(f"Error rolling back recommendation {recommendation_id}: {e!s}")
+        raise HTTPException(status_code=500, detail=f"Failed to rollback recommendation: {e!s}")
 
 
 # Equipment type → control module mapping
@@ -325,7 +325,7 @@ _EQUIPMENT_CONTROL_MAP: dict[str, ModuleType] = {
 }
 
 
-def _get_control_module_for_equipment(equipment_code: str) -> Optional[ModuleType]:
+def _get_control_module_for_equipment(equipment_code: str) -> ModuleType | None:
     """Derive the required control module from an equipment code.
 
     Equipment codes follow SENTINEL naming: {SITE}-{TYPE}-{LOCATION}-{SEQ}

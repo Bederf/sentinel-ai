@@ -11,10 +11,11 @@ Fix: Replaced all 3 log_decision() calls with record_decision({...}) using the
 correct dict-based argument format.
 """
 
-import pytest
 from dataclasses import dataclass
-from typing import Any, Dict
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 
 @dataclass
@@ -23,7 +24,7 @@ class MockRecommendation:
     target_equipment: str = "S002-CHILLER-B1-001"
     site_id: str = "site-002"
     status: Any = None
-    action: Dict = None
+    action: dict = None
 
     def __post_init__(self):
         if self.action is None:

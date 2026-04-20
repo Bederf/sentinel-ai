@@ -9,7 +9,6 @@ Auth gating:
 """
 
 import logging
-from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
 
@@ -69,8 +68,8 @@ async def discover_servicenow(
 
 @router.get("/incidents")
 async def get_incidents(
-    priority: Optional[int] = Query(None, ge=1, le=4, description="Priority filter (1=Critical..4=Low)"),
-    category: Optional[str] = Query(None, description="Category filter"),
+    priority: int | None = Query(None, ge=1, le=4, description="Priority filter (1=Critical..4=Low)"),
+    category: str | None = Query(None, description="Category filter"),
     limit: int = Query(50, ge=1, le=500, description="Max records to return"),
     auth: AuthContext = Depends(require_auth(AuthLevel.AUTHENTICATED)),
 ):
@@ -105,8 +104,8 @@ async def get_incident_summary(
 
 @router.get("/work-orders")
 async def get_work_orders(
-    state: Optional[str] = Query(None, description="State filter"),
-    priority: Optional[int] = Query(None, ge=1, le=4, description="Priority filter"),
+    state: str | None = Query(None, description="State filter"),
+    priority: int | None = Query(None, ge=1, le=4, description="Priority filter"),
     limit: int = Query(50, ge=1, le=500, description="Max records to return"),
     auth: AuthContext = Depends(require_module(ModuleType.MAINTENANCE)),
 ):
@@ -141,11 +140,11 @@ async def get_work_order_summary(
 @router.get("/query/{table}")
 async def query_table(
     table: str,
-    query: Optional[str] = Query(None, description="Encoded query string"),
-    fields: Optional[str] = Query(None, description="Comma-separated field names"),
+    query: str | None = Query(None, description="Encoded query string"),
+    fields: str | None = Query(None, description="Comma-separated field names"),
     limit: int = Query(100, ge=1, le=1000, description="Max records"),
     offset: int = Query(0, ge=0, description="Pagination offset"),
-    order_by: Optional[str] = Query(None, description="Sort field (prefix '-' for desc)"),
+    order_by: str | None = Query(None, description="Sort field (prefix '-' for desc)"),
     auth: AuthContext = Depends(require_module(ModuleType.MAINTENANCE)),
 ):
     """Generic read-only table query.
@@ -193,8 +192,8 @@ async def get_record_history(
 @router.get("/aggregate/{table}")
 async def get_aggregate(
     table: str,
-    query: Optional[str] = Query(None, description="Encoded query string"),
-    group_by: Optional[str] = Query(None, description="Comma-separated group-by fields"),
+    query: str | None = Query(None, description="Encoded query string"),
+    group_by: str | None = Query(None, description="Comma-separated group-by fields"),
     auth: AuthContext = Depends(require_module(ModuleType.MAINTENANCE)),
 ):
     """Stats API for counts and breakdowns on any table.

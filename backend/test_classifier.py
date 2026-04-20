@@ -5,8 +5,8 @@ This script trains a chiller failure classifier using synthetic data.
 Run this to test the classification functionality.
 """
 
-import sys
 import os
+import sys
 
 # Add backend to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))

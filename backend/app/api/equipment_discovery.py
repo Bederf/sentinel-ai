@@ -8,15 +8,14 @@ Supports:
 """
 
 import os
-from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from app.services.lighting_discovery_service import LightingDiscoveryService, SimulatedLightingDiscovery
-from app.services.bacnet_discovery_service import BACnetDiscoveryService, SimulatedBACnetDiscovery
-from app.services.modbus_discovery_service import ModbusDiscoveryService, SimulatedModbusDiscovery
 from app.database.repositories.equipment_metadata_repository import EquipmentMetadataRepository
+from app.services.bacnet_discovery_service import BACnetDiscoveryService, SimulatedBACnetDiscovery
+from app.services.lighting_discovery_service import LightingDiscoveryService, SimulatedLightingDiscovery
+from app.services.modbus_discovery_service import ModbusDiscoveryService, SimulatedModbusDiscovery
 
 router = APIRouter()
 
@@ -26,22 +25,22 @@ class UnifiedDiscoveryRequest(BaseModel):
 
     equipment_code: str = Field(..., description="Equipment code (e.g., S002-CHILLER-B1-001)")
     protocol: str = Field(..., description="Protocol: dali, bacnet, modbus, or auto")
-    equipment_type: Optional[str] = Field(None, description="Equipment type for profile selection")
+    equipment_type: str | None = Field(None, description="Equipment type for profile selection")
 
     # Network info
-    ip_address: Optional[str] = Field(None, description="Device/gateway IP address")
-    port: Optional[int] = Field(None, description="Port number")
+    ip_address: str | None = Field(None, description="Device/gateway IP address")
+    port: int | None = Field(None, description="Port number")
 
     # DALI specific
-    dali_line: Optional[int] = Field(1, ge=1, le=4, description="DALI line number")
-    dali_address: Optional[int] = Field(None, ge=0, le=63, description="DALI short address")
-    gateway_type: Optional[str] = Field("tridonic", description="DALI gateway type")
+    dali_line: int | None = Field(1, ge=1, le=4, description="DALI line number")
+    dali_address: int | None = Field(None, ge=0, le=63, description="DALI short address")
+    gateway_type: str | None = Field("tridonic", description="DALI gateway type")
 
     # BACnet specific
-    bacnet_device_id: Optional[int] = Field(None, description="BACnet device instance")
+    bacnet_device_id: int | None = Field(None, description="BACnet device instance")
 
     # Modbus specific
-    modbus_unit_id: Optional[int] = Field(1, ge=1, le=247, description="Modbus unit/slave ID")
+    modbus_unit_id: int | None = Field(1, ge=1, le=247, description="Modbus unit/slave ID")
 
     # Options
     use_simulated: bool = Field(False, description="Use simulated data if real discovery fails")
@@ -208,7 +207,7 @@ async def auto_discover_equipment(
     return await discover_equipment(request)
 
 
-def _detect_protocol(equipment_code: str, equipment_type: Optional[str]) -> str:
+def _detect_protocol(equipment_code: str, equipment_type: str | None) -> str:
     """Detect protocol from equipment code or type.
 
     Args:
@@ -270,7 +269,7 @@ def _detect_equipment_type(equipment_code: str) -> str:
     return "unknown"
 
 
-async def _discover_dali(request: UnifiedDiscoveryRequest) -> Optional[dict]:
+async def _discover_dali(request: UnifiedDiscoveryRequest) -> dict | None:
     """Attempt DALI discovery."""
     ip = request.ip_address or os.getenv("DALI_GATEWAY_IP")
 
@@ -298,7 +297,7 @@ async def _discover_dali(request: UnifiedDiscoveryRequest) -> Optional[dict]:
     return None
 
 
-async def _discover_bacnet(request: UnifiedDiscoveryRequest) -> Optional[dict]:
+async def _discover_bacnet(request: UnifiedDiscoveryRequest) -> dict | None:
     """Attempt BACnet discovery."""
     niagara_host = os.getenv("NIAGARA_OBIX_HOST")
 
@@ -329,7 +328,7 @@ async def _discover_bacnet(request: UnifiedDiscoveryRequest) -> Optional[dict]:
     return None
 
 
-async def _discover_modbus(request: UnifiedDiscoveryRequest) -> Optional[dict]:
+async def _discover_modbus(request: UnifiedDiscoveryRequest) -> dict | None:
     """Attempt Modbus discovery."""
     if not request.ip_address:
         return None
@@ -353,7 +352,7 @@ async def _discover_modbus(request: UnifiedDiscoveryRequest) -> Optional[dict]:
     return None
 
 
-def _get_simulated_data(equipment_code: str, protocol: str, equipment_type: Optional[str]) -> dict:
+def _get_simulated_data(equipment_code: str, protocol: str, equipment_type: str | None) -> dict:
     """Get simulated discovery data.
 
     Args:

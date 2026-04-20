@@ -8,7 +8,6 @@ to match the live Claude API behavior.
 import json
 import logging
 from pathlib import Path
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +40,7 @@ class DemoCache:
             logger.warning(f"Demo responses file not found: {cache_file}")
             self.responses = []
 
-    def get_cached_response(self, query: str) -> Optional[str]:
+    def get_cached_response(self, query: str) -> str | None:
         """
         Check if query matches any demo patterns.
 

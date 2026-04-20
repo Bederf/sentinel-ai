@@ -1,11 +1,12 @@
 """Tests for escalation engine functionality."""
 
-import pytest
 from datetime import datetime
-from unittest.mock import patch, AsyncMock
+from unittest.mock import AsyncMock, patch
 
-from app.services.escalation_engine import EscalationEngine, EscalationLevel
+import pytest
+
 from app.models.autonomous_decision import BoundaryStatus
+from app.services.escalation_engine import EscalationEngine, EscalationLevel
 
 
 @pytest.fixture

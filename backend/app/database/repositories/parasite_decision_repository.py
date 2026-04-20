@@ -11,7 +11,7 @@ import json
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from app.config.settings import settings
 from app.models.parasite_decision import _safe_json_value
@@ -31,7 +31,7 @@ class ParasiteDecisionRepository:
     All records are validated for JSON-serializability before persistence.
     """
 
-    def __init__(self, json_path: Optional[Path] = None):
+    def __init__(self, json_path: Path | None = None):
         """Initialize the repository.
 
         Args:
@@ -40,7 +40,7 @@ class ParasiteDecisionRepository:
         """
         self._client = None
         self._use_json = settings.use_json_storage
-        self._decisions: Dict[str, Dict[str, Any]] = {}
+        self._decisions: dict[str, dict[str, Any]] = {}
         self._json_path = json_path  # None = use default DATA_DIR path
 
     @property
@@ -56,7 +56,7 @@ class ParasiteDecisionRepository:
                 self._use_json = True
         return self._client
 
-    def _validate_record(self, decision: Dict) -> None:
+    def _validate_record(self, decision: dict) -> None:
         """Validate that all values in a decision record are JSON-serializable.
 
         Raises TypeError if any value would corrupt the store (coroutines,
@@ -66,7 +66,7 @@ class ParasiteDecisionRepository:
             if key in decision:
                 _safe_json_value(decision[key])
 
-    def _normalize_point_name(self, decision: Dict) -> None:
+    def _normalize_point_name(self, decision: dict) -> None:
         """Ensure point_name is canonical, control_point is alias.
 
         point_name is the canonical field name. control_point is kept
@@ -79,7 +79,7 @@ class ParasiteDecisionRepository:
         elif cp is None and pn is not None:
             decision["control_point"] = pn
 
-    async def record_decision(self, decision: Dict) -> Dict:
+    async def record_decision(self, decision: dict) -> dict:
         """Insert new decision record.
 
         Accepts both legacy dicts (from existing call sites) and new-format
@@ -139,10 +139,10 @@ class ParasiteDecisionRepository:
     async def update_outcome(
         self,
         decision_id: str,
-        outcome: Dict,
+        outcome: dict,
         matched: bool,
-        measured_impact: Optional[Dict[str, Any]] = None,
-    ) -> Dict:
+        measured_impact: dict[str, Any] | None = None,
+    ) -> dict:
         """Update decision with measured outcome.
 
         Args:
@@ -182,7 +182,7 @@ class ParasiteDecisionRepository:
             logger.error(f"Error updating outcome for decision {decision_id}: {e}")
             raise
 
-    async def mark_rolled_back(self, decision_id: str, reason: str) -> Dict:
+    async def mark_rolled_back(self, decision_id: str, reason: str) -> dict:
         """Mark decision as rolled back.
 
         Args:
@@ -222,9 +222,9 @@ class ParasiteDecisionRepository:
         decision_id: str,
         verified: bool,
         actual_value: Any,
-        cov_latency_ms: Optional[int] = None,
+        cov_latency_ms: int | None = None,
         cov_tolerance: Any = None,
-    ) -> Dict:
+    ) -> dict:
         """Update COV verification result.
 
         Args:
@@ -241,7 +241,7 @@ class ParasiteDecisionRepository:
             _safe_json_value(actual_value)
             _safe_json_value(cov_tolerance)
 
-            update_data: Dict[str, Any] = {
+            update_data: dict[str, Any] = {
                 "cov_verified": verified,
                 "actual_value": actual_value,
                 "updated_at": datetime.utcnow().isoformat(),
@@ -268,7 +268,7 @@ class ParasiteDecisionRepository:
             logger.error(f"Error updating COV status for decision {decision_id}: {e}")
             raise
 
-    async def get_decision_by_id(self, decision_id: str) -> Optional[Dict]:
+    async def get_decision_by_id(self, decision_id: str) -> dict | None:
         """Get a single decision by its ID.
 
         Args:
@@ -319,7 +319,7 @@ class ParasiteDecisionRepository:
             logger.error(f"Error counting pending measurements: {e}")
             return 0
 
-    async def get_decisions_since(self, since_iso: str, limit: int = 500) -> List[Dict]:
+    async def get_decisions_since(self, since_iso: str, limit: int = 500) -> list[dict]:
         """Get decisions created after a given ISO timestamp.
 
         Args:
@@ -351,7 +351,7 @@ class ParasiteDecisionRepository:
             logger.error(f"Error getting decisions since {since_iso}: {e}")
             return []
 
-    async def get_decisions_by_site(self, site_id: str, since: Optional[str] = None, limit: int = 1000) -> List[Dict]:
+    async def get_decisions_by_site(self, site_id: str, since: str | None = None, limit: int = 1000) -> list[dict]:
         """Query decisions by site with optional time filter.
 
         Like get_decisions_for_site but accepts an optional `since` kwarg
@@ -386,7 +386,7 @@ class ParasiteDecisionRepository:
             logger.error(f"Error querying decisions by site {site_id}: {e}")
             return []
 
-    async def get_decisions_for_equipment(self, equipment_code: str, limit: int = 50) -> List[Dict]:
+    async def get_decisions_for_equipment(self, equipment_code: str, limit: int = 50) -> list[dict]:
         """Query decisions by equipment.
 
         Args:
@@ -411,7 +411,7 @@ class ParasiteDecisionRepository:
             logger.error(f"Error querying decisions for equipment {equipment_code}: {e}")
             return []
 
-    async def get_decisions_for_site(self, site_id: str, limit: int = 50) -> List[Dict]:
+    async def get_decisions_for_site(self, site_id: str, limit: int = 50) -> list[dict]:
         """Query decisions by site.
 
         Args:
@@ -436,7 +436,7 @@ class ParasiteDecisionRepository:
             logger.error(f"Error querying decisions for site {site_id}: {e}")
             return []
 
-    async def get_decisions_by_tier(self, tier: str, limit: int = 50) -> List[Dict]:
+    async def get_decisions_by_tier(self, tier: str, limit: int = 50) -> list[dict]:
         """Query decisions by tier.
 
         Args:
@@ -461,7 +461,7 @@ class ParasiteDecisionRepository:
             logger.error(f"Error querying decisions by tier {tier}: {e}")
             return []
 
-    async def get_recent_decisions(self, limit: int = 100) -> List[Dict]:
+    async def get_recent_decisions(self, limit: int = 100) -> list[dict]:
         """Get most recent decisions across all sites.
 
         Args:
@@ -485,7 +485,7 @@ class ParasiteDecisionRepository:
             logger.error(f"Error querying recent decisions: {e}")
             return []
 
-    async def get_decision_stats(self, site_id: str) -> Dict:
+    async def get_decision_stats(self, site_id: str) -> dict:
         """Get aggregated decision statistics for a site.
 
         Args:
@@ -523,7 +523,7 @@ class ParasiteDecisionRepository:
             logger.error(f"Error calculating decision stats for site {site_id}: {e}")
             return {}
 
-    async def _supabase_insert(self, decision: Dict) -> Optional[Dict]:
+    async def _supabase_insert(self, decision: dict) -> dict | None:
         """Insert decision to Supabase."""
         try:
             if not self.client:
@@ -534,7 +534,7 @@ class ParasiteDecisionRepository:
             logger.error(f"Supabase insert failed: {e}")
             return None
 
-    async def _supabase_update(self, decision_id: str, update_data: Dict) -> Optional[Dict]:
+    async def _supabase_update(self, decision_id: str, update_data: dict) -> dict | None:
         """Update decision in Supabase."""
         try:
             if not self.client:
@@ -545,7 +545,7 @@ class ParasiteDecisionRepository:
             logger.error(f"Supabase update failed: {e}")
             return None
 
-    async def _supabase_query(self, filters: Optional[Dict] = None, limit: int = 50) -> List[Dict]:
+    async def _supabase_query(self, filters: dict | None = None, limit: int = 50) -> list[dict]:
         """Query decisions from Supabase."""
         try:
             if not self.client:
@@ -595,7 +595,7 @@ class ParasiteDecisionRepository:
 
 
 # Singleton pattern
-_instance: Optional[ParasiteDecisionRepository] = None
+_instance: ParasiteDecisionRepository | None = None
 
 
 def get_parasite_decision_repository() -> ParasiteDecisionRepository:

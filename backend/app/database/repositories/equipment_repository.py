@@ -1,10 +1,11 @@
 """Repository for equipment operations."""
 
-from typing import List, Optional, Dict, Any
-import time
 import logging
+import time
+from typing import Any
+
 from app.database.supabase_client import get_supabase_client
-from app.services.cache_service import cache, CacheKeys, CacheService, CacheInvalidation, track_query
+from app.services.cache_service import CacheInvalidation, CacheKeys, CacheService, cache, track_query
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +69,7 @@ class EquipmentRepository:
         if last_error:
             raise last_error
 
-    def get_all(self, site_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_all(self, site_id: str | None = None) -> list[dict[str, Any]]:
         """Get all equipment with optional filtering.
 
         Args:
@@ -97,7 +98,7 @@ class EquipmentRepository:
 
         return result
 
-    def get_by_id(self, equipment_id: str) -> Optional[Dict[str, Any]]:
+    def get_by_id(self, equipment_id: str) -> dict[str, Any] | None:
         """Get equipment by its code.
 
         Args:
@@ -119,7 +120,7 @@ class EquipmentRepository:
             return result
         return None
 
-    def get_by_uuid(self, uuid: str) -> Optional[Dict[str, Any]]:
+    def get_by_uuid(self, uuid: str) -> dict[str, Any] | None:
         """Get equipment by its UUID.
 
         Args:
@@ -134,7 +135,7 @@ class EquipmentRepository:
             return response.data[0]
         return None
 
-    def get_by_site_code(self, site_code: str) -> List[Dict[str, Any]]:
+    def get_by_site_code(self, site_code: str) -> list[dict[str, Any]]:
         """Get equipment by building code.
 
         Args:
@@ -158,7 +159,7 @@ class EquipmentRepository:
 
         return equipment_response.data
 
-    def get_by_type(self, equipment_type: str) -> List[Dict[str, Any]]:
+    def get_by_type(self, equipment_type: str) -> list[dict[str, Any]]:
         """Get equipment by type.
 
         Args:
@@ -171,7 +172,7 @@ class EquipmentRepository:
 
         return response.data
 
-    def get_critical_equipment(self) -> List[Dict[str, Any]]:
+    def get_critical_equipment(self) -> list[dict[str, Any]]:
         """Get all equipment with critical status.
 
         Returns:
@@ -181,7 +182,7 @@ class EquipmentRepository:
 
         return response.data
 
-    def get_low_health_equipment(self, threshold: int = 70) -> List[Dict[str, Any]]:
+    def get_low_health_equipment(self, threshold: int = 70) -> list[dict[str, Any]]:
         """Get equipment with health score below threshold.
 
         Args:
@@ -195,7 +196,7 @@ class EquipmentRepository:
 
         return response.data
 
-    def create(self, equipment_data: Dict[str, Any]) -> Dict[str, Any]:
+    def create(self, equipment_data: dict[str, Any]) -> dict[str, Any]:
         """Create new equipment.
 
         Args:
@@ -209,7 +210,7 @@ class EquipmentRepository:
         CacheInvalidation.on_equipment_change(site_id=equipment_data.get("site_id"))
         return result
 
-    def update(self, equipment_id: str, equipment_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def update(self, equipment_id: str, equipment_data: dict[str, Any]) -> dict[str, Any] | None:
         """Update equipment.
 
         Args:
@@ -233,7 +234,7 @@ class EquipmentRepository:
             return response.data[0]
         return None
 
-    def update_operating_data(self, equipment_id: str, point_values: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def update_operating_data(self, equipment_id: str, point_values: dict[str, Any]) -> dict[str, Any] | None:
         """Update equipment operating_data with new point values.
 
         Merges new point values into existing operating_data JSONB column.
@@ -310,7 +311,7 @@ class EquipmentRepository:
             return True
         return False
 
-    def update_status(self, equipment_id: str, status: str) -> Optional[Dict[str, Any]]:
+    def update_status(self, equipment_id: str, status: str) -> dict[str, Any] | None:
         """Update equipment status.
 
         Args:
@@ -322,7 +323,7 @@ class EquipmentRepository:
         """
         return self.update(equipment_id, {"status": status})
 
-    def update_health_score(self, equipment_id: str, health_score: int) -> Optional[Dict[str, Any]]:
+    def update_health_score(self, equipment_id: str, health_score: int) -> dict[str, Any] | None:
         """Update equipment health score.
 
         Args:
@@ -337,11 +338,11 @@ class EquipmentRepository:
     def update_service_provider(
         self,
         equipment_id: str,
-        provider_name: Optional[str] = None,
-        provider_email: Optional[str] = None,
-        provider_phone: Optional[str] = None,
-        provider_specialty: Optional[str] = None,
-    ) -> Optional[Dict[str, Any]]:
+        provider_name: str | None = None,
+        provider_email: str | None = None,
+        provider_phone: str | None = None,
+        provider_specialty: str | None = None,
+    ) -> dict[str, Any] | None:
         """Update service provider information for equipment.
 
         Args:
@@ -369,7 +370,7 @@ class EquipmentRepository:
 
         return self.update(equipment_id, update_data)
 
-    def get_by_service_provider(self, email: str) -> List[Dict[str, Any]]:
+    def get_by_service_provider(self, email: str) -> list[dict[str, Any]]:
         """Get all equipment assigned to a service provider by email.
 
         Args:
@@ -384,7 +385,7 @@ class EquipmentRepository:
 
         return response.data
 
-    def get_by_service_provider_specialty(self, specialty: str) -> List[Dict[str, Any]]:
+    def get_by_service_provider_specialty(self, specialty: str) -> list[dict[str, Any]]:
         """Get all equipment assigned to service providers with a specific specialty.
 
         Args:
@@ -404,7 +405,7 @@ class EquipmentRepository:
 
 
 # Singleton instance
-_equipment_repository_instance: Optional[EquipmentRepository] = None
+_equipment_repository_instance: EquipmentRepository | None = None
 
 
 def get_equipment_repository() -> EquipmentRepository:

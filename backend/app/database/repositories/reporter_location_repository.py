@@ -14,7 +14,7 @@ import re
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from app.database.supabase_client import get_supabase_client
 
@@ -35,7 +35,7 @@ class ReporterLocationRepository:
             logger.warning("ReporterLocationRepository: Supabase client unavailable: %s", exc)
 
     @staticmethod
-    def normalize_phone(phone: Optional[str]) -> str:
+    def normalize_phone(phone: str | None) -> str:
         """Normalize phone number to a stable matching format.
 
         Keeps digits and optional leading plus sign.
@@ -57,9 +57,9 @@ class ReporterLocationRepository:
     def get_latest(
         self,
         *,
-        reporter_phone: Optional[str] = None,
-        reporter_telegram_id: Optional[str] = None,
-    ) -> Optional[dict[str, Any]]:
+        reporter_phone: str | None = None,
+        reporter_telegram_id: str | None = None,
+    ) -> dict[str, Any] | None:
         """Get latest memory row by phone and/or telegram reporter identity."""
         norm_phone = self.normalize_phone(reporter_phone)
         telegram_id = (reporter_telegram_id or "").strip()
@@ -89,7 +89,7 @@ class ReporterLocationRepository:
 
         return self._get_latest_json(norm_phone=norm_phone, telegram_id=telegram_id)
 
-    def upsert(self, record: dict[str, Any]) -> Optional[dict[str, Any]]:
+    def upsert(self, record: dict[str, Any]) -> dict[str, Any] | None:
         """Create/update latest memory by identity."""
         norm_phone = self.normalize_phone(record.get("reporter_phone"))
         telegram_id = (record.get("reporter_telegram_id") or "").strip()
@@ -153,7 +153,7 @@ class ReporterLocationRepository:
         with open(JSON_PATH, "w") as f:
             json.dump(data, f, indent=2, default=str)
 
-    def _get_latest_json(self, *, norm_phone: str, telegram_id: str) -> Optional[dict[str, Any]]:
+    def _get_latest_json(self, *, norm_phone: str, telegram_id: str) -> dict[str, Any] | None:
         rows = self._load_json()
         matches: list[dict[str, Any]] = []
         for row in rows:
@@ -169,7 +169,7 @@ class ReporterLocationRepository:
         matches.sort(key=lambda r: r.get("updated_at", ""), reverse=True)
         return matches[0]
 
-    def _upsert_json(self, payload: dict[str, Any], *, existing_id: Optional[str]) -> dict[str, Any]:
+    def _upsert_json(self, payload: dict[str, Any], *, existing_id: str | None) -> dict[str, Any]:
         rows = self._load_json()
 
         if existing_id:
@@ -188,7 +188,7 @@ class ReporterLocationRepository:
         return payload
 
 
-_repo: Optional[ReporterLocationRepository] = None
+_repo: ReporterLocationRepository | None = None
 
 
 def get_reporter_location_repository() -> ReporterLocationRepository:

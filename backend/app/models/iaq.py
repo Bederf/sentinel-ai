@@ -1,6 +1,5 @@
 """Indoor Air Quality models."""
 
-from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -8,19 +7,19 @@ from pydantic import BaseModel, Field
 class IAQReading(BaseModel):
     """Raw IAQ sensor readings for a zone."""
 
-    co2_ppm: Optional[float] = None
-    humidity_percent: Optional[float] = None
-    temperature_c: Optional[float] = None
-    setpoint_c: Optional[float] = None
-    voc_ppb: Optional[float] = None
-    pm25_ugm3: Optional[float] = None
+    co2_ppm: float | None = None
+    humidity_percent: float | None = None
+    temperature_c: float | None = None
+    setpoint_c: float | None = None
+    voc_ppb: float | None = None
+    pm25_ugm3: float | None = None
 
 
 class IAQComponentScore(BaseModel):
     """Score for a single IAQ component (0-100)."""
 
     component: str
-    value: Optional[float] = None
+    value: float | None = None
     score: float
     weight: float
     status: str  # excellent, good, poor, unhealthy
@@ -37,10 +36,10 @@ class IAQZoneScore(BaseModel):
     site_id: str
     iaq_score: float = Field(..., ge=0, le=100)
     status: str  # excellent, good, poor, unhealthy
-    components: List[IAQComponentScore]
-    alerts: List[str] = []
-    occupancy: Optional[int] = None
-    area_sqm: Optional[float] = None
+    components: list[IAQComponentScore]
+    alerts: list[str] = []
+    occupancy: int | None = None
+    area_sqm: float | None = None
 
 
 class IAQAlert(BaseModel):
@@ -68,8 +67,8 @@ class IAQSiteOverview(BaseModel):
     zones_good: int
     zones_poor: int
     zones_unhealthy: int
-    zones: List[IAQZoneScore]
-    alerts: List[IAQAlert]
+    zones: list[IAQZoneScore]
+    alerts: list[IAQAlert]
 
 
 class IAQComplianceReport(BaseModel):
@@ -82,4 +81,4 @@ class IAQComplianceReport(BaseModel):
     zones_compliant: int
     zones_non_compliant: int
     metrics: dict
-    recommendations: List[str]
+    recommendations: list[str]

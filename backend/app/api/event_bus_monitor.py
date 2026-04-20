@@ -11,7 +11,6 @@ Phase 139-01: API monitoring routes.
 """
 
 import logging
-from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
 
@@ -26,7 +25,7 @@ router = APIRouter(prefix="/api/event-bus", tags=["event-bus"])
 
 @router.get("/metrics")
 async def get_event_bus_metrics(
-    auth: Optional[AuthContext] = Depends(get_current_auth),
+    auth: AuthContext | None = Depends(get_current_auth),
 ) -> dict:
     """Return event bus metrics for System Health dashboard.
 
@@ -40,16 +39,16 @@ async def get_event_bus_metrics(
 
 @router.get("/history")
 async def get_event_history(
-    event_type: Optional[str] = Query(None, description="Filter by exact event type"),
-    domain: Optional[str] = Query(None, description="Filter by domain (e.g. 'sensor')"),
-    site_id: Optional[str] = Query(None, description="Filter by site ID"),
-    correlation_id: Optional[str] = Query(None, description="Filter by correlation ID"),
-    min_importance: Optional[str] = Query(
+    event_type: str | None = Query(None, description="Filter by exact event type"),
+    domain: str | None = Query(None, description="Filter by domain (e.g. 'sensor')"),
+    site_id: str | None = Query(None, description="Filter by site ID"),
+    correlation_id: str | None = Query(None, description="Filter by correlation ID"),
+    min_importance: str | None = Query(
         None,
         description="Filter by minimum importance: INFO, LOW, MEDIUM, HIGH, CRITICAL",
     ),
     limit: int = Query(100, ge=1, le=1000, description="Maximum results"),
-    auth: Optional[AuthContext] = Depends(get_current_auth),
+    auth: AuthContext | None = Depends(get_current_auth),
 ) -> dict:
     """Query event history with optional filters.
 
@@ -83,7 +82,7 @@ async def get_event_history(
 @router.get("/chain/{correlation_id}")
 async def get_event_chain(
     correlation_id: str,
-    auth: Optional[AuthContext] = Depends(get_current_auth),
+    auth: AuthContext | None = Depends(get_current_auth),
 ) -> dict:
     """Get all events in a correlation chain.
 
@@ -96,7 +95,7 @@ async def get_event_chain(
 
 @router.get("/subscriptions")
 async def get_event_subscriptions(
-    auth: Optional[AuthContext] = Depends(get_current_auth),
+    auth: AuthContext | None = Depends(get_current_auth),
 ) -> dict:
     """List all registered event subscriptions for debugging.
 

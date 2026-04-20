@@ -17,21 +17,19 @@ Usage:
 import asyncio
 import json
 import sys
-from pathlib import Path
 from datetime import datetime, timedelta
-from typing import Dict, List
+from pathlib import Path
 
 # Add backend to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from app.models.baseline import BaselineStatus, BaselineSource  # noqa: E402
-from app.models.inspection import (  # noqa: E402
-    InspectionScheduleFrequency,
-    InspectionOverallStatus,
-    DeficiencySeverity,
+from app.models.baseline import BaselineSource, BaselineStatus
+from app.models.inspection import (
     DeficiencyCategory,
+    DeficiencySeverity,
+    InspectionOverallStatus,
+    InspectionScheduleFrequency,
 )
-
 
 # ============================================================================
 # Demo Building Configuration
@@ -388,15 +386,15 @@ class DemoDataStore:
     """In-memory storage for demo workflow data."""
 
     def __init__(self):
-        self.baselines: Dict[str, List[Dict]] = {}
-        self.inspections: Dict[str, List[Dict]] = {}
-        self.inspection_schedules: Dict[str, List[Dict]] = {}
-        self.deficiencies: Dict[str, List[Dict]] = {}
-        self.work_orders: Dict[str, List[Dict]] = {}
-        self.ml_predictions: Dict[str, Dict] = {}
-        self.equipment: Dict[str, Dict] = {}
+        self.baselines: dict[str, list[dict]] = {}
+        self.inspections: dict[str, list[dict]] = {}
+        self.inspection_schedules: dict[str, list[dict]] = {}
+        self.deficiencies: dict[str, list[dict]] = {}
+        self.work_orders: dict[str, list[dict]] = {}
+        self.ml_predictions: dict[str, dict] = {}
+        self.equipment: dict[str, dict] = {}
 
-    def add_baseline(self, equipment_id: str, baseline: Dict):
+    def add_baseline(self, equipment_id: str, baseline: dict):
         """Add baseline for equipment."""
         if equipment_id not in self.baselines:
             self.baselines[equipment_id] = []
@@ -405,7 +403,7 @@ class DemoDataStore:
         baseline["updated_at"] = datetime.now().isoformat()
         self.baselines[equipment_id].append(baseline)
 
-    def add_inspection(self, equipment_id: str, inspection: Dict):
+    def add_inspection(self, equipment_id: str, inspection: dict):
         """Add inspection result for equipment."""
         if equipment_id not in self.inspections:
             self.inspections[equipment_id] = []
@@ -413,7 +411,7 @@ class DemoDataStore:
         inspection["created_at"] = datetime.now().isoformat()
         self.inspections[equipment_id].append(inspection)
 
-    def add_schedule(self, equipment_id: str, schedule: Dict):
+    def add_schedule(self, equipment_id: str, schedule: dict):
         """Add inspection schedule for equipment."""
         if equipment_id not in self.inspection_schedules:
             self.inspection_schedules[equipment_id] = []
@@ -422,7 +420,7 @@ class DemoDataStore:
         schedule["updated_at"] = datetime.now().isoformat()
         self.inspection_schedules[equipment_id].append(schedule)
 
-    def add_deficiency(self, equipment_id: str, deficiency: Dict):
+    def add_deficiency(self, equipment_id: str, deficiency: dict):
         """Add deficiency for equipment."""
         if equipment_id not in self.deficiencies:
             self.deficiencies[equipment_id] = []
@@ -430,7 +428,7 @@ class DemoDataStore:
         deficiency["created_at"] = datetime.now().isoformat()
         self.deficiencies[equipment_id].append(deficiency)
 
-    def add_work_order(self, equipment_id: str, work_order: Dict):
+    def add_work_order(self, equipment_id: str, work_order: dict):
         """Add work order for equipment."""
         if equipment_id not in self.work_orders:
             self.work_orders[equipment_id] = []
@@ -438,13 +436,13 @@ class DemoDataStore:
         work_order["created_at"] = datetime.now().isoformat()
         self.work_orders[equipment_id].append(work_order)
 
-    def add_prediction(self, equipment_id: str, prediction: Dict):
+    def add_prediction(self, equipment_id: str, prediction: dict):
         """Add ML prediction for equipment."""
         prediction["id"] = f"pred-{equipment_id}"
         prediction["created_at"] = datetime.now().isoformat()
         self.ml_predictions[equipment_id] = prediction
 
-    def add_equipment(self, equipment: Dict):
+    def add_equipment(self, equipment: dict):
         """Add equipment to registry."""
         equipment_id = equipment["equipment_id"]
         equipment["created_at"] = datetime.now().isoformat()

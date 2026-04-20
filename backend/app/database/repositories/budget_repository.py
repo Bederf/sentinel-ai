@@ -4,9 +4,10 @@ Budget Repository - Database operations for contract budgets.
 Phase 48: Contract Management
 """
 
-from typing import Optional, List, Dict, Any
-from ..supabase_client import get_supabase_client
 import logging
+from typing import Any
+
+from ..supabase_client import get_supabase_client
 
 logger = logging.getLogger(__name__)
 
@@ -16,10 +17,10 @@ class BudgetRepository:
 
     def __init__(self):
         self.client = get_supabase_client()
-        self._templates: Optional[Dict[str, Any]] = None
+        self._templates: dict[str, Any] | None = None
         self._load_templates()
 
-    def get_by_contract(self, contract_id: str, year: Optional[int] = None) -> List[Dict[str, Any]]:
+    def get_by_contract(self, contract_id: str, year: int | None = None) -> list[dict[str, Any]]:
         """
         Get budgets for a contract with optional year filter.
 
@@ -53,7 +54,7 @@ class BudgetRepository:
             logger.error(f"Error getting budgets for contract {contract_id}: {e}")
             return []
 
-    def get_spending_summary(self, contract_id: str, year: int) -> Optional[Dict[str, Any]]:
+    def get_spending_summary(self, contract_id: str, year: int) -> dict[str, Any] | None:
         """
         Get aggregate budget vs actual for a contract year.
 
@@ -97,7 +98,7 @@ class BudgetRepository:
             logger.error(f"Error getting spending summary: {e}")
             return None
 
-    def create(self, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def create(self, data: dict[str, Any]) -> dict[str, Any] | None:
         """
         Create a new budget entry.
 
@@ -124,7 +125,7 @@ class BudgetRepository:
             logger.error(f"Error creating budget: {e}")
             return None
 
-    def update(self, budget_id: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def update(self, budget_id: str, data: dict[str, Any]) -> dict[str, Any] | None:
         """
         Update a budget entry (typically actuals).
 
@@ -149,7 +150,7 @@ class BudgetRepository:
             logger.error(f"Error updating budget {budget_id}: {e}")
             return None
 
-    def get_by_id(self, budget_id: str) -> Optional[Dict[str, Any]]:
+    def get_by_id(self, budget_id: str) -> dict[str, Any] | None:
         """Get a single budget entry by ID."""
         if not self.client:
             return None
@@ -182,14 +183,14 @@ class BudgetRepository:
             return
 
         try:
-            with open(template_file, "r") as f:
+            with open(template_file) as f:
                 self._templates = json.load(f)
             logger.info(f"Loaded {len(self._templates)} budget templates")
         except Exception as e:
             logger.error(f"Error loading budget templates: {e}")
             self._templates = {}
 
-    def get_template(self, equipment_type: str) -> Optional[Dict[str, Any]]:
+    def get_template(self, equipment_type: str) -> dict[str, Any] | None:
         """
         Get budget template for a specific equipment type.
 
@@ -201,7 +202,7 @@ class BudgetRepository:
         """
         return self._templates.get(equipment_type)
 
-    def get_budget_templates(self) -> Dict[str, Any]:
+    def get_budget_templates(self) -> dict[str, Any]:
         """
         Get all available budget templates.
 
@@ -211,8 +212,8 @@ class BudgetRepository:
         return self._templates.copy() if self._templates else {}
 
     def create_from_template(
-        self, contract_id: str, equipment_type: str, year: int, month: Optional[int] = None
-    ) -> Optional[Dict[str, Any]]:
+        self, contract_id: str, equipment_type: str, year: int, month: int | None = None
+    ) -> dict[str, Any] | None:
         """
         Create a budget entry using equipment-type template defaults.
 
@@ -260,7 +261,7 @@ class BudgetRepository:
 
 
 # Singleton instance
-_repository: Optional[BudgetRepository] = None
+_repository: BudgetRepository | None = None
 
 
 def get_budget_repository() -> BudgetRepository:

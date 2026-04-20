@@ -17,15 +17,14 @@ Usage:
 
 import logging
 import secrets as secrets_mod
-from typing import Optional
 
 from fastapi import HTTPException, Request, status
 
 from app.config.settings import settings
 from app.middleware.auth_middleware import (
     _authenticate_request,
-    _extract_ip_address,
     _extract_bearer_token,
+    _extract_ip_address,
     _extract_role_from_token,
     validate_jwt_token,
 )
@@ -36,7 +35,7 @@ logger = logging.getLogger(__name__)
 _LOCALHOST_IPS = {"127.0.0.1", "::1", "localhost", "testclient", "unknown"}
 
 
-def extract_mcp_token(request: Request, *, allow_query_param: bool = True) -> Optional[str]:
+def extract_mcp_token(request: Request, *, allow_query_param: bool = True) -> str | None:
     """Extract MCP auth token from request.
 
     Checks (in order):

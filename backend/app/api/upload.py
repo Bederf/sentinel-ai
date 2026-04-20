@@ -1,21 +1,22 @@
 """Upload API endpoints for CSV data files."""
 
 import shutil
-from fastapi import APIRouter, UploadFile, File, HTTPException
+
+from fastapi import APIRouter, File, HTTPException, UploadFile
 from pydantic import BaseModel
 
 from app.services.csv_loader import (
-    WorkOrderData,
-    AssetData,
-    SiteData,
+    DATA_DIR,
     AlarmData,
+    AssetData,
+    ChillerTelemetryData,
     EnergyData,
     GeneratorTelemetryData,
     HVACTelemetryData,
-    VSDTelemetryData,
-    ChillerTelemetryData,
     PumpTelemetryData,
-    DATA_DIR,
+    SiteData,
+    VSDTelemetryData,
+    WorkOrderData,
 )
 
 router = APIRouter()
@@ -108,7 +109,7 @@ async def upload_csv(
         )
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error uploading file: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error uploading file: {e!s}")
 
 
 @router.get("/data-status", response_model=DataStatusResponse)
@@ -166,7 +167,7 @@ async def download_csv(file_type: str):
     if not filepath.exists():
         raise HTTPException(status_code=404, detail=f"File {filename} not found")
 
-    with open(filepath, "r") as f:
+    with open(filepath) as f:
         content = f.read()
 
     return {

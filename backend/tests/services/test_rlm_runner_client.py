@@ -3,16 +3,16 @@
 Phase: 113-03, Task 1
 """
 
-import pytest
-import httpx
 from unittest.mock import AsyncMock, patch
+
+import httpx
+import pytest
 
 from app.services.rlm_runner_client import (
     RLMRunnerClient,
     RLMRunnerDisabledError,
     RLMRunnerUnavailableError,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers

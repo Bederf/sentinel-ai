@@ -1,6 +1,5 @@
 """Equipment Metadata API - Endpoints for equipment notes and metadata management."""
 
-from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -15,53 +14,53 @@ class NotesUpdateRequest(BaseModel):
 
     notes: str = Field(..., description="New notes content")
     changed_by: str = Field(..., description="User making the change")
-    change_reason: Optional[str] = Field(None, description="Reason for change")
+    change_reason: str | None = Field(None, description="Reason for change")
 
 
 class NetworkInfoUpdateRequest(BaseModel):
     """Request to update network info."""
 
-    ip_address: Optional[str] = None
-    mac_address: Optional[str] = None
-    gateway_ip: Optional[str] = None
-    dali_line: Optional[int] = None
-    dali_address: Optional[int] = None
-    bacnet_device_id: Optional[int] = None
-    bacnet_network: Optional[int] = None
-    modbus_address: Optional[int] = None
+    ip_address: str | None = None
+    mac_address: str | None = None
+    gateway_ip: str | None = None
+    dali_line: int | None = None
+    dali_address: int | None = None
+    bacnet_device_id: int | None = None
+    bacnet_network: int | None = None
+    modbus_address: int | None = None
     merge: bool = Field(True, description="Merge with existing or replace")
 
 
 class DeviceInfoUpdateRequest(BaseModel):
     """Request to update device info."""
 
-    gtin: Optional[str] = Field(None, description="Global Trade Item Number")
-    serial_number: Optional[str] = None
-    manufacturer: Optional[str] = None
-    model: Optional[str] = None
-    firmware_version: Optional[str] = None
-    hardware_version: Optional[str] = None
-    device_type: Optional[str] = None
+    gtin: str | None = Field(None, description="Global Trade Item Number")
+    serial_number: str | None = None
+    manufacturer: str | None = None
+    model: str | None = None
+    firmware_version: str | None = None
+    hardware_version: str | None = None
+    device_type: str | None = None
     merge: bool = Field(True, description="Merge with existing or replace")
 
 
 class OperatingDataUpdateRequest(BaseModel):
     """Request to update operating data."""
 
-    lamp_hours: Optional[int] = None
-    power_cycles: Optional[int] = None
-    total_runtime_hours: Optional[float] = None
-    last_fault: Optional[str] = None
-    fault_count: Optional[int] = None
-    energy_kwh: Optional[float] = None
+    lamp_hours: int | None = None
+    power_cycles: int | None = None
+    total_runtime_hours: float | None = None
+    last_fault: str | None = None
+    fault_count: int | None = None
+    energy_kwh: float | None = None
     merge: bool = Field(True, description="Merge with existing or replace")
 
 
 class CommissioningInfoRequest(BaseModel):
     """Request to set commissioning info."""
 
-    commissioning_date: Optional[str] = Field(None, description="Date commissioned (YYYY-MM-DD)")
-    warranty_expiry: Optional[str] = Field(None, description="Warranty expiry (YYYY-MM-DD)")
+    commissioning_date: str | None = Field(None, description="Date commissioned (YYYY-MM-DD)")
+    warranty_expiry: str | None = Field(None, description="Warranty expiry (YYYY-MM-DD)")
 
 
 @router.get("/equipment/{equipment_id}/metadata")

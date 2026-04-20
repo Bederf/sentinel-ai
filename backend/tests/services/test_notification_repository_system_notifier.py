@@ -3,9 +3,9 @@
 from uuid import UUID
 
 from app.database.repositories.notification_repository import (
-    NotificationRepository,
     SYSTEM_NOTIFIER_TECHNICIAN_CODE,
     SYSTEM_NOTIFIER_TECHNICIAN_ID,
+    NotificationRepository,
 )
 
 

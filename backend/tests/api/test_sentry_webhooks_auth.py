@@ -27,7 +27,7 @@ def preserve_settings_state():
 def mock_service_record_list(monkeypatch):
     """Avoid DB access in webhook endpoints that list pending service records."""
 
-    async def _fake_list(self, filters=None):  # noqa: ARG001
+    async def _fake_list(self, filters=None):
         return []
 
     monkeypatch.setattr("app.api.sentry_webhooks.ServiceRecordRepository.list", _fake_list, raising=False)

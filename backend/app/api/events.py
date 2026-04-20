@@ -111,7 +111,7 @@ async def stream_dashboard_events(request: Request) -> StreamingResponse:
                 try:
                     event = await asyncio.wait_for(client_queue.get(), timeout=15)
                     yield event.to_sse()
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     # Heartbeat keeps proxies and browsers from closing idle streams.
                     yield ": keepalive\n\n"
         except asyncio.CancelledError:
@@ -207,7 +207,7 @@ async def event_stream_endpoint(correlation_id: str = Query(...)):
             )
         except Exception as e:
             logger.error(
-                f"SSE stream error: {str(e)}",
+                f"SSE stream error: {e!s}",
                 extra={"correlation_id": correlation_id},
                 exc_info=True,
             )

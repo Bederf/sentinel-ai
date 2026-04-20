@@ -4,14 +4,15 @@ Validates prediction aggregation, severity classification,
 empty predictions, and site filtering for the Digital Twin overlay.
 """
 
-import pytest
 from unittest.mock import MagicMock
 
+import pytest
+
+from app.models.equipment_status import PredictiveFault
 from app.services.prediction_overlay_service import (
     PredictionOverlayService,
     get_prediction_overlay_service,
 )
-from app.models.equipment_status import PredictiveFault
 
 
 @pytest.fixture

@@ -20,13 +20,13 @@ Usage:
     register_all_routes(app)
 """
 
-from app.startup.routes import register_all_routes
-from app.startup.middleware import register_middleware, register_exception_handlers
 from app.startup.events import register_events
+from app.startup.middleware import register_exception_handlers, register_middleware
+from app.startup.routes import register_all_routes
 
 __all__ = [
     "register_all_routes",
-    "register_middleware",
-    "register_exception_handlers",
     "register_events",
+    "register_exception_handlers",
+    "register_middleware",
 ]

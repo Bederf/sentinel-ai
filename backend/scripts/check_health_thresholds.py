@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
 """Check which health thresholds are being used."""
 
+import json
 import sys
 from pathlib import Path
+
 from dotenv import load_dotenv
-import json
 
 load_dotenv(Path(__file__).parent.parent / ".env")
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 try:
     from app.database.supabase_client import get_supabase_client
-    from app.services.health_threshold_service import get_health_thresholds, DEFAULT_THRESHOLDS
+    from app.services.health_threshold_service import DEFAULT_THRESHOLDS, get_health_thresholds
 
     print("=" * 70)
     print("HEALTH THRESHOLD SOURCE ANALYSIS")

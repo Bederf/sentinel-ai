@@ -10,8 +10,9 @@ Tests all MCP endpoints:
 - POST /api/mcp/simbiot/call - Execute tools
 """
 
-import requests
 import sys
+
+import requests
 
 BASE_URL = "http://localhost:9095/api/mcp/simbiot"
 

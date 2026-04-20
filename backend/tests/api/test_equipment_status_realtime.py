@@ -5,8 +5,9 @@ and handles ticket-based authentication in demo mode.
 """
 
 import os
-import pytest
 from unittest.mock import patch
+
+import pytest
 
 os.environ.setdefault("DEMO_MODE", "true")
 os.environ.setdefault("TESTING", "true")
@@ -15,7 +16,8 @@ os.environ.setdefault("TESTING", "true")
 @pytest.mark.asyncio
 async def test_status_ticket_returns_200():
     """POST /api/digital-twin/status/ticket returns a ticket in demo mode."""
-    from httpx import AsyncClient, ASGITransport
+    from httpx import ASGITransport, AsyncClient
+
     from tests.conftest import app
 
     transport = ASGITransport(app=app)
@@ -31,7 +33,8 @@ async def test_status_ticket_returns_200():
 @pytest.mark.asyncio
 async def test_status_stream_returns_sse_content_type():
     """GET /api/digital-twin/status/stream returns text/event-stream content type."""
-    from httpx import AsyncClient, ASGITransport
+    from httpx import ASGITransport, AsyncClient
+
     from tests.conftest import app
 
     # First get a ticket
@@ -58,7 +61,8 @@ async def test_status_stream_returns_sse_content_type():
 @pytest.mark.asyncio
 async def test_status_stream_without_ticket_fails_in_non_demo():
     """GET /api/digital-twin/status/stream returns 401 without ticket (non-demo mode)."""
-    from httpx import AsyncClient, ASGITransport
+    from httpx import ASGITransport, AsyncClient
+
     from tests.conftest import app
 
     transport = ASGITransport(app=app)
@@ -74,7 +78,9 @@ async def test_status_stream_without_ticket_fails_in_non_demo():
 async def test_status_stream_returns_valid_json_frames():
     """SSE stream should return parseable JSON data frames."""
     import json
-    from httpx import AsyncClient, ASGITransport
+
+    from httpx import ASGITransport, AsyncClient
+
     from tests.conftest import app
 
     transport = ASGITransport(app=app)
@@ -129,7 +135,8 @@ async def test_status_stream_returns_valid_json_frames():
 @pytest.mark.asyncio
 async def test_status_ticket_consumed_on_use():
     """Ticket should be single-use (consumed after first stream connection)."""
-    from httpx import AsyncClient, ASGITransport
+    from httpx import ASGITransport, AsyncClient
+
     from tests.conftest import app
 
     transport = ASGITransport(app=app)

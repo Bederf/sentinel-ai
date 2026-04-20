@@ -11,8 +11,8 @@ from datetime import datetime
 from typing import Any
 
 from app.models.maintenance_event import MaintenanceEvent
-from app.services.mri_evolution_client import MRIEvolutionClient
 from app.services.maintenance_adapter_base import MaintenanceAdapter
+from app.services.mri_evolution_client import MRIEvolutionClient
 
 logger = logging.getLogger(__name__)
 

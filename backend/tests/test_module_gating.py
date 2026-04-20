@@ -7,8 +7,9 @@ Phase 087: Validates that:
 3. Dependency cascade works (deactivate parent → children auto-deactivate)
 """
 
+from unittest.mock import AsyncMock, patch
+
 import pytest
-from unittest.mock import patch, AsyncMock
 
 from app.models.module_registry import ModuleType
 from app.services.module_registry_service import module_registry

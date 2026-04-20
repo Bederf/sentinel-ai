@@ -1,13 +1,12 @@
 """Concept document ingestion endpoints."""
 
-from typing import Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
+from app.database.supabase_client import get_supabase_client
 from app.models.auth import AuthContext
 from app.security.pipeline import require_role
-from app.database.supabase_client import get_supabase_client
 from app.services.concept_vector_db import get_concept_vector_db_service
 
 router = APIRouter(prefix="/api/concept-rag", tags=["concept-rag"])
@@ -21,9 +20,9 @@ class ConceptDocumentRequest(BaseModel):
     full_text: str
     concept_document_id: str
     concept_url: str
-    site_id: Optional[str] = None
-    source: Optional[str] = "concept_tsv"
-    metadata: Optional[Dict[str, str]] = None
+    site_id: str | None = None
+    source: str | None = "concept_tsv"
+    metadata: dict[str, str] | None = None
 
 
 @router.post("/documents")

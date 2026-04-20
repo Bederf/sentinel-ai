@@ -6,8 +6,8 @@ from starlette.requests import Request
 
 from app.api import auth as auth_api
 from app.config.settings import settings
-from app.startup.middleware import _admin_requests_by_ip, _check_admin_rate_limit, _should_rate_limit_admin_request
 from app.middleware.auth_middleware import validate_jwt_token
+from app.startup.middleware import _admin_requests_by_ip, _check_admin_rate_limit, _should_rate_limit_admin_request
 
 
 def _make_request(path: str = "/api/auth/refresh", method: str = "POST") -> Request:

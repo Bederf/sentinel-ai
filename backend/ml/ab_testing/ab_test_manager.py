@@ -9,10 +9,10 @@ Manages controlled experiments between model versions:
 
 import hashlib
 import logging
-from datetime import datetime
-from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
+from datetime import datetime
 from enum import Enum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -37,12 +37,12 @@ class ABTest:
     candidate_model_id: str
     status: TestStatus = TestStatus.RUNNING
     created_at: str = ""
-    completed_at: Optional[str] = None
-    control_metrics: Dict[str, float] = field(default_factory=dict)
-    candidate_metrics: Dict[str, float] = field(default_factory=dict)
+    completed_at: str | None = None
+    control_metrics: dict[str, float] = field(default_factory=dict)
+    candidate_metrics: dict[str, float] = field(default_factory=dict)
     control_assignments: int = 0
     candidate_assignments: int = 0
-    winner: Optional[str] = None
+    winner: str | None = None
 
     def __post_init__(self):
         if not self.created_at:
@@ -53,7 +53,7 @@ class ABTestManager:
     """Manages A/B tests between ML model versions."""
 
     def __init__(self):
-        self._tests: Dict[str, ABTest] = {}
+        self._tests: dict[str, ABTest] = {}
         self._next_id = 1
 
     def create_test(
@@ -61,7 +61,7 @@ class ABTestManager:
         model_type: str,
         equipment_type: str,
         candidate_model_id: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Create a new A/B test.
 
         The control model is the current active model from the registry.
@@ -181,7 +181,7 @@ class ABTestManager:
             n = test.candidate_assignments or 1
             test.candidate_metrics[metric_name] = (test.candidate_metrics[metric_name] * (n - 1) + metric_value) / n
 
-    def evaluate_test(self, test_id: str) -> Dict[str, Any]:
+    def evaluate_test(self, test_id: str) -> dict[str, Any]:
         """Evaluate A/B test results.
 
         Returns comparison of control vs candidate metrics.
@@ -225,7 +225,7 @@ class ABTestManager:
             "created_at": test.created_at,
         }
 
-    def promote_candidate(self, test_id: str) -> Dict[str, Any]:
+    def promote_candidate(self, test_id: str) -> dict[str, Any]:
         """Promote the candidate model to active in the registry.
 
         Args:
@@ -265,7 +265,7 @@ class ABTestManager:
             logger.error(f"Promotion failed for test {test_id}: {e}")
             return {"success": False, "error": str(e)}
 
-    def cancel_test(self, test_id: str) -> Dict[str, Any]:
+    def cancel_test(self, test_id: str) -> dict[str, Any]:
         """Cancel a running test."""
         test = self._tests.get(test_id)
         if not test:
@@ -275,7 +275,7 @@ class ABTestManager:
         test.completed_at = datetime.now().isoformat()
         return {"success": True, "test_id": test_id}
 
-    def list_tests(self, status: Optional[str] = None) -> List[Dict[str, Any]]:
+    def list_tests(self, status: str | None = None) -> list[dict[str, Any]]:
         """List all A/B tests, optionally filtered by status."""
         tests = list(self._tests.values())
         if status:
@@ -300,7 +300,7 @@ class ABTestManager:
 
 
 # Singleton
-_manager: Optional[ABTestManager] = None
+_manager: ABTestManager | None = None
 
 
 def get_ab_test_manager() -> ABTestManager:

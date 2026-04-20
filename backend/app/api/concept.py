@@ -5,13 +5,13 @@ Exposes Concept job card and asset data for health/condition assessment.
 """
 
 import json
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
-from typing import Optional
 
-from app.services.concept_loader import concept_loader
-from app.services.simbiot_service import simbiot_service
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
+
 from app.middleware.auth_middleware import require_auth
 from app.models.auth import AuthContext, AuthLevel
+from app.services.concept_loader import concept_loader
+from app.services.simbiot_service import simbiot_service
 
 router = APIRouter(prefix="/api/concept", tags=["concept-cafm"])
 
@@ -62,9 +62,9 @@ async def upload_concept_document(
 
 @router.get("/assets")
 async def get_assets(
-    site_code: Optional[str] = Query(None, description="Filter by building"),
-    criticality: Optional[str] = Query(None, description="Filter by criticality"),
-    condition: Optional[str] = Query(None, description="Filter by condition"),
+    site_code: str | None = Query(None, description="Filter by building"),
+    criticality: str | None = Query(None, description="Filter by criticality"),
+    condition: str | None = Query(None, description="Filter by condition"),
 ):
     """Get all assets from Concept with optional filters."""
     assets = concept_loader.assets
@@ -202,10 +202,10 @@ async def get_asset_job_cards(
 
 @router.get("/job-cards")
 async def get_job_cards(
-    site_code: Optional[str] = Query(None, description="Filter by building"),
-    asset_code: Optional[str] = Query(None, description="Filter by asset"),
-    priority: Optional[str] = Query(None, description="Filter by priority (P1-P4)"),
-    status: Optional[str] = Query(None, description="Filter by status"),
+    site_code: str | None = Query(None, description="Filter by building"),
+    asset_code: str | None = Query(None, description="Filter by asset"),
+    priority: str | None = Query(None, description="Filter by priority (P1-P4)"),
+    status: str | None = Query(None, description="Filter by status"),
     repeat_only: bool = Query(False, description="Show only repeat calls"),
     warnings_only: bool = Query(False, description="Show only jobs with warnings"),
     limit: int = Query(50, description="Maximum results"),

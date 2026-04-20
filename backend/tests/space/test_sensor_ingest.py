@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-import os
 import asyncio
-from datetime import datetime, timezone
+import os
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, patch
-
 
 os.environ.setdefault("DEMO_MODE", "true")
 os.environ.setdefault("TESTING", "true")
@@ -51,7 +50,7 @@ def _make_payload(
         "rssi": -55,
         "uptime_seconds": 3600,
         "firmware_version": "1.0.0",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
     }
 
 

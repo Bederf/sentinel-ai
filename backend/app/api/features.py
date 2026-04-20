@@ -8,7 +8,6 @@ This module provides REST API endpoints for:
 """
 
 from datetime import datetime
-from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -18,8 +17,8 @@ from app.models.feature import (
     FeatureBatchRequest,
     FeatureBatchResponse,
     FeatureDefinitionsResponse,
-    TrainingDatasetMetadata,
     TrainingDataRequest,
+    TrainingDatasetMetadata,
 )
 from app.services.feature_service import get_feature_service
 from app.services.training_data_service import get_training_data_service
@@ -31,7 +30,7 @@ router = APIRouter(prefix="/api/features", tags=["features"])
 class DatasetListResponse(BaseModel):
     """Response containing list of training datasets."""
 
-    datasets: List[TrainingDatasetMetadata] = Field(..., description="List of available training datasets")
+    datasets: list[TrainingDatasetMetadata] = Field(..., description="List of available training datasets")
     count: int = Field(..., description="Total count of datasets")
 
 
@@ -40,7 +39,7 @@ class TrainingDataResponse(BaseModel):
 
     success: bool = Field(..., description="Whether generation succeeded")
     message: str = Field(..., description="Status message")
-    metadata: Optional[TrainingDatasetMetadata] = Field(None, description="Dataset metadata if saved")
+    metadata: TrainingDatasetMetadata | None = Field(None, description="Dataset metadata if saved")
 
 
 # Feature Definition Endpoints
@@ -84,7 +83,7 @@ async def get_feature_definitions_for_type(equipment_type: str):
 async def get_equipment_features(
     equipment_id: str,
     equipment_type: str = Query(..., description="Equipment type (chiller, ahu, generator)"),
-    as_of: Optional[datetime] = Query(None, description="Compute features as of this time"),
+    as_of: datetime | None = Query(None, description="Compute features as of this time"),
 ):
     """Compute features for a single equipment.
 
@@ -200,14 +199,14 @@ async def generate_training_data(request: TrainingDataRequest):
     except Exception as e:
         return TrainingDataResponse(
             success=False,
-            message=f"Error generating training data: {str(e)}",
+            message=f"Error generating training data: {e!s}",
             metadata=None,
         )
 
 
 @router.get("/datasets", response_model=DatasetListResponse)
 async def list_datasets(
-    equipment_type: Optional[str] = Query(None, description="Filter by equipment type"),
+    equipment_type: str | None = Query(None, description="Filter by equipment type"),
 ):
     """List all available training datasets.
 

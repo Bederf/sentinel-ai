@@ -7,16 +7,18 @@ Gap 9 (MEDIUM): MFA enforcement for ADMIN not tested.
 """
 
 import os
+
 import pytest
 
 os.environ.setdefault("DEMO_MODE", "true")
 os.environ.setdefault("TESTING", "true")
 os.environ.setdefault("JWT_SECRET_KEY", "test-only-jwt-secret-for-ci-at-least-32-chars")
 
-from app.models.auth import SentinelRole, AuthContext, ROLE_HIERARCHY  # noqa: E402
-from httpx import AsyncClient, ASGITransport  # noqa: E402
-from app.middleware.auth_middleware import create_jwt_token  # noqa: E402
-from app.main import app  # noqa: E402
+from httpx import ASGITransport, AsyncClient
+
+from app.main import app
+from app.middleware.auth_middleware import create_jwt_token
+from app.models.auth import ROLE_HIERARCHY, AuthContext, SentinelRole
 
 
 class TestAdminMFARequirement:
@@ -152,7 +154,8 @@ class TestAPIKeySuabaseValidation:
 
     def test_api_key_from_supabase_valid(self):
         """Valid API key from Supabase should return auth dict."""
-        from unittest.mock import patch, MagicMock
+        from unittest.mock import MagicMock, patch
+
         from app.repositories.api_keys_repository import get_api_keys_repository
 
         with patch("app.repositories.api_keys_repository.get_supabase_client") as mock_supabase:
@@ -182,8 +185,9 @@ class TestAPIKeySuabaseValidation:
 
     def test_api_key_from_supabase_expired(self):
         """Expired API key should be rejected."""
-        from unittest.mock import patch, MagicMock
         from datetime import datetime, timedelta
+        from unittest.mock import MagicMock, patch
+
         from app.repositories.api_keys_repository import get_api_keys_repository
 
         with patch("app.repositories.api_keys_repository.get_supabase_client") as mock_supabase:
@@ -213,7 +217,8 @@ class TestAPIKeySuabaseValidation:
 
     def test_api_key_from_supabase_not_found(self):
         """Non-existent API key should return None."""
-        from unittest.mock import patch, MagicMock
+        from unittest.mock import MagicMock, patch
+
         from app.repositories.api_keys_repository import get_api_keys_repository
 
         with patch("app.repositories.api_keys_repository.get_supabase_client") as mock_supabase:

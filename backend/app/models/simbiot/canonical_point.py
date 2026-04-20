@@ -15,9 +15,9 @@ Design Principles:
 """
 
 from dataclasses import dataclass
-from typing import Any, Optional, List, Dict
 from datetime import datetime
 from enum import Enum
+from typing import Any
 
 
 class SafetyClass(str, Enum):
@@ -77,14 +77,14 @@ class ControlEnvelope:
     """
 
     # Value constraints - physical/operational bounds
-    bounds: Optional[Dict[str, float]] = None  # {"min": 0.0, "max": 100.0}
+    bounds: dict[str, float] | None = None  # {"min": 0.0, "max": 100.0}
 
     # Temporal constraints - rate limiting and cooldowns
-    min_cooldown_seconds: Optional[int] = None  # Minimum time between writes
-    max_daily_writes: Optional[int] = None  # Maximum writes per 24 hours
+    min_cooldown_seconds: int | None = None  # Minimum time between writes
+    max_daily_writes: int | None = None  # Maximum writes per 24 hours
 
     # Rate limits - prevent sudden changes
-    ramp_limits: Optional[Dict[str, float]] = None  # {"max_per_second": 5.0, "max_per_minute": 30.0}
+    ramp_limits: dict[str, float] | None = None  # {"max_per_second": 5.0, "max_per_minute": 30.0}
 
     # Safety overrides - explicit control restrictions
     writable_override: bool = True  # Can be written (when False, read-only)
@@ -178,7 +178,7 @@ class CanonicalSentinelPoint:
     equipment_type: str
     """Type of equipment (AHU, CHILLER, FCU, etc.)."""
 
-    location_hierarchy: List[str]
+    location_hierarchy: list[str]
     """Location path (e.g., ['site-002', 'building-1', 'floor-2', 'zone-north'])."""
 
     # ========================================================================
@@ -202,10 +202,10 @@ class CanonicalSentinelPoint:
     validation_status: str = "pending"
     """Current validation state: 'pending', 'passed', 'warning', 'failed', 'quarantined'."""
 
-    last_validation_timestamp: Optional[datetime] = None
+    last_validation_timestamp: datetime | None = None
     """When validation was last performed."""
 
-    last_valid_value_timestamp: Optional[datetime] = None
+    last_valid_value_timestamp: datetime | None = None
     """When a valid value was last received."""
 
     # ========================================================================
@@ -226,7 +226,7 @@ class CanonicalSentinelPoint:
     current_value: Any = None
     """Current value of the point."""
 
-    current_value_timestamp: Optional[datetime] = None
+    current_value_timestamp: datetime | None = None
     """When current value was last updated."""
 
     operational_status: OperationalStatus = OperationalStatus.UNKNOWN
@@ -238,7 +238,7 @@ class CanonicalSentinelPoint:
     classification_confidence: float = 0.0
     """Confidence in semantic classification (0.0 - 1.0)."""
 
-    classification_evidence: List[ClassificationEvidence] = None
+    classification_evidence: list[ClassificationEvidence] = None
     """Evidence supporting the classification decision."""
 
     # ========================================================================
@@ -299,7 +299,7 @@ class CanonicalSentinelPoint:
             and self.classification_confidence >= 0.90
         )
 
-    def get_safety_override_reason(self) -> Optional[str]:
+    def get_safety_override_reason(self) -> str | None:
         """Get reason if safety constraints prevent control."""
         if self.safety_class == SafetyClass.HIGH:
             return "HIGH safety class - no autonomous control permitted"
@@ -309,7 +309,7 @@ class CanonicalSentinelPoint:
             return "Point is not writable"
         return None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             "source_provenance": {
@@ -350,7 +350,7 @@ class CanonicalSentinelPoint:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "CanonicalSentinelPoint":
+    def from_dict(cls, data: dict[str, Any]) -> "CanonicalSentinelPoint":
         """Create from dictionary (for deserialization)."""
         provenance_data = data["source_provenance"]
         provenance = Provenance(

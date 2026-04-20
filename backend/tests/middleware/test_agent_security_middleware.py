@@ -12,30 +12,29 @@ import os
 os.environ.setdefault("DEMO_MODE", "true")
 os.environ.setdefault("LIGHTWEIGHT_APP", "1")
 
-import time  # noqa: E402
-from datetime import datetime, timedelta  # noqa: E402
-from unittest.mock import patch  # noqa: E402
+import time
+from datetime import datetime, timedelta
+from unittest.mock import patch
 
-import pytest  # noqa: E402
-from fastapi import FastAPI, Request  # noqa: E402
-from httpx import ASGITransport, AsyncClient  # noqa: E402
-from starlette.middleware.base import BaseHTTPMiddleware  # noqa: E402
+import pytest
+from fastapi import FastAPI, Request
+from httpx import ASGITransport, AsyncClient
+from starlette.middleware.base import BaseHTTPMiddleware
 
-from app.middleware.agent_security.circuit_breaker import (  # noqa: E402
+from app.middleware.agent_security.circuit_breaker import (
     AgentRateLimiter,
     CircuitBreaker,
     QuotaTier,
 )
-from app.middleware.agent_security.middleware import (  # noqa: E402
+from app.middleware.agent_security.middleware import (
     AgentSecurityMiddleware,
     _resolve_tool,
 )
-from app.middleware.agent_security.models import AgentToolName  # noqa: E402
-from app.middleware.agent_security.policy_engine import (  # noqa: E402
+from app.middleware.agent_security.models import AgentToolName
+from app.middleware.agent_security.policy_engine import (
     ToolPolicyEngine,
 )
-from app.models.auth import AuthContext, SentinelRole  # noqa: E402
-
+from app.models.auth import AuthContext, SentinelRole
 
 # ---------------------------------------------------------------------------
 # Test app factory — builds a minimal FastAPI with agent security middleware
@@ -235,6 +234,8 @@ def _reset_singletons():
     """Reset the module-level singletons before each test."""
     from app.middleware.agent_security.circuit_breaker import (
         circuit_breaker as cb_singleton,
+    )
+    from app.middleware.agent_security.circuit_breaker import (
         rate_limiter as rl_singleton,
     )
     from app.middleware.agent_security.policy_engine import (
@@ -480,8 +481,8 @@ async def test_equipment_control_returns_confirmation():
 @pytest.mark.asyncio
 async def test_confirm_action_valid_token():
     """13. POST /api/agent/confirm with correct token → 200."""
-    from app.middleware.agent_security.policy_engine import policy_engine as pe
     from app.middleware.agent_security.models import AgentSession, AgentToolName
+    from app.middleware.agent_security.policy_engine import policy_engine as pe
 
     # Create a pending confirmation directly
     session = AgentSession(
@@ -509,8 +510,8 @@ async def test_confirm_action_valid_token():
 @pytest.mark.asyncio
 async def test_confirm_action_expired_token():
     """14. Confirm after 60s → DENY (expired)."""
-    from app.middleware.agent_security.policy_engine import policy_engine as pe
     from app.middleware.agent_security.models import AgentSession, AgentToolName
+    from app.middleware.agent_security.policy_engine import policy_engine as pe
 
     session = AgentSession(
         owner_id="admin-expire-1",

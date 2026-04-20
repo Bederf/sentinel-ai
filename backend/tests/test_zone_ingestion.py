@@ -5,9 +5,8 @@ Tests zone ingestion validation without Supabase dependencies.
 For integration tests, run: pytest tests/test_zone_ingestion_api.py
 """
 
-import pytest
-from typing import List, Dict, Optional
 
+import pytest
 
 # ============= Validation Utilities =============
 
@@ -64,19 +63,19 @@ def validate_desk_context(context: str) -> bool:
     return context in valid_contexts
 
 
-def check_duplicate_zone_ids(zones: List[Dict]) -> bool:
+def check_duplicate_zone_ids(zones: list[dict]) -> bool:
     """Return True if no duplicates found, False if duplicates exist"""
     zone_ids = [z.get("zone_id") for z in zones]
     return len(zone_ids) == len(set(zone_ids))
 
 
-def check_duplicate_desk_ids(desks: List[Dict]) -> bool:
+def check_duplicate_desk_ids(desks: list[dict]) -> bool:
     """Return True if no duplicates found, False if duplicates exist"""
     desk_ids = [d.get("desk_id") for d in desks]
     return len(desk_ids) == len(set(desk_ids))
 
 
-def validate_desk_zone_references(desks: List[Dict], valid_zones: set) -> bool:
+def validate_desk_zone_references(desks: list[dict], valid_zones: set) -> bool:
     """Return True if all desk zone references are valid"""
     for desk in desks:
         zone_id = desk.get("zone_id")
@@ -85,7 +84,7 @@ def validate_desk_zone_references(desks: List[Dict], valid_zones: set) -> bool:
     return True
 
 
-def calculate_zone_centroid(desks: List[Dict]) -> Optional[Dict[str, float]]:
+def calculate_zone_centroid(desks: list[dict]) -> dict[str, float] | None:
     """Calculate zone centroid from desk positions"""
     if not desks:
         return None

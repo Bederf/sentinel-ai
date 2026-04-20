@@ -8,7 +8,6 @@ Facility managers review, approve, reject, and override semantic classifications
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
@@ -88,9 +87,9 @@ class BulkDecisionResponse(BaseModel):
 @router.get("/pending", response_model=list[ReviewQueueEntry])
 async def get_pending_reviews(
     site_id: str = Query(..., description="Site ID to filter by"),
-    safety_class: Optional[str] = Query(None, description="Filter by safety class (LOW/MEDIUM/HIGH)"),
-    equipment_id: Optional[str] = Query(None, description="Filter by equipment ID"),
-    confidence_threshold: Optional[float] = Query(None, description="Max confidence score filter"),
+    safety_class: str | None = Query(None, description="Filter by safety class (LOW/MEDIUM/HIGH)"),
+    equipment_id: str | None = Query(None, description="Filter by equipment ID"),
+    confidence_threshold: float | None = Query(None, description="Max confidence score filter"),
     limit: int = Query(100, ge=1, le=1000, description="Maximum results to return"),
 ) -> list[ReviewQueueEntry]:
     """Get pending reviews with optional filtering, sorted by priority (lowest first)."""

@@ -12,21 +12,21 @@ Module: 34-05 (Energy Arbitrage & BESS Dispatch Optimization)
 """
 
 import time
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from app.middleware.rate_limiter import limiter
+
 from app.api.dependencies.module_access import require_active_module
+from app.middleware.rate_limiter import limiter
+from app.ml.models.dispatch_predictor import get_dispatch_predictor
 from app.models.module_registry import ModuleType
 from app.services.arbitrage_optimizer import (
-    get_price_forecaster,
     get_arbitrage_analyzer,
+    get_price_forecaster,
 )
 from app.services.bess_dispatch_engine import (
-    get_bess_dispatch_engine,
     BESSState,
+    get_bess_dispatch_engine,
 )
-from app.ml.models.dispatch_predictor import get_dispatch_predictor
 
 router = APIRouter(
     dependencies=[
@@ -47,13 +47,13 @@ router = APIRouter(
 @router.get("/solar/arbitrage/forecast-24h")
 async def get_24h_price_forecast(
     request: Request,
-    load_shedding_stages: Optional[str] = Query(
+    load_shedding_stages: str | None = Query(
         None, description="Comma-separated LS stages for each hour (0-8), default all 0"
     ),
-    temperature_forecast: Optional[str] = Query(
+    temperature_forecast: str | None = Query(
         None, description="Comma-separated temperatures (°C) for each hour, default 20°C"
     ),
-    solar_forecast_pct: Optional[str] = Query(
+    solar_forecast_pct: str | None = Query(
         None, description="Comma-separated solar capacity % for each hour, default 0%"
     ),
 ):

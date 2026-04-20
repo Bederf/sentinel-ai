@@ -4,9 +4,16 @@ Tests evaluate(), apply_enforcement(), and enforcement mapping for
 all mode x status combinations.
 """
 
-import pytest
 from unittest.mock import MagicMock, patch
 
+import pytest
+
+from app.services.quality_gate_evaluator import (
+    _ENFORCEMENT_MAP,
+    _SIMULATION_DEFAULTS,
+    CONFIDENCE_CAP,
+    QualityGateEvaluator,
+)
 from app.services.quality_gate_policy import (
     EnforcementAction,
     GateStatus,
@@ -15,13 +22,6 @@ from app.services.quality_gate_policy import (
     ReasonCode,
     RuleState,
 )
-from app.services.quality_gate_evaluator import (
-    CONFIDENCE_CAP,
-    QualityGateEvaluator,
-    _ENFORCEMENT_MAP,
-    _SIMULATION_DEFAULTS,
-)
-
 
 # ---------------------------------------------------------------------------
 # Fixtures

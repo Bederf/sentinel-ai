@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from typing import Optional
 
 from app.database.supabase_client import get_supabase_client
 
@@ -38,7 +37,7 @@ class RoomRegistryRepository:
             logger.error("Canonical room_registry get_rooms_by_site failed: %s", exc)
             return [room for room in self._load_json_fallback() if room.get("site_id") == site_id]
 
-    async def get_room(self, room_id: str) -> Optional[dict]:
+    async def get_room(self, room_id: str) -> dict | None:
         """Get a single room by room_id from the canonical store."""
         if self.client is None:
             return next((room for room in self._load_json_fallback() if room.get("room_id") == room_id), None)
@@ -55,7 +54,7 @@ class RoomRegistryRepository:
         return await self.get_room(room_id) is not None
 
 
-_repository: Optional[RoomRegistryRepository] = None
+_repository: RoomRegistryRepository | None = None
 
 
 def get_room_registry_repository() -> RoomRegistryRepository:

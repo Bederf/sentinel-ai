@@ -4,9 +4,10 @@ Manages per-building zone configuration for multi-building support.
 Each building can have a unique zone structure.
 """
 
-from typing import List, Optional, Dict, Any
 import logging
 import time
+from typing import Any
+
 from app.database.supabase_client import get_supabase_client
 
 logger = logging.getLogger(__name__)
@@ -44,7 +45,7 @@ class ZoneRepository:
         if last_error:
             raise last_error
 
-    def get_all(self, site_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_all(self, site_id: str | None = None) -> list[dict[str, Any]]:
         """Get all zones with optional building filter.
 
         Args:
@@ -61,7 +62,7 @@ class ZoneRepository:
         response = query.execute()
         return response.data
 
-    def get_by_site(self, site_id: str) -> List[Dict[str, Any]]:
+    def get_by_site(self, site_id: str) -> list[dict[str, Any]]:
         """Get all zones for a specific building.
 
         Args:
@@ -74,7 +75,7 @@ class ZoneRepository:
         response = self._execute_with_retry(query)
         return response.data
 
-    def get_by_zone_id(self, site_id: str, zone_id: str) -> Optional[Dict[str, Any]]:
+    def get_by_zone_id(self, site_id: str, zone_id: str) -> dict[str, Any] | None:
         """Get a specific zone by zone_id within a building.
 
         Args:
@@ -90,7 +91,7 @@ class ZoneRepository:
             return response.data[0]
         return None
 
-    def get_by_uuid(self, uuid: str) -> Optional[Dict[str, Any]]:
+    def get_by_uuid(self, uuid: str) -> dict[str, Any] | None:
         """Get zone by UUID.
 
         Args:
@@ -105,7 +106,7 @@ class ZoneRepository:
             return response.data[0]
         return None
 
-    def get_by_floor(self, site_id: str, floor: str) -> List[Dict[str, Any]]:
+    def get_by_floor(self, site_id: str, floor: str) -> list[dict[str, Any]]:
         """Get zones by building and floor.
 
         Args:
@@ -118,7 +119,7 @@ class ZoneRepository:
         response = self.client.table("zones").select("*").eq("site_id", site_id).eq("floor", floor).execute()
         return response.data
 
-    def create(self, zone_data: Dict[str, Any]) -> Dict[str, Any]:
+    def create(self, zone_data: dict[str, Any]) -> dict[str, Any]:
         """Create a new zone.
 
         Args:
@@ -139,7 +140,7 @@ class ZoneRepository:
         else:
             raise ValueError(f"Failed to create zone: {zone_data}")
 
-    def update(self, zone_id: str, zone_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def update(self, zone_id: str, zone_data: dict[str, Any]) -> dict[str, Any] | None:
         """Update a zone.
 
         Args:
@@ -156,7 +157,7 @@ class ZoneRepository:
             return response.data[0]
         return None
 
-    def upsert(self, zone_data: Dict[str, Any]) -> Dict[str, Any]:
+    def upsert(self, zone_data: dict[str, Any]) -> dict[str, Any]:
         """Insert or update a zone.
 
         Args:
@@ -168,7 +169,7 @@ class ZoneRepository:
         response = self.client.table("zones").upsert(zone_data, on_conflict="site_id,zone_id").execute()
         return response.data[0] if response.data else {}
 
-    def upsert_many(self, zones: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def upsert_many(self, zones: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Insert or update multiple zones.
 
         Args:
@@ -214,7 +215,7 @@ class ZoneRepository:
         logger.info(f"Deleted {count} zones for building {site_id}")
         return count
 
-    def get_zone_centroids(self, site_id: str) -> Dict[str, Dict[str, float]]:
+    def get_zone_centroids(self, site_id: str) -> dict[str, dict[str, float]]:
         """Get zone centroids for all zones in a building.
 
         Centroids are calculated from desk positions and used for

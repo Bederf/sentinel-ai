@@ -20,7 +20,6 @@ from app.services.simbiot.validators.template_completeness import (
 )
 from app.services.simbiot.validators.validation_engine import StaticValidationEngine
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------

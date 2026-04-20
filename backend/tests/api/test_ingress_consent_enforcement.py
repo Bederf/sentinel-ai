@@ -1,7 +1,7 @@
 """Ingress consent enforcement tests for WhatsApp and Telegram paths."""
 
-from unittest.mock import AsyncMock
 import uuid
+from unittest.mock import AsyncMock
 
 import pytest
 

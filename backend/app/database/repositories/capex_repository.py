@@ -1,8 +1,8 @@
 """Repository for canonical CapEx analysis persistence."""
 
 import logging
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime
+from typing import Any
 from uuid import uuid4
 
 logger = logging.getLogger(__name__)
@@ -24,7 +24,7 @@ class CapExRepository:
         except Exception:
             self._supabase = None
 
-    async def save_analysis(self, analysis: Dict[str, Any]) -> Dict[str, Any]:
+    async def save_analysis(self, analysis: dict[str, Any]) -> dict[str, Any]:
         """Save a CapEx analysis result to the canonical DB store."""
         record = {
             "id": str(uuid4()),
@@ -43,7 +43,7 @@ class CapExRepository:
             "discount_rate": analysis.get("discount_rate"),
             "horizon_years": analysis.get("horizon_years"),
             "analysis_date": analysis.get("analysis_date"),
-            "created_at": datetime.now(timezone.utc).isoformat(),
+            "created_at": datetime.now(UTC).isoformat(),
         }
 
         if self._supabase:
@@ -58,10 +58,10 @@ class CapExRepository:
 
     async def get_analyses(
         self,
-        equipment_code: Optional[str] = None,
-        site_id: Optional[str] = None,
+        equipment_code: str | None = None,
+        site_id: str | None = None,
         limit: int = 50,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get CapEx analyses with optional filtering from the canonical DB store."""
         if self._supabase:
             try:
@@ -80,13 +80,13 @@ class CapExRepository:
 
         return []
 
-    async def get_latest_analysis(self, equipment_code: str) -> Optional[Dict[str, Any]]:
+    async def get_latest_analysis(self, equipment_code: str) -> dict[str, Any] | None:
         """Get most recent analysis for equipment."""
         results = await self.get_analyses(equipment_code=equipment_code, limit=1)
         return results[0] if results else None
 
 
-_repo_instance: Optional[CapExRepository] = None
+_repo_instance: CapExRepository | None = None
 
 
 def get_capex_repository() -> CapExRepository:

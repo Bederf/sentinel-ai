@@ -6,13 +6,14 @@ Tests cover:
 - Audit entry retention policy
 """
 
-import pytest
-from datetime import datetime, timedelta
 import json
-from unittest.mock import patch, MagicMock
+from datetime import datetime, timedelta
+from unittest.mock import MagicMock, patch
 
+import pytest
+
+from app.models.audit_log import AuditActionType, AuditLogEntry, AuditResultType
 from app.services.audit_logger import AuditLogger
-from app.models.audit_log import AuditLogEntry, AuditActionType, AuditResultType
 
 
 @pytest.mark.asyncio
@@ -99,7 +100,7 @@ class TestAuditLogRotation:
         assert archived_count == 10, f"Expected 10 archived entries, got {archived_count}"
 
         # Verify active log now has only 5 entries (new ones)
-        with open(audit_logger.log_file, "r") as f:
+        with open(audit_logger.log_file) as f:
             data = json.load(f)
             remaining = data.get("entries", [])
             assert len(remaining) == 5, f"Expected 5 remaining entries in active log, got {len(remaining)}"
@@ -118,7 +119,7 @@ class TestAuditLogRotation:
         assert archived_count == 0, f"Expected 0 archived entries, got {archived_count}"
 
         # Verify all 10 entries remain in active log
-        with open(audit_logger.log_file, "r") as f:
+        with open(audit_logger.log_file) as f:
             data = json.load(f)
             remaining = data.get("entries", [])
             assert len(remaining) == 10
@@ -176,7 +177,7 @@ class TestAuditLogRotation:
         assert archived_count == 0
 
         # Verify original 10 entries are still in active log
-        with open(audit_logger.log_file, "r") as f:
+        with open(audit_logger.log_file) as f:
             data = json.load(f)
             remaining = data.get("entries", [])
             # All 10 should still be there since archival failed
@@ -224,7 +225,7 @@ class TestAuditLogRotation:
         assert archived_count == 5, f"Expected 5 archived entries, got {archived_count}"
 
         # Verify: active log has 5 failed entries remaining (only successful ones deleted)
-        with open(audit_logger.log_file, "r") as f:
+        with open(audit_logger.log_file) as f:
             data = json.load(f)
             remaining = data.get("entries", [])
             # Only the 5 failed entries should remain (entries 5-9, since 0-4 succeeded)
@@ -269,7 +270,7 @@ class TestAuditLogRotation:
             assert count1 == 10, f"First archival should succeed with 10 entries, got {count1}"
 
             # Verify entries were deleted from active log
-            with open(audit_logger.log_file, "r") as f:
+            with open(audit_logger.log_file) as f:
                 data = json.load(f)
                 remaining = data.get("entries", [])
                 assert len(remaining) == 0, (
@@ -334,7 +335,7 @@ class TestAuditLogRotation:
         assert archived_count == 10, f"Expected 10 archived entries, got {archived_count}"
 
         # Verify active log is empty (all entries deleted after successful archival)
-        with open(audit_logger.log_file, "r") as f:
+        with open(audit_logger.log_file) as f:
             data = json.load(f)
             remaining = data.get("entries", [])
             assert len(remaining) == 0, f"Active log should be empty after archival, got {len(remaining)}"

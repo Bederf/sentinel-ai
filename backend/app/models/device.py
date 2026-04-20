@@ -5,11 +5,11 @@ any building automation device (HVAC, lighting, security, etc.) regardless
 of the underlying protocol (BACnet, Modbus, HTTP, etc.).
 """
 
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Dict, Any, Optional
-import uuid
+from typing import Any, Optional
 
 # Import water meter models
 
@@ -107,13 +107,13 @@ class DevicePoint:
     point_type: PointType
     description: str = ""
     unit: str = ""
-    min_value: Optional[float] = None
-    max_value: Optional[float] = None
-    default_value: Optional[Any] = None
-    value: Optional[Any] = None  # Current runtime value (populated by device reads)
+    min_value: float | None = None
+    max_value: float | None = None
+    default_value: Any | None = None
+    value: Any | None = None  # Current runtime value (populated by device reads)
     writable: bool = False
     priority: int = 8  # Default priority for writable points
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def validate_value(self, value: Any) -> bool:
         """Validate if value is within acceptable range for this point."""
@@ -145,13 +145,13 @@ class DeviceValue:
     unit: str = ""
     timestamp: str = ""
     quality: str = "good"  # good, bad, uncertain
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self):
         if not self.timestamp:
             self.timestamp = datetime.now().isoformat()
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for API response."""
         return {
             "point_name": self.point_name,
@@ -176,13 +176,13 @@ class DeviceLocation:
     zone: str  # Q1-Q4 or directional (North, South, East, West)
     room: str  # MR4 (Mechanical Room 4), ER1, OR12, etc.
     description: str  # Human-readable location string
-    zone_id: Optional[str] = None  # References hvac_zones.zone_id for device-to-zone mapping
+    zone_id: str | None = None  # References hvac_zones.zone_id for device-to-zone mapping
     # Zone-aware optimization fields
     zone_type: Optional["ZoneType"] = None  # Type of zone for optimization priority
     exposure: Optional["ExposureDirection"] = None  # Exterior exposure for solar gain
     zone_priority: int = 3  # 1=critical (always maintain), 5=lowest (shed first)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for API response."""
         return {
             "building": self.building,
@@ -249,12 +249,12 @@ class DeviceEquipment:
 
     manufacturer: str  # Manufacturer name
     model: str  # Model number/name
-    serial_number: Optional[str] = None  # Asset serial number
-    installation_year: Optional[int] = None  # Year installed
-    capacity_kw: Optional[float] = None  # Capacity in kW (for HVAC)
-    specifications: Dict[str, Any] = field(default_factory=dict)  # Additional specs
+    serial_number: str | None = None  # Asset serial number
+    installation_year: int | None = None  # Year installed
+    capacity_kw: float | None = None  # Capacity in kW (for HVAC)
+    specifications: dict[str, Any] = field(default_factory=dict)  # Additional specs
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for API response."""
         return {
             "manufacturer": self.manufacturer,
@@ -287,8 +287,8 @@ class Device:
 
     status: DeviceStatus = DeviceStatus.ONLINE
     description: str = ""
-    points: Dict[str, DevicePoint] = field(default_factory=dict)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    points: dict[str, DevicePoint] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
     last_seen: str = ""
     created_at: str = ""
     updated_at: str = ""
@@ -310,7 +310,7 @@ class Device:
         if not self.updated_at:
             self.updated_at = datetime.now().isoformat()
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for API response."""
         return {
             "id": self.id,
@@ -332,7 +332,7 @@ class Device:
             "updated_at": self.updated_at,
         }
 
-    def _point_to_dict(self, point: DevicePoint) -> Dict[str, Any]:
+    def _point_to_dict(self, point: DevicePoint) -> dict[str, Any]:
         """Convert DevicePoint to dictionary."""
         return {
             "name": point.name,
@@ -347,7 +347,7 @@ class Device:
             "metadata": point.metadata,
         }
 
-    def get_point(self, point_name: str) -> Optional[DevicePoint]:
+    def get_point(self, point_name: str) -> DevicePoint | None:
         """Get a point by name."""
         return self.points.get(point_name)
 
@@ -364,9 +364,9 @@ class HVACDevice(Device):
     """HVAC-specific device (chillers, AHUs, fans, pumps)."""
 
     hvac_type: str = ""  # chiller, ahu, fan, pump, vav, etc.
-    capacity: Optional[float] = None  # kW or tons
-    efficiency: Optional[float] = None  # COP or efficiency rating
-    setpoints: Dict[str, float] = field(default_factory=dict)  # temperature, pressure setpoints
+    capacity: float | None = None  # kW or tons
+    efficiency: float | None = None  # COP or efficiency rating
+    setpoints: dict[str, float] = field(default_factory=dict)  # temperature, pressure setpoints
 
     def __post_init__(self):
         super().__post_init__()
@@ -379,7 +379,7 @@ class LightingDevice(Device):
 
     lighting_type: str = ""  # panel, dimmer, switch, sensor
     circuit_count: int = 1
-    total_wattage: Optional[float] = None
+    total_wattage: float | None = None
     dimmable: bool = False
 
     def __post_init__(self):
@@ -401,7 +401,7 @@ class SecurityDevice(Device):
         self.device_type = DeviceType.SECURITY
 
 
-def create_device_from_dict(data: Dict[str, Any]) -> Device:
+def create_device_from_dict(data: dict[str, Any]) -> Device:
     """Create appropriate device type from dictionary data."""
     try:
         device_type = DeviceType(data.get("device_type", "other"))

@@ -4,9 +4,10 @@ Test SSE MCP server.
 Run with: python test_mcp_sse.py (backend must be running on port 9095)
 """
 
-import requests
 import json
 import sys
+
+import requests
 
 BASE_URL = "http://localhost:9095/api/mcp/sse"
 

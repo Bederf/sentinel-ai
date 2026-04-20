@@ -6,9 +6,8 @@ and cause-effect matrix coordination.
 
 from datetime import datetime
 from enum import Enum
-from typing import List, Optional
-from pydantic import BaseModel, Field
 
+from pydantic import BaseModel, Field
 
 # --- Enums ---
 
@@ -113,10 +112,10 @@ class FireAlarm(BaseModel):
     severity: AlarmSeverity
     description: str = ""
     acknowledged: bool = False
-    acknowledged_by: Optional[str] = None
-    acknowledged_at: Optional[datetime] = None
+    acknowledged_by: str | None = None
+    acknowledged_at: datetime | None = None
     cleared: bool = False
-    cleared_at: Optional[datetime] = None
+    cleared_at: datetime | None = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
@@ -124,13 +123,13 @@ class DamperStatus(BaseModel):
     """Smoke damper position and health status."""
 
     damper_id: str
-    equipment_id: Optional[str] = None
-    zone_id: Optional[str] = None
+    equipment_id: str | None = None
+    zone_id: str | None = None
     floor: str = ""
     position: int = 100  # 0-100, 100 = fully open
     target_position: int = 100
     status: DamperStatusEnum = DamperStatusEnum.OPEN
-    last_tested: Optional[datetime] = None
+    last_tested: datetime | None = None
 
 
 class StairwellPressure(BaseModel):
@@ -159,20 +158,20 @@ class CauseEffectEntry(BaseModel):
 
     trigger_zone: str
     trigger_type: str
-    effects: List[CauseEffectEffect] = []
+    effects: list[CauseEffectEffect] = []
 
 
 class FireSystemStatus(BaseModel):
     """Aggregate fire system status."""
 
     panel_status: PanelStatus = PanelStatus.NORMAL
-    active_alarms: List[FireAlarm] = []
+    active_alarms: list[FireAlarm] = []
     zone_count: int = 0
     damper_count: int = 0
     all_dampers_healthy: bool = True
     pressurization_ok: bool = True
     battery_voltage: float = 27.6
-    last_test_date: Optional[str] = None
+    last_test_date: str | None = None
 
 
 class FireSystemHealth(BaseModel):

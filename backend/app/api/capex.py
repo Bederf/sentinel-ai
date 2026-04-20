@@ -6,7 +6,7 @@ budget forecasting, and what-if scenario modeling.
 
 import logging
 from datetime import date, datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -29,11 +29,11 @@ class ScenarioRequest(BaseModel):
     equipment_type: str = Field(..., description="Equipment type (e.g. chiller, ahu)")
     age_years: float = Field(..., ge=0, description="Current equipment age in years")
     health_score: float = Field(..., ge=0, le=100, description="Current health score (0-100)")
-    replacement_cost_zar: Optional[float] = Field(None, ge=0, description="Override replacement cost")
-    repair_cost_zar: Optional[float] = Field(None, ge=0, description="Override repair cost")
-    annual_maintenance_zar: Optional[float] = Field(None, ge=0, description="Override annual maintenance")
-    condition_score: Optional[float] = Field(None, ge=0, le=100, description="Condition score from inspection")
-    scenarios: List[Dict[str, Any]] = Field(
+    replacement_cost_zar: float | None = Field(None, ge=0, description="Override replacement cost")
+    repair_cost_zar: float | None = Field(None, ge=0, description="Override repair cost")
+    annual_maintenance_zar: float | None = Field(None, ge=0, description="Override annual maintenance")
+    condition_score: float | None = Field(None, ge=0, le=100, description="Condition score from inspection")
+    scenarios: list[dict[str, Any]] = Field(
         ...,
         description="List of scenario parameter overrides. Each dict may contain: "
         "name, discount_rate, horizon_years, maintenance_escalation, "
@@ -49,15 +49,15 @@ class ScenarioRequest(BaseModel):
 @router.get("/capex/analysis/{equipment_code}")
 async def get_capex_analysis(
     equipment_code: str,
-    age_years: Optional[float] = Query(None, ge=0, description="Override equipment age"),
-    health_score: Optional[float] = Query(None, ge=0, le=100, description="Override health score"),
-    replacement_cost_zar: Optional[float] = Query(None, ge=0),
-    repair_cost_zar: Optional[float] = Query(None, ge=0),
-    annual_maintenance_zar: Optional[float] = Query(None, ge=0),
-    condition_score: Optional[float] = Query(None, ge=0, le=100),
-    discount_rate: Optional[float] = Query(None, ge=0, le=1.0),
-    horizon_years: Optional[int] = Query(None, ge=1, le=30),
-) -> Dict[str, Any]:
+    age_years: float | None = Query(None, ge=0, description="Override equipment age"),
+    health_score: float | None = Query(None, ge=0, le=100, description="Override health score"),
+    replacement_cost_zar: float | None = Query(None, ge=0),
+    repair_cost_zar: float | None = Query(None, ge=0),
+    annual_maintenance_zar: float | None = Query(None, ge=0),
+    condition_score: float | None = Query(None, ge=0, le=100),
+    discount_rate: float | None = Query(None, ge=0, le=1.0),
+    horizon_years: int | None = Query(None, ge=1, le=30),
+) -> dict[str, Any]:
     """Replace vs repair analysis for a single piece of equipment.
 
     Looks up equipment data from Concept Evolution assets first,
@@ -97,9 +97,7 @@ async def get_capex_analysis(
     else:
         # Parse type from equipment code pattern {site}-{type}-{zone}
         parts = equipment_code.split("-")
-        if len(parts) >= 3:
-            equipment_type = parts[1].lower()
-        elif len(parts) >= 2:
+        if len(parts) >= 3 or len(parts) >= 2:
             equipment_type = parts[1].lower()
 
     if resolved_age is None:
@@ -136,9 +134,9 @@ async def get_capex_analysis(
 @router.get("/capex/portfolio/{site_id}")
 async def get_capex_portfolio(
     site_id: str,
-    discount_rate: Optional[float] = Query(None, ge=0, le=1.0),
-    horizon_years: Optional[int] = Query(None, ge=1, le=30),
-) -> Dict[str, Any]:
+    discount_rate: float | None = Query(None, ge=0, le=1.0),
+    horizon_years: int | None = Query(None, ge=1, le=30),
+) -> dict[str, Any]:
     """Portfolio CapEx analysis for all Concept Evolution assets at a site.
 
     Returns prioritized replacement list with budget forecast.
@@ -210,8 +208,8 @@ async def get_capex_portfolio(
 async def get_capex_budget_forecast(
     site_id: str,
     horizon_years: int = Query(10, ge=1, le=30),
-    discount_rate: Optional[float] = Query(None, ge=0, le=1.0),
-) -> Dict[str, Any]:
+    discount_rate: float | None = Query(None, ge=0, le=1.0),
+) -> dict[str, Any]:
     """Projected CapEx needs by year for a site.
 
     Runs portfolio analysis and extracts the budget forecast.
@@ -234,7 +232,7 @@ async def get_capex_budget_forecast(
 
 
 @router.post("/capex/scenario")
-async def run_capex_scenario(request: ScenarioRequest) -> Dict[str, Any]:
+async def run_capex_scenario(request: ScenarioRequest) -> dict[str, Any]:
     """Run what-if scenario analysis with multiple parameter sets.
 
     Useful for sensitivity analysis: "What if discount rate changes?"
@@ -259,12 +257,12 @@ async def run_capex_scenario(request: ScenarioRequest) -> Dict[str, Any]:
 
 
 @router.get("/capex/type-financials")
-async def get_type_financials() -> Dict[str, Any]:
+async def get_type_financials() -> dict[str, Any]:
     """Return equipment type financial defaults for reference."""
     return capex_planning_service._load_type_financials()
 
 
 @router.get("/capex/concept-assets")
-async def get_concept_assets() -> List[Dict[str, Any]]:
+async def get_concept_assets() -> list[dict[str, Any]]:
     """Return Concept Evolution asset data for reference."""
     return capex_planning_service._load_concept_assets()

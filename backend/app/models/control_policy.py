@@ -10,9 +10,9 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 class ControlMode(str, Enum):
@@ -33,16 +33,16 @@ class AssetControlPolicy:
     equipment_type: str  # "CHILLER", "AHU", "BESS", etc.
 
     # Setpoint limits: point_name -> {min, max}
-    setpoint_limits: Dict[str, Dict[str, float]] = field(default_factory=dict)
+    setpoint_limits: dict[str, dict[str, float]] = field(default_factory=dict)
 
     # Ramp rate limits: point_name -> max change per 10 minutes
-    ramp_limits: Dict[str, float] = field(default_factory=dict)
+    ramp_limits: dict[str, float] = field(default_factory=dict)
 
     # Lockout windows: [{"start": "22:00", "end": "06:00"}]
-    lockout_windows: List[Dict[str, str]] = field(default_factory=list)
+    lockout_windows: list[dict[str, str]] = field(default_factory=list)
 
     # Dependencies: action -> [required_conditions]
-    dependencies: Dict[str, List[str]] = field(default_factory=dict)
+    dependencies: dict[str, list[str]] = field(default_factory=dict)
 
     # Rate limiting
     max_auto_per_hour: int = 5
@@ -50,7 +50,7 @@ class AssetControlPolicy:
     # Kill switch
     kill_switch_enabled: bool = True
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "equipment_type": self.equipment_type,
             "setpoint_limits": self.setpoint_limits,
@@ -62,7 +62,7 @@ class AssetControlPolicy:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> AssetControlPolicy:
+    def from_dict(cls, data: dict[str, Any]) -> AssetControlPolicy:
         return cls(
             equipment_type=data.get("equipment_type", "UNKNOWN"),
             setpoint_limits=data.get("setpoint_limits", {}),
@@ -75,7 +75,7 @@ class AssetControlPolicy:
 
 
 def _now_utc() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 @dataclass
@@ -86,46 +86,46 @@ class CommandEnvelope:
     """
 
     envelope_id: str = field(default_factory=lambda: f"CMD-{uuid.uuid4().hex[:12]}")
-    proposed_action: Dict[str, Any] = field(default_factory=dict)
+    proposed_action: dict[str, Any] = field(default_factory=dict)
     target_equipment: str = ""
     site_id: str = ""
     control_mode: ControlMode = ControlMode.RECOMMEND
 
     # Policy check
     policy_check_passed: bool = False
-    policy_check_details: Dict[str, Any] = field(default_factory=dict)
+    policy_check_details: dict[str, Any] = field(default_factory=dict)
 
     # Safety check
     safety_check_passed: bool = False
-    safety_check_details: Dict[str, Any] = field(default_factory=dict)
+    safety_check_details: dict[str, Any] = field(default_factory=dict)
 
     # State for rollback
-    previous_state: Optional[Dict[str, Any]] = None
-    rollback_command: Optional[Dict[str, Any]] = None
+    previous_state: dict[str, Any] | None = None
+    rollback_command: dict[str, Any] | None = None
     rollback_timeout_seconds: int = 3600
 
     # Approval
     requires_approval: bool = True
-    approved_by: Optional[str] = None
-    approved_at: Optional[datetime] = None
+    approved_by: str | None = None
+    approved_at: datetime | None = None
 
     # Execution
     executed: bool = False
-    executed_at: Optional[datetime] = None
-    execution_result: Optional[Dict[str, Any]] = None
+    executed_at: datetime | None = None
+    execution_result: dict[str, Any] | None = None
     rolled_back: bool = False
-    rolled_back_at: Optional[datetime] = None
+    rolled_back_at: datetime | None = None
 
     # Audit
     created_at: datetime = field(default_factory=_now_utc)
     created_by: str = "ai_optimizer"
     reason: str = ""
-    correlation_id: Optional[str] = None
-    tier_routing_result: Optional[str] = None
-    quality_gate_status: Optional[str] = None
+    correlation_id: str | None = None
+    tier_routing_result: str | None = None
+    quality_gate_status: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
-        def _dt(v: Optional[datetime]) -> Optional[str]:
+    def to_dict(self) -> dict[str, Any]:
+        def _dt(v: datetime | None) -> str | None:
             return v.isoformat() if isinstance(v, datetime) else v
 
         return {

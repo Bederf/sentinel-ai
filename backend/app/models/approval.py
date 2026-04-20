@@ -1,8 +1,9 @@
 """Pydantic models for approval workflow API requests and responses."""
 
-from pydantic import BaseModel, ConfigDict, Field
-from typing import Optional, Dict, Any
 from datetime import datetime
+from typing import Any
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ApprovalRequest(BaseModel):
@@ -15,7 +16,7 @@ class ApprovalRequest(BaseModel):
     )
 
     approved_by: str = Field(..., description="User ID or name of person approving", min_length=1, max_length=255)
-    approval_notes: Optional[str] = Field(None, description="Optional notes about the approval", max_length=500)
+    approval_notes: str | None = Field(None, description="Optional notes about the approval", max_length=500)
 
 
 class RejectionRequest(BaseModel):
@@ -56,10 +57,10 @@ class ApprovalResponse(BaseModel):
     success: bool = Field(..., description="Whether approval was successful")
     recommendation_id: str = Field(..., description="ID of the recommendation")
     status: str = Field(..., description="Result status: approved, rejected, executed, or failed")
-    executed_at: Optional[datetime] = Field(None, description="Timestamp when approved action was executed")
-    error_message: Optional[str] = Field(None, description="Error message if approval failed")
+    executed_at: datetime | None = Field(None, description="Timestamp when approved action was executed")
+    error_message: str | None = Field(None, description="Error message if approval failed")
     cov_verified: bool = Field(False, description="Whether COV feedback verified the device change")
-    execution_result: Optional[Dict[str, Any]] = Field(None, description="Detailed execution result data")
+    execution_result: dict[str, Any] | None = Field(None, description="Detailed execution result data")
 
 
 class ApprovalStatus(BaseModel):
@@ -80,7 +81,7 @@ class ApprovalStatus(BaseModel):
 
     recommendation_id: str = Field(..., description="ID of the recommendation")
     approval_status: str = Field(..., description="Current status: pending, approved, rejected, executed, or failed")
-    approved_by: Optional[str] = Field(None, description="User who approved/rejected")
-    approved_at: Optional[datetime] = Field(None, description="When the approval action was taken")
-    executed_at: Optional[datetime] = Field(None, description="When the approved action was executed")
-    rejection_reason: Optional[str] = Field(None, description="If rejected, the reason why")
+    approved_by: str | None = Field(None, description="User who approved/rejected")
+    approved_at: datetime | None = Field(None, description="When the approval action was taken")
+    executed_at: datetime | None = Field(None, description="When the approved action was executed")
+    rejection_reason: str | None = Field(None, description="If rejected, the reason why")

@@ -19,7 +19,6 @@ Prerequisites:
 import json
 import sys
 from pathlib import Path
-from typing import Optional
 
 import httpx
 
@@ -36,7 +35,7 @@ class BmsIngestionDemo:
     def __init__(self, base_url: str = API_BASE):
         self.base_url = base_url
         self.client = httpx.Client(base_url=base_url, timeout=30.0)
-        self.discovery_id: Optional[str] = None
+        self.discovery_id: str | None = None
 
     def __enter__(self):
         return self
@@ -325,7 +324,7 @@ class BmsIngestionDemo:
             print("\nNext steps:")
             print("  1. Access the frontend: http://localhost:9096")
             print("  2. Select 'Rosebank Corporate Park - Block B' from the site dropdown")
-            print(f"  3. Verify {self.discovery_id and 'equipment' or 'building'} display")
+            print(f"  3. Verify {(self.discovery_id and 'equipment') or 'building'} display")
             print("  4. Check Integration Monitoring dashboard for BMS data")
             return True
         else:

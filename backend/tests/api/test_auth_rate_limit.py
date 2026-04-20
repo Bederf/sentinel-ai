@@ -16,8 +16,9 @@ Specification:
 """
 
 import os
-import pytest
 from datetime import datetime
+
+import pytest
 from fastapi import Request
 from starlette.testclient import TestClient
 
@@ -148,8 +149,9 @@ class TestBruteForceProtection:
 
     def test_check_brute_force_mixed_old_and_new_attempts(self):
         """Verify lockout only counts recent attempts within 15-minute window."""
-        from fastapi import HTTPException
         from datetime import datetime, timedelta
+
+        from fastapi import HTTPException
 
         email = "test-mixed@example.com"
 
@@ -185,7 +187,8 @@ class TestMFAFailureHandling:
     @pytest.mark.asyncio
     async def test_mfa_verification_failure_records_attempt(self):
         """Verify MFA verification failure records failed attempt."""
-        from unittest.mock import patch, MagicMock
+        from unittest.mock import MagicMock, patch
+
         from fastapi import HTTPException
 
         email = "mfa-user@example.com"
@@ -215,7 +218,8 @@ class TestMFAFailureHandling:
     @pytest.mark.asyncio
     async def test_mfa_verification_failure_with_lockout(self):
         """Verify 5 MFA failures trigger 429 lockout."""
-        from unittest.mock import patch, MagicMock
+        from unittest.mock import MagicMock, patch
+
         from fastapi import HTTPException
 
         email = "mfa-lockout@example.com"
@@ -316,8 +320,9 @@ class TestRateLimitAuditLogging:
 
     def test_brute_force_lockout_is_logged(self, caplog):
         """Verify lockout event is logged."""
-        from fastapi import HTTPException
         import logging
+
+        from fastapi import HTTPException
 
         email = "test-logging@example.com"
         auth_api._login_attempts[email] = []

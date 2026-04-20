@@ -17,21 +17,21 @@ verify *authorization* — these verify *authentication* is correct first.
 import os
 import uuid
 from datetime import datetime, timedelta
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import jwt as pyjwt
 import pytest
-from httpx import AsyncClient, ASGITransport
+from httpx import ASGITransport, AsyncClient
 
 os.environ.setdefault("DEMO_MODE", "true")
 os.environ.setdefault("TESTING", "true")
 os.environ.setdefault("JWT_SECRET_KEY", "test-only-jwt-secret-for-ci-at-least-32-chars")
 
-from app.main import app  # noqa: E402
-from app.config.settings import settings  # noqa: E402
-from app.middleware.auth_middleware import (  # noqa: E402
-    validate_jwt_token,
+from app.config.settings import settings
+from app.main import app
+from app.middleware.auth_middleware import (
     create_jwt_token,
+    validate_jwt_token,
 )
 
 # ---------------------------------------------------------------------------

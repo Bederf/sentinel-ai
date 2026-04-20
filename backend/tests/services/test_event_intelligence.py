@@ -7,7 +7,7 @@ Phase 145: Operational Event Intelligence.
 """
 
 import asyncio
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -22,7 +22,6 @@ from app.services.event_intelligence_service import (
     EventIntelligenceService,
     reset_event_intelligence_service,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -193,7 +192,7 @@ class TestSensorFailure:
     @pytest.mark.asyncio
     async def test_sensor_failure_stale_reading(self, service):
         """Stale timestamp (> 15 min old) triggers sensor failure."""
-        old_time = (datetime.now(timezone.utc) - timedelta(minutes=30)).isoformat()
+        old_time = (datetime.now(UTC) - timedelta(minutes=30)).isoformat()
         telemetry = {"supply_temp": 20.0, "last_reading_timestamp": old_time}
         events = await service.evaluate_equipment("S002-AHU-101", "site-002", telemetry)
 
@@ -372,7 +371,7 @@ class TestSentinelEventConversion:
             equipment_id="S002-FCU-101",
             site_id="site-002",
             severity=EventSeverity.HIGH,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             signals=[{"point": "current_temp", "value": 28.0}],
             description="S002-FCU-101: temperature deviation",
             actual_value=28.0,
@@ -406,7 +405,7 @@ class TestSentinelEventConversion:
                 equipment_id="S002-FCU-101",
                 site_id="site-002",
                 severity=severity,
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 signals=[],
                 description="test",
             )
@@ -586,7 +585,7 @@ class TestThresholdBreach:
 class TestSerialization:
     def test_to_dict(self):
         """OperationalEvent.to_dict() produces valid JSON-serializable dict."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         event = OperationalEvent(
             event_id="EVT-20260305-test1234",
             event_type=OperationalEventType.ENERGY_SPIKE,

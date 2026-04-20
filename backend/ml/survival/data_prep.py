@@ -11,7 +11,6 @@ import json
 import logging
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict, List, Optional
 
 import pandas as pd
 
@@ -34,7 +33,7 @@ class SurvivalDataPrep:
         self._equipment_cache = None
         self._alerts_cache = None
 
-    def _load_equipment(self) -> List[Dict]:
+    def _load_equipment(self) -> list[dict]:
         """Load equipment data from JSON file."""
         if self._equipment_cache is None:
             if self.data_path.exists():
@@ -45,7 +44,7 @@ class SurvivalDataPrep:
                 self._equipment_cache = []
         return self._equipment_cache
 
-    def _load_alerts(self) -> List[Dict]:
+    def _load_alerts(self) -> list[dict]:
         """Load alerts for alarm history."""
         if self._alerts_cache is None:
             alerts_path = self.data_path.parent / "alerts.json"
@@ -110,7 +109,7 @@ class SurvivalDataPrep:
         logger.info(f"Prepared survival dataset: {len(df)} samples, {df['event'].sum()} events")
         return df
 
-    def _get_first_failure(self, equipment: Dict) -> Optional[datetime]:
+    def _get_first_failure(self, equipment: dict) -> datetime | None:
         """
         Get first major failure for equipment.
 
@@ -146,7 +145,7 @@ class SurvivalDataPrep:
         # No failure (censored)
         return None
 
-    def _get_features_at_observation(self, equipment: Dict) -> Dict:
+    def _get_features_at_observation(self, equipment: dict) -> dict:
         """
         Get features relevant for survival analysis.
 
@@ -264,7 +263,7 @@ class SurvivalDataPrep:
                     pass
         return count
 
-    def get_training_summary(self) -> Dict:
+    def get_training_summary(self) -> dict:
         """Get summary statistics about the prepared dataset."""
         df = self.prepare_survival_data()
 

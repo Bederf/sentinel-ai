@@ -12,7 +12,7 @@ Currently uses rule-based prediction (XGBoost/TensorFlow integration pending).
 
 import logging
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Any
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -53,10 +53,10 @@ class DispatchPredictor:
         self,
         current_hour: int,
         current_soc_pct: float,
-        price_forecasts: List[Dict[str, Any]],
-        temperature_forecast: Optional[List[float]] = None,
+        price_forecasts: list[dict[str, Any]],
+        temperature_forecast: list[float] | None = None,
         load_shedding_stage: int = 0,
-        building_demand_kw: Optional[List[float]] = None,
+        building_demand_kw: list[float] | None = None,
     ) -> DispatchPrediction:
         """Predict next BESS dispatch action.
 
@@ -190,11 +190,11 @@ class DispatchPredictor:
 
     def predict_daily_dispatch_schedule(
         self,
-        price_forecasts: List[Dict[str, Any]],
-        temperature_forecast: Optional[List[float]] = None,
-        load_shedding_schedule: Optional[List[int]] = None,
-        building_demand_forecast: Optional[List[float]] = None,
-    ) -> List[DispatchPrediction]:
+        price_forecasts: list[dict[str, Any]],
+        temperature_forecast: list[float] | None = None,
+        load_shedding_schedule: list[int] | None = None,
+        building_demand_forecast: list[float] | None = None,
+    ) -> list[DispatchPrediction]:
         """Predict dispatch schedule for entire day.
 
         Args:
@@ -231,9 +231,9 @@ class DispatchPredictor:
 
     def evaluate_prediction_accuracy(
         self,
-        predictions: List[DispatchPrediction],
-        actual_actions: List[str],
-    ) -> Dict[str, Any]:
+        predictions: list[DispatchPrediction],
+        actual_actions: list[str],
+    ) -> dict[str, Any]:
         """Evaluate accuracy of predictions against actual dispatch.
 
         Args:
@@ -266,7 +266,7 @@ class DispatchPredictor:
 
 # === Singleton ===
 
-_dispatch_predictor: Optional[DispatchPredictor] = None
+_dispatch_predictor: DispatchPredictor | None = None
 
 
 def get_dispatch_predictor() -> DispatchPredictor:

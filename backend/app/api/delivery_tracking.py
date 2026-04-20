@@ -1,12 +1,12 @@
 """Delivery tracking for parts orders."""
 
+import asyncio
 import logging
 from datetime import datetime
-from typing import Optional, List
 from enum import Enum
+
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel
-from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
-import asyncio
 
 from app.middleware.auth_middleware import require_auth
 from app.models.auth import AuthContext
@@ -35,11 +35,11 @@ class TrackingInfo(BaseModel):
     order_id: str
     status: DeliveryStatus
     supplier: str
-    tracking_number: Optional[str] = None
-    estimated_delivery: Optional[datetime] = None
+    tracking_number: str | None = None
+    estimated_delivery: datetime | None = None
     last_updated: datetime
-    location: Optional[str] = None
-    notes: Optional[str] = None
+    location: str | None = None
+    notes: str | None = None
 
 
 class DeliveryTrackerResponse(BaseModel):
@@ -48,7 +48,7 @@ class DeliveryTrackerResponse(BaseModel):
     order_id: str
     current_status: DeliveryStatus
     tracking_info: TrackingInfo
-    status_history: List[dict]
+    status_history: list[dict]
 
 
 # In-memory storage for tracking
@@ -121,7 +121,7 @@ class DeliveryTracker:
         # TODO: Send push notification or email
         logger.info(f"Technician notification: Order {order_id} status updated to {tracking_info.status.value}")
 
-    async def poll_supplier_status(self, order_id: str, supplier: str) -> Optional[dict]:
+    async def poll_supplier_status(self, order_id: str, supplier: str) -> dict | None:
         """
         Poll supplier for order status (fallback for suppliers without webhooks).
 
@@ -131,7 +131,7 @@ class DeliveryTracker:
         logger.info(f"Polling {supplier} for order {order_id}")
         return None
 
-    def get_tracking(self, order_id: str) -> Optional[dict]:
+    def get_tracking(self, order_id: str) -> dict | None:
         """Get tracking info for order."""
         return self.tracking_status.get(order_id)
 
@@ -194,7 +194,7 @@ async def sync_tracking(
 
 
 @router.get("/orders/pending")
-async def get_pending_orders(limit: int = 50, auth: AuthContext = Depends(require_auth)) -> List[dict]:
+async def get_pending_orders(limit: int = 50, auth: AuthContext = Depends(require_auth)) -> list[dict]:
     """Get all pending orders for polling."""
     pending = []
     for order_id, tracking in _tracker.tracking_status.items():

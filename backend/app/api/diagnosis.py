@@ -8,12 +8,11 @@ Provides REST API for guided diagnosis conversations:
 - DELETE /api/diagnosis/{session_id} - End diagnosis session
 """
 
-import uuid
 import logging
-from typing import Optional
-from pydantic import BaseModel, Field
+import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
 
 from app.security.pipeline import prompt_guard
 
@@ -33,7 +32,7 @@ class StartDiagnosisRequest(BaseModel):
     """Request to start a new diagnosis session"""
 
     query: str = Field(..., description="Initial problem description")
-    session_id: Optional[str] = Field(None, description="Optional session ID (auto-generated if not provided)")
+    session_id: str | None = Field(None, description="Optional session ID (auto-generated if not provided)")
 
 
 class StartDiagnosisResponse(BaseModel):
@@ -43,9 +42,9 @@ class StartDiagnosisResponse(BaseModel):
     type: str
     state: str
     message: str
-    questions: Optional[list] = None
-    check: Optional[dict] = None
-    progress: Optional[dict] = None
+    questions: list | None = None
+    check: dict | None = None
+    progress: dict | None = None
 
 
 class RespondRequest(BaseModel):
@@ -62,7 +61,7 @@ class FlowStateResponse(BaseModel):
     session_id: str
     state: str
     equipment: dict
-    fault_code: Optional[str]
+    fault_code: str | None
     current_step_index: int
     checkpoints: list
     created_at: str

@@ -9,15 +9,14 @@ Phase 28: SENTINEL Compliance
 
 import logging
 from datetime import datetime
-from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from app.models.compliance import (
-    ElectricalCompliance,
-    ComplianceStatus,
-)
 from app.database.repositories.compliance_repository import ComplianceRepository
+from app.models.compliance import (
+    ComplianceStatus,
+    ElectricalCompliance,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -103,7 +102,7 @@ async def complete_ohs_checklist(
 @router.get("/fire/equipment")
 async def list_fire_equipment(
     site_code: str = Query(..., description="Building code"),
-    zone_id: Optional[str] = Query(None, description="Zone filter"),
+    zone_id: str | None = Query(None, description="Zone filter"),
     repo: ComplianceRepository = Depends(get_compliance_repo),
 ) -> dict:
     """List fire safety equipment at site/zone."""
@@ -158,7 +157,7 @@ async def record_fire_equipment_charge(
 
 @router.post("/emergency-light/schedule")
 async def schedule_emergency_light_tests(
-    light_codes: List[str] = Query(..., description="List of light codes"),
+    light_codes: list[str] = Query(..., description="List of light codes"),
     auto_test: bool = Query(True, description="Enable auto-testing"),
     repo: ComplianceRepository = Depends(get_compliance_repo),
 ) -> dict:
@@ -339,8 +338,8 @@ async def get_compliance_status(
 @router.get("/audits")
 async def list_compliance_audits(
     site_code: str = Query(..., description="Building code"),
-    compliance_type: Optional[str] = Query(None, description="Filter by type"),
-    status: Optional[str] = Query(None, description="Filter by status"),
+    compliance_type: str | None = Query(None, description="Filter by type"),
+    status: str | None = Query(None, description="Filter by status"),
     limit: int = Query(50, ge=1, le=100),
     repo: ComplianceRepository = Depends(get_compliance_repo),
 ) -> dict:

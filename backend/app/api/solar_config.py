@@ -5,7 +5,7 @@ including inverters, BESS, grid meters, and tariff information.
 """
 
 import re
-from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
@@ -37,9 +37,9 @@ class SolarPlant(BaseModel):
     plant_id: str = Field(..., description="Unique plant ID (e.g., S002-rooftop)")
     name: str = Field(..., description="Human-readable plant name")
     capacity_kwp: float = Field(..., gt=0, description="Installed capacity in kWp")
-    panel_model: Optional[str] = Field(None, description="Solar panel model")
+    panel_model: str | None = Field(None, description="Solar panel model")
     panel_count: int = Field(..., gt=0, description="Number of panels")
-    commissioning_date: Optional[str] = Field(None, description="ISO 8601 date")
+    commissioning_date: str | None = Field(None, description="ISO 8601 date")
 
 
 class SolarInverter(BaseModel):
@@ -85,8 +85,8 @@ class SolarConfig(BaseModel):
 
     plants: list[SolarPlant] = Field(..., description="Solar plants")
     inverters: dict[str, list[SolarInverter]] = Field(default_factory=dict, description="Inverters per plant")
-    bess: Optional[BESSConfig] = Field(None, description="Battery storage config")
-    grid_meter: Optional[GridMeterConfig] = Field(None, description="Grid meter config")
+    bess: BESSConfig | None = Field(None, description="Battery storage config")
+    grid_meter: GridMeterConfig | None = Field(None, description="Grid meter config")
     utility: str = Field(default="City Power", description="Utility provider")
     tariff: str = Field(default="standard", description="Tariff code or custom rates")
 
@@ -106,7 +106,7 @@ class SolarSiteResponse(BaseModel):
 
     status: str = Field(default="success")
     site_id: str = Field(..., description="Created site ID")
-    message: Optional[str] = None
+    message: str | None = None
 
 
 # ============================================================================
@@ -283,7 +283,7 @@ async def create_solar_site(request: SolarSiteRequest) -> dict:
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to create solar site: {str(e)}",
+            detail=f"Failed to create solar site: {e!s}",
         )
 
 

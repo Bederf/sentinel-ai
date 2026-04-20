@@ -9,9 +9,9 @@ Phase 45-02: Fleet Learning and Cross-Site Insights.
 """
 
 import logging
-from datetime import datetime
-from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -34,16 +34,16 @@ class FineTuneResult:
     model_type: str
     equipment_type: str
     global_model_id: str
-    fine_tuned_model_id: Optional[str] = None
+    fine_tuned_model_id: str | None = None
     started_at: str = ""
-    completed_at: Optional[str] = None
+    completed_at: str | None = None
     success: bool = False
-    global_metrics: Dict[str, float] = field(default_factory=dict)
-    fine_tuned_metrics: Dict[str, float] = field(default_factory=dict)
-    improvement: Dict[str, float] = field(default_factory=dict)
+    global_metrics: dict[str, float] = field(default_factory=dict)
+    fine_tuned_metrics: dict[str, float] = field(default_factory=dict)
+    improvement: dict[str, float] = field(default_factory=dict)
     samples_used: int = 0
-    config: Dict[str, Any] = field(default_factory=dict)
-    error: Optional[str] = None
+    config: dict[str, Any] = field(default_factory=dict)
+    error: str | None = None
 
     def __post_init__(self):
         if not self.started_at:
@@ -68,8 +68,8 @@ class LocalFineTuner:
     """
 
     def __init__(self):
-        self._fine_tune_history: List[FineTuneResult] = []
-        self._fine_tuned_models: Dict[str, Dict[str, Any]] = {}
+        self._fine_tune_history: list[FineTuneResult] = []
+        self._fine_tuned_models: dict[str, dict[str, Any]] = {}
         self._seed_demo_models()
 
     def _seed_demo_models(self):
@@ -119,7 +119,7 @@ class LocalFineTuner:
         site_code: str,
         model_type: str,
         equipment_type: str,
-        config: Optional[Dict[str, Any]] = None,
+        config: dict[str, Any] | None = None,
     ) -> FineTuneResult:
         """Fine-tune a global model for a specific site.
 
@@ -231,7 +231,7 @@ class LocalFineTuner:
         site_code: str,
         model_type: str,
         equipment_type: str,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """Get a fine-tuned model for a specific site.
 
         Args:
@@ -247,10 +247,10 @@ class LocalFineTuner:
 
     def list_fine_tuned_models(
         self,
-        site_code: Optional[str] = None,
-        model_type: Optional[str] = None,
-        equipment_type: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+        site_code: str | None = None,
+        model_type: str | None = None,
+        equipment_type: str | None = None,
+    ) -> list[dict[str, Any]]:
         """List all fine-tuned models with optional filters.
 
         Args:
@@ -274,8 +274,8 @@ class LocalFineTuner:
 
     def get_fine_tune_history(
         self,
-        site_code: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+        site_code: str | None = None,
+    ) -> list[dict[str, Any]]:
         """Get history of fine-tuning operations.
 
         Args:
@@ -310,8 +310,8 @@ class LocalFineTuner:
 
     def get_improvement_summary(
         self,
-        site_code: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        site_code: str | None = None,
+    ) -> dict[str, Any]:
         """Get summary of fine-tuning improvements.
 
         Args:
@@ -348,7 +348,7 @@ class LocalFineTuner:
 
 
 # Singleton
-_fine_tuner: Optional[LocalFineTuner] = None
+_fine_tuner: LocalFineTuner | None = None
 
 
 def get_local_fine_tuner() -> LocalFineTuner:

@@ -9,8 +9,9 @@ Tests cover:
 - Error handling (safety violations, device failures)
 """
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from app.models.recommendation import Recommendation, RecommendationStatus
 from app.services.approval_service import ApprovalService

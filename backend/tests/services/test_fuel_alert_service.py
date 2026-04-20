@@ -6,19 +6,19 @@ and graceful handling of missing NotificationService.
 
 from __future__ import annotations
 
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 from dataclasses import dataclass
 from typing import Any
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from app.models.fuel import FuelEventType
 from app.services.fuel_alert_service import (
     FuelAlertService,
-    _classify_severity,
-    _build_alert_title,
     _build_alert_body,
+    _build_alert_title,
+    _classify_severity,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers

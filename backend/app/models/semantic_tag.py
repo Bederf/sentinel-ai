@@ -7,7 +7,6 @@ Provides the controlled vocabulary for deterministic, auditable point classifica
 from __future__ import annotations
 
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -45,35 +44,35 @@ class ValidationBounds(BaseModel):
 class RateLimit(BaseModel):
     """Rate-of-change limit for a classified point."""
 
-    max_per_minute: Optional[float] = None
-    max_per_second: Optional[float] = None
+    max_per_minute: float | None = None
+    max_per_second: float | None = None
     alarm_if_exceeded: bool = False
 
 
 class ControlEnvelope(BaseModel):
     """Safety envelope governing writes to a classified control point."""
 
-    min_cooldown_seconds: Optional[int] = None
-    max_daily_writes: Optional[int] = None
-    requires_approval_above: Optional[int] = None
+    min_cooldown_seconds: int | None = None
+    max_daily_writes: int | None = None
+    requires_approval_above: int | None = None
     writable: bool = True
     monitor_only: bool = False
     alarm_on_change: bool = False
     requires_immediate_review: bool = False
-    ramp_limits: Optional[RateLimit] = None
-    bounds: Optional[ValidationBounds] = None
+    ramp_limits: RateLimit | None = None
+    bounds: ValidationBounds | None = None
 
 
 class ClassificationRule(BaseModel):
     """Single rule used to match a point to a semantic tag."""
 
     source: EvidenceSource
-    pattern: Optional[str] = None  # Single glob pattern (haystack_id source)
-    patterns: Optional[list[str]] = None  # Multiple exact/glob patterns (point_name source)
-    must_be: Optional[list[str]] = None  # Allowed values (equipment_type source)
+    pattern: str | None = None  # Single glob pattern (haystack_id source)
+    patterns: list[str] | None = None  # Multiple exact/glob patterns (point_name source)
+    must_be: list[str] | None = None  # Allowed values (equipment_type source)
     weight: float = Field(ge=0.0, le=1.0)
     evidence: str  # Human-readable rationale for this rule
-    equipment_context: Optional[dict] = None  # Additional context constraints
+    equipment_context: dict | None = None  # Additional context constraints
 
 
 class SemanticTag(BaseModel):
@@ -89,8 +88,8 @@ class SemanticTag(BaseModel):
     minimum_confidence: float = Field(ge=0.0, le=1.0)
     negative_samples: list[str] = Field(default_factory=list)
     safety_class: SafetyClass
-    control_envelope: Optional[ControlEnvelope] = None
-    validation_rules: Optional[dict] = None
+    control_envelope: ControlEnvelope | None = None
+    validation_rules: dict | None = None
 
 
 class SemanticDictionary(BaseModel):

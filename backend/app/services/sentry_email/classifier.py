@@ -11,11 +11,9 @@ Called by the SENTRY-EMAIL Python backend after n8n extracts headers/signatures.
 import json
 import logging
 import re
-from typing import Optional
-
-from pydantic import BaseModel, Field
 
 import anthropic
+from pydantic import BaseModel, Field
 
 from app.config.settings import settings
 
@@ -40,10 +38,10 @@ class EmailClassification(BaseModel):
     issue_description: str = Field(default="", description="1-2 sentence technical description")
     issue_category: str = Field(default="General")
     urgency: str = Field(default="medium")
-    specific_location: Optional[str] = None
-    equipment_mentioned: Optional[str] = None
+    specific_location: str | None = None
+    equipment_mentioned: str | None = None
     is_followup: bool = False
-    existing_reference: Optional[str] = None
+    existing_reference: str | None = None
     missing_info: list[str] = []
     summary: str = Field(default="", description="Brief 1-line summary for work order")
     advisor_consulted: bool = False
@@ -51,7 +49,6 @@ class EmailClassification(BaseModel):
 
 
 # ── System Prompt ────────────────────────────────────────────────
-# ruff: noqa: E501
 SYSTEM_PROMPT = """You are SENTINEL's email intake classifier for facilities management.
 
 You receive maintenance request emails from building occupants.
@@ -105,11 +102,11 @@ class EmailClassifierService:
         subject: str,
         body_text: str,
         # Pre-extracted data from n8n layers 1-3
-        sig_building: Optional[str] = None,
-        sig_floor: Optional[str] = None,
-        sig_cost_center: Optional[str] = None,
-        sig_specific_location: Optional[str] = None,
-        existing_reference: Optional[str] = None,
+        sig_building: str | None = None,
+        sig_floor: str | None = None,
+        sig_cost_center: str | None = None,
+        sig_specific_location: str | None = None,
+        existing_reference: str | None = None,
         is_reply: bool = False,
         importance: str = "normal",
         urgency_boost: bool = False,
@@ -282,7 +279,7 @@ Return JSON only."""
 
 # ── Singleton ────────────────────────────────────────────────────
 
-_classifier_instance: Optional[EmailClassifierService] = None
+_classifier_instance: EmailClassifierService | None = None
 
 
 def get_email_classifier() -> EmailClassifierService:

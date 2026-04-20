@@ -10,18 +10,18 @@ Handles CRUD operations for:
 Phase 45: Routine Inspection & Maintenance
 """
 
-from datetime import datetime, timedelta
-from typing import List, Optional, Dict, Any
 import uuid
+from datetime import datetime, timedelta
+from typing import Any
 
+from app.database.supabase_client import get_supabase_client
 from app.models.inspection import (
-    InspectionSchedule,
-    InspectionTask,
-    InspectionResult,
     InspectionDeficiency,
     InspectionMeasurement,
+    InspectionResult,
+    InspectionSchedule,
+    InspectionTask,
 )
-from app.database.supabase_client import get_supabase_client
 
 
 class InspectionRepository:
@@ -31,7 +31,7 @@ class InspectionRepository:
     # Inspection Schedule Operations
     # ============================================================================
 
-    async def create_inspection_schedule(self, schedule_data: Dict[str, Any]) -> InspectionSchedule:
+    async def create_inspection_schedule(self, schedule_data: dict[str, Any]) -> InspectionSchedule:
         """Create a new inspection schedule."""
         schedule_data["id"] = str(uuid.uuid4())
         schedule_data["created_at"] = datetime.now().isoformat()
@@ -40,14 +40,14 @@ class InspectionRepository:
         result = get_supabase_client().table("inspection_schedules").insert(schedule_data).execute()
         return InspectionSchedule(**result.data[0])
 
-    async def get_inspection_schedule(self, schedule_id: str) -> Optional[InspectionSchedule]:
+    async def get_inspection_schedule(self, schedule_id: str) -> InspectionSchedule | None:
         """Get inspection schedule by ID."""
         result = get_supabase_client().table("inspection_schedules").select("*").eq("id", schedule_id).execute()
         if result.data:
             return InspectionSchedule(**result.data[0])
         return None
 
-    async def get_active_schedules(self, equipment_id: Optional[str] = None) -> List[InspectionSchedule]:
+    async def get_active_schedules(self, equipment_id: str | None = None) -> list[InspectionSchedule]:
         """Get all active inspection schedules."""
         query = get_supabase_client().table("inspection_schedules").select("*").eq("is_active", True)
 
@@ -79,7 +79,7 @@ class InspectionRepository:
     # Inspection Task Operations
     # ============================================================================
 
-    async def create_inspection_task(self, task_data: Dict[str, Any]) -> InspectionTask:
+    async def create_inspection_task(self, task_data: dict[str, Any]) -> InspectionTask:
         """Create a new inspection task."""
         task_data["id"] = str(uuid.uuid4())
         task_data["created_at"] = datetime.now().isoformat()
@@ -88,7 +88,7 @@ class InspectionRepository:
         result = get_supabase_client().table("inspection_tasks").insert(task_data).execute()
         return InspectionTask(**result.data[0])
 
-    async def get_inspection_task(self, task_id: str) -> Optional[InspectionTask]:
+    async def get_inspection_task(self, task_id: str) -> InspectionTask | None:
         """Get inspection task by ID."""
         result = get_supabase_client().table("inspection_tasks").select("*").eq("id", task_id).execute()
         if result.data:
@@ -96,8 +96,8 @@ class InspectionRepository:
         return None
 
     async def get_tasks_due_before(
-        self, due_date: datetime, assigned_to: Optional[str] = None, equipment_id: Optional[str] = None
-    ) -> List[InspectionTask]:
+        self, due_date: datetime, assigned_to: str | None = None, equipment_id: str | None = None
+    ) -> list[InspectionTask]:
         """Get inspection tasks due before specified date."""
         query = (
             get_supabase_client()
@@ -116,8 +116,8 @@ class InspectionRepository:
         return [InspectionTask(**row) for row in result.data]
 
     async def get_overdue_tasks(
-        self, overdue_date: datetime, assigned_to: Optional[str] = None, equipment_id: Optional[str] = None
-    ) -> List[InspectionTask]:
+        self, overdue_date: datetime, assigned_to: str | None = None, equipment_id: str | None = None
+    ) -> list[InspectionTask]:
         """Get overdue inspection tasks."""
         query = (
             get_supabase_client()
@@ -135,7 +135,7 @@ class InspectionRepository:
         result = query.order("due_date").execute()
         return [InspectionTask(**row) for row in result.data]
 
-    async def update_task_status(self, task_id: str, status: str, **kwargs) -> Optional[InspectionTask]:
+    async def update_task_status(self, task_id: str, status: str, **kwargs) -> InspectionTask | None:
         """Update inspection task status."""
         update_data = {"status": status, "updated_at": datetime.now().isoformat()}
 
@@ -158,7 +158,7 @@ class InspectionRepository:
 
     async def update_task_scheduling(
         self, task_id: str, new_due_date: datetime, scheduling_notes: str
-    ) -> Optional[InspectionTask]:
+    ) -> InspectionTask | None:
         """Update task scheduling."""
         update_data = {"due_date": new_due_date, "updated_at": datetime.now().isoformat()}
 
@@ -175,7 +175,7 @@ class InspectionRepository:
 
     async def update_task_assignment(
         self, task_id: str, assigned_to: str, assigned_by: str
-    ) -> Optional[InspectionTask]:
+    ) -> InspectionTask | None:
         """Update task assignment."""
         update_data = {"assigned_to": assigned_to, "assigned_by": assigned_by, "updated_at": datetime.now().isoformat()}
 
@@ -188,9 +188,9 @@ class InspectionRepository:
         self,
         start_date: datetime,
         end_date: datetime,
-        assigned_to: Optional[str] = None,
-        equipment_id: Optional[str] = None,
-    ) -> List[InspectionTask]:
+        assigned_to: str | None = None,
+        equipment_id: str | None = None,
+    ) -> list[InspectionTask]:
         """Get tasks within date range."""
         query = (
             get_supabase_client()
@@ -209,8 +209,8 @@ class InspectionRepository:
         return [InspectionTask(**row) for row in result.data]
 
     async def get_tasks_by_equipment(
-        self, equipment_id: str, status: Optional[str] = None, limit: int = 100
-    ) -> List[InspectionTask]:
+        self, equipment_id: str, status: str | None = None, limit: int = 100
+    ) -> list[InspectionTask]:
         """Get tasks for specific equipment."""
         query = get_supabase_client().table("inspection_tasks").select("*").eq("equipment_id", equipment_id)
 
@@ -220,7 +220,7 @@ class InspectionRepository:
         result = query.order("scheduled_date", desc=True).limit(limit).execute()
         return [InspectionTask(**row) for row in result.data]
 
-    async def get_completed_task_count(self, equipment_id: Optional[str] = None, days_back: int = 30) -> int:
+    async def get_completed_task_count(self, equipment_id: str | None = None, days_back: int = 30) -> int:
         """Get count of completed tasks in last N days."""
         start_date = datetime.now() - timedelta(days=days_back)
 
@@ -242,7 +242,7 @@ class InspectionRepository:
     # Inspection Result Operations
     # ============================================================================
 
-    async def create_inspection_result(self, result_data: Dict[str, Any]) -> InspectionResult:
+    async def create_inspection_result(self, result_data: dict[str, Any]) -> InspectionResult:
         """Create a new inspection result."""
         result_data["id"] = str(uuid.uuid4())
         result_data["created_at"] = datetime.now().isoformat()
@@ -251,14 +251,14 @@ class InspectionRepository:
         result = get_supabase_client().table("inspection_results").insert(result_data).execute()
         return InspectionResult(**result.data[0])
 
-    async def get_inspection_result(self, result_id: str) -> Optional[InspectionResult]:
+    async def get_inspection_result(self, result_id: str) -> InspectionResult | None:
         """Get inspection result by ID."""
         result = get_supabase_client().table("inspection_results").select("*").eq("id", result_id).execute()
         if result.data:
             return InspectionResult(**result.data[0])
         return None
 
-    async def get_results_by_task(self, task_id: str) -> List[InspectionResult]:
+    async def get_results_by_task(self, task_id: str) -> list[InspectionResult]:
         """Get inspection results for a task."""
         result = (
             get_supabase_client()
@@ -270,7 +270,7 @@ class InspectionRepository:
         )
         return [InspectionResult(**row) for row in result.data]
 
-    async def get_results_by_equipment(self, equipment_id: str, limit: int = 50) -> List[InspectionResult]:
+    async def get_results_by_equipment(self, equipment_id: str, limit: int = 50) -> list[InspectionResult]:
         """Get inspection results for equipment."""
         result = (
             get_supabase_client()
@@ -287,7 +287,7 @@ class InspectionRepository:
     # Inspection Deficiency Operations
     # ============================================================================
 
-    async def create_inspection_deficiency(self, deficiency_data: Dict[str, Any]) -> InspectionDeficiency:
+    async def create_inspection_deficiency(self, deficiency_data: dict[str, Any]) -> InspectionDeficiency:
         """Create a new inspection deficiency."""
         deficiency_data["id"] = str(uuid.uuid4())
         deficiency_data["reported_date"] = datetime.now().isoformat()
@@ -296,7 +296,7 @@ class InspectionRepository:
         result = get_supabase_client().table("inspection_deficiencies").insert(deficiency_data).execute()
         return InspectionDeficiency(**result.data[0])
 
-    async def get_inspection_deficiency(self, deficiency_id: str) -> Optional[InspectionDeficiency]:
+    async def get_inspection_deficiency(self, deficiency_id: str) -> InspectionDeficiency | None:
         """Get inspection deficiency by ID."""
         result = get_supabase_client().table("inspection_deficiencies").select("*").eq("id", deficiency_id).execute()
         if result.data:
@@ -304,8 +304,8 @@ class InspectionRepository:
         return None
 
     async def get_deficiencies_by_equipment(
-        self, equipment_id: str, resolved: Optional[bool] = None
-    ) -> List[InspectionDeficiency]:
+        self, equipment_id: str, resolved: bool | None = None
+    ) -> list[InspectionDeficiency]:
         """Get deficiencies for equipment."""
         query = get_supabase_client().table("inspection_deficiencies").select("*").eq("equipment_id", equipment_id)
 
@@ -316,8 +316,8 @@ class InspectionRepository:
         return [InspectionDeficiency(**row) for row in result.data]
 
     async def get_unresolved_deficiencies(
-        self, equipment_id: Optional[str] = None, severity: Optional[str] = None
-    ) -> List[InspectionDeficiency]:
+        self, equipment_id: str | None = None, severity: str | None = None
+    ) -> list[InspectionDeficiency]:
         """Get unresolved deficiencies."""
         query = get_supabase_client().table("inspection_deficiencies").select("*").eq("is_resolved", False)
 
@@ -331,7 +331,7 @@ class InspectionRepository:
 
     async def resolve_deficiency(
         self, deficiency_id: str, resolved_by: str, resolution_notes: str
-    ) -> Optional[InspectionDeficiency]:
+    ) -> InspectionDeficiency | None:
         """Mark a deficiency as resolved."""
         update_data = {
             "is_resolved": True,
@@ -350,7 +350,7 @@ class InspectionRepository:
 
     async def escalate_deficiency(
         self, deficiency_id: str, new_severity: str, escalation_notes: str
-    ) -> Optional[InspectionDeficiency]:
+    ) -> InspectionDeficiency | None:
         """Escalate deficiency severity."""
         update_data = {
             "severity": new_severity,
@@ -369,7 +369,7 @@ class InspectionRepository:
     # Statistics and Reporting
     # ============================================================================
 
-    async def get_schedule_statistics(self, equipment_id: Optional[str] = None) -> Dict[str, Any]:
+    async def get_schedule_statistics(self, equipment_id: str | None = None) -> dict[str, Any]:
         """Get inspection scheduling statistics."""
         stats = {
             "total_schedules": 0,
@@ -417,8 +417,8 @@ class InspectionRepository:
         return stats
 
     async def get_deficiency_statistics(
-        self, equipment_id: Optional[str] = None, days_back: int = 30
-    ) -> Dict[str, Any]:
+        self, equipment_id: str | None = None, days_back: int = 30
+    ) -> dict[str, Any]:
         """Get deficiency statistics."""
         start_date = datetime.now() - timedelta(days=days_back)
 
@@ -451,7 +451,7 @@ class InspectionRepository:
     # Inspection Measurement Operations
     # ============================================================================
 
-    async def create_inspection_measurement(self, measurement_data: Dict[str, Any]) -> InspectionMeasurement:
+    async def create_inspection_measurement(self, measurement_data: dict[str, Any]) -> InspectionMeasurement:
         """Create a new inspection measurement record."""
         measurement_data["id"] = str(uuid.uuid4())
         measurement_data["created_at"] = datetime.now().isoformat()
@@ -459,7 +459,7 @@ class InspectionRepository:
         result = get_supabase_client().table("inspection_measurements").insert(measurement_data).execute()
         return InspectionMeasurement(**result.data[0])
 
-    async def get_measurements_by_result(self, result_id: str) -> List[InspectionMeasurement]:
+    async def get_measurements_by_result(self, result_id: str) -> list[InspectionMeasurement]:
         """Get all measurements for an inspection result."""
         result = (
             get_supabase_client()
@@ -472,8 +472,8 @@ class InspectionRepository:
         return [InspectionMeasurement(**row) for row in result.data]
 
     async def get_measurements_by_equipment(
-        self, equipment_id: str, measurement_type: Optional[str] = None, limit: int = 100
-    ) -> List[InspectionMeasurement]:
+        self, equipment_id: str, measurement_type: str | None = None, limit: int = 100
+    ) -> list[InspectionMeasurement]:
         """Get measurements for equipment."""
         query = get_supabase_client().table("inspection_measurements").select("*").eq("equipment_id", equipment_id)
 
@@ -484,8 +484,8 @@ class InspectionRepository:
         return [InspectionMeasurement(**row) for row in result.data]
 
     async def get_measurements_with_deviations(
-        self, equipment_id: Optional[str] = None, status: str = "warning"
-    ) -> List[InspectionMeasurement]:
+        self, equipment_id: str | None = None, status: str = "warning"
+    ) -> list[InspectionMeasurement]:
         """Get measurements with baseline deviations."""
         query = (
             get_supabase_client()

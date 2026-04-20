@@ -7,8 +7,8 @@ and connection strings BEFORE they are passed to tool handlers.
 Reuses patterns from output_filter.py but applied to INPUTS.
 """
 
-import re
 import logging
+import re
 from typing import Any
 
 logger = logging.getLogger(__name__)

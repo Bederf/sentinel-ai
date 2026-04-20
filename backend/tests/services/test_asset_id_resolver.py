@@ -13,8 +13,7 @@ from app.models.asset_resolution import (
     ResolutionMethod,
     ResolutionResult,
 )
-from app.services.asset_id_resolver import AssetIDResolver, KNOWN_ALIASES
-
+from app.services.asset_id_resolver import AssetIDResolver
 
 # --------------------------------------------------------------------------- #
 # Fixtures

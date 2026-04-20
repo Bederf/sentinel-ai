@@ -6,25 +6,24 @@ Covers: AEGIS gating, demo writes, register encoding, write verification,
 """
 
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import patch
 
 import pytest
 
-from app.services.modbus_bess_writer import (
-    ModbusBESSWriter,
-    WriteResult,
-    REGISTER_CHARGE_POWER,
-    REGISTER_DISCHARGE_POWER,
-    REGISTER_SCALE,
-    execute_dispatch_with_write,
-)
 from app.config.settings import settings
 from app.services.bess_dispatch_engine import (
     BESSState,
     DispatchCommand,
 )
-
+from app.services.modbus_bess_writer import (
+    REGISTER_CHARGE_POWER,
+    REGISTER_DISCHARGE_POWER,
+    REGISTER_SCALE,
+    ModbusBESSWriter,
+    WriteResult,
+    execute_dispatch_with_write,
+)
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -68,7 +67,7 @@ def successful_command():
     """A pre-validated successful DispatchCommand."""
     return DispatchCommand(
         site_id="site-002",
-        timestamp=datetime.now(timezone.utc).isoformat(),
+        timestamp=datetime.now(UTC).isoformat(),
         action="discharge",
         requested_power_kw=50.0,
         actual_power_kw=50.0,
@@ -83,7 +82,7 @@ def blocked_command():
     """A dispatch command blocked by constraints."""
     return DispatchCommand(
         site_id="site-002",
-        timestamp=datetime.now(timezone.utc).isoformat(),
+        timestamp=datetime.now(UTC).isoformat(),
         action="discharge",
         requested_power_kw=50.0,
         actual_power_kw=0.0,
@@ -289,7 +288,7 @@ class TestDispatchCommandExecution:
         """Charge command writes to charge register."""
         command = DispatchCommand(
             site_id="site-002",
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
             action="charge",
             requested_power_kw=60.0,
             actual_power_kw=60.0,
@@ -307,7 +306,7 @@ class TestDispatchCommandExecution:
         """Idle action writes zero to charge register."""
         command = DispatchCommand(
             site_id="site-002",
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
             action="idle",
             requested_power_kw=0.0,
             actual_power_kw=0.0,

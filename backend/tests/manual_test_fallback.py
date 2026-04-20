@@ -26,9 +26,10 @@ async def test_api_error_fallback():
     print("Testing: APIError Fallback (simulating 500 error)")
     print(f"{'=' * 60}")
 
-    from app.services.hybrid_ai_service import HybridAIService
-    from anthropic import APIError
     import httpx
+    from anthropic import APIError
+
+    from app.services.hybrid_ai_service import HybridAIService
 
     hybrid_ai = HybridAIService()
 
@@ -83,9 +84,10 @@ async def test_connection_error_fallback():
     print("Testing: APIConnectionError Fallback")
     print(f"{'=' * 60}")
 
-    from app.services.hybrid_ai_service import HybridAIService
-    from anthropic import APIConnectionError
     import httpx
+    from anthropic import APIConnectionError
+
+    from app.services.hybrid_ai_service import HybridAIService
 
     hybrid_ai = HybridAIService()
 
@@ -128,9 +130,10 @@ async def test_rate_limit_fallback():
     print("Testing: RateLimitError Fallback")
     print(f"{'=' * 60}")
 
-    from app.services.hybrid_ai_service import HybridAIService
-    from anthropic import RateLimitError
     import httpx
+    from anthropic import RateLimitError
+
+    from app.services.hybrid_ai_service import HybridAIService
 
     hybrid_ai = HybridAIService()
 
@@ -213,9 +216,10 @@ async def test_both_ais_fail():
     print("Testing: Both AI Services Fail")
     print(f"{'=' * 60}")
 
-    from app.services.hybrid_ai_service import HybridAIService
-    from anthropic import APIError
     import httpx
+    from anthropic import APIError
+
+    from app.services.hybrid_ai_service import HybridAIService
 
     hybrid_ai = HybridAIService()
 

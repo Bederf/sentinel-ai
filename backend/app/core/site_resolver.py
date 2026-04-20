@@ -122,7 +122,7 @@ def get_connected_site_ids() -> list[str]:
     if not site_ids:
         return []
 
-    if not (settings.sentinel_island_mode and settings.simbiot_api_url):
+    if not settings.simbiot_api_url or not settings.simbiot_api_url.startswith("http"):
         return site_ids
 
     now = monotonic()

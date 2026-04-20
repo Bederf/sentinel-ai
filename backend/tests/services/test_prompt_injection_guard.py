@@ -6,6 +6,7 @@ and blocks malicious queries while allowing legitimate queries.
 """
 
 import pytest
+
 from app.services.prompt_injection_guard import PromptInjectionDetector, check_query_safety, prompt_injection_detector
 
 

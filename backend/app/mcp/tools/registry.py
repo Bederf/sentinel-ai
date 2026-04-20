@@ -17,13 +17,14 @@ Usage:
     handlers = get_all_handlers()  # Dict of tool_name -> async handler
 """
 
-from typing import Dict, List, Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 # Import modular tool domains as they become available
-from app.mcp.tools.code import get_code_tools, get_code_handlers
+from app.mcp.tools.code import get_code_handlers, get_code_tools
 
 
-def get_all_tools() -> List[Dict[str, Any]]:
+def get_all_tools() -> list[dict[str, Any]]:
     """
     Get all MCP tool definitions.
 
@@ -46,7 +47,7 @@ def get_all_tools() -> List[Dict[str, Any]]:
     return tools
 
 
-def get_all_handlers() -> Dict[str, Callable]:
+def get_all_handlers() -> dict[str, Callable]:
     """
     Get all MCP tool handlers (mapping tool_name -> async function).
 

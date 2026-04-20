@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from app.services.telegram_document_intake_service import get_telegram_document_intake_service
 from app.services.telegram_conversation_manager import get_conversation_manager
+from app.services.telegram_document_intake_service import get_telegram_document_intake_service
 
 
 class FakeSender:

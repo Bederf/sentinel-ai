@@ -5,8 +5,9 @@ Tests response times, throughput, and identifies bottlenecks.
 Uses pytest-benchmark for consistent measurements.
 """
 
-import pytest
 import time
+
+import pytest
 from fastapi.testclient import TestClient
 
 

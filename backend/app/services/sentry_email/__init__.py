@@ -1,5 +1,5 @@
 """SENTINEL Sentry Email Intake Service"""
 
-from .classifier import get_email_classifier, EmailClassification
+from .classifier import EmailClassification, get_email_classifier
 
-__all__ = ["get_email_classifier", "EmailClassification"]
+__all__ = ["EmailClassification", "get_email_classifier"]

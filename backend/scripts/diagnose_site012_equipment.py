@@ -3,6 +3,7 @@
 
 import sys
 from pathlib import Path
+
 from dotenv import load_dotenv
 
 # Load .env file
@@ -11,8 +12,8 @@ load_dotenv(Path(__file__).parent.parent / ".env")
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 try:
-    from app.database.supabase_client import get_supabase_client
     from app.database.repositories import SiteRepository
+    from app.database.supabase_client import get_supabase_client
 
     client = get_supabase_client()
     building_repo = SiteRepository()

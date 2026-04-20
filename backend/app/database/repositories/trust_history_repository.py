@@ -11,7 +11,6 @@ import json
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 from app.models.trust_history import TrustHistory
 
@@ -60,7 +59,7 @@ class TrustHistoryRepository:
         with path.open("w") as fh:
             json.dump(data, fh, indent=2, default=str)
 
-    def _load_json_fallback(self, point_id: str, site_id: str) -> Optional[TrustHistory]:
+    def _load_json_fallback(self, point_id: str, site_id: str) -> TrustHistory | None:
         path = self._json_path(point_id, site_id)
         if not path.exists():
             return None
@@ -108,7 +107,7 @@ class TrustHistoryRepository:
         self._store_json_fallback(trust_history)
         return True
 
-    async def get_trust_history(self, point_id: str, site_id: str) -> Optional[TrustHistory]:
+    async def get_trust_history(self, point_id: str, site_id: str) -> TrustHistory | None:
         """Retrieve trust history for a point."""
         if not self._use_json and self.client is not None:
             try:

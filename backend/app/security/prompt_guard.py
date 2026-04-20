@@ -16,7 +16,6 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass, field
-from typing import Optional
 
 from app.security.constants import (
     DIRECT_BLOCK_THRESHOLD,
@@ -49,7 +48,7 @@ class GuardResult:
     action: str  # "allow" | "rewrite" | "block"
     score: float
     reasons: list[str] = field(default_factory=list)
-    rewritten_text: Optional[str] = None
+    rewritten_text: str | None = None
 
 
 # ---------------------------------------------------------------------------

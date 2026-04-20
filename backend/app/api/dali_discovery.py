@@ -1,17 +1,15 @@
 """DALI Discovery API - Endpoints for discovering DALI device information."""
 
 import os
-from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from app.config.settings import settings
+from app.database.repositories.equipment_metadata_repository import EquipmentMetadataRepository
 from app.services.dali_discovery_service import (
     DALIDiscoveryService,
     SimulatedDALIDiscovery,
 )
-from app.database.repositories.equipment_metadata_repository import EquipmentMetadataRepository
 
 router = APIRouter()
 
@@ -20,22 +18,22 @@ class DiscoverDeviceRequest(BaseModel):
     """Request to discover a specific DALI device."""
 
     equipment_code: str = Field(..., description="Equipment code (e.g., S002-DALI-L1-A)")
-    gateway_ip: Optional[str] = Field(None, description="DALI gateway IP (uses env default if not provided)")
+    gateway_ip: str | None = Field(None, description="DALI gateway IP (uses env default if not provided)")
     gateway_type: str = Field("tridonic", description="Gateway type: tridonic, philips, helvar, generic")
     dali_line: int = Field(1, ge=1, le=4, description="DALI line number (1-4)")
-    dali_address: Optional[int] = Field(None, ge=0, le=63, description="DALI short address (0-63)")
-    username: Optional[str] = Field(None, description="Gateway auth username")
-    password: Optional[str] = Field(None, description="Gateway auth password")
+    dali_address: int | None = Field(None, ge=0, le=63, description="DALI short address (0-63)")
+    username: str | None = Field(None, description="Gateway auth username")
+    password: str | None = Field(None, description="Gateway auth password")
 
 
 class DiscoverLineRequest(BaseModel):
     """Request to discover all devices on a DALI line."""
 
-    gateway_ip: Optional[str] = Field(None, description="DALI gateway IP")
+    gateway_ip: str | None = Field(None, description="DALI gateway IP")
     gateway_type: str = Field("tridonic", description="Gateway type")
     dali_line: int = Field(1, ge=1, le=4, description="DALI line number")
-    username: Optional[str] = None
-    password: Optional[str] = None
+    username: str | None = None
+    password: str | None = None
 
 
 class SeededDiscoveryRequest(BaseModel):
@@ -47,7 +45,7 @@ class SeededDiscoveryRequest(BaseModel):
     save_to_db: bool = Field(True, description="Save to equipment metadata")
 
 
-def _get_gateway_ip(provided_ip: Optional[str]) -> str:
+def _get_gateway_ip(provided_ip: str | None) -> str:
     """Get gateway IP from parameter or environment."""
     if provided_ip:
         return provided_ip
@@ -61,7 +59,7 @@ def _get_gateway_ip(provided_ip: Optional[str]) -> str:
 
 @router.get("/dali/gateway/info")
 async def get_gateway_info(
-    gateway_ip: Optional[str] = Query(None, description="Gateway IP address"),
+    gateway_ip: str | None = Query(None, description="Gateway IP address"),
     gateway_type: str = Query("tridonic", description="Gateway type"),
 ) -> dict:
     """Get DALI gateway/controller information.
@@ -112,9 +110,7 @@ async def discover_device(request: DiscoverDeviceRequest) -> dict:
     try:
         ip = _get_gateway_ip(request.gateway_ip)
     except HTTPException:
-        if settings.sentinel_island_mode:
-            raise HTTPException(status_code=503, detail="No DALI gateway configured")
-        return await _simulated_discovery(
+            return await _simulated_discovery(
             request.equipment_code,
             "led_panel",
             request.dali_address or 1,
@@ -235,7 +231,7 @@ async def _simulated_discovery(equipment_code: str, device_type: str, dali_addre
 @router.post("/dali/discover/bulk")
 async def discover_bulk(
     equipment_codes: list[str],
-    gateway_ip: Optional[str] = Query(None),
+    gateway_ip: str | None = Query(None),
     gateway_type: str = Query("tridonic"),
     dali_line: int = Query(1, ge=1, le=4),
     use_simulated: bool = Query(False, description="Use simulated data if gateway unavailable"),

@@ -1,8 +1,9 @@
 """Tests for Telegram intent routing API endpoints."""
 
 import os
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
 
 from app.config.settings import settings
 
@@ -27,6 +28,7 @@ def setup_settings():
 @pytest.fixture
 def client():
     from fastapi.testclient import TestClient
+
     from app.main import app
 
     return TestClient(app)

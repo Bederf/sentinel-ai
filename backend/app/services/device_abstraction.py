@@ -342,21 +342,18 @@ class DeviceManager:
         from app.config.settings import settings
         from app.services.niagara.bacnet_adapter import NiagaraBACnetAdapter
 
-        production_island = settings.sentinel_island_mode
+        production_island = False
 
         # Lazy-load SimulatedDeviceAdapter (removable with bms_simulator/)
         SimulatedDeviceAdapter = None
-        if not production_island:
-            try:
-                from app.services.bms_simulator.adapters.simulated_adapter import (
-                    SimulatedDeviceAdapter as _SimAdapter,
-                )
+        try:
+            from app.services.bms_simulator.adapters.simulated_adapter import (
+                SimulatedDeviceAdapter as _SimAdapter,
+            )
 
-                SimulatedDeviceAdapter = _SimAdapter
-            except ImportError:
-                pass
-
-        # Map protocol to adapter class
+            SimulatedDeviceAdapter = _SimAdapter
+        except ImportError:
+            pass
         adapter_map: dict = {
             "bacnet": NiagaraBACnetAdapter,
             # Future: "modbus": ModbusDeviceAdapter,

@@ -1,8 +1,9 @@
 """Tests for cross-encoder reranker service."""
 
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
 import numpy as np
+import pytest
 
 from app.services.reranker_service import RerankerService, get_reranker_service
 

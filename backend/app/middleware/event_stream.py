@@ -6,7 +6,6 @@ Manages per-correlation_id event channels for real-time decision verification up
 
 import asyncio
 import logging
-from typing import Dict, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +15,7 @@ class EventStreamManager:
 
     def __init__(self):
         """Initialize channel registry."""
-        self._channels: Dict[str, asyncio.Queue] = {}
+        self._channels: dict[str, asyncio.Queue] = {}
         self._lock = asyncio.Lock()
 
     async def subscribe(self, correlation_id: str) -> asyncio.Queue:
@@ -40,7 +39,7 @@ class EventStreamManager:
         self,
         event_type: str,
         correlation_id: str,
-        payload: Optional[dict] = None,
+        payload: dict | None = None,
     ) -> None:
         """
         Emit an event to a correlation_id's subscribers.

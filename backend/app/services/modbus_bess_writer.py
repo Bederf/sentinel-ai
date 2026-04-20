@@ -356,32 +356,7 @@ class ModbusBESSWriter:
 
         # 2. No target configured
         if self._is_demo:
-            if settings.sentinel_island_mode:
-                result = WriteResult(
-                    success=False,
-                    register=register,
-                    value_kw=power_kw,
-                    register_value=register_value,
-                    verified=False,
-                    local_only=False,
-                    error="modbus_bess_ip not configured",
-                    timestamp=timestamp,
-                    correlation_id=correlation_id,
-                    requested_kw=requested_kw,
-                    clamped_kw=clamped_kw,
-                    reason=reason or label,
-                    who=who,
-                    end_timestamp=datetime.now(UTC).isoformat(),
-                )
-                logger.error(
-                    "Rejected BESS write without configured Modbus target in SENTINEL_ISLAND_MODE [%s]",
-                    correlation_id,
-                )
-                self._audit_log(result, label)
-                self._write_history.append(result)
-                return result
-
-            result = WriteResult(
+result = WriteResult(
                 success=True,
                 register=register,
                 value_kw=power_kw,

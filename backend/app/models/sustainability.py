@@ -14,7 +14,6 @@ Scopes:
 
 from dataclasses import dataclass, field
 from datetime import date
-from typing import Dict, List, Optional
 
 
 @dataclass
@@ -27,7 +26,7 @@ class EmissionFactors:
     waste_kg_co2_per_ton: float = 580.0  # Landfill waste
     commute_kg_co2_per_person_day: float = 4.2  # Average SA commute
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         return {
             "grid_kg_co2_per_kwh": self.grid_kg_co2_per_kwh,
             "diesel_kg_co2_per_litre": self.diesel_kg_co2_per_litre,
@@ -37,7 +36,7 @@ class EmissionFactors:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict) -> "EmissionFactors":
+    def from_dict(cls, data: dict) -> "EmissionFactors":
         return cls(
             grid_kg_co2_per_kwh=data.get("grid_kg_co2_per_kwh", 1.06),
             diesel_kg_co2_per_litre=data.get("diesel_kg_co2_per_litre", 2.68),
@@ -60,7 +59,7 @@ class EmissionsSnapshot:
     diesel_litres: float = 0.0
     carbon_intensity_kg_per_sqm: float = 0.0
     energy_intensity_kwh_per_sqm: float = 0.0
-    breakdown_by_system: Dict[str, float] = field(default_factory=dict)
+    breakdown_by_system: dict[str, float] = field(default_factory=dict)
 
     # Per-system carbon breakdown (plan 111-02)
     hvac_kg_co2: float = 0.0
@@ -70,16 +69,16 @@ class EmissionsSnapshot:
     net_scope2_kg_co2: float = 0.0  # scope2 after solar offset
 
     # Source data — replaces hardcoded estimates (plan 111-02)
-    actual_diesel_liters: Optional[float] = None  # From daily_sustainability_metrics
-    actual_water_kl: Optional[float] = None  # From daily_sustainability_metrics
-    solar_generation_kwh: Optional[float] = None  # From daily_sustainability_metrics
+    actual_diesel_liters: float | None = None  # From daily_sustainability_metrics
+    actual_water_kl: float | None = None  # From daily_sustainability_metrics
+    solar_generation_kwh: float | None = None  # From daily_sustainability_metrics
     data_source: str = "estimated"  # "estimated" | "measured" | "simulation"
 
     @property
     def total_kg_co2(self) -> float:
         return self.scope1_kg_co2 + self.scope2_kg_co2 + self.scope3_kg_co2
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         return {
             "month": self.month,
             "site_id": self.site_id,
@@ -121,7 +120,7 @@ class GreenStarCategory:
     target_points: int = 0
     notes: str = ""
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         return {
             "category_id": self.category_id,
             "name": self.name,
@@ -132,7 +131,7 @@ class GreenStarCategory:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict) -> "GreenStarCategory":
+    def from_dict(cls, data: dict) -> "GreenStarCategory":
         return cls(
             category_id=data["category_id"],
             name=data["name"],
@@ -150,7 +149,7 @@ class GreenStarAssessment:
     site_id: str
     tool_version: str = "Green Star SA Office v1.1"
     target_rating: str = "5-Star"
-    categories: List[GreenStarCategory] = field(default_factory=list)
+    categories: list[GreenStarCategory] = field(default_factory=list)
 
     @property
     def total_achieved(self) -> int:
@@ -176,7 +175,7 @@ class GreenStarAssessment:
         else:
             return "Below 4-Star"
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         return {
             "site_id": self.site_id,
             "tool_version": self.tool_version,
@@ -189,7 +188,7 @@ class GreenStarAssessment:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict) -> "GreenStarAssessment":
+    def from_dict(cls, data: dict) -> "GreenStarAssessment":
         return cls(
             site_id=data["site_id"],
             tool_version=data.get("tool_version", "Green Star SA Office v1.1"),
@@ -212,7 +211,7 @@ class SustainabilityConfig:
     working_days_per_month: int = 22
     avg_occupancy_pct: float = 75.0  # Average occupancy percentage
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         return {
             "site_id": self.site_id,
             "emission_factors": self.emission_factors.to_dict(),
@@ -226,7 +225,7 @@ class SustainabilityConfig:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict) -> "SustainabilityConfig":
+    def from_dict(cls, data: dict) -> "SustainabilityConfig":
         ef_data = data.get("emission_factors", {})
         return cls(
             site_id=data["site_id"],
@@ -252,7 +251,7 @@ class BenchmarkComparison:
     carbon_typical_kg_per_sqm_yr: float = 180.0
     carbon_efficient_kg_per_sqm_yr: float = 127.0
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         return {
             "energy_typical_kwh_per_sqm_yr": self.energy_typical_kwh_per_sqm_yr,
             "energy_efficient_kwh_per_sqm_yr": self.energy_efficient_kwh_per_sqm_yr,
@@ -305,11 +304,11 @@ class DailySustainabilityWrite:
 
     # Metadata
     source: str = "simulation"
-    site_uuid: Optional[str] = None  # UUID as string for JSON compat
+    site_uuid: str | None = None  # UUID as string for JSON compat
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         """Convert to dict for Supabase upsert / JSON write."""
-        d: Dict = {
+        d: dict = {
             "site_id": self.site_id,
             "date": self.date.isoformat() if isinstance(self.date, date) else str(self.date),
             "grid_kwh": round(self.grid_kwh, 2),
@@ -341,13 +340,13 @@ class DailySustainabilityMetrics(DailySustainabilityWrite):
     via GENERATED ALWAYS AS ... STORED.
     """
 
-    id: Optional[str] = None  # UUID from Postgres
+    id: str | None = None  # UUID from Postgres
     net_grid_kwh: float = 0.0  # grid_kwh - solar_generation_kwh
     water_kl: float = 0.0  # water_liters / 1000
     total_kg_co2: float = 0.0  # scope1 + scope2 + scope3
-    created_at: Optional[str] = None  # ISO timestamp
+    created_at: str | None = None  # ISO timestamp
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         d = super().to_dict()
         d["id"] = self.id
         d["net_grid_kwh"] = round(self.net_grid_kwh, 2)
@@ -357,7 +356,7 @@ class DailySustainabilityMetrics(DailySustainabilityWrite):
         return d
 
     @classmethod
-    def from_dict(cls, data: Dict) -> "DailySustainabilityMetrics":
+    def from_dict(cls, data: dict) -> "DailySustainabilityMetrics":
         """Create from Supabase row or JSON record."""
         dt = data.get("date")
         if isinstance(dt, str):

@@ -6,9 +6,18 @@ contracts, pricing, and commercial analytics.
 
 from fastapi import FastAPI
 
-from app.api import security, fire, modules, health_config
-from app.api import sustainability, contracts, pricing, municipal_billing
-from app.api import complaints, equipment_lookup
+from app.api import (
+    complaints,
+    contracts,
+    equipment_lookup,
+    fire,
+    health_config,
+    modules,
+    municipal_billing,
+    pricing,
+    security,
+    sustainability,
+)
 
 
 def register_modules_routers(app: FastAPI) -> None:

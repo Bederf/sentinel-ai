@@ -1,18 +1,16 @@
 """Alerts API endpoints - SENTINEL Integration."""
 
-import logging
 import json
+import logging
 import uuid
-from pathlib import Path
-from typing import Optional
 from datetime import datetime
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from app.config.settings import settings
-from app.middleware.auth_middleware import require_query_site_access
-from app.middleware.rate_limiter import limiter
 from pydantic import BaseModel
 
+from app.middleware.auth_middleware import require_query_site_access
+from app.middleware.rate_limiter import limiter
 from app.services.sentry_integration.alert_notifier import alert_notifier
 
 router = APIRouter()
@@ -26,13 +24,12 @@ def load_alerts() -> list[dict]:
     """Load alerts from canonical sources."""
     alerts = []
 
-    if not settings.sentinel_island_mode:
-        # Load static alerts from JSON for local simulator/dev workflows only.
-        alerts_file = DATA_DIR / "alerts.json"
-        if alerts_file.exists():
-            with open(alerts_file) as f:
-                static_alerts = json.load(f)
-                alerts.extend(static_alerts)
+    # Load static alerts from JSON for local simulator/dev workflows.
+    alerts_file = DATA_DIR / "alerts.json"
+    if alerts_file.exists():
+        with open(alerts_file) as f:
+            static_alerts = json.load(f)
+            alerts.extend(static_alerts)
 
     # Load active alerts from Supabase database
     try:
@@ -123,7 +120,7 @@ class AlertResponse(BaseModel):
     """Alert response model."""
 
     id: str
-    anomaly_id: Optional[str]
+    anomaly_id: str | None
     equipment_id: str
     site_id: str
     type: str
@@ -134,18 +131,18 @@ class AlertResponse(BaseModel):
     created_at: str
     updated_at: str
     acknowledged: bool
-    acknowledged_by: Optional[str]
-    acknowledged_at: Optional[str]
+    acknowledged_by: str | None
+    acknowledged_at: str | None
     priority: int
     category: str
     estimated_cost_zar: float
     potential_damage_zar: float
     # Enriched fields
-    equipment_name: Optional[str] = None
-    site_name: Optional[str] = None
-    device_id: Optional[str] = None  # Maps to device manager for control navigation
-    recommended_action: Optional[str] = None
-    operational_context: Optional[dict] = None
+    equipment_name: str | None = None
+    site_name: str | None = None
+    device_id: str | None = None  # Maps to device manager for control navigation
+    recommended_action: str | None = None
+    operational_context: dict | None = None
 
 
 class AlertListResponse(BaseModel):
@@ -184,11 +181,11 @@ class AnomalyResponse(BaseModel):
     estimated_repair_hours: int
     urgency: str
     acknowledged: bool
-    acknowledged_by: Optional[str]
-    acknowledged_at: Optional[str]
+    acknowledged_by: str | None
+    acknowledged_at: str | None
     # Enriched fields
-    equipment_name: Optional[str] = None
-    site_name: Optional[str] = None
+    equipment_name: str | None = None
+    site_name: str | None = None
 
 
 class AnomalyListResponse(BaseModel):
@@ -204,11 +201,11 @@ class AnomalyListResponse(BaseModel):
 @router.get("/alerts", response_model=AlertListResponse)
 async def list_alerts(
     request: Request,
-    site_id: Optional[str] = Query(None, description="Filter by site ID"),
-    equipment_id: Optional[str] = Query(None, description="Filter by equipment ID (UUID)"),
-    severity: Optional[str] = Query(None, description="Filter by severity"),
-    status: Optional[str] = Query(None, description="Filter by status (active, acknowledged, resolved)"),
-    category: Optional[str] = Query(None, description="Filter by category (hvac, electrical, maintenance)"),
+    site_id: str | None = Query(None, description="Filter by site ID"),
+    equipment_id: str | None = Query(None, description="Filter by equipment ID (UUID)"),
+    severity: str | None = Query(None, description="Filter by severity"),
+    status: str | None = Query(None, description="Filter by status (active, acknowledged, resolved)"),
+    category: str | None = Query(None, description="Filter by category (hvac, electrical, maintenance)"),
     limit: int = Query(50, description="Maximum number of results"),
 ) -> AlertListResponse:
     """
@@ -324,8 +321,8 @@ async def get_alert(request: Request, alert_id: str) -> AlertResponse:
 async def get_site_alerts(
     request: Request,
     site_id: str,
-    severity: Optional[str] = Query(None, description="Filter by severity"),
-    status: Optional[str] = Query(None, description="Filter by status"),
+    severity: str | None = Query(None, description="Filter by severity"),
+    status: str | None = Query(None, description="Filter by status"),
 ) -> AlertListResponse:
     """
     Get alerts for a specific site.
@@ -345,9 +342,9 @@ async def get_site_alerts(
 @router.get("/anomalies", response_model=AnomalyListResponse)
 async def list_anomalies(
     request: Request,
-    site_id: Optional[str] = Query(None, description="Filter by site ID"),
-    severity: Optional[str] = Query(None, description="Filter by severity"),
-    urgency: Optional[str] = Query(None, description="Filter by urgency (critical, high, medium, low)"),
+    site_id: str | None = Query(None, description="Filter by site ID"),
+    severity: str | None = Query(None, description="Filter by severity"),
+    urgency: str | None = Query(None, description="Filter by urgency (critical, high, medium, low)"),
     _auth=Depends(require_query_site_access("site_id")),
 ) -> AnomalyListResponse:
     """
@@ -407,17 +404,17 @@ async def list_anomalies(
 class DiagnosticContextRequest(BaseModel):
     """Diagnostic context from zone diagnostics."""
 
-    fault_type: Optional[str] = None
-    fault_code: Optional[str] = None
-    fault_description: Optional[str] = None
-    original_reading: Optional[float] = None
-    setpoint: Optional[float] = None
-    deviation: Optional[float] = None
-    faulty_equipment: Optional[str] = None
-    zone_id: Optional[str] = None
+    fault_type: str | None = None
+    fault_code: str | None = None
+    fault_description: str | None = None
+    original_reading: float | None = None
+    setpoint: float | None = None
+    deviation: float | None = None
+    faulty_equipment: str | None = None
+    zone_id: str | None = None
     recommended_actions: list[str] = []
     parts_required: list[str] = []
-    severity: Optional[str] = None
+    severity: str | None = None
 
 
 class CreateAlertRequest(BaseModel):
@@ -428,11 +425,11 @@ class CreateAlertRequest(BaseModel):
     severity: str  # critical, warning, info
     title: str
     message: str
-    zone_name: Optional[str] = None
-    reading: Optional[float] = None
-    setpoint: Optional[float] = None
+    zone_name: str | None = None
+    reading: float | None = None
+    setpoint: float | None = None
     notify_sentry: bool = True
-    diagnostic_context: Optional[DiagnosticContextRequest] = None  # For work order data collection
+    diagnostic_context: DiagnosticContextRequest | None = None  # For work order data collection
 
 
 class CreateAlertResponse(BaseModel):
@@ -600,8 +597,9 @@ async def create_alert(http_request: Request, request: CreateAlertRequest) -> Cr
 
     # Emit real-time SSE event for dashboard
     try:
-        from app.services.event_emitter import get_event_emitter
         import asyncio
+
+        from app.services.event_emitter import get_event_emitter
 
         emitter = get_event_emitter()
         # Use asyncio.create_task to emit event without blocking
@@ -734,7 +732,7 @@ class DispatchWorkOrderRequest(BaseModel):
     technician_id: str
     technician_name: str
     service_type: str = "breakdown"  # breakdown, callout
-    diagnostic_context: Optional[DiagnosticContextRequest] = None
+    diagnostic_context: DiagnosticContextRequest | None = None
 
 
 class DispatchWorkOrderResponse(BaseModel):

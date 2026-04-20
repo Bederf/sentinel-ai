@@ -6,15 +6,14 @@ Provides filtering by time, device, action, user, and result.
 
 import logging
 from datetime import datetime
-from typing import Optional, List, Any
+from typing import Any
 
-from fastapi import APIRouter, Query, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 from app.middleware.rate_limiter import limiter
+from app.models.audit_log import AuditActionType, AuditLogEntry, AuditResultType
 from app.services.audit_logger import AuditLogger
-from app.models.audit_log import AuditActionType, AuditResultType, AuditLogEntry
-from app.config.settings import settings
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/audit", tags=["audit"])
@@ -31,14 +30,14 @@ class AuditLogEntryResponse(BaseModel):
     timestamp: datetime
     action: str
     user: str
-    device_id: Optional[str] = None
-    point_name: Optional[str] = None
-    old_value: Optional[Any] = None
-    new_value: Optional[Any] = None
+    device_id: str | None = None
+    point_name: str | None = None
+    old_value: Any | None = None
+    new_value: Any | None = None
     result: str
-    safety_validation: Optional[dict] = None
-    error_message: Optional[str] = None
-    correlation_id: Optional[str] = None
+    safety_validation: dict | None = None
+    error_message: str | None = None
+    correlation_id: str | None = None
     metadata: dict = Field(default_factory=dict)
 
     @classmethod
@@ -64,7 +63,7 @@ class AuditLogEntryResponse(BaseModel):
 class AuditLogsResponse(BaseModel):
     """Audit logs response with pagination."""
 
-    entries: List[AuditLogEntryResponse]
+    entries: list[AuditLogEntryResponse]
     total_count: int
     page: int
     page_size: int
@@ -89,12 +88,12 @@ async def get_audit_logs(
     request: Request,
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(50, ge=1, le=200, description="Items per page"),
-    start_time: Optional[datetime] = Query(None, description="Start time filter"),
-    end_time: Optional[datetime] = Query(None, description="End time filter"),
-    device_id: Optional[str] = Query(None, description="Filter by device ID"),
-    action: Optional[AuditActionType] = Query(None, description="Filter by action type"),
-    user: Optional[str] = Query(None, description="Filter by user"),
-    result: Optional[AuditResultType] = Query(None, description="Filter by result"),
+    start_time: datetime | None = Query(None, description="Start time filter"),
+    end_time: datetime | None = Query(None, description="End time filter"),
+    device_id: str | None = Query(None, description="Filter by device ID"),
+    action: AuditActionType | None = Query(None, description="Filter by action type"),
+    user: str | None = Query(None, description="Filter by user"),
+    result: AuditResultType | None = Query(None, description="Filter by result"),
 ) -> AuditLogsResponse:
     """
     Get audit logs with filtering and pagination.
@@ -134,7 +133,7 @@ async def get_audit_logs(
 
     except Exception as e:
         logger.error(f"Failed to get audit logs: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to get audit logs: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get audit logs: {e!s}")
 
 
 @router.get("/logs/{entry_id}", response_model=AuditLogEntryResponse)
@@ -158,7 +157,7 @@ async def get_audit_log_entry(entry_id: str) -> AuditLogEntryResponse:
         raise
     except Exception as e:
         logger.error(f"Failed to get audit log entry {entry_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to get audit log entry: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get audit log entry: {e!s}")
 
 
 @router.get("/stats", response_model=AuditStatsResponse)
@@ -189,7 +188,7 @@ async def get_audit_stats() -> AuditStatsResponse:
 
     except Exception as e:
         logger.error(f"Failed to get audit stats: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to get audit stats: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get audit stats: {e!s}")
 
 
 @router.get("/seed-data")
@@ -205,14 +204,8 @@ async def generate_seed_audit_data() -> dict:
     - Different users and devices
     """
     try:
-        from datetime import timedelta
         import random
-
-        if settings.sentinel_island_mode:
-            raise HTTPException(
-                status_code=404,
-                detail="Synthetic audit seeding is disabled on production island instances",
-            )
+        from datetime import timedelta
 
         logger.info("Generating seeded audit data...")
 
@@ -397,4 +390,4 @@ async def generate_seed_audit_data() -> dict:
 
     except Exception as e:
         logger.error(f"Failed to generate seeded audit data: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to generate seeded audit data: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate seeded audit data: {e!s}")

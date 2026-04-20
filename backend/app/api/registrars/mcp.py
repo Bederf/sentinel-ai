@@ -5,7 +5,7 @@ Registers routers for MCP server integrations with AI systems.
 
 from fastapi import FastAPI
 
-from app.api import mcp, mcp_sse, mcp_openai
+from app.api import mcp, mcp_openai, mcp_sse
 
 
 def register_mcp_routers(app: FastAPI) -> None:

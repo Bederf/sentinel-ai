@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
-from typing import Optional
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
@@ -41,8 +40,8 @@ class IngestRequest(BaseModel):
     from_address: str = Field(..., description="Sender email address")
     subject: str = Field(..., description="Email subject line")
     body: str = Field(default="", description="Email body text")
-    received_at: Optional[datetime] = Field(default=None, description="When the email was received")
-    site_id: Optional[str] = Field(default=None, description="Override site ID (defaults to PLANT_SITE_ID)")
+    received_at: datetime | None = Field(default=None, description="When the email was received")
+    site_id: str | None = Field(default=None, description="Override site ID (defaults to PLANT_SITE_ID)")
 
 
 class IngestResponse(BaseModel):

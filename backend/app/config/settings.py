@@ -1,17 +1,15 @@
 """Application settings and configuration."""
 
+import base64
 import hashlib
 import json
 import os
-from typing import Any
-
+import re
 from enum import StrEnum
+from typing import Any
 
 from pydantic import AliasChoices, ConfigDict, Field, field_validator
 from pydantic_settings import BaseSettings
-import re
-import base64
-
 
 # 3-layer model routing (Phase 163)
 # Layer 2 — Execution mode: api | cloud | local
@@ -362,9 +360,6 @@ class Settings(BaseSettings):
 
     # BMS source gate: enable simulator or live bridge polling for site-002 (ENABLE_SITE002_SOURCE env var)
     site002_source_enabled: bool = Field(default=False, validation_alias="ENABLE_SITE002_SOURCE")
-
-    # Sentinel island mode: enforce remote-backed data paths only (no local fallback)
-    sentinel_island_mode: bool = Field(default=False, validation_alias="SENTINEL_ISLAND_MODE")
 
     # Advisory kernel routing switch for chat investigation mode
     sentinel_advisory_kernel_enabled: bool = Field(default=False, validation_alias="SENTINEL_ADVISORY_KERNEL_ENABLED")

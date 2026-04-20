@@ -13,7 +13,7 @@ import secrets
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 class AuthLevel(str, Enum):
@@ -43,7 +43,7 @@ class SentinelRole(str, Enum):
 
 
 # Role hierarchy: higher roles inherit lower role permissions
-ROLE_HIERARCHY: Dict[SentinelRole, int] = {
+ROLE_HIERARCHY: dict[SentinelRole, int] = {
     SentinelRole.ADMIN: 4,
     SentinelRole.ENGINEER: 3,  # Can approve CRITICAL tier decisions (Phase 170-02)
     SentinelRole.DEVELOPER: 3,
@@ -53,7 +53,7 @@ ROLE_HIERARCHY: Dict[SentinelRole, int] = {
 }
 
 # Map AuthLevel to minimum required role
-AUTH_LEVEL_TO_MIN_ROLE: Dict[AuthLevel, Optional[SentinelRole]] = {
+AUTH_LEVEL_TO_MIN_ROLE: dict[AuthLevel, SentinelRole | None] = {
     AuthLevel.PUBLIC: None,
     AuthLevel.AUTHENTICATED: SentinelRole.AUDITOR,
     AuthLevel.OPERATOR: SentinelRole.OPERATOR,
@@ -73,13 +73,13 @@ class AuthContext:
     role: SentinelRole
     auth_method: str  # "bearer_token", "api_key"
     source_ip: str
-    email: Optional[str] = None
-    scopes: List[str] = field(default_factory=list)
-    api_key_id: Optional[str] = None
+    email: str | None = None
+    scopes: list[str] = field(default_factory=list)
+    api_key_id: str | None = None
     authenticated_at: datetime = field(default_factory=datetime.utcnow)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
     is_bot_agent: bool = False  # True when authenticated as bot agent (Phase 120-03)
-    entitlements: List[str] = field(default_factory=list)  # Module types user has access to
+    entitlements: list[str] = field(default_factory=list)  # Module types user has access to
 
     def has_role(self, required_role: SentinelRole) -> bool:
         """Check if user has the required role or higher."""
@@ -100,7 +100,7 @@ class AuthContext:
             return True
         return scope in self.scopes
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize auth context for logging/audit."""
         return {
             "user_id": self.user_id,
@@ -126,10 +126,10 @@ class APIKeyInfo:
     owner: str  # Human owner of the service account
     description: str
     role: SentinelRole
-    scopes: List[str]
+    scopes: list[str]
     created_at: datetime
-    expires_at: Optional[datetime] = None
-    last_used: Optional[datetime] = None
+    expires_at: datetime | None = None
+    last_used: datetime | None = None
     is_active: bool = True
     rate_limit_per_minute: int = 60
 
@@ -184,7 +184,7 @@ PUBLIC_ENDPOINTS = {
 
 # Endpoint path prefixes mapped to their required auth level
 # More specific paths should be listed first (longest prefix match wins)
-ENDPOINT_AUTH_LEVELS: List[tuple[str, AuthLevel]] = [
+ENDPOINT_AUTH_LEVELS: list[tuple[str, AuthLevel]] = [
     # Admin-only endpoints
     ("/api/simulation/", AuthLevel.ADMIN),
     # Operator endpoints (control actions)

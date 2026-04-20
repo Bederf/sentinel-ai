@@ -8,7 +8,7 @@ Publishes WorkOrderCreated / WorkOrderUpdated to Event Bus (stub).
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 
 from app.models.maintenance_event import MaintenanceEvent
 from app.services.event_bus import SentinelEvent, get_event_bus
@@ -61,7 +61,7 @@ class MRIConnectorService:
 
         data = event.model_dump(exclude={"metadata"})
         data["metadata"] = event.metadata
-        data["last_synced_at"] = datetime.now(timezone.utc).isoformat()
+        data["last_synced_at"] = datetime.now(UTC).isoformat()
         if data.get("site_id"):
             data["site_id"] = str(data["site_id"])
 
@@ -74,7 +74,7 @@ class MRIConnectorService:
 
     def _check_sla_breach(self, event: MaintenanceEvent) -> None:
         """Detect SLA breaches and write breach events to sla_breach_events."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         if not event.created_at_source:
             return
 
@@ -133,7 +133,7 @@ class MRIConnectorService:
         return None
 
     def _update_sync_state(self, site_id: str | None, ingested: int, updated: int, errors: int) -> None:
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         self.db.table("mri_connector_sync").upsert(
             {
                 "site_id": site_id,

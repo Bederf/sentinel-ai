@@ -9,10 +9,8 @@ tracking element-level improvements, and health score recalculation.
 """
 
 from datetime import datetime
-from typing import Dict, List, Optional
 
 from pydantic import BaseModel, Field
-
 
 # ============================================================================
 # Core Models
@@ -27,7 +25,7 @@ class RepairOutcome(BaseModel):
     repair_type: str = Field(..., description="Type of repair (e.g., bearing_replacement, filter_change)")
     repair_date: datetime = Field(default_factory=datetime.now, description="When repair was performed")
     technician: str = Field(..., description="Technician who performed the repair")
-    parts_used: List[str] = Field(default_factory=list, description="Parts used in repair")
+    parts_used: list[str] = Field(default_factory=list, description="Parts used in repair")
     labor_hours: float = Field(default=0.0, ge=0, description="Labor hours spent")
     repair_cost: float = Field(default=0.0, ge=0, description="Total repair cost (ZAR)")
     fault_description: str = Field(default="", description="Description of the fault")
@@ -54,7 +52,7 @@ class EffectivenessScore(BaseModel):
     pre_baseline_id: str = Field(default="", description="Pre-repair baseline ID")
     post_baseline_id: str = Field(default="", description="Post-repair baseline ID")
     effectiveness_score: float = Field(..., ge=0, le=100, description="Overall effectiveness score (0-100)")
-    element_improvements: Dict[str, ElementImprovement] = Field(
+    element_improvements: dict[str, ElementImprovement] = Field(
         default_factory=dict, description="Per-element improvement details"
     )
     repair_successful: bool = Field(default=False, description="Whether repair met success threshold")
@@ -71,7 +69,7 @@ class HealthScoreUpdate(BaseModel):
     equipment_id: str = Field(..., description="Equipment identifier")
     previous_score: float = Field(default=100.0, ge=0, le=100, description="Previous health score")
     new_score: float = Field(default=100.0, ge=0, le=100, description="Newly calculated health score")
-    contributing_factors: Dict[str, float] = Field(
+    contributing_factors: dict[str, float] = Field(
         default_factory=dict, description="Factors contributing to score (element_name -> score contribution)"
     )
     updated_at: datetime = Field(default_factory=datetime.now, description="When score was updated")
@@ -87,7 +85,7 @@ class RepairEffectivenessRequest(BaseModel):
 
     equipment_id: str = Field(..., description="Equipment identifier")
     work_order_id: str = Field(..., description="Work order reference")
-    post_repair_readings: Optional[Dict[str, float]] = Field(
+    post_repair_readings: dict[str, float] | None = Field(
         None, description="Post-repair readings (if None, fetch from BMS)"
     )
 

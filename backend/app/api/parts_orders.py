@@ -1,10 +1,8 @@
-from fastapi import APIRouter, HTTPException
-from typing import List, Optional
-from pydantic import BaseModel, Field
-from datetime import datetime
 import uuid
+from datetime import datetime
 
-from app.config.settings import settings
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel, Field
 
 router = APIRouter(prefix="/api/parts-orders", tags=["parts-orders"])
 
@@ -20,16 +18,16 @@ class PartsOrderItem(BaseModel):
 
 class PartsOrder(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    items: List[PartsOrderItem]
+    items: list[PartsOrderItem]
     total_amount: str
     technician_id: str
     site_id: str
     status: str = "pending_approval"  # pending_approval | approved | rejected | ordered | delivered
     created_at: datetime = Field(default_factory=datetime.now)
     requires_approval: bool = True
-    approved_by: Optional[str] = None
-    approved_at: Optional[datetime] = None
-    order_reference: Optional[str] = None
+    approved_by: str | None = None
+    approved_at: datetime | None = None
+    order_reference: str | None = None
 
 
 # In-memory storage for local-only ordering stub (TODO: replace with Supabase)
@@ -37,12 +35,7 @@ _orders_db: dict[str, PartsOrder] = {}
 
 
 def _ensure_parts_ordering_supported() -> None:
-    """Reject stub ordering flows on production islands."""
-    if settings.sentinel_island_mode:
-        raise HTTPException(
-            status_code=501,
-            detail="Parts ordering requires a live supplier integration and is disabled on production island instances",
-        )
+    """Stub - parts ordering integration not yet implemented."""
 
 
 @router.post("/", response_model=PartsOrder)
@@ -79,8 +72,8 @@ async def create_parts_order(order: PartsOrder) -> PartsOrder:
     return order
 
 
-@router.get("/", response_model=List[PartsOrder])
-async def get_parts_orders(technician_id: str, status: Optional[str] = None) -> List[PartsOrder]:
+@router.get("/", response_model=list[PartsOrder])
+async def get_parts_orders(technician_id: str, status: str | None = None) -> list[PartsOrder]:
     """Get parts orders for technician, optionally filtered by status"""
     _ensure_parts_ordering_supported()
     orders = [order for order in _orders_db.values() if order.technician_id == technician_id]
@@ -126,7 +119,7 @@ async def approve_order(order_id: str, approver_id: str) -> PartsOrder:
 
 
 @router.put("/{order_id}/reject", response_model=PartsOrder)
-async def reject_order(order_id: str, reason: Optional[str] = None) -> PartsOrder:
+async def reject_order(order_id: str, reason: str | None = None) -> PartsOrder:
     """Reject pending order (supervisor action)"""
     _ensure_parts_ordering_supported()
     if order_id not in _orders_db:

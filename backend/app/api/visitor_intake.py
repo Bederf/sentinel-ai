@@ -10,9 +10,8 @@ Auth: X-Sentry-API-Key (matches SENTRY_BOT_API_KEY env var)
 
 from __future__ import annotations
 
-import logging
-
 import base64
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import Response
@@ -187,8 +186,9 @@ async def get_visit_qr(token: str) -> Response:
     No auth required — token is the secret. Used in visitor confirmation emails
     so email clients can display the QR image via a real URL.
     """
-    from app.database.repositories.visit_repository import VisitRepository
     from uuid import UUID
+
+    from app.database.repositories.visit_repository import VisitRepository
 
     try:
         uid = UUID(token)

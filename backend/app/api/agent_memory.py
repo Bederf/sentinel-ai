@@ -5,15 +5,14 @@ operator preferences, seasonal patterns, and safety notes.
 """
 
 import logging
-from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from app.database.repositories.agent_memory_repository import (
-    get_agent_memory_repository,
     VALID_CONTEXT_TYPES,
     VALID_SOURCES,
+    get_agent_memory_repository,
 )
 
 logger = logging.getLogger(__name__)
@@ -28,7 +27,7 @@ router = APIRouter(prefix="/api/agent-memory")
 
 class AgentMemoryCreate(BaseModel):
     site_id: str
-    equipment_code: Optional[str] = None
+    equipment_code: str | None = None
     context_type: str = Field(
         ..., description="One of: building_quirk, equipment_note, operator_preference, seasonal, safety_note"
     )
@@ -36,15 +35,15 @@ class AgentMemoryCreate(BaseModel):
     value: str = Field(..., min_length=1)
     source: str = Field(default="system", description="One of: claude, sentry, simbiot, operator, system")
     confidence: float = Field(default=1.0, ge=0.0, le=1.0)
-    expires_at: Optional[str] = None
+    expires_at: str | None = None
 
 
 class AgentMemoryUpdate(BaseModel):
-    value: Optional[str] = None
-    confidence: Optional[float] = Field(default=None, ge=0.0, le=1.0)
-    expires_at: Optional[str] = None
-    context_type: Optional[str] = None
-    source: Optional[str] = None
+    value: str | None = None
+    confidence: float | None = Field(default=None, ge=0.0, le=1.0)
+    expires_at: str | None = None
+    context_type: str | None = None
+    source: str | None = None
 
 
 # --------------------------------------------------------------------------
@@ -55,7 +54,7 @@ class AgentMemoryUpdate(BaseModel):
 @router.get("")
 async def list_memories(
     site_id: str = Query(..., description="Site ID to fetch memories for"),
-    context_type: Optional[str] = Query(None, description="Filter by context type"),
+    context_type: str | None = Query(None, description="Filter by context type"),
     limit: int = Query(50, ge=1, le=200),
 ):
     """List agent memories for a site."""

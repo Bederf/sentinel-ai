@@ -8,12 +8,12 @@ Provides data structures for:
 - Security alerts (forced entry, tailgating, after-hours access)
 """
 
-from typing import Optional, List, Dict, Any
-from enum import Enum
-from datetime import datetime
-from pydantic import BaseModel, ConfigDict, Field
 import uuid
+from datetime import datetime
+from enum import Enum
+from typing import Any
 
+from pydantic import BaseModel, ConfigDict, Field
 
 # ============================================================================
 # Access Control Models
@@ -52,9 +52,9 @@ class AccessEvent(BaseModel):
     status: AccessStatus  # granted/denied/timeout
     access_type: AccessType  # badge/code/override/biometric
     location: str  # Building zone or door name
-    duration_seconds: Optional[int] = None  # Time held door open
+    duration_seconds: int | None = None  # Time held door open
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "event_id": self.event_id,
@@ -98,9 +98,9 @@ class AccessPoint(BaseModel):
     location: str  # Descriptive name (e.g., "Server Room Door")
     device_type: DeviceType  # reader, lock, sensor, controller
     status: PointStatus  # active, inactive, alarm, maintenance
-    last_activity: Optional[datetime] = None
+    last_activity: datetime | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "point_id": self.point_id,
@@ -143,9 +143,9 @@ class AccessCard(BaseModel):
     issued_date: datetime
     expiry_date: datetime
     status: CardStatus
-    allowed_points: List[str] = Field(default_factory=list)  # Point IDs
+    allowed_points: list[str] = Field(default_factory=list)  # Point IDs
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "card_id": self.card_id,
@@ -182,13 +182,13 @@ class Visitor(BaseModel):
     company: str
     visit_date: datetime
     host_contact: str  # Employee receiving visitor
-    access_points: List[str] = Field(default_factory=list)  # Allowed point IDs
+    access_points: list[str] = Field(default_factory=list)  # Allowed point IDs
     status: VisitorStatus
-    checkin_time: Optional[datetime] = None
-    checkout_time: Optional[datetime] = None
-    purpose: Optional[str] = None
+    checkin_time: datetime | None = None
+    checkout_time: datetime | None = None
+    purpose: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "visitor_id": self.visitor_id,
@@ -261,12 +261,12 @@ class SecurityAlert(BaseModel):
     severity: AlertSeverity
     status: AlertStatus
     description: str
-    related_events: List[str] = Field(default_factory=list)  # Event IDs
-    acknowledged_by: Optional[str] = None
-    acknowledged_at: Optional[datetime] = None
-    resolved_at: Optional[datetime] = None
+    related_events: list[str] = Field(default_factory=list)  # Event IDs
+    acknowledged_by: str | None = None
+    acknowledged_at: datetime | None = None
+    resolved_at: datetime | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "alert_id": self.alert_id,
@@ -304,8 +304,8 @@ class OccupancyData(BaseModel):
     """Building occupancy from security system."""
 
     total_occupancy: int
-    by_floor: Dict[str, int]
-    by_zone: Dict[str, int]
+    by_floor: dict[str, int]
+    by_zone: dict[str, int]
     last_updated: datetime
 
 
@@ -326,5 +326,5 @@ class SecurityOccupancy(BaseModel):
     occupancy_count: int = 0
     badge_entries: int = 0
     badge_exits: int = 0
-    last_updated: Optional[str] = None
+    last_updated: str | None = None
     source: OccupancySource = OccupancySource.BADGE

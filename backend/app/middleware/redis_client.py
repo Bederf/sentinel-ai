@@ -8,7 +8,6 @@ Used for:
 """
 
 import logging
-from typing import Optional
 
 import redis.asyncio as redis
 from redis.asyncio import Redis
@@ -18,7 +17,7 @@ from app.config.settings import settings
 logger = logging.getLogger(__name__)
 
 # Global redis client instance
-_redis_client: Optional[Redis] = None
+_redis_client: Redis | None = None
 
 
 async def get_redis_client() -> Redis:
@@ -37,7 +36,7 @@ async def get_redis_client() -> Redis:
             await _redis_client.ping()
             logger.info(f"Redis client connected to {settings.redis_url}")
         except Exception as e:
-            logger.error(f"Failed to connect to Redis: {str(e)}")
+            logger.error(f"Failed to connect to Redis: {e!s}")
             # Return a stub client that always fails gracefully
             return _StubRedisClient()
 
@@ -52,7 +51,7 @@ class _StubRedisClient:
         logger.warning(f"Redis unavailable: stub set({key}) returning False")
         return False
 
-    async def get(self, key: str) -> Optional[str]:
+    async def get(self, key: str) -> str | None:
         """Stub get returns None."""
         return None
 
@@ -87,7 +86,7 @@ class _LazyRedisClient:
         await self._ensure_client()
         return await self._client.set(key, value, nx=nx, ex=ex)
 
-    async def get(self, key: str) -> Optional[str]:
+    async def get(self, key: str) -> str | None:
         """Get a key value."""
         await self._ensure_client()
         return await self._client.get(key)

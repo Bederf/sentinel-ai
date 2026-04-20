@@ -7,8 +7,9 @@ Three test groups:
 """
 
 import os
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 # Ensure test env
 os.environ.setdefault("DEMO_MODE", "true")
@@ -24,14 +25,14 @@ class TestIngestionModeEnum:
     """Test IngestionMode enum and Settings properties."""
 
     def test_default_mode_is_simulation(self):
-        from app.config.settings import Settings, IngestionMode
+        from app.config.settings import IngestionMode, Settings
 
         s = Settings(demo_mode=True)
         assert s.resolved_ingestion_mode == IngestionMode.SIMULATION
         assert not s.is_live_mode
 
     def test_demo_mode_overrides_shadow_live(self):
-        from app.config.settings import Settings, IngestionMode
+        from app.config.settings import IngestionMode, Settings
 
         # v36.0: DEMO_MODE no longer forces SIMULATION; it only bypasses auth
         s = Settings(demo_mode=True, ingestion_mode="shadow_live", site002_source_enabled=False)
@@ -39,7 +40,7 @@ class TestIngestionModeEnum:
         assert s.is_live_mode
 
     def test_demo_mode_overrides_live_control(self):
-        from app.config.settings import Settings, IngestionMode
+        from app.config.settings import IngestionMode, Settings
 
         # v36.0: DEMO_MODE no longer forces SIMULATION; it only bypasses auth
         s = Settings(demo_mode=True, ingestion_mode="live_control", site002_source_enabled=False)
@@ -47,21 +48,21 @@ class TestIngestionModeEnum:
         assert s.is_live_mode
 
     def test_shadow_live_without_demo(self):
-        from app.config.settings import Settings, IngestionMode
+        from app.config.settings import IngestionMode, Settings
 
         s = Settings(demo_mode=False, ingestion_mode="shadow_live", site002_source_enabled=False)
         assert s.resolved_ingestion_mode == IngestionMode.SHADOW_LIVE
         assert s.is_live_mode
 
     def test_live_control_without_demo(self):
-        from app.config.settings import Settings, IngestionMode
+        from app.config.settings import IngestionMode, Settings
 
         s = Settings(demo_mode=False, ingestion_mode="live_control", site002_source_enabled=False)
         assert s.resolved_ingestion_mode == IngestionMode.LIVE_CONTROL
         assert s.is_live_mode
 
     def test_invalid_mode_falls_back_to_simulation(self):
-        from app.config.settings import Settings, IngestionMode
+        from app.config.settings import IngestionMode, Settings
 
         s = Settings(demo_mode=False, ingestion_mode="bogus_mode")
         assert s.resolved_ingestion_mode == IngestionMode.SIMULATION
@@ -283,7 +284,7 @@ class TestStartupLiveModeGuard:
 
     def test_live_mode_settings_resolve_correctly(self):
         """Live mode settings resolve correctly without demo override."""
-        from app.config.settings import Settings, IngestionMode
+        from app.config.settings import IngestionMode, Settings
 
         s = Settings(
             demo_mode=False,
@@ -296,7 +297,7 @@ class TestStartupLiveModeGuard:
 
     def test_default_mode_no_live_requirements(self):
         """Default settings (no INGESTION_MODE) → simulation, no extra requirements."""
-        from app.config.settings import Settings, IngestionMode
+        from app.config.settings import IngestionMode, Settings
 
         s = Settings(demo_mode=True)
         assert s.resolved_ingestion_mode == IngestionMode.SIMULATION

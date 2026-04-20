@@ -4,12 +4,11 @@ SCADA-style monitoring for complete electrical infrastructure:
 MV/LV switchgear, ATS, transformers, power metering, PFC, UPS.
 """
 
-from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from app.middleware.auth_middleware import require_site_access, require_auth
+from app.middleware.auth_middleware import require_auth, require_site_access
 from app.models.auth import AuthContext, AuthLevel
-
 from app.services.energy_centre_service import get_energy_centre_service
 
 router = APIRouter(prefix="/energy-centre", tags=["energy-centre"])
@@ -38,7 +37,7 @@ async def get_sld_data(site_id: str, auth: AuthContext = Depends(require_site_ac
 
 @router.get("")
 async def list_centres(
-    site_id: Optional[str] = Query(None, description="Filter by site"),
+    site_id: str | None = Query(None, description="Filter by site"),
 ):
     """List all energy centres."""
     service = get_energy_centre_service()
@@ -54,7 +53,7 @@ async def list_centres(
 
 @router.get("/ats")
 async def list_ats_units(
-    site_id: Optional[str] = Query(None, description="Filter by site"),
+    site_id: str | None = Query(None, description="Filter by site"),
 ):
     """List all ATS units."""
     service = get_energy_centre_service()
@@ -90,7 +89,7 @@ async def get_ats_status(ats_id: str, auth: AuthContext = Depends(require_auth(A
 
 @router.get("/mv-incomers")
 async def list_mv_incomers(
-    site_id: Optional[str] = Query(None, description="Filter by site"),
+    site_id: str | None = Query(None, description="Filter by site"),
 ):
     """List all MV incomers."""
     service = get_energy_centre_service()
@@ -116,7 +115,7 @@ async def get_mv_incomer(incomer_id: str, auth: AuthContext = Depends(require_au
 
 @router.get("/transformers")
 async def list_transformers(
-    site_id: Optional[str] = Query(None, description="Filter by site"),
+    site_id: str | None = Query(None, description="Filter by site"),
 ):
     """List all transformers."""
     service = get_energy_centre_service()
@@ -142,7 +141,7 @@ async def get_transformer(transformer_id: str, auth: AuthContext = Depends(requi
 
 @router.get("/switchboards")
 async def list_switchboards(
-    site_id: Optional[str] = Query(None, description="Filter by site"),
+    site_id: str | None = Query(None, description="Filter by site"),
 ):
     """List all LV switchboards."""
     service = get_energy_centre_service()
@@ -168,8 +167,8 @@ async def get_switchboard(switchboard_id: str, auth: AuthContext = Depends(requi
 
 @router.get("/meters")
 async def list_meters(
-    site_id: Optional[str] = Query(None, description="Filter by site"),
-    meter_type: Optional[str] = Query(None, description="Filter by type (main, sub, check, generator)"),
+    site_id: str | None = Query(None, description="Filter by site"),
+    meter_type: str | None = Query(None, description="Filter by type (main, sub, check, generator)"),
 ):
     """List all power meters."""
     service = get_energy_centre_service()
@@ -202,7 +201,7 @@ async def get_power_summary(site_id: str, auth: AuthContext = Depends(require_si
 
 @router.get("/pfc")
 async def list_pfc_banks(
-    site_id: Optional[str] = Query(None, description="Filter by site"),
+    site_id: str | None = Query(None, description="Filter by site"),
 ):
     """List all PFC banks."""
     service = get_energy_centre_service()
@@ -228,7 +227,7 @@ async def get_pfc(pfc_id: str, auth: AuthContext = Depends(require_auth(AuthLeve
 
 @router.get("/ups")
 async def list_ups_systems(
-    site_id: Optional[str] = Query(None, description="Filter by site"),
+    site_id: str | None = Query(None, description="Filter by site"),
 ):
     """List all UPS systems."""
     service = get_energy_centre_service()
@@ -261,7 +260,7 @@ async def get_ups_summary(site_id: str, auth: AuthContext = Depends(require_site
 
 @router.get("/feeders")
 async def list_feeders(
-    site_id: Optional[str] = Query(None, description="Filter by site"),
+    site_id: str | None = Query(None, description="Filter by site"),
 ):
     """List all distribution feeders."""
     service = get_energy_centre_service()
