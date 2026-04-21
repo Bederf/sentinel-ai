@@ -536,7 +536,14 @@ function useConciergeGraph(
   onSignalResolved: () => void,
 ) {
   const cyRef = useRef<Core | null>(null);
-  const [containerReady, setContainerReady] = useState(!!containerRef.current);
+  const [containerReady, setContainerReady] = useState(false);
+
+  // Initialize containerReady once the DOM is ready
+  useEffect(() => {
+    const el = containerRef.current;
+    if (el) setContainerReady(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Watch for container resize so we re-init when layout settles
   useEffect(() => {
@@ -544,13 +551,13 @@ function useConciergeGraph(
     if (!el) return;
     const ro = new ResizeObserver(() => {
       if (containerReady && el.clientWidth > 0 && el.clientHeight > 0) {
-        // Force re-render of the init effect by toggling a dummy state
         setContainerReady((v) => !v);
         setContainerReady((v) => !v);
       }
     });
     ro.observe(el);
     return () => ro.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [containerReady]);
 
   useEffect(() => {
