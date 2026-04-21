@@ -355,7 +355,7 @@ export function AccessEventsPanel({ siteId = "", refreshKey }: AccessEventsPanel
                           color:
                             event.direction === "entry"
                               ? "var(--color-sentinel-blue)"
-                              : "#a855f7",
+                              : "var(--color-sentinel-purple)",
                         }}
                       >
                         {event.direction === "entry" ? "Entry" : "Exit"}

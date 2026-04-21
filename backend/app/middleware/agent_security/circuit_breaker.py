@@ -29,7 +29,7 @@ States: CLOSED (normal) → OPEN (tripped) → HALF_OPEN (cooldown elapsed, test
 import logging
 import time
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 
-class QuotaTier(str, Enum):
+class QuotaTier(StrEnum):
     """Rate limit tier applied to an identity."""
 
     PER_USER = "PER_USER"
@@ -47,7 +47,7 @@ class QuotaTier(str, Enum):
     PER_BOT = "PER_BOT"
 
 
-class BreakerState(str, Enum):
+class BreakerState(StrEnum):
     """Circuit breaker state machine states."""
 
     CLOSED = "closed"

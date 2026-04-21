@@ -79,7 +79,7 @@ export function FloorStack({
         const isAffected = rendererHint === "crisis" && incident?.affected === true;
 
         const fillColor = isAffected
-          ? "#dc2626"
+          ? "var(--color-sentinel-red)"
           : rendererHint === "crisis"
           ? "#0f172a"
           : "#1e3a5f";

@@ -202,9 +202,6 @@ def get_whatsapp_service(provider: str | None = None) -> WhatsAppService:
         else:
             resolved = os.getenv("WHATSAPP_PROVIDER", "")
             if not resolved:
-                if os.getenv("TWILIO_ACCOUNT_SID") or settings.twilio_account_sid:
-                    resolved = "twilio"
-                else:
-                    resolved = "meta"
+                resolved = "twilio" if os.getenv("TWILIO_ACCOUNT_SID") or settings.twilio_account_sid else "meta"
         _whatsapp_service = WhatsAppService(resolved)
     return _whatsapp_service

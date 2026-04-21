@@ -41,7 +41,7 @@ class AutoencoderDataPrep:
         self.scaler = StandardScaler()
         self._scaler_fitted = False
 
-    def create_windows(self, data: np.ndarray, exclude_periods: list[tuple[int, int]] = None) -> np.ndarray:
+    def create_windows(self, data: np.ndarray, exclude_periods: list[tuple[int, int]] | None = None) -> np.ndarray:
         """
         Create sliding windows from time-series data.
 
@@ -80,7 +80,7 @@ class AutoencoderDataPrep:
         df: pd.DataFrame,
         feature_cols: list[str],
         timestamp_col: str = "timestamp",
-        failure_dates: list[datetime] = None,
+        failure_dates: list[datetime] | None = None,
         exclude_days_before: int = 7,
         exclude_days_after: int = 3,
     ) -> np.ndarray:

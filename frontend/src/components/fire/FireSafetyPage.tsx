@@ -82,7 +82,7 @@ export function FireSafetyPage({ siteId = 'site-002' }: FireSafetyPageProps) {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded" style={{ background: "rgba(239, 68, 68, 0.15)" }}>
-              <Flame className="h-6 w-6" style={{ color: "#EF4444" }} />
+              <Flame className="h-6 w-6" style={{ color: "var(--color-sentinel-red)" }} />
             </div>
             <div>
               <h1 className="text-2xl font-bold" style={{ color: "var(--color-sentinel-text-primary)" }}>
@@ -107,7 +107,7 @@ export function FireSafetyPage({ siteId = 'site-002' }: FireSafetyPageProps) {
               className="text-xs px-2 py-1 rounded"
               style={{
                 background: bridgeTelemetry?.status === 'live' ? 'rgba(16,185,129,0.15)' : 'rgba(245,158,11,0.15)',
-                color: bridgeTelemetry?.status === 'live' ? '#10B981' : '#F59E0B',
+                color: bridgeTelemetry?.status === 'live' ? 'var(--color-sentinel-green)' : 'var(--color-sentinel-amber)',
               }}
             >
               {bridgeTelemetry?.status === 'live' ? 'Live' : 'Unavailable'}

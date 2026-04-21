@@ -19,7 +19,7 @@ FSR Domain: 4.11 - Incident Response (emergency access controls)
 import logging
 from collections.abc import Callable
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from fastapi import Request
@@ -30,7 +30,7 @@ from starlette.responses import Response
 logger = logging.getLogger("sentinel.middleware.emergency")
 
 
-class EmergencyMode(str, Enum):
+class EmergencyMode(StrEnum):
     """Emergency control modes."""
 
     NORMAL = "normal"  # Normal operation
@@ -229,30 +229,28 @@ class EmergencyControlsService:
             )
 
         # Maintenance mode - block everything except GET and always-allowed
-        if self._mode == EmergencyMode.MAINTENANCE:
-            if method in self._write_methods:
-                return JSONResponse(
-                    status_code=503,
-                    content={
-                        "error": "System is in maintenance mode",
-                        "mode": "maintenance",
-                        "reason": self._reason or "Planned maintenance in progress",
-                        "retry_after": 600,
-                    },
-                    headers={"Retry-After": "600"},
-                )
+        if self._mode == EmergencyMode.MAINTENANCE and method in self._write_methods:
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "error": "System is in maintenance mode",
+                    "mode": "maintenance",
+                    "reason": self._reason or "Planned maintenance in progress",
+                    "retry_after": 600,
+                },
+                headers={"Retry-After": "600"},
+            )
 
         # Read-only mode - block write methods
-        if self._mode == EmergencyMode.READ_ONLY:
-            if method in self._write_methods:
-                return JSONResponse(
-                    status_code=503,
-                    content={
-                        "error": "System is in read-only mode",
-                        "mode": "read_only",
-                        "reason": self._reason or "Write operations temporarily disabled",
-                    },
-                )
+        if self._mode == EmergencyMode.READ_ONLY and method in self._write_methods:
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "error": "System is in read-only mode",
+                    "mode": "read_only",
+                    "reason": self._reason or "Write operations temporarily disabled",
+                },
+            )
 
         # Safety lockdown - block device control paths
         if self._mode == EmergencyMode.SAFETY_LOCKDOWN:

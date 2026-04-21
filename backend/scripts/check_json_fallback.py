@@ -115,7 +115,7 @@ if BUILDINGS_PATH.exists():
     print("-" * 80)
     site_002_equip = BUILDINGS_PATH / "site-002" / "equipment"
     if site_002_equip.exists():
-        files = sorted(list(site_002_equip.glob("*.json")))
+        files = sorted(site_002_equip.glob("*.json"))
         print(f"Total files: {len(files)}")
         print("\nFirst 10 files:")
         for f in files[:10]:

@@ -353,7 +353,7 @@ class FleetAggregator:
         """
         matches = []
 
-        for key, pattern in self._failure_patterns.items():
+        for _key, pattern in self._failure_patterns.items():
             if pattern.equipment_type.upper() != equipment_type.upper():
                 continue
             if failure_type and pattern.failure_type != failure_type:

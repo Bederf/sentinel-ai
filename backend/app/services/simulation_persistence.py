@@ -201,9 +201,8 @@ class SimulationPersistence:
                     zone_data[zone_id]["co2"] = int(readings["co2_ppm"])
                 if "humidity_pct" in readings:
                     zone_data[zone_id]["humidity"] = readings["humidity_pct"]
-            elif equip_type in ("humidity_sensor",):
-                if "humidity_pct" in readings:
-                    zone_data[zone_id]["humidity"] = readings["humidity_pct"]
+            elif equip_type in ("humidity_sensor",) and "humidity_pct" in readings:
+                zone_data[zone_id]["humidity"] = readings["humidity_pct"]
 
         setpoint = 22.0
         if hasattr(schedule_state, "setpoint_offset"):
@@ -252,7 +251,7 @@ class SimulationPersistence:
         """Write one row to solar hourly snapshots from equipment states."""
         # Extract solar generation from inverter equipment
         solar_gen_kw = 0.0
-        for code, state in equipment_states.items():
+        for _code, state in equipment_states.items():
             if state.get("type", "").lower() == "inverter":
                 readings = state.get("sensor_readings", {})
                 solar_gen_kw += readings.get("ac_power_kw", 0.0)
@@ -262,7 +261,7 @@ class SimulationPersistence:
         bess_charge_kw = 0.0
         bess_discharge_kw = 0.0
         grid_import_kw = 0.0
-        for code, state in equipment_states.items():
+        for _code, state in equipment_states.items():
             if state.get("type", "").lower() == "bess":
                 readings = state.get("sensor_readings", {})
                 bess_soc_pct = readings.get("state_of_charge_pct", 50.0)

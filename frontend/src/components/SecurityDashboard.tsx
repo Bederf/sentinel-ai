@@ -464,7 +464,7 @@ export function SecurityDashboard() {
                 >
                   <Users
                     className="h-5 w-5"
-                    style={{ color: "#a855f7" }}
+                    style={{ color: "var(--color-sentinel-purple)" }}
                   />
                 </div>
                 <span
@@ -476,7 +476,7 @@ export function SecurityDashboard() {
               </div>
               <span
                 className="text-3xl font-bold"
-                style={{ color: "#a855f7" }}
+                style={{ color: "var(--color-sentinel-purple)" }}
               >
                 {status.occupancy_total}
               </span>

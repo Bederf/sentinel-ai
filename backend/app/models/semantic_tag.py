@@ -6,12 +6,12 @@ Provides the controlled vocabulary for deterministic, auditable point classifica
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
 
-class SafetyClass(str, Enum):
+class SafetyClass(StrEnum):
     """Safety classification for a semantic tag.
 
     Determines what autonomous actions are permitted on a classified point.
@@ -22,7 +22,7 @@ class SafetyClass(str, Enum):
     HIGH = "HIGH"  # Critical safety — no autonomous writes; monitor only or explicit approval
 
 
-class EvidenceSource(str, Enum):
+class EvidenceSource(StrEnum):
     """Sources of evidence used to classify a point."""
 
     HAYSTACK_ID = "haystack_id"

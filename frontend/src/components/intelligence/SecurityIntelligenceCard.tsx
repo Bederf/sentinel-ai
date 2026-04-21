@@ -100,18 +100,18 @@ export function SecurityIntelligenceCard({ siteId, onNavigate }: SecurityIntelli
     <IntelligenceCard
       title="Security Intelligence"
       subtitle="Access control &amp; occupancy monitoring"
-      icon={<Shield className="h-5 w-5" style={{ color: '#A855F7' }} />}
+      icon={<Shield className="h-5 w-5" style={{ color: 'var(--color-sentinel-purple)' }} />}
       iconBg="rgba(168, 85, 247, 0.15)"
-      accentColor="#A855F7"
+      accentColor="var(--color-sentinel-purple)"
       badge={badge}
       state={state}
       footer={footer}
       onNavigate={onNavigate}
       metrics={
         <>
-          <ValueMetricBox label="Occupants tracked" value={hasOccupancyData ? `${totalOccupancy}` : '—'} color="#A855F7" />
-          <ValueMetricBox label="After-hours flagged" value={`${afterHoursCount}`} color={afterHoursCount > 0 ? '#F59E0B' : '#22C55E'} />
-          <ValueMetricBox label="Cross-system correlation" value={hasOccupancyData ? 'Active' : 'Monitoring'} color={hasOccupancyData ? '#10B981' : '#6B7280'} />
+          <ValueMetricBox label="Occupants tracked" value={hasOccupancyData ? `${totalOccupancy}` : '—'} color="var(--color-sentinel-purple)" />
+          <ValueMetricBox label="After-hours flagged" value={`${afterHoursCount}`} color={afterHoursCount > 0 ? 'var(--color-sentinel-amber)' : 'var(--color-sentinel-green)'} />
+          <ValueMetricBox label="Cross-system correlation" value={hasOccupancyData ? 'Active' : 'Monitoring'} color={hasOccupancyData ? 'var(--color-sentinel-green)' : 'var(--color-sentinel-text-secondary)'} />
         </>
       }
       comparison={afterHoursCount > 0 || anomalyCount > 0 ? (
@@ -121,7 +121,7 @@ export function SecurityIntelligenceCard({ siteId, onNavigate }: SecurityIntelli
           unit=""
           baselineLabel="Undetected events (no AI)"
           optimizedLabel="Caught by SENTINEL"
-          accentColor="#A855F7"
+          accentColor="var(--color-sentinel-purple)"
         />
       ) : undefined}
     />

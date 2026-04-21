@@ -333,9 +333,8 @@ class CrossSystemAnalyzer:
             else:
                 parts.append(f"Low daylight ({occupancy.avg_lux_level:.0f} lux)")
 
-        if desk_data.get("desk_lux"):
-            if desk_data["desk_lux"] > 800:
-                parts.append(f"YOUR LOCATION shows {desk_data['desk_lux']:.0f} lux (very bright - direct sun exposure)")
+        if desk_data.get("desk_lux") and desk_data["desk_lux"] > 800:
+            parts.append(f"YOUR LOCATION shows {desk_data['desk_lux']:.0f} lux (very bright - direct sun exposure)")
 
         if lighting:
             parts.append(f"Lights at {lighting.avg_dim_level:.0f}% average dim level")
@@ -351,7 +350,7 @@ class CrossSystemAnalyzer:
         lighting: ZoneLighting | None,
         complaint_type: str,
         desk_data: dict,
-        vav_data: dict = None,
+        vav_data: dict | None = None,
     ) -> tuple[str, str, list[str]]:
         """Determine most likely root cause and suggestions (includes VAV analysis)"""
 
@@ -401,18 +400,17 @@ class CrossSystemAnalyzer:
                 )
 
         # Reheat valve not responding (too cold with reheat at 0%)
-        if complaint_type == "too_cold" and reheat is not None and reheat == 0:
-            if discharge and discharge < 18:
-                return (
-                    f"Zone too cold: Discharge air at {discharge:.1f}°C with reheat valve CLOSED (0%). "
-                    f"Reheat system not activating despite demand.",
-                    "high",
-                    [
-                        f"Check reheat coil valve actuator on VAV {vav_data.get('vav_id')}",
-                        "Verify hot water supply to reheat coil",
-                        "Check BMS heating demand signal",
-                    ],
-                )
+        if complaint_type == "too_cold" and reheat is not None and reheat == 0 and discharge and discharge < 18:
+            return (
+                f"Zone too cold: Discharge air at {discharge:.1f}°C with reheat valve CLOSED (0%). "
+                f"Reheat system not activating despite demand.",
+                "high",
+                [
+                    f"Check reheat coil valve actuator on VAV {vav_data.get('vav_id')}",
+                    "Verify hot water supply to reheat coil",
+                    "Check BMS heating demand signal",
+                ],
+            )
 
         # Reheat fighting cooling (too hot with reheat active)
         if complaint_type == "too_hot" and reheat is not None and reheat > 30:

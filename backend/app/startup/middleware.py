@@ -129,7 +129,7 @@ def _get_cors_headers(request: Request | None = None) -> dict:
     # Always allow credentials and methods for configured origins
     headers["Access-Control-Allow-Credentials"] = "true"
     headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
-    headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type"
+    headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type, x-site-id"
 
     return headers
 
@@ -194,7 +194,7 @@ def register_middleware(app: FastAPI) -> None:
         allow_origins=settings.cors_origins,
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        allow_headers=["Authorization", "Content-Type"],
+        allow_headers=["Authorization", "Content-Type", "x-site-id"],
     )
 
     # Security headers (Phase 58-03 H-6, H-7)

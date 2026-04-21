@@ -126,6 +126,25 @@ async def get_current_health():
                 details=component_detail,
             )
 
+        # Derive BMS connectivity as aggregate of the 4 protocol subsystems
+        bms_keys = ["supervisor", "field_network", "obix", "lighting"]
+        bms_scores = [snapshot.get("component_scores", {}).get(k, 0) for k in bms_keys]
+        bms_avg = int(sum(bms_scores) / len(bms_scores)) if bms_scores else 0
+        bms_statuses = [snapshot.get("component_details", {}).get(k, {}).get("status", "critical") for k in bms_keys]
+        if all(s == "healthy" for s in bms_statuses):
+            bms_status: str = "healthy"
+        elif any(s == "critical" for s in bms_statuses):
+            bms_status = "critical"
+        else:
+            bms_status = "degraded"
+
+        components["bms_connectivity"] = ComponentHealth(
+            name="bms_connectivity",
+            status=bms_status,
+            score=bms_avg,
+            message="Aggregate BMS protocol connectivity",
+        )
+
         return SystemHealthSnapshot(
             timestamp=snapshot["timestamp"],
             overall_status=snapshot["overall_status"],

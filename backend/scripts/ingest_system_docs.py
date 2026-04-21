@@ -160,10 +160,7 @@ def get_doc_category(filepath: Path) -> tuple:
         parts = relative.parts
 
         # Check directory mapping
-        if parts[0] in DOC_CATEGORY_MAP:
-            equipment_type, document_type = DOC_CATEGORY_MAP[parts[0]]
-        else:
-            equipment_type, document_type = "general", "system_documentation"
+        equipment_type, document_type = DOC_CATEGORY_MAP.get(parts[0], ("general", "system_documentation"))
     except ValueError:
         # File is outside docs/ — check extra dir mappings
         equipment_type, document_type = "general", "system_documentation"
@@ -489,7 +486,7 @@ async def main():
         ("UPS battery inspection Eaton", None),
     ]
 
-    for query, eq_type in test_queries:
+    for query, _eq_type in test_queries:
         print(f"\nQuery: '{query}'")
         results = vector_db.search(query, n_results=3, similarity_threshold=0.2)
         if results:

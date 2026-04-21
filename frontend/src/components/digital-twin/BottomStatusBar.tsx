@@ -64,9 +64,9 @@ export function BottomStatusBar({ equipment, loadKwOverride }: BottomStatusBarPr
         <span
           className="text-lg font-bold"
           style={{
-            color: '#00FF41',
+            color: 'var(--color-sentinel-green)',
             fontFamily: 'Orbitron, monospace',
-            textShadow: '0 0 10px rgba(0, 255, 65, 0.4)',
+            textShadow: '0 0 10px rgba(16, 185, 129, 0.4)',
           }}
         >
           {onlineCount}/{equipment.length}
@@ -88,7 +88,7 @@ export function BottomStatusBar({ equipment, loadKwOverride }: BottomStatusBarPr
         <span
           className="text-lg font-bold"
           style={{
-            color: faultCount > 0 ? '#EF4444' : '#22C55E',
+            color: faultCount > 0 ? 'var(--color-sentinel-red)' : 'var(--color-sentinel-green)',
             fontFamily: 'Orbitron, monospace',
             textShadow: faultCount > 0 ? '0 0 10px rgba(239, 68, 68, 0.4)' : undefined,
           }}
@@ -112,7 +112,7 @@ export function BottomStatusBar({ equipment, loadKwOverride }: BottomStatusBarPr
         <span
           className="text-lg font-bold"
           style={{
-            color: warningCount > 0 ? '#F59E0B' : '#22C55E',
+            color: warningCount > 0 ? 'var(--color-sentinel-amber)' : 'var(--color-sentinel-green)',
             fontFamily: 'Orbitron, monospace',
             textShadow: warningCount > 0 ? '0 0 10px rgba(245, 158, 11, 0.4)' : undefined,
           }}
@@ -136,7 +136,7 @@ export function BottomStatusBar({ equipment, loadKwOverride }: BottomStatusBarPr
         <span
           className="text-lg font-bold"
           style={{
-            color: '#00BCD4',
+            color: 'var(--color-sentinel-cyan)',
             fontFamily: 'Orbitron, monospace',
             textShadow: '0 0 10px rgba(0, 188, 212, 0.4)',
           }}
@@ -160,7 +160,7 @@ export function BottomStatusBar({ equipment, loadKwOverride }: BottomStatusBarPr
         <span
           className="text-lg font-bold"
           style={{
-            color: '#FF9800',
+            color: 'var(--color-sentinel-amber)',
             fontFamily: 'Orbitron, monospace',
             textShadow: '0 0 10px rgba(255, 152, 0, 0.4)',
           }}

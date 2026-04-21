@@ -183,9 +183,8 @@ class SimulatedDeviceAdapter(DeviceAdapter):
             raise ValueError(f"Value {value} invalid for point {point_name}")
 
         # Log test_mode changes for fire safety devices
-        if self.device.metadata.get("life_safety") and point_name == "test_mode":
-            if value:
-                logger.info(f"Fire safety test mode enabled for {self.device.id}")
+        if self.device.metadata.get("life_safety") and point_name == "test_mode" and value:
+            logger.info(f"Fire safety test mode enabled for {self.device.id}")
 
         # Apply the write
         old_value = self._state.get(point_name)

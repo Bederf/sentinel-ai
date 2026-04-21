@@ -443,7 +443,7 @@ class SmartDispatchService:
         # Estimated total onsite time
         total_minutes = sum(t.get("estimated_minutes", 30) for t in bundled_tasks)
         # Add 15 min for travel between floors if multiple floors
-        floors_involved = set(t.get("floor") for t in bundled_tasks if t.get("floor"))
+        floors_involved = {t.get("floor") for t in bundled_tasks if t.get("floor")}
         if len(floors_involved) > 1:
             total_minutes += (len(floors_involved) - 1) * 15
 
@@ -544,7 +544,7 @@ class SmartDispatchService:
             "estimated_minutes": TASK_DURATION_ESTIMATES.get("anomaly_investigation", 30),
             "source": "dispatch_trigger",
         }
-        all_tasks = [primary_task] + bundled
+        all_tasks = [primary_task, *bundled]
 
         # Add any explicitly requested additional tasks
         if additional_tasks:

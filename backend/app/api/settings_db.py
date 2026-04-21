@@ -372,9 +372,8 @@ async def update_setting(key: str, update: SettingUpdate) -> dict[str, Any]:
         # Check if setting exists and is editable
         existing = supabase.table("system_settings").select("is_editable").eq("key", key).execute()
 
-        if existing.data:
-            if not existing.data[0].get("is_editable", True):
-                raise HTTPException(status_code=403, detail=f"Setting '{key}' is not editable")
+        if existing.data and not existing.data[0].get("is_editable", True):
+            raise HTTPException(status_code=403, detail=f"Setting '{key}' is not editable")
 
         # Build update data
         update_data = {

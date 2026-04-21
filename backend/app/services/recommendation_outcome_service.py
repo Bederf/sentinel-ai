@@ -217,10 +217,7 @@ def _evaluate_outcome(
     elif "brightness" in target_point.lower() or "dim" in target_point.lower():
         # Lighting: within 15% of target
         tolerance_pct = 0.15
-        if rec_val == 0:
-            success = current_reading < 5
-        else:
-            success = delta / rec_val <= tolerance_pct
+        success = current_reading < 5 if rec_val == 0 else delta / rec_val <= tolerance_pct
         return success, (
             f"Lighting: reading={current_reading:.0f}, target={rec_val:.0f}, "
             f"delta={delta:.0f} ({'within' if success else 'exceeds'} 15% tolerance)"
@@ -228,10 +225,7 @@ def _evaluate_outcome(
 
     else:
         # Generic: within 10% of recommended value
-        if rec_val == 0:
-            success = abs(current_reading) < 1
-        else:
-            success = delta / abs(rec_val) <= 0.10
+        success = abs(current_reading) < 1 if rec_val == 0 else delta / abs(rec_val) <= 0.1
         return success, (
             f"Measured={current_reading:.2f}, target={rec_val:.2f}, "
             f"delta={delta:.2f} ({'within' if success else 'exceeds'} 10% tolerance)"

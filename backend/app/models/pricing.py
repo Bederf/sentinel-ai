@@ -7,13 +7,13 @@ Models for equipment condition, age, ML risk buffers, SLA tiers, and quote calcu
 
 from datetime import date
 from decimal import Decimal
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, Field
 
 
-class SLATier(str, Enum):
+class SLATier(StrEnum):
     """Service Level Agreement tiers with different response times and uptime targets."""
 
     basic = "basic"  # 99% uptime, 24hr response

@@ -62,7 +62,7 @@ class SentinelDataSync:
         # ML feeder — accumulates sensor data and triggers training
         from app.services.sentinel_ml_feeder import SentinelMLFeeder
 
-        self.ml_feeder = SentinelMLFeeder(site_id=self.site_id)
+        self.ml_feeder = SentinelMLFeeder()
 
     async def ingest_equipment_states(
         self,
@@ -249,7 +249,7 @@ class SentinelDataSync:
                 }
 
             status = health_to_status(final_health_score)
-            h = int(round(final_health_score))
+            h = round(final_health_score)
 
             updates.append((code, json.dumps(operating_data), h, status))
 

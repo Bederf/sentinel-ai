@@ -328,10 +328,7 @@ class EquipmentIDConverter:
         """
         # Extract site number
         site_num = re.findall(r"\d+", site_id)
-        if site_num:
-            site_code = f"site-{site_num[0]}"
-        else:
-            site_code = site_id
+        site_code = f"site-{site_num[0]}" if site_num else site_id
 
         # Check for site-specific mappings
         if site_code in self.site_zone_mappings:

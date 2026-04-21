@@ -43,6 +43,7 @@ from app.services.solar_selfconsumption_service import get_solar_selfconsumption
 from app.utils.ai_provenance import attach_runtime_metadata
 
 router = APIRouter(
+    prefix="/solar",
     dependencies=[
         Depends(
             require_active_module(
@@ -58,7 +59,7 @@ router = APIRouter(
 
 
 @limiter.limit("30/minute")
-@router.get("/solar/sites")
+@router.get("/sites")
 async def list_solar_sites(request: Request):
     """List all registered solar sites."""
     svc = get_solar_ingestion_service()
@@ -66,7 +67,7 @@ async def list_solar_sites(request: Request):
 
 
 @limiter.limit("30/minute")
-@router.get("/solar/sites/{site_id}/overview")
+@router.get("/sites/{site_id}/overview")
 async def get_site_overview(request: Request, site_id: str):
     """Get high-level site overview: total generation, BESS SOC, grid import/export."""
     svc = get_solar_ingestion_service()
@@ -86,7 +87,7 @@ async def get_site_overview(request: Request, site_id: str):
 
 
 @limiter.limit("30/minute")
-@router.get("/solar/sites/{site_id}/inverters")
+@router.get("/sites/{site_id}/inverters")
 async def get_inverters(request: Request, site_id: str):
     """Get all inverters for a site with current readings."""
     svc = get_solar_ingestion_service()
@@ -101,7 +102,7 @@ async def get_inverters(request: Request, site_id: str):
 
 
 @limiter.limit("30/minute")
-@router.get("/solar/sites/{site_id}/inverters/{inverter_id}")
+@router.get("/sites/{site_id}/inverters/{inverter_id}")
 async def get_inverter_detail(request: Request, site_id: str, inverter_id: str):
     """Get single inverter detail with string-level data."""
     svc = get_solar_ingestion_service()
@@ -112,7 +113,7 @@ async def get_inverter_detail(request: Request, site_id: str, inverter_id: str):
 
 
 @limiter.limit("30/minute")
-@router.get("/solar/sites/{site_id}/bess")
+@router.get("/sites/{site_id}/bess")
 async def get_bess_status(request: Request, site_id: str):
     """Get BESS container status: SOC, mode, power, health, alarms."""
     svc = get_solar_ingestion_service()
@@ -183,7 +184,7 @@ async def get_bess_status(request: Request, site_id: str):
 
 
 @limiter.limit("30/minute")
-@router.get("/solar/sites/{site_id}/meter")
+@router.get("/sites/{site_id}/meter")
 async def get_meter_readings(request: Request, site_id: str):
     """Get grid meter readings: import/export, voltage, frequency, PF, THD."""
     svc = get_solar_ingestion_service()
@@ -197,7 +198,7 @@ async def get_meter_readings(request: Request, site_id: str):
     }
 
 
-@router.get("/solar/sites/{site_id}/readings")
+@router.get("/sites/{site_id}/readings")
 async def get_readings(
     site_id: str,
     type: str | None = Query(None, description="Filter by reading type (power, energy, soc, etc.)"),
@@ -214,7 +215,7 @@ async def get_readings(
 
 
 @limiter.limit("30/minute")
-@router.get("/solar/sites/{site_id}/connectors")
+@router.get("/sites/{site_id}/connectors")
 async def get_connector_status(request: Request, site_id: str):
     """Get health status of all manufacturer connectors for a site."""
     svc = get_solar_ingestion_service()
@@ -231,7 +232,7 @@ async def get_connector_status(request: Request, site_id: str):
 # === Performance monitoring endpoints (34-02) ===
 
 
-@router.get("/solar/sites/{site_id}/performance")
+@router.get("/sites/{site_id}/performance")
 async def get_performance_metrics(
     site_id: str,
     period: str = Query("day", description="Period: day, week, or month"),
@@ -249,7 +250,7 @@ async def get_performance_metrics(
 
 
 @limiter.limit("30/minute")
-@router.get("/solar/sites/{site_id}/performance/inverters")
+@router.get("/sites/{site_id}/performance/inverters")
 async def get_inverter_peer_comparison(request: Request, site_id: str):
     """Get inverter peer comparison table with rankings.
 
@@ -271,7 +272,7 @@ async def get_inverter_peer_comparison(request: Request, site_id: str):
     }
 
 
-@router.get("/solar/sites/{site_id}/performance/strings")
+@router.get("/sites/{site_id}/performance/strings")
 async def get_string_anomalies(
     site_id: str,
     inverter_id: str | None = Query(None, description="Filter to specific inverter"),
@@ -303,7 +304,7 @@ async def get_string_anomalies(
 
 
 @limiter.limit("30/minute")
-@router.get("/solar/sites/{site_id}/diagnostics")
+@router.get("/sites/{site_id}/diagnostics")
 async def get_diagnostics(request: Request, site_id: str):
     """Get full diagnostic report with prioritised issues.
 
@@ -322,7 +323,7 @@ async def get_diagnostics(request: Request, site_id: str):
 
 
 @limiter.limit("30/minute")
-@router.get("/solar/sites/{site_id}/compliance")
+@router.get("/sites/{site_id}/compliance")
 async def get_compliance_status(request: Request, site_id: str):
     """Get overall grid compliance status (traffic-light) with breakdown per standard.
 
@@ -338,7 +339,7 @@ async def get_compliance_status(request: Request, site_id: str):
 
 
 @limiter.limit("30/minute")
-@router.get("/solar/sites/{site_id}/compliance/voltage")
+@router.get("/sites/{site_id}/compliance/voltage")
 async def get_voltage_compliance(request: Request, site_id: str):
     """Get voltage compliance detail with violation history.
 
@@ -352,7 +353,7 @@ async def get_voltage_compliance(request: Request, site_id: str):
 
 
 @limiter.limit("30/minute")
-@router.get("/solar/sites/{site_id}/compliance/frequency")
+@router.get("/sites/{site_id}/compliance/frequency")
 async def get_frequency_compliance(request: Request, site_id: str):
     """Get frequency compliance detail with violation history.
 
@@ -366,7 +367,7 @@ async def get_frequency_compliance(request: Request, site_id: str):
 
 
 @limiter.limit("30/minute")
-@router.get("/solar/sites/{site_id}/compliance/power-quality")
+@router.get("/sites/{site_id}/compliance/power-quality")
 async def get_power_quality_compliance(request: Request, site_id: str):
     """Get power quality compliance: THD, power factor, DC injection.
 
@@ -379,7 +380,7 @@ async def get_power_quality_compliance(request: Request, site_id: str):
 
 
 @limiter.limit("30/minute")
-@router.get("/solar/sites/{site_id}/compliance/export")
+@router.get("/sites/{site_id}/compliance/export")
 async def get_export_compliance(request: Request, site_id: str):
     """Get export limit compliance status.
 
@@ -393,7 +394,7 @@ async def get_export_compliance(request: Request, site_id: str):
 
 
 @limiter.limit("30/minute")
-@router.get("/solar/sites/{site_id}/compliance/certificates")
+@router.get("/sites/{site_id}/compliance/certificates")
 async def get_certificate_status(request: Request, site_id: str):
     """Get NRS 097 certificate status for all equipment.
 
@@ -413,7 +414,7 @@ async def get_certificate_status(request: Request, site_id: str):
     }
 
 
-@router.get("/solar/sites/{site_id}/compliance/report")
+@router.get("/sites/{site_id}/compliance/report")
 async def get_compliance_report(
     site_id: str,
     period: str = Query("month", description="Reporting period: day, week, or month"),
@@ -431,7 +432,7 @@ async def get_compliance_report(
     return report.to_dict()
 
 
-@router.get("/solar/sites/{site_id}/compliance/events")
+@router.get("/sites/{site_id}/compliance/events")
 async def get_compliance_events(
     site_id: str,
     from_ts: str | None = Query(None, alias="from", description="Start timestamp (ISO 8601)"),
@@ -456,7 +457,7 @@ async def get_compliance_events(
 
 
 @limiter.limit("30/minute")
-@router.get("/solar/sites/{site_id}/dispatch/schedule")
+@router.get("/sites/{site_id}/dispatch/schedule")
 async def get_dispatch_schedule(request: Request, site_id: str):
     """Get today's 24-hour BESS dispatch schedule optimised for TOU arbitrage.
 
@@ -470,7 +471,7 @@ async def get_dispatch_schedule(request: Request, site_id: str):
 
 
 @limiter.limit("30/minute")
-@router.get("/solar/sites/{site_id}/dispatch/status")
+@router.get("/sites/{site_id}/dispatch/status")
 async def get_dispatch_status(request: Request, site_id: str):
     """Get current dispatch state: mode, action, BESS SOC, savings so far.
 
@@ -488,7 +489,7 @@ async def get_dispatch_status(request: Request, site_id: str):
     return status.to_dict()
 
 
-@router.get("/solar/sites/{site_id}/dispatch/log")
+@router.get("/sites/{site_id}/dispatch/log")
 async def get_dispatch_log(
     site_id: str,
     hours: int = Query(24, ge=1, le=168, description="Hours of history (1-168)"),
@@ -509,7 +510,7 @@ async def get_dispatch_log(
     }
 
 
-@router.get("/solar/sites/{site_id}/arbitrage/savings")
+@router.get("/sites/{site_id}/arbitrage/savings")
 async def get_arbitrage_savings(
     site_id: str,
     period: str = Query("day", description="Period: day, week, or month"),
@@ -531,7 +532,7 @@ async def get_arbitrage_savings(
 
 
 @limiter.limit("30/minute")
-@router.get("/solar/sites/{site_id}/tariff/current")
+@router.get("/sites/{site_id}/tariff/current")
 async def get_current_tariff(request: Request, site_id: str):
     """Get the current City Power TOU tariff band and rate.
 
@@ -553,7 +554,7 @@ async def get_current_tariff(request: Request, site_id: str):
 
 
 @limiter.limit("30/minute")
-@router.get("/solar/sites/{site_id}/demand/status")
+@router.get("/sites/{site_id}/demand/status")
 async def get_demand_status(request: Request, site_id: str):
     """Get current demand status with NMD headroom and peak shaving state.
 
@@ -565,7 +566,7 @@ async def get_demand_status(request: Request, site_id: str):
     return status.to_dict()
 
 
-@router.get("/solar/sites/{site_id}/demand/profile")
+@router.get("/sites/{site_id}/demand/profile")
 async def get_demand_profile(
     site_id: str,
     period: str = Query("day", description="Period: day or week"),
@@ -582,7 +583,7 @@ async def get_demand_profile(
 
 
 @limiter.limit("30/minute")
-@router.get("/solar/sites/{site_id}/demand/nmd")
+@router.get("/sites/{site_id}/demand/nmd")
 async def get_nmd_status(request: Request, site_id: str):
     """Get NMD compliance status with ratchet history and alert level.
 
@@ -595,7 +596,7 @@ async def get_nmd_status(request: Request, site_id: str):
     return nmd.to_dict()
 
 
-@router.get("/solar/sites/{site_id}/demand/savings")
+@router.get("/sites/{site_id}/demand/savings")
 async def get_demand_savings(
     site_id: str,
     period: str = Query("month", description="Period: month"),
@@ -614,7 +615,7 @@ async def get_demand_savings(
 # === Self-consumption endpoints (34-06) ===
 
 
-@router.get("/solar/sites/{site_id}/selfconsumption")
+@router.get("/sites/{site_id}/selfconsumption")
 async def get_selfconsumption(
     site_id: str,
     period: str = Query("day", description="Period: day, week, or month"),
@@ -636,7 +637,7 @@ async def get_selfconsumption(
     return metrics.to_dict()
 
 
-@router.get("/solar/sites/{site_id}/energy-balance")
+@router.get("/sites/{site_id}/energy-balance")
 async def get_energy_balance(
     site_id: str,
     period: str = Query("day", description="Period: day, week, or month"),
@@ -661,7 +662,7 @@ async def get_energy_balance(
 # === Generation forecast endpoints (34-07) ===
 
 
-@router.get("/solar/sites/{site_id}/forecast")
+@router.get("/sites/{site_id}/forecast")
 async def get_generation_forecast(
     site_id: str,
     hours: int = Query(72, ge=1, le=168, description="Forecast horizon in hours (1-168)"),
@@ -683,7 +684,7 @@ async def get_generation_forecast(
     return forecast.to_dict()
 
 
-@router.get("/solar/sites/{site_id}/forecast/accuracy")
+@router.get("/sites/{site_id}/forecast/accuracy")
 async def get_forecast_accuracy(
     site_id: str,
     days: int = Query(7, ge=1, le=30, description="Accuracy period in days (1-30)"),
@@ -704,7 +705,7 @@ async def get_forecast_accuracy(
 
 
 @limiter.limit("30/minute")
-@router.get("/solar/sites/{site_id}/generator/status")
+@router.get("/sites/{site_id}/generator/status")
 async def get_generator_status(request: Request, site_id: str):
     """Get current dispatch priority stack and generator need assessment.
 
@@ -723,7 +724,7 @@ async def get_generator_status(request: Request, site_id: str):
     }
 
 
-@router.get("/solar/sites/{site_id}/generator/avoidance")
+@router.get("/sites/{site_id}/generator/avoidance")
 async def get_diesel_avoidance(
     site_id: str,
     period: str = Query("month", description="Period: day, week, or month"),
@@ -745,7 +746,7 @@ async def get_diesel_avoidance(
     return avoidance.to_dict()
 
 
-@router.get("/solar/sites/{site_id}/generator/events")
+@router.get("/sites/{site_id}/generator/events")
 async def get_generator_events(
     site_id: str,
     period: str = Query("month", description="Period: day, week, or month"),
@@ -776,7 +777,7 @@ async def get_generator_events(
 
 
 @limiter.limit("30/minute")
-@router.get("/solar/sites/{site_id}/health")
+@router.get("/sites/{site_id}/health")
 async def get_fleet_health(request: Request, site_id: str):
     """Get fleet health overview: degradation summary, BESS SoH, alerts.
 
@@ -795,7 +796,7 @@ async def get_fleet_health(request: Request, site_id: str):
 
 
 @limiter.limit("30/minute")
-@router.get("/solar/sites/{site_id}/health/inverters/{inverter_id}")
+@router.get("/sites/{site_id}/health/inverters/{inverter_id}")
 async def get_inverter_health(request: Request, site_id: str, inverter_id: str):
     """Get single inverter health detail with degradation rate.
 
@@ -829,7 +830,7 @@ async def get_inverter_health(request: Request, site_id: str, inverter_id: str):
 
 
 @limiter.limit("30/minute")
-@router.get("/solar/sites/{site_id}/health/bess")
+@router.get("/sites/{site_id}/health/bess")
 async def get_bess_health(request: Request, site_id: str):
     """Get BESS State-of-Health with rack-level detail.
 
@@ -847,7 +848,7 @@ async def get_bess_health(request: Request, site_id: str):
     return health.to_dict()
 
 
-@router.get("/solar/sites/{site_id}/health/bess/cycles")
+@router.get("/sites/{site_id}/health/bess/cycles")
 async def get_bess_cycle_history(
     site_id: str,
     months: int = Query(12, ge=1, le=24, description="Months of history (1-24)"),
@@ -874,7 +875,7 @@ async def get_bess_cycle_history(
 
 
 @limiter.limit("30/minute")
-@router.get("/solar/sites/{site_id}/health/degradation")
+@router.get("/sites/{site_id}/health/degradation")
 async def get_degradation_ranking(request: Request, site_id: str):
     """Get fleet-wide degradation ranking for all inverters.
 
@@ -892,7 +893,7 @@ async def get_degradation_ranking(request: Request, site_id: str):
     return degradation.to_dict()
 
 
-@router.post("/solar/sites/{site_id}/health/warranty-evidence/{equipment_id}")
+@router.post("/sites/{site_id}/health/warranty-evidence/{equipment_id}")
 async def generate_warranty_evidence(site_id: str, equipment_id: str):
     """Generate warranty evidence package for an inverter or BESS.
 
@@ -916,7 +917,7 @@ async def generate_warranty_evidence(site_id: str, equipment_id: str):
 
 
 @limiter.limit("30/minute")
-@router.get("/solar/sites/{site_id}/maintenance/schedule")
+@router.get("/sites/{site_id}/maintenance/schedule")
 async def get_maintenance_schedule(request: Request, site_id: str):
     """Get 90-day maintenance calendar (PPM + condition-based).
 
@@ -931,7 +932,7 @@ async def get_maintenance_schedule(request: Request, site_id: str):
 
 
 @limiter.limit("30/minute")
-@router.get("/solar/sites/{site_id}/maintenance/recommendations")
+@router.get("/sites/{site_id}/maintenance/recommendations")
 async def get_maintenance_recommendations(request: Request, site_id: str):
     """Get current maintenance recommendations from condition evaluation.
 
@@ -954,7 +955,7 @@ async def get_maintenance_recommendations(request: Request, site_id: str):
     )
 
 
-@router.post("/solar/sites/{site_id}/maintenance/generate-work-orders")
+@router.post("/sites/{site_id}/maintenance/generate-work-orders")
 async def generate_maintenance_work_orders(site_id: str):
     """Create work orders from urgent/soon maintenance recommendations.
 
@@ -974,7 +975,7 @@ async def generate_maintenance_work_orders(site_id: str):
 # === Financial reporting endpoints (34-09) ===
 
 
-@router.get("/solar/sites/{site_id}/financial/monthly")
+@router.get("/sites/{site_id}/financial/monthly")
 async def get_monthly_financial_report(
     site_id: str,
     month: int = Query(..., ge=1, le=12, description="Month (1-12)"),
@@ -992,7 +993,7 @@ async def get_monthly_financial_report(
     return report.to_dict()
 
 
-@router.get("/solar/sites/{site_id}/financial/summary")
+@router.get("/sites/{site_id}/financial/summary")
 async def get_financial_summary(
     site_id: str,
     period: str = Query("ytd", description="Period: ytd (year-to-date)"),
@@ -1007,7 +1008,7 @@ async def get_financial_summary(
     return summary.to_dict()
 
 
-@router.get("/solar/sites/{site_id}/financial/carbon")
+@router.get("/sites/{site_id}/financial/carbon")
 async def get_carbon_offset(
     site_id: str,
     period: str = Query("month", description="Period: month or ytd"),

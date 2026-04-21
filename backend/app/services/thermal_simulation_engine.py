@@ -650,7 +650,7 @@ class ThermalSimulationEngine:
             updated += 1
 
         # Also map codes to zone fcu_ids for zones that reference equipment by ID
-        for zone_id, zone_config in self._zone_cache.items():
+        for _zone_id, zone_config in self._zone_cache.items():
             fcu_id = zone_config.get("fcu_id")
             if fcu_id and fcu_id in health_dict:
                 self._equipment_health_cache[fcu_id] = health_dict[fcu_id]

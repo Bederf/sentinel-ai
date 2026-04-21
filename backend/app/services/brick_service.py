@@ -304,7 +304,7 @@ class BrickService:
     def _graph_search_bacnet_ref(self, bacnet_ref: str) -> str | None:
         """Fallback: search graph for a point with matching bacnet_ref."""
         # Check sentinel:bacnet_ref on point nodes
-        for s, _, o in self.g.triples((None, SENTINEL.bacnet_ref, Literal(bacnet_ref))):
+        for s, _, _o in self.g.triples((None, SENTINEL.bacnet_ref, Literal(bacnet_ref))):
             # Could be on point directly or on external ref node
             # If on point, return it
             if any(self.g.triples((s, BRICK.isPointOf, None))):
@@ -314,7 +314,7 @@ class BrickService:
                 return str(pt)
 
         # Check bacnet:object-name on external ref nodes
-        for refnode, _, o in self.g.triples((None, BACNET["object-name"], Literal(bacnet_ref))):
+        for refnode, _, _o in self.g.triples((None, BACNET["object-name"], Literal(bacnet_ref))):
             for pt, _, _ in self.g.triples((None, REF.hasExternalReference, refnode)):
                 return str(pt)
 

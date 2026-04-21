@@ -579,6 +579,11 @@ export interface Site {
   equipment_count: number; // Total equipment count
   alert_count: number;
   status: "normal" | "warning" | "critical";
+  // Bridge connectivity status
+  bridge_connected?: boolean;
+  bridge_data_source?: "remote_bridge" | "local_adapter" | "none";
+  bridge_last_sync?: string | null;
+  bridge_sync_error?: string | null;
   // Extended fields from backend (optional for summary, required for detail)
   sqm?: number;
   floors?: number;
@@ -619,11 +624,6 @@ export interface Site {
     created_at: string;
     reason?: string | null;
   } | null;
-  // Bridge ingestion status
-  bridge_connected?: boolean;
-  bridge_data_source?: "remote_bridge" | "local_adapter" | "none";
-  bridge_last_sync?: string | null;
-  bridge_sync_error?: string | null;
 }
 
 // Equipment interface

@@ -204,7 +204,7 @@ class TestJSONRPCEnvelopeValidation:
         """jsonrpc != '2.0' gets 400."""
         from app.api.mcp_sse import _validate_jsonrpc_envelope
 
-        valid, msg, status = _validate_jsonrpc_envelope(
+        valid, _msg, status = _validate_jsonrpc_envelope(
             {
                 "jsonrpc": "1.0",
                 "id": 1,
@@ -263,7 +263,7 @@ class TestJSONRPCEnvelopeValidation:
         """notifications/initialized without id is allowed."""
         from app.api.mcp_sse import _validate_jsonrpc_envelope
 
-        valid, msg, status = _validate_jsonrpc_envelope(
+        valid, _msg, _status = _validate_jsonrpc_envelope(
             {
                 "jsonrpc": "2.0",
                 "method": "notifications/initialized",
@@ -275,7 +275,7 @@ class TestJSONRPCEnvelopeValidation:
         """Well-formed envelope passes."""
         from app.api.mcp_sse import _validate_jsonrpc_envelope
 
-        valid, msg, status = _validate_jsonrpc_envelope(
+        valid, msg, _status = _validate_jsonrpc_envelope(
             {
                 "jsonrpc": "2.0",
                 "id": 1,

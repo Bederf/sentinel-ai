@@ -93,11 +93,7 @@ class SecureSSEBuffer:
             return True
 
         # Flush at sentence boundaries for natural reading experience
-        for boundary in _SENTENCE_BOUNDARIES:
-            if self._buffer.endswith(boundary):
-                return True
-
-        return False
+        return any(self._buffer.endswith(boundary) for boundary in _SENTENCE_BOUNDARIES)
 
     def _flush(self) -> str | None:
         """Run the filter on sliding_window + buffer, return safe text."""

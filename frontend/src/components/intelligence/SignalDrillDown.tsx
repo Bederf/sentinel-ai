@@ -16,10 +16,10 @@ import { conciergeApi } from "../../lib/api";
 // ---- Severity badge colours ----
 
 const SEVERITY_BADGE: Record<string, { bg: string; text: string }> = {
-  low: { bg: "rgba(46,204,113,0.15)", text: "#2ecc71" },
-  medium: { bg: "rgba(241,196,15,0.15)", text: "#f1c40f" },
-  high: { bg: "rgba(230,126,34,0.15)", text: "#e67e22" },
-  critical: { bg: "rgba(231,76,60,0.15)", text: "#e74c3c" },
+  low: { bg: "rgba(46,204,113,0.15)", text: "var(--color-sentinel-green)" },
+  medium: { bg: "rgba(241,196,15,0.15)", text: "var(--color-sentinel-amber)" },
+  high: { bg: "rgba(230,126,34,0.15)", text: "var(--color-sentinel-amber)" },
+  critical: { bg: "rgba(231,76,60,0.15)", text: "var(--color-sentinel-red)" },
 };
 
 // ---- Signal type labels (shared with RoomDetailPanel) ----
@@ -282,7 +282,7 @@ function EmailThread({ detail }: { detail: ConciergeSignalDetail }) {
             {message.body_plain && (
               <div
                 className="mt-3 px-3 py-2 rounded text-xs leading-6 whitespace-pre-wrap"
-                style={{ background: "rgba(15,23,42,0.75)", border: "1px solid rgba(148,163,184,0.12)", color: "#d1d5db" }}
+                style={{ background: "rgba(15,23,42,0.75)", border: "1px solid rgba(148,163,184,0.12)", color: "var(--color-sentinel-text-secondary)" }}
               >
                 {message.body_plain}
               </div>
@@ -305,7 +305,7 @@ function RawContent({ detail }: { detail: ConciergeSignalDetail }) {
         style={{
           background: "rgba(148,163,184,0.08)",
           border: "1px solid rgba(148,163,184,0.16)",
-          color: "#cbd5e1",
+          color: "var(--color-sentinel-text-secondary)",
         }}
         aria-expanded={expanded}
       >
@@ -447,9 +447,9 @@ function BlockBookingDetail({ detail, siteId, roomId, signalId, onBack }: BlockB
           disabled={Boolean(processing)}
           className="px-4 py-2 text-xs font-semibold uppercase tracking-widest rounded border transition-colors"
           style={{
-            background: processing === "resolve" ? "#dcfce7" : "rgba(16, 185, 129, 0.15)",
-            color: "#15803d",
-            border: "1px solid rgba(16, 185, 129, 0.4)",
+            background: processing === "resolve" ? "rgba(34,197,94,0.22)" : "rgba(16,185,129,0.15)",
+            color: "var(--color-sentinel-green)",
+            border: "1px solid rgba(16,185,129,0.4)",
           }}
         >
           {processing === "resolve" ? "Resolving…" : "Resolve"}
@@ -459,9 +459,9 @@ function BlockBookingDetail({ detail, siteId, roomId, signalId, onBack }: BlockB
           disabled={Boolean(processing)}
           className="px-4 py-2 text-xs font-semibold uppercase tracking-widest rounded border transition-colors"
           style={{
-            background: processing === "archive" ? "#fee2e2" : "rgba(239, 68, 68, 0.15)",
-            color: "#b91c1c",
-            border: "1px solid rgba(239, 68, 68, 0.4)",
+            background: processing === "archive" ? "rgba(239,68,68,0.22)" : "rgba(239,68,68,0.15)",
+            color: "var(--color-sentinel-red)",
+            border: "1px solid rgba(239,68,68,0.4)",
           }}
         >
           {processing === "archive" ? "Archiving…" : "Archive"}
@@ -570,7 +570,7 @@ function RelatedTimeline({ detail }: { detail: ConciergeSignalDetail }) {
             className="flex items-start gap-2 px-2 py-1.5 rounded text-xs"
             style={{
               background: rs.id === detail.id ? "rgba(59,130,246,0.1)" : "transparent",
-              borderLeft: rs.id === detail.id ? "2px solid #3B82F6" : "2px solid transparent",
+              borderLeft: rs.id === detail.id ? "2px solid var(--color-sentinel-blue)" : "2px solid transparent",
             }}
           >
             <span className="text-gray-500 flex-shrink-0 w-12">{relativeTime(rs.created_at)}</span>
@@ -716,9 +716,9 @@ export function SignalDrillDown({ siteId, roomId, signalId, room, onSignalSelect
             disabled={processing}
             className="px-2.5 py-1 text-[10px] font-semibold uppercase tracking-widest rounded-lg border transition-colors"
             style={{
-              background: processing ? "rgba(34,197,94,0.22)" : "rgba(34,197,94,0.12)",
-              color: "#22c55e",
-              borderColor: "rgba(34,197,94,0.35)",
+              background: processing ? "rgba(34,197,94,0.22)" : "rgba(16,185,129,0.12)",
+              color: "var(--color-sentinel-green)",
+              borderColor: "rgba(16,185,129,0.35)",
               opacity: processing ? 0.75 : 1,
             }}
             title="Resolve and remove from the map"
@@ -747,7 +747,7 @@ export function SignalDrillDown({ siteId, roomId, signalId, room, onSignalSelect
                 style={{
                   background: isActive ? "rgba(59,130,246,0.22)" : "rgba(148,163,184,0.10)",
                   borderColor: isActive ? "rgba(59,130,246,0.55)" : "rgba(148,163,184,0.25)",
-                  color: isActive ? "#93c5fd" : "#cbd5e1",
+                  color: isActive ? "var(--color-sentinel-blue)" : "var(--color-sentinel-text-secondary)",
                 }}
               >
                 {categoryLabel(tab.key)} ({tab.signals.length})
@@ -777,7 +777,7 @@ export function SignalDrillDown({ siteId, roomId, signalId, room, onSignalSelect
           ) : (
             <>
               {actionError && (
-                <div className="mb-3 px-3 py-2 rounded text-xs" style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.18)", color: "#fca5a5" }}>
+                <div className="mb-3 px-3 py-2 rounded text-xs" style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.18)", color: "var(--color-sentinel-red)" }}>
                   {actionError}
                 </div>
               )}

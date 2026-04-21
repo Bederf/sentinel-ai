@@ -23,7 +23,7 @@ import json
 import logging
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, time, timedelta
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 # === Enums ===
 
 
-class TariffBandName(str, Enum):
+class TariffBandName(StrEnum):
     """TOU tariff band names."""
 
     PEAK = "peak"
@@ -43,7 +43,7 @@ class TariffBandName(str, Enum):
     OFF_PEAK = "off_peak"
 
 
-class DispatchActionType(str, Enum):
+class DispatchActionType(StrEnum):
     """BESS dispatch action types."""
 
     CHARGE = "charge"
@@ -52,7 +52,7 @@ class DispatchActionType(str, Enum):
     SOLAR_PRIORITY = "solar_priority"
 
 
-class Season(str, Enum):
+class Season(StrEnum):
     """Tariff season (SA winter = high demand = Jun/Jul/Aug)."""
 
     SUMMER = "summer"

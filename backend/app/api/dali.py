@@ -342,10 +342,7 @@ def run_dali_simulation(max_day: int = 365) -> dict:
                 # ============================================================
                 # SCENARIO 1: BASELINE (Fixed schedule)
                 # ============================================================
-                if 7 <= hour < 18:
-                    baseline_power = zone_power_kw
-                else:
-                    baseline_power = 0
+                baseline_power = zone_power_kw if 7 <= hour < 18 else 0
 
                 # ============================================================
                 # SCENARIO 2: WITH DALI (Occupancy + Daylight)
@@ -1012,10 +1009,7 @@ async def get_detailed_occupancy(
 
     try:
         # Get simulation time (or current time if not provided)
-        if time:
-            sim_time = datetime.fromisoformat(time)
-        else:
-            sim_time = datetime.now()
+        sim_time = datetime.fromisoformat(time) if time else datetime.now()
 
         hour = sim_time.hour
         day_of_week = sim_time.weekday()

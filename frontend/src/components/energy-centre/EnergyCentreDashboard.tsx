@@ -220,7 +220,7 @@ export function EnergyCentreDashboard({ siteId, onAIRecommendation, enabledModul
       <div className="h-full p-4 md:p-6">
         <div className="flex items-center gap-3 mb-6">
           <div className="p-2 rounded" style={{ background: "rgba(234, 179, 8, 0.15)" }}>
-            <Activity className="h-6 w-6" style={{ color: "#EAB308" }} />
+            <Activity className="h-6 w-6" style={{ color: "var(--color-sentinel-amber)" }} />
           </div>
           <div>
             <h1 className="text-2xl font-bold" style={{ color: "var(--color-sentinel-text-primary)" }}>Energy Centre</h1>
@@ -237,7 +237,7 @@ export function EnergyCentreDashboard({ siteId, onAIRecommendation, enabledModul
       <div className="h-full p-4 md:p-6">
         <div className="flex items-center gap-3 mb-6">
           <div className="p-2 rounded" style={{ background: "rgba(234, 179, 8, 0.15)" }}>
-            <Activity className="h-6 w-6" style={{ color: "#EAB308" }} />
+            <Activity className="h-6 w-6" style={{ color: "var(--color-sentinel-amber)" }} />
           </div>
           <div>
             <h1 className="text-2xl font-bold" style={{ color: "var(--color-sentinel-text-primary)" }}>Energy Centre</h1>
@@ -256,7 +256,7 @@ export function EnergyCentreDashboard({ siteId, onAIRecommendation, enabledModul
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded" style={{ background: "rgba(234, 179, 8, 0.15)" }}>
-              <Activity className="h-6 w-6" style={{ color: "#EAB308" }} />
+              <Activity className="h-6 w-6" style={{ color: "var(--color-sentinel-amber)" }} />
             </div>
             <div>
               <div className="flex items-center gap-2">
@@ -265,12 +265,12 @@ export function EnergyCentreDashboard({ siteId, onAIRecommendation, enabledModul
                 </h1>
                 {overview.status.on_generator ? (
                   <div className="px-2 py-0.5 rounded text-xs font-medium"
-                    style={{ background: 'rgba(245, 158, 11, 0.15)', color: '#F59E0B' }}>
+                    style={{ background: 'rgba(245, 158, 11, 0.15)', color: 'var(--color-sentinel-amber)' }}>
                     On Generator
                   </div>
                 ) : (
                   <div className="px-2 py-0.5 rounded text-xs font-medium"
-                    style={{ background: 'rgba(34, 197, 94, 0.15)', color: '#22C55E' }}>
+                    style={{ background: 'rgba(34, 197, 94, 0.15)', color: 'var(--color-sentinel-green)' }}>
                     Mains Supply
                   </div>
                 )}

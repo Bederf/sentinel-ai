@@ -222,7 +222,7 @@ class TestCardIdempotency:
         card_ids_2 = generate_cards(c, cluster_id, targets)
 
         # Same card IDs returned (updated, not new)
-        assert set(str(cid) for cid in card_ids_1) == set(str(cid) for cid in card_ids_2)
+        assert {str(cid) for cid in card_ids_1} == {str(cid) for cid in card_ids_2}
 
         # Total card count unchanged
         cur = c.cursor()

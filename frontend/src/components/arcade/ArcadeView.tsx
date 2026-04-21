@@ -225,7 +225,7 @@ export function ArcadeView({ siteId, onModuleDisplayChange }: ArcadeViewProps) {
           <span
             style={{
               fontSize: 11,
-              color: "#f59e0b",
+              color: "var(--color-sentinel-amber)",
               fontFamily: "system-ui, sans-serif",
             }}
             title={error}

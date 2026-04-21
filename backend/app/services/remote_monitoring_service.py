@@ -10,6 +10,7 @@ Integrates with:
   - AuditLogger for session logging
 """
 
+import contextlib
 import logging
 import uuid
 from datetime import datetime
@@ -210,10 +211,8 @@ class RemoteMonitoringService:
 
         # Safety status
         safety_status: dict[str, Any] | None = None
-        try:
+        with contextlib.suppress(Exception):
             safety_status = await device_manager.get_device_safety_status(equipment_id)
-        except Exception:
-            pass
 
         # Determine summary
         status_val = device.status.value if hasattr(device.status, "value") else str(device.status)

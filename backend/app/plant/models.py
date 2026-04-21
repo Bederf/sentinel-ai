@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
 
-class AlarmSeverity(str, Enum):
+class AlarmSeverity(StrEnum):
     """Severity classification for Desigo building alarms."""
 
     VERY_CRITICAL = "very_critical"

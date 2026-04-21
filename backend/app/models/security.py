@@ -10,7 +10,7 @@ Provides data structures for:
 
 import uuid
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -20,7 +20,7 @@ from pydantic import BaseModel, ConfigDict, Field
 # ============================================================================
 
 
-class AccessType(str, Enum):
+class AccessType(StrEnum):
     """Type of access credential used."""
 
     BADGE = "badge"
@@ -30,7 +30,7 @@ class AccessType(str, Enum):
     MANUAL = "manual"
 
 
-class AccessStatus(str, Enum):
+class AccessStatus(StrEnum):
     """Result of access attempt."""
 
     GRANTED = "granted"
@@ -69,7 +69,7 @@ class AccessEvent(BaseModel):
         }
 
 
-class DeviceType(str, Enum):
+class DeviceType(StrEnum):
     """Type of access control device."""
 
     READER = "reader"
@@ -78,7 +78,7 @@ class DeviceType(str, Enum):
     CONTROLLER = "controller"
 
 
-class PointStatus(str, Enum):
+class PointStatus(StrEnum):
     """Status of access control point."""
 
     ACTIVE = "active"
@@ -113,7 +113,7 @@ class AccessPoint(BaseModel):
         }
 
 
-class CardStatus(str, Enum):
+class CardStatus(StrEnum):
     """Status of access card."""
 
     ACTIVE = "active"
@@ -122,7 +122,7 @@ class CardStatus(str, Enum):
     SUSPENDED = "suspended"
 
 
-class AccessLevel(str, Enum):
+class AccessLevel(StrEnum):
     """Access privilege level."""
 
     VISITOR = "visitor"
@@ -163,7 +163,7 @@ class AccessCard(BaseModel):
 # ============================================================================
 
 
-class VisitorStatus(str, Enum):
+class VisitorStatus(StrEnum):
     """Visitor state."""
 
     PENDING = "pending"
@@ -220,7 +220,7 @@ class VisitSchedule(BaseModel):
 # ============================================================================
 
 
-class AlertType(str, Enum):
+class AlertType(StrEnum):
     """Type of security alert."""
 
     FORCED_ENTRY = "forced_entry"
@@ -232,7 +232,7 @@ class AlertType(str, Enum):
     UNAUTHORIZED_ACCESS = "unauthorized_access"
 
 
-class AlertSeverity(str, Enum):
+class AlertSeverity(StrEnum):
     """Alert priority level."""
 
     CRITICAL = "critical"
@@ -240,7 +240,7 @@ class AlertSeverity(str, Enum):
     INFO = "info"
 
 
-class AlertStatus(str, Enum):
+class AlertStatus(StrEnum):
     """Alert resolution state."""
 
     OPEN = "open"
@@ -309,7 +309,7 @@ class OccupancyData(BaseModel):
     last_updated: datetime
 
 
-class OccupancySource(str, Enum):
+class OccupancySource(StrEnum):
     """Source of occupancy data."""
 
     BADGE = "badge"

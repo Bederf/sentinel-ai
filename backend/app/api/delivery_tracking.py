@@ -3,7 +3,7 @@
 import asyncio
 import logging
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel
@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/delivery", tags=["delivery_tracking"])
 
 
-class DeliveryStatus(str, Enum):
+class DeliveryStatus(StrEnum):
     """Delivery status enum."""
 
     ORDERED = "ordered"

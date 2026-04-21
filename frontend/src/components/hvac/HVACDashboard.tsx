@@ -177,7 +177,7 @@ export function HVACDashboard({
       <div className="h-full p-4 md:p-6">
         <div className="flex items-center gap-3 mb-6">
           <div className="p-2 rounded" style={{ background: "rgba(59, 130, 246, 0.15)" }}>
-            <Wind className="h-6 w-6" style={{ color: "#3B82F6" }} />
+            <Wind className="h-6 w-6" style={{ color: "var(--color-sentinel-blue)" }} />
           </div>
           <div>
             <h1 className="text-2xl font-bold" style={{ color: "var(--color-sentinel-text-primary)" }}>HVAC Control</h1>
@@ -200,7 +200,7 @@ export function HVACDashboard({
       <div className="h-full p-4 md:p-6">
         <div className="flex items-center gap-3 mb-6">
           <div className="p-2 rounded" style={{ background: "rgba(59, 130, 246, 0.15)" }}>
-            <Wind className="h-6 w-6" style={{ color: "#3B82F6" }} />
+            <Wind className="h-6 w-6" style={{ color: "var(--color-sentinel-blue)" }} />
           </div>
           <div>
             <h1 className="text-2xl font-bold" style={{ color: "var(--color-sentinel-text-primary)" }}>HVAC Control</h1>
@@ -266,7 +266,7 @@ export function HVACDashboard({
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
             <div className="flex items-center gap-2 mb-2">
-              <Thermometer className="w-5 h-5" style={{ color: "#3B82F6" }} />
+              <Thermometer className="w-5 h-5" style={{ color: "var(--color-sentinel-blue)" }} />
               <span className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>Zones</span>
             </div>
             <div className="text-3xl font-bold" style={{ color: "var(--color-sentinel-text-primary)" }}>{overview.zones.total}</div>
@@ -277,7 +277,7 @@ export function HVACDashboard({
 
           <div className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
             <div className="flex items-center gap-2 mb-2">
-              <Activity className="w-5 h-5" style={{ color: "#06B6D4" }} />
+              <Activity className="w-5 h-5" style={{ color: "var(--color-sentinel-cyan)" }} />
               <span className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>Chillers</span>
             </div>
             <div className="text-3xl font-bold" style={{ color: "var(--color-sentinel-text-primary)" }}>
@@ -289,9 +289,9 @@ export function HVACDashboard({
           <div className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
             <div className="flex items-center gap-2 mb-2">
               {overview.health_status === "healthy" ? (
-                <CheckCircle className="w-5 h-5" style={{ color: "#22C55E" }} />
+                <CheckCircle className="w-5 h-5" style={{ color: "var(--color-sentinel-green)" }} />
               ) : (
-                <AlertTriangle className="w-5 h-5" style={{ color: "#F59E0B" }} />
+                <AlertTriangle className="w-5 h-5" style={{ color: "var(--color-sentinel-amber)" }} />
               )}
               <span className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>Health</span>
             </div>
@@ -303,7 +303,7 @@ export function HVACDashboard({
 
           <div className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
             <div className="flex items-center gap-2 mb-2">
-              <AlertTriangle className="w-5 h-5" style={{ color: "#F59E0B" }} />
+              <AlertTriangle className="w-5 h-5" style={{ color: "var(--color-sentinel-amber)" }} />
               <span className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>Alerts</span>
             </div>
             <div className="text-3xl font-bold" style={{ color: "var(--color-sentinel-text-primary)" }}>{overview.alerts.length}</div>
@@ -320,7 +320,7 @@ export function HVACDashboard({
             style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}
           >
             <div className="flex items-center gap-2 mb-2">
-              <Brain className="w-5 h-5" style={{ color: "#8B5CF6" }} />
+              <Brain className="w-5 h-5" style={{ color: "var(--color-sentinel-purple)" }} />
               <span className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>
                 SENTINEL HVAC Intelligence
               </span>
@@ -363,7 +363,7 @@ export function HVACDashboard({
             style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}
           >
             <div className="flex items-center gap-2 mb-2">
-              <Activity className="w-5 h-5" style={{ color: "#06B6D4" }} />
+              <Activity className="w-5 h-5" style={{ color: "var(--color-sentinel-cyan)" }} />
               <span className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>
                 Raw Bridge Telemetry
               </span>
@@ -406,7 +406,7 @@ export function HVACDashboard({
             <h3 className="text-sm font-medium mb-3" style={{ color: "var(--color-sentinel-text-primary)" }}>Active Alerts</h3>
             <div className="space-y-2">
               {overview.alerts.slice(0, 5).map((alert, idx) => {
-                const alertColor = alert.priority === "critical" ? "#EF4444" : alert.priority === "high" ? "#F59E0B" : "#3B82F6";
+                const alertColor = alert.priority === "critical" ? "var(--color-sentinel-red)" : alert.priority === "high" ? "var(--color-sentinel-amber)" : "var(--color-sentinel-blue)";
                 return (
                 <div
                   key={idx}
@@ -477,7 +477,7 @@ export function HVACDashboard({
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded" style={{ background: "rgba(59, 130, 246, 0.15)" }}>
-              <Wind className="h-6 w-6" style={{ color: "#3B82F6" }} />
+              <Wind className="h-6 w-6" style={{ color: "var(--color-sentinel-blue)" }} />
             </div>
             <div>
               <h1 className="text-2xl font-bold" style={{ color: "var(--color-sentinel-text-primary)" }}>

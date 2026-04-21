@@ -129,7 +129,7 @@ def seed_equipment_for_site(client, site_code: str, site_uuid: str) -> int:
         return 0
 
     count = 0
-    equipment_files = sorted(list(equipment_dir.glob("*.json")))
+    equipment_files = sorted(equipment_dir.glob("*.json"))
 
     for eq_file in equipment_files:
         try:

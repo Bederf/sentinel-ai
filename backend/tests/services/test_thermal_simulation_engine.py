@@ -269,9 +269,9 @@ class TestIntegration:
             temps[hour] = result
 
         # Verify temperature profile makes sense
-        morning_temp = list(temps[8].values())[0]
-        peak_temp = list(temps[14].values())[0]
-        night_temp = list(temps[23].values())[0]
+        morning_temp = next(iter(temps[8].values()))
+        peak_temp = next(iter(temps[14].values()))
+        night_temp = next(iter(temps[23].values()))
 
         # Temperatures should vary across the day (not all identical)
         assert morning_temp != night_temp or peak_temp != night_temp, "Temperatures should vary across the day"

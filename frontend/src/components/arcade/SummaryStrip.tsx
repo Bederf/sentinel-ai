@@ -12,10 +12,10 @@ export interface SummaryStripProps {
 }
 
 function healthColor(pct: number | null): string {
-  if (pct === null) return "var(--color-sentinel-text-secondary, #94a3b8)";
-  if (pct >= 80) return "#22c55e"; // green
-  if (pct >= 50) return "#f59e0b"; // amber
-  return "#ef4444"; // red
+  if (pct === null) return "var(--color-sentinel-text-secondary)";
+  if (pct >= 80) return "var(--color-sentinel-green)";
+  if (pct >= 50) return "var(--color-sentinel-amber)";
+  return "var(--color-sentinel-red)";
 }
 
 interface PillProps {
@@ -44,7 +44,7 @@ function StatPill({ label, value, valueColor }: PillProps) {
           fontSize: 20,
           fontWeight: 700,
           fontFamily: "system-ui, sans-serif",
-          color: valueColor ?? "var(--color-sentinel-text-primary, #f1f5f9)",
+          color: valueColor ?? "var(--color-sentinel-text-primary)",
           lineHeight: 1.2,
         }}
       >
@@ -53,7 +53,7 @@ function StatPill({ label, value, valueColor }: PillProps) {
       <span
         style={{
           fontSize: 11,
-          color: "var(--color-sentinel-text-secondary, #94a3b8)",
+          color: "var(--color-sentinel-text-secondary)",
           fontFamily: "system-ui, sans-serif",
           textTransform: "uppercase",
           letterSpacing: "0.05em",
@@ -90,7 +90,7 @@ export function SummaryStrip({
         value={risksValue}
         valueColor={
           activeRiskCount !== null && activeRiskCount > 0
-            ? "#ef4444"
+            ? "var(--color-sentinel-red)"
             : undefined
         }
       />

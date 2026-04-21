@@ -216,7 +216,7 @@ export function LightingPage({ siteId: propSiteId }: LightingPageProps) {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded" style={{ background: "rgba(250, 204, 21, 0.15)" }}>
-              <Lightbulb className="h-6 w-6" style={{ color: "#FACC15" }} />
+              <Lightbulb className="h-6 w-6" style={{ color: "var(--color-sentinel-amber)" }} />
             </div>
             <div>
               <div className="flex items-center gap-2">
@@ -249,7 +249,7 @@ export function LightingPage({ siteId: propSiteId }: LightingPageProps) {
               className="text-xs px-2 py-1 rounded"
               style={{
                 background: bridgeTelemetry?.status === 'live' ? "rgba(16,185,129,0.15)" : "rgba(245,158,11,0.15)",
-                color: bridgeTelemetry?.status === 'live' ? "#10B981" : "#F59E0B",
+                color: bridgeTelemetry?.status === 'live' ? "var(--color-sentinel-green)" : "var(--color-sentinel-amber)",
               }}
             >
               {bridgeTelemetry?.status === 'live' ? 'Live' : 'Unavailable'}
@@ -316,9 +316,9 @@ function LightingZoneCard({ zone }: { zone: LightingZone }) {
   };
 
   const statusColors = {
-    active: { bg: "rgba(34, 197, 94, 0.15)", text: "#22C55E" },
-    standby: { bg: "rgba(251, 191, 36, 0.15)", text: "#FBB924" },
-    fault: { bg: "rgba(239, 68, 68, 0.15)", text: "#EF4444" }
+    active: { bg: "rgba(34, 197, 94, 0.15)", text: "var(--color-sentinel-green)" },
+    standby: { bg: "rgba(251, 191, 36, 0.15)", text: "var(--color-sentinel-amber)" },
+    fault: { bg: "rgba(239, 68, 68, 0.15)", text: "var(--color-sentinel-red)" }
   };
 
   const statusColor = statusColors[zone.status];
@@ -352,17 +352,17 @@ function LightingZoneCard({ zone }: { zone: LightingZone }) {
       {/* Metrics */}
       <div className="grid grid-cols-3 gap-2 mb-4">
         <ZoneMetric
-          icon={<Lightbulb className="w-4 h-4" style={{ color: "#FACC15" }} />}
+          icon={<Lightbulb className="w-4 h-4" style={{ color: "var(--color-sentinel-amber)" }} />}
           label="Brightness"
           value={`${brightness}%`}
         />
         <ZoneMetric
-          icon={<Users className="w-4 h-4" style={{ color: "#3B82F6" }} />}
+          icon={<Users className="w-4 h-4" style={{ color: "var(--color-sentinel-blue)" }} />}
           label="Occupancy"
           value={`${zone.occupancy}%`}
         />
         <ZoneMetric
-          icon={<Sun className="w-4 h-4" style={{ color: "#F59E0B" }} />}
+          icon={<Sun className="w-4 h-4" style={{ color: "var(--color-sentinel-amber)" }} />}
           label="Daylight"
           value={`${zone.daylight}%`}
         />
@@ -382,12 +382,12 @@ function LightingZoneCard({ zone }: { zone: LightingZone }) {
           onChange={(e) => handleBrightnessChange(Number(e.target.value))}
           className="w-full h-2 rounded-lg appearance-none cursor-pointer"
           style={{
-            background: `linear-gradient(to right, #FACC15 0%, #FACC15 ${brightness}%, #374151 ${brightness}%, #374151 100%)`
+            background: `linear-gradient(to right, var(--color-sentinel-amber) 0%, var(--color-sentinel-amber) ${brightness}%, var(--color-sentinel-border) ${brightness}%, var(--color-sentinel-border) 100%)`
           }}
         />
         <div className="flex justify-between text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
           <span>0%</span>
-          <span className="font-medium" style={{ color: "#FACC15" }}>{brightness}%</span>
+          <span className="font-medium" style={{ color: "var(--color-sentinel-amber)" }}>{brightness}%</span>
           <span>100%</span>
         </div>
       </div>

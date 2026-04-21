@@ -744,11 +744,48 @@ export function CockpitView({ state, renderMode, spatialCanvas, onApprove, selec
             </div>
           )}
 
-          <DetailRow icon={<Brain className="h-3.5 w-3.5" />} label="Cause" value={waiting ? 'No live building signal yet.' : state.activeCondition.summary} accent />
-          <DetailRow icon={<Layers3 className="h-3.5 w-3.5" />} label="Impact" value={waiting ? 'No operator action required until live state arrives.' : `${state.decision.impact} · ${activeModuleLabels(state).join(' + ')}`} />
-          <DetailRow icon={<Clock3 className="h-3.5 w-3.5" />} label="Time to impact" value={timeToImpact(state)} accent />
-          <DetailRow icon={<ArrowRight className="h-3.5 w-3.5" />} label="Action" value={waiting ? 'Watch for live building state.' : `${state.decision.summary} · ${state.site.dataFreshnessLabel}`} accent />
-          <DetailRow icon={<Gauge className="h-3.5 w-3.5" />} label="Trade-off" value={waiting ? 'No intervention energy penalty while waiting.' : `${state.decision.tradeoff} · ${telemetrySnapshot(state)}`} />
+          {state.site.onboardingPhase === 'shadow' ? (
+            <>
+              {/* Shadow mode: replace decision fields with telemetry observation fields */}
+              <DetailRow
+                icon={<Brain className="h-3.5 w-3.5" />}
+                label="Observation"
+                value={state.activeCondition.summary}
+                accent
+              />
+              <DetailRow
+                icon={<Layers3 className="h-3.5 w-3.5" />}
+                label="ML Training"
+                value={state.emergingRisks.length > 0 ? `${state.emergingRisks.length} tension(s) under observation` : 'Model calibration in progress'}
+              />
+              <DetailRow
+                icon={<Clock3 className="h-3.5 w-3.5" />}
+                label="Observation window"
+                value="Ongoing — no constraint breach predicted"
+                accent
+              />
+              <DetailRow
+                icon={<ArrowRight className="h-3.5 w-3.5" />}
+                label="Mode"
+                value={`Observation only · ${state.site.dataFreshnessLabel}`}
+                accent
+              />
+              <DetailRow
+                icon={<Gauge className="h-3.5 w-3.5" />}
+                label="Load profile"
+                value={telemetrySnapshot(state)}
+              />
+            </>
+          ) : (
+            <>
+              {/* Advisory+: decision surface fields */}
+              <DetailRow icon={<Brain className="h-3.5 w-3.5" />} label="Cause" value={waiting ? 'No live building signal yet.' : state.activeCondition.summary} accent />
+              <DetailRow icon={<Layers3 className="h-3.5 w-3.5" />} label="Impact" value={waiting ? 'No operator action required until live state arrives.' : `${state.decision.impact} · ${activeModuleLabels(state).join(' + ')}`} />
+              <DetailRow icon={<Clock3 className="h-3.5 w-3.5" />} label="Time to impact" value={timeToImpact(state)} accent />
+              <DetailRow icon={<ArrowRight className="h-3.5 w-3.5" />} label="Action" value={waiting ? 'Watch for live building state.' : `${state.decision.summary} · ${state.site.dataFreshnessLabel}`} accent />
+              <DetailRow icon={<Gauge className="h-3.5 w-3.5" />} label="Trade-off" value={waiting ? 'No intervention energy penalty while waiting.' : `${state.decision.tradeoff} · ${telemetrySnapshot(state)}`} />
+            </>
+          )}
 
           <div className="grid grid-cols-2 gap-3 border-t border-white/8 px-5 py-4">
             <div className={`rounded-2xl border ${palette.border} ${palette.soft} px-4 py-3`}>

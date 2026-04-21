@@ -335,7 +335,7 @@ class AnomalyDetectionService:
 
         return data
 
-    def check_all_equipment(self, equipment_list: list[dict[str, str]] = None) -> list[dict[str, Any]]:
+    def check_all_equipment(self, equipment_list: list[dict[str, str]] | None = None) -> list[dict[str, Any]]:
         """
         Check multiple equipment for anomalies.
 

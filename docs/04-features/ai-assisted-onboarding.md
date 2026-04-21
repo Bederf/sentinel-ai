@@ -770,6 +770,6 @@ See [Niagara BMS Connection Wizard](niagara-connection-wizard.md) for details.
 
 - [Niagara BMS Connection Wizard](niagara-connection-wizard.md) - Direct Niagara supervisor connection wizard
 - [MCP Tools Reference](../03-api-reference/mcp-tools-reference.md) - Full tool schemas
-- [Naming Conventions](../02-architecture/naming-conventions.md) - Device ID patterns
+- [Naming Conventions](../02-architecture/NAMING_CONVENTIONS.md) - Device ID patterns
 - [BMS Fundamentals](../05-bms-concepts/bms-fundamentals.md) - BMS concepts
 - [Safety Interlocks](../06-safety-compliance/safety-interlocks-engine.md) - Safety system

@@ -473,7 +473,7 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
         };
       case "medium":
         return {
-          color: "#FBBF24",
+          color: "var(--color-sentinel-amber)",
           bg: "rgba(251, 191, 36, 0.15)",
           border: "rgba(251, 191, 36, 0.3)",
         };
@@ -963,7 +963,7 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
               className="p-2 rounded"
               style={{
                 background: "rgba(168, 85, 247, 0.15)",
-                color: "#a78bfa",
+                color: "var(--color-sentinel-purple)",
               }}
             >
               <Calendar className="h-5 w-5" />
@@ -1465,9 +1465,9 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
                                     : item.category === "Generator Plant"
                                     ? "var(--color-sentinel-amber)"
                                     : item.category === "Energy Centre"
-                                    ? "#a78bfa"
+                                    ? "var(--color-sentinel-purple)"
                                     : item.category === "Lighting"
-                                    ? "#fbbf24"
+                                    ? "var(--color-sentinel-amber)"
                                     : "var(--color-sentinel-text-secondary)",
                                 }}
                               >

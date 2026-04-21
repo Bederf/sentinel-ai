@@ -54,10 +54,7 @@ class EncryptionService:
                 from cryptography.fernet import Fernet
 
                 # Validate key format
-                if isinstance(encryption_key, str):
-                    encryption_key_bytes = encryption_key.encode()
-                else:
-                    encryption_key_bytes = encryption_key
+                encryption_key_bytes = encryption_key.encode() if isinstance(encryption_key, str) else encryption_key
 
                 # Test key validity
                 self._fernet = Fernet(encryption_key_bytes)

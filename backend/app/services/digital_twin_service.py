@@ -344,7 +344,7 @@ class DigitalTwinService:
         equipment = []
         equipment_id = 1
 
-        for floor_idx, floor in enumerate(floors):
+        for _floor_idx, floor in enumerate(floors):
             # Plant room equipment (B1/G)
             if floor in ["B1", "G"]:
                 for eq_type in ["chiller", "ahu", "gen", "ups"]:

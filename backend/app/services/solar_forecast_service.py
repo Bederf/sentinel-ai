@@ -829,8 +829,8 @@ class SolarForecastService:
 
         # Calculate accuracy on the training data (in-sample, for tracking)
         predictions = [model.predict(f) for f in features_list]
-        rmse = math.sqrt(sum((p - t) ** 2 for p, t in zip(predictions, targets)) / len(targets))
-        mae = sum(abs(p - t) for p, t in zip(predictions, targets)) / len(targets)
+        rmse = math.sqrt(sum((p - t) ** 2 for p, t in zip(predictions, targets, strict=False)) / len(targets))
+        mae = sum(abs(p - t) for p, t in zip(predictions, targets, strict=False)) / len(targets)
 
         self._ml_accuracy[site_id] = {
             "training_samples": len(targets),
@@ -980,7 +980,7 @@ class _GradientBoostingModel:
 
         for feat_idx in range(n_features):
             # Get unique split points (sample to keep fast)
-            values = sorted(set(f[feat_idx] for f in features))
+            values = sorted({f[feat_idx] for f in features})
             if len(values) < 2:
                 continue
 

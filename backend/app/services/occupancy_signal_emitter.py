@@ -186,10 +186,7 @@ async def emit_underutilisation_signal(data: dict) -> dict | None:
         return None
 
     # Severity: low if 20-40%, medium if <20%
-    if utilisation_pct < 20:
-        severity = "medium"
-    else:
-        severity = "low"
+    severity = "medium" if utilisation_pct < 20 else "low"
 
     raw_content = (
         f"Underutilisation in {room_code}: {utilisation_pct:.0f}% over {period} "

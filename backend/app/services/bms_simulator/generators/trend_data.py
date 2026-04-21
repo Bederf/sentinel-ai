@@ -185,10 +185,7 @@ class TrendDataGenerator:
             value_range = (min_val, max_val)
         else:
             # Default to +/- 20% of default value
-            if default_value != 0:
-                value_range = (default_value * 0.8, default_value * 1.2)
-            else:
-                value_range = (0, 100)
+            value_range = (default_value * 0.8, default_value * 1.2) if default_value != 0 else (0, 100)
 
         # Get pattern type
         pattern_type = self.PATTERN_TYPE_MAP.get(point_name, "temperature")

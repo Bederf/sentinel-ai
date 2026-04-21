@@ -144,10 +144,7 @@ class BaselineComparator:
         current_peaks = set(current.get("peak_frequencies_hz", []))
         baseline_peaks_list = baseline.get("vibration_peak_frequencies_hz", [])
 
-        if isinstance(baseline_peaks_list, list):
-            baseline_peaks = set(baseline_peaks_list)
-        else:
-            baseline_peaks = set()
+        baseline_peaks = set(baseline_peaks_list) if isinstance(baseline_peaks_list, list) else set()
 
         # New peaks (not in baseline, with 5% tolerance)
         new_peaks = []
@@ -276,10 +273,7 @@ class BaselineComparator:
             first_rms = rms_values[0]
             last_rms = rms_values[-1]
 
-            if first_rms > 0:
-                change_pct = ((last_rms - first_rms) / first_rms) * 100
-            else:
-                change_pct = 0
+            change_pct = (last_rms - first_rms) / first_rms * 100 if first_rms > 0 else 0
 
             # Determine trend direction
             if change_pct > self.TREND_THRESHOLDS["rapid_increase"]:

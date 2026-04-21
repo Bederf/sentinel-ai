@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 
-const LOGO_URL = "https://sentinel-ai.co.za/img/sentinel-logo.png";
+const LOGO_URL = "/images/sentinel-logo.png";
 
 const theme = {
   navyDeep: "#060E18",

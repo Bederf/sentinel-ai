@@ -25,6 +25,7 @@ from app.api import (
     fire,
     generators,
     holiday_calendar,
+    hvac,
     iaq,
     lighting,
     lighting_discovery,
@@ -70,10 +71,10 @@ def register_site_routers(app: FastAPI) -> None:
     app.include_router(cockpit.router, prefix="/api", tags=["cockpit"])
 
     # Zone ingestion system (per-building zone configuration)
-    app.include_router(zone_ingestion.router, tags=["zone-ingestion"])
+    app.include_router(zone_ingestion.router, prefix="/api", tags=["zone-ingestion"])
 
     # Desk positioning and data (workspace positions for Digital Twin accuracy)
-    app.include_router(desks.router, tags=["desks"])
+    app.include_router(desks.router, prefix="/api", tags=["desks"])
 
     # Equipment discovery
     app.include_router(lighting_discovery.router, prefix="/api", tags=["lighting-discovery"])
@@ -81,6 +82,9 @@ def register_site_routers(app: FastAPI) -> None:
 
     # Building systems - Lighting
     app.include_router(lighting.router, prefix="/api/lighting", tags=["lighting"])
+
+    # Building systems - HVAC (zones, equipment, overview, chillers, thermal runway)
+    app.include_router(hvac.router, prefix="/api", tags=["hvac"])
 
     # Occupancy analytics (trends, zone utilization, peak hours)
     app.include_router(occupancy_analytics.router, prefix="/api", tags=["occupancy-analytics"])

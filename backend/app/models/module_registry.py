@@ -10,11 +10,11 @@ Each module operates standalone but integrates when multiple are activated.
 """
 
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 
-class ModuleType(str, Enum):
+class ModuleType(StrEnum):
     """Available module types (35 total)."""
 
     # Base Platform (7, always on)
@@ -83,7 +83,7 @@ MANDATORY_MODULES: list[str] = [
 ]
 
 
-class ModuleStatus(str, Enum):
+class ModuleStatus(StrEnum):
     """Module operational status."""
 
     ACTIVE = "active"
@@ -92,7 +92,7 @@ class ModuleStatus(str, Enum):
     MAINTENANCE = "maintenance"
 
 
-class RecommendationType(str, Enum):
+class RecommendationType(StrEnum):
     """AI recommendation types."""
 
     OPTIMIZATION = "optimization"
@@ -102,7 +102,7 @@ class RecommendationType(str, Enum):
     PREDICTIVE = "predictive"
 
 
-class RecommendationPriority(str, Enum):
+class RecommendationPriority(StrEnum):
     """Recommendation priority levels."""
 
     LOW = "low"

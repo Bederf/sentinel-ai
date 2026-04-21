@@ -272,24 +272,23 @@ class DataQualityAlertService:
 
             pct_change = abs((curr_val - prev_val) / prev_val) * 100
 
-            if pct_change >= self.DRIFT_THRESHOLD_PERCENT:
-                if alert_key not in self._active_alerts:
-                    alert = DataQualityAlert(
-                        alert_type="drift",
-                        severity="warning",
-                        equipment_id=equipment_id,
-                        sensor_type=sensor_type,
-                        message=f"Sensor drift: {sensor_type} on {equipment_id} - {pct_change:.1f}% change",
-                        detected_at=timestamps[i] if i < len(timestamps) else datetime.utcnow(),
-                        details={
-                            "previous_value": prev_val,
-                            "current_value": curr_val,
-                            "percent_change": round(pct_change, 2),
-                        },
-                    )
-                    self._active_alerts[alert_key] = alert
-                    self._alert_history.append(alert)
-                    return alert
+            if pct_change >= self.DRIFT_THRESHOLD_PERCENT and alert_key not in self._active_alerts:
+                alert = DataQualityAlert(
+                    alert_type="drift",
+                    severity="warning",
+                    equipment_id=equipment_id,
+                    sensor_type=sensor_type,
+                    message=f"Sensor drift: {sensor_type} on {equipment_id} - {pct_change:.1f}% change",
+                    detected_at=timestamps[i] if i < len(timestamps) else datetime.utcnow(),
+                    details={
+                        "previous_value": prev_val,
+                        "current_value": curr_val,
+                        "percent_change": round(pct_change, 2),
+                    },
+                )
+                self._active_alerts[alert_key] = alert
+                self._alert_history.append(alert)
+                return alert
 
         return None
 

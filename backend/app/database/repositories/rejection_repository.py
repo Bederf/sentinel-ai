@@ -124,7 +124,7 @@ class RejectionRepository:
             cutoff_date = datetime.utcnow() - timedelta(days=days)
             results = []
 
-            for rec_id, data in self._rejections.items():
+            for _rec_id, data in self._rejections.items():
                 if data.get("site_id") == site_id and data.get("action_type") == action_type:
                     # Parse timestamp
                     rejected_at = data.get("rejected_at")

@@ -150,7 +150,7 @@ class FeatureComputeService:
             start_date = as_of - timedelta(days=window_days)
 
             # Get unique sensor types for this window
-            sensor_types = list(set(f.source_sensor for f in window_features))
+            sensor_types = list({f.source_sensor for f in window_features})
 
             # Query sensor data
             sensor_data: dict[str, list[float]] = {}

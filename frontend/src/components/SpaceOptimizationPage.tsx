@@ -414,7 +414,7 @@ export function SpaceOptimizationPage({ siteId: propSiteId }: { siteId?: string 
       <div ref={headerRef} className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 opacity-0">
         <div className="flex items-center gap-3">
           <div className="p-2 rounded" style={{ background: "rgba(13, 148, 136, 0.15)" }}>
-            <LayoutGrid className="h-6 w-6" style={{ color: "#0d9488" }} />
+            <LayoutGrid className="h-6 w-6" style={{ color: "var(--color-sentinel-teal)" }} />
           </div>
           <div>
             <h1 className="text-2xl font-bold" style={{ color: "var(--color-sentinel-text-primary)" }}>
@@ -499,7 +499,7 @@ export function SpaceOptimizationPage({ siteId: propSiteId }: { siteId?: string 
           icon={<Clock className="h-5 w-5" />}
           label="Booking Emails Ingested"
           value={totalIngested}
-          color="#0d9488"
+          color="var(--color-sentinel-teal)"
           bgColor="rgba(13, 148, 136, 0.15)"
           subtitle={`${flaggedBookings} flagged`}
         />
@@ -512,8 +512,8 @@ export function SpaceOptimizationPage({ siteId: propSiteId }: { siteId?: string 
             onClick={() => setActiveTab(tab.id)}
             className="space-optim-tab px-4 py-2.5 text-sm font-medium border-b-2 transition-colors"
             style={{
-              borderColor: activeTab === tab.id ? "#0d9488" : "transparent",
-              color: activeTab === tab.id ? "#0d9488" : "var(--color-sentinel-text-secondary)",
+              borderColor: activeTab === tab.id ? "var(--color-sentinel-teal)" : "transparent",
+              color: activeTab === tab.id ? "var(--color-sentinel-teal)" : "var(--color-sentinel-text-secondary)",
             }}
           >
             {tab.label}
@@ -521,8 +521,8 @@ export function SpaceOptimizationPage({ siteId: propSiteId }: { siteId?: string 
               <span
                 className="ml-2 text-xs px-1.5 py-0.5 rounded-full"
                 style={{
-                  background: activeTab === tab.id ? "rgba(13, 148, 136, 0.2)" : "var(--color-sentinel-bg-secondary)",
-                  color: activeTab === tab.id ? "#0d9488" : "var(--color-sentinel-text-secondary)",
+                  background: activeTab === tab.id ? "rgba(13,148,136,0.2)" : "var(--color-sentinel-bg-secondary)",
+                  color: activeTab === tab.id ? "var(--color-sentinel-teal)" : "var(--color-sentinel-text-secondary)",
                 }}
               >
                 {tab.count}
@@ -609,7 +609,7 @@ function GhostRoomsPanel({
     open: { label: "Open", color: "var(--color-sentinel-red)", bg: "rgba(220, 38, 38, 0.15)" },
     pending_inspection: { label: "Pending Inspection", color: "var(--color-sentinel-amber)", bg: "rgba(245, 158, 11, 0.15)" },
     verified_occupied: { label: "Verified Occupied", color: "var(--color-sentinel-green)", bg: "rgba(16, 185, 129, 0.15)" },
-    confirmed_empty: { label: "Confirmed Empty", color: "#0d9488", bg: "rgba(13, 148, 136, 0.15)" },
+    confirmed_empty: { label: "Confirmed Empty", color: "var(--color-sentinel-teal)", bg: "rgba(13,148,136,0.15)" },
     dismissed: { label: "Dismissed", color: "var(--color-sentinel-text-disabled)", bg: "rgba(148, 163, 184, 0.12)" },
   };
 
@@ -1137,7 +1137,7 @@ function FocusRoomsPanel({
                       {shortRoom(room)}
                     </span>
                     <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.06)" }}>
-                      <div className="h-full rounded-full" style={{ width: `${pct}%`, background: "#0d9488" }} />
+                      <div className="h-full rounded-full" style={{ width: `${pct}%`, background: "var(--color-sentinel-teal)" }} />
                     </div>
                     <span className="text-xs w-8 text-right font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>
                       {count}
@@ -1298,7 +1298,7 @@ function OccupancyTrendsPanel({ trends }: { trends: HourlyTrend[] }) {
                       className="w-full rounded-sm transition-all"
                       style={{
                         height: `${Math.max(height, 2)}%`,
-                        background: isPeak ? "var(--color-sentinel-amber)" : "#0d9488",
+                        background: isPeak ? "var(--color-sentinel-amber)" : "var(--color-sentinel-teal)",
                         opacity: 0.8,
                         minHeight: 2,
                       }}
@@ -1350,7 +1350,7 @@ function EmptyState({ icon, message, detail }: { icon: React.ReactNode; message:
       className="rounded-md p-8 text-center"
       style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}
     >
-      <div className="inline-flex p-3 rounded-full mb-3" style={{ background: "rgba(13, 148, 136, 0.1)", color: "#0d9488" }}>
+      <div className="inline-flex p-3 rounded-full mb-3" style={{ background: "rgba(13,148,136,0.1)", color: "var(--color-sentinel-teal)" }}>
         {icon}
       </div>
       <p className="text-sm font-medium mb-1" style={{ color: "var(--color-sentinel-text-primary)" }}>

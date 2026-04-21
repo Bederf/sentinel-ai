@@ -26,7 +26,7 @@ import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import UTC
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
@@ -62,7 +62,7 @@ except Exception:  # pragma: no cover
 # ---------------------------------------------------------------------------
 
 
-class VerificationStatus(str, Enum):
+class VerificationStatus(StrEnum):
     """Outcome of a single verification step."""
 
     PASSED = "PASSED"

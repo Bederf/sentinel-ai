@@ -13,7 +13,7 @@ import os
 import uuid
 from collections.abc import Callable
 from datetime import datetime, timedelta
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -67,7 +67,7 @@ class BACnetReadError(BACnetException):
 # ---------------------------------------------------------------------------
 
 
-class BACnetObjectType(str, Enum):
+class BACnetObjectType(StrEnum):
     """Standard BACnet object types."""
 
     ANALOG_INPUT = "analogInput"
@@ -501,9 +501,8 @@ class NiagaraBACnetClient:
             for obj_ref in raw_list:
                 try:
                     point = self._parse_object_reference(device_id, obj_ref)
-                    if point:
-                        if object_types is None or point.object_type in object_types:
-                            points.append(point)
+                    if point and (object_types is None or point.object_type in object_types):
+                        points.append(point)
                 except Exception as e:
                     logger.debug(f"Skipping object {obj_ref}: {e}")
 

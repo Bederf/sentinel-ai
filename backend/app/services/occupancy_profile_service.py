@@ -111,10 +111,7 @@ def calculate_building_occupancy_percent(
         else:
             base = 5.0
 
-        if is_weekend:
-            day_factors = {5: 0.30, 6: 0.20}
-        else:
-            day_factors = {0: 1.0, 1: 0.95, 2: 0.90, 3: 0.88, 4: 0.80}
+        day_factors = {5: 0.3, 6: 0.2} if is_weekend else {0: 1.0, 1: 0.95, 2: 0.9, 3: 0.88, 4: 0.8}
         base *= day_factors.get(day_of_week, 1.0)
 
     if seeded_variation:

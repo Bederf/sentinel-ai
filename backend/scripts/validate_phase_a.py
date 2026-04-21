@@ -38,7 +38,7 @@ def test_floor_plan(floor_code, floor_path):
 
     if lookup:
         print("  ✓ Detected text regions:")
-        for region_id, data in list(lookup.items())[:5]:
+        for _region_id, data in list(lookup.items())[:5]:
             print(f"    - {data['text']:20} @ ({data['coordinates']['x']}, {data['coordinates']['y']})")
         if len(lookup) > 5:
             print(f"    ... and {len(lookup) - 5} more")

@@ -18,7 +18,7 @@ source_system, source_document_id, site_id (via ON CONFLICT).
 from __future__ import annotations
 
 from datetime import date, datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -26,7 +26,7 @@ from pydantic import BaseModel, Field
 from app.models.document_source import SourceSystem
 
 
-class DocumentType(str, Enum):
+class DocumentType(StrEnum):
     """
     Document type — mirrors DocumentSource values.
     Used for the documents.document_type column.
@@ -40,7 +40,7 @@ class DocumentType(str, Enum):
     UNKNOWN = "unknown"
 
 
-class ExtractionStatus(str, Enum):
+class ExtractionStatus(StrEnum):
     """Status of OCR / text extraction from the document."""
 
     PENDING = "pending"

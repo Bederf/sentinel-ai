@@ -174,13 +174,13 @@ export function ThermalRunwayChart({ data, outagePeriod, metrics }: ThermalRunwa
             {/* Comfort limit reference line */}
             <ReferenceLine
               y={comfortLimit}
-              stroke="#EF4444"
+              stroke="var(--color-sentinel-red)"
               strokeDasharray="3 3"
               strokeWidth={1.5}
               label={{
                 value: "Comfort Limit",
                 position: "right",
-                fill: "#EF4444",
+                fill: "var(--color-sentinel-red)",
                 fontSize: 12
               }}
             />
@@ -189,12 +189,12 @@ export function ThermalRunwayChart({ data, outagePeriod, metrics }: ThermalRunwa
             {startIdx >= 0 && endIdx >= 0 && (
               <ReferenceLine
                 x={data.time_points[startIdx]}
-                stroke="#F59E0B"
+                stroke="var(--color-sentinel-amber)"
                 strokeWidth={2}
                 label={{
                   value: "LOAD SHEDDING",
                   position: "insideTopLeft",
-                  fill: "#F59E0B",
+                  fill: "var(--color-sentinel-amber)",
                   fontSize: 10,
                   offset: 5
                 }}
@@ -204,12 +204,12 @@ export function ThermalRunwayChart({ data, outagePeriod, metrics }: ThermalRunwa
             {startIdx >= 0 && endIdx >= 0 && (
               <ReferenceLine
                 x={data.time_points[endIdx]}
-                stroke="#10B981"
+                stroke="var(--color-sentinel-green)"
                 strokeWidth={2}
                 label={{
                   value: "POWER BACK",
                   position: "insideTopRight",
-                  fill: "#10B981",
+                  fill: "var(--color-sentinel-green)",
                   fontSize: 10,
                   offset: 5
                 }}
@@ -222,7 +222,7 @@ export function ThermalRunwayChart({ data, outagePeriod, metrics }: ThermalRunwa
                 type="monotone"
                 dataKey="comfortLimit"
                 stroke="none"
-                fill="#F59E0B"
+                fill="var(--color-sentinel-amber)"
                 fillOpacity={0.1}
                 activeDot={false}
                 connectNulls={true}
@@ -246,10 +246,10 @@ export function ThermalRunwayChart({ data, outagePeriod, metrics }: ThermalRunwa
             <Line
               type="monotone"
               dataKey="With SENTINEL Pre-cooling"
-              stroke="#3B82F6"
+              stroke="var(--color-sentinel-blue)"
               strokeWidth={3}
               dot={{ r: 4, strokeWidth: 2, fill: "#1F2937" }}
-              activeDot={{ r: 6, strokeWidth: 2, fill: "#3B82F6" }}
+              activeDot={{ r: 6, strokeWidth: 2, fill: "var(--color-sentinel-blue)" }}
               connectNulls={true}
             />
 
@@ -257,13 +257,13 @@ export function ThermalRunwayChart({ data, outagePeriod, metrics }: ThermalRunwa
             {breachWithoutIdx >= 0 && (
               <ReferenceLine
                 x={data.time_points[breachWithoutIdx]}
-                stroke="#EF4444"
+                stroke="var(--color-sentinel-red)"
                 strokeWidth={1}
                 strokeDasharray="3 3"
                 label={{
                   value: "Breach",
                   position: "top",
-                  fill: "#EF4444",
+                  fill: "var(--color-sentinel-red)",
                   fontSize: 10
                 }}
               />
@@ -272,13 +272,13 @@ export function ThermalRunwayChart({ data, outagePeriod, metrics }: ThermalRunwa
             {breachWithIdx >= 0 && (
               <ReferenceLine
                 x={data.time_points[breachWithIdx]}
-                stroke="#3B82F6"
+                stroke="var(--color-sentinel-blue)"
                 strokeWidth={1}
                 strokeDasharray="3 3"
                 label={{
                   value: "Breach",
                   position: "top",
-                  fill: "#3B82F6",
+                  fill: "var(--color-sentinel-blue)",
                   fontSize: 10
                 }}
               />

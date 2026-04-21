@@ -186,7 +186,7 @@ def generate_tool_summary(result: Any, tool_name: str) -> str:
         parts.append(f"count={result['count']}")
 
     # Key field names (without values)
-    remaining_keys = [k for k in result.keys() if k not in {"success", "status", "error", "count"}]
+    remaining_keys = [k for k in result if k not in {"success", "status", "error", "count"}]
     if remaining_keys:
         parts.append(f"fields=[{', '.join(remaining_keys[:10])}]")
 

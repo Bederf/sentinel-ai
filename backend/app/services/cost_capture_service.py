@@ -9,6 +9,7 @@ so profitability and variance analytics have real actuals.
 
 from __future__ import annotations
 
+import contextlib
 import logging
 from dataclasses import dataclass
 from datetime import date, timedelta
@@ -95,10 +96,8 @@ class CostCaptureService:
 
             # Attach contract_id if missing (best effort)
             if not wo.get("contract_id"):
-                try:
+                with contextlib.suppress(Exception):
                     await self.work_order_repo.update_work_order(wo["id"], {"contract_id": contract_id})
-                except Exception:
-                    pass
 
         total_actual = labor_total + parts_total + subcontractor_total + callout_total + consumables_total
 

@@ -17,7 +17,7 @@ import logging
 import shutil
 import tempfile
 from datetime import UTC, datetime
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
@@ -30,7 +30,7 @@ AUDIT_LOG_PATH = DATA_DIR / "visit_audit_log.json"
 AUDIT_LOCK_PATH = DATA_DIR / "visit_audit_log.lock"
 
 
-class VisitEventType(str, Enum):
+class VisitEventType(StrEnum):
     """All recordable visit lifecycle events."""
 
     SCAN = "SCAN"

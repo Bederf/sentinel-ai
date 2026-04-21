@@ -249,7 +249,7 @@ def run_correlation_for_signal(conn, signal_id: uuid.UUID) -> dict:
     # 8. Evaluate state machine
     new_state = None
     try:
-        new_state, transition = evaluate_state_transition(conn, cluster_id)
+        new_state, _transition = evaluate_state_transition(conn, cluster_id)
         result["cluster_state"] = new_state
     except Exception as e:
         logger.exception("State transition failed for cluster %s", cluster_id)

@@ -11,11 +11,11 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 
-class ControlMode(str, Enum):
+class ControlMode(StrEnum):
     """Operating control mode — determines what the AI can do."""
 
     RECOMMEND = "recommend"  # Advisory only, no writes

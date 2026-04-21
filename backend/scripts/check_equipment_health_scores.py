@@ -64,7 +64,7 @@ try:
 
     # Show unique health score values
     print("\n[4] Unique Health Score Values:")
-    unique_scores = sorted(set(eq.get("health_score") for eq in (equipment_result.data or [])))
+    unique_scores = sorted({eq.get("health_score") for eq in (equipment_result.data or [])})
     print(f"  Found {len(unique_scores)} unique health score values:")
     for score in unique_scores:
         count = health_distribution[score]

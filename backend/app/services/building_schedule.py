@@ -15,10 +15,10 @@ Weekend: Skeleton mode (server room HVAC if any, security lights only)
 """
 
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 
 
-class HVACMode(str, Enum):
+class HVACMode(StrEnum):
     OFF = "off"
     PRE_COOL = "pre_cool"
     FULL = "full"
@@ -26,7 +26,7 @@ class HVACMode(str, Enum):
     NIGHT_SETBACK = "night_setback"
 
 
-class LightingMode(str, Enum):
+class LightingMode(StrEnum):
     OFF = "off"
     SECURITY_ONLY = "security_only"
     DIMMED = "dimmed"
@@ -34,14 +34,14 @@ class LightingMode(str, Enum):
     DAYLIGHT_HARVEST = "daylight_harvest"
 
 
-class ChillerStaging(str, Enum):
+class ChillerStaging(StrEnum):
     OFF = "off"
     STAGE_1 = "stage_1"  # ~30% load
     STAGE_2 = "stage_2"  # ~60% load
     FULL_LOAD = "full_load"  # ~90%+ load
 
 
-class BuildingState(str, Enum):
+class BuildingState(StrEnum):
     OVERNIGHT = "overnight"
     PRE_COOL = "pre_cool"
     MORNING_STARTUP = "morning_startup"

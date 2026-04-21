@@ -525,7 +525,7 @@ Account Manager: ________________    Date: ________________
 - **SIMBIOT Integration Guide**: `docs/05-integrations/README.md`
 - **BACnet Discovery Deep Dive**: `docs/05-integrations/bacnet-object-reference.md`
 - **Troubleshooting**: `docs/05-integrations/simbiot-troubleshooting.md`
-- **Equipment Naming v2.0**: `docs/02-architecture/naming-conventions.md`
+- **Equipment Naming v2.0**: `../02-architecture/NAMING_CONVENTIONS.md`
 - **Digital Twin Feature**: `docs/04-features/DIGITAL_TWIN_REAL_DATA_INTEGRATION.md`
 - **Deterministic Stage Policy (Site-002)**: `docs/04-features/109C-site-002-mode-policy-dry-run.md`
 

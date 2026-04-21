@@ -8,7 +8,7 @@
 import { type Site } from "@/lib/api";
 import { api } from "@/lib/api";
 import { useSiteSummary } from "@/hooks/useSiteSummary";
-import { Shield, AlertTriangle, Zap, TrendingUp, Eye, EyeOff } from "lucide-react";
+import { Shield, AlertTriangle, TrendingUp, Wifi, WifiOff } from "lucide-react";
 import { useState, useEffect } from "react";
 
 interface SiteCardProps {
@@ -21,12 +21,12 @@ interface SiteCardProps {
 
 function StatusBadge({ status }: { status: string }) {
   const config: Record<string, { label: string; color: string; bg: string }> = {
-    normal: { label: "Protected", color: "#22c55e", bg: "rgba(34,197,94,0.15)" },
-    warning: { label: "Elevated", color: "#f59e0b", bg: "rgba(245,158,11,0.15)" },
-    critical: { label: "Critical", color: "#ef4444", bg: "rgba(239,68,68,0.15)" },
-    healthy: { label: "Protected", color: "#22c55e", bg: "rgba(34,197,94,0.15)" },
-    degraded: { label: "Elevated", color: "#f59e0b", bg: "rgba(245,158,11,0.15)" },
-    at_risk: { label: "Critical", color: "#ef4444", bg: "rgba(239,68,68,0.15)" },
+    normal: { label: "Protected", color: "var(--color-sentinel-green)", bg: "rgba(34,197,94,0.15)" },
+    warning: { label: "Elevated", color: "var(--color-sentinel-amber)", bg: "rgba(245,158,11,0.15)" },
+    critical: { label: "Critical", color: "var(--color-sentinel-red)", bg: "rgba(239,68,68,0.15)" },
+    healthy: { label: "Protected", color: "var(--color-sentinel-green)", bg: "rgba(34,197,94,0.15)" },
+    degraded: { label: "Elevated", color: "var(--color-sentinel-amber)", bg: "rgba(245,158,11,0.15)" },
+    at_risk: { label: "Critical", color: "var(--color-sentinel-red)", bg: "rgba(239,68,68,0.15)" },
   };
   const cfg = config[status] ?? config.normal;
   return (
@@ -66,10 +66,10 @@ function OptimizationStatus({ siteId, enabled }: OptimizationStatusProps) {
 
   const color =
     status?.state === "optimized"
-      ? "#22c55e"
+      ? "var(--color-sentinel-green)"
       : status?.state === "optimizing"
-      ? "#f59e0b"
-      : "#6b7280";
+      ? "var(--color-sentinel-amber)"
+      : "var(--color-sentinel-text-secondary)";
   const label =
     status?.state === "optimized"
       ? "Optimized"
@@ -167,12 +167,12 @@ export function SiteCard({
         <div className="flex items-center gap-1.5">
           <AlertTriangle
             className="w-3.5 h-3.5"
-            style={{ color: site.alert_count > 0 ? "#f59e0b" : "var(--color-grafana-text-secondary)" }}
+            style={{ color: site.alert_count > 0 ? "var(--color-sentinel-amber)" : "var(--color-grafana-text-secondary)" }}
           />
           <span
             className="text-sm font-medium"
             style={{
-              color: site.alert_count > 0 ? "#f59e0b" : "var(--color-grafana-text-primary)",
+              color: site.alert_count > 0 ? "var(--color-sentinel-amber)" : "var(--color-grafana-text-primary)",
             }}
           >
             {site.alert_count}
@@ -204,17 +204,17 @@ export function SiteCard({
               {summary?.safety && (
                 <div className="flex gap-1.5 ml-auto">
                   {summary.safety.warning > 0 && (
-                    <span className="text-xs" style={{ color: "#f59e0b" }}>
+                    <span className="text-xs" style={{ color: "var(--color-sentinel-amber)" }}>
                       {summary.safety.warning}⚠
                     </span>
                   )}
                   {summary.safety.alarm > 0 && (
-                    <span className="text-xs" style={{ color: "#ef4444" }}>
+                    <span className="text-xs" style={{ color: "var(--color-sentinel-red)" }}>
                       {summary.safety.alarm}🔴
                     </span>
                   )}
                   {summary.safety.blocked > 0 && (
-                    <span className="text-xs" style={{ color: "#a855f7" }}>
+                    <span className="text-xs" style={{ color: "var(--color-sentinel-purple)" }}>
                       {summary.safety.blocked}🚫
                     </span>
                   )}
@@ -230,6 +230,39 @@ export function SiteCard({
         siteId={site.id}
         enabled={showOptimizationStatus ?? site.optimization_enabled ?? false}
       />
+
+      {/* Bridge connection indicator */}
+      {site.bridge_connected !== undefined && (
+        <div className="flex items-center gap-1.5">
+          {site.bridge_connected ? (
+            <Wifi className="w-3.5 h-3.5" style={{ color: "var(--color-sentinel-green)" }} />
+          ) : (
+            <WifiOff className="w-3.5 h-3.5" style={{ color: "var(--color-sentinel-red)" }} />
+          )}
+          <span
+            className="text-xs"
+            style={{
+              color: site.bridge_connected ? "var(--color-sentinel-green)" : "var(--color-sentinel-red)",
+            }}
+          >
+            {site.bridge_connected ? "Bridge connected" : "Bridge offline"}
+          </span>
+          {site.bridge_last_sync && (
+            <span className="text-xs" style={{ color: "var(--color-grafana-text-disabled)" }}>
+              · {new Date(site.bridge_last_sync).toLocaleTimeString()}
+            </span>
+          )}
+          {!site.bridge_connected && site.bridge_sync_error && (
+            <span
+              className="text-xs truncate max-w-[120px]"
+              style={{ color: "var(--color-sentinel-red)" }}
+              title={site.bridge_sync_error}
+            >
+              · {site.bridge_sync_error}
+            </span>
+          )}
+        </div>
+      )}
     </div>
   );
 }

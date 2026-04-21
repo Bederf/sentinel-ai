@@ -17,7 +17,7 @@ import logging
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Optional
 
 from app.config.settings import settings
@@ -31,7 +31,7 @@ from app.services.decision_event_logger import emit_decision_event
 logger = logging.getLogger(__name__)
 
 
-class TierLevel(str, Enum):
+class TierLevel(StrEnum):
     """Autonomy tier levels."""
 
     TIER1 = "tier1"  # Advisory only

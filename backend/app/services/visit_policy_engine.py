@@ -70,10 +70,7 @@ class VisitPolicyEngine:
 
         # Rule 2/3: lookup
         visit: Visit | None = None
-        if token:
-            visit = self._repo.get_visit_by_token(token)
-        else:
-            visit = self._repo.get_visit_by_pin(pin)
+        visit = self._repo.get_visit_by_token(token) if token else self._repo.get_visit_by_pin(pin)
 
         if visit is None:
             return PolicyResult(

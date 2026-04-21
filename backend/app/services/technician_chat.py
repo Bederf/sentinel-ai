@@ -608,9 +608,8 @@ class DiagnosisFlowEngine:
 
         for check in checklist:
             response = flow.collected_info.get(check["id"])
-            if response and check.get("critical_responses"):
-                if response in check["critical_responses"]:
-                    critical_findings.append({"check": check["question"], "response": response, "severity": "high"})
+            if response and check.get("critical_responses") and response in check["critical_responses"]:
+                critical_findings.append({"check": check["question"], "response": response, "severity": "high"})
 
         # Generate diagnosis based on findings
         diagnosis = self._generate_diagnosis(flow, critical_findings)

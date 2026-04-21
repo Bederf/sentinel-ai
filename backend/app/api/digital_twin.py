@@ -5,6 +5,7 @@ Supports sanitized image input (Tier 1) and DXF parsing (Tier 2).
 Also provides SSE endpoint for real-time equipment status streaming.
 """
 
+import contextlib
 import logging
 import uuid
 from datetime import datetime, timedelta
@@ -477,10 +478,8 @@ async def validate_config(
 
         # Try to get stored config
         config = None
-        try:
+        with contextlib.suppress(Exception):
             config = service._generate_stub_config(site_id, site_id, 3)
-        except Exception:
-            pass
 
         if not config:
             raise HTTPException(

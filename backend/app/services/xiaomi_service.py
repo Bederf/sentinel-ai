@@ -124,10 +124,7 @@ class XiaomiService:
         if not self._api_key:
             raise ValueError("XIAOMI_API_KEY not configured. Set it in .env or environment variables.")
 
-        if system_prompt:
-            system = system_prompt
-        else:
-            system = _build_xiaomi_system_prompt(include_site_context)
+        system = system_prompt or _build_xiaomi_system_prompt(include_site_context)
 
         openai_messages = [{"role": "system", "content": system}]
         openai_messages.extend(messages)

@@ -73,10 +73,7 @@ class FloorPlanSanitizer:
         image = self._load_image(image_path_or_bytes)
 
         # Convert to grayscale
-        if len(image.shape) == 3:
-            gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        else:
-            gray = image.copy()
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if len(image.shape) == 3 else image.copy()
 
         # Build lookup table before any modifications
         lookup_table = {}
@@ -172,7 +169,7 @@ class FloorPlanSanitizer:
                 circularity = (4 * np.pi * area) / (perimeter * perimeter) if perimeter > 0 else 0
 
                 # Draw if circular (0.7-1.0) or rectangular (bounding box ratio)
-                x, y, w, h = cv2.boundingRect(contour)
+                _x, _y, w, h = cv2.boundingRect(contour)
                 aspect_ratio = float(w) / h if h > 0 else 1
 
                 if (0.7 <= circularity <= 1.1) or (0.5 <= aspect_ratio <= 2.0):
@@ -348,10 +345,7 @@ class FloorPlanSanitizer:
         """
         image = self._load_image(image_path_or_bytes)
 
-        if len(image.shape) == 3:
-            gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        else:
-            gray = image.copy()
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if len(image.shape) == 3 else image.copy()
 
         return self._extract_text_regions(gray)
 

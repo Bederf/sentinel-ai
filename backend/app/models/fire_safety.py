@@ -5,14 +5,14 @@ and cause-effect matrix coordination.
 """
 
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
 # --- Enums ---
 
 
-class FireZoneType(str, Enum):
+class FireZoneType(StrEnum):
     """Types of fire zones."""
 
     CORRIDOR = "corridor"
@@ -24,7 +24,7 @@ class FireZoneType(str, Enum):
     LOBBY = "lobby"
 
 
-class AlarmType(str, Enum):
+class AlarmType(StrEnum):
     """Types of fire alarms."""
 
     SMOKE = "smoke"
@@ -34,7 +34,7 @@ class AlarmType(str, Enum):
     FAULT = "fault"
 
 
-class AlarmSeverity(str, Enum):
+class AlarmSeverity(StrEnum):
     """Fire alarm severity levels."""
 
     FIRE = "fire"
@@ -43,7 +43,7 @@ class AlarmSeverity(str, Enum):
     SUPERVISORY = "supervisory"
 
 
-class DamperStatusEnum(str, Enum):
+class DamperStatusEnum(StrEnum):
     """Smoke damper status values."""
 
     OPEN = "open"
@@ -53,7 +53,7 @@ class DamperStatusEnum(str, Enum):
     UNKNOWN = "unknown"
 
 
-class FanStatus(str, Enum):
+class FanStatus(StrEnum):
     """Pressurization fan status values."""
 
     OFF = "off"
@@ -61,7 +61,7 @@ class FanStatus(str, Enum):
     FAULT = "fault"
 
 
-class PanelStatus(str, Enum):
+class PanelStatus(StrEnum):
     """Fire alarm panel status."""
 
     NORMAL = "normal"
@@ -70,7 +70,7 @@ class PanelStatus(str, Enum):
     DISABLED = "disabled"
 
 
-class HealthStatus(str, Enum):
+class HealthStatus(StrEnum):
     """Overall system health status."""
 
     HEALTHY = "healthy"
@@ -78,7 +78,7 @@ class HealthStatus(str, Enum):
     CRITICAL = "critical"
 
 
-class CauseEffectTargetType(str, Enum):
+class CauseEffectTargetType(StrEnum):
     """Target types for cause-effect matrix."""
 
     HVAC = "hvac"

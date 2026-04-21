@@ -22,7 +22,7 @@ import os
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 import httpx
@@ -63,14 +63,14 @@ class SentryRouterConfig:
 # ---------------------------------------------------------------------------
 
 
-class DeliveryChannel(str, Enum):
+class DeliveryChannel(StrEnum):
     WHATSAPP = "whatsapp"
     TELEGRAM = "telegram"
     EMAIL = "email"
     SMS = "sms"
 
 
-class DeliveryMode(str, Enum):
+class DeliveryMode(StrEnum):
     IMMEDIATE = "immediate"
     DAILY_DIGEST = "daily"
     WEEKLY_DIGEST = "weekly"
@@ -98,9 +98,7 @@ class NotificationRecipient:
     def should_notify(self, event: SentinelEvent) -> bool:
         if event.importance < self.min_importance:
             return False
-        if self.site_ids and event.site_id and event.site_id not in self.site_ids:
-            return False
-        return True
+        return not (self.site_ids and event.site_id and event.site_id not in self.site_ids)
 
 
 # ---------------------------------------------------------------------------

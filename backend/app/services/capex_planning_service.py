@@ -190,10 +190,7 @@ def calculate_failure_probability(
     health_factor = 1.0 + (1.0 - health_score / 100.0) * 0.5
 
     # Condition adjustment if available
-    if condition_score is not None:
-        condition_factor = 1.0 + (1.0 - condition_score / 100.0) * 0.3
-    else:
-        condition_factor = 1.0
+    condition_factor = 1.0 + (1.0 - condition_score / 100.0) * 0.3 if condition_score is not None else 1.0
 
     prob = base_prob * health_factor * condition_factor
     return round(min(max(prob, 0.0), 0.99), 4)

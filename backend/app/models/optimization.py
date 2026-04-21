@@ -6,11 +6,11 @@ building telemetry and generates optimal HVAC setpoint recommendations.
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 
-class ControlTier(str, Enum):
+class ControlTier(StrEnum):
     """Control tier for automation level."""
 
     MONITOR = "monitor"  # View-only, no recommendations
@@ -18,7 +18,7 @@ class ControlTier(str, Enum):
     AUTO_EXECUTE = "auto_execute"  # Automatic execution of recommendations
 
 
-class OptimizationProfile(str, Enum):
+class OptimizationProfile(StrEnum):
     """Optimization profile types."""
 
     SWEAT_ASSETS = "sweat_assets"  # Maximize equipment utilization
@@ -116,7 +116,7 @@ class SiteProfileConfig:
         )
 
 
-class OptimizationStatus(str, Enum):
+class OptimizationStatus(StrEnum):
     """Optimization status for a building."""
 
     OPTIMIZED = "optimized"

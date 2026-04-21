@@ -54,7 +54,7 @@ class ChecklistGeneratorService:
         equipment_type: str,
         manufacturer: str,
         model: str,
-        capacity: str = None,
+        capacity: str | None = None,
         additional_specs: dict[str, Any] | None = None,
     ) -> list[dict[str, Any]]:
         """Generate OEM-specific inspection/maintenance checklists.
@@ -165,7 +165,7 @@ class ChecklistGeneratorService:
         equipment_type: str,
         manufacturer: str,
         model: str,
-        capacity: str = None,
+        capacity: str | None = None,
         additional_specs: dict[str, Any] | None = None,
     ) -> str:
         """Build Claude prompt for checklist generation.
@@ -321,7 +321,7 @@ Respond with ONLY the JSON array of 3 templates. No markdown, no explanation, ju
         equipment_type: str,
         manufacturer: str,
         model: str,
-        capacity: str = None,
+        capacity: str | None = None,
     ) -> list[dict[str, Any]]:
         """Generate pre-built seeded templates without Claude API.
 

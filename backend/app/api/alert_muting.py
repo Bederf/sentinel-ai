@@ -126,7 +126,4 @@ def is_equipment_muted(equipment_code: str) -> bool:
     """Check if equipment is currently muted. Used by notification router."""
     mutes = _load_mutes()
     now = datetime.utcnow().isoformat()
-    for m in mutes:
-        if m["equipment_code"] == equipment_code and m.get("muted_until", "") > now:
-            return True
-    return False
+    return any(m["equipment_code"] == equipment_code and m.get("muted_until", "") > now for m in mutes)

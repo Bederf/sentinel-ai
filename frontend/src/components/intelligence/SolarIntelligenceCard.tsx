@@ -113,18 +113,18 @@ export function SolarIntelligenceCard({ siteId, onNavigate }: SolarIntelligenceC
     <IntelligenceCard
       title="Solar &amp; BESS Intelligence"
       subtitle="Generation, storage &amp; grid offset"
-      icon={<Sun className="h-5 w-5" style={{ color: '#FACC15' }} />}
+      icon={<Sun className="h-5 w-5" style={{ color: 'var(--color-sentinel-amber)' }} />}
       iconBg="rgba(250, 204, 21, 0.15)"
-      accentColor="#FACC15"
+      accentColor="var(--color-sentinel-amber)"
       badge={badge}
       state={state}
       footer={footer}
       onNavigate={onNavigate}
       metrics={
         <>
-          <ValueMetricBox label="Self-consumption optimised" value={selfConsumption > 0 ? `${selfConsumption.toFixed(0)}%` : '—'} color="#10B981" />
-          <ValueMetricBox label="Daily generation value" value={hasValue(dailyValue) ? formatCurrencyZAR(dailyValue) : '—'} color="#FACC15" />
-          <ValueMetricBox label="YTD ROI" value={ytdRoi > 0 ? `${ytdRoi.toFixed(1)}%` : '—'} color="#3B82F6" />
+          <ValueMetricBox label="Self-consumption optimised" value={selfConsumption > 0 ? `${selfConsumption.toFixed(0)}%` : '—'} color="var(--color-sentinel-green)" />
+          <ValueMetricBox label="Daily generation value" value={hasValue(dailyValue) ? formatCurrencyZAR(dailyValue) : '—'} color="var(--color-sentinel-amber)" />
+          <ValueMetricBox label="YTD ROI" value={ytdRoi > 0 ? `${ytdRoi.toFixed(1)}%` : '—'} color="var(--color-sentinel-blue)" />
         </>
       }
       comparison={gridCostBaseline > 0 ? (
@@ -134,7 +134,7 @@ export function SolarIntelligenceCard({ siteId, onNavigate }: SolarIntelligenceC
           unit="ZAR"
           baselineLabel="Monthly grid cost (no solar)"
           optimizedLabel="With SENTINEL dispatch"
-          accentColor="#FACC15"
+          accentColor="var(--color-sentinel-amber)"
         />
       ) : undefined}
     />

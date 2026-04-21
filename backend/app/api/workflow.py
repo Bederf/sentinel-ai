@@ -455,10 +455,7 @@ async def get_dashboard_equipment(site_id: str | None = Query(None, description=
         work_order_repo = get_work_order_repository()
 
         # Get equipment
-        if site_uuid:
-            equipment_list = equipment_repo.get_all(site_id=site_uuid)
-        else:
-            equipment_list = equipment_repo.get_all()
+        equipment_list = equipment_repo.get_all(site_id=site_uuid) if site_uuid else equipment_repo.get_all()
 
         dashboard_equipment = []
         workflow_states = {}

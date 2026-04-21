@@ -631,7 +631,7 @@ If issues arise:
 - **Migration Schema:** `supabase/migrations/057_zone_ingestion_schema.sql`
 - **Migration Script:** `backend/scripts/migrate_zone_desk_data.py`
 - **Related Docs:**
-  - `docs/02-architecture/naming-conventions.md`
+  - `../02-architecture/NAMING_CONVENTIONS.md`
   - `docs/04-features/DIGITAL_TWIN_REAL_DATA_INTEGRATION.md`
   - `CLAUDE.md` (project instructions)
 

@@ -199,7 +199,7 @@ class ElementTrendService:
         # Manual least squares regression
         sum_x = sum(x_values)
         sum_y = sum(y_values)
-        sum_xy = sum(x * y for x, y in zip(x_values, y_values))
+        sum_xy = sum(x * y for x, y in zip(x_values, y_values, strict=False))
         sum_x2 = sum(x * x for x in x_values)
 
         mean_x = sum_x / n
@@ -220,12 +220,9 @@ class ElementTrendService:
         ss_tot = sum((y - mean_y) ** 2 for y in y_values)
         # SS_res = sum((y - predicted_y)^2)
         intercept = mean_y - slope * mean_x
-        ss_res = sum((y - (slope * x + intercept)) ** 2 for x, y in zip(x_values, y_values))
+        ss_res = sum((y - (slope * x + intercept)) ** 2 for x, y in zip(x_values, y_values, strict=False))
 
-        if ss_tot > 0:
-            r_squared = max(0.0, 1.0 - (ss_res / ss_tot))
-        else:
-            r_squared = 0.0
+        r_squared = max(0.0, 1.0 - ss_res / ss_tot) if ss_tot > 0 else 0.0
 
         # Confidence is based on R-squared and number of data points
         # More data points and better fit = higher confidence

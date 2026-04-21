@@ -9,13 +9,13 @@ Phase 45-03: MLOps Monitoring and Success Metrics.
 
 import logging
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
-class MLAlertSeverity(str, Enum):
+class MLAlertSeverity(StrEnum):
     """Severity levels for ML system alerts."""
 
     INFO = "info"
@@ -23,7 +23,7 @@ class MLAlertSeverity(str, Enum):
     CRITICAL = "critical"
 
 
-class MLAlertType(str, Enum):
+class MLAlertType(StrEnum):
     """Types of ML system alerts."""
 
     FEATURE_DRIFT = "feature_drift"

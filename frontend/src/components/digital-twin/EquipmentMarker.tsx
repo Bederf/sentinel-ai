@@ -32,10 +32,10 @@ export const TYPE_COLORS: Record<string, string> = {
 };
 
 const STATUS_COLORS: Record<string, string> = {
-  online: '#22C55E', normal: '#22C55E', running: '#22C55E',
-  warning: '#F59E0B', offline: '#6B7280',
+  online: 'var(--color-sentinel-green)', normal: 'var(--color-sentinel-green)', running: 'var(--color-sentinel-green)',
+  warning: 'var(--color-sentinel-amber)', offline: '#6B7280',
   standby: '#6366F1', idle: '#6366F1',
-  fault: '#EF4444', critical: '#EF4444',
+  fault: 'var(--color-sentinel-red)', critical: 'var(--color-sentinel-red)',
 };
 
 // ─── Type-specific geometry (matches landing page switch statement) ───
@@ -182,7 +182,7 @@ export function EquipmentMarker({ equipment, position, onClick, realtimeStatus }
             background: 'rgba(0, 255, 65, 0.15)',
             border: '1px solid rgba(0, 255, 65, 0.4)',
             boxShadow: '0 0 10px rgba(0, 255, 65, 0.3)',
-            color: '#00FF41',
+            color: 'var(--color-sentinel-green)',
           }}
         >
           {(equipment as any).code || equipment.id}

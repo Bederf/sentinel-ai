@@ -388,7 +388,7 @@ def validate_and_sanitize_query(query: str) -> tuple[bool, str, str | None]:
     Returns:
         Tuple of (is_safe, safe_query_or_rejection_message, original_query)
     """
-    is_safe, rejection_reason, injections = check_query_safety(query)
+    is_safe, rejection_reason, _injections = check_query_safety(query)
 
     if is_safe:
         return True, query, None

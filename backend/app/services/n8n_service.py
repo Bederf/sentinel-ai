@@ -18,7 +18,7 @@ import logging
 import os
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 import httpx
@@ -66,7 +66,7 @@ class N8nConfig:
 # ---------------------------------------------------------------------------
 
 
-class N8nConnectionStatus(str, Enum):
+class N8nConnectionStatus(StrEnum):
     NOT_CONFIGURED = "not_configured"
     CONNECTED = "connected"
     AUTH_FAILED = "auth_failed"
@@ -344,7 +344,7 @@ class N8nService:
                 "active": data.get("active", False),
                 "tags": [t.get("name", "") for t in data.get("tags", [])],
                 "node_count": len(nodes),
-                "node_types": list(set(n.get("type", "") for n in nodes)),
+                "node_types": list({n.get("type", "") for n in nodes}),
                 "trigger_type": self._detect_trigger_type(nodes),
                 "created_at": data.get("createdAt"),
                 "updated_at": data.get("updatedAt"),
@@ -492,10 +492,7 @@ class N8nService:
 
                 resp_body = None
                 content_type = response.headers.get("content-type", "")
-                if content_type.startswith("application/json"):
-                    resp_body = response.json()
-                else:
-                    resp_body = response.text[:500]
+                resp_body = response.json() if content_type.startswith("application/json") else response.text[:500]
 
                 return {
                     "success": response.status_code in (200, 201, 204),

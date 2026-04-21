@@ -202,7 +202,7 @@ async def control_device(
         # Check point exists and is writable
         device_point = device.get_point(point)
         if not device_point:
-            available_points = [p for p in device.points.keys()]
+            available_points = list(device.points.keys())
             return {
                 "success": False,
                 "error": f"Point '{point}' not found on device '{device.name}'. Available points: {available_points}",
@@ -1116,7 +1116,7 @@ async def get_energy_analysis(site_id: str) -> dict[str, Any]:
         suggestions = []
 
         # Check HVAC efficiency
-        for device_id, data in readings.items():
+        for _device_id, data in readings.items():
             if data["type"] == "hvac":
                 r = data["readings"]
                 # Check temperature differential
@@ -1139,7 +1139,7 @@ async def get_energy_analysis(site_id: str) -> dict[str, Any]:
                         )
 
         # Check lighting usage
-        for device_id, data in readings.items():
+        for _device_id, data in readings.items():
             if data["type"] == "lighting":
                 r = data["readings"]
                 if "brightness" in r and r["brightness"]["value"] > 80:
@@ -4028,7 +4028,7 @@ async def _build_wo_email_body(wo, description: str, reported_by: str, equipment
     if template_items:
         # Equipment-specific prompts from ML template
         step = 2
-        for item_name, prompt in template_items["prompts"].items():
+        for _item_name, prompt in template_items["prompts"].items():
             lines.append(f"{step}. {prompt}")
             step += 1
         lines.append(f"{step}. Document all findings with photos, measurements, and notes.")

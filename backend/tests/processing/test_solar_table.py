@@ -20,17 +20,17 @@ from app.services.solar_annual_aggregator import HourlySnapshot, MonthSummary
 
 def _snapshot(hour: int, month: int, day_of_year: int, **kwargs) -> HourlySnapshot:
     """Build a minimal HourlySnapshot with sensible defaults."""
-    defaults = dict(
-        solar_gen_kw=10.0,
-        site_load_kw=20.0,
-        bess_soc_pct=50.0,
-        bess_charge_kw=2.0,
-        bess_discharge_kw=1.0,
-        grid_import_kw=15.0,
-        grid_export_kw=3.0,
-        tariff_band="standard",
-        tariff_rate_c_kwh=2.12,
-    )
+    defaults = {
+        "solar_gen_kw": 10.0,
+        "site_load_kw": 20.0,
+        "bess_soc_pct": 50.0,
+        "bess_charge_kw": 2.0,
+        "bess_discharge_kw": 1.0,
+        "grid_import_kw": 15.0,
+        "grid_export_kw": 3.0,
+        "tariff_band": "standard",
+        "tariff_rate_c_kwh": 2.12,
+    }
     defaults.update(kwargs)
     return HourlySnapshot(
         hour=hour,
@@ -42,24 +42,24 @@ def _snapshot(hour: int, month: int, day_of_year: int, **kwargs) -> HourlySnapsh
 
 
 def _month_summary(month: int, **kwargs) -> MonthSummary:
-    defaults = dict(
-        month_name=["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][month - 1],
-        season=_SEASON_MAP[month],
-        solar_generated_kwh=1000.0,
-        bess_charged_kwh=200.0,
-        bess_discharged_kwh=150.0,
-        grid_import_kwh=500.0,
-        grid_export_kwh=100.0,
-        site_load_kwh=1400.0,
-        self_consumption_kwh=900.0,
-        peak_demand_kw=50.0,
-        total_cost_standard_ems_zar=5000.0,
-        total_cost_sentinel_ai_zar=4250.0,
-        savings_zar=750.0,
-        savings_pct=15.0,
-        avg_bess_soc_pct=55.0,
-        capacity_factor_pct=80.0,
-    )
+    defaults = {
+        "month_name": ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][month - 1],
+        "season": _SEASON_MAP[month],
+        "solar_generated_kwh": 1000.0,
+        "bess_charged_kwh": 200.0,
+        "bess_discharged_kwh": 150.0,
+        "grid_import_kwh": 500.0,
+        "grid_export_kwh": 100.0,
+        "site_load_kwh": 1400.0,
+        "self_consumption_kwh": 900.0,
+        "peak_demand_kw": 50.0,
+        "total_cost_standard_ems_zar": 5000.0,
+        "total_cost_sentinel_ai_zar": 4250.0,
+        "savings_zar": 750.0,
+        "savings_pct": 15.0,
+        "avg_bess_soc_pct": 55.0,
+        "capacity_factor_pct": 80.0,
+    }
     defaults.update(kwargs)
     return MonthSummary(month=month, **defaults)
 

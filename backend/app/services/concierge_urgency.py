@@ -35,10 +35,7 @@ def compute_urgency_score(
     """
     severity_weight = SEVERITY_WEIGHTS.get(highest_severity, 1)
 
-    if oldest_unresolved_at:
-        days_unresolved = (datetime.now(UTC) - oldest_unresolved_at).days
-    else:
-        days_unresolved = 0
+    days_unresolved = (datetime.now(UTC) - oldest_unresolved_at).days if oldest_unresolved_at else 0
 
     raw = signal_count * 0.3 + severity_weight * 0.4 + days_unresolved * 0.2 + repeat_count * 0.1
     return raw

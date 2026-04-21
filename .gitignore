@@ -112,3 +112,4 @@ backend/app/data/policies/
 
 # BACnet write audit logs (runtime, per-site — compliance archival)
 backend/app/data/bacnet_audit/*.jsonl
+.serena/

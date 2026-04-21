@@ -218,10 +218,7 @@ class PointMappingService:
         """
         # Majority vote on equipment type
         type_counts = Counter(p.equipment_type for p in points if p.equipment_type != "unknown")
-        if type_counts:
-            equipment_type = type_counts.most_common(1)[0][0]
-        else:
-            equipment_type = "unknown"
+        equipment_type = type_counts.most_common(1)[0][0] if type_counts else "unknown"
 
         # Calculate group confidence
         confidence_values = {

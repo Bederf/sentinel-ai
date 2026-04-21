@@ -123,7 +123,7 @@ def scan_all_focus_relays(now: datetime | None = None) -> dict[str, int]:
     changed = 0
 
     site_ids = set(get_connected_site_ids())
-    for node_id, node in mapping.items():
+    for _node_id, node in mapping.items():
         room_type = (node.get("room_type") or "meeting").lower()
         if room_type != "focus":
             continue

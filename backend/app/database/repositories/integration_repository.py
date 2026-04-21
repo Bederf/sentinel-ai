@@ -426,9 +426,8 @@ class IntegrationRepository:
         total_records_ingested = 0
         for source in sources:
             sync_at = source.get("last_sync_at")
-            if sync_at:
-                if last_sync is None or sync_at > last_sync:
-                    last_sync = sync_at
+            if sync_at and (last_sync is None or sync_at > last_sync):
+                last_sync = sync_at
             records = source.get("last_sync_records") or 0
             total_records_ingested += records
 

@@ -13,6 +13,7 @@ Usage:
 """
 
 import asyncio
+import contextlib
 import hashlib
 import inspect
 import json
@@ -662,15 +663,11 @@ async def get_alarms_tool(
     from_dt = None
     to_dt = None
     if from_time:
-        try:
+        with contextlib.suppress(ValueError):
             from_dt = datetime.fromisoformat(from_time.replace("Z", "+00:00"))
-        except ValueError:
-            pass
     if to_time:
-        try:
+        with contextlib.suppress(ValueError):
             to_dt = datetime.fromisoformat(to_time.replace("Z", "+00:00"))
-        except ValueError:
-            pass
 
     filtered_alarms = []
     for alert in alerts:
@@ -866,7 +863,7 @@ async def search_alarms_tool(query: str, site_id: str | None = None, limit: int 
             "site_id": asset_alerts[0].get("site_id"),
             "alarm_count": len(asset_alerts),
             "dates": dates[:5],  # Last 5 dates
-            "severities": list(set(a.get("severity") for a in asset_alerts if a.get("severity"))),
+            "severities": list({a.get("severity") for a in asset_alerts if a.get("severity")}),
             "pattern": pattern,
             "latest_alarm": {
                 "title": asset_alerts[0].get("title"),
@@ -1815,7 +1812,7 @@ async def process_municipal_bill_tool(
             "extracted_data": extracted_data,
             "pdf_file": str(pdf_path),
             "nmd_extracted_kva": extracted_data.get("demand_kva"),  # PHASE 081: Show extracted NMD
-            "nmd_updated": True if extracted_data.get("demand_kva") else False,  # PHASE 081: Confirm update
+            "nmd_updated": bool(extracted_data.get("demand_kva")),  # PHASE 081: Confirm update
             "status": "processed",
             "confidence": extracted_data.get("confidence", 0.0),
         }
@@ -1860,10 +1857,7 @@ async def get_utility_costs_tool(
             today = date.today()
             period_start = today.replace(day=1).isoformat()
             # Get last day of month
-            if today.month == 12:
-                next_month = date(today.year + 1, 1, 1)
-            else:
-                next_month = date(today.year, today.month + 1, 1)
+            next_month = date(today.year + 1, 1, 1) if today.month == 12 else date(today.year, today.month + 1, 1)
             period_end = (next_month - timedelta(days=1)).isoformat()
 
         # Get invoices for period
@@ -1961,8 +1955,8 @@ async def create_site_tool(
     site_id: str,
     name: str,
     address: str = "",
-    floors: list[str] = None,
-    features: dict[str, bool] = None,
+    floors: list[str] | None = None,
+    features: dict[str, bool] | None = None,
     client_name: str | None = None,
     monthly_fee_zar: float | None = None,
     contract_start: str | None = None,
@@ -2509,7 +2503,7 @@ async def add_site_desks_tool(
 async def add_site_devices_tool(
     site_id: str,
     devices: list[dict[str, Any]],
-    site_code: str = None,
+    site_code: str | None = None,
 ) -> dict[str, Any]:
     """
     Add BMS devices to the system for a site.
@@ -2599,8 +2593,8 @@ async def add_site_devices_tool(
 async def import_point_list_tool(
     site_id: str,
     point_list: list[dict[str, Any]],
-    site_code: str = None,
-    bms_vendor: str = None,
+    site_code: str | None = None,
+    bms_vendor: str | None = None,
 ) -> dict[str, Any]:
     """
     Import BACnet point list and auto-generate device/zone structure.
@@ -2922,7 +2916,7 @@ async def import_point_list_tool(
 async def import_controller_list_tool(
     site_id: str,
     controllers: list[dict[str, Any]],
-    site_code: str = None,
+    site_code: str | None = None,
 ) -> dict[str, Any]:
     """
     Import BMS controller information and create device structure.
@@ -4212,7 +4206,7 @@ ASSET_METRIC_TEMPLATES = {
 
 async def get_asset_metrics_template_tool(
     site_id: str,
-    equipment_types: list[str] = None,
+    equipment_types: list[str] | None = None,
 ) -> dict[str, Any]:
     """
     Get asset metric templates for a site during onboarding.

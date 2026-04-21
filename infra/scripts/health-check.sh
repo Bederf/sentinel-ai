@@ -162,6 +162,59 @@ else
   fi
 fi
 
+# --- MQTT Broker (Mosquitto) ---
+$QUIET || echo ""
+$QUIET || echo "=== MQTT Broker ==="
+
+# Mosquitto process
+if pgrep -x mosquitto >/dev/null 2>&1; then
+  check "Mosquitto (process)" 0 "running"
+else
+  check "Mosquitto (process)" 1 "not running"
+fi
+
+# Mosquitto port 1883
+(echo > /dev/tcp/localhost/1883) 2>/dev/null \
+  && check "Mosquitto port :1883" 0 "open" \
+  || check "Mosquitto port :1883" 1 "closed"
+
+# Mosquitto auth - try anonymous connection (should fail but confirm broker responds)
+# Use { } to capture pipefail correctly; mosquitto_sub exits 5 (auth rejected)
+auth_output=$(timeout 2 mosquitto_sub -t '$SYS/test/health' -C 1 -W 1 2>&1 || true)
+if echo "$auth_output" | grep -qiE "connection refused|not authorised|connection error"; then
+  check "Mosquitto auth" 0 "auth required (good)"
+else
+  check "Mosquitto auth" 2 "broker may allow anonymous or unreachable"
+fi
+
+# Recent node connections from Mosquitto log
+if [[ -f /var/log/mosquitto/mosquitto.log ]]; then
+  recent_window=$(date -d '15 minutes ago' +%s 2>/dev/null || echo "0")
+  recent_nodes=$(sudo grep -cE "node_001|node_002" /var/log/mosquitto/mosquitto.log 2>/dev/null || echo "0")
+  node_001_recent=$(sudo grep -c "node_001" /var/log/mosquitto/mosquitto.log 2>/dev/null || echo "0")
+  node_002_recent=$(sudo grep -c "node_002" /var/log/mosquitto/mosquitto.log 2>/dev/null || echo "0")
+  node_001_last=$(sudo grep "node_001" /var/log/mosquitto/mosquitto.log 2>/dev/null | tail -1 | awk '{print $2}' || echo "unknown")
+  node_002_last=$(sudo grep "node_002" /var/log/mosquitto/mosquitto.log 2>/dev/null | tail -1 | awk '{print $2}' || echo "unknown")
+
+  if [[ "$node_001_recent" -gt 0 && "$node_002_recent" -gt 0 ]]; then
+    check "ESP32 node_001" 0 "connected (last: $node_001_last)"
+    check "ESP32 node_002" 0 "connected (last: $node_002_last)"
+  elif [[ "$node_001_recent" -gt 0 ]]; then
+    check "ESP32 node_001" 0 "seen in log (last: $node_001_last)"
+    check "ESP32 node_002" 1 "not in log"
+  elif [[ "$node_002_recent" -gt 0 ]]; then
+    check "ESP32 node_001" 1 "not in log"
+    check "ESP32 node_002" 0 "seen in log (last: $node_002_last)"
+  else
+    check "ESP32 node_001" 1 "no recent log activity"
+    check "ESP32 node_002" 1 "no recent log activity"
+  fi
+else
+  check "Mosquitto log" 2 "/var/log/mosquitto/mosquitto.log not accessible"
+  check "ESP32 node_001" 2 "cannot check (no log access)"
+  check "ESP32 node_002" 2 "cannot check (no log access)"
+fi
+
 # --- Data Stores ---
 $QUIET || echo ""
 $QUIET || echo "=== Data Stores ==="
@@ -190,7 +243,68 @@ curl -sf -m 5 -o /dev/null http://localhost:55323 2>/dev/null \
   && check "Supabase Studio :55323" 0 "serving" \
   || check "Supabase Studio :55323" 2 "unreachable (optional)"
 
-# --- Summary ---
+# --- Streaming WAL Replica (Mirror DB) ---
+$QUIET || echo ""
+$QUIET || echo "=== Streaming WAL Replica ==="
+
+REPLICA_HOST="${REPLICA_HOST:-164.90.235.216}"
+REPLICA_PORT="${REPLICA_PORT:-55432}"
+REPLICA_CONN="postgresql://postgres:postgres@${REPLICA_HOST}:${REPLICA_PORT}/postgres"
+
+if (echo > /dev/tcp/${REPLICA_HOST}/${REPLICA_PORT}) 2>/dev/null; then
+  check "Replica port :${REPLICA_PORT}" 0 "open"
+
+  if command -v psql &>/dev/null; then
+    # Check replica is in recovery mode (i.e., really a standby)
+    repl_status=$(psql "${REPLICA_CONN}" -c "SELECT pg_is_in_recovery()" -t -A 2>/dev/null || echo "error")
+    if [[ "$repl_status" == "t" ]]; then
+      check "Replica in recovery" 0 "standby active"
+
+      # Replication lag in bytes — NULL means WAL receiver not connected
+      repl_lag=$(psql "${REPLICA_CONN}" -c "SELECT pg_wal_lag_diff(pg_current_wal_lsn(), replay_location)" -t -A 2>/dev/null || echo "NULL")
+      if [[ "$repl_lag" == "NULL" || "$repl_lag" == "" ]]; then
+        check "Replica WAL lag" 2 "not connected to primary (pg_wal_lag_diff returned NULL)"
+      else
+        # Convert bytes to MB for readability
+        repl_lag_mb=$(echo "scale=1; ${repl_lag:-0} / 1024 / 1024" | bc 2>/dev/null || echo "unknown")
+        if [[ "$repl_lag" -lt 10485760 ]]; then  # < 10 MB
+          check "Replica WAL lag" 0 "~${repl_lag_mb} MB"
+        elif [[ "$repl_lag" -lt 104857600 ]]; then  # < 100 MB
+          check "Replica WAL lag" 2 "~${repl_lag_mb} MB (elevated)"
+        else
+          check "Replica WAL lag" 1 "~${repl_lag_mb} MB (critical lag)"
+        fi
+      fi
+
+      # Last WAL received timestamp
+      last_wal=$(psql "${REPLICA_CONN}" -c "SELECT now() - pg_last_xact_replay_timestamp()" -t -A 2>/dev/null || echo "NULL")
+      if [[ "$last_wal" != "NULL" && -n "$last_wal" ]]; then
+        # Extract seconds for threshold check
+        repl_age_sec=$(echo "$last_wal" | grep -oE '[0-9]+' | head -1 || echo "0")
+        if [[ "${repl_age_sec:-0}" -lt 60 ]]; then
+          check "Replica WAL age" 0 "~${repl_age_sec}s ago"
+        elif [[ "${repl_age_sec:-0}" -lt 300 ]]; then
+          check "Replica WAL age" 2 "~${repl_age_sec}s ago (delayed)"
+        else
+          check "Replica WAL age" 1 "~${repl_age_sec}s ago (stalled?)"
+        fi
+      else
+        check "Replica WAL age" 2 "pg_last_xact_replay_timestamp() returned NULL"
+      fi
+    elif [[ "$repl_status" == "f" ]]; then
+      check "Replica in recovery" 1 "is PRIMARY (replica expected)"
+    else
+      check "Replica in recovery" 2 "could not determine (pg_is_in_recovery=${repl_status})"
+    fi
+  else
+    check "Replica psql" 2 "psql not installed (cannot run deep checks)"
+    check "Replica WAL lag" 2 "psql not installed"
+  fi
+else
+  check "Replica port :${REPLICA_PORT}" 1 "closed or unreachable"
+fi
+
+# Summary
 $QUIET || echo ""
 $QUIET || echo "=== Summary ==="
 TOTAL=$((PASS + WARN + FAIL))

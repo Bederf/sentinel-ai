@@ -11,7 +11,7 @@ import hashlib
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 CANDIDATE_TRAFFIC_PCT = 10  # 10% traffic to candidate model
 
 
-class TestStatus(str, Enum):
+class TestStatus(StrEnum):
     RUNNING = "running"
     COMPLETED = "completed"
     PROMOTED = "promoted"

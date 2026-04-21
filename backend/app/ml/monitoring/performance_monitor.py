@@ -92,7 +92,7 @@ class PerformanceMonitor:
                 equipment_predictions[equipment_id]["repair_completed"] = True
 
         # Build confusion matrix from predictions
-        for eq_id, pred in equipment_predictions.items():
+        for _eq_id, pred in equipment_predictions.items():
             predicted = pred["fault_predicted"]  # Model predicted fault
             actual = pred["repair_completed"]  # Actual: repair happened
 

@@ -92,7 +92,7 @@ class ChecklistTemplateRepository:
             return []
 
     def get_oem_template(
-        self, equipment_type: str, manufacturer: str, model: str = None, inspection_type: str = None
+        self, equipment_type: str, manufacturer: str, model: str | None = None, inspection_type: str | None = None
     ) -> dict[str, Any] | None:
         """Get OEM-specific template by manufacturer name matching.
 

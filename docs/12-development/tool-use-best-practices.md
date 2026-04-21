@@ -174,7 +174,7 @@ Before submitting PR:
 - [ ] All tests pass (`pytest` and `npm test`)
 - [ ] No linting errors (`npm run lint`, `pylint app/`)
 - [ ] Documentation updated (if needed)
-- [ ] Follows naming conventions (see `NAMING_CONVENTIONS.md`)
+- [ ] Follows naming conventions (see `docs/02-architecture/NAMING_CONVENTIONS.md`)
 - [ ] Safety validation included (for device control)
 - [ ] Audit logging added (for state changes)
 - [ ] Error handling present

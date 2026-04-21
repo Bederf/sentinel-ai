@@ -59,10 +59,7 @@ def _sanitize_email(email: str) -> str:
         return "***"
 
     local, domain = email.split("@", 1)
-    if len(local) <= 1:
-        masked_local = "*"
-    else:
-        masked_local = local[0] + "*" * (len(local) - 2) + local[-1]
+    masked_local = "*" if len(local) <= 1 else local[0] + "*" * (len(local) - 2) + local[-1]
 
     if len(domain) <= 1:
         masked_domain = "*"
@@ -194,10 +191,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
             return True
 
         # Work order creation
-        if path == "/api/work-orders" and method == "POST":
-            return True
-
-        return False
+        return bool(path == "/api/work-orders" and method == "POST")
 
     async def _log_successful_action(
         self, request: Request, response: Response, user: str, correlation_id: str, request_start: datetime

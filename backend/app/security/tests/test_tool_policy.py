@@ -207,7 +207,7 @@ class TestValidateBmsIp:
         assert reason == ""
 
     def test_valid_10_network(self):
-        ok, reason = validate_bms_ip("10.0.1.50")
+        ok, _reason = validate_bms_ip("10.0.1.50")
         assert ok is True
 
     def test_loopback_blocked(self):
@@ -236,7 +236,7 @@ class TestValidateBmsIp:
         assert "Invalid" in reason
 
     def test_reserved_blocked(self):
-        ok, reason = validate_bms_ip("0.0.0.0")
+        ok, _reason = validate_bms_ip("0.0.0.0")
         assert ok is False
 
 
@@ -257,7 +257,7 @@ class TestMcpAdminToolAccess:
         assert "ADMIN" in reason
 
     def test_non_admin_tools_pass(self):
-        ok, reason = check_mcp_admin_tool_access("get_buildings", None)
+        ok, _reason = check_mcp_admin_tool_access("get_buildings", None)
         assert ok is True
 
     def test_code_tools_blocked_for_operator(self):
@@ -273,7 +273,7 @@ class TestMcpAdminToolAccess:
         """Admin role should access code tools."""
         mock_ctx = MagicMock()
         mock_ctx.has_role.return_value = True
-        ok, reason = check_mcp_admin_tool_access("code_search", mock_ctx)
+        ok, _reason = check_mcp_admin_tool_access("code_search", mock_ctx)
         assert ok is True
 
 

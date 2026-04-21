@@ -7,11 +7,11 @@ Used by RecommendationService to manage approval workflow and execution.
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 
-class RecommendationStatus(str, Enum):
+class RecommendationStatus(StrEnum):
     """Status of a recommendation in the approval/execution workflow."""
 
     PENDING = "pending"  # Generated, awaiting action
@@ -24,7 +24,7 @@ class RecommendationStatus(str, Enum):
     FAILED = "failed"  # Execution failed
 
 
-class ActionRiskLevel(str, Enum):
+class ActionRiskLevel(StrEnum):
     """Risk level classification for recommended actions."""
 
     LOW = "low"  # Setpoint adjustments, dimming

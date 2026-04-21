@@ -7,12 +7,12 @@ Includes temperature, humidity, and wet-bulb patterns for different regions.
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from enum import Enum
+from enum import StrEnum
 
 import numpy as np
 
 
-class Season(str, Enum):
+class Season(StrEnum):
     """South African seasons."""
 
     SUMMER = "summer"  # Dec-Feb
@@ -21,7 +21,7 @@ class Season(str, Enum):
     SPRING = "spring"  # Sep-Nov
 
 
-class ClimateZone(str, Enum):
+class ClimateZone(StrEnum):
     """South African climate zones."""
 
     JOHANNESBURG = "johannesburg"  # Highveld - hot summers, cool dry winters

@@ -5,13 +5,13 @@ Typical South African commercial building configuration.
 """
 
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 # === Enums ===
 
 
-class ATSType(str, Enum):
+class ATSType(StrEnum):
     """ATS changeover mechanism type."""
 
     MECHANICAL = "mechanical"  # Motorized contactors (Socomec, ABB)
@@ -19,7 +19,7 @@ class ATSType(str, Enum):
     HYBRID = "hybrid"  # Mechanical with electronic control
 
 
-class ATSPosition(str, Enum):
+class ATSPosition(StrEnum):
     """ATS position states."""
 
     MAINS = "mains"
@@ -30,7 +30,7 @@ class ATSPosition(str, Enum):
     FAULT = "fault"
 
 
-class BreakerState(str, Enum):
+class BreakerState(StrEnum):
     """Circuit breaker states."""
 
     OPEN = "open"
@@ -41,7 +41,7 @@ class BreakerState(str, Enum):
     WITHDRAWN = "withdrawn"
 
 
-class TransformerTapPosition(str, Enum):
+class TransformerTapPosition(StrEnum):
     """Transformer tap changer positions."""
 
     LOWER = "lower"  # -5% to -2.5%

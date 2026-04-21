@@ -1257,50 +1257,49 @@ class ApprovalService:
 
             # Auto-rollback on COV failure if enabled
             auto_rolled_back = False
-            if not cov_verified_flag:
-                if settings.parasite_auto_rollback_enabled:
-                    logger.warning(
-                        f"Tier 3 auto-execute: COV verification failed for {equipment_id}.{control_point}, "
-                        f"initiating auto-rollback"
-                    )
-                    # Build a minimal COVVerificationResult for the rollback helper
-                    from app.services.cov_monitor_service import COVVerificationResult as _CVR
+            if not cov_verified_flag and settings.parasite_auto_rollback_enabled:
+                logger.warning(
+                    f"Tier 3 auto-execute: COV verification failed for {equipment_id}.{control_point}, "
+                    f"initiating auto-rollback"
+                )
+                # Build a minimal COVVerificationResult for the rollback helper
+                from app.services.cov_monitor_service import COVVerificationResult as _CVR
 
-                    _cov_for_rollback = _CVR(
-                        verified=False,
-                        actual_value=actual_value_read,
-                        expected_value=target_value,
-                        read_success=actual_value_read is not None,
-                        elapsed_seconds=0.0,
-                    )
-                    auto_rolled_back = await self._auto_rollback(
-                        recommendation=recommendation,
-                        original_value=original_value,
-                        cov_result=_cov_for_rollback,
-                        decision_id=routing_result.decision_id,
-                    )
+                _cov_for_rollback = _CVR(
+                    verified=False,
+                    actual_value=actual_value_read,
+                    expected_value=target_value,
+                    read_success=actual_value_read is not None,
+                    elapsed_seconds=0.0,
+                )
+                auto_rolled_back = await self._auto_rollback(
+                    recommendation=recommendation,
+                    original_value=original_value,
+                    cov_result=_cov_for_rollback,
+                    decision_id=routing_result.decision_id,
+                )
 
-                    if auto_rolled_back:
-                        logger.info("Tier 3 auto-execute: Auto-rollback completed successfully")
-                        return ApprovalResult(
-                            success=False,
-                            recommendation_id=recommendation_id,
-                            status="rolled_back",
-                            error_message=(
-                                "COV verification failed, auto-rollback initiated:"
-                                f" expected={target_value},"
-                                f" actual={actual_value_read}"
-                            ),
-                            cov_verified=False,
-                        )
-                    else:
-                        logger.error("Tier 3 auto-execute: Auto-rollback failed")
-                        return ApprovalResult(
-                            success=False,
-                            recommendation_id=recommendation_id,
-                            status="failed",
-                            error_message="COV verification failed and auto-rollback failed",
-                        )
+                if auto_rolled_back:
+                    logger.info("Tier 3 auto-execute: Auto-rollback completed successfully")
+                    return ApprovalResult(
+                        success=False,
+                        recommendation_id=recommendation_id,
+                        status="rolled_back",
+                        error_message=(
+                            "COV verification failed, auto-rollback initiated:"
+                            f" expected={target_value},"
+                            f" actual={actual_value_read}"
+                        ),
+                        cov_verified=False,
+                    )
+                else:
+                    logger.error("Tier 3 auto-execute: Auto-rollback failed")
+                    return ApprovalResult(
+                        success=False,
+                        recommendation_id=recommendation_id,
+                        status="failed",
+                        error_message="COV verification failed and auto-rollback failed",
+                    )
 
             # Schedule outcome measurement for 10-minute learning window
             cov_monitor = get_cov_monitor_service()

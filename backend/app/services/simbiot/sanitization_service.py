@@ -242,10 +242,7 @@ class SanitizationService:
         if not sanitized.sanitized_name or sanitized.sanitized_name.startswith("unknown_"):
             return True
 
-        if sanitized.normalized_unit == "unknown":
-            return True
-
-        return False
+        return sanitized.normalized_unit == "unknown"
 
     def get_metrics(self) -> dict[str, int]:
         """Get sanitization metrics."""

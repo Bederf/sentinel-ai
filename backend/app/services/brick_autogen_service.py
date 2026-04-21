@@ -676,7 +676,7 @@ def build_brick_for_site(
         validate_graph=validate,
     )
 
-    graph, idx, result = svc.build()
+    _graph, idx, result = svc.build()
 
     if output_dir:
         output_dir.mkdir(parents=True, exist_ok=True)

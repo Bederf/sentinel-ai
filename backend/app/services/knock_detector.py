@@ -77,7 +77,7 @@ class KnockDetector:
         knock_range = profile["knock_range"]
 
         # Look for low frequency peaks (engine knock signature)
-        low_freq_peaks = [(f, a) for f, a in zip(peak_freqs, peak_amps) if knock_range[0] <= f <= knock_range[1]]
+        low_freq_peaks = [(f, a) for f, a in zip(peak_freqs, peak_amps, strict=False) if knock_range[0] <= f <= knock_range[1]]
 
         result["analysis_details"]["peaks_in_knock_range"] = len(low_freq_peaks)
 
@@ -123,7 +123,7 @@ class KnockDetector:
         harmonics = []
         for n in range(2, 8):  # Check up to 7th harmonic
             expected = fundamental * n
-            for f, a in zip(freqs, amps):
+            for f, a in zip(freqs, amps, strict=False):
                 if abs(f - expected) < expected * 0.1:  # 10% tolerance
                     harmonics.append({"n": n, "freq": f, "amp": a})
                     break
@@ -135,10 +135,7 @@ class KnockDetector:
     ) -> float:
         """Calculate confidence that knock is present."""
         # Base: amplitude prominence (percentile)
-        if all_amps:
-            amp_percentile = sum(1 for a in all_amps if a < knock_amp) / len(all_amps)
-        else:
-            amp_percentile = 0.5
+        amp_percentile = sum(1 for a in all_amps if a < knock_amp) / len(all_amps) if all_amps else 0.5
 
         # Harmonic boost (more harmonics = more confidence)
         harmonic_boost = min(0.4, harmonic_evidence["count"] * 0.1)

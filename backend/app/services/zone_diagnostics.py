@@ -60,7 +60,7 @@ class ZoneDiagnostics:
     def get_equipment_status(self, equipment_codes: dict[str, str]) -> dict[str, dict]:
         """Fetch status for all zone equipment."""
         status = {}
-        for eq_type, code in equipment_codes.items():
+        for _eq_type, code in equipment_codes.items():
             result = self.client.table("equipment").select("*").eq("code", code).execute()
             if result.data:
                 status[code] = result.data[0]

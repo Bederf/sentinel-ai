@@ -56,11 +56,7 @@ def should_skip_query(query: str) -> bool:
         r"^good day\. give me a quick overview",
     ]
 
-    for pattern in skip_patterns:
-        if re.match(pattern, normalized):
-            return True
-
-    return False
+    return any(re.match(pattern, normalized) for pattern in skip_patterns)
 
 
 def hash_query(query: str) -> str:

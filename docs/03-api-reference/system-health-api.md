@@ -2,9 +2,9 @@
 title: "System Health & Diagnostics API Reference"
 type: "reference"
 status: "draft"
-version: "1.0.0"
+version: "1.1.0"
 created: "2026-03-31"
-updated: "2026-03-31"
+updated: "2026-04-21"
 tags: ["sentinel", "documentation"]
 related: []
 domain: "bms"
@@ -12,6 +12,30 @@ audience: "all"
 complexity: "intermediate"
 estimated_read_time: 10
 ---
+
+```mermaid
+flowchart TD
+    subgraph probes["Health Probes"]
+        S["supervisor\nDesigo CC bridge"]
+        FN["field_network\nBACnet/IP field bus"]
+        OB["obix\nWeather API OBIX"]
+        LT["lighting\nDALI-2 gateway"]
+    end
+    subgraph aggregate["bms_connectivity Aggregate"]
+        AG[">avg(scores)"]
+        ST[">worst-case status"]
+    end
+    probes --> AG
+    probes --> ST
+    AG --> BMS["bms_connectivity\nscore = avg(probe scores)"]
+    ST --> BMS
+
+    style S fill:#4A90E2,color:#fff
+    style FN fill:#4A90E2,color:#fff
+    style OB fill:#4A90E2,color:#fff
+    style LT fill:#4A90E2,color:#fff
+    style BMS fill:#2E7D32,color:#fff
+```
 
 # System Health & Diagnostics API Reference
 
@@ -54,19 +78,49 @@ curl -X GET http://localhost:9095/api/system/health \
   "overall_score": 87,
   "components": {
     "bms_connectivity": {
-      "name": "BMS Connectivity",
+      "name": "bms_connectivity",
       "status": "healthy",
       "score": 92,
-      "message": "All BMS systems online",
+      "message": "Aggregate BMS protocol connectivity",
+      "details": null
+    },
+    "supervisor": {
+      "name": "supervisor",
+      "status": "healthy",
+      "score": 90,
+      "message": "Supervisor bridge connected · 142 polls · 26.4h ML ingested",
       "details": {
-        "niagara": "connected",
-        "bacnet": "connected",
-        "obix": "responding",
-        "dali_gateway": "ready"
+        "poll_count": 142,
+        "ml_hours_ingested": 26.4,
+        "last_poll": "2026-04-21T08:30:00Z"
+      }
+    },
+    "field_network": {
+      "name": "field_network",
+      "status": "healthy",
+      "score": 90,
+      "message": "Field network connected",
+      "details": null
+    },
+    "obix": {
+      "name": "obix",
+      "status": "healthy",
+      "score": 90,
+      "message": "ObiX API connected",
+      "details": null
+    },
+    "lighting": {
+      "name": "lighting",
+      "status": "degraded",
+      "score": 45,
+      "message": "Partial lighting data — 3 of 12 DALI fixtures responding",
+      "details": {
+        "fixtures_responding": 3,
+        "fixtures_total": 12
       }
     },
     "api_health": {
-      "name": "API Health",
+      "name": "api_health",
       "status": "healthy",
       "score": 85,
       "message": "All REST endpoints responding",
@@ -77,7 +131,7 @@ curl -X GET http://localhost:9095/api/system/health \
       }
     },
     "database_status": {
-      "name": "Database Status",
+      "name": "database_status",
       "status": "healthy",
       "score": 95,
       "message": "Supabase, InfluxDB online",
@@ -89,7 +143,7 @@ curl -X GET http://localhost:9095/api/system/health \
       }
     },
     "service_health": {
-      "name": "Service Health",
+      "name": "service_health",
       "status": "degraded",
       "score": 72,
       "message": "ML model delayed response detected",
@@ -101,7 +155,7 @@ curl -X GET http://localhost:9095/api/system/health \
       }
     },
     "data_freshness": {
-      "name": "Data Freshness",
+      "name": "data_freshness",
       "status": "healthy",
       "score": 88,
       "message": "Data updates within expected intervals",
@@ -109,8 +163,8 @@ curl -X GET http://localhost:9095/api/system/health \
         "last_reading_timestamp": "2024-01-15T10:30:00Z",
         "staleness_minutes": 0.75,
         "sources": {
-          "niagara_points": "within 2 min",
-          "bacnet_devices": "within 5 min",
+          "supervisor_points": "within 2 min",
+          "field_network_devices": "within 5 min",
           "modbus_registers": "within 10 min"
         }
       }
@@ -145,6 +199,22 @@ curl -X GET http://localhost:9095/api/system/health \
 | `components[*].details` | object | Component-specific metrics |
 | `active_alerts` | array | Current system alerts |
 | `recommendations` | array | Actionable recommendations |
+
+#### BMS Connectivity Probe Details
+
+The `bms_connectivity` aggregate is derived from 4 brand-agnostic protocol probes:
+
+| Probe Key | Display Name | Backend Check | Score Weight |
+|-----------|--------------|---------------|--------------|
+| `supervisor` | Supervisor | `ShadowModePollingService.status` — Desigo CC bridge connectivity | 5% |
+| `field_network` | Field Network | `ShadowModePollingService.status` — BACnet/IP field bus | 5% |
+| `obix` | Weather API | `OBIXClient.check_connection()` — OBIX weather API | 5% |
+| `lighting` | Lighting | `lighting_energy` table row count — DALI-2 gateway | 5% |
+
+**bms_connectivity aggregate rules:**
+- `score` = average of the 4 probe scores
+- `status` = `healthy` only if ALL 4 probes are `healthy`; `critical` if ANY probe is `critical`; otherwise `degraded`
+- No graceful degradation — an unavailable probe scores 0 / `critical`
 
 #### Scoring Formula
 
@@ -552,7 +622,7 @@ curl -X POST http://localhost:9095/api/system/diagnostics \
 curl -X POST http://localhost:9095/api/system/diagnostics \
   -H "Content-Type: application/json" \
   -d '{
-    "target": "component:dali_gateway"
+    "target": "component:lighting"
   }'
 ```
 
@@ -807,8 +877,8 @@ curl "http://localhost:9095/api/system/error-logs?category=database&offset=0&lim
       "timestamp": "2024-01-15T09:30:00Z",
       "category": "bms",
       "severity": "critical",
-      "component": "niagara.obix",
-      "message": "ObiX connection timeout - Niagara server unresponsive",
+      "component": "obix",
+      "message": "ObiX connection timeout - OBIX weather API unresponsive",
       "details": {
         "host": "192.168.1.100",
         "port": 8080,

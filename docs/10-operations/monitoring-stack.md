@@ -67,6 +67,33 @@ docker restart promtail  # Log collector
 docker restart grafana   # Dashboards
 ```
 
+## Infrastructure Health Check
+
+`infra/scripts/health-check.sh` runs a comprehensive check of all Sentinel infrastructure. It covers: systemd services, HTTP endpoints, Docker containers (Supabase), MQTT broker, data stores (Redis, Postgres), and streaming WAL replica.
+
+### Run the health check
+
+```bash
+# Full output
+./infra/scripts/health-check.sh
+
+# Exit code only (for cron/monitoring)
+./infra/scripts/health-check.sh --quiet
+```
+
+### Streaming WAL replica checks
+
+When `REPLICA_HOST`/`REPLICA_PORT` are set, the script verifies:
+- Port connectivity to the replica
+- `pg_is_in_recovery()` = `t` (confirms it's a standby, not a promoted primary)
+- WAL lag in MB (`pg_wal_lag_diff`) — warns at >10 MB, fails at >100 MB
+- WAL replay age — warns if replay is delayed >60s
+
+```bash
+# Override replica host/port if needed
+REPLICA_HOST=164.90.235.216 REPLICA_PORT=55432 ./infra/scripts/health-check.sh
+```
+
 ### Check service health
 
 ```bash

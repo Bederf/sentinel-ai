@@ -44,9 +44,9 @@ const FLOOR_ID: Record<string, number> = {
  */
 function _getHealthColor(healthScore: number | undefined | null): string {
   const score = healthScore || 100;
-  if (score >= 60) return '#22c55e';
-  if (score >= 30) return '#f59e0b';
-  return '#ef4444';
+  if (score >= 60) return 'var(--color-sentinel-green)';
+  if (score >= 30) return 'var(--color-sentinel-amber)';
+  return 'var(--color-sentinel-red)';
 }
 
 /**
@@ -178,7 +178,7 @@ export function FloorPlan2D({
           </text>
 
           {/* Healthy */}
-          <circle cx={0} cy={0.6} r={0.15} fill="#22c55e" />
+          <circle cx={0} cy={0.6} r={0.15} fill="var(--color-sentinel-green)" />
           <text
             x={0.3}
             y={0.6}
@@ -190,7 +190,7 @@ export function FloorPlan2D({
           </text>
 
           {/* Warning */}
-          <circle cx={0} cy={1.1} r={0.15} fill="#f59e0b" />
+          <circle cx={0} cy={1.1} r={0.15} fill="var(--color-sentinel-amber)" />
           <text
             x={0.3}
             y={1.1}
@@ -202,7 +202,7 @@ export function FloorPlan2D({
           </text>
 
           {/* Critical */}
-          <circle cx={0} cy={1.6} r={0.15} fill="#ef4444" />
+          <circle cx={0} cy={1.6} r={0.15} fill="var(--color-sentinel-red)" />
           <text
             x={0.3}
             y={1.6}

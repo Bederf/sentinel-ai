@@ -16,17 +16,17 @@ import { conciergeApi } from "../../lib/api";
 // ---- Severity colour mapping ----
 
 const SEVERITY_COLORS: Record<string, string> = {
-  low: "#2ecc71",
-  medium: "#f1c40f",
-  high: "#e67e22",
-  critical: "#e74c3c",
+  low: "var(--color-sentinel-green)",
+  medium: "var(--color-sentinel-amber)",
+  high: "var(--color-sentinel-amber)",
+  critical: "var(--color-sentinel-red)",
 };
 
 const SEVERITY_BG: Record<string, string> = {
-  low: "#0d1f15",
-  medium: "#1a1800",
-  high: "#1f1208",
-  critical: "#1f0d0d",
+  low: "rgba(46,204,113,0.12)",
+  medium: "rgba(241,196,15,0.12)",
+  high: "rgba(230,126,34,0.12)",
+  critical: "rgba(231,76,60,0.12)",
 };
 
 // ---- Helpers ----
@@ -132,9 +132,9 @@ function categoryLabelFromKey(key: CategoryKey): string {
 }
 
 const _CATEGORY_BORDER_COLORS: Record<CategoryKey, string> = {
-  ghost: "#e11d48",
-  block_risk: "#f59e0b",
-  info: "#f59e0b",
+  ghost: "var(--color-sentinel-red)",
+  block_risk: "var(--color-sentinel-amber)",
+  info: "var(--color-sentinel-amber)",
 };
 
 function severityRank(severity: string): number {
@@ -369,7 +369,7 @@ function getCyStylesheet(): any[] {
         label: "data(label)",
         "font-family": "'DM Mono', 'JetBrains Mono', monospace",
         "font-size": 8,
-        color: "#a0a0a0",
+        color: "var(--color-sentinel-text-secondary)",
         "text-valign": "bottom",
         "text-halign": "center",
         "text-margin-y": 8,
@@ -405,7 +405,7 @@ function getCyStylesheet(): any[] {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         "shadow-opacity": (ele: any) => glowOpacity(ele.data("urgency_score")),
         "shadow-offset-x": 0, "shadow-offset-y": 0,
-        color: "#f8fafc",
+        color: "var(--color-sentinel-text-primary)",
       },
     },
     {
@@ -414,10 +414,10 @@ function getCyStylesheet(): any[] {
         shape: "round-rectangle",
         width: 96,
         height: 48,
-        "background-color": "#0f172a",
+        "background-color": "var(--color-sentinel-bg-panel)",
         "border-width": 1.5,
-        "border-color": "#475569",
-        color: "#e2e8f0",
+        "border-color": "var(--color-sentinel-border)",
+        color: "var(--color-sentinel-text-primary)",
         "font-size": 10,
         "font-weight": 600,
         "text-valign": "center",
@@ -432,7 +432,7 @@ function getCyStylesheet(): any[] {
         shape: "ellipse",
         width: (ele: any) => Number(ele.data("node_size") || 44),
         height: (ele: any) => Number(ele.data("node_size") || 44),
-        "background-color": "#111827",
+        "background-color": "var(--color-sentinel-bg-panel)",
         "border-width": 2,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         "border-color": (ele: any) => colorFromSeverity(ele.data("highest_severity")),
@@ -442,7 +442,7 @@ function getCyStylesheet(): any[] {
         "shadow-opacity": 0.28,
         "shadow-offset-x": 0,
         "shadow-offset-y": 0,
-        color: "#ffffff",
+        color: "var(--color-sentinel-text-primary)",
         "font-size": 10,
         "font-weight": 600,
         "text-max-width": 70,
@@ -459,7 +459,7 @@ function getCyStylesheet(): any[] {
         shape: "ellipse",
         width: (ele: any) => Number(ele.data("node_size") || 26),
         height: (ele: any) => Number(ele.data("node_size") || 26),
-        "background-color": "#111827",
+        "background-color": "var(--color-sentinel-bg-panel)",
         "border-width": 2,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         "border-color": (ele: any) => colorFromSeverity(ele.data("highest_severity")),
@@ -469,7 +469,7 @@ function getCyStylesheet(): any[] {
         "shadow-opacity": 0.35,
         "shadow-offset-x": 0,
         "shadow-offset-y": 0,
-        color: "#d1d5db",
+        color: "var(--color-sentinel-text-secondary)",
         "font-size": 8,
         "text-max-width": 56,
         "text-wrap": "wrap",
@@ -482,7 +482,7 @@ function getCyStylesheet(): any[] {
       style: {
         width: 1.5,
         opacity: 0.5,
-        "line-color": "#334155",
+        "line-color": "var(--color-sentinel-border)",
         "curve-style": "straight",
         "z-index": 8,
       },
@@ -492,7 +492,7 @@ function getCyStylesheet(): any[] {
       style: {
         width: 1.5,
         opacity: 0.6,
-        "line-color": "#334155",
+        "line-color": "var(--color-sentinel-border)",
         "curve-style": "straight",
         "z-index": 10,
       },
@@ -502,7 +502,7 @@ function getCyStylesheet(): any[] {
       style: {
         width: 1.5,
         opacity: 0.7,
-        "line-color": "#334155",
+        "line-color": "var(--color-sentinel-border)",
         "curve-style": "straight",
         "z-index": 12,
       },
@@ -514,7 +514,7 @@ function getCyStylesheet(): any[] {
 
 function MapPlaceholder({ children }: { children: React.ReactNode }) {
   return (
-    <div className="h-full flex items-center justify-center" style={{ background: "#0d1117" }}>
+    <div className="h-full flex items-center justify-center" style={{ background: "var(--color-sentinel-bg-canvas)" }}>
       {children}
     </div>
   );
@@ -536,12 +536,30 @@ function useConciergeGraph(
   onSignalResolved: () => void,
 ) {
   const cyRef = useRef<Core | null>(null);
+  const [containerReady, setContainerReady] = useState(!!containerRef.current);
+
+  // Watch for container resize so we re-init when layout settles
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => {
+      if (containerReady && el.clientWidth > 0 && el.clientHeight > 0) {
+        // Force re-render of the init effect by toggling a dummy state
+        setContainerReady((v) => !v);
+        setContainerReady((v) => !v);
+      }
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [containerReady]);
 
   useEffect(() => {
-    if (!containerRef.current || rooms.length === 0) return;
+    if (!containerReady || !containerRef.current || rooms.length === 0) return;
     const el = containerRef.current;
-    const w = el.clientWidth || 800;
-    const h = el.clientHeight || 600;
+    const w = el.clientWidth;
+    const h = el.clientHeight;
+    // If container has no real dimensions yet, defer until it does
+    if (w === 0 || h === 0) return;
     const dims: CanvasDims = { centreX: w / 2, centreY: h / 2, maxRadius: Math.min(w, h) / 2 - 60 };
 
     const centreNode = buildCentreNode(dims);
@@ -680,7 +698,7 @@ function useConciergeGraph(
               signalIds.map((id) => conciergeApi.resolveSignal(siteId, room.room_id, id, "resolved", "Resolved via drag-to-room")),
             );
             categoryNode.animate(
-              { style: { opacity: 0, "border-color": "#22c55e" } },
+              { style: { opacity: 0, "border-color": "var(--color-sentinel-green)" } },
               {
                 duration: 220,
                 complete: () => {
@@ -730,6 +748,7 @@ function useConciergeGraph(
 
     return () => { cy.destroy(); cyRef.current = null; };
   }, [
+    containerReady,
     siteId,
     rooms,
     expandedRoomId,
@@ -855,5 +874,5 @@ export function ConciergeMap({ siteId, onSignalSelect }: ConciergeMapProps) {
     );
   }
 
-  return <div ref={containerRef} className="w-full h-full concierge-cytoscape-map" style={{ background: "#0d1117" }} />;
+  return <div ref={containerRef} className="w-full h-full concierge-cytoscape-map" style={{ background: "var(--color-sentinel-bg-canvas)" }} />;
 }

@@ -122,12 +122,9 @@ class AlarmEventGenerator:
             alarm_threshold = metadata.get("alarm_threshold")
             critical_threshold = metadata.get("critical_threshold")
 
-            for i, (ts, val) in enumerate(zip(timestamps, values)):
+            for i, (ts, val) in enumerate(zip(timestamps, values, strict=False)):
                 # Skip if in existing alarm state (avoid duplicate alarms)
-                if i > 0:
-                    prev_val = values[i - 1]
-                else:
-                    prev_val = val
+                prev_val = values[i - 1] if i > 0 else val
 
                 # High threshold alarm
                 if max_val is not None and val > max_val:
@@ -250,7 +247,7 @@ class AlarmEventGenerator:
         # Convert to AlarmEvent objects
         alarm_sequence = [a["code"] for a in profile if a.get("code")]
 
-        for i, raw_alarm in enumerate(raw_alarms):
+        for _i, raw_alarm in enumerate(raw_alarms):
             # Determine which alarm code based on threshold index
             alarm_idx = min(raw_alarm.get("threshold_index", 0), len(alarm_sequence) - 1)
             alarm_info = profile[alarm_idx] if alarm_idx < len(profile) else profile[-1]

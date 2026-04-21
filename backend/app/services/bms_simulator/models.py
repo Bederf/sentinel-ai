@@ -6,13 +6,13 @@ Includes support for Siemens Desigo, Niagara, and Rickard DALI equipment.
 """
 
 from datetime import date, timedelta
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class VendorType(str, Enum):
+class VendorType(StrEnum):
     """Supported BMS vendor formats."""
 
     SIEMENS_DESIGO = "siemens_desigo"
@@ -20,7 +20,7 @@ class VendorType(str, Enum):
     RICKARD = "rickard"  # Rickard DALI diffusers with MLM controllers
 
 
-class EquipmentType(str, Enum):
+class EquipmentType(StrEnum):
     """Equipment type categories."""
 
     CHILLER = "chiller"
@@ -50,7 +50,7 @@ class EquipmentType(str, Enum):
     PUMP = "pump"
 
 
-class AlarmSeverity(str, Enum):
+class AlarmSeverity(StrEnum):
     """Alarm severity levels."""
 
     INFO = "info"

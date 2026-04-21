@@ -42,10 +42,7 @@ class TrustHistory(BaseModel):
         - Penalty from failures (-0.1 per failure, min 0.0)
         - Minimum validation runs required (5 runs before full trust)
         """
-        if validation_runs < 5:
-            validation_factor = validation_runs / 5.0
-        else:
-            validation_factor = 1.0
+        validation_factor = validation_runs / 5.0 if validation_runs < 5 else 1.0
 
         stability_score = min(stability_days / 30.0, 0.6) * validation_factor
         success_rate = (

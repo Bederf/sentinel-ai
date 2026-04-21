@@ -28,14 +28,14 @@ const SIGNAL_TYPE_LABELS: Record<string, string> = {
 // ---- Domain colour dots ----
 
 const SIGNAL_DOMAIN_COLORS: Record<string, string> = {
-  booking_conflict: "#f4900c",
-  booking_saturation: "#f4900c",
-  no_show_pattern: "#e74c3c",
-  complaint_email: "#4a9eff",
-  escalation_email: "#4a9eff",
-  observation_email: "#4a9eff",
-  hvac_fault: "#e74c3c",
-  maintenance_request: "#f1c40f",
+  booking_conflict: "var(--color-sentinel-amber)",
+  booking_saturation: "var(--color-sentinel-amber)",
+  no_show_pattern: "var(--color-sentinel-red)",
+  complaint_email: "var(--color-sentinel-blue)",
+  escalation_email: "var(--color-sentinel-blue)",
+  observation_email: "var(--color-sentinel-blue)",
+  hvac_fault: "var(--color-sentinel-red)",
+  maintenance_request: "var(--color-sentinel-amber)",
 };
 
 // ---- Relative time helper ----
@@ -71,7 +71,7 @@ function SignalCard({
   repeatCount: number;
   onSelect: () => void;
 }) {
-  const color = SIGNAL_DOMAIN_COLORS[signal.signal_type] || "#8b7fd4";
+  const color = SIGNAL_DOMAIN_COLORS[signal.signal_type] || "var(--color-sentinel-purple)";
   const label = SIGNAL_TYPE_LABELS[signal.signal_type] || signal.signal_type.replace(/_/g, " ");
 
   return (
@@ -98,7 +98,7 @@ function SignalCard({
             {repeatCount > 1 && (
               <span
                 className="text-[9px] px-1.5 py-0.5 rounded-full"
-                style={{ background: "rgba(255,255,255,0.08)", color: "#a0a0a0" }}
+                style={{ background: "rgba(255,255,255,0.08)", color: "var(--color-sentinel-text-secondary)" }}
               >
                 x{repeatCount}
               </span>
@@ -159,7 +159,7 @@ export function RoomDetailPanel({ siteId, room, onClose, onSignalSelect }: RoomD
           <div className="flex items-center gap-2 mt-0.5">
             <span
               className="text-[10px] px-1.5 py-0.5 rounded"
-              style={{ background: "rgba(59,130,246,0.15)", color: "#60a5fa" }}
+              style={{ background: "rgba(59,130,246,0.15)", color: "var(--color-sentinel-blue)" }}
             >
               {room.signal_count} signal{room.signal_count !== 1 ? "s" : ""}
             </span>

@@ -19,7 +19,7 @@ from app.models.auth import AuthContext
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/buildings", tags=["desks"])
+router = APIRouter(prefix="/buildings", tags=["desks"])
 
 
 # ============================================================================

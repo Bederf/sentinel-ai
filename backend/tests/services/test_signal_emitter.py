@@ -84,7 +84,7 @@ class TestClassifyEmail:
     def test_classify_email_complaint(self):
         from app.services.signal_emitter import _classify_email
 
-        mod, sig, sev = _classify_email("Room issue", "This problem is ongoing")
+        mod, sig, _sev = _classify_email("Room issue", "This problem is ongoing")
         assert sig == "complaint_email"
         assert mod == "email_helpdesk"
 
@@ -99,21 +99,21 @@ class TestClassifyEmail:
     def test_classify_email_action_request(self):
         from app.services.signal_emitter import _classify_email
 
-        mod, sig, sev = _classify_email("Room booking", "Please release the room for us")
+        _mod, sig, sev = _classify_email("Room booking", "Please release the room for us")
         assert sig == "action_request_email"
         assert sev == "high"
 
     def test_classify_email_fallback(self):
         from app.services.signal_emitter import _classify_email
 
-        mod, sig, sev = _classify_email("Hello", "Just a general note with no keywords")
+        _mod, sig, sev = _classify_email("Hello", "Just a general note with no keywords")
         assert sig == "observation_email"
         assert sev == "low"
 
     def test_classify_email_observation(self):
         from app.services.signal_emitter import _classify_email
 
-        mod, sig, sev = _classify_email("Status update", "We confirmed the rooms cancelled for today")
+        _mod, sig, sev = _classify_email("Status update", "We confirmed the rooms cancelled for today")
         assert sig == "observation_email"
         assert sev == "medium"
 

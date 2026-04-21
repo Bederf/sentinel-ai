@@ -59,7 +59,7 @@ def query_table(cur, table: str, where: str = "", params: tuple = ()) -> list[di
         cur.execute(sql, params)
         columns = [desc[0] for desc in cur.description]
         rows = cur.fetchall()
-        return [dict(zip(columns, row)) for row in rows]
+        return [dict(zip(columns, row, strict=False)) for row in rows]
     except Exception as e:
         print(f"  SKIP {table}: {e}")
         cur.connection.rollback()

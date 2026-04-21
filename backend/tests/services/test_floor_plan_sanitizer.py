@@ -149,7 +149,7 @@ class TestFloorPlanSanitizer:
         # If OCR available, should have found text
         if sanitizer.ocr_installed and len(lookup) > 0:
             # Each entry should have text and coordinates
-            for region_id, region_data in lookup.items():
+            for _region_id, region_data in lookup.items():
                 assert "text" in region_data
                 assert "coordinates" in region_data
 
@@ -324,7 +324,7 @@ class TestIntegration:
     @pytest.mark.asyncio
     async def test_end_to_end_sanitization_export(self, sanitizer, simple_floor_plan):
         """Test saving sanitized image to disk and re-loading."""
-        sanitized_bytes, lookup = sanitizer.sanitize_floor_plan(simple_floor_plan, remove_text=True, return_lookup=True)
+        sanitized_bytes, _lookup = sanitizer.sanitize_floor_plan(simple_floor_plan, remove_text=True, return_lookup=True)
 
         # Decode and verify we can work with the sanitized version
         nparr = np.frombuffer(sanitized_bytes, np.uint8)

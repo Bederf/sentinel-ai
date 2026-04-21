@@ -52,15 +52,15 @@ export interface ClusterGraphData {
 // ---- Domain colours (SENTINEL design system) ----
 
 const DOMAIN_COLORS_RAW: Record<string, string> = {
-  cluster: "#3B82F6",
-  email: "#3B82F6",
-  space_optimisation: "#F59E0B",
-  occupancy: "#10B981",
-  hvac: "#DC2626",
-  maintenance: "#F59E0B",
-  security: "#14B8A6",
-  energy: "#8B5CF6",
-  entity: "#8B7FD4",
+  cluster: "var(--color-sentinel-blue)",
+  email: "var(--color-sentinel-blue)",
+  space_optimisation: "var(--color-sentinel-amber)",
+  occupancy: "var(--color-sentinel-green)",
+  hvac: "var(--color-sentinel-red)",
+  maintenance: "var(--color-sentinel-amber)",
+  security: "var(--color-sentinel-teal)",
+  energy: "var(--color-sentinel-purple)",
+  entity: "var(--color-sentinel-purple)",
 };
 
 const DOMAIN_LABELS: Record<string, string> = {
@@ -486,12 +486,12 @@ export function ClusterGraph({ data, className = "", onNodeSelect }: ClusterGrap
         </div>
         <div className="flex flex-col gap-1.5">
           {[
-            { color: "#3B82F6", label: "Email signal" },
-            { color: "#F59E0B", label: "Space / booking" },
-            { color: "#10B981", label: "Occupancy" },
-            { color: "#DC2626", label: "HVAC" },
-            { color: "#8B7FD4", label: "Person" },
-            { color: "#2980B9", label: "Room / location" },
+            { color: "var(--color-sentinel-blue)", label: "Email signal" },
+            { color: "var(--color-sentinel-amber)", label: "Space / booking" },
+            { color: "var(--color-sentinel-green)", label: "Occupancy" },
+            { color: "var(--color-sentinel-red)", label: "HVAC" },
+            { color: "var(--color-sentinel-purple)", label: "Person" },
+            { color: "var(--color-sentinel-blue)", label: "Room / location" },
           ].map((item) => (
             <div key={item.label} className="flex items-center gap-2" style={{ color: "var(--color-sentinel-text-secondary)" }}>
               <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: item.color }} />
@@ -611,7 +611,7 @@ function ClusterDetail({ node }: { node: GraphNode }) {
   return (
     <>
       <SectionTitle>Status</SectionTitle>
-      <MetricRow label="State" value={String(m.cluster_state)} valueColor="#DC2626" />
+      <MetricRow label="State" value={String(m.cluster_state)} valueColor="var(--color-sentinel-red)" />
       <MetricRow label="Severity" value={String(node.severity || "unknown")} />
       <MetricRow label="Open for" value={`${m.duration_days} days`} />
       <MetricRow label="Confidence" value={String(node.confidence || 0)} />
@@ -634,7 +634,7 @@ function ClusterDetail({ node }: { node: GraphNode }) {
       {m.likely_root_cause && (
         <>
           <SectionTitle>Likely Root Cause</SectionTitle>
-          <div className="text-[10px] leading-relaxed" style={{ color: "#a0b0c0" }}>{String(m.likely_root_cause)}</div>
+          <div className="text-[10px] leading-relaxed" style={{ color: "var(--color-sentinel-text-secondary)" }}>{String(m.likely_root_cause)}</div>
         </>
       )}
 
@@ -644,7 +644,7 @@ function ClusterDetail({ node }: { node: GraphNode }) {
           <ul className="list-none">
             {actions.map((a, i) => (
               <li key={i} className="text-[9px] py-1.5 pl-3 relative" style={{ color: "var(--color-sentinel-text-secondary)", borderBottom: "1px solid rgba(30, 45, 61, 0.4)" }}>
-                <span className="absolute left-0" style={{ color: "#3B82F6" }}>&rarr;</span>
+                <span className="absolute left-0" style={{ color: "var(--color-sentinel-blue)" }}>&rarr;</span>
                 {a}
               </li>
             ))}
@@ -684,7 +684,7 @@ function SignalDetail({ node }: { node: GraphNode }) {
       {m.summary && (
         <>
           <SectionTitle>Summary</SectionTitle>
-          <div className="text-[10px] leading-relaxed" style={{ color: "#a0b0c0" }}>{String(m.summary)}</div>
+          <div className="text-[10px] leading-relaxed" style={{ color: "var(--color-sentinel-text-secondary)" }}>{String(m.summary)}</div>
         </>
       )}
 

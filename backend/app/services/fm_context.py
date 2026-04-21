@@ -1,29 +1,28 @@
 """FM Context Service for building data injection into Claude context."""
 
-import json
 import logging
 from datetime import UTC
-from pathlib import Path
 
 from app.core.site_resolver import get_primary_site_code
+from app.database.supabase_client import get_supabase_client
 
 logger = logging.getLogger(__name__)
-
-# Data directory
-DATA_DIR = Path(__file__).parent.parent / "data"
-
-
-def load_json(filename: str) -> list[dict]:
-    """Load JSON data file."""
-    filepath = DATA_DIR / filename
-    if filepath.exists():
-        with open(filepath) as f:
-            return json.load(f)
-    return []
 
 
 class FMContextService:
     """Service for providing building management context to Claude."""
+
+    def _get_site_uuid(self, site_code: str) -> str | None:
+        """Resolve a site code (e.g. 'site-002') to its UUID."""
+        client = get_supabase_client()
+        resp = client.table("sites").select("id").eq("code", site_code).execute()
+        return resp.data[0]["id"] if resp.data else None
+
+    def _get_site_name(self, site_uuid: str) -> str:
+        """Resolve a site UUID to its name."""
+        client = get_supabase_client()
+        resp = client.table("sites").select("name").eq("id", site_uuid).execute()
+        return resp.data[0]["name"] if resp.data else "Unknown"
 
     def get_sites_context(self) -> str:
         """
@@ -32,10 +31,10 @@ class FMContextService:
         Returns:
             Markdown-formatted site information.
         """
-        sites = load_json("sites.json") or load_json("sites.json")
-        equipment = load_json("equipment.json")
-        alerts = load_json("alerts.json")
+        client = get_supabase_client()
 
+        sites_resp = client.table("sites").select("id, code, name, region, type, sqm").execute()
+        sites = sites_resp.data or []
         if not sites:
             return "No sites available."
 
@@ -43,17 +42,12 @@ class FMContextService:
         lines.append("|---------|------|--------|------|------------|-----------|---------------|")
 
         for site in sites:
-            site_id = site.get("id", "")
-            site_code = site.get("code", site_id)
-            site_equipment = [e for e in equipment if e.get("site_id") == site_id or e.get("site_id") == site_id]
-            site_alerts = [
-                a
-                for a in alerts
-                if (a.get("site_id") == site_id or a.get("site_id") == site_code) and a.get("status") == "active"
-            ]
+            site_uuid = site["id"]
+            eq_resp = client.table("equipment").select("id", count="exact").eq("site_id", site_uuid).execute()
+            alert_resp = client.table("alerts").select("id", count="exact").eq("site_id", site_uuid).eq("status", "active").execute()
             lines.append(
-                f"| {site_code} | {site.get('name', '')} | {site.get('region', '')} | "
-                f"{site.get('type', '')} | {site.get('sqm', '')} | {len(site_equipment)} | {len(site_alerts)} |"
+                f"| {site.get('code', '')} | {site.get('name', '')} | {site.get('region', '')} | "
+                f"{site.get('type', '')} | {site.get('sqm', '')} | {eq_resp.count or 0} | {alert_resp.count or 0} |"
             )
 
         return "\n".join(lines)
@@ -63,22 +57,31 @@ class FMContextService:
         Get formatted equipment context for Claude.
 
         Args:
-            site_id: Optional site ID to filter equipment.
+            site_id: Optional site ID (code like 'site-002') to filter equipment.
 
         Returns:
             Markdown-formatted equipment information.
         """
-        equipment = load_json("equipment.json")
-        sites = load_json("sites.json")
+        client = get_supabase_client()
 
+        query = client.table("equipment").select("id, code, name, type, status, health_score, last_service, site_id")
         if site_id:
-            equipment = [e for e in equipment if e.get("site_id") == site_id]
+            site_uuid = self._get_site_uuid(site_id)
+            if site_uuid:
+                query = query.eq("site_id", site_uuid)
+        resp = query.execute()
+        equipment = resp.data or []
 
         if not equipment:
             return "No equipment found."
 
-        # Create site lookup
-        site_lookup = {s["id"]: s["name"] for s in sites}
+        # Build site name lookup
+        site_uuids = list({e["site_id"] for e in equipment})
+        if site_uuids:
+            sites_resp = client.table("sites").select("id, name").in_("id", site_uuids).execute()
+            site_lookup = {s["id"]: s["name"] for s in sites_resp.data}
+        else:
+            site_lookup = {}
 
         lines = ["| Equipment ID | Name | Site | Type | Status | Health | Last Service |"]
         lines.append("|--------------|------|------|------|--------|--------|--------------|")
@@ -97,7 +100,7 @@ class FMContextService:
             site_name = site_lookup.get(eq.get("site_id"), "Unknown")
             lines.append(
                 f"| {eq['id']} | {eq['name']} | {site_name[:20]} | "
-                f"{eq['type']} | {eq['status']} | {eq['health_score']}% | {eq['last_service']} |"
+                f"{eq['type']} | {eq['status']} | {eq['health_score']}% | {eq.get('last_service') or 'N/A'} |"
             )
 
         if len(equipment) > 20:
@@ -112,92 +115,148 @@ class FMContextService:
         Returns:
             Markdown-formatted alert information.
         """
-        alerts = load_json("alerts.json")
-        equipment = load_json("equipment.json")
-        sites = load_json("sites.json")
+        client = get_supabase_client()
 
-        # Filter to active alerts only
-        active_alerts = [a for a in alerts if a.get("status") == "active"]
+        alerts_resp = (
+            client.table("alerts")
+            .select("id, severity, site_id, equipment_id, title")
+            .eq("status", "active")
+            .order("severity")
+            .execute()
+        )
+        active_alerts = alerts_resp.data or []
 
         if not active_alerts:
             return "No active alerts."
 
-        # Create lookups
-        eq_lookup = {eq["id"]: eq["name"] for eq in equipment}
-        site_lookup = {s["id"]: s["name"] for s in sites}
+        # Build lookups
+        eq_lookup = {}
+        site_lookup = {}
+        eq_ids = list({a["equipment_id"] for a in active_alerts if a.get("equipment_id")})
+        site_uuids = list({a["site_id"] for a in active_alerts if a.get("site_id")})
 
-        # Sort by priority (1 = highest)
-        active_alerts.sort(key=lambda a: a.get("priority", 99))
+        if eq_ids:
+            eq_resp = client.table("equipment").select("id, name").in_("id", eq_ids).execute()
+            eq_lookup = {e["id"]: e["name"] for e in eq_resp.data}
+        if site_uuids:
+            sites_resp = client.table("sites").select("id, name").in_("id", site_uuids).execute()
+            site_lookup = {s["id"]: s["name"] for s in sites_resp.data}
 
-        lines = ["| Alert ID | Severity | Site | Equipment | Title | Est. Cost (ZAR) |"]
-        lines.append("|----------|----------|------|-----------|-------|-----------------|")
+        lines = ["| Alert ID | Severity | Site | Equipment | Title |"]
+        lines.append("|----------|----------|------|-----------|-------|")
 
         for alert in active_alerts:
             site_name = site_lookup.get(alert.get("site_id"), "Unknown")
             eq_name = eq_lookup.get(alert.get("equipment_id"), "Unknown")
-            cost = alert.get("estimated_cost_zar", 0)
+            title = (alert.get("title") or "")[:40]
             lines.append(
                 f"| {alert['id']} | **{alert['severity'].upper()}** | {site_name[:15]} | "
-                f"{eq_name} | {alert['title'][:40]}... | R{cost:,.0f} |"
+                f"{eq_name} | {title} |"
             )
 
         return "\n".join(lines)
 
-    def get_anomalies_context(self) -> str:
+    def get_anomalies_context(self, site_id: str | None = None) -> str:
         """
-        Get formatted anomalies/predictions context for Claude.
+        Get formatted open anomalies/predictions context for Claude.
+
+        Args:
+            site_id: Optional site code (e.g. 'site-002') to filter anomalies.
 
         Returns:
             Markdown-formatted anomaly information.
         """
-        anomalies = load_json("anomalies.json")
-        equipment = load_json("equipment.json")
-        sites = load_json("sites.json")
+        client = get_supabase_client()
+
+        query = client.table("anomalies").select(
+            "id, severity, type, confidence, status, site_id, equipment_id"
+        ).eq("status", "open")
+
+        if site_id:
+            site_uuid = self._get_site_uuid(site_id)
+            if site_uuid:
+                query = query.eq("site_id", site_uuid)
+
+        resp = query.execute()
+        anomalies = resp.data or []
 
         if not anomalies:
-            return "No anomalies detected."
+            return "No open anomalies."
 
-        # Create lookups
-        eq_lookup = {eq["id"]: eq["name"] for eq in equipment}
-        site_lookup = {s["id"]: s["name"] for s in sites}
+        # Build lookups
+        eq_lookup = {}
+        site_lookup = {}
+        eq_ids = list({a["equipment_id"] for a in anomalies if a.get("equipment_id")})
+        site_uuids = list({a["site_id"] for a in anomalies if a.get("site_id")})
 
-        # Sort by urgency
-        urgency_order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
-        anomalies.sort(key=lambda a: urgency_order.get(a.get("urgency", "low"), 4))
+        if eq_ids:
+            eq_resp = client.table("equipment").select("id, name").in_("id", eq_ids).execute()
+            eq_lookup = {e["id"]: e["name"] for e in eq_resp.data}
+        if site_uuids:
+            sites_resp = client.table("sites").select("id, name").in_("id", site_uuids).execute()
+            site_lookup = {s["id"]: s["name"] for s in sites_resp.data}
 
-        lines = ["| Anomaly ID | Site | Equipment | Type | Urgency | Predicted Failure | Confidence |"]
-        lines.append("|------------|------|-----------|------|---------|-------------------|------------|")
+        # Sort by severity (critical first)
+        severity_order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
+        anomalies.sort(key=lambda a: (severity_order.get(a.get("severity", "low"), 4), -(a.get("confidence", 0))))
+
+        lines = ["| Anomaly ID | Severity | Site | Equipment | Type | Confidence |"]
+        lines.append("|------------|----------|------|-----------|------|------------|")
 
         for anomaly in anomalies:
             site_name = site_lookup.get(anomaly.get("site_id"), "Unknown")
             eq_name = eq_lookup.get(anomaly.get("equipment_id"), "Unknown")
             confidence_pct = int(anomaly.get("confidence", 0) * 100)
             lines.append(
-                f"| {anomaly['id']} | {site_name[:15]} | {eq_name} | "
-                f"{anomaly['type']} | **{anomaly['urgency'].upper()}** | "
-                f"{anomaly['predicted_failure']} | {confidence_pct}% |"
+                f"| {anomaly['id']} | **{anomaly.get('severity', 'unknown').upper()}** | {site_name[:15]} | {eq_name} | "
+                f"{anomaly.get('type') or 'N/A'} | {confidence_pct}% |"
             )
 
-        # Add summary
-        total_repair = sum(a.get("repair_cost_zar", 0) for a in anomalies)
-        total_damage = sum(a.get("damage_cost_zar", 0) for a in anomalies)
         lines.append("")
-        lines.append(f"**Total Repair Cost:** R{total_repair:,.0f}")
-        lines.append(f"**Potential Damage if Unaddressed:** R{total_damage:,.0f}")
+        lines.append(f"**Total open anomalies:** {len(anomalies)}")
 
         return "\n".join(lines)
 
-    def get_predictions_context(self) -> str:
+    def get_predictions_context(self, site_id: str | None = None) -> str:
         """
         Get formatted AI failure predictions context for Claude.
+
+        Args:
+            site_id: Optional site code (e.g. 'site-002') to filter predictions.
 
         Returns:
             Markdown-formatted prediction information with explainability.
         """
-        predictions = load_json("predictions.json")
+        client = get_supabase_client()
+
+        query = client.table("predictions").select(
+            "id, equipment_id, site_id, prediction_type, probability_percent, confidence, "
+            "predicted_failure_date, timeframe_days, severity, urgency, "
+            "repair_cost_zar, potential_loss_zar, evidence, contributing_factors"
+        ).eq("status", "active")
+
+        if site_id:
+            site_uuid = self._get_site_uuid(site_id)
+            if site_uuid:
+                query = query.eq("site_id", site_uuid)
+
+        resp = query.execute()
+        predictions = resp.data or []
 
         if not predictions:
             return "No AI failure predictions available."
+
+        # Build lookups
+        eq_ids = list({p["equipment_id"] for p in predictions if p.get("equipment_id")})
+        site_uuids = list({p["site_id"] for p in predictions if p.get("site_id")})
+        eq_lookup, site_lookup = {}, {}
+
+        if eq_ids:
+            eq_resp = client.table("equipment").select("id, name").in_("id", eq_ids).execute()
+            eq_lookup = {e["id"]: e["name"] for e in eq_resp.data}
+        if site_uuids:
+            sites_resp = client.table("sites").select("id, name").in_("id", site_uuids).execute()
+            site_lookup = {s["id"]: s["name"] for s in sites_resp.data}
 
         # Sort by probability (highest first)
         predictions.sort(key=lambda p: p.get("probability_percent", 0), reverse=True)
@@ -206,17 +265,17 @@ class FMContextService:
         lines.append("|---------------|------|-----------|------|-------------|----------|----------|")
 
         for pred in predictions:
-            site_name = pred.get("site_name", "Unknown")
-            eq_name = pred.get("equipment_name", "Unknown")
+            site_name = site_lookup.get(pred.get("site_id"), "Unknown")
+            eq_name = eq_lookup.get(pred.get("equipment_id"), "Unknown")
             prob = pred.get("probability_percent", 0)
             timeframe = f"{pred.get('timeframe_days', 0)} days"
             severity = pred.get("severity", "unknown").upper()
             lines.append(
-                f"| {pred['id']} | {site_name[:15]} | {eq_name} | "
+                f"| {pred['id'][:8]}... | {site_name[:15]} | {eq_name} | "
                 f"{pred['prediction_type']} | **{prob}%** | {timeframe} | **{severity}** |"
             )
 
-        # Add detailed explainability for each prediction
+        # Detailed breakdown for high-probability predictions
         lines.append("\n### Prediction Details (High Probability Only)")
         lines.append("")
 
@@ -224,69 +283,39 @@ class FMContextService:
             if pred.get("probability_percent", 0) < 70:
                 continue
 
-            lines.append(f"#### {pred['id']}: {pred['equipment_name']} at {pred['site_name']}")
+            site_name = site_lookup.get(pred.get("site_id"), "Unknown")
+            eq_name = eq_lookup.get(pred.get("equipment_id"), "Unknown")
+            lines.append(f"#### {eq_name} at {site_name}")
             lines.append(f"**Prediction:** {pred['prediction_type'].replace('_', ' ').title()}")
-            lines.append(f"**Probability:** {pred['probability_percent']}% ({pred['confidence']} confidence)")
-            lines.append(f"**Predicted Failure:** {pred['predicted_failure_date']}")
+            lines.append(f"**Probability:** {pred['probability_percent']}% ({pred.get('confidence', 0):.0%} confidence)")
+            lines.append(f"**Predicted Failure:** {pred.get('predicted_failure_date') or 'N/A'}")
+            lines.append(f"**Timeframe:** {pred.get('timeframe_days', 0)} days")
 
-            # Evidence summary
-            evidence = pred.get("evidence", {})
-            lines.append("**Evidence:**")
-            repeat_wo = evidence.get("repeat_work_orders", 0)
-            repeat_months = evidence.get("repeat_period_months", 0)
-            lines.append(f"- Repeat work orders: {repeat_wo} in {repeat_months} months")
-            asset_age = evidence.get("asset_age_years", 0)
-            exp_life = evidence.get("expected_life_years", 0)
-            lines.append(f"- Asset age: {asset_age} years (expected life: {exp_life} years)")
+            # Evidence
+            evidence = pred.get("evidence") or {}
+            if evidence:
+                lines.append("**Evidence:**")
+                for key, val in evidence.items():
+                    if val:
+                        lines.append(f"- {key.replace('_', ' ').title()}: {val}")
 
-            # Top contributing factors
-            lines.append("**Top Contributing Factors:**")
-            factors = pred.get("contributing_factors", [])[:3]
-            for factor in factors:
-                weight_pct = int(factor.get("weight", 0) * 100)
-                lines.append(f"- {factor['factor']} ({weight_pct}%): {factor['description']}")
+            # Contributing factors
+            factors = pred.get("contributing_factors") or []
+            if factors:
+                lines.append("**Top Contributing Factors:**")
+                for factor in factors[:3]:
+                    w = int(factor.get("weight", 0) * 100)
+                    lines.append(f"- {factor.get('factor', 'unknown')} ({w}%): {factor.get('description', '')}")
 
             # Financial impact
-            financial = pred.get("financial_impact", {})
-            lines.append("**Financial Impact:**")
-            lines.append(f"- Repair cost: R{financial.get('repair_cost_zar', 0):,.0f}")
-            lines.append(f"- Potential loss: R{financial.get('potential_loss_zar', 0):,.0f}")
-            potential_savings = financial.get("potential_loss_zar", 0) - financial.get("repair_cost_zar", 0)
-            lines.append(f"- Potential savings: R{potential_savings:,.0f}")
-
-            # Cost impact breakdown
-            cost_impact = pred.get("costImpact")
-            if cost_impact:
-                lines.append("**Cost Impact Analysis:**")
-                lines.append(f"- Failure cost: R{cost_impact.get('estimatedFailureCost', 0):,.0f}")
-                lines.append(f"- Preventive cost: R{cost_impact.get('estimatedPreventiveCost', 0):,.0f}")
-                lines.append(f"- **Potential savings: R{cost_impact.get('potentialSavings', 0):,.0f}**")
-
-                failure_breakdown = cost_impact.get("failureBreakdown", {})
-                if failure_breakdown:
-                    lines.append("  - Failure breakdown:")
-                    lines.append(f"    - Parts: R{failure_breakdown.get('parts', 0):,.0f}")
-                    lines.append(f"    - Labor: R{failure_breakdown.get('labor', 0):,.0f}")
-                    lines.append(f"    - Downtime: R{failure_breakdown.get('downtime', 0):,.0f}")
-                    lines.append(f"    - Secondary damage: R{failure_breakdown.get('secondaryDamage', 0):,.0f}")
-
-                preventive_breakdown = cost_impact.get("preventiveBreakdown", {})
-                if preventive_breakdown:
-                    lines.append("  - Preventive breakdown:")
-                    lines.append(f"    - Parts: R{preventive_breakdown.get('parts', 0):,.0f}")
-                    lines.append(f"    - Labor: R{preventive_breakdown.get('labor', 0):,.0f}")
-                    lines.append(f"    - Downtime: R{preventive_breakdown.get('downtime', 0):,.0f}")
-
-                story = cost_impact.get("story")
-                if story:
-                    lines.append(f"  - Context: {story}")
-
-            # Similar failures
-            similar = pred.get("similar_failures", [])
-            if similar:
-                lines.append("**Similar Historical Failures:**")
-                for fail in similar[:2]:
-                    lines.append(f"- {fail['site']} {fail['equipment']} (failed {fail['failure_date']})")
+            repair = pred.get("repair_cost_zar", 0)
+            loss = pred.get("potential_loss_zar", 0)
+            if repair or loss:
+                lines.append("**Financial Impact:**")
+                lines.append(f"- Repair cost: R{repair:,.0f}")
+                lines.append(f"- Potential loss: R{loss:,.0f}")
+                if repair:
+                    lines.append(f"- Potential savings: R{max(0, loss - repair):,.0f}")
 
             lines.append("")
 
@@ -373,9 +402,12 @@ class FMContextService:
             logger.warning("Could not load agent memory context: %s", e)
             return ""
 
-    def get_full_context(self) -> str:
+    def get_full_context(self, site_id: str | None = None) -> str:
         """
         Get complete building context for Claude system prompt.
+
+        Args:
+            site_id: Optional site code (e.g. 'site-002') to scope all data to a specific site.
 
         Returns:
             Full markdown-formatted context with all building data.
@@ -385,13 +417,13 @@ class FMContextService:
             "### Sites Overview\n",
             self.get_sites_context(),
             "\n### Equipment Status (Priority Issues)\n",
-            self.get_equipment_context(),
+            self.get_equipment_context(site_id),
             "\n### Active Alerts\n",
             self.get_alerts_context(),
             "\n### Predicted Issues (Anomalies)\n",
-            self.get_anomalies_context(),
+            self.get_anomalies_context(site_id),
             "\n### AI Failure Predictions\n",
-            self.get_predictions_context(),
+            self.get_predictions_context(site_id),
         ]
 
         return "\n".join(sections)

@@ -155,7 +155,7 @@ class LoginAuditRepository:
             successful = len([r for r in records if r.get("success")])
             failed = total - successful
             new_users = len([r for r in records if r.get("is_new_user")])
-            unique_users = len(set(r.get("user_email") for r in records))
+            unique_users = len({r.get("user_email") for r in records})
 
             return {
                 "period_hours": hours,

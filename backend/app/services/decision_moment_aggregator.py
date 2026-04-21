@@ -292,10 +292,7 @@ class DecisionMomentAggregator:
 
         # Action + validation state
         recommended_action = _resolve_action(fault_type, asset_id, affected_zone_ids)
-        if tier >= 2 and safety_approved and point_writable:
-            action_validation_state = "validated"
-        else:
-            action_validation_state = "unverified"
+        action_validation_state = "validated" if tier >= 2 and safety_approved and point_writable else "unverified"
 
         # Reasoning summary (v1 template)
         reasoning_summary = _build_reasoning_summary(

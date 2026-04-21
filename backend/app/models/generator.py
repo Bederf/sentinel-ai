@@ -5,11 +5,11 @@ Supports N+1 redundancy, diesel fuel tracking, and predictive maintenance.
 """
 
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 
-class GeneratorStatus(str, Enum):
+class GeneratorStatus(StrEnum):
     """Operating status of a generator."""
 
     STANDBY = "standby"  # Ready to start
@@ -21,7 +21,7 @@ class GeneratorStatus(str, Enum):
     OFFLINE = "offline"  # Not communicating
 
 
-class ControllerModel(str, Enum):
+class ControllerModel(StrEnum):
     """DeepSea controller models."""
 
     DSE7320 = "DSE7320"  # Standard AMF/ATS controller
@@ -30,7 +30,7 @@ class ControllerModel(str, Enum):
     DSE8660 = "DSE8660"  # Advanced parallel
 
 
-class TransferMode(str, Enum):
+class TransferMode(StrEnum):
     """ATS transfer mode."""
 
     OPEN = "open"  # Open transition (break before make)

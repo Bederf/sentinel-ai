@@ -276,11 +276,10 @@ class TestStage3FuzzyMatch:
 
         resolver = AssetIDResolver(db=mock_db, site_id="site-002")
         result = await resolver.resolve("Chiller B1 compressor")
-        if result.method == ResolutionMethod.FUZZY:
-            if result.confidence_band == ResolutionConfidence.MEDIUM:
-                assert result.needs_review is True
-                assert result.review_reason is not None
-                assert "fuzzy match" in result.review_reason
+        if result.method == ResolutionMethod.FUZZY and result.confidence_band == ResolutionConfidence.MEDIUM:
+            assert result.needs_review is True
+            assert result.review_reason is not None
+            assert "fuzzy match" in result.review_reason
 
     async def test_fuzzy_below_060_returns_unresolved(self, mock_db, equipment_data):
         """Score < 0.60 → stage 4 LLM called (now async); test with alien description."""

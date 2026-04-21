@@ -34,7 +34,7 @@ DATA_DIR = Path(__file__).parent.parent / "data"
 # CO2 thresholds (ppm)
 CO2_EXCELLENT = 600
 CO2_GOOD = 800
-CO2_WARNING = 1000
+CO2_WARNING = 900  # was 1000 — 950ppm sustained across 20 zones warrants warning
 CO2_CRITICAL = 1500
 
 # Humidity thresholds (%)
@@ -559,11 +559,10 @@ class IAQService:
                         humidity_values.append(c.value)
                         if c.value < 30 or c.value > 60:
                             zone_ok = False
-                elif c.component == "temperature":
-                    if c.value is not None:
-                        temp_devs.append(c.score)
-                        if c.score < 80:
-                            zone_ok = False
+                elif c.component == "temperature" and c.value is not None:
+                    temp_devs.append(c.score)
+                    if c.score < 80:
+                        zone_ok = False
             if zone_ok:
                 compliant += 1
             else:

@@ -7,12 +7,12 @@ based on text patterns, session state, and callback data.
 from __future__ import annotations
 
 import re
-from enum import Enum
+from enum import StrEnum
 
 from app.services.issue_classifier import classify_issue
 
 
-class TelegramIntent(str, Enum):
+class TelegramIntent(StrEnum):
     CLIENT_COMPLAINT = "client_complaint"
     TECHNICIAN_REPORT = "technician_report"
     WO_UPDATE = "wo_update"

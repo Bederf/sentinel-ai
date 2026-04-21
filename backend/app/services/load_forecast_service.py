@@ -273,10 +273,7 @@ class LoadForecastService:
             solar_kw = _synthetic_solar_kw(hour)
 
             # Previous interval demand (use last predicted or current load)
-            if intervals:
-                prev_interval = intervals[-1].demand_kw
-            else:
-                prev_interval = self.get_current_load(site_id)
+            prev_interval = intervals[-1].demand_kw if intervals else self.get_current_load(site_id)
 
             # Previous day same interval (approximate with current model prediction)
             prev_day_dt = forecast_dt - timedelta(days=1)

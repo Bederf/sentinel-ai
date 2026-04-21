@@ -13,6 +13,7 @@ professional CAD drawings using standardized layer conventions.
 - FP-LIFE: Fire protection and life safety equipment
 """
 
+import contextlib
 import logging
 import os
 import re
@@ -219,10 +220,8 @@ class DXFParserService:
             raise ValueError(f"Failed to load DXF: {e}")
         finally:
             # Clean up temp file
-            try:
+            with contextlib.suppress(Exception):
                 os.remove(temp_path)
-            except Exception:
-                pass
 
     def _calculate_floor_plan_bbox(self, doc: Drawing) -> BoundingBox:
         """
@@ -519,9 +518,8 @@ class DXFParserService:
                             "TAG",
                             "NAME",
                             "LABEL",
-                        ]:
-                            if hasattr(attrib.dxf, "text"):
-                                return attrib.dxf.text
+                        ] and hasattr(attrib.dxf, "text"):
+                            return attrib.dxf.text
         except Exception as e:
             logger.debug(f"Error extracting attributes: {e}")
 

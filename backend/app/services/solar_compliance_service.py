@@ -16,7 +16,7 @@ import logging
 import random
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 # === Enums ===
 
 
-class ComplianceStatus(str, Enum):
+class ComplianceStatus(StrEnum):
     """Traffic-light compliance status."""
 
     COMPLIANT = "compliant"
@@ -36,7 +36,7 @@ class ComplianceStatus(str, Enum):
     VIOLATION = "violation"
 
 
-class ComplianceEventType(str, Enum):
+class ComplianceEventType(StrEnum):
     """Types of compliance events."""
 
     VOLTAGE_HIGH = "voltage_high"

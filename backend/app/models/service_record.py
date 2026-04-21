@@ -1,20 +1,20 @@
 """Service record models for Phase 41 ML Engineer Knowledge Capture."""
 
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class ServiceType(str, Enum):
+class ServiceType(StrEnum):
     MINOR = "minor"
     MAJOR = "major"
     BREAKDOWN = "breakdown"
     CALLOUT = "callout"
 
 
-class ServiceStatus(str, Enum):
+class ServiceStatus(StrEnum):
     NOTIFIED = "notified"
     IN_PROGRESS = "in_progress"
     DATA_COLLECTION = "data_collection"
@@ -22,7 +22,7 @@ class ServiceStatus(str, Enum):
     CLOSED = "closed"
 
 
-class AttachmentType(str, Enum):
+class AttachmentType(StrEnum):
     SERVICE_SHEET = "service_sheet"
     AUDIO_RECORDING = "audio_recording"
     OIL_SAMPLE = "oil_sample"
@@ -35,7 +35,7 @@ class AttachmentType(str, Enum):
     OIL_ANALYSIS_REPORT = "oil_analysis_report"
 
 
-class SourceType(str, Enum):
+class SourceType(StrEnum):
     OCR = "ocr"
     MANUAL = "manual"
     SENSOR = "sensor"

@@ -9,11 +9,11 @@ Three tables:
 
 from dataclasses import dataclass, field
 from datetime import datetime, time
-from enum import Enum
+from enum import StrEnum
 from uuid import UUID
 
 
-class ChannelType(str, Enum):
+class ChannelType(StrEnum):
     """Supported notification channels."""
 
     TELEGRAM = "telegram"
@@ -22,7 +22,7 @@ class ChannelType(str, Enum):
     EMAIL = "email"
 
 
-class NotificationStatus(str, Enum):
+class NotificationStatus(StrEnum):
     """Delivery status for a notification."""
 
     PENDING = "pending"
@@ -31,7 +31,7 @@ class NotificationStatus(str, Enum):
     FAILED = "failed"
 
 
-class AlertLevel(str, Enum):
+class AlertLevel(StrEnum):
     """Alert severity levels."""
 
     INFO = "info"

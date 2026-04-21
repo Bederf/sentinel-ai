@@ -12,6 +12,7 @@ GET /api/decisions/stream/{site_id}
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json as _json
 import logging
 from datetime import UTC, datetime
@@ -281,14 +282,10 @@ async def stream_decisions(site_id: str):
                     queue.put_nowait(payload)
                 except asyncio.QueueFull:
                     # Drop oldest and insert latest — kiosk always gets freshest state
-                    try:
+                    with contextlib.suppress(asyncio.QueueEmpty):
                         queue.get_nowait()
-                    except asyncio.QueueEmpty:
-                        pass
-                    try:
+                    with contextlib.suppress(asyncio.QueueFull):
                         queue.put_nowait(payload)
-                    except asyncio.QueueFull:
-                        pass
 
         # Subscribe to all event types for this site
         bus = get_event_bus()
@@ -318,10 +315,8 @@ async def stream_decisions(site_id: str):
         finally:
             stopped = True
             # Unsubscribe when client disconnects — prevents dead-queue leaks
-            try:
+            with contextlib.suppress(Exception):
                 bus.unsubscribe(sub_id)
-            except Exception:
-                pass
 
     return StreamingResponse(
         event_generator(),

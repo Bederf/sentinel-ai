@@ -629,7 +629,7 @@ async def ml_health_check():
         "lstm_models_active": len(lstm_active),
         "autoencoder_models_active": len(ae_active),
         "classifier_models_active": len(classifier_active),
-        "equipment_types_covered": list(set(m["equipment_type"] for m in active_models)),
+        "equipment_types_covered": list({m["equipment_type"] for m in active_models}),
     }
 
 

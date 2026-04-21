@@ -6,6 +6,7 @@ WO update, ad-hoc fault, and unknown/orientation.
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import re
 from datetime import datetime
@@ -850,10 +851,8 @@ async def handle_ghost_room(
             pass  # Button may already be stale
 
     # Remove keyboard and confirm
-    try:
+    with contextlib.suppress(Exception):
         await sender.edit_message_reply_markup(chat_id, message_id, keyboard=None)
-    except Exception:
-        pass
 
     await sender.send_text(
         chat_id,

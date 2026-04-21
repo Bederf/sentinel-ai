@@ -168,7 +168,7 @@ export function SolarOverviewPanel({ siteId }: SolarOverviewPanelProps) {
       >
         <div className="flex items-center gap-3">
           <div className="p-2 rounded" style={{ background: "rgba(250, 204, 21, 0.15)" }}>
-            <Sun className="h-5 w-5" style={{ color: "#FACC15" }} />
+            <Sun className="h-5 w-5" style={{ color: "var(--color-sentinel-amber)" }} />
           </div>
           <div>
             <h3 className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>
@@ -195,7 +195,7 @@ export function SolarOverviewPanel({ siteId }: SolarOverviewPanelProps) {
         {/* Generation Gauge */}
         <div className="p-3 rounded" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
           <div className="flex items-center gap-2 mb-2">
-            <Zap className="h-4 w-4" style={{ color: "#FACC15" }} />
+            <Zap className="h-4 w-4" style={{ color: "var(--color-sentinel-amber)" }} />
             <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
               Current Output
             </span>
@@ -216,7 +216,7 @@ export function SolarOverviewPanel({ siteId }: SolarOverviewPanelProps) {
                   background: generationPercent > 80
                     ? "var(--color-sentinel-green)"
                     : generationPercent > 40
-                    ? "#FACC15"
+                    ? "var(--color-sentinel-amber)"
                     : "var(--color-sentinel-text-secondary)",
                 }}
               />
@@ -256,7 +256,7 @@ export function SolarOverviewPanel({ siteId }: SolarOverviewPanelProps) {
                   background: yieldPercent >= 90
                     ? "var(--color-sentinel-green)"
                     : yieldPercent >= 70
-                    ? "#FACC15"
+                    ? "var(--color-sentinel-amber)"
                     : "var(--color-sentinel-red)",
                 }}
               />

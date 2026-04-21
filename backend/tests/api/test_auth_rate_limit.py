@@ -25,6 +25,8 @@ from starlette.testclient import TestClient
 # Ensure JWT_SECRET_KEY is available for token creation in CI
 os.environ.setdefault("JWT_SECRET_KEY", "test-only-jwt-secret-for-ci-at-least-32-chars")
 
+import contextlib
+
 from app.api import auth as auth_api
 from app.main import app
 
@@ -88,7 +90,7 @@ class TestBruteForceProtection:
         auth_api._login_attempts[email] = []
 
         # Record 4 failed attempts
-        for i in range(4):
+        for _i in range(4):
             auth_api._record_failed_attempt(email)
             # Should not raise on check
             auth_api._check_brute_force(email)
@@ -102,7 +104,7 @@ class TestBruteForceProtection:
         auth_api._login_attempts[email] = []
 
         # Record 5 failed attempts
-        for i in range(5):
+        for _i in range(5):
             auth_api._record_failed_attempt(email)
 
         # 5th check should raise 429
@@ -121,7 +123,7 @@ class TestBruteForceProtection:
         auth_api._login_attempts[email] = []
 
         # Record 6 failed attempts
-        for i in range(6):
+        for _i in range(6):
             auth_api._record_failed_attempt(email)
 
         # Should still be locked out
@@ -239,7 +241,7 @@ class TestMFAFailureHandling:
             request = _make_request("/api/auth/login/mfa-complete")
 
             # First 5 attempts should fail with 400
-            for i in range(5):
+            for _i in range(5):
                 with pytest.raises(HTTPException) as exc_info:
                     await auth_api.complete_mfa_login(request, email, "000000")
                 assert exc_info.value.status_code == 400
@@ -328,15 +330,12 @@ class TestRateLimitAuditLogging:
         auth_api._login_attempts[email] = []
 
         # Record 5 failed attempts
-        for i in range(5):
+        for _i in range(5):
             auth_api._record_failed_attempt(email)
 
         # Attempt 6 should log warning
-        with caplog.at_level(logging.WARNING):
-            try:
-                auth_api._check_brute_force(email)
-            except HTTPException:
-                pass
+        with caplog.at_level(logging.WARNING), contextlib.suppress(HTTPException):
+            auth_api._check_brute_force(email)
 
         # Check that warning was logged
         # Note: The implementation logs at WARN level
@@ -412,7 +411,7 @@ class TestIntegrationScenarios:
         auth_api._login_attempts[email] = []
 
         # Record 3 failed attempts
-        for i in range(3):
+        for _i in range(3):
             auth_api._record_failed_attempt(email)
 
         # On successful login, counter should be reset
@@ -427,7 +426,7 @@ class TestIntegrationScenarios:
         auth_api._login_attempts[email] = []
 
         # Record 5 failed attempts
-        for i in range(5):
+        for _i in range(5):
             auth_api._record_failed_attempt(email)
 
         # Check error message

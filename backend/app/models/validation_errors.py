@@ -6,12 +6,12 @@ Provides typed error categories and structured reports for the static validation
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel
 
 
-class ValidationErrorCategory(str, Enum):
+class ValidationErrorCategory(StrEnum):
     BOUNDS_VIOLATION = "bounds_violation"
     RATE_LIMIT_EXCEEDED = "rate_limit_exceeded"
     MISSING_REQUIRED_POINTS = "missing_required_points"

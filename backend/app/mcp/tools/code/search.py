@@ -50,10 +50,7 @@ SEARCHABLE_EXTENSIONS = {
 
 def _should_exclude_path(path: Path) -> bool:
     """Check if path should be excluded from search."""
-    for exclude in EXCLUDE_DIRS:
-        if fnmatch.fnmatch(path.name, exclude) or exclude in str(path):
-            return True
-    return False
+    return any(fnmatch.fnmatch(path.name, exclude) or exclude in str(path) for exclude in EXCLUDE_DIRS)
 
 
 def _should_include_file(path: Path) -> bool:

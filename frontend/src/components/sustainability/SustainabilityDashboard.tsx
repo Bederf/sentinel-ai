@@ -198,7 +198,7 @@ export function SustainabilityDashboard({
             className="p-2 rounded"
             style={{ background: 'rgba(16, 185, 129, 0.15)' }}
           >
-            <Leaf className="h-5 w-5" style={{ color: 'var(--color-sentinel-emerald)' }} />
+            <Leaf className="h-5 w-5" style={{ color: 'var(--color-sentinel-green)' }} />
           </div>
           <div>
             <div className="flex items-center gap-2">
@@ -293,7 +293,7 @@ export function SustainabilityDashboard({
           </Metric>
           <Text className="text-xs mt-2" style={{ color: "var(--color-grafana-text-secondary)" }}>Current month</Text>
           {currentMonth?.solar_offset_kg_co2 != null && currentMonth.solar_offset_kg_co2 > 0 && (
-            <Text className="text-xs mt-1" style={{ color: 'var(--color-sentinel-emerald)' }}>
+            <Text className="text-xs mt-1" style={{ color: 'var(--color-sentinel-green)' }}>
               Solar offset: -{(currentMonth.solar_offset_kg_co2 / 1000).toFixed(1)}t CO2
             </Text>
           )}
@@ -435,7 +435,7 @@ export function SustainabilityDashboard({
             const pct = cat.max_points > 0
               ? Math.round((cat.achieved_points / cat.max_points) * 100)
               : 0;
-            const barColor = pct >= 75 ? '#10b981' : pct >= 50 ? '#f59e0b' : '#ef4444';
+            const barColor = pct >= 75 ? 'var(--color-sentinel-green)' : pct >= 50 ? 'var(--color-sentinel-amber)' : 'var(--color-sentinel-red)';
             const targetPct = cat.max_points > 0 && cat.target_points > 0
               ? Math.round((cat.target_points / cat.max_points) * 100)
               : 0;

@@ -14,7 +14,7 @@ Classification approach:
 import json
 import logging
 import re
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 DATA_DIR = Path(__file__).parent.parent.parent / "data" / "niagara"
 
 
-class ConfidenceLevel(str, Enum):
+class ConfidenceLevel(StrEnum):
     """Classification confidence levels."""
 
     HIGH = "high"  # Exact regex or keyword match
@@ -33,7 +33,7 @@ class ConfidenceLevel(str, Enum):
     UNKNOWN = "unknown"  # Could not classify
 
 
-class PointType(str, Enum):
+class PointType(StrEnum):
     """BMS point functional types."""
 
     SENSOR = "sensor"
@@ -194,10 +194,7 @@ class PointClassifier:
         # Step 1: Use pre-populated metadata when available (vendor-agnostic path)
         # Equipment JSON files already contain equipment_id, equipment_type, point_type
         # regardless of BMS vendor (Niagara, Desigo, Schneider, etc.)
-        if metadata_equipment_id:
-            equipment_id = metadata_equipment_id
-        else:
-            equipment_id = self._extract_equipment_id(point_name)
+        equipment_id = metadata_equipment_id or self._extract_equipment_id(point_name)
 
         # Step 2: Match equipment type - prefer metadata over regex
         if metadata_equipment_type and metadata_equipment_type.lower() != "unknown":

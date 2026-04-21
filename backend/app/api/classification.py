@@ -284,10 +284,9 @@ def calculate_overall_risk(predictions: dict) -> dict:
     risk_factors = []
 
     # Anomaly detection contributes to risk
-    if "anomaly" in predictions and "is_anomaly" in predictions["anomaly"]:
-        if predictions["anomaly"]["is_anomaly"]:
-            risk_score += 30
-            risk_factors.append("Anomalous behavior detected")
+    if "anomaly" in predictions and "is_anomaly" in predictions["anomaly"] and predictions["anomaly"]["is_anomaly"]:
+        risk_score += 30
+        risk_factors.append("Anomalous behavior detected")
 
     # Survival analysis contributes
     if "survival" in predictions and "failure_probability" in predictions["survival"]:

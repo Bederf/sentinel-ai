@@ -24,7 +24,7 @@ class LSTMDataPrep:
     def __init__(
         self,
         window_size: int = 168,  # 7 days of hourly data
-        forecast_horizons: list[int] = None,
+        forecast_horizons: list[int] | None = None,
     ):
         """
         Initialize data preparation.

@@ -236,22 +236,22 @@ export function OccupancyEnergyCorrelationPage() {
           <div className="p-6">
             <ResponsiveContainer width="100%" height={400}>
               <LineChart data={correlationData.hourly_data}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                <XAxis dataKey="time" stroke="#9CA3AF" />
-                <YAxis yAxisId="left" stroke="#3B82F6" unit="%" />
-                <YAxis yAxisId="right" orientation="right" stroke="#EF4444" unit=" kWh" />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-sentinel-border)" />
+                <XAxis dataKey="time" stroke="var(--color-sentinel-text-secondary)" />
+                <YAxis yAxisId="left" stroke="var(--color-sentinel-blue)" unit="%" />
+                <YAxis yAxisId="right" orientation="right" stroke="var(--color-sentinel-red)" unit=" kWh" />
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: '#1F2937',
-                    border: '1px solid #374151',
+                    backgroundColor: 'var(--color-sentinel-bg-secondary)',
+                    border: '1px solid var(--color-sentinel-border)',
                     borderRadius: '4px',
                   }}
                   formatter={(value: any) => typeof value === 'number' ? value.toFixed(2) : value}
                 />
                 <Legend />
-                <Line type="monotone" dataKey="occupancy_percent" stroke="#3B82F6" name="Occupancy %" yAxisId="left" />
-                <Line type="monotone" dataKey="actual_kwh" stroke="#EF4444" name="Actual Energy" yAxisId="right" />
-                <Line type="monotone" dataKey="optimal_kwh" stroke="#10B981" name="Optimal Energy" yAxisId="right" strokeDasharray="5 5" />
+                <Line type="monotone" dataKey="occupancy_percent" stroke="var(--color-sentinel-blue)" name="Occupancy %" yAxisId="left" />
+                <Line type="monotone" dataKey="actual_kwh" stroke="var(--color-sentinel-red)" name="Actual Energy" yAxisId="right" />
+                <Line type="monotone" dataKey="optimal_kwh" stroke="var(--color-sentinel-green)" name="Optimal Energy" yAxisId="right" strokeDasharray="5 5" />
               </LineChart>
             </ResponsiveContainer>
           </div>

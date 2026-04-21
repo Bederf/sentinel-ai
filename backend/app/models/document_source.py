@@ -14,10 +14,10 @@ source vs source_system distinction:
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 
-class DocumentSource(str, Enum):
+class DocumentSource(StrEnum):
     """
     Content-type classifier — what the document IS.
     Write-once at first intake. Never overwritten on update.
@@ -31,7 +31,7 @@ class DocumentSource(str, Enum):
     UNKNOWN = "unknown"  # Fallback when type cannot be determined
 
 
-class SourceSystem(str, Enum):
+class SourceSystem(StrEnum):
     """
     Ingestion adapter — where the document CAME FROM.
     This is the upsert key component (with source_document_id).

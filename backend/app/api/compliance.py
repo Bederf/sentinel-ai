@@ -70,7 +70,7 @@ async def generate_ohs_checklist(
 @router.post("/ohs/checklist/{task_id}/complete")
 async def complete_ohs_checklist(
     task_id: str,
-    findings: dict = None,
+    findings: dict | None = None,
     repo: ComplianceRepository = Depends(get_compliance_repo),
 ) -> dict:
     """
@@ -300,7 +300,7 @@ async def schedule_lift_inspection(
 @router.post("/lift/{lift_code}/test-results")
 async def record_lift_test_results(
     lift_code: str,
-    test_results: dict = None,
+    test_results: dict | None = None,
     repo: ComplianceRepository = Depends(get_compliance_repo),
 ) -> dict:
     """Record lift inspection test results."""

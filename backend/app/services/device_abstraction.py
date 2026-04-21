@@ -202,10 +202,7 @@ class DeviceAdapter(ABC):
         safety_result = await self.validate_control(point_name, value)
         if not safety_result["allowed"]:
             reasons = safety_result.get("reasons", [])
-            if reasons:
-                error_msg = f"Safety violation: {', '.join(reasons)}"
-            else:
-                error_msg = "Safety validation failed"
+            error_msg = f"Safety violation: {', '.join(reasons)}" if reasons else "Safety validation failed"
 
             # Log blocked action to audit
             self.audit_logger.log_control_action(

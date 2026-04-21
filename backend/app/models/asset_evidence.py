@@ -6,7 +6,7 @@ Supports classification, normalization, and CRUD operations.
 """
 
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -16,7 +16,7 @@ from pydantic import BaseModel, ConfigDict, Field
 # ============================================================================
 
 
-class SourceType(str, Enum):
+class SourceType(StrEnum):
     """Evidence source type."""
 
     UPLOAD = "upload"
@@ -31,7 +31,7 @@ class SourceType(str, Enum):
     TELEMETRY_SUMMARY = "telemetry_summary"
 
 
-class ArtifactType(str, Enum):
+class ArtifactType(StrEnum):
     """Evidence artifact type."""
 
     DOCUMENT = "document"
@@ -41,7 +41,7 @@ class ArtifactType(str, Enum):
     METADATA = "metadata"
 
 
-class EvidenceClass(str, Enum):
+class EvidenceClass(StrEnum):
     """Evidence classification (business meaning)."""
 
     SERVICE_REPORT = "service_report"
@@ -55,7 +55,7 @@ class EvidenceClass(str, Enum):
     TELEMETRY_SUMMARY = "telemetry_summary"
 
 
-class ProvenanceType(str, Enum):
+class ProvenanceType(StrEnum):
     """Evidence provenance (origin)."""
 
     USER_UPLOAD = "user_upload"

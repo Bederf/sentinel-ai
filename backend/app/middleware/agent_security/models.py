@@ -15,7 +15,7 @@ Design rules:
 import hashlib
 import secrets
 from datetime import datetime, timedelta
-from enum import Enum
+from enum import StrEnum
 from uuid import uuid4
 
 from pydantic import BaseModel, Field
@@ -27,7 +27,7 @@ from app.models.auth import SentinelRole
 # ---------------------------------------------------------------------------
 
 
-class AgentToolName(str, Enum):
+class AgentToolName(StrEnum):
     """Tool categories that the agent security gate controls."""
 
     BMS_READ = "BMS_READ"
@@ -40,7 +40,7 @@ class AgentToolName(str, Enum):
     MCP_EXPOSE = "MCP_EXPOSE"
 
 
-class PolicyDecision(str, Enum):
+class PolicyDecision(StrEnum):
     """Result of a permission matrix lookup."""
 
     ALLOW = "ALLOW"

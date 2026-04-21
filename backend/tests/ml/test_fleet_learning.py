@@ -64,7 +64,7 @@ class TestFleetAggregator:
         all_similar = aggregator.get_similar_failures(equipment_type="CHILLER")
         excluded = aggregator.get_similar_failures(equipment_type="CHILLER", exclude_site="site-002")
         # Excluding a site should reduce counts
-        for a, e in zip(all_similar, excluded):
+        for a, e in zip(all_similar, excluded, strict=False):
             assert e["fleet_occurrences"] <= a["fleet_occurrences"]
 
     def test_fleet_summary(self):

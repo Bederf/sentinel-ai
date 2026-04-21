@@ -142,7 +142,7 @@ class DegradationPattern:
             degradation = self._linear_degradation(effective_days)
 
         # Apply degradation to values
-        for i, (ts, deg) in enumerate(zip(timestamps, degradation)):
+        for i, (ts, deg) in enumerate(zip(timestamps, degradation, strict=False)):
             # Base value with degradation
             degraded_value = base_value * (1 + deg)
 

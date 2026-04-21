@@ -204,7 +204,7 @@ export default function SystemHealthPage() {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded" style={{ background: "rgba(99, 102, 241, 0.15)" }}>
-              <Server className="h-6 w-6" style={{ color: "#6366F1" }} />
+              <Server className="h-6 w-6" style={{ color: "var(--color-sentinel-purple)" }} />
             </div>
             <div>
               <h1 className="text-2xl font-bold" style={{ color: "var(--color-sentinel-text-primary)" }}>

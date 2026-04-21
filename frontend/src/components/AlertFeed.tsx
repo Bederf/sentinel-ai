@@ -485,8 +485,8 @@ export function AlertFeed({
                           <span
                             className="px-1.5 py-0.5 rounded"
                             style={{
-                              backgroundColor: "rgba(255, 152, 48, 0.15)",
-                              color: "#ff9830",
+                              backgroundColor: "rgba(245, 158, 11, 0.15)",
+                              color: "var(--color-sentinel-amber)",
                               fontSize: "0.65rem",
                             }}
                           >
@@ -541,7 +541,7 @@ export function AlertFeed({
                               className="flex items-center gap-1 text-xs px-1.5 py-0.5 rounded"
                               style={{
                                 background: "rgba(16, 185, 129, 0.15)",
-                                color: "var(--color-sentinel-green, #10B981)",
+                                color: "var(--color-sentinel-green)",
                               }}
                             >
                               <ClipboardList className="h-3 w-3" />
@@ -553,7 +553,7 @@ export function AlertFeed({
                             className="flex items-center gap-1 text-xs px-2 py-1 rounded transition-colors hover:brightness-125"
                             style={{
                               background: "rgba(61, 113, 217, 0.15)",
-                              color: "var(--color-grafana-blue, #3D71D9)",
+                              color: "var(--color-sentinel-blue)",
                               border: "1px solid rgba(61, 113, 217, 0.3)",
                             }}
                             title="Acknowledge alert and create work order"

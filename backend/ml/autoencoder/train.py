@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 class AutoencoderTrainer:
     """Training pipeline for autoencoder anomaly detection models."""
 
-    def __init__(self, model_dir: str = None, window_size: int = 24):
+    def __init__(self, model_dir: str | None = None, window_size: int = 24):
         """
         Initialize trainer.
 
@@ -243,7 +243,7 @@ class AutoencoderTrainer:
             Detection metrics (precision, recall, F1)
         """
         # Get predictions
-        is_anomaly, scores = model.is_anomaly(X_all)
+        is_anomaly, _scores = model.is_anomaly(X_all)
 
         # Create ground truth
         y_true = np.zeros(len(X_all), dtype=bool)
@@ -388,7 +388,7 @@ class AutoencoderTrainer:
         """Train models for all equipment types."""
         results = []
 
-        for eq_type in AUTOENCODER_SENSOR_CONFIGS.keys():
+        for eq_type in AUTOENCODER_SENSOR_CONFIGS:
             try:
                 result = self.train_equipment_type(eq_type, epochs=epochs, use_demo_data=use_demo_data)
                 results.append(result)

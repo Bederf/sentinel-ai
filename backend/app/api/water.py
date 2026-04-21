@@ -27,6 +27,7 @@ from app.services.water_ingestion_service import get_water_ingestion_service
 logger = logging.getLogger(__name__)
 
 router = APIRouter(
+    prefix="/water",
     dependencies=[
         Depends(
             require_active_module(
@@ -42,7 +43,7 @@ router = APIRouter(
 
 
 @limiter.limit("30/minute")
-@router.get("/water/sites/{site}/flow")
+@router.get("/sites/{site}/flow")
 async def get_current_flow(request: Request, site: str):
     """Get current flow rate for a site.
 
@@ -74,7 +75,7 @@ async def get_current_flow(request: Request, site: str):
 
 
 @limiter.limit("30/minute")
-@router.get("/water/sites/{site}/consumption")
+@router.get("/sites/{site}/consumption")
 async def get_consumption(
     request: Request,
     site: str,
@@ -121,7 +122,7 @@ async def get_consumption(
 
 
 @limiter.limit("30/minute")
-@router.get("/water/sites/{site}/current")
+@router.get("/sites/{site}/current")
 async def get_current_consumption(request: Request, site: str):
     """Get current flow rate and latest consumption reading.
 
@@ -148,7 +149,7 @@ async def get_current_consumption(request: Request, site: str):
 
 
 @limiter.limit("30/minute")
-@router.get("/water/sites/{site}/trending")
+@router.get("/sites/{site}/trending")
 async def get_consumption_trends(
     request: Request,
     site: str,
@@ -247,7 +248,7 @@ async def get_consumption_trends(
 
 
 @limiter.limit("30/minute")
-@router.get("/water/sites/{site}/alerts")
+@router.get("/sites/{site}/alerts")
 async def get_alerts(
     request: Request,
     site: str,
@@ -296,7 +297,7 @@ async def get_alerts(
 
 
 @limiter.limit("30/minute")
-@router.get("/water/sites/{site}/alerts/active")
+@router.get("/sites/{site}/alerts/active")
 async def get_active_alerts(request: Request, site: str):
     """Get all active (unresolved) leak alerts.
 
@@ -321,7 +322,7 @@ async def get_active_alerts(request: Request, site: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.patch("/water/alerts/{alert_id}/resolve")
+@router.patch("/alerts/{alert_id}/resolve")
 async def resolve_alert(
     alert_id: str,
     resolved_by: str = Query(..., description="User resolving the alert"),
@@ -363,7 +364,7 @@ async def resolve_alert(
 
 
 @limiter.limit("20/minute")
-@router.get("/water/ingestion/status")
+@router.get("/ingestion/status")
 async def get_ingestion_status(request: Request):
     """Get water ingestion service status.
 
@@ -391,7 +392,7 @@ async def get_ingestion_status(request: Request):
 
 
 @limiter.limit("20/minute")
-@router.get("/water/ingestion/{site}/status")
+@router.get("/ingestion/{site}/status")
 async def get_site_ingestion_status(request: Request, site: str):
     """Get ingestion status for a specific site.
 
@@ -421,7 +422,7 @@ async def get_site_ingestion_status(request: Request, site: str):
 
 
 @limiter.limit("30/minute")
-@router.get("/water/zones/{zone_id}/consumption")
+@router.get("/zones/{zone_id}/consumption")
 async def get_zone_consumption(
     request: Request,
     zone_id: str,
@@ -462,7 +463,7 @@ async def get_zone_consumption(
 
 
 @limiter.limit("30/minute")
-@router.get("/water/sites/{site}/zones/{floor}/consumption")
+@router.get("/sites/{site}/zones/{floor}/consumption")
 async def get_floor_consumption(
     request: Request,
     site: str,
@@ -507,7 +508,7 @@ async def get_floor_consumption(
 
 
 @limiter.limit("30/minute")
-@router.get("/water/sites/{site}/zones/top")
+@router.get("/sites/{site}/zones/top")
 async def get_top_consuming_zones(
     request: Request,
     site: str,
@@ -543,7 +544,7 @@ async def get_top_consuming_zones(
 
 
 @limiter.limit("30/minute")
-@router.get("/water/zones/{zone_id}/trend")
+@router.get("/zones/{zone_id}/trend")
 async def get_zone_trend(
     request: Request,
     zone_id: str,
@@ -577,7 +578,7 @@ async def get_zone_trend(
 
 
 @limiter.limit("30/minute")
-@router.get("/water/zones/{zone_id}/comparison")
+@router.get("/zones/{zone_id}/comparison")
 async def get_zone_vs_building(
     request: Request,
     zone_id: str,
@@ -611,7 +612,7 @@ async def get_zone_vs_building(
 
 
 @limiter.limit("30/minute")
-@router.get("/water/alerts/advanced")
+@router.get("/alerts/advanced")
 async def get_advanced_alerts(
     request: Request,
     site: str = Query(..., description="Building site code"),
@@ -683,7 +684,7 @@ async def get_advanced_alerts(
 
 
 @limiter.limit("30/minute")
-@router.post("/water/alerts/thresholds/{site}")
+@router.post("/alerts/thresholds/{site}")
 async def set_alert_thresholds(
     request: Request,
     site: str,
@@ -720,7 +721,7 @@ async def set_alert_thresholds(
 
 
 @limiter.limit("30/minute")
-@router.get("/water/alerts/thresholds/{site}")
+@router.get("/alerts/thresholds/{site}")
 async def get_alert_thresholds(request: Request, site: str):
     """Get current alert thresholds for a site.
 
@@ -746,7 +747,7 @@ async def get_alert_thresholds(request: Request, site: str):
 
 
 @limiter.limit("30/minute")
-@router.get("/water/zones/{zone_id}/anomaly-history")
+@router.get("/zones/{zone_id}/anomaly-history")
 async def get_zone_anomaly_history(
     request: Request,
     zone_id: str,
@@ -812,7 +813,7 @@ async def get_zone_anomaly_history(
 
 
 @limiter.limit("30/minute")
-@router.get("/water/tariffs/{site}")
+@router.get("/tariffs/{site}")
 async def get_site_tariffs(request: Request, site: str) -> dict:
     """Get all tariff configurations for a site.
 
@@ -838,7 +839,7 @@ async def get_site_tariffs(request: Request, site: str) -> dict:
 
 
 @limiter.limit("30/minute")
-@router.post("/water/tariffs/{site}")
+@router.post("/tariffs/{site}")
 async def create_tariff(
     request: Request,
     site: str,
@@ -872,7 +873,7 @@ async def create_tariff(
 
 
 @limiter.limit("30/minute")
-@router.get("/water/costs/site/{site}")
+@router.get("/costs/site/{site}")
 async def get_site_costs(
     request: Request,
     site: str,
@@ -906,7 +907,7 @@ async def get_site_costs(
 
 
 @limiter.limit("30/minute")
-@router.get("/water/costs/zone/{zone_id}")
+@router.get("/costs/zone/{zone_id}")
 async def get_zone_costs(
     request: Request,
     zone_id: str,
@@ -940,7 +941,7 @@ async def get_zone_costs(
 
 
 @limiter.limit("30/minute")
-@router.get("/water/forecast/monthly")
+@router.get("/forecast/monthly")
 async def forecast_monthly(
     request: Request,
     site: str = Query(..., description="Building site code"),
@@ -967,7 +968,7 @@ async def forecast_monthly(
 
 
 @limiter.limit("30/minute")
-@router.get("/water/forecast/annual")
+@router.get("/forecast/annual")
 async def forecast_annual(
     request: Request,
     site: str = Query(..., description="Building site code"),
@@ -994,7 +995,7 @@ async def forecast_annual(
 
 
 @limiter.limit("30/minute")
-@router.get("/water/zones/cost-comparison")
+@router.get("/zones/cost-comparison")
 async def zone_cost_comparison(
     request: Request,
     site: str = Query(..., description="Building site code"),
@@ -1026,7 +1027,7 @@ async def zone_cost_comparison(
 
 
 @limiter.limit("30/minute")
-@router.post("/water/cost-impact")
+@router.post("/cost-impact")
 async def calculate_cost_impact(
     request: Request,
     site: str = Query(..., description="Building site code"),
@@ -1058,7 +1059,7 @@ async def calculate_cost_impact(
 
 
 @limiter.limit("30/minute")
-@router.post("/water/work-orders/from-alert/{alert_id}")
+@router.post("/work-orders/from-alert/{alert_id}")
 async def create_work_order_from_water_alert(
     request: Request,
     alert_id: str,
@@ -1100,7 +1101,7 @@ async def create_work_order_from_water_alert(
 
 
 @limiter.limit("30/minute")
-@router.get("/water/work-orders/{work_order_id}")
+@router.get("/work-orders/{work_order_id}")
 async def get_water_work_order_details(
     request: Request,
     work_order_id: str,
@@ -1134,7 +1135,7 @@ async def get_water_work_order_details(
 
 
 @limiter.limit("30/minute")
-@router.post("/water/work-orders/{work_order_id}/acknowledge-alert")
+@router.post("/work-orders/{work_order_id}/acknowledge-alert")
 async def acknowledge_work_order_alert(
     request: Request,
     work_order_id: str,
@@ -1171,7 +1172,7 @@ async def acknowledge_work_order_alert(
 
 
 @limiter.limit("30/minute")
-@router.get("/water/alerts/unacknowledged")
+@router.get("/alerts/unacknowledged")
 async def get_unacknowledged_water_alerts(
     request: Request,
     site: str = Query(..., description="Building site code"),
@@ -1214,7 +1215,7 @@ async def get_unacknowledged_water_alerts(
 
 
 @limiter.limit("30/minute")
-@router.post("/water/alerts/{alert_id}/escalate")
+@router.post("/alerts/{alert_id}/escalate")
 async def escalate_water_alert(
     request: Request,
     alert_id: str,
@@ -1249,7 +1250,7 @@ async def escalate_water_alert(
 
 
 @limiter.limit("30/minute")
-@router.get("/water/work-orders/status-report")
+@router.get("/work-orders/status-report")
 async def water_work_order_status(
     request: Request,
     site: str = Query(..., description="Building site code"),

@@ -126,23 +126,23 @@ function ThresholdPreview({
 function ThresholdPreviewBars({ values }: { values: RiskThresholdValues }) {
   return (
     <div className="flex h-8 overflow-hidden rounded-md">
-      <ThresholdPreviewBand label="Low" width={values.medium} background="#0ea5e9" color="white" />
+      <ThresholdPreviewBand label="Low" width={values.medium} background="var(--color-sentinel-blue)" color="white" />
       <ThresholdPreviewBand
         label="Medium"
         width={values.high - values.medium}
-        background="#facc15"
+        background="var(--color-sentinel-amber)"
         color="#111827"
       />
       <ThresholdPreviewBand
         label="High"
         width={values.critical - values.high}
-        background="#f97316"
+        background="var(--color-sentinel-amber)"
         color="white"
       />
       <ThresholdPreviewBand
         label="Critical"
         width={100 - values.critical}
-        background="#ef4444"
+        background="var(--color-sentinel-red)"
         color="white"
       />
     </div>

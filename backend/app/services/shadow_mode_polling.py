@@ -244,7 +244,7 @@ class ShadowModePollingService:
 
             if agg_readings:
                 agg_states["S002-CHILLER-AGG"] = {
-                    "type": "chiller",
+                    "type": "site_aggregate",
                     "sensor_readings": agg_readings,
                 }
 
@@ -252,7 +252,7 @@ class ShadowModePollingService:
             equip_online = equip_summary.get("online", 0)
             if zone_count or equip_online:
                 agg_states["S002-SITE-AGG"] = {
-                    "type": "ahu",
+                    "type": "site_aggregate",
                     "sensor_readings": {
                         "zone_count": float(zone_count),
                         "equip_online": float(equip_online),
@@ -267,6 +267,24 @@ class ShadowModePollingService:
         except Exception as e:
             logger.warning(f"[SHADOW] Telemetry poll error: {e}")
             errors.append(f"telemetry: {e}")
+
+        # ── 3b. Fetch occupancy from badge/visitor events ───────────────────
+        # Wire occupancy into the ML feeder via S002-SITE-AGG
+        try:
+            from app.database.repositories.security_repository import SecurityRepository
+
+            repo = SecurityRepository()
+            occ = repo.get_occupancy(self.site_id)
+            total_occ = occ.get("total_occupancy", 0)
+
+            if "S002-SITE-AGG" in agg_states:
+                agg_states["S002-SITE-AGG"]["sensor_readings"]["total_occupancy"] = float(total_occ)
+                agg_states["S002-SITE-AGG"]["sensor_readings"]["occupied_zones"] = 0.0
+                agg_states["S002-SITE-AGG"]["sensor_readings"]["peak_zone_density"] = 0.0
+            result["occupancy_fetched"] = True
+        except Exception as e:
+            logger.debug(f"[SHADOW] Occupancy poll skipped: {e}")
+            errors.append(f"occupancy: {e}")
 
         # ── 4. Fetch fault alarms (Fault Classifier buffer) ──────────────────
         fault_count = 0
@@ -355,7 +373,7 @@ class ShadowModePollingService:
                 result["trends_polled"] = len(sensor_batch)
                 result["trends_with_data"] = sum(
                     1
-                    for code, s in zip(sensor_batch, trend_results)
+                    for code, s in zip(sensor_batch, trend_results, strict=False)
                     if not isinstance(s, Exception) and s[1] is not None
                 )
 
@@ -613,10 +631,7 @@ class ShadowModePollingService:
              S002-MTR-B1-MAIN     → type=meter,  name=S002 Meter B1 Main
         """
         parts = code.split("-")
-        if len(parts) >= 2:
-            raw_type = parts[1].upper()
-        else:
-            raw_type = "UNKNOWN"
+        raw_type = parts[1].upper() if len(parts) >= 2 else "UNKNOWN"
 
         # Normalise equipment type labels
         type_map = {

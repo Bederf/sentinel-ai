@@ -339,7 +339,7 @@ class RepairEffectivenessService:
         total_cost = 0.0
         repairs_by_type: dict[str, int] = {}
 
-        for wo_id, outcome in self._repair_outcomes.items():
+        for _wo_id, outcome in self._repair_outcomes.items():
             total_cost += outcome.repair_cost
             rt = outcome.repair_type
             repairs_by_type[rt] = repairs_by_type.get(rt, 0) + 1
@@ -431,7 +431,7 @@ class RepairEffectivenessService:
         """
         score = 100.0
 
-        for name, ei in element_improvements.items():
+        for _name, ei in element_improvements.items():
             if ei.baseline_value == 0:
                 continue
             deviation_pct = abs(ei.pre_value - ei.baseline_value) / abs(ei.baseline_value) * 100
@@ -453,7 +453,7 @@ class RepairEffectivenessService:
         """
         score = 100.0
 
-        for name, ei in element_improvements.items():
+        for _name, ei in element_improvements.items():
             if ei.baseline_value == 0:
                 continue
             deviation_pct = abs(ei.post_value - ei.baseline_value) / abs(ei.baseline_value) * 100

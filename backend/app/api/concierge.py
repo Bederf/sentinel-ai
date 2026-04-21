@@ -106,10 +106,7 @@ def _oldest_created_at(signals: list[dict]) -> datetime | None:
         created = s.get("created_at")
         if created:
             try:
-                if isinstance(created, str):
-                    dt = datetime.fromisoformat(created.replace("Z", "+00:00"))
-                else:
-                    dt = created
+                dt = datetime.fromisoformat(created.replace("Z", "+00:00")) if isinstance(created, str) else created
                 if oldest is None or dt < oldest:
                     oldest = dt
             except (ValueError, TypeError):
@@ -249,9 +246,8 @@ async def get_concierge_rooms(site_id: str) -> dict[str, Any]:
         latest_at = None
         for s in signals:
             cat = s.get("created_at")
-            if cat:
-                if latest_at is None or cat > latest_at:
-                    latest_at = cat
+            if cat and (latest_at is None or cat > latest_at):
+                latest_at = cat
 
         result_rooms.append(
             {

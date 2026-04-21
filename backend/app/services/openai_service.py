@@ -277,7 +277,7 @@ class OpenAIService:
         }
 
         max_iterations = 10
-        for iteration in range(max_iterations):
+        for _iteration in range(max_iterations):
             payload: dict[str, Any] = {
                 "model": model,
                 "messages": openai_messages,

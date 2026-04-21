@@ -164,7 +164,7 @@ async def test_verify_telemetry_immediate_success(mock_event_stream, mock_audit_
 
                 # Should verify on attempt 1
                 audit_calls = mock_audit_logger.record_event.call_args_list
-                verify_call = [c for c in audit_calls if c[0][0].get("event_type") == "DECISION_VERIFIED"][0]
+                verify_call = next(c for c in audit_calls if c[0][0].get("event_type") == "DECISION_VERIFIED")
                 assert verify_call[0][0]["verification_time_seconds"] == 1
 
 

@@ -51,7 +51,9 @@ function managedLocalYRange(floors: CockpitState['visualTwin']['floors']): { min
     const h = SLAB_HEIGHT
     const cy = yCursor + h / 2
     yCursor += h
-    if (f.isManaged) {
+    // Gate on OCCUPIED_FLOOR_IDS — same source of truth as BuildingStack.
+    // Prevents the tracer from floating above the occupied stack.
+    if (OCCUPIED_FLOOR_IDS.has(f.id)) {
       minY = Math.min(minY, cy - h / 2)
       maxY = Math.max(maxY, cy + h / 2)
     }
@@ -248,11 +250,13 @@ function DriftPath({
   yRange: { minY: number; maxY: number } | null
 }) {
   const color = cockpitFlowColor(tone)
+  // Always call useMemo — returning null before hooks violates Rules of Hooks
   const points = useMemo(() => {
+    if (!yRange) return []
     const curves: THREE.Vector3[] = []
     const segs = 16
-    const y0 = yRange ? yRange.minY + 0.04 : 0.12
-    const y1 = yRange ? yRange.maxY - 0.04 : SLAB_HEIGHT * 5
+    const y0 = yRange.minY + 0.04
+    const y1 = yRange.maxY - 0.04
     const span = Math.max(y1 - y0, SLAB_HEIGHT * 2)
     for (let i = 0; i <= segs; i++) {
       const t = i / segs
@@ -326,14 +330,31 @@ function AnimatedTracer({
   )
 }
 
+/** Deterministic hash for stable orb positioning — no Math.random(), no Date.now() */
+function hashString(str: string): number {
+  let hash = 0
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) - hash) + str.charCodeAt(i)
+    hash |= 0
+  }
+  return hash
+}
+
 function ZoneMarkers({
   state,
   buildingHeight,
+  onboardingPhase,
 }: {
   state: CockpitState
   buildingHeight: number
+  onboardingPhase: string | null
 }) {
-  const signals = state.visualTwin.zoneSignals.slice(0, 5)
+  // Shadow mode has no active conditions — no orbs
+  if (onboardingPhase === 'shadow') return null
+
+  const signals = state.visualTwin.zoneSignals
+    .filter((sig) => (sig.weight ?? 0) > 0.15)
+    .slice(0, 5)
   const floors = state.visualTwin.floors
   const n = Math.max(floors.length, 1)
 
@@ -347,16 +368,27 @@ function ZoneMarkers({
         const idx = fi
         const yRatio = n > 1 ? idx / Math.max(n - 1, 1) : 0.5
         const y = 0.2 + yRatio * Math.max(buildingHeight - 0.4, SLAB_HEIGHT * 2)
-        const angle = (index / Math.max(signals.length, 1)) * Math.PI * 2
-        const x = Math.cos(angle) * 0.72
-        const z = Math.sin(angle) * 0.58 + 0.1
+
+        // Deterministic hash-based position within floor footprint (70% of base)
+        const seedA = hashString(sig.zoneId)
+        const seedB = hashString(sig.meshId || sig.zoneId + '-b')
+        const xNorm = ((seedA % 1000) / 1000) * 2 - 1 // -1 to 1
+        const zNorm = ((seedB % 1000) / 1000) * 2 - 1 // -1 to 1
+        const x = xNorm * (BASE_WIDTH * 0.35)
+        const z = zNorm * (BASE_DEPTH * 0.35)
+
+        // Primary signal gets larger, brighter orb
+        const isPrimary = sig.isPrimary === true
+        const radius = isPrimary ? 0.11 : 0.07
+        const emissiveIntensity = isPrimary ? 1.4 : 0.9
+
         return (
           <mesh key={`${sig.zoneId}-${index}`} position={[x, y, z]}>
-            <sphereGeometry args={[0.09, 16, 16]} />
+            <sphereGeometry args={[radius, 16, 16]} />
             <meshStandardMaterial
               color="#f8fafc"
               emissive="#ffffff"
-              emissiveIntensity={0.9}
+              emissiveIntensity={emissiveIntensity}
               metalness={0.2}
               roughness={0.2}
               transparent
@@ -462,7 +494,11 @@ function SceneR3F({
         <BuildingStack state={state} tone={tone} />
         <DriftPath state={state} tone={tone} visible={showFlow} yRange={yRange} />
         <AnimatedTracer tone={tone} yRange={yRange} active={showFlow} />
-        <ZoneMarkers state={state} buildingHeight={buildingHeight} />
+        <ZoneMarkers
+          state={state}
+          buildingHeight={buildingHeight}
+          onboardingPhase={state.site.onboardingPhase ?? null}
+        />
       </group>
 
       <OrbitControls

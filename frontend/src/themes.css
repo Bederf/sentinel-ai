@@ -66,6 +66,38 @@
 
   /* Matrix-specific font */
   font-family: 'Share Tech Mono', 'JetBrains Mono', monospace;
+
+  /* ── SENTINEL canonical token overrides (matrix) ── */
+  --sentinel-bg-canvas: #060e18;
+  --sentinel-bg-primary: #0a1520;
+  --sentinel-bg-secondary: #0f1a2e;
+  --sentinel-bg-panel: #060e18;
+  --sentinel-border: #00ff41;
+  --sentinel-border-strong: #00ff41;
+  --sentinel-text-primary: #00ff41;
+  --sentinel-text-secondary: #66b366;
+  --sentinel-text-disabled: #336633;
+  --sentinel-text-link: #00ff41;
+  --sentinel-amber: #00ff41;
+  --sentinel-amber-light: #33ff66;
+  --sentinel-amber-dark: #00cc33;
+  --sentinel-chart-1: #00ff41;
+  --sentinel-chart-2: #33ff66;
+  --sentinel-chart-3: #00cc33;
+  --sentinel-chart-4: #ff3300;
+  --sentinel-chart-5: #ffff00;
+  --sentinel-chart-6: #ff6600;
+  --sentinel-glass-bg: rgba(6, 14, 24, 0.85);
+  --sentinel-glass-bg-light: rgba(6, 14, 24, 0.6);
+  --sentinel-glass-bg-heavy: rgba(6, 14, 24, 0.95);
+  --sentinel-glass-border: rgba(0, 255, 65, 0.3);
+  --sentinel-glass-border-strong: rgba(0, 255, 65, 0.6);
+  --sentinel-glass-shadow: 0 0 16px rgba(0, 255, 65, 0.2);
+  --sentinel-radius-md: 0px;
+  --sentinel-radius-xl: 0px;
+  --sentinel-shadow-panel: 0 0 10px rgba(0, 255, 65, 0.3), inset 0 0 10px rgba(0, 255, 65, 0.1);
+  --sentinel-font-body: 'Share Tech Mono', 'JetBrains Mono', monospace;
+  --sentinel-font-mono: 'Share Tech Mono', 'JetBrains Mono', monospace;
 }
 
 @layer components {
@@ -347,6 +379,36 @@
   --glass-border-strong: rgba(42, 58, 85, 0.9);
   --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
   --radius-glass: 12px;
+
+  /* ── SENTINEL canonical token overrides (ops) ── */
+  --sentinel-bg-canvas: #0a0f1a;
+  --sentinel-bg-primary: #0f1422;
+  --sentinel-bg-secondary: #111827;
+  --sentinel-bg-panel: #111827;
+  --sentinel-border: #1e2d42;
+  --sentinel-border-strong: #2a3a55;
+  --sentinel-text-primary: #e2e8f0;
+  --sentinel-text-secondary: #64748b;
+  --sentinel-text-disabled: #475569;
+  --sentinel-text-link: #00d2ff;
+  --sentinel-amber: #00d2ff;
+  --sentinel-amber-light: #33ddff;
+  --sentinel-amber-dark: #0099cc;
+  --sentinel-chart-1: #00d2ff;
+  --sentinel-chart-2: #00e676;
+  --sentinel-chart-3: #ffd700;
+  --sentinel-chart-4: #ff6b6b;
+  --sentinel-chart-5: #a855f7;
+  --sentinel-chart-6: #ff9f43;
+  --sentinel-glass-bg: rgba(15, 20, 34, 0.85);
+  --sentinel-glass-bg-light: rgba(15, 20, 34, 0.6);
+  --sentinel-glass-bg-heavy: rgba(10, 15, 26, 0.92);
+  --sentinel-glass-border: rgba(30, 45, 66, 0.8);
+  --sentinel-glass-border-strong: rgba(42, 58, 85, 0.9);
+  --sentinel-glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  --sentinel-radius-md: 12px;
+  --sentinel-radius-xl: 12px;
+  --sentinel-shadow-panel: 0 4px 24px rgba(0, 0, 0, 0.4), 0 1px 4px rgba(0, 0, 0, 0.3);
 }
 
 @layer components {
@@ -597,6 +659,13 @@
   --color-sentinel-border-strong: var(--glass-border-strong);
   --radius-panel: var(--radius-glass);
   --shadow-panel: var(--glass-shadow);
+
+  /* ── SENTINEL canonical token overrides (glass) ── */
+  --sentinel-bg-panel: var(--sentinel-glass-bg);
+  --sentinel-border: var(--sentinel-glass-border);
+  --sentinel-border-strong: var(--sentinel-glass-border-strong);
+  --sentinel-radius-md: var(--sentinel-radius-xl);
+  --sentinel-shadow-panel: var(--sentinel-glass-shadow);
 }
 
 @layer components {
@@ -717,6 +786,40 @@
 
   /* Fonts */
   font-family: 'Syne', -apple-system, sans-serif;
+
+  /* ── SENTINEL canonical token overrides (teal) ── */
+  --sentinel-bg-canvas: #1E2A2A;
+  --sentinel-bg-primary: #2D3D3D;
+  --sentinel-bg-secondary: #253333;
+  --sentinel-bg-panel: #2D3D3D;
+  --sentinel-border: rgba(0, 168, 157, 0.15);
+  --sentinel-border-strong: rgba(0, 168, 157, 0.3);
+  --sentinel-text-primary: #F8FAFA;
+  --sentinel-text-secondary: #6B8888;
+  --sentinel-text-disabled: #4A6666;
+  --sentinel-text-link: #00A89D;
+  --sentinel-amber: #00A89D;
+  --sentinel-amber-light: #B2E8E5;
+  --sentinel-amber-dark: #007A72;
+  --sentinel-green: #00A89D;
+  --sentinel-red: #DC2626;
+  --sentinel-blue: #60A5FA;
+  --sentinel-chart-1: #00A89D;
+  --sentinel-chart-2: #F5A623;
+  --sentinel-chart-3: #B2E8E5;
+  --sentinel-chart-4: #007A72;
+  --sentinel-chart-5: #FDE8B8;
+  --sentinel-chart-6: #3D5050;
+  --sentinel-glass-bg: rgba(45, 61, 61, 0.85);
+  --sentinel-glass-bg-light: rgba(45, 61, 61, 0.6);
+  --sentinel-glass-bg-heavy: rgba(30, 42, 42, 0.92);
+  --sentinel-glass-border: rgba(0, 168, 157, 0.2);
+  --sentinel-glass-border-strong: rgba(0, 168, 157, 0.35);
+  --sentinel-glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  --sentinel-radius-md: 16px;
+  --sentinel-radius-xl: 16px;
+  --sentinel-shadow-panel: 0 4px 24px rgba(0, 0, 0, 0.3), 0 1px 4px rgba(0, 0, 0, 0.2);
+  --sentinel-font-body: 'Syne', -apple-system, sans-serif;
 }
 
 @layer components {

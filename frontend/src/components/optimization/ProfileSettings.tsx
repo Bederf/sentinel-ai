@@ -255,7 +255,7 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({
           className="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
           style={{
             background: 'var(--color-sentinel-blue)',
-            color: '#fff',
+            color: 'white',
           }}
         >
           Add Zone Override

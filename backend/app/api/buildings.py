@@ -200,7 +200,7 @@ class BuildingConfigUpdate(BaseModel):
 
 
 @router.get("")
-async def list_sites(current_user: dict = None) -> dict:
+async def list_sites(current_user: dict | None = None) -> dict:
     """
     List buildings accessible to the current user.
 
@@ -227,7 +227,7 @@ async def list_sites(current_user: dict = None) -> dict:
             )
 
             if response.data:
-                accessible_site_ids = set(str(row["site_id"]) for row in response.data)
+                accessible_site_ids = {str(row["site_id"]) for row in response.data}
         except Exception as e:
             logger.warning(f"Could not fetch user site access: {e}")
             # Fall back to showing all buildings if DB query fails

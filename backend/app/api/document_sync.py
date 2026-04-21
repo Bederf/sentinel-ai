@@ -10,6 +10,7 @@ GET /sync/status/{adapter} — get last sync state
 
 from __future__ import annotations
 
+import contextlib
 import logging
 from datetime import datetime
 
@@ -114,10 +115,8 @@ async def sync_status(
     row = result.data[0]
     last_sync = None
     if row.get("last_successful_sync"):
-        try:
+        with contextlib.suppress(ValueError, TypeError):
             last_sync = datetime.fromisoformat(row["last_successful_sync"])
-        except (ValueError, TypeError):
-            pass
 
     return SyncStatusResponse(
         last_sync=last_sync,

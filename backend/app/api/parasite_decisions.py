@@ -201,10 +201,7 @@ async def get_health(auth: AuthContext = Depends(require_auth)) -> dict[str, Any
         parasite_repo = ParasiteDecisionRepository()
 
         # Determine overall status
-        if not settings.parasite_enabled:
-            status = "disabled"
-        else:
-            status = "active"
+        status = "disabled" if not settings.parasite_enabled else "active"
 
         # Count pending outcome measurements
         pending_measurements = await parasite_repo.count_pending_measurements()

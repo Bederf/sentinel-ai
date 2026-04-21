@@ -365,12 +365,11 @@ async def _check_rsvp_accepted(event_id: str, visitor_email: str) -> bool:
     attendees = event.get("attendees", [])
     for a in attendees:
         email = a.get("emailAddress", {}).get("address", "").lower()
-        if email == visitor_email.lower():
-            if _is_external_email(email):
-                # External attendee — check responseStatus
-                response_status = a.get("responseStatus", {})
-                if response_status.get("response") == "accepted":
-                    return True
+        if email == visitor_email.lower() and _is_external_email(email):
+            # External attendee — check responseStatus
+            response_status = a.get("responseStatus", {})
+            if response_status.get("response") == "accepted":
+                return True
     return False
 
 

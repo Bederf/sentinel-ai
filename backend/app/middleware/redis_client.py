@@ -81,7 +81,7 @@ class _LazyRedisClient:
         if self._client is None:
             self._client = await get_redis_client()
 
-    async def set(self, key: str, value: str, nx: bool = False, ex: int = None) -> bool:
+    async def set(self, key: str, value: str, nx: bool = False, ex: int | None = None) -> bool:
         """Set a key with optional NX (only if not exists) and EX (expire in seconds)."""
         await self._ensure_client()
         return await self._client.set(key, value, nx=nx, ex=ex)

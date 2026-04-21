@@ -197,7 +197,7 @@ export function AiRuntimePolicySettings({
             disabled={!canEdit || saving || loading || !siteId}
             onClick={savePolicy}
             className="px-4 py-2 rounded inline-flex items-center gap-2 disabled:opacity-50"
-            style={{ background: "var(--color-sentinel-blue)", color: "#fff" }}
+            style={{ background: "var(--color-sentinel-blue)", color: "white" }}
           >
             <Save className="h-4 w-4" />
             {saving ? "Saving..." : "Save AI policy"}
@@ -207,4 +207,3 @@ export function AiRuntimePolicySettings({
     </div>
   );
 }
-

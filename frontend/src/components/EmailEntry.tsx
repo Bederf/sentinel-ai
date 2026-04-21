@@ -118,7 +118,17 @@ export function EmailEntry({ onSuccess }: EmailEntryProps) {
       className="min-h-screen flex flex-col items-center justify-center p-4"
       style={{ background: "var(--color-sentinel-bg-canvas)" }}
     >
-      {/* Title only — no static logo here; splash already showed the logo video */}
+      {/* Static logo — splash already showed the animated logo, but login page needs brand mark */}
+      <div className="mb-6">
+        <img
+          src="/images/sentinel-logo.png"
+          alt="SENTINEL"
+          className="h-16 w-auto mx-auto"
+          style={{ opacity: 0.85 }}
+        />
+      </div>
+
+      {/* Title */}
       <div className="flex flex-col items-center mb-8 text-center">
         <h1
           className="text-2xl font-bold tracking-wide mb-1"

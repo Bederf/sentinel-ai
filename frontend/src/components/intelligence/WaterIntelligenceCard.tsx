@@ -90,23 +90,23 @@ export function WaterIntelligenceCard({ siteId, onNavigate }: WaterIntelligenceC
           : `Maintained ${Math.abs(baselineComparison).toFixed(0)}% below baseline — no anomalies detected`;
 
   const trendLabel = trendDirection === 'rising' ? 'Rising' : trendDirection === 'falling' ? 'Falling' : 'Stable';
-  const trendColor = trendDirection === 'falling' ? '#10B981' : trendDirection === 'rising' ? '#F59E0B' : '#3B82F6';
+  const trendColor = trendDirection === 'falling' ? 'var(--color-sentinel-green)' : trendDirection === 'rising' ? 'var(--color-sentinel-amber)' : 'var(--color-sentinel-blue)';
 
   return (
     <IntelligenceCard
       title="Water Intelligence"
       subtitle="Consumption monitoring &amp; leak detection"
-      icon={<Droplets className="h-5 w-5" style={{ color: '#06B6D4' }} />}
+      icon={<Droplets className="h-5 w-5" style={{ color: 'var(--color-sentinel-cyan)' }} />}
       iconBg="rgba(6, 182, 212, 0.15)"
-      accentColor="#06B6D4"
+      accentColor="var(--color-sentinel-cyan)"
       badge={badge}
       state={state}
       footer={footer}
       onNavigate={onNavigate}
       metrics={
         <>
-          <ValueMetricBox label="Below baseline" value={baselineComparison < 0 ? `${Math.abs(baselineComparison).toFixed(0)}%` : '—'} color={baselineComparison <= 0 ? '#10B981' : '#F59E0B'} />
-          <ValueMetricBox label="Alerts caught" value={`${activeAlerts}`} color={activeAlerts > 0 ? '#EF4444' : '#22C55E'} />
+          <ValueMetricBox label="Below baseline" value={baselineComparison < 0 ? `${Math.abs(baselineComparison).toFixed(0)}%` : '—'} color={baselineComparison <= 0 ? 'var(--color-sentinel-green)' : 'var(--color-sentinel-amber)'} />
+          <ValueMetricBox label="Alerts caught" value={`${activeAlerts}`} color={activeAlerts > 0 ? 'var(--color-sentinel-red)' : 'var(--color-sentinel-green)'} />
           <ValueMetricBox label="Trend" value={trendLabel} color={trendColor} />
         </>
       }
@@ -117,7 +117,7 @@ export function WaterIntelligenceCard({ siteId, onNavigate }: WaterIntelligenceC
           unit="%"
           baselineLabel="Baseline consumption"
           optimizedLabel="With SENTINEL monitoring"
-          accentColor="#06B6D4"
+          accentColor="var(--color-sentinel-cyan)"
         />
       ) : undefined}
     />

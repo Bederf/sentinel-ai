@@ -256,7 +256,7 @@ class TestFindExistingCluster:
         assert str(result) == str(cluster_id)
 
     def test_returns_none_when_no_candidates_clustered(self, conn):
-        c, created = conn
+        c, _created = conn
 
         result = find_existing_cluster(
             c,

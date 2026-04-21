@@ -375,7 +375,7 @@ class TestApprovalHardening:
         routing_details = [
             {"tier": "blocked", "action": "blocked", "effective_confidence": 0.10},
         ]
-        approved, rejected, already = self._simulate_approval_check(
+        approved, rejected, _already = self._simulate_approval_check(
             routing_details,
             routing_enforced=True,
         )
@@ -388,7 +388,7 @@ class TestApprovalHardening:
         routing_details = [
             {"tier": "tier1_advisory", "action": "advisory", "effective_confidence": 0.45},
         ]
-        approved, rejected, already = self._simulate_approval_check(
+        approved, rejected, _already = self._simulate_approval_check(
             routing_details,
             routing_enforced=True,
         )
@@ -401,7 +401,7 @@ class TestApprovalHardening:
         routing_details = [
             {"tier": "tier2_approval", "action": "pending_approval", "effective_confidence": 0.70},
         ]
-        approved, rejected, already = self._simulate_approval_check(
+        approved, rejected, _already = self._simulate_approval_check(
             routing_details,
             routing_enforced=True,
         )

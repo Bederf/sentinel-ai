@@ -286,7 +286,7 @@ class ExplanationEvaluator:
             ("recommendation", ["recommend", "should", "advised to", "consider"]),
         ]
 
-        for component, keywords in completeness_checks:
+        for _component, keywords in completeness_checks:
             if any(keyword in explanation_lower for keyword in keywords):
                 score += 0.25
 
@@ -503,7 +503,7 @@ def format_evaluation_results(results: list[ExplanationMetrics]) -> dict[str, fl
         return {}
 
     all_metrics = {}
-    for metric_name in vars(results[0]).keys():
+    for metric_name in vars(results[0]):
         values = [getattr(r, metric_name) for r in results if getattr(r, metric_name) is not None]
         numeric_values = [v for v in values if isinstance(v, (int, float, np.floating))]
         if numeric_values:

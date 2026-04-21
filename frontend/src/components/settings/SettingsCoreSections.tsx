@@ -222,7 +222,7 @@ function RiskThresholdPanel({ controller }: { controller: ReturnType<typeof useS
       description="Configure how cockpit and heat map severity bands interpret risk scores"
       icon={<Gauge className="h-5 w-5" />}
       iconBackground="rgba(249, 115, 22, 0.15)"
-      iconColor="#f97316"
+      iconColor="var(--color-sentinel-amber)"
       title="Cockpit Risk Thresholds"
     >
       {controller.riskThresholdError ? (

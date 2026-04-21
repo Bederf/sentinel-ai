@@ -125,7 +125,7 @@ export function EnergyFlowDiagram({ siteId }: EnergyFlowDiagramProps) {
       to: "building",
       power_kw: Math.max(0, solarToBuilding - solarToBess),
       active: solarToBuilding > 0,
-      color: "#FACC15",
+      color: "var(--color-sentinel-amber)",
       label: "Solar to Building",
     },
     {
@@ -133,7 +133,7 @@ export function EnergyFlowDiagram({ siteId }: EnergyFlowDiagramProps) {
       to: "bess",
       power_kw: solarToBess,
       active: solarToBess > 0,
-      color: "#3B82F6",
+      color: "var(--color-sentinel-blue)",
       label: "Solar to BESS",
     },
     {
@@ -141,7 +141,7 @@ export function EnergyFlowDiagram({ siteId }: EnergyFlowDiagramProps) {
       to: "grid",
       power_kw: solarToGrid,
       active: solarToGrid > 0,
-      color: "#10B981",
+      color: "var(--color-sentinel-green)",
       label: "Export to Grid",
     },
     {
@@ -149,7 +149,7 @@ export function EnergyFlowDiagram({ siteId }: EnergyFlowDiagramProps) {
       to: "building",
       power_kw: gridToBuilding,
       active: gridToBuilding > 0,
-      color: "#EF4444",
+      color: "var(--color-sentinel-red)",
       label: "Grid Import",
     },
     {
@@ -157,7 +157,7 @@ export function EnergyFlowDiagram({ siteId }: EnergyFlowDiagramProps) {
       to: "building",
       power_kw: bessToBuilding,
       active: bessToBuilding > 0,
-      color: "#8B5CF6",
+      color: "var(--color-sentinel-purple)",
       label: "BESS Discharge",
     },
   ];
@@ -177,7 +177,7 @@ export function EnergyFlowDiagram({ siteId }: EnergyFlowDiagramProps) {
       >
         <div className="flex items-center gap-3">
           <div className="p-2 rounded" style={{ background: "rgba(250, 204, 21, 0.15)" }}>
-            <Plug className="h-5 w-5" style={{ color: "#FACC15" }} />
+            <Plug className="h-5 w-5" style={{ color: "var(--color-sentinel-amber)" }} />
           </div>
           <div>
             <h3 className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>
@@ -316,11 +316,11 @@ export function EnergyFlowDiagram({ siteId }: EnergyFlowDiagramProps) {
             >
               <div
                 className="w-14 h-14 rounded-full flex items-center justify-center flex-shrink-0"
-                style={{ background: "rgba(250, 204, 21, 0.2)", border: "2px solid #FACC15" }}
+                style={{ background: "rgba(250, 204, 21, 0.2)", border: "2px solid var(--color-sentinel-amber)" }}
               >
-                <Sun className="h-6 w-6" style={{ color: "#FACC15" }} />
+                <Sun className="h-6 w-6" style={{ color: "var(--color-sentinel-amber)" }} />
               </div>
-              <span className="text-xs font-medium mt-1 whitespace-nowrap" style={{ color: "#FACC15" }}>
+              <span className="text-xs font-medium mt-1 whitespace-nowrap" style={{ color: "var(--color-sentinel-amber)" }}>
                 Solar
               </span>
               <span className="text-[10px] whitespace-nowrap" style={{ color: "var(--color-sentinel-text-secondary)" }}>
@@ -347,9 +347,9 @@ export function EnergyFlowDiagram({ siteId }: EnergyFlowDiagramProps) {
                     : "rgba(107, 114, 128, 0.2)",
                   border: `2px solid ${
                     bessMode === "charging"
-                      ? "#3B82F6"
+                      ? "var(--color-sentinel-blue)"
                       : bessMode === "discharging"
-                      ? "#8B5CF6"
+                      ? "var(--color-sentinel-purple)"
                       : "#6B7280"
                   }`,
                 }}
@@ -359,9 +359,9 @@ export function EnergyFlowDiagram({ siteId }: EnergyFlowDiagramProps) {
                   style={{
                     color:
                       bessMode === "charging"
-                        ? "#3B82F6"
+                        ? "var(--color-sentinel-blue)"
                         : bessMode === "discharging"
-                        ? "#8B5CF6"
+                        ? "var(--color-sentinel-purple)"
                         : "#6B7280",
                   }}
                 />
@@ -413,14 +413,14 @@ export function EnergyFlowDiagram({ siteId }: EnergyFlowDiagramProps) {
                 className="w-14 h-14 rounded-full flex items-center justify-center flex-shrink-0"
                 style={{
                   background: gridExportKw > 0 ? "rgba(16, 185, 129, 0.2)" : "rgba(239, 68, 68, 0.2)",
-                  border: `2px solid ${gridExportKw > 0 ? "#10B981" : "#EF4444"}`,
+                  border: `2px solid ${gridExportKw > 0 ? "var(--color-sentinel-green)" : "var(--color-sentinel-red)"}`,
                 }}
               >
-                <Plug className="h-6 w-6" style={{ color: gridExportKw > 0 ? "#10B981" : "#EF4444" }} />
+                <Plug className="h-6 w-6" style={{ color: gridExportKw > 0 ? "var(--color-sentinel-green)" : "var(--color-sentinel-red)" }} />
               </div>
               <span
                 className="text-xs font-medium mt-1 whitespace-nowrap"
-                style={{ color: gridExportKw > 0 ? "#10B981" : "#EF4444" }}
+                style={{ color: gridExportKw > 0 ? "var(--color-sentinel-green)" : "var(--color-sentinel-red)" }}
               >
                 Grid
               </span>

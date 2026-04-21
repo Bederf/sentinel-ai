@@ -15,7 +15,7 @@ Phase 48: Contract Management
 """
 
 from datetime import date, datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -25,7 +25,7 @@ from pydantic import BaseModel, ConfigDict, Field
 # ============================================================================
 
 
-class OrganizationTier(str, Enum):
+class OrganizationTier(StrEnum):
     """Organization tier matching organizations.tier CHECK constraint."""
 
     PLATINUM = "platinum"
@@ -34,7 +34,7 @@ class OrganizationTier(str, Enum):
     BRONZE = "bronze"
 
 
-class OrganizationStatus(str, Enum):
+class OrganizationStatus(StrEnum):
     """Organization status matching organizations.status CHECK constraint."""
 
     ACTIVE = "active"
@@ -42,7 +42,7 @@ class OrganizationStatus(str, Enum):
     TERMINATED = "terminated"
 
 
-class ContractStatus(str, Enum):
+class ContractStatus(StrEnum):
     """Contract lifecycle status matching contracts.status CHECK constraint."""
 
     DRAFT = "draft"
@@ -53,7 +53,7 @@ class ContractStatus(str, Enum):
     TERMINATED = "terminated"
 
 
-class ContractType(str, Enum):
+class ContractType(StrEnum):
     """Contract type matching contracts.contract_type CHECK constraint."""
 
     COMPREHENSIVE = "comprehensive"
@@ -62,7 +62,7 @@ class ContractType(str, Enum):
     HYBRID = "hybrid"
 
 
-class SLAType(str, Enum):
+class SLAType(StrEnum):
     """SLA type matching sla_terms.sla_type CHECK constraint."""
 
     UPTIME = "uptime"
@@ -72,7 +72,7 @@ class SLAType(str, Enum):
     FIRST_FIX_RATE = "first_fix_rate"
 
 
-class SLAPriority(str, Enum):
+class SLAPriority(StrEnum):
     """SLA priority level matching sla_terms.priority CHECK constraint."""
 
     CRITICAL = "critical"
@@ -82,7 +82,7 @@ class SLAPriority(str, Enum):
     ALL = "all"
 
 
-class MeasurementPeriod(str, Enum):
+class MeasurementPeriod(StrEnum):
     """Measurement period matching sla_terms.measurement_period CHECK constraint."""
 
     MONTHLY = "monthly"
@@ -90,7 +90,7 @@ class MeasurementPeriod(str, Enum):
     ANNUALLY = "annually"
 
 
-class PenaltyType(str, Enum):
+class PenaltyType(StrEnum):
     """Penalty type matching sla_terms.penalty_type CHECK constraint."""
 
     PERCENTAGE = "percentage"
@@ -98,7 +98,7 @@ class PenaltyType(str, Enum):
     TIERED = "tiered"
 
 
-class CoverageType(str, Enum):
+class CoverageType(StrEnum):
     """Asset coverage type matching asset_contracts.coverage_type CHECK constraint."""
 
     FULL = "full"
@@ -107,7 +107,7 @@ class CoverageType(str, Enum):
     EXCLUDED = "excluded"
 
 
-class CriticalityTier(str, Enum):
+class CriticalityTier(StrEnum):
     """Asset criticality matching asset_contracts.criticality CHECK constraint."""
 
     CRITICAL = "critical"
@@ -116,7 +116,7 @@ class CriticalityTier(str, Enum):
     LOW = "low"
 
 
-class AssessmentType(str, Enum):
+class AssessmentType(StrEnum):
     """Assessment type matching condition_assessments.assessment_type CHECK constraint."""
 
     INITIAL = "initial"
@@ -125,7 +125,7 @@ class AssessmentType(str, Enum):
     AD_HOC = "ad_hoc"
 
 
-class AssessmentStatus(str, Enum):
+class AssessmentStatus(StrEnum):
     """Assessment status matching condition_assessments.status CHECK constraint."""
 
     DRAFT = "draft"
@@ -134,7 +134,7 @@ class AssessmentStatus(str, Enum):
     DISPUTED = "disputed"
 
 
-class FailureRisk(str, Enum):
+class FailureRisk(StrEnum):
     """Failure risk level matching condition_assessments.estimated_failure_risk CHECK."""
 
     LOW = "low"
@@ -143,7 +143,7 @@ class FailureRisk(str, Enum):
     CRITICAL = "critical"
 
 
-class BudgetStatus(str, Enum):
+class BudgetStatus(StrEnum):
     """Budget status matching budgets.status CHECK constraint."""
 
     DRAFT = "draft"
@@ -151,7 +151,7 @@ class BudgetStatus(str, Enum):
     LOCKED = "locked"
 
 
-class SLAPerformanceStatus(str, Enum):
+class SLAPerformanceStatus(StrEnum):
     """SLA performance status matching sla_performance.status CHECK constraint."""
 
     PENDING = "pending"
@@ -161,7 +161,7 @@ class SLAPerformanceStatus(str, Enum):
     RESOLVED = "resolved"
 
 
-class ProfitabilityStatus(str, Enum):
+class ProfitabilityStatus(StrEnum):
     """Profitability status matching contract_profitability.status CHECK constraint."""
 
     PRELIMINARY = "preliminary"
@@ -174,7 +174,7 @@ class ProfitabilityStatus(str, Enum):
 # ============================================================================
 
 
-class LaborCostType(str, Enum):
+class LaborCostType(StrEnum):
     """Labor cost subcategory for detailed tracking."""
 
     PLANNED_MAINTENANCE = "planned_maintenance"
@@ -184,7 +184,7 @@ class LaborCostType(str, Enum):
     OVERTIME = "overtime"
 
 
-class PartsCostType(str, Enum):
+class PartsCostType(StrEnum):
     """Parts cost subcategory for detailed tracking."""
 
     SCHEDULED_REPLACEMENT = "scheduled_replacement"
@@ -193,7 +193,7 @@ class PartsCostType(str, Enum):
     CALIBRATION_MATERIALS = "calibration_materials"
 
 
-class CalloutType(str, Enum):
+class CalloutType(StrEnum):
     """Callout type for billing differentiation."""
 
     BUSINESS_HOURS = "business_hours"
@@ -245,7 +245,7 @@ class BudgetTemplate(BaseModel):
 # ============================================================================
 
 
-class SLAMetricType(str, Enum):
+class SLAMetricType(StrEnum):
     """SLA metric type for compliance tracking (Phase 50)."""
 
     RESPONSE_TIME = "response_time"  # Time to acknowledge
@@ -255,7 +255,7 @@ class SLAMetricType(str, Enum):
     PREVENTIVE_MAINTENANCE = "preventive_maintenance"
 
 
-class SLABreachSeverity(str, Enum):
+class SLABreachSeverity(StrEnum):
     """SLA breach severity levels (Phase 50)."""
 
     MINOR = "minor"  # 10-20% breach
@@ -263,7 +263,7 @@ class SLABreachSeverity(str, Enum):
     CRITICAL = "critical"  # >50% breach or safety-critical failure
 
 
-class SLAComplianceStatus(str, Enum):
+class SLAComplianceStatus(StrEnum):
     """SLA compliance status for real-time monitoring (Phase 50)."""
 
     COMPLIANT = "compliant"

@@ -549,10 +549,7 @@ def get_energy_from_supabase(
         client = get_supabase_client()
 
         # Get consumption records
-        if site_id:
-            records = repo.get_by_site(site_id, days)
-        else:
-            records = repo.get_all_sites(days)
+        records = repo.get_by_site(site_id, days) if site_id else repo.get_all_sites(days)
 
         if not records:
             return [], True
@@ -1163,7 +1160,7 @@ async def get_energy_simulated(
 
         # Look for any running simulation
         orchestrator = None
-        for task_id, orch in _active_simulations.items():
+        for _task_id, orch in _active_simulations.items():
             if orch.running:
                 orchestrator = orch
                 break
@@ -2020,10 +2017,7 @@ async def get_daily_simulated_cost(
 
         engine = get_cost_validation_engine(site_id)
 
-        if cost_date:
-            calc_date = datetime.fromisoformat(cost_date)
-        else:
-            calc_date = datetime.now()
+        calc_date = datetime.fromisoformat(cost_date) if cost_date else datetime.now()
 
         result = await engine.get_daily_simulated_cost(
             energy_kwh=energy_kwh,

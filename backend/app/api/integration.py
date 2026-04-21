@@ -343,7 +343,7 @@ async def match_points_to_assets(
 
     # Extract unique point IDs
     rows = list(csv.DictReader(io.StringIO(text_content), delimiter=detection.delimiter))
-    point_ids = list(set(r.get(point_column, "") for r in rows if r.get(point_column)))
+    point_ids = list({r.get(point_column, "") for r in rows if r.get(point_column)})
 
     # Run matching
     result = matcher_service.bulk_match(point_ids, cafm_assets)

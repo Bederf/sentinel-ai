@@ -102,7 +102,7 @@ export function ContextPanel({
             fontWeight: 600,
             textTransform: "uppercase",
             letterSpacing: "0.08em",
-            color: "var(--color-sentinel-text-secondary, #94a3b8)",
+            color: "var(--color-sentinel-text-secondary)",
           }}
         >
           Floor Intelligence
@@ -113,7 +113,7 @@ export function ContextPanel({
           style={{
             background: "none",
             border: "none",
-            color: "var(--color-sentinel-text-secondary, #94a3b8)",
+            color: "var(--color-sentinel-text-secondary)",
             cursor: "pointer",
             fontSize: 14,
             padding: "4px 8px",
@@ -130,7 +130,7 @@ export function ContextPanel({
           margin: 0,
           fontSize: 18,
           fontWeight: 700,
-          color: "var(--color-sentinel-text-primary, #f1f5f9)",
+          color: "var(--color-sentinel-text-primary)",
         }}
       >
         {floorLabel || floorId || "—"}
@@ -141,7 +141,7 @@ export function ContextPanel({
           style={{
             margin: 0,
             fontSize: 13,
-            color: "var(--color-sentinel-text-secondary, #94a3b8)",
+            color: "var(--color-sentinel-text-secondary)",
           }}
         >
           Applying floor context…
@@ -153,7 +153,7 @@ export function ContextPanel({
           style={{
             margin: 0,
             fontSize: 13,
-            color: "#f59e0b",
+            color: "var(--color-sentinel-amber)",
           }}
         >
           Could not load floor context from the server. Scroll the overview and try again, or check your connection.
@@ -167,7 +167,7 @@ export function ContextPanel({
               margin: 0,
               fontSize: 13,
               lineHeight: 1.45,
-              color: "var(--color-sentinel-text-secondary, #94a3b8)",
+              color: "var(--color-sentinel-text-secondary)",
             }}
           >
             Selecting a floor opens the matching intelligence sections on this page (below the spatial view). This
@@ -186,7 +186,7 @@ export function ContextPanel({
                 borderRadius: 6,
                 background: "rgba(239, 68, 68, 0.12)",
                 border: "1px solid rgba(239, 68, 68, 0.35)",
-                color: "#fca5a5",
+                color: "var(--color-sentinel-red)",
               }}
             >
               This floor is marked <strong>affected</strong> in the current incident map (crisis view).
@@ -199,7 +199,7 @@ export function ContextPanel({
               fontWeight: 600,
               textTransform: "uppercase",
               letterSpacing: "0.06em",
-              color: "var(--color-sentinel-text-secondary, #94a3b8)",
+              color: "var(--color-sentinel-text-secondary)",
             }}
           >
             Modules highlighted
@@ -215,7 +215,7 @@ export function ContextPanel({
                 margin: 0,
                 paddingLeft: 18,
                 fontSize: 13,
-                color: "var(--color-sentinel-text-primary, #f1f5f9)",
+                color: "var(--color-sentinel-text-primary)",
                 lineHeight: 1.6,
               }}
             >

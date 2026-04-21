@@ -16,7 +16,7 @@ import logging
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
-from enum import Enum
+from enum import StrEnum
 
 from app.plant.models import DesigoBuildingAlarm
 
@@ -39,7 +39,7 @@ HOURLY_MESSAGE_LIMIT = 30
 # ---------------------------------------------------------------------------
 
 
-class ThrottleAction(str, Enum):
+class ThrottleAction(StrEnum):
     SEND = "send"
     SEND_FLOOD_SUMMARY = "send_flood_summary"
     SUPPRESS = "suppress"

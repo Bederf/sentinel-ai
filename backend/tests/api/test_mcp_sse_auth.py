@@ -319,7 +319,7 @@ class TestCheckMCPToolAccess:
 
     def test_admin_can_create_site(self):
         ctx = _admin_auth_ctx()
-        allowed, reason = check_mcp_tool_access("create_site", ctx, None)
+        allowed, _reason = check_mcp_tool_access("create_site", ctx, None)
         assert allowed is True
 
     @patch("app.services.module_registry_service.module_registry")
@@ -334,7 +334,7 @@ class TestCheckMCPToolAccess:
     def test_module_active_allows_tool(self, mock_registry):
         mock_registry.is_module_active.return_value = True
         ctx = _admin_auth_ctx()
-        allowed, reason = check_mcp_tool_access("create_building", ctx, "S002")
+        allowed, _reason = check_mcp_tool_access("create_building", ctx, "S002")
         assert allowed is True
 
 

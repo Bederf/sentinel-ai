@@ -48,20 +48,32 @@ export function ConciergeDashboardPage({ siteId, showHeader = true, siteLabel }:
     const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (prefersReduced) { setPanelEntered(true); return; }
 
-    const ctx = gsap.context(() => {
-      gsap.fromTo(mapContainerRef.current,
-        { opacity: 0, scale: 0.97 },
-        { opacity: 1, scale: 1, duration: 0.6, ease: "power3.out", delay: 0.1 }
-      );
-      if (headerRef.current) {
-        gsap.fromTo(headerRef.current,
-          { y: -16, opacity: 0 },
-          { y: 0, opacity: 1, duration: 0.4, ease: "power3.out" }
+    const mapEl = mapContainerRef.current;
+    if (!mapEl) {
+      setPanelEntered(true);
+      return;
+    }
+
+    try {
+      const ctx = gsap.context(() => {
+        gsap.fromTo(mapEl,
+          { opacity: 0, scale: 0.97 },
+          { opacity: 1, scale: 1, duration: 0.6, ease: "power3.out", delay: 0.1 }
         );
-      }
-    });
-    setPanelEntered(true);
-    return () => ctx.revert();
+        if (headerRef.current) {
+          gsap.fromTo(headerRef.current,
+            { y: -16, opacity: 0 },
+            { y: 0, opacity: 1, duration: 0.4, ease: "power3.out" }
+          );
+        }
+      });
+      setPanelEntered(true);
+      return () => ctx.revert();
+    } catch {
+      // Ensure map stays visible even if GSAP fails
+      mapEl.style.opacity = "1";
+      setPanelEntered(true);
+    }
   }, []);
 
   // GSAP drill panel entrance

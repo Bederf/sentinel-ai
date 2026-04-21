@@ -409,10 +409,7 @@ Examples:
         )
 
         # Format output
-        if args.json:
-            output = json.dumps(results, indent=2)
-        else:
-            output = _format_text_output(results)
+        output = json.dumps(results, indent=2) if args.json else _format_text_output(results)
 
         # Write output
         if args.log_file:

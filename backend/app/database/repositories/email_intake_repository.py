@@ -150,10 +150,7 @@ class EmailIntakeRepository:
             except Exception as exc:
                 logger.error("EmailIntakeRepository.email_exists_hash failed: %s", exc)
         # JSON fallback
-        for r in self._load_json():
-            if r.get("msg_hash") == msg_hash:
-                return True
-        return False
+        return any(r.get("msg_hash") == msg_hash for r in self._load_json())
 
     def get_latest_by_reference(self, reference: str) -> dict[str, Any] | None:
         """Return latest intake row for an existing reference code."""

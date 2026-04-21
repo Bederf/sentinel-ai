@@ -66,7 +66,7 @@ def _fetch_pending(site_id: str, conn, limit: int = BATCH_SIZE) -> list[dict[str
         (site_id, limit),
     )
     cols = [d[0] for d in cur.description]
-    rows = [dict(zip(cols, row)) for row in cur.fetchall()]
+    rows = [dict(zip(cols, row, strict=False)) for row in cur.fetchall()]
     cur.close()
     return rows
 

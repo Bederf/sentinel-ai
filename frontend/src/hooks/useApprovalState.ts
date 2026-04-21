@@ -33,8 +33,8 @@ export function useApprovalState(siteId: string, enabled: boolean = true) {
     queryFn: async () => {
       // Placeholder: In real implementation, call API to fetch pending recommendations
       // For now, return empty array (tests will mock this)
-      // Backend route: GET /modules/site/{site_id}/recommendations?status=pending
-      const response = await authorizedFetch(`/modules/site/${siteId}/recommendations?status=pending`);
+      // Backend route: GET /api/modules/site/{site_id}/recommendations?status=pending
+      const response = await authorizedFetch(`/api/modules/site/${siteId}/recommendations?status=pending`);
       if (!response.ok) throw new Error('Failed to fetch recommendations');
       const data = await response.json();
       // Backend returns a list directly, not wrapped in {recommendations: [...]}

@@ -6,10 +6,10 @@ equipment types, time ranges) for routing to the appropriate service.
 
 import re
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 
 
-class Intent(str, Enum):
+class Intent(StrEnum):
     """Supported query intents for local LLM routing."""
 
     WHY_PREDICTION = "why_prediction"

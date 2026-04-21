@@ -82,7 +82,7 @@ export function BuildingModel({
               />
               <lineBasicMaterial
                 attach="material"
-                color="#00FF41"
+                color="var(--color-sentinel-green)"
                 linewidth={1}
                 transparent
                 opacity={0.4}
@@ -98,7 +98,7 @@ export function BuildingModel({
           <edgesGeometry args={[new BoxGeometry(30, 15, 20)]} attach="geometry" />
           <lineBasicMaterial
             attach="material"
-            color="#00FF41"
+            color="var(--color-sentinel-green)"
             linewidth={1}
             transparent
             opacity={0.2}
@@ -107,7 +107,7 @@ export function BuildingModel({
       </group>
 
       {/* Ambient green light for Matrix theme */}
-      <pointLight position={[15, 8, 15]} color="#00FF41" intensity={0.3} distance={50} />
+      <pointLight position={[15, 8, 15]} color="var(--color-sentinel-green)" intensity={0.3} distance={50} />
     </group>
   );
 }

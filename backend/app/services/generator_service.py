@@ -214,10 +214,7 @@ class GeneratorService:
         current_burn_rate = sum(g.engine.get("fuel_rate_lph", 0) if g.engine else 0 for g in generators)
 
         # Estimate runtime remaining
-        if current_burn_rate > 0:
-            hours_remaining = tank.current_level_liters / current_burn_rate
-        else:
-            hours_remaining = None
+        hours_remaining = tank.current_level_liters / current_burn_rate if current_burn_rate > 0 else None
 
         return {
             "tank_id": tank.tank_id,

@@ -16,11 +16,11 @@ Design Principles:
 
 from dataclasses import dataclass
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 
-class SafetyClass(str, Enum):
+class SafetyClass(StrEnum):
     """Safety classification determining automation eligibility."""
 
     LOW = "LOW"  # Monitor/presentation only (e.g., temperature sensors)
@@ -28,7 +28,7 @@ class SafetyClass(str, Enum):
     HIGH = "HIGH"  # Critical safety - no autonomous writes (e.g., emergency stops)
 
 
-class AutonomyTier(str, Enum):
+class AutonomyTier(StrEnum):
     """Automation eligibility tiers based on trust and validation."""
 
     OBSERVE_ONLY = "OBSERVE_ONLY"  # Monitoring only, no suggestions
@@ -38,7 +38,7 @@ class AutonomyTier(str, Enum):
     AUTOMATIC = "AUTOMATIC"  # Full autonomy within control envelope
 
 
-class OperationalStatus(str, Enum):
+class OperationalStatus(StrEnum):
     """Current operational state of the point."""
 
     NORMAL = "normal"  # Operating within expected parameters
@@ -48,7 +48,7 @@ class OperationalStatus(str, Enum):
     UNKNOWN = "unknown"  # State cannot be determined
 
 
-class DataType(str, Enum):
+class DataType(StrEnum):
     """Standardized data types for processing and validation."""
 
     FLOAT = "float"
@@ -58,7 +58,7 @@ class DataType(str, Enum):
     UNKNOWN = "unknown"
 
 
-class PointType(str, Enum):
+class PointType(StrEnum):
     """Canonical point types for routing and validation."""
 
     ANALOG_INPUT = "analog_input"

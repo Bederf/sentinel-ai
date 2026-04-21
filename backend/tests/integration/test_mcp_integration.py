@@ -126,11 +126,10 @@ class TestMCPSafetyValidation:
             response = test_client.post(f"/api/mcp/simbiot/devices/{device_id}/write", json=payload)
 
             # Should be blocked by safety rules
-            if response.status_code in [200, 403]:
-                if response.status_code == 403:
-                    # Check that safety info is in response
-                    body = response.json()
-                    assert "safety" in str(body).lower() or "block" in str(body).lower()
+            if response.status_code in [200, 403] and response.status_code == 403:
+                # Check that safety info is in response
+                body = response.json()
+                assert "safety" in str(body).lower() or "block" in str(body).lower()
 
     def test_audit_logging_on_mcp_actions(self, test_client):
         """Test MCP actions are logged in audit trail."""

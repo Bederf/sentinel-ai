@@ -4,6 +4,7 @@ Provides replace-vs-repair analysis, portfolio CapEx planning,
 budget forecasting, and what-if scenario modeling.
 """
 
+import contextlib
 import logging
 from datetime import date, datetime
 from typing import Any
@@ -83,17 +84,13 @@ async def get_capex_analysis(
         if resolved_health is None:
             cs = concept_asset.get("ConditionScore")
             if cs:
-                try:
+                with contextlib.suppress(ValueError, TypeError):
                     resolved_health = float(cs)
-                except (ValueError, TypeError):
-                    pass
         if resolved_condition is None:
             cs = concept_asset.get("ConditionScore")
             if cs:
-                try:
+                with contextlib.suppress(ValueError, TypeError):
                     resolved_condition = float(cs)
-                except (ValueError, TypeError):
-                    pass
     else:
         # Parse type from equipment code pattern {site}-{type}-{zone}
         parts = equipment_code.split("-")
@@ -161,22 +158,16 @@ async def get_capex_portfolio(
                 pass
 
         cs = None
-        try:
+        with contextlib.suppress(ValueError, TypeError):
             cs = float(asset.get("ConditionScore", ""))
-        except (ValueError, TypeError):
-            pass
 
         repl_cost = None
-        try:
+        with contextlib.suppress(ValueError, TypeError):
             repl_cost = float(asset.get("ReplacementCost", ""))
-        except (ValueError, TypeError):
-            pass
 
         maint_cost = None
-        try:
+        with contextlib.suppress(ValueError, TypeError):
             maint_cost = float(asset.get("AnnualMaintCost", ""))
-        except (ValueError, TypeError):
-            pass
 
         equipment_list.append(
             {

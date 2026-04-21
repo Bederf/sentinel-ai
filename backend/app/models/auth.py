@@ -12,11 +12,11 @@ import hashlib
 import secrets
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 
-class AuthLevel(str, Enum):
+class AuthLevel(StrEnum):
     """Authentication level required for endpoint access.
 
     Levels are hierarchical: ADMIN > OPERATOR > AUTHENTICATED > PUBLIC
@@ -28,7 +28,7 @@ class AuthLevel(str, Enum):
     ADMIN = "admin"  # Admin only (configuration, simulation)
 
 
-class SentinelRole(str, Enum):
+class SentinelRole(StrEnum):
     """SENTINEL platform roles mapped to FSR access control requirements.
 
     Roles determine what a user can do within the application.

@@ -183,9 +183,7 @@ class TestUpsertWritesEquipmentDescription:
             adapter = ManualUploadAdapter()
 
             async def columns_exist(self_ref, table: str, *cols: str) -> bool:
-                if "equipment_description" in cols:
-                    return False
-                return True
+                return "equipment_description" not in cols
 
             original_upsert = dsa_module.DocumentSourceAdapter._upsert
             upsert_calls = []

@@ -377,9 +377,8 @@ class ControlPolicyEngine:
         """Get active (executed, not rolled back) command envelopes."""
         results = []
         for env in self._active_envelopes.values():
-            if env.executed and not env.rolled_back:
-                if site_id is None or env.site_id == site_id:
-                    results.append(env)
+            if env.executed and not env.rolled_back and (site_id is None or env.site_id == site_id):
+                results.append(env)
         return results
 
     # -----------------------------------------------------------------

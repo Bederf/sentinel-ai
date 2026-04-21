@@ -318,12 +318,11 @@ async def verify_telegram_webhook(request: Request) -> bytes:
         message = payload.get("message", {})
         chat_id = message.get("chat", {}).get("id")
 
-        if update_id is not None and chat_id is not None:
-            if not _check_telegram_update_id(chat_id, update_id):
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail="Stale update (replay detected)",
-                )
+        if update_id is not None and chat_id is not None and not _check_telegram_update_id(chat_id, update_id):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Stale update (replay detected)",
+            )
     except (json.JSONDecodeError, KeyError):
         pass
 

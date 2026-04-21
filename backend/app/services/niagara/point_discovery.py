@@ -8,6 +8,7 @@ Handles large point lists incrementally (1000+ points) and caches
 results to avoid repeated scanning.
 """
 
+import contextlib
 import csv
 import io
 import json
@@ -369,14 +370,12 @@ class PointDiscoveryService:
                 present_value = present_value if present_value else None
 
             instance = 0
-            try:
+            with contextlib.suppress(ValueError, TypeError):
                 instance = int(row.get("instance", 0))
-            except (ValueError, TypeError):
-                pass
 
             # Extract equipment ID from hierarchical name
             # STC/L1/DALI-01/Lum01_ActivePower → equipment_id = DALI-01
-            equipment_id, point_suffix = self._parse_hierarchical_name(name)
+            equipment_id, _point_suffix = self._parse_hierarchical_name(name)
 
             point = {
                 "name": name,
@@ -600,10 +599,8 @@ class PointDiscoveryService:
             logger.warning("Failed to load %s adapter points for %s: %s", adapter_type, site_id, e)
             return []
         finally:
-            try:
+            with contextlib.suppress(Exception):
                 await adapter.disconnect()
-            except Exception:
-                pass
 
     async def _discover_from_bacnet(
         self,
@@ -660,26 +657,22 @@ class PointDiscoveryService:
                         pass  # Description is optional
 
                     units = ""
-                    try:
+                    with contextlib.suppress(Exception):
                         units = await client.read_point(
                             device_id,
                             point.object_type,
                             point.instance,
                             property_name="units",
                         )
-                    except Exception:
-                        pass
 
                     value = None
-                    try:
+                    with contextlib.suppress(Exception):
                         value = await client.read_point(
                             device_id,
                             point.object_type,
                             point.instance,
                             property_name="presentValue",
                         )
-                    except Exception:
-                        pass
 
                     detailed_points.append(
                         {

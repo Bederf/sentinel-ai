@@ -6,6 +6,8 @@ policy systems can render/write from one BMS-agnostic contract.
 
 from __future__ import annotations
 
+import contextlib
+
 from fastapi import APIRouter, HTTPException, Query
 
 from app.core.site_resolver import get_registered_site_ids
@@ -109,10 +111,8 @@ async def get_site_capabilities(
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Capability discovery failed: {exc}") from exc
     finally:
-        try:
+        with contextlib.suppress(Exception):
             await adapter.disconnect()
-        except Exception:
-            pass
 
 
 @router.post("/sites/{site_id}/capabilities/sync")

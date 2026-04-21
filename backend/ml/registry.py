@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 class ModelRegistry:
     """Registry for managing ML model versions."""
 
-    def __init__(self, registry_path: str = None):
+    def __init__(self, registry_path: str | None = None):
         if registry_path is None:
             registry_path = Path(__file__).parent / "models" / "registry.json"
         self.registry_path = Path(registry_path)
@@ -93,7 +93,7 @@ class ModelRegistry:
         equipment_type: str,  # e.g., "chiller", "generator"
         model_path: str,
         metrics: dict,
-        metadata: dict = None,
+        metadata: dict | None = None,
         auto_activate: bool = True,
     ) -> str:
         """
@@ -172,7 +172,7 @@ class ModelRegistry:
             return self._resolve_model_paths(self.registry["models"][model_id])
         return None
 
-    def list_models(self, model_type: str = None, equipment_type: str = None, status: str = None) -> list[dict]:
+    def list_models(self, model_type: str | None = None, equipment_type: str | None = None, status: str | None = None) -> list[dict]:
         """List registered models with optional filters.
 
         Returns copies with paths resolved to absolute.

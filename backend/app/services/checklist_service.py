@@ -176,7 +176,7 @@ class ChecklistService:
         templates = self._load_templates()
         return [t for t in templates.values() if t.get("equipment_type") == equipment_type]
 
-    def get_oem_template(self, equipment_type: str, manufacturer: str, model: str = None) -> dict[str, Any] | None:
+    def get_oem_template(self, equipment_type: str, manufacturer: str, model: str | None = None) -> dict[str, Any] | None:
         """
         Get OEM-specific template by manufacturer.
 
@@ -514,10 +514,7 @@ class ChecklistService:
                     errors.append(f"Item '{item_id}' has invalid value '{response}'. Valid values: {valid_values}")
 
             elif item_type == "measurement":
-                if isinstance(response, dict):
-                    value = response.get("value")
-                else:
-                    value = response
+                value = response.get("value") if isinstance(response, dict) else response
 
                 if value is not None:
                     try:

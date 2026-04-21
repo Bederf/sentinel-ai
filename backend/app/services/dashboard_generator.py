@@ -11,7 +11,7 @@ Phase 141-01: Core service.
 import logging
 import math
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 logger = logging.getLogger("sentinel.dashboard_generator")
@@ -22,7 +22,7 @@ logger = logging.getLogger("sentinel.dashboard_generator")
 # =============================================================================
 
 
-class EquipmentClass(str, Enum):
+class EquipmentClass(StrEnum):
     """Equipment categories for dashboard generation."""
 
     CHILLER = "chiller"

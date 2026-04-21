@@ -16,12 +16,12 @@ All gates use phase_allows() — single source of truth.
 """
 
 import logging
-from enum import Enum
+from enum import StrEnum
 
 logger = logging.getLogger(__name__)
 
 
-class OnboardingPhase(str, Enum):
+class OnboardingPhase(StrEnum):
     SHADOW = "shadow"
     ADVISORY = "advisory"
     SUPERVISED = "supervised"
@@ -199,6 +199,7 @@ async def check_shadow_exit_criteria(site_id: str) -> dict:
             blocked_by = "ml_training_hours"
 
         # Gate 2: Zero safety blocks in last 24h
+        gate2_passed = True  # safe default — overwritten below only if repo call succeeds
         try:
             repo = ParasiteDecisionRepository()
             recent = await repo.get_decisions_since(limit=100)
@@ -257,6 +258,7 @@ async def check_shadow_exit_criteria(site_id: str) -> dict:
             results.append({"name": "anomaly_rate_below_15pct", "passed": True, "detail": "could not verify"})
 
         # Gate 4: ≥ 3 completed recommendation cycles (any tier decisions logged)
+        gate4_passed = False  # safe default — overwritten below only if repo call succeeds
         try:
             repo4 = ParasiteDecisionRepository()
             decisions = await repo4.get_decisions_since(limit=100)
@@ -277,6 +279,7 @@ async def check_shadow_exit_criteria(site_id: str) -> dict:
             blocked_by = "min_3_recommendation_cycles"
 
         # Gate 5: Zero failed Tier3 auto-executions (false positives erode operator trust)
+        gate5_passed = True  # safe default — overwritten below only if repo call succeeds
         try:
             repo5 = ParasiteDecisionRepository()
             tier3 = await repo5.get_decisions_since(limit=100)

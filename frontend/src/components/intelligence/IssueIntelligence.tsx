@@ -99,13 +99,13 @@ function StatChip({ label, value }: { label: string; value: string }) {
 function stateColor(state: string): { bg: string; border: string; text: string } {
   switch (state) {
     case "escalated":
-      return { bg: "rgba(220, 38, 38, 0.15)", border: "rgba(220, 38, 38, 0.4)", text: "#DC2626" };
+      return { bg: "rgba(220, 38, 38, 0.15)", border: "rgba(220, 38, 38, 0.4)", text: "var(--color-sentinel-red)" };
     case "active":
-      return { bg: "rgba(245, 158, 11, 0.15)", border: "rgba(245, 158, 11, 0.4)", text: "#F59E0B" };
+      return { bg: "rgba(245, 158, 11, 0.15)", border: "rgba(245, 158, 11, 0.4)", text: "var(--color-sentinel-amber)" };
     case "emerging":
-      return { bg: "rgba(59, 130, 246, 0.15)", border: "rgba(59, 130, 246, 0.4)", text: "#3B82F6" };
+      return { bg: "rgba(59, 130, 246, 0.15)", border: "rgba(59, 130, 246, 0.4)", text: "var(--color-sentinel-blue)" };
     case "resolved":
-      return { bg: "rgba(16, 185, 129, 0.15)", border: "rgba(16, 185, 129, 0.4)", text: "#10B981" };
+      return { bg: "rgba(16, 185, 129, 0.15)", border: "rgba(16, 185, 129, 0.4)", text: "var(--color-sentinel-green)" };
     default:
       return { bg: "rgba(139, 148, 158, 0.15)", border: "rgba(139, 148, 158, 0.4)", text: "#8B949E" };
   }

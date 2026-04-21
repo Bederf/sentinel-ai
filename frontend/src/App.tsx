@@ -469,7 +469,7 @@ function App() {
     setShowSplash(false);
   }, []);
 
-  const handleEmailEntrySuccess = useCallback((user: AuthUser) => {
+  const handleEmailEntrySuccess = useCallback((user: AuthUser, _token: string) => {
     setCurrentUser(user);
   }, []);
 

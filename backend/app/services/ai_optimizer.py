@@ -781,10 +781,7 @@ class AIOptimizerService:
         for devices in equipment_inventory.values():
             for device in devices:
                 eq_type = getattr(device, "type", None)
-                if eq_type:
-                    eq_type_str = eq_type.value if hasattr(eq_type, "value") else str(eq_type)
-                else:
-                    eq_type_str = "unknown"
+                eq_type_str = (eq_type.value if hasattr(eq_type, "value") else str(eq_type)) if eq_type else "unknown"
                 equipment_list.append(
                     {
                         "equipment_id": device.id,
@@ -2042,7 +2039,7 @@ Provide ONLY the JSON response, no additional text."""
 
         # Lighting Telemetry by Zone
         lines.append("\n**Lighting Telemetry by Zone:**")
-        for zone_id, zone in lighting_zones.items():
+        for _zone_id, zone in lighting_zones.items():
             occ = zone.get("occupancy", {})
             light = zone.get("lighting", {})
 

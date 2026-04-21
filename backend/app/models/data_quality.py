@@ -9,12 +9,12 @@ This module defines the data models for monitoring data quality:
 """
 
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
 
-class DataQualityLevel(str, Enum):
+class DataQualityLevel(StrEnum):
     """Data quality classification levels based on completeness percentage.
 
     - EXCELLENT: >= 95% data completeness

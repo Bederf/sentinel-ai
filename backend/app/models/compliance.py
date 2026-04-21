@@ -7,7 +7,7 @@ Phase 28: SENTINEL Compliance
 """
 
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -17,7 +17,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 # ============================================================================
 
 
-class ComplianceType(str, Enum):
+class ComplianceType(StrEnum):
     """Types of compliance requirements."""
 
     OHS = "OHS"
@@ -28,7 +28,7 @@ class ComplianceType(str, Enum):
     EMERGENCY = "Emergency"
 
 
-class RiskLevel(str, Enum):
+class RiskLevel(StrEnum):
     """Risk classification levels."""
 
     CRITICAL = "critical"
@@ -37,7 +37,7 @@ class RiskLevel(str, Enum):
     LOW = "low"
 
 
-class AuditStatus(str, Enum):
+class AuditStatus(StrEnum):
     """Audit lifecycle status."""
 
     DRAFT = "draft"
@@ -47,7 +47,7 @@ class AuditStatus(str, Enum):
     CLOSED = "closed"
 
 
-class FireEquipmentType(str, Enum):
+class FireEquipmentType(StrEnum):
     """Types of fire safety equipment."""
 
     EXTINGUISHER = "extinguisher"
@@ -57,7 +57,7 @@ class FireEquipmentType(str, Enum):
     DETECTOR = "detector"
 
 
-class ElectricalCertificateType(str, Enum):
+class ElectricalCertificateType(StrEnum):
     """Types of electrical certificates."""
 
     COC_NEW_INSTALLATION = "CoC_new_installation"
@@ -65,7 +65,7 @@ class ElectricalCertificateType(str, Enum):
     SABS_INSPECTION = "SABS_inspection"
 
 
-class LiftInspectionType(str, Enum):
+class LiftInspectionType(StrEnum):
     """Types of lift inspections."""
 
     PERIODIC_6MONTHLY = "periodic_6monthly"
@@ -73,7 +73,7 @@ class LiftInspectionType(str, Enum):
     AFTER_REPAIR = "after_repair"
 
 
-class ComplianceChecklistStatus(str, Enum):
+class ComplianceChecklistStatus(StrEnum):
     """Status of equipment compliance."""
 
     ACTIVE = "active"

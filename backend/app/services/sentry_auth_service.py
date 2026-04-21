@@ -6,6 +6,7 @@ Runs as a service in the background, automatically refreshing tokens before expi
 """
 
 import asyncio
+import contextlib
 import logging
 from datetime import datetime, timedelta
 
@@ -151,10 +152,8 @@ class SentryAuthService:
         """Stop background refresh task."""
         if self._refresh_task:
             self._refresh_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._refresh_task
-            except asyncio.CancelledError:
-                pass
             self._refresh_task = None
             logger.info("Stopped Sentry JWT token refresh task")
 

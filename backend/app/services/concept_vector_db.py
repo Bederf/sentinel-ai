@@ -90,7 +90,7 @@ class ConceptVectorDBService:
         embeddings = self.embedding_service.embed_batch([c["content"] for c in chunks])
 
         chunk_records = []
-        for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
+        for i, (chunk, embedding) in enumerate(zip(chunks, embeddings, strict=False)):
             chunk_records.append(
                 {
                     "document_id": document_id,

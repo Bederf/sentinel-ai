@@ -66,10 +66,7 @@ class PredictionOverlayService:
                     continue
 
                 # Classify severity based on timeframe
-                if timeframe_days <= self.CRITICAL_THRESHOLD_DAYS:
-                    severity = "critical"
-                else:
-                    severity = "warning"
+                severity = "critical" if timeframe_days <= self.CRITICAL_THRESHOLD_DAYS else "warning"
 
                 fault = PredictiveFault(
                     equipment_id=pred.get("equipment_id", ""),

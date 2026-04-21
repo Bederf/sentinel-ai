@@ -119,9 +119,8 @@ def parse_mqtt_presence_message(topic: str, payload: bytes | str | dict[str, Any
 
     # Derive presence from radar fields if not explicitly set
     # LD2410C: presence = moving OR stationary
-    if "presence" not in raw_data and "occupied" not in raw_data:
-        if moving is not None or stationary is not None:
-            occupied = bool(moving) or bool(stationary)
+    if "presence" not in raw_data and "occupied" not in raw_data and (moving is not None or stationary is not None):
+        occupied = bool(moving) or bool(stationary)
 
     from app.core.site_resolver import get_primary_site_code
 

@@ -56,7 +56,7 @@ export function EquipmentDetailPanel({ equipment, onClose }: EquipmentDetailPane
               className="text-xs px-2 py-1 rounded border"
               style={{
                 background: `rgba(${Math.round((100 - healthScore) / 100 * 255)}, ${Math.round(healthScore / 100 * 255)}, 0, 0.15)`,
-                color: healthScore < 60 ? '#f59e0b' : '#10b981',
+                color: healthScore < 60 ? 'var(--color-sentinel-amber)' : 'var(--color-sentinel-green)',
                 borderColor: healthScore < 60 ? 'rgba(245, 158, 11, 0.3)' : 'rgba(16, 185, 129, 0.3)',
               }}
             >
@@ -92,9 +92,9 @@ export function EquipmentDetailPanel({ equipment, onClose }: EquipmentDetailPane
               fontFamily: 'Orbitron, monospace',
               color:
                 activeTab === tab
-                  ? '#00FF41'
+                  ? 'var(--color-sentinel-green)'
                   : 'rgba(0, 255, 65, 0.4)',
-              borderColor: activeTab === tab ? '#00FF41' : 'transparent',
+              borderColor: activeTab === tab ? 'var(--color-sentinel-green)' : 'transparent',
               background:
                 activeTab === tab
                   ? 'rgba(0, 255, 65, 0.08)'
@@ -283,10 +283,10 @@ export function EquipmentDetailPanel({ equipment, onClose }: EquipmentDetailPane
               className="p-3 rounded border-l-2"
               style={{
                 background: 'rgba(34, 197, 94, 0.1)',
-                borderColor: '#22c55e',
+                borderColor: 'var(--color-sentinel-green)',
               }}
             >
-              <div className="text-xs font-medium" style={{ color: '#22c55e' }}>
+              <div className="text-xs font-medium" style={{ color: 'var(--color-sentinel-green)' }}>
                 ✓ Online
               </div>
               <div className="text-xs mt-1" style={{ color: 'var(--color-sentinel-text-secondary)' }}>
@@ -298,10 +298,10 @@ export function EquipmentDetailPanel({ equipment, onClose }: EquipmentDetailPane
               className="p-3 rounded border-l-2"
               style={{
                 background: 'rgba(59, 130, 246, 0.1)',
-                borderColor: '#3b82f6',
+                borderColor: 'var(--color-sentinel-blue)',
               }}
             >
-              <div className="text-xs font-medium" style={{ color: '#3b82f6' }}>
+              <div className="text-xs font-medium" style={{ color: 'var(--color-sentinel-blue)' }}>
                 ⓘ Maintenance Due
               </div>
               <div className="text-xs mt-1" style={{ color: 'var(--color-sentinel-text-secondary)' }}>

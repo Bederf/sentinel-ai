@@ -8,6 +8,7 @@ Free for non-commercial use, handles DWG R12 through 2024.
 """
 
 import asyncio
+import contextlib
 import logging
 import os
 import shutil
@@ -124,7 +125,7 @@ class DWGConverterService:
             )
 
             try:
-                stdout, stderr = await asyncio.wait_for(
+                _stdout, stderr = await asyncio.wait_for(
                     process.communicate(),
                     timeout=self.CONVERSION_TIMEOUT,
                 )
@@ -160,10 +161,8 @@ class DWGConverterService:
             # Clean up temp directories
             for d in [input_dir, output_dir]:
                 if d:
-                    try:
+                    with contextlib.suppress(Exception):
                         shutil.rmtree(d)
-                    except Exception:
-                        pass
 
 
 # Singleton

@@ -77,8 +77,8 @@ function getSeverityConfig(severity: string): {
       };
     case "high":
       return {
-        color: "#F97316",
-        bg: "rgba(249, 115, 22, 0.15)",
+        color: "var(--color-sentinel-amber)",
+        bg: "rgba(245,158,11,0.15)",
         label: "HIGH RISK",
       };
     case "medium":
@@ -138,7 +138,7 @@ function getConfidenceConfig(confidence: string): {
  */
 function getGaugeColor(probability: number): string {
   if (probability >= 75) return "var(--color-sentinel-red)";
-  if (probability >= 50) return "#F97316";
+  if (probability >= 50) return "var(--color-sentinel-amber)";
   if (probability >= 25) return "var(--color-sentinel-amber)";
   return "var(--color-sentinel-green)";
 }
@@ -381,7 +381,7 @@ export function PredictionCard({ prediction, onClick }: PredictionCardProps) {
             <div className="flex items-center gap-1 mb-1">
               <Clock
                 className="h-3 w-3"
-                style={{ color: "#a78bfa" }}
+                style={{ color: "var(--color-sentinel-purple)" }}
               />
               <span
                 className="text-xs"
@@ -395,7 +395,7 @@ export function PredictionCard({ prediction, onClick }: PredictionCardProps) {
               style={{
                 color: prediction.evidence?.latest_reading?.trend === "decreasing" || prediction.evidence?.health_trend === "declining"
                   ? "var(--color-sentinel-red)"
-                  : "#a78bfa",
+                  : "var(--color-sentinel-purple)",
               }}
             >
               {prediction.evidence?.latest_reading?.trend ?? prediction.evidence?.health_trend ?? "N/A"}

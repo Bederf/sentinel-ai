@@ -1,13 +1,13 @@
 """Pydantic models for integration/log ingestion."""
 
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class SourceType(str, Enum):
+class SourceType(StrEnum):
     BMS_ALARM = "bms_alarm"
     BMS_TREND = "bms_trend"
     CAFM_ASSET = "cafm_asset"
@@ -16,7 +16,7 @@ class SourceType(str, Enum):
     DALI_LIGHTING = "dali_lighting"
 
 
-class ConnectionType(str, Enum):
+class ConnectionType(StrEnum):
     FILE_DROP = "file_drop"
     SFTP = "sftp"
     DATABASE = "database"
@@ -25,27 +25,27 @@ class ConnectionType(str, Enum):
     NIAGARA_BACNET = "niagara_bacnet"
 
 
-class FileFormat(str, Enum):
+class FileFormat(StrEnum):
     CSV = "csv"
     EXCEL = "excel"
     JSON = "json"
     XML = "xml"
 
 
-class Severity(str, Enum):
+class Severity(StrEnum):
     CRITICAL = "critical"
     HIGH = "high"
     MEDIUM = "medium"
     LOW = "low"
 
 
-class AlarmState(str, Enum):
+class AlarmState(StrEnum):
     ACTIVE = "active"
     ACKNOWLEDGED = "acknowledged"
     CLEARED = "cleared"
 
 
-class MatchConfidence(str, Enum):
+class MatchConfidence(StrEnum):
     EXACT = "exact"
     FUZZY = "fuzzy"
     MANUAL = "manual"
@@ -229,7 +229,7 @@ class BulkMatchResult(BaseModel):
 # ==================== Building Status / Go-Live Workflow ====================
 
 
-class BuildingStatus(str, Enum):
+class BuildingStatus(StrEnum):
     """Building activation status for go-live workflow."""
 
     DRAFT = "draft"

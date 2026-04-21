@@ -129,7 +129,7 @@ class SecurityService:
             logger.warning(f"Error parsing door {door_id}: {e}")
             return None
 
-    def get_recent_badge_events(self, zone_id: str = None, limit: int = 50) -> list[BadgeEvent]:
+    def get_recent_badge_events(self, zone_id: str | None = None, limit: int = 50) -> list[BadgeEvent]:
         """Get recent badge events with optional zone filter."""
         raw_events = self._repo.get_badge_events(zone_id=zone_id, limit=limit)
         events = []
@@ -285,7 +285,7 @@ class SecurityService:
             "timestamp": datetime.now(UTC).isoformat(),
         }
 
-    def get_after_hours_events(self, since: str = None) -> list[BadgeEvent]:
+    def get_after_hours_events(self, since: str | None = None) -> list[BadgeEvent]:
         """Get events outside business hours (06:00-20:00)."""
         events = self.get_recent_badge_events(limit=200)
         after_hours = []
@@ -304,7 +304,7 @@ class SecurityService:
                 continue
         return after_hours
 
-    def get_denied_access_events(self, since: str = None) -> list[BadgeEvent]:
+    def get_denied_access_events(self, since: str | None = None) -> list[BadgeEvent]:
         """Get denied entry events."""
         events = self.get_recent_badge_events(limit=200)
         return [e for e in events if not e.granted]

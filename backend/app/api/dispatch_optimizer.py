@@ -8,14 +8,13 @@ Endpoints:
 """
 
 import logging
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, Query
 
+from app.config.settings import settings
 from app.middleware.auth_middleware import require_site_access
 from app.models.auth import AuthContext
-from app.config.settings import settings
 from app.services.mip_dispatch_optimizer import get_mip_dispatch_optimizer
 
 logger = logging.getLogger(__name__)
@@ -83,7 +82,7 @@ async def compare_dispatch_strategies(site_id: str, auth: AuthContext = Depends(
 @router.post("/{site_id}/solve")
 async def solve_dispatch(
     site_id: str,
-    initial_soc_kwh: Optional[float] = Query(100.0, ge=0, le=200, description="Initial SOC in kWh"),
+    initial_soc_kwh: float | None = Query(100.0, ge=0, le=200, description="Initial SOC in kWh"),
     auth: AuthContext = Depends(require_site_access("site_id")),
 ):
     """Trigger a fresh MIP optimization solve.
@@ -162,13 +161,6 @@ async def kill_switch():
     except Exception as e:
         errors.append(f"aegis_close_failed: {e}")
 
-    # 3. Avoid fabricating a local simulation source on production islands
-    try:
-        settings.solar_connector_mode = "simulation"
-            actions.append("connector_mode: simulation")
-    except Exception as e:
-        errors.append(f"mode_switch_failed: {e}")
-
     # 4. Disconnect Modbus TCP
     try:
         writer = get_modbus_bess_writer()
@@ -178,7 +170,7 @@ async def kill_switch():
         errors.append(f"disconnect_failed: {e}")
 
     # 5. Audit log
-    timestamp = datetime.now(timezone.utc).isoformat()
+    timestamp = datetime.now(UTC).isoformat()
     logger.critical(
         "KILL SWITCH COMPLETE at %s — actions: %s, errors: %s",
         timestamp,

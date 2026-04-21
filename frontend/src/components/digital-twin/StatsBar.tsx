@@ -61,10 +61,10 @@ export function StatsBar({ equipment, selectedFloors }: StatsBarProps) {
     >
       {/* Total equipment */}
       <div className="flex items-center gap-2">
-        <Activity className="h-5 w-5" style={{ color: '#00FF41' }} />
+        <Activity className="h-5 w-5" style={{ color: 'var(--color-sentinel-green)' }} />
         <div>
           <div className="matrix-label text-xs">UNITS</div>
-          <div className="text-lg font-bold" style={{ color: '#00FF41', textShadow: '0 0 8px rgba(0, 255, 65, 0.3)' }}>
+          <div className="text-lg font-bold" style={{ color: 'var(--color-sentinel-green)', textShadow: '0 0 8px rgba(16, 185, 129, 0.3)' }}>
             {totalEquipment}
           </div>
         </div>
@@ -72,10 +72,10 @@ export function StatsBar({ equipment, selectedFloors }: StatsBarProps) {
 
       {/* Average health */}
       <div className="flex items-center gap-2 pl-4" style={{ borderLeft: '1px solid rgba(0, 255, 65, 0.2)' }}>
-        <Zap className="h-5 w-5" style={{ color: '#00FF41' }} />
+        <Zap className="h-5 w-5" style={{ color: 'var(--color-sentinel-green)' }} />
         <div>
           <div className="matrix-label text-xs">SYS HEALTH</div>
-          <div className="text-lg font-bold" style={{ color: '#00FF41', textShadow: '0 0 8px rgba(0, 255, 65, 0.3)' }}>
+          <div className="text-lg font-bold" style={{ color: 'var(--color-sentinel-green)', textShadow: '0 0 8px rgba(16, 185, 129, 0.3)' }}>
             {avgHealth}%
           </div>
         </div>
@@ -85,19 +85,19 @@ export function StatsBar({ equipment, selectedFloors }: StatsBarProps) {
       <div className="flex items-center gap-2 pl-4" style={{ borderLeft: '1px solid rgba(0, 255, 65, 0.2)' }}>
         <div
           className="h-5 w-5 rounded flex items-center justify-center text-xs font-bold"
-          style={{ background: 'rgba(16, 185, 129, 0.2)', color: '#10b981' }}
+          style={{ background: 'rgba(16, 185, 129, 0.2)', color: 'var(--color-sentinel-green)' }}
         >
           {healthyCount}
         </div>
         <div
           className="h-5 w-5 rounded flex items-center justify-center text-xs font-bold"
-          style={{ background: 'rgba(245, 158, 11, 0.2)', color: '#f59e0b' }}
+          style={{ background: 'rgba(245, 158, 11, 0.2)', color: 'var(--color-sentinel-amber)' }}
         >
           {warningCount}
         </div>
         <div
           className="h-5 w-5 rounded flex items-center justify-center text-xs font-bold"
-          style={{ background: 'rgba(239, 68, 68, 0.2)', color: '#ef4444' }}
+          style={{ background: 'rgba(239, 68, 68, 0.2)', color: 'var(--color-sentinel-red)' }}
         >
           {faultCount}
         </div>

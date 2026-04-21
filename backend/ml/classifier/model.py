@@ -100,7 +100,7 @@ class FailureClassifier:
         proba = self.model.predict_proba(X)
 
         results = []
-        for i, row_proba in enumerate(proba):
+        for _i, row_proba in enumerate(proba):
             # Create probability dict for each class
             class_proba = {self.class_names[j]: float(p) for j, p in enumerate(row_proba)}
 

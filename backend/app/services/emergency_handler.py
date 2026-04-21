@@ -234,11 +234,7 @@ class EmergencyHandler:
             True if device supports autonomous control
         """
         # Check if device has controllable points
-        for point in device.points.values():
-            if hasattr(point, "writable") and point.writable:
-                return True
-
-        return False
+        return any(hasattr(point, "writable") and point.writable for point in device.points.values())
 
     def _get_safe_state_for_device(self, device) -> dict[str, Any] | None:
         """

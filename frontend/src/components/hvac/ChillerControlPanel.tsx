@@ -380,13 +380,13 @@ export function ChillerControlPanel({ siteId, compact = false, onChillerChange }
                             : "var(--color-sentinel-text-secondary)",
                         }}
                       >
-                        {metadata.chw_supply_temp?.toFixed(1) ?? "--"}°C
+                        {Number(metadata.chw_supply_temp)?.toFixed(1) ?? "--"}°C
                       </Text>
                     </div>
                     <div>
                       <Text style={{ color: "var(--color-sentinel-text-disabled)" }}>Return</Text>
                       <Text className="font-medium" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                        {metadata.chw_return_temp?.toFixed(1) ?? "--"}°C
+                        {Number(metadata.chw_return_temp)?.toFixed(1) ?? "--"}°C
                       </Text>
                     </div>
                     <div>

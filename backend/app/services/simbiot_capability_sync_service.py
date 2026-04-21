@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 from datetime import UTC, datetime
 from typing import Any
 
@@ -155,7 +156,5 @@ async def sync_site_capabilities_to_supabase(
             "updated": updated,
         }
     finally:
-        try:
+        with contextlib.suppress(Exception):
             await adapter.disconnect()
-        except Exception:
-            pass

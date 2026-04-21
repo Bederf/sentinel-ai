@@ -60,9 +60,9 @@ export function useRecommendationToasts(
 
     const poll = async () => {
       try {
-        // Backend route: GET /modules/site/{site_id}/recommendations
+        // Backend route: GET /api/modules/site/{site_id}/recommendations
         // Returns a list directly (not {recommendations: [...]})
-        const response = await authorizedFetch(`/modules/site/${siteId}/recommendations`);
+        const response = await authorizedFetch(`/api/modules/site/${siteId}/recommendations`);
         if (!response.ok) return;
         const data = await response.json();
         const items: RecommendationData[] = Array.isArray(data) ? data : (data.recommendations || []);
@@ -80,7 +80,7 @@ export function useRecommendationToasts(
               toast("AI Recommendation", {
                 description: `${rec.reason} — ${rec.target_equipment}`,
                 duration: 10000,
-                icon: <Lightbulb className="h-4 w-4" style={{ color: '#FACC15' }} />,
+                icon: <Lightbulb className="h-4 w-4" style={{ color: 'var(--color-sentinel-amber)' }} />,
                 action: {
                   label: "View",
                   onClick: () => onShowCard(rec),
@@ -148,7 +148,7 @@ export function RecommendationCard({
   const isLighting = recommendation.action?.point?.includes('lighting') || recommendation.action?.point?.includes('dimming');
 
   const Icon = isHVAC ? ThermometerSun : isLighting ? Lamp : Zap;
-  const iconColor = isHVAC ? '#3B82F6' : isLighting ? '#FACC15' : '#10B981';
+  const iconColor = isHVAC ? 'var(--color-sentinel-blue)' : isLighting ? 'var(--color-sentinel-amber)' : 'var(--color-sentinel-green)';
   const savings = recommendation.expected_impact?.energy_savings_percent ?? 0;
 
   // Swipe-to-dismiss (left swipe = read/close)
@@ -201,12 +201,12 @@ export function RecommendationCard({
           <div className="p-1.5 rounded" style={{ background: `${iconColor}20` }}>
             <Icon className="h-4 w-4" style={{ color: iconColor }} />
           </div>
-          <span className="font-medium text-sm" style={{ color: 'var(--color-sentinel-text-primary, #fff)' }}>
+          <span className="font-medium text-sm" style={{ color: 'var(--color-sentinel-text-primary)' }}>
             AI Recommendation
           </span>
         </div>
         <button onClick={onClose} className="p-1 rounded hover:bg-white/10 transition-colors">
-          <X className="h-4 w-4" style={{ color: 'var(--color-sentinel-text-secondary, #aaa)' }} />
+          <X className="h-4 w-4" style={{ color: 'var(--color-sentinel-text-secondary)' }} />
         </button>
       </div>
 
@@ -214,20 +214,20 @@ export function RecommendationCard({
       <div className="p-4 space-y-3">
         {/* Equipment */}
         <div>
-          <span className="text-xs" style={{ color: 'var(--color-sentinel-text-secondary, #aaa)' }}>
+          <span className="text-xs" style={{ color: 'var(--color-sentinel-text-secondary)' }}>
             Equipment
           </span>
-          <div className="font-mono text-sm mt-0.5" style={{ color: 'var(--color-sentinel-text-primary, #fff)' }}>
+          <div className="font-mono text-sm mt-0.5" style={{ color: 'var(--color-sentinel-text-primary)' }}>
             {recommendation.target_equipment}
           </div>
         </div>
 
         {/* Reason */}
         <div>
-          <span className="text-xs" style={{ color: 'var(--color-sentinel-text-secondary, #aaa)' }}>
+          <span className="text-xs" style={{ color: 'var(--color-sentinel-text-secondary)' }}>
             Finding
           </span>
-          <div className="text-sm mt-0.5" style={{ color: 'var(--color-sentinel-text-primary, #fff)' }}>
+          <div className="text-sm mt-0.5" style={{ color: 'var(--color-sentinel-text-primary)' }}>
             {recommendation.reason}
           </div>
         </div>
@@ -238,12 +238,12 @@ export function RecommendationCard({
             className="p-3 rounded"
             style={{ background: 'var(--color-sentinel-bg-secondary, #111128)' }}
           >
-            <span className="text-xs" style={{ color: 'var(--color-sentinel-text-secondary, #aaa)' }}>
+            <span className="text-xs" style={{ color: 'var(--color-sentinel-text-secondary)' }}>
               Proposed Action
             </span>
             <div className="flex items-center gap-2 mt-1">
               <ChevronRight className="h-3 w-3" style={{ color: iconColor }} />
-              <span className="text-sm" style={{ color: 'var(--color-sentinel-text-primary, #fff)' }}>
+              <span className="text-sm" style={{ color: 'var(--color-sentinel-text-primary)' }}>
                 Set <span className="font-mono">{recommendation.action.point}</span> to{' '}
                 <span className="font-bold" style={{ color: iconColor }}>
                   {recommendation.action.value}
@@ -261,10 +261,10 @@ export function RecommendationCard({
               className="flex-1 p-2 rounded text-center"
               style={{ background: 'rgba(16, 185, 129, 0.1)' }}
             >
-              <div className="text-lg font-bold" style={{ color: 'var(--color-sentinel-green, #10B981)' }}>
+              <div className="text-lg font-bold" style={{ color: 'var(--color-sentinel-green)' }}>
                 {savings}%
               </div>
-              <div className="text-[10px]" style={{ color: 'var(--color-sentinel-text-secondary, #aaa)' }}>
+              <div className="text-[10px]" style={{ color: 'var(--color-sentinel-text-secondary)' }}>
                 Energy Savings
               </div>
             </div>
@@ -272,10 +272,10 @@ export function RecommendationCard({
               className="flex-1 p-2 rounded text-center"
               style={{ background: 'rgba(59, 130, 246, 0.1)' }}
             >
-              <div className="text-lg font-bold" style={{ color: '#3B82F6' }}>
+              <div className="text-lg font-bold" style={{ color: 'var(--color-sentinel-blue)' }}>
                 {recommendation.confidence}
               </div>
-              <div className="text-[10px]" style={{ color: 'var(--color-sentinel-text-secondary, #aaa)' }}>
+              <div className="text-[10px]" style={{ color: 'var(--color-sentinel-text-secondary)' }}>
                 Confidence
               </div>
             </div>
@@ -283,10 +283,10 @@ export function RecommendationCard({
               className="flex-1 p-2 rounded text-center"
               style={{ background: 'rgba(16, 185, 129, 0.1)' }}
             >
-              <div className="text-lg font-bold" style={{ color: 'var(--color-sentinel-green, #10B981)' }}>
+              <div className="text-lg font-bold" style={{ color: 'var(--color-sentinel-green)' }}>
                 {recommendation.risk_level}
               </div>
-              <div className="text-[10px]" style={{ color: 'var(--color-sentinel-text-secondary, #aaa)' }}>
+              <div className="text-[10px]" style={{ color: 'var(--color-sentinel-text-secondary)' }}>
                 Risk Level
               </div>
             </div>
@@ -307,7 +307,7 @@ export function RecommendationCard({
         {!isControlActive && (
           <div
             className="flex items-center gap-2 px-3 py-2 rounded text-xs"
-            style={{ background: 'rgba(250, 204, 21, 0.1)', color: '#FACC15' }}
+            style={{ background: 'rgba(250, 204, 21, 0.1)', color: 'var(--color-sentinel-amber)' }}
           >
             <Lock className="h-3 w-3 flex-shrink-0" />
             <span>Control module not active. Enable the control add-on to execute recommendations.</span>
@@ -316,7 +316,7 @@ export function RecommendationCard({
         {isControlActive && !phaseAllows(sitePhase, "approve_reject") && (
           <div
             className="flex items-center gap-2 px-3 py-2 rounded text-xs"
-            style={{ background: 'rgba(59, 130, 246, 0.1)', color: '#93C5FD' }}
+            style={{ background: 'rgba(59, 130, 246, 0.1)', color: 'var(--color-sentinel-blue)' }}
           >
             <Lock className="h-3 w-3 flex-shrink-0" />
             <span>Advisory mode — recommendations are view-only. Upgrade to supervised to approve.</span>
@@ -327,7 +327,7 @@ export function RecommendationCard({
             <button
               onClick={() => { onApprove(recommendation.id); onClose(); }}
               className="flex-1 py-2 rounded text-sm font-medium flex items-center justify-center gap-1.5 transition-colors hover:brightness-110"
-              style={{ background: 'var(--color-sentinel-green, #10B981)', color: '#fff' }}
+              style={{ background: 'var(--color-sentinel-green)', color: 'white' }}
             >
               <CheckCircle2 className="h-3.5 w-3.5" />
               Approve & Execute
@@ -336,7 +336,7 @@ export function RecommendationCard({
             <button
               disabled
               className="flex-1 py-2 rounded text-sm font-medium flex items-center justify-center gap-1.5 opacity-50 cursor-not-allowed"
-              style={{ background: 'var(--color-sentinel-text-disabled, #666)', color: '#fff' }}
+              style={{ background: 'var(--color-sentinel-text-disabled)', color: 'white' }}
             >
               <Lock className="h-3.5 w-3.5" />
               Control Module Required
@@ -345,7 +345,7 @@ export function RecommendationCard({
           <button
             onClick={onClose}
             className="px-4 py-2 rounded text-sm transition-colors hover:bg-white/10"
-            style={{ color: 'var(--color-sentinel-text-secondary, #aaa)', border: '1px solid var(--color-sentinel-border, #2a2a4a)' }}
+            style={{ color: 'var(--color-sentinel-text-secondary)', border: '1px solid var(--color-sentinel-border, #2a2a4a)' }}
           >
             Dismiss
           </button>
@@ -360,7 +360,7 @@ export function RecommendationCard({
           opacity: 0.4,
         }}
       >
-        <span style={{ fontSize: '0.6rem', color: 'var(--color-sentinel-text-secondary, #aaa)', letterSpacing: '0.05em' }}>
+        <span style={{ fontSize: '0.6rem', color: 'var(--color-sentinel-text-secondary)', letterSpacing: '0.05em' }}>
           ← swipe to dismiss
         </span>
       </div>
@@ -388,7 +388,7 @@ export function RecommendationBadge({ siteId }: { siteId: string }) {
     }
     const poll = async () => {
       try {
-        const response = await authorizedFetch(`/modules/site/${siteId}/recommendations`);
+        const response = await authorizedFetch(`/api/modules/site/${siteId}/recommendations`);
         if (!response.ok) return;
         const data = await response.json();
         const items: RecommendationData[] = Array.isArray(data) ? data : (data.recommendations || []);

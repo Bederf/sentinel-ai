@@ -151,7 +151,7 @@ class ClassifierDataPrep:
 
         num_failures = random.randint(3, 5)
 
-        for i in range(num_failures):
+        for _i in range(num_failures):
             days_ago = random.randint(1, 90)
             failure_time = base_time - timedelta(days=days_ago)
 

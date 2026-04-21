@@ -45,10 +45,7 @@ def solar_profile():
     profile = []
     for t in range(96):
         hour = t / 4.0
-        if 6 <= hour <= 19:
-            solar = 3200.0 * math.exp(-0.5 * ((hour - 12.5) / 3.5) ** 2)
-        else:
-            solar = 0.0
+        solar = 3200.0 * math.exp(-0.5 * ((hour - 12.5) / 3.5) ** 2) if 6 <= hour <= 19 else 0.0
         profile.append(solar)
     return profile
 
@@ -474,7 +471,7 @@ class TestConfigDrivenTariffs:
 
     def test_tariff_with_none_config_uses_defaults(self):
         """Explicitly passing None falls back to defaults."""
-        rate, band = _tariff_for_hour(8, None)
+        rate, _band = _tariff_for_hour(8, None)
         assert rate == _DEFAULT_TARIFF_RATES["peak"]
 
 

@@ -95,9 +95,8 @@ class ErrorSanitizationMiddleware(BaseHTTPMiddleware):
                 return detail
 
         # For validation errors, provide limited detail
-        if status_code == 422:
-            if "validation error" in detail.lower():
-                return "Request validation failed"
+        if status_code == 422 and "validation error" in detail.lower():
+            return "Request validation failed"
 
         # For client errors (4xx), use safe message if detail looks sensitive
         if 400 <= status_code < 500:

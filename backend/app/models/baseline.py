@@ -5,7 +5,7 @@ Phase 44: Asset Baseline Assessment
 """
 
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -15,7 +15,7 @@ from pydantic import BaseModel, ConfigDict, Field
 # ============================================================================
 
 
-class BaselineType(str, Enum):
+class BaselineType(StrEnum):
     """Type of baseline capture."""
 
     INITIAL = "initial"  # First baseline at equipment installation/onboarding
@@ -25,7 +25,7 @@ class BaselineType(str, Enum):
     SEASONAL = "seasonal"  # Baseline at different operating conditions
 
 
-class BaselineStatus(str, Enum):
+class BaselineStatus(StrEnum):
     """Status of baseline record."""
 
     ACTIVE = "active"  # Current active baseline
@@ -33,7 +33,7 @@ class BaselineStatus(str, Enum):
     SUPERSEDED = "superseded"  # Replaced by newer baseline
 
 
-class BaselineSource(str, Enum):
+class BaselineSource(StrEnum):
     """Source of baseline data."""
 
     MANUAL = "manual"  # Engineer manual measurement and entry
@@ -43,7 +43,7 @@ class BaselineSource(str, Enum):
     LAB = "lab"  # Laboratory analysis results
 
 
-class ElementType(str, Enum):
+class ElementType(StrEnum):
     """Type of equipment element/component."""
 
     BEARING = "bearing"
@@ -58,7 +58,7 @@ class ElementType(str, Enum):
     CONTROLLER = "controller"
 
 
-class MeasurementType(str, Enum):
+class MeasurementType(StrEnum):
     """Type of measurement for element baselines."""
 
     VIBRATION = "vibration"  # Vibration analysis (RMS, frequency spectrum)
@@ -69,7 +69,7 @@ class MeasurementType(str, Enum):
     OIL_ANALYSIS = "oil_analysis"  # Oil analysis results (viscosity, particles, water)
 
 
-class DeviationStatus(str, Enum):
+class DeviationStatus(StrEnum):
     """Deviation status for comparison results."""
 
     NORMAL = "normal"
@@ -77,7 +77,7 @@ class DeviationStatus(str, Enum):
     CRITICAL = "critical"
 
 
-class Criticality(str, Enum):
+class Criticality(StrEnum):
     """Criticality level for maintenance prioritization."""
 
     LOW = "low"

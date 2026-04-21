@@ -67,7 +67,7 @@ export function CrisisOverlay({
       {/* Header */}
       <div
         style={{
-          background: "#dc2626",
+          background: "var(--color-sentinel-red)",
           padding: "10px 14px",
           display: "flex",
           alignItems: "center",
@@ -81,7 +81,7 @@ export function CrisisOverlay({
             fontWeight: 700,
             textTransform: "uppercase",
             letterSpacing: "0.1em",
-            color: "#fff",
+            color: "white",
           }}
         >
           SENTINEL ALERT
@@ -102,7 +102,7 @@ export function CrisisOverlay({
             fontWeight: 600,
             textTransform: "uppercase",
             letterSpacing: "0.08em",
-            color: "var(--color-sentinel-text-secondary, #94a3b8)",
+            color: "var(--color-sentinel-text-secondary)",
             marginBottom: 4,
           }}
         >
@@ -112,7 +112,7 @@ export function CrisisOverlay({
           style={{
             fontSize: 14,
             fontWeight: 600,
-            color: "#f59e0b",
+            color: "var(--color-sentinel-amber)",
             lineHeight: 1.4,
           }}
         >
@@ -134,7 +134,7 @@ export function CrisisOverlay({
             fontWeight: 600,
             textTransform: "uppercase",
             letterSpacing: "0.08em",
-            color: "var(--color-sentinel-text-secondary, #94a3b8)",
+            color: "var(--color-sentinel-text-secondary)",
             marginBottom: 4,
           }}
         >
@@ -143,12 +143,12 @@ export function CrisisOverlay({
         <div
           style={{
             fontSize: 13,
-            color: "#e2e8f0",
+            color: "var(--color-sentinel-text-primary)",
             lineHeight: 1.5,
           }}
         >
           <div>{surface.impact}</div>
-          <div style={{ color: "#94a3b8", marginTop: 6 }}>{surface.action.tradeoff}</div>
+          <div style={{ color: "var(--color-sentinel-text-secondary)", marginTop: 6 }}>{surface.action.tradeoff}</div>
         </div>
       </div>
 
@@ -166,7 +166,7 @@ export function CrisisOverlay({
             fontWeight: 600,
             textTransform: "uppercase",
             letterSpacing: "0.08em",
-            color: "var(--color-sentinel-text-secondary, #94a3b8)",
+            color: "var(--color-sentinel-text-secondary)",
             marginBottom: 4,
           }}
         >
@@ -179,13 +179,13 @@ export function CrisisOverlay({
             gap: 4,
           }}
         >
-          <span style={{ fontSize: 12, color: "#94a3b8" }}>{surface.time.label}</span>
-          <span style={{ fontSize: 20, fontWeight: 700, color: "#f8fafc" }}>
+          <span style={{ fontSize: 12, color: "var(--color-sentinel-text-secondary)" }}>{surface.time.label}</span>
+          <span style={{ fontSize: 20, fontWeight: 700, color: "white" }}>
             {timeLabel(timeToDiscomfort)}
           </span>
-          <span style={{ fontSize: 12, color: "#cbd5e1" }}>{surface.time.detail}</span>
+          <span style={{ fontSize: 12, color: "var(--color-sentinel-text-secondary)" }}>{surface.time.detail}</span>
           {affectedFloor && (
-            <span style={{ fontSize: 12, color: "#94a3b8" }}>Affected floor: {affectedFloor}</span>
+            <span style={{ fontSize: 12, color: "var(--color-sentinel-text-secondary)" }}>Affected floor: {affectedFloor}</span>
           )}
         </div>
       </div>
@@ -203,7 +203,7 @@ export function CrisisOverlay({
             fontWeight: 600,
             textTransform: "uppercase",
             letterSpacing: "0.08em",
-            color: "var(--color-sentinel-text-secondary, #94a3b8)",
+            color: "var(--color-sentinel-text-secondary)",
             marginBottom: 6,
           }}
         >
@@ -212,26 +212,26 @@ export function CrisisOverlay({
         <div
           style={{
             fontSize: 12,
-            color: "#cbd5e1",
+            color: "var(--color-sentinel-text-secondary)",
             lineHeight: 1.5,
             marginBottom: 10,
           }}
         >
           <div>{surface.action.summary}</div>
           {!surface.behavior.showResultOnly && (
-            <div style={{ marginTop: 6, color: "#f8fafc", fontWeight: 600 }}>
+            <div style={{ marginTop: 6, color: "white", fontWeight: 600 }}>
               {surface.action.operatorPrompt}
             </div>
           )}
           <div style={{ marginTop: 6 }}>{surface.action.expectedOutcome}</div>
           {surface.behavior.showInstructions && surface.action.bmsGuide && (
-            <div style={{ marginTop: 8, color: "#94a3b8" }}>
+            <div style={{ marginTop: 8, color: "var(--color-sentinel-text-secondary)" }}>
               {surface.action.bmsGuide.navigationPath.join(" -> ")}
             </div>
           )}
           {surface.behavior.showResultOnly && (
             <div style={{ marginTop: 8, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.08em",
-              color: surface.mode === "autonomous" ? "#6ee7b7" : "#94a3b8" }}>
+              color: surface.mode === "autonomous" ? "var(--color-sentinel-green)" : "var(--color-sentinel-text-secondary)" }}>
               {surface.mode === "autonomous"
                 ? "SENTINEL executed — verifying result"
                 : "Ghost mode — observe only, no write from this surface"}
@@ -245,8 +245,8 @@ export function CrisisOverlay({
             <button
               onClick={onApprove}
               style={{
-                background: "#16a34a",
-                color: "#fff",
+                background: "var(--color-sentinel-green)",
+                color: "white",
                 border: "none",
                 borderRadius: 4,
                 padding: "6px 14px",
@@ -265,7 +265,7 @@ export function CrisisOverlay({
               onClick={onDismiss}
               style={{
                 background: "rgba(255,255,255,0.06)",
-                color: "var(--color-sentinel-text-secondary, #94a3b8)",
+                color: "var(--color-sentinel-text-secondary)",
                 border: "1px solid var(--color-sentinel-border, rgba(255,255,255,0.08))",
                 borderRadius: 4,
                 padding: "6px 14px",

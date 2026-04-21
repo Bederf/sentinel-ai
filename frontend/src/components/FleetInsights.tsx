@@ -99,8 +99,8 @@ function RiskBar({
 }) {
   const levels = [
     { key: "critical", color: "var(--color-sentinel-red)", label: "Critical" },
-    { key: "high", color: "#F59E0B", label: "High" },
-    { key: "medium", color: "#3B82F6", label: "Medium" },
+    { key: "high", color: "var(--color-sentinel-amber)", label: "High" },
+    { key: "medium", color: "var(--color-sentinel-blue)", label: "Medium" },
     { key: "low", color: "var(--color-sentinel-green)", label: "Low" },
   ] as const;
 
@@ -325,7 +325,7 @@ function ModelCard({
               : "rgba(59, 130, 246, 0.15)",
             color: isFineTuned
               ? "var(--color-sentinel-green)"
-              : "#3B82F6",
+              : "var(--color-sentinel-blue)",
           }}
         >
           {isFineTuned ? "Fine-tuned" : "Global"}
@@ -442,7 +442,7 @@ export function FleetInsights() {
             className="mt-3 px-4 py-2 rounded text-sm"
             style={{
               background: "var(--color-sentinel-amber)",
-              color: "#000",
+              color: "black",
             }}
           >
             Retry
@@ -640,7 +640,7 @@ export function FleetInsights() {
               className="text-xs px-2 py-0.5 rounded"
               style={{
                 background: "rgba(59, 130, 246, 0.15)",
-                color: "#3B82F6",
+                color: "var(--color-sentinel-blue)",
               }}
             >
               {globalModels.length} models

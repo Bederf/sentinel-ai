@@ -104,7 +104,7 @@ class VectorDBService:
 
         # Insert chunks with embeddings
         chunk_records = []
-        for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
+        for i, (chunk, embedding) in enumerate(zip(chunks, embeddings, strict=False)):
             chunk_records.append(
                 self._build_chunk_record(
                     document=document,
@@ -350,7 +350,7 @@ class VectorDBService:
 
         # Store chunks with original content (no context header)
         chunk_records = []
-        for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
+        for i, (chunk, embedding) in enumerate(zip(chunks, embeddings, strict=False)):
             chunk_records.append(
                 self._build_chunk_record(
                     document=document,

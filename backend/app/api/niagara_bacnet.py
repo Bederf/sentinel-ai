@@ -6,6 +6,7 @@ via BACnet/IP protocol. Provides device discovery, point read/write,
 and COV subscription management.
 """
 
+import contextlib
 import logging
 from datetime import datetime
 
@@ -324,10 +325,8 @@ async def write_point(
         logger.error("Point write failed: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
     finally:
-        try:
+        with contextlib.suppress(Exception):
             await adapter.disconnect()
-        except Exception:
-            pass
 
 
 # ---------------------------------------------------------------------------

@@ -244,10 +244,9 @@ def cluster_points(
         used.add(i)
 
         for j, other_point in enumerate(points):
-            if j not in used:
-                if euclidean_distance(point, other_point) <= distance_threshold:
-                    cluster.append(other_point)
-                    used.add(j)
+            if j not in used and euclidean_distance(point, other_point) <= distance_threshold:
+                cluster.append(other_point)
+                used.add(j)
 
         clusters.append(cluster)
 

@@ -19,7 +19,7 @@ Work orders follow existing Sentry notification + auto-assignment pattern.
 import logging
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from app.services.solar_health_service import get_solar_health_service
@@ -32,13 +32,13 @@ logger = logging.getLogger(__name__)
 # === Enums ===
 
 
-class MaintenancePriority(str, Enum):
+class MaintenancePriority(StrEnum):
     ROUTINE = "routine"
     SOON = "soon"
     URGENT = "urgent"
 
 
-class MaintenanceType(str, Enum):
+class MaintenanceType(StrEnum):
     PANEL_CLEANING = "panel_cleaning"
     INVERTER_SERVICE = "inverter_service"
     BESS_MAINTENANCE = "bess_maintenance"

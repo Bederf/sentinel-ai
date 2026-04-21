@@ -159,7 +159,7 @@ def load_desks_backup(backup_path: Path) -> list[dict[str, Any]]:
     desk_counter = 1000  # Start desk IDs at 1000
     desks_by_zone = {}
 
-    for desk_idx, desk in enumerate(desk_list):
+    for _desk_idx, desk in enumerate(desk_list):
         zone_id_old = desk.get("zone_id", "Zone-L10-A")
         zone_id = migrate_zone_id(zone_id_old)
 
@@ -262,7 +262,7 @@ def validate_zones_and_desks(zones: list[dict], desks: list[dict]) -> tuple[bool
             errors.append(f"❌ Invalid floor code in desk: {desk['floor']}")
 
     if not errors:
-        print(f"✓ Floor codes valid: {sorted(set(z['floor'] for z in zones))}")
+        print(f"✓ Floor codes valid: {sorted({z['floor'] for z in zones})}")
 
     return len(errors) == 0, errors
 
@@ -358,7 +358,7 @@ def main():
 
     # Validate
     print("\nValidating data integrity...")
-    is_valid, errors = validate_zones_and_desks(zones, desks)
+    _is_valid, errors = validate_zones_and_desks(zones, desks)
 
     if errors:
         print("\n❌ Validation errors found:")

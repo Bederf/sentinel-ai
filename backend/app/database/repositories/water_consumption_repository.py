@@ -694,7 +694,7 @@ class WaterConsumptionRepository:
             zone_id = record.get("zone_id")
             if zone_id:
                 zones.add(zone_id)
-        return sorted(list(zones))
+        return sorted(zones)
 
     def get_top_consuming_zones(
         self,

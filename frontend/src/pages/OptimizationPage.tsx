@@ -172,7 +172,9 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
         // Fetch scenarios and optimization status in parallel
         const [scenarioData, statusData] = await Promise.all([
           api.getOptimizationScenarios().catch(() => [] as OptimizationScenario[]),
-          api.getOptimizationStatus(selectedSiteId).catch(() => null as OptimizationStatusResponse | null),
+          selectedSiteId
+            ? api.getOptimizationStatus(selectedSiteId).catch(() => null as OptimizationStatusResponse | null)
+            : Promise.resolve(null),
         ]);
 
         setAllScenarios(scenarioData);
@@ -319,7 +321,7 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded" style={{ background: "rgba(250, 204, 21, 0.15)" }}>
-              <Zap className="h-6 w-6" style={{ color: "#FACC15" }} />
+              <Zap className="h-6 w-6" style={{ color: "var(--color-sentinel-amber)" }} />
             </div>
             <div>
               <h1 className="text-2xl font-bold" style={{ color: "var(--color-sentinel-text-primary)" }}>
@@ -581,7 +583,7 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
                           onClick={() => handleExecuteOptimization(scenario.id)}
                           disabled={showConfirmModal}
                           className="inline-flex items-center text-xs px-3 py-1.5 rounded font-medium"
-                          style={{ background: "var(--color-sentinel-blue)", color: "#fff", cursor: showConfirmModal ? "not-allowed" : "pointer", opacity: showConfirmModal ? 0.5 : 1 }}
+                          style={{ background: "var(--color-sentinel-blue)", color: "white", cursor: showConfirmModal ? "not-allowed" : "pointer", opacity: showConfirmModal ? 0.5 : 1 }}
                         >
                           <Play className="h-3 w-3 mr-1" />
                           Execute
@@ -705,7 +707,7 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
               <button
                 onClick={confirmExecution}
                 className="inline-flex items-center text-sm px-4 py-2 rounded font-medium"
-                style={{ background: "var(--color-sentinel-green)", color: "#fff", cursor: "pointer" }}
+                style={{ background: "var(--color-sentinel-green)", color: "white", cursor: "pointer" }}
               >
                 <CheckCircle className="h-4 w-4 mr-1" />
                 Confirm

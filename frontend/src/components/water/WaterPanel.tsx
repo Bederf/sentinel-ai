@@ -21,7 +21,7 @@ import {
   TabPanel,
   Text,
 } from "@tremor/react";
-import { Droplets, Building2, ChevronDown, AlertTriangle } from "lucide-react";
+import { Droplets, AlertTriangle } from "lucide-react";
 import { authorizedFetch } from "@/lib/api/client";
 import { SentinelValueCard } from "../SentinelValueCard";
 import { waterApi } from "../../lib/waterApi";
@@ -35,12 +35,6 @@ import { WaterZoneBreakdown } from "./WaterZoneBreakdown";
 import { WaterCostAnalysis } from "./WaterCostAnalysis";
 import { WaterAnomalyChart } from "./WaterAnomalyChart";
 import { WaterAlertPanel } from "./WaterAlertPanel";
-
-interface Building {
-  code: string;
-  name: string;
-  region?: string;
-}
 
 interface WaterPanelProps {
   siteId?: string;
@@ -60,31 +54,13 @@ interface BridgeTelemetrySummary {
 export function WaterPanel({ siteId: propSiteId }: WaterPanelProps) {
   const [selectedSiteId, setSelectedSiteId] = useState<string>(propSiteId || "");
   const [activeTabIndex, setActiveTabIndex] = useState<number>(0);
-  const [buildings, setBuildings] = useState<Building[]>([]);
-  const [_currentFlow, setCurrentFlow] = useState<CurrentFlowResponse | null>(null);
+  const [currentFlow, setCurrentFlow] = useState<CurrentFlowResponse | null>(null);
   const [consumptionData, setConsumptionData] = useState<WaterConsumption[]>([]);
   const [alerts, setAlerts] = useState<WaterAlert[]>([]);
   const [trending, setTrending] = useState<WaterTrending | null>(null);
   const [bridgeTelemetry, setBridgeTelemetry] = useState<BridgeTelemetrySummary | null>(null);
   const [sentinelGuidance, setSentinelGuidance] = useState<string | null>(null);
   const [sentinelPosture, setSentinelPosture] = useState<string | null>(null);
-
-  // Fetch buildings with water module (on mount)
-  useEffect(() => {
-    const fetchBuildings = async () => {
-      try {
-        const response = await fetch("/api/water/buildings");
-        const data = await response.json();
-        setBuildings(data.buildings || []);
-      } catch (err) {
-        console.error("Failed to fetch water buildings:", err);
-        // Fallback: empty list when API is unavailable
-        setBuildings([]);
-      }
-    };
-
-    fetchBuildings();
-  }, []);
 
   // Fetch current flow rate (poll every 30 seconds)
   useEffect(() => {
@@ -323,39 +299,17 @@ export function WaterPanel({ siteId: propSiteId }: WaterPanelProps) {
           </div>
 
         <div className="flex items-center gap-3">
-          {/* Site Selector */}
-          <div className="relative">
-            <Building2
-              className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4"
-              style={{ color: "var(--color-sentinel-text-secondary)" }}
-            />
-            <ChevronDown
-              className="absolute right-2 top-1/2 transform -translate-y-1/2 h-3 w-3 pointer-events-none"
-              style={{ color: "var(--color-sentinel-text-secondary)" }}
-            />
-            <select
-              value={selectedSiteId}
-              onChange={(e) => setSelectedSiteId(e.target.value)}
-              className="pl-9 pr-7 py-1.5 text-sm rounded appearance-none cursor-pointer"
-              style={{
-                background: "var(--color-sentinel-bg-secondary)",
-                border: "1px solid var(--color-sentinel-border)",
-                color: "var(--color-sentinel-text-primary)",
-                outline: "none",
-                minWidth: "200px",
-              }}
-            >
-              {buildings.length > 0 ? (
-                buildings.map((building) => (
-                  <option key={building.code} value={building.code}>
-                    {building.name}
-                  </option>
-                ))
-              ) : (
-                <option value="" disabled>No buildings available</option>
-              )}
-            </select>
-          </div>
+          {/* Site Label */}
+          <span
+            className="px-3 py-1.5 text-sm rounded"
+            style={{
+              background: "var(--color-sentinel-bg-secondary)",
+              border: "1px solid var(--color-sentinel-border)",
+              color: "var(--color-sentinel-text-primary)",
+            }}
+          >
+            {selectedSiteId || "No site"}
+          </span>
         </div>
       </div>
       </div>
@@ -400,7 +354,7 @@ export function WaterPanel({ siteId: propSiteId }: WaterPanelProps) {
               className="text-xs px-2 py-1 rounded"
               style={{
                 background: bridgeTelemetry?.status === "live" ? "rgba(16,185,129,0.15)" : "rgba(245,158,11,0.15)",
-                color: bridgeTelemetry?.status === "live" ? "#10B981" : "#F59E0B",
+                color: bridgeTelemetry?.status === "live" ? "var(--color-sentinel-green)" : "var(--color-sentinel-amber)",
               }}
             >
               {bridgeTelemetry?.status === "live" ? "Live" : "Unavailable"}

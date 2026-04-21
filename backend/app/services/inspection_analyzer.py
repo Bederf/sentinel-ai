@@ -10,13 +10,13 @@ Powered by contextual analysis of findings, health score changes, and keyword de
 
 import logging
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
-class InspectionDecision(str, Enum):
+class InspectionDecision(StrEnum):
     """Decision after analyzing inspection findings."""
 
     RESOLVED = "resolved"
@@ -109,10 +109,10 @@ class InspectionAnalyzer:
         self,
         findings: str,
         equipment_code: str,
-        health_before: int = None,
-        health_after: int = None,
-        parts_needed: list = None,
-        technician_notes: str = None,
+        health_before: int | None = None,
+        health_after: int | None = None,
+        parts_needed: list | None = None,
+        technician_notes: str | None = None,
     ) -> InspectionAnalysisResult:
         """
         Analyze inspection findings to recommend next action.
@@ -163,7 +163,7 @@ class InspectionAnalyzer:
             confidence=0.7,
         )
 
-    def _check_resolved(self, findings_lower: str, health_before: int = None, health_after: int = None) -> bool:
+    def _check_resolved(self, findings_lower: str, health_before: int | None = None, health_after: int | None = None) -> bool:
         """Check if findings indicate the issue was resolved."""
         # Keyword match for resolved status
         if any(keyword in findings_lower for keyword in self.RESOLVED_KEYWORDS):
@@ -172,13 +172,9 @@ class InspectionAnalyzer:
                 return True
 
         # If health jumped from warning to normal, likely resolved
-        if health_before and health_after:
-            if health_before < 65 and health_after >= 80:
-                return True
+        return bool(health_before and health_after and health_before < 65 and health_after >= 80)
 
-        return False
-
-    def _check_critical_issue(self, findings_lower: str, parts_needed: list = None) -> bool:
+    def _check_critical_issue(self, findings_lower: str, parts_needed: list | None = None) -> bool:
         """Check if findings indicate a critical issue requiring repair."""
         # Critical keywords found
         if any(keyword in findings_lower for keyword in self.CRITICAL_KEYWORDS):
@@ -193,7 +189,7 @@ class InspectionAnalyzer:
 
         return False
 
-    def _check_repair_needed(self, findings_lower: str, health_before: int = None, health_after: int = None) -> bool:
+    def _check_repair_needed(self, findings_lower: str, health_before: int | None = None, health_after: int | None = None) -> bool:
         """Check if findings indicate repair is needed."""
         # Repair keywords found
         if any(keyword in findings_lower for keyword in self.REPAIR_KEYWORDS):

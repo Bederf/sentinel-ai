@@ -781,18 +781,12 @@ class SolarHealthService:
 
         # Years until SoH reaches 80%
         soh_remaining = soh - BESS_SOH_WARRANTY_THRESHOLD
-        if soh_decline_per_year > 0:
-            years_to_soh_breach = soh_remaining / soh_decline_per_year
-        else:
-            years_to_soh_breach = 20.0
+        years_to_soh_breach = soh_remaining / soh_decline_per_year if soh_decline_per_year > 0 else 20.0
         soh_breach_year = datetime.now().year + int(years_to_soh_breach)
 
         # Cycles per year
         cycles_remaining = BESS_WARRANTY_CYCLES - cycles
-        if cycles_per_year > 0:
-            years_to_cycle_breach = cycles_remaining / cycles_per_year
-        else:
-            years_to_cycle_breach = 20.0
+        years_to_cycle_breach = cycles_remaining / cycles_per_year if cycles_per_year > 0 else 20.0
         cycle_breach_year = datetime.now().year + int(years_to_cycle_breach)
 
         # Replacement = earlier of the two

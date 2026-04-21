@@ -496,7 +496,7 @@ class TestComplaintHistorySummary:
         handler._complaints = {}
 
         # Add 3 recent complaints
-        for i in range(3):
+        for _i in range(3):
             c = ComfortComplaint(
                 desk_id="25",
                 complaint_type="too_hot",

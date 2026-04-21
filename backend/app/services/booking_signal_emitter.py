@@ -261,10 +261,7 @@ async def emit_booking_saturation_signal(data: dict) -> dict | None:
     floor = data.get("floor", "")
     utilisation_pct = data.get("utilisation_pct", 0)
 
-    if floor:
-        location_ref = f"{building_code}/{floor}"
-    else:
-        location_ref = building_code or "unknown"
+    location_ref = f"{building_code}/{floor}" if floor else building_code or "unknown"
 
     # Dedup: same building + floor + booking_saturation within 4h
     if check_dedup("booking_system", "booking_saturation", location_ref, window_seconds=14400):

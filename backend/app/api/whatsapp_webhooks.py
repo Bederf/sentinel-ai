@@ -222,10 +222,7 @@ async def handle_twilio_whatsapp_message(
 
     # Twilio signs against the public URL, not the internal proxy URL
     public_base = os.getenv("PUBLIC_BASE_URL", "").rstrip("/")
-    if public_base:
-        request_url = f"{public_base}/api/whatsapp/twilio"
-    else:
-        request_url = str(request.url)
+    request_url = f"{public_base}/api/whatsapp/twilio" if public_base else str(request.url)
 
     if not _verify_twilio_signature(request_url, params, X_Twilio_Signature):
         raise HTTPException(status_code=403, detail="Invalid Twilio signature")

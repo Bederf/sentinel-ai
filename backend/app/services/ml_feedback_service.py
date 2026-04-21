@@ -482,7 +482,7 @@ class MLFeedbackService:
 
         return {
             "refreshed_sites": len(refreshed),
-            "site_ids": sorted(list(refreshed.keys())),
+            "site_ids": sorted(refreshed.keys()),
         }
 
     def get_scoring_inputs(self, site_id: str) -> dict[str, Any]:

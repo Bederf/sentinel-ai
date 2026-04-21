@@ -20,6 +20,7 @@ Services must NOT contain hardcoded model strings.
 
 from __future__ import annotations
 
+import contextlib
 import logging
 from collections.abc import AsyncGenerator
 
@@ -277,11 +278,11 @@ class ModelGateway:
                         }
                     ]
 
-                kwargs: dict = dict(
-                    model=model,
-                    max_tokens=max_tokens,
-                    messages=messages,
-                )
+                kwargs: dict = {
+                    "model": model,
+                    "max_tokens": max_tokens,
+                    "messages": messages,
+                }
                 if system_blocks:
                     kwargs["system"] = system_blocks
                 if tools:
@@ -338,7 +339,7 @@ class ModelGateway:
                     "max_tokens": max_tokens,
                 }
                 if system:
-                    payload["messages"] = [{"role": "system", "content": system}] + list(messages)
+                    payload["messages"] = [{"role": "system", "content": system}, *list(messages)]
                 if tools:
                     payload["tools"] = tools
 
@@ -385,7 +386,7 @@ class ModelGateway:
                 "max_tokens": max_tokens,
             }
             if system:
-                payload["messages"] = [{"role": "system", "content": system}] + list(messages)
+                payload["messages"] = [{"role": "system", "content": system}, *list(messages)]
             if tools:
                 payload["tools"] = tools
 
@@ -412,7 +413,7 @@ class ModelGateway:
                                     yield delta
                                 usage = chunk.get("usage", {})
                                 if usage:
-                                    try:
+                                    with contextlib.suppress(Exception):
                                         usage_tracker.record(
                                             provider="azure_openai",
                                             model=model,
@@ -420,8 +421,6 @@ class ModelGateway:
                                             output_tokens=usage.get("completion_tokens", 0),
                                             source=source,
                                         )
-                                    except Exception:
-                                        pass
 
                 return stream_gen()
             else:

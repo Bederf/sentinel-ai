@@ -12,6 +12,7 @@ Configuration:
 """
 
 import asyncio
+import contextlib
 import logging
 import random
 from datetime import datetime
@@ -81,10 +82,8 @@ class HealthSimulationService:
         self.is_running = False
         if self._task:
             self._task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._task
-            except asyncio.CancelledError:
-                pass
 
     def defer_to_orchestrator(self, task_id: str) -> bool:
         """
@@ -304,7 +303,7 @@ class HealthSimulationService:
         """Update equipment health in Supabase."""
         try:
             # Round to integer since health_score is INTEGER in database
-            health_int = int(round(new_health))
+            health_int = round(new_health)
             self.client.table("equipment").update(
                 {
                     "health_score": health_int,

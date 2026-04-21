@@ -26,7 +26,7 @@ import logging
 import random
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from app.core.site_resolver import get_primary_site_code
@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 # === Enums ===
 
 
-class DispatchSource(str, Enum):
+class DispatchSource(StrEnum):
     """Energy source in the priority stack."""
 
     SOLAR = "solar"
@@ -47,7 +47,7 @@ class DispatchSource(str, Enum):
     GENERATOR = "generator"
 
 
-class GeneratorEventType(str, Enum):
+class GeneratorEventType(StrEnum):
     """Types of generator events."""
 
     START = "start"

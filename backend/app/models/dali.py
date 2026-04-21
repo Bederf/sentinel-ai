@@ -5,11 +5,11 @@ Models for controllers, sensors (PIR/daylight), luminaires, and zone aggregation
 """
 
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 
-class ControllerStatus(str, Enum):
+class ControllerStatus(StrEnum):
     """Status of a DALI controller."""
 
     ONLINE = "online"
@@ -18,7 +18,7 @@ class ControllerStatus(str, Enum):
     COMMISSIONING = "commissioning"
 
 
-class SensorType(str, Enum):
+class SensorType(StrEnum):
     """Type of DALI sensor."""
 
     PIR = "pir"
@@ -27,7 +27,7 @@ class SensorType(str, Enum):
     SWITCH = "switch"
 
 
-class LuminaireType(str, Enum):
+class LuminaireType(StrEnum):
     """Type of luminaire."""
 
     LED_DOWNLIGHT = "led_downlight"

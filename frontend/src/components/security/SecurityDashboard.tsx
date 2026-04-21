@@ -617,7 +617,7 @@ export function SecurityDashboard({ siteId: propSiteId }: SecurityDashboardProps
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded" style={{ background: "rgba(59, 130, 246, 0.15)" }}>
-              <Shield className="h-6 w-6" style={{ color: "#3B82F6" }} />
+              <Shield className="h-6 w-6" style={{ color: "var(--color-sentinel-blue)" }} />
             </div>
             <div>
               <h1 className="text-2xl font-bold tracking-tight" style={{ color: "var(--color-sentinel-text-primary)" }}>

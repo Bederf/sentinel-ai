@@ -123,7 +123,7 @@ export function HVACIntelligenceCard({ siteId, onNavigate }: HVACIntelligenceCar
     <IntelligenceCard
       title="HVAC Intelligence"
       subtitle="Climate control &amp; thermal management"
-      icon={<Thermometer className="h-5 w-5" style={{ color: '#3B82F6' }} />}
+      icon={<Thermometer className="h-5 w-5" style={{ color: 'var(--color-sentinel-blue)' }} />}
       iconBg="rgba(59, 130, 246, 0.15)"
       accentColor="var(--color-sentinel-blue)"
       badge={badge}
@@ -132,9 +132,9 @@ export function HVACIntelligenceCard({ siteId, onNavigate }: HVACIntelligenceCar
       onNavigate={onNavigate}
       metrics={
         <>
-          <ValueMetricBox label="Pre-cooling runway" value={runwayHours > 0 ? `${runwayHours.toFixed(1)}h` : '—'} color="#3B82F6" />
-          <ValueMetricBox label="Zone comfort maintained" value={zonesTotal > 0 ? `${zonesComfort}%` : '—'} color={zonesComfort >= 90 ? '#22C55E' : '#F59E0B'} />
-          <ValueMetricBox label="Anomalies detected" value={`${zonesFault}`} color={zonesFault > 0 ? '#EF4444' : '#22C55E'} />
+          <ValueMetricBox label="Pre-cooling runway" value={runwayHours > 0 ? `${runwayHours.toFixed(1)}h` : '—'} color="var(--color-sentinel-blue)" />
+          <ValueMetricBox label="Zone comfort maintained" value={zonesTotal > 0 ? `${zonesComfort}%` : '—'} color={zonesComfort >= 90 ? 'var(--color-sentinel-green)' : 'var(--color-sentinel-amber)'} />
+          <ValueMetricBox label="Anomalies detected" value={`${zonesFault}`} color={zonesFault > 0 ? 'var(--color-sentinel-red)' : 'var(--color-sentinel-green)'} />
         </>
       }
       comparison={baselineCost > 0 ? (
@@ -144,7 +144,7 @@ export function HVACIntelligenceCard({ siteId, onNavigate }: HVACIntelligenceCar
           unit="ZAR"
           baselineLabel="Unplanned failure risk"
           optimizedLabel="With SENTINEL prediction"
-          accentColor="#3B82F6"
+          accentColor="var(--color-sentinel-blue)"
         />
       ) : undefined}
     />

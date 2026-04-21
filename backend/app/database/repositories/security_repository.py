@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from app.database.supabase_client import get_supabase_client
-from app.models.security import AccessEvent, AccessStatus, AlertStatus, SecurityAlert, VisitorStatus
+from app.models.security import AccessEvent, AlertStatus, SecurityAlert, VisitorStatus
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +78,7 @@ class SecurityRepository:
 
             # Backup to JSON
             backup = self._load_json_backup("access_events")
-            backup[site] = [e for e in events]
+            backup[site] = list(events)
             self._save_json_backup("access_events", backup)
 
             return events
@@ -322,49 +322,27 @@ class SecurityRepository:
     # ========================================================================
 
     def get_occupancy(self, site: str) -> dict[str, Any]:
-        """Get current building occupancy from badge events and visitors."""
+        """Get current building occupancy from LD2410C radar access events."""
         try:
-            # Get recent badge access (last 30 min)
             thirty_min_ago = (datetime.now() - timedelta(minutes=30)).isoformat()
 
             response = (
                 self.client.table("access_events")
-                .select("*")
+                .select("occupancy_count", "event_type")
                 .eq("site_id", site)
-                .gte("timestamp", thirty_min_ago)
-                .eq("status", AccessStatus.GRANTED)
+                .gte("recorded_at", thirty_min_ago)
                 .execute()
             )
 
-            recent_events = response.data
-
-            # Count unique people (granted access in last 30 min)
-            people_in = set()
-            for event in recent_events:
-                if event.get("status") == AccessStatus.GRANTED:
-                    people_in.add(event.get("person_name"))
-
-            # Add checked-in visitors
-            visitors_resp = (
-                self.client.table("visitors")
-                .select("*")
-                .eq("site", site)
-                .eq("status", VisitorStatus.CHECKED_IN)
-                .execute()
-            )
-
-            for visitor in visitors_resp.data:
-                people_in.add(visitor.get("name"))
+            events = response.data
+            total = sum(e.get("occupancy_count", 0) for e in events)
 
             return {
-                "total_occupancy": len(people_in),
-                "by_floor": {"L0": len([p for p in people_in if True])},  # Simplified
-                "by_zone": {},
+                "total_occupancy": total,
                 "last_updated": datetime.now().isoformat(),
             }
         except Exception as e:
-            logger.warning(f"Failed to calculate occupancy for {site}: {e}")
-            return {"total_occupancy": 0, "by_floor": {}, "by_zone": {}, "last_updated": datetime.now().isoformat()}
+            return {"total_occupancy": 0, "error": str(e)}
 
     # ========================================================================
     # Helper Methods

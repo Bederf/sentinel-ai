@@ -952,13 +952,12 @@ def _match_reasons(
         reasons.append(document.document_type)
     if hints.equipment_categories and document.equipment_category in hints.equipment_categories:
         reasons.append(document.equipment_category)
-    if hints.annual_intent and "annual" not in reasons:
-        if (
-            "annual" in combined_tokens
-            or "annual" in document.title.lower()
-            or "annual" in document.cleaned_text.lower()
-        ):
-            reasons.append("annual")
+    if hints.annual_intent and "annual" not in reasons and (
+        "annual" in combined_tokens
+        or "annual" in document.title.lower()
+        or "annual" in document.cleaned_text.lower()
+    ):
+        reasons.append("annual")
 
     deduped: list[str] = []
     for reason in reasons:
@@ -998,7 +997,7 @@ def _post_openai_chat(messages: list[dict[str, str]], model: str | None) -> dict
         model = settings.openai_model
     payload = {
         "model": model,
-        "messages": [{"role": "system", "content": "You are a concise metadata assistant."}] + messages,
+        "messages": [{"role": "system", "content": "You are a concise metadata assistant."}, *messages],
         "temperature": 0.2,
     }
     try:
@@ -1203,7 +1202,7 @@ def _file_name_from_path(value: str) -> str:
 
 def _build_display_path(repository_description: str, actual_path: str) -> str:
     if repository_description:
-        label, separator, raw_path = repository_description.partition(":")
+        label, separator, _raw_path = repository_description.partition(":")
         if separator and label.strip():
             return label.strip()
         if repository_description.strip():

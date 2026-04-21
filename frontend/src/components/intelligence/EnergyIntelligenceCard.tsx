@@ -85,7 +85,7 @@ export function EnergyIntelligenceCard({ siteId, onNavigate }: EnergyIntelligenc
     <IntelligenceCard
       title="Energy Intelligence"
       subtitle="Optimisation &amp; cost management"
-      icon={<Zap className="h-5 w-5" style={{ color: '#10B981' }} />}
+      icon={<Zap className="h-5 w-5" style={{ color: 'var(--color-sentinel-green)' }} />}
       iconBg="rgba(16, 185, 129, 0.15)"
       accentColor="var(--color-sentinel-green)"
       badge={badge}
@@ -94,9 +94,9 @@ export function EnergyIntelligenceCard({ siteId, onNavigate }: EnergyIntelligenc
       onNavigate={onNavigate}
       metrics={
         <>
-          <ValueMetricBox label="Optimisations applied" value={`${applied}`} color={applied > 0 ? '#10B981' : '#6B7280'} />
-          <ValueMetricBox label="Mode" value={mode === 'automatic' ? 'Auto' : 'Supervised'} color="#3B82F6" />
-          <ValueMetricBox label="Savings rate" value={hasValue(savingsPerHour) ? `${formatCurrencyZAR(savingsPerHour)}/hr` : '—'} color="#F59E0B" />
+          <ValueMetricBox label="Optimisations applied" value={`${applied}`} color={applied > 0 ? 'var(--color-sentinel-green)' : 'var(--color-sentinel-text-secondary)'} />
+          <ValueMetricBox label="Mode" value={mode === 'automatic' ? 'Auto' : 'Supervised'} color="var(--color-sentinel-blue)" />
+          <ValueMetricBox label="Savings rate" value={hasValue(savingsPerHour) ? `${formatCurrencyZAR(savingsPerHour)}/hr` : '—'} color="var(--color-sentinel-amber)" />
         </>
       }
       comparison={monthlyBaseline > 0 ? (
@@ -106,7 +106,7 @@ export function EnergyIntelligenceCard({ siteId, onNavigate }: EnergyIntelligenc
           unit="ZAR"
           baselineLabel="Monthly energy cost"
           optimizedLabel="With SENTINEL optimisation"
-          accentColor="#10B981"
+          accentColor="var(--color-sentinel-green)"
         />
       ) : undefined}
     />

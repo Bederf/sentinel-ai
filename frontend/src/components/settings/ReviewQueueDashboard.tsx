@@ -45,22 +45,22 @@ interface BulkConfirmModalState {
 
 function safetyBadgeStyle(safetyClass: string): React.CSSProperties {
   if (safetyClass === "HIGH") {
-    return { background: "rgba(239,68,68,0.15)", color: "#ef4444", border: "1px solid rgba(239,68,68,0.3)" };
+    return { background: "rgba(239,68,68,0.15)", color: "var(--color-sentinel-red)", border: "1px solid rgba(239,68,68,0.3)" };
   }
   if (safetyClass === "MEDIUM") {
     return { background: "rgba(245,158,11,0.15)", color: "var(--color-sentinel-amber)", border: "1px solid rgba(245,158,11,0.3)" };
   }
-  return { background: "rgba(34,197,94,0.15)", color: "#22c55e", border: "1px solid rgba(34,197,94,0.3)" };
+  return { background: "rgba(34,197,94,0.15)", color: "var(--color-sentinel-green)", border: "1px solid rgba(34,197,94,0.3)" };
 }
 
 function confidenceBadgeStyle(confidenceLevel: string): React.CSSProperties {
   if (confidenceLevel === "HIGH") {
-    return { background: "rgba(34,197,94,0.15)", color: "#22c55e", border: "1px solid rgba(34,197,94,0.3)" };
+    return { background: "rgba(34,197,94,0.15)", color: "var(--color-sentinel-green)", border: "1px solid rgba(34,197,94,0.3)" };
   }
   if (confidenceLevel === "MEDIUM") {
     return { background: "rgba(245,158,11,0.15)", color: "var(--color-sentinel-amber)", border: "1px solid rgba(245,158,11,0.3)" };
   }
-  return { background: "rgba(239,68,68,0.15)", color: "#ef4444", border: "1px solid rgba(239,68,68,0.3)" };
+  return { background: "rgba(239,68,68,0.15)", color: "var(--color-sentinel-red)", border: "1px solid rgba(239,68,68,0.3)" };
 }
 
 const textPrimary: React.CSSProperties = { color: "var(--color-sentinel-text-primary)" };
@@ -220,7 +220,7 @@ export function ReviewQueueDashboard({
             <div className="flex items-center gap-3">
               <div
                 className="p-2 rounded"
-                style={{ background: "rgba(99,102,241,0.15)", color: "#818cf8" }}
+                style={{ background: "rgba(99,102,241,0.15)", color: "var(--color-sentinel-blue)" }}
               >
                 <ClipboardCheck className="h-5 w-5" />
               </div>
@@ -237,7 +237,7 @@ export function ReviewQueueDashboard({
               type="button"
               onClick={handleBulkApprove}
               className="flex items-center gap-1 px-3 py-1.5 rounded text-xs font-medium transition-colors hover:brightness-110"
-              style={{ background: "rgba(34,197,94,0.15)", color: "#22c55e", border: "1px solid rgba(34,197,94,0.3)" }}
+              style={{ background: "rgba(34,197,94,0.15)", color: "var(--color-sentinel-green)", border: "1px solid rgba(34,197,94,0.3)" }}
             >
               <CheckCircle className="h-3 w-3" />
               Bulk Approve Safe
@@ -254,7 +254,7 @@ export function ReviewQueueDashboard({
             </div>
             <div className="rounded p-3" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
               <p className="text-xs mb-1" style={textSecondary}>High Priority</p>
-              <p className="text-2xl font-bold" style={{ color: "#ef4444" }}>{stats.high_priority_count}</p>
+              <p className="text-2xl font-bold" style={{ color: "var(--color-sentinel-red)" }}>{stats.high_priority_count}</p>
             </div>
             <div className="rounded p-3" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
               <p className="text-xs mb-1" style={textSecondary}>Avg Age (hrs)</p>
@@ -323,7 +323,7 @@ export function ReviewQueueDashboard({
             </div>
           ) : entries.length === 0 ? (
             <div className="p-8 text-center">
-              <CheckCircle className="h-8 w-8 mx-auto mb-2" style={{ color: "#22c55e" }} />
+              <CheckCircle className="h-8 w-8 mx-auto mb-2" style={{ color: "var(--color-sentinel-green)" }} />
               <p className="text-sm" style={textSecondary}>
                 No pending reviews{safetyFilter ? ` for safety class ${safetyFilter}` : ""}
               </p>
@@ -348,7 +348,7 @@ export function ReviewQueueDashboard({
                           <span
                             key={tag}
                             className="px-1.5 py-0.5 rounded text-xs"
-                            style={{ background: "rgba(99,102,241,0.15)", color: "#818cf8", border: "1px solid rgba(99,102,241,0.3)" }}
+                            style={{ background: "rgba(99,102,241,0.15)", color: "var(--color-sentinel-blue)", border: "1px solid rgba(99,102,241,0.3)" }}
                           >
                             {tag}
                           </span>
@@ -368,7 +368,7 @@ export function ReviewQueueDashboard({
                     <td className="px-3 py-2">
                       <span
                         className="px-1.5 py-0.5 rounded text-xs font-medium"
-                        style={entry.priority <= 50 ? { color: "#ef4444", background: "rgba(239,68,68,0.1)" } : textSecondary}
+                        style={entry.priority <= 50 ? { color: "var(--color-sentinel-red)", background: "rgba(239,68,68,0.1)" } : textSecondary}
                       >
                         {entry.priority}
                       </span>
@@ -386,7 +386,7 @@ export function ReviewQueueDashboard({
                           type="button"
                           onClick={() => handleApprove(entry.id)}
                           className="flex items-center gap-0.5 px-2 py-1 rounded transition-colors hover:brightness-110"
-                          style={{ background: "rgba(34,197,94,0.1)", color: "#22c55e", border: "1px solid rgba(34,197,94,0.2)" }}
+                          style={{ background: "rgba(34,197,94,0.1)", color: "var(--color-sentinel-green)", border: "1px solid rgba(34,197,94,0.2)" }}
                         >
                           <CheckCircle className="h-3 w-3" />
                           Approve
@@ -395,7 +395,7 @@ export function ReviewQueueDashboard({
                           type="button"
                           onClick={() => handleReject(entry.id)}
                           className="flex items-center gap-0.5 px-2 py-1 rounded transition-colors hover:brightness-110"
-                          style={{ background: "rgba(239,68,68,0.1)", color: "#ef4444", border: "1px solid rgba(239,68,68,0.2)" }}
+                          style={{ background: "rgba(239,68,68,0.1)", color: "var(--color-sentinel-red)", border: "1px solid rgba(239,68,68,0.2)" }}
                         >
                           <XCircle className="h-3 w-3" />
                           Reject
@@ -469,7 +469,7 @@ export function ReviewQueueDashboard({
                 type="button"
                 onClick={submitApprove}
                 className="flex items-center gap-1.5 px-4 py-1.5 rounded text-sm font-medium transition-colors hover:brightness-110"
-                style={{ background: "rgba(34,197,94,0.15)", color: "#22c55e", border: "1px solid rgba(34,197,94,0.3)" }}
+                style={{ background: "rgba(34,197,94,0.15)", color: "var(--color-sentinel-green)", border: "1px solid rgba(34,197,94,0.3)" }}
               >
                 <CheckCircle className="h-4 w-4" />
                 Approve
@@ -500,7 +500,7 @@ export function ReviewQueueDashboard({
               </p>
               <div>
                 <label className="block text-xs mb-1.5 font-medium" style={textSecondary}>
-                  Reason <span style={{ color: "#ef4444" }}>*</span>
+                  Reason <span style={{ color: "var(--color-sentinel-red)" }}>*</span>
                 </label>
                 <input
                   type="text"
@@ -536,7 +536,7 @@ export function ReviewQueueDashboard({
                 onClick={submitReject}
                 disabled={!rejectModal.reason.trim()}
                 className="flex items-center gap-1.5 px-4 py-1.5 rounded text-sm font-medium transition-colors hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed"
-                style={{ background: "rgba(239,68,68,0.15)", color: "#ef4444", border: "1px solid rgba(239,68,68,0.3)" }}
+                style={{ background: "rgba(239,68,68,0.15)", color: "var(--color-sentinel-red)", border: "1px solid rgba(239,68,68,0.3)" }}
               >
                 <XCircle className="h-4 w-4" />
                 Reject
@@ -564,7 +564,7 @@ export function ReviewQueueDashboard({
             <div className="px-5 py-4">
               <p className="text-sm mb-3" style={textPrimary}>
                 Approve{" "}
-                <span className="font-semibold" style={{ color: "#22c55e" }}>
+                <span className="font-semibold" style={{ color: "var(--color-sentinel-green)" }}>
                   {bulkModal.eligibleIds.length}
                 </span>{" "}
                 classifications?
@@ -587,7 +587,7 @@ export function ReviewQueueDashboard({
                 type="button"
                 onClick={submitBulkApprove}
                 className="flex items-center gap-1.5 px-4 py-1.5 rounded text-sm font-medium transition-colors hover:brightness-110"
-                style={{ background: "rgba(34,197,94,0.15)", color: "#22c55e", border: "1px solid rgba(34,197,94,0.3)" }}
+                style={{ background: "rgba(34,197,94,0.15)", color: "var(--color-sentinel-green)", border: "1px solid rgba(34,197,94,0.3)" }}
               >
                 <CheckCircle className="h-4 w-4" />
                 Approve All

@@ -110,6 +110,24 @@ SENSOR_MAPPING: dict[str, dict[str, str]] = {
         "pfc_current_a": "current_a",
         "pfc_voltage_v": "voltage_v",
     },
+    # Site-wide aggregate from /telemetry bridge endpoint
+    "site_aggregate": {
+        "lighting_kw": "lighting_kw",
+        "hvac_kw": "hvac_kw",
+        "total_kw": "total_kw",
+        "flow_lpm": "flow_lpm",
+        "pressure_bar": "pressure_bar",
+        "zone_count": "zone_count",
+        "equip_online": "equip_online",
+        # Occupancy from SecurityOccupancyService
+        "total_occupancy": "total_occupancy",
+        "occupied_zones": "occupied_zones",
+        "peak_zone_density": "peak_zone_density",
+        # Derived features (populated at ingest time, not from bridge)
+        "hvac_ratio": "hvac_ratio",
+        "lighting_ratio": "lighting_ratio",
+        "non_hvac_kw": "non_hvac_kw",
+    },
     "bess": {
         "bess_soc_pct": "soc_pct",
         "bess_charge_power_kw": "charge_power_kw",
@@ -222,6 +240,20 @@ class SentinelMLFeeder:
                     value = readings.get(sim_key)
                     if value is not None:
                         self._buffers[equip_type][ml_feature].append(float(value))
+
+                # Derive site-level ratios for site_aggregate
+                if equip_type == "site_aggregate":
+                    hvac_kw = readings.get("hvac_kw")
+                    lighting_kw = readings.get("lighting_kw")
+                    total_kw = readings.get("total_kw")
+                    if total_kw and total_kw != 0:
+                        if hvac_kw is not None:
+                            self._buffers[equip_type]["hvac_ratio"].append(round(float(hvac_kw) / float(total_kw), 4))
+                        if lighting_kw is not None:
+                            self._buffers[equip_type]["lighting_ratio"].append(round(float(lighting_kw) / float(total_kw), 4))
+                    if hvac_kw is not None and lighting_kw is not None and total_kw is not None:
+                        non_hvac = float(total_kw) - float(hvac_kw) - float(lighting_kw)
+                        self._buffers[equip_type]["non_hvac_kw"].append(round(max(0, non_hvac), 3))
             else:
                 # Catch-all: store every sensor reading under its own name
                 # so no telemetry is discarded even for unmapped equipment types
@@ -262,7 +294,7 @@ class SentinelMLFeeder:
                 continue
 
             max_z = 0.0
-            for feature, values in buf.items():
+            for _feature, values in buf.items():
                 if len(values) < 12:  # Need at least 12 readings for a meaningful mean/std
                     continue
                 # Use last 72 readings as rolling window

@@ -60,7 +60,7 @@ class SurvivalModel:
         self.feature_cols = [c for c in data.columns if c not in exclude_cols]
 
         # Prepare training data
-        training_data = data[[duration_col, event_col] + self.feature_cols].copy()
+        training_data = data[[duration_col, event_col, *self.feature_cols]].copy()
 
         # Check for constant columns
         constant_cols = training_data[self.feature_cols].nunique()
@@ -68,7 +68,7 @@ class SurvivalModel:
         if constant_cols:
             logger.warning(f"Removing constant columns: {constant_cols}")
             self.feature_cols = [c for c in self.feature_cols if c not in constant_cols]
-            training_data = training_data[[duration_col, event_col] + self.feature_cols]
+            training_data = training_data[[duration_col, event_col, *self.feature_cols]]
 
         # Check minimum samples
         if len(training_data) < 10:
@@ -151,7 +151,7 @@ class SurvivalModel:
 
         return hazard_ratios
 
-    def predict_survival_probability(self, features, times: list[int] = None) -> pd.DataFrame:
+    def predict_survival_probability(self, features, times: list[int] | None = None) -> pd.DataFrame:
         """
         Predict survival probability at specific times.
 

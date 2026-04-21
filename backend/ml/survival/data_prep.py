@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 class SurvivalDataPrep:
     """Prepare survival data for Cox Proportional Hazards model."""
 
-    def __init__(self, data_path: str = None):
+    def __init__(self, data_path: str | None = None):
         """
         Initialize data prep.
 

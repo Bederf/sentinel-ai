@@ -13,7 +13,7 @@ Phase 53-02: Automated Triggers & Workflow Automation
 
 import logging
 from datetime import datetime, timedelta
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 # ============================================================================
 
 
-class TriggerType(str, Enum):
+class TriggerType(StrEnum):
     """Types of workflow triggers"""
 
     ML_ANOMALY = "ml_anomaly"
@@ -43,7 +43,7 @@ class TriggerType(str, Enum):
     REPAIR_VALIDATION = "repair_validation"
 
 
-class TriggerPriority(str, Enum):
+class TriggerPriority(StrEnum):
     """Trigger priority levels"""
 
     CRITICAL = "critical"

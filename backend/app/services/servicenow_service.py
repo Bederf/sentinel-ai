@@ -12,7 +12,7 @@ import asyncio
 import logging
 import os
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 import httpx
@@ -65,7 +65,7 @@ class ServiceNowConfig:
 # =============================================================================
 
 
-class ConnectionStatus(str, Enum):
+class ConnectionStatus(StrEnum):
     """ServiceNow connectivity state."""
 
     NOT_CONFIGURED = "not_configured"
@@ -354,7 +354,7 @@ class ServiceNowService:
                 *(self._probe_table(table) for table in batch),
                 return_exceptions=True,
             )
-            for table, result in zip(batch, results):
+            for table, result in zip(batch, results, strict=False):
                 if result is True:
                     discovered.append(table)
 

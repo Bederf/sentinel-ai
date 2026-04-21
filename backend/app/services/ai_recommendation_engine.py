@@ -16,7 +16,7 @@ Output: Ranked list of actionable recommendations with financial impact.
 
 import logging
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from statistics import mean
 from typing import Any
 
@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 
 # Recommendation categories
-class RecommendationType(str, Enum):
+class RecommendationType(StrEnum):
     """Types of recommendations"""
 
     LIGHTING_OPTIMIZATION = "lighting_optimization"

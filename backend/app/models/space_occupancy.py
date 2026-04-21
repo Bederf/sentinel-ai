@@ -12,10 +12,10 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 
 
-class RightSizingPattern(str, Enum):
+class RightSizingPattern(StrEnum):
     """Detectable room underuse patterns (presence-based, not count-based)."""
 
     EARLY_VACATE = "early_vacate"  # Room occupied then vacated >90 min before booking end

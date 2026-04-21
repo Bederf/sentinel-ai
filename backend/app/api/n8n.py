@@ -144,7 +144,7 @@ async def deactivate_workflow(
 @router.post("/trigger/{webhook_path:path}")
 async def trigger_webhook(
     webhook_path: str,
-    payload: dict = {},
+    payload: dict | None = None,
     test: bool = Query(False, description="Use test webhook URL"),
     auth: AuthContext = Depends(require_module(ModuleType.INTEGRATIONS)),
 ):
@@ -153,5 +153,7 @@ async def trigger_webhook(
     Used by the event bus to dispatch contractor notifications,
     email pipelines, etc. Requires Integrations module.
     """
+    if payload is None:
+        payload = {}
     service = get_n8n_service()
     return await service.trigger_webhook(webhook_path, payload, test=test)

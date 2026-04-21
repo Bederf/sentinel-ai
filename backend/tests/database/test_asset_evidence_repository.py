@@ -238,7 +238,7 @@ class TestAssetEvidenceRepository:
         test_input.equipment_id = equipment_id
 
         # Create 5 records
-        for i in range(5):
+        for _i in range(5):
             test_input.event_timestamp = datetime.utcnow()
             await repository.create(test_input)
 

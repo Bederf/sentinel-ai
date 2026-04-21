@@ -84,10 +84,7 @@ def _in_time_window(
 
     if start and ts < start:
         return False
-    if end and ts > end:
-        return False
-
-    return True
+    return not (end and ts > end)
 
 
 async def _replay_emails(

@@ -12,13 +12,14 @@ Time compression: 24 hours → configurable (default 24 minutes)
 """
 
 import asyncio
+import contextlib
 import logging
 import math
 import random
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from enum import Enum
+from enum import Enum, StrEnum
 from typing import Any
 
 from app.core.site_resolver import get_primary_site_code
@@ -67,7 +68,7 @@ class SimulatedHour(int, Enum):
     NIGHT = 22
 
 
-class EventType(str, Enum):
+class EventType(StrEnum):
     """Types of lifecycle events."""
 
     BUILDING_WAKE = "building_wake"
@@ -91,7 +92,7 @@ class EventType(str, Enum):
     SHADOW_WRITE = "shadow_write"
 
 
-class OperationMode(str, Enum):
+class OperationMode(StrEnum):
     """Building operation modes for comparison."""
 
     HVAC_ONLY = "hvac_only"
@@ -751,7 +752,7 @@ class LifecycleOrchestrator:
         scenario: str = "normal_day",
         duration_minutes: float = 24.0,
         start_hour: int = 0,
-        task_id: str = None,  # For checkpoint recovery
+        task_id: str | None = None,  # For checkpoint recovery
         speed_multiplier: float = 10.0,
         start_date: str | None = None,  # ISO date string e.g. "2025-06-15"
         max_cycles: int = 1,  # Number of full cycles before completing (0=infinite)
@@ -943,10 +944,8 @@ class LifecycleOrchestrator:
         # Cancel the async task
         if self._task and not self._task.done():
             self._task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError, Exception):
                 await self._task
-            except (asyncio.CancelledError, Exception):
-                pass
 
         # Write stopped status to DB (with final state snapshot)
         await self._write_stopped_status()
@@ -1875,12 +1874,12 @@ class LifecycleOrchestrator:
     def _accumulate_solar_daily(self, equipment_states: dict) -> None:
         """Accumulate solar/BESS data for daily aggregation from equipment states."""
         hourly_solar_kw = 0.0
-        for code, state in equipment_states.items():
+        for _code, state in equipment_states.items():
             if state.get("type", "").lower() == "inverter":
                 readings = state.get("sensor_readings", {})
                 hourly_solar_kw += readings.get("ac_power_kw", 0.0)
 
-        for code, state in equipment_states.items():
+        for _code, state in equipment_states.items():
             if state.get("type", "").lower() == "bess":
                 readings = state.get("sensor_readings", {})
                 self._daily_bess_charge_kwh += readings.get("charge_power_kw", 0.0)
@@ -2947,7 +2946,7 @@ class LifecycleOrchestrator:
         chillers = []
         pumps = []
 
-        for code, state in equipment_states.items():
+        for _code, state in equipment_states.items():
             if state.get("type") == "chiller":
                 chillers.append(state.get("health_score", 100))
             elif state.get("type") == "pump":
@@ -2960,7 +2959,7 @@ class LifecycleOrchestrator:
         cooling_capacity = min(chiller_health_avg, pump_health_avg) / 100.0
 
         if cooling_capacity < 0.9:  # Some degradation
-            for code, state in equipment_states.items():
+            for _code, state in equipment_states.items():
                 if state.get("type") in ("vav", "fcu"):
                     readings = state.get("sensor_readings", {})
                     # Reduce damper/valve effectiveness
@@ -3797,10 +3796,7 @@ class LifecycleOrchestrator:
             if solar_eff > 0:
                 # Time-of-day bell curve: peak at noon
                 hour_mod = hour % 24
-                if 6 <= hour_mod < 18:
-                    time_factor = max(0, 1.0 - abs(hour_mod - 12) / 6.0)
-                else:
-                    time_factor = 0.0
+                time_factor = max(0, 1.0 - abs(hour_mod - 12) / 6.0) if 6 <= hour_mod < 18 else 0.0
 
                 dc_power = panel_capacity_kw * (solar_eff / 100.0) * time_factor * (health / 100.0)
                 inv_efficiency = 0.96 * (health / 100.0)  # Degrades slightly with health
@@ -5096,7 +5092,7 @@ class LifecycleOrchestrator:
 
         by_type: dict[str, int] = {}
         healths: list[float] = []
-        for code, state in states.items():
+        for _code, state in states.items():
             t = state.get("type", "unknown")
             by_type[t] = by_type.get(t, 0) + 1
             healths.append(state.get("health_score", 0))

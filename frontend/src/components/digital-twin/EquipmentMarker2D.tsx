@@ -23,9 +23,9 @@ interface EquipmentMarker2DProps {
  */
 function getHealthColor(healthScore: number | undefined | null): string {
   const score = healthScore || 100;
-  if (score >= 60) return '#22c55e';
-  if (score >= 30) return '#f59e0b';
-  return '#ef4444';
+  if (score >= 60) return 'var(--color-sentinel-green)';
+  if (score >= 30) return 'var(--color-sentinel-amber)';
+  return 'var(--color-sentinel-red)';
 }
 
 /**
@@ -64,7 +64,7 @@ export function EquipmentMarker2D({
           <circle
             r={0.4}
             fill="none"
-            stroke="#3b82f6"
+            stroke="var(--color-sentinel-blue)"
             strokeWidth={0.06}
           />
           <style>
@@ -78,7 +78,7 @@ export function EquipmentMarker2D({
           <circle
             r={0.4}
             fill="none"
-            stroke="#3b82f6"
+            stroke="var(--color-sentinel-blue)"
             strokeWidth={0.06}
             opacity={0.6}
             style={{

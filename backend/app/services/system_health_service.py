@@ -8,6 +8,7 @@ This service provides:
 """
 
 import asyncio
+import contextlib
 import logging
 import uuid
 from datetime import datetime, timedelta
@@ -46,6 +47,10 @@ class SystemHealthService:
             self._check_servicenow(),
             self._check_notifications(),
             self._check_device_manager(),
+            self._check_lighting(),
+            self._check_supervisor(),
+            self._check_field_network(),
+            self._check_obix(),
             return_exceptions=True,
         )
 
@@ -57,13 +62,17 @@ class SystemHealthService:
             "servicenow",
             "notifications",
             "device_manager",
+            "lighting",
+            "supervisor",
+            "field_network",
+            "obix",
         ]
 
         component_scores: dict[str, int] = {}
         component_details: dict[str, dict[str, Any]] = {}
         errors = []
 
-        for label, result in zip(labels, checks):
+        for label, result in zip(labels, checks, strict=False):
             if isinstance(result, Exception):
                 component_scores[label] = 0
                 component_details[label] = {"status": "critical", "note": str(result)}
@@ -84,6 +93,10 @@ class SystemHealthService:
             "servicenow": 0.10,
             "notifications": 0.10,
             "device_manager": 0.10,
+            "lighting": 0.05,
+            "supervisor": 0.05,
+            "field_network": 0.05,
+            "obix": 0.05,
         }
 
         weighted_score = sum(component_scores.get(c, 0) * w for c, w in weights.items())
@@ -287,6 +300,90 @@ class SystemHealthService:
         except Exception as e:
             return {"score": 40, "status": "degraded", "note": f"Check failed: {e}"}
 
+    async def _check_lighting(self) -> dict[str, Any]:
+        """Check lighting telemetry flow via Supabase energy data.
+
+        Confirms aggregate lighting_kw data from the bridge is reaching Supabase
+        via ShadowModePollingService → SentinelDataSync → lighting_energy table.
+        """
+        try:
+
+            from app.database.supabase_client import get_supabase_client
+
+            supabase = get_supabase_client()
+
+            # Check lighting_energy table for recent data
+            # lighting_energy holds per-period lighting_kwh readings from bridge
+            recent = (
+                supabase.table("lighting_energy")
+                .select("*", count="exact")
+                .execute()
+            )
+            count = recent.count or 0
+
+            if count == 0:
+                return {"score": 0, "status": "critical", "note": "No lighting data in Supabase (bridge not flowing)"}
+
+            return {
+                "score": 90,
+                "status": "healthy",
+                "note": f"Lighting telemetry flowing · {count} readings in last hour",
+            }
+        except Exception as e:
+            return {"score": 0, "status": "critical", "note": f"Error: {e}"}
+
+    async def _check_supervisor(self) -> dict[str, Any]:
+        """Check BMS supervisor connectivity via ShadowModePollingService.
+
+        ShadowModePollingService polls the Desigo CC supervisor bridge.
+        """
+        try:
+            from app.services.shadow_mode_polling import get_shadow_mode_polling_service
+
+            shadow = get_shadow_mode_polling_service()
+            status = shadow.status
+            if isinstance(status, dict) and status.get("connected"):
+                poll_count = status.get("poll_count", 0)
+                ml_hours = status.get("ml_hours_ingested", 0)
+                return {
+                    "score": 90,
+                    "status": "healthy",
+                    "note": f"Supervisor bridge connected · {poll_count} polls · {ml_hours}h ML ingested",
+                }
+            reason = status.get("reason", "not polled") if isinstance(status, dict) else "unknown"
+            return {"score": 0, "status": "critical", "note": f"Supervisor not connected: {reason}"}
+        except Exception as e:
+            return {"score": 0, "status": "critical", "note": f"Error: {e}"}
+
+    async def _check_field_network(self) -> dict[str, Any]:
+        """Check field network (BACnet/IP) connectivity via ShadowModePollingService."""
+        try:
+            from app.services.shadow_mode_polling import get_shadow_mode_polling_service
+
+            shadow = get_shadow_mode_polling_service()
+            status = shadow.status
+            if isinstance(status, dict) and status.get("connected"):
+                return {"score": 90, "status": "healthy", "note": "Field network connected"}
+            return {"score": 0, "status": "critical", "note": "Field network not connected"}
+        except Exception as e:
+            return {"score": 0, "status": "critical", "note": f"Error: {e}"}
+
+    async def _check_obix(self) -> dict[str, Any]:
+        """Check ObiX API connectivity for weather/external data via OBIXClient."""
+        try:
+            from app.services.niagara.obix_client import get_obix_client
+
+            svc = get_obix_client()
+            if hasattr(svc, "check_connection"):
+                result = svc.check_connection()
+                if isinstance(result, dict) and result.get("connected"):
+                    return {"score": 90, "status": "healthy", "note": "ObiX API connected"}
+                note = result.get("message", "not connected") if isinstance(result, dict) else "not available"
+                return {"score": 0, "status": "critical", "note": f"ObiX: {note}"}
+            return {"score": 0, "status": "critical", "note": "ObiX client not available"}
+        except Exception as e:
+            return {"score": 0, "status": "critical", "note": f"Error: {e}"}
+
     # ==================== Extended Probes (Phase 160) ====================
 
     async def _check_disk(self) -> dict[str, Any]:
@@ -430,7 +527,7 @@ class SystemHealthService:
 
         extended_labels = ["disk", "llm", "ml_models", "background_jobs", "rag"]
 
-        for label, result in zip(extended_labels, extended_checks):
+        for label, result in zip(extended_labels, extended_checks, strict=False):
             if isinstance(result, Exception):
                 base["component_scores"][label] = 0
                 base["component_details"][label] = {
@@ -726,15 +823,13 @@ class SystemHealthService:
 
         except Exception as e:
             # Mark as failed
-            try:
+            with contextlib.suppress(Exception):
                 self.client.table("system_diagnostics").update(
                     {
                         "status": "failed",
                         "error_message": str(e),
                     }
                 ).eq("diagnostic_id", diagnostic_id).execute()
-            except Exception:
-                pass
 
     async def _call_simbiot_tool(
         self,

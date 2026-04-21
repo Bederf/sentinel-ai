@@ -98,6 +98,7 @@ export const WaterAlertPanel: React.FC<WaterAlertPanelProps> = ({
       }
     },
     refetchInterval: 30 * 1000, // Refresh every 30 seconds
+    enabled: !!siteId, // Skip query when siteId is empty (avoids /sites// double-slash)
   });
 
   // Get severity icon

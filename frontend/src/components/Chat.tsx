@@ -404,7 +404,7 @@ export function Chat() {
       >
         {/* STT error message */}
         {stt.error && (
-          <p className="text-xs mb-2" style={{ color: "#f44" }}>
+          <p className="text-xs mb-2" style={{ color: "var(--color-sentinel-red)" }}>
             {stt.error}
           </p>
         )}
@@ -470,10 +470,10 @@ export function Chat() {
                   ? "rgba(255, 68, 68, 0.2)"
                   : "var(--color-grafana-bg-panel)",
                 border: stt.isListening
-                  ? "1px solid #f44"
+                  ? "1px solid var(--color-sentinel-red)"
                   : "1px solid var(--color-grafana-border)",
                 color: stt.isListening
-                  ? "#f44"
+                  ? "var(--color-sentinel-red)"
                   : "var(--color-grafana-text-secondary)",
                 animation: stt.isListening ? "pulse 1.5s ease-in-out infinite" : undefined,
               }}
@@ -498,7 +498,7 @@ export function Chat() {
                   ? "1px solid rgba(255,136,0,0.6)"
                   : "1px solid var(--color-grafana-border)",
                 color: voiceMode
-                  ? "#ff8800"
+                  ? "var(--color-sentinel-orange)"
                   : "var(--color-grafana-text-secondary)",
               }}
               aria-label={voiceMode ? "Disable voice mode" : "Enable voice mode"}

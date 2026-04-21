@@ -328,13 +328,25 @@ export function OptimizationInfoCard({
               className="text-lg font-semibold"
               style={{ color: "var(--color-sentinel-text-primary)" }}
             >
-              {isAdvisory ? "Advisory" : isAutoMode ? "Auto" : "Supervised"}
+              {onboardingPhase === "shadow"
+                ? "Shadow"
+                : isAdvisory
+                  ? "Advisory"
+                  : isAutoMode
+                    ? "Auto"
+                    : "Supervised"}
             </div>
             <div
               className="text-xs"
               style={{ color: "var(--color-sentinel-text-secondary)" }}
             >
-              {isAdvisory ? "Learning & advising" : isAutoMode ? "AI auto-applies" : "Human approval"}
+              {onboardingPhase === "shadow"
+                ? "Learning & monitoring"
+                : isAdvisory
+                  ? "Learning & advising"
+                  : isAutoMode
+                    ? "AI auto-applies"
+                    : "Human approval"}
             </div>
           </div>
         </div>

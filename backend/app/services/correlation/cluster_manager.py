@@ -224,7 +224,7 @@ def link_entities_to_cluster(conn, cluster_id: uuid.UUID) -> int:
                 WHERE id IN ({e_placeholders})
                   AND (issue_cluster_id IS NULL OR issue_cluster_id != %s)
                 """,
-                [str(cluster_id)] + entity_ids + [str(cluster_id)],
+                [str(cluster_id), *entity_ids, str(cluster_id)],
             )
 
         # 4. Create involves edges (signal → entity), skip duplicates

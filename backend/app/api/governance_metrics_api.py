@@ -89,10 +89,7 @@ def _percentile_from_buckets(buckets: list[dict[str, Any]], target: float) -> fl
 
     for b in sorted_buckets:
         le_str = b["labels"].get("le", "+Inf")
-        if le_str == "+Inf":
-            upper = float("inf")
-        else:
-            upper = float(le_str)
+        upper = float("inf") if le_str == "+Inf" else float(le_str)
 
         count = b["value"]
         if count >= threshold:

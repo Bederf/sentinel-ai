@@ -12,6 +12,7 @@ Endpoints used:
   GET /api_allowance - Check remaining API quota
 """
 
+import contextlib
 import logging
 import time
 from dataclasses import dataclass
@@ -235,10 +236,8 @@ class EskomSePushService:
                 if "stage" in note.lower():
                     parts = note.lower().replace("stage", "").strip().split()
                     if parts:
-                        try:
+                        with contextlib.suppress(ValueError, IndexError):
                             stage_num = int(parts[0])
-                        except (ValueError, IndexError):
-                            pass
 
                 area_events.append(
                     AreaEvent(

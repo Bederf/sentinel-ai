@@ -360,7 +360,7 @@ class LightingSimulationEngine:
             # Determine dim level (0-254 DALI scale)
             dim_ratio = per_lum_power_w / sample_rated if sample_rated > 0 else 0.0
             dim_ratio = min(1.0, dim_ratio)
-            dali_level = int(round(dim_ratio * 254))
+            dali_level = round(dim_ratio * 254)
 
             # Assign zone to a sceneCOM controller (1 per floor)
             zone_config = self._zone_cache.get(zone_id, {})
@@ -491,7 +491,7 @@ class LightingSimulationEngine:
             # --- Sensor telemetry (one per zone) ---
             # Derive occupancy count from percent and typical occupancy
             typical = zone_config.get("typical_occupancy", 10)
-            occ_count = max(0, int(round(occupancy_pct / 100.0 * typical)))
+            occ_count = max(0, round(occupancy_pct / 100.0 * typical))
             sensor_records.append(
                 {
                     "sensor_id": f"PIR-{zone_id}",

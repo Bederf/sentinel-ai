@@ -11,7 +11,7 @@ recommendations derived from inspection measurement data over time.
 """
 
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
@@ -20,7 +20,7 @@ from pydantic import BaseModel, Field
 # ============================================================================
 
 
-class TrendDirection(str, Enum):
+class TrendDirection(StrEnum):
     """Direction of element degradation trend."""
 
     IMPROVING = "improving"
@@ -29,7 +29,7 @@ class TrendDirection(str, Enum):
     RAPID_DEGRADING = "rapid_degrading"
 
 
-class TrendSource(str, Enum):
+class TrendSource(StrEnum):
     """Source of a trend data point."""
 
     INSPECTION = "inspection"
@@ -97,7 +97,7 @@ class EquipmentTrendSummary(BaseModel):
 # ============================================================================
 
 
-class RiskLevel(str, Enum):
+class RiskLevel(StrEnum):
     """Risk level classification for RUL predictions."""
 
     LOW = "low"
@@ -106,7 +106,7 @@ class RiskLevel(str, Enum):
     CRITICAL = "critical"
 
 
-class Urgency(str, Enum):
+class Urgency(StrEnum):
     """Urgency classification for service recommendations."""
 
     ROUTINE = "routine"
@@ -180,7 +180,7 @@ class AnalyzeChangesRequest(BaseModel):
 # ============================================================================
 
 
-class UtilizationStatus(str, Enum):
+class UtilizationStatus(StrEnum):
     """Status classification for asset utilization."""
 
     HEALTHY = "healthy"

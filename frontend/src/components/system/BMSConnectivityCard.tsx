@@ -37,12 +37,16 @@ export function BMSConnectivityCard({ health }: BMSConnectivityCardProps) {
     critical: 'var(--color-sentinel-red)',
   };
 
-  // Mock subsystem data for local fallback mode
+  const supervisor = health.components['supervisor'] || { name: 'supervisor', status: 'critical', score: 0 };
+  const fieldNetwork = health.components['field_network'] || { name: 'field_network', status: 'critical', score: 0 };
+  const obix = health.components['obix'] || { name: 'obix', status: 'critical', score: 0 };
+  const lighting = health.components['lighting'] || { name: 'lighting', status: 'critical', score: 0 };
+
   const subsystems = [
-    { name: 'Niagara', status: component.score >= 80 ? 'online' : 'offline' },
-    { name: 'BACnet', status: component.score >= 60 ? 'online' : 'degraded' },
-    { name: 'ObiX', status: component.score >= 60 ? 'connected' : 'disconnected' },
-    { name: 'DALI', status: component.score >= 60 ? 'online' : 'offline' },
+    { name: 'Supervisor', status: supervisor.status },
+    { name: 'Field Network', status: fieldNetwork.status },
+    { name: 'Weather API', status: obix.status },
+    { name: 'Lighting', status: lighting.status },
   ];
 
   return (
@@ -104,7 +108,7 @@ export function BMSConnectivityCard({ health }: BMSConnectivityCardProps) {
             <span
               style={{
                 color:
-                  sys.status === 'online' || sys.status === 'connected'
+                  sys.status === 'healthy'
                     ? 'var(--color-sentinel-green)'
                     : sys.status === 'degraded'
                     ? 'var(--color-sentinel-amber)'

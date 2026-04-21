@@ -11,11 +11,11 @@ import json
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 
-class OperatingMode(str, Enum):
+class OperatingMode(StrEnum):
     """System operating mode at decision time."""
 
     SIMULATION = "simulation"
@@ -23,7 +23,7 @@ class OperatingMode(str, Enum):
     LIVE_CONTROL = "live_control"
 
 
-class GateStatus(str, Enum):
+class GateStatus(StrEnum):
     """Quality gate evaluation result."""
 
     PASS = "pass"
@@ -31,7 +31,7 @@ class GateStatus(str, Enum):
     FAIL = "fail"
 
 
-class EnforcementAction(str, Enum):
+class EnforcementAction(StrEnum):
     """What the system did with the gate result."""
 
     NORMAL = "normal"
@@ -40,7 +40,7 @@ class EnforcementAction(str, Enum):
     BLOCK_WRITES = "block_writes"
 
 
-class SafetyResult(str, Enum):
+class SafetyResult(StrEnum):
     """Single-flag outcome of safety check."""
 
     ALLOWED = "allowed"
@@ -48,7 +48,7 @@ class SafetyResult(str, Enum):
     ALARMED = "alarmed"
 
 
-class Actor(str, Enum):
+class Actor(StrEnum):
     """Who or what triggered the decision."""
 
     AUTO_TIER3 = "auto_tier3"
@@ -57,7 +57,7 @@ class Actor(str, Enum):
     SYSTEM = "system"
 
 
-class RejectionCategory(str, Enum):
+class RejectionCategory(StrEnum):
     """Stable label for why a decision was rejected."""
 
     SAFETY_BLOCK = "safety_block"
@@ -68,7 +68,7 @@ class RejectionCategory(str, Enum):
     VALIDATION_ERROR = "validation_error"
 
 
-class WriteStatus(str, Enum):
+class WriteStatus(StrEnum):
     """Status of the device write attempt."""
 
     SUCCESS = "success"

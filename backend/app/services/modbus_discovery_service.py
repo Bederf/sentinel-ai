@@ -296,10 +296,7 @@ class SimulatedModbusDiscovery:
         if profile["capacity_range"]:
             min_cap, max_cap = profile["capacity_range"]
             capacity = random.randint(min_cap, max_cap)
-            if equipment_type == "ats":
-                capacity = f"{capacity}A"
-            else:
-                capacity = f"{capacity}kVA"
+            capacity = f"{capacity}A" if equipment_type == "ats" else f"{capacity}kVA"
 
         min_rt, max_rt = profile["runtime_range"]
         runtime = random.randint(min_rt, max_rt)

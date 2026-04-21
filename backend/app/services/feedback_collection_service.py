@@ -8,11 +8,12 @@ Feedback is used to update equipment health scores.
 Phase 59: Service Feedback & Health Score Integration
 """
 
+import contextlib
 import json
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
@@ -26,7 +27,7 @@ logger = logging.getLogger(__name__)
 TEMPLATES_PATH = Path(__file__).parent.parent / "data" / "ml_data_templates.json"
 
 
-class FeedbackItemType(str, Enum):
+class FeedbackItemType(StrEnum):
     """Types of feedback items."""
 
     READING = "reading"
@@ -36,7 +37,7 @@ class FeedbackItemType(str, Enum):
     CHECKLIST = "checklist"
 
 
-class HealthImpact(str, Enum):
+class HealthImpact(StrEnum):
     """Health score impact direction."""
 
     POSITIVE = "positive"  # Reading improved vs baseline
@@ -416,10 +417,8 @@ class FeedbackCollectionService:
         if isinstance(value, (int, float)):
             numeric_value = float(value)
         elif isinstance(value, str):
-            try:
+            with contextlib.suppress(ValueError):
                 numeric_value = float(value.replace(",", "."))
-            except ValueError:
-                pass
 
         # Get validation rules for this item
         validation_rules = session.template.validation_rules.get(item_key, {})

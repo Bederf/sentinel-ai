@@ -333,10 +333,9 @@ def generate_narrative_candidates(
     service = issue_service or CockpitIssueFusionService()
 
     try:
-        issues, statuses, _, _ = service.aggregate(site_id)
+        issues, _statuses, _, _ = service.aggregate(site_id)
     except Exception:
         issues = []
-        statuses = []
 
     candidates = generate_narrative_candidates_from_issues(issues, operating_mode=operating_mode)
     if candidates:

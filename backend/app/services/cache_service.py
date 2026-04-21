@@ -441,7 +441,7 @@ class CacheInvalidation:
     """Cache invalidation patterns for write operations."""
 
     @staticmethod
-    def on_building_change(site_id: str = None, site_code: str = None):
+    def on_building_change(site_id: str | None = None, site_code: str | None = None):
         """Invalidate building-related caches."""
         cache.delete(CacheKeys.sites_all())
         if site_id:
@@ -451,7 +451,7 @@ class CacheInvalidation:
             cache.delete(CacheKeys.asset_summary(site_code))
 
     @staticmethod
-    def on_equipment_change(site_id: str = None, equipment_code: str = None):
+    def on_equipment_change(site_id: str | None = None, equipment_code: str | None = None):
         """Invalidate equipment-related caches."""
         cache.delete(CacheKeys.equipment_all())
         if site_id:
@@ -461,14 +461,14 @@ class CacheInvalidation:
             cache.delete(CacheKeys.equipment_by_code(equipment_code))
 
     @staticmethod
-    def on_alert_change(site_id: str = None):
+    def on_alert_change(site_id: str | None = None):
         """Invalidate alert-related caches."""
         cache.delete(CacheKeys.alerts_active())
         if site_id:
             cache.delete(CacheKeys.alerts_active(site_id))
 
     @staticmethod
-    def on_prediction_change(site_id: str = None):
+    def on_prediction_change(site_id: str | None = None):
         """Invalidate prediction-related caches."""
         cache.delete(CacheKeys.predictions_active())
         if site_id:

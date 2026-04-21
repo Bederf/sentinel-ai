@@ -7,13 +7,13 @@ dictionaries that can be used in the UI or stored in the database.
 import logging
 import re
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
-class ActionPriority(str, Enum):
+class ActionPriority(StrEnum):
     """Priority levels for recommended actions."""
 
     HIGH = "HIGH"

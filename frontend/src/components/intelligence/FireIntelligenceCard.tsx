@@ -94,18 +94,18 @@ export function FireIntelligenceCard({ siteId, onNavigate }: FireIntelligenceCar
     <IntelligenceCard
       title="Fire Safety Intelligence"
       subtitle="Equipment compliance &amp; readiness"
-      icon={<Flame className="h-5 w-5" style={{ color: '#EF4444' }} />}
+      icon={<Flame className="h-5 w-5" style={{ color: 'var(--color-sentinel-red)' }} />}
       iconBg="rgba(239, 68, 68, 0.15)"
-      accentColor="#EF4444"
+      accentColor="var(--color-sentinel-red)"
       badge={badge}
       state={state}
       footer={footer}
       onNavigate={onNavigate}
       metrics={
         <>
-          <ValueMetricBox label="Equipment tracked" value={equipCount > 0 ? `${equipCount}` : '—'} color="#EF4444" />
-          <ValueMetricBox label="Inspected" value={inspectedCount > 0 ? `${inspectedCount}` : '—'} color="#22C55E" />
-          <ValueMetricBox label="Overdue" value={overdue > 0 ? `${overdue}` : 'All current'} color={overdue > 0 ? '#EF4444' : '#22C55E'} />
+          <ValueMetricBox label="Equipment tracked" value={equipCount > 0 ? `${equipCount}` : '—'} color="var(--color-sentinel-red)" />
+          <ValueMetricBox label="Inspected" value={inspectedCount > 0 ? `${inspectedCount}` : '—'} color="var(--color-sentinel-green)" />
+          <ValueMetricBox label="Overdue" value={overdue > 0 ? `${overdue}` : 'All current'} color={overdue > 0 ? 'var(--color-sentinel-red)' : 'var(--color-sentinel-green)'} />
         </>
       }
       comparison={equipCount > 0 ? (
@@ -115,7 +115,7 @@ export function FireIntelligenceCard({ siteId, onNavigate }: FireIntelligenceCar
           unit=""
           baselineLabel="Total fire assets"
           optimizedLabel="Inspected by SENTINEL"
-          accentColor="#EF4444"
+          accentColor="var(--color-sentinel-red)"
         />
       ) : undefined}
     />

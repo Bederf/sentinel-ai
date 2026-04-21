@@ -6,7 +6,7 @@
 
 const INDEX_KEY = "safe-cache:index";  // JSON array of cached pathnames
 const CACHE_PREFIX = "safe-cache:";    // KV value prefix
-const NEG_PREFIX = "neg:";             // negative-cache marker
+const NEG_PREFIX = "neg2:";            // negative-cache marker (v2 — clears stale neg: entries)
 
 const INDEX_TTL_SECS = 300;            // 5 min edge cache for the index
 const NEG_TTL_SECS = 600;              // 10 min remember 404/410
@@ -142,10 +142,11 @@ async function handleOrigin(request) {
 
   // Route based on hostname: SENTINEL BMS backend vs AimTheLaw backend
   if (inUrl.hostname === "api.sentinel-ai.co.za") {
-    // SENTINEL BMS — route via tunnel hostname to backend port 9095
-    // (Workers can't fetch bare IPs, so use the cloudflared tunnel hostname)
+    // SENTINEL BMS — route via cloudflared tunnel hostname (port 443)
+    // bms.sentinel-ai.co.za is handled by sentinel-cloudflared.service (tunnel 65f19403)
+    // which proxies to Caddy on :8090 → BMS backend on :9095
     outUrl.hostname = "bms.sentinel-ai.co.za";
-    outUrl.port = "9095";
+    outUrl.port = "";
     outUrl.protocol = "https";
   } else {
     // AimTheLaw — route to appropriate backend
@@ -303,7 +304,13 @@ export default {
         console.log(`CORS rejected: Origin "${origin}" not in allowed list`);
         return new Response("Forbidden", {
           status: 403,
-          headers: MINIMAL_SECURITY_HEADERS
+          headers: {
+            ...MINIMAL_SECURITY_HEADERS,
+            "Access-Control-Allow-Origin": origin || "",
+            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization, X-CSRF-Token, X-Requested-With, x-site-id",
+            "Access-Control-Allow-Credentials": "true",
+          }
         });
       }
 
@@ -312,7 +319,7 @@ export default {
         headers: {
           "Access-Control-Allow-Origin": origin,  // Echo the allowed origin, not "*"
           "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
-          "Access-Control-Allow-Headers": "Content-Type, Authorization, X-CSRF-Token, X-Requested-With",
+          "Access-Control-Allow-Headers": "Content-Type, Authorization, X-CSRF-Token, X-Requested-With, x-site-id",
           "Access-Control-Allow-Credentials": "true",
           "Access-Control-Max-Age": "86400",
         },
@@ -320,19 +327,22 @@ export default {
       return finalize(resp, "OPTIONS");
     }
 
+    // Extract origin for CORS header injection on all responses
+    const origin = request.headers.get("Origin");
+
     // HEAD or non-GET → don't cache
     if (method === "HEAD" || method !== "GET") {
-      return finalize(await handleOrigin(request), "BYPASS-METHOD");
+      return finalize(await handleOrigin(request), "BYPASS-METHOD", origin);
     }
 
     // Skip caching for authenticated requests
     if (request.headers.has("Authorization") || request.headers.has("Cookie")) {
-      return finalize(await handleOrigin(request), "BYPASS-AUTH");
+      return finalize(await handleOrigin(request), "BYPASS-AUTH", origin);
     }
 
     // Only cache whitelisted paths
     if (!shouldCache(url.pathname)) {
-      return finalize(await handleOrigin(request), "BYPASS-PATH");
+      return finalize(await handleOrigin(request), "BYPASS-PATH", origin);
     }
 
     // 1) Free Edge cache first
@@ -382,14 +392,14 @@ export default {
       originRes = await handleOrigin(request);
     } catch (err) {
       console.error("Origin fetch error:", err);
-      return new Response("Gateway Error", {
-        status: 502,
-        headers: {
-          ...MINIMAL_SECURITY_HEADERS,
-          "Content-Type": "text/plain; charset=utf-8",
-          "Server-Timing": 'phase;desc="ORIGIN-ERROR"',
-        },
-      });
+      const errHeaders = { ...MINIMAL_SECURITY_HEADERS, "Content-Type": "text/plain; charset=utf-8", "Server-Timing": 'phase;desc="ORIGIN-ERROR"' };
+      if (origin && isAllowedOrigin(origin)) {
+        errHeaders["Access-Control-Allow-Origin"] = origin;
+        errHeaders["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH";
+        errHeaders["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-CSRF-Token, X-Requested-With";
+        errHeaders["Access-Control-Allow-Credentials"] = "true";
+      }
+      return new Response("Gateway Error", { status: 502, headers: errHeaders });
     }
 
     // Clone for body + headers reuse
@@ -445,6 +455,6 @@ export default {
       headers,
     });
 
-    return finalize(passResp, "MISS-NOCACHE");
+    return finalize(passResp, "MISS-NOCACHE", origin);
   },
 };

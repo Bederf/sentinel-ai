@@ -146,10 +146,9 @@ class QueryExpansionService:
         for term, synonyms in SYNONYMS.items():
             # Check if term appears in query (word boundary aware)
             pattern = r"\b" + re.escape(term) + r"\b"
-            if re.search(pattern, query_lower):
-                if len(term) > best_match_len:
-                    best_match = (term, synonyms)
-                    best_match_len = len(term)
+            if re.search(pattern, query_lower) and len(term) > best_match_len:
+                best_match = (term, synonyms)
+                best_match_len = len(term)
 
         if not best_match:
             return None

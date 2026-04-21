@@ -264,14 +264,14 @@ export function OccupancyAnalyticsPage() {
                   <YAxis label={{ value: 'Occupancy %', angle: -90, position: 'insideLeft' }} />
                   <Tooltip
                     formatter={(value) => `${value}%`}
-                    contentStyle={{ backgroundColor: '#1e1e1e', border: '1px solid #333' }}
+                    contentStyle={{ backgroundColor: 'var(--color-sentinel-bg-secondary)', border: '1px solid var(--color-sentinel-border)' }}
                   />
                   <Legend />
-                  <Line type="monotone" dataKey="office" stroke="#3b82f6" strokeWidth={2} dot={false} />
-                  <Line type="monotone" dataKey="meeting" stroke="#8b5cf6" strokeWidth={2} dot={false} />
-                  <Line type="monotone" dataKey="common" stroke="#10b981" strokeWidth={2} dot={false} />
-                  <Line type="monotone" dataKey="utility" stroke="#f59e0b" strokeWidth={2} dot={false} />
-                  <Line type="monotone" dataKey="entry" stroke="#ef4444" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="office" stroke="var(--color-sentinel-blue)" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="meeting" stroke="var(--color-sentinel-purple)" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="common" stroke="var(--color-sentinel-green)" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="utility" stroke="var(--color-sentinel-amber)" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="entry" stroke="var(--color-sentinel-red)" strokeWidth={2} dot={false} />
                 </LineChart>
               </ResponsiveContainer>
             )}

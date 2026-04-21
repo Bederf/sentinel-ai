@@ -83,7 +83,7 @@ def get_doc_rag_system_prompt(doc_results: list[dict[str, Any]]) -> str:
     # Format documentation results
     if doc_results:
         doc_sections = []
-        for i, doc in enumerate(doc_results, 1):
+        for _i, doc in enumerate(doc_results, 1):
             title = doc.get("document_title", doc.get("title", "Documentation"))
             section = doc.get("section_title", "")
             content = doc.get("content", "")

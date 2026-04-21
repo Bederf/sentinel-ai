@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 class SurvivalTrainer:
     """Training pipeline for survival analysis model."""
 
-    def __init__(self, data_path: str = None):
+    def __init__(self, data_path: str | None = None):
         """
         Initialize trainer.
 

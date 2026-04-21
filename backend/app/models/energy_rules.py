@@ -4,12 +4,12 @@ Energy Rules Engine Models
 Defines data structures for the rules-based energy optimization system.
 """
 
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel
 
 
-class LearningCurvePhase(str, Enum):
+class LearningCurvePhase(StrEnum):
     """Learning curve phases for ML confidence progression."""
 
     PHASE_1_LEARNING = "phase_1_learning"  # Months 1-2, confidence 78-80%

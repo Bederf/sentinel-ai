@@ -241,7 +241,7 @@ class TestP3SchemaValidation:
             "properties": {"site_id": {"type": "string"}},
             "required": ["site_id"],
         }
-        valid, err = validate_tool_input("get_assets", {"site_id": 123}, schema)
+        valid, _err = validate_tool_input("get_assets", {"site_id": 123}, schema)
         assert valid is False
 
     def test_oversized_string_rejected(self):
@@ -279,7 +279,7 @@ class TestP4RateLimitsAndTimeouts:
         monkeypatch.setattr(settings, "mcp_read_rate_limit", 5)
         from app.mcp.rate_limiter import check_rate_limit
 
-        for i in range(5):
+        for _i in range(5):
             allowed, _, _ = check_rate_limit("user-1", "get_sites")
             assert allowed is True
 
@@ -292,7 +292,7 @@ class TestP4RateLimitsAndTimeouts:
         monkeypatch.setattr(settings, "mcp_mutate_rate_limit", 3)
         from app.mcp.rate_limiter import check_rate_limit
 
-        for i in range(3):
+        for _i in range(3):
             allowed, _, _ = check_rate_limit("user-1", "write_device_point")
             assert allowed is True
 
@@ -305,7 +305,7 @@ class TestP4RateLimitsAndTimeouts:
         monkeypatch.setattr(settings, "mcp_read_rate_limit", 2)
         from app.mcp.rate_limiter import check_rate_limit
 
-        for i in range(2):
+        for _i in range(2):
             check_rate_limit("user-a", "get_sites")
 
         # user-a is now rate-limited

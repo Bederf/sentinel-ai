@@ -428,10 +428,7 @@ class LightingService:
     ) -> list[LightingSensor]:
         """Get sensors with optional filters."""
         site_data = self._get_site_data(site_id)
-        if site_data:
-            sensors = list(site_data.sensors.values())
-        else:
-            sensors = self._all_sensors()
+        sensors = list(site_data.sensors.values()) if site_data else self._all_sensors()
         if zone_id:
             sensors = [s for s in sensors if s.zone_id == zone_id]
         if controller_id:
@@ -460,10 +457,7 @@ class LightingService:
     ) -> list[LightingLuminaire]:
         """Get luminaires with optional filters."""
         site_data = self._get_site_data(site_id)
-        if site_data:
-            luminaires = list(site_data.luminaires.values())
-        else:
-            luminaires = self._all_luminaires()
+        luminaires = list(site_data.luminaires.values()) if site_data else self._all_luminaires()
         if zone_id:
             luminaires = [lum for lum in luminaires if lum.zone_id == zone_id]
         if faulty_only:
@@ -638,7 +632,7 @@ class LightingService:
         sensors = site_data.sensors
         luminaires = site_data.luminaires
 
-        floors = set(z.get("floor") for z in zones.values() if z.get("floor"))
+        floors = {z.get("floor") for z in zones.values() if z.get("floor")}
         floor_summaries = [self.get_floor_summary(f, site_id) for f in sorted(floors)]
 
         total_sensors = len(sensors)

@@ -527,10 +527,7 @@ async def validate_and_scan_upload(
 
     # ---- Step 8: Trust level assignment ----
     if trust_level != "QUARANTINED":
-        if user_role.lower() == "admin":
-            trust_level = "VERIFIED"
-        else:
-            trust_level = "STANDARD"
+        trust_level = "VERIFIED" if user_role.lower() == "admin" else "STANDARD"
 
     # If AV scan was skipped (ClamAV unavailable, REQUIRE_AV_SCAN=false), downgrade trust
     if not av_scanned and av_message == "clamav_unavailable" and trust_level != "QUARANTINED":

@@ -332,14 +332,13 @@ class SolarSelfConsumptionService:
             grid_import = max(0, remaining_load)
 
             # Off-peak grid charging of BESS
-            if hour >= 22 or hour < 6:
-                if bess_soc < 90.0:
-                    charge_kwh = min(
-                        self.BESS_RATED_POWER_KW * interval_hours,
-                        self.BESS_CAPACITY_KWH * (90.0 - bess_soc) / 100.0,
-                    )
-                    bess_soc += (charge_kwh * self.BESS_EFFICIENCY / self.BESS_CAPACITY_KWH) * 100
-                    grid_import += charge_kwh
+            if (hour >= 22 or hour < 6) and bess_soc < 90.0:
+                charge_kwh = min(
+                    self.BESS_RATED_POWER_KW * interval_hours,
+                    self.BESS_CAPACITY_KWH * (90.0 - bess_soc) / 100.0,
+                )
+                bess_soc += (charge_kwh * self.BESS_EFFICIENCY / self.BESS_CAPACITY_KWH) * 100
+                grid_import += charge_kwh
 
             intervals.append(
                 EnergyBalanceInterval(

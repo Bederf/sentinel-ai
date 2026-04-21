@@ -176,7 +176,7 @@ class AlertNotifier:
         # Check if this is an escalation from a previous alert
         equipment_key_prefix = f"{equipment_code}:"
         previous_max_rank = 0
-        for key in self._last_alerts.keys():
+        for key in self._last_alerts:
             if key.startswith(equipment_key_prefix):
                 prev_severity = key.split(":")[1]
                 prev_rank = severity_rank.get(prev_severity, 0)
@@ -216,10 +216,7 @@ class AlertNotifier:
 
             registry = ModuleRegistryService()
             # Check all configured sites for an active notifications module
-            for site_id in registry._site_configs:
-                if registry.is_module_active(site_id, "notifications"):
-                    return True
-            return False
+            return any(registry.is_module_active(site_id, "notifications") for site_id in registry._site_configs)
         except Exception:
             # Fail closed in live modes so an unavailable registry cannot bypass controls.
             if settings.is_live_mode:

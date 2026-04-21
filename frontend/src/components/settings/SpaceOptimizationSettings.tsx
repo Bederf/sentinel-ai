@@ -437,7 +437,7 @@ export function SpaceOptimizationSettings({
                 className="px-4 py-2 rounded text-sm font-medium transition-colors hover:brightness-110 disabled:opacity-50"
                 style={{
                   background: "var(--color-sentinel-blue)",
-                  color: "#fff",
+                  color: "white",
                 }}
               >
                 {graceSaving ? "Saving..." : "Save Grace Periods"}
@@ -459,7 +459,7 @@ export function SpaceOptimizationSettings({
                 className="p-2 rounded"
                 style={{
                   background: "rgba(168, 85, 247, 0.15)",
-                  color: "var(--color-sentinel-purple, #a855f7)",
+                  color: "var(--color-sentinel-purple)",
                 }}
               >
                 <Users className="h-5 w-5" />
@@ -953,7 +953,7 @@ function ConciergeForm({
           className="flex items-center gap-1.5 px-3 py-1.5 rounded text-sm font-medium transition-colors hover:brightness-110 disabled:opacity-50"
           style={{
             background: "var(--color-sentinel-blue)",
-            color: "#fff",
+            color: "white",
           }}
         >
           <Check className="h-4 w-4" />

@@ -106,10 +106,7 @@ class PointListExporter:
         with open(self.REFERENCE_DEVICES_PATH) as f:
             all_devices = json.load(f)
 
-        if site_id:
-            devices = [d for d in all_devices if d.get("site_id") == site_id]
-        else:
-            devices = all_devices
+        devices = [d for d in all_devices if d.get("site_id") == site_id] if site_id else all_devices
 
         if site_id is None:
             self._devices_cache = devices

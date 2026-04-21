@@ -22,7 +22,7 @@ export function useHoldToConfirm(
 
     // Kill any previous timeline and reset position
     tlRef.current?.kill()
-    gsap.set(el, { scaleX: 0, backgroundColor: '#f59e0b', transformOrigin: 'left center' })
+    gsap.set(el, { scaleX: 0, backgroundColor: 'var(--color-sentinel-amber)', transformOrigin: 'left center' })
 
     const duration = HOLD_DURATIONS[mode]
 
@@ -39,7 +39,7 @@ export function useHoldToConfirm(
     // Phase 2: color shift to orange at 50% progress
     tlRef.current.to(
       el,
-      { backgroundColor: '#f97316', duration: duration * 0.3, ease: 'none' },
+      { backgroundColor: 'var(--color-sentinel-amber)', duration: duration * 0.3, ease: 'none' },
       duration * 0.35, // start slightly before 50%
     )
 
@@ -47,8 +47,8 @@ export function useHoldToConfirm(
     tlRef.current.call(() => {
       if (!progressRef.current) return
       gsap.timeline()
-        .to(progressRef.current, { backgroundColor: '#ef4444', duration: 0.12, ease: 'none' })
-        .to(progressRef.current, { backgroundColor: '#10b981', duration: 0.2, ease: 'power1.out' })
+        .to(progressRef.current, { backgroundColor: 'var(--color-sentinel-red)', duration: 0.12, ease: 'none' })
+        .to(progressRef.current, { backgroundColor: 'var(--color-sentinel-green)', duration: 0.2, ease: 'power1.out' })
         .call(() => {
           confirmedRef.current = true
           onConfirm()
@@ -64,7 +64,7 @@ export function useHoldToConfirm(
     if (progressRef.current) {
       gsap.to(progressRef.current, {
         scaleX: 0,
-        backgroundColor: '#f59e0b', // reset to amber
+        backgroundColor: 'var(--color-sentinel-amber)', // reset to amber
         duration: 0.32,
         ease: 'back.out(1.4)',
         transformOrigin: 'left center',
@@ -116,7 +116,7 @@ export function SupervisedConfirmBar({ onConfirm, mode = 'advisory' }: Supervise
           ref={progressRef}
           className="h-full rounded-full"
           // GSAP owns fill color — no Tailwind bg class here
-          style={{ transform: 'scaleX(0)', transformOrigin: 'left center', backgroundColor: '#f59e0b' }}
+          style={{ transform: 'scaleX(0)', transformOrigin: 'left center', backgroundColor: 'var(--color-sentinel-amber)' }}
         />
       </div>
     </div>

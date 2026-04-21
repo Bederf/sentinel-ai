@@ -5,7 +5,7 @@ Phase 45: Routine Inspection & Maintenance
 """
 
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -15,7 +15,7 @@ from pydantic import BaseModel, ConfigDict, Field
 # ============================================================================
 
 
-class InspectionScheduleFrequency(str, Enum):
+class InspectionScheduleFrequency(StrEnum):
     """Frequency types for inspection schedules."""
 
     WEEKLY = "weekly"
@@ -25,7 +25,7 @@ class InspectionScheduleFrequency(str, Enum):
     CUSTOM = "custom"
 
 
-class InspectionTaskStatus(str, Enum):
+class InspectionTaskStatus(StrEnum):
     """Status of inspection tasks."""
 
     SCHEDULED = "scheduled"
@@ -35,7 +35,7 @@ class InspectionTaskStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
-class InspectionPriority(str, Enum):
+class InspectionPriority(StrEnum):
     """Priority levels for inspections."""
 
     LOW = "low"
@@ -44,7 +44,7 @@ class InspectionPriority(str, Enum):
     URGENT = "urgent"
 
 
-class InspectionOverallStatus(str, Enum):
+class InspectionOverallStatus(StrEnum):
     """Overall status of inspection results."""
 
     PASS = "pass"
@@ -52,7 +52,7 @@ class InspectionOverallStatus(str, Enum):
     PARTIAL = "partial"
 
 
-class DeficiencySeverity(str, Enum):
+class DeficiencySeverity(StrEnum):
     """Severity levels for deficiencies."""
 
     MINOR = "minor"
@@ -61,7 +61,7 @@ class DeficiencySeverity(str, Enum):
     SAFETY = "safety"
 
 
-class DeficiencyCategory(str, Enum):
+class DeficiencyCategory(StrEnum):
     """Categories for deficiencies."""
 
     MECHANICAL = "mechanical"

@@ -104,7 +104,7 @@ class BearingAnalyzer:
         bearing_band = eq_range["bearing_band"]
 
         # Filter peaks within bearing frequency band
-        bearing_peaks = [(f, a) for f, a in zip(peak_freqs, peak_amps) if bearing_band[0] <= f <= bearing_band[1]]
+        bearing_peaks = [(f, a) for f, a in zip(peak_freqs, peak_amps, strict=False) if bearing_band[0] <= f <= bearing_band[1]]
 
         result["analysis_details"]["total_peaks"] = len(peak_freqs)
         result["analysis_details"]["peaks_in_bearing_band"] = len(bearing_peaks)
@@ -150,7 +150,7 @@ class BearingAnalyzer:
         faults_found = []
 
         # Check for imbalance (strong 1x)
-        for freq, amp in zip(peak_freqs, peak_amps):
+        for freq, amp in zip(peak_freqs, peak_amps, strict=False):
             if abs(freq - shaft_freq) < shaft_freq * 0.1:  # Within 10% of 1x
                 # Check if this is dominant
                 if amp > 0 and amp >= 0.5 * max(peak_amps):
@@ -164,7 +164,7 @@ class BearingAnalyzer:
                     )
 
         # Check for misalignment (strong 2x)
-        for freq, amp in zip(peak_freqs, peak_amps):
+        for freq, amp in zip(peak_freqs, peak_amps, strict=False):
             if abs(freq - 2 * shaft_freq) < shaft_freq * 0.1:  # Within 10% of 2x
                 if amp > 0 and amp >= 0.3 * max(peak_amps):
                     faults_found.append(

@@ -472,7 +472,7 @@ export function DigitalTwin({ siteId: propSiteId }: DigitalTwinProps = {}) {
           <p
             className="text-[10px] md:text-xs tracking-[0.28em] uppercase mb-1.5"
             style={{
-              color: '#00FF41',
+              color: 'var(--color-sentinel-green)',
               fontFamily: 'Orbitron, ui-sans-serif, system-ui, sans-serif',
               textShadow: '0 0 12px rgba(0, 255, 65, 0.35)',
             }}
@@ -647,7 +647,7 @@ export function DigitalTwin({ siteId: propSiteId }: DigitalTwinProps = {}) {
             <div
               className="w-2.5 h-2.5 rounded-full"
               title={sseConnected ? 'Real-time connected' : 'Real-time disconnected'}
-              style={{ backgroundColor: sseConnected ? '#22C55E' : '#6B7280' }}
+              style={{ backgroundColor: sseConnected ? 'var(--color-sentinel-green)' : '#6B7280' }}
             />
 
           </div>
@@ -669,7 +669,7 @@ export function DigitalTwin({ siteId: propSiteId }: DigitalTwinProps = {}) {
                     className="text-xs px-2 py-1 rounded"
                     style={{
                       background: bridgeTelemetry?.status === 'live' ? "rgba(16,185,129,0.15)" : "rgba(245,158,11,0.15)",
-                      color: bridgeTelemetry?.status === 'live' ? "#10B981" : "#F59E0B",
+                      color: bridgeTelemetry?.status === 'live' ? "var(--color-sentinel-green)" : "var(--color-sentinel-amber)",
                     }}
                   >
                     {bridgeTelemetry?.status === 'live' ? 'Live' : 'Unavailable'}

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 from app.services.building_posture_resolver import resolve_building_posture
 from app.services.building_state_models import (
     BuildingStatePayload,
@@ -15,6 +17,22 @@ from app.services.email_cluster_service import get_email_cluster_service
 from app.services.narrative_candidate_generator import generate_narrative_candidates
 from app.services.operator_guidance_resolver import resolve_operator_guidance
 from app.services.site_operating_mode_service import SentinelOperatingMode, resolve_site_operating_mode
+
+logger = logging.getLogger(__name__)
+
+
+async def _get_site_onboarding_phase(site_id: str) -> str:
+    """Fetch onboarding phase for a site. Returns 'shadow' as safe default on error."""
+    try:
+        from app.database.supabase_client import get_supabase_client
+
+        sb = get_supabase_client()
+        result = sb.table("sites").select("onboarding_phase").eq("code", site_id).execute()
+        if result.data:
+            return result.data[0].get("onboarding_phase") or "shadow"
+    except Exception as exc:
+        logger.debug("Could not fetch onboarding_phase for %s: %s", site_id, exc)
+    return "shadow"
 
 
 def build_building_state_payload(

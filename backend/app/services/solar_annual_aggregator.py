@@ -7,7 +7,7 @@ Compares Standard EMS (reactive control) vs Sentinel AI (predictive optimization
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 
 from app.core.site_resolver import get_primary_site_code
 from app.processing.solar_table import SolarTableProcessor
@@ -15,7 +15,7 @@ from app.processing.solar_table import SolarTableProcessor
 logger = logging.getLogger(__name__)
 
 
-class Season(str, Enum):
+class Season(StrEnum):
     """South African seasons for year-round simulation."""
 
     SUMMER = "summer"  # Dec-Feb: High solar, high HVAC load

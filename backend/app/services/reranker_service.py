@@ -75,7 +75,7 @@ class RerankerService:
 
             # Attach scores and sort descending
             scored = []
-            for chunk, score in zip(chunks, scores):
+            for chunk, score in zip(chunks, scores, strict=False):
                 enriched = dict(chunk)
                 enriched["rerank_score"] = float(score)
                 scored.append(enriched)

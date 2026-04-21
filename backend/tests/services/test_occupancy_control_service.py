@@ -27,26 +27,26 @@ from app.services.occupancy_control_service import (
 
 def _ok_write_result(**overrides) -> WriteResult:
     """Create a successful WriteResult for mocking bridge responses."""
-    defaults = dict(
-        success=True,
-        equipment_id="S002-VAV-101",
-        point_name="temperature_setpoint",
-        previous_value=22.0,
-        requested_value=24.0,
-        actual_value=24.0,
-    )
+    defaults = {
+        "success": True,
+        "equipment_id": "S002-VAV-101",
+        "point_name": "temperature_setpoint",
+        "previous_value": 22.0,
+        "requested_value": 24.0,
+        "actual_value": 24.0,
+    }
     defaults.update(overrides)
     return WriteResult(**defaults)
 
 
 def _fail_write_result(error: str = "bridge write failed", **overrides) -> WriteResult:
     """Create a failed WriteResult for mocking bridge responses."""
-    defaults = dict(
-        success=False,
-        equipment_id="S002-VAV-101",
-        point_name="temperature_setpoint",
-        error=error,
-    )
+    defaults = {
+        "success": False,
+        "equipment_id": "S002-VAV-101",
+        "point_name": "temperature_setpoint",
+        "error": error,
+    }
     defaults.update(overrides)
     return WriteResult(**defaults)
 
@@ -261,7 +261,7 @@ class TestHvacSetpointRelaxation:
     @pytest.mark.asyncio
     async def test_relax_logs_failure_when_bridge_fails(self):
         """When bridge write fails, audit log records the failure."""
-        svc, mock_bridge, _ = _make_svc_with_mocks(
+        svc, _mock_bridge, _ = _make_svc_with_mocks(
             read_hvac_setpoint=22.0,
             write_hvac_result=_fail_write_result("safety engine blocked"),
         )
@@ -367,7 +367,7 @@ class TestLightingControl:
     @pytest.mark.asyncio
     async def test_dim_fails_gracefully(self):
         """Bridge write returns failure → logs failure, returns 0."""
-        svc, mock_bridge, _ = _make_svc_with_mocks(
+        svc, _mock_bridge, _ = _make_svc_with_mocks(
             read_lighting_brightness=80.0,
             write_lighting_result=_fail_write_result(
                 "no adapter",
@@ -399,7 +399,7 @@ class TestLightingControl:
     @pytest.mark.asyncio
     async def test_dim_when_brightness_unknown(self):
         """When current brightness is None (read failed), still try to dim."""
-        svc, mock_bridge, _ = _make_svc_with_mocks(read_lighting_brightness=None)
+        svc, _mock_bridge, _ = _make_svc_with_mocks(read_lighting_brightness=None)
         state = svc._get_zone_state("zone-101")
 
         result = await svc._dim_lighting(
@@ -426,7 +426,7 @@ class TestEvaluateHvac:
 
     @pytest.mark.asyncio
     async def test_empty_zone_triggers_relax(self):
-        svc, mock_bridge, _ = _make_svc_with_mocks(read_hvac_setpoint=22.0)
+        svc, _mock_bridge, _ = _make_svc_with_mocks(read_hvac_setpoint=22.0)
         state = svc._get_zone_state("zone-101")
 
         mock_settings = MagicMock()
@@ -453,7 +453,7 @@ class TestEvaluateHvac:
 
     @pytest.mark.asyncio
     async def test_occupied_zone_with_relaxed_state_triggers_restore(self):
-        svc, mock_bridge, _ = _make_svc_with_mocks(read_hvac_setpoint=24.0)
+        svc, _mock_bridge, _ = _make_svc_with_mocks(read_hvac_setpoint=24.0)
         state = svc._get_zone_state("zone-101")
         state.hvac_relaxed = True
         state.original_setpoint = 22.0

@@ -57,10 +57,10 @@ logger = logging.getLogger(__name__)
 # Data Models
 # ============================================================================
 
-from enum import Enum  # noqa: E402
+from enum import StrEnum  # noqa: E402
 
 
-class WorkflowState(str, Enum):
+class WorkflowState(StrEnum):
     """Asset lifecycle states"""
 
     ONBOARDING = "onboarding"

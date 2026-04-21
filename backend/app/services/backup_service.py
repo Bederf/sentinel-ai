@@ -5,6 +5,7 @@ Wraps the PostgreSQL logical backup script with status tracking
 and async execution for the Settings UI manual trigger.
 """
 
+import contextlib
 import json
 import logging
 import os
@@ -88,20 +89,16 @@ class BackupService:
                 # Calculate total size safely
                 total_size = 0.0
                 for f in backup_files:
-                    try:
+                    with contextlib.suppress(OSError, PermissionError):
                         total_size += f.stat().st_size
-                    except (OSError, PermissionError):
-                        pass
                 status["total_size_mb"] = round(total_size / (1024 * 1024), 2) if total_size > 0 else 0.0
 
                 # Get newest backup timestamp
                 if backup_sets:
                     mtimes = []
                     for d in backup_sets:
-                        try:
+                        with contextlib.suppress(OSError, PermissionError):
                             mtimes.append(d.stat().st_mtime)
-                        except (OSError, PermissionError):
-                            pass
                     if mtimes:
                         newest = max(mtimes)
                         last_dt = datetime.fromtimestamp(newest)

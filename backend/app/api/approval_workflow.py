@@ -7,7 +7,7 @@ import smtplib
 from datetime import datetime
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from enum import Enum
+from enum import StrEnum
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel
@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/approval", tags=["approval_workflow"])
 
 
-class ApprovalStatus(str, Enum):
+class ApprovalStatus(StrEnum):
     """Approval status enum."""
 
     PENDING = "pending_approval"

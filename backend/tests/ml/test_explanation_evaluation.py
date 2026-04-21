@@ -234,7 +234,7 @@ class TestMetricFormatting:
         assert "conciseness_score" in results
 
         # Check statistics
-        for metric_name, stats in results.items():
+        for _metric_name, stats in results.items():
             assert "mean" in stats
             assert "std" in stats
             assert "min" in stats

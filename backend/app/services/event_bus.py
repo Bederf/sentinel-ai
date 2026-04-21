@@ -224,10 +224,7 @@ class Subscription:
             return False
 
         # Custom filter function
-        if self.filter and not self.filter(event):
-            return False
-
-        return True
+        return not (self.filter and not self.filter(event))
 
 
 # =============================================================================

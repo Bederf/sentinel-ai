@@ -543,7 +543,7 @@ class SolarIngestionService:
                 logger.debug(f"Solar overview from snapshot: {total_pv_kw:.1f} kW, SOC {bess_soc:.1f}%")
             else:
                 # === Fallback: live connectors ===
-                for key, connector in site.connectors.items():
+                for _key, connector in site.connectors.items():
                     if not connector.is_connected():
                         try:
                             await connector.connect()
@@ -775,7 +775,7 @@ class SolarIngestionService:
         if not site:
             return None
 
-        for key, connector in site.connectors.items():
+        for _key, connector in site.connectors.items():
             if not connector.is_connected():
                 try:
                     await connector.connect()
@@ -804,7 +804,7 @@ class SolarIngestionService:
             return None
 
         container_id = bess_cfg.get("container_id", "")
-        for key, connector in site.connectors.items():
+        for _key, connector in site.connectors.items():
             if not connector.is_connected():
                 try:
                     await connector.connect()
@@ -826,7 +826,7 @@ class SolarIngestionService:
         meters = []
         for mtr_cfg in site.config.get("meters", []):
             meter_id = mtr_cfg["meter_id"]
-            for key, connector in site.connectors.items():
+            for _key, connector in site.connectors.items():
                 if not connector.is_connected():
                     try:
                         await connector.connect()

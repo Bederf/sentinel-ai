@@ -98,6 +98,88 @@
   --glass-blur-sm: 6px;
   --glass-blur-lg: 20px;
   --radius-glass: 12px;
+
+  /* ── SENTINEL canonical token aliases (mirrors --color-sentinel-*) ── */
+  /* Allows use of --sentinel-* prefix per design system spec */
+  --sentinel-bg-canvas: var(--color-sentinel-bg-canvas);
+  --sentinel-bg-primary: var(--color-sentinel-bg-primary);
+  --sentinel-bg-secondary: var(--color-sentinel-bg-secondary);
+  --sentinel-bg-panel: var(--color-sentinel-bg-panel);
+  --sentinel-border: var(--color-sentinel-border);
+  --sentinel-border-strong: var(--color-sentinel-border-strong);
+  --sentinel-text-primary: var(--color-sentinel-text-primary);
+  --sentinel-text-secondary: var(--color-sentinel-text-secondary);
+  --sentinel-text-disabled: var(--color-sentinel-text-disabled);
+  --sentinel-text-link: var(--color-sentinel-text-link);
+  --sentinel-navy: var(--color-sentinel-navy);
+  --sentinel-navy-light: var(--color-sentinel-navy-light);
+  --sentinel-navy-dark: var(--color-sentinel-navy-dark);
+  --sentinel-amber: var(--color-sentinel-amber);
+  --sentinel-amber-light: var(--color-sentinel-amber-light);
+  --sentinel-amber-dark: var(--color-sentinel-amber-dark);
+  --sentinel-green: var(--color-sentinel-green);
+  --sentinel-green-light: var(--color-sentinel-green-light);
+  --sentinel-red: var(--color-sentinel-red);
+  --sentinel-red-light: var(--color-sentinel-red-light);
+  --sentinel-blue: var(--color-sentinel-blue);
+  --sentinel-blue-light: var(--color-sentinel-blue-light);
+  --sentinel-cyan: #22d3ee;
+  --sentinel-purple: #8B5CF6;
+  --sentinel-risk-critical: var(--color-risk-critical);
+  --sentinel-risk-high: #F97316;
+  --sentinel-risk-elevated: var(--color-risk-elevated);
+  --sentinel-risk-moderate: #EAB308;
+  --sentinel-risk-low: var(--color-risk-low);
+  --sentinel-chart-1: var(--color-chart-1);
+  --sentinel-chart-2: var(--color-chart-2);
+  --sentinel-chart-3: var(--color-chart-3);
+  --sentinel-chart-4: #8B5CF6;
+  --sentinel-chart-5: #EC4899;
+  --sentinel-chart-6: #22d3ee;
+  --sentinel-glass-bg: var(--glass-bg);
+  --sentinel-glass-bg-light: var(--glass-bg-light);
+  --sentinel-glass-bg-heavy: var(--glass-bg-heavy);
+  --sentinel-glass-border: var(--glass-border);
+  --sentinel-glass-border-strong: var(--glass-border-strong);
+  --sentinel-glass-highlight: var(--glass-highlight);
+  --sentinel-glass-shadow: var(--glass-shadow);
+  --sentinel-glass-shadow-lg: var(--glass-shadow-lg);
+  --sentinel-glass-blur: var(--glass-blur);
+  --sentinel-glass-blur-sm: var(--glass-blur-sm);
+  --sentinel-glass-blur-lg: var(--glass-blur-lg);
+  --sentinel-glass-blur-radius: var(--radius-glass);
+  --sentinel-radius-xs: 2px;
+  --sentinel-radius-sm: 3px;
+  --sentinel-radius: 4px;
+  --sentinel-radius-md: 6px;
+  --sentinel-radius-lg: 8px;
+  --sentinel-radius-xl: 12px;
+  --sentinel-radius-2xl: 16px;
+  --sentinel-shadow-panel: var(--shadow-panel);
+  --sentinel-shadow-glow-green: 0 0 12px rgba(16, 185, 129, 0.4);
+  --sentinel-shadow-glow-amber: 0 0 12px rgba(245, 158, 11, 0.4);
+  --sentinel-shadow-glow-red: 0 0 12px rgba(220, 38, 38, 0.4);
+  --sentinel-shadow-glow-blue: 0 0 12px rgba(59, 130, 246, 0.4);
+  --sentinel-shadow-shield: 0 0 20px rgba(245, 158, 11, 0.3);
+  --sentinel-space-1: 4px;
+  --sentinel-space-2: 8px;
+  --sentinel-space-3: 12px;
+  --sentinel-space-4: 16px;
+  --sentinel-space-5: 20px;
+  --sentinel-space-6: 24px;
+  --sentinel-space-8: 32px;
+  --sentinel-space-10: 40px;
+  --sentinel-sidebar-collapsed: 64px;
+  --sentinel-sidebar-expanded: 224px;
+  --sentinel-header-height: 56px;
+  --sentinel-font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --sentinel-font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+  --sentinel-font-matrix: 'Share Tech Mono', 'JetBrains Mono', monospace;
+  --sentinel-font-hud: 'Orbitron', monospace;
+  --sentinel-font-brand: 'Syne', -apple-system, sans-serif;
+  --sentinel-transition-fast: 150ms;
+  --sentinel-transition-normal: 200ms;
+  --sentinel-transition-gauge: 500ms;
 }
 
 @theme {
@@ -195,6 +277,99 @@
   --glass-blur-sm: 6px;
   --glass-blur-lg: 20px;
   --radius-glass: 12px;
+
+  /* ── SENTINEL canonical tokens (--sentinel-* prefix per design system spec) ── */
+  /* Backgrounds */
+  --sentinel-bg-canvas: #0d1117;
+  --sentinel-bg-primary: #161b22;
+  --sentinel-bg-secondary: #1c2128;
+  --sentinel-bg-panel: #21262d;
+  /* Borders */
+  --sentinel-border: #30363d;
+  --sentinel-border-strong: #484f58;
+  /* Text */
+  --sentinel-text-primary: #e6edf3;
+  --sentinel-text-secondary: #8b949e;
+  --sentinel-text-disabled: #6e7681;
+  --sentinel-text-link: #58a6ff;
+  /* Brand */
+  --sentinel-navy: #1A2B4C;
+  --sentinel-navy-light: #2a4a7a;
+  --sentinel-navy-dark: #0f1a2e;
+  --sentinel-amber: #F59E0B;
+  --sentinel-amber-light: #FBBF24;
+  --sentinel-amber-dark: #D97706;
+  --sentinel-green: #10B981;
+  --sentinel-green-light: #34D399;
+  --sentinel-red: #DC2626;
+  --sentinel-red-light: #EF4444;
+  --sentinel-blue: #3B82F6;
+  --sentinel-blue-light: #60A5FA;
+  --sentinel-cyan: #22d3ee;
+  --sentinel-purple: #8B5CF6;
+  /* Risk */
+  --sentinel-risk-critical: #DC2626;
+  --sentinel-risk-high: #F97316;
+  --sentinel-risk-elevated: #F59E0B;
+  --sentinel-risk-moderate: #EAB308;
+  --sentinel-risk-low: #10B981;
+  /* Charts */
+  --sentinel-chart-1: #10B981;
+  --sentinel-chart-2: #F59E0B;
+  --sentinel-chart-3: #3B82F6;
+  --sentinel-chart-4: #8B5CF6;
+  --sentinel-chart-5: #EC4899;
+  --sentinel-chart-6: #22d3ee;
+  /* Glass */
+  --sentinel-glass-bg: rgba(33, 38, 45, 0.65);
+  --sentinel-glass-bg-light: rgba(33, 38, 45, 0.45);
+  --sentinel-glass-bg-heavy: rgba(33, 38, 45, 0.85);
+  --sentinel-glass-border: rgba(255, 255, 255, 0.12);
+  --sentinel-glass-border-strong: rgba(255, 255, 255, 0.22);
+  --sentinel-glass-highlight: rgba(255, 255, 255, 0.06);
+  --sentinel-glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.37);
+  --sentinel-glass-shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.5);
+  --sentinel-glass-blur: 12px;
+  --sentinel-glass-blur-sm: 6px;
+  --sentinel-glass-blur-lg: 20px;
+  /* Radii */
+  --sentinel-radius-xs: 2px;
+  --sentinel-radius-sm: 3px;
+  --sentinel-radius: 4px;
+  --sentinel-radius-md: 6px;
+  --sentinel-radius-lg: 8px;
+  --sentinel-radius-xl: 12px;
+  --sentinel-radius-2xl: 16px;
+  /* Shadows */
+  --sentinel-shadow-panel: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
+  --sentinel-shadow-glow-green: 0 0 12px rgba(16, 185, 129, 0.4);
+  --sentinel-shadow-glow-amber: 0 0 12px rgba(245, 158, 11, 0.4);
+  --sentinel-shadow-glow-red: 0 0 12px rgba(220, 38, 38, 0.4);
+  --sentinel-shadow-glow-blue: 0 0 12px rgba(59, 130, 246, 0.4);
+  --sentinel-shadow-shield: 0 0 20px rgba(245, 158, 11, 0.3);
+  /* Spacing */
+  --sentinel-space-1: 4px;
+  --sentinel-space-2: 8px;
+  --sentinel-space-3: 12px;
+  --sentinel-space-4: 16px;
+  --sentinel-space-5: 20px;
+  --sentinel-space-6: 24px;
+  --sentinel-space-8: 32px;
+  --sentinel-space-10: 40px;
+  /* Layout */
+  --sentinel-sidebar-collapsed: 64px;
+  --sentinel-sidebar-expanded: 224px;
+  --sentinel-header-height: 56px;
+  /* Typography */
+  --sentinel-font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --sentinel-font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+  --sentinel-font-matrix: 'Share Tech Mono', 'JetBrains Mono', monospace;
+  --sentinel-font-hud: 'Orbitron', monospace;
+  --sentinel-font-brand: 'Syne', -apple-system, sans-serif;
+  /* Animation */
+  --sentinel-transition-fast: 150ms;
+  --sentinel-transition-normal: 200ms;
+  --sentinel-transition-gauge: 500ms;
 }
 
 /* Custom base styles - Dark Theme */

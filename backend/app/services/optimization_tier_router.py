@@ -7,11 +7,11 @@ Phase 82-01: Foundation routing service.
 """
 
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 
-class RoutingTier(str, Enum):
+class RoutingTier(StrEnum):
     """Routing tier for optimization recommendations."""
 
     BLOCKED = "blocked"

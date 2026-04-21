@@ -102,36 +102,36 @@ class TestDiscoveryLoader:
 # ---------------------------------------------------------------------------
 class TestBrickBuild:
     def test_build_produces_graph_and_index(self, service, discovery_enrichment):
-        graph, idx, result = service.build(discovery=discovery_enrichment)
+        _graph, idx, result = service.build(discovery=discovery_enrichment)
         assert result.equipment_count > 0
         assert result.point_count > 0
         assert isinstance(idx, ResolutionIndex)
 
     def test_equipment_iris_minted(self, service, discovery_enrichment):
-        graph, idx, result = service.build(discovery=discovery_enrichment)
+        _graph, idx, _result = service.build(discovery=discovery_enrichment)
         assert "S002-CHILLER-B1-001" in idx.equipment_code_to_equipment_iri
         eq_iri = idx.equipment_code_to_equipment_iri["S002-CHILLER-B1-001"]
         assert "eq/S002-CHILLER-B1-001" in eq_iri
 
     def test_points_linked_to_equipment(self, service, discovery_enrichment):
-        graph, idx, result = service.build(discovery=discovery_enrichment)
+        _graph, idx, _result = service.build(discovery=discovery_enrichment)
         # At least one point should map back to chiller
         chiller_iri = idx.equipment_code_to_equipment_iri.get("S002-CHILLER-B1-001")
         chiller_points = [pt for pt, eq in idx.point_iri_to_equipment_iri.items() if eq == chiller_iri]
         assert len(chiller_points) >= 1
 
     def test_bacnet_refs_indexed(self, service, discovery_enrichment):
-        graph, idx, result = service.build(discovery=discovery_enrichment)
+        _graph, idx, _result = service.build(discovery=discovery_enrichment)
         # Equipment JSON has bacnet_ref like "CH-1.ChwSupplyTemp"
         assert len(idx.bacnet_ref_to_point_iri) > 0
 
     def test_bacnet_objects_indexed(self, service, discovery_enrichment):
-        graph, idx, result = service.build(discovery=discovery_enrichment)
+        _graph, idx, _result = service.build(discovery=discovery_enrichment)
         # Equipment JSON has real BACnet instances (1000, 1001, 10, 11, etc.)
         assert len(idx.bacnet_object_to_point_iri) > 0
 
     def test_locations_created(self, service, discovery_enrichment):
-        graph, idx, result = service.build(discovery=discovery_enrichment)
+        _graph, idx, result = service.build(discovery=discovery_enrichment)
         assert result.location_count > 0
         assert len(idx.equipment_code_to_location_iri) > 0
 
@@ -147,7 +147,7 @@ class TestBrickBuild:
 
     def test_build_without_discovery(self, service):
         """Build with empty discovery — should still create equipment and points."""
-        graph, idx, result = service.build(discovery={})
+        _graph, _idx, result = service.build(discovery={})
         assert result.equipment_count > 0
         assert result.point_count > 0
 
@@ -254,7 +254,7 @@ class TestEquipmentTypeMapping:
 
     def test_build_handles_unknown_type(self, service):
         """Equipment with unknown type should still build as brick:Equipment."""
-        graph, idx, result = service.build(discovery={})
+        _graph, _idx, result = service.build(discovery={})
         # site-002 has S002-UNKNOWN-* equipment in discovery, but equipment
         # JSON may not have them. Either way, unknown types shouldn't crash.
         assert result.equipment_count >= 0
@@ -265,7 +265,7 @@ class TestEquipmentTypeMapping:
 # ---------------------------------------------------------------------------
 class TestConvenienceFunction:
     def test_build_brick_for_site(self, tmp_path):
-        idx, result = build_brick_for_site(
+        _idx, result = build_brick_for_site(
             BACKEND_DIR,
             "site-002",
             validate=False,

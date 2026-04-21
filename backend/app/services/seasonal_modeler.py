@@ -13,10 +13,10 @@ Provides realistic seasonal variations for:
 import random
 from dataclasses import dataclass
 from datetime import date
-from enum import Enum
+from enum import StrEnum
 
 
-class Season(str, Enum):
+class Season(StrEnum):
     """South African seasons."""
 
     SUMMER = "summer"  # Dec-Feb: Hot, rainy (summer rainfall regions)

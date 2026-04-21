@@ -205,9 +205,8 @@ class EmailReplyService:
         if existing_references:
             for token in existing_references.split():
                 token = token.strip()
-                if token.startswith("<") and token.endswith(">"):
-                    if token not in refs:
-                        refs.append(token)
+                if token.startswith("<") and token.endswith(">") and token not in refs:
+                    refs.append(token)
 
         # Append the Message-ID we are replying to (if not already present)
         if in_reply_to:

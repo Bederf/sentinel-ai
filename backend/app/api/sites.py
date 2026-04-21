@@ -601,9 +601,15 @@ async def list_sites(
             if code in phase_state:
                 site["onboarding_phase"] = phase_state[code]
             status = calculate_site_status_from_equipment(site.get("equipment_status"))
+
+            # Merge live bridge status so SiteCard shows correct connectivity
+            sentinel_enabled = site.get("sentinel_processing_enabled", True)
+            bridge_status = _get_bridge_status(sentinel_enabled=sentinel_enabled)
+            site_with_bridge = {**site, **bridge_status}
+
             result.append(
                 SiteResponse(
-                    **site,
+                    **site_with_bridge,
                     location=site.get("address", ""),
                     status=status,
                 )
@@ -1302,21 +1308,20 @@ def _get_bridge_status(sentinel_enabled: bool = True) -> dict:
             if bridge_connected or settings.simbiot_api_url:
                 bridge_data_source = "remote_bridge"
 
-        # Also check ShadowModePollingService — it has the live bridge connection
-        # even when simbiot_service is not configured.
-        if bridge_data_source == "remote_bridge" and not bridge_connected:
-            try:
-                from app.services.shadow_mode_polling import get_shadow_mode_polling_service
+        # Check ShadowModePollingService — it has the live bridge connection
+        # when simbiot_service is not enabled but the bridge is configured.
+        try:
+            from app.services.shadow_mode_polling import get_shadow_mode_polling_service
 
-                shadow = get_shadow_mode_polling_service()
-                shadow_status = shadow.status
-                if isinstance(shadow_status, dict) and shadow_status.get("connected"):
-                    bridge_connected = True
-                    bridge_last_sync = shadow_status.get("last_poll")
-                    bridge_sync_error = None
-                    # bridge_data_source stays "remote_bridge"
-            except Exception as e:
-                logger.debug(f"Shadow polling status unavailable: {e}")
+            shadow = get_shadow_mode_polling_service()
+            shadow_status = shadow.status
+            if isinstance(shadow_status, dict) and shadow_status.get("connected"):
+                bridge_connected = True
+                bridge_last_sync = shadow_status.get("last_poll")
+                bridge_sync_error = None
+                bridge_data_source = "remote_bridge"
+        except Exception as e:
+            logger.debug("Shadow polling status unavailable: %s", e)
 
         if (
             settings.site002_source_enabled

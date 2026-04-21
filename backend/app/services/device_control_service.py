@@ -13,13 +13,13 @@ Supports:
 
 import logging
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
-class EquipmentType(str, Enum):
+class EquipmentType(StrEnum):
     """Equipment types with control capabilities."""
 
     # HVAC
@@ -421,9 +421,8 @@ class DeviceControlService:
         elif point.data_type == "bool":
             if not isinstance(value, bool):
                 errors.append(f"Expected bool, got {type(value).__name__}")
-        elif point.data_type == "enum":
-            if value not in point.enum_values:
-                errors.append(f"Invalid value. Allowed: {point.enum_values}")
+        elif point.data_type == "enum" and value not in point.enum_values:
+            errors.append(f"Invalid value. Allowed: {point.enum_values}")
 
         # Range checking
         if not errors and point.min_value is not None and value < point.min_value:

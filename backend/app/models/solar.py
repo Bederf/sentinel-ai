@@ -8,13 +8,13 @@ Follows the dataclass pattern established in energy_centre.py.
 """
 
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 # === Enums ===
 
 
-class SolarEquipmentType(str, Enum):
+class SolarEquipmentType(StrEnum):
     """Types of solar/BESS equipment."""
 
     INVERTER = "inverter"
@@ -25,7 +25,7 @@ class SolarEquipmentType(str, Enum):
     PLANT = "plant"
 
 
-class InverterStatus(str, Enum):
+class InverterStatus(StrEnum):
     """Inverter operational status."""
 
     ONLINE = "online"
@@ -34,7 +34,7 @@ class InverterStatus(str, Enum):
     OFFLINE = "offline"
 
 
-class BESSMode(str, Enum):
+class BESSMode(StrEnum):
     """BESS operating mode."""
 
     CHARGING = "charging"
@@ -43,7 +43,7 @@ class BESSMode(str, Enum):
     STANDBY = "standby"
 
 
-class QualityFlag(str, Enum):
+class QualityFlag(StrEnum):
     """Data quality flags for normalised readings."""
 
     GOOD = "good"  # Fresh data, < 30s old
@@ -52,7 +52,7 @@ class QualityFlag(str, Enum):
     SUSPECT = "suspect"  # Out of expected range
 
 
-class ReadingType(str, Enum):
+class ReadingType(StrEnum):
     """Types of normalised readings."""
 
     POWER = "power"
@@ -67,7 +67,7 @@ class ReadingType(str, Enum):
     THD = "thd"
 
 
-class DataSource(str, Enum):
+class DataSource(StrEnum):
     """Source of data."""
 
     MODBUS = "modbus"
@@ -76,7 +76,7 @@ class DataSource(str, Enum):
     SIMULATED = "simulated"
 
 
-class ConnectorProtocol(str, Enum):
+class ConnectorProtocol(StrEnum):
     """Communication protocol for connectors."""
 
     MODBUS_TCP = "modbus_tcp"
@@ -429,7 +429,7 @@ class ConnectorStatus:
 # === Grid Compliance Models (Phase 34, Module 8) ===
 
 
-class GridCode(str, Enum):
+class GridCode(StrEnum):
     """Grid compliance standards."""
 
     NRS_097_2_3 = "nrs_097_2_3"  # South African grid code
@@ -437,7 +437,7 @@ class GridCode(str, Enum):
     IEEE_1547 = "ieee_1547"  # US standard
 
 
-class GridParameter(str, Enum):
+class GridParameter(StrEnum):
     """Grid parameters being monitored."""
 
     FREQUENCY = "frequency"
@@ -448,7 +448,7 @@ class GridParameter(str, Enum):
     RAMP_RATE = "ramp_rate"
 
 
-class ComplianceSeverity(str, Enum):
+class ComplianceSeverity(StrEnum):
     """Severity of compliance violations."""
 
     CRITICAL = "critical"  # Immediate action required, trip threshold

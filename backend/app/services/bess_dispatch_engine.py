@@ -15,7 +15,7 @@ and load-shedding emergency response.
 import logging
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from app.services.solar_config_service import get_site_solar_config
@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 # === Enums ===
 
 
-class DispatchActionType(str, Enum):
+class DispatchActionType(StrEnum):
     """Dispatch action types."""
 
     CHARGE = "charge"
@@ -34,7 +34,7 @@ class DispatchActionType(str, Enum):
     IDLE = "idle"
 
 
-class ConstraintType(str, Enum):
+class ConstraintType(StrEnum):
     """Constraint violation types."""
 
     TEMPERATURE_HIGH = "temperature_high"
@@ -329,32 +329,31 @@ class BESSDispatchEngine:
                 limited_power = max_export
 
         # 6. Load shedding stage adjustments
-        if load_shedding_stage >= 4:
-            if action == "discharge":
-                # During LS stages 4-5, reduce discharge to 50%
-                if load_shedding_stage < 6:
-                    reduced_power = limited_power * 0.5
-                else:
-                    # Stages 6-8: stop discharge, prepare for emergency support
-                    reduced_power = 0.0
+        if load_shedding_stage >= 4 and action == "discharge":
+            # During LS stages 4-5, reduce discharge to 50%
+            if load_shedding_stage < 6:
+                reduced_power = limited_power * 0.5
+            else:
+                # Stages 6-8: stop discharge, prepare for emergency support
+                reduced_power = 0.0
 
-                if reduced_power < limited_power:
-                    constraint = DispatchConstraint(
-                        constraint_type=ConstraintType.LOAD_SHEDDING.value,
-                        severity="warning",
-                        current_value=load_shedding_stage,
-                        limit_value=3,  # Normal is 0-3
-                        message=(
-                            f"Discharge limited for load shedding stage"
-                            f" {load_shedding_stage}: reserving capacity"
-                            f" for grid support"
-                        ),
-                        mitigation=f"Limited to {reduced_power:.0f} kW ({reduced_power / limited_power * 100:.0f}%)"
-                        if reduced_power > 0
-                        else "Disabled",
-                    )
-                    constraints.append(constraint)
-                    limited_power = reduced_power
+            if reduced_power < limited_power:
+                constraint = DispatchConstraint(
+                    constraint_type=ConstraintType.LOAD_SHEDDING.value,
+                    severity="warning",
+                    current_value=load_shedding_stage,
+                    limit_value=3,  # Normal is 0-3
+                    message=(
+                        f"Discharge limited for load shedding stage"
+                        f" {load_shedding_stage}: reserving capacity"
+                        f" for grid support"
+                    ),
+                    mitigation=f"Limited to {reduced_power:.0f} kW ({reduced_power / limited_power * 100:.0f}%)"
+                    if reduced_power > 0
+                    else "Disabled",
+                )
+                constraints.append(constraint)
+                limited_power = reduced_power
 
         # Clamp to positive values
         if limited_power < 0:

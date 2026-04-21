@@ -179,7 +179,7 @@ class SensorAutoencoder:
 
         return history.history
 
-    def _calibrate_threshold(self, X_normal: np.ndarray, percentile: float = None):
+    def _calibrate_threshold(self, X_normal: np.ndarray, percentile: float | None = None):
         """
         Calibrate anomaly threshold based on reconstruction errors on normal data.
 
@@ -235,7 +235,7 @@ class SensorAutoencoder:
         """
         return self.get_reconstruction_error(X)
 
-    def is_anomaly(self, X: np.ndarray, threshold: float = None) -> tuple[np.ndarray, np.ndarray]:
+    def is_anomaly(self, X: np.ndarray, threshold: float | None = None) -> tuple[np.ndarray, np.ndarray]:
         """
         Detect anomalies in input windows.
 

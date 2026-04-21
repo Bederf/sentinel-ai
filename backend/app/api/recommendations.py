@@ -13,12 +13,11 @@ from typing import Any
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 
-from app.config.settings import IngestionMode, settings
+from app.database.repositories.site_repository import SiteRepository
 from app.middleware.auth_middleware import require_site_access
 from app.middleware.rate_limiter import limiter
 from app.models.auth import AuthContext
 from app.services.recommendation_service import get_recommendation_service
-from app.services.site_ai_policy_service import get_site_ai_policy
 from app.utils.ai_provenance import attach_ai_provenance, get_ml_provenance
 
 logger = logging.getLogger(__name__)
@@ -72,18 +71,17 @@ async def get_pending_recommendations(
         JSON response with pending recommendations
     """
     try:
-        # Shadow mode default is learning-only unless site policy explicitly allows visibility.
-        policy = get_site_ai_policy(site_id)
-        if settings.resolved_ingestion_mode == IngestionMode.SHADOW_LIVE and not policy.get(
-            "show_recommendations_in_shadow", False
-        ):
+        # Shadow phase suppresses the queue from operator view — Supabase is authoritative.
+        repo = SiteRepository()
+        site = repo.get_by_id(site_id)
+        if site and site.get("onboarding_phase") == "shadow":
             return attach_ai_provenance(
                 {
                     "site_id": site_id,
                     "recommendations": [],
                     "count": 0,
                     "suppressed": True,
-                    "mode": settings.resolved_ingestion_mode.value,
+                    "mode": "shadow",
                 },
                 get_ml_provenance("recommendation-engine-v1"),
             )
@@ -128,11 +126,10 @@ async def get_recommendation_history(
         JSON response with historical recommendations
     """
     try:
-        # Shadow mode default is learning-only unless site policy explicitly allows visibility.
-        policy = get_site_ai_policy(site_id)
-        if settings.resolved_ingestion_mode == IngestionMode.SHADOW_LIVE and not policy.get(
-            "show_recommendations_in_shadow", False
-        ):
+        # Shadow phase suppresses history from operator view — Supabase is authoritative.
+        repo = SiteRepository()
+        site = repo.get_by_id(site_id)
+        if site and site.get("onboarding_phase") == "shadow":
             return attach_ai_provenance(
                 {
                     "site_id": site_id,
@@ -143,7 +140,7 @@ async def get_recommendation_history(
                         "risk_level": None,
                     },
                     "suppressed": True,
-                    "mode": settings.resolved_ingestion_mode.value,
+                    "mode": "shadow",
                 },
                 get_ml_provenance("recommendation-engine-v1"),
             )

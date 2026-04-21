@@ -7,7 +7,7 @@ commissioning with chat-based review.
 """
 
 import logging
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from fastapi import APIRouter, File, HTTPException, Query, UploadFile
@@ -94,7 +94,7 @@ class CorrectResponse(BaseModel):
     message: str = ""
 
 
-class WorkflowState(str, Enum):
+class WorkflowState(StrEnum):
     """Discovery workflow states."""
 
     DISCOVERING = "discovering"
@@ -304,7 +304,7 @@ async def get_mapping_summary(discovery_id: str):
 
     # Build equipment list
     equipment_list = []
-    for eid, mapping in mappings.items():
+    for _eid, mapping in mappings.items():
         equipment_list.append(mapping.to_dict())
 
     # Run validation

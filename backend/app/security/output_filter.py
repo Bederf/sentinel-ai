@@ -132,10 +132,7 @@ def _stage_1_secrets(text: str, redactions: list[str]) -> str:
 
 def _stage_2_system_prompt_leak(text: str) -> bool:
     """Stage 2: Detect system prompt leaks. Returns True if leak detected."""
-    for pattern in _SYSTEM_PROMPT_LEAK_PATTERNS:
-        if pattern.search(text):
-            return True
-    return False
+    return any(pattern.search(text) for pattern in _SYSTEM_PROMPT_LEAK_PATTERNS)
 
 
 def _stage_3_pii(text: str, redactions: list[str], user_role: str | None) -> str:

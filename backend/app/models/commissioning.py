@@ -1,12 +1,12 @@
 """Pydantic models for commissioning scorecard and promotion gates."""
 
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
 
-class CommissioningGateId(str, Enum):
+class CommissioningGateId(StrEnum):
     """Identifiers for the 8 hard commissioning gates."""
 
     MATCH_COVERAGE = "match_coverage"

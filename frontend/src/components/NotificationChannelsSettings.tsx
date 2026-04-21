@@ -431,9 +431,9 @@ function ChannelsTab({
                   zIndex: 10,
                 }}
               >
-                <option value="telegram" style={{ background: "#1a1a2e", color: "#e0e0e0" }}>Telegram</option>
-                <option value="whatsapp" style={{ background: "#1a1a2e", color: "#e0e0e0" }}>WhatsApp</option>
-                <option value="sms" style={{ background: "#1a1a2e", color: "#e0e0e0" }}>SMS</option>
+                <option value="telegram" style={{ background: "var(--color-sentinel-bg-panel)", color: "var(--color-sentinel-text-primary)" }}>Telegram</option>
+                <option value="whatsapp" style={{ background: "var(--color-sentinel-bg-panel)", color: "var(--color-sentinel-text-primary)" }}>WhatsApp</option>
+                <option value="sms" style={{ background: "var(--color-sentinel-bg-panel)", color: "var(--color-sentinel-text-primary)" }}>SMS</option>
               </select>
             </div>
             <div>

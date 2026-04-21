@@ -35,7 +35,7 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 - [Profile-Based Optimization Architecture](02-architecture/profile-based-optimization.md) - Three optimization profiles (SWEAT ASSETS, COMFORT, COST) with multi-objective scoring and feedback loop (Phase 72)
 - [Module Connectivity - Quick Reference](02-architecture/module-connectivity-quick-ref.md) - Executive summary of modules, integrations, and profiles
 - [Device Abstraction Layer](02-architecture/device-abstraction-layer.md) - Protocol-agnostic interface
-- [Naming Conventions](02-architecture/naming-conventions.md) - Device ID and point naming
+- [Naming Conventions](02-architecture/NAMING_CONVENTIONS.md) - Device ID and point naming
 - [Background ML Model Retraining](02-architecture/background-ml-retraining.md) - Automated background training, APScheduler integration, production deployment (Phase 45-01)
 - **[ML Data Architecture](02-architecture/ML-DATA-ARCHITECTURE.md)** - Building Operations ML, Equipment Condition ML, Unified AI Recommendation Engine, feature engineering, inspection priority scoring (Phase 132)
 - **[Event Bus Architecture](02-architecture/event-bus-architecture.md)** - Async pub/sub event bus with importance scoring, middleware pipeline, event chaining, 7 default subscribers (Phase 139)
@@ -374,4 +374,4 @@ When adding new documentation:
 
 - [CLAUDE.md](../CLAUDE.md) - Claude Code project instructions
 - [README_MCP_INTEGRATION.md](../backend/README_MCP_INTEGRATION.md) - MCP server guide
-- [NAMING_CONVENTIONS.md](../NAMING_CONVENTIONS.md) - Device naming (moved to docs)
+- [NAMING_CONVENTIONS.md](02-architecture/NAMING_CONVENTIONS.md) - Device naming

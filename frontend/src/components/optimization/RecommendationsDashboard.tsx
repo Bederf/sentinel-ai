@@ -120,7 +120,7 @@ export const RecommendationsDashboard: React.FC<
                 {rec.risk_level}
               </span>
               <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded text-sm">
-                Score: {rec.multi_objective_score.toFixed(2)}
+                Score: {typeof rec.multi_objective_score === 'number' ? rec.multi_objective_score.toFixed(2) : '--'}
               </span>
             </div>
           </div>
@@ -136,19 +136,25 @@ export const RecommendationsDashboard: React.FC<
             <div className="bg-green-50 p-3 rounded">
               <p className="text-xs text-gray-600">Cost Saving</p>
               <p className="text-lg font-bold text-green-700">
-                R{rec.expected_impact.cost_zar?.toFixed(2) || '0'}
+                {rec.expected_impact
+                  ? `R${typeof rec.expected_impact.cost_zar === 'number' ? rec.expected_impact.cost_zar.toFixed(2) : '0'}`
+                  : 'R0'}
               </p>
             </div>
             <div className="bg-blue-50 p-3 rounded">
               <p className="text-xs text-gray-600">Comfort Impact</p>
               <p className="text-lg font-bold text-blue-700">
-                {rec.expected_impact.comfort_delta?.toFixed(1) || '0'}°C
+                {rec.expected_impact
+                  ? `${typeof rec.expected_impact.comfort_delta === 'number' ? rec.expected_impact.comfort_delta.toFixed(1) : '0'}°C`
+                  : '0°C'}
               </p>
             </div>
             <div className="bg-purple-50 p-3 rounded">
               <p className="text-xs text-gray-600">Energy Saving</p>
               <p className="text-lg font-bold text-purple-700">
-                {rec.expected_impact.energy_kwh?.toFixed(1) || '0'} kWh
+                {rec.expected_impact
+                  ? `${typeof rec.expected_impact.energy_kwh === 'number' ? rec.expected_impact.energy_kwh.toFixed(1) : '0'} kWh`
+                  : '0 kWh'}
               </p>
             </div>
           </div>

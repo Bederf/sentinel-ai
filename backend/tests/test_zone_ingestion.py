@@ -23,9 +23,7 @@ def validate_zone_id(zone_id: str) -> bool:
     if not validate_floor_code(floor):
         return False
     # Zone letter must be single uppercase letter
-    if len(letter) != 1 or not letter.isalpha() or not letter.isupper():
-        return False
-    return True
+    return not (len(letter) != 1 or not letter.isalpha() or not letter.isupper())
 
 
 def validate_floor_code(floor: str) -> bool:

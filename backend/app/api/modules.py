@@ -4,6 +4,7 @@ Module Registry API - Bolt-on Module System Endpoints
 Manages module activation, integration, and AI recommendations.
 """
 
+import contextlib
 import logging
 from datetime import datetime
 
@@ -427,17 +428,13 @@ async def get_recommendations(
     try:
         module_filter = None
         if modules:
-            try:
+            with contextlib.suppress(ValueError):
                 module_filter = [ModuleType(m.strip()) for m in modules.split(",")]
-            except ValueError:
-                pass
 
         priority_filter = None
         if priorities:
-            try:
+            with contextlib.suppress(ValueError):
                 priority_filter = [RecommendationPriority(p.strip()) for p in priorities.split(",")]
-            except ValueError:
-                pass
 
         registry_recs = module_registry.get_recommendations(
             site_id=site_id,

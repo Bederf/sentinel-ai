@@ -23,7 +23,7 @@ estimated_read_time: 7
 
 ## Data and Integration Standards
 
-- Naming rules: `NAMING_CONVENTIONS.md`
+- Naming rules: `docs/02-architecture/NAMING_CONVENTIONS.md`
 - Integration APIs and contracts: `docs/03-api-reference/`
 - Audit and traceability requirements: `docs/06-safety-compliance/audit-logging.md`
 

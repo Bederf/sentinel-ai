@@ -24,7 +24,7 @@ Examples:
 - `README.md`
 - `AGENTS.md`
 - `CLAUDE*.md`
-- `NAMING_CONVENTIONS.md`
+- `docs/02-architecture/NAMING_CONVENTIONS.md`
 - `FEATURES.md`
 - `TODO.md`, `TODOdone.md`
 

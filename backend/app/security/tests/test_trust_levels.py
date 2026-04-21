@@ -173,7 +173,7 @@ class TestValidateCitations:
     def test_invalid_citation_detected(self):
         """Citations referencing unknown documents should be flagged."""
         response = "According to [Source: FAKE-DOC-999], the pump should be replaced."
-        all_valid, valid, invalid = validate_citations(
+        all_valid, _valid, invalid = validate_citations(
             response,
             retrieval_doc_ids=["CHILLER-MANUAL-001"],
         )
@@ -183,7 +183,7 @@ class TestValidateCitations:
     def test_no_citations_is_valid(self):
         """Response with no citations should be considered valid."""
         response = "The equipment is in good condition."
-        all_valid, valid, invalid = validate_citations(
+        all_valid, valid, _invalid = validate_citations(
             response,
             retrieval_doc_ids=["doc-1"],
         )
@@ -193,7 +193,7 @@ class TestValidateCitations:
     def test_title_based_matching(self):
         """Citations using document titles should match."""
         response = "Per [Source: Chiller Maintenance Guide], weekly checks are required."
-        all_valid, valid, invalid = validate_citations(
+        all_valid, valid, _invalid = validate_citations(
             response,
             retrieval_doc_ids=["doc-123"],
             retrieval_doc_titles=["Chiller Maintenance Guide"],
@@ -204,7 +204,7 @@ class TestValidateCitations:
     def test_partial_id_matching(self):
         """Citations using partial document IDs (prefix) should match."""
         response = "See [Source: doc-123a] for details."
-        all_valid, valid, invalid = validate_citations(
+        all_valid, _valid, _invalid = validate_citations(
             response,
             retrieval_doc_ids=["doc-123abc-full-uuid"],
         )

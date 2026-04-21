@@ -539,5 +539,5 @@ Both routes converge on same BuildingConfigResponse schema
 
 - [Phase A: Vision-Based Extraction](./DIGITAL_TWIN_REAL_DATA_INTEGRATION.md)
 - [Building Structure API](../03-api-reference/digital-twin-api.md)
-- [Equipment ID Naming Conventions](../02-architecture/naming-conventions.md)
+- [Equipment ID Naming Conventions](../02-architecture/NAMING_CONVENTIONS.md)
 - [SIMBIOT Wizard Integration](./SIMBIOT_WIZARD_ENHANCEMENTS.md)

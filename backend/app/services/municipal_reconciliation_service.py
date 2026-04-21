@@ -323,10 +323,9 @@ class MunicipalReconciliationService:
         tou_breakdown: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         total_kwh = 0.0
-        if period_start and period_end:
-            if self.energy_repo:
-                records = self.energy_repo.get_by_date_range(site_id, period_start, period_end)
-                total_kwh = sum(float(r.get("total_kwh") or 0.0) for r in records)
+        if period_start and period_end and self.energy_repo:
+            records = self.energy_repo.get_by_date_range(site_id, period_start, period_end)
+            total_kwh = sum(float(r.get("total_kwh") or 0.0) for r in records)
 
         peak_demand_kw = 0.0
         peak_windows: list[dict[str, Any]] = []

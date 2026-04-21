@@ -439,9 +439,7 @@ class SpaceBookingSimulator:
     def _should_generate_bookings(self, site_id: str, simulated_date: date) -> bool:
         if simulated_date.weekday() >= 5:
             return False
-        if self._holiday_service.is_holiday(site_id, simulated_date):
-            return False
-        return True
+        return not self._holiday_service.is_holiday(site_id, simulated_date)
 
     def _should_inject_block_booking(self, site_id: str, simulated_date: date, rng: random.Random) -> bool:
         if not self._should_generate_bookings(site_id, simulated_date):
@@ -482,10 +480,7 @@ class SpaceBookingSimulator:
         )[0]
 
     def _select_issue_type(self, site_id: str, simulated_date: date, booking) -> str:
-        if booking.start_time.hour <= 12 < booking.end_time.hour:
-            preferred = "catering"
-        else:
-            preferred = "av"
+        preferred = "catering" if booking.start_time.hour <= 12 < booking.end_time.hour else "av"
 
         selector = self._stable_seed(
             site_id,

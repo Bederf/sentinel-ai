@@ -16,7 +16,7 @@ Metrics sourced from existing services:
 import logging
 from dataclasses import dataclass
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 
-class RuleState(str, Enum):
+class RuleState(StrEnum):
     """Evaluation result for a single metric threshold."""
 
     PASS = "pass"
@@ -35,7 +35,7 @@ class RuleState(str, Enum):
     NA = "na"
 
 
-class GateStatus(str, Enum):
+class GateStatus(StrEnum):
     """Overall quality gate status (aggregate of all rule states)."""
 
     PASS = "pass"
@@ -43,7 +43,7 @@ class GateStatus(str, Enum):
     FAIL = "fail"
 
 
-class EnforcementAction(str, Enum):
+class EnforcementAction(StrEnum):
     """Action applied to recommendations based on gate status + mode."""
 
     NORMAL = "normal"
@@ -52,7 +52,7 @@ class EnforcementAction(str, Enum):
     BLOCK_WRITES = "block_writes"
 
 
-class ReasonCode(str, Enum):
+class ReasonCode(StrEnum):
     """Machine-readable reason for quality gate failures."""
 
     QUALITY_GATE_BLOCK = "quality_gate_block"

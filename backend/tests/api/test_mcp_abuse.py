@@ -81,7 +81,7 @@ class TestRateLimitBurst:
 
         # Fire (limit + 5) calls — last 5 should be rate-limited
         results = []
-        for i in range(limit + 5):
+        for _i in range(limit + 5):
             result = await server.call_tool(
                 "get_sites",
                 _auth_context=ctx,
@@ -248,7 +248,7 @@ class TestOversizedPayload:
         }
 
         huge_array = ["item"] * 1500
-        valid, error = validate_tool_input("test_tool", {"items": huge_array}, schema)
+        valid, _error = validate_tool_input("test_tool", {"items": huge_array}, schema)
         assert valid is False
 
 
@@ -341,7 +341,7 @@ class TestEnvelopeFuzzing:
     def test_prototype_pollution_attempt(self):
         from app.api.mcp_sse import _validate_jsonrpc_envelope
 
-        valid, msg, status = _validate_jsonrpc_envelope(
+        valid, msg, _status = _validate_jsonrpc_envelope(
             {
                 "jsonrpc": "2.0",
                 "id": 1,
@@ -355,7 +355,7 @@ class TestEnvelopeFuzzing:
     def test_constructor_pollution_attempt(self):
         from app.api.mcp_sse import _validate_jsonrpc_envelope
 
-        valid, msg, status = _validate_jsonrpc_envelope(
+        valid, _msg, _status = _validate_jsonrpc_envelope(
             {
                 "jsonrpc": "2.0",
                 "id": 1,
@@ -368,7 +368,7 @@ class TestEnvelopeFuzzing:
     def test_method_injection(self):
         from app.api.mcp_sse import _validate_jsonrpc_envelope
 
-        valid, msg, status = _validate_jsonrpc_envelope(
+        valid, msg, _status = _validate_jsonrpc_envelope(
             {
                 "jsonrpc": "2.0",
                 "id": 1,
@@ -381,7 +381,7 @@ class TestEnvelopeFuzzing:
     def test_missing_jsonrpc_version(self):
         from app.api.mcp_sse import _validate_jsonrpc_envelope
 
-        valid, msg, status = _validate_jsonrpc_envelope(
+        valid, _msg, _status = _validate_jsonrpc_envelope(
             {
                 "id": 1,
                 "method": "tools/list",
@@ -392,5 +392,5 @@ class TestEnvelopeFuzzing:
     def test_empty_envelope(self):
         from app.api.mcp_sse import _validate_jsonrpc_envelope
 
-        valid, msg, status = _validate_jsonrpc_envelope({})
+        valid, _msg, _status = _validate_jsonrpc_envelope({})
         assert valid is False

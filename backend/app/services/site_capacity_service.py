@@ -55,14 +55,14 @@ class SiteCapacityService:
 
         occupancy_capacity = metadata.get("occupancy_capacity")
         if occupancy_capacity:
-            return int(round(float(occupancy_capacity) * DESK_SHARE_OF_TOTAL_CAPACITY))
+            return round(float(occupancy_capacity) * DESK_SHARE_OF_TOTAL_CAPACITY)
 
         return 0
 
     def get_total_capacity(self, site_id: str) -> int:
         desk_count = self.get_desk_count(site_id)
         if desk_count:
-            return int(round(desk_count / DESK_SHARE_OF_TOTAL_CAPACITY))
+            return round(desk_count / DESK_SHARE_OF_TOTAL_CAPACITY)
 
         metadata = self._load_building_data(site_id).get("metadata", {})
         if metadata.get("occupancy_capacity"):

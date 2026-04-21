@@ -1,5 +1,6 @@
 """Chat API endpoint with Server-Sent Events streaming."""
 
+import contextlib
 import logging
 from collections.abc import AsyncGenerator
 
@@ -466,10 +467,8 @@ async def generate_sse_stream(
         )
         yield format_sse_chunk(response_text)
         if conversation_id:
-            try:
+            with contextlib.suppress(Exception):
                 chat_context_repository.add_message(conversation_id, "assistant", response_text)
-            except Exception:
-                pass
         yield "data: [DONE]\n\n"
         return
 
@@ -478,10 +477,8 @@ async def generate_sse_stream(
 
     # Store user message optimistically (before stream) — if stream fails, partial handler saves assistant
     if conversation_id:
-        try:
+        with contextlib.suppress(Exception):
             chat_context_repository.add_message(conversation_id, "user", message_with_context)
-        except Exception:
-            pass
 
     # POPIA cross-border routing guard: fall back to local AI when cloud
     # processing consent is missing for the data subject.
@@ -498,10 +495,8 @@ async def generate_sse_stream(
     # Get tools if enabled (Minimax accepts OpenAI-format tools but won't use them)
     available_tools = None
     if use_tools:
-        try:
+        with contextlib.suppress(Exception):
             available_tools = get_chat_tools(site_id, user_email=user_email, user_role=user_role)
-        except Exception:
-            pass
 
     try:
         if use_local_fallback:
@@ -549,10 +544,8 @@ async def generate_sse_stream(
 
         # Store assistant response (user message already stored before stream)
         if conversation_id:
-            try:
+            with contextlib.suppress(Exception):
                 chat_context_repository.add_message(conversation_id, "assistant", assistant_text)
-            except Exception:
-                pass
 
         # Send completion sentinel
         yield "data: [DONE]\n\n"
@@ -567,12 +560,10 @@ async def generate_sse_stream(
         # API or unexpected errors — save partial response if we have one
         logger.error("Chat stream error: %s", e, exc_info=True)
         if conversation_id and assistant_parts:
-            try:
+            with contextlib.suppress(Exception):
                 chat_context_repository.add_message(
                     conversation_id, "assistant", "".join(assistant_parts), status="partial"
                 )
-            except Exception:
-                pass
         yield format_sse_chunk("An error occurred processing your request.")
         yield "data: [DONE]\n\n"
         yield format_sse_chunk("An error occurred processing your request.")

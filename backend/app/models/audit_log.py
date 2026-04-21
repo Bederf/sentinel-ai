@@ -8,11 +8,11 @@ troubleshooting.
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 
-class AuditActionType(str, Enum):
+class AuditActionType(StrEnum):
     """Types of actions that can be audited."""
 
     DEVICE_CONTROL = "device_control"
@@ -21,7 +21,7 @@ class AuditActionType(str, Enum):
     CONFIG_CHANGE = "config_change"
 
 
-class AuditResultType(str, Enum):
+class AuditResultType(StrEnum):
     """Result types for audit log entries."""
 
     SUCCESS = "success"

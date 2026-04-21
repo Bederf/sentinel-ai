@@ -245,7 +245,7 @@ class PriceForecaster:
 
             # Weather impact
             temp = temps[hour] if hour < len(temps) else 20.0
-            weather_type, weather_impact = self._get_weather_adjustment(temp)
+            _weather_type, weather_impact = self._get_weather_adjustment(temp)
 
             # Solar impact
             solar_pct = solar_pcts[hour] if hour < len(solar_pcts) else 0.0

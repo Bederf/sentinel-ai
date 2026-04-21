@@ -239,10 +239,7 @@ class PowerMeterValidationEngine:
         baseline = await self.get_power_baseline(meter_id)
 
         # Calculate variance
-        if real_power_kw > 0:
-            variance_pct = abs(simulated_power_kw - real_power_kw) / real_power_kw * 100
-        else:
-            variance_pct = 0.0
+        variance_pct = abs(simulated_power_kw - real_power_kw) / real_power_kw * 100 if real_power_kw > 0 else 0.0
 
         # Determine status
         if variance_pct > CRITICAL_VARIANCE_PCT:
@@ -460,10 +457,7 @@ class PowerMeterValidationEngine:
             baseline_stdev = baseline.get("stdev_kw", 1)
 
             # Calculate variance from baseline
-            if baseline_mean > 0:
-                variance_pct = abs(avg_kw - baseline_mean) / baseline_mean * 100
-            else:
-                variance_pct = 0.0
+            variance_pct = abs(avg_kw - baseline_mean) / baseline_mean * 100 if baseline_mean > 0 else 0.0
 
             # Determine status
             if variance_pct > CRITICAL_VARIANCE_PCT:

@@ -69,10 +69,7 @@ class BacnetBmsAdapter(BmsAdapter):
         status = "connected" if self._connected and self._client.is_running else "disconnected"
         message = "BACnet client ready"
         if status != "connected":
-            if self._client._bac0_unavailable:
-                message = "BAC0 library not installed"
-            else:
-                message = "BACnet client not connected"
+            message = "BAC0 library not installed" if self._client._bac0_unavailable else "BACnet client not connected"
         return BmsConnectionStatus(
             connected=status == "connected",
             site_id=site_id,

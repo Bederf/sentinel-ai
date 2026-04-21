@@ -1131,7 +1131,7 @@ class WorkOrderNotifier:
         )
 
         # Update collected items
-        new_collected = service_record.get("items_collected", []) + [attachment_type]
+        new_collected = [*service_record.get("items_collected", []), attachment_type]
         await self.repository.update_items_collected(service_record["id"], attachment_type)
 
         # For breakdown service with diagnostic context, use context-aware flow

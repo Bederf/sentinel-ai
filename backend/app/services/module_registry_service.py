@@ -92,19 +92,19 @@ class ModuleRegistryService:
         """Load site module configurations.
 
         Source of truth: Supabase (site_module_configs + site_modules + cross_module_links).
-        Fallback: JSON file (site_modules.json) when Supabase is unavailable.
+        No JSON fallback — if Supabase is unavailable, module registry returns empty (critical failure).
         """
-        if not self._use_json:
-            try:
-                self._load_configs_from_supabase()
-                if self._site_configs:
-                    logger.info(f"Loaded module configs for {len(self._site_configs)} sites from Supabase")
-                    return
-            except Exception as e:
-                logger.warning(f"Supabase load failed, falling back to JSON: {e}")
+        try:
+            self._load_configs_from_supabase()
+            if self._site_configs:
+                logger.info(f"Loaded module configs for {len(self._site_configs)} sites from Supabase")
+                return
+        except Exception as e:
+            logger.error(f"Supabase unavailable for module config load: {e}")
 
-        # JSON fallback
-        self._load_configs_from_json()
+        # No JSON fallback — if Supabase fails, return empty configs (force failure not silent data loss)
+        self._site_configs = {}
+        logger.warning("Module registry has no active configs — Supabase unavailable")
 
     def _load_configs_from_supabase(self) -> None:
         """Load site module configs from Supabase tables."""

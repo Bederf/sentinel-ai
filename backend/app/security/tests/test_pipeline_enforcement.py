@@ -168,7 +168,7 @@ class TestMessageLengthEnforcement:
         long_msg = "x" * (MAX_CHAT_MESSAGE_LENGTH + 1)
         try:
             ChatRequest(message=long_msg)
-            assert False, "Should have raised ValidationError"
+            raise AssertionError("Should have raised ValidationError")
         except ValidationError:
             pass
 
@@ -196,7 +196,7 @@ class TestSiteIdValidation:
 
         try:
             ChatRequest(message="hi", site_id="'; DROP TABLE--")
-            assert False, "Should have raised ValidationError"
+            raise AssertionError("Should have raised ValidationError")
         except ValidationError:
             pass
 
@@ -250,6 +250,6 @@ class TestSiteIdInjectionRejected:
         for attempt in injection_attempts:
             try:
                 ChatRequest(message="hi", site_id=attempt)
-                assert False, f"Should have rejected site_id={attempt}"
+                raise AssertionError(f"Should have rejected site_id={attempt}")
             except ValidationError:
                 pass

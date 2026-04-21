@@ -78,15 +78,15 @@ function FocusRoomCard({ siteId, roomCode, roomLabel }: FocusRoomCardProps) {
   let statusLabel = "Vacant";
   if (isActive) {
     if (redLight) {
-      statusColor = "#ef4444";
+      statusColor = "var(--color-sentinel-red)";
       StatusIcon = AlertCircle;
       statusLabel = "Overstay";
     } else if (extended) {
-      statusColor = "#f59e0b";
+      statusColor = "var(--color-sentinel-amber)";
       StatusIcon = Clock;
       statusLabel = "In use";
     } else {
-      statusColor = "#22c55e";
+      statusColor = "var(--color-sentinel-green)";
       StatusIcon = CheckCircle2;
       statusLabel = "In use";
     }
@@ -118,8 +118,8 @@ function FocusRoomCard({ siteId, roomCode, roomLabel }: FocusRoomCardProps) {
               width: 10,
               height: 10,
               borderRadius: "50%",
-              background: "#ef4444",
-              boxShadow: "0 0 8px #ef4444",
+              background: "var(--color-sentinel-red)",
+              boxShadow: "0 0 8px var(--color-sentinel-red)",
               animation: "pulse 1.5s infinite",
             }}
           />
@@ -181,8 +181,8 @@ export function FocusRoomGrid({ siteId, rooms }: FocusRoomGridProps) {
         {analytics && (
           <>
             <span><strong style={{ color: "var(--color-text)" }}>{analytics.total}</strong> total sessions</span>
-            <span><strong style={{ color: "#22c55e" }}>{analytics.active}</strong> currently active</span>
-            <span><strong style={{ color: "#f59e0b" }}>{analytics.extended}</strong> extended-use</span>
+            <span><strong style={{ color: "var(--color-sentinel-green)" }}>{analytics.active}</strong> currently active</span>
+            <span><strong style={{ color: "var(--color-sentinel-amber)" }}>{analytics.extended}</strong> extended-use</span>
           </>
         )}
       </div>

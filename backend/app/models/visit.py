@@ -9,13 +9,13 @@ Provides data structures for:
 from __future__ import annotations
 
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
 
-class VisitStatus(str, Enum):
+class VisitStatus(StrEnum):
     """Visit lifecycle states.
 
     PENDING    — Invite received, visitor has not yet accepted

@@ -57,7 +57,7 @@ export function SentinelValueCard({
         >
           <div className="flex items-center gap-3">
             <div className="p-2 rounded" style={{ background: 'rgba(34, 197, 94, 0.15)' }}>
-              <Icon className="h-5 w-5" style={{ color: '#22C55E' }} />
+              <Icon className="h-5 w-5" style={{ color: 'var(--color-sentinel-green)' }} />
             </div>
             <h3 className="font-medium" style={{ color: 'var(--color-sentinel-text-primary)' }}>
               {title}
@@ -67,7 +67,7 @@ export function SentinelValueCard({
         <div className="p-6 flex items-center gap-3">
           <div
             className="h-3 w-3 rounded-full animate-pulse"
-            style={{ background: '#22C55E' }}
+            style={{ background: 'var(--color-sentinel-green)' }}
           />
           <p className="text-sm" style={{ color: 'var(--color-sentinel-text-secondary)' }}>
             Collecting baseline data &mdash; comparison available after 7 days of telemetry
@@ -111,7 +111,7 @@ export function SentinelValueCard({
         </div>
         <span
           className="text-xs px-2 py-1 rounded font-medium"
-          style={{ background: 'rgba(34, 197, 94, 0.15)', color: '#22C55E' }}
+          style={{ background: 'rgba(34, 197, 94, 0.15)', color: 'var(--color-sentinel-green)' }}
         >
           {savingsPercent.toFixed(0)}% Savings
         </span>
@@ -123,7 +123,7 @@ export function SentinelValueCard({
         <div>
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
-              <div style={{ color: '#6B7280' }}>
+              <div style={{ color: 'var(--color-sentinel-text-secondary)' }}>
                 <TrendingDown className="h-4 w-4" />
               </div>
               <span className="text-sm font-medium" style={{ color: 'var(--color-sentinel-text-primary)' }}>
@@ -147,7 +147,7 @@ export function SentinelValueCard({
           >
             <div
               className="h-full transition-all duration-500"
-              style={{ width: '100%', background: '#6B7280' }}
+              style={{ width: '100%', background: 'var(--color-sentinel-text-secondary)' }}
             />
           </div>
         </div>
@@ -156,7 +156,7 @@ export function SentinelValueCard({
         <div>
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
-              <div style={{ color: '#22C55E' }}>
+              <div style={{ color: 'var(--color-sentinel-green)' }}>
                 <Leaf className="h-4 w-4" />
               </div>
               <span className="text-sm font-medium" style={{ color: 'var(--color-sentinel-text-primary)' }}>
@@ -174,7 +174,7 @@ export function SentinelValueCard({
               )}
               <span
                 className="text-xs px-2 py-1 rounded"
-                style={{ background: 'rgba(34, 197, 94, 0.15)', color: '#22C55E' }}
+                style={{ background: 'rgba(34, 197, 94, 0.15)', color: 'var(--color-sentinel-green)' }}
               >
                 -{savingsPercent.toFixed(0)}%
               </span>
@@ -186,7 +186,7 @@ export function SentinelValueCard({
           >
             <div
               className="h-full transition-all duration-500"
-              style={{ width: `${barPercent}%`, background: '#22C55E' }}
+              style={{ width: `${barPercent}%`, background: 'var(--color-sentinel-green)' }}
             />
           </div>
         </div>
@@ -200,12 +200,12 @@ export function SentinelValueCard({
           }}
         >
           <div className="flex items-center gap-2">
-            <Leaf className="h-5 w-5 flex-shrink-0" style={{ color: '#22C55E' }} />
+            <Leaf className="h-5 w-5 flex-shrink-0" style={{ color: 'var(--color-sentinel-green)' }} />
             <div>
-              <p className="text-sm font-medium" style={{ color: '#22C55E' }}>
+              <p className="text-sm font-medium" style={{ color: 'var(--color-sentinel-green)' }}>
                 SENTINEL AI Optimization
               </p>
-              <p className="text-xs" style={{ color: 'rgba(34, 197, 94, 0.8)' }}>
+              <p className="text-xs" style={{ color: 'var(--color-sentinel-green)', opacity: 0.8 }}>
                 {saved.toLocaleString()} {baseline.unit} saved
                 {costSaved > 0 && <> &bull; R{costSaved.toLocaleString()} cost reduction</>}
                 {carbonSavedKg != null && carbonSavedKg > 0 && (

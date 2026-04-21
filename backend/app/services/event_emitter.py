@@ -9,13 +9,13 @@ import json
 import logging
 from dataclasses import dataclass
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
-class EventType(str, Enum):
+class EventType(StrEnum):
     """Types of events that can be emitted."""
 
     ALERT_CREATED = "alert_created"
@@ -174,7 +174,7 @@ class EventEmitter:
         equipment_name: str,
         old_health_score: int,
         new_health_score: int,
-        reason: str = None,
+        reason: str | None = None,
         **kwargs,
     ) -> None:
         """Emit health score change event.
@@ -208,7 +208,7 @@ class EventEmitter:
         equipment_id: str,
         equipment_code: str,
         status: str,
-        work_order_type: str = None,
+        work_order_type: str | None = None,
         **kwargs,
     ) -> None:
         """Emit work order update event.
@@ -240,7 +240,7 @@ class EventEmitter:
         equipment_id: str,
         equipment_code: str,
         findings: str,
-        recommendation: str = None,
+        recommendation: str | None = None,
         **kwargs,
     ) -> None:
         """Emit inspection completion event.

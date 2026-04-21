@@ -51,16 +51,14 @@ async def _acquire_access_token() -> str | None:
         Access token string on success, None on failure.
     """
     # Fast path: return cached token if still valid (60s buffer)
-    if cached := _token_cache.get("access_token"):
-        if cached["expires_at"] > time.time() + 60:
-            return cached["token"]
+    if (cached := _token_cache.get("access_token")) and cached["expires_at"] > time.time() + 60:
+        return cached["token"]
 
     # Slow path: acquire lock and refresh if needed
     async with _token_lock:
         # Re-check after acquiring lock (another coroutine may have refreshed)
-        if cached := _token_cache.get("access_token"):
-            if cached["expires_at"] > time.time() + 60:
-                return cached["token"]
+        if (cached := _token_cache.get("access_token")) and cached["expires_at"] > time.time() + 60:
+            return cached["token"]
 
         # Attempt token acquisition
         try:

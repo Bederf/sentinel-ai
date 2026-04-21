@@ -18,6 +18,7 @@ M&V windows vary by action type:
 - BESS dispatch: 15 min (immediate power effect)
 """
 
+import contextlib
 import json
 import logging
 from dataclasses import dataclass, field
@@ -434,10 +435,8 @@ class MVVerificationService:
 
         # 6. Create Outcome record for feedback loop (with quality context)
         action_time = None
-        try:
+        with contextlib.suppress(ValueError, TypeError):
             action_time = datetime.fromisoformat(task.applied_at)
-        except (ValueError, TypeError):
-            pass
 
         outcome = Outcome(
             recommendation_id=task.recommendation_id,

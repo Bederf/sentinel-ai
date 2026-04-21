@@ -200,10 +200,7 @@ class BaselineComparisonService:
             _tolerance_threshold = tolerance
 
         # Calculate deviation as percentage for severity check
-        if baseline_value != 0:
-            deviation_pct_for_severity = deviation_percent
-        else:
-            deviation_pct_for_severity = 0.0
+        deviation_pct_for_severity = deviation_percent if baseline_value != 0 else 0.0
 
         # Determine severity
         severity = self._determine_severity(

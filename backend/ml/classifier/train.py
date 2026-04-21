@@ -18,16 +18,13 @@ logger = logging.getLogger(__name__)
 class ClassifierTrainer:
     """Training pipeline for failure classifiers."""
 
-    def __init__(self, models_dir: str = None):
+    def __init__(self, models_dir: str | None = None):
         """Initialize the trainer.
 
         Args:
             models_dir: Directory to save trained models
         """
-        if models_dir is None:
-            models_dir = Path(__file__).parent.parent / "models" / "classifier"
-        else:
-            models_dir = Path(models_dir)
+        models_dir = Path(__file__).parent.parent / "models" / "classifier" if models_dir is None else Path(models_dir)
 
         self.models_dir = Path(models_dir)
         self.models_dir.mkdir(parents=True, exist_ok=True)
@@ -128,7 +125,7 @@ class ClassifierTrainer:
         """
         results = []
 
-        for eq_type in ClassifierDataPrep.FAILURE_TYPES.keys():
+        for eq_type in ClassifierDataPrep.FAILURE_TYPES:
             logger.info(f"Training {eq_type} classifier...")
             result = self.train_equipment_type(eq_type, n_estimators, max_depth)
             results.append(result)

@@ -44,10 +44,7 @@ class TrainingDataService:
             data_dir: Directory for training data files.
                      Defaults to backend/app/data/training/
         """
-        if data_dir is None:
-            data_dir = Path(__file__).parent.parent / "data" / "training"
-        else:
-            data_dir = Path(data_dir)
+        data_dir = Path(__file__).parent.parent / "data" / "training" if data_dir is None else Path(data_dir)
 
         self._data_dir = data_dir
         self._registry_path = data_dir / "registry.json"

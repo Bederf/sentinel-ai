@@ -65,10 +65,7 @@ def sanitize_email(email: str) -> str:
         return "***"
 
     local, domain = email.split("@", 1)
-    if len(local) <= 1:
-        masked_local = "*"
-    else:
-        masked_local = local[0] + "*" * (len(local) - 2) + local[-1]
+    masked_local = "*" if len(local) <= 1 else local[0] + "*" * (len(local) - 2) + local[-1]
 
     if len(domain) <= 1:
         masked_domain = "*"

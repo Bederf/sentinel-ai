@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 class LSTMTrainer:
     """Training pipeline for LSTM forecasting models."""
 
-    def __init__(self, model_dir: str = None, window_size: int = 168, forecast_horizons: list[int] = None):
+    def __init__(self, model_dir: str | None = None, window_size: int = 168, forecast_horizons: list[int] | None = None):
         """
         Initialize trainer.
 

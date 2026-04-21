@@ -120,7 +120,7 @@ export const RecommendationHistory: React.FC<
                     </span>
                   </td>
                   <td className="py-3">
-                    {rec.multi_objective_score.toFixed(2)}
+                    {typeof rec.multi_objective_score === 'number' ? rec.multi_objective_score.toFixed(2) : '--'}
                   </td>
                   <td className="py-3">
                     <span
@@ -149,7 +149,7 @@ export const RecommendationHistory: React.FC<
                         </div>
                         <div className="text-sm">
                           <p className="font-semibold">
-                            Pred: {rec.expected_impact.temperature_c?.toFixed(1)}°C
+                            Pred: {typeof rec.expected_impact?.temperature_c === 'number' ? `${rec.expected_impact.temperature_c.toFixed(1)}°C` : '--'}
                           </p>
                           <p className="text-gray-600">
                             Actual:{' '}

@@ -15,7 +15,7 @@ Provides:
 import logging
 from dataclasses import dataclass
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from app.database.supabase_client import get_supabase_client
@@ -23,7 +23,7 @@ from app.database.supabase_client import get_supabase_client
 logger = logging.getLogger(__name__)
 
 
-class ModelStatus(str, Enum):
+class ModelStatus(StrEnum):
     """Status of ML model availability and quality."""
 
     ACTIVE = "active"

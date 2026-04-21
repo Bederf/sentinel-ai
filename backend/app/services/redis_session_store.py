@@ -120,10 +120,7 @@ class RedisSessionStore:
                 if raw:
                     data = json.loads(raw)
                     # Reconstruct object if deserializer provided
-                    if self._deserializer:
-                        obj = self._deserializer(data)
-                    else:
-                        obj = data
+                    obj = self._deserializer(data) if self._deserializer else data
                     # Cache in memory
                     self._memory[session_id] = obj
                     self._memory_expiry[session_id] = datetime.utcnow() + timedelta(seconds=self._ttl_seconds)

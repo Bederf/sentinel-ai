@@ -7,13 +7,12 @@ device management.
 
 import json
 import logging
-import re
 import os
+import re
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import List, Optional, Union
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Body, Request
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field, field_validator
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -62,7 +61,7 @@ class DeviceControlRequest(BaseModel):
         max_length=100,
         description="Point name to control",
     )
-    value: Union[float, int, bool, str] = Field(
+    value: float | int | bool | str = Field(
         ...,
         description="Value to write",
     )
@@ -83,7 +82,7 @@ class DeviceControlRequest(BaseModel):
 
     @field_validator("value")
     @classmethod
-    def validate_value(cls, v: Union[float, int, bool, str]) -> Union[float, int, bool, str]:
+    def validate_value(cls, v: float | int | bool | str) -> float | int | bool | str:
         """Enforce sensible bounds on numeric values and string length."""
         if isinstance(v, bool):
             return v
@@ -109,7 +108,7 @@ SITES_DIR = DATA_DIR / "sites"
 REFERENCE_DEVICES_PATH = Path(__file__).parent.parent / "services" / "bms_simulator" / "data" / "reference_devices.json"
 
 
-async def load_reference_devices() -> List[dict]:
+async def load_reference_devices() -> list[dict]:
     """Load Site-002 reference devices from JSON file."""
     if REFERENCE_DEVICES_PATH.exists():
         with open(REFERENCE_DEVICES_PATH) as f:
@@ -117,7 +116,7 @@ async def load_reference_devices() -> List[dict]:
     return []
 
 
-async def load_equipment_from_buildings() -> List[dict]:
+async def load_equipment_from_buildings() -> list[dict]:
     """Load all equipment from building directories.
 
     Scans all building equipment directories and returns all equipment,
@@ -161,7 +160,7 @@ async def load_equipment_from_buildings() -> List[dict]:
     return all_devices
 
 
-def _transform_equipment_to_device(eq_data: dict) -> Optional[dict]:
+def _transform_equipment_to_device(eq_data: dict) -> dict | None:
     """Transform equipment JSON format to device manager format."""
     try:
         device_id = eq_data.get("id")
@@ -313,12 +312,12 @@ async def devices_lifespan(_app):
 router.lifespan_context = devices_lifespan
 
 
-@router.get("/devices", response_model=List[dict])
+@router.get("/devices", response_model=list[dict])
 async def get_devices(
-    site_id: Optional[str] = Query(None, description="Filter by site ID"),
-    device_type: Optional[str] = Query(None, description="Filter by device type"),
-    protocol: Optional[str] = Query(None, description="Filter by protocol"),
-) -> List[dict]:
+    site_id: str | None = Query(None, description="Filter by site ID"),
+    device_type: str | None = Query(None, description="Filter by device type"),
+    protocol: str | None = Query(None, description="Filter by protocol"),
+) -> list[dict]:
     """Get all devices with optional filtering."""
     try:
         devices = await device_manager.list_devices()
@@ -565,8 +564,8 @@ async def disconnect_device(device_id: str, auth: AuthContext = Depends(require_
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/sites/{site_id}/devices", response_model=List[dict])
-async def get_site_devices(site_id: str) -> List[dict]:
+@router.get("/sites/{site_id}/devices", response_model=list[dict])
+async def get_site_devices(site_id: str) -> list[dict]:
     """Get all devices at a specific site."""
     try:
         devices = await device_manager.list_devices_by_site(site_id)

@@ -19,7 +19,7 @@ from app.services.zone_ingestion_service import ZoneIngestionService
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/buildings", tags=["zone-ingestion"])
+router = APIRouter(prefix="/buildings", tags=["zone-ingestion"])
 
 
 # ============================================================================

@@ -14,13 +14,13 @@ Weights are configurable per asset class.
 """
 
 import logging
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
-class ConditionGrade(str, Enum):
+class ConditionGrade(StrEnum):
     """Equipment condition grade."""
 
     GOOD = "good"  # 80-100: Normal operation
@@ -257,7 +257,7 @@ class ConditionScorer:
             return 50  # No data
 
         shaft_freq = profile["shaft_freq_hz"]
-        expected = [shaft_freq] + profile.get("harmonics_hz", [])
+        expected = [shaft_freq, *profile.get("harmonics_hz", [])]
 
         # Count how many expected frequencies are present
         matches = 0
@@ -270,10 +270,7 @@ class ConditionScorer:
                 unexpected += 1
 
         # Score based on matches vs unexpected
-        if len(expected) > 0:
-            match_ratio = matches / len(expected)
-        else:
-            match_ratio = 0.5
+        match_ratio = matches / len(expected) if len(expected) > 0 else 0.5
 
         unexpected_penalty = min(30, unexpected * 10)
 

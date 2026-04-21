@@ -219,9 +219,8 @@ class SolarDispatchService:
             net_load = load_kw_noisy - solar_kw_noisy
             if action == "discharge":
                 net_load -= power_kw
-            elif action in ("charge", "solar_priority"):
-                if action == "charge":
-                    net_load += power_kw
+            elif action in ("charge", "solar_priority") and action == "charge":
+                net_load += power_kw
                 # solar_priority: excess solar charges BESS, no grid impact
 
             grid_import = max(0, net_load)

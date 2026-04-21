@@ -439,7 +439,7 @@ export function ControlDashboard({ onError, siteId: propSiteId }: ControlDashboa
       <div className="flex-none px-4 md:px-6 pt-4 md:pt-6 pb-2">
         <div className="flex items-center gap-3">
           <div className="p-2 rounded" style={{ background: "rgba(16, 185, 129, 0.15)" }}>
-            <Cpu className="h-6 w-6" style={{ color: "#10B981" }} />
+            <Cpu className="h-6 w-6" style={{ color: "var(--color-sentinel-green)" }} />
           </div>
           <div>
             <h1 className="text-2xl font-bold" style={{ color: "var(--color-sentinel-text-primary)" }}>
@@ -459,7 +459,7 @@ export function ControlDashboard({ onError, siteId: propSiteId }: ControlDashboa
               <h2 className="text-sm font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>
                 Raw Bridge Telemetry
               </h2>
-              <span className="text-xs px-2 py-1 rounded" style={{ background: bridgeTelemetry?.status === "live" ? "rgba(16,185,129,0.15)" : "rgba(245,158,11,0.15)", color: bridgeTelemetry?.status === "live" ? "#10B981" : "#F59E0B" }}>
+              <span className="text-xs px-2 py-1 rounded" style={{ background: bridgeTelemetry?.status === "live" ? "rgba(16,185,129,0.15)" : "rgba(245,158,11,0.15)", color: bridgeTelemetry?.status === "live" ? "var(--color-sentinel-green)" : "var(--color-sentinel-amber)" }}>
                 {bridgeTelemetry?.status === "live" ? "Live" : "Unavailable"}
               </span>
             </div>

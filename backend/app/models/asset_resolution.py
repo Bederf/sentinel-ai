@@ -9,10 +9,10 @@ ResolutionResult  — immutable result dataclass returned by AssetIDResolver.res
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 
 
-class ResolutionMethod(str, Enum):
+class ResolutionMethod(StrEnum):
     """
     How the asset ID was matched.
 
@@ -28,7 +28,7 @@ class ResolutionMethod(str, Enum):
     UNRESOLVED = "unresolved"
 
 
-class ResolutionConfidence(str, Enum):
+class ResolutionConfidence(StrEnum):
     """
     Confidence band derived from the raw fuzzy score.
 

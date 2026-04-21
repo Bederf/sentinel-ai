@@ -7,7 +7,7 @@ created: "2026-01-30"
 updated: "2026-01-30"
 author: "Sentinel Development Team"
 tags: ["architecture", "device-abstraction", "protocols", "bms"]
-related: ["system-overview.md", "naming-conventions.md", "../07-integrations/bacnet-integration.md"]
+related: ["system-overview.md", "NAMING_CONVENTIONS.md", "../07-integrations/bacnet-integration.md"]
 domain: "bms"
 audience: "developers"
 complexity: "advanced"
@@ -647,6 +647,6 @@ device = await device_manager.get_device(device_id)
 ## Related Documentation
 
 - [System Architecture](system-overview.md) - High-level architecture
-- [Naming Conventions](naming-conventions.md) - Device ID format
+- [Naming Conventions](NAMING_CONVENTIONS.md) - Device ID format
 - [BACnet Integration](../07-integrations/bacnet-integration.md) - BACnet protocol details
 - [Safety Interlocks Engine](../06-safety-compliance/safety-interlocks-engine.md) - Safety validation

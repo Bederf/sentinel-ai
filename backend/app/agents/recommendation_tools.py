@@ -508,10 +508,7 @@ def check_recommendation_freshness(recommendation: dict[str, Any], max_age_minut
         return {"is_fresh": False, "age_minutes": 999, "reason": "No timestamp"}
 
     try:
-        if isinstance(timestamp_str, str):
-            rec_time = datetime.fromisoformat(timestamp_str)
-        else:
-            rec_time = timestamp_str
+        rec_time = datetime.fromisoformat(timestamp_str) if isinstance(timestamp_str, str) else timestamp_str
 
         age = datetime.utcnow() - rec_time
         age_minutes = age.total_seconds() / 60

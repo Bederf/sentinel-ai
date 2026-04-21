@@ -12,13 +12,13 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from app.services.event_bus import Importance, SentinelEvent
 
 
-class OperationalEventType(str, Enum):
+class OperationalEventType(StrEnum):
     """Classified operational event types."""
 
     TEMPERATURE_DEVIATION = "temperature_deviation"
@@ -33,7 +33,7 @@ class OperationalEventType(str, Enum):
     PATTERN_ANOMALY = "pattern_anomaly"  # ML-detected
 
 
-class EventSeverity(str, Enum):
+class EventSeverity(StrEnum):
     """Severity levels for operational events."""
 
     INFO = "info"

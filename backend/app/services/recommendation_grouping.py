@@ -13,13 +13,13 @@ Purpose:
 
 import logging
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
-class RecommendationObjective(str, Enum):
+class RecommendationObjective(StrEnum):
     """Objective categories for grouping recommendations."""
 
     LOAD_REDUCTION = "load_reduction"  # Peak shaving, demand response
@@ -29,7 +29,7 @@ class RecommendationObjective(str, Enum):
     MAINTENANCE = "maintenance"  # Scheduled maintenance actions
 
 
-class SystemType(str, Enum):
+class SystemType(StrEnum):
     """Building systems that recommendations can affect."""
 
     HVAC = "hvac"  # Heating, ventilation, air conditioning
@@ -37,7 +37,7 @@ class SystemType(str, Enum):
     POWER = "power"  # Generators, UPS, load shedding
 
 
-class ExecutionOrder(str, Enum):
+class ExecutionOrder(StrEnum):
     """Execution order for grouped recommendations (safest to riskiest)."""
 
     LIGHTING = "lighting"  # Safest - most reversible
