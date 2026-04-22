@@ -641,3 +641,38 @@ Review safety violations in the audit log to identify:
 | Field | Type | Required | Default |
 |-------|------|----------|---------|
 | `validation_logic` | string | No | "" |
+
+---
+
+## Appendix: Three-Way Sync Rule (Architecture Invariant)
+
+**⚠️  CRITICAL ARCHITECTURE RULE — MUST BE MAINTAINED**
+
+When adding or modifying action types, three synchronized structures must be kept in agreement:
+
+| # | Structure | Location | Purpose |
+|---|-----------|----------|---------|
+| 1 | `_DANGEROUS_ACTION_TYPES` | `app/models/sentinel_tool.py` | Marks actions that bypass Tier3 dangerous-gate |
+| 2 | `_REVERSIBLE_ACTION_TYPES` | `app/models/sentinel_tool.py` | Marks actions with automatic rollback capability |
+| 3 | `safety_profiles` matrix | `app/services/chat_tools.py` | Defines per-role safety guardrails for `control_device` tool |
+
+**Sync rule:** When modifying ANY of these three structures, update the other two in the same commit.
+Violation: Actions may bypass safety controls or fail to roll back.
+
+**Example (from Phase 185):**
+```python
+# sentinel_tool.py
+_DANGEROUS_ACTION_TYPES = {"equipment_on_off", "load_shedding", "fire_panel_reset"}
+_REVERSIBLE_ACTION_TYPES = {"setpoint_adjust", "damper_position", "fan_speed"}
+
+# chat_tools.py
+safety_profiles = {
+    "control_device": {
+        "ADMIN": {"allowed": True, "dangerous_gate": False},
+        "SUPERVISOR": {"allowed": True, "dangerous_gate": True, "require_reversible": False},
+        ...
+    }
+}
+```
+
+See: `app/models/sentinel_tool.py` (SentinelTool dataclass, Phase 185)

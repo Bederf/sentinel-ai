@@ -35,11 +35,22 @@ Chat is the interface. The control engine is separate.
 
 ## Three Control Modes
 
+**⚠️  Terminology Note:**
+This document uses the **legacy PARASITE schema** (RECOMMEND/SUPERVISED/FULL_CONTROL).
+The **canonical schema** (per CLAUDE.md) is: `shadow → advisory → supervised → autonomous`.
+
 | Mode | IngestionMode | control_tier | Behavior |
 |------|--------------|--------------|----------|
 | **RECOMMEND** | SIMULATION | monitor | Advisory only. No write tools registered. |
 | **SUPERVISED** | SHADOW_LIVE | human_in_loop | Writes require human approval. |
 | **FULL_CONTROL** | LIVE_CONTROL | auto_execute | Auto-execute within policy limits. |
+
+| Canonical (CLAUDE.md) | Legacy (this doc) | Notes |
+|---------------------|-------------------|-------|
+| `shadow` | RECOMMEND | Read-only advisory |
+| `advisory` | — | Advisory mode (new) |
+| `supervised` | SUPERVISED | Human approval required |
+| `autonomous` | FULL_CONTROL | Full autonomous control |
 
 ## Command Envelope Pattern
 

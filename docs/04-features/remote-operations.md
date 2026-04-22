@@ -367,7 +367,7 @@ Configurable safety rules enforced by SafetyEngine. Managed via the settings pag
 | Category | File |
 |----------|------|
 | Models | `backend/app/models/remote_ops.py` |
-| Auth Service | `backend/app/services/auth_service.py` |
+| Auth Service | ~~`backend/app/services/auth_service.py`~~ → `backend/app/api/auth.py` (authoritative) |
 | Monitoring | `backend/app/services/remote_monitoring_service.py` |
 | Commands | `backend/app/services/remote_command_service.py` |
 | Dispatch | `backend/app/services/smart_dispatch_service.py` |

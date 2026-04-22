@@ -26,7 +26,6 @@ Stores daily energy, water, fuel, and emissions data per site. Populated by the 
 CREATE TABLE daily_sustainability_metrics (
     id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     site_id                 TEXT NOT NULL,
-    building_id             UUID REFERENCES buildings(id),
     date                    DATE NOT NULL,
 
     -- Energy breakdown (kWh)
@@ -124,7 +123,7 @@ Format: JSON array of daily records matching the table columns.
 
 | Table | Relationship |
 |-------|-------------|
-| `buildings` | `building_id` FK |
+| `sites` | `site_id` FK (normalized from buildings→sites, migration 111) |
 | `energy_consumption_history` | Source for water data (energy_type='WATER') |
 | `power_meters` | Source for real-time energy readings |
 

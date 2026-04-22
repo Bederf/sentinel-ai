@@ -302,8 +302,14 @@ SENTINEL implements **building-level access control** where users only see build
 
 ### 4.4 Authentication Status
 
+**⚠️  JWT Token Lifetime Note:**
+This report states JWT access token lifetime as "15 minutes" (line 306) — this is **OUTDATED**.
+The authoritative source is `security-hardening.md` (Phase 58-04), which specifies **8 hours** for JWT access tokens.
+This report predates the security-hardening phase and has not been updated to reflect the current token lifetime.
+For current JWT TTL configuration, refer to `docs/06-safety-compliance/security-hardening.md`.
+
 **Current Implementation:**
-- ✅ Email-based authentication with short-lived JWT access tokens (15 minutes)
+- ✅ Email-based authentication with short-lived JWT access tokens (~~15 minutes~~ **8 hours** — see security-hardening.md)
 - ✅ Refresh tokens with rotation (7-day TTL) and revocation on use
 - ✅ JWT blacklist enforcement using token `jti` (Redis-backed, graceful degradation)
 - ✅ Session tracking and revocation endpoints (`/api/auth/sessions*`)
