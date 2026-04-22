@@ -40,10 +40,14 @@ logger.info(f"Loaded {len(documents)} chunks from RAG_INDEX.json")
 logger.info(f"Connecting to Supabase: {SUPABASE_URL}")
 supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
-logger.info("Loading embedding model (all-MiniLM-L6-v2, 384d)...")
-es = get_embedding_service(None)
-_ = es.model
-logger.info("Embedding model ready")
+try:
+    logger.info("Loading embedding model (all-MiniLM-L6-v2, 384d)...")
+    es = get_embedding_service()
+    _ = es.model
+    logger.info("Embedding model ready")
+except Exception as e:
+    logger.warning(f"Embedding model not available ({e}) — skipping vector embedding generation")
+    es = None
 
 DOCUMENT_TYPES = {
     "arch": "technical_bulletin",
@@ -57,7 +61,7 @@ DOCUMENT_TYPES = {
     "db": "technical_bulletin",
     "supabase": "technical_bulletin",
     "config": "technical_bulletin",
-    "docs": "internal_procedure",
+    "docs": "technical_bulletin",
 }
 
 
@@ -93,7 +97,7 @@ for i in range(0, len(documents), batch_size):
         }
 
         logger.info(f"  Inserting document: {doc_id}")
-        result = supabase.table("documents").insert(doc_record).execute()
+        result = supabase.table("documents").upsert(doc_record, on_conflict="code").execute()
         if result.data:
             inserted_docs[doc_id] = result.data[0]["id"]
         else:
