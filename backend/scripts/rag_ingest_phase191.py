@@ -120,6 +120,14 @@ for chunk in documents:
     doc_uuid = inserted_docs[doc_id]
     chunk_index = int(chunk["chunk_id"].split("_")[-1])
 
+    # Generate embedding for this chunk
+    embedding = None
+    if es is not None:
+        try:
+            embedding = es.embed_text(chunk["content"])
+        except Exception as e:
+            logger.warning(f"  Embedding failed for {chunk['chunk_id']}: {e}")
+
     rec = {
         "id": str(uuid.uuid4()),
         "document_id": doc_uuid,
@@ -130,11 +138,12 @@ for chunk in documents:
         "equipment_type": doc_id.split("_")[0],
         "document_type": get_doc_type(doc_id),
         "keywords": chunk.get("keywords", []),
+        "embedding": embedding,
     }
     chunks_batch.append(rec)
 
     if len(chunks_batch) >= batch_size:
-        logger.info(f"  Inserting {len(chunks_batch)} chunks...")
+        logger.info(f"  Inserting {len(chunks_batch)} chunks with embeddings...")
         try:
             supabase.table("document_chunks").insert(chunks_batch).execute()
             chunk_count += len(chunks_batch)
@@ -143,7 +152,7 @@ for chunk in documents:
         chunks_batch = []
 
 if chunks_batch:
-    logger.info(f"  Inserting final {len(chunks_batch)} chunks...")
+    logger.info(f"  Inserting final {len(chunks_batch)} chunks with embeddings...")
     try:
         supabase.table("document_chunks").insert(chunks_batch).execute()
         chunk_count += len(chunks_batch)
