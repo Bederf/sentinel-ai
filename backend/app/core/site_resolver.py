@@ -195,6 +195,40 @@ def get_primary_site_code() -> str | None:
     return site
 
 
+def normalize_site_id(site_id: str, to_supabase: bool = True) -> str:
+    """Normalize site ID format.
+
+    Internal/config format:  site-002  (site_resolver canonical)
+    Supabase/DB format:      S002      (database primary key)
+
+    Args:
+        site_id: Site identifier in either format.
+        to_supabase: True  → internal  → Supabase format (S002)
+                     False → Supabase → internal format (site-002)
+    """
+    if to_supabase:
+        # internal → Supabase: "site-002" → "S002"
+        if site_id.startswith("site-"):
+            return f"S{site_id.split('-')[1]}"
+        return site_id  # already S002
+    else:
+        # Supabase → internal: "S002" → "site-002"
+        if site_id.startswith("S"):
+            num = site_id[1:]  # "002"
+            return f"site-{num}"
+        return site_id  # already site-XXX
+
+
+def _to_supabase_site_id(site_id: str) -> str:
+    """Convert internal site ID to Supabase format (alias for normalize_site_id(x, to_supabase=True))."""
+    return normalize_site_id(site_id, to_supabase=True)
+
+
+def _from_supabase_site_id(site_id: str) -> str:
+    """Convert Supabase site ID to internal format (alias for normalize_site_id(x, to_supabase=False))."""
+    return normalize_site_id(site_id, to_supabase=False)
+
+
 async def require_any_site(
     site_id: str = Query(..., description="Site code (e.g. site-002)"),
 ) -> str:
