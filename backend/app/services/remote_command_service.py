@@ -22,6 +22,7 @@ from app.models.remote_ops import COMMAND_AUTHORIZATION, AuthorizationLevel
 from app.services.audit_logger import AuditLogger
 from app.services.auth_service import get_authorization_service
 from app.services.device_abstraction import device_manager
+from app.core.site_resolver import normalize_site_id
 
 logger = logging.getLogger(__name__)
 
@@ -593,11 +594,8 @@ class RemoteCommandService:
         """
         overrides = list(self._active_overrides.values())
         if site_id:
-            overrides = [
-                o
-                for o in overrides
-                if o["device_id"].startswith(site_id.replace("site-", "S").upper()) or site_id in o["device_id"]
-            ]
+            supabase_site = normalize_site_id(site_id, to_supabase=True).upper()
+            overrides = [o for o in overrides if o["device_id"].startswith(supabase_site) or site_id in o["device_id"]]
         return overrides
 
     # ------------------------------------------------------------------ #

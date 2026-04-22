@@ -22,7 +22,7 @@ from datetime import datetime, timedelta
 from enum import Enum, StrEnum
 from typing import Any
 
-from app.core.site_resolver import get_primary_site_code
+from app.core.site_resolver import get_primary_site_code, normalize_site_id
 from app.database.repositories.equipment_repository import EquipmentRepository
 from app.database.repositories.prediction_repository import PredictionRepository
 from app.database.repositories.work_order_repository import get_work_order_repository
@@ -286,7 +286,7 @@ class LifecycleOrchestrator:
         # Cycle tracking for completion
         self.max_cycles: int = 1  # How many full cycles before completing
         self.completed_cycles: int = 0
-        self._site_prefix: str = self.site_id.replace("site-", "S").upper()  # site-005 -> S005
+        self._site_prefix: str = normalize_site_id(self.site_id, to_supabase=True).upper()  # site-005 → S005
 
         # Energy tracking
         self.total_energy_kwh: float = 0.0  # Cumulative energy consumption
