@@ -285,6 +285,26 @@ async def get_hvac_overview(
     chillers = [eq for eq in equipment_rows if eq.get("type", "").lower() in ("chiller", "hvac_chiller")]
     chillers_running = sum(1 for c in chillers if c.get("status") == "running" and c.get("is_running"))
 
+    # Fetch live site power from ML feeder bridge buffers (bridge data, not DB)
+    site_power = None
+    try:
+        from app.services.sentinel_data_sync import get_sentinel_data_sync
+        sync = get_sentinel_data_sync(site_id=site_id)
+        site_power = sync.ml_feeder.get_latest_site_power()
+    except Exception:
+        pass
+
+    if site_power:
+        hvac_kw = site_power["hvac_kw"]
+        lighting_kw = site_power["lighting_kw"]
+        total_kw = site_power["total_kw"]
+        raw_telemetry_status = "live"
+    else:
+        hvac_kw = 0.0
+        lighting_kw = 0.0
+        total_kw = 0.0
+        raw_telemetry_status = "unavailable"
+
     # Fetch alerts for this site
     from app.database.supabase_client import get_supabase_client
     sb = get_supabase_client()
@@ -311,7 +331,15 @@ async def get_hvac_overview(
         health_status=get_health_status(overall_health),
         alerts=active_alerts,
         chillers_running=chillers_running,
-        raw_telemetry={"status": "live" if zones else "unavailable", "zone_count": len(zones)},
+        raw_telemetry={
+            "status": raw_telemetry_status,
+            "zone_count": len(zones),
+            "power": {
+                "hvac_kw": hvac_kw,
+                "lighting_kw": lighting_kw,
+                "total_kw": total_kw,
+            },
+        },
         sentinel_intelligence=None,
     )
 

@@ -70,15 +70,20 @@ function useBuildingStatePayload(siteId: string) {
         if (mounted) {
           setPayload(json.payload as BuildingStatePayload | null)
           setHvacOverview((hvacJson as HVACOverview | null) ?? null)
+          const hvacPower = hvacJson?.raw_telemetry?.power
+          const totalKw = hvacPower?.total_kw ?? Number(energyJson?.total_power_kw ?? 0)
+          const hvacKw = hvacPower?.hvac_kw ?? 0
+          const lightingKw = hvacPower?.lighting_kw ?? 0
+          const powerPercent = totalKw > 0 && hvacKw > 0 ? (hvacKw / totalKw) * 100 : 0
           setEnergyTelemetry(
-            energyJson
+            energyJson || hvacPower
               ? {
-                  totalKw: Number(energyJson.total_power_kw ?? 0),
-                  hvacKw: 0,
-                  lightingKw: 0,
-                  powerKw: Number(energyJson.total_power_kw ?? 0),
-                  powerPercent: 0,
-                  timestamp: typeof energyJson.timestamp === 'string' ? energyJson.timestamp : undefined,
+                  totalKw,
+                  hvacKw,
+                  lightingKw,
+                  powerKw: totalKw,
+                  powerPercent,
+                  timestamp: typeof energyJson?.timestamp === 'string' ? energyJson.timestamp : undefined,
                 }
               : null,
           )

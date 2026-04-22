@@ -265,6 +265,23 @@ class SentinelMLFeeder:
         self._hours_ingested += 1
         self._data_sources.append(data_source)
 
+    def get_latest_site_power(self) -> dict[str, float] | None:
+        """Return latest HVAC/lighting/total kW from site_aggregate buffer.
+
+        Returns None when no bridge data has arrived yet, so the cockpit can
+        display "No info" instead of fake zeros.
+        """
+        buf = self._buffers.get("site_aggregate")
+        if not buf:
+            return None
+        if not buf.get("total_kw"):
+            return None
+        return {
+            "hvac_kw": round(buf.get("hvac_kw", [0])[-1], 2),
+            "lighting_kw": round(buf.get("lighting_kw", [0])[-1], 2),
+            "total_kw": round(buf.get("total_kw", [0])[-1], 2),
+        }
+
     def score_anomaly(self, hours_ingested: int | None = None) -> dict[str, float]:
         """Compute anomaly_score per equipment code from the latest buffer readings.
 

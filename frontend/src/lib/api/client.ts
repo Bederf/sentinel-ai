@@ -15,7 +15,8 @@
 
 import { secureConsoleLog } from './security-utils';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "";
+// VITE_API_URL set = use it (production/self-hosted)
+const API_BASE_URL = import.meta.env.VITE_API_URL || window.location.origin;
 const ACCESS_TOKEN_KEY = "sentinel_token";
 const REFRESH_TOKEN_KEY = "sentinel_refresh_token";
 export const AUTH_EXPIRED_EVENT = "sentinel:auth-expired";

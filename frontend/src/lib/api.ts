@@ -2,7 +2,7 @@
  * API Client for BMS Intelligence Backend
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "";
+const API_BASE_URL = import.meta.env.VITE_API_URL || window.location.origin;
 const ACCESS_TOKEN_KEY = "sentinel_token";
 const REFRESH_TOKEN_KEY = "sentinel_refresh_token";
 export const AUTH_EXPIRED_EVENT = "sentinel:auth-expired";

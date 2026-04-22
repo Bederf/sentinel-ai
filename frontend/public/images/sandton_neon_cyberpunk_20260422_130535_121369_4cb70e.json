@@ -1,0 +1,21 @@
+{
+  "city": "Sandton",
+  "country": "South Africa",
+  "display_city": "Sandton City",
+  "display_country": "Johannesburg, SA",
+  "theme": "neon_cyberpunk",
+  "theme_description": "Dark background with electric pink/cyan - bold night city vibes",
+  "output_file": "/opt/bms-intelligence/frontend/public/images/sandton_neon_cyberpunk_20260422_130535_121369_4cb70e.png",
+  "output_format": "png",
+  "width_in": 16.0,
+  "height_in": 12.0,
+  "dpi": 150,
+  "distance_m": 4000,
+  "latitude": -26.0682406,
+  "longitude": 28.0479844,
+  "generated_at": "2026-04-22T13:05:37.241249Z",
+  "show_attribution": false,
+  "paper_size": null,
+  "orientation": "portrait",
+  "font_family": null
+}

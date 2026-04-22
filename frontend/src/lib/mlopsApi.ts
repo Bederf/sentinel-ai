@@ -6,7 +6,7 @@
  * Phase 45-03: MLOps Monitoring and Success Metrics.
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "";
+const API_BASE_URL = import.meta.env.VITE_API_URL || window.location.origin;
 
 function authHeaders(): Record<string, string> {
   const token = localStorage.getItem("sentinel_token");

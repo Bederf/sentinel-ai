@@ -341,6 +341,11 @@ function RailAction({ state, onApprove }: { state: CockpitState; onApprove?: () 
     )
   }
 
+  // Advisory phase: recommendations only, no hold-to-confirm action UI
+  if (state.site.onboardingPhase === 'advisory') {
+    return null
+  }
+
   if (state.site.mode === 'prepare' || state.site.mode === 'intervene_soon') {
     return (
       <div className="border-t border-white/8 p-4">
