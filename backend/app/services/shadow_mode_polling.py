@@ -23,6 +23,8 @@ from typing import Any
 
 import httpx
 
+from app.core.site_resolver import normalize_site_id
+
 logger = logging.getLogger("sentinel.shadow_mode")
 
 
@@ -303,7 +305,7 @@ class ShadowModePollingService:
                 # Feed alarm events to ML feeder fault buffer
                 from app.services.sentinel_data_sync import get_sentinel_data_sync
 
-                sync = get_sentinel_data_sync(site_id=self.site_id.replace("site-", "S"))
+                sync = get_sentinel_data_sync(site_id=normalize_site_id(self.site_id, to_supabase=True))
                 for alarm in alarms:
                     sync.ml_feeder.ingest_fault_event(alarm)
                 fault_count = len(alarms)
@@ -404,7 +406,7 @@ class ShadowModePollingService:
         try:
             from app.services.sentinel_data_sync import get_sentinel_data_sync
 
-            sync = get_sentinel_data_sync(site_id=self.site_id.replace("site-", "S"))
+            sync = get_sentinel_data_sync(site_id=normalize_site_id(self.site_id, to_supabase=True))
             await sync.ingest_equipment_states(equipment_states, now, data_source="bridge_poll")
             result["equipment_states"] = len(equipment_states)
             result["ml_hours_ingested"] = sync.ml_feeder.hours_ingested
