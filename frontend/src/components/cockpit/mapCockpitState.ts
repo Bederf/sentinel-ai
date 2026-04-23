@@ -483,6 +483,7 @@ export function mapCockpitState(
   hvacOverview?: HVACOverview | null,
   energyCentreTelemetry?: EnergyCentreTelemetry | null,
   remoteTelemetry?: RemoteSiteTelemetry | null,
+  systemFilter?: string | null,
 ): CockpitState {
   if (!payload) return buildUnavailableState(summary)
 
@@ -555,7 +556,6 @@ export function mapCockpitState(
   })
 
   // Add zone signals for clusters that don't have a BMS narrative yet (standalone clusters)
-  const clusteredZoneIds = new Set(Object.keys(clusterByZone))
   const existingZoneIds = new Set(zoneSignals.map((s) => s.zoneId))
   const standaloneClusters = emailClusters.filter(
     (c) => c.emailCount >= 3 && !existingZoneIds.has(c.zoneId)
@@ -697,5 +697,6 @@ export function mapCockpitState(
       detail: tension.message,
     })),
     emailClusters,
+    systemFilter: (systemFilter ?? null) as 'hvac' | 'energy' | 'lighting' | 'water' | 'fire' | 'security' | 'solar_bess' | null,
   }
 }

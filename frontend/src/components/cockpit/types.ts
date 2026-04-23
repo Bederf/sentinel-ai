@@ -165,6 +165,8 @@ export interface CockpitState {
   emergingRisks: CockpitRiskItem[]
   /** Active occupant complaint clusters (count >= 3) — email heatmap signals */
   emailClusters: EmailClusterData[]
+  /** Active system filter — when set, only zones/equipment of this system type render */
+  systemFilter?: 'hvac' | 'energy' | 'lighting' | 'water' | 'fire' | 'security' | 'solar_bess' | null
 }
 
 export interface ModelReadiness {

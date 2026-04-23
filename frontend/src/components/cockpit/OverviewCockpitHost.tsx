@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import api, { authorizedFetch } from '@/lib/api'
+import { authorizedFetch } from '@/lib/api'
 import type { HVACOverview } from '@/lib/hvacApi'
 import { CockpitView } from './CockpitView'
 import { CockpitBuildingThree } from './CockpitBuildingThree'
@@ -14,6 +14,7 @@ interface OverviewCockpitHostProps {
   predictionsCount: number
   equipmentCount: number
   posture?: string | null
+  systemFilter?: string | null
   onModuleDisplayChange?: (moduleDisplay: Record<string, string>) => void
 }
 
@@ -133,6 +134,7 @@ export function OverviewCockpitHost({
   predictionsCount,
   equipmentCount,
   posture,
+  systemFilter,
   onModuleDisplayChange: _onModuleDisplayChange,
 }: OverviewCockpitHostProps) {
   const { payload, hvacOverview, energyTelemetry, lastUpdatedAt } = useBuildingStatePayload(siteId)
@@ -201,8 +203,8 @@ export function OverviewCockpitHost({
       { siteId, siteName, onboardingPhase, posture, activeAlerts, predictionsCount, equipmentCount },
       lastUpdatedAt,
     )
-    return mapCockpitState(summary, payload, hvacOverview, energyTelemetry)
-  }, [siteId, siteName, onboardingPhase, posture, activeAlerts, predictionsCount, equipmentCount, lastUpdatedAt, payload, hvacOverview, energyTelemetry])
+    return mapCockpitState(summary, payload, hvacOverview, energyTelemetry, undefined, systemFilter)
+  }, [siteId, siteName, onboardingPhase, posture, activeAlerts, predictionsCount, equipmentCount, lastUpdatedAt, payload, hvacOverview, energyTelemetry, systemFilter])
 
   return (
     <CockpitView
