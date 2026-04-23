@@ -31,6 +31,7 @@ interface CockpitViewProps {
   onZoneClose?: () => void
   modelReadiness?: ModelReadiness | null
   onAdvancePhase?: () => void
+  onZoneSelect?: (zone: CockpitTwinZoneSignal) => void
 }
 
 const FRAMER_EASE: [number, number, number, number] = [0.4, 0, 0.2, 1]
@@ -63,6 +64,15 @@ interface QueueItem {
 
 function activeModuleLabels(state: CockpitState): string[] {
   const labels = new Set<string>()
+  // When a system filter is active, prioritize that system label first
+  const filter = state.systemFilter
+  if (filter === 'hvac') labels.add('HVAC')
+  if (filter === 'energy') labels.add('Energy')
+  if (filter === 'lighting') labels.add('Lighting')
+  if (filter === 'water') labels.add('Water')
+  if (filter === 'fire') labels.add('Fire')
+  if (filter === 'security') labels.add('Security')
+  if (filter === 'solar_bess') labels.add('Solar & BESS')
   if (state.evidence.refs.some((ref) => ref.startsWith('zone:'))) labels.add('HVAC')
   if (state.evidence.refs.some((ref) => ref.startsWith('energy-centre:'))) labels.add('Energy Centre')
   for (const risk of state.emergingRisks) {
@@ -139,7 +149,23 @@ function phaseLabel(phase: CockpitState['site']['onboardingPhase']) {
   return 'Auto'
 }
 
+function systemLabel(filter: string | null | undefined): string | null {
+  if (!filter) return null
+  const map: Record<string, string> = {
+    hvac: 'HVAC',
+    energy: 'Energy',
+    lighting: 'Lighting',
+    water: 'Water',
+    fire: 'Fire',
+    security: 'Security',
+    solar_bess: 'Solar & BESS',
+  }
+  return map[filter] ?? null
+}
+
 function railTitle(state: CockpitState) {
+  const sys = systemLabel(state.systemFilter)
+  if (sys) return `${sys} Focus`
   return state.site.onboardingPhase === 'shadow' ? 'Observation' : 'Decision'
 }
 
@@ -157,8 +183,10 @@ function evidenceLabel(state: CockpitState) {
 
 function heroHeadline(state: CockpitState) {
   if (isWaitingState(state)) return 'Awaiting building signal'
-  if (state.primaryMetric.value === 'Stable') return 'Site operating within comfort and energy bands'
-  return state.activeCondition.summary
+  const sys = systemLabel(state.systemFilter)
+  const prefix = sys ? `${sys} · ` : ''
+  if (state.primaryMetric.value === 'Stable') return `${prefix}Site operating within comfort and energy bands`
+  return `${prefix}${state.activeCondition.summary}`
 }
 
 function heroSubheadline(state: CockpitState) {
@@ -456,7 +484,7 @@ function ZoneEquipmentPanel({
   )
 }
 
-export function CockpitView({ state, renderMode, spatialCanvas, onApprove, selectedZone, onZoneClose, modelReadiness, onAdvancePhase }: CockpitViewProps) {
+export function CockpitView({ state, renderMode, spatialCanvas, onApprove, selectedZone, onZoneClose, modelReadiness, onAdvancePhase, onZoneSelect }: CockpitViewProps) {
   const shellRef = useRef<HTMLElement | null>(null)
   const headerRef = useRef<HTMLDivElement | null>(null)
   const railRef = useRef<HTMLDivElement | null>(null)
@@ -469,7 +497,7 @@ export function CockpitView({ state, renderMode, spatialCanvas, onApprove, selec
   const queue = useMemo(() => buildQueue(state), [state])
   const forecast = useMemo(() => buildForecast(state), [state])
   const largeHeadline = renderMode === 'wall'
-  const twinCanvas = useMemo(() => <CockpitNervousSystemTwin state={state} />, [state])
+  const twinCanvas = useMemo(() => <CockpitNervousSystemTwin state={state} onZoneSelect={onZoneSelect} />, [state, onZoneSelect])
   const canvas = spatialCanvas ?? twinCanvas
 
   const [zoomLevel, setZoomLevel] = useState(1)

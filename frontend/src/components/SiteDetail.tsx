@@ -281,6 +281,15 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
 
   // SENTINEL processing state — gates all intelligence panels
   const sentinelEnabled = site?.sentinel_processing_enabled !== false;
+  const systemFilter = ({
+    hvac: 'hvac',
+    energy: 'energy',
+    lighting: 'lighting',
+    water: 'water',
+    fire: 'fire',
+    security: 'security',
+    'solar-bess': 'solar_bess',
+  } as const)[activeMainTab] ?? null;
   const bridgeSourceValue = liveBridgeSource ?? site?.bridge_data_source ?? null;
   const bridgeConnectedValue = liveBridgeConnected ?? site?.bridge_connected ?? false;
   const bridgeLastSyncValue = liveBridgeLastSync ?? site?.bridge_last_sync ?? null;
@@ -1095,6 +1104,23 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
       </div>
 
       {/* ═══════════════════════════════════════════════════════════
+          Sentinel Cockpit — persists across all tabs
+          ═══════════════════════════════════════════════════════════ */}
+      {sentinelEnabled && site && (
+        <div className="mb-6">
+          <OverviewCockpitHost
+            siteId={siteId}
+            siteName={site.name}
+            onboardingPhase={sitePhase}
+            activeAlerts={alerts.length}
+            predictionsCount={predictions.length}
+            equipmentCount={equipment.length}
+            systemFilter={systemFilter}
+          />
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════
           Tab Content
           ═══════════════════════════════════════════════════════════ */}
 
@@ -1127,19 +1153,6 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
           <ArcadeView siteId={siteId} onModuleDisplayChange={handleModuleDisplayChange} />
         )}
       </div>
-      {/* Sentinel Cockpit — decision intelligence with fullscreen support */}
-      {sentinelEnabled && site && (
-        <div className="mb-6">
-          <OverviewCockpitHost
-            siteId={siteId}
-            siteName={site.name}
-            onboardingPhase={sitePhase}
-            activeAlerts={alerts.length}
-            predictionsCount={predictions.length}
-            equipmentCount={equipment.length}
-          />
-        </div>
-      )}
       {/* Overview Tab — original Equipment/Alerts/Energy/Predictions tabs + summary panels */}
       <div
         className="rounded-md overflow-hidden mb-6"

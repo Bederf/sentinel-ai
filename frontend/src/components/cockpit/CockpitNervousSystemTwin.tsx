@@ -8,6 +8,7 @@ import { AutoExecutionsPanel } from './AutoExecutionsPanel'
 
 interface CockpitNervousSystemTwinProps {
   state: CockpitState
+  onZoneSelect?: (zone: import('./types').CockpitTwinZoneSignal) => void
 }
 
 function moduleFlags(state: CockpitState) {
@@ -24,7 +25,7 @@ function moduleFlags(state: CockpitState) {
   }
 }
 
-export function CockpitNervousSystemTwin({ state }: CockpitNervousSystemTwinProps) {
+export function CockpitNervousSystemTwin({ state, onZoneSelect: _onZoneSelect }: CockpitNervousSystemTwinProps) {
   const panelRef = useRef<HTMLDivElement | null>(null)
   const waiting = state.site.renderState === 'waiting'
   const tone = cockpitToneKey(state)
@@ -77,13 +78,33 @@ export function CockpitNervousSystemTwin({ state }: CockpitNervousSystemTwinProp
 
         <CockpitBuildingThree state={state} />
 
-        {/* Module strip: same signals as before, now decoupled from the 2D SVG overlay */}
-        <div className="pointer-events-none absolute right-3 top-14 flex flex-col gap-1.5 text-[9px] uppercase tracking-[0.12em] text-slate-500">
-          {modules.lighting ? <span className="text-amber-200/90">Lighting trace</span> : null}
-          {modules.water ? <span className="text-sky-300/90">Water spine</span> : null}
-          {modules.fire ? <span className="text-rose-300/90">Fire watch</span> : null}
-          {modules.security ? <span className="text-cyan-200/90">Security mesh</span> : null}
-          {modules.occupancy ? <span className="text-violet-200/90">Occupancy</span> : null}
+        {/* Module strip: same signals as before, now decoupled from the 2D SVG overlay.
+            When a systemFilter is active, highlight that system and dim others. */}
+        <div className="pointer-events-none absolute right-3 top-14 flex flex-col gap-1.5 text-[9px] uppercase tracking-[0.12em]">
+          {modules.lighting || state.systemFilter === 'lighting' ? (
+            <span className={state.systemFilter === 'lighting' ? 'text-amber-200 font-semibold' : state.systemFilter ? 'text-slate-600' : 'text-amber-200/90'}>Lighting trace</span>
+          ) : null}
+          {modules.water || state.systemFilter === 'water' ? (
+            <span className={state.systemFilter === 'water' ? 'text-sky-300 font-semibold' : state.systemFilter ? 'text-slate-600' : 'text-sky-300/90'}>Water spine</span>
+          ) : null}
+          {modules.fire || state.systemFilter === 'fire' ? (
+            <span className={state.systemFilter === 'fire' ? 'text-rose-300 font-semibold' : state.systemFilter ? 'text-slate-600' : 'text-rose-300/90'}>Fire watch</span>
+          ) : null}
+          {modules.security || state.systemFilter === 'security' ? (
+            <span className={state.systemFilter === 'security' ? 'text-cyan-200 font-semibold' : state.systemFilter ? 'text-slate-600' : 'text-cyan-200/90'}>Security mesh</span>
+          ) : null}
+          {modules.occupancy || state.systemFilter === 'lighting' ? (
+            <span className={state.systemFilter === 'lighting' ? 'text-violet-200 font-semibold' : state.systemFilter ? 'text-slate-600' : 'text-violet-200/90'}>Occupancy</span>
+          ) : null}
+          {state.systemFilter === 'hvac' ? (
+            <span className="text-cyan-300 font-semibold">HVAC trace</span>
+          ) : null}
+          {state.systemFilter === 'energy' ? (
+            <span className="text-orange-300 font-semibold">Energy pulse</span>
+          ) : null}
+          {state.systemFilter === 'solar_bess' ? (
+            <span className="text-yellow-300 font-semibold">Solar & BESS</span>
+          ) : null}
         </div>
 
         {/* Auto-execution rollback panel — only shown when site has advanced past shadow */}

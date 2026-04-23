@@ -1,7 +1,7 @@
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { Edges, Line, OrbitControls } from '@react-three/drei'
+import { Edges, Line, OrbitControls, useTexture } from '@react-three/drei'
 import type { MutableRefObject } from 'react'
-import { Suspense, useCallback, useLayoutEffect, useMemo, useRef } from 'react'
+import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { MOUSE } from 'three'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
@@ -19,6 +19,18 @@ const SLAB_HEIGHT = 0.28
 const BASE_WIDTH  = 1.35
 const BASE_DEPTH  = 1.05
 
+/** Tracer orbit speed per active system (units: cycles per second roughly) */
+const TRACER_SPEEDS: Record<string, number> = {
+  hvac: 0.42,
+  energy: 0.58,
+  lighting: 0.35,
+  water: 0.30,
+  fire: 0.50,
+  security: 0.40,
+  solar_bess: 0.45,
+  default: 0.42,
+}
+
 // Hard cap — twin represents a known building, not an infinite stack.
 // 10 floors covers any realistic FNB REMS site.
 const MAX_FLOORS = 10
@@ -32,6 +44,23 @@ const OCCUPIED_FLOOR_IDS = new Set(['L0', 'L1', 'L2'])
 function GridHelperMemo() {
   const grid = useMemo(() => new THREE.GridHelper(18, 18, 0x334155, 0x0c1222), [])
   return <primitive object={grid} position={[0, 0, 0]} />
+}
+
+function GroundPlane() {
+  const map = useTexture('/images/sandton-map.png')
+  return (
+    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.02, 0]} receiveShadow>
+      <planeGeometry args={[32, 32]} />
+      <meshStandardMaterial
+        map={map}
+        color="#020617"
+        metalness={0.05}
+        roughness={0.95}
+        opacity={0.45}
+        transparent
+      />
+    </mesh>
+  )
 }
 
 type SlabInfo = {
@@ -241,15 +270,16 @@ function BuildingStack({
 function DriftPath({
   state,
   tone,
-  visible,
+  targetOpacity,
   yRange,
 }: {
   state: CockpitState
   tone: ReturnType<typeof cockpitToneKey>
-  visible: boolean
+  targetOpacity: number
   yRange: { minY: number; maxY: number } | null
 }) {
   const color = cockpitFlowColor(tone)
+
   // Always call useMemo — returning null before hooks violates Rules of Hooks
   const points = useMemo(() => {
     if (!yRange) return []
@@ -279,7 +309,7 @@ function DriftPath({
       color={color}
       lineWidth={lineWidth}
       transparent
-      opacity={visible ? 0.98 : 0.1}
+      opacity={targetOpacity}
       depthWrite={false}
     />
   )
@@ -289,20 +319,30 @@ function AnimatedTracer({
   tone,
   yRange,
   active,
+  speed = 0.42,
+  opacity = 1,
 }: {
   tone: ReturnType<typeof cockpitToneKey>
   yRange: { minY: number; maxY: number } | null
   active: boolean
+  speed?: number
+  opacity?: number
 }) {
   const tracerRef = useRef<THREE.Mesh>(null)
   const haloRef = useRef<THREE.Mesh>(null)
   const color = cockpitFlowColor(tone)
+  const currentOpacity = useRef(opacity)
+  const targetRef = useRef(opacity)
+
+  useEffect(() => {
+    targetRef.current = opacity
+  }, [opacity])
 
   useFrame(() => {
     if (!tracerRef.current || !haloRef.current || !yRange) return
     const t = performance.now() * 0.001
-    const speed = active ? 0.42 : 0.24
-    const phase = (t * speed) % 1
+    const effectiveSpeed = active ? speed : speed * 0.57
+    const phase = (t * effectiveSpeed) % 1
     const y = yRange.minY + (yRange.maxY - yRange.minY) * phase
     const spiral = phase * Math.PI * 2.2
     const x = Math.sin(spiral) * 0.52 + 0.12
@@ -312,6 +352,14 @@ function AnimatedTracer({
     const pulse = 0.65 + 0.35 * Math.sin(t * 8)
     tracerRef.current.scale.setScalar(0.9 + pulse * 0.35)
     haloRef.current.scale.setScalar(1.6 + pulse * 0.5)
+
+    // Smooth opacity crossfade
+    currentOpacity.current += (targetRef.current - currentOpacity.current) * 0.1
+    const co = currentOpacity.current
+    const tracerMat = tracerRef.current.material as THREE.MeshStandardMaterial
+    const haloMat = haloRef.current.material as THREE.MeshStandardMaterial
+    tracerMat.opacity = co * 0.98
+    haloMat.opacity = co * 0.38
   })
 
   if (!yRange) return null
@@ -330,6 +378,69 @@ function AnimatedTracer({
   )
 }
 
+/** Energy busbar glow — vertical riser lines that pulse with load intensity */
+function EnergyBusbarLayer({
+  opacity,
+  buildingHeight,
+}: {
+  opacity: number
+  buildingHeight: number
+}) {
+  const lineRefs = useRef<THREE.Mesh[]>([])
+  const currentOpacity = useRef(opacity)
+  const targetRef = useRef(opacity)
+
+  useEffect(() => {
+    targetRef.current = opacity
+  }, [opacity])
+
+  useFrame(() => {
+    currentOpacity.current += (targetRef.current - currentOpacity.current) * 0.1
+    const co = currentOpacity.current
+    const t = performance.now() * 0.001
+    lineRefs.current.forEach((mesh, i) => {
+      if (!mesh) return
+      const mat = mesh.material as THREE.MeshStandardMaterial
+      mat.opacity = co * (0.55 + 0.25 * Math.sin(t * 2.5 + i * 1.3))
+      const pulse = 0.8 + 0.2 * Math.sin(t * 3 + i * 0.7)
+      mat.emissiveIntensity = co * pulse * 1.2
+    })
+  })
+
+  const lines = useMemo(() => {
+    const items: { x: number; z: number; color: string }[] = [
+      { x: -0.35, z: -0.25, color: '#fb923c' },
+      { x: 0.35, z: -0.25, color: '#f97316' },
+      { x: 0, z: 0.3, color: '#fdba74' },
+    ]
+    return items
+  }, [])
+
+  return (
+    <group>
+      {lines.map((line, i) => (
+        <mesh
+          key={`busbar-${i}`}
+          ref={(el) => {
+            if (el) lineRefs.current[i] = el
+          }}
+          position={[line.x, buildingHeight * 0.5, line.z]}
+        >
+          <cylinderGeometry args={[0.015, 0.015, buildingHeight * 0.9, 8]} />
+          <meshStandardMaterial
+            color={line.color}
+            emissive={line.color}
+            emissiveIntensity={1.2}
+            transparent
+            opacity={0}
+            depthWrite={false}
+          />
+        </mesh>
+      ))}
+    </group>
+  )
+}
+
 /** Deterministic hash for stable orb positioning — no Math.random(), no Date.now() */
 function hashString(str: string): number {
   let hash = 0
@@ -344,10 +455,12 @@ function ZoneMarkers({
   state,
   buildingHeight,
   onboardingPhase,
+  onZoneSelect,
 }: {
   state: CockpitState
   buildingHeight: number
   onboardingPhase: string | null
+  onZoneSelect?: (sig: import('./types').CockpitTwinZoneSignal) => void
 }) {
   // Shadow mode has no active conditions — no orbs
   if (onboardingPhase === 'shadow') return null
@@ -383,7 +496,14 @@ function ZoneMarkers({
         const emissiveIntensity = isPrimary ? 1.4 : 0.9
 
         return (
-          <mesh key={`${sig.zoneId}-${index}`} position={[x, y, z]}>
+          <mesh
+            key={`${sig.zoneId}-${index}`}
+            position={[x, y, z]}
+            onClick={(e) => {
+              e.stopPropagation()
+              onZoneSelect?.(sig)
+            }}
+          >
             <sphereGeometry args={[radius, 16, 16]} />
             <meshStandardMaterial
               color="#f8fafc"
@@ -440,12 +560,14 @@ function SceneR3F({
   defaultCam,
   computedTarget,
   modelScale,
+  onZoneSelect,
 }: {
   state: CockpitState
   controlsRef: MutableRefObject<OrbitControlsImpl | null>
   defaultCam: THREE.Vector3
   computedTarget: THREE.Vector3
   modelScale: number
+  onZoneSelect?: (sig: import('./types').CockpitTwinZoneSignal) => void
 }) {
   const tone = cockpitToneKey(state)
   const { camera } = useThree()
@@ -469,6 +591,14 @@ function SceneR3F({
   const calm = !waiting && state.primaryMetric.value === 'Stable'
   const showFlow = !waiting && state.visualTwin.flowPaths.length > 0 && !calm
 
+  // System-driven animation layer targets
+  const systemFilter = state.systemFilter
+  const isHVAC = systemFilter === 'hvac'
+  const isEnergy = systemFilter === 'energy'
+  const hvacTarget = isHVAC ? 1 : systemFilter ? 0 : showFlow ? 1 : 0
+  const energyTarget = isEnergy ? 1 : 0
+  const tracerSpeed = TRACER_SPEEDS[systemFilter ?? ''] ?? TRACER_SPEEDS.default
+
   const worldHalf = buildingHeight * modelScale * 0.5
   const fogFar = Math.max(18, worldHalf * 4.5)
 
@@ -483,21 +613,20 @@ function SceneR3F({
       <directionalLight position={[0, 4, -9]} intensity={0.44} color="#e2e8f0" />
       <hemisphereLight args={['#0ea5e9', '#0b1120', 0.3]} />
 
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.02, 0]} receiveShadow>
-        <planeGeometry args={[32, 32]} />
-        <meshStandardMaterial color="#020617" metalness={0.05} roughness={0.95} />
-      </mesh>
+      <GroundPlane />
 
       <GridHelperMemo />
 
       <group scale={[modelScale, modelScale, modelScale]}>
         <BuildingStack state={state} tone={tone} />
-        <DriftPath state={state} tone={tone} visible={showFlow} yRange={yRange} />
-        <AnimatedTracer tone={tone} yRange={yRange} active={showFlow} />
+        <DriftPath state={state} tone={tone} targetOpacity={hvacTarget} yRange={yRange} />
+        <AnimatedTracer tone={tone} yRange={yRange} active={showFlow} speed={tracerSpeed} opacity={hvacTarget} />
+        <EnergyBusbarLayer opacity={energyTarget} buildingHeight={buildingHeight} />
         <ZoneMarkers
           state={state}
           buildingHeight={buildingHeight}
           onboardingPhase={state.site.onboardingPhase ?? null}
+          onZoneSelect={onZoneSelect}
         />
       </group>
 
@@ -506,8 +635,8 @@ function SceneR3F({
         makeDefault
         enableDamping
         dampingFactor={0.08}
-        minDistance={Math.max(1.4, worldHalf * 0.7)}
-        maxDistance={Math.max(8, worldHalf * 3.2)}
+        minDistance={Math.max(2.5, worldHalf * 0.7)}
+        maxDistance={Math.max(14, worldHalf * 3.2)}
         minPolarAngle={0.32}
         maxPolarAngle={Math.PI / 2 + 0.14}
         target={computedTarget}
@@ -523,7 +652,7 @@ function SceneR3F({
   )
 }
 
-export function CockpitBuildingThree({ state, className }: CockpitBuildingThreeProps) {
+export function CockpitBuildingThree({ state, className, onZoneSelect }: CockpitBuildingThreeProps) {
   const controlsRef = useRef<OrbitControlsImpl>(null)
   // Apply MAX_FLOORS cap so modelScale and camera are sized for a known building
   const floorCount = Math.min(Math.max(state.visualTwin.floors.length, 5), MAX_FLOORS)
@@ -537,7 +666,7 @@ export function CockpitBuildingThree({ state, className }: CockpitBuildingThreeP
   const layout = useMemo(() => {
     const wh = buildingHeight * modelScale * 0.5
     const target = new THREE.Vector3(0, wh, 0)
-    const cam = new THREE.Vector3(wh * 1.05, wh * 0.78, wh * 1.45)
+    const cam = new THREE.Vector3(wh * 2.1, wh * 1.4, wh * 2.9)
     return { computedTarget: target, defaultCam: cam }
   }, [buildingHeight, modelScale])
 
@@ -586,6 +715,7 @@ export function CockpitBuildingThree({ state, className }: CockpitBuildingThreeP
             defaultCam={defaultCam}
             computedTarget={computedTarget}
             modelScale={modelScale}
+            onZoneSelect={onZoneSelect}
           />
         </Suspense>
       </Canvas>
