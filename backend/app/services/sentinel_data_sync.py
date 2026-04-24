@@ -206,8 +206,10 @@ class SentinelDataSync:
             "postgresql://postgres:postgres@127.0.0.1:55322/postgres",
         )
 
-        def health_to_status(score: float) -> str:
+        def health_to_status(score: float | None) -> str:
             """Map health score to Supabase status constraint."""
+            if score is None:
+                return "unknown"
             if score >= 70:
                 return "normal"
             elif score >= 40:
@@ -227,7 +229,7 @@ class SentinelDataSync:
             ml_hours = self.ml_feeder.hours_ingested
             final_health_score = _blend_health_score(health_score, sensor_readings, ml_hours)
 
-            if final_health_score != health_score:
+            if final_health_score is not None and health_score is not None and final_health_score != health_score:
                 logger.info(
                     "health_score_blended",
                     equipment_id=code,
@@ -249,7 +251,7 @@ class SentinelDataSync:
                 }
 
             status = health_to_status(final_health_score)
-            h = round(final_health_score)
+            h = round(final_health_score) if final_health_score is not None else None
 
             updates.append((code, json.dumps(operating_data), h, status))
 

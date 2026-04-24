@@ -134,25 +134,39 @@ class CompilerWorker:
 
     def _claim_entries(self, limit: int = 50) -> list[dict]:
         """
-        Atomically claim unprocessed queue entries using UPDATE...RETURNING.
+        Atomically claim unprocessed queue entries using SELECT FOR UPDATE SKIP LOCKED.
 
-        The UPDATE's WHERE clause (processed_at IS NULL) ensures each row is
-        claimed by only one worker. No explicit FOR UPDATE needed since the
-        UPDATE itself acquires a row-level lock on each matched row.
+        Uses SELECT...FOR UPDATE SKIP LOCKED to atomically claim rows so multiple
+        workers can run concurrently without double-processing. No UPDATE needed —
+        we directly SELECT and mark processed in a follow-up.
         """
         try:
-            result = (
-                self.db.table("compiler_queue")
-                .update({"processed_at": "now()"})
-                .is_("processed_at", None)
-                .order("queued_at")
-                .limit(limit)
-                .execute()
-            )
-            return result.data or []
+            conn = self._get_conn()
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT id, document_id, asset_id, queued_at
+                    FROM compiler_queue
+                    WHERE processed_at IS NULL
+                    ORDER BY queued_at ASC
+                    LIMIT %s
+                    FOR UPDATE SKIP LOCKED
+                    """,
+                    (limit,),
+                )
+                rows = cur.fetchall()
+            return [dict(zip(["id", "document_id", "asset_id", "queued_at"], row)) for row in rows] if rows else []
         except Exception as exc:
             logger.error("[CompilerWorker] _claim_entries failed: %s", exc)
             return []
+
+    def _get_conn(self):
+        """Get a raw psycopg2 connection for this method."""
+        import os
+        import psycopg2
+
+        database_url = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@127.0.0.1:55322/postgres")
+        return psycopg2.connect(database_url)
 
     def _fetch_document_and_equipment(self, queue_entry: dict) -> tuple[dict | None, dict | None]:
         """

@@ -401,6 +401,20 @@ class SentinelMLFeeder:
 
         return scores
 
+    def score_autoencoder_anomaly(self, hours_ingested: int | None = None) -> dict[str, float]:
+        """Compute autoencoder-derived anomaly scores per equipment code.
+
+        Requires an autoencoder model to have been trained for the equipment type.
+        Below that threshold returns empty dict.
+
+        Returns:
+            Dict of {equipment_code: autoencoder_anomaly_score} for equipment with
+            trained models. 0.0 = normal reconstruction, 1.0 = maximally anomalous.
+        """
+        # Autoencoder scoring not yet implemented — placeholder until AE training
+        # pipeline is complete. Remove this stub once score_autoencoder() is wired.
+        return {}
+
     def ingest_fault_event(self, alarm: dict[str, Any]) -> None:
         """Ingest one BACnet alarm/fault event into the Fault Classifier buffer.
 
