@@ -130,7 +130,7 @@ export function ConciergeDashboardPage({ siteId, showHeader = true, siteLabel }:
       {/* Map + overlay panels */}
       <div className="flex-1 min-h-0 relative">
         {/* Map fills available space */}
-        <div ref={mapContainerRef} className="absolute inset-0 opacity-0">
+        <div ref={mapContainerRef} className="absolute inset-0">
           <ConciergeMap
             key={refreshKey}
             siteId={effectiveSiteId}
@@ -140,7 +140,7 @@ export function ConciergeDashboardPage({ siteId, showHeader = true, siteLabel }:
 
         {/* Signal drill-down (replaces room panel) */}
         {selectedRoom && selectedSignalId && (
-          <div ref={drillPanelRef} className="absolute right-0 top-0 h-full w-full sm:w-[480px] z-20 opacity-0">
+          <div ref={drillPanelRef} className="absolute right-0 top-0 h-full w-full sm:w-[480px] z-20">
             <SignalDrillDown
               siteId={effectiveSiteId}
               roomId={selectedRoom.room_id}
@@ -162,7 +162,7 @@ const HeaderBar = React.forwardRef<HTMLDivElement, { siteId: string; siteLabel: 
     return (
       <div
         ref={ref}
-        className="flex items-center justify-between px-5 py-3 flex-shrink-0 opacity-0"
+        className="flex items-center justify-between px-5 py-3 flex-shrink-0"
         style={{
           background: "var(--color-sentinel-bg-primary, #0d1117)",
           borderBottom: "1px solid var(--color-sentinel-border, rgba(255,255,255,0.08))",

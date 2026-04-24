@@ -431,24 +431,14 @@ async def startup_event(app: FastAPI) -> None:
     try:
         from app.services.graph_subscription_service import graph_subscription_service
 
-        async def _ensure_graph_subscription():
-            sub = await graph_subscription_service.get_or_create_subscription()
-            if sub:
-                _logger.info(
-                    "Graph subscription active: id=%s expires=%s", sub.subscription_id, sub.expiration_datetime
-                )
-            else:
-                _logger.warning(
-                    "Graph subscription not created — set GRAPH_WEBHOOK_URL, "
-                    "OUTLOOK_CLIENT_ID, OUTLOOK_CLIENT_SECRET, OUTLOOK_TENANT_ID"
-                )
-
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            loop.run_until_complete(_ensure_graph_subscription())
-        finally:
-            loop.close()
+        sub = await graph_subscription_service.get_or_create_subscription()
+        if sub:
+            _logger.info("Graph subscription active: id=%s expires=%s", sub.subscription_id, sub.expiration_datetime)
+        else:
+            _logger.warning(
+                "Graph subscription not created — set GRAPH_WEBHOOK_URL, "
+                "OUTLOOK_CLIENT_ID, OUTLOOK_CLIENT_SECRET, OUTLOOK_TENANT_ID"
+            )
     except Exception as e:
         _logger.warning("Graph subscription startup check failed: %s", e)
 

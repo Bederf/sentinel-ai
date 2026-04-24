@@ -50,6 +50,7 @@ _PUBLIC_PATHS = {
 _PUBLIC_PREFIXES = (
     "/api/visits/qr/",  # Visitor QR code images — token is the secret, no JWT needed
     "/api/sentry-webhooks",  # Telegram bot callbacks (authenticated via webhook secret)
+    "/api/sentry/telegram",  # Telegram bot webhook (authenticated via X-Telegram-Bot-Api-Secret-Token)
     "/api/sentry/email/",  # Sentry email intake (authenticated via X-Sentry-API-Key middleware)
     "/api/sentry-email/",  # Sentry email intake v2 — advisor strategy (authenticated via X-Sentry-API-Key in endpoint)
     "/api/emails/",  # Email cluster intake (authenticated via Bearer token in endpoint)

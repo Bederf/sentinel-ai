@@ -4,8 +4,6 @@ Provides endpoints to list alerts, dismiss alerts, list ingested bookings,
 view/update config, trigger manual scans, and ingest booking emails.
 """
 
-from __future__ import annotations
-
 import logging
 from datetime import date, timedelta
 from typing import Any

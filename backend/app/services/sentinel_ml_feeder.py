@@ -250,7 +250,9 @@ class SentinelMLFeeder:
                         if hvac_kw is not None:
                             self._buffers[equip_type]["hvac_ratio"].append(round(float(hvac_kw) / float(total_kw), 4))
                         if lighting_kw is not None:
-                            self._buffers[equip_type]["lighting_ratio"].append(round(float(lighting_kw) / float(total_kw), 4))
+                            self._buffers[equip_type]["lighting_ratio"].append(
+                                round(float(lighting_kw) / float(total_kw), 4)
+                            )
                     if hvac_kw is not None and lighting_kw is not None and total_kw is not None:
                         non_hvac = float(total_kw) - float(hvac_kw) - float(lighting_kw)
                         self._buffers[equip_type]["non_hvac_kw"].append(round(max(0, non_hvac), 3))

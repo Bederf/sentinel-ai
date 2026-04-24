@@ -410,7 +410,7 @@ export function SpaceOptimizationPage({ siteId: propSiteId }: { siteId?: string 
   }
 
   return (
-    <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-6 opacity-0" style={{ background: "var(--color-sentinel-bg-canvas)" }} ref={(el) => { if (el) { /* outer wrapper fade handled by GSAP via headerRef ctx */ void el; } }}>
+    <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-6" style={{ background: "var(--color-sentinel-bg-canvas)" }}>
       <div ref={headerRef} className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 opacity-0">
         <div className="flex items-center gap-3">
           <div className="p-2 rounded" style={{ background: "rgba(13, 148, 136, 0.15)" }}>

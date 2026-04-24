@@ -236,9 +236,9 @@ async def startup_event():
         testing_mode = os.getenv("TESTING", "").lower() == "true"
         print("[DEVICES] Starting device manager initialization...")
 
+        devices_data: list[dict] = []
+        ref_count = 0
         if _settings.site002_source_enabled:
-            devices_data = []
-            ref_count = 0
             devices_data = await load_reference_devices()
             ref_count = len(devices_data)
             print(f"[DEVICES] Loaded {ref_count} local reference devices (Site-002)")

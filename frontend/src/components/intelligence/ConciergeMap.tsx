@@ -520,6 +520,73 @@ function MapPlaceholder({ children }: { children: React.ReactNode }) {
   );
 }
 
+function EmptyConciergeMindMap() {
+  const roomNodes = [
+    { label: "Room Registry", top: "18%", left: "50%" },
+    { label: "Meeting Rooms", top: "50%", left: "18%" },
+    { label: "Occupancy", top: "50%", left: "82%" },
+    { label: "Bookings", top: "82%", left: "50%" },
+  ];
+
+  return (
+    <div className="relative h-full w-full overflow-hidden" style={{ background: "var(--color-sentinel-bg-canvas)" }}>
+      <div className="absolute inset-0 opacity-30" style={{ backgroundImage: "radial-gradient(circle at center, rgba(255,255,255,0.05) 0, rgba(255,255,255,0.01) 45%, transparent 70%)" }} />
+
+      <div className="absolute left-1/2 top-1/2 h-px w-[58%] -translate-x-1/2 -translate-y-1/2" style={{ background: "var(--color-sentinel-border)" }} />
+      <div className="absolute left-1/2 top-1/2 h-[58%] w-px -translate-x-1/2 -translate-y-1/2" style={{ background: "var(--color-sentinel-border)" }} />
+
+      <div
+        className="absolute left-1/2 top-1/2 flex h-24 w-24 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-xl text-center"
+        style={{
+          background: "var(--color-sentinel-bg-panel)",
+          border: "1px solid var(--color-sentinel-border)",
+          color: "var(--color-sentinel-text-primary)",
+          boxShadow: "0 0 24px rgba(59,130,246,0.14)",
+        }}
+      >
+        <div>
+          <div className="text-[11px] font-semibold">Meeting</div>
+          <div className="text-[11px] font-semibold">Rooms</div>
+        </div>
+      </div>
+
+      {roomNodes.map((node) => (
+        <div
+          key={node.label}
+          className="absolute flex h-16 w-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full text-center"
+          style={{
+            top: node.top,
+            left: node.left,
+            background: "rgba(148, 163, 184, 0.08)",
+            border: "1px solid rgba(148, 163, 184, 0.25)",
+            color: "var(--color-sentinel-text-secondary)",
+          }}
+        >
+          <span className="px-2 text-[10px] font-medium leading-tight">{node.label}</span>
+        </div>
+      ))}
+
+      <div className="absolute left-4 top-4 pointer-events-none">
+        <div
+          className="rounded-md px-3 py-2"
+          style={{
+            background: "rgba(15, 23, 42, 0.82)",
+            border: "1px solid var(--color-sentinel-border)",
+            backdropFilter: "blur(6px)",
+          }}
+        >
+          <p className="text-[11px] font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>
+            No active room signals
+          </p>
+          <p className="text-[10px]" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+            The mind map stays visible while SENTINEL waits for room registry or signal activity.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ---- Cytoscape hook ----
 
 function useConciergeGraph(
@@ -780,6 +847,7 @@ export function ConciergeMap({ siteId, onSignalSelect }: ConciergeMapProps) {
   const [roomPositions, setRoomPositions] = useState<RoomPositions>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const totalSignals = rooms.reduce((sum, room) => sum + room.signal_count, 0);
 
   const fetchRooms = useCallback(async () => {
     try {
@@ -874,12 +942,32 @@ export function ConciergeMap({ siteId, onSignalSelect }: ConciergeMapProps) {
   }
 
   if (rooms.length === 0) {
-    return (
-      <MapPlaceholder>
-        <p className="text-xs text-gray-500">No meeting room signals for this building</p>
-      </MapPlaceholder>
-    );
+    return <EmptyConciergeMindMap />;
   }
 
-  return <div ref={containerRef} className="w-full h-full concierge-cytoscape-map" style={{ background: "var(--color-sentinel-bg-canvas)" }} />;
+  return (
+    <div className="relative w-full h-full" style={{ background: "var(--color-sentinel-bg-canvas)" }}>
+      <div ref={containerRef} className="w-full h-full concierge-cytoscape-map" />
+
+      {totalSignals === 0 && (
+        <div className="absolute left-4 top-4 pointer-events-none">
+          <div
+            className="rounded-md px-3 py-2"
+            style={{
+              background: "rgba(15, 23, 42, 0.82)",
+              border: "1px solid var(--color-sentinel-border)",
+              backdropFilter: "blur(6px)",
+            }}
+          >
+            <p className="text-[11px] font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>
+              No active room signals
+            </p>
+            <p className="text-[10px]" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+              The meeting room map stays visible and will light up when new signals arrive.
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }

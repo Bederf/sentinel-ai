@@ -34,6 +34,7 @@ FORMULA_VERSION_STATIC = "2.0.0"
 
 # === Pydantic models ===
 
+
 class EquipmentHealthResponse(BaseModel):
     health_score: float
     status: str
@@ -110,6 +111,7 @@ class HVACOverviewResponse(BaseModel):
 
 # === Health calculation ===
 
+
 def get_health_status(score: float) -> str:
     if score >= 80:
         return "healthy"
@@ -121,6 +123,7 @@ def get_health_status(score: float) -> str:
 def load_json(path: Path) -> dict:
     try:
         import json
+
         return json.loads(path.read_text())
     except Exception:
         return {}
@@ -227,6 +230,7 @@ def calculate_equipment_health(equipment: dict) -> dict:
 
 # === Helpers ===
 
+
 def _get_site_uuid(site_code: str) -> str | None:
     """Resolve site code (e.g. 'site-002') to site UUID."""
     result = _zone_repo.get_site_uuid(site_code)
@@ -234,6 +238,7 @@ def _get_site_uuid(site_code: str) -> str | None:
         return result
     # Try as direct site code
     from app.database.supabase_client import get_supabase_client
+
     sb = get_supabase_client()
     resp = sb.table("sites").select("id").eq("code", site_code).execute()
     if resp.data:
@@ -242,6 +247,7 @@ def _get_site_uuid(site_code: str) -> str | None:
 
 
 # === Routes ===
+
 
 @router.get("/overview/{site_id}", response_model=HVACOverviewResponse)
 async def get_hvac_overview(
@@ -289,6 +295,7 @@ async def get_hvac_overview(
     site_power = None
     try:
         from app.services.sentinel_data_sync import get_sentinel_data_sync
+
         sync = get_sentinel_data_sync(site_id=site_id)
         site_power = sync.ml_feeder.get_latest_site_power()
     except Exception:
@@ -307,6 +314,7 @@ async def get_hvac_overview(
 
     # Fetch alerts for this site
     from app.database.supabase_client import get_supabase_client
+
     sb = get_supabase_client()
     alert_resp = sb.table("alerts").select("*").eq("site_id", site_uuid).eq("status", "active").execute()
     active_alerts = [
@@ -365,25 +373,27 @@ async def get_hvac_zones(
 
     zone_responses = []
     for z in all_zones:
-        zone_responses.append(HVACZoneResponse(
-            zone_id=z.get("zone_id", ""),
-            zone_name=z.get("zone_name", z.get("name", "")),
-            floor=z.get("floor", ""),
-            fcu_id=z.get("fcu_id"),
-            vav_id=z.get("vav_id"),
-            ahu_id=z.get("ahu_id"),
-            temp_sensor=z.get("temp_sensor"),
-            co2_sensor=z.get("co2_sensor"),
-            typical_occupancy=z.get("typical_occupancy", 0),
-            area_sqm=z.get("area_sqm", 0),
-            setpoint=z.get("setpoint", 22),
-            current_temp=z.get("current_temp"),
-            status=z.get("status", "unknown"),
-            temp_deviation=z.get("temp_deviation", 0),
-            temp_min=z.get("temp_min", 18),
-            temp_max=z.get("temp_max", 28),
-            fcu_health=z.get("fcu_health"),
-        ))
+        zone_responses.append(
+            HVACZoneResponse(
+                zone_id=z.get("zone_id", ""),
+                zone_name=z.get("zone_name", z.get("name", "")),
+                floor=z.get("floor", ""),
+                fcu_id=z.get("fcu_id"),
+                vav_id=z.get("vav_id"),
+                ahu_id=z.get("ahu_id"),
+                temp_sensor=z.get("temp_sensor"),
+                co2_sensor=z.get("co2_sensor"),
+                typical_occupancy=z.get("typical_occupancy", 0),
+                area_sqm=z.get("area_sqm", 0),
+                setpoint=z.get("setpoint", 22),
+                current_temp=z.get("current_temp"),
+                status=z.get("status", "unknown"),
+                temp_deviation=z.get("temp_deviation", 0),
+                temp_min=z.get("temp_min", 18),
+                temp_max=z.get("temp_max", 28),
+                fcu_health=z.get("fcu_health"),
+            )
+        )
 
     return {"zones": zone_responses, "total": len(zone_responses)}
 
@@ -456,29 +466,48 @@ async def get_hvac_equipment(
         rows = []
 
     # Filter HVAC types
-    hvac_types = {"ahu", "fcu", "chiller", "cooling_tower", "vav", "pump", "crac", "hvac_ahu", "hvac_fcu", "hvac_chiller", "hvac_vav", "hvac_pump"}
+    hvac_types = {
+        "ahu",
+        "fcu",
+        "chiller",
+        "cooling_tower",
+        "vav",
+        "pump",
+        "crac",
+        "hvac_ahu",
+        "hvac_fcu",
+        "hvac_chiller",
+        "hvac_vav",
+        "hvac_pump",
+    }
     if equipment_type:
         rows = [r for r in rows if equipment_type.lower() in r.get("type", "").lower()]
     else:
-        rows = [r for r in rows if r.get("type", "").lower() in hvac_types or any(t in r.get("type", "").lower() for t in hvac_types)]
+        rows = [
+            r
+            for r in rows
+            if r.get("type", "").lower() in hvac_types or any(t in r.get("type", "").lower() for t in hvac_types)
+        ]
 
     equip_responses = []
     for eq in rows:
-        equip_responses.append(HVACEquipmentResponse(
-            id=eq.get("id", eq.get("code", "")),
-            site_id=eq.get("site_id", site_id or ""),
-            type=eq.get("type") or "unknown",
-            name=eq.get("name") or "Unknown",
-            manufacturer=eq.get("manufacturer") or "Unknown",
-            model=eq.get("model") or "Unknown",
-            capacity=eq.get("capacity") or "N/A",
-            install_date=eq.get("install_date") or "",
-            last_service=eq.get("last_service") or "",
-            status=eq.get("status") or "normal",
-            health_score=int(eq.get("health_score") or 85),
-            location=eq.get("location") or "",
-            serial_number=eq.get("serial_number"),
-        ))
+        equip_responses.append(
+            HVACEquipmentResponse(
+                id=eq.get("id", eq.get("code", "")),
+                site_id=eq.get("site_id", site_id or ""),
+                type=eq.get("type") or "unknown",
+                name=eq.get("name") or "Unknown",
+                manufacturer=eq.get("manufacturer") or "Unknown",
+                model=eq.get("model") or "Unknown",
+                capacity=eq.get("capacity") or "N/A",
+                install_date=eq.get("install_date") or "",
+                last_service=eq.get("last_service") or "",
+                status=eq.get("status") or "normal",
+                health_score=int(eq.get("health_score") or 85),
+                location=eq.get("location") or "",
+                serial_number=eq.get("serial_number"),
+            )
+        )
 
     return {"equipment": equip_responses, "total": len(equip_responses)}
 
@@ -490,6 +519,7 @@ async def get_hvac_equipment_detail(
 ) -> HVACEquipmentResponse:
     """Get single HVAC equipment by ID."""
     from app.database.supabase_client import get_supabase_client
+
     sb = get_supabase_client()
     resp = sb.table("equipment").select("*").eq("id", equipment_id).execute()
     if not resp.data:
@@ -532,23 +562,25 @@ async def get_chillers(
 
     chillers_response = []
     for c in chillers:
-        chillers_response.append({
-            "id": c.get("id", c.get("code", "")),
-            "site_id": c.get("site_id", site_id or ""),
-            "type": "chiller",
-            "name": c.get("name") or "Unknown Chiller",
-            "manufacturer": c.get("manufacturer") or "Unknown",
-            "model": c.get("model") or "Unknown",
-            "capacity": c.get("capacity") or "N/A",
-            "install_date": c.get("install_date") or "",
-            "last_service": c.get("last_service") or "",
-            "status": c.get("status") or "unknown",
-            "health_score": int(c.get("health_score") or 85),
-            "location": c.get("location") or "",
-            "serial_number": c.get("serial_number"),
-            "is_running": c.get("status") == "running" or c.get("is_running", False),
-            "metadata": c.get("operating_data") or c.get("metadata") or {},
-        })
+        chillers_response.append(
+            {
+                "id": c.get("id", c.get("code", "")),
+                "site_id": c.get("site_id", site_id or ""),
+                "type": "chiller",
+                "name": c.get("name") or "Unknown Chiller",
+                "manufacturer": c.get("manufacturer") or "Unknown",
+                "model": c.get("model") or "Unknown",
+                "capacity": c.get("capacity") or "N/A",
+                "install_date": c.get("install_date") or "",
+                "last_service": c.get("last_service") or "",
+                "status": c.get("status") or "unknown",
+                "health_score": int(c.get("health_score") or 85),
+                "location": c.get("location") or "",
+                "serial_number": c.get("serial_number"),
+                "is_running": c.get("status") == "running" or c.get("is_running", False),
+                "metadata": c.get("operating_data") or c.get("metadata") or {},
+            }
+        )
 
     return {"chillers": chillers_response, "total": len(chillers_response), "running": running}
 
@@ -560,6 +592,7 @@ async def get_equipment_health(
 ) -> dict:
     """Get calculated health score for equipment."""
     from app.database.supabase_client import get_supabase_client
+
     sb = get_supabase_client()
     resp = sb.table("equipment").select("*").eq("id", equipment_id).execute()
     if not resp.data:

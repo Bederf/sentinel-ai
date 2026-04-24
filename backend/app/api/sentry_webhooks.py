@@ -1503,15 +1503,17 @@ class TelegramCallbackPayload(BaseModel):
 
 @router.post("/telegram/message", status_code=status.HTTP_200_OK)
 async def handle_telegram_message(
+    request: Request,
     payload: TelegramMessagePayload,
-    x_sentry_secret: str | None = Header(None),
 ):
     """Handle incoming Telegram free-text message via conversation flow.
 
     The gateway forwards non-slash-command messages here for intent
     classification and multi-step conversation handling.
     """
-    _require_sentry_secret(x_sentry_secret, endpoint_name="telegram_message")
+    # Accept either header — X-Sentry-Secret (legacy) or X-Telegram-Bot-Api-Secret-Token (gateway-forwarded)
+    secret = request.headers.get("X-Sentry-Secret") or request.headers.get("X-Telegram-Bot-Api-Secret-Token")
+    _require_sentry_secret(secret, endpoint_name="telegram_message")
 
     # Prompt guard
     if payload.text:

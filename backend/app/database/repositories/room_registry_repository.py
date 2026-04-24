@@ -7,6 +7,7 @@ import logging
 from pathlib import Path
 
 from app.database.supabase_client import get_supabase_client
+from app.services.block_booking_detector.site_resolver import normalize_site_id
 
 logger = logging.getLogger(__name__)
 _JSON_FALLBACK_PATH = Path(__file__).resolve().parent / "data" / "room_registry.json"
@@ -26,16 +27,44 @@ class RoomRegistryRepository:
             logger.error("Room registry JSON fallback load failed: %s", exc)
             return []
 
+    def _site_id_candidates(self, site_id: str) -> list[str]:
+        raw = str(site_id).strip()
+        normalized = normalize_site_id(raw)
+
+        candidates: list[str] = []
+        for candidate in (raw, raw.lower(), raw.upper(), normalized):
+            if candidate and candidate not in candidates:
+                candidates.append(candidate)
+
+        if normalized.startswith("site-"):
+            suffix = normalized.split("site-", 1)[1]
+            short_code = f"S{suffix}"
+            for candidate in (short_code, short_code.lower(), short_code.upper()):
+                if candidate not in candidates:
+                    candidates.append(candidate)
+
+        return candidates
+
     async def get_rooms_by_site(self, site_id: str) -> list[dict]:
         """Get all active rooms for a site from the canonical store."""
+        site_candidates = self._site_id_candidates(site_id)
+
         if self.client is None:
-            return [room for room in self._load_json_fallback() if room.get("site_id") == site_id]
+            fallback = self._load_json_fallback()
+            return [room for room in fallback if str(room.get("site_id", "")).strip() in site_candidates]
         try:
-            result = self.client.table("room_registry").select("*").eq("site_id", site_id).eq("active", True).execute()
+            result = (
+                self.client.table("room_registry")
+                .select("*")
+                .in_("site_id", site_candidates)
+                .eq("active", True)
+                .execute()
+            )
             return result.data or []
         except Exception as exc:
             logger.error("Canonical room_registry get_rooms_by_site failed: %s", exc)
-            return [room for room in self._load_json_fallback() if room.get("site_id") == site_id]
+            fallback = self._load_json_fallback()
+            return [room for room in fallback if str(room.get("site_id", "")).strip() in site_candidates]
 
     async def get_room(self, room_id: str) -> dict | None:
         """Get a single room by room_id from the canonical store."""

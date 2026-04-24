@@ -50,6 +50,11 @@ PRICING_USD_PER_1M = {
     "azure_openai/gpt-4o-mini": {"input": 0.15, "output": 0.60},
     # ZhipuAI
     "glm-4.7-flash": {"input": 0.10, "output": 0.10},
+    # Moonshot / Kimi
+    "kimi-k2.6": {"input": 0.95, "output": 4.00},
+    "kimi-k2.5": {"input": 0.80, "output": 3.20},
+    "kimi-k2-thinking-turbo": {"input": 1.00, "output": 4.50},
+    "kimi-k2-turbo-preview": {"input": 0.90, "output": 3.80},
     # Local (free)
     "ollama": {"input": 0.00, "output": 0.00},
 }

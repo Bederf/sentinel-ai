@@ -118,25 +118,32 @@ export function EmailEntry({ onSuccess }: EmailEntryProps) {
       className="min-h-screen flex flex-col items-center justify-center p-4"
       style={{ background: "var(--color-sentinel-bg-canvas)" }}
     >
-      {/* Static logo — splash already showed the animated logo, but login page needs brand mark */}
-      <div className="mb-6">
-        <img
-          src="/images/sentinel-logo.png"
-          alt="SENTINEL"
-          className="h-16 w-auto mx-auto"
-          style={{ opacity: 0.85 }}
+      {/* Brand mark — glowing shield with gradient backing */}
+      <div className="mb-8 relative">
+        {/* Glow halo */}
+        <div
+          className="absolute inset-0 blur-2xl rounded-full scale-75"
+          style={{
+            background: "radial-gradient(circle, rgba(46,134,171,0.35) 0%, transparent 70%)",
+          }}
         />
+        {/* Logo */}
+        <div className="relative w-20 h-20 mx-auto rounded-2xl flex items-center justify-center overflow-hidden" style={{ background: "linear-gradient(135deg, #0B1D33 0%, #163350 100%)", border: "1px solid rgba(46,134,171,0.3)" }}>
+          <img
+            src="/images/sentinel-logo.png"
+            alt="SENTINEL"
+            className="w-12 h-12 object-contain"
+          />
+        </div>
+        {/* Brand name below */}
+        <div className="mt-3 text-center">
+          <span className="text-lg font-bold tracking-[0.3em] uppercase" style={{ color: "var(--color-sentinel-text-primary)" }}>SENTINEL</span>
+        </div>
       </div>
 
       {/* Title */}
       <div className="flex flex-col items-center mb-8 text-center">
-        <h1
-          className="text-2xl font-bold tracking-wide mb-1"
-          style={{ color: "var(--color-sentinel-text-primary)" }}
-        >
-          SENTINEL
-        </h1>
-        <p className="text-xs tracking-wide mb-3" style={{ color: "var(--color-sentinel-text-disabled)" }}>
+        <p className="text-xs tracking-widest mb-3 uppercase" style={{ color: "var(--color-sentinel-text-disabled)" }}>
           BMS Intelligence
         </p>
         <p
