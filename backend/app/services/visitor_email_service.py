@@ -328,26 +328,37 @@ class VisitorEmailService:
             except Exception as exc:
                 logger.warning("Failed to attach QR code image: %s", exc)
 
-        # Send
+        # Send via thread pool (cannot use asyncio.run() from async context)
         try:
             import asyncio
+            import concurrent.futures
 
-            # asyncio.run() handles nested event loops correctly
             # use_tls and start_tls are mutually exclusive in aiosmtplib
             # Port 587: STARTTLS (use_tls=False, start_tls=True)
             # Port 465: implicit TLS (use_tls=True, start_tls=False)
             tls_enabled = self._config["use_tls"]
-            asyncio.run(
-                aiosmtplib.send(
-                    msg,
-                    hostname=self._config["host"],
-                    port=self._config["port"],
-                    username=self._config["username"],
-                    password=self._config["password"],
-                    use_tls=not tls_enabled,
-                    start_tls=tls_enabled,
-                )
-            )
+
+            def _send_sync() -> None:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    loop.run_until_complete(
+                        aiosmtplib.send(
+                            msg,
+                            hostname=self._config["host"],
+                            port=self._config["port"],
+                            username=self._config["username"],
+                            password=self._config["password"],
+                            use_tls=not tls_enabled,
+                            start_tls=tls_enabled,
+                        )
+                    )
+                finally:
+                    loop.close()
+
+            executor: concurrent.futures.ThreadPoolExecutor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+            executor.submit(_send_sync)
+            executor.shutdown(wait=False)
 
             logger.info("Visitor email sent to %s", to_email)
             return True
