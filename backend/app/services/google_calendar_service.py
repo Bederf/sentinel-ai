@@ -277,9 +277,27 @@ class GoogleCalendarService:
         if not event_id:
             return None
 
-        # Idempotency check
+        # Idempotency check — also handles RSVP acceptance update
         existing = self._repo.get_visit_by_external_event_id(f"gcal-{event_id}")
         if existing is not None:
+            # Check if visitor accepted RSVP — transition PENDING → CREATED
+            if existing.status == VisitStatus.PENDING.value:
+                attendee_response = None
+                for a in event.get("attendees", []):
+                    if a.get("email", "").lower() == existing.visitor_email.lower():
+                        attendee_response = a.get("responseStatus")
+                        break
+                if attendee_response == "accepted":
+                    updated = self._repo.update_visit(existing.id, {"status": VisitStatus.CREATED})
+                    logger.info("[GoogleCal] Visit %s ACCEPTED via RSVP — QR email triggered", existing.id)
+                    try:
+                        from app.services.visitor_email_service import VisitorEmailService
+
+                        email_svc = VisitorEmailService()
+                        email_svc.send_visitor_confirmation(updated or existing)
+                    except Exception as exc:
+                        logger.error("[GoogleCal] Failed to send QR email for %s: %s", existing.id, exc)
+                    return updated or existing
             logger.debug("[GoogleCal] Event %s already processed", event_id)
             return None
 

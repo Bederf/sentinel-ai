@@ -1,9 +1,9 @@
-"""Visitor Intake API — receives calendar invite data from n8n IMAP workflow.
+"""Visitor Intake API — creates visitor check-in records and sends QR confirmations.
 
 POST /api/visits/internal
-  Called by n8n workflow when a calendar invite is received in the info@ inbox.
-  Creates a Visit, generates token + PIN + QR, returns visit data to n8n.
-  n8n then sends the visitor confirmation email via its own SMTP node.
+  Receives calendar invite data (from n8n, webhook, or direct trigger).
+  Creates a Visit, generates token + PIN + QR code.
+  Sends confirmation email directly via backend (info@sentinel-ai.co.za).
 
 Auth: X-Sentry-API-Key (matches SENTRY_BOT_API_KEY env var)
 """
@@ -28,10 +28,10 @@ router = APIRouter(prefix="/api/visits", tags=["visitor_intake"])
 
 
 class VisitIntakeRequest(BaseModel):
-    """Payload from n8n IMAP workflow — calendar invite details.
+    """Payload for visitor intake — calendar invite details.
 
-    The n8n workflow parses the ICS attachment / iTip reply from the info@ inbox
-    and extracts the relevant fields for visit creation.
+    Can come from n8n, Google Calendar webhook, webhook, or direct API call.
+    Contains parsed calendar event data + visitor details.
     """
 
     visitor_email: EmailStr = Field(description="External visitor's email address")
@@ -71,10 +71,11 @@ async def create_visit_from_intake(
     request: VisitIntakeRequest,
     _auth: AuthContext = Depends(require_auth(AuthLevel.AUTHENTICATED)),
 ) -> VisitIntakeResponse:
-    """Create a visit from n8n IMAP intake pipeline.
+    """Create a visit from calendar invite data and send confirmation email.
 
     Idempotent via external_event_id — if a visit with this external_event_id
     already exists, returns the existing visit instead of creating a duplicate.
+    Email is sent directly by backend; no n8n involvement.
     """
     from datetime import datetime
 
@@ -175,7 +176,7 @@ async def create_visit_from_intake(
         meeting_subject=visit.meeting_subject,
         meeting_start=meeting_start.isoformat(),
         meeting_end=meeting_end.isoformat(),
-        message="Visit created — n8n will send confirmation email to visitor",
+        message="Visit pending — awaiting visitor RSVP",
     )
 
 
@@ -278,9 +279,16 @@ async def handle_rsvp(
                 message="Visit already accepted",
             )
 
-        # Update to CREATED — this triggers QR email in n8n
+        # Update to CREATED and send QR email
         updated = repo.update_visit(visit.id, {"status": VisitStatus.CREATED})
         logger.info("[RSVP] Visit %s ACCEPTED by %s", visit.id, request.visitor_email)
+        try:
+            from app.services.visitor_email_service import VisitorEmailService
+
+            email_svc = VisitorEmailService()
+            email_svc.send_visitor_confirmation(updated)
+        except Exception as exc:
+            logger.error("[RSVP] Failed to send QR email for %s: %s", updated.id, exc)
         return RSVPResponse(
             success=True,
             visit_id=str(updated.id),

@@ -408,6 +408,31 @@ async def startup_event(app: FastAPI) -> None:
         scheduler_service.add_outlook_polling_job(interval_minutes=5)
         _logger.info("Outlook calendar polling job initialized (every 5 minutes)")
 
+    # Phase 176: Google Calendar polling — creates Visit records from external-attendee events
+    # Falls back to Pub/Sub push if GOOGLE_WEBHOOK_URL is set (requires Pub/Sub OAuth scope)
+    google_webhook_url = os.getenv("GOOGLE_WEBHOOK_URL", "")
+    if google_webhook_url:
+        from app.services.google_calendar_service import GoogleCalendarService
+
+        svc = GoogleCalendarService()
+        try:
+            success = await svc.ensure_channel(google_webhook_url)
+            if success:
+                _logger.info("[GoogleCal] Calendar watch channel registered: %s", google_webhook_url)
+            else:
+                # Fall back to polling if Pub/Sub setup failed
+                scheduler_service.add_google_calendar_poll_job(interval_minutes=5)
+                _logger.info("[GoogleCal] Pub/Sub not available — using polling fallback (every 5 min)")
+        except Exception as exc:
+            _logger.warning("[GoogleCal] Calendar watch registration failed: %s", exc)
+            scheduler_service.add_google_calendar_poll_job(interval_minutes=5)
+            _logger.info("[GoogleCal] Using Google Calendar polling fallback (every 5 min)")
+    else:
+        # No webhook URL — use polling
+        if hasattr(scheduler_service, "add_google_calendar_poll_job"):
+            scheduler_service.add_google_calendar_poll_job(interval_minutes=5)
+            _logger.info("[GoogleCal] Google Calendar polling job initialized (every 5 minutes)")
+
     # Phase 189: Email intake IMAP polling (every 5 minutes)
     # Warns at startup if IMAP is not configured (poller skips silently when unconfigured)
     if not settings.intelligence_intake_imap_host:

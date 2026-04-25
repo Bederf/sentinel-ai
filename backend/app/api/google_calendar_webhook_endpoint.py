@@ -113,10 +113,16 @@ async def handle_google_calendar_notification(request: Request, background_tasks
         try:
             encoded_data = body.get("message", {}).get("data", "")
             if encoded_data:
-                decoded = base64.b64decode(encoded_data).decode("utf-8")
+                raw_bytes = base64.b64decode(encoded_data)
+                # Try UTF-8 first, fall back to latin-1 (cp1252) for Windows-encoded payloads
+                try:
+                    decoded = raw_bytes.decode("utf-8")
+                except UnicodeDecodeError:
+                    decoded = raw_bytes.decode("latin-1")
                 message_data = json.loads(decoded)
         except Exception as exc:
             logger.warning("[GoogleCalWebhook] Failed to decode Pub/Sub message data: %s", exc)
+            logger.debug("[GoogleCalWebhook] Raw body: %s", body)
             raise HTTPException(status_code=400, detail="Failed to decode message data") from exc
     else:
         # Direct format (testing/dev)

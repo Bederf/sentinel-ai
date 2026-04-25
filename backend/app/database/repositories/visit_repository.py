@@ -1,8 +1,4 @@
-"""Repository for visit management with JSON file persistence.
-
-Dual-write pattern: Supabase (primary) + JSON file (backup/fallback).
-Thread-safe read-modify-write using file rotation + filelock.
-"""
+"""Repository for visit management — Supabase primary store."""
 
 from __future__ import annotations
 
@@ -10,7 +6,7 @@ import json
 import logging
 import shutil
 import tempfile
-from datetime import UTC, datetime
+from datetime import datetime
 from pathlib import Path
 from uuid import UUID
 
@@ -20,271 +16,127 @@ from app.models.visit import BuildingMap, Visit, VisitStatus
 
 logger = logging.getLogger(__name__)
 
-# JSON store paths
 DATA_DIR = Path(__file__).parent.parent.parent / "data"
-VISIT_STORE_PATH = DATA_DIR / "visit_store.json"
-BUILDING_MAP_STORE_PATH = DATA_DIR / "building_map_store.json"
-VISIT_LOCK_PATH = DATA_DIR / "visit_store.lock"
-BUILDING_MAP_LOCK_PATH = DATA_DIR / "building_map_store.lock"
 
 
 def _serialize_visit(visit: Visit) -> dict:
-    """Serialize a Visit to a JSON-serializable dict."""
     return visit.model_dump(mode="json")
 
 
 def _deserialize_visit(data: dict) -> Visit:
-    """Deserialize a dict back to a Visit model."""
     return Visit(**data)
 
 
 def _serialize_building_map(mapping: BuildingMap) -> dict:
-    """Serialize a BuildingMap to a JSON-serializable dict."""
     return mapping.model_dump(mode="json")
 
 
 def _deserialize_building_map(data: dict) -> BuildingMap:
-    """Deserialize a dict back to a BuildingMap model."""
     return BuildingMap(**data)
 
 
 class VisitRepository:
-    """Repository for Visit records with thread-safe JSON store."""
+    """Repository for Visit records — Supabase primary store."""
 
     def __init__(self) -> None:
         self._client = None
-        self._use_json = False
-        DATA_DIR.mkdir(parents=True, exist_ok=True)
-
-    # ------------------------------------------------------------------
-    # Supabase client (lazy, falls back to JSON on failure)
-    # ------------------------------------------------------------------
 
     @property
     def client(self):
-        """Lazy-load Supabase client; fall back to JSON if unavailable."""
-        if self._client is None and not self._use_json:
-            try:
-                from app.database.supabase_client import get_supabase_client
+        """Lazy-load Supabase client."""
+        if self._client is None:
+            from app.database.supabase_client import get_supabase_client
 
-                self._client = get_supabase_client()
-            except Exception as exc:
-                logger.warning("Failed to get Supabase client, using JSON fallback: %s", exc)
-                self._use_json = True
+            self._client = get_supabase_client()
         return self._client
 
-    # ------------------------------------------------------------------
-    # Visit CRUD — JSON store
-    # ------------------------------------------------------------------
-
-    def _read_store(self) -> dict:
-        """Read the entire visit store, returning an empty dict if missing."""
-        if not VISIT_STORE_PATH.exists():
-            return {"visits": []}
-        try:
-            with open(VISIT_STORE_PATH) as f:
-                return json.load(f)
-        except (OSError, json.JSONDecodeError) as exc:
-            logger.warning("Failed to read visit store: %s", exc)
-            return {"visits": []}
-
-    def _write_store(self, store: dict) -> None:
-        """Atomically write the visit store using file rotation."""
-        # Write to a temp file in the same directory, then rename
-        dirname = VISIT_STORE_PATH.parent
-        with tempfile.NamedTemporaryFile(mode="w", dir=dirname, delete=False) as tmp:
-            json.dump(store, tmp, indent=2, default=str)
-            tmp_path = Path(tmp.name)
-        # Atomic rename (on POSIX this is atomic if on same filesystem)
-        shutil.move(str(tmp_path), str(VISIT_STORE_PATH))
-
-    def _with_lock(self, func, lock_path: Path = VISIT_LOCK_PATH):
-        """Execute func while holding a FileLock."""
-        lock = FileLock(lock_path, timeout=10)
-        with lock:
-            return func()
-
     def create_visit(self, visit: Visit) -> Visit:
-        """Persist a new visit to the store."""
-
-        def _create():
-            store = self._read_store()
-            # Ensure no duplicate token or pin
-            existing_tokens = {v["token"] for v in store["visits"]}
-            existing_pins = {v["pin"] for v in store["visits"]}
-            if str(visit.token) in existing_tokens:
-                raise ValueError(f"Visit with token {visit.token} already exists")
-            if visit.pin in existing_pins:
-                raise ValueError(f"Visit with pin {visit.pin} already exists")
-            store["visits"].append(_serialize_visit(visit))
-            self._write_store(store)
-            return visit
-
-        return self._with_lock(_create)
+        """Persist a new visit to Supabase."""
+        payload = {
+            "id": str(visit.id),
+            "token": str(visit.token),
+            "pin": visit.pin,
+            "visitor_email": visit.visitor_email,
+            "visitor_name": visit.visitor_name,
+            "visitor_photo": visit.visitor_photo,
+            "visitor_vehicle": visit.visitor_vehicle,
+            "visitor_id_number": visit.visitor_id_number,
+            "host_email": visit.host_email,
+            "host_name": visit.host_name,
+            "host_mobile": visit.host_mobile,
+            "building_id": visit.building_id,
+            "meeting_subject": visit.meeting_subject,
+            "meeting_start": visit.meeting_start.isoformat(),
+            "meeting_end": visit.meeting_end.isoformat(),
+            "status": visit.status,
+            "access_card_id": visit.access_card_id,
+            "qr_code": visit.qr_code,
+            "external_event_id": visit.external_event_id,
+            "created_at": visit.created_at.isoformat(),
+            "updated_at": visit.updated_at.isoformat(),
+        }
+        self.client.table("visits").insert(payload).execute()
+        return visit
 
     def get_visit_by_id(self, id: UUID) -> Visit | None:
-        """Retrieve a visit by its primary id."""
-
-        def _get():
-            store = self._read_store()
-            for v in store["visits"]:
-                if v["id"] == str(id):
-                    return _deserialize_visit(v)
+        result = self.client.table("visits").select("*").eq("id", str(id)).execute()
+        if not result.data:
             return None
-
-        return self._with_lock(_get)
+        return _deserialize_visit(result.data[0])
 
     def get_visit_by_token(self, token: UUID) -> Visit | None:
-        """Retrieve a visit by its QR token (primary lookup key)."""
-
-        def _get():
-            store = self._read_store()
-            for v in store["visits"]:
-                if v["token"] == str(token):
-                    return _deserialize_visit(v)
+        result = self.client.table("visits").select("*").eq("token", str(token)).execute()
+        if not result.data:
             return None
-
-        return self._with_lock(_get)
+        return _deserialize_visit(result.data[0])
 
     def get_visit_by_pin(self, pin: str) -> Visit | None:
-        """Retrieve a visit by its 6-digit PIN (scan fallback)."""
-
-        def _get():
-            store = self._read_store()
-            for v in store["visits"]:
-                if v["pin"] == pin:
-                    return _deserialize_visit(v)
+        result = self.client.table("visits").select("*").eq("pin", pin).execute()
+        if not result.data:
             return None
-
-        return self._with_lock(_get)
+        return _deserialize_visit(result.data[0])
 
     def get_visit_by_external_event_id(self, external_event_id: str) -> Visit | None:
-        """Retrieve a visit by its Graph/Outlook external event ID (idempotency key)."""
-
-        def _get():
-            store = self._read_store()
-            for v in store["visits"]:
-                if v.get("external_event_id") == external_event_id:
-                    return _deserialize_visit(v)
+        result = self.client.table("visits").select("*").eq("external_event_id", external_event_id).execute()
+        if not result.data:
             return None
-
-        return self._with_lock(_get)
+        return _deserialize_visit(result.data[0])
 
     def update_visit(self, id: UUID, updates: dict) -> Visit | None:
-        """Update a visit by id, applying partial updates from updates dict."""
+        # Serialize datetime fields
+        serialized = {}
+        for k, v in updates.items():
+            if isinstance(v, datetime):
+                serialized[k] = v.isoformat()
+            else:
+                serialized[k] = v
 
-        def _update():
-            store = self._read_store()
-            for i, v in enumerate(store["visits"]):
-                if v["id"] == str(id):
-                    # Merge updates, protecting id/token/pin
-                    for key in [
-                        "visitor_email",
-                        "visitor_name",
-                        "host_email",
-                        "host_name",
-                        "host_mobile",
-                        "building_id",
-                        "meeting_subject",
-                        "meeting_start",
-                        "meeting_end",
-                        "status",
-                        "visitor_photo",
-                        "visitor_vehicle",
-                        "visitor_id_number",
-                        "access_card_id",
-                        "qr_code",
-                        "external_event_id",
-                    ]:
-                        if key in updates:
-                            v[key] = updates[key]
-                    v["updated_at"] = datetime.now(UTC).isoformat()
-                    store["visits"][i] = v
-                    self._write_store(store)
-                    return _deserialize_visit(v)
+        result = self.client.table("visits").update(serialized).eq("id", str(id)).execute()
+        if not result.data:
             return None
-
-        return self._with_lock(_update)
-
-    def update_visit_with_status_check(
-        self,
-        id: UUID,
-        new_status: str,
-        expected_status: str,
-    ) -> Visit | None:
-        """Atomically update visit status only if currently in expected_status.
-
-        This prevents race conditions where two concurrent replies both read
-        the same visit and try to update it.
-        Returns the updated Visit, or None if visit not found or status changed.
-        """
-
-        def _update():
-            store = self._read_store()
-            for i, v in enumerate(store["visits"]):
-                if v["id"] == str(id):
-                    if v["status"] != expected_status:
-                        # Status changed — another thread got there first
-                        return None
-                    v["status"] = new_status
-                    v["updated_at"] = datetime.now(UTC).isoformat()
-                    store["visits"][i] = v
-                    self._write_store(store)
-                    return _deserialize_visit(v)
-            return None
-
-        return self._with_lock(_update)
+        return _deserialize_visit(result.data[0])
 
     def update_visit_by_external_event_id(self, external_event_id: str, updates: dict) -> Visit | None:
-        """Update a visit by external_event_id, applying partial updates from updates dict."""
+        serialized = {}
+        for k, v in updates.items():
+            if isinstance(v, datetime):
+                serialized[k] = v.isoformat()
+            else:
+                serialized[k] = v
 
-        def _update():
-            store = self._read_store()
-            for i, v in enumerate(store["visits"]):
-                if v.get("external_event_id") == external_event_id:
-                    for key in [
-                        "visitor_email",
-                        "visitor_name",
-                        "host_email",
-                        "host_name",
-                        "host_mobile",
-                        "building_id",
-                        "meeting_subject",
-                        "meeting_start",
-                        "meeting_end",
-                        "status",
-                        "visitor_photo",
-                        "visitor_vehicle",
-                        "visitor_id_number",
-                        "access_card_id",
-                        "qr_code",
-                        "external_event_id",
-                    ]:
-                        if key in updates:
-                            v[key] = updates[key]
-                    v["updated_at"] = datetime.now(UTC).isoformat()
-                    store["visits"][i] = v
-                    self._write_store(store)
-                    return _deserialize_visit(v)
+        result = self.client.table("visits").update(serialized).eq("external_event_id", external_event_id).execute()
+        if not result.data:
             return None
-
-        return self._with_lock(_update)
+        return _deserialize_visit(result.data[0])
 
     def list_visits_by_building(self, building_id: str, status: VisitStatus | None = None) -> list[Visit]:
-        """List all visits for a building, optionally filtered by status."""
-
-        def _list():
-            store = self._read_store()
-            visits = []
-            for v in store["visits"]:
-                if v["building_id"] == building_id and (status is None or v["status"] == status.value):
-                    visits.append(_deserialize_visit(v))
-            return visits
-
-        return self._with_lock(_list)
+        query = self.client.table("visits").select("*").eq("building_id", building_id)
+        if status:
+            query = query.eq("status", status.value)
+        result = query.execute()
+        return [_deserialize_visit(r) for r in result.data]
 
     def list_active_visits(self) -> list[Visit]:
-        """List all visits in CREATED, ARRIVED, REGISTERED, or APPROVED status."""
         ACTIVE_STATUSES = {
             VisitStatus.CREATED.value,
             VisitStatus.ARRIVED.value,
@@ -292,60 +144,53 @@ class VisitRepository:
             VisitStatus.APPROVED.value,
             VisitStatus.ACTIVE.value,
         }
-
-        def _list():
-            store = self._read_store()
-            visits = []
-            for v in store["visits"]:
-                if v["status"] in ACTIVE_STATUSES:
-                    visits.append(_deserialize_visit(v))
-            return visits
-
-        return self._with_lock(_list)
+        result = self.client.table("visits").select("*").in_("status", list(ACTIVE_STATUSES)).execute()
+        return [_deserialize_visit(r) for r in result.data]
 
 
 class BuildingMapRepository:
-    """Repository for BuildingMap records with JSON file persistence."""
+    """Repository for BuildingMap records — JSON file store."""
 
     def __init__(self) -> None:
-        pass
+        self._client = None
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+    @property
+    def client(self):
+        if self._client is None:
+            from app.database.supabase_client import get_supabase_client
+
+            self._client = get_supabase_client()
+        return self._client
 
     def _read_store(self) -> dict:
-        """Read the entire building map store."""
-        if not BUILDING_MAP_STORE_PATH.exists():
+        if not DATA_DIR.exists():
             return {"building_maps": []}
         try:
-            with open(BUILDING_MAP_STORE_PATH) as f:
+            with open(DATA_DIR / "building_map_store.json") as f:
                 return json.load(f)
-        except (OSError, json.JSONDecodeError) as exc:
-            logger.warning("Failed to read building map store: %s", exc)
+        except (OSError, json.JSONDecodeError):
             return {"building_maps": []}
 
     def _write_store(self, store: dict) -> None:
-        """Atomically write the building map store using file rotation."""
-        dirname = BUILDING_MAP_STORE_PATH.parent
-        with tempfile.NamedTemporaryFile(mode="w", dir=dirname, delete=False) as tmp:
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+        path = DATA_DIR / "building_map_store.json"
+        with tempfile.NamedTemporaryFile(mode="w", dir=str(DATA_DIR), delete=False) as tmp:
             json.dump(store, tmp, indent=2, default=str)
             tmp_path = Path(tmp.name)
-        shutil.move(str(tmp_path), str(BUILDING_MAP_STORE_PATH))
+        shutil.move(str(tmp_path), str(path))
 
     def _with_lock(self, func):
-        """Execute func while holding a FileLock."""
-        lock = FileLock(BUILDING_MAP_LOCK_PATH, timeout=10)
+        lock = FileLock(DATA_DIR / "building_map_store.lock", timeout=10)
         with lock:
             return func()
 
     def create_building_map(self, mapping: BuildingMap) -> BuildingMap:
-        """Persist a new building map entry."""
-
         def _create():
             store = self._read_store()
-            # Check for duplicate outlook_location_string
             existing = {bm["outlook_location_string"] for bm in store["building_maps"]}
             if mapping.outlook_location_string in existing:
-                raise ValueError(
-                    f"BuildingMap with outlook_location_string '{mapping.outlook_location_string}' already exists"
-                )
+                raise ValueError(f"BuildingMap '{mapping.outlook_location_string}' already exists")
             store["building_maps"].append(_serialize_building_map(mapping))
             self._write_store(store)
             return mapping
@@ -353,8 +198,6 @@ class BuildingMapRepository:
         return self._with_lock(_create)
 
     def get_building_map_by_outlook_location(self, location: str) -> BuildingMap | None:
-        """Resolve an Outlook location string to a BuildingMap (case-insensitive)."""
-
         def _get():
             store = self._read_store()
             loc_lower = location.lower()
@@ -366,8 +209,6 @@ class BuildingMapRepository:
         return self._with_lock(_get)
 
     def list_building_maps(self) -> list[BuildingMap]:
-        """List all building map entries."""
-
         def _list():
             store = self._read_store()
             return [_deserialize_building_map(bm) for bm in store["building_maps"]]

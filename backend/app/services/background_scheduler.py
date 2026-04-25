@@ -1389,10 +1389,13 @@ class BackgroundSchedulerService:
 
             def _thread_target():
                 try:
+
                     async def _send_async():
                         from app.services.telegram_message_sender import get_telegram_sender
+
                         sender = get_telegram_sender()
                         from app.config.settings import settings
+
                         chat_id = getattr(settings, "telegram_alert_chat_id", None) or getattr(
                             settings, "sentry_fm_chat_id", None
                         )
@@ -3362,6 +3365,43 @@ class BackgroundSchedulerService:
 
         except Exception as e:
             logger.error("Outlook calendar poll failed: %s", e, exc_info=True)
+
+    # ------------------------------------------------------------------
+    # Google Calendar polling (Phase 176)
+    # ------------------------------------------------------------------
+
+    def add_google_calendar_poll_job(self, interval_minutes: int = 5):
+        """Add a job to poll Google Calendar for external-attendee events.
+
+        Used as fallback when Pub/Sub push is not configured.
+        """
+        job_id = "google_calendar_poll"
+        if self.scheduler.get_job(job_id):
+            self.scheduler.remove_job(job_id)
+            logger.info("Removed existing Google Calendar polling job")
+
+        self.scheduler.add_job(
+            func=self._run_google_calendar_poll,
+            trigger=IntervalTrigger(minutes=interval_minutes),
+            id=job_id,
+            name="Google Calendar Poll — External Attendees",
+            replace_existing=True,
+        )
+        logger.info("Added Google Calendar polling job (%d min interval)", interval_minutes)
+
+    def _run_google_calendar_poll(self):
+        """Run the Google Calendar poll."""
+        try:
+            from app.services.google_calendar_service import GoogleCalendarService
+
+            svc = GoogleCalendarService()
+            if not svc.is_enabled():
+                return
+            visits = svc.poll_recent_events()
+            if visits:
+                logger.info("Google Calendar poll: created %d visit(s)", len(visits))
+        except Exception as e:
+            logger.error("Google Calendar poll failed: %s", e, exc_info=True)
 
     # ------------------------------------------------------------------
     # Graph subscription renewal (Phase 177)
