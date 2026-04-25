@@ -123,10 +123,8 @@ async def create_visit_from_intake(
                 email_already_sent=True,
             )
 
-    # Create visit with CREATED status — QR sent immediately.
-    # Accept-First cannot work via IMAP: visitor replies go to the organizer's inbox,
-    # not to info@. The Google Calendar / Graph webhook paths (Phase 177/178) handle
-    # Accept-First correctly because they watch the organizer's calendar directly.
+    # Create visit with PENDING status — awaiting visitor RSVP acceptance.
+    # Backend will send QR confirmation email when acceptance is detected.
     try:
         visit = service.create_visit(
             visitor_email=request.visitor_email,
@@ -136,7 +134,7 @@ async def create_visit_from_intake(
             meeting_end=meeting_end,
             host_name=request.host_name,
             host_mobile=request.host_mobile,
-            status=VisitStatus.CREATED,
+            status=VisitStatus.PENDING,
         )
     except Exception as exc:
         logger.error("[VisitorIntake] Failed to create visit: %s", exc)
