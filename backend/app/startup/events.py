@@ -175,6 +175,17 @@ async def startup_event(app: FastAPI) -> None:
     else:
         print("Redis cache unavailable - running without caching")
 
+    # Warm token blacklist local cache from Redis (Phase 61.9)
+    # Ensures process restart doesn't create revocation gap for already-revoked tokens
+    from app.services.token_blacklist_service import token_blacklist
+
+    try:
+        warm_result = await token_blacklist.warm_cache()
+        if warm_result > 0:
+            _logger.info(f"Token blacklist cache warmed: {warm_result} entries")
+    except Exception as e:
+        _logger.warning(f"Token blacklist warm_cache failed (non-fatal): {e}")
+
     # Pre-warm embedding model + auto-load RAG knowledge in background
     def _warm_embedding_and_rag():
         try:
