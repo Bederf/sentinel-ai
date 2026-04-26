@@ -1163,7 +1163,11 @@ async def get_site_status(
 
 
 class PhaseUpdateRequest(BaseModel):
-    phase: Literal["shadow", "advisory", "supervised", "auto"]
+    phase: Literal[
+        "commissioning", "shadow_live", "advisory", "supervised", "automatic",
+        # Legacy aliases (normalised on write)
+        "shadow", "auto",
+    ]
     reason: str | None = None
     changed_by: str | None = None  # user email; defaults to "system" if omitted
 
@@ -1194,9 +1198,17 @@ async def update_site_phase(site_id: str, request: PhaseUpdateRequest) -> PhaseU
     """Set the onboarding phase for a site.
 
     Progresses SENTINEL's trust-building model:
-      shadow → advisory → supervised → auto
+      commissioning → shadow_live → advisory → supervised → automatic
+
+    Transition rules:
+    - Forward by one step: allowed
+    - Same stage: no-op (succeeds)
+    - Forward by more than one step: 400 error
+    - Backward: 400 error
     """
-    phase = request.phase
+    from app.models.onboarding_phase import LEGACY_MAP, normalise_stage, validate_transition
+
+    requested = normalise_stage(request.phase)
     supabase_ok = False
 
     previous_phase: str | None = None
@@ -1205,14 +1217,30 @@ async def update_site_phase(site_id: str, request: PhaseUpdateRequest) -> PhaseU
 
         client = get_supabase_client()
 
-        # Capture current phase for audit log
+        # Capture current phase for audit log + transition validation
         current_row = client.table("sites").select("onboarding_phase").eq("code", site_id).limit(1).execute()
         if current_row.data:
-            previous_phase = current_row.data[0].get("onboarding_phase") or "shadow"
+            previous_phase = normalise_stage(
+                current_row.data[0].get("onboarding_phase") or "commissioning"
+            )
 
-        client.table("sites").update({"onboarding_phase": phase}).eq("code", site_id).execute()
+        # Validate transition before writing
+        if previous_phase:
+            valid, err = validate_transition(previous_phase, requested)
+            if not valid:
+                raise HTTPException(
+                    status_code=400,
+                    detail={
+                        "error": "Invalid transition",
+                        "current": previous_phase,
+                        "requested": requested,
+                        "message": err,
+                    },
+                )
+
+        client.table("sites").update({"onboarding_phase": requested}).eq("code", site_id).execute()
         supabase_ok = True
-        logger.info(f"Onboarding phase set to '{phase}' for {site_id} (Supabase)")
+        logger.info(f"Onboarding phase set to '{requested}' for {site_id} (Supabase)")
 
         # Write phase transition to dedicated immutable log table
         try:
@@ -1220,7 +1248,7 @@ async def update_site_phase(site_id: str, request: PhaseUpdateRequest) -> PhaseU
                 {
                     "site_id": site_id,
                     "from_phase": previous_phase,
-                    "to_phase": phase,
+                    "to_phase": requested,
                     "changed_by": request.changed_by
                     if hasattr(request, "changed_by") and request.changed_by
                     else "system",
@@ -1234,9 +1262,9 @@ async def update_site_phase(site_id: str, request: PhaseUpdateRequest) -> PhaseU
 
     # JSON fallback — persist phase and last transition for offline visibility
     state = _load_phase_state()
-    state[site_id] = phase
+    state[site_id] = requested
     state[f"{site_id}:last_transition"] = {
-        "to_phase": phase,
+        "to_phase": requested,
         "from_phase": previous_phase,
         "changed_by": request.changed_by or "system",
         "created_at": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat(),
@@ -1252,16 +1280,16 @@ async def update_site_phase(site_id: str, request: PhaseUpdateRequest) -> PhaseU
                 sites = json.loads(sites_file.read_text())
                 for s in sites:
                     if s.get("code") == site_id:
-                        s["onboarding_phase"] = phase
+                        s["onboarding_phase"] = requested
                         break
                 sites_file.write_text(json.dumps(sites, indent=2))
         except Exception as e:
             logger.warning(f"sites.json phase fallback failed: {e}")
 
     if not supabase_ok:
-        logger.info(f"Onboarding phase set to '{phase}' for {site_id} (JSON fallback only)")
+        logger.info(f"Onboarding phase set to '{requested}' for {site_id} (JSON fallback only)")
 
-    return PhaseUpdateResponse(site_id=site_id, onboarding_phase=phase)
+    return PhaseUpdateResponse(site_id=site_id, onboarding_phase=requested)
 
 
 # ============= Get Single Site Endpoint =============

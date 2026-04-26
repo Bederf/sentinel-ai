@@ -105,6 +105,9 @@ class Settings(BaseSettings):
     xiaomi_api_key: str = ""
     xiaomi_model: str = "mimo-v2-flash"
     xiaomi_base_url: str = "https://api.mimo.xiaomi.com/v1"
+    deepseek_api_key: str = ""
+    deepseek_model: str = "deepseek-chat"
+    deepseek_base_url: str = "https://api.deepseek.com/v1"
     minimax_api_key: str = ""
     minimax_model: str = "MiniMax-M2.7"
     minimax_base_url: str = "https://api.minimax.io/anthropic"
@@ -299,7 +302,13 @@ class Settings(BaseSettings):
     # Background optimization model (cheaper than interactive chat)
     # Empty = use claude_model; set to e.g. "claude-haiku-4-5-20251001" for cost savings
     optimization_model: str = ""
-    optimization_max_tokens: int = 1536
+    optimization_max_tokens: int = 4096
+
+    # Token budget enforcement (Phase 185 Wave 2)
+    daily_token_budget_per_site: int = Field(default=200_000, validation_alias="DAILY_TOKEN_BUDGET_PER_SITE")
+    token_budget_alert_threshold: float = Field(default=0.85, validation_alias="TOKEN_BUDGET_ALERT_THRESHOLD")
+    token_budget_hard_limit: bool = Field(default=True, validation_alias="TOKEN_BUDGET_HARD_LIMIT")
+    token_budget_exclude_interactive: bool = Field(default=True, validation_alias="TOKEN_BUDGET_EXCLUDE_INTERACTIVE")
 
     # Lifecycle simulation optimization mode
     # IMPORTANT: Simulation MUST NOT consume LLM tokens. It uses rule-based

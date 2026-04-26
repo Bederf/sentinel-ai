@@ -223,13 +223,13 @@ class SpaceMqttListener:
                     radar_topic = settings.space_mqtt_radar_topic
                     if radar_topic:
                         client.subscribe(radar_topic)
-                        logger.warning(
+                        logger.info(
                             "Space MQTT listener connected — subscribed to %s",
                             radar_topic,
                         )
                     else:
                         client.subscribe(settings.space_mqtt_topic)
-                        logger.warning(
+                        logger.info(
                             "Space MQTT listener connected — subscribed to %s (legacy)",
                             settings.space_mqtt_topic,
                         )
@@ -238,7 +238,7 @@ class SpaceMqttListener:
 
             def _on_message(_client, _userdata, message):
                 try:
-                    logger.warning("Space MQTT rx: %s → %s", message.topic, message.payload[:120])
+                    logger.debug("Space MQTT rx: %s → %s", message.topic, message.payload[:120])
                     if self._loop and self._loop.is_running():
                         future = asyncio.run_coroutine_threadsafe(
                             process_mqtt_presence_message(message.topic, message.payload),

@@ -215,6 +215,25 @@ class ApprovalService:
             except Exception as e:
                 logger.warning(f"Quality gate check failed for approval {recommendation_id}, proceeding: {e}")
 
+            # Mode gate: execution requires supervised or automatic mode
+            # Commissioning/shadow_live modes block execution (generation is still allowed)
+            EXECUTION_ALLOWED = {"supervised", "automatic"}
+            try:
+                from app.models.onboarding_phase import effective_phase
+
+                site_id = recommendation.site_id or "unknown"
+                current_stage = await effective_phase(site_id)
+
+                if current_stage not in EXECUTION_ALLOWED:
+                    return ApprovalResult(
+                        success=False,
+                        recommendation_id=recommendation_id,
+                        status="failed",
+                        error_message=f"EXECUTION_BLOCKED: Approval not permitted in {current_stage} mode (requires {EXECUTION_ALLOWED})",
+                    )
+            except Exception as e:
+                logger.warning(f"Mode gate check failed for approval {recommendation_id}, proceeding: {e}")
+
             # CRITICAL: Run SafetyEngine validation AGAIN before write
             # (Defense-in-depth: validate at both recommendation creation and approval time)
             equipment_id = recommendation.target_equipment

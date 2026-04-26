@@ -128,6 +128,16 @@ async def create_dispatch_recommendation(
 
     confidence_score = _score_confidence(dispatch_command, context)
 
+    # Determine shadow_mode from site operational mode
+    shadow_mode = False
+    try:
+        from app.models.onboarding_phase import effective_phase
+
+        current_stage = await effective_phase(site_id)
+        shadow_mode = current_stage == "shadow_live"
+    except Exception:
+        shadow_mode = False
+
     action_payload = {
         "point": "dispatch_command",
         "value": {
@@ -172,6 +182,7 @@ async def create_dispatch_recommendation(
         profile="cost_saving",
         action=action_payload,
         expected_impact=expected_impact,
+        shadow_mode=shadow_mode,
     )
 
     return rec

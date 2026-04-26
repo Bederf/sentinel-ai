@@ -178,6 +178,9 @@ def extract_text_from_docx(file_bytes: bytes) -> str:
         raise
 
 
+# TODO: inject scan DOCX text via score_prompt() if DOCX ever added to ALLOWED_MAGIC_BYTES in document_scanner.py
+
+
 async def extract_text(file: UploadFile) -> tuple[str, dict]:
     """Extract text from uploaded file based on file type.
 

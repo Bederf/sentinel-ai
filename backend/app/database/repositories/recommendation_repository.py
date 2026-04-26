@@ -41,6 +41,7 @@ class RecommendationRepository:
         "executed_at",
         "execution_result",
         "rejection_reason",
+        "shadow_mode",
     }
 
     def __init__(self):
@@ -189,6 +190,7 @@ class RecommendationRepository:
                 .select("*")
                 .eq("site_id", site_id)
                 .eq("status", status.value)
+                .eq("shadow_mode", False)  # Exclude shadow-mode recs from UI
                 .order("timestamp", desc=True)
                 .limit(limit)
                 .execute()
@@ -229,6 +231,7 @@ class RecommendationRepository:
                 .select("*")
                 .eq("site_id", site_id)
                 .neq("status", "pending")
+                .eq("shadow_mode", False)  # Exclude shadow-mode recs from UI
                 .order("timestamp", desc=True)
                 .limit(limit)
             )

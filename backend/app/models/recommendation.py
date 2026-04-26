@@ -92,6 +92,7 @@ class Recommendation:
     outcome_validated: bool | None = None
     outcome_notes: str | None = None
     outcome_validated_at: datetime | None = None
+    shadow_mode: bool = False  # If True, stored but hidden from frontend UI
 
     def get_numeric_confidence(self) -> float:
         """Return numeric confidence, converting string if needed.
@@ -147,6 +148,7 @@ class Recommendation:
                 if isinstance(self.outcome_validated_at, datetime)
                 else self.outcome_validated_at
             ),
+            "shadow_mode": self.shadow_mode,
         }
 
     @classmethod
@@ -226,4 +228,5 @@ class Recommendation:
             outcome_validated=data.get("outcome_validated"),
             outcome_notes=data.get("outcome_notes"),
             outcome_validated_at=outcome_validated_at,
+            shadow_mode=data.get("shadow_mode", False),
         )

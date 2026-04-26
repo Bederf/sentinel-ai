@@ -114,8 +114,7 @@ class MinimaxService:
             raise ValueError("MINIMAX_API_KEY not configured.")
 
         system = system_prompt or MINIMAX_SYSTEM_PROMPT
-        # Build messages in Anthropic SDK format
-        anthropic_messages = [{"role": "user", "content": system}]
+        anthropic_messages = [{"role": "system", "content": system}]
         anthropic_messages.extend(messages)
 
         model = model_override or self._model
@@ -217,7 +216,7 @@ class MinimaxService:
             raise ValueError("MINIMAX_API_KEY not configured.")
 
         system = system_prompt or MINIMAX_SYSTEM_PROMPT
-        anthropic_messages = [{"role": "user", "content": system}]
+        anthropic_messages = [{"role": "system", "content": system}]
         anthropic_messages.extend(messages)
 
         model = model_override or self._model

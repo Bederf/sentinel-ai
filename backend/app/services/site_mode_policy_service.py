@@ -314,6 +314,11 @@ class SiteModePolicyService:
         state["last_evaluated_at"] = _iso(now)
         self._save_state(site_id, state)
 
+        # Sync stage to Supabase so mode gates (which now read from Supabase) stay in sync
+        if decision in ("would_promote", "would_fail_closed_demote", "would_demote"):
+            from app.models.onboarding_phase import sync_site_phase_to_supabase
+            await sync_site_phase_to_supabase(site_id, target_stage)
+
         return {
             "site_id": site_id,
             "policy_version": policy.get("version"),

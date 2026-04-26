@@ -42,6 +42,39 @@ class TelegramProvider(BaseNotificationProvider):
         except Exception:
             return False
 
+    def send_budget_alert(self, site_id: str, current: int, budget: int, pct: float) -> None:
+        """Fire-and-forget budget alert via ThreadPoolExecutor."""
+        import json
+        from concurrent.futures import ThreadPoolExecutor
+
+        body = (
+            f"Site: {site_id}\n"
+            f"Usage: {current:,} / {budget:,} tokens ({pct:.0f}%)\n"
+            f"Background LLM calls will be blocked at 100%."
+        )
+        payload = {
+            "chat_id": self.default_chat_id or "",
+            "text": f"⚠️ SENTINEL Token Budget Alert\n\n{body}",
+            "parse_mode": "Markdown",
+        }
+
+        def _send():
+            try:
+                import httpx
+
+                with httpx.Client(timeout=15.0) as client:
+                    resp = client.post(
+                        f"{TELEGRAM_API_BASE}{self.bot_token}/sendMessage",
+                        json=payload,
+                    )
+                    resp.raise_for_status()
+                    logger.info("Budget alert sent to %s for %s", self.default_chat_id, site_id)
+            except Exception as e:
+                logger.warning("Failed to send budget alert Telegram: %s", e)
+
+        if self.is_enabled():
+            ThreadPoolExecutor(max_workers=1).submit(_send)
+
     async def send(self, recipient: str, title: str, body: str, **kwargs) -> NotificationResult:
         if not self.is_enabled():
             return NotificationResult(

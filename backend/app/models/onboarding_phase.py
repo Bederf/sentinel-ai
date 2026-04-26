@@ -13,6 +13,11 @@ The phase gates are enforced at:
   - Frontend: SiteCard, SiteDetail, ControlPanel visibility
 
 All gates use phase_allows() — single source of truth.
+
+Phase names are normalised to the policy stage_order set:
+  'commissioning', 'shadow_live', 'advisory', 'supervised', 'automatic'
+Legacy names ('shadow' → 'shadow_live', 'auto' → 'automatic') are mapped on read.
+Supabase 'sites.onboarding_phase' is the single source of truth for mode gates.
 """
 
 import logging
@@ -28,13 +33,28 @@ class OnboardingPhase(StrEnum):
     AUTO = "auto"
 
 
-_PHASE_ORDER = ["shadow", "advisory", "supervised", "auto"]
+# Canonical stage names — match site-mode-policy.json stage_order
+VALID_STAGES = [
+    "commissioning",
+    "shadow_live",
+    "advisory",
+    "supervised",
+    "automatic",
+]
+
+# Map legacy Supabase names to canonical policy names
+LEGACY_MAP: dict[str, str] = {
+    "shadow": "shadow_live",
+    "auto": "automatic",
+}
+
+_PHASE_ORDER = ["commissioning", "shadow_live", "advisory", "supervised", "automatic"]
 
 _FEATURE_GATES: dict[str, str] = {
     "recommendations_ui": "advisory",
     "sentry_notifications": "advisory",
     "approve_reject": "supervised",
-    "auto_apply": "auto",
+    "auto_apply": "automatic",
     "concierge_dashboard": "advisory",
     "email_signal_routing": "advisory",
     "emit_signal": "advisory",
@@ -117,10 +137,41 @@ async def effective_phase(site_id: str, module_type: str | None = None) -> str:
         # Fall through to site-level
         site_result = sb.table("sites").select("onboarding_phase").eq("code", site_id).execute()
         if site_result.data:
-            return site_result.data[0].get("onboarding_phase") or "shadow"
+            raw = site_result.data[0].get("onboarding_phase") or "shadow"
+            return LEGACY_MAP.get(raw, raw)  # normalise legacy names to policy names
     except Exception as exc:
         logger.debug("effective_phase: could not fetch phase for %s/%s: %s", site_id, module_type, exc)
     return "shadow"
+
+
+def normalise_stage(raw: str) -> str:
+    """Normalise any stage name to canonical policy name via LEGACY_MAP."""
+    return LEGACY_MAP.get(raw, raw)
+
+
+def validate_transition(current_stage: str, requested_stage: str) -> tuple[bool, str | None]:
+    """Validate that a requested transition is at most one step forward.
+
+    Returns (is_valid, error_message).
+    """
+    if requested_stage == current_stage:
+        return True, None
+    try:
+        current_idx = VALID_STAGES.index(current_stage)
+        requested_idx = VALID_STAGES.index(requested_stage)
+    except ValueError:
+        return False, f"Unknown stage value: current={current_stage}, requested={requested_stage}"
+    if requested_idx > current_idx + 1:
+        return False, (
+            f"Invalid transition from '{current_stage}' to '{requested_stage}'. "
+            f"Must transition through '{VALID_STAGES[current_idx + 1]}' first."
+        )
+    if requested_idx < current_idx:
+        return False, (
+            f"Backward transitions are not permitted. "
+            f"Current stage is '{current_stage}'; cannot move to '{requested_stage}'."
+        )
+    return True, None
 
 
 async def get_site_phase(site_id: str, module_type: str | None = None) -> str:
@@ -136,6 +187,22 @@ async def get_site_phase(site_id: str, module_type: str | None = None) -> str:
         Falls back to 'shadow' on any error or missing value.
     """
     return await effective_phase(site_id, module_type)
+
+
+async def sync_site_phase_to_supabase(site_id: str, stage: str) -> bool:
+    """Write canonical stage name to Supabase sites.onboarding_phase.
+
+    Used by evaluate_site() when the scheduler job determines promotion.
+    Returns True on success.
+    """
+    try:
+        from app.database.supabase_client import get_supabase_client
+        sb = get_supabase_client()
+        sb.table("sites").update({"onboarding_phase": stage}).eq("code", site_id).execute()
+        return True
+    except Exception as exc:
+        logger.error("sync_site_phase_to_supabase: failed for %s -> %s: %s", site_id, stage, exc)
+        return False
 
 
 # ── Shadow Exit Criteria ────────────────────────────────────────────────────

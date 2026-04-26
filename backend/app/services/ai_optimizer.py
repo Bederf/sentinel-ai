@@ -16,6 +16,7 @@ equipment combinations.
 
 import json
 import logging
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -229,10 +230,21 @@ class AIOptimizerService:
             feedback_rates_text=feedback_rates_text,
         )
 
+        # Determine task_class based on anomaly state
+        has_anomalies = (
+            ml_context is not None
+            and bool(ml_context.get("anomaly_alerts"))
+        )
+        task_class = "heavy" if has_anomalies else "medium"
+        logger.info(
+            f"Site {site_id}: anomaly_alerts={len(ml_context.get('anomaly_alerts', []) if ml_context else [])} — "
+            f"task_class={task_class}"
+        )
+
         try:
             # Try LLM analysis via model_gateway
             recommendation = await self._analyze_with_claude(
-                site_id, prompt, current_conditions, equipment_inventory, lighting_zones, profile
+                site_id, task_class, prompt, current_conditions, equipment_inventory, lighting_zones, profile
             )
 
             # Apply recommendation scoring and ranking with profile weights
@@ -1386,6 +1398,7 @@ Provide ONLY the JSON response, no additional text."""
     async def _analyze_with_claude(
         self,
         site_id: str,
+        task_class: str,
         prompt: str,
         current_conditions: dict[str, Any],
         equipment_inventory: dict[str, list[Device]],
@@ -1396,18 +1409,19 @@ Provide ONLY the JSON response, no additional text."""
 
         Args:
             site_id: Site identifier
-            prompt: Optimization prompt with profile information
+            task_class: model_gateway task class (heavy/medium) — heavy when anomalies present
+            prompt: User message content (prompt split handles system content separately)
             current_conditions: Current building conditions
             equipment_inventory: Equipment by type
             lighting_zones: DALI zone data
             profile: Active optimization profile (if any)
         """
         try:
-            logger.info(f"Using model_gateway(heavy) for optimization of site {site_id}")
+            logger.info(f"Using model_gateway({task_class}) for optimization of site {site_id}")
 
-            # Call LLM via model_gateway (task_class=heavy for complex multi-system reasoning)
+            # Call LLM via model_gateway (task_class determined by anomaly state)
             response_text = await model_gateway.call(
-                task_class="heavy",
+                task_class=task_class,
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=settings.optimization_max_tokens,
                 stream=False,
@@ -1416,18 +1430,7 @@ Provide ONLY the JSON response, no additional text."""
 
             # Parse JSON response
             try:
-                # Extract JSON from response (handle markdown code blocks)
-                if "```json" in response_text:
-                    json_start = response_text.find("```json") + 7
-                    json_end = response_text.find("```", json_start)
-                    json_text = response_text[json_start:json_end].strip()
-                elif "```" in response_text:
-                    json_start = response_text.find("```") + 3
-                    json_end = response_text.find("```", json_start)
-                    json_text = response_text[json_start:json_end].strip()
-                else:
-                    json_text = response_text.strip()
-
+                json_text = self._extract_json(response_text)
                 result = json.loads(json_text)
 
                 # Log no-action reasons for observability
@@ -1461,6 +1464,82 @@ Provide ONLY the JSON response, no additional text."""
         except Exception as e:
             logger.error(f"Claude analysis failed: {e}")
             raise
+
+    def _extract_json(self, raw: str) -> str:
+        """Extract JSON from LLM response with markdown fences stripped.
+
+        If the response is truncated mid-JSON (max_tokens cutoff), attempts
+        to recover by finding the last structurally complete object.
+        """
+        import re
+
+        # Strip markdown code fences
+        clean = re.sub(r"^```json\s*|```\s*$", "", raw.strip(), flags=re.MULTILINE)
+
+        # Try parsing as-is first
+        try:
+            json.loads(clean)
+            return clean
+        except json.JSONDecodeError:
+            pass
+
+        # Truncation recovery: find the last complete top-level object/array
+        # Walk backwards from the end to find a valid closing brace for the
+        # outermost container (starts with { or [)
+        if clean.startswith("{"):
+            # Find the last '}' that closes the outermost object
+            depth = 0
+            last_valid = -1
+            for i, ch in enumerate(clean):
+                if ch == "{":
+                    depth += 1
+                elif ch == "}":
+                    depth -= 1
+                    if depth == 0:
+                        last_valid = i + 1
+                        break
+            if last_valid > 0:
+                truncated = clean[:last_valid]
+                try:
+                    json.loads(truncated)
+                    logger.warning(
+                        "[AI-OPT] Response was truncated at %d chars — recovered %d valid chars",
+                        len(raw),
+                        last_valid,
+                    )
+                    return truncated
+                except json.JSONDecodeError:
+                    pass
+        elif clean.startswith("["):
+            depth = 0
+            last_valid = -1
+            for i, ch in enumerate(clean):
+                if ch == "[":
+                    depth += 1
+                elif ch == "]":
+                    depth -= 1
+                    if depth == 0:
+                        last_valid = i + 1
+                        break
+            if last_valid > 0:
+                truncated = clean[:last_valid]
+                try:
+                    json.loads(truncated)
+                    logger.warning(
+                        "[AI-OPT] Response was truncated at %d chars — recovered %d valid chars",
+                        len(raw),
+                        last_valid,
+                    )
+                    return truncated
+                except json.JSONDecodeError:
+                    pass
+
+        # Unrecoverable — return as-is and let json.loads throw the real error
+        logger.error(
+            "[AI-OPT] Unrecoverable JSON parse error. Raw tail (last 300 chars): %s",
+            raw[-300:],
+        )
+        return clean
 
     def _score_and_rank_recommendations(
         self, recommendation: OptimizationRecommendation, profile: dict[str, Any]

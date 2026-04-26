@@ -17,11 +17,11 @@ def _base_policy() -> dict:
         "version": "test-v1",
         "dry_run": True,
         "default_stage": "shadow_live",
-        "stage_order": ["commissioning", "shadow_live", "supervised", "automatic"],
+        "stage_order": ["commissioning", "shadow_live", "advisory", "supervised", "automatic"],
         "repromotion_stability_hours": 24,
         "stages": {
             "shadow_live": {
-                "next_stage": "supervised",
+                "next_stage": "advisory",
                 "promotion": {
                     "min_dwell_hours": 0,
                     "entry_thresholds": {
@@ -29,6 +29,22 @@ def _base_policy() -> dict:
                         "match_coverage_min_pct": 95.0,
                         "error_rate_max_pct": 1.0,
                         "file_manual_sources_max": 0,
+                        "commissioning_all_gates_passed": True,
+                        "consecutive_pass_days_min": 2,
+                        "quality_gate_allowed": ["pass", "warn"],
+                    },
+                },
+            },
+            "advisory": {
+                "next_stage": "supervised",
+                "promotion": {
+                    "min_dwell_hours": 0,
+                    "entry_thresholds": {
+                        "freshness_hours_max": 1.0,
+                        "match_coverage_min_pct": 97.0,
+                        "error_rate_max_pct": 1.0,
+                        "file_manual_sources_max": 0,
+                        "conflict_events_max_24h": 0,
                         "commissioning_all_gates_passed": True,
                         "consecutive_pass_days_min": 2,
                         "quality_gate_allowed": ["pass", "warn"],
@@ -105,7 +121,7 @@ def _snapshot(
 
 
 @pytest.mark.asyncio
-async def test_promotes_shadow_live_to_supervised(tmp_path):
+async def test_promotes_shadow_live_to_advisory(tmp_path):
     policy = _base_policy()
     _write_policy(tmp_path, policy)
 
@@ -118,7 +134,7 @@ async def test_promotes_shadow_live_to_supervised(tmp_path):
 
     assert result["decision"] == "would_promote"
     assert result["state_before"] == "shadow_live"
-    assert result["state_after"] == "supervised"
+    assert result["state_after"] == "advisory"
 
 
 @pytest.mark.asyncio

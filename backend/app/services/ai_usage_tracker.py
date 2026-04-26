@@ -16,9 +16,11 @@ Tracks token consumption and costs across all paid services:
 Persists to JSON with daily rollup. No external dependencies.
 """
 
+import asyncio
 import json
 import logging
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 from pathlib import Path
 from threading import Lock
 from typing import Optional
@@ -44,7 +46,8 @@ PRICING_USD_PER_1M = {
     "gpt-4.1-mini": {"input": 0.40, "output": 1.60},
     "gpt-4-turbo": {"input": 10.00, "output": 30.00},
     # MiniMax
-    "MiniMax-M2.7": {"input": 0.40, "output": 1.60},
+    "MiniMax-M2.5": {"input": 0.15, "output": 0.95, "cached_input": 0.06},
+    "MiniMax-M2.7": {"input": 0.30, "output": 1.20, "cached_input": None},
     # Azure OpenAI (uses OpenAI pricing tiers)
     "azure_openai/gpt-4o": {"input": 2.50, "output": 10.00},
     "azure_openai/gpt-4o-mini": {"input": 0.15, "output": 0.60},
@@ -55,8 +58,8 @@ PRICING_USD_PER_1M = {
     "kimi-k2.5": {"input": 0.80, "output": 3.20},
     "kimi-k2-thinking-turbo": {"input": 1.00, "output": 4.50},
     "kimi-k2-turbo-preview": {"input": 0.90, "output": 3.80},
-    # Local (free)
-    "ollama": {"input": 0.00, "output": 0.00},
+    # DeepSeek
+    "deepseek-chat": {"input": 0.27, "output": 1.10},
 }
 
 # ---- Per-message pricing (USD) ----
@@ -75,6 +78,19 @@ SERVICE_PRICING_USD = {
 
 # Default USD→ZAR rate (configurable via settings)
 DEFAULT_USD_ZAR = 18.50
+
+# Interactive task classes — excluded from token budget enforcement
+INTERACTIVE_TASK_CLASSES = frozenset({"chat_ai", "chat_tech"})
+
+
+class TokenBudgetExceeded(Exception):
+    """Raised when a site's daily token budget is exceeded."""
+
+    def __init__(self, site_id: str, current: int, budget: int):
+        self.site_id = site_id
+        self.current = current
+        self.budget = budget
+        super().__init__(f"Daily token budget exceeded for {site_id}: {current}/{budget}")
 
 
 class AiUsageTracker:
@@ -98,6 +114,11 @@ class AiUsageTracker:
         self._today_key: str = ""
         self._usd_zar = DEFAULT_USD_ZAR
         self._load_today()
+        # Token budget infrastructure
+        self._redis = None
+        self._redis_checked = False
+        self._memory_daily_totals: dict[str, int] = {}  # site_id -> total tokens today
+        self._memory_alert_sent: dict[str, bool] = {}  # site_id -> alert sent today
 
     def _load_today(self):
         """Load today's usage from disk."""
@@ -105,6 +126,139 @@ class AiUsageTracker:
         self._today_key = today
         data = self._read_file()
         self._today_cache = data.get("daily", {}).get(today, {})
+
+    def _sast_date(self) -> str:
+        """Return today's date in SAST (UTC+2)."""
+        return datetime.now(ZoneInfo("Africa/Johannesburg")).strftime("%Y-%m-%d")
+
+    def _get_redis(self):
+        """Lazy Redis connection for budget counters."""
+        if self._redis is not None:
+            return self._redis
+        if self._redis_checked:
+            return None
+        try:
+            from app.config.settings import settings
+
+            if not settings.redis_enabled:
+                self._redis_checked = True
+                return None
+            import redis
+
+            self._redis = redis.from_url(
+                settings.redis_url,
+                decode_responses=True,
+                socket_connect_timeout=2,
+                socket_timeout=2,
+            )
+            self._redis.ping()
+            self._redis_checked = True
+            return self._redis
+        except Exception as e:
+            logger.warning("Token budget Redis unavailable, using memory fallback: %s", e)
+            self._redis_checked = True
+            self._redis = None
+            return None
+
+    async def _get_daily_total(self, site_id: str) -> int:
+        """Get today's token total for a site from Redis, or 0 if unavailable."""
+        today = self._sast_date()
+        key = f"token_budget:{site_id}:{today}"
+        redis_client = self._get_redis()
+        if redis_client:
+            try:
+                val = await asyncio.to_thread(redis_client.get, key)
+                return int(val) if val else 0
+            except Exception:
+                return 0
+        return self._memory_daily_totals.get(key, 0)
+
+    def _increment_daily_total(self, site_id: str, tokens: int) -> int:
+        """Atomically increment daily total. Returns new total. Uses Redis INCRBY or memory fallback."""
+        today = self._sast_date()
+        key = f"token_budget:{site_id}:{today}"
+        redis_client = self._get_redis()
+        if redis_client:
+            try:
+                new_total = redis_client.incrby(key, tokens)
+                redis_client.expire(key, 86400)
+                return int(new_total)
+            except Exception:
+                pass
+        # Memory fallback
+        current = self._memory_daily_totals.get(key, 0)
+        new_total = current + tokens
+        self._memory_daily_totals[key] = new_total
+        return new_total
+
+    async def _check_alert_sent(self, site_id: str) -> bool:
+        """Check if budget alert has already been sent today for this site."""
+        today = self._sast_date()
+        key = f"token_budget_alert:{site_id}:{today}"
+        redis_client = self._get_redis()
+        if redis_client:
+            try:
+                val = await asyncio.to_thread(redis_client.get, key)
+                return bool(val)
+            except Exception:
+                return self._memory_alert_sent.get(key, False)
+        return self._memory_alert_sent.get(key, False)
+
+    async def _mark_alert_sent(self, site_id: str) -> None:
+        """Mark that a budget alert has been sent today for this site."""
+        today = self._sast_date()
+        key = f"token_budget_alert:{site_id}:{today}"
+        redis_client = self._get_redis()
+        if redis_client:
+            try:
+                await asyncio.to_thread(redis_client.setex, key, 86400, "1")
+                return
+            except Exception:
+                pass
+        self._memory_alert_sent[key] = True
+
+    async def _send_budget_alert(self, site_id: str, current: int, budget: int) -> None:
+        """Send Telegram budget alert via ThreadPoolExecutor (fire-and-forget)."""
+        pct = (current / budget * 100) if budget > 0 else 0
+        try:
+            from concurrent.futures import ThreadPoolExecutor
+            from app.services.notification_providers.telegram_provider import TelegramProvider
+
+            tp = TelegramProvider()
+            if not tp.is_enabled():
+                logger.warning("Telegram not configured, cannot send budget alert for %s", site_id)
+                return
+
+            def _send():
+                try:
+                    tp.send_budget_alert(site_id, current, budget, pct)
+                except Exception as e:
+                    logger.warning("Budget alert failed for %s: %s", site_id, e)
+
+            ThreadPoolExecutor(max_workers=1).submit(_send)
+        except Exception as e:
+            logger.warning("Failed to send token budget alert: %s", e)
+
+    async def _check_and_enforce_budget(
+        self, site_id: str, tokens: int, task_class: str
+    ) -> None:
+        """Check budget and raise TokenBudgetExceeded or send alert as needed."""
+        from app.config.settings import settings
+
+        if settings.token_budget_exclude_interactive:
+            if task_class in INTERACTIVE_TASK_CLASSES:
+                return
+
+        new_total = self._increment_daily_total(site_id, tokens)
+        budget = settings.daily_token_budget_per_site
+
+        if new_total >= budget * settings.token_budget_alert_threshold:
+            if not await self._check_alert_sent(site_id):
+                await self._send_budget_alert(site_id, new_total, budget)
+                await self._mark_alert_sent(site_id)
+
+        if new_total >= budget and settings.token_budget_hard_limit:
+            raise TokenBudgetExceeded(site_id, new_total, budget)
 
     def _read_file(self) -> dict:
         if not USAGE_FILE.exists():
@@ -130,6 +284,7 @@ class AiUsageTracker:
         site_id: str = "unknown",
         cache_read_tokens: int = 0,
         cache_creation_tokens: int = 0,
+        task_class: str = "",
     ):
         """Record a single AI API call.
 
@@ -141,6 +296,8 @@ class AiUsageTracker:
             source: "chat", "tools", "sentry", "background", "vision", "tts"
             cache_read_tokens: Anthropic prompt cache read tokens (75% discount)
             cache_creation_tokens: Anthropic prompt cache write tokens (25% surcharge)
+            task_class: Optional task class for budget enforcement ("heavy", "medium",
+                "light", "chat_ai", "chat_tech"). Defaults to "" (checked but not enforced).
         """
         today = date.today().isoformat()
 
@@ -205,6 +362,22 @@ class AiUsageTracker:
             # Flush periodically (every 10 calls)
             if entry["calls"] % 10 == 0:
                 self._flush()
+
+            # Budget enforcement (Phase 185 Wave 2)
+            total_tokens = input_tokens + output_tokens
+            if total_tokens > 0 and site_key != "unknown":
+                try:
+                    # Run synchronously to ensure budget check completes before record() returns
+                    # (avoid async task race condition in tests and scheduler call sites)
+                    asyncio.get_event_loop().run_until_complete(
+                        self._check_and_enforce_budget(site_key, total_tokens, task_class)
+                    )
+                except RuntimeError:
+                    # No event loop — create one for this call
+                    asyncio.run(self._check_and_enforce_budget(site_key, total_tokens, task_class))
+                except Exception:
+                    # Budget check failures must never block usage recording
+                    pass
 
     def record_message(
         self,
@@ -617,6 +790,31 @@ class AiUsageTracker:
             for key, model_data in service_models.items():
                 lines.append(f"  {key}: {model_data['calls']} calls, R {model_data['cost_zar']:.2f}")
 
+        # Token budget section (Phase 185 Wave 2)
+        import asyncio
+
+        from app.config.settings import settings
+
+        budget = settings.daily_token_budget_per_site
+        budget_lines = ["", "--- Token Budget ---"]
+        site_budget_found = False
+        for site_id in sorted(set(e.get("site_id", "unknown") for e in self._today_cache.values())):
+            if site_id == "unknown":
+                continue
+            site_budget_found = True
+            try:
+                site_total = asyncio.run(self._get_daily_total(site_id))
+            except Exception:
+                site_total = 0
+            if site_total == 0:
+                continue
+            pct = site_total / budget * 100 if budget > 0 else 0
+            status = "✅ within budget" if site_total < budget else "🚨 EXCEEDED"
+            budget_lines.append(f"  {site_id}: {site_total:,} / {budget:,} ({pct:.0f}%) — {status}")
+        if not site_budget_found:
+            budget_lines.append("  (no site-scoped data)")
+
+        lines.extend(budget_lines)
         lines.extend(
             [
                 "",

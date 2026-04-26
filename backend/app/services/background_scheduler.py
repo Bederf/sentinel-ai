@@ -265,10 +265,10 @@ class BackgroundSchedulerService:
         # Store the real-time interval for non-simulation mode
         self._optimization_real_interval = interval_seconds
 
-        # Poll every 30s so we can react quickly to sim-time changes.
-        # The sim-time gate inside _run_optimization_analysis_gated() decides
-        # whether to actually run.
-        poll_seconds = 30
+        # Poll every 300s (5 min) — sim-time gate decides whether to actually run.
+        # Real-time fallback was previously 30s (sim stress-test artifact).
+        # 5 min is appropriate for production without simulator active.
+        poll_seconds = 300
         first_run = datetime.now() + timedelta(seconds=60)  # 60s warmup
 
         self.scheduler.add_job(
@@ -424,23 +424,29 @@ class BackgroundSchedulerService:
 
             for site_id in site_ids:
                 try:
-                    # Site mode gate: skip LLM optimization for sites not in 'automatic' mode
+                    # Mode gate: Supabase onboarding_phase is authoritative.
+                    # Use effective_phase() which reads sites.onboarding_phase and
+                    # normalises legacy names (shadow→shadow_live, auto→automatic).
                     try:
-                        from app.services.site_mode_policy_service import SiteModePolicyService
+                        from app.models.onboarding_phase import effective_phase
 
-                        policy_service = SiteModePolicyService()
-                        policy = policy_service.load_policy(site_id)
-                        if policy:
-                            state = policy_service._load_state(site_id, policy)
-                            current_stage = state.get("current_stage", "commissioning")
-                            if current_stage != "automatic":
-                                logger.info(
-                                    f"[AI-OPT] Skipping LLM optimization for {site_id} "
-                                    f"(mode={current_stage}, requires 'automatic')"
-                                )
-                                continue
-                    except Exception as gate_err:
-                        logger.debug(f"[AI-OPT] Mode gate check failed for {site_id}: {gate_err}")
+                        _loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(_loop)
+                        try:
+                            current_stage = _loop.run_until_complete(effective_phase(site_id))
+                        finally:
+                            _loop.close()
+                    except Exception:
+                        current_stage = "commissioning"
+
+                    GENERATION_ALLOWED = {"shadow_live", "advisory", "supervised", "automatic"}
+                    if current_stage not in GENERATION_ALLOWED:
+                        logger.info(
+                            f"[AI-OPT] Skipping — site={site_id} mode={current_stage} (generation requires {GENERATION_ALLOWED})"
+                        )
+                        continue
+
+                    is_shadow = current_stage == "shadow_live"
 
                     # Optimization toggle gate: skip if optimization_enabled is off
                     if not self._is_optimization_enabled(site_id):
@@ -1012,6 +1018,151 @@ class BackgroundSchedulerService:
         except Exception as e:
             logger.error("Outcome verification job failed: %s", e)
 
+    # -----------------------------------------------------------------
+    # Recommendation Lifecycle — expiry + deduplication
+    # -----------------------------------------------------------------
+
+    def add_recommendation_expiry_job(self, interval_seconds: int = 21600):
+        """Add a job to expire stale recommendations and dedup duplicate noise.
+
+        Runs every 6 hours by default. For each (site_id, action_type):
+          - Keeps the 10 most recent pending recommendations
+          - Expires any remaining pending recommendations older than 48 hours
+
+        Args:
+            interval_seconds: How often to run (default 6h). Run daily via cron
+                              for production: 0 3 * * * (03:00 SAST).
+        """
+        from apscheduler.triggers.interval import IntervalTrigger
+
+        if self.scheduler.get_job("recommendation_expiry"):
+            self.scheduler.remove_job("recommendation_expiry")
+
+        first_run = datetime.now() + timedelta(minutes=5)
+        self.scheduler.add_job(
+            func=self._run_recommendation_expiry,
+            trigger=IntervalTrigger(seconds=interval_seconds),
+            id="recommendation_expiry",
+            name="Recommendation Expiry + Dedup (6h)",
+            replace_existing=True,
+            next_run_time=first_run,
+            max_instances=1,
+            coalesce=True,
+        )
+        logger.info(
+            "Added recommendation expiry job: dedup top-10 + expire >48h pending (every %ds)",
+            interval_seconds,
+        )
+
+    def _run_recommendation_expiry(self):
+        """Sync wrapper for async recommendation expiry."""
+        try:
+            import asyncio
+
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                expired_count, dedup_count = loop.run_until_complete(
+                    self._run_recommendation_expiry_async()
+                )
+                if expired_count or dedup_count:
+                    logger.info(
+                        "[REC-EXPIRY] expired=%d, dedup=%d",
+                        expired_count,
+                        dedup_count,
+                    )
+            finally:
+                loop.close()
+        except Exception as e:
+            logger.error("Recommendation expiry job failed: %s", e)
+
+    async def _run_recommendation_expiry_async(self) -> tuple[int, int]:
+        """Expire stale pending recommendations and dedup noisy duplicates.
+
+        Returns:
+            Tuple of (expired_count, dedup_count)
+        """
+        import asyncio
+
+        from app.database.supabase_client import get_supabase_client
+
+        sb = get_supabase_client()
+        expired_total = 0
+        dedup_total = 0
+
+        try:
+            sites_result = await asyncio.to_thread(
+                lambda: sb.table("sites").select("code").execute()
+            )
+            site_ids = [s["code"] for s in (sites_result.data or [])]
+        except Exception:
+            logger.debug("Could not fetch site IDs for recommendation expiry")
+            return 0, 0
+
+        cutoff_48h = datetime.now(UTC) - timedelta(hours=48)
+
+        for site_id in site_ids:
+            try:
+                result = await asyncio.to_thread(
+                    lambda sid=site_id: (
+                        sb.table("recommendations")
+                        .select("id, timestamp, action_type")
+                        .eq("site_id", sid)
+                        .eq("status", "pending")
+                        .order("timestamp", desc=True)
+                        .execute()
+                    )
+                )
+
+                records = result.data or []
+                if not records:
+                    continue
+
+                # Partition by action_type within this site
+                by_type: dict[str, list[dict]] = {}
+                for r in records:
+                    by_type.setdefault(r["action_type"], []).append(r)
+
+                ids_to_expire: set[str] = set()
+
+                for action_type, typed_records in by_type.items():
+                    # Keep top 10 most recent regardless of age
+                    for r in typed_records[10:]:
+                        ts = datetime.fromisoformat(r["timestamp"].replace("Z", "+00:00"))
+                        if ts < cutoff_48h:
+                            ids_to_expire.add(r["id"])
+
+                if ids_to_expire:
+                    expire_ids = list(ids_to_expire)
+                    # Batch update in chunks of 100
+                    for i in range(0, len(expire_ids), 100):
+                        chunk = expire_ids[i : i + 100]
+                        try:
+                            await asyncio.to_thread(
+                                lambda c=chunk: sb.table("recommendations")
+                                .update({"status": "expired"})
+                                .in_("id", c)
+                                .execute()
+                            )
+                            expired_total += len(chunk)
+                            dedup_total += len(chunk)
+                        except Exception as exc:
+                            logger.warning(
+                                "[REC-EXPIRY] Failed to expire batch for %s: %s",
+                                site_id,
+                                exc,
+                            )
+
+            except Exception as e:
+                logger.debug(
+                    "[REC-EXPIRY] Error processing site %s: %s",
+                    site_id,
+                    e,
+                )
+                continue
+
+        return expired_total, dedup_total
+
     def _run_recommendation_generation_gated(self):
         """Sim-time gate wrapper around _run_recommendation_generation."""
         import app.services.lifecycle_orchestrator as _orch_mod
@@ -1072,45 +1223,49 @@ class BackgroundSchedulerService:
 
             logger.info("Running scheduled AI recommendation generation...")
 
-            # Site mode gate: build set of site IDs in 'automatic' mode
-            # Equipment belonging to non-automatic sites is skipped
-            automatic_site_ids: set[str] = set()
+            # Mode gate: build sets for generation + visibility control
+            # Generation runs for shadow_live/supervised/automatic (not commissioning)
+            # Visibility is False in shadow_live (recommendations stored but hidden from UI)
+            GENERATION_ALLOWED = {"shadow_live", "advisory", "supervised", "automatic"}
+            generation_site_ids: set[str] = set()
+            shadow_site_ids: set[str] = set()
             try:
                 from app.core.site_resolver import get_registered_site_ids
-                from app.services.site_mode_policy_service import SiteModePolicyService
+                from app.models.onboarding_phase import effective_phase
 
-                policy_service = SiteModePolicyService()
                 for sid in get_registered_site_ids():
-                    policy = policy_service.load_policy(sid)
-                    if policy:
-                        state = policy_service._load_state(sid, policy)
-                        current_stage = state.get("current_stage", "commissioning")
-                        if current_stage == "automatic":
-                            # Also check optimization_enabled toggle
-                            if self._is_optimization_enabled(sid):
-                                automatic_site_ids.add(sid)
-                            else:
-                                logger.info(
-                                    f"[AI-REC] Skipping recommendations for {sid} "
-                                    f"(optimization_enabled=False in site settings)"
-                                )
-                        else:
-                            logger.info(
-                                f"[AI-REC] Skipping recommendations for {sid} "
-                                f"(mode={current_stage}, requires 'automatic')"
-                            )
+                    try:
+                        _loop2 = asyncio.new_event_loop()
+                        asyncio.set_event_loop(_loop2)
+                        try:
+                            current_stage = _loop2.run_until_complete(effective_phase(sid))
+                        finally:
+                            _loop2.close()
+                    except Exception:
+                        current_stage = "commissioning"
+
+                    if current_stage not in GENERATION_ALLOWED:
+                        logger.info(
+                            f"[AI-REC] Skipping — site={sid} mode={current_stage} "
+                            f"(generation requires {GENERATION_ALLOWED})"
+                        )
+                        continue
+
+                    if current_stage == "shadow_live":
+                        shadow_site_ids.add(sid)
+
+                    # Also check optimization_enabled toggle
+                    if self._is_optimization_enabled(sid):
+                        generation_site_ids.add(sid)
                     else:
-                        # No policy file — still check optimization_enabled toggle
-                        if self._is_optimization_enabled(sid):
-                            automatic_site_ids.add(sid)
-                        else:
-                            logger.info(
-                                f"[AI-REC] Skipping recommendations for {sid} "
-                                f"(optimization_enabled=False in site settings)"
-                            )
+                        logger.info(
+                            f"[AI-REC] Skipping recommendations for {sid} "
+                            f"(optimization_enabled=False in site settings)"
+                        )
             except Exception as gate_err:
                 logger.debug(f"[AI-REC] Mode gate check failed: {gate_err}")
-                automatic_site_ids = None  # Disable gate on error
+                generation_site_ids = None  # Disable gate on error
+                shadow_site_ids = set()
 
             client = get_supabase_client()
             recommender = get_maintenance_recommender(client)
@@ -1141,13 +1296,13 @@ class BackgroundSchedulerService:
                     site_code = site_response.data[0]["code"] if site_response.data else "unknown"
                     site_name = site_response.data[0]["name"] if site_response.data else "Unknown Building"
 
-                    # Site mode gate: skip equipment belonging to non-automatic sites
-                    if automatic_site_ids is not None:
+                    # Mode gate: skip equipment belonging to non-generation sites
+                    if generation_site_ids is not None:
                         # Convert site code (e.g. "S002") to site resolver format ("site-002")
                         resolver_id = site_code
                         if site_code.startswith("S") and site_code[1:].isdigit():
                             resolver_id = f"site-{site_code[1:]}"
-                        if resolver_id not in automatic_site_ids:
+                        if resolver_id not in generation_site_ids:
                             continue
 
                     # Get recent alerts for this equipment (last 30 days)

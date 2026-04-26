@@ -464,6 +464,53 @@ class ModelGateway:
                     source=source,
                 )
 
+        elif provider == "deepseek":
+            # DeepSeek uses OpenAI-compatible /chat/completions format
+            import httpx
+
+            from app.config.settings import settings
+            from app.services.ai_usage_tracker import usage_tracker
+
+            if not settings.deepseek_api_key:
+                raise ValueError("DEEPSEEK_API_KEY not configured.")
+
+            url = f"{settings.deepseek_base_url.rstrip('/')}/chat/completions"
+            headers = {
+                "Authorization": f"Bearer {settings.deepseek_api_key}",
+                "Content-Type": "application/json",
+            }
+            payload: dict = {
+                "model": model,
+                "messages": messages,
+                "max_tokens": max_tokens,
+            }
+            if system:
+                payload["messages"] = [{"role": "system", "content": system}, *list(messages)]
+            if tools:
+                payload["tools"] = tools
+
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                resp = await client.post(url, headers=headers, json=payload)
+                resp.raise_for_status()
+
+            body = resp.json()
+            try:
+                usage = body.get("usage", {})
+                usage_tracker.record(
+                    provider="deepseek",
+                    model=model,
+                    input_tokens=usage.get("prompt_tokens", 0),
+                    output_tokens=usage.get("completion_tokens", 0),
+                    source=source,
+                )
+            except Exception:
+                pass
+
+            choices = body.get("choices", [])
+            if not choices:
+                return ""
+            return choices[0].get("message", {}).get("content", "")
+
         else:
             raise ValueError(f"api mode: unknown provider '{provider}'")
 

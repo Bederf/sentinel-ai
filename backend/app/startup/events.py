@@ -306,6 +306,10 @@ async def startup_event(app: FastAPI) -> None:
 
     # Start AI recommendation generation job (rule-based, sim-time gated)
     scheduler_service.add_recommendation_generation_job(interval_seconds=600)  # 10 min real-time fallback
+
+    # Recommendation lifecycle: expire stale + dedup duplicates (every 6h)
+    scheduler_service.add_recommendation_expiry_job(interval_seconds=21600)  # 6h
+
     scheduler_service.add_ghost_room_monitor_job(interval_seconds=60)
 
     # Optional ESP32 MQTT listener for room-presence nodes
