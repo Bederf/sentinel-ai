@@ -307,6 +307,7 @@ class ApprovalService:
             # BESS dispatch stays APPROVED (not EXECUTED) since write is blocked
             recommendation.status = RecommendationStatus.APPROVED if is_bess_dispatch else RecommendationStatus.EXECUTED
             recommendation.approved_by = approved_by
+            recommendation.approved_at = datetime.utcnow()  # Tier 3: capture approval click time
             recommendation.approval_reason = approval_notes
             recommendation.executed_at = datetime.utcnow()
             recommendation.execution_result = {
@@ -447,6 +448,18 @@ class ApprovalService:
                 )
             except Exception:
                 pass
+
+            # Tier 3: Capture critical path latency trace (approval → execution)
+            try:
+                from app.services.critical_path_monitor import CriticalPathMonitor
+
+                monitor = CriticalPathMonitor()
+                await monitor.capture_action_latency(
+                    site_id=recommendation.site_id or "unknown",
+                    recommendation=recommendation,
+                )
+            except Exception as e:
+                logger.warning(f"Critical path trace failed (non-blocking): {e}")
 
             logger.info(f"Approval executed successfully for {recommendation_id}")
 

@@ -3,6 +3,7 @@
 Provides unified system health monitoring and SIMBIOT-powered diagnostics.
 """
 
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -389,6 +390,140 @@ async def get_monitoring_snapshot(site_id: str | None = Query(None)):
     return await svc.get_snapshot(site_id=site_id)
 
 
+# ==================== Adapter Health (SLI Tier 1) ====================
+
+
+@router.get("/sites/{site_id}/adapter-health")
+async def get_adapter_health(site_id: str):
+    """Current adapter health + uptime stats per site.
+
+    Returns health state for all registered adapters (BACnet, Niagara, OBIX, shadow bridge).
+    """
+    from datetime import UTC
+
+    from app.database.supabase_client import get_supabase_client
+
+    supabase = get_supabase_client()
+
+    current = supabase.table("adapter_health_current").select("*").eq("site_id", site_id).execute()
+
+    if not current.data:
+        return {"site_id": site_id, "adapters": [], "status": "no_data"}
+
+    return {
+        "site_id": site_id,
+        "timestamp": __import__("datetime").datetime.now(UTC).isoformat(),
+        "adapters": [
+            {
+                "name": row["adapter_name"],
+                "type": row["adapter_type"],
+                "is_healthy": row["is_healthy"],
+                "uptime_1h_percent": row.get("uptime_1h_percent"),
+                "uptime_24h_percent": row.get("uptime_24h_percent"),
+                "last_check": row["last_check"],
+                "consecutive_failures": row.get("consecutive_failures", 0),
+            }
+            for row in current.data
+        ],
+    }
+
+
+@router.get("/sites/{site_id}/adapter-health/history")
+async def get_adapter_health_history(
+    site_id: str,
+    adapter_name: str | None = Query(None),
+    window_hours: int = Query(24, ge=1, le=168),
+):
+    """Time-series history of adapter health checks.
+
+    Args:
+        site_id: Site identifier (e.g. 'site-002')
+        adapter_name: Filter to a specific adapter (optional)
+        window_hours: Lookback window (1-168h, default 24h)
+    """
+    from datetime import UTC, timedelta
+
+    from app.database.supabase_client import get_supabase_client
+
+    supabase = get_supabase_client()
+    cutoff = __import__("datetime").datetime.now(UTC) - timedelta(hours=window_hours)
+
+    query = (
+        supabase.table("adapter_health")
+        .select("adapter_name, adapter_type, timestamp, is_healthy, latency_ms, consecutive_failures, error_message")
+        .eq("site_id", site_id)
+        .gte("timestamp", cutoff.isoformat())
+        .order("timestamp", desc=True)
+    )
+
+    if adapter_name:
+        query = query.eq("adapter_name", adapter_name)
+
+    result = query.execute()
+
+    return {
+        "site_id": site_id,
+        "window_hours": window_hours,
+        "adapter_name": adapter_name,
+        "records": result.data,
+    }
+
+
+@router.get("/sites/{site_id}/adapter-health/alerts")
+async def get_adapter_alerts(site_id: str, unacknowledged: bool = Query(True)):
+    """Unacknowledged (or all) adapter failure/recovery alerts."""
+    from app.database.supabase_client import get_supabase_client
+
+    supabase = get_supabase_client()
+
+    query = (
+        supabase.table("adapter_health_alerts")
+        .select("*")
+        .eq("site_id", site_id)
+        .order("created_at", desc=True)
+        .limit(50)
+    )
+
+    if unacknowledged:
+        query = query.is_("acknowledged_at", "null")
+
+    alerts = query.execute()
+
+    return {
+        "site_id": site_id,
+        "count": len(alerts.data),
+        "alerts": alerts.data,
+    }
+
+
+@router.post("/sites/{site_id}/adapter-health/alerts/{alert_id}/acknowledge")
+async def acknowledge_adapter_alert(site_id: str, alert_id: int, user_email: str):
+    """Human acknowledges an adapter alert after manual remediation."""
+    from datetime import UTC
+
+    from app.database.supabase_client import get_supabase_client
+
+    supabase = get_supabase_client()
+
+    result = (
+        supabase.table("adapter_health_alerts")
+        .update(
+            {
+                "acknowledged_at": __import__("datetime").datetime.now(UTC).isoformat(),
+                "acknowledged_by": user_email,
+            }
+        )
+        .eq("id", alert_id)
+        .eq("site_id", site_id)
+        .execute()
+    )
+
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Alert not found")
+
+    return {"status": "acknowledged", "alert_id": alert_id}
+
+
 # ==================== Backup Management ====================
 
 
@@ -418,3 +553,154 @@ async def trigger_backup(background_tasks: BackgroundTasks):
         "status": "started",
         "message": "Backup triggered. Check /api/system/backup-status for progress.",
     }
+
+
+# ==================== Data Freshness (SLI Tier 2) ====================
+
+
+@router.get("/sites/{site_id}/data-freshness")
+async def get_data_freshness(site_id: str):
+    """Current age and SLI pass/fail for all data sources at a site.
+
+    Sources: bms_telemetry (target: 30s), documents (7200s), anomalies (300s),
+    recommendations (900s).
+    """
+    from app.services.system_health_service import SystemHealthService
+
+    health_service = SystemHealthService()
+    return await health_service.get_data_freshness(site_id)
+
+
+@router.get("/sites/{site_id}/data-freshness/history")
+async def get_data_freshness_history(
+    site_id: str,
+    source: str = Query(..., description="data_source value, e.g. bms_telemetry"),
+    hours: int = Query(24, ge=1, le=168),
+):
+    """Breach history for a data source over N hours (default: 24h, max: 168h/7d)."""
+    from app.services.system_health_service import SystemHealthService
+
+    health_service = SystemHealthService()
+    return await health_service.get_data_freshness_history(site_id, source, hours)
+
+
+# ==================== API Uptime (SLI Tier 4) ====================
+
+
+@router.get("/uptime/daily")
+async def get_daily_uptime(days: int = Query(30, ge=1, le=365)):
+    """Last N days of daily uptime aggregates."""
+    from datetime import date, timedelta
+
+    from app.database.supabase_client import get_supabase_client
+
+    cutoff = date.today() - timedelta(days=days)
+    supabase = get_supabase_client()
+
+    daily = (
+        await supabase.table("api_uptime_daily")
+        .select("check_date, total_checks, successful_checks, uptime_percent, avg_latency_ms, max_latency_ms")
+        .gte("check_date", cutoff.isoformat())
+        .order("check_date", desc=False)
+        .execute()
+    )
+
+    return {"data": daily.data}
+
+
+@router.get("/uptime/monthly/current")
+async def get_current_month_uptime():
+    """Current month's SLO status."""
+    from datetime import date
+
+    from app.database.supabase_client import get_supabase_client
+
+    month = date.today().strftime("%Y-%m")
+    supabase = get_supabase_client()
+
+    result = await supabase.table("api_uptime_monthly").select("*").eq("month", month).execute()
+
+    if not result.data:
+        return {"data": None, "month": month}
+
+    return {"data": result.data[0], "month": month}
+
+
+@router.get("/uptime/monthly/{month}")
+async def get_month_uptime(month: str):
+    """Specific month's SLO audit data (YYYY-MM format)."""
+    from app.database.supabase_client import get_supabase_client
+
+    supabase = get_supabase_client()
+    result = await supabase.table("api_uptime_monthly").select("*").eq("month", month).execute()
+
+    if not result.data:
+        return {"data": None, "month": month}
+
+    return {"data": result.data[0], "month": month}
+
+
+# ==================== Critical Path Latency (SLI Tier 3) ====================
+
+
+@router.get("/sites/{site_id}/critical-path")
+async def get_critical_path(site_id: str):
+    """Current hour's critical path latency stats for a site.
+
+    Returns p50/p99/p99.9/max/avg total latency (ms) from critical_path_hourly
+    for the most recent complete hour. SLO target: p99 < 7000ms.
+    """
+    from app.database.supabase_client import get_supabase_client
+
+    supabase = get_supabase_client()
+    now = datetime.now(timezone.utc)
+    hour_start = now.replace(minute=0, second=0, microsecond=0) - timedelta(hours=1)
+
+    result = (
+        await supabase.table("critical_path_hourly")
+        .select(
+            "site_id, hour_start, total_actions, p50_total_ms, p99_total_ms, "
+            "p99_9_total_ms, max_total_ms, avg_total_ms, slo_pass"
+        )
+        .eq("site_id", site_id)
+        .eq("hour_start", hour_start.isoformat())
+        .execute()
+    )
+
+    if not result.data:
+        return {
+            "site_id": site_id,
+            "hour_start": hour_start.isoformat(),
+            "data": None,
+            "message": "No traces for this hour yet",
+        }
+
+    return {"site_id": site_id, "hour_start": hour_start.isoformat(), "data": result.data[0]}
+
+
+@router.get("/sites/{site_id}/critical-path/history")
+async def get_critical_path_history(
+    site_id: str,
+    days: int = Query(7, ge=1, le=30),
+):
+    """Last N days of hourly critical path aggregates for a site."""
+    from datetime import date, timedelta
+
+    from app.database.supabase_client import get_supabase_client
+
+    supabase = get_supabase_client()
+    cutoff = date.today() - timedelta(days=days)
+
+    result = (
+        await supabase.table("critical_path_hourly")
+        .select(
+            "site_id, hour_start, total_actions, p50_total_ms, p99_total_ms, "
+            "p99_9_total_ms, max_total_ms, avg_total_ms, slo_pass"
+        )
+        .eq("site_id", site_id)
+        .gte("hour_start", cutoff.isoformat())
+        .order("hour_start", desc=False)
+        .execute()
+    )
+
+    return {"site_id": site_id, "days": days, "data": result.data}

@@ -21,10 +21,10 @@ import {
   Text,
   ProgressBar,
   LineChart,
-  Badge,
 } from '@tremor/react';
 import {
   AlertCircle,
+  AlertTriangle,
   CheckCircle,
   Clock,
   Link as LinkIcon,
@@ -37,6 +37,8 @@ import { monitoringApi } from '@/lib/api';
 import { authorizedFetch } from '../lib/api/client';
 
 import { PageLoading } from './PageLoading';
+import { AdapterHealthCard } from './system/AdapterHealthCard';
+import { CriticalPathCard } from './system/CriticalPathCard';
 
 interface _HealthComponent {
   name: string;
@@ -60,12 +62,57 @@ export default function SystemHealthPage() {
   const [integrationHealth, setIntegrationHealth] = useState<IntegrationHealthSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [dataFreshness, setDataFreshness] = useState<DataFreshnessResponse | null>(null);
+
+  // ---- Data Freshness Types ----
+  interface FreshnessSource {
+    data_source: string;
+    age_seconds: number | null;
+    target_seconds: number;
+    sli_pass: boolean;
+    last_updated: string | null;
+  }
+
+  interface DataFreshnessResponse {
+    site_id: string;
+    timestamp: string;
+    sources: FreshnessSource[];
+    overall_sli_pass: boolean;
+    breach_count: number;
+  }
+
+  interface DailyUptimeRow {
+    check_date: string;
+    uptime_percent: number;
+    total_checks: number;
+    successful_checks: number;
+    max_latency_ms: number;
+  }
+
+  interface MonthlyUptimeRow {
+    month: string;
+    uptime_percent: number;
+    slo_pass: boolean;
+    error_budget_remaining: number;
+    downtime_minutes: number;
+    total_checks: number;
+    successful_checks: number;
+    slo_target: number;
+  }
 
   useEffect(() => {
     loadHealthData();
-    // Refresh every 30 seconds
-    const interval = setInterval(loadHealthData, 30000);
-    return () => clearInterval(interval);
+    loadDataFreshness();
+    loadUptimeData();
+    // Refresh health every 30s, freshness every 5m, uptime every 10m
+    const healthInterval = setInterval(loadHealthData, 30000);
+    const freshnessInterval = setInterval(loadDataFreshness, 300000);
+    const uptimeInterval = setInterval(loadUptimeData, 600000);
+    return () => {
+      clearInterval(healthInterval);
+      clearInterval(freshnessInterval);
+      clearInterval(uptimeInterval);
+    };
   }, []);
 
   const loadHealthData = async () => {
@@ -92,6 +139,43 @@ export default function SystemHealthPage() {
       console.error('Health data load error:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadDataFreshness = async () => {
+    try {
+      const siteId = 'S002';
+      const res = await authorizedFetch(`/api/system/sites/${siteId}/data-freshness`);
+      if (res.ok) {
+        const data = await res.json();
+        setDataFreshness(data);
+      }
+    } catch (err) {
+      console.error('Data freshness fetch error:', err);
+    }
+  };
+
+  const [dailyUptime, setDailyUptime] = useState<DailyUptimeRow[]>([]);
+  const [monthlyUptime, setMonthlyUptime] = useState<MonthlyUptimeRow | null>(null);
+
+  const loadUptimeData = async () => {
+    try {
+      const [dailyRes, monthlyRes] = await Promise.all([
+        authorizedFetch('/api/system/uptime/daily?days=30'),
+        authorizedFetch('/api/system/uptime/monthly/current'),
+      ]);
+
+      if (dailyRes.ok) {
+        const data = await dailyRes.json();
+        setDailyUptime(data.data || []);
+      }
+
+      if (monthlyRes.ok) {
+        const data = await monthlyRes.json();
+        setMonthlyUptime(data.data || null);
+      }
+    } catch (err) {
+      console.error('Uptime data fetch error:', err);
     }
   };
 
@@ -344,6 +428,9 @@ export default function SystemHealthPage() {
                   </div>
                 </Card>
 
+                {/* Adapter Health — SLI Tier 1 */}
+                <AdapterHealthCard siteId="site-002" />
+
                 {/* Component Status Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {Object.entries(currentHealth.components || {}).map(
@@ -385,9 +472,93 @@ export default function SystemHealthPage() {
                 </div>
               </>
             )}
-          </TabPanel>
+            </TabPanel>
+            {/* TAB 2: DATA FRESHNESS */}
+            <TabPanel className="space-y-6">
+            <Card className="rounded-lg p-5" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+              <div className="pb-3">
+                <div className="flex items-center justify-between">
+                  <Text className="text-base font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>Data Freshness</Text>
+                  <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                    {dataFreshness?.timestamp && new Date(dataFreshness.timestamp).toLocaleTimeString()}
+                  </span>
+                </div>
+              </div>
+              <div>
+                {dataFreshness && dataFreshness.breach_count > 0 && (
+                  <div className="mb-4 p-3 rounded-lg flex items-start gap-2" style={{ background: "rgba(234, 179, 8, 0.12)", border: "1px solid rgba(234, 179, 8, 0.35)" }}>
+                    <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: "var(--color-sentinel-yellow)" }} />
+                    <div>
+                      <p className="text-sm font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>Stale Data Detected</p>
+                      <p className="text-xs mt-0.5" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                        {dataFreshness.breach_count} source(s) exceed SLI target
+                      </p>
+                    </div>
+                  </div>
+                )}
+                {(!dataFreshness || dataFreshness.sources.length === 0) && (
+                  <Text className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>No freshness data available</Text>
+                )}
+                <div className="space-y-3">
+                  {dataFreshness?.sources.map((source: FreshnessSource) => {
+                    const agePct = source.age_seconds != null
+                      ? Math.min(100, (source.age_seconds / source.target_seconds) * 100)
+                      : 0;
+                    return (
+                      <div
+                        key={source.data_source}
+                        className="p-3 rounded"
+                        style={{
+                          background: source.sli_pass ? "rgba(34, 197, 94, 0.08)" : "rgba(234, 179, 8, 0.08)",
+                          border: `1px solid ${source.sli_pass ? "rgba(34, 197, 94, 0.3)" : "rgba(234, 179, 8, 0.3)"}`,
+                        }}
+                      >
+                        <div className="flex items-center justify-between mb-1.5">
+                          <div className="flex items-center gap-1.5">
+                            {source.sli_pass
+                              ? <CheckCircle className="w-3.5 h-3.5" style={{ color: "#22c55e" }} />
+                              : <AlertTriangle className="w-3.5 h-3.5" style={{ color: "#eab308" }} />}
+                            <span className="text-sm font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                              {source.data_source.replace(/_/g, " ")}
+                            </span>
+                          </div>
+                          <span
+                            className="text-xs font-mono font-bold"
+                            style={{ color: source.sli_pass ? "#22c55e" : "#eab308" }}
+                          >
+                            {source.age_seconds != null ? (
+                              source.age_seconds < 60
+                                ? `${source.age_seconds}s`
+                                : source.age_seconds < 3600
+                                  ? `${Math.floor(source.age_seconds / 60)}m`
+                                  : `${Math.floor(source.age_seconds / 3600)}h`
+                            ) : "N/A"} / {source.target_seconds < 60
+                              ? `${source.target_seconds}s`
+                              : source.target_seconds < 3600
+                                ? `${Math.floor(source.target_seconds / 60)}m`
+                                : `${Math.floor(source.target_seconds / 3600)}h`}
+                          </span>
+                        </div>
+                        <div className="w-full rounded-full h-1.5 overflow-hidden" style={{ background: "rgba(148, 163, 184, 0.2)" }}>
+                          <div
+                            className="h-1.5 rounded-full transition-all duration-500"
+                            style={{ width: `${agePct}%`, background: source.sli_pass ? "#22c55e" : "#eab308" }}
+                          />
+                        </div>
+                        {source.last_updated && (
+                          <p className="text-xs mt-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                            Updated {new Date(source.last_updated).toLocaleTimeString()}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </Card>
+            </TabPanel>
 
-          {/* TAB 2: HISTORICAL INSIGHTS */}
+          {/* TAB 3: HISTORICAL INSIGHTS */}
           <TabPanel className="space-y-6">
             {history && (
               <>
@@ -461,6 +632,91 @@ export default function SystemHealthPage() {
                     </Text>
                   </Card>
                 )}
+
+                {/* Availability SLI Card */}
+                {monthlyUptime && (
+                  <Card className="rounded-lg p-5" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+                    <div className="pb-3">
+                      <div className="flex items-center justify-between">
+                        <Text className="text-base font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>Availability SLI</Text>
+                        <span className="text-xs font-medium px-2 py-1 rounded" style={{
+                          background: monthlyUptime.slo_pass ? "rgba(34,197,94,0.12)" : "rgba(239,68,68,0.12)",
+                          border: `1px solid ${monthlyUptime.slo_pass ? "rgba(34,197,94,0.35)" : "rgba(239,68,68,0.35)"}`,
+                          color: monthlyUptime.slo_pass ? "var(--color-sentinel-green)" : "var(--color-sentinel-red)",
+                        }}>
+                          {monthlyUptime.slo_pass ? "✅ SLO PASS" : "❌ SLO FAIL"}
+                        </span>
+                      </div>
+                      <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                        Target: 99.5% uptime · Checks every 60s
+                      </Text>
+                    </div>
+
+                    <div className="mb-4 p-4 rounded-lg" style={{
+                      background: monthlyUptime.slo_pass ? "rgba(34,197,94,0.08)" : "rgba(239,68,68,0.08)",
+                      border: `1px solid ${monthlyUptime.slo_pass ? "rgba(34,197,94,0.3)" : "rgba(239,68,68,0.3)"}`,
+                    }}>
+                      <div className="flex items-baseline justify-between">
+                        <div>
+                          <Text className="text-xs uppercase tracking-wide" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                            This Month ({monthlyUptime.month})
+                          </Text>
+                          <Metric style={{ color: "var(--color-sentinel-text-primary)", fontVariantNumeric: "tabular-nums" }}>
+                            {monthlyUptime.uptime_percent}%
+                          </Metric>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-bold" style={{ color: monthlyUptime.slo_pass ? "var(--color-sentinel-green)" : "var(--color-sentinel-red)" }}>
+                            {monthlyUptime.uptime_percent >= 99.5 ? "✓" : "✗"} {monthlyUptime.uptime_percent.toFixed(3)}%
+                          </p>
+                          <p className="text-xs mt-0.5" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                            Budget: {monthlyUptime.error_budget_remaining.toFixed(3)}% remaining
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Last 30 days mini-calendar */}
+                    {dailyUptime.length > 0 && (
+                      <div className="mb-3">
+                        <Text className="text-xs font-medium" style={{ color: "var(--color-sentinel-text-secondary)" }}>Last 30 Days</Text>
+                        <div className="grid grid-cols-10 gap-1 mt-2">
+                          {dailyUptime.slice(-30).map((day: DailyUptimeRow) => {
+                            const pct = day.uptime_percent;
+                            const color = pct >= 99.5 ? "#22c55e" : pct >= 95 ? "#eab308" : "#ef4444";
+                            return (
+                              <div
+                                key={day.check_date}
+                                className="w-full aspect-square rounded-sm flex items-center justify-center cursor-default transition-opacity hover:opacity-80"
+                                style={{ background: color }}
+                                title={`${day.check_date}: ${pct.toFixed(1)}%`}
+                              />
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Metrics row */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="rounded p-2.5" style={{ background: "var(--color-sentinel-bg-secondary)", border: "1px solid var(--color-sentinel-border)" }}>
+                        <Text className="text-xs uppercase tracking-wide" style={{ color: "var(--color-sentinel-text-secondary)" }}>Downtime</Text>
+                        <p className="text-base font-bold font-mono" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                          {monthlyUptime.downtime_minutes.toFixed(1)} min
+                        </p>
+                      </div>
+                      <div className="rounded p-2.5" style={{ background: "var(--color-sentinel-bg-secondary)", border: "1px solid var(--color-sentinel-border)" }}>
+                        <Text className="text-xs uppercase tracking-wide" style={{ color: "var(--color-sentinel-text-secondary)" }}>Checks Run</Text>
+                        <p className="text-base font-bold font-mono" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                          {monthlyUptime.total_checks?.toLocaleString() ?? "—"}
+                        </p>
+                      </div>
+                    </div>
+                  </Card>
+                )}
+
+                {/* Critical Path Latency Card — SLI Tier 3 */}
+                <CriticalPathCard siteId="site-002" />
               </>
             )}
           </TabPanel>

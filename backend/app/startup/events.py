@@ -926,6 +926,18 @@ async def startup_event(app: FastAPI) -> None:
     # System health snapshot job (every 5 minutes)
     scheduler_service.add_health_snapshot_job(interval_seconds=300)
 
+    # Adapter health monitor — SLI Tier 1: checks all BACnet/Niagara/OBIX/bridge adapters every 60s
+    scheduler_service.add_adapter_health_monitor_job(interval_seconds=60)
+
+    # Data freshness monitor — SLI Tier 2: tracks age of normalized data every 5 minutes
+    scheduler_service.add_data_freshness_monitor_job(interval_seconds=300)
+
+    # Uptime aggregator — SLI Tier 4: daily (01:00 SAST) + monthly (1st 02:00 SAST)
+    scheduler_service.add_uptime_aggregator_jobs()
+
+    # Critical path monitor — SLI Tier 3: hourly aggregation of PARASITE decision latencies
+    scheduler_service.add_critical_path_monitor_job()
+
     # Autoencoder anomaly detection — note: add_anomaly_detection_job not yet implemented
     # pending bridge integration; commented out to eliminate warning
     # try:

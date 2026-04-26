@@ -81,6 +81,7 @@ class Recommendation:
     status: RecommendationStatus = RecommendationStatus.PENDING
     requires_approval: bool = False
     approved_by: str | None = None
+    approved_at: datetime | None = None
     approval_reason: str | None = None
     executed_at: datetime | None = None
     execution_result: dict[str, Any] | None = None
@@ -132,6 +133,7 @@ class Recommendation:
             "status": self.status.value if isinstance(self.status, RecommendationStatus) else self.status,
             "requires_approval": self.requires_approval,
             "approved_by": self.approved_by,
+            "approved_at": self.approved_at.isoformat() if isinstance(self.approved_at, datetime) else self.approved_at,
             "approval_reason": self.approval_reason,
             "executed_at": self.executed_at.isoformat() if isinstance(self.executed_at, datetime) else self.executed_at,
             "execution_result": self.execution_result,
@@ -169,6 +171,13 @@ class Recommendation:
                 executed_at = datetime.fromisoformat(executed_at)
             except (ValueError, TypeError):
                 executed_at = None
+
+        approved_at = data.get("approved_at")
+        if isinstance(approved_at, str) and approved_at:
+            try:
+                approved_at = datetime.fromisoformat(approved_at)
+            except (ValueError, TypeError):
+                approved_at = None
 
         outcome_validated_at = data.get("outcome_validated_at")
         if isinstance(outcome_validated_at, str) and outcome_validated_at:
@@ -209,6 +218,7 @@ class Recommendation:
             status=status,
             requires_approval=data.get("requires_approval", False),
             approved_by=data.get("approved_by"),
+            approved_at=approved_at,
             approval_reason=data.get("approval_reason"),
             executed_at=executed_at,
             execution_result=data.get("execution_result"),

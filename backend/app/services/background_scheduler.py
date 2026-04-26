@@ -2988,6 +2988,56 @@ class BackgroundSchedulerService:
         )
         logger.info(f"Added error auto-resolve job with {interval_seconds}s interval")
 
+    def add_adapter_health_monitor_job(self, interval_seconds: int = 60):
+        """
+        Add a job to run adapter health checks every 60 seconds.
+
+        Tracks BACnet, Niagara, OBIX, and ShadowModePolling bridge health.
+        Writes to adapter_health table and emits alerts after 3 consecutive failures.
+
+        Args:
+            interval_seconds: How often to run health checks (default: 60 seconds)
+        """
+        job_id = "adapter_health_monitor"
+        if self.scheduler.get_job(job_id):
+            self.scheduler.remove_job(job_id)
+            logger.info("Removed existing adapter health monitor job")
+
+        first_run = datetime.now() + timedelta(seconds=10)  # 10s warmup
+
+        self.scheduler.add_job(
+            func=self._run_adapter_health_monitor,
+            trigger=IntervalTrigger(seconds=interval_seconds),
+            id=job_id,
+            name="Adapter Health Monitor",
+            replace_existing=True,
+            next_run_time=first_run,
+            max_instances=1,
+        )
+        logger.info(f"Added adapter health monitor job with {interval_seconds}s interval")
+
+    def _run_adapter_health_monitor(self):
+        """Sync wrapper for async adapter health monitoring."""
+        try:
+            if self._main_loop and self._main_loop.is_running():
+                future = asyncio.run_coroutine_threadsafe(
+                    self._run_adapter_health_monitor_async(),
+                    self._main_loop,
+                )
+                future.result(timeout=30)
+            else:
+                asyncio.run(self._run_adapter_health_monitor_async())
+        except Exception as e:
+            logger.error(f"Failed to run adapter health monitor: {e}", exc_info=True)
+
+    async def _run_adapter_health_monitor_async(self):
+        """Run one adapter health check cycle."""
+        from app.services.adapter_health_monitor import AdapterHealthMonitor
+
+        monitor = AdapterHealthMonitor()
+        await monitor.run_health_cycle()
+        logger.debug("Adapter health monitor cycle completed")
+
     def _run_error_auto_resolve(self):
         """Sync wrapper for async error auto-resolution."""
         try:
@@ -3010,6 +3060,158 @@ class BackgroundSchedulerService:
         resolved_count = await health_service.auto_resolve_stale_errors()
         if resolved_count > 0:
             logger.info(f"Auto-resolved {resolved_count} stale errors")
+
+    # -----------------------------------------------------------------
+    # Data Freshness Monitor (Tier 2 SLI)
+    # -----------------------------------------------------------------
+
+    def add_data_freshness_monitor_job(self, interval_seconds: int = 300):
+        """
+        Add a job to check data freshness every 5 minutes.
+
+        Calculates age of normalized data per source (BMS telemetry, documents,
+        anomalies, recommendations), updates SLI pass/fail, detects new breaches,
+        and auto-resolves resolved ones.
+
+        Args:
+            interval_seconds: How often to run freshness checks (default: 300s = 5 min)
+        """
+        job_id = "data_freshness_monitor"
+        if self.scheduler.get_job(job_id):
+            self.scheduler.remove_job(job_id)
+            logger.info("Removed existing data freshness monitor job")
+
+        first_run = datetime.now() + timedelta(seconds=30)  # 30s warmup
+
+        self.scheduler.add_job(
+            func=self._run_data_freshness_monitor,
+            trigger=IntervalTrigger(seconds=interval_seconds),
+            id=job_id,
+            name="Data Freshness Monitor (5m)",
+            replace_existing=True,
+            next_run_time=first_run,
+            max_instances=1,
+            coalesce=True,
+        )
+        logger.info(f"Added data freshness monitor job with {interval_seconds}s interval")
+
+    def _run_data_freshness_monitor(self):
+        """Sync wrapper for async data freshness monitoring."""
+        try:
+            if self._main_loop and self._main_loop.is_running():
+                future = asyncio.run_coroutine_threadsafe(
+                    self._run_data_freshness_monitor_async(),
+                    self._main_loop,
+                )
+                future.result(timeout=60)
+            else:
+                asyncio.run(self._run_data_freshness_monitor_async())
+        except Exception as e:
+            logger.error(f"Failed to run data freshness monitor: {e}", exc_info=True)
+
+    async def _run_data_freshness_monitor_async(self):
+        """Run one data freshness check cycle."""
+        from app.services.data_freshness_monitor import DataFreshnessMonitor
+
+        monitor = DataFreshnessMonitor()
+        await monitor.run_freshness_cycle()
+        logger.debug("Data freshness monitor cycle completed")
+
+    # -----------------------------------------------------------------
+    # Uptime Aggregator (Tier 4 SLI)
+    # -----------------------------------------------------------------
+
+    def add_uptime_aggregator_jobs(self):
+        """
+        Register daily and monthly uptime aggregation jobs.
+
+        Daily:  01:00 SAST every day       → aggregates prior day's checks
+        Monthly: 02:00 SAST on 1st of month → aggregates prior complete month
+        """
+        from apscheduler.triggers.cron import CronTrigger
+        from app.services.uptime_aggregator import UptimeAggregator
+
+        uptime_agg = UptimeAggregator()
+
+        # Daily aggregation: 01:00 SAST
+        self.scheduler.add_job(
+            func=uptime_agg.aggregate_daily_uptime,
+            trigger=CronTrigger(hour=1, minute=0, timezone="Africa/Johannesburg"),
+            id="uptime_daily_agg",
+            name="Uptime Daily Aggregation (01:00 SAST)",
+            max_instances=1,
+            coalesce=True,
+        )
+        logger.info("Added uptime daily aggregation job (01:00 SAST)")
+
+        # Monthly aggregation: 02:00 SAST on the 1st
+        self.scheduler.add_job(
+            func=uptime_agg.aggregate_monthly_uptime,
+            trigger=CronTrigger(day=1, hour=2, minute=0, timezone="Africa/Johannesburg"),
+            id="uptime_monthly_agg",
+            name="Uptime Monthly Aggregation (1st 02:00 SAST)",
+            max_instances=1,
+            coalesce=True,
+        )
+        logger.info("Added uptime monthly aggregation job (1st 02:00 SAST)")
+
+        # SLO report email: 02:10 SAST on the 1st (after monthly agg completes)
+        self.scheduler.add_job(
+            func=self._send_monthly_slo_report,
+            trigger=CronTrigger(day=1, hour=2, minute=10, timezone="Africa/Johannesburg"),
+            id="slo_monthly_report",
+            name="Monthly SLO Report Email (1st 02:10 SAST)",
+            max_instances=1,
+            coalesce=True,
+        )
+        logger.info("Added monthly SLO report email job (1st 02:10 SAST)")
+
+    def _send_monthly_slo_report(self):
+        """Sync wrapper for monthly SLO report email."""
+        try:
+            if self._main_loop and self._main_loop.is_running():
+                future = asyncio.run_coroutine_threadsafe(
+                    self._send_monthly_slo_report_async(),
+                    self._main_loop,
+                )
+                future.result(timeout=60)
+            else:
+                asyncio.run(self._send_monthly_slo_report_async())
+        except Exception as e:
+            logger.error(f"Failed to send monthly SLO report: {e}", exc_info=True)
+
+    async def _send_monthly_slo_report_async(self):
+        """Send monthly SLO report email to stakeholders."""
+        from app.services.slo_report_service import SLOReportService
+
+        service = SLOReportService()
+        await service._send_monthly_slo_report_async(None)
+
+    # -----------------------------------------------------------------
+    # Critical Path Monitor (Tier 3 SLI)
+    # -----------------------------------------------------------------
+
+    def add_critical_path_monitor_job(self):
+        """
+        Register hourly aggregation job for PARASITE decision latencies.
+
+        Runs at :00 SAST each hour. Collects all supervised_action_traces from
+        the prior complete hour, computes p50/p99/p99.9/max/avg percentiles,
+        and upserts into critical_path_hourly. SLO pass if p99 <= 7000ms.
+        """
+        from apscheduler.triggers.cron import CronTrigger
+        from app.services.critical_path_monitor import CriticalPathMonitor
+
+        critical_path = CriticalPathMonitor()
+        self.scheduler.add_job(
+            func=critical_path.run_hourly_aggregation,
+            trigger=CronTrigger(minute=0, timezone="Africa/Johannesburg"),
+            id="critical_path_hourly",
+            name="Critical Path Hourly Aggregation (:00 SAST)",
+            max_instances=1,
+            coalesce=True,
+        )
+        logger.info("Added critical path hourly aggregation job (:00 SAST)")
 
     # -----------------------------------------------------------------
     # Event Intelligence evaluation
