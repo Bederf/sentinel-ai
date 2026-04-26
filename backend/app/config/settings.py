@@ -403,7 +403,7 @@ class Settings(BaseSettings):
     space_mqtt_client_id: str = "sentinel-space-backend"
     space_mqtt_topic: str = "sentinel/nodes/+/presence"
     space_mqtt_radar_topic: str = "sentinel/node/+/radar"  # LD2410C extended payload topic
-    space_default_site_id: str = "site-002"
+    space_default_site_id: str = Field(default="", validation_alias="SITE_ID")  # Required env var
 
     # Graph / Azure AD email integration (Phase 184)
     graph_integration_enabled: bool = Field(default=False)  # Kill-switch without redeployment
@@ -475,8 +475,8 @@ class Settings(BaseSettings):
     # Plant Room Alerts — Desigo email→WhatsApp pipeline (Phase 146)
     plant_alerts_enabled: bool = False  # Master switch for plant alert ingestion
     desigo_sender_email: str = "noreply@fnb.co.za"  # Authorised Desigo sender address
-    plant_site_id: str = "FLN02"  # Default site identifier for alarms
-    plant_building_name: str = "Fairland 2"  # Default building name for alarms
+    plant_site_id: str = Field(default="", validation_alias="PLANT_SITE_ID")  # Required env var
+    plant_building_name: str = Field(default="", validation_alias="BUILDING_NAME")  # Required env var
 
     # MRI Evolution Connector (Phase 178)
     mri_evolution_base_url: str = Field(default="", validation_alias="MRI_EVOLUTION_BASE_URL")
@@ -655,6 +655,25 @@ class Settings(BaseSettings):
                 )
         except (base64.binascii.Error, UnicodeDecodeError) as e:
             raise ValueError(f"ENCRYPTION_KEY must be valid base64-encoded data: {e}")
+        return value
+
+    @field_validator("space_default_site_id", "plant_site_id", "plant_building_name", mode="after")
+    @classmethod
+    def _validate_required_site_config(cls, value, info):
+        """Ensure required site config fields are set."""
+        if not value:
+            # Map Pydantic field name → env var alias
+            field_to_env = {
+                "space_default_site_id": "SITE_ID",
+                "plant_site_id": "PLANT_SITE_ID",
+                "plant_building_name": "BUILDING_NAME",
+            }
+            env_var = field_to_env.get(info.field_name, info.field_name.upper())
+            raise ValueError(
+                f"REQUIRED env var not set: {env_var}. "
+                "Deployment cannot start without site configuration. "
+                "Set SITE_ID, PLANT_SITE_ID, and BUILDING_NAME env vars."
+            )
         return value
 
     @classmethod

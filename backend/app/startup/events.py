@@ -104,6 +104,29 @@ async def startup_event(app: FastAPI) -> None:
         _user_repo.ensure_admin_emails(_admin_list)
         _logger.info("ADMIN_EMAILS bootstrap complete: %s", ", ".join(_admin_list))
 
+    # === Required Site Configuration ===
+    _logger.info(
+        "✓ Site config: site_id=%s, plant=%s, building=%s",
+        settings.space_default_site_id,
+        settings.plant_site_id,
+        settings.plant_building_name,
+    )
+
+    # === Run database migrations (fail-fast) ===
+    if os.getenv("MIGRATION_SKIP", "").lower() != "true":
+        from app.migrations.runner import run_pending_migrations
+
+        try:
+            dry_run = os.getenv("MIGRATION_DRY_RUN", "false").lower() == "true"
+            applied = run_pending_migrations(dry_run=dry_run)
+            if dry_run:
+                _logger.warning("MIGRATION DRY RUN — no files were applied")
+            else:
+                _logger.info("Migrations applied: %s", applied if applied else "none (all locked)")
+        except Exception as e:
+            _logger.critical("Migration failed: %s. Halting startup.", e)
+            raise RuntimeError(f"Migration failure: {e}") from e
+
     # === SENTINEL LIVE MODE BANNER ===
     # Sprint 0 hardening: loud banner when hardware writes are possible
     if settings.solar_connector_mode == "live":
