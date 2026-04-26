@@ -34,66 +34,101 @@ class FleetAggregator:
         self._aggregation_cache: dict[str, Any] = {}
         self._last_aggregation: str | None = None
 
+    def _get_supabase_client(self):
+        """Get Supabase client lazily to avoid import-time errors."""
+        from app.database.supabase_client import get_supabase_client
+
+        return get_supabase_client()
+
+    def _get_real_counts(self) -> dict[str, Any]:
+        """Query real counts from Supabase."""
+        supabase = self._get_supabase_client()
+
+        # Real site count
+        sites = supabase.table("sites").select("id", count="exact").execute()
+        total_sites = sites.count or 0
+
+        # Real equipment count + health
+        equip_result = supabase.table("equipment").select("health_score", count="exact").execute()
+        total_equipment = equip_result.count or 0
+        scores = [r["health_score"] for r in equip_result.data if r.get("health_score") is not None]
+        avg_health = round(sum(scores) / len(scores), 1) if scores else 0.0
+
+        # Active alerts
+        alerts = supabase.table("alerts").select("id", count="exact").eq("status", "active").execute()
+        total_open_alerts = alerts.count or 0
+
+        # Open work orders (maintenance proxy)
+        wo = supabase.table("work_orders").select("id", count="exact").eq("status", "open").execute()
+        open_wo = wo.count or 0
+
+        return {
+            "total_sites": total_sites,
+            "total_equipment": total_equipment,
+            "avg_fleet_health": avg_health,
+            "total_open_alerts": total_open_alerts,
+            "open_work_orders": open_wo,
+        }
+
     def get_fleet_summary(self) -> dict[str, Any]:
         """Get fleet-wide summary statistics.
 
         Returns:
             Summary with overview, type distribution, top failure patterns.
         """
-        # Fleet-wide overview
+        counts = self._get_real_counts()
+
+        # Fleet-wide overview — real data from Supabase
         overview = {
-            "total_sites": 5,
-            "total_equipment": 185,
-            "avg_fleet_health": 73.2,
-            "total_open_alerts": 31,
-            "monthly_maintenance_zar": 660000,
-            "failure_patterns_tracked": 8,
-            "total_recorded_failures": 281,
+            "total_sites": counts["total_sites"],
+            "total_equipment": counts["total_equipment"],
+            "avg_fleet_health": counts["avg_fleet_health"],
+            "total_open_alerts": counts["total_open_alerts"],
+            "monthly_maintenance_zar": counts["open_work_orders"] * 5000,  # proxy
+            "failure_patterns_tracked": 0,  # requires anomaly_events table
+            "total_recorded_failures": 0,  # requires failure_events table
         }
 
-        # Distribution by equipment type
-        type_distribution = {
-            "chiller": {"failures": 45, "total_cost_zar": 42000},
-            "ahu": {"failures": 120, "total_cost_zar": 9000},
-            "fcu": {"failures": 380, "total_cost_zar": 3000},
-            "gen": {"failures": 30, "total_cost_zar": 25000},
-            "vav": {"failures": 520, "total_cost_zar": 2000},
-            "pump": {"failures": 90, "total_cost_zar": 6000},
-        }
+        # Distribution by equipment type — real counts from DB
+        supabase = self._get_supabase_client()
+        equip_data = supabase.table("equipment").select("type", "status").execute()
 
-        # Top failure patterns
-        top_patterns = [
-            {
-                "equipment_type": "chiller",
-                "failure_type": "compressor_failure",
-                "count": 12,
-                "sites_affected": 3,
-            },
-            {
-                "equipment_type": "ahu",
-                "failure_type": "filter_clogging",
-                "count": 28,
-                "sites_affected": 4,
-            },
-            {
-                "equipment_type": "fcu",
-                "failure_type": "coil_fouling",
-                "count": 45,
-                "sites_affected": 5,
-            },
-            {
-                "equipment_type": "pump",
-                "failure_type": "bearing_wear",
-                "count": 18,
-                "sites_affected": 3,
-            },
-            {
-                "equipment_type": "vav",
-                "failure_type": "damper_failure",
-                "count": 35,
-                "sites_affected": 5,
-            },
-        ]
+        type_failures: dict[str, int] = {}
+        for row in equip_data.data:
+            eq_type = (row.get("type") or "unknown").lower()
+            status = row.get("status", "normal")
+            if status in ("critical", "fault", "offline"):
+                type_failures[eq_type] = type_failures.get(eq_type, 0) + 1
+
+        type_distribution = {}
+        for eq_type in EQUIPMENT_TYPES:
+            type_distribution[eq_type] = {
+                "failures": type_failures.get(eq_type, 0),
+                "total_cost_zar": type_failures.get(eq_type, 0) * 5000,
+            }
+        # Catch-all for types not in EQUIPMENT_TYPES
+        unknown_failures = sum(v for k, v in type_failures.items() if k not in EQUIPMENT_TYPES)
+        if unknown_failures:
+            type_distribution["unknown"] = {"failures": unknown_failures, "total_cost_zar": unknown_failures * 5000}
+
+        # Top failure patterns — real data from alerts table
+        # Group active alerts by equipment type
+        alert_data = supabase.table("alerts").select("equipment_id", "severity").eq("status", "active").execute()
+        top_patterns = []
+        if alert_data.data:
+            # Extract equipment type from equipment_id if possible
+            for row in alert_data.data[:5]:
+                equip_id = row.get("equipment_id", "")
+                parts = equip_id.split("-")
+                eq_type = parts[1].lower() if len(parts) >= 2 else "unknown"
+                top_patterns.append(
+                    {
+                        "equipment_type": eq_type,
+                        "failure_type": "active_alert",
+                        "count": 1,
+                        "sites_affected": 1,
+                    }
+                )
 
         return {
             "fleet_overview": overview,
@@ -109,103 +144,51 @@ class FleetAggregator:
             equipment_type: Filter by equipment type (optional).
 
         Returns:
-            List of FailurePattern dicts.
+            List of FailurePattern dicts — sourced from real alert/equipment data.
         """
-        all_patterns = [
-            {
-                "equipment_type": "chiller",
-                "failure_type": "compressor_failure",
-                "occurrence_count": 12,
-                "avg_age_at_failure_years": 6.2,
-                "avg_health_at_detection": 38.5,
-                "common_precursors": ["high_discharge_temp", "oil_analysis_degradation"],
-                "avg_repair_cost_zar": 3500,
-                "avg_downtime_hours": 12.5,
-                "sites_affected": 3,
-            },
-            {
-                "equipment_type": "chiller",
-                "failure_type": "refrigerant_leak",
-                "occurrence_count": 8,
-                "avg_age_at_failure_years": 8.1,
-                "avg_health_at_detection": 42.0,
-                "common_precursors": ["rising_subcooling", "pressure_drop"],
-                "avg_repair_cost_zar": 2800,
-                "avg_downtime_hours": 8.0,
-                "sites_affected": 2,
-            },
-            {
-                "equipment_type": "ahu",
-                "failure_type": "filter_clogging",
-                "occurrence_count": 28,
-                "avg_age_at_failure_years": 2.3,
-                "avg_health_at_detection": 51.0,
-                "common_precursors": ["rising_pressure_drop", "reduced_airflow"],
-                "avg_repair_cost_zar": 320,
-                "avg_downtime_hours": 4.0,
-                "sites_affected": 4,
-            },
-            {
-                "equipment_type": "ahu",
-                "failure_type": "motor_failure",
-                "occurrence_count": 15,
-                "avg_age_at_failure_years": 7.5,
-                "avg_health_at_detection": 35.0,
-                "common_precursors": ["vibration_increase", "temperature_rise"],
-                "avg_repair_cost_zar": 1200,
-                "avg_downtime_hours": 16.0,
-                "sites_affected": 3,
-            },
-            {
-                "equipment_type": "fcu",
-                "failure_type": "coil_fouling",
-                "occurrence_count": 45,
-                "avg_age_at_failure_years": 4.2,
-                "avg_health_at_detection": 55.0,
-                "common_precursors": ["reduced_cooling_capacity", "water_temp_deviation"],
-                "avg_repair_cost_zar": 180,
-                "avg_downtime_hours": 2.0,
-                "sites_affected": 5,
-            },
-            {
-                "equipment_type": "gen",
-                "failure_type": "fuel_system_failure",
-                "occurrence_count": 5,
-                "avg_age_at_failure_years": 12.0,
-                "avg_health_at_detection": 28.0,
-                "common_precursors": ["fuel_filter_clogging", "injector_wear"],
-                "avg_repair_cost_zar": 8500,
-                "avg_downtime_hours": 24.0,
-                "sites_affected": 2,
-            },
-            {
-                "equipment_type": "vav",
-                "failure_type": "damper_failure",
-                "occurrence_count": 35,
-                "avg_age_at_failure_years": 5.5,
-                "avg_health_at_detection": 45.0,
-                "common_precursors": ["actuator_drift", "control_error"],
-                "avg_repair_cost_zar": 520,
-                "avg_downtime_hours": 6.0,
-                "sites_affected": 5,
-            },
-            {
-                "equipment_type": "pump",
-                "failure_type": "bearing_wear",
-                "occurrence_count": 18,
-                "avg_age_at_failure_years": 6.8,
-                "avg_health_at_detection": 40.0,
-                "common_precursors": ["vibration_increase", "temperature_rise"],
-                "avg_repair_cost_zar": 950,
-                "avg_downtime_hours": 8.0,
-                "sites_affected": 3,
-            },
-        ]
+        supabase = self._get_supabase_client()
+        alert_data = (
+            supabase.table("alerts").select("equipment_id", "severity", "created_at").eq("status", "active").execute()
+        )
+
+        patterns: dict[str, dict[str, Any]] = {}
+        for row in alert_data.data:
+            equip_id = row.get("equipment_id", "")
+            parts = equip_id.split("-")
+            eq_type = parts[1].lower() if len(parts) >= 2 else "unknown"
+            severity = row.get("severity", "medium")
+
+            key = f"{eq_type}_{severity}"
+            if key not in patterns:
+                patterns[key] = {
+                    "equipment_type": eq_type,
+                    "failure_type": f"{severity}_alert",
+                    "occurrence_count": 0,
+                    "avg_age_at_failure_years": 0,
+                    "avg_health_at_detection": 0,
+                    "common_precursors": [],
+                    "avg_repair_cost_zar": 0,
+                    "avg_downtime_hours": 0,
+                    "sites_affected": set(),
+                }
+            patterns[key]["occurrence_count"] += 1
+            patterns[key]["sites_affected"].add(equip_id.split("-")[0] if equip_id else "unknown")
+
+        # Convert sets to counts
+        result = []
+        for p in patterns.values():
+            p["sites_affected"] = len(p["sites_affected"])
+            del p["sites_affected"]  # convert set to count inline
+            result.append(p)
 
         if equipment_type:
-            return [p for p in all_patterns if p["equipment_type"] == equipment_type]
+            result = [p for p in result if p["equipment_type"] == equipment_type]
 
-        return all_patterns
+        return (
+            result
+            if result
+            else [{"equipment_type": "none", "failure_type": "no_data", "occurrence_count": 0, "sites_affected": 0}]
+        )
 
     def get_similar_failures(
         self,
@@ -213,118 +196,65 @@ class FleetAggregator:
         failure_type: str | None = None,
         exclude_site: str | None = None,
     ) -> list[dict[str, Any]]:
-        """Find similar equipment failures across fleet.
-
-        Args:
-            equipment_type: Equipment type to match.
-            failure_type: Specific failure type (optional).
-            exclude_site: Site to exclude for privacy (optional).
-
-        Returns:
-            List of similar failures from other sites.
-        """
+        """Find similar equipment failures across fleet."""
         patterns = self.aggregate_failure_patterns(equipment_type)
-
         if failure_type:
             patterns = [p for p in patterns if p["failure_type"] == failure_type]
-
-        # In local mode, return all matches (in production, exclude site-specific data)
         return patterns
 
     def get_risk_distribution(self) -> dict[str, Any]:
-        """Get fleet-wide equipment risk distribution.
+        """Get fleet-wide equipment risk distribution from real equipment health data."""
+        supabase = self._get_supabase_client()
+        counts = self._get_real_counts()
 
-        Returns:
-            Risk distribution by severity level.
-        """
+        equip_data = supabase.table("equipment").select("health_score").execute()
+        scores = [r["health_score"] for r in equip_data.data if r.get("health_score") is not None]
+
+        critical = sum(1 for s in scores if s < 40)
+        high = sum(1 for s in scores if 40 <= s < 60)
+        medium = sum(1 for s in scores if 60 <= s < 80)
+        low = sum(1 for s in scores if s >= 80)
+        total = len(scores) or 1
+
         return {
-            "total_equipment": 185,
+            "total_equipment": counts["total_equipment"],
             "distribution": {
-                "critical": {"count": 9, "percentage": 4.9},
-                "high": {"count": 22, "percentage": 11.9},
-                "medium": {"count": 27, "percentage": 15},
-                "low": {"count": 126, "percentage": 68.2},
+                "critical": {"count": critical, "percentage": round(critical / total * 100, 1)},
+                "high": {"count": high, "percentage": round(high / total * 100, 1)},
+                "medium": {"count": medium, "percentage": round(medium / total * 100, 1)},
+                "low": {"count": low, "percentage": round(low / total * 100, 1)},
             },
-            "sites_with_critical": 5,
-            "total_sites": 5,
+            "sites_with_critical": counts["total_sites"] if critical > 0 else 0,
+            "total_sites": counts["total_sites"],
         }
 
     def get_benchmarks(self, equipment_type: str | None = None) -> list[dict[str, Any]]:
-        """Get fleet benchmarking data for equipment types.
+        """Get fleet benchmarking data — real averages from equipment health scores."""
+        supabase = self._get_supabase_client()
 
-        Args:
-            equipment_type: Filter by equipment type (optional).
+        all_types = [equipment_type] if equipment_type else EQUIPMENT_TYPES
+        benchmarks = []
 
-        Returns:
-            List of Benchmark dicts.
-        """
-        all_benchmarks = [
-            {
-                "equipment_type": "chiller",
-                "fleet_avg_health": 68.5,
-                "fleet_avg_mtbf_days": 245,
-                "fleet_avg_maintenance_cost_zar": 42000,
-                "fleet_best_health": 85.0,
-                "fleet_worst_health": 42.0,
-                "total_equipment_count": 45,
-                "total_sites": 15,
-            },
-            {
-                "equipment_type": "ahu",
-                "fleet_avg_health": 74.2,
-                "fleet_avg_mtbf_days": 180,
-                "fleet_avg_maintenance_cost_zar": 9000,
-                "fleet_best_health": 88.0,
-                "fleet_worst_health": 55.0,
-                "total_equipment_count": 120,
-                "total_sites": 15,
-            },
-            {
-                "equipment_type": "fcu",
-                "fleet_avg_health": 71.0,
-                "fleet_avg_mtbf_days": 210,
-                "fleet_avg_maintenance_cost_zar": 3000,
-                "fleet_best_health": 82.0,
-                "fleet_worst_health": 48.0,
-                "total_equipment_count": 380,
-                "total_sites": 15,
-            },
-            {
-                "equipment_type": "gen",
-                "fleet_avg_health": 82.1,
-                "fleet_avg_mtbf_days": 365,
-                "fleet_avg_maintenance_cost_zar": 25000,
-                "fleet_best_health": 92.0,
-                "fleet_worst_health": 70.0,
-                "total_equipment_count": 30,
-                "total_sites": 15,
-            },
-            {
-                "equipment_type": "vav",
-                "fleet_avg_health": 76.8,
-                "fleet_avg_mtbf_days": 190,
-                "fleet_avg_maintenance_cost_zar": 2000,
-                "fleet_best_health": 89.0,
-                "fleet_worst_health": 58.0,
-                "total_equipment_count": 520,
-                "total_sites": 15,
-            },
-            {
-                "equipment_type": "pump",
-                "fleet_avg_health": 72.4,
-                "fleet_avg_mtbf_days": 220,
-                "fleet_avg_maintenance_cost_zar": 6000,
-                "fleet_best_health": 84.0,
-                "fleet_worst_health": 52.0,
-                "total_equipment_count": 90,
-                "total_sites": 15,
-            },
-        ]
+        for eq_type in all_types:
+            rows = supabase.table("equipment").select("health_score").eq("type", eq_type).execute()
+            scores = [r["health_score"] for r in rows.data if r.get("health_score") is not None]
 
-        if equipment_type:
-            return [b for b in all_benchmarks if b["equipment_type"] == equipment_type]
+            if scores:
+                avg = round(sum(scores) / len(scores), 1)
+                benchmarks.append(
+                    {
+                        "equipment_type": eq_type,
+                        "fleet_avg_health": avg,
+                        "fleet_avg_mtbf_days": 0,  # requires mtbf table
+                        "fleet_avg_maintenance_cost_zar": 0,
+                        "fleet_best_health": round(max(scores), 1),
+                        "fleet_worst_health": round(min(scores), 1),
+                        "total_equipment_count": len(scores),
+                        "total_sites": self._get_real_counts()["total_sites"],
+                    }
+                )
 
-        return all_benchmarks
+        return benchmarks
 
     def benchmark_site(
         self,
@@ -332,22 +262,11 @@ class FleetAggregator:
         site_health: float,
         equipment_type: str | None = None,
     ) -> dict[str, Any]:
-        """Compare a site's performance against fleet average.
-
-        Args:
-            site_code: Site to benchmark.
-            site_health: Current site health score (0-100).
-            equipment_type: Filter by equipment type (optional).
-
-        Returns:
-            Comparison with fleet benchmarks.
-        """
+        """Compare a site's performance against fleet average."""
         benchmarks = self.get_benchmarks(equipment_type)
+        fleet_avg = sum(b["fleet_avg_health"] for b in benchmarks) / len(benchmarks) if benchmarks else 72.0
 
-        # Calculate percentile (simple local fallback calculation)
         percentile = min(100, (site_health / 100) * 100)
-
-        # Determine status
         if site_health >= 75:
             status = "healthy"
             message = "Performing above fleet average"
@@ -357,8 +276,6 @@ class FleetAggregator:
         else:
             status = "critical"
             message = "Urgent: Significant underperformance vs fleet"
-
-        fleet_avg = sum(b["fleet_avg_health"] for b in benchmarks) / len(benchmarks) if benchmarks else 72.0
 
         return {
             "site_health": site_health,

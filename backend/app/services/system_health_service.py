@@ -301,21 +301,53 @@ class SystemHealthService:
             return {"score": 40, "status": "degraded", "note": f"Check failed: {e}"}
 
     async def _check_lighting(self) -> dict[str, Any]:
-        """Check lighting telemetry flow via Supabase energy data.
+        """Check lighting telemetry flow via bridge live data + Supabase energy history.
 
-        Confirms aggregate lighting_kwh data from the bridge is reaching Supabase
-        via ShadowModePollingService → energy_consumption_history table.
+        Probes two paths:
+        1. Live: fetches /telemetry from the bridge directly for lighting_kw.
+           This confirms the DALI controllers are reachable even before the
+           midnight energy flush writes energy_consumption_history.
+        2. Historical: checks energy_consumption_history for accumulated lighting_kwh
+           (written by ShadowModePollingService at midnight flush).
+
+        Either path healthy = lighting is flowing.
         """
         try:
+            # ── 1. Live bridge check (primary — works during the day) ──────────
+            from app.config.settings import settings
+
+            bridge_base = getattr(settings, "simbiot_api_url", None) or getattr(settings, "bridge_base_url", None)
+            bridge_token = getattr(settings, "simbiot_api_key", None) or getattr(settings, "bridge_api_token", None)
+
+            if bridge_base and bridge_token:
+                try:
+                    import httpx
+
+                    async with httpx.AsyncClient(timeout=5.0) as client:
+                        resp = await client.get(
+                            f"{bridge_base}/api/sites/site-002/telemetry",
+                            headers={"Authorization": f"Bearer {bridge_token}"},
+                        )
+                        resp.raise_for_status()
+                        power = resp.json().get("power", {})
+                        lighting_kw = power.get("lighting_kw")
+
+                    if lighting_kw is not None:
+                        # Bridge live data confirms DALI controllers are reachable
+                        return {
+                            "score": 90,
+                            "status": "healthy",
+                            "note": f"Lighting live · {lighting_kw:.1f} kW (bridge /telemetry)",
+                        }
+                except Exception:
+                    pass  # Fall through to historical check
+
+            # ── 2. Historical check (works after midnight flush) ───────────────
+            from datetime import date, timedelta
+
             from app.database.supabase_client import get_supabase_client
 
             supabase = get_supabase_client()
-
-            # Check energy_consumption_history for recent lighting_kwh data
-            # ShadowModePollingService._flush_energy_to_db() writes aggregated
-            # lighting_kwh per site per day via EnergyConsumptionRepository.upsert()
-            from datetime import date, timedelta
-
             since = date.today() - timedelta(days=7)
             result = (
                 supabase.table("energy_consumption_history")
@@ -326,17 +358,17 @@ class SystemHealthService:
             )
             count = result.count or 0
 
-            if count == 0:
+            if count > 0:
                 return {
-                    "score": 0,
-                    "status": "critical",
-                    "note": "No lighting kWh data in Supabase (shadow polling not flushing)",
+                    "score": 90,
+                    "status": "healthy",
+                    "note": f"Lighting telemetry flowing · {count} day(s) with kWh data in last 7 days",
                 }
 
             return {
-                "score": 90,
-                "status": "healthy",
-                "note": f"Lighting telemetry flowing · {count} day(s) with data in last 7 days",
+                "score": 0,
+                "status": "critical",
+                "note": "No lighting data — bridge unreachable and no kWh history in Supabase",
             }
         except Exception as e:
             return {"score": 0, "status": "critical", "note": f"Error: {e}"}
