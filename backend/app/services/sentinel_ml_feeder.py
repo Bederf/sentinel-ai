@@ -110,6 +110,10 @@ SENSOR_MAPPING: dict[str, dict[str, str]] = {
         "pfc_current_a": "current_a",
         "pfc_voltage_v": "voltage_v",
     },
+    "meter": {
+        # Power meters from bridge /points endpoint (e.g. S002-MTR-B1-LIGHT)
+        "active_power_kw": "active_power_kw",
+    },
     # Site-wide aggregate from /telemetry bridge endpoint
     "site_aggregate": {
         "lighting_kw": "lighting_kw",

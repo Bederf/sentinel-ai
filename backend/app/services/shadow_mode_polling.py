@@ -129,7 +129,7 @@ class ShadowModePollingService:
                             floor_to_ahu[floor] = equip_id
 
             # Add AHU trends for each known floor
-            for floor, ahu_id in floor_to_ahu.items():
+            for _floor, ahu_id in floor_to_ahu.items():
                 sensor_codes.add(f"{ahu_id}-supply_air_temp")
                 sensor_codes.add(f"{ahu_id}-fan_speed_pct")
 
@@ -396,6 +396,12 @@ class ShadowModePollingService:
         for code, state in trends_states.items():
             if state["sensor_readings"]:
                 equipment_states[code] = state
+        # Merge DALI controller and power meter states from /points endpoint
+        # (extracted in _sync_equipment_status and returned via points_result)
+        for code, state in points_result.get("dali_states", {}).items():
+            equipment_states[code] = state
+        for code, state in points_result.get("meter_states", {}).items():
+            equipment_states[code] = state
 
         if not equipment_states:
             logger.warning(f"[SHADOW] Poll {self._poll_count}: no data — errors={errors}")
@@ -718,6 +724,35 @@ class ShadowModePollingService:
             if not equip_status_map:
                 return result
 
+            # ── Extract DALI controller and power meter states for ML pipeline ──
+            # Bridge /points returns status + sensor readings per equipment code.
+            # Feed these to SentinelMLFeeder so DALI controllers and power meters
+            # are trained on alongside HVAC telemetry.
+            dali_states: dict[str, dict[str, Any]] = {}
+            meter_states: dict[str, dict[str, Any]] = {}
+            for code, info in equip_status_map.items():
+                if code.startswith("S002-DALI-"):
+                    # DALI controller: status + updated_at as sensor readings
+                    dali_states[code] = {
+                        "type": "dali",
+                        "sensor_readings": {
+                            "controller_status": 1.0 if info.get("status") in ("online", "normal", "ok") else 0.0,
+                        },
+                    }
+                elif code.startswith("S002-MTR-"):
+                    # Power meter: active_power_kw (e.g. S002-MTR-B1-LIGHT)
+                    readings: dict[str, float] = {}
+                    if (ap := info.get("active_power_kw")) is not None:
+                        readings["active_power_kw"] = float(ap)
+                    if readings:
+                        meter_states[code] = {
+                            "type": "meter",
+                            "sensor_readings": readings,
+                        }
+
+            result["dali_states"] = dali_states
+            result["meter_states"] = meter_states
+
             # Get all equipment from DB for this site
             from app.database.repositories.equipment_repository import EquipmentRepository
             from app.database.repositories.site_repository import SiteRepository
@@ -753,9 +788,8 @@ class ShadowModePollingService:
                     # Try prefix match: bridge code as prefix of DB code
                     matched = None
                     for db_code in db_full_codes:
-                        if db_code.startswith(bcode):
-                            if matched is None or len(db_code) < len(matched):
-                                matched = db_code
+                        if db_code.startswith(bcode) and (matched is None or len(db_code) < len(matched)):
+                            matched = db_code
                     if matched:
                         bridge_to_db[bcode] = matched
 

@@ -303,31 +303,40 @@ class SystemHealthService:
     async def _check_lighting(self) -> dict[str, Any]:
         """Check lighting telemetry flow via Supabase energy data.
 
-        Confirms aggregate lighting_kw data from the bridge is reaching Supabase
-        via ShadowModePollingService → SentinelDataSync → lighting_energy table.
+        Confirms aggregate lighting_kwh data from the bridge is reaching Supabase
+        via ShadowModePollingService → energy_consumption_history table.
         """
         try:
-
             from app.database.supabase_client import get_supabase_client
 
             supabase = get_supabase_client()
 
-            # Check lighting_energy table for recent data
-            # lighting_energy holds per-period lighting_kwh readings from bridge
-            recent = (
-                supabase.table("lighting_energy")
-                .select("*", count="exact")
+            # Check energy_consumption_history for recent lighting_kwh data
+            # ShadowModePollingService._flush_energy_to_db() writes aggregated
+            # lighting_kwh per site per day via EnergyConsumptionRepository.upsert()
+            from datetime import date, timedelta
+
+            since = date.today() - timedelta(days=7)
+            result = (
+                supabase.table("energy_consumption_history")
+                .select("lighting_kwh", count="exact")
+                .eq("site_id", "site-002")
+                .gte("date", since.isoformat())
                 .execute()
             )
-            count = recent.count or 0
+            count = result.count or 0
 
             if count == 0:
-                return {"score": 0, "status": "critical", "note": "No lighting data in Supabase (bridge not flowing)"}
+                return {
+                    "score": 0,
+                    "status": "critical",
+                    "note": "No lighting kWh data in Supabase (shadow polling not flushing)",
+                }
 
             return {
                 "score": 90,
                 "status": "healthy",
-                "note": f"Lighting telemetry flowing · {count} readings in last hour",
+                "note": f"Lighting telemetry flowing · {count} day(s) with data in last 7 days",
             }
         except Exception as e:
             return {"score": 0, "status": "critical", "note": f"Error: {e}"}
@@ -560,7 +569,7 @@ class SystemHealthService:
                 "timestamp": datetime.utcnow().isoformat(),
             }
         except Exception as e:
-            raise Exception(f"Failed to check {endpoint}: {e!s}")
+            raise Exception(f"Failed to check {endpoint}: {e!s}") from e
 
     # ==================== Health Storage ====================
 
@@ -732,7 +741,8 @@ class SystemHealthService:
 
         # Start async diagnostic execution
         # In production, this would be queued to a background task
-        asyncio.create_task(self._execute_diagnostics(diagnostic_id, target, site_code))
+        # In production, this would be queued to a background task
+        _task = asyncio.create_task(self._execute_diagnostics(diagnostic_id, target, site_code))  # noqa: RUF006
 
         return diagnostic_id
 
@@ -1003,3 +1013,89 @@ class SystemHealthService:
         except Exception as e:
             print(f"Error auto-resolving errors: {e}")
             return 0
+
+    # -----------------------------------------------------------------
+    # Data Freshness (Tier 2 SLI)
+    # -----------------------------------------------------------------
+
+    async def get_data_freshness(self, site_id: str) -> dict[str, Any]:
+        """Current age and SLI pass/fail for all data sources at a site.
+
+        GET /api/system/sites/{site_id}/data-freshness
+        """
+        from datetime import UTC as dt_UTC
+
+        try:
+            freshness_rows = (
+                await self.supabase.table("data_freshness")
+                .select("*")
+                .eq("site_id", site_id)
+                .order("data_source")
+                .execute()
+            )
+
+            sources = []
+            breach_count = 0
+            now = datetime.now(dt_UTC)
+
+            for row in freshness_rows.data:
+                sli_pass = bool(row["sli_pass"])
+                if not sli_pass:
+                    breach_count += 1
+
+                sources.append(
+                    {
+                        "data_source": row["data_source"],
+                        "age_seconds": row["age_seconds"],
+                        "target_seconds": row["sli_target_seconds"],
+                        "sli_pass": sli_pass,
+                        "last_updated": row["last_updated"],
+                    }
+                )
+
+            return {
+                "site_id": site_id,
+                "timestamp": now.isoformat(),
+                "sources": sources,
+                "overall_sli_pass": breach_count == 0,
+                "breach_count": breach_count,
+            }
+
+        except Exception as e:
+            logger.error(f"get_data_freshness failed for {site_id}: {e}")
+            return {"site_id": site_id, "sources": [], "error": str(e)}
+
+    async def get_data_freshness_history(self, site_id: str, data_source: str, hours: int = 24) -> dict[str, Any]:
+        """Breach history for a data source over N hours.
+
+        GET /api/system/sites/{site_id}/data-freshness/history
+        """
+        from datetime import UTC as dt_UTC
+
+        cutoff = datetime.now(dt_UTC) - timedelta(hours=hours)
+
+        try:
+            breaches = (
+                await self.supabase.table("data_freshness_breaches")
+                .select("*")
+                .eq("site_id", site_id)
+                .eq("data_source", data_source)
+                .gte("breach_time", cutoff.isoformat())
+                .order("breach_time", desc=False)
+                .execute()
+            )
+
+            total_duration = sum(b["duration_seconds"] or 0 for b in breaches.data if b.get("resolved_at"))
+
+            return {
+                "site_id": site_id,
+                "data_source": data_source,
+                "window_hours": hours,
+                "breaches": breaches.data,
+                "total_breaches": len(breaches.data),
+                "total_duration_seconds": total_duration,
+            }
+
+        except Exception as e:
+            logger.error(f"get_data_freshness_history failed: {e}")
+            return {"error": str(e)}
