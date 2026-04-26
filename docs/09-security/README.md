@@ -2,9 +2,9 @@
 title: "SENTINEL Security Documentation"
 type: "reference"
 status: "approved"
-version: "1.5.1"
+version: "1.6.0"
 created: "2026-02-04"
-updated: "2026-03-14"
+updated: "2026-04-26"
 author: "SENTINEL Security Office"
 tags: ["security", "governance", "index", "FSR"]
 domain: "security"
@@ -94,6 +94,21 @@ Key controls:
 - **Cross-Tenant Isolation** — Rate limits, approval tokens, and SSE tickets scoped per identity
 
 Related: [MCP Tools Reference](../03-api-reference/mcp-tools-reference.md) (Safety & Security section)
+
+### AI/LLM Security (Phase 62)
+
+Controls securing the AI model interaction layer against prompt injection, persona override, and indirect injection via document upload.
+
+| Document | Description | Status |
+|---|---|---|
+| [Prompt Injection Protection](PROMPT_INJECTION_PROTECTION.md) | 5-tier detection system, BMS-specific patterns, indirect injection scanning, Phase 62.0 persona anchor hardening | Complete |
+
+Key controls:
+- **Persona anchor clauses** — `FM_SYSTEM_PROMPT_BASE` and `SOUL.md` (live Sentry bot) block fictional framing, roleplay, and context override attacks
+- **5-tier severity classifier** — Critical/High/Medium/Low/BMS-specific patterns with configurable thresholds
+- **Indirect injection scanning** — Uploaded PDF text scanned via `score_prompt()` before processing
+- **DOCX future warning** — TODO placed for DOCX scan if magic byte validation is ever extended
+- **INDIRECT_BLOCK_THRESHOLD=0.5** — Rejection threshold for document-context injection attacks
 
 ### Technical Implementation Evidence (Phase 63)
 
