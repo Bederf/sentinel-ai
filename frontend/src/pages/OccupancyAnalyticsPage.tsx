@@ -11,6 +11,7 @@ import { useModules } from '@/contexts/ModuleHooks';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Card } from '@/components/Card';
 import { AlertCircle } from 'lucide-react';
+import { authorizedFetch } from '@/lib/api/client';
 
 interface OccupancyTrendData {
   site_id: string;
@@ -73,7 +74,7 @@ export function OccupancyAnalyticsPage() {
   const { data: trendData, isLoading: trendLoading } = useQuery<OccupancyTrendData>({
     queryKey: ['occupancy-trend', siteId, days],
     queryFn: async () => {
-      const response = await fetch(`/api/occupancy/analytics/hourly-trend?site_id=${siteId}&days=${days}`);
+      const response = await authorizedFetch(`/api/occupancy/analytics/hourly-trend?site_id=${siteId}&days=${days}`);
       if (!response.ok) throw new Error('Failed to fetch occupancy trend');
       return response.json();
     },
@@ -83,7 +84,7 @@ export function OccupancyAnalyticsPage() {
   const { data: utilizationData, isLoading: utilizationLoading } = useQuery<ZoneUtilizationData>({
     queryKey: ['zone-utilization', siteId],
     queryFn: async () => {
-      const response = await fetch(`/api/occupancy/analytics/zone-utilization?site_id=${siteId}`);
+      const response = await authorizedFetch(`/api/occupancy/analytics/zone-utilization?site_id=${siteId}`);
       if (!response.ok) throw new Error('Failed to fetch zone utilization');
       return response.json();
     },
@@ -93,7 +94,7 @@ export function OccupancyAnalyticsPage() {
   const { data: peakHoursData, isLoading: peakHoursLoading } = useQuery<PeakHoursData>({
     queryKey: ['peak-hours', siteId],
     queryFn: async () => {
-      const response = await fetch(`/api/occupancy/analytics/peak-hours?site_id=${siteId}`);
+      const response = await authorizedFetch(`/api/occupancy/analytics/peak-hours?site_id=${siteId}`);
       if (!response.ok) throw new Error('Failed to fetch peak hours');
       return response.json();
     },

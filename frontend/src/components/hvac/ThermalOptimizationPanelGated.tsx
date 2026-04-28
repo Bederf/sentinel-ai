@@ -16,16 +16,23 @@ interface ThermalOptimizationPanelGatedProps {
   compact?: boolean
   /** Whether to apply module gating (default: true) */
   gated?: boolean
+  /** Optional pre-computed thermal runway from scenario data. */
+  scenarioRunwayMetrics?: {
+    without_precooling: number;
+    with_precooling: number;
+    comfort_breach_time?: string;
+  };
 }
 
 export function ThermalOptimizationPanelGated({
   siteId,
   compact = false,
   gated = true,
+  scenarioRunwayMetrics,
 }: ThermalOptimizationPanelGatedProps) {
   if (!gated) {
     // Bypass gating for backward compatibility
-    return <ThermalOptimizationPanel siteId={siteId} compact={compact} />
+    return <ThermalOptimizationPanel siteId={siteId} compact={compact} scenarioRunwayMetrics={scenarioRunwayMetrics} />
   }
 
   return (
@@ -34,7 +41,7 @@ export function ThermalOptimizationPanelGated({
       featureName="Thermal Optimization"
       customMessage="Enable Controls module to let SENTINEL predict and prevent thermal runway through proactive pre-cooling — reduce peak demand by 15-20% and maintain optimal occupant comfort."
     >
-      <ThermalOptimizationPanel siteId={siteId} compact={compact} />
+      <ThermalOptimizationPanel siteId={siteId} compact={compact} scenarioRunwayMetrics={scenarioRunwayMetrics} />
     </LockedFeatureOverlay>
   )
 }

@@ -442,11 +442,12 @@ class BackgroundSchedulerService:
                     GENERATION_ALLOWED = {"shadow_live", "advisory", "supervised", "automatic"}
                     if current_stage not in GENERATION_ALLOWED:
                         logger.info(
-                            f"[AI-OPT] Skipping — site={site_id} mode={current_stage} (generation requires {GENERATION_ALLOWED})"
+                            "[AI-OPT] Skipping — site=%s mode=%s (generation requires %s)",
+                            site_id,
+                            current_stage,
+                            GENERATION_ALLOWED,
                         )
                         continue
-
-                    is_shadow = current_stage == "shadow_live"
 
                     # Optimization toggle gate: skip if optimization_enabled is off
                     if not self._is_optimization_enabled(site_id):
@@ -471,8 +472,9 @@ class BackgroundSchedulerService:
                     finally:
                         loop.close()
 
+                    recs_len = len(optimization_result.recommendations)
                     logger.warning(
-                        f"[AI-OPT DEBUG] recs count={len(optimization_result.recommendations)}, recs={optimization_result.recommendations}"
+                        "[AI-OPT DEBUG] recs count=%d, recs=%s", recs_len, optimization_result.recommendations
                     )
 
                     if not optimization_result.recommendations:
@@ -509,7 +511,9 @@ class BackgroundSchedulerService:
                         equipment_id = rec_dict.get("equipment_id", "")
                         rec_action_type = rec_dict.get("action_type", "")
                         logger.info(
-                            f"[AI-OPT] Persisting {rec_action_type} rec for {equipment_id} — maintenance (no validation)"
+                            "[AI-OPT] Persisting %s rec for %s — maintenance (no validation)",
+                            rec_action_type,
+                            equipment_id,
                         )
                         loop = asyncio.new_event_loop()
                         asyncio.set_event_loop(loop)
@@ -517,7 +521,7 @@ class BackgroundSchedulerService:
                             rec = Recommendation(
                                 site_id=storage_site_id,
                                 timestamp=datetime.utcnow(),
-                                action_type="ai_optimization",
+                                action_type=rec_action_type or "health_maintenance",
                                 risk_level=ActionRiskLevel.LOW,
                                 target_equipment=equipment_id,
                                 action={
@@ -572,9 +576,10 @@ class BackgroundSchedulerService:
                     finally:
                         loop.close()
 
-                    logger.warning(
-                        f"[AI-OPT DEBUG] validation allowed_keys count={len([vr for vr in validation.get('validation_results', []) if vr.get('allowed', False)])}"
+                    allowed_count = sum(
+                        1 for vr in validation.get("validation_results", []) if vr.get("allowed", False)
                     )
+                    logger.warning("[AI-OPT DEBUG] validation allowed_keys count=%d", allowed_count)
                     logger.warning(f"[AI-OPT DEBUG] validation results={validation.get('validation_results', [])}")
 
                     # Build set of individually-allowed recommendations
@@ -627,7 +632,10 @@ class BackgroundSchedulerService:
                         rec_action_type = rec_dict.get("action_type", "")
 
                         logger.warning(
-                            f"[AI-OPT DEBUG] Processing rec: equipment={equipment_id}, action_type={rec_action_type!r}, point={point_name!r}"
+                            "[AI-OPT DEBUG] Processing rec: equipment=%s, action_type=%r, point=%r",
+                            equipment_id,
+                            rec_action_type,
+                            point_name,
                         )
 
                         # Safety check: skip recs that failed individual validation
@@ -666,7 +674,7 @@ class BackgroundSchedulerService:
                         rec = Recommendation(
                             site_id=storage_site_id,
                             timestamp=datetime.utcnow(),
-                            action_type="ai_optimization",
+                            action_type=rec_action_type or "ai_optimization",
                             risk_level=ActionRiskLevel.LOW,
                             target_equipment=equipment_id,
                             action={
@@ -1218,7 +1226,7 @@ class BackgroundSchedulerService:
 
                 ids_to_expire: set[str] = set()
 
-                for action_type, typed_records in by_type.items():
+                for _action_type, typed_records in by_type.items():
                     # Keep top 10 most recent regardless of age
                     for r in typed_records[10:]:
                         ts = datetime.fromisoformat(r["timestamp"].replace("Z", "+00:00"))
@@ -2459,7 +2467,7 @@ class BackgroundSchedulerService:
                     finally:
                         unregister_simulation(sim_task_id)
 
-                asyncio.create_task(_watch_completion(task_id, orchestrator._task, store))
+                _watch_task = asyncio.create_task(_watch_completion(task_id, orchestrator._task, store))  # noqa: RUF006
                 return
 
         except Exception as e:

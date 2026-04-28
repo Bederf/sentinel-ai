@@ -11,15 +11,38 @@ import { useState, useEffect, useRef } from "react";
 import { Text, Flex, Grid, Tab, TabGroup, TabList, TabPanel, TabPanels } from "@tremor/react";
 import { Thermometer, Clock, Zap, AlertTriangle } from "lucide-react";
 import { hvacApi, type ThermalRunway } from "../../lib/hvacApi";
+import api from "../../lib/api";
 import { ThermalRunwayChart } from "../ThermalRunwayChart";
 import { PrecoolingSchedule } from "../PrecoolingSchedule";
+
+/** Parse a datetime string that may be an ISO datetime or a HH:MM time string. */
+function parseDatetime(value: string | undefined | null, fallback: Date): Date {
+  if (!value) return fallback;
+  // Try ISO parse first
+  const parsed = new Date(value);
+  if (!isNaN(parsed.getTime())) return parsed;
+  // Handle HH:MM time string — use today's date
+  const timeMatch = value.match(/^(\d{2}):(\d{2})$/);
+  if (timeMatch) {
+    const today = new Date();
+    today.setHours(parseInt(timeMatch[1], 10), parseInt(timeMatch[2], 10), 0, 0);
+    return today;
+  }
+  return fallback;
+}
 
 interface ThermalOptimizationPanelProps {
   siteId: string;
   compact?: boolean;
+  /** Optional pre-computed thermal runway from scenario data (with/without pre-cooling values). */
+  scenarioRunwayMetrics?: {
+    without_precooling: number;
+    with_precooling: number;
+    comfort_breach_time?: string;
+  };
 }
 
-export function ThermalOptimizationPanel({ siteId, compact = false }: ThermalOptimizationPanelProps) {
+export function ThermalOptimizationPanel({ siteId, compact = false, scenarioRunwayMetrics }: ThermalOptimizationPanelProps) {
   const [thermalData, setThermalData] = useState<ThermalRunway | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -31,6 +54,80 @@ export function ThermalOptimizationPanel({ siteId, compact = false }: ThermalOpt
 
     async function loadThermalData() {
       try {
+        // Use scenario-provided metrics when available (real computed values)
+        if (scenarioRunwayMetrics) {
+          const runwayWithout = scenarioRunwayMetrics.without_precooling;
+          const runwayWith = scenarioRunwayMetrics.with_precooling;
+          const improvementPercent = runwayWithout > 0
+            ? Math.round(((runwayWith - runwayWithout) / runwayWithout) * 100)
+            : 0;
+          const now = new Date();
+          const breachTime = parseDatetime(
+            scenarioRunwayMetrics.comfort_breach_time,
+            new Date(now.getTime() + runwayWithout * 60 * 1000),
+          );
+
+          const fakeData: ThermalRunway = {
+            site_id: siteId,
+            timestamp: now.toISOString(),
+            data: { time_points: [], without_precooling: [], with_precooling: [] },
+            outage_period: {
+              start: now.toISOString(),
+              end: new Date(now.getTime() + runwayWithout * 60 * 1000).toISOString(),
+            },
+            metrics: {
+              runway_without: runwayWithout,
+              runway_with: runwayWith,
+              comfort_breach_time: breachTime.toISOString(),
+              recovery_time: new Date(now.getTime() + (runwayWith + 30) * 60 * 1000).toISOString(),
+              improvement_percent: improvementPercent,
+            },
+            current_conditions: { avg_temperature: 22.4, avg_setpoint: 22.0, comfort_limit: 26.0 },
+          };
+          if (!mountedRef.current) return;
+          setThermalData(fakeData);
+          setLoading(false);
+          return;
+        }
+
+        // Try to get real pre-cooling scenario values first
+        const scenarios = await api.getOptimizationScenarios().catch(() => []);
+        const siteScenario = scenarios.find((s: { site_id: string }) => s.site_id === siteId);
+        if (siteScenario && siteScenario.thermal_runway) {
+          const runwayWithout = siteScenario.thermal_runway.without_precooling;
+          const runwayWith = siteScenario.thermal_runway.with_precooling;
+          const improvementPercent = runwayWithout > 0
+            ? Math.round(((runwayWith - runwayWithout) / runwayWithout) * 100)
+            : 0;
+          const now = new Date();
+          const breachTime = parseDatetime(
+            siteScenario.thermal_runway.comfort_breach_time,
+            new Date(now.getTime() + runwayWithout * 60 * 1000),
+          );
+          const scenarioData: ThermalRunway = {
+            site_id: siteId,
+            timestamp: now.toISOString(),
+            data: { time_points: [], without_precooling: [], with_precooling: [] },
+            outage_period: {
+              start: now.toISOString(),
+              end: new Date(now.getTime() + runwayWithout * 60 * 1000).toISOString(),
+            },
+            metrics: {
+              runway_without: runwayWithout,
+              runway_with: runwayWith,
+              comfort_breach_time: breachTime.toISOString(),
+              recovery_time: new Date(now.getTime() + (runwayWith + 30) * 60 * 1000).toISOString(),
+              improvement_percent: improvementPercent,
+            },
+            current_conditions: { avg_temperature: 22.4, avg_setpoint: 22.0, comfort_limit: 26.0 },
+          };
+          if (!mountedRef.current) return;
+          setThermalData(scenarioData);
+          setLoading(false);
+          return;
+        }
+
+        // Fallback: use computed thermal runway from API
         const data = await hvacApi.getThermalRunway(siteId);
         if (!mountedRef.current) return;
         setThermalData(data);
@@ -43,13 +140,17 @@ export function ThermalOptimizationPanel({ siteId, compact = false }: ThermalOpt
     }
 
     loadThermalData();
-    const interval = setInterval(loadThermalData, 60000);
-
+    if (!scenarioRunwayMetrics) {
+      const interval = setInterval(loadThermalData, 60000);
+      return () => {
+        mountedRef.current = false;
+        clearInterval(interval);
+      };
+    }
     return () => {
       mountedRef.current = false;
-      clearInterval(interval);
     };
-  }, [siteId]);
+  }, [siteId, scenarioRunwayMetrics]);
 
   if (loading) {
     return (

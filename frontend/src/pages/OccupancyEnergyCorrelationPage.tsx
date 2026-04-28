@@ -13,6 +13,7 @@ import { useEffect, useState } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { AlertCircle, CheckCircle, Lightbulb, Wind, TrendingDown, DollarSign, Leaf } from 'lucide-react';
 import { Card } from '@/components/Card';
+import { authorizedFetch } from '@/lib/api/client';
 
 interface CorrelationDataPoint {
   hour: number;
@@ -118,9 +119,9 @@ export function OccupancyEnergyCorrelationPage() {
       try {
         setLoading(true);
         const [corrRes, scenRes, savRes] = await Promise.all([
-          fetch('/api/occupancy-energy/correlation?site_id=bld-002'),
-          fetch('/api/occupancy-energy/scenarios?site_id=bld-002'),
-          fetch('/api/occupancy-energy/savings-potential?site_id=bld-002'),
+          authorizedFetch('/api/occupancy-energy/correlation?site_id=bld-002'),
+          authorizedFetch('/api/occupancy-energy/scenarios?site_id=bld-002'),
+          authorizedFetch('/api/occupancy-energy/savings-potential?site_id=bld-002'),
         ]);
 
         if (!corrRes.ok || !scenRes.ok || !savRes.ok) {
