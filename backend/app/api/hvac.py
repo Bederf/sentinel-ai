@@ -136,8 +136,8 @@ def calculate_equipment_health(equipment: dict) -> dict:
 
     if eq_type not in health_config:
         return {
-            "health_score": equipment.get("health_score", 85),
-            "status": get_health_status(equipment.get("health_score", 85)),
+            "health_score": equipment.get("health_score") or 85,
+            "status": get_health_status(equipment.get("health_score") or 85),
             "factors": {},
             "formula_version": FORMULA_VERSION_STATIC,
         }
@@ -262,8 +262,8 @@ async def get_hvac_overview(
     zones = _zone_repo.get_all(site_uuid)
     equipment_rows = _equip_repo.get_all(site_uuid)
 
-    # Zone counts
-    normal = sum(1 for z in zones if z.get("status") in ("running", "normal", None))
+    # Zone counts — "idle" with active temp control counts as running (chillers are active)
+    normal = sum(1 for z in zones if z.get("status") in ("running", "normal", "idle", None))
     fault = sum(1 for z in zones if z.get("status") in ("fault", "warning"))
     offline = sum(1 for z in zones if z.get("status") in ("offline", "off"))
 
@@ -278,18 +278,20 @@ async def get_hvac_overview(
     # Equipment summaries
     equip_summary = {}
     for eq_type, items in equip_by_type.items():
-        scores = [item.get("health_score", 85) for item in items]
+        scores = [item.get("health_score") or 85 for item in items]
         avg_health = sum(scores) / len(scores) if scores else 85
         faults = sum(1 for item in items if item.get("status") in ("fault", "critical", "warning"))
         equip_summary[eq_type] = {"count": len(items), "avg_health": round(avg_health, 1), "faults": faults}
 
     # Overall health
-    all_scores = [z.get("health_score", 85) for z in zones] + [item.get("health_score", 85) for item in equipment_rows]
+    zone_scores = [z.get("health_score") or 85 for z in zones]
+    equip_scores = [item.get("health_score") or 85 for item in equipment_rows]
+    all_scores = zone_scores + equip_scores
     overall_health = round(sum(all_scores) / len(all_scores), 1) if all_scores else 85
 
-    # Chillers running
+    # Chillers running — status "normal" means actively cooling (no is_running column in equipment table)
     chillers = [eq for eq in equipment_rows if eq.get("type", "").lower() in ("chiller", "hvac_chiller")]
-    chillers_running = sum(1 for c in chillers if c.get("status") == "running" and c.get("is_running"))
+    chillers_running = sum(1 for c in chillers if c.get("status") in ("running", "normal"))
 
     # Fetch live site power from ML feeder bridge buffers (bridge data, not DB)
     site_power = None
@@ -347,6 +349,10 @@ async def get_hvac_overview(
                 "lighting_kw": lighting_kw,
                 "total_kw": total_kw,
             },
+            "equipment_summary": {
+                "total": len(equipment_rows),
+                "online": sum(1 for eq in equipment_rows if eq.get("status") not in ("offline", "fault", "off")),
+            },
         },
         sentinel_intelligence=None,
     )
@@ -373,12 +379,24 @@ async def get_hvac_zones(
 
     zone_responses = []
     for z in all_zones:
+        # Derive FCU code when fcu_id is null — zone_id pattern: Zone-{num} or Zone-{letter}
+        raw_fcu_id = z.get("fcu_id")
+        if not raw_fcu_id:
+            zone_id_str = z.get("zone_id", "")
+            # Numeric zone: Zone-001 → S002-FCU-001, Zone-101 → S002-FCU-101, Zone-201 → S002-FCU-201
+            if zone_id_str.startswith("Zone-"):
+                suffix = zone_id_str[5:]  # e.g. "001", "101", "B", "R"
+                if suffix.isdigit():
+                    raw_fcu_id = f"S002-FCU-{suffix}"
+                elif suffix in ("B", "R"):
+                    raw_fcu_id = "S002-FCU-BASEMENT" if suffix == "B" else "S002-FCU-ROOF"
+
         zone_responses.append(
             HVACZoneResponse(
                 zone_id=z.get("zone_id", ""),
                 zone_name=z.get("zone_name", z.get("name", "")),
                 floor=z.get("floor", ""),
-                fcu_id=z.get("fcu_id"),
+                fcu_id=raw_fcu_id,
                 vav_id=z.get("vav_id"),
                 ahu_id=z.get("ahu_id"),
                 temp_sensor=z.get("temp_sensor"),

@@ -231,9 +231,9 @@ export function ChillerControlPanel({ siteId, compact = false, onChillerChange }
                 </div>
                 <span
                   className="text-sm px-2.5 py-0.5 rounded font-medium"
-                  style={chipStyle(getHealthColor(chiller.calculated_health || chiller.health_score))}
+                  style={chipStyle(getHealthColor(chiller.calculated_health ?? chiller.health_score))}
                 >
-                  Health: {(chiller.calculated_health || chiller.health_score).toFixed(0)}%
+                  Health: {(() => { const h = chiller.calculated_health ?? chiller.health_score; return h != null ? h.toFixed(0) : "--"; })()}%
                 </span>
               </Flex>
 

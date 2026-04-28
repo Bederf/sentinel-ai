@@ -295,7 +295,7 @@ export function HVACDashboard({
               )}
               <span className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>Health</span>
             </div>
-            <div className="text-3xl font-bold" style={{ color: "var(--color-sentinel-text-primary)" }}>{overview.overall_health.toFixed(0)}%</div>
+            <div className="text-3xl font-bold" style={{ color: "var(--color-sentinel-text-primary)" }}>{overview.overall_health != null ? overview.overall_health.toFixed(0) : "--"}%</div>
             <span className="text-xs capitalize" style={{ color: "var(--color-sentinel-text-secondary)" }}>
               {overview.health_status}
             </span>

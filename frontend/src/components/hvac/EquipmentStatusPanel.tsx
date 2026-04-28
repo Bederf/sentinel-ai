@@ -205,9 +205,9 @@ export function EquipmentStatusPanel({ siteId, compact = false, onEquipmentSelec
           <Text className="text-sm">Health Score</Text>
           <span
             className="text-sm px-2.5 py-0.5 rounded font-medium"
-            style={chipStyle(getHealthColor(eq.calculated_health || eq.health_score))}
+            style={chipStyle(getHealthColor(eq.calculated_health ?? eq.health_score))}
           >
-            {(eq.calculated_health || eq.health_score).toFixed(0)}%
+            {(() => { const h = eq.calculated_health ?? eq.health_score; return h != null ? h.toFixed(0) : "--"; })()}%
           </span>
         </Flex>
 

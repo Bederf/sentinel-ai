@@ -199,15 +199,15 @@ export function ZoneOverviewPanel({ siteId, compact = false, onZoneSelect }: Zon
                   <Flex alignItems="baseline" className="gap-1">
                     <span
                       className="text-3xl font-bold"
-                      style={{ color: getDeviationColor(zone.temp_deviation) }}
+                      style={{ color: getDeviationColor(zone.temp_deviation ?? 0) }}
                     >
-                      {zone.current_temp.toFixed(1)}
+                      {zone.current_temp != null ? zone.current_temp.toFixed(1) : "--"}
                     </span>
                     <span style={{ color: "var(--color-sentinel-text-disabled)" }}>°C</span>
                   </Flex>
 
                   {/* Deviation indicator */}
-                  {Math.abs(zone.temp_deviation) > 0.5 && (
+                  {zone.temp_deviation != null && Math.abs(zone.temp_deviation) > 0.5 && (
                     <Flex alignItems="center" className="gap-1 mt-1">
                       <AlertTriangle
                         className="w-3 h-3"
