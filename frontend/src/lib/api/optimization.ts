@@ -36,7 +36,13 @@ export interface Outcome {
 export const optimizationApi = {
   // Profiles
   getProfileSettings: (siteId: string) =>
-    fetchApi<SiteProfileConfig>(`/api/optimization/settings/${siteId}`),
+    fetchApi<SiteProfileConfig>(`/api/optimization/settings/${siteId}`).then(
+      (res) => {
+        // Backend returns {success, site_id, config} — unwrap to SiteProfileConfig
+        if ('config' in res) return res.config as SiteProfileConfig
+        return res as SiteProfileConfig
+      }
+    ),
 
   updateProfileSettings: (siteId: string, config: Partial<SiteProfileConfig>) =>
     fetchApi(`/api/optimization/settings/${siteId}`, {

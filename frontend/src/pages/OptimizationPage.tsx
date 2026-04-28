@@ -111,6 +111,7 @@ interface ScenarioComparison {
   energySavings: string;
   costSavings: number;
   successRate: string;
+  isPortfolio?: boolean;
 }
 
 interface OptimizationPageProps {
@@ -122,7 +123,7 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
 
   // State
   const [_sites, setSites] = useState<Site[]>([]);
-  const [selectedSiteId, setSelectedSiteId] = useState<string>("");
+  const [selectedSiteId, setSelectedSiteId] = useState<string>("site-002");
   const [allScenarios, setAllScenarios] = useState<OptimizationScenario[]>([]);
   const [scenarios, setScenarios] = useState<ScenarioComparison[]>([]);
   const [actionHistory, setActionHistory] = useState<ActionHistoryItem[]>([]);
@@ -196,6 +197,7 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
           });
 
           for (const s of scenarioData) {
+            const isPortfolio = s.site_id !== "site-002";
             comparisonRows.push({
               id: s.scenario_id,
               name: s.site_name,
@@ -203,6 +205,7 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
               energySavings: `${s.savings.energy_savings_percent}%`,
               costSavings: s.savings.total_savings_zar,
               successRate: s.thermal_runway.comfort_maintained ? "Yes" : "No",
+              isPortfolio,
             });
           }
         }
@@ -346,7 +349,7 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
           <TabPanel>
       {/* Energy Value Card */}
       <div className="mb-6">
-        {comparison ? (
+        {comparison && (comparison.actual.total_kwh > 0 || comparison.sentinel.total_kwh > 0) ? (
           <SentinelValueCard
             title="Energy Optimization Impact"
             icon={Zap}
@@ -568,7 +571,12 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
               <tbody>
                 {scenarios.map((scenario) => (
                   <tr key={scenario.id} style={{ borderBottom: "1px solid var(--color-sentinel-border)" }}>
-                    <td className="py-2.5 px-3" style={{ color: "var(--color-sentinel-text-primary)" }}>{scenario.name}</td>
+                    <td className="py-2.5 px-3" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                      <span>{scenario.name}</span>
+                      {scenario.isPortfolio && (
+                        <span className="ml-2 text-xs px-1.5 py-0.5 rounded" style={{ background: "rgba(59, 130, 246, 0.15)", color: "var(--color-sentinel-blue)", fontSize: "10px" }}>Portfolio benchmark</span>
+                      )}
+                    </td>
                     <td className="py-2.5 px-3">
                       <SentinelBadge variant={scenario.id === "baseline" ? "error" : "success"} size="sm">{scenario.runwayExtension}</SentinelBadge>
                     </td>

@@ -15,11 +15,13 @@ export const RecommendationHistory: React.FC<
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    if (!siteId) return
     loadHistory()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [siteId, filter])
 
   const loadHistory = async () => {
+    if (!siteId) return
     try {
       setLoading(true)
       setError(null)
