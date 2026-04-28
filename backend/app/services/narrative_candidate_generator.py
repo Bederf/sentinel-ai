@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from typing import Any
 from datetime import UTC, datetime
 
 from app.schemas.cockpit import CockpitIssue, CockpitSourceStatus
@@ -209,62 +210,106 @@ def _candidate_from_issue(issue: CockpitIssue, operating_mode: SentinelOperating
     )
 
 
-def _fallback_candidates_for_site(site_id: str) -> list[NarrativeCandidate]:
+def _fallback_candidates_for_site(
+    site_id: str,
+    telemetry: dict[str, Any] | None = None,
+) -> list[NarrativeCandidate]:
+    """Return fallback candidates only when real telemetry confirms conditions.
+
+    Gating logic:
+      - cooling_drift: fires only when basement zone temp > L0 avg + 1.0°C
+        AND this condition has been observed in 2+ consecutive polls (sustained).
+      - chiller_cycling / load_compensation: always available as fallback.
+    """
     canonical_site_id = normalize_site_id(site_id)
 
     if canonical_site_id != "S002":
         return []
 
-    return [
-        NarrativeCandidate(
-            candidate_id="comfort-s002-b1-upward-drift",
-            voice="comfort_stress",
-            message="Cooling drift is spreading upward from the basement plant.",
-            location=NarrativeLocation(
-                epicenter="B1",
-                affected=["L0", "L1"],
-                propagation="upward",
-            ),
-            action="Prepare standby cooling.",
-            time_to_constraint_breach_min=18,
-            affected_occupants_est=42,
-            system_criticality=0.88,
-            propagation_risk=0.74,
-            eroding_margin=True,
+    t = telemetry or {}
+
+    # ── cooling drift gate ────────────────────────────────────────────────────
+    basement_temp = t.get("basement_temp_c")
+    l0_avg_temp = t.get("l0_avg_temp_c")
+    sustained_polls = t.get("sustained_polls", 0)
+
+    cooling_drift_candidate: NarrativeCandidate | None = None
+    if basement_temp is not None and l0_avg_temp is not None:
+        if basement_temp > l0_avg_temp + 1.0 and sustained_polls >= 2:
+            cooling_drift_candidate = NarrativeCandidate(
+                candidate_id="comfort-s002-b1-upward-drift",
+                voice="comfort_stress",
+                message="Cooling drift is spreading upward from the basement plant.",
+                location=NarrativeLocation(
+                    epicenter="B1",
+                    affected=["L0", "L1"],
+                    propagation="upward",
+                ),
+                action="Prepare standby cooling.",
+                time_to_constraint_breach_min=18,
+                affected_occupants_est=42,
+                system_criticality=0.88,
+                propagation_risk=0.74,
+                eroding_margin=True,
+            )
+
+    # ── always-available fallback candidates ─────────────────────────────────
+    chiller_cycling = NarrativeCandidate(
+        candidate_id="stability-s002-chiller-cycling",
+        voice="operational_stability",
+        message="Chiller cycling margin is tightening around the plant transition.",
+        location=NarrativeLocation(
+            epicenter="B1",
+            affected=["B1", "L0"],
+            propagation="contained",
         ),
-        NarrativeCandidate(
-            candidate_id="stability-s002-chiller-cycling",
-            voice="operational_stability",
-            message="Chiller cycling margin is tightening around the plant transition.",
-            location=NarrativeLocation(
-                epicenter="B1",
-                affected=["B1", "L0"],
-                propagation="contained",
-            ),
-            action="Stabilize plant staging before the next load step.",
-            time_to_constraint_breach_min=24,
-            affected_occupants_est=18,
-            system_criticality=0.91,
-            propagation_risk=0.52,
-            eroding_margin=True,
+        action="Stabilize plant staging before the next load step.",
+        time_to_constraint_breach_min=24,
+        affected_occupants_est=18,
+        system_criticality=0.91,
+        propagation_risk=0.52,
+        eroding_margin=True,
+    )
+
+    load_compensation = NarrativeCandidate(
+        candidate_id="energy-s002-compensation-load",
+        voice="energy_pressure",
+        message="Load is rising as the building compensates.",
+        location=NarrativeLocation(
+            epicenter="B1",
+            affected=["L0", "L1"],
+            propagation="upward",
         ),
-        NarrativeCandidate(
-            candidate_id="energy-s002-compensation-load",
-            voice="energy_pressure",
-            message="Load is rising as the building compensates.",
-            location=NarrativeLocation(
-                epicenter="B1",
-                affected=["L0", "L1"],
-                propagation="upward",
-            ),
-            action="Watch plant efficiency while compensation remains active.",
-            time_to_constraint_breach_min=28,
-            affected_occupants_est=24,
-            system_criticality=0.45,
-            propagation_risk=0.38,
-            eroding_margin=False,
+        action="Watch plant efficiency while compensation remains active.",
+        time_to_constraint_breach_min=28,
+        affected_occupants_est=24,
+        system_criticality=0.45,
+        propagation_risk=0.38,
+        eroding_margin=False,
+    )
+
+    candidates = [cooling_drift_candidate, chiller_cycling, load_compensation]
+    return [c for c in candidates if c is not None]
+
+
+def _build_calm_state_candidate(site_id: str) -> NarrativeCandidate:
+    """Return a calm-state candidate when no issues and no fallback conditions are met."""
+    return NarrativeCandidate(
+        candidate_id=f"calm-{normalize_site_id(site_id).lower()}",
+        voice="operational_stability",
+        message="All building systems are operating within normal parameters.",
+        location=NarrativeLocation(
+            epicenter="building",
+            affected=[],
+            propagation="building_wide",
         ),
-    ]
+        action="Continue monitoring. No action required.",
+        time_to_constraint_breach_min=60,
+        affected_occupants_est=None,
+        system_criticality=0.1,
+        propagation_risk=0.05,
+        eroding_margin=False,
+    )
 
 
 def _candidate_from_source_health(statuses: Iterable[CockpitSourceStatus]) -> NarrativeCandidate | None:
@@ -329,6 +374,7 @@ def generate_narrative_candidates(
     site_id: str,
     issue_service: CockpitIssueFusionService | None = None,
     operating_mode: SentinelOperatingMode = "comfort",
+    telemetry: dict[str, Any] | None = None,
 ) -> list[NarrativeCandidate]:
     service = issue_service or CockpitIssueFusionService()
 
@@ -341,8 +387,9 @@ def generate_narrative_candidates(
     if candidates:
         return candidates
 
-    fallback_candidates = _fallback_candidates_for_site(site_id)
+    fallback_candidates = _fallback_candidates_for_site(site_id, telemetry=telemetry)
     if fallback_candidates:
         return fallback_candidates
 
-    return []
+    # No issues AND no fallback conditions met → calm state
+    return [_build_calm_state_candidate(site_id)]
