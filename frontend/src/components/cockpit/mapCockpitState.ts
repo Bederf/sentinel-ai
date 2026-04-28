@@ -505,15 +505,18 @@ export function mapCockpitState(
     solar_bess: ['energy_pressure'],
   }
   const matchVoices = systemFilter ? (SYSTEM_VOICE_MAP[systemFilter] ?? []) : []
+  // When a tab is active but has no mapped voices (e.g. lighting, water),
+  // suppress the fallback to primary_narrative so unrelated HVAC content
+  // doesn't bleed into other system views.
   const systemNarrative = matchVoices.length > 0
     ? payload.primary_narrative
       ? matchVoices.includes(payload.primary_narrative.voice)
         ? payload.primary_narrative
         : null
       : null
-    : payload.primary_narrative
+    : null
 
-  const narrative = systemNarrative ?? payload.primary_narrative
+  const narrative = systemFilter ? systemNarrative : (systemNarrative ?? payload.primary_narrative)
 
   // Filter secondary tensions by system voice when a system tab is active
   const secondaryTensions = matchVoices.length > 0
@@ -574,7 +577,7 @@ export function mapCockpitState(
   }
 
   // If a zone has an email cluster, add it as intakeCluster on the existing zoneSignal
-  const zoneSignalsWithClusters = zoneSignals.map((signal) => {
+  let zoneSignalsWithClusters = zoneSignals.map((signal) => {
     const cluster = clusterByZone[signal.zoneId]
     if (cluster && cluster.emailCount >= 3) {
       return { ...signal, intakeCluster: cluster }
@@ -636,6 +639,11 @@ export function mapCockpitState(
     }
   }
 
+  // Deduplicate by zoneId — keep last occurrence (equipZone version wins over standalone cluster).
+  const seen = new Map<string, typeof zoneSignalsWithClusters[0]>()
+  for (const s of zoneSignalsWithClusters) seen.set(s.zoneId, s)
+  zoneSignalsWithClusters = [...seen.values()]
+
   const secondarySummary = secondaryTensions.length > 0
     ? secondaryTensions.map((tension) => `${formatVoiceLabel(tension.voice)}: ${tension.message}`).join(' | ')
     : 'No secondary tensions are currently rising above the building background.'
@@ -661,9 +669,14 @@ export function mapCockpitState(
       tone,
       label: 'Time to Constraint',
       value: timeValue,
-      detail: energyCentreTelemetry
-        ? `${payload.operator_guidance.headline} · Energy Centre ${energyCentreTelemetry.totalKw.toFixed(0)} kW`
-        : payload.operator_guidance.headline,
+      // Suppress HVAC operator_guidance headline when a non-HVAC system tab is active
+      // without a matching narrative — prevents HVAC content from bleeding into
+      // Energy, Lighting, Water, Fire, Security tabs.
+      detail: systemFilter && !narrative
+        ? (energyCentreTelemetry ? `Energy Centre ${energyCentreTelemetry.totalKw.toFixed(0)} kW` : '—')
+        : (energyCentreTelemetry
+            ? `${payload.operator_guidance.headline} · Energy Centre ${energyCentreTelemetry.totalKw.toFixed(0)} kW`
+            : payload.operator_guidance.headline),
     },
     activeCondition: {
       summary: isShadowPhase

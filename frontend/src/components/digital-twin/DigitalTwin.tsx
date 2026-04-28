@@ -409,6 +409,15 @@ export function DigitalTwin({ siteId: propSiteId }: DigitalTwinProps = {}) {
     [filteredEquipment, selectedEquipment]
   );
 
+  // isMatrix and twinHeroTitle must be defined before any early returns
+  // so that hook call order is consistent across all render paths.
+  const isMatrix = theme === 'matrix';
+  const twinHeroTitle = useMemo(() => {
+    const site = liveSites.find((s) => s.id === selectedSiteId);
+    const label = site?.name || formatSiteTwinLabel(selectedSiteId);
+    return `${label} — Live Building Model`;
+  }, [liveSites, selectedSiteId]);
+
   // Loading state
   if (loading && equipment.length === 0) {
     return (
@@ -451,13 +460,7 @@ export function DigitalTwin({ siteId: propSiteId }: DigitalTwinProps = {}) {
     );
   }
 
-  const isMatrix = theme === 'matrix';
-
-  const twinHeroTitle = useMemo(() => {
-    const site = liveSites.find((s) => s.id === selectedSiteId);
-    const label = site?.name || formatSiteTwinLabel(selectedSiteId);
-    return `${label} — Live Building Model`;
-  }, [liveSites, selectedSiteId]);
+  // twinHeroTitle is defined before the loading return — do not recalculate here
 
   const rootClass = `h-full min-h-0 flex flex-col ${
     isMatrix

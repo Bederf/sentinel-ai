@@ -603,37 +603,17 @@ function useConciergeGraph(
   onSignalResolved: () => void,
 ) {
   const cyRef = useRef<Core | null>(null);
-  const [containerReady, setContainerReady] = useState(false);
 
-  // Initialize containerReady once the DOM is ready
+  // When container becomes available (ref set) or rooms change, re-init Cytoscape
   useEffect(() => {
     const el = containerRef.current;
-    if (el) setContainerReady(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (!el || el.clientWidth === 0 || el.clientHeight === 0) return;
+    if (rooms.length === 0) return;
 
-  // Watch for container resize so we re-init when layout settles
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver(() => {
-      if (containerReady && el.clientWidth > 0 && el.clientHeight > 0) {
-        setContainerReady((v) => !v);
-        setContainerReady((v) => !v);
-      }
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [containerReady]);
+    if (cyRef.current) cyRef.current.destroy();
 
-  useEffect(() => {
-    if (!containerReady || !containerRef.current || rooms.length === 0) return;
-    const el = containerRef.current;
     const w = el.clientWidth;
     const h = el.clientHeight;
-    // If container has no real dimensions yet, defer until it does
-    if (w === 0 || h === 0) return;
     const dims: CanvasDims = { centreX: w / 2, centreY: h / 2, maxRadius: Math.min(w, h) / 2 - 60 };
 
     const centreNode = buildCentreNode(dims);
@@ -646,8 +626,6 @@ function useConciergeGraph(
       nodes,
       dims,
     );
-
-    if (cyRef.current) cyRef.current.destroy();
 
     const cy = cytoscape({
       container: el,
@@ -673,7 +651,6 @@ function useConciergeGraph(
     const adjustRoomLabelSizes = () => {
       cy.nodes("node.room").forEach((node) => {
         const size = node.width();
-        // Keep labels inside the circle; avoid explosive scaling on large viewports.
         const fontSize = Math.min(14, Math.max(8, size * 0.22));
         node.style("font-size", `${fontSize}px`);
       });
@@ -686,7 +663,6 @@ function useConciergeGraph(
       const rd = evt.target.data("_room") as ConciergeRoom | undefined;
       if (!rd) return;
 
-      // First tap expands the room context; second tap drills into top signal.
       if (expandedRoomId === rd.room_id) {
         const primarySignalId = pickPrimarySignalId(rd);
         if (primarySignalId) {
@@ -702,15 +678,12 @@ function useConciergeGraph(
       const categoryKey = evt.target.data("category_key") as CategoryKey | undefined;
       if (!room || !categoryKey) return;
 
-      // Prefer opening the highest-priority signal in this category instead of expanding
-      // multiple overlapping per-signal nodes.
       const signalIds = (evt.target.data("signal_ids") as string[] | undefined) || [];
       if (signalIds.length > 0) {
         onSignalSelect(room, signalIds[0]);
         return;
       }
 
-      // Fallback (no signals) — just toggle selection state.
       onCategoryToggle(room, categoryKey);
     });
     cy.on("drag", "node.room", (evt) => {
@@ -758,7 +731,6 @@ function useConciergeGraph(
         categoryNode.animate({ position: { x: anchor.x + dx, y: anchor.y + dy } }, { duration: 180 });
       };
 
-      // Drop inside the room circle = resolve this category's signals.
       if (roomNode.length) {
         const roomPosition = roomNode.position();
         const dx = categoryPosition.x - roomPosition.x;
@@ -789,7 +761,6 @@ function useConciergeGraph(
         }
       }
 
-      // Drop near the centre root = resolve as well.
       const root = cy.getElementById("meeting-rooms-root");
       if (root.length) {
         const rootPosition = root.position();
@@ -812,17 +783,14 @@ function useConciergeGraph(
         }
       }
 
-      // Otherwise snap back to its orbit position.
       revert();
     });
     cy.on("mouseover", "node.room", (evt) => { evt.target.style("border-width", 3); evt.target.style("z-index", 20); });
     cy.on("mouseout", "node.room", (evt) => { evt.target.style("border-width", 2); evt.target.style("z-index", 5); });
-    // Category nodes have variable size; avoid overriding width/height on hover.
-    cy.fit(undefined, 40);
 
+    cy.fit(undefined, 40);
     return () => { cy.destroy(); cyRef.current = null; };
   }, [
-    containerReady,
     siteId,
     rooms,
     expandedRoomId,
@@ -835,7 +803,9 @@ function useConciergeGraph(
     onSignalResolved,
     containerRef,
   ]);
+
 }
+
 
 // ---- Main component ----
 

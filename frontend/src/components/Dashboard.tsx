@@ -280,7 +280,7 @@ export function Dashboard({ onViewChange, autoSelectSiteId, defaultBuildingTab: 
     loadEnergyData();
     const interval = setInterval(loadEnergyData, 30_000);
     return () => clearInterval(interval);
-  }, [energyFilterSiteId, selectedDays, buildingsList]);
+  }, [energyFilterSiteId, selectedDays, buildingsList, autoSelectSiteId]);
 
   // Calculate site status counts for KPI
   // eslint-disable-next-line @typescript-eslint/ban-ts-comment

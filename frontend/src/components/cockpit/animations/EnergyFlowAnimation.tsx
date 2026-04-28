@@ -40,7 +40,8 @@ export function EnergyFlowOverlay({ state, tone, yRange }: EnergyFlowOverlayProp
   if (!yRange) return null
 
   const height = yRange.maxY - yRange.minY
-  const totalKw = state.visualTwin.energyCentre.totalKw
+  // totalKw available for future power-label overlay
+  const _totalKw = state.visualTwin.energyCentre.totalKw
 
   return (
     <group position={[-0.5, yRange.minY, -0.2]}>

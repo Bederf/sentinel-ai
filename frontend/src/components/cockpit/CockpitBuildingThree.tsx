@@ -492,8 +492,8 @@ function ZoneMarkers({
       {signals.map((sig, index) => {
         const fi = floors.findIndex((f) => f.id === sig.floorId)
         const targetFloor = fi >= 0 ? floors[fi] : null
-        // Only render orbs on occupied floors
-        if (!targetFloor || !OCCUPIED_FLOOR_IDS.has(targetFloor.id)) return null
+        // Skip orbs whose floorId doesn't match any floor (would render outside the building)
+        if (fi < 0 || !targetFloor || !OCCUPIED_FLOOR_IDS.has(targetFloor.id)) return null
         // reversedIndex: 0 = bottom floor (L0), increases upward — matches BuildingStack slab Y math
         const reversedIndex = totalFloors - 1 - fi
         const y = reversedIndex * SLAB_HEIGHT + SLAB_HEIGHT / 2
