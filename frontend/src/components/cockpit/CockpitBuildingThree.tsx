@@ -453,7 +453,7 @@ function hashString(str: string): number {
 
 function ZoneMarkers({
   state,
-  buildingHeight,
+  buildingHeight: _buildingHeight,
   onboardingPhase,
   onZoneSelect,
 }: {
@@ -469,7 +469,7 @@ function ZoneMarkers({
     .filter((sig) => (sig.weight ?? 0) > 0.15)
     .slice(0, 5)
   const floors = state.visualTwin.floors
-  const n = Math.max(floors.length, 1)
+  const totalFloors = Math.max(floors.length, 1)
 
   return (
     <group>
@@ -478,9 +478,9 @@ function ZoneMarkers({
         const targetFloor = fi >= 0 ? floors[fi] : null
         // Only render orbs on occupied floors
         if (!targetFloor || !OCCUPIED_FLOOR_IDS.has(targetFloor.id)) return null
-        const idx = fi
-        const yRatio = n > 1 ? idx / Math.max(n - 1, 1) : 0.5
-        const y = 0.2 + yRatio * Math.max(buildingHeight - 0.4, SLAB_HEIGHT * 2)
+        // reversedIndex: 0 = bottom floor (L0), increases upward — matches BuildingStack slab Y math
+        const reversedIndex = totalFloors - 1 - fi
+        const y = reversedIndex * SLAB_HEIGHT + SLAB_HEIGHT / 2
 
         // Deterministic hash-based position within floor footprint (70% of base)
         const seedA = hashString(sig.zoneId)

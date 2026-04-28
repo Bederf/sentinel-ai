@@ -491,7 +491,34 @@ export function mapCockpitState(
   const isShadowPhase = onboardingPhase === 'shadow'
   const tone = toneFromPosture(payload.building_posture)
   const riskBand = riskBandFromPosture(payload.building_posture)
-  const narrative = payload.primary_narrative
+  // --- System-filtered narrative selection ---
+  // Map systemFilter to the voice types that belong to that system.
+  // When a system tab is active, prefer a matching narrative; fall back to the
+  // first available narrative so the right rail never goes blank.
+  const SYSTEM_VOICE_MAP: Record<string, BuildingStateNarrative['voice'][]> = {
+    hvac:     ['comfort_stress', 'occupant_friction', 'asset_stress'],
+    energy:   ['energy_pressure'],
+    lighting: [],
+    water:    [],
+    fire:     [],
+    security: [],
+    solar_bess: ['energy_pressure'],
+  }
+  const matchVoices = systemFilter ? (SYSTEM_VOICE_MAP[systemFilter] ?? []) : []
+  const systemNarrative = matchVoices.length > 0
+    ? payload.primary_narrative
+      ? matchVoices.includes(payload.primary_narrative.voice)
+        ? payload.primary_narrative
+        : null
+      : null
+    : payload.primary_narrative
+
+  const narrative = systemNarrative ?? payload.primary_narrative
+
+  // Filter secondary tensions by system voice when a system tab is active
+  const secondaryTensions = matchVoices.length > 0
+    ? payload.secondary_tensions.filter((t) => matchVoices.includes(t.voice))
+    : payload.secondary_tensions
   const urgencyScore = payload.urgency_score ?? 0
   const bands = { low: 0.3, medium: 0.5, high: 0.7, critical: 0.9 }
   const timeToBreach = narrative?.time_to_breach_min ?? null
@@ -575,8 +602,8 @@ export function mapCockpitState(
     })
   }
 
-  const secondarySummary = payload.secondary_tensions.length > 0
-    ? payload.secondary_tensions.map((tension) => `${formatVoiceLabel(tension.voice)}: ${tension.message}`).join(' | ')
+  const secondarySummary = secondaryTensions.length > 0
+    ? secondaryTensions.map((tension) => `${formatVoiceLabel(tension.voice)}: ${tension.message}`).join(' | ')
     : 'No secondary tensions are currently rising above the building background.'
 
   return {
@@ -593,7 +620,7 @@ export function mapCockpitState(
       tone,
       attentionScore: tone === 'critical' ? 1 : tone === 'elevated' ? 0.8 : tone === 'warning' ? 0.6 : 0.2,
       activeConditionCount: narrative ? 1 : 0,
-      emergingRiskCount: payload.secondary_tensions.length,
+      emergingRiskCount: secondaryTensions.length,
       evidenceStrength: narrative ? 'moderate' : 'strong',
     },
     primaryMetric: {
@@ -691,7 +718,7 @@ export function mapCockpitState(
       assetClass: null,
       criticality: null,
     },
-    emergingRisks: payload.secondary_tensions.map((tension, index) => ({
+    emergingRisks: secondaryTensions.map((tension, index) => ({
       id: `secondary-${index}-${tension.voice}`,
       title: formatVoiceLabel(tension.voice),
       detail: tension.message,
