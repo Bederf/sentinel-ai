@@ -51,7 +51,7 @@ class SLOReportService:
         supabase = get_supabase_client()
 
         try:
-            monthly_result = await supabase.table("api_uptime_monthly").select("*").eq("month", month).execute()
+            monthly_result = supabase.table("api_uptime_monthly").select("*").eq("month", month).execute()
 
             data = monthly_result.data[0] if monthly_result.data else None
 

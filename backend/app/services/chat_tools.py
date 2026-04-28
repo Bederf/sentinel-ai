@@ -26,6 +26,7 @@ from app.services.chat_tools_service_history import get_equipment_service_histor
 from app.services.device_abstraction import device_manager
 from app.services.health_threshold_service import get_health_thresholds
 from app.services.module_registry_service import module_registry
+from app.utils.calm_harness import calm_error_legacy
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +86,7 @@ async def list_devices(device_type: str | None = None, site_id: str | None = Non
         return {"success": True, "count": len(device_list), "devices": device_list}
     except Exception as e:
         logger.error(f"Error listing devices: {e}")
-        return {"success": False, "error": str(e), "devices": []}
+        return {"success": False} | calm_error_legacy(e, tool_name="list_devices")
 
 
 async def get_device_details(device_id: str) -> dict[str, Any]:
@@ -119,13 +120,13 @@ async def get_device_details(device_id: str) -> dict[str, Any]:
                         "quality": value.quality,
                     }
                 except Exception as e:
-                    point_values[point_name] = {"error": str(e)}
+                    point_values[point_name] = {"error": calm_error_legacy(e, tool_name="get_device_details")["error"]}
 
         # Get safety status
         try:
             safety_status = await device_manager.get_device_safety_status(device_id)
         except Exception as e:
-            safety_status = {"error": str(e)}
+            safety_status = {"error": calm_error_legacy(e, tool_name="get_device_details")["error"]}
 
         # Build point definitions
         points_info = {}
@@ -158,7 +159,7 @@ async def get_device_details(device_id: str) -> dict[str, Any]:
         }
     except Exception as e:
         logger.error(f"Error getting device details for {device_id}: {e}")
-        return {"success": False, "error": str(e)}
+        return {"success": False} | calm_error_legacy(e, tool_name="get_device_details")
 
 
 async def control_device(
@@ -241,8 +242,8 @@ async def control_device(
 
     except ValueError as e:
         # Safety validation failures come as ValueError
-        error_msg = str(e)
-        logger.warning(f"Control blocked for {device_id}.{point}={value}: {error_msg}")
+        error_msg = calm_error_legacy(e, tool_name="control_device")["error"]
+        logger.warning(f"Control blocked for {device_id}.{point}={value}: {e}")
         return {
             "success": False,
             "blocked": True,
@@ -253,7 +254,7 @@ async def control_device(
         }
     except Exception as e:
         logger.error(f"Error controlling device {device_id}.{point}={value}: {e}")
-        return {"success": False, "error": str(e)}
+        return {"success": False} | calm_error_legacy(e, tool_name="control_device")
 
 
 async def get_system_status(site_id: str | None = None) -> dict[str, Any]:
@@ -494,7 +495,7 @@ async def get_system_status(site_id: str | None = None) -> dict[str, Any]:
 
     except Exception as e:
         logger.error(f"Error getting system status: {e}")
-        return {"success": False, "error": str(e)}
+        return {"success": False} | calm_error_legacy(e, tool_name="get_system_status")
 
 
 async def get_optimization_recommendations(site_id: str) -> dict[str, Any]:
@@ -526,10 +527,10 @@ async def get_optimization_recommendations(site_id: str) -> dict[str, Any]:
             "note": "These are AI-generated recommendations. Use control_device to apply them after review.",
         }
     except ValueError as e:
-        return {"success": False, "error": str(e)}
+        return {"success": False} | calm_error_legacy(e, tool_name="get_optimization_recommendations")
     except Exception as e:
         logger.error(f"Error getting optimization recommendations: {e}")
-        return {"success": False, "error": str(e)}
+        return {"success": False} | calm_error_legacy(e, tool_name="get_optimization_recommendations")
 
 
 async def get_equipment_health(
@@ -947,7 +948,7 @@ async def get_equipment_health(
         }
     except Exception as e:
         logger.error(f"Error getting equipment health: {e}")
-        return {"success": False, "error": str(e)}
+        return {"success": False} | calm_error_legacy(e, tool_name="get_equipment_health")
 
 
 async def get_alerts_and_anomalies(
@@ -1070,7 +1071,7 @@ async def get_alerts_and_anomalies(
         }
     except Exception as e:
         logger.error(f"Error getting alerts and anomalies: {e}")
-        return {"success": False, "error": str(e)}
+        return {"success": False} | calm_error_legacy(e, tool_name="get_alerts_and_anomalies")
 
 
 async def get_energy_analysis(site_id: str) -> dict[str, Any]:
@@ -1163,7 +1164,7 @@ async def get_energy_analysis(site_id: str) -> dict[str, Any]:
         }
     except Exception as e:
         logger.error(f"Error getting energy analysis: {e}")
-        return {"success": False, "error": str(e)}
+        return {"success": False} | calm_error_legacy(e, tool_name="get_energy_analysis")
 
 
 async def get_floor_temperatures(floor: str | None = None, site_id: str | None = None) -> dict:
@@ -1201,7 +1202,7 @@ async def get_floor_temperatures(floor: str | None = None, site_id: str | None =
         }
     except Exception as e:
         logger.error(f"Error getting floor temperatures: {e}")
-        return {"success": False, "error": str(e)}
+        return {"success": False} | calm_error_legacy(e, tool_name="get_floor_temperatures")
 
 
 async def lookup_desk(desk_id: str, building: str | None = None) -> dict[str, Any]:
@@ -1318,7 +1319,7 @@ async def lookup_desk(desk_id: str, building: str | None = None) -> dict[str, An
                 }
         except Exception as e:
             logger.warning(f"Could not get DALI context: {e}")
-            dali_context = {"available": False, "reason": str(e)}
+            dali_context = {"available": False, "reason": calm_error_legacy(e, tool_name="lookup_desk")["error"]}
 
         # Build response
         response = {
@@ -1377,7 +1378,7 @@ async def lookup_desk(desk_id: str, building: str | None = None) -> dict[str, An
         logger.error(f"Error looking up desk {desk_id}: {e}")
         return {
             "success": False,
-            "error": str(e),
+            "error": calm_error_legacy(e, tool_name="lookup_desk")["error"],
             "prompt_user": (
                 "I encountered an error looking up that desk. Can you provide more details about the location?"
             ),
@@ -1797,7 +1798,7 @@ async def diagnose_comfort_complaint(
         logger.error(f"Error diagnosing comfort complaint for desk {desk_id}: {e}")
         return {
             "success": False,
-            "error": str(e),
+            "error": calm_error_legacy(e, tool_name="diagnose_complaint")["error"],
             "prompt_user": "I encountered an error during diagnosis. Can you provide more details about the complaint?",
         }
 
@@ -1895,7 +1896,7 @@ async def discover_niagara_points(
 
     except Exception as e:
         logger.error(f"Error in discover_niagara_points: {e}")
-        return {"success": False, "error": str(e)}
+        return {"success": False} | calm_error_legacy(e, tool_name="discover_niagara_points")
 
 
 async def review_point_mapping(
@@ -1970,7 +1971,7 @@ async def review_point_mapping(
 
     except Exception as e:
         logger.error(f"Error in review_point_mapping: {e}")
-        return {"success": False, "error": str(e)}
+        return {"success": False} | calm_error_legacy(e, tool_name="review_point_mapping")
 
 
 async def approve_point_mapping(
@@ -2023,7 +2024,7 @@ async def approve_point_mapping(
 
     except Exception as e:
         logger.error(f"Error in approve_point_mapping: {e}")
-        return {"success": False, "error": str(e)}
+        return {"success": False} | calm_error_legacy(e, tool_name="approve_point_mapping")
 
 
 async def correct_point_classification(
@@ -2080,7 +2081,7 @@ async def correct_point_classification(
 
     except Exception as e:
         logger.error(f"Error in correct_point_classification: {e}")
-        return {"success": False, "error": str(e)}
+        return {"success": False} | calm_error_legacy(e, tool_name="correct_point_classification")
 
 
 # Methodology access is now gated by DEVELOPER role (Phase 137-02)
@@ -2282,7 +2283,7 @@ async def get_fire_system_status() -> dict[str, Any]:
 
     except Exception as e:
         logger.error(f"Error getting fire system status: {e}")
-        return {"error": str(e)}
+        return {"error": calm_error_legacy(e, tool_name="get_fire_system_status")["error"]}
 
 
 async def get_security_status() -> dict[str, Any]:
@@ -2377,7 +2378,7 @@ async def get_security_status() -> dict[str, Any]:
 
     except Exception as e:
         logger.error(f"Error getting security status: {e}")
-        return {"error": str(e)}
+        return {"error": calm_error_legacy(e, tool_name="get_security_status")["error"]}
 
 
 # Tool definitions for Claude API
@@ -2399,7 +2400,7 @@ async def get_solar_overview(site_id: str | None = None) -> dict[str, Any]:
         return {"success": True, **overview}
     except Exception as e:
         logger.error(f"get_solar_overview error: {e}")
-        return {"error": str(e)}
+        return {"error": calm_error_legacy(e, tool_name="get_solar_overview")["error"]}
 
 
 async def get_bess_status_chat(site_id: str | None = None) -> dict[str, Any]:
@@ -2415,7 +2416,7 @@ async def get_bess_status_chat(site_id: str | None = None) -> dict[str, Any]:
         return {"success": True, **bess.to_dict()}
     except Exception as e:
         logger.error(f"get_bess_status error: {e}")
-        return {"error": str(e)}
+        return {"error": calm_error_legacy(e, tool_name="get_bess_status_chat")["error"]}
 
 
 async def get_solar_savings(
@@ -2432,7 +2433,7 @@ async def get_solar_savings(
         return {"success": True, **summary.to_dict()}
     except Exception as e:
         logger.error(f"get_solar_savings error: {e}")
-        return {"error": str(e)}
+        return {"error": calm_error_legacy(e, tool_name="get_solar_savings")["error"]}
 
 
 async def get_solar_diagnostics(site_id: str | None = None) -> dict[str, Any]:
@@ -2458,7 +2459,7 @@ async def get_solar_diagnostics(site_id: str | None = None) -> dict[str, Any]:
         return result
     except Exception as e:
         logger.error(f"get_solar_diagnostics error: {e}")
-        return {"error": str(e)}
+        return {"error": calm_error_legacy(e, tool_name="get_solar_diagnostics")["error"]}
 
 
 async def get_solar_forecast(
@@ -2475,7 +2476,7 @@ async def get_solar_forecast(
         return {"success": True, **forecast.to_dict()}
     except Exception as e:
         logger.error(f"get_solar_forecast error: {e}")
-        return {"error": str(e)}
+        return {"error": calm_error_legacy(e, tool_name="get_solar_forecast")["error"]}
 
 
 async def handle_comfort_complaint(
@@ -2511,7 +2512,7 @@ async def handle_comfort_complaint(
         }
     except Exception as e:
         logger.error(f"handle_comfort_complaint error: {e}")
-        return {"success": False, "error": str(e)}
+        return {"success": False} | calm_error_legacy(e, tool_name="handle_comfort_complaint")
 
 
 CHAT_TOOLS = [
@@ -3802,7 +3803,7 @@ async def process_recommendation(
         }
     except Exception as e:
         logger.error(f"Error processing recommendation: {e}")
-        return {"success": False, "error": str(e)}
+        return {"success": False} | calm_error_legacy(e, tool_name="process_recommendation")
 
 
 # ================================================================
@@ -4287,7 +4288,7 @@ async def create_work_order_chat(
         }
     except Exception as e:
         logger.error(f"Error creating work order: {e}")
-        return {"success": False, "error": str(e)}
+        return {"success": False} | calm_error_legacy(e, tool_name="create_work_order_chat")
 
 
 async def approve_recommendation_chat(
@@ -4308,7 +4309,7 @@ async def approve_recommendation_chat(
         return {"success": False, "error": "Recommendation agent not available"}
     except Exception as e:
         logger.error(f"Error approving recommendation: {e}")
-        return {"success": False, "error": str(e)}
+        return {"success": False} | calm_error_legacy(e, tool_name="approve_recommendation_chat")
 
 
 async def reject_recommendation_chat(
@@ -4329,7 +4330,7 @@ async def reject_recommendation_chat(
         return {"success": False, "error": "Recommendation agent not available"}
     except Exception as e:
         logger.error(f"Error rejecting recommendation: {e}")
-        return {"success": False, "error": str(e)}
+        return {"success": False} | calm_error_legacy(e, tool_name="reject_recommendation_chat")
 
 
 _RESET_BLOCKED_TYPES = {"FIRE", "GEN"}
@@ -4376,7 +4377,7 @@ async def reset_equipment_fault_chat(
         }
     except Exception as e:
         logger.error(f"Error resetting equipment fault: {e}")
-        return {"success": False, "error": str(e)}
+        return {"success": False} | calm_error_legacy(e, tool_name="reset_equipment_fault_chat")
 
 
 def _format_doc_results(results: list[dict], query: str) -> dict[str, Any]:
@@ -4440,7 +4441,7 @@ async def search_documents(
         return _format_doc_results(results, query)
     except Exception as e:
         logger.error(f"Error searching documents: {e}")
-        return {"success": False, "error": str(e), "results": []}
+        return {"success": False} | calm_error_legacy(e, tool_name="search_documents") | {"results": []}
 
 
 async def search_system_documents(
@@ -4464,7 +4465,7 @@ async def search_system_documents(
         return _format_doc_results(results, query)
     except Exception as e:
         logger.error(f"Error searching system documents: {e}")
-        return {"success": False, "error": str(e), "results": []}
+        return {"success": False} | calm_error_legacy(e, tool_name="search_system_documents") | {"results": []}
 
 
 # ---------------------------------------------------------------------------
@@ -4531,7 +4532,7 @@ async def get_hybrid_context(
         return result
     except Exception as e:
         logger.error(f"Error fetching hybrid context: {e}")
-        return {"success": False, "error": str(e)}
+        return {"success": False} | calm_error_legacy(e, tool_name="get_hybrid_context")
 
 
 # ---------------------------------------------------------------------------

@@ -471,6 +471,10 @@ class BackgroundSchedulerService:
                     finally:
                         loop.close()
 
+                    logger.warning(
+                        f"[AI-OPT DEBUG] recs count={len(optimization_result.recommendations)}, recs={optimization_result.recommendations}"
+                    )
+
                     if not optimization_result.recommendations:
                         logger.warning(f"[AI-OPT] {site_id}: 0 recommendations (building at optimal)")
                         continue
@@ -484,6 +488,94 @@ class BackgroundSchedulerService:
                         )
                     finally:
                         loop.close()
+
+                    # === FIX 1: Filter maintenance BEFORE validate_recommendation ===
+                    # Maintenance recs don't need device_manager validation — write directly.
+                    # This must happen before validate_recommendation call so maintenance
+                    # recs never block on device_manager lookup failures.
+                    MAINTENANCE_ACTIONS = {"maintenance_schedule", "maintenance", "inspect", "replace", "repair"}
+                    maintenance_recs = []
+                    control_recs = []
+                    for rec_dict in optimization_result.recommendations:
+                        if rec_dict.get("action_type", "") in MAINTENANCE_ACTIONS or "maintenance" in rec_dict.get(
+                            "point_name", ""
+                        ):
+                            maintenance_recs.append(rec_dict)
+                        else:
+                            control_recs.append(rec_dict)
+
+                    # Persist maintenance recs immediately — no validation needed
+                    for rec_dict in maintenance_recs:
+                        equipment_id = rec_dict.get("equipment_id", "")
+                        rec_action_type = rec_dict.get("action_type", "")
+                        logger.info(
+                            f"[AI-OPT] Persisting {rec_action_type} rec for {equipment_id} — maintenance (no validation)"
+                        )
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                        try:
+                            rec = Recommendation(
+                                site_id=storage_site_id,
+                                timestamp=datetime.utcnow(),
+                                action_type="ai_optimization",
+                                risk_level=ActionRiskLevel.LOW,
+                                target_equipment=equipment_id,
+                                action={
+                                    "point": rec_dict.get("point_name", ""),
+                                    "value": rec_dict.get("recommended_value"),
+                                },
+                                reason=rec_dict.get("reason", ""),
+                                expected_impact={
+                                    "current_value": rec_dict.get("current_value"),
+                                    "recommended_value": rec_dict.get("recommended_value"),
+                                    "unit": rec_dict.get("unit", ""),
+                                    "energy_savings_percent": rec_dict.get("savings_kwh", 5),
+                                },
+                                confidence="0.7",
+                                confidence_score=0.7,
+                                profile=optimization_result.profile or "",
+                                source="ai_optimizer",
+                                source_type="ml_model",
+                                status=RecommendationStatus.PENDING,
+                                requires_approval=True,
+                            )
+                            loop.run_until_complete(recommendation_repo.create(rec))
+                            created_count += 1
+                        except Exception as e:
+                            logger.warning(f"[AI-OPT] Failed to persist maintenance rec for {equipment_id}: {e}")
+                            error_count += 1
+                        finally:
+                            loop.close()
+
+                    if not control_recs:
+                        logger.info(f"[AI-OPT] {site_id}: all recs were maintenance, skipping validation")
+                        continue
+
+                    # Build a filtered recommendation for validation (maintenance stripped)
+                    from app.models.optimization import OptimizationRecommendation as OptRec
+
+                    filtered_recommendation = OptRec(
+                        site_id=optimization_result.site_id,
+                        timestamp=optimization_result.timestamp,
+                        recommendations=control_recs,
+                        confidence=optimization_result.confidence,
+                        profile=optimization_result.profile,
+                    )
+
+                    # Validate only control/setpoint recs
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    try:
+                        validation = loop.run_until_complete(
+                            get_ai_optimizer().validate_recommendation(site_id, filtered_recommendation)
+                        )
+                    finally:
+                        loop.close()
+
+                    logger.warning(
+                        f"[AI-OPT DEBUG] validation allowed_keys count={len([vr for vr in validation.get('validation_results', []) if vr.get('allowed', False)])}"
+                    )
+                    logger.warning(f"[AI-OPT DEBUG] validation results={validation.get('validation_results', [])}")
 
                     # Build set of individually-allowed recommendations
                     # (top-level "allowed" is an AND — one failure blocks all)
@@ -529,9 +621,14 @@ class BackgroundSchedulerService:
                             recent_keys.add((existing.target_equipment, action_point, action_value))
 
                     # Persist each recommendation
-                    for rec_dict in optimization_result.recommendations:
+                    for rec_dict in control_recs:
                         equipment_id = rec_dict.get("equipment_id", "")
                         point_name = rec_dict.get("point_name", "")
+                        rec_action_type = rec_dict.get("action_type", "")
+
+                        logger.warning(
+                            f"[AI-OPT DEBUG] Processing rec: equipment={equipment_id}, action_type={rec_action_type!r}, point={point_name!r}"
+                        )
 
                         # Safety check: skip recs that failed individual validation
                         if (equipment_id, point_name) not in allowed_keys:
@@ -746,7 +843,7 @@ class BackgroundSchedulerService:
 
                 for eq in eq_resp.data:
                     code = eq["code"]
-                    health = eq.get("health_score", 100)
+                    health = eq.get("health_score") or 100
                     eq_type = eq.get("type", "unknown")
 
                     # Determine severity
@@ -1062,9 +1159,7 @@ class BackgroundSchedulerService:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
             try:
-                expired_count, dedup_count = loop.run_until_complete(
-                    self._run_recommendation_expiry_async()
-                )
+                expired_count, dedup_count = loop.run_until_complete(self._run_recommendation_expiry_async())
                 if expired_count or dedup_count:
                     logger.info(
                         "[REC-EXPIRY] expired=%d, dedup=%d",
@@ -1091,9 +1186,7 @@ class BackgroundSchedulerService:
         dedup_total = 0
 
         try:
-            sites_result = await asyncio.to_thread(
-                lambda: sb.table("sites").select("code").execute()
-            )
+            sites_result = await asyncio.to_thread(lambda: sb.table("sites").select("code").execute())
             site_ids = [s["code"] for s in (sites_result.data or [])]
         except Exception:
             logger.debug("Could not fetch site IDs for recommendation expiry")
@@ -1139,10 +1232,9 @@ class BackgroundSchedulerService:
                         chunk = expire_ids[i : i + 100]
                         try:
                             await asyncio.to_thread(
-                                lambda c=chunk: sb.table("recommendations")
-                                .update({"status": "expired"})
-                                .in_("id", c)
-                                .execute()
+                                lambda c=chunk: (
+                                    sb.table("recommendations").update({"status": "expired"}).in_("id", c).execute()
+                                )
                             )
                             expired_total += len(chunk)
                             dedup_total += len(chunk)
@@ -1259,8 +1351,7 @@ class BackgroundSchedulerService:
                         generation_site_ids.add(sid)
                     else:
                         logger.info(
-                            f"[AI-REC] Skipping recommendations for {sid} "
-                            f"(optimization_enabled=False in site settings)"
+                            f"[AI-REC] Skipping recommendations for {sid} (optimization_enabled=False in site settings)"
                         )
             except Exception as gate_err:
                 logger.debug(f"[AI-REC] Mode gate check failed: {gate_err}")
@@ -1282,13 +1373,13 @@ class BackgroundSchedulerService:
             )
 
             all_equipment = response.data if response.data else []
-            at_risk = len([eq for eq in all_equipment if eq.get("health_score", 100) < 90])
+            at_risk = len([eq for eq in all_equipment if (eq.get("health_score") or 100) < 90])
             logger.info(f"Generating recommendations for {len(all_equipment)} equipment ({at_risk} at-risk)")
 
             generated = 0
             for eq in all_equipment:
                 try:
-                    health = eq.get("health_score", 100)
+                    health = eq.get("health_score") or 100
                     equipment_id = eq.get("id")
 
                     # Get building/site code
@@ -1639,21 +1730,14 @@ class BackgroundSchedulerService:
                     continue
 
                 try:
-                    # Run async evaluation
-                    loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(loop)
+                    recommendation = asyncio.run(coordinator.evaluate_current_state(site_id))
 
-                    try:
-                        recommendation = loop.run_until_complete(coordinator.evaluate_current_state(site_id))
-
-                        if recommendation:
-                            logger.info(
-                                f"Site {site_id}: Generated {recommendation['type']} recommendation - "
-                                f"Modules: {recommendation.get('modules_involved')}, "
-                                f"Reduction: {recommendation.get('estimated_reduction_kw'):.0f}kW"
-                            )
-                    finally:
-                        loop.close()
+                    if recommendation:
+                        logger.info(
+                            f"Site {site_id}: Generated {recommendation['type']} recommendation - "
+                            f"Modules: {recommendation.get('modules_involved')}, "
+                            f"Reduction: {recommendation.get('estimated_reduction_kw'):.0f}kW"
+                        )
 
                 except Exception as e:
                     logger.warning(f"Demand coordination failed for site {site_id}: {e}")
@@ -2742,8 +2826,8 @@ class BackgroundSchedulerService:
         if result:
             logger.info(
                 "AEGIS cycle produced proposal: action=%s tier=%s for %s",
-                result.get("action_type", "?"),
-                result.get("routing", {}).get("tier", "?"),
+                getattr(result, "action_type", "?"),
+                getattr(getattr(result, "routing", {}), "tier", "?"),
                 site_id,
             )
 
@@ -3284,6 +3368,7 @@ class BackgroundSchedulerService:
         Monthly: 02:00 SAST on 1st of month → aggregates prior complete month
         """
         from apscheduler.triggers.cron import CronTrigger
+
         from app.services.uptime_aggregator import UptimeAggregator
 
         uptime_agg = UptimeAggregator()
@@ -3355,6 +3440,7 @@ class BackgroundSchedulerService:
         and upserts into critical_path_hourly. SLO pass if p99 <= 7000ms.
         """
         from apscheduler.triggers.cron import CronTrigger
+
         from app.services.critical_path_monitor import CriticalPathMonitor
 
         critical_path = CriticalPathMonitor()
@@ -3655,8 +3741,7 @@ class BackgroundSchedulerService:
             from ml.explanations.evaluation import LLMJudgeService
 
             service = LLMJudgeService(sample_size=10)
-            loop = asyncio.get_event_loop()
-            result = loop.run_until_complete(service.evaluate_recent())
+            result = asyncio.run(service.evaluate_recent())
 
             if result is not None:
                 sentinel_llm_judge_score.labels(score_type="actionability").set(result.actionability_score or 0.0)
@@ -4005,28 +4090,33 @@ class BackgroundSchedulerService:
     def _run_document_mri_sync(self):
         """Sync documents from MRI Concept API. Runs synchronously via APScheduler."""
         try:
+            from app.config.settings import settings
+
+            if not settings.mri_document_base_url:
+                logger.warning("[DOC_MRI] MRI_DOCUMENT_BASE_URL not configured — skipping sync")
+                return
+        except Exception as e:
+            logger.warning("[DOC_MRI] Could not load settings: %s — skipping sync", e)
+            return
+
+        try:
             import asyncio
 
             from app.services.document_adapter_mri import ConceptMRIAdapter
 
             adapter = ConceptMRIAdapter()
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            try:
-                result = loop.run_until_complete(adapter.run_sync(site_id="site-002"))
-                if result.get("errors"):
-                    logger.warning(
-                        "[DOC_MRI] sync errors: %s",
-                        result["errors"],
-                    )
-                else:
-                    logger.info(
-                        "[DOC_MRI] sync OK: ingested=%s updated=%s",
-                        result.get("ingested", 0),
-                        result.get("updated", 0),
-                    )
-            finally:
-                loop.close()
+            result = asyncio.run(adapter.run_sync(site_id="site-002"))
+            if result.get("errors"):
+                logger.warning(
+                    "[DOC_MRI] sync errors: %s",
+                    result["errors"],
+                )
+            else:
+                logger.info(
+                    "[DOC_MRI] sync OK: ingested=%s updated=%s",
+                    result.get("synced", 0),
+                    result.get("failed", 0),
+                )
         except Exception as e:
             logger.error("Document MRI sync failed: %s", e, exc_info=True)
 

@@ -42,7 +42,7 @@ class UptimeAggregator:
 
         try:
             checks_result = (
-                await supabase.table("api_uptime_checks")
+                supabase.table("api_uptime_checks")
                 .select("status_code, latency_ms")
                 .gte("check_time", start_dt.isoformat())
                 .lt("check_time", end_dt.isoformat())
@@ -59,20 +59,16 @@ class UptimeAggregator:
             avg_latency = round(sum(c["latency_ms"] for c in checks_result.data) / total, 2)
             max_latency = round(max(c["latency_ms"] for c in checks_result.data), 2)
 
-            await (
-                supabase.table("api_uptime_daily")
-                .upsert(
-                    {
-                        "check_date": yesterday.isoformat(),
-                        "total_checks": total,
-                        "successful_checks": successful,
-                        "uptime_percent": uptime_percent,
-                        "avg_latency_ms": avg_latency,
-                        "max_latency_ms": max_latency,
-                    }
-                )
-                .execute()
-            )
+            supabase.table("api_uptime_daily").upsert(
+                {
+                    "check_date": yesterday.isoformat(),
+                    "total_checks": total,
+                    "successful_checks": successful,
+                    "uptime_percent": uptime_percent,
+                    "avg_latency_ms": avg_latency,
+                    "max_latency_ms": max_latency,
+                }
+            ).execute()
 
             logger.info(f"Daily uptime {yesterday}: {uptime_percent}% ({successful}/{total} checks)")
             return {
@@ -122,7 +118,7 @@ class UptimeAggregator:
 
         try:
             checks_result = (
-                await supabase.table("api_uptime_checks")
+                supabase.table("api_uptime_checks")
                 .select("status_code, latency_ms")
                 .gte("check_time", month_start.isoformat())
                 .lt("check_time", month_end.isoformat())
@@ -142,23 +138,19 @@ class UptimeAggregator:
             downtime_checks = total - successful
             downtime_minutes = round(downtime_checks * 1.0 / 60, 2)
 
-            await (
-                supabase.table("api_uptime_monthly")
-                .upsert(
-                    {
-                        "month": month,
-                        "total_checks": total,
-                        "successful_checks": successful,
-                        "uptime_percent": uptime_percent,
-                        "error_budget_remaining": error_budget,
-                        "downtime_minutes": downtime_minutes,
-                        "slo_target": SLO_TARGET,
-                        "slo_pass": slo_pass,
-                        "incidents": "[]",
-                    }
-                )
-                .execute()
-            )
+            supabase.table("api_uptime_monthly").upsert(
+                {
+                    "month": month,
+                    "total_checks": total,
+                    "successful_checks": successful,
+                    "uptime_percent": uptime_percent,
+                    "error_budget_remaining": error_budget,
+                    "downtime_minutes": downtime_minutes,
+                    "slo_target": SLO_TARGET,
+                    "slo_pass": slo_pass,
+                    "incidents": "[]",
+                }
+            ).execute()
 
             status = "PASS" if slo_pass else "FAIL"
             logger.info(

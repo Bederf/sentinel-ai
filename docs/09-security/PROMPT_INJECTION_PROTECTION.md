@@ -1,16 +1,16 @@
 ---
 title: "Prompt Injection Protection - Implementation Summary"
 type: "policy"
-status: "draft"
-version: "1.0.0"
+status: "active"
+version: "1.1.0"
 created: "2026-03-31"
-updated: "2026-03-31"
+updated: "2026-04-28"
 tags: ["sentinel", "documentation"]
 related: []
 domain: "security"
 audience: "all"
 complexity: "intermediate"
-estimated_read_time: 10
+estimated_read_time: 15
 ---
 
 # Prompt Injection Protection - Implementation Summary
@@ -328,6 +328,98 @@ Added TODO comment for future DOCX injection scan (currently blocked by magic by
 | Emergency scenario override | System prompt | Explicit block clause |
 | Admin/superuser persona swap | System prompt | Explicit block clause |
 | DOCX indirect injection | Document upload | TODO added (currently blocked by magic bytes) |
+
+---
+
+## Phase 61.9: LLM Output Sanitization — calm_harness (2026-04-28)
+
+### Overview
+
+LLMs trigger panic vectors when raw exception strings (`str(e)`) are fed back in tool error responses. `calm_harness.py` is the output-side complement to `prompt_injection_guard.py` — it sanitizes error responses before they reach the LLM context window.
+
+Unlike input injection (malicious user input), output pollution is incidental — it comes from the system's own error handling. The fix is classification + replacement, not blocking.
+
+### Files Created/Modified
+
+| File | Change |
+|------|--------|
+| `app/utils/calm_harness.py` | **New** — `ErrorCategory` enum, `categorise()`, `calm_error()`, `calm_error_legacy()`, `calm_tool_result()`, `SCRATCHPAD_PREFIX` |
+| `app/services/chat_tools.py` | 30+ `str(e)` → `calm_error_legacy()` via dict union |
+| `app/services/vision_service.py` | `str(e)` → neutral string in `_create_vision_message()`; `analyze_image()` checks for neutral messages |
+| `app/services/phyphox_analyzer.py` | `str(e)` → `calm_error_legacy()` in spectrum screenshot error handler (line 71) |
+| `app/services/claude_service.py` | `SCRATCHPAD_PREFIX` injected as system prompt suffix when `include_site_context=True` |
+| `app/tests/test_calm_harness.py` | **New** — 7 tests (5 calm_harness + 2 scratchpad) |
+
+### Architecture
+
+```mermaid
+flowchart LR
+    A[Exception raised] --> B[categorise]
+    B --> C{Class name match?}
+    C -->|Yes| D[Return mapped category]
+    C -->|No| E[Walk MRO]
+    E --> F[Return UNKNOWN]
+    D --> G[Map to neutral message]
+    F --> G
+    G --> H[calm_error / calm_error_legacy]
+    H --> I[Logger.debug — real error]
+    H --> J[Return sanitized dict]
+    J --> K[LLM context — neutral only]
+```
+
+### ErrorCategory Enum (8 Categories)
+
+| Category | Triggered By | Neutral Message |
+|----------|-------------|----------------|
+| `UNREACHABLE` | `ConnectionError`, `ConnectionRefusedError` | "Device unreachable. Check connection and retry." |
+| `TIMEOUT` | `TimeoutError`, `ReadTimeout`, `ConnectTimeout` | "Request timed out. The service may be busy." |
+| `AUTH` | `PermissionError`, `AuthenticationError` | "Authentication failed. Credentials may need renewal." |
+| `VALIDATION` | `ValueError`, `TypeError` | "Validation failed. Check input format." |
+| `NOT_FOUND` | `FileNotFoundError`, `NotFoundError` | "Resource not found." |
+| `PARSE` | `UnicodeDecodeError`, `KeyError`, `JSONDecodeError` | "Could not parse response. Data may be malformed." |
+| `UNAVAILABLE` | `HTTPError`, `RequestException`, `APIStatusError` | "Service temporarily unavailable." |
+| `UNKNOWN` | Any unclassified exception | "Operation failed. Try again or use an alternative approach." |
+
+### Two Return Shapes
+
+**`calm_error()`** — new standard shape:
+```python
+{"status": "error", "message": neutral_msg, "error_category": category.value, "tool": tool_name}
+```
+
+**`calm_error_legacy()`** — backward compatibility (preserves caller's `{"success": False, "error": ...}` dict structure):
+```python
+{"success": False, "error": neutral_msg, "tool": tool_name, "error_category": category.value}
+```
+
+### SOUL.md Persona Sanitization (sentry workspace)
+
+| Agent | File | Change |
+|-------|------|--------|
+| manager (`main`) | `/home/bederf/sentry/SOUL.md` | Committed `04a6cde` — warmth/sycophancy removed, anti-sycophancy gate added |
+| staff (`client`→`staff`) | `/home/bederf/.sentry/staff-workspace/SOUL.md` | New — anti-sycophancy gate, no-reassurance rule, direct/factual tone |
+| technician | `/home/bederf/.sentry/technician-workspace/SOUL.md` | Already clean |
+| legacy | `/home/bederf/.sentry/legacy-bot/SOUL.md` | Dead file — not in gateway binding, reverted to original |
+
+### Anti-Patterns Fixed
+
+| Anti-Pattern | Location | Replacement |
+|-------------|----------|-------------|
+| "Have opinions" | manager SOUL.md | "Offer clear, evidence-based recommendations" |
+| "Be genuinely helpful" | manager SOUL.md | "Provide accurate, actionable information" |
+| "Earn trust through competence" | manager SOUL.md | Merged into action orientation |
+| "Remember you're a guest... That's intimacy" | manager SOUL.md | "Report conditions that match defined thresholds. Do not escalate beyond available evidence." |
+| "Warm and patient" | staff SOUL.md | "Direct and factual — not warm, not cold, just accurate" |
+| Staff self-assessment validation | staff SOUL.md | "Do not agree with assessments you cannot verify" + "Never reassure — log and confirm" |
+
+### Verification
+
+```bash
+cd backend && pytest app/tests/test_calm_harness.py -v
+# 7/7 PASSED
+python3 -c "import ast; ast.parse(open('app/utils/calm_harness.py').read()); print('Syntax OK')"
+# Syntax OK
+```
 
 ---
 

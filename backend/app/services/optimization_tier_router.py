@@ -98,7 +98,7 @@ class OptimizationTierRouter:
             system: Equipment system type (e.g. "HVAC", "FCU", "DALI").
             point_name: BACnet/oBIX point name.
             site_id: Site identifier.
-            control_tier: One of "monitor", "human_in_loop", "auto_execute".
+            control_tier: One of "monitor", "supervised", "auto_execute".
 
         Returns:
             RoutingDecision with tier, action, and metadata.
@@ -206,18 +206,18 @@ class OptimizationTierRouter:
         Resolution order:
             1. site_profile["control_tier"] if present and valid
             2. Fallback from optimization_settings.mode:
-               - "supervised" -> "human_in_loop"
+               - "supervised" -> "supervised"
                - "automatic" -> "auto_execute"
-            3. Default: "human_in_loop"
+            3. Default: "supervised"
 
         Args:
             site_profile: Dict with optional "control_tier" key.
             optimization_settings: OptimizationSettings instance with .mode.
 
         Returns:
-            One of "monitor", "human_in_loop", "auto_execute".
+            One of "monitor", "supervised", "auto_execute".
         """
-        valid_tiers = {"monitor", "human_in_loop", "auto_execute"}
+        valid_tiers = {"monitor", "supervised", "auto_execute"}
 
         # 1. Check site profile
         if site_profile:
@@ -229,12 +229,12 @@ class OptimizationTierRouter:
         if optimization_settings is not None:
             mode = getattr(optimization_settings, "mode", None)
             if mode == "supervised":
-                return "human_in_loop"
+                return "supervised"
             if mode == "automatic":
                 return "auto_execute"
 
         # 3. Default
-        return "human_in_loop"
+        return "supervised"
 
     # ------------------------------------------------------------------
     # Private helpers
@@ -277,7 +277,7 @@ class OptimizationTierRouter:
         if control_tier == "monitor":
             return "log_only"
 
-        if control_tier == "human_in_loop":
+        if control_tier == "supervised":
             if tier == RoutingTier.TIER1_ADVISORY:
                 return "advisory"
             # tier2 and tier3 both go to pending_approval

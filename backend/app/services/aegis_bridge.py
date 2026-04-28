@@ -380,7 +380,7 @@ async def _check_tripwire_repeated_hash(
 async def run_aegis_cycle(
     site_id: str,
     context: dict | None = None,
-) -> dict | None:
+) -> "Recommendation | None":
     """Run one AEGIS dispatch cycle: arbitrage -> validate -> route -> persist.
 
     Called by solar_dispatch_service or scheduler.
@@ -444,7 +444,19 @@ async def run_aegis_cycle(
             )
             return None
 
-        # 5. Create recommendation
+        # 5. Pre-insert dedup — skip if functionally identical pending rec exists
+        action_value = dispatch_action.action
+        power_kw = dispatch_command.actual_power_kw
+        tariff = dispatch_action.tariff_band
+        rec_repo = RecommendationRepository()
+        if await _pending_bess_dup_exists_global(site_id, tariff, action_value, power_kw, rec_repo):
+            logger.debug("AEGIS: skipping duplicate bess_dispatch %s %.0fkW for %s", action_value, power_kw, site_id)
+            return None
+
+        # 6. Expire stale BESS pending recs (keep only 2 most recent)
+        await _expire_stale_bess_global(site_id, rec_repo)
+
+        # 7. Create recommendation
         rec = await create_dispatch_recommendation(
             site_id=site_id,
             dispatch_action=dispatch_action,
@@ -452,45 +464,57 @@ async def run_aegis_cycle(
             bess_state=bess_state,
             context=context,
         )
-
-        # 6. Persist recommendation
-        rec_repo = RecommendationRepository()
-        await rec_repo.upsert(rec)
-
-        # 7. Route through tier routing engine
-        router = TierRoutingEngine()
-        rec_dict = rec.to_dict()
-        rec_dict["contributing_factors"] = _build_contributing_factors(
-            dispatch_action, dispatch_command, bess_state, rec, context
-        )
-        routing_result = await router.route_recommendation(rec_dict)
-
-        logger.info(
-            "AEGIS cycle: %s -> tier=%s action=%s confidence=%.2f for %s",
-            dispatch_action.action,
-            routing_result.tier,
-            routing_result.action,
-            routing_result.confidence_score,
-            site_id,
-        )
-
-        # 8. Return recommendation dict for API
-        result = rec.to_dict()
-        result["routing"] = {
-            "tier": routing_result.tier,
-            "action": routing_result.action,
-            "decision_id": routing_result.decision_id,
-            "confidence_score": routing_result.confidence_score,
-        }
-        # Stable join key: links JSONL dispatch events to parasite_decisions
-        result["aegis_proposal_id"] = rec.correlation_id
-
-        # 9. Tripwire checks
-        _check_tripwire_gate_fail(rec_dict, routing_result, site_id)
-        await _check_tripwire_repeated_hash(rec_dict, routing_result, site_id)
-
-        return result
+        return rec
 
     except Exception as e:
-        logger.error("AEGIS cycle failed for %s: %s", site_id, e, exc_info=True)
+        logger.error("run_aegis_cycle failed for %s: %s", site_id, e)
         return None
+
+
+async def _pending_bess_dup_exists_global(
+    site_id: str,
+    tariff_band: str,
+    action: str,
+    power_kw: float,
+    rec_repo,
+) -> bool:
+    """Check if a functionally identical pending bess_dispatch rec already exists."""
+    from app.models.recommendation import RecommendationStatus
+
+    try:
+        existing = await rec_repo.get_by_status(site_id, RecommendationStatus.PENDING, limit=50)
+        for rec in existing:
+            if rec.action_type != "bess_dispatch":
+                continue
+            action_dict = rec.action or {}
+            value_dict = action_dict.get("value", {}) or {}
+            if (
+                value_dict.get("tariff_band") == tariff_band
+                and value_dict.get("action") == action
+                and abs(float(value_dict.get("power_kw") or 0) - power_kw) < 1.0
+            ):
+                return True
+    except Exception as e:
+        logger.warning("Dedup check failed for %s: %s", site_id, e)
+    return False
+
+
+async def _expire_stale_bess_global(site_id: str, rec_repo) -> int:
+    """Expire all but the 2 most recent pending bess_dispatch recs. Returns count expired."""
+    from app.models.recommendation import RecommendationStatus
+
+    expired = 0
+    try:
+        pending = await rec_repo.get_by_status(site_id, RecommendationStatus.PENDING, limit=100)
+        bess_pending = [r for r in pending if r.action_type == "bess_dispatch"]
+        if len(bess_pending) >= 3:
+            for rec in bess_pending[2:]:
+                rec.status = RecommendationStatus.EXPIRED
+                try:
+                    await rec_repo.update(rec.id, rec)
+                    expired += 1
+                except Exception:
+                    pass
+    except Exception as e:
+        logger.warning("Stale BESS expire failed for %s: %s", site_id, e)
+    return expired

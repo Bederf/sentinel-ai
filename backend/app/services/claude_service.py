@@ -12,6 +12,7 @@ from app.models.auth import SentinelRole
 from app.services.chat_tools import execute_tool, get_chat_tools
 from app.services.cross_system_analyzer import get_cross_system_analyzer
 from app.services.fm_context import fm_context_service
+from app.utils.calm_harness import SCRATCHPAD_PREFIX
 
 logger = logging.getLogger(__name__)
 
@@ -87,7 +88,7 @@ savings come from avoiding the emergency premium on parts (+50% \
 after hours), scheduled labour vs overtime rates, and preventing \
 secondary damage to other equipment."
 
-Always be helpful, professional, and safety-conscious. If you \
+Provide accurate information based on available data. If you \
 identify a critical issue, emphasize the urgency appropriately.
 
 **BMS AI Agent Capabilities:**
@@ -491,6 +492,16 @@ class ClaudeService:
                 "cache_control": {"type": "ephemeral"},
             }
         ]
+
+        # Calm scratchpad: inject as system prompt suffix when in interactive/recommendation mode.
+        # Not injected for background/lean calls (include_site_context=False).
+        if include_site_context:
+            system_blocks.append(SCRATCHPAD_PREFIX.strip())
+            logger.debug(
+                "Calm scratchpad injected: source=%s include_site_context=%s",
+                source,
+                include_site_context,
+            )
 
         effective_model = model_override or self._model
 

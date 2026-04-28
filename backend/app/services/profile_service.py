@@ -75,6 +75,9 @@ class ProfileService:
             Profile dictionary or None if not found
         """
         config = self.load_site_profile_config(site_id)
+        logger.warning(
+            f"[PROFILE] get_site_profile({site_id!r}) -> config.active_profile={config.active_profile if config else None}"
+        )
         if not config:
             return None
 
@@ -208,21 +211,26 @@ class ProfileService:
             return self.site_configs[site_code]
 
         # 1) Try Supabase first (primary authority since Phase 183)
+        # Try normalized code first, then original (DB uses 'site-002' format)
         try:
             from app.database.supabase_client import get_supabase_client
 
             client = get_supabase_client()
-            result = client.table("sites").select("optimization_settings").eq("code", site_code).single().execute()
-            if result.data:
-                opt = result.data.get("optimization_settings") or {}
-                if opt:
-                    config = SiteProfileConfig.from_dict(opt)
-                    config.site_id = site_code
-                    self.site_configs[site_code] = config
-                    logger.info(f"Loaded profile config for {site_code} from Supabase")
-                    return config
+            for code in [site_code, site_id]:
+                try:
+                    result = client.table("sites").select("optimization_settings").eq("code", code).execute()
+                    if result.data:
+                        opt = result.data[0].get("optimization_settings") or {}
+                        if opt:
+                            config = SiteProfileConfig.from_dict(opt)
+                            config.site_id = site_code
+                            self.site_configs[site_code] = config
+                            logger.info(f"Loaded profile config for {site_code} from Supabase (code={code})")
+                            return config
+                except Exception as e:
+                    logger.warning(f"Supabase query failed for code={code!r}: {e}")
         except Exception as e:
-            logger.debug(f"Could not load profile config from Supabase for {site_code}: {e}")
+            logger.warning(f"Could not load profile config from Supabase for {site_code}: {e}")
 
         # 2) Fall back to local JSON (backward compatibility)
         site_path = Path(__file__).parent.parent / "data" / "buildings" / site_code / "building.json"
@@ -232,7 +240,7 @@ class ProfileService:
             config = SiteProfileConfig(
                 site_id=site_code,
                 active_profile="balanced",
-                control_tier="human_in_loop",
+                control_tier="supervised",
             )
             self.site_configs[site_code] = config
             return config
@@ -246,7 +254,7 @@ class ProfileService:
                 config = SiteProfileConfig(
                     site_id=site_code,
                     active_profile="cost",
-                    control_tier="human_in_loop",
+                    control_tier="supervised",
                 )
                 self.site_configs[site_code] = config
                 return config
@@ -262,7 +270,7 @@ class ProfileService:
             config = SiteProfileConfig(
                 site_id=site_code,
                 active_profile="balanced",
-                control_tier="human_in_loop",
+                control_tier="supervised",
             )
             return config
 

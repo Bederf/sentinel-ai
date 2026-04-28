@@ -48,7 +48,7 @@ class CriticalPathMonitor:
         """Async internals of latency capture."""
         from app.database.supabase_client import get_supabase_client
 
-        supabase = await get_supabase_client()
+        supabase = get_supabase_client()
 
         # Extract timestamps
         created_at = recommendation.timestamp
@@ -77,20 +77,16 @@ class CriticalPathMonitor:
         total_ms = (executed_at - created_at).total_seconds() * 1000
 
         try:
-            await (
-                supabase.table("supervised_action_traces")
-                .upsert(
-                    {
-                        "site_id": site_id,
-                        "recommendation_id": recommendation.id,
-                        "approval_latency_ms": round(approval_ms, 2),
-                        "execution_latency_ms": round(execution_ms, 2),
-                        "total_latency_ms": round(total_ms, 2),
-                        "timestamp": datetime.now(UTC).isoformat(),
-                    }
-                )
-                .execute()
-            )
+            supabase.table("supervised_action_traces").upsert(
+                {
+                    "site_id": site_id,
+                    "recommendation_id": recommendation.id,
+                    "approval_latency_ms": round(approval_ms, 2),
+                    "execution_latency_ms": round(execution_ms, 2),
+                    "total_latency_ms": round(total_ms, 2),
+                    "timestamp": datetime.now(UTC).isoformat(),
+                }
+            ).execute()
 
             logger.info(
                 f"✓ Critical path trace: {recommendation.id} | "
@@ -126,7 +122,7 @@ class CriticalPathMonitor:
         """Async internals of hourly percentile aggregation."""
         from app.database.supabase_client import get_supabase_client
 
-        supabase = await get_supabase_client()
+        supabase = get_supabase_client()
 
         # Determine hour window (last complete hour)
         now = datetime.now(UTC)
@@ -136,7 +132,7 @@ class CriticalPathMonitor:
         try:
             # Get all sites with traces in this window
             sites_result = (
-                await supabase.table("supervised_action_traces")
+                supabase.table("supervised_action_traces")
                 .select("DISTINCT site_id")
                 .gte("timestamp", hour_start.isoformat())
                 .lt("timestamp", hour_end.isoformat())
@@ -148,7 +144,7 @@ class CriticalPathMonitor:
 
             for site_id in sites:
                 traces_result = (
-                    await supabase.table("supervised_action_traces")
+                    supabase.table("supervised_action_traces")
                     .select("total_latency_ms, approval_latency_ms, execution_latency_ms")
                     .eq("site_id", site_id)
                     .gte("timestamp", hour_start.isoformat())
@@ -182,24 +178,20 @@ class CriticalPathMonitor:
 
                 slo_pass = p99 <= SLO_TARGET_MS
 
-                await (
-                    supabase.table("critical_path_hourly")
-                    .upsert(
-                        {
-                            "site_id": site_id,
-                            "hour_start": hour_start.isoformat(),
-                            "total_actions": total_actions,
-                            "p50_total_ms": p50,
-                            "p99_total_ms": p99,
-                            "p99_9_total_ms": p99_9,
-                            "max_total_ms": max_lat,
-                            "avg_total_ms": avg_lat,
-                            "slo_pass": slo_pass,
-                            "updated_at": datetime.now(UTC).isoformat(),
-                        }
-                    )
-                    .execute()
-                )
+                supabase.table("critical_path_hourly").upsert(
+                    {
+                        "site_id": site_id,
+                        "hour_start": hour_start.isoformat(),
+                        "total_actions": total_actions,
+                        "p50_total_ms": p50,
+                        "p99_total_ms": p99,
+                        "p99_9_total_ms": p99_9,
+                        "max_total_ms": max_lat,
+                        "avg_total_ms": avg_lat,
+                        "slo_pass": slo_pass,
+                        "updated_at": datetime.now(UTC).isoformat(),
+                    }
+                ).execute()
 
                 results[site_id] = {
                     "hour": hour_start.isoformat(),

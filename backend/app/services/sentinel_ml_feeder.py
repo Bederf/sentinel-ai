@@ -272,21 +272,20 @@ class SentinelMLFeeder:
         self._data_sources.append(data_source)
 
     def get_latest_site_power(self) -> dict[str, float] | None:
-        """Return latest HVAC/lighting/total kW from site_aggregate buffer.
+        """Return latest HVAC/lighting/total kW from whichever buffer has power data.
 
-        Returns None when no bridge data has arrived yet, so the cockpit can
-        display "No info" instead of fake zeros.
+        Handles the case where multiple aggregates (S002-CHILLER-AGG, S002-SITE-AGG)
+        share equip_type='site_aggregate' — scan all buffers and pick the one that
+        actually contains total_kw readings.
         """
-        buf = self._buffers.get("site_aggregate")
-        if not buf:
-            return None
-        if not buf.get("total_kw"):
-            return None
-        return {
-            "hvac_kw": round(buf.get("hvac_kw", [0])[-1], 2),
-            "lighting_kw": round(buf.get("lighting_kw", [0])[-1], 2),
-            "total_kw": round(buf.get("total_kw", [0])[-1], 2),
-        }
+        for buf in self._buffers.values():
+            if buf.get("total_kw") is not None:
+                return {
+                    "hvac_kw": round(buf.get("hvac_kw", [0])[-1], 2),
+                    "lighting_kw": round(buf.get("lighting_kw", [0])[-1], 2),
+                    "total_kw": round(buf.get("total_kw", [0])[-1], 2),
+                }
+        return None
 
     def score_anomaly(self, hours_ingested: int | None = None) -> dict[str, float]:
         """Compute anomaly_score per equipment code from the latest buffer readings.

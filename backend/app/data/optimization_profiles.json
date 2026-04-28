@@ -1,8 +1,8 @@
 {
   "profiles": {
-    "asset_sweating": {
-      "name": "Asset Sweating",
-      "description": "Maximize equipment utilization and defer replacements. Accepts higher maintenance risk for greater runtime.",
+    "asset_preservation": {
+      "name": "Asset Preservation",
+      "description": "Sweat the assets — maximize equipment utilization and defer replacements. Accepts higher maintenance risk for greater runtime.",
       "weights": {
         "runtime": 0.35,
         "comfort": 0.10,
@@ -16,8 +16,8 @@
         "acceptable_mttr_hours": 4
       }
     },
-    "comfort_first": {
-      "name": "Comfort First",
+    "comfort": {
+      "name": "Comfort",
       "description": "Prioritize occupant comfort with tight temperature bands and fast fault response. Accepts higher costs.",
       "weights": {
         "runtime": 0.10,

@@ -21,12 +21,37 @@ from app.services.signal_emitter_base import (
 
 logger = logging.getLogger(__name__)
 
-# Site code to friendly name mapping
-_SITE_NAME_MAP: dict[str, str] = {
-    "S002": "Fairlands",
-    "FA1": "Fairlands",
-    "FA2": "Fairlands",
-}
+# In-memory cache: site code (e.g. "S002") → friendly name
+_site_name_cache: dict[str, str] = {}
+
+
+def _get_site_name(site_code: str) -> str:
+    """Look up a site's friendly name from Supabase (buildings table).
+
+    Falls back to the site code itself if not found.
+    """
+    if site_code in _site_name_cache:
+        return _site_name_cache[site_code]
+
+    try:
+        from app.core.site_resolver import _from_supabase_site_id
+        from app.database.supabase_client import get_supabase_client
+
+        # Convert S002 → site-002 for buildings table lookup
+        internal_code = _from_supabase_site_id(site_code)
+
+        client = get_supabase_client()
+        result = client.table("buildings").select("name").eq("code", internal_code).execute()
+        if result.data:
+            name = result.data[0].get("name") or site_code
+            _site_name_cache[site_code] = name
+            return name
+    except Exception as e:
+        logger.debug("Site name lookup failed for %s: %s", site_code, e)
+
+    # Fallback: return code as-is
+    _site_name_cache[site_code] = site_code
+    return site_code
 
 
 # ---------------------------------------------------------------------------
@@ -49,7 +74,7 @@ def _room_code_to_location_ref(room_code: str) -> str:
     parts = room_code.split("-")
     if len(parts) >= 3:
         building = parts[0].upper()
-        site_name = _SITE_NAME_MAP.get(building, building)
+        site_name = _get_site_name(building)
         # Reconstruct: site/building/remaining parts joined by /
         remaining = "/".join(parts[1:])
         if site_name != building:

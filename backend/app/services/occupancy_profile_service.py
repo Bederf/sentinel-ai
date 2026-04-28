@@ -55,6 +55,20 @@ def calculate_zone_occupancy(
             return max(5.0, 75.0 - (hour - 17) * 25)
         return 5.0
 
+    # open_plan office floor zones — same schedule as 'office'
+    if zone_type == "open_office":
+        if 7 <= hour < 9:
+            return 30.0 + (hour - 7) * 27.5
+        if 9 <= hour < 12:
+            return 85.0 + random_source.uniform(-5, 5)
+        if 12 <= hour < 14:
+            return 65.0 + random_source.uniform(-10, 10)
+        if 14 <= hour < 17:
+            return 75.0 + random_source.uniform(-5, 10)
+        if 17 <= hour < 19:
+            return max(5.0, 75.0 - (hour - 17) * 25)
+        return 5.0
+
     if zone_type == "meeting":
         if 9 <= hour < 17:
             return 50.0 + random_source.uniform(-20, 30)

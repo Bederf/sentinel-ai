@@ -60,7 +60,7 @@ class RecommendationService:
 
         # Get control tier from profile
         config = self.profile_service.load_site_profile_config(site_id)
-        control_tier = config.control_tier if config else "human_in_loop"
+        control_tier = config.control_tier if config else "supervised"
 
         # Classify risk level
         risk_level = self._classify_risk(action_type)
@@ -457,7 +457,7 @@ class RecommendationService:
             # Tier 1: Display only, never execute
             return True
 
-        if control_tier == "human_in_loop":
+        if control_tier == "supervised":
             # Tier 2: Always require approval
             return True
 

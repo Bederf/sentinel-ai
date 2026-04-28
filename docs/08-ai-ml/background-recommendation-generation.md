@@ -2,9 +2,9 @@
 title: "Background Recommendation Generation"
 type: "technical"
 status: "complete"
-version: "1.1.0"
+version: "1.2.0"
 created: "2026-02-11"
-updated: "2026-02-27"
+updated: "2026-04-28"
 author: "Sentinel Development Team"
 tags: ["ai", "recommendations", "background-jobs", "scheduler", "autonomous"]
 related: ["./ai-recommendation-system.md", "../04-features/lifecycle-simulation.md", "../03-api-reference/recommendations-api.md"]
@@ -16,7 +16,7 @@ estimated_read_time: 15
 
 # Background Recommendation Generation
 
-**Automatic AI recommendations run 24/7 without manual intervention or simulations.** The background scheduler continuously monitors equipment health and generates actionable recommendations every 10 minutes.
+**Automatic AI recommendations run 24/7 without manual intervention or simulations.** The background scheduler continuously monitors equipment health and generates actionable recommendations every 15 minutes.
 
 ## Overview
 
@@ -29,7 +29,7 @@ The recommendation system operates as **autonomous background jobs** that:
 
 ```mermaid
 graph LR
-    A["Background Scheduler<br/>(APScheduler)"] -->|Every 10 min| B["Recommendation<br/>Generation Job"]
+    A["Background Scheduler<br/>(APScheduler)"] -->|Every 15 min| B["Recommendation<br/>Generation Job"]
     C["Real Equipment Data<br/>(Health, Alerts, Service History)"] --> B
     M["ML Models<br/>(LSTM, Anomaly, Classifier)"] -->|Phase 132| B
     B -->|Analyze & Score| D["Maintenance Recommender<br/>Engine"]

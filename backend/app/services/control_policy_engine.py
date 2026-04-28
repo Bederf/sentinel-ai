@@ -92,7 +92,7 @@ class ControlPolicyEngine:
         - LIVE_CONTROL -> FULL_CONTROL
         """
         mode = settings.resolved_ingestion_mode
-        control_tier = getattr(settings, "control_tier", "human_in_loop")
+        control_tier = getattr(settings, "control_tier", "supervised")
 
         if mode == IngestionMode.SIMULATION:
             return ControlMode.RECOMMEND

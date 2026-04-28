@@ -30,6 +30,8 @@ class MqttPresenceEvent:
     distance_m: float | None = None
     moving_gate: int | None = None
     static_gate: int | None = None
+    # Door state (magnetic reed switch on GPIO — ground truth for "did they leave?")
+    door_closed: bool | None = None
 
 
 def _load_node_room_mapping() -> dict[str, dict[str, Any]]:
@@ -117,6 +119,11 @@ def parse_mqtt_presence_message(topic: str, payload: bytes | str | dict[str, Any
     moving_gate = raw_data.get("moving_gate")
     static_gate = raw_data.get("static_gate")
 
+    # Extract door state (magnetic reed switch on GPIO — ground truth for "did they leave?")
+    # None = no door sensor installed; True = door closed; False = door open
+    door_closed_raw = raw_data.get("door_closed")
+    door_closed: bool | None = None if door_closed_raw is None else bool(door_closed_raw)
+
     # Derive presence from radar fields if not explicitly set
     # LD2410C: presence = moving OR stationary
     if "presence" not in raw_data and "occupied" not in raw_data and (moving is not None or stationary is not None):
@@ -142,6 +149,7 @@ def parse_mqtt_presence_message(topic: str, payload: bytes | str | dict[str, Any
         distance_m=float(distance_m) if distance_m is not None else None,
         moving_gate=int(moving_gate) if moving_gate is not None else None,
         static_gate=int(static_gate) if static_gate is not None else None,
+        door_closed=door_closed,
     )
 
 
@@ -189,6 +197,7 @@ async def process_mqtt_presence_message(topic: str, payload: bytes | str | dict[
         distance_m=event.distance_m,
         moving_gate=event.moving_gate,
         static_gate=event.static_gate,
+        door_closed=event.door_closed,
     )
 
 

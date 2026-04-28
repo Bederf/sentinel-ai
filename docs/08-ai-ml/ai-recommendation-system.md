@@ -2,9 +2,9 @@
 title: "AI Recommendation System"
 type: "technical"
 status: "approved"
-version: "3.0.0"
+version: "3.1.0"
 created: "2026-02-02"
-updated: "2026-02-27"
+updated: "2026-04-28"
 author: "Sentinel Development Team"
 tags: ["ai", "optimization", "recommendations", "claude", "zone-aware", "background-jobs"]
 related: ["./background-recommendation-generation.md", "../14-south-africa-context/load-shedding-optimization.md", "../06-safety-compliance/safety-interlocks-engine.md", "../08-ai-ml/hybrid-ai-routing.md", "../03-api-reference/recommendations-api.md"]
@@ -109,6 +109,42 @@ graph TB
 | **Recommendation Modal** | `frontend/src/components/OptimizationRecommendationModal.tsx` | Approval dialog |
 | **Energy Comparison** | `frontend/src/components/EnergyComparisonPanel.tsx` | Actual vs SENTINEL comparison (in Validation tab) |
 | **ROI Summary** | `frontend/src/components/ROISummaryCard.tsx` | Risk intelligence from predictions (in Validation tab) |
+
+---
+
+## 5-Layer Prompt Structure (Phase 2)
+
+AI-OPT uses a 5-layer prompt structure to produce profile-driven operational recommendations:
+
+```mermaid
+flowchart TD
+    L1["Layer 1: ACTIVE GOAL<br/>Profile intent + energy prices"]
+    L2["Layer 2: WASTE OPPORTUNITIES<br/>Pre-computed from FCUStateTracker"]
+    L3["Layer 3: LEARNED PATTERNS<br/>Decision memory from previous cycles"]
+    L4["Layer 4: CONSTRAINTS<br/>Autonomous systems + safety limits"]
+    L5["Layer 5: ADVISORY TASK<br/>Anticipatory check + JSON recommendation format"]
+
+    L1 --> L2 --> L3 --> L4 --> L5
+```
+
+| Layer | Content | Source |
+|-------|---------|--------|
+| 1 | Active goal (cost_saving/comfort/asset_preservation/balanced) | `_format_profile_intent()` |
+| 2 | Waste opportunities (zone empty + FCU running) | `ContextPreComputeService.format_for_prompt()` |
+| 3 | Learned patterns | Decision memory text |
+| 4 | Constraints + safety limits | `_format_constraints()` |
+| 5 | Advisory question + anticipatory check + JSON format | `_format_task()` |
+
+### AI-OPT vs Health Engine Separation
+
+AI-OPT produces **operational advisory recommendations**. Maintenance recommendations are the exclusive domain of the rule-based health engine. This is a hard architectural separation:
+
+| System | Output | Audience | Cadence |
+|--------|--------|----------|---------|
+| Health rule engine | "AHU-2 at 78% — schedule inspection" | Maintenance technician | When health drops below threshold |
+| AI-OPT | "AHU-2 is degraded — reduce load, shift to AHU-1 to protect it" | Building operator | Every 15 minutes |
+
+AI-OPT asks: "given current conditions, what should the operator adjust right now?" Degraded equipment informs the urgency of an operational recommendation — it does not trigger a maintenance ticket.
 
 ---
 

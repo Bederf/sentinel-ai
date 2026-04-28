@@ -173,9 +173,9 @@ async def get_point_value(
                     return float(value)
 
         # Fallback: query Supabase for latest point value
-        supabase = await get_supabase_client()
+        supabase = get_supabase_client()
         result = (
-            await supabase.table("device_telemetry")
+            supabase.table("device_telemetry")
             .select("value")
             .eq("device_id", device_id)
             .eq("point_name", point)

@@ -356,7 +356,7 @@ class ModbusBESSWriter:
 
         # 2. No target configured
         if self._is_demo:
-result = WriteResult(
+            result = WriteResult(
                 success=True,
                 register=register,
                 value_kw=power_kw,

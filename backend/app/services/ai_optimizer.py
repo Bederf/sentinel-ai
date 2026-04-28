@@ -16,8 +16,7 @@ equipment combinations.
 
 import json
 import logging
-import re
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -32,7 +31,17 @@ from app.services.lighting_service import get_lighting_service
 from app.services.model_gateway import model_gateway
 from app.services.safety_interlocks import safety_engine
 
+UTC = UTC
+
 logger = logging.getLogger(__name__)
+
+# Profile-aware health recommendation thresholds
+HEALTH_THRESHOLDS: dict[str, dict[str, int]] = {
+    "comfort": {"warn": 60, "critical": 45},
+    "cost_saving": {"warn": 60, "critical": 45},
+    "asset_preservation": {"warn": 85, "critical": 70},
+    "balanced": {"warn": 70, "critical": 50},
+}
 
 # Data directory for sites
 DATA_DIR = Path(__file__).parent.parent / "data"
@@ -128,6 +137,12 @@ class AIOptimizerService:
         # Provider selection handled by model_gateway using active routing profile
         self._sites = None
         self._optimization_status_cache: dict[str, SiteOptimizationStatus] = {}
+        # Phase 1a: FCU state tracker for post-occupancy waste detection
+        from app.services.context_precompute_service import ContextPreComputeService
+        from app.services.fcu_state_tracker import FCUStateTracker
+
+        self.fcu_state_tracker = FCUStateTracker()
+        self.context_precompute_service = ContextPreComputeService(self.fcu_state_tracker)
 
     @property
     def sites(self) -> list[dict[str, Any]]:
@@ -216,6 +231,53 @@ class AIOptimizerService:
         # Gather module success rates from feedback loop
         feedback_rates_text = self._gather_feedback_success_rates(site_id)
 
+        # Phase 1b: Pre-compute waste opportunities before LLM analysis
+        ahu_devices = equipment_inventory.get("ahu", [])
+        ahu_states = []
+        for d in ahu_devices:
+            op_data = getattr(d, "operating_data", {}) or {}
+            cap = op_data.get("capacity_pct", 0) if isinstance(op_data, dict) else 0
+            equip_code = getattr(d, "code", "")
+            if equip_code:
+                ahu_states.append({"equipment_id": equip_code, "capacity_pct": cap})
+
+        # Build enriched current_conditions for pre-compute (avoid mutating the original)
+        enriched_conditions = dict(current_conditions)
+        enriched_conditions["ahu_states"] = ahu_states
+        # building_occupancy_pct: numeric from zone_occupancy or occupancy string
+        zone_occ = current_conditions.get("zone_occupancy", {})
+        if zone_occ:
+            occ_vals = [v for v in zone_occ.values() if isinstance(v, (int, float))]
+            enriched_conditions["building_occupancy_pct"] = sum(occ_vals) / len(occ_vals) if occ_vals else 100
+        else:
+            occ_val = current_conditions.get("occupancy", 100)
+            if isinstance(occ_val, (int, float)):
+                enriched_conditions["building_occupancy_pct"] = occ_val
+            elif occ_val == "high":
+                enriched_conditions["building_occupancy_pct"] = 80
+            elif occ_val == "medium":
+                enriched_conditions["building_occupancy_pct"] = 50
+            elif occ_val == "low":
+                enriched_conditions["building_occupancy_pct"] = 20
+            else:
+                enriched_conditions["building_occupancy_pct"] = 100
+        # bess fields: pull from current_conditions if present
+        enriched_conditions.setdefault("bess_soc", 0)
+        enriched_conditions.setdefault("bess_dispatching", False)
+        enriched_conditions.setdefault("indoor_avg_temp", current_conditions.get("indoor_temp"))
+
+        active_profile_name = profile.get("name", "balanced") if profile else "balanced"
+        outdoor_temp = current_conditions.get("outdoor_temp")
+        peak_tariff = energy_prices.get("peak_rate", 3.01) if energy_prices else 3.01
+
+        precomputed_context = await self.context_precompute_service.compute(
+            site_id=site_id,
+            current_conditions=enriched_conditions,
+            active_profile=active_profile_name,
+            outdoor_temp=outdoor_temp,
+            peak_tariff=peak_tariff,
+        )
+
         # Build optimization prompt for Claude with ALL available equipment
         prompt = self._build_optimization_prompt(
             site,
@@ -228,13 +290,11 @@ class AIOptimizerService:
             ml_context=ml_context,
             decision_memory_text=decision_memory_text,
             feedback_rates_text=feedback_rates_text,
+            precomputed_context=precomputed_context,
         )
 
         # Determine task_class based on anomaly state
-        has_anomalies = (
-            ml_context is not None
-            and bool(ml_context.get("anomaly_alerts"))
-        )
+        has_anomalies = ml_context is not None and bool(ml_context.get("anomaly_alerts"))
         task_class = "heavy" if has_anomalies else "medium"
         logger.info(
             f"Site {site_id}: anomaly_alerts={len(ml_context.get('anomaly_alerts', []) if ml_context else [])} — "
@@ -408,8 +468,19 @@ class AIOptimizerService:
                 for point_name in device.points:
                     point_name_lower = point_name.lower()
 
-                    # Ignore writable targets; we only want sensor values.
+                    # Read setpoints live via device_manager
                     if "setpoint" in point_name_lower or point_name_lower.endswith("_sp"):
+                        try:
+                            sp_value = await device_manager.read_device_value(device.id, point_name)
+                            if sp_value.value is not None:
+                                conditions.setdefault("setpoints", {})[f"{device.id}.{point_name}"] = {
+                                    "value": sp_value.value,
+                                    "unit": sp_value.unit,
+                                    "timestamp": sp_value.timestamp,
+                                }
+                                conditions["_data_sources"]["setpoints"] = "live"
+                        except Exception:
+                            pass
                         continue
 
                     target_key: str | None = None
@@ -597,6 +668,68 @@ class AIOptimizerService:
 
             except Exception as e:
                 logger.warning(f"Failed to get BESS telemetry: {e}")
+
+            # ── Read setpoints from operating_data (populated by oBIX setpoint poll) ──
+            # device_manager is empty for HTTP bridge sites (S002), so instead of
+            # read_device_value() calls, read directly from Supabase equipment.operating_data.
+            # This is populated by ShadowModePollingService.poll() → Section 5b.
+            try:
+                from app.database.repositories.equipment_repository import EquipmentRepository
+                from app.database.supabase_client import get_supabase_client
+
+                # Inline site lookup — sb not yet defined at this point in the function
+                sb_sp = get_supabase_client()
+                site_resp_sp = sb_sp.table("sites").select("id").eq("code", site_id).execute()
+                if site_resp_sp.data:
+                    site_uuid_sp = site_resp_sp.data[0]["id"]
+                    eq_repo = EquipmentRepository()
+                    all_equip = eq_repo.get_all(site_id=site_uuid_sp)
+                    now_utc = datetime.now(tz=UTC)
+                    stale_delta = timedelta(hours=2)
+                    stale_count = 0
+                    for eq in all_equip:
+                        op = eq.get("operating_data") or {}
+                        if not op:
+                            continue
+                        updated_at_str = eq.get("updated_at") or eq.get("created_at", "")
+                        is_stale = True
+                        if updated_at_str:
+                            try:
+                                updated_at = datetime.fromisoformat(updated_at_str.replace("Z", "+00:00"))
+                                is_stale = (now_utc - updated_at) > stale_delta
+                            except Exception:
+                                pass
+                        if is_stale:
+                            stale_count += 1
+                            continue
+                        for key, val in op.items():
+                            if any(
+                                sp in key.lower()
+                                for sp in [
+                                    "setpoint",
+                                    "_sp",
+                                    "cooling",
+                                    "heating",
+                                    "supply_temp",
+                                    "room_temp",
+                                    "flow",
+                                    "speed",
+                                ]
+                            ):
+                                if isinstance(val, dict) and val.get("value") is not None:
+                                    conditions.setdefault("setpoints", {})[f"{eq.get('code')}.{key}"] = {
+                                        "value": val["value"],
+                                        "unit": val.get("unit", ""),
+                                        "timestamp": val.get("timestamp", ""),
+                                    }
+                    sp_count = len(conditions.get("setpoints", {}))
+                    if sp_count > 0:
+                        conditions["_data_sources"]["setpoints"] = "live"
+                        logger.warning(
+                            f"[AI-OPT] Loaded {sp_count} setpoints from operating_data for {site_id} ({stale_count} stale skipped)"
+                        )
+            except Exception as e:
+                logger.warning(f"Failed to load setpoints from operating_data: {e}")
 
             # Gather equipment health from Supabase — enables health-aware recs
             try:
@@ -1097,6 +1230,138 @@ class AIOptimizerService:
 
         return "\n" + "\n\n".join(sections) + "\n"
 
+    # ── Phase 2: 5-Layer Prompt Structure ─────────────────────────────────────
+
+    def _format_profile_intent(self, profile: str, energy_prices: dict[str, Any]) -> str:
+        """Layer 1 — Active goal: what we're optimising for right now."""
+        current_rate = energy_prices.get("current_rate", energy_prices.get("eskom_rate", 0))
+        band = energy_prices.get("band", "standard")
+        schedule = energy_prices.get("schedule", [])
+        next_change = "unknown"
+        if isinstance(schedule, list) and schedule:
+            next_entry = schedule[0]
+            if isinstance(next_entry, dict):
+                next_change = next_entry.get("start", "unknown")
+            else:
+                next_change = str(next_entry)
+
+        intents = {
+            "cost_saving": f"""
+Optimise for minimum energy cost.
+Current TOU: R{current_rate:.2f}/kWh ({band.upper()})
+Next tariff change: {next_change}
+Every recommendation must include ZAR saving estimate.
+Comfort may be relaxed within safe bounds.
+Equipment health is secondary unless failure is imminent.
+""",
+            "comfort": """
+Optimise for occupant comfort.
+Maintain setpoints within tight tolerance.
+Energy cost is secondary.
+Do not recommend setpoint relaxation unless building is empty.
+""",
+            "asset_preservation": f"""
+Optimise for equipment longevity.
+Reduce unnecessary runtime on degraded equipment.
+Flag any equipment operating outside safe parameters.
+Current TOU: R{current_rate:.2f}/kWh — cost context only.
+""",
+            "balanced": f"""
+Balance cost, comfort, and asset health equally.
+Current TOU: R{current_rate:.2f}/kWh ({band.upper()})
+Prioritise actions that improve multiple dimensions simultaneously.
+""",
+        }
+        return intents.get(profile, intents["balanced"])
+
+    def _format_pattern_context(
+        self,
+        decision_memory: str | None,
+        simulated_time: datetime,
+    ) -> str:
+        """Layer 3 — Learned patterns from shadow phase."""
+        if not decision_memory:
+            return (
+                "No patterns learned yet — building still in early observation phase.\n"
+                "Use sensor data and ML model outputs to identify anomalies."
+            )
+        time_str = simulated_time.strftime("%H:%M")
+        return f"""
+Time-relevant patterns (±1 hour from {time_str}):
+{decision_memory}
+
+Use these patterns to anticipate conditions, not just react to them.
+If a pattern suggests a zone will empty soon, recommend action now.
+"""
+
+    def _format_constraints(self, site: dict[str, Any]) -> str:
+        """Layer 4 — What autonomous systems handle and safety limits."""
+        return """
+AUTONOMOUS SYSTEMS (already running — do not duplicate):
+- DALI/Tridonic: occupancy dimming, daylight harvesting
+- BESS solar arbitrage: TOU charge/discharge cycles
+- HVAC occupancy setback: +2°C when zone empty
+
+DO NOT recommend what these systems already handle.
+Recommend EARLIER or SMARTER action when patterns justify it.
+
+SAFETY LIMITS:
+- Minimum zone temp (after hours): 18°C
+- Maximum setpoint relaxation: +3°C from comfort baseline
+- Do not increase load on equipment with health score < 70%
+"""
+
+    def _format_task(
+        self,
+        profile: str,
+        current_time: datetime,
+        energy_prices: dict[str, Any],
+    ) -> str:
+        """Layer 5 — The specific question the AI should answer."""
+        time_str = current_time.strftime("%H:%M")
+        is_occupied = 7 <= current_time.hour < 18
+        period = "occupied hours" if is_occupied else "after hours"
+        current_rate = energy_prices.get("current_rate", energy_prices.get("eskom_rate", 0))
+
+        return f"""
+Current time: {time_str} SAST ({period})
+Active profile: {profile.upper().replace("_", " ")}
+
+ANTICIPATORY CHECK:
+Look 60 minutes ahead. Based on the occupancy schedule and energy pricing:
+- Are any zones about to become occupied that need pre-conditioning?
+- Is a peak tariff window approaching that requires pre-cooling now?
+- Is a TOU transition coming that changes the optimal BESS/plant state?
+Recommend NOW if lead time is required — do not wait until conditions arrive.
+
+ADVISORY TASK:
+Based on the waste opportunities above and learned patterns,
+recommend specific actions the operator should take right now.
+
+For each recommendation:
+1. Name the exact equipment (ID)
+2. State what it is doing vs what it should be doing
+3. Reference the source (live telemetry / schedule / learned pattern)
+4. Recommend the specific action
+5. State the benefit in ZAR (cost_saving) or qualitative terms
+
+FORMAT each recommendation as:
+{{
+  "equipment_id": "S002-FCU-201",
+  "action": {{"point": "power_state", "value": "off"}},
+  "reason": "Zone-201 schedule shows empty since 19:45 (18 min). FCU still running. Pattern confirms no re-occupancy after 19:30 on weekdays. Recommend switching off now.",
+  "benefit": "Saves ~0.3 kWh at R{current_rate:.2f}/kWh = R0.90",
+  "confidence": 0.87,
+  "source": "schedule + pattern"
+}}
+
+If the building is already running optimally for {profile},
+state specifically why — reference actual values, not generic statements.
+
+If you need additional data to improve recommendations, list in:
+{{"data_requests": ["occupancy_schedule", "nmd_limit"]}}
+"""
+
     def _build_optimization_prompt(
         self,
         site: dict[str, Any],
@@ -1109,6 +1374,7 @@ class AIOptimizerService:
         ml_context: dict[str, Any] | None = None,
         decision_memory_text: str | None = None,
         feedback_rates_text: str | None = None,
+        precomputed_context=None,  # Phase 1b: PreComputedContext | None
     ) -> str:
         """Build optimization prompt for Claude with ALL available equipment.
 
@@ -1140,72 +1406,17 @@ class AIOptimizerService:
             if devices:
                 inventory_summary.append(f"- {device_type.upper()}: {len(devices)} devices")
 
-        # Build profile section if profile is provided
-        profile_section = ""
-        if profile:
-            profile_weights = profile.get("weights", {})
-            profile_thresholds = profile.get("thresholds", {})
-            profile_section = f"""
-**ACTIVE OPTIMIZATION PROFILE: {profile.get("name", "Default")}**
-{profile.get("description", "No description available")}
+        # Extract active profile name for profile-aware prompt
+        active_profile = "balanced"
+        profile_name = "balanced"
+        if profile and profile.get("name"):
+            active_profile = profile.get("name", "balanced")
+            profile_name = active_profile.lower()
 
-**Optimization Weights (priorities):**
-- Runtime/Equipment Health: {profile_weights.get("runtime", 0.25):.0%}
-- Comfort: {profile_weights.get("comfort", 0.25):.0%}
-- Cost: {profile_weights.get("cost", 0.25):.0%}
-- Maintenance: {profile_weights.get("maintenance", 0.15):.0%}
-- Energy: {profile_weights.get("energy", 0.10):.0%}
-
-**Profile-Specific Decision Guidance:**
-"""
-            # Add profile-specific guidance
-            profile_name = profile.get("name", "").lower()
-            if "asset" in profile_name or "sweat" in profile_name:
-                profile_section += """- MAXIMIZE equipment runtime and utilization
-- Accept higher maintenance risk to extend asset life
-- Reduce idle hours - keep systems running efficiently
-- Use relaxed comfort bands to maximize runtime"""
-            elif "comfort" in profile_name:
-                profile_section += """- PRIORITIZE occupant comfort with tight temperature control
-- Maintain setpoints within ±1°C of target
-- Fast fault response and recovery
-- Accept higher energy costs for comfort"""
-            elif "cost" in profile_name or "saving" in profile_name:
-                profile_section += """- MINIMIZE operational costs and energy consumption
-- Aggressive load shifting and demand response
-- Accept wider comfort bands (±2°C) during off-peak
-- Prioritize peak-shaving and cost reduction"""
-
-            profile_section += f"""
-
-**Profile Thresholds & Constraints:**
-{json.dumps(profile_thresholds, indent=2) if profile_thresholds else "No specific thresholds"}
-
-**Your optimization must respect these profile priorities above all else.**
-"""
-
-        # Use configured health thresholds from settings page
-        _ht = current_conditions.get("_health_thresholds", {"healthy": 90, "warning": 70, "critical": 50})
-        _t_healthy = _ht.get("healthy", 90)
-        _t_warning = _ht.get("warning", 70)
-        _t_critical = _ht.get("critical", 50)
-
-        prompt = (
-            "You are an expert building optimization engineer operating in INTERVENTION mode. "
-            "You must ONLY recommend changes when current conditions diverge from optimal. "
-            "If the building is running normally, output zero recommendations.\n\n"
-            "**CRITICAL RULE:** Do NOT generate recommendations for the sake of coverage. "
-            "Every recommendation must cite a specific measured condition that is suboptimal "
-            "and explain exactly what is wrong and why your change fixes it.\n\n"
-            "**NOTE:** Equipment health/maintenance recommendations are handled separately by "
-            "a rule-based engine. Focus ONLY on operational optimization: setpoints, scheduling, "
-            "energy, BESS dispatch, solar, and load management.\n\n"
-        )
-
+        # Current time context
         op_hours = site.get("operating_hours", {})
         op_start = op_hours.get("start", "08:00")
         op_end = op_hours.get("end", "18:00")
-
         now_sast = datetime.now()
         current_time_str = now_sast.strftime("%H:%M")
         current_weekday = now_sast.strftime("%A")
@@ -1213,7 +1424,49 @@ class AIOptimizerService:
             current_time_str.replace(":", "")
         ) <= int(op_end.replace(":", ""))
 
-        prompt += f"""**Building:** {site["name"]} ({site["id"]})
+        # ── 5-LAYER PROMPT STRUCTURE ───────────────────────────────────────────
+        prompt_parts = []
+
+        # LAYER 1 — ACTIVE GOAL
+        layer1 = f"""=================================================================
+LAYER 1 — ACTIVE GOAL
+=================================================================
+Profile: {active_profile.upper().replace("_", " ")}
+{self._format_profile_intent(profile_name, energy_prices)}"""
+
+        # LAYER 2 — WASTE OPPORTUNITIES
+        waste_block = (
+            self.context_precompute_service.format_for_prompt(precomputed_context) if precomputed_context else ""
+        )
+        layer2 = f"""=================================================================
+LAYER 2 — WASTE OPPORTUNITIES (pre-computed)
+=================================================================
+{waste_block if waste_block else "No waste opportunities detected at current conditions."}"""
+
+        # LAYER 3 — LEARNED PATTERNS
+        layer3 = f"""=================================================================
+LAYER 3 — LEARNED PATTERNS
+=================================================================
+{self._format_pattern_context(decision_memory_text, now_sast)}"""
+
+        # LAYER 4 — CONSTRAINTS
+        layer4 = f"""=================================================================
+LAYER 4 — CONSTRAINTS
+=================================================================
+{self._format_constraints(site)}"""
+
+        # LAYER 5 — TASK
+        layer5 = f"""=================================================================
+LAYER 5 — TASK
+=================================================================
+{self._format_task(profile_name, now_sast, energy_prices)}"""
+
+        prompt_parts.extend([layer1, layer2, layer3, layer4, layer5])
+
+        # ── DATA SECTIONS (unchanged — between LAYER 3 and LAYER 5) ───────
+        # Building context
+        data_sections = [
+            f"""**Building:** {site["name"]} ({site["id"]})
 - Type: {site.get("type", "commercial")}
 - Size: {site.get("sqm", 5000)} sqm
 - Floors: {site.get("floors", 1)}
@@ -1232,33 +1485,33 @@ class AIOptimizerService:
   * Safety and security equipment monitoring
 
 **Equipment Inventory at This Site:**
-{chr(10).join(inventory_summary) if inventory_summary else "No equipment registered"}
-{profile_section}
-
-**Current Conditions (LIVE SENSOR DATA):**
+{chr(10).join(inventory_summary) if inventory_summary else "No equipment registered"}""",
+            # Current conditions
+            f"""**Current Conditions (LIVE SENSOR DATA):**
 - Indoor temperature: {current_conditions.get("indoor_temp", 22)}°C
 - Outdoor temperature: {current_conditions.get("outdoor_temp", 28)}°C
 - Humidity: {current_conditions.get("humidity", 55)}%
 - Occupancy: {current_conditions.get("occupancy", "unknown")}
 - Equipment status: {current_conditions.get("equipment_status", "normal")}
-{self._format_equipment_health(current_conditions)}
 {self._format_solar_bess_telemetry(current_conditions)}
+{self._format_setpoint_context(current_conditions)}
 {self._format_ml_context_section(ml_context) if ml_context else ""}
-{self._format_feedback_loop_section(decision_memory_text, feedback_rates_text)}
-**Weather Forecast (next 4 hours):**
+{self._format_feedback_loop_section(decision_memory_text, feedback_rates_text)}""",
+            # Weather + Energy
+            f"""**Weather Forecast (next 4 hours):**
 {json.dumps(weather_forecast, indent=2)}
 
 **Energy Pricing (South African):**
-{json.dumps(energy_prices, indent=2)}
-
-{self._format_all_equipment_sections(equipment_inventory)}
+{json.dumps(energy_prices, indent=2)}""",
+            # Equipment + Control Points
+            f"""{self._format_all_equipment_sections(equipment_inventory)}
 
 **All Available Control Points (by system):**
 {self._format_all_control_points(controllable)}
 
-{self._format_zone_context(hvac_devices)}
-
-**Zone-Aware Optimization Rules (Southern Hemisphere - South Africa):**
+{self._format_zone_context(hvac_devices)}""",
+            # Zone rules + Equipment constraints
+            f"""**Zone-Aware Optimization Rules (Southern Hemisphere - South Africa):**
 - Executive/Server zones (P1): Maintain tighter comfort bands, never sacrifice cooling
 - North/West-facing zones: Account for strongest direct and afternoon solar heat gain
 - Top floor zones: Apply stronger optimization response due to roof-driven heat gain
@@ -1305,49 +1558,13 @@ BESS (Battery Storage) — autonomous dispatch engine handles natively:
 - SOC limits: maintain 10-90% (never fully discharge or overcharge)
 - Mode changes: idle→discharge allowed, charging→discharge needs 60s transition
 
-{self._format_lighting_section(lighting_devices, lighting_zones)}
+{self._format_lighting_section(lighting_devices, lighting_zones)}""",
+        ]
 
-**Your Task — INTERVENTION MODE:**
+        prompt = "\n\n".join(prompt_parts) + "\n\n" + "\n\n".join(data_sections) + "\n\n"
 
-**Core principle:** Generate 0 recommendations if the building is running normally.
-Only recommend changes when you detect a SPECIFIC problem or opportunity.
-
-1. Review current sensor data above. For each equipment item, ask: "Is this currently suboptimal?"
-   - If current indoor temp is within ±1°C of setpoint → NO recommendation needed
-   - If damper positions match occupancy level → NO recommendation needed
-   - If equipment is already at the correct operating point → skip it entirely
-2. ONLY generate a recommendation when you identify a SPECIFIC divergence:
-   - Indoor temp 26°C but setpoint 22°C → recommend investigation or setpoint adjustment
-   - Occupancy at 10% but full HVAC active → recommend setback
-   - Peak tariff period with BESS idle → recommend discharge (only if arbitrage engine missed it)
-   - ML anomaly score elevated → flag for inspection
-3. Every recommendation reason MUST cite the actual sensor value that triggered it:
-   - ✅ "Indoor temp 26.3°C exceeds setpoint 24°C by 2.3°C — investigate FCU capacity"
-   - ✅ "Occupancy at 8% (sensor reading) but cooling at full capacity — setback to 25°C"
-   - ❌ "Low occupancy — reduce active cooling" (too generic, no actual values)
-   - ❌ "High occupancy — increase airflow" (what is the actual occupancy %? what is current airflow?)
-4. USE ML MODEL INTELLIGENCE above for PREDICTIVE interventions only:
-   - If LSTM forecasts predict rising temperatures, pre-cool NOW (cite the forecast)
-   - If anomaly scores > 0.5, flag equipment for inspection (cite the score)
-   - If fault classification shows bearing wear risk, recommend maintenance (cite confidence)
-   - If base load index is high, recommend after-hours equipment audit (cite the BLI value)
-5. System-specific rules:
-   - HVAC: Only during occupied hours. Cite current temp vs setpoint delta
-   - Lighting: DO NOT recommend dim levels or occupancy dimming (Tridonic DALI-2 handles natively).
-     Only recommend tariff-based demand response overrides. DALI brightness range is 0-254 only.
-   - Power: Generator start/stop ONLY if load shedding active or imminent
-   - Solar: Performance alerts only if PR < 75%
-   - BESS: DO NOT duplicate autonomous dispatch (TOU charge/discharge, load shedding,
-     SOC protection). Only recommend cross-system coordination the arbitrage engine cannot see.
-   - Meters: No direct control, use for context only
-6. CRITICAL: Use EXACT point_name from "All Available Control Points" above
-7. Project energy savings in ZAR per hour for each recommendation
-8. Ensure all recommendations are within safety limits
-9. Set confidence between 0.50 and 0.95 based on data quality:
-   - 0.50-0.65: Limited sensor data, stale readings, or uncertain conditions
-   - 0.65-0.80: Normal conditions with good sensor coverage
-   - 0.80-0.95: High certainty with multiple corroborating data points
-
+        # JSON response format block
+        prompt += """
 **Response Format (JSON):**
 
 NOTE: The "recommendations" array may be EMPTY if the building is running normally.
@@ -1432,6 +1649,11 @@ Provide ONLY the JSON response, no additional text."""
             try:
                 json_text = self._extract_json(response_text)
                 result = json.loads(json_text)
+
+                # Log data_requests for observability (Phase 2: data request mechanism)
+                data_requests = result.get("data_requests", [])
+                if data_requests:
+                    logger.info(f"[AI-OPT] Data requests from AI model: {data_requests}")
 
                 # Log no-action reasons for observability
                 no_action_reasons = result.get("no_action_reasons", [])
@@ -2018,27 +2240,6 @@ Provide ONLY the JSON response, no additional text."""
 
         return zone_data
 
-    def _format_equipment_health(self, conditions: dict[str, Any]) -> str:
-        """Format equipment health section for the prompt when degraded equipment exists."""
-        degraded = conditions.get("equipment_health")
-        if not degraded:
-            return ""
-
-        ht = conditions.get("_health_thresholds", {"healthy": 90, "warning": 70, "critical": 50})
-        t_warning = ht.get("warning", 70)
-        t_critical = ht.get("critical", 50)
-
-        lines = [f"\n**DEGRADED EQUIPMENT (health < {ht.get('healthy', 90)}% — ACTION REQUIRED):**"]
-        for eq in sorted(degraded, key=lambda e: e["health"]):
-            severity = "CRITICAL" if eq["health"] < t_critical else "WARNING" if eq["health"] < t_warning else "MONITOR"
-            lines.append(f"- [{severity}] {eq['code']} ({eq['type']}): health={eq['health']}%")
-        lines.append(
-            f"\nYou MUST generate a maintenance recommendation for each [{severity}] and [CRITICAL] item above. "
-            f"Equipment below {t_warning}% needs inspection/service. Below {t_critical}% needs URGENT action. "
-            "These are NOT no_action items — they require recommendations."
-        )
-        return "\n".join(lines)
-
     def _format_solar_bess_telemetry(self, conditions: dict[str, Any]) -> str:
         """Format solar/BESS telemetry section for the optimization prompt.
 
@@ -2072,6 +2273,32 @@ Provide ONLY the JSON response, no additional text."""
         bess_temp = conditions.get("bess_temperature")
         if bess_temp is not None:
             lines.append(f"- BESS temperature: {bess_temp}°C")
+
+        return "\n".join(lines) + "\n"
+
+    def _format_setpoint_context(self, conditions: dict[str, Any]) -> str:
+        """Format live setpoint context for the optimization prompt.
+
+        Includes current vs optimal setpoint values so Claude knows exactly
+        what to change and why. Only included when setpoints are available.
+        """
+        setpoints = conditions.get("setpoints")
+        if not setpoints:
+            return ""
+
+        lines = ["**Live Setpoints (CURRENT vs OPTIMAL):**"]
+        for point_key, sp_data in setpoints.items():
+            value = sp_data.get("value")
+            unit = sp_data.get("unit", "")
+            lines.append(f"- {point_key}: {value}{unit} (current)")
+
+        # Add brief note about operational context
+        active_profile = "balanced"
+        if "equipment_status" in conditions:
+            status = conditions["equipment_status"]
+            lines.append(f"- Equipment status: {status}")
+            if status in ("degraded", "critical"):
+                lines.append("  → Optimization should prioritize efficient operation of degraded equipment")
 
         return "\n".join(lines) + "\n"
 
@@ -3134,8 +3361,9 @@ Provide ONLY the JSON response, no additional text."""
             Validation result with allowed flag and details
         """
         try:
-            devices = await device_manager.list_devices_by_site(site_id)
+            from app.database.repositories.equipment_repository import EquipmentRepository
 
+            devices = await device_manager.list_devices_by_site(site_id)
             all_allowed = True
             validation_results = []
 
@@ -3146,17 +3374,43 @@ Provide ONLY the JSON response, no additional text."""
 
                 # Find device
                 device = next((d for d in devices if d.id == equipment_id), None)
+
+                # FIX 2: HTTP bridge fallback — device_manager empty for oBIX sites
                 if not device:
-                    validation_results.append(
-                        {
-                            "equipment_id": equipment_id,
-                            "point_name": point_name,
-                            "allowed": False,
-                            "reason": f"Device {equipment_id} not found",
-                        }
-                    )
-                    all_allowed = False
-                    continue
+                    equip_repo = EquipmentRepository()
+                    # get_by_site_code is synchronous — run directly
+                    equip_list = equip_repo.get_by_site_code(site_id)
+
+                    # Normalise site_id for lookup: "site-002" → "S002"
+                    lookup_id = site_id
+                    if site_id.startswith("site-"):
+                        num = site_id.split("-")[1]
+                        lookup_id = f"S{num}"
+
+                    found = next((e for e in equip_list if e.get("code") == equipment_id), None)
+                    if found:
+                        logger.warning(f"[AI-OPT] {equipment_id} validated via Supabase fallback")
+                        validation_results.append(
+                            {
+                                "equipment_id": equipment_id,
+                                "point_name": point_name,
+                                "allowed": True,
+                                "reason": "Validated via Supabase fallback (device_manager not populated for HTTP bridge site)",
+                                "source": "supabase_fallback",
+                            }
+                        )
+                        continue
+                    else:
+                        validation_results.append(
+                            {
+                                "equipment_id": equipment_id,
+                                "point_name": point_name,
+                                "allowed": False,
+                                "reason": f"Device {equipment_id} not found in device_manager or Supabase",
+                            }
+                        )
+                        all_allowed = False
+                        continue
 
                 # Validate against safety rules
                 if not safety_engine._initialized:

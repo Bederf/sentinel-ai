@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import threading
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timezone
 
 from app.config.settings import settings
 from app.database.supabase_client import get_supabase_client
@@ -152,8 +152,10 @@ def room_sensor_is_alive(room_code: str, max_silence_minutes: int = 0) -> bool:
     if not events:
         return True
     last = events[-1]
-    last_seen = _make_naive(last.received_at) if last.received_at else _make_naive(last.timestamp)
-    age_minutes = (datetime.utcnow() - last_seen).total_seconds() / 60
+    last_seen = last.received_at if last.received_at else last.timestamp
+    if last_seen.tzinfo is None:
+        last_seen = last_seen.replace(tzinfo=UTC)
+    age_minutes = (datetime.now(timezone.utc) - last_seen).total_seconds() / 60
     return age_minutes <= max_silence_minutes
 
 
@@ -303,10 +305,10 @@ def update_ghost_finding_status(
                 status = "confirmed_empty"
             r["status"] = status
             if status in ("verified_occupied", "confirmed_empty", "dismissed"):
-                r["resolved_at"] = _dt_to_str(datetime.utcnow())
+                r["resolved_at"] = _dt_to_str(datetime.now(timezone.utc))
             if inspected_by:
                 r["inspected_by"] = inspected_by
-                r["inspected_at"] = _dt_to_str(datetime.utcnow())
+                r["inspected_at"] = _dt_to_str(datetime.now(timezone.utc))
             if response_message_id:
                 r["response_message_id"] = response_message_id
             if response_text:
@@ -377,7 +379,7 @@ def mark_ghost_finding_notified(
             if not rows:
                 return None
             r = rows[0]
-            now_str = _dt_to_str(datetime.utcnow())
+            now_str = _dt_to_str(datetime.now(timezone.utc))
             r["notification_sent"] = bool(r.get("notification_sent")) or email_sent or whatsapp_sent
             r["notification_sent_at"] = now_str
             if concierge_email:
@@ -418,7 +420,7 @@ def mark_ghost_finding_reminder_sent(
             if not rows:
                 return None
             r = rows[0]
-            now_str = _dt_to_str(datetime.utcnow())
+            now_str = _dt_to_str(datetime.now(timezone.utc))
             r["reminder_sent"] = True
             r["reminder_sent_at"] = now_str
             if whatsapp_message_id:
@@ -610,6 +612,7 @@ def _session_to_dict(s: FocusRoomSession) -> dict:
         "extended_use": s.extended_use,
         "created_at": _dt_to_str(s.created_at),
         "vacant_since": _dt_to_str(s.vacant_since) if s.vacant_since else None,
+        "door_closed": s.door_closed,
     }
 
 
@@ -627,6 +630,7 @@ def _dict_to_session(d: dict) -> FocusRoomSession:
         extended_use=d.get("extended_use", False),
         created_at=_str_to_dt(d.get("created_at", d["start_time"])),
         vacant_since=_str_to_dt(d["vacant_since"]) if d.get("vacant_since") else None,
+        door_closed=d.get("door_closed"),
     )
 
 
@@ -679,6 +683,17 @@ def clear_vacant_since(session_id: str) -> None:
             ).execute()
         except Exception as exc:
             logger.error("Canonical clear_vacant_since failed: %s", exc)
+
+
+def set_door_closed(session_id: str, door_closed: bool | None) -> None:
+    """Update the door_closed state for a session."""
+    with _lock:
+        try:
+            _client().table("space_focus_room_sessions").update({"door_closed": door_closed}).eq(
+                "session_id", session_id
+            ).execute()
+        except Exception as exc:
+            logger.error("Canonical set_door_closed failed: %s", exc)
 
 
 def close_session(

@@ -16,6 +16,7 @@ import anthropic
 
 from app.config.settings import settings
 from app.services.ai_usage_tracker import usage_tracker
+from app.utils.calm_harness import calm_error_legacy
 
 logger = logging.getLogger(__name__)
 
@@ -103,7 +104,7 @@ class VisionService:
             return message.content[0].text
         except Exception as e:
             logger.error(f"Vision API error: {e}")
-            raise
+            return calm_error_legacy(e, tool_name="vision_analysis")["error"]
 
     def analyze_image(self, image_data: bytes, media_type: str = "image/jpeg", prompt: str | None = None) -> dict:
         """
@@ -121,9 +122,16 @@ class VisionService:
 Describe what you see, identify any components, and note any visible issues.
 Be specific about manufacturers, models, and conditions if visible."""
 
-        analysis = self._create_vision_message(image_data, media_type, prompt or default_prompt)
-
-        return {"analysis": analysis, "success": True}
+        result = self._create_vision_message(image_data, media_type, prompt or default_prompt)
+        if isinstance(result, str) and result in (
+            "Device unreachable. Check connection and retry.",
+            "Request timed out. The service may be busy.",
+            "Authentication failed. Credentials may need renewal.",
+            "Service temporarily unavailable.",
+            "Operation failed. Try again or use an alternative approach.",
+        ):
+            return {"analysis": result, "success": False}
+        return {"analysis": result, "success": True}
 
     def identify_component(self, image_data: bytes, media_type: str = "image/jpeg", context: str | None = None) -> dict:
         """

@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_MIN_SESSION_SECONDS = 180  # 3 minutes — discard shorter visits
 DEFAULT_EXTENDED_USE_SECONDS = 7200  # 2 hours — flag as extended
 DEFAULT_RED_LIGHT_COOLDOWN_SECONDS = 300  # 5 minutes — keep red light on after overstay ends
-DEFAULT_GAP_TOLERANCE_SECONDS = 30  # 30 seconds — door-open buffer before closing session
+DEFAULT_GAP_TOLERANCE_SECONDS = 300  # 5 minutes — coffee / restroom break buffer before closing session
 
 
 def describe_focus_session_state(
@@ -79,6 +79,7 @@ def process_focus_room_event(
     min_session_seconds: int | None = None,
     extended_use_seconds: int | None = None,
     gap_tolerance_seconds: int | None = None,
+    door_closed: bool | None = None,
 ) -> dict:
     """Process a single occupancy event for a focus room.
 
@@ -107,6 +108,7 @@ def process_focus_room_event(
             source=source,
             start_time=timestamp,
             created_at=datetime.utcnow(),
+            door_closed=door_closed,
         )
         occupancy_store.save_session(session)
         logger.info("Focus session started: room=%s session=%s", room_code, session.session_id)
@@ -118,14 +120,29 @@ def process_focus_room_event(
         }
 
     elif occupied and active is not None:
-        # Occupied event — clear any vacant_since, session stays open
+        # Occupied event — clear any vacant_since, update door state, session stays open
         if active.vacant_since is not None:
             occupancy_store.clear_vacant_since(active.session_id)
             logger.debug("Focus session held open: room=%s (occupied resumed)", room_code)
+        occupancy_store.set_door_closed(active.session_id, door_closed)
         return {"action": "no_action", "room_code": room_code}
 
     elif not occupied and active is not None:
-        # Vacancy event — start gap timer if not already running
+        # Update door state on every vacancy event
+        occupancy_store.set_door_closed(active.session_id, door_closed)
+
+        # Door-closed is ground truth: person left belongings, gap is FROZEN.
+        # Do NOT start the gap timer — 2hr overstay clock keeps running.
+        if door_closed is True:
+            logger.debug(
+                "Focus session gap frozen (door closed): room=%s at %s",
+                room_code,
+                timestamp.isoformat(),
+            )
+            return {"action": "session_held", "room_code": room_code, "gap_frozen": True}
+
+        # No door sensor (None) or door open (False) — normal gap tolerance applies.
+        # Start gap timer if not already running.
         if active.vacant_since is None:
             occupancy_store.set_vacant_since(active.session_id, timestamp)
             logger.debug(

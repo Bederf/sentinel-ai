@@ -157,6 +157,8 @@ class FocusRoomSession:
     extended_use: bool = False  # True if duration > threshold
     created_at: datetime = field(default_factory=datetime.utcnow)
     vacant_since: datetime | None = None  # When room went vacant (gap tolerance)
+    # Door state: True = closed (person left belongings, gap frozen); None = no sensor
+    door_closed: bool | None = None
 
     @property
     def is_active(self) -> bool:

@@ -598,7 +598,7 @@ async def get_daily_uptime(days: int = Query(30, ge=1, le=365)):
     supabase = get_supabase_client()
 
     daily = (
-        await supabase.table("api_uptime_daily")
+        supabase.table("api_uptime_daily")
         .select("check_date, total_checks, successful_checks, uptime_percent, avg_latency_ms, max_latency_ms")
         .gte("check_date", cutoff.isoformat())
         .order("check_date", desc=False)
@@ -618,7 +618,7 @@ async def get_current_month_uptime():
     month = date.today().strftime("%Y-%m")
     supabase = get_supabase_client()
 
-    result = await supabase.table("api_uptime_monthly").select("*").eq("month", month).execute()
+    result = supabase.table("api_uptime_monthly").select("*").eq("month", month).execute()
 
     if not result.data:
         return {"data": None, "month": month}
@@ -632,7 +632,7 @@ async def get_month_uptime(month: str):
     from app.database.supabase_client import get_supabase_client
 
     supabase = get_supabase_client()
-    result = await supabase.table("api_uptime_monthly").select("*").eq("month", month).execute()
+    result = supabase.table("api_uptime_monthly").select("*").eq("month", month).execute()
 
     if not result.data:
         return {"data": None, "month": month}
@@ -657,7 +657,7 @@ async def get_critical_path(site_id: str):
     hour_start = now.replace(minute=0, second=0, microsecond=0) - timedelta(hours=1)
 
     result = (
-        await supabase.table("critical_path_hourly")
+        supabase.table("critical_path_hourly")
         .select(
             "site_id, hour_start, total_actions, p50_total_ms, p99_total_ms, "
             "p99_9_total_ms, max_total_ms, avg_total_ms, slo_pass"
@@ -692,7 +692,7 @@ async def get_critical_path_history(
     cutoff = date.today() - timedelta(days=days)
 
     result = (
-        await supabase.table("critical_path_hourly")
+        supabase.table("critical_path_hourly")
         .select(
             "site_id, hour_start, total_actions, p50_total_ms, p99_total_ms, "
             "p99_9_total_ms, max_total_ms, avg_total_ms, slo_pass"

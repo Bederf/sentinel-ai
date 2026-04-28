@@ -14,6 +14,7 @@ import logging
 from typing import Any
 
 from app.services.model_gateway import model_gateway
+from app.utils.calm_harness import calm_error_legacy
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +69,13 @@ class PhyphoxAnalyzer:
 
         except Exception as e:
             logger.error(f"phyphox screenshot analysis failed: {e}")
-            return {"measurement_type": measurement_type, "source": "screenshot", "error": str(e), "confidence": 0.0}
+            error_result = calm_error_legacy(e, tool_name="phyphox_screenshot")
+            return {
+                "measurement_type": measurement_type,
+                "source": "screenshot",
+                "error": error_result["error"],
+                "confidence": 0.0,
+            }
 
     def _get_extraction_prompt(self, measurement_type: str) -> str:
         """Get Vision API prompt for data extraction."""

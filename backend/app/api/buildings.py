@@ -316,7 +316,7 @@ async def get_site(site_id: str, auth: AuthContext = Depends(require_site_access
                     "sentinel_operating_mode": opt.get(
                         "sentinel_operating_mode", opt.get("active_profile", "balanced")
                     ),
-                    "control_tier": opt.get("control_tier", "human_in_loop"),
+                    "control_tier": opt.get("control_tier", "supervised"),
                     "zone_overrides": opt.get("zone_overrides", []),
                     "schedule_overrides": opt.get("schedule_overrides", []),
                 },
@@ -350,7 +350,7 @@ async def get_site(site_id: str, auth: AuthContext = Depends(require_site_access
             "optimization": {
                 "active_profile": "balanced",
                 "sentinel_operating_mode": "balanced",
-                "control_tier": "human_in_loop",
+                "control_tier": "supervised",
             },
             "metadata": {},
             "desk_count": 0,

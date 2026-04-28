@@ -39,15 +39,15 @@ class DataFreshnessMonitor:
         Returns:
             {site_id: {data_source: FreshnessResult}}
         """
-        from app.database.supabase_postgres import get_supabase_client
+        from app.database.supabase_client import get_supabase_client
 
-        supabase = await get_supabase_client()
+        supabase = get_supabase_client()
         results: dict[str, dict[str, FreshnessResult]] = {}
 
         try:
             # Get all unique sites registered in data_freshness table
-            sites_result = await supabase.table("data_freshness").select("DISTINCT site_id").execute()
-            sites = [row["site_id"] for row in sites_result.data]
+            sites_result = supabase.table("data_freshness").select("site_id").execute()
+            sites = list({row["site_id"] for row in sites_result.data})
 
             logger.debug(f"Freshness cycle: {len(sites)} sites → {sites}")
 
@@ -67,7 +67,7 @@ class DataFreshnessMonitor:
 
     async def _check_site_freshness(self, supabase, site_id: str) -> dict[str, FreshnessResult]:
         """Check all data sources at one site; update age and SLI in DB."""
-        freshness_rows = await supabase.table("data_freshness").select("*").eq("site_id", site_id).execute()
+        freshness_rows = supabase.table("data_freshness").select("*").eq("site_id", site_id).execute()
 
         results: dict[str, FreshnessResult] = {}
         now = datetime.now(UTC)
@@ -88,13 +88,9 @@ class DataFreshnessMonitor:
             sli_pass = age_seconds is not None and age_seconds <= sli_target
 
             # Update age and SLI in data_freshness table
-            await (
-                supabase.table("data_freshness")
-                .update({"age_seconds": age_seconds, "sli_pass": sli_pass, "updated_at": now.isoformat()})
-                .eq("site_id", site_id)
-                .eq("data_source", data_source)
-                .execute()
-            )
+            supabase.table("data_freshness").update(
+                {"age_seconds": age_seconds, "sli_pass": sli_pass, "updated_at": now.isoformat()}
+            ).eq("site_id", site_id).eq("data_source", data_source).execute()
 
             result = FreshnessResult(
                 site_id=site_id,
@@ -137,7 +133,7 @@ class DataFreshnessMonitor:
         """Detect new breaches and resolve active ones."""
         # Check for active (unresolved) breach
         active_breach_result = (
-            await supabase.table("data_freshness_breaches")
+            supabase.table("data_freshness_breaches")
             .select("id, breach_time")
             .eq("site_id", site_id)
             .eq("data_source", data_source)
@@ -156,30 +152,23 @@ class DataFreshnessMonitor:
             breach_time = datetime.fromisoformat(active_breach[0]["breach_time"].replace("Z", "+00:00"))
             duration = int((now - breach_time).total_seconds())
 
-            await (
-                supabase.table("data_freshness_breaches")
-                .update({"resolved_at": now.isoformat(), "duration_seconds": duration})
-                .eq("id", breach_id)
-                .execute()
-            )
+            supabase.table("data_freshness_breaches").update(
+                {"resolved_at": now.isoformat(), "duration_seconds": duration}
+            ).eq("id", breach_id).execute()
 
             return {"breach_started": False, "breach_resolved": True, "breach_duration_seconds": duration}
 
         elif not sli_pass and not active_breach:
             # New breach detected
-            await (
-                supabase.table("data_freshness_breaches")
-                .insert(
-                    {
-                        "site_id": site_id,
-                        "data_source": data_source,
-                        "age_seconds": age_seconds,
-                        "sli_target": target,
-                        "breach_time": now.isoformat(),
-                    }
-                )
-                .execute()
-            )
+            supabase.table("data_freshness_breaches").insert(
+                {
+                    "site_id": site_id,
+                    "data_source": data_source,
+                    "age_seconds": age_seconds,
+                    "sli_target": target,
+                    "breach_time": now.isoformat(),
+                }
+            ).execute()
 
             # Telegram alert for critical sources
             if data_source in self._CRITICAL_SOURCES:
@@ -192,11 +181,15 @@ class DataFreshnessMonitor:
     async def _send_freshness_alert(self, site_id: str, data_source: str, age_seconds: int | None, target: int) -> None:
         """Send Telegram alert for critical source breaches (bms_telemetry, anomalies)."""
         try:
-            from app.integrations.telegram import send_alert
+            from app.services.notification_providers.telegram_provider import TelegramProvider
 
-            await send_alert(
-                title=f"🚨 Data Freshness Breach: {data_source}",
-                message=(f"{data_source} at {site_id} is stale.\nAge: {age_seconds}s | Target: {target}s"),
+            provider = TelegramProvider()
+            await provider.send(
+                recipient=getattr(
+                    __import__("settings", fromlist=["telegram_alert_chat_id"]), "telegram_alert_chat_id", ""
+                ),
+                title=f"Data Freshness Breach: {data_source}",
+                body=f"{data_source} at {site_id} is stale.\nAge: {age_seconds}s | Target: {target}s",
                 priority="high",
             )
         except Exception as e:

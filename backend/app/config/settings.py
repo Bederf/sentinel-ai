@@ -432,7 +432,7 @@ class Settings(BaseSettings):
     focus_red_light_cooldown_seconds: int = 300  # Keep red light on for 5 minutes after overstay ends
     focus_relay_enabled: bool = True  # Publish relay/light control for focus room overstay
     focus_relay_topic_template: str = "sentinel/node/{node_id}/relay"
-    focus_vacancy_grace_seconds: int = 60  # Allow radar flicker up to 60s without breaking session
+    focus_vacancy_grace_seconds: int = 300  # 5 min gap = same session (coffee / restroom)
 
     # Cost alert threshold — sends Telegram alert when daily spend exceeds this (ZAR)
     cost_alert_daily_threshold_zar: float = 100.0

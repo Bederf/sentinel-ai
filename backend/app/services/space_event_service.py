@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from app.api.block_bookings import get_block_booking_config
@@ -84,9 +84,11 @@ async def process_occupancy_event(
     distance_m: float | None = None,
     moving_gate: int | None = None,
     static_gate: int | None = None,
+    # Door state (optional — magnetic reed switch; None = no sensor)
+    door_closed: bool | None = None,
 ) -> dict[str, Any]:
     """Persist an occupancy event and apply space-optimization rules."""
-    now = timestamp or datetime.utcnow()
+    now = timestamp or datetime.now(timezone.utc)
     event = OccupancyEvent(
         site_id=site_id,
         room_code=room_code,
@@ -94,7 +96,7 @@ async def process_occupancy_event(
         occupied=occupied,
         timestamp=now,
         source=source,
-        received_at=datetime.utcnow(),
+        received_at=datetime.now(timezone.utc),
         moving=moving,
         stationary=stationary,
         distance_m=distance_m,
@@ -119,6 +121,7 @@ async def process_occupancy_event(
             timestamp=now,
             source=source,
             room_type="focus",
+            door_closed=door_closed,
         )
         # Clear overstay alert flag when room becomes vacant (session ends)
         focus_session_result = result.get("focus_session", {})

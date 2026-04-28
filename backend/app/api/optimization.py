@@ -1832,7 +1832,7 @@ async def update_profile_settings(
             )
 
         # Validate control tier
-        valid_tiers = ["monitor", "human_in_loop", "auto_execute"]
+        valid_tiers = ["monitor", "supervised", "auto_execute"]
         if config_request.control_tier not in valid_tiers:
             raise HTTPException(
                 status_code=400, detail=f"Invalid control_tier: {config_request.control_tier}. Valid: {valid_tiers}"

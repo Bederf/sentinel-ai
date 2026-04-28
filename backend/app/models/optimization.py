@@ -14,7 +14,7 @@ class ControlTier(StrEnum):
     """Control tier for automation level."""
 
     MONITOR = "monitor"  # View-only, no recommendations
-    HUMAN_IN_LOOP = "human_in_loop"  # Recommendations require approval
+    SUPERVISED = "supervised"  # Recommendations require approval
     AUTO_EXECUTE = "auto_execute"  # Automatic execution of recommendations
 
 
@@ -90,7 +90,7 @@ class SiteProfileConfig:
 
     site_id: str
     active_profile: str  # "sweat_assets" | "comfort" | "cost"
-    control_tier: str  # "monitor" | "human_in_loop" | "auto_execute"
+    control_tier: str  # "monitor" | "supervised" | "auto_execute"
     zone_overrides: list[ZoneProfileOverride] = field(default_factory=list)
     schedule_overrides: list[ScheduleProfileOverride] = field(default_factory=list)
 
@@ -110,7 +110,7 @@ class SiteProfileConfig:
         return cls(
             site_id=data.get("site_id", ""),
             active_profile=data.get("active_profile", "cost"),
-            control_tier=data.get("control_tier", "human_in_loop"),
+            control_tier=data.get("control_tier", "supervised"),
             zone_overrides=[ZoneProfileOverride.from_dict(zo) for zo in data.get("zone_overrides", [])],
             schedule_overrides=[ScheduleProfileOverride.from_dict(so) for so in data.get("schedule_overrides", [])],
         )

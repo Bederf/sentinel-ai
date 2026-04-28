@@ -52,6 +52,37 @@ class ShadowModePollingService:
         }
         self._energy_accum_start: datetime | None = None  # Start of current accumulation period
         self._energy_last_poll: datetime | None = None  # Last poll timestamp for kWh calc
+        # Phase 1a: FCU state tracker for waste opportunity detection
+        from app.services.fcu_state_tracker import FCUStateTracker
+
+        # Build zone_type_resolver from Supabase zones table (static, cached)
+        zone_type_map = self._build_zone_type_map()
+        self.fcu_state_tracker = FCUStateTracker(
+            zone_type_resolver=lambda zid: zone_type_map.get(zid, ""),
+        )
+
+    def _build_zone_type_map(self) -> dict[str, str]:
+        """Load zone_id → zone_type mapping from Supabase zones table.
+
+        Zone types are static configuration — fetched once, cached for session.
+        """
+        try:
+            from app.config.settings import settings
+            from supabase import create_client
+
+            if not getattr(settings, "supabase_url", None):
+                return {}
+            client = create_client(settings.supabase_url, settings.supabase_service_role_key)
+            # Get site UUID
+            site_row = client.table("sites").select("id").eq("code", self.site_id).execute()
+            if not site_row.data:
+                return {}
+            site_uuid = site_row.data[0]["id"]
+            rows = client.table("zones").select("zone_id, zone_type").eq("site_id", site_uuid).execute()
+            return {r["zone_id"]: r["zone_type"] for r in rows.data}
+        except Exception as exc:
+            logger.warning(f"[SHADOW] Could not load zone types from Supabase: {exc}")
+            return {}
 
     def _get_bridge_credentials(self) -> tuple[str, str]:
         """Return (base_url, api_token) from settings."""
@@ -104,13 +135,20 @@ class ShadowModePollingService:
             # coverage. The poll loop batches to 20 per cycle to stay within time
             # budget, so we don't need to filter here — queue everything.
             sensor_codes: set[str] = set()
+            setpoint_codes: set[str] = set()
+            SENSOR_POINT_TYPES = {"sensor", "analog_input", "binary_input"}
+            SETPOINT_POINT_TYPES = {"setpoint", "analog_value", "analog_output", "command"}
             for obj in objs:
                 point_type = obj.get("point_type", "")
                 obj_id = obj.get("object_id", "")
 
-                if point_type == "sensor" and obj_id:
+                if point_type in SENSOR_POINT_TYPES and obj_id:
                     # Convert "CH-1.ChwSupplyTemp" → "CH-1-ChwSupplyTemp" for bridge API
                     sensor_codes.add(obj_id.replace(".", "-"))
+
+                if point_type in SETPOINT_POINT_TYPES and obj_id:
+                    # Collect setpoint object IDs for separate polling pass
+                    setpoint_codes.add(obj_id.replace(".", "-"))
 
             # Add explicit zone temp trends (pre-emptive, in case catalog lacks these)
             for i in range(1, 21):
@@ -134,10 +172,11 @@ class ShadowModePollingService:
                 sensor_codes.add(f"{ahu_id}-fan_speed_pct")
 
             self._trends_sensor_codes = sorted(sensor_codes)
+            self._setpoint_codes = sorted(setpoint_codes)
             logger.info(
                 f"[SHADOW] Object catalog loaded: {len(objs)} objects, "
                 f"{len(self._object_catalog)} indexed, {len(self._zone_to_ahu)} zone→AHU mappings, "
-                f"{len(self._trends_sensor_codes)} trend sensors"
+                f"{len(self._trends_sensor_codes)} trend sensors, {len(self._setpoint_codes)} setpoint points"
             )
 
         except Exception as e:
@@ -198,6 +237,15 @@ class ShadowModePollingService:
                         "type": "fcu",
                         "sensor_readings": readings,
                     }
+
+                # Phase 1a: feed zone poll to FCU state tracker
+                self.fcu_state_tracker.record_poll(
+                    zone_id=zone_id,
+                    occupancy_pct=0.0,  # occupancy not available per-zone from bridge
+                    room_temp_c=z.get("temperature_c"),
+                    setpoint_c=z.get("cooling_setpoint"),
+                    timestamp=now,
+                )
 
             result["zones_polled"] = len(zones)
 
@@ -381,6 +429,80 @@ class ShadowModePollingService:
 
             except Exception as e:
                 logger.warning(f"[SHADOW] Trends poll error: {e}")
+
+        # ── 5b. Poll setpoint points and write to equipment operating_data ────
+        # Setpoints (cooling_setpoint, supply_temp_sp, etc.) are needed by AI-OPT
+        # to generate setpoint-adjustment recommendations instead of maintenance recs.
+        # Each setpoint is read and written to operating_data on the equipment record.
+        if getattr(self, "_setpoint_codes", None):
+            sp_batch = self._setpoint_codes[:20]  # Same batch budget as trends
+            try:
+                from app.database.repositories.equipment_repository import EquipmentRepository
+                from app.database.repositories.site_repository import SiteRepository
+
+                site_repo = SiteRepository()
+                site = site_repo.get_by_id(self.site_id)
+                site_uuid = site.get("id") if site else None
+                eq_repo = EquipmentRepository()
+                all_equipment = eq_repo.get_all(site_id=site_uuid) if site_uuid else []
+                equip_by_code = {eq.get("code"): eq for eq in all_equipment}
+
+                async def fetch_setpoint(sp_code: str) -> tuple[str, dict | None]:
+                    try:
+                        async with httpx.AsyncClient(timeout=10.0) as client:
+                            r = await client.get(
+                                f"{base}/api/sites/{self.site_id}/trends/{sp_code}",
+                                headers=headers,
+                                params={"limit": 1},
+                            )
+                            r.raise_for_status()
+                            d = r.json()
+                            samples = d.get("samples", [])
+                            if samples:
+                                return sp_code, {"value": samples[-1].get("value"), "unit": d.get("unit")}
+                    except Exception:
+                        pass
+                    return sp_code, None
+
+                import asyncio
+
+                sp_results = await asyncio.gather(
+                    *[fetch_setpoint(sp) for sp in sp_batch],
+                    return_exceptions=True,
+                )
+
+                sp_written = 0
+                for sp_result in sp_results:
+                    if isinstance(sp_result, Exception):
+                        continue
+                    sp_code, sample = sp_result
+                    if not sample or sample.get("value") is None:
+                        continue
+
+                    equip_code, point_name = self._resolve_sensor(sp_code)
+                    if not equip_code or not point_name:
+                        continue
+
+                    # Write setpoint value to equipment operating_data
+                    try:
+                        point_values = {
+                            point_name: {
+                                "value": float(sample["value"]),
+                                "timestamp": datetime.now(tz=UTC).isoformat(),
+                                "source": "setpoint_poll",
+                            }
+                        }
+                        eq_repo.update_operating_data(equip_code, point_values)
+                        sp_written += 1
+                    except Exception as e:
+                        logger.debug(f"[SHADOW] Failed to write setpoint {sp_code} → {equip_code}.{point_name}: {e}")
+
+                if sp_written > 0:
+                    logger.info(f"[SHADOW] Setpoint poll: {sp_written} written to operating_data")
+                result["setpoints_polled"] = sp_written
+
+            except Exception as e:
+                logger.warning(f"[SHADOW] Setpoint poll error: {e}")
 
         # ── 6. Sync equipment online/offline status from /points ─────────────
         points_result = await self._sync_equipment_status(base, headers)
