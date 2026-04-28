@@ -41,6 +41,17 @@ const MAX_FLOORS = 10
 // but neither is an occupied tenant space — they render as neutral host mass.
 const OCCUPIED_FLOOR_IDS = new Set(['L0', 'L1', 'L2'])
 
+/** Orb colour per active system tab — matches the tone palette used elsewhere */
+const SYSTEM_ORB_COLORS: Record<string, { color: string; emissive: string }> = {
+  hvac:      { color: '#22d3ee', emissive: '#22d3ee' },
+  energy:    { color: '#fb923c', emissive: '#fb923c' },
+  lighting:  { color: '#fbbf24', emissive: '#fbbf24' },
+  water:     { color: '#38bdf8', emissive: '#38bdf8' },
+  fire:      { color: '#fb7185', emissive: '#fb7185' },
+  security:  { color: '#06b6d4', emissive: '#06b6d4' },
+  solar_bess:{ color: '#facc15', emissive: '#facc15' },
+}
+
 function GridHelperMemo() {
   const grid = useMemo(() => new THREE.GridHelper(18, 18, 0x334155, 0x0c1222), [])
   return <primitive object={grid} position={[0, 0, 0]} />
@@ -101,6 +112,7 @@ function ManagedSlab({
   breath,
   waiting,
   calm,
+  systemFilter,
 }: {
   floor: SlabInfo
   tone: ReturnType<typeof cockpitToneKey>
@@ -111,9 +123,10 @@ function ManagedSlab({
   breath: number
   waiting: boolean
   calm: boolean
+  systemFilter?: string | null
 }) {
   const groupRef = useRef<THREE.Group>(null)
-  const pal = cockpitFloorPalette(tone, floor.intensity, floor.isManaged, floor.riskLevel)
+  const pal = cockpitFloorPalette(tone, floor.intensity, floor.isManaged, floor.riskLevel, systemFilter)
 
   useFrame(() => {
     const g = groupRef.current
@@ -150,6 +163,7 @@ function HostSlab({
   w,
   d,
   h,
+  systemFilter,
 }: {
   floor: SlabInfo
   tone: ReturnType<typeof cockpitToneKey>
@@ -157,9 +171,10 @@ function HostSlab({
   w: number
   d: number
   h: number
+  systemFilter?: string | null
 }) {
   // Force isManaged=false so host slabs always get neutral palette
-  const pal = cockpitFloorPalette(tone, floor.intensity, false, floor.riskLevel)
+  const pal = cockpitFloorPalette(tone, floor.intensity, false, floor.riskLevel, systemFilter)
   return (
     <mesh position={[0, y, 0]} castShadow receiveShadow>
       <boxGeometry args={[w, h, d]} />
@@ -258,10 +273,11 @@ function BuildingStack({
               breath={breath}
               waiting={waiting}
               calm={calm}
+              systemFilter={state.systemFilter}
             />
           )
         }
-        return <HostSlab key={floor.id} floor={floor} tone={tone} y={y} w={w} d={d} h={h} />
+        return <HostSlab key={floor.id} floor={floor} tone={tone} y={y} w={w} d={d} h={h} systemFilter={state.systemFilter} />
       })}
     </group>
   )
@@ -494,6 +510,8 @@ function ZoneMarkers({
         const isPrimary = sig.isPrimary === true
         const radius = isPrimary ? 0.11 : 0.07
         const emissiveIntensity = isPrimary ? 1.4 : 0.9
+        const orbColor = (state.systemFilter && SYSTEM_ORB_COLORS[state.systemFilter])
+          ?? { color: '#f8fafc', emissive: '#ffffff' }
 
         return (
           <mesh
@@ -506,8 +524,8 @@ function ZoneMarkers({
           >
             <sphereGeometry args={[radius, 16, 16]} />
             <meshStandardMaterial
-              color="#f8fafc"
-              emissive="#ffffff"
+              color={orbColor.color}
+              emissive={orbColor.emissive}
               emissiveIntensity={emissiveIntensity}
               metalness={0.2}
               roughness={0.2}

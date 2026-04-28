@@ -602,6 +602,40 @@ export function mapCockpitState(
     })
   }
 
+  // --- Inject representative equipment zone signals when system tab is active
+  // but no matching narrative exists — ensures the 3D building always shows
+  // relevant orbs regardless of which system the operator has selected.
+  const SYSTEM_EQUIPMENT_ZONES: Record<string, Array<{ zoneId: string; floorId: string; label: string; level: CockpitTwinRiskLevel }>> = {
+    energy: [
+      { zoneId: 'Zone-B1-001', floorId: 'B1', label: 'Chiller & Meter', level: 'stable' },
+    ],
+    lighting: [
+      { zoneId: 'Zone-L1-A', floorId: 'L1', label: 'DALI Controller L1', level: 'stable' },
+      { zoneId: 'Zone-L2-B', floorId: 'L2', label: 'DALI Controller L2', level: 'stable' },
+    ],
+    solar_bess: [
+      { zoneId: 'Zone-B1-001', floorId: 'B1', label: 'Solar & BESS', level: 'stable' },
+    ],
+  }
+
+  const equipZones = systemFilter ? (SYSTEM_EQUIPMENT_ZONES[systemFilter] ?? []) : []
+  const equipZoneIds = new Set(zoneSignalsWithClusters.map((s) => s.zoneId))
+  for (const ez of equipZones) {
+    if (!equipZoneIds.has(ez.zoneId)) {
+      zoneSignalsWithClusters.push({
+        zoneId: ez.zoneId,
+        label: ez.label,
+        floorId: ez.floorId,
+        meshId: `mesh:${ez.zoneId.toLowerCase()}`,
+        level: ez.level,
+        weight: 0.85,
+        slot: zoneSignalsWithClusters.length,
+        isPrimary: false,
+        actionLabel: systemFilter === 'energy' ? 'Energy Centre' : systemFilter === 'lighting' ? 'Lighting' : 'Solar & BESS',
+      })
+    }
+  }
+
   const secondarySummary = secondaryTensions.length > 0
     ? secondaryTensions.map((tension) => `${formatVoiceLabel(tension.voice)}: ${tension.message}`).join(' | ')
     : 'No secondary tensions are currently rising above the building background.'

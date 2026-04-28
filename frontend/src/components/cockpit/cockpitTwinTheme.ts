@@ -18,7 +18,22 @@ export function cockpitFloorPalette(
   intensity: number,
   isManaged: boolean,
   riskLevel: string,
+  systemFilter?: string | null,
 ): { base: string; emissive: string; emissiveIntensity: number; edge: string } {
+  // System colour override when a tab is active — applies the system colour to managed slabs
+  // regardless of posture tone, making the building shift colour when the operator
+  // changes tab (e.g. Energy tab → orange tint, Lighting tab → amber tint).
+  const SYSTEM_EMISSIVE: Record<string, string> = {
+    hvac:      '#22d3ee',
+    energy:    '#fb923c',
+    lighting:  '#fbbf24',
+    water:     '#38bdf8',
+    fire:      '#fb7185',
+    security:  '#06b6d4',
+    solar_bess:'#facc15',
+  }
+  const sysColor = systemFilter ? (SYSTEM_EMISSIVE[systemFilter] ?? null) : null
+
   // Host-building floors outside Sentinel scope: neutral shell only (no posture / load tint).
   if (!isManaged) {
     return {
@@ -31,6 +46,16 @@ export function cockpitFloorPalette(
 
   const i = Math.max(0.12, Math.min(1, intensity))
   const managedBoost = 0.22
+
+  // System tab active: use system colour for managed slabs
+  if (sysColor) {
+    return {
+      base: sysColor,
+      emissive: sysColor,
+      emissiveIntensity: 0.14 + i * 0.32 + managedBoost,
+      edge: sysColor,
+    }
+  }
 
   if (tone === 'critical') {
     return {
