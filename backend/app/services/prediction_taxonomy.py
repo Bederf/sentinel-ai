@@ -8,8 +8,8 @@ CONFIDENCE_HIGH = "high"
 CONFIDENCE_MEDIUM = "medium"
 CONFIDENCE_LOW = "low"
 
-# Freeze current deterministic rule-based formulas before ML rollout.
-FORMULA_VERSION_STATIC = "v1.0-static"
+# Threshold-derived formula using HealthThresholdService (v1.2+).
+FORMULA_VERSION_STATIC = "v1.2-threshold-derived"
 
 
 def normalize_prediction_severity(value: str | None) -> str | None:

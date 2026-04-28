@@ -24,28 +24,36 @@ from app.services.prediction_taxonomy import (
 
 logger = logging.getLogger(__name__)
 
-# Minimum probability threshold for creating predictions
-MIN_PROBABILITY_THRESHOLD = 25
+# Minimum probability threshold for creating predictions.
+# Aligned with _calculate_prediction_from_health() minimum (50%).
+MIN_PROBABILITY_THRESHOLD = 50
 
 
 def health_to_probability(health_score: float) -> float:
     """
-    Maps health score to failure probability.
-    Calibrated for warning-tier equipment (70-89% health range).
+    Maps health score to failure probability using configured thresholds.
+    Aligned with _calculate_prediction_from_health() in prediction_calculator.py.
 
-    90-100% -> 5-15%   healthy, low risk
-    70-89%  -> 15-35%  warning, moderate risk
-    50-69%  -> 35-65%  poor, elevated risk
-    <50%    -> 65-95%  critical, high risk
+    Uses HealthThresholdService to get healthy/warning/critical boundaries,
+    then applies the same continuous probability bands.
     """
-    if health_score >= 90:
-        return round(5 + (100 - health_score) * 1.0, 1)
-    elif health_score >= 70:
-        return round(15 + (89 - health_score) * 1.0, 1)
-    elif health_score >= 50:
-        return round(35 + (69 - health_score) * 1.5, 1)
+    thresholds = get_health_thresholds()
+    h = health_score
+
+    if h >= thresholds["healthy"]:
+        return 0.0  # Healthy equipment — no prediction generated
+
+    if h < thresholds["critical"]:
+        # Critical: 60-75%
+        base = 75 - (h * 0.3)
+    elif h < thresholds["warning"]:
+        # Severely degraded: 55-65%
+        base = 65 - ((h - thresholds["critical"]) * 0.5)
     else:
-        return round(min(95, 65 + (49 - health_score) * 1.5), 1)
+        # Moderately degraded: 50-55%
+        base = 55 - ((h - thresholds["warning"]) * 0.5)
+
+    return max(50, min(95, base))
 
 
 class PredictionGeneratorService:
@@ -262,18 +270,19 @@ class PredictionGeneratorService:
 
     def _build_evidence(self, equipment: dict[str, Any]) -> dict[str, Any]:
         """Build evidence data for prediction."""
+        thresholds = get_health_thresholds()
         health_score = equipment.get("health_score", 50)
 
         evidence = {
             "health_score": health_score,
-            "health_trend": "declining" if health_score < 70 else "stable",
+            "health_trend": "declining" if health_score < thresholds["warning"] else "stable",
             "formula_version": FORMULA_VERSION_STATIC,
             "data_source": "automatic_health_monitoring",
             "last_reading": {
                 "parameter": "health_score",
                 "value": health_score,
-                "baseline": 90,
-                "threshold": 70,
+                "baseline": thresholds["healthy"],
+                "threshold": thresholds["warning"],
                 "trend": "declining",
             },
         }
