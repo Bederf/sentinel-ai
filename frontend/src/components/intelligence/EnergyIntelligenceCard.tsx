@@ -52,14 +52,23 @@ export function EnergyIntelligenceCard({ siteId, onNavigate }: EnergyIntelligenc
   const mode = status?.optimization_settings?.mode ?? 'supervised';
   const applied = status?.monthly_savings?.applied_recommendations ?? 0;
 
-  // Determine state
+  // Determine state — show active if any meaningful optimization data exists
+  // even if optimization_status is "unknown" (baseline established but no recommendations applied yet)
   let state: CardState;
+  const hasSavings = hasValue(savings) && savings > 0;
+  const hasApplied = applied > 0;
   if (apiError || !status) {
     state = 'no-data';
-  } else if (status.optimization_status === 'unknown' || (!hasValue(savings) && applied === 0)) {
-    state = 'learning';
-  } else {
+  } else if (
+    status.optimization_status !== 'unknown'
+    && status.optimization_status != null
+  ) {
     state = 'active';
+  } else if (hasSavings || hasApplied) {
+    // Baseline established — savings or applied recommendations exist
+    state = 'active';
+  } else {
+    state = 'learning';
   }
 
   // Badge per state

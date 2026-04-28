@@ -315,7 +315,11 @@ export function CostValidationCard({
                 )}
               </>
             ) : (
-              <div className="mt-1">
+              <div>
+                <div className="text-lg font-medium text-gray-400 mt-1">Not uploaded yet</div>
+                <Text className="text-xs text-gray-500 mt-0.5">
+                  Upload invoice to calculate variance
+                </Text>
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -384,9 +388,11 @@ export function CostValidationCard({
               />
             </div>
             <div className="text-lg font-semibold text-white">
-              {validation.variance_pct !== undefined
-                ? `${validation.variance_pct > 0 ? "+" : ""}${validation.variance_pct.toFixed(1)}%`
-                : "—"}
+              {validation.variance_pct !== undefined ? (
+                `${validation.variance_pct > 0 ? "+" : ""}${validation.variance_pct.toFixed(1)}%`
+              ) : (
+                <span className="text-base text-gray-500">Upload invoice to calculate</span>
+              )}
             </div>
             {validation.variance_pct !== undefined && (
               <>
@@ -424,7 +430,7 @@ export function CostValidationCard({
                   {((validation.tariff_adjustment_factor - 1) * 100).toFixed(1)}%
                 </>
               ) : (
-                "—"
+                <span className="text-base text-gray-500">Upload invoice to compare</span>
               )}
             </div>
             {validation.confidence !== undefined && (
