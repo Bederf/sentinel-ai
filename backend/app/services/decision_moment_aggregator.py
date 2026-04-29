@@ -301,7 +301,7 @@ class DecisionMomentAggregator:
 
         # Phase 165 fields — build inline (sync path; _build_building_metadata is async for v2)
         from app.database.repositories.site_3d_config_repository import get_site_3d_config_repository
-        from app.services.floor_zone_utils import FLOOR_LABELS, FLOOR_STACK_ORDER
+        from app.services.floor_zone_utils import FLOOR_LABELS, FLOOR_STACK_INDEX, FLOOR_STACK_ORDER
 
         building_metadata: dict = {
             "floors_count": 0,
@@ -317,6 +317,33 @@ class DecisionMomentAggregator:
             "active_risk_count": 0,
             "health_pct": 100,
         }
+        # Equipment stats + critical equipment list — used for building_metadata and incident map
+        all_equip: list[dict] = []
+        try:
+            import re
+
+            from app.database.repositories.site_repository import SiteRepository
+            from app.services.floor_zone_utils import extract_floor_from_equipment_id
+
+            # Normalize building_id (S002 → site-002) for repository lookups
+            site_code = building_id
+            m = re.fullmatch(r"S(\d+)", building_id)
+            if m:
+                site_code = f"site-{m.group(1).zfill(3)}"
+            site_repo = SiteRepository()
+            all_equip = site_repo.get_equipment(site_code) or []
+            if all_equip:
+                building_metadata["equipment_count"] = len(all_equip)
+                health_scores = [e.get("health_score") or 100 for e in all_equip if e.get("health_score") is not None]
+                building_metadata["health_pct"] = (
+                    round(sum(health_scores) / len(health_scores), 1) if health_scores else 100
+                )
+                building_metadata["active_risk_count"] = sum(
+                    1 for e in all_equip if (e.get("health_score") or 100) < 70
+                )
+        except Exception as e:
+            logger.warning("Could not load equipment stats for %s: %s", building_id, e)
+
         try:
             repo = get_site_3d_config_repository()
             config = repo.get_by_site_id(building_id)
@@ -340,6 +367,30 @@ class DecisionMomentAggregator:
                             ],
                         }
                     )
+                if floor_stack:
+                    building_metadata["has_spatial_data"] = True
+                    building_metadata["floor_stack"] = floor_stack
+                    building_metadata["floors_count"] = len(floor_stack)
+            else:
+                # Fallback: derive floor_stack from already-loaded all_equip — works without site_3d_configs row
+                floor_map: dict[str, list] = {}
+                for e in all_equip:
+                    floor = extract_floor_from_equipment_id(e.get("code", ""))
+                    if floor and floor in FLOOR_STACK_INDEX:
+                        floor_map.setdefault(floor, []).append(e)
+                floor_stack = []
+                for floor_id in FLOOR_STACK_ORDER:
+                    if floor_id in floor_map:
+                        floor_stack.append(
+                            {
+                                "floor_id": floor_id,
+                                "floor_width_m": 0,
+                                "floor_depth_m": 0,
+                                "equipment_positions": [
+                                    {"x": 0, "y": 0, "type": e.get("type", "unknown")} for e in floor_map[floor_id]
+                                ],
+                            }
+                        )
                 if floor_stack:
                     building_metadata["has_spatial_data"] = True
                     building_metadata["floor_stack"] = floor_stack
@@ -374,6 +425,7 @@ class DecisionMomentAggregator:
             active_incident_map=build_active_incident_map(
                 affected_zone_ids,
                 asset_id,
+                critical_equipment=all_equip,
             ),
             renderer_hint=_compute_renderer_hint(urgency_score, profile),
         )

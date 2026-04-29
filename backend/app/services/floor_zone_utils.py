@@ -66,7 +66,7 @@ def floor_to_svg_y_pct(floor_id: str, total_floors: int | None = None) -> float:
         total_floors: override for custom stacks (defaults to len(FLOOR_STACK_ORDER))
 
     Returns:
-        Float 0.0–100.0 representing SVG Y% for the floor band midpoint.
+        Float 0.0-100.0 representing SVG Y% for the floor band midpoint.
     """
     stack = FLOOR_STACK_ORDER
     total = total_floors or len(stack)
@@ -80,6 +80,7 @@ def floor_to_svg_y_pct(floor_id: str, total_floors: int | None = None) -> float:
 def build_active_incident_map(
     affected_zone_ids: list[str],
     primary_asset_id: str | None = None,
+    critical_equipment: list[dict] | None = None,
 ) -> dict[str, dict]:
     """
     Build the active_incident_map from a list of affected zone IDs.
@@ -89,9 +90,15 @@ def build_active_incident_map(
 
     Also adds the primary asset's floor if not already covered.
 
+    Floor eligibility filter: a floor is only marked as affected if it has
+    at least one critical piece of equipment (health < 50). This prevents
+    stale or noise events from permanently flagging healthy floors.
+
     Args:
         affected_zone_ids: e.g. ["Zone-B1-001", "Zone-L1-A", "Zone-L1-B"]
         primary_asset_id: e.g. "S002-CHILLER-B1-001" (optional, ensures floor covered)
+        critical_equipment: list of equipment dicts with "code" and "health_score" keys.
+            Used to verify each floor actually has critical equipment before marking affected.
 
     Returns:
         {
@@ -99,6 +106,7 @@ def build_active_incident_map(
           "L1": {"stack_index": 2, "svg_y_pct": 41.7, "affected": True},
         }
     """
+
     affected_floors: set[str] = set()
 
     for zone_id in affected_zone_ids:
@@ -119,6 +127,17 @@ def build_active_incident_map(
         floor = extract_floor_from_equipment_id(primary_asset_id)
         if floor and floor in FLOOR_STACK_INDEX:
             affected_floors.add(floor)
+
+    # Floor eligibility filter: only mark a floor affected if it has critical equipment
+    if critical_equipment is not None:
+        eligible_floors: set[str] = set()
+        for equip in critical_equipment:
+            if (equip.get("health_score") or 100) < 50:
+                floor = extract_floor_from_equipment_id(equip.get("code", ""))
+                if floor and floor in FLOOR_STACK_INDEX:
+                    eligible_floors.add(floor)
+        # If primary asset floor is not eligible, remove it from affected
+        affected_floors = affected_floors & eligible_floors
 
     result: dict[str, dict] = {}
     total = len(FLOOR_STACK_ORDER)
