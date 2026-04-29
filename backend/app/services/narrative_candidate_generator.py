@@ -253,42 +253,58 @@ def _fallback_candidates_for_site(
                 eroding_margin=True,
             )
 
-    # ── always-available fallback candidates ─────────────────────────────────
-    chiller_cycling = NarrativeCandidate(
-        candidate_id="stability-s002-chiller-cycling",
-        voice="operational_stability",
-        message="Chiller cycling margin is tightening around the plant transition.",
-        location=NarrativeLocation(
-            epicenter="B1",
-            affected=["B1", "L0"],
-            propagation="contained",
-        ),
-        action="Stabilize plant staging before the next load step.",
-        time_to_constraint_breach_min=24,
-        affected_occupants_est=18,
-        system_criticality=0.91,
-        propagation_risk=0.52,
-        eroding_margin=True,
-    )
+    # ── chiller cycling gate ─────────────────────────────────────────────────
+    # Fires when staging_state changes (indicates chiller starts/stops).
+    # Fallback: no direct cycle count from bridge → gate on elevated staging_state.
+    staging_state = t.get("staging_state")
+    chiller_cycling_candidate: NarrativeCandidate | None = None
+    if staging_state is not None and staging_state > 0:
+        chiller_cycling_candidate = NarrativeCandidate(
+            candidate_id="stability-s002-chiller-cycling",
+            voice="operational_stability",
+            message="Chiller cycling margin is tightening around the plant transition.",
+            location=NarrativeLocation(
+                epicenter="B1",
+                affected=["B1", "L0"],
+                propagation="contained",
+            ),
+            action="Stabilize plant staging before the next load step.",
+            time_to_constraint_breach_min=24,
+            affected_occupants_est=18,
+            system_criticality=0.91,
+            propagation_risk=0.52,
+            eroding_margin=True,
+        )
 
-    load_compensation = NarrativeCandidate(
-        candidate_id="energy-s002-compensation-load",
-        voice="energy_pressure",
-        message="Load is rising as the building compensates.",
-        location=NarrativeLocation(
-            epicenter="B1",
-            affected=["L0", "L1"],
-            propagation="upward",
-        ),
-        action="Watch plant efficiency while compensation remains active.",
-        time_to_constraint_breach_min=28,
-        affected_occupants_est=24,
-        system_criticality=0.45,
-        propagation_risk=0.38,
-        eroding_margin=False,
-    )
+    # ── load compensation gate ──────────────────────────────────────────────
+    # Fires when load is trending upward (3+ consecutive positive deltas)
+    # OR when current load > 85% of site capacity.
+    load_trending_up = t.get("load_trending_up", False)
+    load_high = t.get("load_high", False)
+    load_compensation_candidate: NarrativeCandidate | None = None
+    if load_trending_up or load_high:
+        load_compensation_candidate = NarrativeCandidate(
+            candidate_id="energy-s002-compensation-load",
+            voice="energy_pressure",
+            message="Load is rising as the building compensates.",
+            location=NarrativeLocation(
+                epicenter="B1",
+                affected=["L0", "L1"],
+                propagation="upward",
+            ),
+            action="Watch plant efficiency while compensation remains active.",
+            time_to_constraint_breach_min=28,
+            affected_occupants_est=24,
+            system_criticality=0.45,
+            propagation_risk=0.38,
+            eroding_margin=False,
+        )
 
-    candidates = [cooling_drift_candidate, chiller_cycling, load_compensation]
+    candidates = [
+        cooling_drift_candidate,
+        chiller_cycling_candidate,
+        load_compensation_candidate,
+    ]
     return [c for c in candidates if c is not None]
 
 
