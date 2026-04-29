@@ -120,13 +120,7 @@ class SupabaseBackend(FCUStateTrackerBackend):
                 "occupancy_source": state.occupancy_source,
                 "updated_at": datetime.now(tz=UTC).isoformat(),
             }
-            (
-                self._client.table("fcu_zone_state")
-                .upsert(payload)
-                .eq("site_id", self._site_id)
-                .eq("zone_id", zone_id)
-                .execute()
-            )
+            self._client.table("fcu_zone_state").upsert(payload, on_conflict="site_id,zone_id").execute()
         except Exception as e:
             logger.warning(f"[FCU-SUPABASE-BACKEND] Failed to persist state for {zone_id}: {e}")
 
