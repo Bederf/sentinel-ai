@@ -11,6 +11,7 @@ No new data ingestion — uses Energy module + Generator service + building meta
 
 import json
 import logging
+import math
 import random
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -462,16 +463,28 @@ class SustainabilityService:
         total_kwh_year = sum(s.grid_kwh for s in history)
         total_co2_year = sum(s.total_kg_co2 for s in history)
 
-        energy_intensity = total_kwh_year / sqm if sqm else 0
-        carbon_intensity = total_co2_year / sqm if sqm else 0
+        # Guard against zero sqm and infinity
+        if sqm and sqm > 0:
+            energy_intensity = total_kwh_year / sqm
+            if math.isinf(energy_intensity) or math.isnan(energy_intensity):
+                energy_intensity = None
+        else:
+            energy_intensity = None
+
+        if sqm and sqm > 0:
+            carbon_intensity = total_co2_year / sqm
+            if math.isinf(carbon_intensity) or math.isnan(carbon_intensity):
+                carbon_intensity = None
+        else:
+            carbon_intensity = None
 
         bm = self._benchmarks
         return {
             "site_id": site_id,
             "period": "12 months",
             "site_sqm": sqm,
-            "energy_intensity_kwh_per_sqm_yr": round(energy_intensity, 1),
-            "carbon_intensity_kg_per_sqm_yr": round(carbon_intensity, 1),
+            "energy_intensity_kwh_per_sqm_yr": round(energy_intensity, 1) if energy_intensity is not None else None,
+            "carbon_intensity_kg_per_sqm_yr": round(carbon_intensity, 1) if carbon_intensity is not None else None,
             "total_kwh_year": round(total_kwh_year, 0),
             "total_co2_tonnes_year": round(total_co2_year / 1000, 2),
             "benchmarks": {
@@ -483,21 +496,29 @@ class SustainabilityService:
             "vs_typical": {
                 "energy_pct": round(
                     ((energy_intensity - bm.energy_typical_kwh_per_sqm_yr) / bm.energy_typical_kwh_per_sqm_yr) * 100, 1
-                ),
+                )
+                if energy_intensity is not None
+                else None,
                 "carbon_pct": round(
                     ((carbon_intensity - bm.carbon_typical_kg_per_sqm_yr) / bm.carbon_typical_kg_per_sqm_yr) * 100, 1
-                ),
+                )
+                if carbon_intensity is not None
+                else None,
             },
             "vs_efficient": {
                 "energy_pct": round(
                     ((energy_intensity - bm.energy_efficient_kwh_per_sqm_yr) / bm.energy_efficient_kwh_per_sqm_yr)
                     * 100,
                     1,
-                ),
+                )
+                if energy_intensity is not None
+                else None,
                 "carbon_pct": round(
                     ((carbon_intensity - bm.carbon_efficient_kg_per_sqm_yr) / bm.carbon_efficient_kg_per_sqm_yr) * 100,
                     1,
-                ),
+                )
+                if carbon_intensity is not None
+                else None,
             },
         }
 

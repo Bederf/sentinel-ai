@@ -6,7 +6,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { Leaf } from 'lucide-react';
+import { Leaf, CloudOff } from 'lucide-react';
 import {
   Card,
   Title,
@@ -174,14 +174,29 @@ export function SustainabilityDashboard({
   }));
 
   // Efficiency benchmark bars
+  const safeEnergyIntensity = efficiency?.energy_intensity_kwh_per_sqm_yr != null && Number.isFinite(efficiency.energy_intensity_kwh_per_sqm_yr)
+    ? Math.round(efficiency.energy_intensity_kwh_per_sqm_yr)
+    : null;
+  const safeCarbonIntensity = efficiency?.carbon_intensity_kg_per_sqm_yr != null && Number.isFinite(efficiency.carbon_intensity_kg_per_sqm_yr)
+    ? Math.round(efficiency.carbon_intensity_kg_per_sqm_yr * 10) / 10
+    : null;
+
   const energyBars = efficiency ? [
-    { name: 'Your Site', value: Math.round(efficiency.energy_intensity_kwh_per_sqm_yr) },
+    {
+      name: 'Your Site',
+      value: safeEnergyIntensity ?? 0,
+      label: safeEnergyIntensity != null ? `${safeEnergyIntensity} kWh/sqm` : 'Awaiting data',
+    },
     { name: 'SA Typical', value: efficiency.benchmarks?.energy_typical ?? 170 },
     { name: 'SA Efficient', value: efficiency.benchmarks?.energy_efficient ?? 120 },
   ] : [];
 
   const carbonBars = efficiency ? [
-    { name: 'Your Site', value: Math.round(efficiency.carbon_intensity_kg_per_sqm_yr) },
+    {
+      name: 'Your Site',
+      value: safeCarbonIntensity ?? 0,
+      label: safeCarbonIntensity != null ? `${safeCarbonIntensity} kg/sqm` : 'Awaiting data',
+    },
     { name: 'SA Typical', value: efficiency.benchmarks?.carbon_typical ?? 85 },
     { name: 'SA Efficient', value: efficiency.benchmarks?.carbon_efficient ?? 55 },
   ] : [];
@@ -210,8 +225,9 @@ export function SustainabilityDashboard({
               </h2>
               {dataSource && (
                 <Badge
-                  color={dataSource === 'measured' ? 'green' : 'gray'}
+                  color={dataSource === 'measured' ? 'green' : 'amber'}
                   size="xs"
+                  style={dataSource !== 'measured' ? { background: 'rgba(245, 158, 11, 0.15)', color: 'var(--color-sentinel-amber)', border: '1px solid rgba(245, 158, 11, 0.3)' } : undefined}
                 >
                   {dataSource === 'measured' ? 'Live Data' : 'Estimated'}
                 </Badge>
@@ -335,7 +351,7 @@ export function SustainabilityDashboard({
             style={{ border: "1px solid var(--color-grafana-border)" }}
           >
             <Text style={{ color: "var(--color-grafana-text-secondary)" }}>ESG Score</Text>
-            <Metric>{esgMetrics.overall_esg_score}/100</Metric>
+            <Metric>{esgMetrics.overall_esg_score ?? '—'}/100</Metric>
             <Text className="text-xs mt-1" style={{ color: "var(--color-grafana-text-secondary)" }}>
               Carbon: {esgMetrics.carbon_intensity_score}% |
               Energy: {esgMetrics.energy_efficiency_score}% |
@@ -362,7 +378,10 @@ export function SustainabilityDashboard({
             className="h-72"
           />
         ) : (
-          <Text style={{ color: "var(--color-grafana-text-disabled)" }}>No emissions data available</Text>
+          <div className="flex items-center justify-center flex-col gap-2" style={{ color: 'var(--color-grafana-text-disabled)' }}>
+            <CloudOff className="h-8 w-8 opacity-50" />
+            <Text style={{ color: 'var(--color-grafana-text-disabled)' }}>No emissions data available</Text>
+          </div>
         )}
       </Card>
 
@@ -370,7 +389,7 @@ export function SustainabilityDashboard({
       {systemBreakdownData.length > 0 && (
         <Card className="panel" style={{ border: "1px solid var(--color-grafana-border)" }}>
           <Title>Carbon by System</Title>
-          <Text className="text-xs" style={{ color: "var(--color-grafana-text-secondary)" }}>
+          <Text className="text-xs" style={{ color: "var(--color-grafana-text-disabled)" }}>
             Source: {dataSource === 'measured' ? 'Metered Data' : 'Estimated'}
           </Text>
           <DonutChart
@@ -389,7 +408,11 @@ export function SustainabilityDashboard({
         <Card className="panel" style={{ border: "1px solid var(--color-grafana-border)" }}>
           <Title>Energy Intensity vs SA Benchmarks</Title>
           <Text className="mb-3" style={{ color: "var(--color-grafana-text-secondary)" }}>kWh per sqm per year</Text>
-          <BarList data={energyBars} color="amber" className="mt-2" />
+          <BarList
+            data={energyBars}
+            color="amber"
+            className="mt-2 [&>li:first-child>a]:!text-[var(--color-sentinel-blue)] [&>li:first-child>div>div]:!bg-[var(--color-sentinel-blue)]"
+          />
           {efficiency?.vs_typical && (
             <Text className="text-xs mt-3" style={{ color: "var(--color-grafana-text-secondary)" }}>
               {efficiency.vs_typical.energy_pct > 0
@@ -402,7 +425,11 @@ export function SustainabilityDashboard({
         <Card className="panel" style={{ border: "1px solid var(--color-grafana-border)" }}>
           <Title>Carbon Intensity vs SA Benchmarks</Title>
           <Text className="mb-3" style={{ color: "var(--color-grafana-text-secondary)" }}>kg CO2 per sqm per year</Text>
-          <BarList data={carbonBars} color="emerald" className="mt-2" />
+          <BarList
+            data={carbonBars}
+            color="emerald"
+            className="mt-2 [&>li:first-child>a]:!text-[var(--color-sentinel-blue)] [&>li:first-child>div>div]:!bg-[var(--color-sentinel-blue)]"
+          />
           {efficiency?.vs_typical && (
             <Text className="text-xs mt-3" style={{ color: "var(--color-grafana-text-secondary)" }}>
               {efficiency.vs_typical.carbon_pct > 0
@@ -464,6 +491,7 @@ export function SustainabilityDashboard({
                     style={{
                       height: '100%',
                       width: `${pct}%`,
+                      minWidth: 2,
                       borderRadius: 4,
                       background: barColor,
                       transition: 'width 0.6s ease',
