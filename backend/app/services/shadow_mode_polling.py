@@ -54,11 +54,13 @@ class ShadowModePollingService:
         self._energy_last_poll: datetime | None = None  # Last poll timestamp for kWh calc
         # Phase 1a: FCU state tracker for waste opportunity detection
         from app.services.fcu_state_tracker import FCUStateTracker
+        from app.services.fcu_state_tracker_backend import SupabaseBackend
 
         # Build zone_type_resolver from Supabase zones table (static, cached)
         zone_type_map = self._build_zone_type_map()
         self.fcu_state_tracker = FCUStateTracker(
             zone_type_resolver=lambda zid: zone_type_map.get(zid, ""),
+            backend=SupabaseBackend(site_id=site_id),
         )
 
     def _build_zone_type_map(self) -> dict[str, str]:
@@ -438,14 +440,8 @@ class ShadowModePollingService:
             sp_batch = self._setpoint_codes[:20]  # Same batch budget as trends
             try:
                 from app.database.repositories.equipment_repository import EquipmentRepository
-                from app.database.repositories.site_repository import SiteRepository
 
-                site_repo = SiteRepository()
-                site = site_repo.get_by_id(self.site_id)
-                site_uuid = site.get("id") if site else None
                 eq_repo = EquipmentRepository()
-                all_equipment = eq_repo.get_all(site_id=site_uuid) if site_uuid else []
-                equip_by_code = {eq.get("code"): eq for eq in all_equipment}
 
                 async def fetch_setpoint(sp_code: str) -> tuple[str, dict | None]:
                     try:
