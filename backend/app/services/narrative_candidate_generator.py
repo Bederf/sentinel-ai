@@ -254,11 +254,12 @@ def _fallback_candidates_for_site(
             )
 
     # ── chiller cycling gate ─────────────────────────────────────────────────
-    # Fires when staging_state changes (indicates chiller starts/stops).
-    # Fallback: no direct cycle count from bridge → gate on elevated staging_state.
+    # Fires when staging_state transitions > 2 in last 30 min (chiller starts/stops).
+    # Also fires when elevated staging (no quiet baseline).
+    chiller_cycle_rate = t.get("chiller_cycle_rate", 0)
     staging_state = t.get("staging_state")
     chiller_cycling_candidate: NarrativeCandidate | None = None
-    if staging_state is not None and staging_state > 0:
+    if chiller_cycle_rate > 2 or (staging_state is not None and staging_state > 0):
         chiller_cycling_candidate = NarrativeCandidate(
             candidate_id="stability-s002-chiller-cycling",
             voice="operational_stability",
