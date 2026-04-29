@@ -1,7 +1,9 @@
 """Claude AI service for building management intelligence."""
 
+import asyncio
 import json
 import logging
+import re
 import sys
 from collections.abc import AsyncGenerator
 
@@ -12,9 +14,30 @@ from app.models.auth import SentinelRole
 from app.services.chat_tools import execute_tool, get_chat_tools
 from app.services.cross_system_analyzer import get_cross_system_analyzer
 from app.services.fm_context import fm_context_service
+from app.services.rag_service import RAGService
 from app.utils.calm_harness import SCRATCHPAD_PREFIX
 
 logger = logging.getLogger(__name__)
+
+# Equipment ID patterns (regex — no LLM call needed)
+# Zone: {SITE}-{TYPE}-{ZONE} e.g. S002-VAV-101, S002-FCU-104A
+#   SITE = 3 letters + 3 digits (S002) or letter + 3 digits (A001)
+#   TYPE = 2-8 uppercase letters (VAV, FCU, SPLIT, CHILLER)
+#   ZONE = 1-4 digits + optional letter + optional suffix (101, 104A, 1-1)
+EQUIP_ZONE_PATTERN = re.compile(r"\b([A-Z]{3}-\d{3}|[A-Z]\d{3})-[A-Z]{2,8}-\d{1,4}[A-Z]?(?:-\d+)?\b")
+# Plant: {SITE}-{TYPE}-{LOC}-{SEQ} e.g. S002-CHILLER-B1-001, S002-GEN-B1-001
+#   LOC = 1-3 uppercase letters + optional digit (B1, EL, MAIN)
+#   SEQ = 3 digits
+EQUIP_PLANT_PATTERN = re.compile(r"\b([A-Z]{3}-\d{3}|[A-Z]\d{3})-[A-Z]{2,8}-[A-Z]{1,3}\d?-\d{3}\b")
+SITE_CODE_PATTERN = re.compile(r"\bsite-\d{3}\b", re.IGNORECASE)
+
+# RAG context prefix template — prepended to prompt when RAG context is available
+RAG_CONTEXT_PREFIX = """Based on the following relevant documentation:
+
+{context}
+
+---
+"""
 
 
 # Suppress anthropic library stderr spam
@@ -432,12 +455,18 @@ FSR assessments, OWASP, SIEM, network architecture, POPIA, or any IT concern:
 class ClaudeService:
     """Service for interacting with Claude AI."""
 
-    def __init__(self):
-        """Initialize Claude service with API configuration."""
+    def __init__(self, rag_service: RAGService | None = None):
+        """Initialize Claude service with API configuration.
+
+        Args:
+            rag_service: Optional RAG service for context-augmented inference.
+                         If None, falls back to prompt-only (no RAG lookup).
+        """
         self._client: Anthropic | None = None
         self._api_key = settings.anthropic_api_key
         self._model = settings.claude_model
         self._max_tokens = settings.claude_max_tokens
+        self._rag_service = rag_service
 
     @property
     def client(self) -> Anthropic:
@@ -447,6 +476,73 @@ class ClaudeService:
                 raise ValueError("ANTHROPIC_API_KEY not configured. Set it in .env or environment variables.")
             self._client = Anthropic(api_key=self._api_key)
         return self._client
+
+    def _extract_entities(self, prompt: str) -> dict:
+        """Extract equipment IDs and site codes from user prompt.
+
+        Returns:
+            dict with keys: equipment_id, site_id, equipment_type
+            Values are None if not detected.
+        """
+        entities = {"equipment_id": None, "site_id": None, "equipment_type": None}
+
+        # Equipment zone pattern (e.g. S002-VAV-101)
+        zone_match = EQUIP_ZONE_PATTERN.search(prompt)
+        if zone_match:
+            entities["equipment_id"] = zone_match.group(0)
+            # Extract site code from equipment ID prefix
+            entities["site_id"] = entities["equipment_id"].split("-")[0]
+            entities["equipment_type"] = entities["equipment_id"].split("-")[1]
+            return entities
+
+        # Equipment plant pattern (e.g. S002-CHILLER-B1-001)
+        plant_match = EQUIP_PLANT_PATTERN.search(prompt)
+        if plant_match:
+            entities["equipment_id"] = plant_match.group(0)
+            entities["site_id"] = entities["equipment_id"].split("-")[0]
+            entities["equipment_type"] = entities["equipment_id"].split("-")[1]
+            return entities
+
+        # Site code pattern (e.g. site-002)
+        site_match = SITE_CODE_PATTERN.search(prompt)
+        if site_match:
+            entities["site_id"] = site_match.group(0).lower()
+
+        return entities
+
+    async def _build_rag_prompt(self, prompt: str, entities: dict, user_role: str | None) -> str:
+        """Build RAG-augmented prompt by prepending retrieved chunks."""
+        if not self._rag_service:
+            return prompt
+        if not entities["equipment_id"] and not entities["site_id"]:
+            return prompt
+
+        query = entities["equipment_id"] or entities["site_id"]
+        equipment_type = entities.get("equipment_type")
+        site_id = entities.get("site_id")
+
+        try:
+            rag_context = await asyncio.wait_for(
+                self._rag_service.get_context(
+                    query=query,
+                    user_role=user_role,
+                    equipment_type=equipment_type,
+                    site_id=site_id,
+                    endpoint_type="claude_service",
+                    n_results=5,
+                ),
+                timeout=2.0,
+            )
+
+            if rag_context and rag_context.strip():
+                prompt = RAG_CONTEXT_PREFIX.format(context=rag_context) + prompt
+
+        except TimeoutError:
+            logger.warning("[RAG] Lookup timed out after 2s, proceeding without context")
+        except Exception as e:
+            logger.warning(f"[RAG] Lookup failed: {e}, proceeding without context")
+
+        return prompt
 
     async def stream_response(
         self,
@@ -636,6 +732,18 @@ class ClaudeService:
         conversation = list(messages)
         max_tool_iterations = 10  # Safety limit
         effective_model = model_override or self._model
+
+        # RAG context injection: extract entities from last user message and prepend RAG context
+        if conversation and conversation[-1].get("role") == "user":
+            last_user_message = conversation[-1].get("content", "")
+            if isinstance(last_user_message, str) and last_user_message.strip():
+                entities = self._extract_entities(last_user_message)
+                if entities["equipment_id"] or entities["site_id"]:
+                    user_role_str = user_role.value if user_role else None
+                    augmented = await self._build_rag_prompt(last_user_message, entities, user_role_str)
+                    if augmented != last_user_message:
+                        conversation[-1] = {**conversation[-1], "content": augmented}
+                        logger.debug(f"[RAG] Augmented prompt with context: entities={entities}")
 
         try:
             for iteration in range(max_tool_iterations):
