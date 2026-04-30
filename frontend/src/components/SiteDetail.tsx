@@ -669,10 +669,14 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
     );
   }
 
-  // Calculate summary stats based on status field (matches what's shown in table)
+  // Calculate summary stats — status field tracks BMS comms, health_score tracks equipment condition
+  // Critical = health degradation (operational). Offline = comms loss (BMS not reporting, may be healthy).
   const healthyEquipment = equipment.filter((e) => e.status === "normal" || (e.status as string) === "online").length;
   const warningEquipment = equipment.filter((e) => e.status === "warning").length;
-  const criticalEquipment = equipment.filter((e) => e.status === "critical" || (e.status as string) === "offline" || (e.status as string) === "maintenance").length;
+  // critical = health_score < 60 (actual degradation, not comms state)
+  const criticalEquipment = equipment.filter((e) => (e.health_score ?? 100) < 60).length;
+  // offline = BMS comms lost (separate from health state — do not conflate with critical)
+  const offlineEquipment = equipment.filter((e) => e.status === "offline" || (e.status as string) === "maintenance").length;
   const avgHealth = equipment.length > 0
     ? Math.round(equipment.reduce((sum, e) => sum + (e.health_score || (e as any).health || 0), 0) / equipment.length)
     : 0;
@@ -1283,8 +1287,8 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
                   </button>
                   <button
                     onClick={() => {
-                      // Filter to critical equipment and show first prediction if available
-                      const criticalItems = equipment.filter((e) => e.status === "critical" || (e.status as string) === "offline" || (e.status as string) === "maintenance");
+                      // Filter to critical equipment (health < 60) and show first prediction if available
+                      const criticalItems = equipment.filter((e) => (e.health_score ?? 100) < 60);
                       if (criticalItems.length > 0) {
                         const prediction = predictions.find(
                           (p) => criticalItems.some((c) => p.equipment_id === c.id || p.equipment_name === c.name)
@@ -1293,7 +1297,7 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
                           setSelectedPrediction(prediction);
                           setIsPredictionDetailOpen(true);
                         } else {
-                          // No prediction yet - show the first critical equipment in control panel
+                          // No prediction yet — show the first critical equipment in control panel
                           const firstCritical = criticalItems[0];
                           handleEquipmentClick(firstCritical);
                         }
@@ -1308,6 +1312,26 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
                   >
                     {criticalEquipment} Critical
                   </button>
+                  {offlineEquipment > 0 && (
+                    <button
+                      onClick={() => {
+                        // Filter to offline equipment (comms loss, not health degradation)
+                        const offlineItems = equipment.filter((e) => e.status === "offline" || (e.status as string) === "maintenance");
+                        if (offlineItems.length > 0) {
+                          const firstOffline = offlineItems[0];
+                          handleEquipmentClick(firstOffline);
+                        }
+                      }}
+                      className="px-2 py-1 rounded text-xs font-medium transition-all hover:brightness-110 cursor-pointer"
+                      style={{
+                        background: "rgba(107, 114, 128, 0.15)",
+                        color: "var(--color-sentinel-text-secondary)",
+                      }}
+                      title="Equipment with lost BMS communications — may be healthy"
+                    >
+                      {offlineEquipment} Offline
+                    </button>
+                  )}
                 </div>
               </div>
 
