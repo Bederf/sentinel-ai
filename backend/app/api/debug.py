@@ -39,4 +39,5 @@ async def get_energy_accumulator_state() -> dict:
         "next_flush_in_minutes": next_flush_in_minutes,
         "object_catalog_size": len(svc._object_catalog),
         "trends_sensor_count": len(svc._trends_sensor_codes),
+        "last_poll_result": getattr(svc, "_last_poll_result", None),
     }
