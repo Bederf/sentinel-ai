@@ -9,6 +9,7 @@ from fastapi import FastAPI
 from app.api import (
     auth,
     cache,
+    debug,
     events,
     governance_metrics_api,
     health,
@@ -33,6 +34,7 @@ def register_core_routers(app: FastAPI) -> None:
     app.include_router(system_health.router, tags=["system-health"])
     app.include_router(cache.router, tags=["cache"])
     app.include_router(events.router, tags=["events"])
+    app.include_router(debug.router, prefix="/api", tags=["debug"])
 
     # Prometheus metrics (no prefix — mounted at root /metrics)
     app.include_router(prometheus_metrics.router, tags=["monitoring"])
