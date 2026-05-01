@@ -62,6 +62,7 @@ _PUBLIC_PREFIXES = (
     "/api/municipal-billing/tariffs",  # Tariff schedules — read-only, scoped to site municipality
     "/api/webhooks/google/calendar",  # Google Calendar Pub/Sub push notifications (public — validated by channel ID)
     "/api/webhooks/graph/events",  # Microsoft Graph webhook notifications (public — validated by clientState)
+    "/api/debug/",  # Debug endpoints for non-production inspection (guarded by environment=production check)
 )
 _PUBLIC_READ_PATHS = {
     "/api/block-bookings/alerts",

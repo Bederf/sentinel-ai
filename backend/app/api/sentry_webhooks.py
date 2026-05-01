@@ -1641,6 +1641,26 @@ async def handle_telegram_callback(
     except Exception as e:
         logger.warning("Failed to answer callback query: %s", e)
 
+    # Certified notification acknowledgement
+    if payload.data.startswith("ack:"):
+        from app.services.notification_service import notification_service
+
+        result = await notification_service.handle_acknowledgement(
+            callback_data=payload.data,
+            acknowledged_by_telegram_id=payload.user_id,
+        )
+        if result["success"]:
+            # Confirm to user
+            try:
+                sender = get_telegram_sender()
+                await sender.send_text(
+                    chat_id=payload.chat_id,
+                    text="✅ Acknowledgement recorded.",
+                )
+            except Exception:
+                pass
+        return {"success": True, "intent": "certified_ack", "confirmed": result["success"]}
+
     if payload.data.startswith("docintake:"):
         from app.services.telegram_document_intake_service import get_telegram_document_intake_service
 

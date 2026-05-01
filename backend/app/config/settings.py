@@ -485,6 +485,12 @@ class Settings(BaseSettings):
     mri_evolution_password: str = ""
     mri_poll_interval_minutes: int = Field(default=15, validation_alias="MRI_POLL_INTERVAL_MINUTES")
 
+    # Alarm ingestion — recency filter (Phase 187)
+    # Alarms older than this are stale and dropped at ingest time.
+    # Mirrors operator workflow: 48h-old unacknowledged alarms are operator backlog,
+    # not SENTINEL intelligence input.
+    alarm_recency_window_minutes: int = Field(default=30, validation_alias="ALARM_RECENCY_WINDOW_MINUTES")
+
     # MRI Document Client — Concept API for service reports and documents (Phase 179)
     mri_document_base_url: str = Field(default="", validation_alias="MRI_DOCUMENT_BASE_URL")
     mri_document_api_key: str = Field(default="", validation_alias="MRI_DOCUMENT_API_KEY")

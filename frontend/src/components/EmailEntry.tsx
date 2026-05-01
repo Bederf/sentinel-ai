@@ -128,11 +128,13 @@ export function EmailEntry({ onSuccess }: EmailEntryProps) {
           }}
         />
         {/* Logo */}
-        <div className="relative w-20 h-20 mx-auto rounded-2xl flex items-center justify-center overflow-hidden" style={{ background: "linear-gradient(135deg, #0B1D33 0%, #163350 100%)", border: "1px solid rgba(46,134,171,0.3)" }}>
+        <div className="relative w-24 h-24 mx-auto flex items-center justify-center" style={{ background: "linear-gradient(135deg, #0B1D33 0%, #163350 100%)", border: "1px solid rgba(46,134,171,0.3)", borderRadius: "1rem" }}>
+          {/* Glow halo */}
+          <div className="absolute inset-0 blur-2xl rounded-2xl scale-90" style={{ background: "radial-gradient(circle, rgba(46,134,171,0.35) 0%, transparent 70%)" }} />
           <img
             src="/images/sentinel-logo.png"
             alt="SENTINEL"
-            className="w-12 h-12 object-contain"
+            className="w-16 h-16 object-contain rounded-lg"
           />
         </div>
         {/* Brand name below */}

@@ -427,6 +427,8 @@ async def get_equipment_info_for_technician(equipment_code: str):
         "notes": metadata.get("notes"),
         # Discovery info
         "last_discovery": metadata.get("last_discovery"),
+        # Live operating data (room temp, CO2, etc.)
+        "operating_data": operating_data if operating_data else None,
     }
 
     # Remove None values for cleaner response

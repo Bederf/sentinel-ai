@@ -130,12 +130,17 @@ async def get_current_health():
         # Derive BMS connectivity as aggregate of the 4 protocol subsystems
         bms_keys = ["supervisor", "field_network", "obix", "lighting"]
         bms_scores = [snapshot.get("component_scores", {}).get(k, 0) for k in bms_keys]
-        bms_avg = int(sum(bms_scores) / len(bms_scores)) if bms_scores else 0
         bms_statuses = [snapshot.get("component_details", {}).get(k, {}).get("status", "critical") for k in bms_keys]
-        if all(s == "healthy" for s in bms_statuses):
+        # Exclude not_configured probes from average so they don't drag score down
+        active_scores = [s for s, st in zip(bms_scores, bms_statuses) if st != "not_configured"]
+        active_statuses = [st for st in bms_statuses if st != "not_configured"]
+        bms_avg = int(sum(active_scores) / len(active_scores)) if active_scores else 0
+        if all(s == "healthy" for s in active_statuses) and active_statuses:
             bms_status: str = "healthy"
-        elif any(s == "critical" for s in bms_statuses):
+        elif any(s == "critical" for s in active_statuses):
             bms_status = "critical"
+        elif any(s == "not_configured" for s in bms_statuses):
+            bms_status = "degraded"  # some probes are not configured on this stack
         else:
             bms_status = "degraded"
 
@@ -397,7 +402,9 @@ async def get_monitoring_snapshot(site_id: str | None = Query(None)):
 async def get_adapter_health(site_id: str):
     """Current adapter health + uptime stats per site.
 
-    Returns health state for all registered adapters (BACnet, Niagara, OBIX, shadow bridge).
+    Returns health state for only the adapters configured in site_adapter_config.
+    Prevents showing DOWN status for phantom adapters (BACnetAdapter, DALIAdapter,
+    etc.) that don't run on this stack — only Shadow Bridge runs.
     """
     from datetime import UTC
 
@@ -405,27 +412,58 @@ async def get_adapter_health(site_id: str):
 
     supabase = get_supabase_client()
 
-    current = supabase.table("adapter_health_current").select("*").eq("site_id", site_id).execute()
+    # Get configured adapters for this site
+    config_result = (
+        supabase.table("site_adapter_config")
+        .select("adapter_name")
+        .eq("site_id", site_id)
+        .eq("enabled", True)
+        .execute()
+    )
 
-    if not current.data:
-        return {"site_id": site_id, "adapters": [], "status": "no_data"}
+    if not config_result.data:
+        # No config — fallback to only UP adapters to avoid showing all 65 phantoms
+        current = (
+            supabase.table("adapter_health_current").select("*").eq("site_id", site_id).eq("is_healthy", True).execute()
+        )
+        return {
+            "site_id": site_id,
+            "timestamp": __import__("datetime").datetime.now(UTC).isoformat(),
+            "adapters": _format_adapter_rows(current.data),
+            "status": "no_adapter_config",
+        }
+
+    configured_names = [r["adapter_name"] for r in config_result.data]
+
+    current = (
+        supabase.table("adapter_health_current")
+        .select("*")
+        .eq("site_id", site_id)
+        .in_("adapter_name", configured_names)
+        .execute()
+    )
 
     return {
         "site_id": site_id,
         "timestamp": __import__("datetime").datetime.now(UTC).isoformat(),
-        "adapters": [
-            {
-                "name": row["adapter_name"],
-                "type": row["adapter_type"],
-                "is_healthy": row["is_healthy"],
-                "uptime_1h_percent": row.get("uptime_1h_percent"),
-                "uptime_24h_percent": row.get("uptime_24h_percent"),
-                "last_check": row["last_check"],
-                "consecutive_failures": row.get("consecutive_failures", 0),
-            }
-            for row in current.data
-        ],
+        "adapters": _format_adapter_rows(current.data),
+        "status": "ok",
     }
+
+
+def _format_adapter_rows(rows: list[dict]) -> list[dict]:
+    return [
+        {
+            "name": row["adapter_name"],
+            "type": row["adapter_type"],
+            "is_healthy": row["is_healthy"],
+            "uptime_1h_percent": row.get("uptime_1h_percent"),
+            "uptime_24h_percent": row.get("uptime_24h_percent"),
+            "last_check": row["last_check"],
+            "consecutive_failures": row.get("consecutive_failures", 0),
+        }
+        for row in rows
+    ]
 
 
 @router.get("/sites/{site_id}/adapter-health/history")

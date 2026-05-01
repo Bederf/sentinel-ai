@@ -244,3 +244,42 @@ class TestRagIntegrationWithStreamResponseWithTools:
         assert result == messages[-1]["content"]
         # RAG service should NOT have been called
         service_with_rag._rag_service.get_context.assert_not_called()
+
+
+class TestCavemanMode:
+    """Unit tests for caveman mode equipment detection."""
+
+    def test_caveman_applied_on_plant_equipment_query(self, service):
+        """Plant equipment ID in query triggers caveman directive."""
+        entities = service._extract_entities("What's the startup sequence for S002-CHILLER-B1-001?")
+        assert entities["equipment_id"] == "S002-CHILLER-B1-001"
+        assert entities["site_id"] == "S002"
+        assert entities["equipment_type"] == "CHILLER"
+
+    def test_caveman_applied_on_zone_equipment_query(self, service):
+        """Zone equipment ID in query triggers caveman directive."""
+        entities = service._extract_entities("S002-FCU-104 cooling issue — how to diagnose?")
+        assert entities["equipment_id"] == "S002-FCU-104"
+        assert entities["site_id"] == "S002"
+        assert entities["equipment_type"] == "FCU"
+
+    def test_caveman_applied_on_site_code(self, service):
+        """Site code (site-NNN format) in query triggers caveman directive."""
+        entities = service._extract_entities("Show me the phase state of site-002")
+        assert entities["equipment_id"] is None
+        assert entities["site_id"] == "site-002"
+
+    def test_no_caveman_on_generic_query(self, service):
+        """Non-equipment query does not trigger caveman directive."""
+        entities = service._extract_entities("How does SENTINEL health scoring work?")
+        assert entities["equipment_id"] is None
+        assert entities["site_id"] is None
+
+    def test_caveman_directive_content(self):
+        """CAVEMAN_DIRECTIVE contains expected instructions."""
+        from app.services.claude_service import CAVEMAN_DIRECTIVE
+
+        assert "CAVEMAN MODE" in CAVEMAN_DIRECTIVE
+        assert "Strip filler, use technical shorthand" in CAVEMAN_DIRECTIVE
+        assert "numbered lists" in CAVEMAN_DIRECTIVE
+        assert "Applies to: Equipment" in CAVEMAN_DIRECTIVE

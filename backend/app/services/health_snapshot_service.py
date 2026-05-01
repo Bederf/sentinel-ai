@@ -106,6 +106,49 @@ class HealthSnapshotService:
 
         return await self._store_supabase(snapshot_data, rating)
 
+    # ------------------------------------------------------------------
+    # UUID resolution helpers
+    # ------------------------------------------------------------------
+
+    def _resolve_uuid(self, code_or_uuid: str) -> str:
+        """Resolve equipment code or UUID to a UUID string.
+
+        If input looks like a UUID, return it directly.
+        Otherwise look up by code and return the equipment's UUID.
+        Returns original string if resolution fails.
+        """
+        # Fast path: already a UUID
+        try:
+            from app.database.repositories.equipment_repository import (
+                EquipmentRepository,
+            )
+
+            repo = EquipmentRepository()
+            if repo._is_uuid(code_or_uuid):
+                return code_or_uuid
+        except Exception:
+            pass
+
+        # Slow path: resolve code → UUID
+        try:
+            from app.database.repositories.equipment_repository import (
+                EquipmentRepository,
+            )
+
+            repo = EquipmentRepository()
+            eq = repo.get_by_id(code_or_uuid)
+            if eq and eq.get("id"):
+                return eq["id"]
+        except Exception:
+            pass
+
+        # Last resort: return as-is (will fail downstream with clear error)
+        return code_or_uuid
+
+    # ------------------------------------------------------------------
+    # Store
+    # ------------------------------------------------------------------
+
     def _store_memory(self, snapshot_data: dict) -> str:
         """Store snapshot in memory (test/local fallback)."""
         import uuid
@@ -122,29 +165,26 @@ class HealthSnapshotService:
 
     async def _store_supabase(self, snapshot_data: dict, rating: HealthRating) -> str:
         """Store snapshot in Supabase and update equipment health_score."""
+        # Resolve equipment UUID before any DB operation
+        eq_uuid = self._resolve_uuid(rating.equipment_id)
+        snapshot_data = dict(snapshot_data)
+        snapshot_data["equipment_id"] = eq_uuid
+
         try:
             result = self._supabase.table("asset_health_snapshots").insert(snapshot_data).execute()
             snapshot_id = result.data[0]["id"] if result.data else "unknown"
 
             # Update equipment.health_score — ONLY health_score and updated_at
+            # Use UUID directly (resolved above) — no fallback to code needed
             try:
                 self._supabase.table("equipment").update(
                     {
-                        "health_score": rating.health_score,
+                        "health_score": int(rating.health_score),
                         "updated_at": datetime.utcnow().isoformat() + "Z",
                     }
-                ).eq("id", rating.equipment_id).execute()
+                ).eq("id", eq_uuid).execute()
             except Exception as e:
-                # Also try by code (equipment_id might be a code)
-                try:
-                    self._supabase.table("equipment").update(
-                        {
-                            "health_score": rating.health_score,
-                            "updated_at": datetime.utcnow().isoformat() + "Z",
-                        }
-                    ).eq("code", rating.equipment_id).execute()
-                except Exception:
-                    logger.warning(f"Could not update equipment health_score: {e}")
+                logger.warning(f"Could not update equipment health_score for {eq_uuid}: {e}")
 
             return snapshot_id
 
@@ -172,11 +212,14 @@ class HealthSnapshotService:
             latest = max(snapshots, key=lambda s: s.get("snapshot_at", ""))
             return self._snapshot_to_rating(latest)
 
+        # Resolve code → UUID before querying asset_health_snapshots
+        eq_uuid = self._resolve_uuid(equipment_id)
+
         try:
             result = (
                 self._supabase.table("asset_health_snapshots")
                 .select("*")
-                .eq("equipment_id", equipment_id)
+                .eq("equipment_id", eq_uuid)
                 .order("snapshot_at", desc=True)
                 .limit(1)
                 .execute()
@@ -210,11 +253,14 @@ class HealthSnapshotService:
             filtered.sort(key=lambda s: s.get("snapshot_at", ""), reverse=True)
             return [self._snapshot_to_rating(s) for s in filtered]
 
+        # Resolve code → UUID before querying asset_health_snapshots
+        eq_uuid = self._resolve_uuid(equipment_id)
+
         try:
             result = (
                 self._supabase.table("asset_health_snapshots")
                 .select("*")
-                .eq("equipment_id", equipment_id)
+                .eq("equipment_id", eq_uuid)
                 .gte("snapshot_at", cutoff)
                 .order("snapshot_at", desc=True)
                 .execute()
@@ -291,6 +337,9 @@ class HealthSnapshotService:
             self._update_memory_rollup(equipment_id, date)
             return
 
+        # Resolve equipment code → UUID before querying snapshots
+        eq_uuid = self._resolve_uuid(equipment_id)
+
         try:
             # Get all snapshots for the day
             start = f"{date}T00:00:00Z"
@@ -298,7 +347,7 @@ class HealthSnapshotService:
             result = (
                 self._supabase.table("asset_health_snapshots")
                 .select("health_score, health_status, confidence")
-                .eq("equipment_id", equipment_id)
+                .eq("equipment_id", eq_uuid)
                 .gte("snapshot_at", start)
                 .lte("snapshot_at", end)
                 .execute()
@@ -313,7 +362,7 @@ class HealthSnapshotService:
             confidences = [s["confidence"] for s in snapshots]
 
             rollup_data = {
-                "equipment_id": equipment_id,
+                "equipment_id": eq_uuid,
                 "date": date,
                 "score_min": min(scores),
                 "score_max": max(scores),
@@ -456,27 +505,38 @@ class HealthSnapshotService:
 
             repo = EquipmentRepository()
             if scope == "site" and site_id:
-                return repo.get_all(site_id=site_id)
+                # Resolve site code → UUID before querying equipment
+                resolved = self._resolve_uuid(site_id)
+                return repo.get_all(site_id=resolved)
             return repo.get_all()
         except Exception as e:
             logger.error(f"Could not get equipment list: {e}")
             return []
 
     async def _get_single_equipment(self, equipment_id: str) -> dict[str, Any]:
-        """Get a single equipment item by ID or code."""
+        """Get a single equipment item by ID or code.
+
+        Tries code lookup first, then UUID lookup if code lookup returns None.
+        """
         try:
             from app.database.repositories.equipment_repository import (
                 EquipmentRepository,
             )
 
             repo = EquipmentRepository()
+            # Try code first (get_by_id queries equipment.code)
             equip = repo.get_by_id(equipment_id)
+            if equip:
+                return equip
+            # Fall back to UUID lookup (get_by_uuid queries equipment.id)
+            equip = repo.get_by_uuid(equipment_id)
             if equip:
                 return equip
         except Exception:
             pass
-        # Fallback: return minimal dict
-        return {"id": equipment_id, "code": equipment_id}
+        # Last resort: resolve UUID but return minimal dict
+        uuid_resolved = self._resolve_uuid(equipment_id)
+        return {"id": uuid_resolved, "code": equipment_id}
 
     def _resolve_mode(self) -> str:
         """Resolve the current ingestion mode string."""

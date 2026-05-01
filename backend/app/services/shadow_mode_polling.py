@@ -352,14 +352,36 @@ class ShadowModePollingService:
 
             alarms = alarm_data.get("alarms", [])
             if alarms:
-                # Feed alarm events to ML feeder fault buffer
                 from app.services.sentinel_data_sync import get_sentinel_data_sync
 
                 sync = get_sentinel_data_sync(site_id=normalize_site_id(self.site_id, to_supabase=True))
+
+                # Recency filter — only alarms within alarm_recency_window_minutes are current signal
+                from app.config.settings import settings as app_settings
+                from datetime import timezone
+
+                stale_count = 0
                 for alarm in alarms:
+                    alarm_time_str = alarm.get("timestamp") or alarm.get("time")
+                    if alarm_time_str:
+                        try:
+                            alarm_time = datetime.fromisoformat(alarm_time_str.replace("Z", "+00:00"))
+                            if alarm_time.tzinfo is None:
+                                alarm_time = alarm_time.replace(tzinfo=timezone.utc)
+                            age_minutes = (datetime.now(tz=timezone.utc) - alarm_time).total_seconds() / 60
+                            if age_minutes > app_settings.alarm_recency_window_minutes:
+                                stale_count += 1
+                                continue
+                        except (ValueError, TypeError):
+                            pass  # timestamp unparseable — allow through
+
                     sync.ml_feeder.ingest_fault_event(alarm)
-                fault_count = len(alarms)
-                logger.info(f"[SHADOW] {fault_count} alarms → Fault Classifier buffer")
+
+                fault_count = len(alarms) - stale_count
+                logger.info(
+                    f"[SHADOW] {fault_count}/{len(alarms)} alarms → Fault Classifier buffer "
+                    f"({stale_count} stale, cutoff={app_settings.alarm_recency_window_minutes}m)"
+                )
 
             result["faults_polled"] = fault_count
 

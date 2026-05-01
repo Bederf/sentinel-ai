@@ -162,6 +162,191 @@ else
   fi
 fi
 
+# --- Site Bridge (WireGuard + Sentinel Bridge API) ---
+$QUIET || echo ""
+$QUIET || echo "=== Site Bridge (S002 / WireGuard) ==="
+
+# WireGuard tunnel — check peer handshake and transfer stats
+if command -v wg &>/dev/null; then
+  wg_show=$(sudo wg show wg0 2>/dev/null || echo "")
+  if [[ -n "$wg_show" ]]; then
+    # Check for active handshake (latest handshake line)
+    handshake_age=$(echo "$wg_show" | grep "latest handshake" | awk '{print $4, $5, $6}' || echo "unknown")
+    if echo "$wg_show" | grep -q "latest handshake:.*1 minute"; then
+      check "WireGuard wg0" 0 "active (handshake: $handshake_age)"
+    elif echo "$wg_show" | grep -q "latest handshake"; then
+      check "WireGuard wg0" 0 "active (handshake: $handshake_age)"
+    elif echo "$wg_show" | grep -q "no handshake"; then
+      check "WireGuard wg0" 1 "no handshake — tunnel may be stale"
+    else
+      # No latest-handshake line = never established
+      check "WireGuard wg0" 2 "handshake unknown — verify peer is reachable"
+    fi
+
+    # Transfer stats — non-zero TX means we can reach peer
+    tx_bytes=$(echo "$wg_show" | grep "transfer:" | awk '{print $2}' | tr -d 'MiB KiB' || echo "0")
+    rx_bytes=$(echo "$wg_show" | grep "transfer:" | awk '{print $5}' | tr -d 'MiB KiB' || echo "0")
+    if [[ "${tx_bytes:-0}" != "0" && "${rx_bytes:-0}" != "0" ]]; then
+      check "WireGuard tx/rx" 0 "tx=${tx_bytes}B rx=${rx_bytes}B"
+    elif [[ "${tx_bytes:-0}" != "0" ]]; then
+      check "WireGuard tx/rx" 2 "tx only (${tx_bytes}B) — no return traffic"
+    else
+      check "WireGuard tx/rx" 1 "no traffic on tunnel"
+    fi
+
+    # Check endpoint is correct (should be VPS public IP, not old IP)
+    endpoint=$(echo "$wg_show" | grep "endpoint:" | awk '{print $2}' || echo "unknown")
+    expected_endpoint="158.220.87.183:51820"
+    if [[ "$endpoint" == "$expected_endpoint" ]]; then
+      check "WireGuard endpoint" 0 "$endpoint"
+    else
+      check "WireGuard endpoint" 2 "endpoint=$endpoint (expected $expected_endpoint)"
+    fi
+  else
+    check "WireGuard wg0" 1 "interface not found or no peers"
+  fi
+else
+  check "WireGuard (wg cmd)" 2 "wg command not available"
+fi
+
+# Bridge API reachable via WireGuard
+BRIDGE_BASE_URL="${BRIDGE_BASE_URL:-http://10.99.0.1:8080}"
+BRIDGE_API_TOKEN="${BRIDGE_API_TOKEN:-}"
+if [[ -n "$BRIDGE_API_TOKEN" ]]; then
+  bridge_health=$(curl -sf -m 5 "$BRIDGE_BASE_URL/health" -H "Authorization: Bearer $BRIDGE_API_TOKEN" 2>/dev/null || echo "fail")
+  if [[ "$bridge_health" != "fail" ]]; then
+    sites_tracked=$(echo "$bridge_health" | python3 -c "import sys,json; print(json.load(sys.stdin).get('sites_tracked','?'))" 2>/dev/null || echo "?")
+    bridge_uptime=$(echo "$bridge_health" | python3 -c "import sys,json; print(json.load(sys.stdin).get('uptime_seconds','?'))" 2>/dev/null || echo "?")
+    check "Bridge API $BRIDGE_BASE_URL" 0 "up (sites=$sites_tracked, uptime=${bridge_uptime}s)"
+  else
+    check "Bridge API $BRIDGE_BASE_URL" 1 "unreachable via WireGuard tunnel"
+  fi
+else
+  check "Bridge API token" 2 "BRIDGE_API_TOKEN not set"
+fi
+
+# Sentinel backend shadow mode polling job
+shadow_status=$(curl -sf -m 5 "http://localhost:9095/api/debug/health-snapshot/status" 2>/dev/null || echo "")
+if [[ -n "$shadow_status" ]]; then
+  # Check shadow_mode_polling job exists and next_run is near
+  shadow_job=$(echo "$shadow_status" | python3 -c "
+import sys, json, datetime
+d = json.load(sys.stdin)
+jobs = d.get('all_jobs', [])
+for j in jobs:
+    if j['id'] == 'shadow_mode_polling':
+        nr = j.get('next_run', '')
+        pending = j.get('pending', False)
+        # Flag if next_run > 20 min away (job stalled)
+        if nr:
+            try:
+                from datetime import datetime
+                from dateutil import parser as dp
+                next_run = dp.parse(nr)
+                now = datetime.now(next_run.tzinfo)
+                diff_min = (next_run - now).total_seconds() / 60
+                stale = diff_min > 20
+                print(f\"next={nr} pending={pending} diff_min={diff_min:.0f} stale={stale}\")
+            except:
+                print(f\"next={nr} pending={pending}\")
+        else:
+            print('not scheduled')
+        break
+else:
+    print('NOT FOUND')
+" 2>/dev/null || echo "ERROR")
+
+  if [[ "$shadow_job" == "NOT FOUND" ]]; then
+    check "Shadow polling job" 1 "not registered in APScheduler"
+  elif echo "$shadow_job" | grep -q "stale=True"; then
+    diff=$(echo "$shadow_job" | grep -oE 'diff_min=[0-9]+' | cut -d= -f2)
+    check "Shadow polling job" 2 "stale — next run ${diff}m away (job may be stalled)"
+  elif echo "$shadow_job" | grep -q "pending=True"; then
+    check "Shadow polling job" 0 "$(echo $shadow_job | grep -oE 'next=[^ ]+' | head -1)"
+  else
+    check "Shadow polling job" 0 "$(echo $shadow_job | grep -oE 'next=[^ ]+' | head -1)"
+  fi
+
+  # Check last poll result from energy-accum endpoint
+  energy_data=$(curl -sf -m 5 "http://localhost:9095/api/debug/energy-accum" 2>/dev/null || echo "")
+  if [[ -n "$energy_data" ]]; then
+    poll_count=$(echo "$energy_data" | python3 -c "import sys,json; d=json.load(sys.stdin); lp=d.get('last_poll_result',{}); print(lp.get('poll_count','?'))" 2>/dev/null || echo "?")
+    ml_hours=$(echo "$energy_data" | python3 -c "import sys,json; d=json.load(sys.stdin); lp=d.get('last_poll_result',{}); print(lp.get('ml_hours_ingested','?'))" 2>/dev/null || echo "?")
+    errors=$(echo "$energy_data" | python3 -c "import sys,json; d=json.load(sys.stdin); lp=d.get('last_poll_result',{}); e=lp.get('errors',[]); print(len(e))" 2>/dev/null || echo "0")
+    missing_eq=$(echo "$energy_data" | python3 -c "import sys,json; d=json.load(sys.stdin); lp=d.get('last_poll_result',{}); m=lp.get('equipment_missing_from_bridge',[]); print(len(m))" 2>/dev/null || echo "0")
+    trends_data=$(echo "$energy_data" | python3 -c "import sys,json; d=json.load(sys.stdin); lp=d.get('last_poll_result',{}); print(lp.get('trends_with_data','0'))" 2>/dev/null || echo "0")
+    setpoints_polled=$(echo "$energy_data" | python3 -c "import sys,json; d=json.load(sys.stdin); lp=d.get('last_poll_result',{}); print(lp.get('setpoints_polled','0'))" 2>/dev/null || echo "0")
+
+    check "Bridge poll count" 0 "polls=$poll_count ml_hours=$ml_hours"
+    [[ "$errors" -gt 0 ]] && check "Bridge poll errors" 1 "$errors errors" || check "Bridge poll errors" 0 "none"
+
+    if [[ "$missing_eq" -gt 0 ]]; then
+      missing_list=$(echo "$energy_data" | python3 -c "import sys,json; d=json.load(sys.stdin); lp=d.get('last_poll_result',{}); m=lp.get('equipment_missing_from_bridge',[]); print(', '.join(m[:5]))" 2>/dev/null || echo "$missing_eq items")
+      check "Equipment missing from bridge" 2 "$missing_eq missing: $missing_list"
+    else
+      check "Equipment catalog sync" 0 "all equipment found in bridge"
+    fi
+
+    if [[ "$trends_data" == "0" ]]; then
+      check "Bridge trend data" 2 "no historical trend data yet (new session — expected)"
+    else
+      check "Bridge trend data" 0 "$trends_data sensors with data"
+    fi
+
+    if [[ "$setpoints_polled" == "0" ]]; then
+      check "Bridge setpoints" 0 "none configured (expected for BACnet)"
+    else
+      check "Bridge setpoints" 0 "$setpoints_polled polled"
+    fi
+  else
+    check "Energy-accum debug endpoint" 2 "not reachable"
+  fi
+else
+  check "Scheduler debug endpoint" 2 "not reachable (backend may be down)"
+fi
+
+# Bridge API bridge-level alarms
+if [[ -n "$BRIDGE_API_TOKEN" ]]; then
+  bridge_alarms=$(curl -sf -m 5 "$BRIDGE_BASE_URL/api/sites/site-002/alarms" -H "Authorization: Bearer $BRIDGE_API_TOKEN" 2>/dev/null || echo '{"count":"?"}')
+  alarm_count=$(echo "$bridge_alarms" | python3 -c "
+import sys, json
+try:
+    d = json.load(sys.stdin)
+    if isinstance(d, list): print(len(d))
+    elif isinstance(d, dict):
+        if 'count' in d: print(d['count'])
+        elif 'alarms' in d: print(len(d['alarms']))
+        else: print(len(d))
+except: print('parse_err')
+" 2>/dev/null || echo "?")
+  if [[ "$alarm_count" == "parse_err" || "$alarm_count" == "?" ]]; then
+    check "Bridge alarm count" 2 "could not parse alarm response"
+  elif [[ "$alarm_count" -gt 500 ]]; then
+    check "Bridge alarms" 2 "HIGH — $alarm_count active alarms (ingestion may be stalled)"
+  elif [[ "$alarm_count" -gt 100 ]]; then
+    check "Bridge alarms" 2 "ELEVATED — $alarm_count active alarms"
+  elif [[ "$alarm_count" -gt 0 ]]; then
+    check "Bridge alarms" 0 "$alarm_count active (normal)"
+  else
+    check "Bridge alarms" 0 "none active"
+  fi
+
+  # Bridge telemetry — policy_stage and source_mode
+  bridge_telemetry=$(curl -sf -m 5 "$BRIDGE_BASE_URL/api/sites/site-002/telemetry" -H "Authorization: Bearer $BRIDGE_API_TOKEN" 2>/dev/null || echo "")
+  if [[ -n "$bridge_telemetry" ]]; then
+    policy_stage=$(echo "$bridge_telemetry" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('policy_stage','?'))" 2>/dev/null || echo "?")
+    source_mode=$(echo "$bridge_telemetry" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('source_mode','?'))" 2>/dev/null || echo "?")
+    if [[ "$policy_stage" == "commissioning" ]]; then
+      check "Bridge policy_stage" 2 "commissioning (site still being onboarded)"
+    elif [[ "$policy_stage" == "live" || "$policy_stage" == "shadow_live" || "$policy_stage" == "advisory" || "$policy_stage" == "supervised" || "$policy_stage" == "automatic" ]]; then
+      check "Bridge policy_stage" 0 "$policy_stage"
+    else
+      check "Bridge policy_stage" 2 "$policy_stage"
+    fi
+    [[ "$source_mode" == "live" ]] && check "Bridge source_mode" 0 "live" || check "Bridge source_mode" 2 "source_mode=$source_mode"
+  fi
+fi
+
 # --- MQTT Broker (Mosquitto) ---
 $QUIET || echo ""
 $QUIET || echo "=== MQTT Broker ==="

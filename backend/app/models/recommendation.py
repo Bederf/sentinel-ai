@@ -93,6 +93,9 @@ class Recommendation:
     outcome_notes: str | None = None
     outcome_validated_at: datetime | None = None
     shadow_mode: bool = False  # If True, stored but hidden from frontend UI
+    metadata: dict[str, Any] = field(
+        default_factory=dict
+    )  # Additional context (e.g., affected_equipment for grouped recs)
 
     def get_numeric_confidence(self) -> float:
         """Return numeric confidence, converting string if needed.
@@ -149,6 +152,7 @@ class Recommendation:
                 else self.outcome_validated_at
             ),
             "shadow_mode": self.shadow_mode,
+            "metadata": self.metadata,
         }
 
     @classmethod
@@ -229,4 +233,5 @@ class Recommendation:
             outcome_notes=data.get("outcome_notes"),
             outcome_validated_at=outcome_validated_at,
             shadow_mode=data.get("shadow_mode", False),
+            metadata=data.get("metadata", {}),
         )

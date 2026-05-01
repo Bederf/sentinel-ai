@@ -41,6 +41,23 @@ class ElementTrendService:
         self._inspection_repo = None
         self._baseline_repo = None
 
+    def _resolve_uuid(self, code_or_uuid: str) -> str:
+        """Resolve equipment code to UUID. Pass-through if already UUID."""
+        try:
+            from app.database.repositories.equipment_repository import (
+                EquipmentRepository,
+            )
+
+            repo = EquipmentRepository()
+            if repo._is_uuid(code_or_uuid):
+                return code_or_uuid
+            eq = repo.get_by_id(code_or_uuid)
+            if eq and eq.get("id"):
+                return eq["id"]
+        except Exception:
+            pass
+        return code_or_uuid
+
     @property
     def inspection_repo(self):
         """Lazy-load inspection repository."""
@@ -390,10 +407,11 @@ class ElementTrendService:
         """
         elements: dict[str, str] = {}
 
+        # Resolve equipment code → UUID for inspection_measurements queries
+        eq_uuid = self._resolve_uuid(equipment_id)
+
         try:
-            measurements = await self.inspection_repo.get_measurements_by_equipment(
-                equipment_id=equipment_id, limit=500
-            )
+            measurements = await self.inspection_repo.get_measurements_by_equipment(equipment_id=eq_uuid, limit=500)
 
             cutoff = datetime.now() - timedelta(days=days)
             for m in measurements:

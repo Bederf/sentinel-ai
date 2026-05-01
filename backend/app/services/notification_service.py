@@ -5,6 +5,7 @@ Phase 102: Routes notifications to technicians via their enabled channels (Teleg
 Respects technician preferences: quiet hours, alert level thresholds, emergency override.
 """
 
+import asyncio
 import logging
 from datetime import datetime
 from uuid import UUID
@@ -215,6 +216,40 @@ class NotificationService:
         result["success"] = result["recipients_notified"] > 0
         return result
 
+    async def send_alert_direct(
+        self,
+        title: str,
+        body: str,
+        alert_level: AlertLevel = AlertLevel.WARNING,
+    ) -> dict:
+        """Send an alert directly via TelegramProvider (bypasses technician lookup).
+
+        For infrastructure alerts (sensor offline, data freshness) where no
+        technician_id is available. Sends to the default FM chat ID.
+
+        Returns:
+            {"success": bool, "error": str|None}
+        """
+        from app.config.settings import settings
+
+        telegram_to = (
+            str(getattr(settings, "sentry_fm_chat_id", "") or "").strip()
+            or str(getattr(settings, "telegram_alert_chat_id", "") or "").strip()
+        )
+        if not telegram_to:
+            return {"success": False, "error": "no_telegram_chat_id_configured"}
+
+        provider = self.providers.get(ChannelType.TELEGRAM)
+        if not provider or not provider.is_enabled():
+            return {"success": False, "error": "telegram_not_enabled"}
+
+        try:
+            send_result = await provider.send(telegram_to, title, body)
+            return {"success": bool(send_result.success), "error": getattr(send_result, "error_message", None)}
+        except Exception as e:
+            logger.warning(f"[NOTIFY] send_alert_direct failed: {e}")
+            return {"success": False, "error": str(e)}
+
     def _get_default_recipient(self, channel_type: ChannelType) -> str:
         """Get default recipient for a channel when no technician DB available."""
         from app.config.settings import settings
@@ -346,6 +381,218 @@ class NotificationService:
             for channel in ChannelType
             if channel in self.providers
         }
+
+    async def send_certified(
+        self,
+        *,
+        site_id: str,
+        recipient_telegram_id: str,
+        title: str,
+        message: str,
+        alert_level: AlertLevel = AlertLevel.WARNING,
+        reference_id: str | None = None,
+        acknowledgement_timeout_minutes: int = 15,
+    ) -> dict:
+        """Send a certified notification requiring Telegram acknowledgement.
+
+        Flow:
+        1. Send message with inline [✅ Acknowledged] keyboard via TelegramProvider
+        2. Log delivery to notification_delivery_log
+        3. Schedule escalation if no acknowledgement within timeout
+        4. Return notification_id for tracking
+
+        Args:
+            site_id: Site context
+            recipient_telegram_id: Telegram chat ID
+            title: Notification title
+            message: Notification body
+            alert_level: Severity
+            reference_id: Optional reference (work_order_id, alert_id, etc.)
+            acknowledgement_timeout_minutes: Minutes before escalation
+
+        Returns:
+            {"success": bool, "notification_id": str, "error": str|None}
+        """
+        from uuid import uuid4
+
+        notification_id = str(uuid4())
+        provider = self.providers[ChannelType.TELEGRAM]
+
+        if not provider.is_enabled():
+            return {"success": False, "notification_id": notification_id, "error": "telegram_not_enabled"}
+
+        # Build inline keyboard with acknowledgement button
+        from app.services.telegram_message_sender import InlineButton, InlineKeyboard, get_telegram_sender
+
+        keyboard = InlineKeyboard(
+            rows=[[InlineButton(label="✅ Acknowledged", callback_data=f"ack:{notification_id}:{reference_id or ''}")]]
+        )
+
+        # Send via Telegram sender (supports inline keyboard)
+        sender = get_telegram_sender()
+        try:
+            result = await sender.send_text(
+                chat_id=recipient_telegram_id,
+                text=f"*{title}*\n\n{message}",
+                keyboard=keyboard,
+            )
+            msg_id = result.get("result", {}).get("message_id") if result.get("ok") else None
+        except Exception as e:
+            logger.warning(f"[CERTIFIED] Telegram send failed for {recipient_telegram_id}: {e}")
+            msg_id = None
+            telegram_error = str(e)
+        else:
+            telegram_error = None
+
+        # Log delivery
+        try:
+            delivery_log = NotificationDeliveryLog(
+                id=uuid4(),
+                technician_id=UUID("00000000-0000-0000-0000-000000000000"),  # system notifier
+                notification_type="certified",
+                channel_type=ChannelType.TELEGRAM,
+                recipient_identifier=recipient_telegram_id,
+                status=NotificationStatus.SENT if msg_id else NotificationStatus.FAILED,
+                provider="telegram",
+                external_message_id=msg_id,
+                sent_at=datetime.utcnow(),
+                error_message=telegram_error,
+            )
+            await self.notification_repo.create_delivery_log(delivery_log)
+        except Exception as log_err:
+            logger.warning(f"[CERTIFIED] Failed to log delivery: {log_err}")
+
+        # Schedule escalation check (fire-and-forget, no reference needed)
+        if msg_id:
+            asyncio.create_task(  # noqa: RUF006
+                self._check_acknowledgement(
+                    notification_id=notification_id,
+                    recipient_telegram_id=recipient_telegram_id,
+                    title=title,
+                    message=message,
+                    timeout_minutes=acknowledgement_timeout_minutes,
+                    reference_id=reference_id,
+                )
+            )
+
+        return {
+            "success": bool(msg_id),
+            "notification_id": notification_id,
+            "error": None if msg_id else "send_failed",
+        }
+
+    async def handle_acknowledgement(
+        self,
+        callback_data: str,
+        acknowledged_by_telegram_id: str,
+    ) -> dict:
+        """Handle [✅ Acknowledged] button press from Telegram.
+
+        Called by the Telegram gateway when FM taps the inline button.
+        Updates delivery log and cancels pending escalation.
+        """
+        parts = callback_data.split(":")
+        if len(parts) < 2 or parts[0] != "ack":
+            return {"success": False, "error": "invalid_callback_data"}
+
+        notification_id = parts[1]
+        reference_id = parts[2] if len(parts) > 2 else None
+
+        try:
+            await self.notification_repo.update_delivery_log_acknowledged(
+                notification_id=notification_id,
+                acknowledged_by=acknowledged_by_telegram_id,
+                acknowledged_at=datetime.utcnow(),
+            )
+            logger.info(f"[CERTIFIED] Notification {notification_id} acknowledged by {acknowledged_by_telegram_id}")
+            return {"success": True, "notification_id": notification_id, "reference_id": reference_id}
+        except Exception as e:
+            logger.warning(f"[CERTIFIED] Failed to record acknowledgement for {notification_id}: {e}")
+            return {"success": False, "error": str(e)}
+
+    async def _check_acknowledgement(
+        self,
+        notification_id: str,
+        recipient_telegram_id: str,
+        title: str,
+        message: str,
+        timeout_minutes: int,
+        reference_id: str | None,
+    ) -> None:
+        """Wait for acknowledgement timeout, then escalate if not acknowledged."""
+
+        await asyncio.sleep(timeout_minutes * 60)
+
+        try:
+            # Check if already acknowledged via notification_id lookup
+            result = (
+                self.notification_repo.client.table("notification_delivery_log")
+                .select("id, acknowledged_at, escalated")
+                .eq("notification_id", notification_id)
+                .limit(1)
+                .execute()
+            )
+
+            if not result.data:
+                logger.warning(f"[CERTIFIED] Delivery log not found for {notification_id}")
+                return
+
+            row = result.data[0]
+            if row.get("acknowledged_at") or row.get("escalated"):
+                # Already acknowledged or escalated — nothing to do
+                return
+
+            logger.warning(
+                f"[CERTIFIED] Notification {notification_id} unacknowledged after {timeout_minutes}min — escalating"
+            )
+            await self._escalate(
+                notification_id=notification_id,
+                recipient_telegram_id=recipient_telegram_id,
+                title=title,
+                message=message,
+                reference_id=reference_id,
+            )
+        except Exception as e:
+            logger.warning(f"[CERTIFIED] Escalation check failed for {notification_id}: {e}")
+
+    async def _escalate(
+        self,
+        notification_id: str,
+        recipient_telegram_id: str,
+        title: str,
+        message: str,
+        reference_id: str | None,
+    ) -> None:
+        """Send escalation message to FM and secondary contacts."""
+        from app.config.settings import settings
+        from app.services.telegram_message_sender import get_telegram_sender
+
+        sender = get_telegram_sender()
+
+        escalation_msg = (
+            f"⚠️ *ESCALATION*\n"
+            f"No acknowledgement received for:\n"
+            f"*{title}*\n"
+            f"{message[:200]}\n"
+            f"Reference: {reference_id or 'N/A'}"
+        )
+
+        # Send to original recipient
+        await sender.send_text(chat_id=recipient_telegram_id, text=escalation_msg)
+
+        # Also notify secondary FM chat from settings
+        secondary = getattr(settings, "sentry_fm_chat_id", None)
+        if secondary and secondary != recipient_telegram_id:
+            await sender.send_text(chat_id=secondary, text=f"[ESCALATION COPY]\n{escalation_msg}")
+
+        # Update escalated flag
+        try:
+            await self.notification_repo.update_delivery_log_escalated(
+                notification_id=notification_id,
+                escalated_at=datetime.utcnow(),
+            )
+        except Exception as e:
+            logger.warning(f"[CERTIFIED] Failed to mark escalated: {e}")
 
 
 # Singleton instance for module-level imports

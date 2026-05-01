@@ -59,6 +59,18 @@ class StderrFilter:
 # Apply the filter
 sys.stderr = StderrFilter()
 
+CAVEMAN_DIRECTIVE = """
+CAVEMAN MODE: Strip filler, use technical shorthand. Facts only, no preamble.
+
+Guidelines:
+- Use numbered lists for procedures: "1) Check X, 2) Prime Y, 3) Verify Z"
+- Omit "The X involves Y steps..." preamble
+- Write: "Startup: 1) Check pressure, 2) Prime pump"
+- NOT: "The startup sequence involves several steps. First, you would..."
+
+Applies to: Equipment procedures, commissioning, maintenance, troubleshooting, fault codes.
+"""
+
 # Base FM-focused system prompt for building management intelligence
 FM_SYSTEM_PROMPT_BASE = """\
 You are an AI assistant specializing in Facilities Management (FM) \
@@ -578,6 +590,16 @@ class ClaudeService:
         else:
             system = FM_SYSTEM_PROMPT_BASE
 
+        # Caveman mode: append directive when user query mentions equipment/zones/sites
+        last_msg = next(
+            (m for m in reversed(messages) if m.get("role") == "user" and isinstance(m.get("content"), str)), None
+        )
+        if last_msg:
+            entities = self._extract_entities(last_msg["content"])
+            if entities["equipment_id"] or entities["site_id"]:
+                system = system + "\n\n" + CAVEMAN_DIRECTIVE.strip()
+                logger.debug(f"[CAVEMAN] Equipment detected — directive appended: {entities}")
+
         # Prompt caching: wrap system prompt as a content block with cache_control.
         # Anthropic caches the prefix server-side for ~5 min, saving 90% of input
         # token cost on repeated requests with the same system prompt.
@@ -697,6 +719,15 @@ class ClaudeService:
             )
         else:
             system_text = FM_SYSTEM_PROMPT_BASE
+
+        # Caveman mode for equipment queries in tool path too
+        last_msg = next(
+            (m for m in reversed(messages) if m.get("role") == "user" and isinstance(m.get("content"), str)), None
+        )
+        if last_msg:
+            entities = self._extract_entities(last_msg["content"])
+            if entities["equipment_id"] or entities["site_id"]:
+                system_text = system_text + "\n\n" + CAVEMAN_DIRECTIVE.strip()
 
         # Prompt caching: wrap system prompt as a content block with cache_control.
         # Anthropic caches the prefix server-side for ~5 min, saving 90% of input

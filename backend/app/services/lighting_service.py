@@ -745,11 +745,11 @@ class LightingService:
             supabase = get_supabase_client()
 
             # Query live sensor occupancy
-            sensors_response = supabase.table("dali_sensors").select("*").eq("site_id", site_id).execute()
+            sensors_response = supabase.table("lighting_sensors").select("*").eq("site_id", site_id).execute()
             sensors = sensors_response.data or []
 
             # Query live luminaire brightness
-            luminaires_response = supabase.table("dali_luminaires").select("*").eq("site_id", site_id).execute()
+            luminaires_response = supabase.table("lighting_luminaires").select("*").eq("site_id", site_id).execute()
             luminaires = luminaires_response.data or []
 
             # Query recent energy data (last 1 hour)
@@ -807,7 +807,7 @@ class LightingService:
             for energy in energy_data:
                 zone_id = energy.get("zone_id", "unknown")
                 if zone_id in zones_agg:
-                    zones_agg[zone_id]["energy_total_kwh"] += energy.get("energy_kwh", 0)
+                    zones_agg[zone_id]["energy_total_kwh"] += energy.get("total_watts", 0) / 1000
 
             # Calculate zone statistics
             zones_list = []

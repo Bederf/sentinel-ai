@@ -410,7 +410,10 @@ class AIOptimizerService:
             provider = HealthFeatureProvider()
 
             for rec_dict in recommendation.recommendations:
-                equipment_id = rec_dict.get("equipment_id") or rec_dict.get("device_id")
+                # target_equipment is canonical; fall back to equipment_id for compatibility
+                equipment_id = (
+                    rec_dict.get("target_equipment") or rec_dict.get("equipment_id") or rec_dict.get("device_id")
+                )
                 if not equipment_id:
                     continue
 
@@ -726,7 +729,7 @@ class AIOptimizerService:
                     if sp_count > 0:
                         conditions["_data_sources"]["setpoints"] = "live"
                         logger.warning(
-                            f"[AI-OPT] Loaded {sp_count} setpoints from operating_data for {site_id} ({stale_count} stale skipped)"
+                            f"[AI-OPT] Loaded {sp_count} setpoints for {site_id} ({stale_count} stale skipped)"
                         )
             except Exception as e:
                 logger.warning(f"Failed to load setpoints from operating_data: {e}")
@@ -1347,13 +1350,48 @@ For each recommendation:
 
 FORMAT each recommendation as:
 {{
-  "equipment_id": "S002-FCU-201",
+  "target_equipment": "S002-FCU-201",
   "action": {{"point": "power_state", "value": "off"}},
-  "reason": "Zone-201 schedule shows empty since 19:45 (18 min). FCU still running. Pattern confirms no re-occupancy after 19:30 on weekdays. Recommend switching off now.",
+  "reason": "Zone-201 empty since 19:45 (18 min). FCU still running. No re-occupancy pattern after 19:30. Switch off.",
   "benefit": "Saves ~0.3 kWh at R{current_rate:.2f}/kWh = R0.90",
   "confidence": 0.87,
   "source": "schedule + pattern"
 }}
+
+GROUPING RULE — Important:
+When the same condition affects multiple equipment items identically,
+generate ONE recommendation covering all affected equipment — not one
+per equipment item.
+
+Example of WRONG per-equipment output (7 identical recs):
+[
+  {{"target_equipment": "S002-FCU-L0-A", "action": {{"point": "cooling_setpoint", "value": 22.9}}, ...}},
+  {{"target_equipment": "S002-FCU-L1-A", "action": {{"point": "cooling_setpoint", "value": 22.9}}, ...}},
+  ...
+]
+
+Example of CORRECT grouped output (1 rec covering all zones):
+[
+  {{
+    "target_equipment": "S002-FCU-L0-A",
+    "affected_equipment": ["S002-FCU-L0-A", "S002-FCU-L1-A", "S002-FCU-L1-B", "S002-FCU-L2-C", "S002-FCU-L2-D"],
+    "action": {{"point": "cooling_setpoint", "value": 22.9}},
+    "reason": "Outdoor 28.0°C. All 5 FCU zones identical — indoor 22.0°C. Relax cooling 22.0°C→22.9°C. Saves ~5% cooling.",
+    "benefit": "~R8.50/day at current tariff",
+    "confidence": 0.82
+  }}
+]
+
+Use grouped recommendations when:
+- Same outdoor condition affects multiple zones
+- Same TOU tariff period applies to all affected equipment
+- Same occupancy pattern applies across equipment
+- Recommended action and values are identical per zone
+
+Only generate separate per-equipment recommendations when:
+- Conditions genuinely differ per zone (different indoor temps, different occupancy)
+- The recommended action differs per equipment
+- Equipment is in different risk categories
 
 If the building is already running optimally for {profile},
 state specifically why — reference actual values, not generic statements.
@@ -1666,10 +1704,15 @@ Provide ONLY the JSON response, no additional text."""
                     for reason in no_action_reasons[:5]:
                         logger.warning(f"[AI-OPT]   No action: {reason}")
 
+                # Normalise all recommendations to canonical format before storage
+                normalised_recommendations = [
+                    self._normalise_recommendation(r) for r in result.get("recommendations", [])
+                ]
+
                 return OptimizationRecommendation(
                     site_id=site_id,
                     timestamp=datetime.now().isoformat(),
-                    recommendations=result.get("recommendations", []),
+                    recommendations=normalised_recommendations,
                     projected_savings=result.get("projected_savings", {}),
                     confidence=result.get("confidence", 0.7),
                     reasoning=result.get("reasoning", ""),
@@ -1762,6 +1805,60 @@ Provide ONLY the JSON response, no additional text."""
             raw[-300:],
         )
         return clean
+
+    def _normalise_recommendation(self, raw: dict) -> dict:
+        """
+        Normalise LLM response to canonical format regardless of
+        which format the LLM returned.
+
+        Canonical format:
+        {
+            "target_equipment": "S002-FCU-L0-A",   # always this key
+            "action": {"point": "cooling_setpoint", "value": 22.9},  # always nested
+            "reason": "...",
+            "confidence": 0.82,
+            "affected_equipment": [...],  # optional, for grouped recs
+            "metadata": {"affected_equipment": [...], "group_recommendation": True}
+        }
+
+        Handles:
+        - flat format: {point_name, recommended_value} → canonical
+        - equipment_id vs target_equipment
+        - affected_equipment top-level vs metadata-embedded
+        - action.value as float or string
+        """
+        out = dict(raw)
+
+        # Normalise equipment_id → target_equipment
+        if "equipment_id" in out and "target_equipment" not in out:
+            out["target_equipment"] = out.pop("equipment_id")
+        elif "equipment_id" in out:
+            out.pop("equipment_id", None)
+
+        # Normalise flat action format → canonical nested
+        if "point_name" in out and "action" not in out:
+            out["action"] = {
+                "point": out.pop("point_name"),
+                "value": out.pop("recommended_value", out.pop("value", None)),
+            }
+        # Handle action.value that came through as string
+        if "action" in out and isinstance(out["action"], dict):
+            raw_val = out["action"].get("value")
+            if raw_val is not None:
+                try:
+                    out["action"]["value"] = float(raw_val)
+                except (TypeError, ValueError):
+                    pass
+
+        # Normalise affected_equipment → metadata
+        if "affected_equipment" in out:
+            affected = out.pop("affected_equipment")
+            if "metadata" not in out:
+                out["metadata"] = {}
+            out["metadata"]["affected_equipment"] = affected
+            out["metadata"]["group_recommendation"] = True
+
+        return out
 
     def _score_and_rank_recommendations(
         self, recommendation: OptimizationRecommendation, profile: dict[str, Any]
@@ -2293,7 +2390,6 @@ Provide ONLY the JSON response, no additional text."""
             lines.append(f"- {point_key}: {value}{unit} (current)")
 
         # Add brief note about operational context
-        active_profile = "balanced"
         if "equipment_status" in conditions:
             status = conditions["equipment_status"]
             lines.append(f"- Equipment status: {status}")
@@ -3368,9 +3464,12 @@ Provide ONLY the JSON response, no additional text."""
             validation_results = []
 
             for rec in recommendation.recommendations:
-                equipment_id = rec.get("equipment_id")
-                point_name = rec.get("point_name")
-                value = rec.get("recommended_value")
+                # target_equipment is canonical; fall back to equipment_id for compatibility
+                equipment_id = rec.get("target_equipment") or rec.get("equipment_id")
+                # Handle both flat format (point_name) and grouped format (action.point)
+                point_name = rec.get("point_name") or rec.get("action", {}).get("point", "")
+                # Handle both flat format (recommended_value) and grouped format (action.value)
+                value = rec.get("recommended_value") or rec.get("action", {}).get("value")
 
                 # Find device
                 device = next((d for d in devices if d.id == equipment_id), None)
@@ -3381,12 +3480,7 @@ Provide ONLY the JSON response, no additional text."""
                     # get_by_site_code is synchronous — run directly
                     equip_list = equip_repo.get_by_site_code(site_id)
 
-                    # Normalise site_id for lookup: "site-002" → "S002"
-                    lookup_id = site_id
-                    if site_id.startswith("site-"):
-                        num = site_id.split("-")[1]
-                        lookup_id = f"S{num}"
-
+                    # Normalise site_id for lookup: "site-002" → "S002" (for future use)
                     found = next((e for e in equip_list if e.get("code") == equipment_id), None)
                     if found:
                         logger.warning(f"[AI-OPT] {equipment_id} validated via Supabase fallback")
@@ -3395,7 +3489,7 @@ Provide ONLY the JSON response, no additional text."""
                                 "equipment_id": equipment_id,
                                 "point_name": point_name,
                                 "allowed": True,
-                                "reason": "Validated via Supabase fallback (device_manager not populated for HTTP bridge site)",
+                                "reason": "Validated via Supabase fallback (device_manager empty for HTTP bridge site)",
                                 "source": "supabase_fallback",
                             }
                         )

@@ -32,9 +32,9 @@ ROUTING_PROFILES: dict[str, dict[str, Any]] = {
                 {"provider": "openai", "model": "gpt-4o"},
             ],
             "medium": [
-                {"provider": "minimax", "model": "MiniMax-M2.5"},
                 {"provider": "deepseek", "model": "deepseek-chat"},
-                {"provider": "openai", "model": "gpt-4-turbo"},
+                {"provider": "minimax", "model": "MiniMax-M2.5"},
+                {"provider": "openai", "model": "gpt-4o-mini"},
             ],
             "light": [
                 {"provider": "minimax", "model": "MiniMax-M2.5"},
@@ -43,11 +43,11 @@ ROUTING_PROFILES: dict[str, dict[str, Any]] = {
             ],
             "chat_ai": [
                 {"provider": "anthropic", "model": "claude-sonnet-4-6"},
-                {"provider": "openai", "model": "gpt-4o"},
+                {"provider": "minimax", "model": "MiniMax-M2.7"},
             ],
             "chat_tech": [
                 {"provider": "anthropic", "model": "claude-sonnet-4-6"},
-                {"provider": "openai", "model": "gpt-4o"},
+                {"provider": "minimax", "model": "MiniMax-M2.7"},
             ],
         },
     },
@@ -61,9 +61,9 @@ ROUTING_PROFILES: dict[str, dict[str, Any]] = {
                 {"provider": "openai", "model": "gpt-4o"},
             ],
             "medium": [
-                {"provider": "minimax", "model": "MiniMax-M2.5"},
                 {"provider": "deepseek", "model": "deepseek-chat"},
-                {"provider": "openai", "model": "gpt-4-turbo"},
+                {"provider": "minimax", "model": "MiniMax-M2.5"},
+                {"provider": "openai", "model": "gpt-4o-mini"},
             ],
             "light": [
                 {"provider": "minimax", "model": "MiniMax-M2.5"},
@@ -72,11 +72,11 @@ ROUTING_PROFILES: dict[str, dict[str, Any]] = {
             ],
             "chat_ai": [
                 {"provider": "anthropic", "model": "claude-sonnet-4-6"},
-                {"provider": "openai", "model": "gpt-4o"},
+                {"provider": "minimax", "model": "MiniMax-M2.7"},
             ],
             "chat_tech": [
                 {"provider": "anthropic", "model": "claude-sonnet-4-6"},
-                {"provider": "openai", "model": "gpt-4o"},
+                {"provider": "minimax", "model": "MiniMax-M2.7"},
             ],
         },
     },

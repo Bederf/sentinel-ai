@@ -422,6 +422,9 @@ class SystemHealthService:
                 note = result.get("message", "not connected") if isinstance(result, dict) else "not available"
                 return {"score": 0, "status": "critical", "note": f"ObiX: {note}"}
             return {"score": 0, "status": "critical", "note": "ObiX client not available"}
+        except ImportError:
+            # OBIX client module not installed — this stack doesn't use Niagara/oBIX
+            return {"score": 50, "status": "not_configured", "note": "OBIX not configured on this stack"}
         except Exception as e:
             return {"score": 0, "status": "critical", "note": f"Error: {e}"}
 

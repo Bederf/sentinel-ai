@@ -184,3 +184,11 @@ class NotificationDeliveryLog:
     # Metadata
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)
+
+    # Certified notification fields
+    acknowledged_at: datetime | None = None
+    acknowledged_by: str | None = None
+    escalated: bool = False
+    escalated_at: datetime | None = None
+    timeout_minutes: int = 15
+    notification_id: str | None = None  # Certified notification tracking ID

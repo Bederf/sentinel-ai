@@ -66,19 +66,13 @@ function getRoomDisplayName(room: ConciergeRoom): string {
   const raw = (room.room_id || "").trim();
   if (!raw) return "";
 
-  // Strip site prefix: S002-L1-MR2 -> L1-MR2
-  const compact = raw.replace(/^S\d{3}-/i, "");
-  const base = compact && compact !== raw ? compact : raw;
+  // Strip site prefix: S002-FA2-1Q4-FR25 -> FA2-1Q4-FR25, S002-L0-MR01 -> L0-MR01
+  const withoutSite = raw.replace(/^S\d{3}-/i, "");
 
-  // Abbreviate common room types so labels fit inside circles cleanly
-  return base
-    .replace(/\bfocus\s*room\b/gi, "FR")
-    .replace(/\bmeeting\s*room\b/gi, "MR")
-    .replace(/\bconference\s*room\b/gi, "CR")
-    .replace(/\bboard\s*room\b/gi, "BR")
-    .replace(/\bopen\s*space\b/gi, "OS")
-    .replace(/\btraining\s*room\b/gi, "TR")
-    .replace(/\bhuddle\s*room\b/gi, "HR");
+  // Strip floor/location prefix: FA2-1Q4-FR25 -> FR25, L0-MR01 -> MR01
+  // Take only the last segment after splitting by hyphen
+  const parts = withoutSite.split("-");
+  return parts[parts.length - 1] || withoutSite;
 }
 
 function roomLabel(room: ConciergeRoom): string {
@@ -367,13 +361,16 @@ function getCyStylesheet(): any[] {
       selector: "node",
       style: {
         label: "data(label)",
-        "font-family": "'DM Mono', 'JetBrains Mono', monospace",
-        "font-size": 8,
-        color: "var(--color-sentinel-text-secondary)",
-        "text-valign": "bottom",
+        "font-family": "'DM Sans', 'Segoe UI', system-ui, sans-serif",
+        "font-size": 11,
+        "text-font-size": 11,
+        color: "var(--color-sentinel-text-primary)",
+        "text-valign": "center",
         "text-halign": "center",
-        "text-margin-y": 8,
-        "min-zoomed-font-size": 6,
+        "text-margin-y": 0,
+        "min-zoomed-font-size": 7,
+        "text-events": "yes",
+        "events": "yes",
       },
     },
     {
@@ -391,12 +388,12 @@ function getCyStylesheet(): any[] {
         "border-color": (ele: any) => colorFromSeverity(ele.data("highest_severity")),
         "text-valign": "center",
         "text-halign": "center",
-        "text-wrap": "wrap",
-        // Keep labels constrained to the circle diameter so they don't explode visually.
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        "text-max-width": (ele: any) => Math.max(34, sizeFromSignalCount(ele.data("signal_count")) * 0.78),
+        "text-wrap": "nowrap",
+        "text-max-width": (ele: any) => Math.max(30, sizeFromSignalCount(ele.data("signal_count")) * 0.82),
         "text-margin-y": 0,
         "font-weight": 700,
+        "font-size": 11,
+        "text-font-size": 11,
         "z-index": 5,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         "shadow-blur": (ele: any) => 8 + ele.data("urgency_score") * 20,
@@ -406,6 +403,10 @@ function getCyStylesheet(): any[] {
         "shadow-opacity": (ele: any) => glowOpacity(ele.data("urgency_score")),
         "shadow-offset-x": 0, "shadow-offset-y": 0,
         color: "var(--color-sentinel-text-primary)",
+        "text-shadow": "0 1px 3px rgba(0,0,0,0.5)",
+        "transition-property": "width, height, background-color, border-color, shadow-blur, shadow-opacity",
+        "transition-duration": "400ms",
+        "transition-timing-function": "cubic-bezier(0.16, 1, 0.3, 1)",
       },
     },
     {

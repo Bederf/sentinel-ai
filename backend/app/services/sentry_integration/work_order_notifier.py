@@ -586,7 +586,13 @@ class WorkOrderNotifier:
 
             from app.services.sentry_integration.config import get_sentry_bot_cli
 
+            # Prefer code from payload; fall back to DB lookup to avoid showing UUID in /done command
             wo_ref = work_order_data.get("code") or work_order_data.get("work_order_id", "WO-???")
+            if not work_order_data.get("code") and work_order_data.get("work_order_id"):
+                # Look up the work order code from the database to show human-readable reference
+                work_order = await self._load_work_order_context(work_order_data["work_order_id"])
+                if work_order and work_order.get("code"):
+                    wo_ref = work_order["code"]
             eq_name = work_order_data.get("equipment_name", "?")
             pri = work_order_data.get("criticality", "MEDIUM").upper()
             service_type = work_order_data.get("service_type", "callout")

@@ -4,19 +4,18 @@ Module Registry API - Bolt-on Module System Endpoints
 Manages module activation, integration, and AI recommendations.
 """
 
-import contextlib
 import logging
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 
-from app.core.site_resolver import get_primary_site_code
 from app.database.repositories.module_access_repository import get_module_access_repository
-from app.database.supabase_client import get_supabase_client
+from app.database.repositories.recommendation_repository import get_recommendation_repository
 from app.middleware.auth_middleware import require_auth
 from app.models.auth import AuthContext, AuthLevel
 from app.models.module_registry import AIRecommendation, ModuleType, RecommendationPriority, RecommendationType
+from app.models.recommendation import RecommendationStatus
 from app.services.module_registry_service import module_registry
 
 logger = logging.getLogger(__name__)
@@ -319,152 +318,95 @@ async def get_recommendations(
     site_id: str,
     modules: str | None = Query(None, description="Comma-separated module types to filter"),
     priorities: str | None = Query(None, description="Comma-separated priorities to filter"),
-    include_resolved: bool = False,
     limit: int = Query(50, ge=1, le=200),
 ):
-    """Get AI recommendations for a site from Supabase predictions."""
+    """Get AI recommendations for a site from the recommendations table.
 
-    # Fetch from Supabase predictions table
-    recommendations = []
+    Source: recommendations table (AI-OPT operational recommendations).
+    NOT predictions table (ML health assessments — those belong in the maintenance panel).
+    """
+    recommendations: list[RecommendationResponse] = []
+
+    # Normalise site_id (site-002 → S002 for recommendations table)
+    normalized = site_id
+    if site_id.startswith("site-"):
+        num = site_id.split("-")[1]
+        normalized = f"S{num}"
+
+    # Fetch from recommendations table
     try:
-        client = get_supabase_client()
-        if not client:
-            logger.warning("Supabase client not available, skipping predictions fetch")
-        else:
-            # Get building ID from site code
-            site_response = client.table("sites").select("id").eq("code", site_id).limit(1).execute()
-            if not site_response.data:
-                # Try with 'sandton' mapping for legacy support
-                if site_id == get_primary_site_code():
-                    site_response = client.table("sites").select("id").ilike("name", "%sandton%").limit(1).execute()
-
-            if site_response.data:
-                site_id = site_response.data[0]["id"]
-
-                # Query predictions with active status
-                query = (
-                    client.table("predictions")
-                    .select(
-                        "id, code, equipment_id, prediction_type, probability_percent, "
-                        "recommended_action, urgency, severity, status, created_at, "
-                        "evidence, contributing_factors"
-                    )
-                    .eq("site_id", site_id)
-                )
-
-                if not include_resolved:
-                    query = query.eq("status", "active")
-
-                query = query.order("probability_percent", desc=True).limit(limit)
-
-                pred_response = query.execute()
-
-                # Get equipment names
-                equipment_ids = [p["equipment_id"] for p in pred_response.data if p.get("equipment_id")]
-                equipment_names = {}
-                if equipment_ids:
-                    eq_response = client.table("equipment").select("id, name, type").in_("id", equipment_ids).execute()
-                    equipment_names = {e["id"]: e for e in eq_response.data}
-
-                # Convert predictions to recommendations
-                for pred in pred_response.data:
-                    eq_info = equipment_names.get(pred.get("equipment_id"), {})
-                    eq_name = eq_info.get("name", "Unknown Equipment")
-                    eq_type = eq_info.get("type", "").lower()
-
-                    # Map urgency to priority
-                    urgency = pred.get("urgency", "routine")
-                    if urgency == "immediate" or pred.get("severity") == "critical":
-                        priority = "critical"
-                    elif urgency == "soon" or pred.get("severity") == "warning":
-                        priority = "high"
-                    elif urgency == "scheduled":
-                        priority = "medium"
-                    else:
-                        priority = "low"
-
-                    # Map equipment type to module
-                    if eq_type in ["chiller", "ahu", "fcu", "vav", "pump"]:
-                        source_module = "hvac"
-                    elif eq_type in ["luminaire", "lighting", "dali"]:
-                        source_module = "lighting"
-                    elif eq_type in ["generator", "ups", "transformer", "meter"]:
-                        source_module = "energy"
-                    else:
-                        source_module = "hvac"  # Default
-
-                    # Apply filters
-                    if modules:
-                        module_list = [m.strip().lower() for m in modules.split(",")]
-                        if source_module not in module_list:
-                            continue
-
-                    if priorities:
-                        priority_list = [p.strip().lower() for p in priorities.split(",")]
-                        if priority not in priority_list:
-                            continue
-
-                    recommendations.append(
-                        RecommendationResponse(
-                            recommendation_id=pred["code"],
-                            timestamp=pred.get("created_at", datetime.now().isoformat()),
-                            source_module=source_module,
-                            recommendation_type="maintenance",
-                            priority=priority,
-                            title=f"{eq_name}: {pred.get('prediction_type', 'Issue Detected')}",
-                            description=pred.get("recommended_action", "Review equipment status"),
-                            confidence=min(pred.get("probability_percent", 50) / 100, 1.0),
-                            related_modules=[],
-                            auto_actionable=False,
-                            acknowledged=False,
-                            resolved=pred.get("status") == "resolved",
-                        )
-                    )
-
-    except Exception as e:
-        logger.warning(f"Failed to fetch recommendations from Supabase: {e}")
-
-    # Also try module registry for any additional recommendations
-    try:
-        module_filter = None
-        if modules:
-            with contextlib.suppress(ValueError):
-                module_filter = [ModuleType(m.strip()) for m in modules.split(",")]
-
-        priority_filter = None
-        if priorities:
-            with contextlib.suppress(ValueError):
-                priority_filter = [RecommendationPriority(p.strip()) for p in priorities.split(",")]
-
-        registry_recs = module_registry.get_recommendations(
-            site_id=site_id,
-            module_filter=module_filter,
-            priority_filter=priority_filter,
-            include_resolved=include_resolved,
+        rec_repo = get_recommendation_repository()
+        recs = await rec_repo.get_by_status(
+            site_id=normalized,
+            status=RecommendationStatus.PENDING,
             limit=limit,
         )
 
-        for r in registry_recs:
-            # Avoid duplicates
-            if not any(rec.recommendation_id == r.recommendation_id for rec in recommendations):
-                recommendations.append(
-                    RecommendationResponse(
-                        recommendation_id=r.recommendation_id,
-                        timestamp=r.timestamp,
-                        source_module=r.source_module.value,
-                        recommendation_type=r.recommendation_type.value,
-                        priority=r.priority.value,
-                        title=r.title,
-                        description=r.description,
-                        confidence=r.confidence,
-                        related_modules=[m.value for m in r.related_modules],
-                        auto_actionable=r.auto_actionable,
-                        acknowledged=r.acknowledged,
-                        resolved=r.resolved,
-                    )
-                )
+        for rec in recs:
+            # Map risk_level → priority (AIRecommendationsPanel expects priority)
+            risk = rec.risk_level.value if hasattr(rec.risk_level, "value") else str(rec.risk_level)
+            priority_map = {"critical": "critical", "high": "high", "medium": "medium", "low": "low"}
+            priority = priority_map.get(risk, "medium")
+
+            # Apply module filter
+            if modules:
+                module_list = [m.strip().lower() for m in modules.split(",")]
+                src = rec.source or ""
+                if src not in module_list:
+                    continue
+
+            # Apply priority filter
+            if priorities:
+                priority_list = [p.strip().lower() for p in priorities.split(",")]
+                if priority not in priority_list:
+                    continue
+
+            # Map source → source_module
+            source = rec.source or "ai_optimizer"
+            source_module_map = {
+                "ai_optimizer": "hvac",
+                "health_alert": "hvac",
+                "financial_roi": "energy",
+                "anomaly_detector": "hvac",
+            }
+            src_module = source_module_map.get(source, "hvac")
+
+            # Title: use reason truncated, or fall back to target_equipment
+            if rec.reason:
+                title = rec.reason[:80]
+                if len(rec.reason) > 80:
+                    title = title[:77] + "..."
+            else:
+                title = f"Recommendation for {rec.target_equipment}"
+
+            rec_type = rec.action_type or "optimization"
+
+            rec_resp = RecommendationResponse(
+                recommendation_id=rec.id,
+                timestamp=rec.timestamp.isoformat() if isinstance(rec.timestamp, datetime) else str(rec.timestamp),
+                source_module=src_module,
+                recommendation_type=rec_type,
+                priority=priority,
+                title=title,
+                description=rec.reason or "AI-generated recommendation",
+                confidence=rec.get_numeric_confidence(),
+                related_modules=[],
+                auto_actionable=not rec.requires_approval,
+                acknowledged=False,
+                resolved=rec.status
+                in (
+                    RecommendationStatus.EXECUTED,
+                    RecommendationStatus.REJECTED,
+                    RecommendationStatus.EXPIRED,
+                    RecommendationStatus.FAILED,
+                    RecommendationStatus.AUTO_EXECUTED,
+                    RecommendationStatus.ROLLED_BACK,
+                ),
+            )
+            recommendations.append(rec_resp)
+
     except Exception as e:
-        logger.warning(f"Failed to fetch recommendations from module registry: {e}")
+        logger.warning(f"Failed to fetch recommendations from Supabase: {e}")
 
     return recommendations[:limit]
 

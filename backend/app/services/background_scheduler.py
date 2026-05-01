@@ -628,7 +628,11 @@ class BackgroundSchedulerService:
                     # Persist each recommendation
                     for rec_dict in control_recs:
                         equipment_id = rec_dict.get("equipment_id", "")
-                        point_name = rec_dict.get("point_name", "")
+                        # Handle both flat format (point_name) and grouped format (action.point)
+                        raw_point = rec_dict.get("point_name", "")
+                        if not raw_point:
+                            raw_point = rec_dict.get("action", {}).get("point", "")
+                        point_name = raw_point
                         rec_action_type = rec_dict.get("action_type", "")
 
                         logger.warning(
@@ -651,10 +655,33 @@ class BackgroundSchedulerService:
                                 continue
 
                         # Value-aware dedup check: same equipment + point + value within 48h
-                        rec_value = str(rec_dict.get("recommended_value", "")).strip().lower()
+                        # Handle both flat format (recommended_value) and grouped format (action.value)
+                        raw_value = rec_dict.get("recommended_value", "")
+                        if raw_value == "":
+                            raw_value = rec_dict.get("action", {}).get("value", "")
+                        rec_value = str(raw_value).strip().lower()
                         if (equipment_id, point_name, rec_value) in recent_keys:
                             skipped_count += 1
                             continue
+
+                        # GROUPED REC DIPLEX: If this is a grouped rec (affected_equipment),
+                        # check if any individual equipment in the group already has a pending rec.
+                        # Skip the group rec if individual recs exist for the same point+value.
+                        affected = rec_dict.get("affected_equipment", [])
+                        is_grouped = bool(affected)
+                        if is_grouped:
+                            # Check each affected equipment for existing pending rec
+                            group_conflict = False
+                            for aff_eq in affected:
+                                if (aff_eq, point_name, rec_value) in recent_keys:
+                                    group_conflict = True
+                                    logger.info(
+                                        f"[DEDUP] Skipping ZONE_GROUP — individual rec already exists for {aff_eq}"
+                                    )
+                                    break
+                            if group_conflict:
+                                skipped_count += 1
+                                continue
 
                         # Parse confidence from Claude response
                         confidence_raw = optimization_result.confidence
@@ -696,6 +723,12 @@ class BackgroundSchedulerService:
                             source_type="ml_model",
                             status=RecommendationStatus.PENDING,
                             requires_approval=True,
+                            metadata={
+                                "group_recommendation": is_grouped,
+                                "affected_equipment": affected,
+                            }
+                            if is_grouped
+                            else {},
                         )
 
                         loop = asyncio.new_event_loop()
@@ -3211,6 +3244,80 @@ class BackgroundSchedulerService:
         snapshot = await health_service.get_current_health()
         await health_service.store_health_snapshot(snapshot)
         logger.debug("Health snapshot stored successfully")
+
+    # ── Equipment Health Snapshot jobs ──────────────────────────────────
+
+    def add_equipment_health_snapshot_job(self, interval_hours: int = 2):
+        """
+        Add a job to compute and store equipment health snapshots periodically.
+
+        Args:
+            interval_hours: How often to recompute snapshots (default: 2 hours)
+        """
+        job_id = "equipment_health_snapshot"
+        if self.scheduler.get_job(job_id):
+            self.scheduler.remove_job(job_id)
+            logger.info("Removed existing equipment health snapshot job")
+
+        first_run = datetime.now(UTC) + timedelta(seconds=30)  # 30s warmup
+        self.scheduler.add_job(
+            func=self._run_equipment_health_snapshot,
+            trigger=IntervalTrigger(hours=interval_hours),
+            id=job_id,
+            name="Equipment Health Snapshot",
+            replace_existing=True,
+            next_run_time=first_run,
+            max_instances=1,
+        )
+        logger.info(
+            "Added equipment health snapshot job (%dh interval, first run at %s)",
+            interval_hours,
+            first_run.strftime("%H:%M:%S"),
+        )
+
+    def _run_equipment_health_snapshot(self):
+        """Sync wrapper for async equipment health snapshot recompute."""
+        try:
+            if self._main_loop and self._main_loop.is_running():
+                future = asyncio.run_coroutine_threadsafe(
+                    self._run_equipment_health_snapshot_async(),
+                    self._main_loop,
+                )
+                future.result(timeout=120)
+            else:
+                asyncio.run(self._run_equipment_health_snapshot_async())
+        except Exception as e:
+            logger.error(f"[HEALTH-SNAP] Failed to run equipment health snapshot: {e}", exc_info=True)
+
+    async def _run_equipment_health_snapshot_async(self):
+        """Recompute health ratings for all registered sites and their equipment."""
+        from app.database.repositories.site_repository import SiteRepository
+        from app.services.health_snapshot_service import HealthSnapshotService
+
+        site_repo = SiteRepository()
+        sites = site_repo.get_all()
+
+        if not sites:
+            logger.debug("[HEALTH-SNAP] No registered sites found")
+            return
+
+        snapshot_service = HealthSnapshotService()
+
+        for site in sites:
+            site_uuid = site.get("id")
+            if not site_uuid:
+                continue
+            try:
+                result = await snapshot_service.recompute(scope="site", site_id=site_uuid)
+                logger.info(
+                    "[HEALTH-SNAP] site=%s processed=%d failed=%d duration_ms=%s",
+                    site_uuid,
+                    result.equipment_processed,
+                    result.equipment_failed,
+                    result.duration_ms,
+                )
+            except Exception as e:
+                logger.warning(f"[HEALTH-SNAP] site={site_uuid} failed: {e}")
 
     def add_error_auto_resolve_job(self, interval_seconds: int = 86400):
         """

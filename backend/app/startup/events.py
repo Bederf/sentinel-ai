@@ -964,6 +964,14 @@ async def startup_event(app: FastAPI) -> None:
     # System health snapshot job (every 5 minutes)
     scheduler_service.add_health_snapshot_job(interval_seconds=300)
 
+    # Equipment health snapshot job (every 2 hours) — first run ~30s after registration
+    # (next_run_time=30s is set inside add_equipment_health_snapshot_job)
+    try:
+        scheduler_service.add_equipment_health_snapshot_job(interval_hours=2)
+        _logger.info("Equipment health snapshot job registered")
+    except Exception as e:
+        _logger.error(f"Equipment health snapshot job failed: {e}", exc_info=True)
+
     # Adapter health monitor — SLI Tier 1: checks all BACnet/Niagara/OBIX/bridge adapters every 60s
     scheduler_service.add_adapter_health_monitor_job(interval_seconds=60)
 

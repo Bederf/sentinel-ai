@@ -221,6 +221,13 @@ async def login_with_email(request: Request, email: str):
         mfa_enrolled = mfa_service.is_mfa_enrolled(email)
         mfa_enabled = mfa_service.is_mfa_enabled(email)
 
+        # Check for MFA pause bypass (for development/testing)
+        pause_mfa_email = os.getenv("PAUSE_MFA_FOR_EMAIL", "").strip()
+        if pause_mfa_email and pause_mfa_email.lower() == email.lower():
+            logger.info(f"MFA bypass for {email} (PAUSE_MFA_FOR_EMAIL match)")
+            mfa_required = False
+            mfa_enabled = False
+
         # Get client IP
         source_ip = _extract_ip_address(request)
         user_agent = request.headers.get("User-Agent")

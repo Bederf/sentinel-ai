@@ -181,16 +181,15 @@ class DataFreshnessMonitor:
     async def _send_freshness_alert(self, site_id: str, data_source: str, age_seconds: int | None, target: int) -> None:
         """Send Telegram alert for critical source breaches (bms_telemetry, anomalies)."""
         try:
-            from app.services.notification_providers.telegram_provider import TelegramProvider
+            from app.models.notification import AlertLevel
+            from app.services.notification_service import notification_service
 
-            provider = TelegramProvider()
-            await provider.send(
-                recipient=getattr(
-                    __import__("settings", fromlist=["telegram_alert_chat_id"]), "telegram_alert_chat_id", ""
-                ),
+            result = await notification_service.send_alert_direct(
                 title=f"Data Freshness Breach: {data_source}",
                 body=f"{data_source} at {site_id} is stale.\nAge: {age_seconds}s | Target: {target}s",
-                priority="high",
+                alert_level=AlertLevel.WARNING,
             )
+            if not result["success"]:
+                logger.warning(f"[FRESHNESS] Telegram alert failed: {result.get('error')}")
         except Exception as e:
             logger.warning(f"Failed to send freshness Telegram alert: {e}")

@@ -329,6 +329,41 @@ class NotificationRepository:
             logger.error(f"Error retrieving delivery logs: {e}")
             return []
 
+    async def update_delivery_log_acknowledged(
+        self,
+        notification_id: str,
+        acknowledged_by: str,
+        acknowledged_at: datetime,
+    ) -> None:
+        """Mark a certified notification as acknowledged."""
+        try:
+            self.client.table("notification_delivery_log").update(
+                {
+                    "acknowledged_at": acknowledged_at.isoformat(),
+                    "acknowledged_by": acknowledged_by,
+                }
+            ).eq("notification_id", notification_id).execute()
+        except Exception as e:
+            logger.error(f"Error updating acknowledgement for {notification_id}: {e}")
+            raise
+
+    async def update_delivery_log_escalated(
+        self,
+        notification_id: str,
+        escalated_at: datetime,
+    ) -> None:
+        """Mark a certified notification as escalated."""
+        try:
+            self.client.table("notification_delivery_log").update(
+                {
+                    "escalated": True,
+                    "escalated_at": escalated_at.isoformat(),
+                }
+            ).eq("notification_id", notification_id).execute()
+        except Exception as e:
+            logger.error(f"Error updating escalated for {notification_id}: {e}")
+            raise
+
     # ========== Conversion Helpers ==========
 
     @staticmethod
@@ -434,6 +469,12 @@ class NotificationRepository:
             max_retries=data.get("max_retries", 3),
             created_at=datetime.fromisoformat(data["created_at"]) if data.get("created_at") else datetime.utcnow(),
             updated_at=datetime.fromisoformat(data["updated_at"]) if data.get("updated_at") else datetime.utcnow(),
+            acknowledged_at=datetime.fromisoformat(data["acknowledged_at"]) if data.get("acknowledged_at") else None,
+            acknowledged_by=data.get("acknowledged_by"),
+            escalated=data.get("escalated", False),
+            escalated_at=datetime.fromisoformat(data["escalated_at"]) if data.get("escalated_at") else None,
+            timeout_minutes=data.get("timeout_minutes", 15),
+            notification_id=data.get("notification_id"),
         )
 
     @staticmethod
@@ -461,4 +502,10 @@ class NotificationRepository:
             "max_retries": model.max_retries,
             "created_at": model.created_at.isoformat(),
             "updated_at": model.updated_at.isoformat(),
+            "acknowledged_at": model.acknowledged_at.isoformat() if model.acknowledged_at else None,
+            "acknowledged_by": model.acknowledged_by,
+            "escalated": model.escalated,
+            "escalated_at": model.escalated_at.isoformat() if model.escalated_at else None,
+            "timeout_minutes": model.timeout_minutes,
+            "notification_id": model.notification_id,
         }

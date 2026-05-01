@@ -151,6 +151,7 @@ class AlertListResponse(BaseModel):
     total: int
     by_severity: dict[str, int]
     alerts: list[AlertResponse]
+    pending_recommendations: int = 0
 
 
 class AnomalyResponse(BaseModel):
@@ -270,10 +271,31 @@ async def list_alerts(
     # Apply limit
     limited_results = result[:limit]
 
+    # Count pending ai_optimization recommendations for bell
+    pending_recommendations = 0
+    try:
+        # Use first alert's site_id as context, or default to site-002
+        rec_site = site_id or "site-002"
+        # Count total pending without limit for accurate bell count
+        from app.database.repositories import get_recommendation_repository
+
+        rec_repo = get_recommendation_repository()
+        normalized = rec_site
+        if rec_site.startswith("site-"):
+            num = rec_site.split("-")[1]
+            normalized = f"S{num}"
+        from app.models.recommendation import RecommendationStatus
+
+        all_pending = await rec_repo.get_by_status(normalized, RecommendationStatus.PENDING, limit=1000)
+        pending_recommendations = len(all_pending)
+    except Exception:
+        pass
+
     return AlertListResponse(
         total=len(limited_results),
         by_severity=by_severity,
         alerts=limited_results,
+        pending_recommendations=pending_recommendations,
     )
 
 
