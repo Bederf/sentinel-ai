@@ -1540,14 +1540,18 @@ export const api = {
   /**
    * Get active alerts
    */
-  async getAlerts(): Promise<Alert[]> {
+  async getAlerts(siteId?: string): Promise<{ alerts: Alert[]; pending_recommendations: number }> {
     try {
-      const response = await fetchApi<{ total: number; alerts: Alert[] }>("/api/alerts");
-      return response.alerts;
+      const response = await fetchApi<{ total: number; alerts: Alert[]; pending_recommendations: number }>("/api/alerts");
+      const alerts = response.alerts || [];
+      return {
+        alerts: siteId ? alerts.filter((a) => a.site_id === siteId) : alerts,
+        pending_recommendations: response.pending_recommendations ?? 0,
+      };
     } catch (err) {
       const apiError = err as ApiError | undefined;
       if (apiError?.status === 429) {
-        return [];
+        return { alerts: [], pending_recommendations: 0 };
       }
       throw err;
     }

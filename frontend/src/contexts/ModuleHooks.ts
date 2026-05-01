@@ -22,7 +22,11 @@ export function useCriticalRecommendations(): AIRecommendation[] {
 
 export function useCrossSystemRecommendations(): AIRecommendation[] {
   const { recommendations } = useModules();
-  return recommendations.filter((r) => r.recommendation_type === "cross_system" && !r.resolved);
+  // cross_system = AI-OPT operational recommendations
+  // health_maintenance records belong in the maintenance panel
+  return recommendations.filter(
+    (r) => r.recommendation_type === "cross_system" && !r.resolved
+  );
 }
 
 export function useModuleRecommendations(moduleType: ModuleType): AIRecommendation[] {

@@ -118,8 +118,8 @@ export function AlertFeed({
   // Fetch alerts from API
   const fetchAlerts = useCallback(async () => {
     try {
-      const data = await api.getAlerts();
-      const sortedAlerts = data
+      const { alerts } = await api.getAlerts();
+      const sortedAlerts = alerts
         .sort(
           (a, b) =>
             new Date(b.created_at).getTime() - new Date(a.created_at).getTime()

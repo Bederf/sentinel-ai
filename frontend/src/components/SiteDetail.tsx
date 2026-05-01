@@ -371,7 +371,7 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
         }
 
         // Fetch alerts for this site
-        const allAlerts = await api.getAlerts();
+        const { alerts: allAlerts } = await api.getAlerts();
         setAlerts(allAlerts.filter((a) => a.site_id === siteId));
 
         // Fetch predictions for this site
@@ -676,7 +676,7 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
   // critical = health_score < 60 (actual degradation, not comms state)
   const criticalEquipment = equipment.filter((e) => (e.health_score ?? 100) < 60).length;
   // offline = BMS comms lost (separate from health state — do not conflate with critical)
-  const offlineEquipment = equipment.filter((e) => e.status === "offline" || (e.status as string) === "maintenance").length;
+  const offlineEquipment = equipment.filter((e) => (e.status as string) === "offline" || (e.status as string) === "maintenance").length;
   const avgHealth = equipment.length > 0
     ? Math.round(equipment.reduce((sum, e) => sum + (e.health_score || (e as any).health || 0), 0) / equipment.length)
     : 0;
@@ -1316,7 +1316,7 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
                     <button
                       onClick={() => {
                         // Filter to offline equipment (comms loss, not health degradation)
-                        const offlineItems = equipment.filter((e) => e.status === "offline" || (e.status as string) === "maintenance");
+                        const offlineItems = equipment.filter((e) => (e.status as string) === "offline" || (e.status as string) === "maintenance");
                         if (offlineItems.length > 0) {
                           const firstOffline = offlineItems[0];
                           handleEquipmentClick(firstOffline);

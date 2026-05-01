@@ -292,7 +292,7 @@ function App() {
         return;
       }
       try {
-        const alerts = await api.getAlerts();
+        const { alerts, pending_recommendations } = await api.getAlerts();
         // Count unread alerts (not acknowledged or created after last viewed time)
         const unread = alerts.filter((alert) => {
           if (!alert.acknowledged) return true;
@@ -301,7 +301,7 @@ function App() {
           }
           return false;
         });
-        setUnreadAlertCount(unread.length);
+        setUnreadAlertCount(unread.length + (pending_recommendations ?? 0));
         failureCount = 0;
       } catch (err) {
         failureCount += 1;
