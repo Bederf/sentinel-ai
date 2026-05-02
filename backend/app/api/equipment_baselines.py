@@ -10,7 +10,7 @@ Phase: 206-asset-onboarding
 import logging
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Body, HTTPException
 
 from app.database.repositories.baseline_repository import BaselineRepository
 from app.models.baseline import BaselineSource, EquipmentBaseline
@@ -84,9 +84,9 @@ async def seed_equipment_baseline(
 
 @router.post("/seed-batch", response_model=dict[str, Any], status_code=201)
 async def seed_equipment_baselines_batch(
-    equipment_ids: list[str],
-    site_id: str,
-    captured_by: str = "automated",
+    equipment_ids: list[str] = Body(..., description="List of equipment identifiers"),
+    site_id: str = Body(..., description="Site identifier"),
+    captured_by: str = Body(default="automated"),
 ) -> dict[str, Any]:
     """
     Seed baselines for multiple equipment items.
