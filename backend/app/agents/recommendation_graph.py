@@ -170,8 +170,8 @@ async def validate_relevance_node(state: RecommendationAgentState) -> dict:
     if not rec:
         return {"is_relevant": False, "relevance_reason": "No recommendation"}
 
-    # Check freshness (max 30 minutes old)
-    freshness = check_recommendation_freshness(rec, max_age_minutes=30)
+    # Check freshness (max 120 minutes old — sites polled ~hourly)
+    freshness = check_recommendation_freshness(rec, max_age_minutes=120)
     if not freshness["is_fresh"]:
         logger.info(f"[RecAgent] Recommendation {rec.get('id')} is stale: {freshness['reason']}")
         return {

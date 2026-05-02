@@ -226,6 +226,7 @@ class TierRoutingEngine:
         decision_data = {
             "site_id": site_id,
             "equipment_code": equipment_code,
+            "recommendation_id": recommendation.get("id"),
             "correlation_id": correlation_id,
             "decision_type": f"tier{tier_num}_{action}",
             "tier": f"tier{tier_num}",

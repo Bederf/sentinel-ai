@@ -7,7 +7,7 @@ and multi-turn Tier 2 approval flow.
 
 import os
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -32,7 +32,7 @@ def make_recommendation(
     status="pending",
 ):
     """Create a test recommendation dict."""
-    ts = (datetime.utcnow() - timedelta(minutes=age_minutes)).isoformat()
+    ts = (datetime.now(timezone.utc) - timedelta(minutes=age_minutes)).isoformat()
     return {
         "id": rec_id,
         "site_id": "S002",
@@ -414,7 +414,7 @@ class TestValidateRelevanceNode:
     async def test_stale_recommendation_not_relevant(self):
         from app.agents.recommendation_graph import validate_relevance_node
 
-        rec = make_recommendation(age_minutes=60)
+        rec = make_recommendation(age_minutes=150)
         state = {"recommendation": rec}
         result = await validate_relevance_node(state)
         assert result["is_relevant"] is False
