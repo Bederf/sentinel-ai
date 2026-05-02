@@ -73,7 +73,7 @@ class ObixBmsAdapter(BmsAdapter):
             supports_device_discovery=False,  # oBIX has no device discovery
             supports_point_discovery=True,
             supports_reads=True,
-            supports_writes=True,
+            supports_writes=False,
             supports_subscriptions=False,
             supports_history=True,
         )
@@ -103,7 +103,7 @@ class ObixBmsAdapter(BmsAdapter):
 
         try:
             # Run sync authenticate in thread pool to avoid blocking event loop
-            await asyncio.to_thread(self._obix_client.authenticate)
+            await asyncio.wait_for(asyncio.to_thread(self._obix_client.authenticate), timeout=timeout)
             self._connected = self._obix_client.is_authenticated
         except OBIXAuthenticationError as e:
             self._connected = False
@@ -201,10 +201,8 @@ class ObixBmsAdapter(BmsAdapter):
         raw_value = result.get("value")
         unit = result.get("type", "")  # OBIXClient uses "type" for the value type, unit comes from attrs
 
-        # Normalize value if numeric
-        normalized_value = raw_value
-        si_unit = unit
-        if isinstance(raw_value, (int, float)) and unit:
+        is_numeric = raw_value is not None and isinstance(raw_value, (int, float)) and not isinstance(raw_value, bool)
+        if is_numeric and unit:
             # Try to get unit from the point metadata if available
             normalized_value, si_unit = _normalize_unit(float(raw_value), unit)
 
@@ -238,7 +236,10 @@ class ObixBmsAdapter(BmsAdapter):
 
             normalized_value = raw_value
             si_unit = unit
-            if isinstance(raw_value, (int, float)) and unit:
+            is_numeric = (
+                raw_value is not None and isinstance(raw_value, (int, float)) and not isinstance(raw_value, bool)
+            )
+            if is_numeric and unit:
                 normalized_value, si_unit = _normalize_unit(float(raw_value), unit)
 
             values.append(

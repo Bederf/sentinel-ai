@@ -33,7 +33,7 @@ class TestObixBmsAdapter:
         assert caps.supports_device_discovery is False
         assert caps.supports_point_discovery is True
         assert caps.supports_reads is True
-        assert caps.supports_writes is True
+        assert caps.supports_writes is False
         assert caps.supports_subscriptions is False
         assert caps.supports_history is True
 
