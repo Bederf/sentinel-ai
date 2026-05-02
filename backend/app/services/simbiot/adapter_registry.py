@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from .bms_adapter import BmsAdapter
+from .modbus_bms_adapter import ModbusBmsAdapter
 from .obix_bms_adapter import ObixBmsAdapter
 from .policy_enforced_bms_adapter import PolicyEnforcedBmsAdapter
 
@@ -19,6 +20,7 @@ _ADAPTER_ALIASES: dict[str, str] = {
     "trend": "bacnet",
     "generic": "bacnet",
     "obix": "obix",
+    "modbus": "modbus",
 }
 
 
@@ -30,7 +32,7 @@ def register_bms_adapter(adapter_type: str, adapter_cls: type[BmsAdapter]) -> No
 def resolve_bms_adapter_type(
     adapter_type: str | None = None,
     bms_vendor: str | None = None,
-    device_ip: str | None = None,
+    device_ip: str | None = None,  # noqa: ARG001 - reserved for future discovery use
 ) -> str:
     """Resolve a requested adapter or vendor to a concrete adapter type."""
     requested = adapter_type or bms_vendor or "bacnet"
@@ -60,3 +62,4 @@ def _register_default_adapters() -> None:
 
     register_bms_adapter("bacnet", BacnetBmsAdapter)
     register_bms_adapter("obix", ObixBmsAdapter)
+    register_bms_adapter("modbus", ModbusBmsAdapter)
