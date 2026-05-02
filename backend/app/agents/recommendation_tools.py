@@ -491,7 +491,7 @@ async def submit_feedback_to_model(
         return False
 
 
-def check_recommendation_freshness(recommendation: dict[str, Any], max_age_minutes: int = 30) -> dict[str, Any]:
+def check_recommendation_freshness(recommendation: dict[str, Any], max_age_minutes: int = 120) -> dict[str, Any]:
     """Check if a recommendation is still fresh (not stale/expired).
 
     Pure function — no service dependency.
