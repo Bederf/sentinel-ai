@@ -18,6 +18,7 @@ from app.api import (
     audit,
     autonomous,
     baselines,
+    equipment_baselines,
     block_bookings,
     cafm_integration,
     capex,
@@ -98,6 +99,7 @@ def register_operations_routers(app: FastAPI) -> None:
     # Workflow orchestration
     app.include_router(workflow.router, tags=["workflow"])
     app.include_router(baselines.router, tags=["baselines"])
+    app.include_router(equipment_baselines.router, prefix="/api", tags=["equipment-baselines"])
     app.include_router(condition.router, tags=["condition"])
 
     # Remote operations
