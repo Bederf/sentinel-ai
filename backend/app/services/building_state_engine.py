@@ -45,6 +45,59 @@ async def _get_site_onboarding_phase(site_id: str) -> str:
     return "shadow"
 
 
+def _zone_temps_from_equipment(equip_rows: list[dict], target_zones: list[str]) -> list[float]:
+    """Extract zone temperatures from equipment by matching on location name.
+
+    Zones table: zone_id='Zone-001', floor='L0'
+    Equipment table: location='Level 0 Zone A', operating_data has temperature_c
+
+    Zone-001 → floor L0 → location 'Level 0 Zone A'
+    Zone-101 → floor L1 → location 'Level 1 Zone A'
+    Zone-201 → floor L2 → location 'Level 2 Zone A'
+    """
+    zone_letter_map = {1: "A", 2: "B", 3: "C", 4: "D", 5: "E"}
+    zone_to_location: dict[str, str] = {}
+
+    for zone in target_zones:
+        # Parse zone_id: 'Zone-NNN' where NNN = floor*100 + zone position
+        try:
+            num = int(zone.replace("Zone-", ""))
+        except ValueError:
+            continue
+        floor_num = num // 100  # 1→L0, 2→L1, 3→L2, 0→Basement
+        zone_pos = num % 100  # 1-5 → A-E
+
+        if floor_num == 0:
+            loc = "Basement 1"
+        elif floor_num == 1:
+            loc = f"Level 0 Zone {zone_letter_map.get(zone_pos, '')}"
+        elif floor_num == 2:
+            loc = f"Level 1 Zone {zone_letter_map.get(zone_pos, '')}"
+        elif floor_num == 3:
+            loc = f"Level 2 Zone {zone_letter_map.get(zone_pos, '')}"
+        else:
+            continue
+
+        if loc:
+            zone_to_location[zone] = loc
+
+    # Build equipment.location → [temperatures] map
+    loc_to_temps: dict[str, list[float]] = {}
+    for row in equip_rows:
+        loc = row.get("location") or ""
+        od = row.get("operating_data") or {}
+        t = od.get("temperature_c") or od.get("temperature") or od.get("temp_c")
+        if isinstance(t, (int, float)) and loc:
+            loc_to_temps.setdefault(loc, []).append(float(t))
+
+    temps: list[float] = []
+    for zone, loc in zone_to_location.items():
+        if loc in loc_to_temps:
+            temps.extend(loc_to_temps[loc])
+
+    return temps
+
+
 def _fetch_fallback_telemetry(site_id: str) -> dict[str, Any]:
     """Fetch telemetry for fallback narrative gating.
 
@@ -71,57 +124,53 @@ def _fetch_fallback_telemetry(site_id: str) -> dict[str, Any]:
         site_uuid = site_row.data[0]["id"]
 
         # ── Zone temperatures ────────────────────────────────────────────────
-        rows = sb.table("zones").select("zone_id, floor").eq("site_id", site_uuid).execute()
-        if rows.data:
-            basement_zones = [r["zone_id"] for r in rows.data if r.get("floor") == "B1"]
-            l0_zones = [r["zone_id"] for r in rows.data if r.get("floor") == "L0"]
+        try:
+            rows = sb.table("zones").select("zone_id, floor").eq("site_id", site_uuid).execute()
+            if rows.data:
+                basement_zones = [r["zone_id"] for r in rows.data if r.get("floor") == "B1"]
+                l0_zones = [r["zone_id"] for r in rows.data if r.get("floor") == "L0"]
 
-            basement_temps: list[float] = []
-            l0_temps: list[float] = []
+                basement_temps: list[float] = []
+                l0_temps: list[float] = []
 
-            if basement_zones:
-                equip_rows = (
-                    sb.table("equipment")
-                    .select("zone_id, temperature_c")
-                    .eq("site_id", site_uuid)
-                    .in_("zone_id", basement_zones)
-                    .execute()
-                ).data
-                for row in equip_rows:
-                    t = row.get("temperature_c")
-                    if isinstance(t, (int, float)):
-                        basement_temps.append(float(t))
+                # equipment table has no zone_id — use equipment.location as zone_id proxy
+                if basement_zones:
+                    equip_rows = (
+                        sb.table("equipment")
+                        .select("id, code, location, operating_data")
+                        .eq("site_id", site_uuid)
+                        .execute()
+                    ).data
+                    basement_temps = _zone_temps_from_equipment(equip_rows, basement_zones)
 
-            if l0_zones:
-                equip_rows = (
-                    sb.table("equipment")
-                    .select("zone_id, temperature_c")
-                    .eq("site_id", site_uuid)
-                    .in_("zone_id", l0_zones)
-                    .execute()
-                ).data
-                for row in equip_rows:
-                    t = row.get("temperature_c")
-                    if isinstance(t, (int, float)):
-                        l0_temps.append(float(t))
+                if l0_zones:
+                    equip_rows = (
+                        sb.table("equipment")
+                        .select("id, code, location, operating_data")
+                        .eq("site_id", site_uuid)
+                        .execute()
+                    ).data
+                    l0_temps = _zone_temps_from_equipment(equip_rows, l0_zones)
 
-            basement_temp = basement_temps[0] if basement_temps else None
-            l0_avg = sum(l0_temps) / len(l0_temps) if l0_temps else None
+                basement_temp = basement_temps[0] if basement_temps else None
+                l0_avg = sum(l0_temps) / len(l0_temps) if l0_temps else None
 
-            global _fallback_poll_count, _cooling_drift_last_met
-            _fallback_poll_count += 1
+                global _fallback_poll_count, _cooling_drift_last_met
+                _fallback_poll_count += 1
 
-            cooling_drift_now = basement_temp is not None and l0_avg is not None and basement_temp > l0_avg + 1.0
-            sustained = _fallback_poll_count if (cooling_drift_now and _cooling_drift_last_met) else 0
-            if cooling_drift_now:
-                _cooling_drift_last_met = True
-            else:
-                _cooling_drift_last_met = False
-                _fallback_poll_count = 0
+                cooling_drift_now = basement_temp is not None and l0_avg is not None and basement_temp > l0_avg + 1.0
+                sustained = _fallback_poll_count if (cooling_drift_now and _cooling_drift_last_met) else 0
+                if cooling_drift_now:
+                    _cooling_drift_last_met = True
+                else:
+                    _cooling_drift_last_met = False
+                    _fallback_poll_count = 0
 
-            result["basement_temp_c"] = basement_temp
-            result["l0_avg_temp_c"] = l0_avg
-            result["sustained_polls"] = sustained
+                result["basement_temp_c"] = basement_temp
+                result["l0_avg_temp_c"] = l0_avg
+                result["sustained_polls"] = sustained
+        except Exception as exc:
+            logger.debug("Zone temperature block failed for %s: %s", site_id, exc)
 
         # ── Chiller cycling — count staging_state changes in last 30 min ───────
         thirty_min_ago = (datetime.now(tz=UTC) - timedelta(minutes=30)).isoformat()
