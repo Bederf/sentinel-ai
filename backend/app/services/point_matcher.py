@@ -16,6 +16,9 @@ class PointMatcherService:
 
     # Common patterns for extracting asset ID from point names
     EXTRACTION_PATTERNS = [
+        # Pattern: S002-AssetID.Parameter (SENTINEL canonical — e.g. S002-FCU-003.status, S002-AHU-B1-001.health_score)
+        # Must come first — more specific than the generic S002-site prefix pattern
+        r"^(S002-(?:AHU|FCU|VAV|CHILLER|MTR|CT|DALI|LTG|ZONE|SENSOR|WEATHER|INV|GEN|BESS|PUMP)-[A-Z0-9-]+)",
         # Pattern: Controller/AssetID.Parameter (Honeywell)
         # NAE01/AHU-L12-001.SAT → AHU-L12-001
         r"^[A-Z0-9]+/([A-Z]+-[A-Z0-9-]+)\.",
@@ -28,12 +31,59 @@ class PointMatcherService:
         # Pattern: System/AssetID.Parameter
         # BMS/AHU/L12/001/SAT → AHU-L12-001 (needs special handling)
         r"/([A-Z]+)/([A-Z]?\d+)/(\d+)/",
+        # Pattern: AHU1/AHU2/AHU3 bare (SCADA/Siemens convention — maps to zone-specific S002 equipment)
+        r"^(AHU\d+)\.",
+        # Pattern: CHILLER/CHILLER1/CHILLER2 bare (maps to basement chillers)
+        r"^(CHILLER\d?)\.",
+        # Pattern: CT/CT1 bare (maps to basement cooling tower)
+        r"^(CT\d?)\.",
+        # Pattern: FCU01–FCU05 bare (maps to zone G FCUs 001–005)
+        r"^(FCU0[1-5])\.",
+        # Pattern: FCU06 bare (maps to L1 FCU 101)
+        r"^(FCU06)\.",
+        # Pattern: FCU07–FCU15 bare (maps to L1 FCUs 102–105)
+        r"^(FCU0[7-9])\.",
+        # Pattern: FCU10–FCU15 (second digit 0-5, first digit 1)
+        r"^(FCU1[0-5])\.",
+        # Pattern: FCU16–FCU20 bare (maps to L2 FCUs 201–205)
+        r"^(FCU(?:1[6-9]|2[0-5]))\.",
+        # Pattern: FCU21–FCU39 bare (maps to L3 FCUs 221–305)
+        r"^(FCU(?:2[1-9]|[3-9]\d))\.",
         # Pattern: Simple AssetID.Parameter
-        # CH-001.CHWST → CH-001
+        # CH-001.CHWST → CH-001  (must come AFTER FCU bare patterns to avoid false extraction)
         r"^([A-Z]+-\d+)\.",
         # Pattern: AssetID_Parameter
         # AHU_L12_001_SAT → AHU_L12_001
         r"^([A-Z]+_[A-Z]?\d+_\d+)_",
+    ]
+
+    # Maps bare SCADA asset IDs → S002-prefixed equipment codes
+    # Used after extraction to normalize bare IDs to their physical zone assignments
+    SCADA_NORMALIZATION_MAP = {
+        # AHU: basement (B1), Level 2 (L2), Rooftop (R)
+        "AHU1": "S002-AHU-B1-001",
+        "AHU2": "S002-AHU-L2-001",
+        "AHU3": "S002-AHU-R-001",
+        # CHILLER: basement B1
+        "CHILLER": "S002-CHILLER-B1-001",
+        "CHILLER1": "S002-CHILLER-B1-001",
+        "CHILLER2": "S002-CHILLER-B1-002",
+        # Cooling tower: basement B1
+        "CT": "S002-CT-B1-001",
+        "CT1": "S002-CT-B1-001",
+        "CT2": "S002-CT-R-001",
+    }
+
+    # FCU zone mapping: FCU## → S002-FCU-{zone}{seq:03d}
+    # G-zone: FCU01→001, FCU02→002, FCU03→003, FCU04→004, FCU05→005
+    # L1-zone: FCU06→101, FCU07→102, ..., FCU15→105
+    # L2-zone: FCU16→201, FCU17→202, ..., FCU20→205
+    # L3-zone: FCU21-25 → S002-FCU-301..305 (equipment table has 301-305)
+    FCU_NORMALIZATION_RANGES = [
+        (1, 5, "G", 0),  # FCU01-05 → S002-FCU-001..005
+        (6, 15, "L1", 100),  # FCU06-15 → S002-FCU-101..105
+        (16, 20, "L2", 200),  # FCU16-20 → S002-FCU-201..205
+        (21, 25, "L3", 300),  # FCU21-25 → S002-FCU-301..305
     ]
 
     # Parameter name patterns
@@ -81,6 +131,9 @@ class PointMatcherService:
                 # Normalize: replace underscores with dashes, uppercase
                 asset_id = asset_id.replace("_", "-").upper()
 
+                # Normalize bare SCADA IDs to S002-prefixed equipment codes
+                asset_id = self._normalize_scada_asset_id(asset_id)
+
                 # Extract parameter from remaining part
                 param = self._extract_parameter(point_id, asset_id)
 
@@ -90,10 +143,52 @@ class PointMatcherService:
         fallback = re.search(r"([A-Z]{2,4}[-_][A-Z]?\d+[-_]?\d*)", point_id, re.IGNORECASE)
         if fallback:
             asset_id = fallback.group(1).replace("_", "-").upper()
+            asset_id = self._normalize_scada_asset_id(asset_id)
             param = self._extract_parameter(point_id, asset_id)
             return asset_id, param
 
         return None, None
+
+    def _normalize_scada_asset_id(self, asset_id: str) -> str:
+        """Normalize a bare SCADA asset ID to its S002-prefixed equipment code."""
+        if not asset_id:
+            return asset_id
+
+        # Already S002-prefixed — no normalization needed
+        if asset_id.startswith("S002-"):
+            return asset_id
+
+        # Direct mapping for AHU/CHILLER/CT types
+        if asset_id in self.SCADA_NORMALIZATION_MAP:
+            return self.SCADA_NORMALIZATION_MAP[asset_id]
+
+        # FCU range-based mapping
+        if asset_id.startswith("FCU"):
+            return self._normalize_fcu_asset_id(asset_id)
+
+        # Unknown bare ID — return as-is (will remain unmatched)
+        return asset_id
+
+    def _normalize_fcu_asset_id(self, asset_id: str) -> str:
+        """Normalize a bare FCU ID to its S002-prefixed equipment code."""
+        # Extract the numeric suffix: FCU01 → 1, FCU21 → 21
+        match = re.match(r"^FCU(\d+)$", asset_id, re.IGNORECASE)
+        if not match:
+            return asset_id
+
+        num = int(match.group(1))
+
+        for start, end, zone, offset in self.FCU_NORMALIZATION_RANGES:
+            if start <= num <= end:
+                seq = num - start + 1  # 1-based within range
+                if zone == "G":
+                    # G-zone: 001..005 (padded to 3 digits, no zone letter)
+                    return f"S002-FCU-{seq:03d}"
+                else:
+                    # L1→101..105, L2→201..205, L3→301..305
+                    return f"S002-FCU-{offset + seq}"
+
+        return asset_id  # Unmapped FCU range
 
     def _extract_parameter(self, point_id: str, asset_id: str) -> str | None:
         """Extract parameter name from point ID after asset ID."""
