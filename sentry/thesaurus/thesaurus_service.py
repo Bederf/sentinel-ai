@@ -10,7 +10,7 @@ from typing import Optional
 
 import rapidfuzz.fuzz as fuzz
 
-from complaint_thesaurus import (
+from .complaint_thesaurus import (
     ComplaintCategory,
     PRIORITY_MAP,
     SPECIALTY_MAP,

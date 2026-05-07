@@ -1928,8 +1928,8 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
             <SpaceOptimizationPage siteId={siteId} />
           )}
 
-          {/* Fuel — only visible when fuel_monitoring add-on is active */}
-          {activeMainTab === "fuel" && isModuleActive('fuel_monitoring') && (
+          {/* Fuel — only visible when fuel add-on is active */}
+          {activeMainTab === "fuel" && isModuleActive('fuel') && (
             <FuelDashboard siteId={siteId} />
           )}
 

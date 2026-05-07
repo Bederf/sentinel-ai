@@ -285,6 +285,8 @@ class AiUsageTracker:
         cache_read_tokens: int = 0,
         cache_creation_tokens: int = 0,
         task_class: str = "",
+        feature: str | None = None,
+        session_id: str | None = None,
     ):
         """Record a single AI API call.
 
@@ -298,6 +300,9 @@ class AiUsageTracker:
             cache_creation_tokens: Anthropic prompt cache write tokens (25% surcharge)
             task_class: Optional task class for budget enforcement ("heavy", "medium",
                 "light", "chat_ai", "chat_tech"). Defaults to "" (checked but not enforced).
+            feature: Optional feature tag for cost attribution (e.g. "rag_query",
+                "email_ocr", "recommendation", "gsd_phase_193"). Defaults to source.
+            session_id: Optional session identifier for per-session tracking.
         """
         today = date.today().isoformat()
 
@@ -323,9 +328,15 @@ class AiUsageTracker:
                     "cache_creation_tokens": 0,
                     "cost_usd": 0.0,
                     "sources": {},
+                    "feature": feature or source,
+                    "session_id": session_id,
                 }
 
             entry = self._today_cache[key]
+            if feature:
+                entry["feature"] = feature
+            if session_id:
+                entry["session_id"] = session_id
             entry["calls"] += 1
             entry["input_tokens"] += input_tokens
             entry["output_tokens"] += output_tokens
@@ -549,6 +560,76 @@ class AiUsageTracker:
         except Exception as e:
             logger.error(f"Failed to flush AI usage data: {e}")
 
+    def _get_cache_stats(self, days: int = 30) -> dict:
+        """Calculate cache efficiency metrics from JSON storage."""
+        data = self._read_file()
+        daily = data.get("daily", {})
+
+        today_dt = date.today()
+        cutoff = today_dt - timedelta(days=days)
+
+        total_input = 0
+        total_cache_read = 0
+        total_output = 0
+
+        for day_str, entries in daily.items():
+            try:
+                day_date = date.fromisoformat(day_str)
+            except ValueError:
+                continue
+            if day_date < cutoff:
+                continue
+
+            for key, entry in entries.items():
+                if str(key).startswith("_"):
+                    continue
+                total_input += entry.get("input_tokens", 0)
+                total_cache_read += entry.get("cache_read_tokens", 0)
+                total_output += entry.get("output_tokens", 0)
+
+        cache_hit_rate = (total_cache_read / total_input) if total_input > 0 else 0
+
+        return {
+            "total_input_tokens": total_input,
+            "total_output_tokens": total_output,
+            "cache_read_tokens": total_cache_read,
+            "cache_hit_rate": round(cache_hit_rate, 4),
+            "cache_hit_pct": round(cache_hit_rate * 100, 2),
+        }
+
+    def _group_by_feature(self) -> dict:
+        """Group usage by feature (RAG, recommendation, email, etc.)."""
+        data = self._read_file()
+        daily = data.get("daily", {})
+
+        today_dt = date.today()
+        cutoff = today_dt - timedelta(days=30)
+
+        by_feature: dict = {}
+
+        for day_str, entries in daily.items():
+            try:
+                day_date = date.fromisoformat(day_str)
+            except ValueError:
+                continue
+            if day_date < cutoff:
+                continue
+
+            for key, entry in entries.items():
+                if str(key).startswith("_"):
+                    continue
+
+                feature = entry.get("feature", "unknown")
+
+                if feature not in by_feature:
+                    by_feature[feature] = {"calls": 0, "tokens": 0, "cost_usd": 0.0}
+
+                by_feature[feature]["calls"] += entry.get("calls", 0)
+                by_feature[feature]["tokens"] += entry.get("input_tokens", 0) + entry.get("output_tokens", 0)
+                by_feature[feature]["cost_usd"] += entry.get("cost_usd", 0)
+
+        return by_feature
+
     def flush(self):
         """Public flush — call on shutdown."""
         with self._write_lock:
@@ -661,6 +742,8 @@ class AiUsageTracker:
                 k: {**v, "cost_usd": round(v["cost_usd"], 4), "cost_zar": round(v["cost_usd"] * rate, 2)}
                 for k, v in sorted(totals_by_source.items(), key=lambda x: -x[1]["cost_usd"])
             },
+            "by_feature": self._group_by_feature(),
+            "cache_stats": self._get_cache_stats(days=days),
             "daily": daily_costs,
         }
 
@@ -826,6 +909,37 @@ class AiUsageTracker:
 
         for provider, pdata in monthly.get("by_provider", {}).items():
             lines.append(f"  {provider}: R {pdata['cost_zar']:.2f} ({pdata['calls']} calls)")
+
+        # Cache efficiency (30-day)
+        cache_stats = monthly.get("cache_stats")
+        if cache_stats and cache_stats.get("total_input_tokens", 0) > 0:
+            lines.extend([
+                "",
+                "--- Cache Efficiency (30d) ---",
+                f"  Input Tokens:     {cache_stats['total_input_tokens']:,}",
+                f"  Cache Read:      {cache_stats['cache_read_tokens']:,}",
+                f"  Hit Rate:        {cache_stats['cache_hit_pct']:.1f}%",
+            ])
+        else:
+            lines.extend([
+                "",
+                "--- Cache Efficiency (30d) ---",
+                "  (no cache data available)",
+            ])
+
+        # By feature (30-day)
+        by_feature = monthly.get("by_feature")
+        if by_feature:
+            lines.extend([
+                "",
+                "--- By Feature (30d) ---",
+            ])
+            for feature, fdata in sorted(by_feature.items(), key=lambda x: -x[1]["tokens"]):
+                lines.append(
+                    f"  {feature}: {fdata['calls']} calls, "
+                    f"{fdata['tokens']:,} tokens, "
+                    f"R {fdata['cost_usd'] * self._usd_zar:.2f}"
+                )
 
         lines.extend(
             [

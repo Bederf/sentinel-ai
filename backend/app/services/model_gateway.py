@@ -411,15 +411,13 @@ class ModelGateway:
                                 delta = chunk.get("choices", [{}])[0].get("delta", {}).get("content", "")
                                 if delta:
                                     yield delta
-                                usage = chunk.get("usage", {})
-                                if usage:
-                                    with contextlib.suppress(Exception):
-                                        usage_tracker.record(
+                    usage_tracker.record(
                                             provider="azure_openai",
                                             model=model,
                                             input_tokens=usage.get("prompt_tokens", 0),
                                             output_tokens=usage.get("completion_tokens", 0),
                                             source=source,
+                                            feature="gsd_orchestrator",
                                         )
 
                 return stream_gen()
@@ -437,6 +435,7 @@ class ModelGateway:
                         input_tokens=usage.get("prompt_tokens", 0),
                         output_tokens=usage.get("completion_tokens", 0),
                         source=source,
+                        feature="gsd_orchestrator",
                     )
                 except Exception:
                     pass

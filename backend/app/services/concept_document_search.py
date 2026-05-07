@@ -1019,6 +1019,7 @@ def _post_openai_chat(messages: list[dict[str, str]], model: str | None) -> dict
                 input_tokens=usage.get("prompt_tokens", 0),
                 output_tokens=usage.get("completion_tokens", 0),
                 source="concept_search",
+                feature="rag_query",
             )
         except Exception:
             pass

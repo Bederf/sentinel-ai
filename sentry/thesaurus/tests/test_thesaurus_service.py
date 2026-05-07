@@ -2,14 +2,14 @@
 """Tests for ThesaurusService — 14 core tests."""
 
 import pytest
-from thesaurus_service import (
+from ..thesaurus_service import (
     ThesaurusService,
     get_thesaurus,
     classify_complaint,
     is_facilities,
     MATCH_THRESHOLD,
 )
-from complaint_thesaurus import (
+from ..complaint_thesaurus import (
     ComplaintCategory,
     get_all_entries,
 )

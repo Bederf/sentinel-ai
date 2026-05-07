@@ -1,5 +1,4 @@
-import type { ModuleType } from "../../lib/moduleRegistry";
-import { MANDATORY_MODULES } from "../../lib/mandatoryModules";
+import type { ModuleDefinition, ModuleType } from "../../lib/moduleRegistry";
 
 export interface FeatureToggleCard {
   id: string;
@@ -18,33 +17,80 @@ export interface BuildingSystemCard {
   description: string;
 }
 
-export const BASE_PACK_LOCKED_MODULES: ModuleType[] = MANDATORY_MODULES;
+const PLATFORM_MODULE_TYPES = new Set<ModuleType>([
+  "kpi",
+  "ml",
+  "notifications",
+  "integrations",
+  "simbiot",
+  "logging",
+  "assets",
+]);
 
-export const PLATFORM_STATUS_CARDS: FeatureToggleCard[] = [
-  { id: "kpi", label: "KPI Dashboard", moduleType: "kpi", description: "Portfolio and site KPI scorecards.", note: "Always on" },
-  { id: "ml", label: "ML Intelligence", moduleType: "ml", description: "Anomaly detection and predictive maintenance.", note: "Always on" },
-  { id: "notifications", label: "Notifications", moduleType: "notifications", description: "Alert routing and acknowledgement.", note: "Always on" },
-  { id: "integrations", label: "System Health", moduleType: "integrations", description: "Integration health and data quality.", note: "Always on" },
-  { id: "simbiot", label: "SIMBIOT", moduleType: "simbiot", description: "Site ingestion, discovery, and canonical data intake.", note: "Always on" },
-  { id: "logging", label: "Logging", moduleType: "logging", description: "Audit trail and event logs.", note: "Always on" },
-  { id: "assets", label: "Assets", moduleType: "assets", description: "Asset registry and lifecycle.", note: "Always on" },
-];
+const BUILDING_SYSTEM_MODULE_TYPES = new Set<ModuleType>([
+  "hvac",
+  "energy",
+  "lighting",
+  "solar",
+  "water",
+  "fire",
+  "security",
+  "digital_twin",
+]);
 
-export const BUILDING_SYSTEM_CARDS: BuildingSystemCard[] = [
-  { id: "hvac-system", label: "HVAC", baseModule: "hvac", controlModule: "hvac_control", description: "Heating, ventilation, and air conditioning." },
-  { id: "energy-system", label: "Energy", baseModule: "energy", controlModule: "energy_control", description: "Power metering, generators, UPS." },
-  { id: "lighting-system", label: "Lighting", baseModule: "lighting", controlModule: "lighting_control", description: "DALI lighting and occupancy." },
-  { id: "solar-system", label: "Solar & BESS", baseModule: "solar", controlModule: "solar_control", description: "Solar PV and battery storage." },
-  { id: "water-system", label: "Water", baseModule: "water", controlModule: "water_control", description: "Water monitoring and leak detection." },
-  { id: "security-system", label: "Security", baseModule: "security", controlModule: "security_control", description: "Access control and CCTV." },
-  { id: "fire-system", label: "Fire", baseModule: "fire", description: "Fire alarm monitoring (always read-only)." },
-  { id: "twin-system", label: "Digital Twin", baseModule: "digital_twin", controlModule: "digital_twin_control", description: "3D/2D building visualization." },
-];
+const CONTROL_MODULE_BY_BASE: Partial<Record<ModuleType, ModuleType>> = {
+  hvac: "hvac_control",
+  energy: "energy_control",
+  lighting: "lighting_control",
+  solar: "solar_control",
+  water: "water_control",
+  security: "security_control",
+  digital_twin: "digital_twin_control",
+};
 
-export const ADDON_TOGGLE_CARDS: FeatureToggleCard[] = [
-  { id: "maintenance-addon", label: "Maintenance", moduleType: "maintenance", description: "Work orders, scheduling, technician dispatch." },
-  { id: "financial-addon", label: "Financial", moduleType: "financial", description: "Contracts, profitability, budget, SLA." },
-  { id: "compliance-addon", label: "Compliance", moduleType: "compliance", description: "Carbon Tax, Green Star, SANS, ESG." },
-  { id: "fleet-ml-addon", label: "Fleet ML", moduleType: "fleet_ml", description: "Cross-portfolio analytics and benchmarking." },
-  { id: "space-optimization-addon", label: "Space Optimization", moduleType: "space_optimization", description: "Ghost booking detection, room right-sizing, focus room analytics." },
-];
+function sortModules(modules: ModuleDefinition[]): ModuleDefinition[] {
+  return [...modules].sort((left, right) => left.name.localeCompare(right.name));
+}
+
+export function getPlatformStatusCards(modules: ModuleDefinition[]): FeatureToggleCard[] {
+  return sortModules(modules)
+    .filter((moduleDef) => PLATFORM_MODULE_TYPES.has(moduleDef.module_type))
+    .map((moduleDef) => ({
+      id: moduleDef.module_type,
+      label: moduleDef.name,
+      moduleType: moduleDef.module_type,
+      description: moduleDef.description,
+      note: moduleDef.mandatory ? "Always on" : undefined,
+    }));
+}
+
+export function getBuildingSystemCards(modules: ModuleDefinition[]): BuildingSystemCard[] {
+  const moduleMap = new Map(modules.map((moduleDef) => [moduleDef.module_type, moduleDef]));
+  return sortModules(modules)
+    .filter((moduleDef) => BUILDING_SYSTEM_MODULE_TYPES.has(moduleDef.module_type))
+    .map((moduleDef) => ({
+      id: `${moduleDef.module_type}-system`,
+      label: moduleDef.name,
+      baseModule: moduleDef.module_type,
+      controlModule: moduleMap.has(CONTROL_MODULE_BY_BASE[moduleDef.module_type] || "")
+        ? CONTROL_MODULE_BY_BASE[moduleDef.module_type]
+        : undefined,
+      description: moduleDef.description,
+    }));
+}
+
+export function getAddonToggleCards(modules: ModuleDefinition[]): FeatureToggleCard[] {
+  return sortModules(modules)
+    .filter((moduleDef) =>
+      !moduleDef.mandatory &&
+      !moduleDef.module_type.endsWith("_control") &&
+      !PLATFORM_MODULE_TYPES.has(moduleDef.module_type) &&
+      !BUILDING_SYSTEM_MODULE_TYPES.has(moduleDef.module_type)
+    )
+    .map((moduleDef) => ({
+      id: `${moduleDef.module_type}-addon`,
+      label: moduleDef.name,
+      moduleType: moduleDef.module_type,
+      description: moduleDef.description,
+    }));
+}

@@ -267,8 +267,9 @@ class QualityGateEvaluator:
             snapshot = await asyncio.wait_for(monitoring.get_snapshot(site_id=site_id), timeout=5.0)
             metrics["freshness_minutes"] = snapshot.ingestion.freshness_hours * 60.0
             metrics["ingest_error_rate_pct_1h"] = snapshot.ingestion.error_rate * 100.0
-            metrics["match_coverage_pct"] = snapshot.ingestion.match_coverage * 100.0
-            metrics["unmatched_points_pct"] = 100.0 - metrics["match_coverage_pct"]
+            # match_coverage is already a percentage (0-100) from MonitoringService
+            metrics["match_coverage_pct"] = snapshot.ingestion.match_coverage
+            metrics["unmatched_points_pct"] = 100.0 - snapshot.ingestion.match_coverage
             prov = snapshot.ingestion.provenance_summary
             live_count = prov.get("live_protocol", 0)
             manual_count = prov.get("file_manual", 0)
@@ -287,9 +288,11 @@ class QualityGateEvaluator:
             comm_svc = CommissioningService()
             if hasattr(comm_svc, "_truth_checks") and site_id:
                 truth_data = comm_svc._truth_checks.get(site_id)
-                if truth_data and isinstance(truth_data, dict):
-                    pass_rate = truth_data.get("pass_rate", 1.0)
-                    metrics["truth_check_pass_rate_pct"] = pass_rate * 100.0
+                if truth_data is not None:
+                    # TruthCheckResult object — use agreement_pct directly
+                    agreement_pct = getattr(truth_data, "agreement_pct", None)
+                    if agreement_pct is not None:
+                        metrics["truth_check_pass_rate_pct"] = agreement_pct
 
         async def _collect_mv():
             from app.services.mv_verification_service import MVVerificationService

@@ -255,6 +255,7 @@ class MinimaxService:
                     input_tokens=u.get("input_tokens", 0),
                     output_tokens=u.get("output_tokens", 0),
                     source=source,
+                    feature="intent_classifier",
                 )
             except Exception:
                 pass

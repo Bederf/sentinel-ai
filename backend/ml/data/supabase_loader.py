@@ -77,6 +77,34 @@ class SupabaseTrainingDataLoader:
         self.site_id = site_id
         self.client = _get_supabase_client()
 
+    def delete_readings(self) -> int:
+        """Delete all sensor readings for the configured site_id.
+
+        Call this after successful training to free up storage.
+        Training data is not needed once models are trained.
+
+        Returns:
+            Number of rows deleted.
+
+        Raises:
+            RuntimeError: If no site_id is set (would delete data for all sites).
+        """
+        if not self.site_id:
+            raise RuntimeError("delete_readings requires a site_id — refusing to delete all sites")
+
+        if not self.client:
+            logger.warning("Supabase client unavailable — cannot delete readings")
+            return 0
+
+        try:
+            result = self.client.table("equipment_sensor_readings").delete().eq("site_id", self.site_id).execute()
+            deleted = len(result.data) if result.data else 0
+            logger.info("[DATA LOADER] Deleted %d readings for site_id=%s", deleted, self.site_id)
+            return deleted
+        except Exception as e:
+            logger.error("Failed to delete equipment_sensor_readings for %s: %s", self.site_id, e)
+            return 0
+
     def _query_readings(
         self,
         equipment_type: str,
@@ -193,6 +221,7 @@ class SupabaseTrainingDataLoader:
         equipment_type: str,
         min_hours: int = 500,
         lookback_days: int = 365,
+        delete_after_load: bool = False,
     ) -> pd.DataFrame | None:
         """Load sensor data as a wide-format DataFrame for LSTM training.
 
@@ -200,10 +229,15 @@ class SupabaseTrainingDataLoader:
             equipment_type: Equipment type (chiller, ahu, etc.)
             min_hours: Minimum hours of data required
             lookback_days: How far back to query
+            delete_after_load: If True, delete all sensor readings for this site after
+                successful loading and validation. Used to free storage after training
+                data has been consumed. Raises RuntimeError if site_id is not set.
 
         Returns:
             DataFrame with columns [timestamp, feature_1, feature_2, ...] or None
         """
+        if delete_after_load and not self.site_id:
+            raise RuntimeError("delete_after_load=True requires site_id to be set")
         sensor_types = _get_bms_sensor_types(equipment_type)
         if not sensor_types:
             logger.warning(f"No sensor mapping for equipment type: {equipment_type}")
@@ -251,6 +285,9 @@ class SupabaseTrainingDataLoader:
             )
             return None
 
+        if delete_after_load:
+            self.delete_readings()
+
         return df
 
     def load_equipment_type_array(
@@ -258,6 +295,7 @@ class SupabaseTrainingDataLoader:
         equipment_type: str,
         min_hours: int = 200,
         lookback_days: int = 365,
+        delete_after_load: bool = False,
     ) -> np.ndarray | None:
         """Load sensor data as a numpy array (hours, features) for autoencoder.
 
@@ -265,11 +303,16 @@ class SupabaseTrainingDataLoader:
             equipment_type: Equipment type
             min_hours: Minimum hours required
             lookback_days: How far back to look
+            delete_after_load: Passed through to load_equipment_type_dataframe.
+                Set to True after training to free storage.
 
         Returns:
             Array of shape (hours, n_features) or None
         """
-        df = self.load_equipment_type_dataframe(equipment_type, min_hours=min_hours, lookback_days=lookback_days)
+        df = self.load_equipment_type_dataframe(
+            equipment_type, min_hours=min_hours, lookback_days=lookback_days,
+            delete_after_load=delete_after_load,
+        )
         if df is None:
             return None
 

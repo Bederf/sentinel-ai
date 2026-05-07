@@ -110,12 +110,12 @@ class HealthSnapshotService:
     # UUID resolution helpers
     # ------------------------------------------------------------------
 
-    def _resolve_uuid(self, code_or_uuid: str) -> str:
+    def _resolve_uuid(self, code_or_uuid: str) -> str | None:
         """Resolve equipment code or UUID to a UUID string.
 
         If input looks like a UUID, return it directly.
         Otherwise look up by code and return the equipment's UUID.
-        Returns original string if resolution fails.
+        Returns None if resolution fails.
         """
         # Fast path: already a UUID
         try:
@@ -142,8 +142,7 @@ class HealthSnapshotService:
         except Exception:
             pass
 
-        # Last resort: return as-is (will fail downstream with clear error)
-        return code_or_uuid
+        return None
 
     # ------------------------------------------------------------------
     # Store
@@ -167,6 +166,9 @@ class HealthSnapshotService:
         """Store snapshot in Supabase and update equipment health_score."""
         # Resolve equipment UUID before any DB operation
         eq_uuid = self._resolve_uuid(rating.equipment_id)
+        if eq_uuid is None:
+            logger.debug("Could not resolve UUID for %s — storing in memory", rating.equipment_id)
+            return self._store_memory(snapshot_data)
         snapshot_data = dict(snapshot_data)
         snapshot_data["equipment_id"] = eq_uuid
 
@@ -174,12 +176,15 @@ class HealthSnapshotService:
             result = self._supabase.table("asset_health_snapshots").insert(snapshot_data).execute()
             snapshot_id = result.data[0]["id"] if result.data else "unknown"
 
-            # Update equipment.health_score — ONLY health_score and updated_at
-            # Use UUID directly (resolved above) — no fallback to code needed
+            # Update equipment.health_score AND status — sync derived status from health_status
+            # Status mapping: healthy→normal, warning→warning, critical→critical
+            health_status = rating.health_status  # "healthy", "warning", or "critical"
+            equip_status = "normal" if health_status == "healthy" else health_status
             try:
                 self._supabase.table("equipment").update(
                     {
                         "health_score": int(rating.health_score),
+                        "status": equip_status,
                         "updated_at": datetime.utcnow().isoformat() + "Z",
                     }
                 ).eq("id", eq_uuid).execute()
@@ -214,6 +219,9 @@ class HealthSnapshotService:
 
         # Resolve code → UUID before querying asset_health_snapshots
         eq_uuid = self._resolve_uuid(equipment_id)
+        if eq_uuid is None:
+            logger.debug("Could not resolve UUID for %s — no latest snapshot", equipment_id)
+            return None
 
         try:
             result = (
@@ -227,7 +235,7 @@ class HealthSnapshotService:
             if result.data:
                 return self._snapshot_to_rating(result.data[0])
         except Exception as e:
-            logger.error(f"Failed to get latest snapshot: {e}")
+            logger.debug(f"Failed to get latest snapshot for {equipment_id}: {e}")
 
         return None
 
@@ -255,6 +263,9 @@ class HealthSnapshotService:
 
         # Resolve code → UUID before querying asset_health_snapshots
         eq_uuid = self._resolve_uuid(equipment_id)
+        if eq_uuid is None:
+            logger.debug("Could not resolve UUID for %s — no snapshot history", equipment_id)
+            return []
 
         try:
             result = (
@@ -267,7 +278,7 @@ class HealthSnapshotService:
             )
             return [self._snapshot_to_rating(s) for s in (result.data or [])]
         except Exception as e:
-            logger.error(f"Failed to get snapshot history: {e}")
+            logger.debug(f"Failed to get snapshot history for {equipment_id}: {e}")
             return []
 
     async def get_daily_rollups(
@@ -292,12 +303,17 @@ class HealthSnapshotService:
             filtered = {k: v for k, v in rollups.items() if k >= cutoff}
             return [DailyRollup(**v) for v in sorted(filtered.values(), key=lambda r: r["date"], reverse=True)]
 
+        eq_uuid = self._resolve_uuid(equipment_id)
+        if eq_uuid is None:
+            logger.debug("Could not resolve UUID for %s — no daily rollups", equipment_id)
+            return []
+
         try:
             cutoff = (datetime.utcnow() - timedelta(days=range_days)).strftime("%Y-%m-%d")
             result = (
                 self._supabase.table("asset_health_daily_rollups")
                 .select("*")
-                .eq("equipment_id", equipment_id)
+                .eq("equipment_id", eq_uuid)
                 .gte("date", cutoff)
                 .order("date", desc=True)
                 .execute()
@@ -339,6 +355,9 @@ class HealthSnapshotService:
 
         # Resolve equipment code → UUID before querying snapshots
         eq_uuid = self._resolve_uuid(equipment_id)
+        if eq_uuid is None:
+            logger.debug("Could not resolve UUID for %s — skipping daily rollup", equipment_id)
+            return
 
         try:
             # Get all snapshots for the day

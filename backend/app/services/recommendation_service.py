@@ -275,6 +275,27 @@ class RecommendationService:
             logger.error(f"Error rejecting recommendation {rec_id}: {e}")
             raise ValueError(f"Failed to reject recommendation: {e}")
 
+    async def acknowledge_recommendation(self, rec_id: str, acknowledgement_type: str) -> None:
+        """Acknowledge a recommendation (accept or dismiss) from Telegram inline button.
+
+        Sets acknowledgement_type on the recommendation so it counts toward the
+        advisory→supervised acceptance rate gate. Status stays PENDING — the
+        recommendation still needs to be approved before execution.
+        """
+        from app.database.repositories import get_recommendation_repository
+
+        if acknowledgement_type not in ("accepted", "dismissed"):
+            raise ValueError(f"acknowledgement_type must be 'accepted' or 'dismissed', got {acknowledgement_type}")
+
+        repo = get_recommendation_repository()
+        rec = await repo.get(rec_id)
+        if not rec:
+            raise ValueError(f"Recommendation {rec_id} not found")
+
+        rec.acknowledgement_type = acknowledgement_type
+        await repo.update(rec_id, rec)
+        logger.info(f"Recommendation {rec_id} acknowledged as {acknowledgement_type}")
+
     async def execute_recommendation(self, rec_id: str, rec: Recommendation) -> dict[str, Any]:
         """Execute recommendation via device manager.
 

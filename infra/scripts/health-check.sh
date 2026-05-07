@@ -15,6 +15,12 @@ set -euo pipefail
 QUIET=false
 [[ "${1:-}" == "--quiet" ]] && QUIET=true
 
+# Source backend env for BRIDGE_API_TOKEN (extract without full sourcing to avoid spaces parsing issues)
+if [[ -f /opt/bms-intelligence/backend/.env ]]; then
+  BRIDGE_API_TOKEN="$(grep '^BRIDGE_API_TOKEN=' /opt/bms-intelligence/backend/.env 2>/dev/null | cut -d= -f2- | tr -d '"' || echo '')"
+  SUPABASE_URL="$(grep '^SUPABASE_URL=' /opt/bms-intelligence/backend/.env 2>/dev/null | cut -d= -f2- | tr -d '"' || echo '')"
+fi
+
 PASS=0
 WARN=0
 FAIL=0
@@ -115,7 +121,7 @@ backend_resp=$(curl -sf -m 5 http://localhost:9095/api/health 2>/dev/null) && {
 } || check "Backend API :9095" 1 "unreachable"
 
 # Frontend
-curl -sf -m 5 -o /dev/null http://localhost:9096 2>/dev/null \
+curl -sf -m 5 -o /dev/null http://localhost:9096/api/health 2>/dev/null \
   && check "Frontend :9096" 0 "serving" \
   || check "Frontend :9096" 1 "unreachable"
 
@@ -376,8 +382,8 @@ fi
 if [[ -f /var/log/mosquitto/mosquitto.log ]]; then
   recent_window=$(date -d '15 minutes ago' +%s 2>/dev/null || echo "0")
   recent_nodes=$(sudo grep -cE "node_001|node_002" /var/log/mosquitto/mosquitto.log 2>/dev/null || echo "0")
-  node_001_recent=$(sudo grep -c "node_001" /var/log/mosquitto/mosquitto.log 2>/dev/null || echo "0")
-  node_002_recent=$(sudo grep -c "node_002" /var/log/mosquitto/mosquitto.log 2>/dev/null || echo "0")
+  node_001_recent=$(sudo grep -c "node_001" /var/log/mosquitto/mosquitto.log 2>/dev/null | tr -d '[:space:]' || echo "0")
+  node_002_recent=$(sudo grep -c "node_002" /var/log/mosquitto/mosquitto.log 2>/dev/null | tr -d '[:space:]' || echo "0")
   node_001_last=$(sudo grep "node_001" /var/log/mosquitto/mosquitto.log 2>/dev/null | tail -1 | awk '{print $2}' || echo "unknown")
   node_002_last=$(sudo grep "node_002" /var/log/mosquitto/mosquitto.log 2>/dev/null | tail -1 | awk '{print $2}' || echo "unknown")
 
@@ -436,7 +442,7 @@ REPLICA_HOST="${REPLICA_HOST:-164.90.235.216}"
 REPLICA_PORT="${REPLICA_PORT:-55432}"
 REPLICA_CONN="postgresql://postgres:postgres@${REPLICA_HOST}:${REPLICA_PORT}/postgres"
 
-if (echo > /dev/tcp/${REPLICA_HOST}/${REPLICA_PORT}) 2>/dev/null; then
+if nc -z -w5 "$REPLICA_HOST" "$REPLICA_PORT" 2>/dev/null; then
   check "Replica port :${REPLICA_PORT}" 0 "open"
 
   if command -v psql &>/dev/null; then

@@ -189,7 +189,7 @@ export function EquipmentStatusPanel({ siteId, compact = false, onEquipmentSelec
           {getStatusIcon(eq.status)}
           <span
             className="text-xs px-2 py-0.5 rounded capitalize"
-            style={chipStyle(eq.status === "normal" ? "green" : "red")}
+            style={chipStyle(eq.status === "normal" ? "green" : eq.status === "warning" ? "amber" : "red")}
           >
             {eq.status}
           </span>

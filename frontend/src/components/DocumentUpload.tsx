@@ -42,15 +42,6 @@ const DOCUMENT_TYPES = [
 
 export type DocumentType = string;
 
-const DOCUMENT_CLASSIFICATION = [
-  { value: 'service_report', label: 'Service Report' },
-  { value: 'warranty', label: 'Warranty Certificate' },
-  { value: 'inspection_report', label: 'Inspection Report' },
-  { value: 'certificate', label: 'Certificate of Compliance' },
-  { value: 'equipment_manual', label: 'Equipment Manual' },
-  { value: 'building_manual', label: 'Building Manual' },
-] as const;
-
 export function DocumentUpload({
   siteId,
   onUploadComplete,
@@ -115,7 +106,7 @@ export function DocumentUpload({
     setError(null);
 
     try {
-      const response = await documentsApi.uploadDocument(
+      await documentsApi.uploadDocument(
         siteId,
         selectedFile,
         documentType,

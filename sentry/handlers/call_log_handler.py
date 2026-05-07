@@ -8,15 +8,12 @@ import os
 import re
 import sys
 
-_HERE = os.path.dirname(os.path.abspath(__file__))
-_SENTRY_ROOT = os.path.join(_HERE, "..")
-_THESAURUS_DIR = os.path.join(_SENTRY_ROOT, "thesaurus")
-for _p in (_THESAURUS_DIR, _SENTRY_ROOT):
-    if _p not in sys.path:
-        sys.path.insert(0, _p)
-
-from complaint_thesaurus import ComplaintCategory, PRIORITY_MAP, SPECIALTY_MAP
-from thesaurus_service import get_thesaurus
+from sentry.thesaurus.complaint_thesaurus import (
+    ComplaintCategory,
+    PRIORITY_MAP,
+    SPECIALTY_MAP,
+)
+from sentry.thesaurus.thesaurus_service import get_thesaurus
 
 # ---------------------------------------------------------------------------
 # Taxonomy constants

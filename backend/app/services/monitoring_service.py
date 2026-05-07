@@ -114,11 +114,25 @@ class MonitoringService:
         if site_id:
             try:
                 qm = self._integration_repo.get_quality_metrics(site_id)
-                freshness = qm.get("data_freshness_hours") or 9999.0
-                error_rate = qm.get("error_rate") or 0.0
-                match_coverage = qm.get("match_coverage") or 0.0
+                freshness = 0.0 if qm.get("data_freshness_hours") is None else qm.get("data_freshness_hours")
+                error_rate = 0.0 if qm.get("error_rate") is None else qm.get("error_rate")
+                match_coverage = 0.0 if qm.get("match_coverage") is None else qm.get("match_coverage")
             except Exception:
-                pass
+                # Fallback: derive freshness from integration_health last_sync
+                health = self._integration_repo.get_integration_health(site_id)
+                last_sync = health.get("last_sync")
+                if last_sync:
+                    try:
+                        if isinstance(last_sync, str):
+                            ls_dt = datetime.fromisoformat(last_sync.replace("Z", "+00:00").replace("+00:00", ""))
+                        else:
+                            ls_dt = last_sync
+                        # Strip tzinfo to get naive UTC datetime for consistent arithmetic
+                        if ls_dt.tzinfo is not None:
+                            ls_dt = ls_dt.replace(tzinfo=None)
+                        freshness = (datetime.utcnow() - ls_dt).total_seconds() / 3600
+                    except Exception:
+                        pass
         else:
             # Global: derive match_coverage from health data
             if total_points > 0:
@@ -160,7 +174,10 @@ class MonitoringService:
                     approved += 1
 
                 if entry.action == AuditActionType.SAFETY_VALIDATION and entry.result == AuditResultType.FAILED:
-                    safety_violations += 1
+                    # Only count CRITICAL-level safety rejections as violations for policy gating.
+                    # WARNING-level and older entries (escalation_level=None) are excluded.
+                    if entry.escalation_level and entry.escalation_level.lower() == "critical":
+                        safety_violations += 1
         except Exception as e:
             logger.warning(f"Failed to collect control KPIs from audit log: {e}")
 

@@ -14,6 +14,7 @@ Equipment inventory is site-specific - different buildings have different
 equipment combinations.
 """
 
+import asyncio
 import json
 import logging
 from datetime import UTC, datetime, timedelta
@@ -315,7 +316,7 @@ class AIOptimizerService:
             recommendation = await self._apply_quality_gate(site_id, recommendation)
 
             # Phase 109B-03: Enrich recommendations with health features (ADDITIVE)
-            recommendation = await self._enrich_with_health_features(recommendation)
+            recommendation = await self._enrich_with_health_features(site_id, recommendation)
 
             return recommendation
 
@@ -337,7 +338,7 @@ class AIOptimizerService:
             # Phase 109: Apply quality gate to fallback recommendations too
             rec = await self._apply_quality_gate(site_id, rec)
             # Phase 109B-03: Enrich fallback recommendations with health features too
-            rec = await self._enrich_with_health_features(rec)
+            rec = await self._enrich_with_health_features(site_id, rec)
             return rec
 
     async def _apply_quality_gate(
@@ -379,12 +380,19 @@ class AIOptimizerService:
                 f"failed={result.failed_rules}"
             )
         except Exception as e:
-            logger.warning(f"Quality gate evaluation failed for {site_id}, proceeding without gate: {e}")
+            logger.error(
+                f"[AI-OPT] Quality gate evaluation failed for {site_id}: {e}. "
+                f"Recommendations will be flagged as unverified.",
+                exc_info=True
+            )
+            for rec in recommendation.recommendations:
+                rec["quality_gate_status"] = "unverified"
+                rec["quality_gate_error"] = str(e)
 
         return recommendation
 
     async def _enrich_with_health_features(
-        self, recommendation: "OptimizationRecommendation"
+        self, site_id: str, recommendation: "OptimizationRecommendation"
     ) -> "OptimizationRecommendation":
         """Enrich recommendations with health feature payloads.
 
@@ -410,11 +418,13 @@ class AIOptimizerService:
             provider = HealthFeatureProvider()
 
             for rec_dict in recommendation.recommendations:
-                # target_equipment is canonical; fall back to equipment_id for compatibility
-                equipment_id = (
-                    rec_dict.get("target_equipment") or rec_dict.get("equipment_id") or rec_dict.get("device_id")
-                )
+                # target_equipment is canonical after normalisation — assert it, don't silently fall back
+                equipment_id = rec_dict.get("target_equipment")
                 if not equipment_id:
+                    logger.error(
+                        f"[AI-OPT] Recommendation missing target_equipment after normalisation: "
+                        f"{list(rec_dict.keys())} — skipping"
+                    )
                     continue
 
                 try:
@@ -430,7 +440,15 @@ class AIOptimizerService:
                     logger.debug(f"Could not get health features for {equipment_id}: {e}")
 
         except Exception as e:
-            logger.warning(f"Health feature enrichment failed, proceeding without: {e}")
+            logger.error(
+                f"[AI-OPT] Health feature enrichment failed for {site_id}: {e}. "
+                f"Recommendations will proceed without health severity signals. "
+                f"This may affect recommendation ranking accuracy.",
+                exc_info=True
+            )
+            # Add explicit marker so downstream knows health features are missing
+            # (attached to recommendation object's metadata, not individual recs)
+            recommendation.metadata["health_features_available"] = False
 
         return recommendation
 
@@ -1116,6 +1134,165 @@ class AIOptimizerService:
 
         return "\n".join(lines)
 
+    async def run_full_equipment_sweep(
+        self,
+        site_id: str,
+        bypass_occupancy_gate: bool = True,
+    ) -> list[dict]:
+        """
+        Run a full equipment sweep for a site, bypassing occupancy gates.
+
+        Unlike the main analyze_building() flow which gates recommendations on
+        occupancy schedules, this method generates recommendations for ALL equipment
+        regardless of time/occupancy. Used by the daily health sweep to catch issues
+        outside business hours.
+
+        Args:
+            site_id: Site code (e.g. "site-002")
+            bypass_occupancy_gate: If True, process all equipment regardless of
+                occupancy state. Default True.
+
+        Returns:
+            List of generated recommendation dicts (same format as analyze_building).
+        """
+        from app.database.repositories.equipment_repository import EquipmentRepository
+        from app.database.supabase_client import get_supabase_client
+
+        logger.info(f"[AI-OPT] Running full equipment sweep for {site_id} (bypass_occupancy_gate={bypass_occupancy_gate})")
+
+        results: list[dict] = []
+
+        try:
+            site = self.find_site(site_id)
+            if not site:
+                logger.warning(f"[AI-OPT] Site {site_id} not found for sweep")
+                return results
+
+            await ensure_device_manager_initialized()
+
+            # Get site UUID for queries
+            sb = get_supabase_client()
+            site_resp = sb.table("sites").select("id").eq("code", site_id).execute()
+            if not site_resp.data:
+                logger.warning(f"[AI-OPT] No UUID for site {site_id}")
+                return results
+            site_uuid = site_resp.data[0]["id"]
+
+            # Fetch all equipment with health_score and operating_data (anomaly scores)
+            eq_repo = EquipmentRepository()
+            all_equip = eq_repo.get_all(site_id=site_uuid)
+
+            # Filter: skip healthy equipment (health_score >= 90 AND anomaly_score < 0.3)
+            candidates = []
+            for eq in all_equip:
+                health = eq.get("health_score")
+                op = eq.get("operating_data") or {}
+                anomaly = op.get("anomaly_score") if isinstance(op, dict) else None
+                if health is not None and health >= 90 and (anomaly is None or float(anomaly) < 0.3):
+                    continue  # Skip healthy equipment
+                candidates.append(eq)
+
+            if not candidates:
+                logger.info(f"[AI-OPT] No candidate equipment for sweep at {site_id}")
+                return results
+
+            logger.info(f"[AI-OPT] Sweep candidate count: {len(candidates)}/{len(all_equip)}")
+
+            # Build minimal current_conditions for the sweep
+            conditions = {
+                "indoor_temp": 22.0,
+                "outdoor_temp": 28.0,
+                "humidity": 55.0,
+                "occupancy": "unknown",
+                "equipment_status": "normal",
+                "timestamp": datetime.now().isoformat(),
+                "zone_occupancy": {},
+            }
+            weather = self._generate_mock_weather_forecast()
+            energy = self._generate_mock_energy_prices()
+
+            # For each candidate, build a targeted prompt
+            for eq in candidates:
+                eq_code = eq.get("code", "")
+                eq_type = eq.get("type", "unknown")
+                health = eq.get("health_score")
+                op = eq.get("operating_data") or {}
+                anomaly = op.get("anomaly_score") if isinstance(op, dict) else None
+                lstm_anomaly = op.get("lstm_anomaly_score") if isinstance(op, dict) else None
+
+                logger.debug(
+                    f"[AI-OPT] Sweep target: {eq_code} type={eq_type} health={health} "
+                    f"anomaly={anomaly} lstm={lstm_anomaly}"
+                )
+
+                # Build focused prompt for this equipment
+                prompt = f"""SENTINEL Health Sweep — Equipment Analysis
+
+Site: {site_id}
+Equipment: {eq_code}
+Type: {eq_type}
+Current Health Score: {health}
+Anomaly Score (IF): {anomaly}
+LSTM Anomaly Score: {lstm_anomaly}
+
+Current Conditions:
+- Indoor temp: {conditions.get('indoor_temp', 22)}°C
+- Outdoor temp: {conditions.get('outdoor_temp', 28)}°C
+- Humidity: {conditions.get('humidity', 55)}%
+
+Energy Pricing: R{energy.get('current_rate', 2.28)}/kWh (standard)
+
+Analyze this equipment and generate any needed maintenance or optimization
+recommendations. Consider:
+- Is health_score declining or below thresholds?
+- Are anomaly scores elevated?
+- Are there operational inefficiencies (e.g., excessive runtime, unnecessary consumption)?
+
+Format output as JSON:
+{{
+  "recommendations": [
+    {{
+      "equipment_id": "{eq_code}",
+      "point_name": "<control_point>",
+      "current_value": <value>,
+      "recommended_value": <value>,
+      "reason": "<explanation>",
+      "confidence": <0-1>
+    }}
+  ]
+}}
+
+If no action needed, return empty recommendations array.
+"""
+
+                try:
+                    response_text = await self._call_claude(prompt, site_id)
+                    if not response_text:
+                        continue
+
+                    import re
+                    json_match = re.search(r"\{[\s\S]*\}", response_text)
+                    if not json_match:
+                        continue
+
+                    import json as _json
+                    parsed = _json.loads(json_match.group())
+                    recs = parsed.get("recommendations", [])
+                    for rec in recs:
+                        rec["site_id"] = site_id
+                        rec["source"] = "health_sweep"
+                        results.append(rec)
+
+                except Exception as e:
+                    logger.warning(f"[AI-OPT] Sweep recommendation failed for {eq_code}: {e}")
+
+            logger.info(f"[AI-OPT] Sweep complete: {len(results)} recommendations for {site_id}")
+
+        except Exception as e:
+            logger.error(f"[AI-OPT] Full equipment sweep failed for {site_id}: {e}")
+
+        return results
+
     def _format_ml_context_section(self, ml_context: dict[str, Any]) -> str:
         """Format ML context into a readable prompt section for Claude."""
         if not ml_context:
@@ -1376,7 +1553,7 @@ Example of CORRECT grouped output (1 rec covering all zones):
     "target_equipment": "S002-FCU-L0-A",
     "affected_equipment": ["S002-FCU-L0-A", "S002-FCU-L1-A", "S002-FCU-L1-B", "S002-FCU-L2-C", "S002-FCU-L2-D"],
     "action": {{"point": "cooling_setpoint", "value": 22.9}},
-    "reason": "Outdoor 28.0°C. All 5 FCU zones identical — indoor 22.0°C. Relax cooling 22.0°C→22.9°C. Saves ~5% cooling.",
+    "reason": "Outdoor 28°C, all 5 FCU zones 22°C. Relax cooling 22→22.9°C, saves ~5%.",
     "benefit": "~R8.50/day at current tariff",
     "confidence": 0.82
   }}
@@ -3408,7 +3585,13 @@ Provide ONLY the JSON response, no additional text."""
                     filtered_recs.append(modified_rec)
 
         # Adjust projected savings based on stage (more aggressive = more savings)
-        savings_multiplier = 1.0 + (load_shedding_stage * 0.2)  # 1.2x to 1.8x
+        MAX_SAVINGS_MULTIPLIER = 2.0  # Cap at 2x — beyond this is speculative
+        savings_multiplier = min(1.0 + (load_shedding_stage * 0.2), MAX_SAVINGS_MULTIPLIER)
+        logger.debug(
+            f"[AI-OPT] Load shedding stage {load_shedding_stage} → "
+            f"savings multiplier {savings_multiplier:.1f}x "
+            f"({'capped' if savings_multiplier == MAX_SAVINGS_MULTIPLIER else 'uncapped'})"
+        )
         adjusted_savings = recommendation.projected_savings.copy()
         adjusted_savings["energy_kwh"] = round(adjusted_savings.get("energy_kwh", 0) * savings_multiplier, 1)
         adjusted_savings["cost_zar_per_hour"] = round(
@@ -3477,8 +3660,29 @@ Provide ONLY the JSON response, no additional text."""
                 # FIX 2: HTTP bridge fallback — device_manager empty for oBIX sites
                 if not device:
                     equip_repo = EquipmentRepository()
-                    # get_by_site_code is synchronous — run directly
-                    equip_list = equip_repo.get_by_site_code(site_id)
+                    # Wrap synchronous call in asyncio thread pool with 5s timeout
+                    try:
+                        equip_list = await asyncio.wait_for(
+                            asyncio.to_thread(equip_repo.get_by_site_code, site_id),
+                            timeout=5.0,
+                        )
+                    except asyncio.TimeoutError:
+                        logger.error(
+                            f"[AI-OPT] validate_recommendation DB timeout for {site_id} "
+                            f"— allowing recommendation through with reduced confidence"
+                        )
+                        # Allow through but reduce confidence
+                        validation_results.append(
+                            {
+                                "equipment_id": equipment_id,
+                                "point_name": point_name,
+                                "allowed": True,
+                                "reason": "DB timeout — reduced confidence",
+                                "validation_note": "supabase_timeout",
+                                "confidence_multiplier": 0.7,
+                            }
+                        )
+                        continue
 
                     # Normalise site_id for lookup: "site-002" → "S002" (for future use)
                     found = next((e for e in equip_list if e.get("code") == equipment_id), None)

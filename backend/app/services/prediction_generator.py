@@ -376,8 +376,9 @@ class PredictionGeneratorService:
             except Exception:
                 pass
 
-        # Runtime factor (if available)
-        runtime = equipment.get("runtime_hours", 0)
+        # Runtime factor (if available) — check operating_data.total_runtime_hours
+        operating_data = equipment.get("operating_data") or {}
+        runtime = operating_data.get("total_runtime_hours", 0)
         if runtime > 20000:
             factors.append(
                 {

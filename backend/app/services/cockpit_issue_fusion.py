@@ -108,7 +108,7 @@ class CockpitIssueFusionService:
                     client.table("work_orders")
                     .select("*")
                     .eq("site_id", site_id)
-                    .neq("status", "completed")
+                    .in_("status", ["new", "in_progress"])
                     .order("updated_at", desc=True)
                     .limit(10)
                     .execute()

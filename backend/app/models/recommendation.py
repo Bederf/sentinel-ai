@@ -24,6 +24,20 @@ class RecommendationStatus(StrEnum):
     FAILED = "failed"  # Execution failed
 
 
+class MilestoneStatus(StrEnum):
+    """4-milestone SLA lifecycle for Fairlands maintenance tickets.
+
+
+    Tracks which phase of the SLA workflow a recommendation is in.
+    Each milestone has its own SLA deadline (configured per-site).
+    """
+
+    ASSIGNED = "assigned"  # Ticket assigned, awaiting action
+    IN_PROGRESS = "in_progress"  # Work started
+    RESOLVED = "resolved"  # Work completed, awaiting verification
+    VERIFIED = "verified"  # Customer confirmed, milestone complete
+
+
 class ActionRiskLevel(StrEnum):
     """Risk level classification for recommended actions."""
 
@@ -97,6 +111,16 @@ class Recommendation:
         default_factory=dict
     )  # Additional context (e.g., affected_equipment for grouped recs)
 
+    # --- 4-milestone SLA fields ---
+    milestone_status: MilestoneStatus = MilestoneStatus.ASSIGNED
+    assigned_at: datetime = field(default_factory=datetime.utcnow)
+    in_progress_at: datetime | None = None
+    resolved_at: datetime | None = None
+    verified_at: datetime | None = None
+    sla_hours: dict[str, int] = field(default_factory=dict)  # {"assigned": 24, "in_progress": 48, ...}
+    sla_deadline_at: datetime | None = None  # Materialised deadline, updated on advance
+    external_ticket_id: str | None = None  # FSI/external ticket correlation
+
     def get_numeric_confidence(self) -> float:
         """Return numeric confidence, converting string if needed.
 
@@ -153,6 +177,20 @@ class Recommendation:
             ),
             "shadow_mode": self.shadow_mode,
             "metadata": self.metadata,
+            "milestone_status": self.milestone_status.value
+            if isinstance(self.milestone_status, MilestoneStatus)
+            else self.milestone_status,
+            "assigned_at": self.assigned_at.isoformat() if isinstance(self.assigned_at, datetime) else self.assigned_at,
+            "in_progress_at": self.in_progress_at.isoformat()
+            if isinstance(self.in_progress_at, datetime)
+            else self.in_progress_at,
+            "resolved_at": self.resolved_at.isoformat() if isinstance(self.resolved_at, datetime) else self.resolved_at,
+            "verified_at": self.verified_at.isoformat() if isinstance(self.verified_at, datetime) else self.verified_at,
+            "sla_hours": self.sla_hours,
+            "sla_deadline_at": self.sla_deadline_at.isoformat()
+            if isinstance(self.sla_deadline_at, datetime)
+            else self.sla_deadline_at,
+            "external_ticket_id": self.external_ticket_id,
         }
 
     @classmethod
@@ -207,6 +245,37 @@ class Recommendation:
             except ValueError:
                 status = RecommendationStatus.PENDING
 
+        # Parse milestone status
+        milestone_status = data.get("milestone_status", "assigned")
+        if isinstance(milestone_status, str):
+            try:
+                milestone_status = MilestoneStatus(milestone_status)
+            except ValueError:
+                milestone_status = MilestoneStatus.ASSIGNED
+
+        # Parse milestone timestamps
+        def _parse_ts(key: str) -> datetime | None:
+            val = data.get(key)
+            if isinstance(val, str) and val:
+                try:
+                    return datetime.fromisoformat(val)
+                except (ValueError, TypeError):
+                    return None
+            return val
+
+        assigned_at = _parse_ts("assigned_at") or datetime.utcnow()
+        in_progress_at = _parse_ts("in_progress_at")
+        resolved_at = _parse_ts("resolved_at")
+        verified_at = _parse_ts("verified_at")
+        sla_deadline_at = _parse_ts("sla_deadline_at")
+
+        # Parse SLA hours dict
+        sla_hours_raw = data.get("sla_hours", {})
+        if isinstance(sla_hours_raw, dict):
+            sla_hours = {k: int(v) for k, v in sla_hours_raw.items()}
+        else:
+            sla_hours = {}
+
         return cls(
             id=data.get("id", str(uuid.uuid4())),
             site_id=data.get("site_id", ""),
@@ -234,4 +303,13 @@ class Recommendation:
             outcome_validated_at=outcome_validated_at,
             shadow_mode=data.get("shadow_mode", False),
             metadata=data.get("metadata", {}),
+            # 4-milestone SLA fields
+            milestone_status=milestone_status,
+            assigned_at=assigned_at,
+            in_progress_at=in_progress_at,
+            resolved_at=resolved_at,
+            verified_at=verified_at,
+            sla_hours=sla_hours,
+            sla_deadline_at=sla_deadline_at,
+            external_ticket_id=data.get("external_ticket_id"),
         )

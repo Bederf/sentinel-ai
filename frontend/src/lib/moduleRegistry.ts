@@ -12,18 +12,7 @@ const RECOMMENDATIONS_CACHE_PREFIX = "sentinel_module_recommendations_";
 
 // ==================== Types ====================
 
-export type ModuleType =
-  // Base Platform (7, always on)
-  | 'kpi' | 'ml' | 'notifications' | 'integrations' | 'simbiot' | 'logging' | 'assets'
-  // Base Building Systems (8, always on)
-  | 'hvac' | 'energy' | 'lighting' | 'solar' | 'water' | 'fire' | 'security' | 'digital_twin'
-  // Control Add-ons (7, toggleable)
-  | 'hvac_control' | 'energy_control' | 'lighting_control' | 'solar_control'
-  | 'water_control' | 'security_control' | 'digital_twin_control'
-  // Standalone Add-ons (9, toggleable)
-  | 'maintenance' | 'financial' | 'compliance' | 'fleet_ml'
-  | 'block_booking' | 'space_optimization'
-  | 'fuel_monitoring' | 'fuel_alerts';
+export type ModuleType = string;
 export type ModuleStatus = 'active' | 'inactive' | 'error' | 'maintenance';
 export type RecommendationType = 'optimization' | 'maintenance' | 'alert' | 'cross_system' | 'predictive';
 export type RecommendationPriority = 'low' | 'medium' | 'high' | 'critical';
@@ -39,14 +28,23 @@ export interface ModuleDefinition {
   name: string;
   version: string;
   description: string;
+  enabled: boolean;
+  mandatory: boolean;
   capabilities: ModuleCapability[];
   integrates_with: ModuleType[];
+  telemetry_points: string[];
   ai_features: string[];
 }
+
+type ModuleRegistryPayload = Record<string, ModuleDefinition> | ModuleDefinition[];
 
 // Cache for available modules (5 minute TTL)
 const MODULES_CACHE_TTL = 5 * 60 * 1000;
 let modulesCache: { data: ModuleDefinition[] | null; timestamp: number } = { data: null, timestamp: 0 };
+
+function normalizeModuleRegistryPayload(payload: ModuleRegistryPayload): ModuleDefinition[] {
+  return Array.isArray(payload) ? payload : Object.values(payload);
+}
 
 export interface ModuleInstance {
   instance_id: string;
@@ -132,7 +130,7 @@ export const moduleRegistryApi = {
    * Get all available module definitions
    * Cached for 5 minutes to prevent rate limit hits
    */
-  async getAvailableModules(): Promise<ModuleDefinition[]> {
+  async getModuleRegistry(): Promise<ModuleDefinition[]> {
     const now = Date.now();
 
     // Return cached data if still valid
@@ -141,9 +139,9 @@ export const moduleRegistryApi = {
     }
 
     try {
-      const response = await fetchWithAuth(`${API_BASE}/api/modules/available`);
-      if (!response.ok) throw new Error('Failed to fetch available modules');
-      const data = await response.json();
+      const response = await fetchWithAuth(`${API_BASE}/api/modules/registry`);
+      if (!response.ok) throw new Error('Failed to fetch module registry');
+      const data = normalizeModuleRegistryPayload(await response.json() as ModuleRegistryPayload);
 
       // Update cache
       modulesCache = { data, timestamp: now };
@@ -156,6 +154,10 @@ export const moduleRegistryApi = {
       }
       throw error;
     }
+  },
+
+  async getAvailableModules(): Promise<ModuleDefinition[]> {
+    return moduleRegistryApi.getModuleRegistry();
   },
 
   /**
@@ -410,7 +412,11 @@ export const MODULE_ICONS: Record<ModuleType, string> = {
   fleet_ml: 'brain',
   block_booking: 'calendar-check',
   space_optimization: 'layout-grid',
-  fuel_monitoring: 'fuel',
+  sustainability: 'leaf',
+  contracts: 'file-signature',
+  access: 'key-round',
+  control: 'sliders-horizontal',
+  fuel: 'fuel',
   fuel_alerts: 'bell-ring',
 };
 
@@ -447,7 +453,11 @@ export const MODULE_COLORS: Record<ModuleType, string> = {
   fleet_ml: 'cyan',
   block_booking: 'rose',
   space_optimization: 'teal',
-  fuel_monitoring: 'orange',
+  sustainability: 'emerald',
+  contracts: 'orange',
+  access: 'purple',
+  control: 'slate',
+  fuel: 'orange',
   fuel_alerts: 'red',
 };
 

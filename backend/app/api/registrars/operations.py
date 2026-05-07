@@ -48,6 +48,7 @@ from app.api import (
     inspection_recommendations,
     integration,
     modules,
+    onboarding,
     mri_connector,
     municipal_billing,
     n8n,
@@ -99,7 +100,8 @@ def register_operations_routers(app: FastAPI) -> None:
     # Workflow orchestration
     app.include_router(workflow.router, tags=["workflow"])
     app.include_router(baselines.router, tags=["baselines"])
-    app.include_router(equipment_baselines.router, prefix="/api", tags=["equipment-baselines"])
+    app.include_router(equipment_baselines.router, tags=["equipment-baselines"])
+    app.include_router(onboarding.router, tags=["onboarding"])
     app.include_router(condition.router, tags=["condition"])
 
     # Remote operations

@@ -2,9 +2,9 @@ import type { ReactNode } from "react";
 import { Brain, Gauge, Zap } from "lucide-react";
 import { ModuleDescriptions } from "./ModuleDescriptions";
 import {
-  ADDON_TOGGLE_CARDS,
-  BUILDING_SYSTEM_CARDS,
-  PLATFORM_STATUS_CARDS,
+  getAddonToggleCards,
+  getBuildingSystemCards,
+  getPlatformStatusCards,
   type BuildingSystemCard,
   type FeatureToggleCard,
 } from "./settingsCatalog";
@@ -80,10 +80,12 @@ function ModuleCard({
 }
 
 function PlatformModuleCard({ controller }: { controller: ReturnType<typeof useSettingsController> }) {
+  const platformCards = getPlatformStatusCards(controller.availableModules);
+
   return (
     <ModuleCard description="Core platform modules (always active)" icon={<Zap className="h-5 w-5" />} title="Platform">
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-        {PLATFORM_STATUS_CARDS.map((card) => (
+        {platformCards.map((card) => (
           <div key={card.id} className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-secondary)", border: "1px solid var(--glass-border)" }}>
             <div className="flex items-start justify-between gap-3">
               <div>
@@ -140,10 +142,12 @@ function BuildingSystemToggle({
 }
 
 function BuildingSystemsCard({ controller }: { controller: ReturnType<typeof useSettingsController> }) {
+  const buildingSystemCards = getBuildingSystemCards(controller.availableModules);
+
   return (
     <ModuleCard description="Monitoring always on. Toggle control features per discipline." icon={<Gauge className="h-5 w-5" />} title="Building Systems">
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-        {BUILDING_SYSTEM_CARDS.map((card) => {
+        {buildingSystemCards.map((card) => {
           const controlActive = card.controlModule ? controller.isModuleActive(card.controlModule) : false;
           const loadingCard = controller.togglingCardId === card.id;
           return (
@@ -175,6 +179,8 @@ function BuildingSystemsCard({ controller }: { controller: ReturnType<typeof use
 }
 
 function AddonsCard({ controller }: { controller: ReturnType<typeof useSettingsController> }) {
+  const addonCards = getAddonToggleCards(controller.availableModules);
+
   return (
     <div className="glass-panel overflow-hidden" style={{ background: "var(--glass-bg)", border: "1px solid var(--glass-border)" }}>
       <div className="p-4 border-b" style={{ borderColor: "var(--color-sentinel-border)" }}>
@@ -190,7 +196,7 @@ function AddonsCard({ controller }: { controller: ReturnType<typeof useSettingsC
       </div>
       <div className="p-6">
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-          {ADDON_TOGGLE_CARDS.map((card) => {
+          {addonCards.map((card) => {
             const active = controller.isModuleActive(card.moduleType);
             const loadingCard = controller.togglingCardId === card.id;
             return (

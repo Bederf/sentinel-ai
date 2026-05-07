@@ -142,6 +142,9 @@ async def reload_all_data():
     ChillerTelemetryData.load(force_reload=True)
     PumpTelemetryData.load(force_reload=True)
 
+    # Sync runtime hours from telemetry to equipment operating_data
+    synced = _sync_telemetry_runtime_to_equipment()
+
     return {
         "success": True,
         "message": "All data reloaded from CSV files",
@@ -155,7 +158,92 @@ async def reload_all_data():
         "vsd_telemetry": len(VSDTelemetryData.load()),
         "chiller_telemetry": len(ChillerTelemetryData.load()),
         "pump_telemetry": len(PumpTelemetryData.load()),
+        "runtime_synced": synced,
     }
+
+
+def _sync_telemetry_runtime_to_equipment() -> int:
+    """Sync latest runtime hours from telemetry CSVs to equipment operating_data.
+
+    Matches telemetry asset_tag to equipment code by equipment TYPE
+    (chiller→chiller, ahu→AHU, fcu→FCU, pump→pump, generator→generator).
+    Takes max runtime across all telemetry readings per type.
+
+    Returns:
+        Number of equipment records updated.
+    """
+    try:
+        from app.database.repositories.equipment_metadata_repository import EquipmentMetadataRepository
+        from app.services.csv_loader import (
+            ChillerTelemetryData,
+            GeneratorTelemetryData,
+            HVACTelemetryData,
+            PumpTelemetryData,
+            VSDTelemetryData,
+        )
+
+        meta_repo = EquipmentMetadataRepository()
+        updated = 0
+
+        # Collect latest runtime by equipment TYPE from all telemetry sources
+        # Map asset_tag patterns to canonical equipment type
+        TYPE_KEYWORDS = {
+            "chiller": ["chiller", "ch-", "ch_"],
+            "ahu": ["ahu", "air handling"],
+            "fcu": ["fcu", "fan coil"],
+            "pump": ["pump", "cp-", "hp-"],
+            "generator": ["generator", "gen-", "genset"],
+            "vsd": ["vsd", "drive", "inverter"],
+        }
+
+        def get_type_from_tag(asset_tag: str) -> str | None:
+            tag_lower = asset_tag.lower()
+            for eq_type, keywords in TYPE_KEYWORDS.items():
+                if any(kw in tag_lower for kw in keywords):
+                    return eq_type
+            return None
+
+        # Collect max runtime per equipment type from all telemetry
+        max_runtime_by_type: dict[str, float] = {}
+        for telemetry_class in (GeneratorTelemetryData, HVACTelemetryData, VSDTelemetryData, ChillerTelemetryData, PumpTelemetryData):
+            data = telemetry_class.load()
+            for row in data:
+                asset_tag = row.get("asset_tag", "")
+                run_hours = row.get("run_hours") or 0
+                if not asset_tag or not run_hours:
+                    continue
+                eq_type = get_type_from_tag(asset_tag)
+                if eq_type:
+                    if eq_type not in max_runtime_by_type or run_hours > max_runtime_by_type[eq_type]:
+                        max_runtime_by_type[eq_type] = run_hours
+
+        if not max_runtime_by_type:
+            return 0
+
+        # Query all equipment and update by matching type
+        from app.database.supabase_client import get_supabase_client
+        client = get_supabase_client()
+        all_equipment = client.table("equipment").select("id,code,type,operating_data").execute().data or []
+
+        for equipment in all_equipment:
+            eq_type = (equipment.get("type") or "").lower()
+            # Match equipment type to telemetry type
+            matched_type = None
+            for tel_type, keywords in TYPE_KEYWORDS.items():
+                if any(kw in eq_type for kw in keywords):
+                    matched_type = tel_type
+                    break
+            if matched_type and matched_type in max_runtime_by_type:
+                runtime_hours = max_runtime_by_type[matched_type]
+                try:
+                    meta_repo.update_operating_data(equipment["id"], {"total_runtime_hours": runtime_hours})
+                    updated += 1
+                except Exception:
+                    pass
+
+        return updated
+    except Exception:
+        return 0
 
 
 @router.get("/download/{file_type}")

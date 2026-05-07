@@ -41,8 +41,10 @@ class ElementTrendService:
         self._inspection_repo = None
         self._baseline_repo = None
 
-    def _resolve_uuid(self, code_or_uuid: str) -> str:
-        """Resolve equipment code to UUID. Pass-through if already UUID."""
+    def _resolve_uuid(self, code_or_uuid: str) -> str | None:
+        """Resolve equipment code to UUID. Pass-through if already UUID.
+        Returns None if resolution fails.
+        """
         try:
             from app.database.repositories.equipment_repository import (
                 EquipmentRepository,
@@ -56,7 +58,7 @@ class ElementTrendService:
                 return eq["id"]
         except Exception:
             pass
-        return code_or_uuid
+        return None
 
     @property
     def inspection_repo(self):
@@ -409,6 +411,9 @@ class ElementTrendService:
 
         # Resolve equipment code → UUID for inspection_measurements queries
         eq_uuid = self._resolve_uuid(equipment_id)
+        if eq_uuid is None:
+            logger.debug("Could not resolve UUID for %s — skipping element discovery", equipment_id)
+            return elements
 
         try:
             measurements = await self.inspection_repo.get_measurements_by_equipment(equipment_id=eq_uuid, limit=500)
@@ -421,7 +426,7 @@ class ElementTrendService:
                     elements[m.measurement_point] = m.measurement_type
 
         except Exception as e:
-            logger.warning(f"Could not discover elements for {equipment_id}: {e}")
+            logger.debug(f"Could not discover elements for {equipment_id}: {e}")
 
         return elements
 

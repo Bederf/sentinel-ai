@@ -28,8 +28,8 @@ class TestNotifyPendingRecommendations:
         svc._notify_recommendation_alert("S002", ai_rec)
 
     @pytest.mark.asyncio
-    async def test_notify_skips_high_severity(self):
-        """High severity rec does NOT trigger Telegram alert (only critical fires)."""
+    async def test_notify_sends_telegram_for_high_severity(self):
+        """High severity rec now triggers Telegram alert (not just critical)."""
         from app.services.background_scheduler import BackgroundSchedulerService
 
         svc = BackgroundSchedulerService.__new__(BackgroundSchedulerService)
@@ -42,7 +42,24 @@ class TestNotifyPendingRecommendations:
         ai_rec.confidence = 0.72
         ai_rec.suggested_action = {"type": "pending_approval"}
 
-        svc._notify_recommendation_alert("S002", ai_rec)
+        with patch("app.services.telegram_message_sender.get_telegram_sender") as mock_sender:
+            mock_instance = AsyncMock()
+            mock_sender.return_value = mock_instance
+            with patch("app.config.settings") as mock_settings:
+                mock_settings.telegram_alert_chat_id = "12345"
+
+                try:
+                    loop = asyncio.get_running_loop()
+                    with concurrent.futures.ThreadPoolExecutor() as pool:
+                        future = pool.submit(svc._notify_recommendation_alert, "S002", ai_rec)
+                        future.result()
+                except RuntimeError:
+                    svc._notify_recommendation_alert("S002", ai_rec)
+
+                mock_instance.send_text.assert_called_once()
+                call_args = mock_instance.send_text.call_args
+                assert "S002-AHU-201" in call_args[0][1]
+                assert "HIGH" in call_args[0][1]
 
     @pytest.mark.asyncio
     async def test_notify_skips_info_severity(self):

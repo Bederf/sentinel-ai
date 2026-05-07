@@ -9,6 +9,7 @@ from fastapi import FastAPI
 from app.api.registrars.analytics import register_analytics_routers
 from app.api.registrars.building import register_site_routers
 from app.api.registrars.core import register_core_routers
+from app.api.registrars.integrations import register_integrations_routers
 from app.api.registrars.operations import register_operations_routers
 
 
@@ -36,6 +37,9 @@ def register_all_routes(app: FastAPI) -> None:
 
     # Register operations routers (work orders, maintenance, inspection, workflow, etc.)
     register_operations_routers(app)
+
+    # Register integration routers (Niagara, BACnet, SIMBIOT, energy, lighting)
+    register_integrations_routers(app)
 
     # Register analytics routers (chat/ai, predictions, optimization, ML, etc.)
     register_analytics_routers(app)

@@ -27,21 +27,26 @@ SENTINEL's SIMBIOT device abstraction layer autodetects **~60% of BMS integratio
 
 ---
 
-## Site-002 deterministic stage gates (Phase 109C dry-run)
+## Site-002 deterministic stage gates
 
-Site-002 onboarding now includes deterministic stage evaluation with explicit promotion and demotion thresholds:
+Site-002 onboarding uses a deterministic policy to drive stage progression:
 
-`commissioning -> shadow_live -> supervised -> automatic`
+`commissioning -> shadow_live -> advisory -> supervised -> automatic`
 
-Important: this phase is currently **dry-run only**. It logs `would_promote` and `would_demote` decisions without executing control changes.
+The policy evaluates every 5 minutes and automatically writes stage transitions to Supabase when `dry_run: false`. A manual phase advance via the UI is **blocked** when the current stage's entry gates have not passed — the operator sees a toast explaining which specific gates failed.
+
+See [`109C-site-002-mode-policy-dry-run.md`](../04-features/109C-site-002-mode-policy-dry-run.md) for the full threshold table.
 
 ### Promotion and demotion criteria
 
 | Transition | Minimum dwell | Promotion criteria | Demotion criteria |
 |-----------|---|---|---|
-| `commissioning -> shadow_live` | 0h | all commissioning gates pass, truth check present, consecutive pass days >= 2 | n/a |
-| `shadow_live -> supervised` | 12h | freshness <= 2h, match coverage >= 95%, error rate <= 1%, no file/manual sources, quality gate pass/warn | demote to `commissioning` after 2h sustained violation of shadow exit thresholds |
-| `supervised -> automatic` | 24h | freshness <= 0.5h, match coverage >= 98%, error rate <= 0.5%, conflicts 24h = 0, no file/manual sources, quality gate pass | demote to `shadow_live` after 1h sustained violation of supervised exit thresholds |
+| `commissioning -> shadow_live` | 0h | all commissioning gates pass, truth check submitted, consecutive pass days >= 2 | n/a |
+| `shadow_live -> advisory` | 12h | freshness <= 2h, match coverage >= 95%, error rate <= 1%, no file/manual sources, quality gate pass/warn, consecutive pass days >= 2 | demote to `shadow_live` after 2h sustained violation of shadow exit thresholds |
+| `advisory -> supervised` | 24h | freshness <= 1h, match coverage >= 97%, error rate <= 1%, no file/manual sources, conflicts 24h = 0, quality gate pass/warn, consecutive pass days >= 2 | demote to `shadow_live` after 2h sustained violation of advisory exit thresholds |
+| `supervised -> automatic` | 24h | freshness <= 0.5h, match coverage >= 98%, error rate <= 0.5%, no file/manual sources, conflicts 24h = 0, quality gate pass only, consecutive pass days >= 2 | demote to `shadow_live` after 1h sustained violation of supervised exit thresholds |
+
+Note: BMS active alarms do **not** block SENTINEL policy gates — only data quality metrics (freshness, match coverage, error rate, provenance, quality gate status) gate progression.
 
 ### Automatic stage fail-closed
 
@@ -527,7 +532,7 @@ Account Manager: ________________    Date: ________________
 - **Troubleshooting**: `docs/05-integrations/simbiot-troubleshooting.md`
 - **Equipment Naming v2.0**: `../02-architecture/NAMING_CONVENTIONS.md`
 - **Digital Twin Feature**: `docs/04-features/DIGITAL_TWIN_REAL_DATA_INTEGRATION.md`
-- **Deterministic Stage Policy (Site-002)**: `docs/04-features/109C-site-002-mode-policy-dry-run.md`
+- **Deterministic Stage Policy (Site-002)**: `../04-features/109C-site-002-mode-policy-dry-run.md`
 
 ---
 

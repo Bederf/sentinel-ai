@@ -97,24 +97,46 @@ class SentinelDataSync:
         # models with outdated baselines. Uses integration_repository which
         # already computes data_freshness_hours from last_sync_at timestamps.
         freshness_threshold = DATA_FRESHNESS_MAX_HOURS  # 24h
+        data_freshness_hours = 9999.0  # Default: block ML ingest
         try:
-            from app.database.repositories.integration_repository import IntegrationRepository
+            from app.database.supabase_client import get_supabase_client
 
-            integration_repo = IntegrationRepository()
-            freshness_data = integration_repo.get_data_quality_metrics(site_id=self.site_id)
-            data_freshness_hours = freshness_data.get("data_freshness_hours") or 9999
+            client = get_supabase_client()
+            # Resolve site code → UUID for log_sources query (site_id is UUID there)
+            # Normalize to site-XXX format for sites table query (sites table uses "site-002" not "S002")
+            site_code_for_query = self.site_id
+            if self.site_id.startswith("S"):
+                # Convert S002 → site-002 for sites table lookup
+                num = self.site_id[1:]  # "002"
+                site_code_for_query = f"site-{num}"
+
+            sites_resp = client.table("sites").select("id").eq("code", site_code_for_query).execute()
+            if sites_resp.data:
+                site_uuid = sites_resp.data[0]["id"]
+                sources_resp = (
+                    client.table("log_sources")
+                    .select("last_sync_at")
+                    .eq("site_id", site_uuid)
+                    .execute()
+                )
+                if sources_resp.data and sources_resp.data[0].get("last_sync_at"):
+                    from datetime import timezone as tz
+
+                    now = datetime.now(tz=tz.utc)
+                    sync_at = sources_resp.data[0]["last_sync_at"]
+                    sync_time = datetime.fromisoformat(sync_at.replace("Z", "+00:00"))
+                    if sync_time.tzinfo is None:
+                        sync_time = sync_time.replace(tzinfo=tz.utc)
+                    data_freshness_hours = (now - sync_time).total_seconds() / 3600
+                    logger.info(f"[ML FEEDER] Freshness check: site_id={self.site_id} site_code={site_code_for_query} last_sync={sync_at} freshness_hours={data_freshness_hours:.2f}")
         except Exception as e:
-            logger.warning(f"[ML FEEDER] Could not compute freshness — proceeding without gate: {e}")
-            data_freshness_hours = 0.0  # Proceed if freshness check fails (fail-open)
+            logger.warning(f"[ML FEEDER] Freshness check error for site_id={self.site_id}: {e}")
+            data_freshness_hours = 9999.0  # Block ML ingest if freshness check fails
+        else:
+            logger.info(f"[ML FEEDER] Freshness check: no log_sources entry for site_id={self.site_id} site_code={site_code_for_query}")
 
         if data_freshness_hours > freshness_threshold:
-            violation_msg = (
-                f"site_id={self.site_id} "
-                f"data_freshness_hours={data_freshness_hours:.1f} "
-                f"threshold_hours={freshness_threshold} "
-                f"skip_reason=stale_telemetry_blocked_before_ml_ingest"
-            )
-            logger.warning(f"[ML FEEDER] Freshness gate rejected: {violation_msg}")
+            logger.warning(f"[ML FEEDER] Freshness gate rejected: site_id={self.site_id} data_freshness_hours={data_freshness_hours:.1f} threshold_hours={freshness_threshold}")
             audit_structured_logger.warning(
                 f"event=data_freshness_violation "
                 f"site_id={self.site_id} "
@@ -133,6 +155,39 @@ class SentinelDataSync:
                     logger.info(f"[ML FEEDER] Trained {len(successful)} models from SENTINEL data")
                     results["ml_models_trained"] = len(successful)
                 results["ml_hours_ingested"] = self.ml_feeder.hours_ingested
+
+                # Persist ml_hours_ingested to sites table so it survives restarts
+                # Note: sites table uses "site-002" format, not "S002"
+                site_code_for_persist = self.site_id
+                if self.site_id.startswith("S"):
+                    num = self.site_id[1:]
+                    site_code_for_persist = f"site-{num}"
+
+                # Calculate actual ML hours from telemetry timestamps (restart-proof)
+                # Falls back to in-memory counter if DB query fails or returns 0
+                actual_hours = await self.ml_feeder.calculate_actual_ml_hours(self.site_id)
+                persisted_hours = actual_hours if actual_hours > 0 else float(self.ml_feeder.hours_ingested)
+                try:
+                    import psycopg2
+
+                    database_url = os.getenv("DATABASE_URL")
+                    if not database_url:
+                        raise ValueError("DATABASE_URL not set")
+                    conn = psycopg2.connect(database_url)
+                    conn.autocommit = True
+                    cur = conn.cursor()
+                    cur.execute(
+                        """
+                        UPDATE sites SET ml_hours_ingested = %s, updated_at = now()
+                        WHERE code = %s
+                        """,
+                        (persisted_hours, site_code_for_persist),
+                    )
+                    cur.close()
+                    conn.close()
+                    logger.info(f"[ML FEEDER] Persisted ml_hours_ingested={persisted_hours:.1f} (counter={self.ml_feeder.hours_ingested}) for site {self.site_id}")
+                except Exception as e:
+                    logger.warning(f"[ML FEEDER] Could not persist ml_hours_ingested: {e}")
 
                 # 1a. Compute IF anomaly scores and inject into equipment_states.
                 anomaly_scores = self.ml_feeder.score_anomaly()
@@ -201,10 +256,9 @@ class SentinelDataSync:
         """
         import psycopg2
 
-        database_url = os.getenv(
-            "DATABASE_URL",
-            "postgresql://postgres:postgres@127.0.0.1:55322/postgres",
-        )
+        database_url = os.getenv("DATABASE_URL")
+        if not database_url:
+            raise ValueError("DATABASE_URL not set")
 
         def health_to_status(score: float | None) -> str:
             """Map health score to Supabase status constraint."""
@@ -299,10 +353,9 @@ class SentinelDataSync:
         """
         import psycopg2
 
-        database_url = os.getenv(
-            "DATABASE_URL",
-            "postgresql://postgres:postgres@127.0.0.1:55322/postgres",
-        )
+        database_url = os.getenv("DATABASE_URL")
+        if not database_url:
+            raise ValueError("DATABASE_URL not set")
 
         # Unit hints for common BMS point names
         _UNITS: dict[str, str] = {
@@ -375,6 +428,22 @@ class SentinelDataSync:
             )
 
             written = cur.rowcount
+
+            # Enforce 24h retention: delete rows older than 24h for this site
+            site_ids = list({r[5] for r in rows if r[5]})
+            if site_ids:
+                cur.execute(
+                    """
+                    DELETE FROM equipment_sensor_readings
+                    WHERE site_id = ANY(%s)
+                    AND recorded_at < NOW() - INTERVAL '24 hours'
+                    """,
+                    (site_ids,),
+                )
+                purged = cur.rowcount
+                if purged > 0:
+                    logger.debug("[SENTINEL SYNC] Purged %d stale sensor rows (>24h)", purged)
+
             cur.close()
             conn.close()
             return written
@@ -394,10 +463,9 @@ class SentinelDataSync:
         """
         import psycopg2
 
-        database_url = os.getenv(
-            "DATABASE_URL",
-            "postgresql://postgres:postgres@127.0.0.1:55322/postgres",
-        )
+        database_url = os.getenv("DATABASE_URL")
+        if not database_url:
+            raise ValueError("DATABASE_URL not set")
 
         zone_updates = []
         for code, state in equipment_states.items():

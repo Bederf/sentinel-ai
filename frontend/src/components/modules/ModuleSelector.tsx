@@ -10,14 +10,11 @@ import { Card, Text, Badge, Flex, Grid } from '@tremor/react';
 import { useModules } from '../../contexts/ModuleHooks';
 import { MODULE_COLORS } from '../../lib/moduleRegistry';
 import type { ModuleType, ModuleDefinition } from '../../lib/moduleRegistry';
-import { MANDATORY_MODULES } from '../../lib/mandatoryModules';
 import {
   Wind, Zap, Lock, Lightbulb, Sun, Droplets, Flame,
   Brain, Leaf, FileText, Gamepad2, Package, Plug, Link2, Bell
 } from 'lucide-react';
 import { ModuleDependencyWarning } from './ModuleDependencyWarning';
-
-const NON_DEACTIVATABLE_MODULES: ModuleType[] = MANDATORY_MODULES;
 
 interface ModuleSelectorProps {
   onModuleActivated?: (moduleType: ModuleType) => void;
@@ -44,7 +41,8 @@ export function ModuleSelector({ onModuleActivated, onModuleDeactivated }: Modul
   };
 
   async function handleToggle(moduleType: ModuleType, currentlyActive: boolean) {
-    if (currentlyActive && NON_DEACTIVATABLE_MODULES.includes(moduleType)) {
+    const moduleDef = availableModules.find((module) => module.module_type === moduleType);
+    if (currentlyActive && moduleDef?.mandatory) {
       return;
     }
 
@@ -150,7 +148,7 @@ export function ModuleSelector({ onModuleActivated, onModuleDeactivated }: Modul
       <Grid className="grid grid-cols-2 gap-4">
         {availableModules.map(moduleDef => {
           const isActive = isModuleActive(moduleDef.module_type);
-          const isProtectedBasePack = NON_DEACTIVATABLE_MODULES.includes(moduleDef.module_type);
+          const isProtectedBasePack = moduleDef.mandatory;
           const isActivatingThis = activating === moduleDef.module_type;
           const potentialIntegrations = getPotentialIntegrations(moduleDef.module_type);
           const activeInstance = activeModules.find(m => m.module_type === moduleDef.module_type);

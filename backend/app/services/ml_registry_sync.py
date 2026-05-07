@@ -17,10 +17,9 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 _REGISTRY_PATH = Path(__file__).parent.parent.parent / "ml" / "models" / "registry.json"
-_DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql://postgres:postgres@127.0.0.1:55322/postgres",
-)
+_DATABASE_URL = os.getenv("DATABASE_URL")
+if not _DATABASE_URL:
+    raise ValueError("DATABASE_URL environment variable not set")
 
 
 def _parse_model_row(model_id: str, entry: dict[str, Any]) -> dict[str, Any] | None:

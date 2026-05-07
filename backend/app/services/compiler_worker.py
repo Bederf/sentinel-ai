@@ -165,7 +165,9 @@ class CompilerWorker:
         import os
         import psycopg2
 
-        database_url = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@127.0.0.1:55322/postgres")
+        database_url = os.getenv("DATABASE_URL")
+        if not database_url:
+            raise ValueError("DATABASE_URL not set")
         return psycopg2.connect(database_url)
 
     def _fetch_document_and_equipment(self, queue_entry: dict) -> tuple[dict | None, dict | None]:

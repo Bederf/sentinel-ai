@@ -4,7 +4,7 @@
  * Shows tank level cards, summary stats, recent events feed,
  * refill log table, and generator runtime history.
  * Polls every 30 seconds for live data updates.
- * Gated behind fuel_monitoring module activation.
+ * Gated behind fuel module activation.
  */
 
 import { useState, useEffect, useCallback } from 'react';

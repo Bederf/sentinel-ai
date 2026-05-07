@@ -15,7 +15,7 @@ const PHASE_ORDER: OnboardingPhase[] = ["shadow", "advisory", "supervised", "aut
 
 const FEATURE_GATES: Record<string, OnboardingPhase> = {
   recommendations_ui:   "advisory",
-  sentry_notifications: "advisory",
+  sentry_notifications: "shadow",
   approve_reject:       "supervised",
   auto_apply:           "auto",
   concierge_dashboard:  "advisory",
@@ -26,10 +26,12 @@ export function phaseAllows(
   phase: OnboardingPhase | string | undefined,
   feature: keyof typeof FEATURE_GATES
 ): boolean {
-  const p = (phase ?? "shadow") as OnboardingPhase;
-  const required = FEATURE_GATES[feature];
+  const p = phase ?? "shadow";
+  // Normalize shadow_live → shadow (live shadow mode)
+  const normalized = p === "shadow_live" ? "shadow" : p;
+  const required = FEATURE_GATES[feature as keyof typeof FEATURE_GATES];
   if (!required) return false;
-  return PHASE_ORDER.indexOf(p) >= PHASE_ORDER.indexOf(required);
+  return PHASE_ORDER.indexOf(normalized as OnboardingPhase) >= PHASE_ORDER.indexOf(required);
 }
 
 export const PHASE_LABELS: Record<OnboardingPhase, string> = {

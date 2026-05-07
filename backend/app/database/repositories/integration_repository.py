@@ -386,6 +386,25 @@ class IntegrationRepository:
 
     # ==================== Monitoring Aggregations ====================
 
+    def _resolve_site_id(self, site_id: str) -> str:
+        """Resolve site code string to UUID for FK column queries.
+
+        The sites table stores codes (e.g. 'site-002') in sites.code,
+        but FK columns in log_sources and point_asset_mappings store UUIDs.
+        """
+        if not site_id:
+            return site_id
+        # If it looks like a UUID already, skip lookup
+        if len(site_id) == 36 and "-" in site_id:
+            return site_id
+        try:
+            response = self.client.table("sites").select("id").eq("code", site_id).execute()
+            if response.data:
+                return response.data[0]["id"]
+        except Exception:
+            pass
+        return site_id  # Fallback: return as-is and let the query fail gracefully
+
     def get_integration_health(self, site_id: str | None = None) -> dict[str, Any]:
         """
         Get integration health summary.
@@ -399,11 +418,13 @@ class IntegrationRepository:
         - unmatched_points: Count of unmatched point mappings
         - recent_errors_count: Failed sync jobs in last 24 hours
         """
+        resolved_site_id = self._resolve_site_id(site_id) if site_id else None
+
         try:
             # Get log sources
             sources_query = self.client.table("log_sources").select("*")
-            if site_id:
-                sources_query = sources_query.eq("site_id", site_id)
+            if resolved_site_id:
+                sources_query = sources_query.eq("site_id", resolved_site_id)
             sources_response = sources_query.execute()
             sources = sources_response.data or []
         except Exception:
@@ -434,8 +455,8 @@ class IntegrationRepository:
         # Get point mappings count
         try:
             mappings_query = self.client.table("point_asset_mappings").select("id,match_confidence")
-            if site_id:
-                mappings_query = mappings_query.eq("site_id", site_id)
+            if resolved_site_id:
+                mappings_query = mappings_query.eq("site_id", resolved_site_id)
             mappings_response = mappings_query.execute()
             mappings = mappings_response.data or []
         except Exception:
@@ -499,10 +520,12 @@ class IntegrationRepository:
             "trend": "stable",
         }
 
+        resolved_site_id = self._resolve_site_id(site_id)
+
         try:
             # Get point mappings for match coverage
             mappings_response = (
-                self.client.table("point_asset_mappings").select("id,match_confidence").eq("site_id", site_id).execute()
+                self.client.table("point_asset_mappings").select("id,match_confidence").eq("site_id", resolved_site_id).execute()
             )
             mappings = mappings_response.data or []
         except Exception:
@@ -514,7 +537,7 @@ class IntegrationRepository:
 
         # Get data freshness from log sources
         try:
-            sources_response = self.client.table("log_sources").select("last_sync_at").eq("site_id", site_id).execute()
+            sources_response = self.client.table("log_sources").select("last_sync_at").eq("site_id", resolved_site_id).execute()
             sources = sources_response.data or []
         except Exception:
             sources = []
@@ -546,7 +569,7 @@ class IntegrationRepository:
             cutoff = (datetime.utcnow() - timedelta(days=7)).isoformat()
 
             # Get source IDs for this building
-            source_ids_response = self.client.table("log_sources").select("id").eq("site_id", site_id).execute()
+            source_ids_response = self.client.table("log_sources").select("id").eq("site_id", resolved_site_id).execute()
             source_ids = [s["id"] for s in (source_ids_response.data or [])]
 
             if source_ids:

@@ -57,6 +57,9 @@ class AuditLogEntry:
     safety_validation: dict[str, Any] | None = None  # Safety validation details
     error_message: str | None = None  # Error details if failed/blocked
 
+    # Severity of safety validation outcome (for filtering CRITICAL vs WARNING)
+    escalation_level: str | None = None  # "critical", "warning", "none" — from EscalationLevel
+
     # Context and metadata
     correlation_id: str | None = None  # For grouping related actions
     metadata: dict[str, Any] = field(default_factory=dict)  # Additional context
@@ -75,6 +78,7 @@ class AuditLogEntry:
             "result": self.result.value,
             "safety_validation": self.safety_validation,
             "error_message": self.error_message,
+            "escalation_level": self.escalation_level,
             "correlation_id": self.correlation_id,
             "metadata": self.metadata,
         }
@@ -99,6 +103,7 @@ class AuditLogEntry:
             new_value=data.get("new_value"),
             safety_validation=data.get("safety_validation"),
             error_message=data.get("error_message"),
+            escalation_level=data.get("escalation_level"),
             correlation_id=data.get("correlation_id"),
             metadata=data.get("metadata", {}),
         )

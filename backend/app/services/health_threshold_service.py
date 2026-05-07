@@ -11,6 +11,8 @@ Phase: Health Score Threshold Consistency Fix
 import logging
 from datetime import datetime, timedelta
 
+from typing import Any
+
 from app.database.supabase_client import get_supabase_client
 
 logger = logging.getLogger(__name__)
@@ -26,7 +28,7 @@ class HealthThresholdService:
     """Centralized service for health score thresholds."""
 
     def __init__(self):
-        self._cache: dict[str, any] | None = None
+        self._cache: dict[str, Any] | None = None
         self._cache_expiry: datetime | None = None
 
     def get_thresholds(self, force_refresh: bool = False) -> dict[str, int]:

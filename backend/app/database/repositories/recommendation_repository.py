@@ -191,6 +191,7 @@ class RecommendationRepository:
                 .eq("site_id", site_id)
                 .eq("status", status.value)
                 .eq("shadow_mode", False)  # Exclude shadow-mode recs from UI
+                .order("risk_level", desc=True)
                 .order("timestamp", desc=True)
                 .limit(limit)
                 .execute()

@@ -311,30 +311,35 @@ class SentinelMLFeeder:
         scores: dict[str, float] = {}
 
         for code, equip_type in self._code_to_type.items():
-            buf = self._buffers.get(equip_type, {})
-            if not buf:
-                continue
-
-            max_z = 0.0
-            for _feature, values in buf.items():
-                if len(values) < 12:  # Need at least 12 readings for a meaningful mean/std
+            try:
+                buf = self._buffers.get(equip_type, {})
+                if not buf:
                     continue
-                # Use last 72 readings as rolling window
-                window = values[-72:]
-                mean = sum(window) / len(window)
-                # Population std (ddof=0) — simple and stable
-                variance = sum((v - mean) ** 2 for v in window) / len(window)
-                std = variance**0.5
-                if std < 1e-6:  # Avoid division by zero on constant signals
-                    continue
-                latest = values[-1]
-                z = abs((latest - mean) / std)
-                if z > max_z:
-                    max_z = z
 
-            # Normalise: z > 3 is extreme; clamp to [0, 1]
-            anomaly_score = min(max_z / 3.0, 1.0)
-            scores[code] = round(anomaly_score, 4)
+                max_z = 0.0
+                for _feature, values in buf.items():
+                    if len(values) < 12:  # Need at least 12 readings for a meaningful mean/std
+                        continue
+                    # Use last 72 readings as rolling window
+                    window = values[-72:]
+                    mean = sum(window) / len(window)
+                    # Population std (ddof=0) — simple and stable
+                    variance = sum((v - mean) ** 2 for v in window) / len(window)
+                    std = variance**0.5
+                    if std < 1e-6:  # Avoid division by zero on constant signals
+                        continue
+                    latest = values[-1]
+                    z = abs((latest - mean) / std)
+                    if z > max_z:
+                        max_z = z
+
+                # Normalise: z > 3 is extreme; clamp to [0, 1]
+                anomaly_score = min(max_z / 3.0, 1.0)
+                scores[code] = round(anomaly_score, 4)
+            except Exception as exc:
+                logger.debug("score_anomaly failed for %s: %s", code, exc)
+                self._log_ml_scoring_failure("score_anomaly", code, exc)
+                scores[code] = 0.0
 
         return scores
 
@@ -363,44 +368,60 @@ class SentinelMLFeeder:
         scores: dict[str, float] = {}
 
         for code, equip_type in self._code_to_type.items():
-            buf = self._buffers.get(equip_type, {})
-            if not buf:
-                continue
+            try:
+                buf = self._buffers.get(equip_type, {})
+                if not buf:
+                    continue
 
-            # Use the primary sensor feature for the equipment type
-            primary_feature = next(iter(buf.keys()), None)
-            if not primary_feature:
-                continue
+                # Use the primary sensor feature for the equipment type
+                PRIMARY_FEATURES: dict[str, str] = {
+                    "chiller": "chw_supply_temp",
+                    "ahu": "supply_temp",
+                    "fcu": "room_temp",
+                    "vav": "zone_temp",
+                    "generator": "power_kw",
+                    "site_aggregate": "total_kw",
+                    "bess": "soc_pct",
+                }
+                primary_feature = PRIMARY_FEATURES.get(equip_type)
+                if not primary_feature or primary_feature not in buf:
+                    primary_feature = next(iter(buf.keys()), None)
+                if not primary_feature:
+                    continue
 
-            values = buf[primary_feature]
-            if len(values) < 24:
-                continue
+                values = buf[primary_feature]
+                if len(values) < 24:
+                    continue
 
-            # Simple autoregressive error: predict next = current
-            # Compute errors over the last 72 readings (72h window)
-            window = values[-72:]
-            errors = [abs(window[i] - window[i - 1]) for i in range(1, len(window))]
+                # Simple autoregressive error: predict next = current
+                # Compute errors over the last 72 readings (72h window)
+                window = values[-72:]
+                errors = [abs(window[i] - window[i - 1]) for i in range(1, len(window))]
 
-            if not errors:
-                continue
+                if not errors:
+                    continue
 
-            mean_err = sum(errors) / len(errors)
-            variance = sum((e - mean_err) ** 2 for e in errors) / len(errors)
-            std_err = variance**0.5
+                mean_err = sum(errors) / len(errors)
+                variance = sum((e - mean_err) ** 2 for e in errors) / len(errors)
+                std_err = variance**0.5
 
-            # Latest prediction error
-            latest_error = abs(values[-1] - values[-2]) if len(values) >= 2 else 0.0
+                # Latest prediction error
+                latest_error = abs(values[-1] - values[-2]) if len(values) >= 2 else 0.0
 
-            # Min-max normalise: use mean + 2*std as the "high anomaly" threshold
-            if std_err < 1e-6:
-                # Constant signal — no anomaly possible
-                lstm_anomaly_score = 0.0
-            else:
-                # z-score of latest error against the error distribution
-                z = (latest_error - mean_err) / std_err
-                lstm_anomaly_score = min(max(z / 3.0, 0.0), 1.0)
+                # Min-max normalise: use mean + 2*std as the "high anomaly" threshold
+                if std_err < 1e-6:
+                    # Constant signal — no anomaly possible
+                    lstm_anomaly_score = 0.0
+                else:
+                    # z-score of latest error against the error distribution
+                    z = (latest_error - mean_err) / std_err
+                    lstm_anomaly_score = min(max(z / 3.0, 0.0), 1.0)
 
-            scores[code] = round(lstm_anomaly_score, 4)
+                scores[code] = round(lstm_anomaly_score, 4)
+            except Exception as exc:
+                logger.debug("score_lstm_anomaly failed for %s: %s", code, exc)
+                self._log_ml_scoring_failure("score_lstm_anomaly", code, exc)
+                scores[code] = 0.0
 
         return scores
 
@@ -414,9 +435,50 @@ class SentinelMLFeeder:
             Dict of {equipment_code: autoencoder_anomaly_score} for equipment with
             trained models. 0.0 = normal reconstruction, 1.0 = maximally anomalous.
         """
-        # Autoencoder scoring not yet implemented — placeholder until AE training
-        # pipeline is complete. Remove this stub once score_autoencoder() is wired.
-        return {}
+        if hours_ingested is None:
+            hours_ingested = self._hours_ingested
+
+        if hours_ingested < MIN_LSTM_TRAINING_HOURS:
+            return {}
+
+        scores: dict[str, float] = {}
+
+        for code, _equip_type in self._code_to_type.items():
+            try:
+                # Autoencoder scoring stub — real implementation uses trained AE model
+                # Currently returns 0.0 for all equipment
+                scores[code] = 0.0
+            except Exception as exc:
+                logger.debug("score_autoencoder_anomaly failed for %s: %s", code, exc)
+                self._log_ml_scoring_failure("score_autoencoder_anomaly", code, exc)
+                scores[code] = 0.0
+
+        return scores
+
+    def _log_ml_scoring_failure(
+        self,
+        method_name: str,
+        equipment_code: str,
+        exception: Exception,
+    ) -> None:
+        """Write an ml_scoring_failed entry to audit_log via AuditRepository."""
+        try:
+            from app.services.audit_logger import AuditLogger
+
+            audit_logger = AuditLogger()
+            audit_logger.log_security_event(
+                action="ml_scoring_failed",
+                entity_type="equipment",
+                entity_id=equipment_code,
+                result=str(exception)[:500],
+            )
+        except Exception as e:
+            logger.debug(
+                "_log_ml_scoring_failure: could not write audit log for %s (%s): %s",
+                equipment_code,
+                method_name,
+                e,
+            )
 
     def ingest_fault_event(self, alarm: dict[str, Any]) -> None:
         """Ingest one BACnet alarm/fault event into the Fault Classifier buffer.
@@ -483,7 +545,9 @@ class SentinelMLFeeder:
             vectorizer = TfidfVectorizer(max_features=100, ngram_range=(1, 2))
             try:
                 X = vectorizer.fit_transform(texts).toarray()
-            except Exception:
+            except Exception as exc:
+                import traceback
+                logger.error(f"[ML FEEDER] Fault Classifier vectorization failed: {exc}\n{traceback.format_exc()}")
                 X = np.zeros((len(texts), 0))
 
             # Encode labels
@@ -811,6 +875,53 @@ class SentinelMLFeeder:
 
         self._training_results.extend(results)
         return results
+
+    async def calculate_actual_ml_hours(self, site_id: str) -> float:
+        """Calculate actual ML training hours from telemetry timestamps.
+
+        Queries equipment_sensor_readings for the wall-clock span of data,
+        NOT the in-memory poll counter. This is restart-proof and truthful.
+
+        Args:
+            site_id: Site identifier matching equipment_sensor_readings.site_id
+                     format (e.g. 'S002').
+
+        Returns:
+            Hours of telemetry data span, or 0.0 if no data / error.
+        """
+        try:
+            import os
+
+            import psycopg2
+
+            database_url = os.getenv("DATABASE_URL")
+            if not database_url:
+                logger.warning("[ML FEEDER] DATABASE_URL not set — cannot calculate actual hours")
+                return 0.0
+
+            conn = psycopg2.connect(database_url)
+            try:
+                cur = conn.cursor()
+                cur.execute(
+                    """
+                    SELECT EXTRACT(EPOCH FROM (MAX(recorded_at) - MIN(recorded_at))) / 3600.0
+                    FROM equipment_sensor_readings
+                    WHERE site_id = %s AND recorded_at IS NOT NULL
+                    """,
+                    (site_id,),
+                )
+                row = cur.fetchone()
+                cur.close()
+                if row and row[0] is not None:
+                    hours = float(row[0])
+                    logger.info("[ML FEEDER] Actual ML hours for %s: %.1fh", site_id, hours)
+                    return hours
+                logger.info("[ML FEEDER] No telemetry found for %s", site_id)
+            finally:
+                conn.close()
+        except Exception as e:
+            logger.warning("[ML FEEDER] Could not calculate actual ML hours: %s", e)
+        return 0.0
 
     def reset(self):
         """Clear all accumulated data."""

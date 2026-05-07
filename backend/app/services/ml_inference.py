@@ -431,7 +431,9 @@ class AnomalyDetectionService:
         if not cols:
             return None
 
-        database_url = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@127.0.0.1:55322/postgres")
+        database_url = os.getenv("DATABASE_URL")
+        if not database_url:
+            raise ValueError("DATABASE_URL not set")
         since = datetime.utcnow() - timedelta(hours=hours)
 
         try:
@@ -492,7 +494,9 @@ class AnomalyDetectionService:
 
         import psycopg2
 
-        database_url = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@127.0.0.1:55322/postgres")
+        database_url = os.getenv("DATABASE_URL")
+        if not database_url:
+            raise ValueError("DATABASE_URL not set")
 
         # Equipment types with trained autoencoders
         supported_types = {"chiller", "ahu", "generator", "fcu"}

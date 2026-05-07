@@ -937,9 +937,11 @@ async def _create_complaint_wo(
     priority: str,
     category_override: str | None = None,
 ) -> str | None:
-    """Create a work order from a client complaint session."""
+    """Create a work order from a client complaint session and notify technician."""
     try:
         from app.database.repositories.work_order_repository import WorkOrderRepository
+        from app.database.supabase_client import get_supabase_client
+        from app.services.sentry_integration.work_order_notifier import WorkOrderNotifier
 
         wo_repo = WorkOrderRepository()
         category = category_override or session.answers.get("category", "general")
@@ -958,7 +960,6 @@ async def _create_complaint_wo(
         )
 
         wo_data = {
-            "site_id": "site-002",
             "title": title,
             "description": description,
             "priority": "urgent" if priority == "critical" else priority,
@@ -967,8 +968,66 @@ async def _create_complaint_wo(
         }
 
         created = await wo_repo.create_work_order(wo_data)
-        if created:
-            return created.get("code")
+        if not created:
+            return None
+
+        wo_code = created.get("code")
+        wo_uuid = created.get("id")
+
+        # Look up technician by category / specialty for site-002
+        tech = None
+        try:
+            sb = get_supabase_client()
+            if sb:
+                site_result = sb.table("sites").select("id").eq("code", "site-002").execute()
+                if site_result.data:
+                    site_id = site_result.data[0]["id"]
+                    tech_result = (
+                        sb.table("site_technicians")
+                        .select("specialty, technicians(id, name, email, phone, telegram_id)")
+                        .eq("site_id", site_id)
+                        .eq("specialty", category)
+                        .eq("is_primary", True)
+                        .execute()
+                    )
+                    if tech_result.data:
+                        tech = tech_result.data[0].get("technicians", {})
+
+                    # Fallback to general specialty
+                    if not tech and category != "general":
+                        tech_result = (
+                            sb.table("site_technicians")
+                            .select("specialty, technicians(id, name, email, phone, telegram_id)")
+                            .eq("site_id", site_id)
+                            .eq("specialty", "general")
+                            .eq("is_primary", True)
+                            .execute()
+                        )
+                        if tech_result.data:
+                            tech = tech_result.data[0].get("technicians", {})
+        except Exception as e:
+            logger.warning("Complaint WO technician lookup failed: %s", e)
+
+        # Notify technician
+        if tech and tech.get("telegram_id"):
+            try:
+                notifier = WorkOrderNotifier()
+                await notifier.notify_technician({
+                    "code": wo_code,
+                    "work_order_id": str(wo_uuid) if wo_uuid else wo_code,
+                    "equipment_id": f"site-002",
+                    "equipment_name": title,
+                    "site_id": "site-002",
+                    "technician_id": tech.get("telegram_id"),
+                    "technician_name": tech.get("name", "Technician"),
+                    "service_type": "callout",
+                    "criticality": priority.upper(),
+                    "problem_description": description,
+                })
+            except Exception as e:
+                logger.warning("Complaint WO notification failed: %s", e)
+
+        return wo_code
     except Exception as e:
         logger.error("Failed to create complaint WO: %s", e, exc_info=True)
 

@@ -58,6 +58,7 @@ _PUBLIC_PREFIXES = (
     "/api/mcp/sse",  # MCP SSE transport for Claude Desktop (authenticated at MCP layer)
     "/api/mcp/openai",  # MCP OpenAI endpoints for ChatGPT/M365 Copilot (authenticated at MCP layer)
     "/api/lifecycle/",  # Lifecycle simulation status endpoints (frontend health checks)
+    "/api/simbiot/",  # SIMBIOT onboarding wizard — public during site setup
     "/api/recommendations/",  # Recommendations endpoints (can be public for UI)
     "/api/municipal-billing/tariffs",  # Tariff schedules — read-only, scoped to site municipality
     "/api/webhooks/google/calendar",  # Google Calendar Pub/Sub push notifications (public — validated by channel ID)

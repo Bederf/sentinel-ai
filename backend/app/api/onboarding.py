@@ -30,7 +30,7 @@ async def _get_major_mechanical_equipment(site_id: str) -> list[dict[str, Any]]:
     """
     try:
         repo = EquipmentRepository()
-        equipment_list = await repo.list_equipment(site_id=site_id)
+        equipment_list = repo.get_by_site_code(site_code=site_id)
 
         major_types = {"chiller", "ahu", "fcu", "pump", "generator", "bess", "cooling_tower", "ct", "crac"}
         major_equipment = [

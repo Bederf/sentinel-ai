@@ -26,6 +26,9 @@ from app.services.popia_consent_guard import evaluate_ingress_processing_consent
 
 logger = logging.getLogger(__name__)
 
+# Placeholder equipment for call-log entries that don't reference real equipment.
+_CALL_LOG_PLACEHOLDER_EQUIPMENT_ID = "00000000-0000-0000-0000-000000000001"
+
 
 class WorkOrderNotifier:
     """Service for notifying technicians about work orders via Sentry."""
@@ -427,14 +430,52 @@ class WorkOrderNotifier:
             Dict with success status and service_record_code
         """
         try:
+            # For call-log entries, site_id and equipment_id may be TEXT codes (e.g., "site-002", "ZONE-207")
+            # that don't map to UUID FKs. Attempt to resolve them; if resolution fails, set to None
+            # so the service record can still be created (these fields may be nullable).
+            site_id_val = work_order_data.get("site_id")
+            if site_id_val:
+                try:
+                    uuid.UUID(str(site_id_val))
+                except ValueError:
+                    # Try to resolve via sites table
+                    try:
+                        from app.database.repositories.site_repository import SiteRepository
+                        site_repo = SiteRepository()
+                        site = site_repo.get_by_id(site_id_val)
+                        if site:
+                            site_id_val = site.get("id")
+                        else:
+                            site_id_val = None
+                    except Exception:
+                        site_id_val = None
+
+            equipment_id_val = work_order_data.get("equipment_id")
+            if equipment_id_val:
+                try:
+                    uuid.UUID(str(equipment_id_val))
+                except ValueError:
+                    # Try to resolve via equipment table
+                    try:
+                        from app.database.repositories.equipment_repository import get_equipment_repository
+                        eq_repo = get_equipment_repository()
+                        # equipment.code is text like "S002-LIGHTING-L2-001" or "ZONE-207"
+                        eqs = await eq_repo.get_equipment_by_code(equipment_id_val)
+                        if eqs:
+                            equipment_id_val = eqs.get("id")
+                        else:
+                            equipment_id_val = None
+                    except Exception:
+                        equipment_id_val = None
+
             # Create service record first
-            service_record = await self.create_service_record(work_order_data)
+            service_record = await self.create_service_record(work_order_data, site_id_val, equipment_id_val)
 
             if not service_record:
                 return {"success": False, "error": "Failed to create service record"}
 
-            logger.warning(
-                f"[WO-NOTIFY] Service record {service_record['code']} created for {work_order_data['equipment_name']}"
+            logger.info(
+                f"Service record {service_record['code']} created for {work_order_data['equipment_name']}"
             )
 
             # Ensure technician email is available (look up if not passed)
@@ -452,7 +493,6 @@ class WorkOrderNotifier:
                     )
                     if matched and matched.get("email"):
                         work_order_data["technician_email"] = matched["email"]
-                        logger.warning(f"[WO-NOTIFY] Resolved email for {tech_name}: {matched['email']}")
                 except Exception as e:
                     logger.warning(f"Could not look up technician email: {e}")
 
@@ -623,7 +663,7 @@ class WorkOrderNotifier:
                     "--channel",
                     "telegram",
                     "--account",
-                    "default",
+                    "technician",
                     "--target",
                     technician_id,
                     "--message",
@@ -763,11 +803,18 @@ class WorkOrderNotifier:
         result = await self.notify_technician_with_code(work_order_data)
         return result.get("success", False)
 
-    async def create_service_record(self, work_order_data: dict[str, Any]) -> dict[str, Any] | None:
+    async def create_service_record(
+        self,
+        work_order_data: dict[str, Any],
+        site_id_val: str | None = None,
+        equipment_id_val: str | None = None,
+    ) -> dict[str, Any] | None:
         """Create a service record from work order data.
 
         Args:
             work_order_data: Work order information including diagnostic_context
+            site_id_val: Pre-resolved site UUID (optional — skips resolution if None)
+            equipment_id_val: Pre-resolved equipment UUID (optional — falls back to work_order_id if None)
 
         Returns:
             Created service record, or None if failed
@@ -791,11 +838,16 @@ class WorkOrderNotifier:
         # Extract diagnostic context from work order (passed from alert)
         diagnostic_context = work_order_data.get("diagnostic_context")
 
+        # Use pre-resolved UUIDs where available; equipment_id falls back to placeholder
+        # (service_records.equipment_id is NOT NULL and must reference real equipment)
+        resolved_equipment_id = equipment_id_val or _CALL_LOG_PLACEHOLDER_EQUIPMENT_ID
+        resolved_site_id = site_id_val or work_order_data.get("site_id")
+
         record_data = {
             "code": code,
             "work_order_id": work_order_data["work_order_id"],
-            "equipment_id": work_order_data["equipment_id"],
-            "site_id": work_order_data["site_id"],
+            "equipment_id": resolved_equipment_id,
+            "site_id": resolved_site_id,
             "service_type": work_order_data["service_type"],
             "technician_id": work_order_data["technician_id"],
             "technician_name": work_order_data["technician_name"],

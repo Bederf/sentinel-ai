@@ -17,6 +17,9 @@ from apscheduler.triggers.interval import IntervalTrigger
 
 from app.services.ai_optimizer import get_ai_optimizer
 from app.services.audit_logger import AuditLogger
+from app.services.phase_promotion_evaluator import get_phase_promotion_evaluator
+
+EXPIRY_HOURS = 168  # 7 days — gives Evans a full week to review before expiry
 
 logger = logging.getLogger(__name__)
 
@@ -1160,12 +1163,150 @@ class BackgroundSchedulerService:
     # Recommendation Lifecycle — expiry + deduplication
     # -----------------------------------------------------------------
 
+    def add_recommendation_processing_job(self, interval_seconds: int = 300):
+        """Add a job to process pending recommendations through the tier router.
+
+        Runs every 5 minutes. Fetches PENDING recommendations for each registered
+        site, routes them through the recommendation graph to fill outcome={}
+        placeholder records in parasite_decisions, and handles Tier 2 approval
+        requests / Tier 3 auto-execution.
+
+        This is the production pipeline that closes the recommendation loop —
+        without it, recommendations expire after 48h before any outcome is written.
+
+        Args:
+            interval_seconds: How often to run (default 5 min)
+        """
+        from apscheduler.triggers.interval import IntervalTrigger
+
+        if self.scheduler.get_job("recommendation_processing"):
+            self.scheduler.remove_job("recommendation_processing")
+
+        first_run = datetime.now() + timedelta(seconds=90)  # 90s warmup
+
+        self.scheduler.add_job(
+            func=self._run_recommendation_processing,
+            trigger=IntervalTrigger(seconds=interval_seconds),
+            id="recommendation_processing",
+            name="Recommendation Lifecycle Processing (5min)",
+            replace_existing=True,
+            next_run_time=first_run,
+            max_instances=1,
+            coalesce=True,
+        )
+        logger.info(
+            "Added recommendation processing job: every %ds (first run at %s)",
+            interval_seconds,
+            first_run.strftime("%H:%M:%S"),
+        )
+
+    def _run_recommendation_processing(self):
+        """Process pending recommendations through the recommendation graph."""
+        try:
+            import asyncio
+
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                processed = loop.run_until_complete(self._run_recommendation_processing_async())
+                if processed:
+                    logger.info("[REC-PROC] Processed %d recommendation batches", processed)
+            finally:
+                loop.close()
+        except Exception as e:
+            logger.error("Recommendation processing job failed: %s", e)
+
+    async def _run_recommendation_processing_async(self) -> int:
+        """Async version — process all registered sites."""
+        from langchain_core.messages import HumanMessage
+
+        from app.agents import get_recommendation_graph
+        from app.core.site_resolver import get_registered_site_ids
+
+        site_ids = get_registered_site_ids()
+        if not site_ids:
+            logger.debug("No registered sites for recommendation processing")
+            return 0
+
+        agent = get_recommendation_graph()
+        processed = 0
+
+        for site_id in site_ids:
+            try:
+                thread_id = f"rec_scheduler_{site_id}"
+                config = {"configurable": {"thread_id": thread_id}}
+
+                result = await agent.ainvoke(
+                    {
+                        "messages": [HumanMessage(content="process")],
+                        "site_id": site_id,
+                        "channel": "system",
+                        "trigger": "scheduled",
+                    },
+                    config=config,
+                )
+                if result and result.get("processing_complete"):
+                    processed += 1
+                    logger.info(f"[REC-PROC] Completed processing for {site_id}")
+                else:
+                    logger.debug(f"[REC-PROC] No recommendations to process for {site_id}")
+            except Exception as e:
+                logger.warning(f"[REC-PROC] Failed to process {site_id}: {e}")
+
+        return processed
+
+    def add_milestone_timer_job(self, interval_seconds: int = 300):
+        """Add job to check recommendation SLA milestone deadlines every 5 minutes.
+
+        Args:
+            interval_seconds: How often to check (default 300s = 5 min).
+        """
+        from apscheduler.triggers.interval import IntervalTrigger
+
+        if self.scheduler.get_job("check_recommendation_milestone_timers"):
+            self.scheduler.remove_job("check_recommendation_milestone_timers")
+
+        self.scheduler.add_job(
+            func=self._check_milestone_deadlines,
+            trigger=IntervalTrigger(seconds=interval_seconds),
+            id="check_recommendation_milestone_timers",
+            name="Check Recommendation Milestone SLA Timers (5 min)",
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+        )
+        logger.info("Added milestone timer job (every %ds)", interval_seconds)
+
+    def _check_milestone_deadlines(self):
+        """Background job: check SLA breaches and escalate."""
+        try:
+            from app.services.recommendation_milestone_service import (
+                get_recommendation_milestone_service,
+            )
+
+            svc = get_recommendation_milestone_service()
+            breaches = svc.check_breaches()
+            for breach in breaches:
+                rec = breach["recommendation"]
+                logger.debug(
+                    "SLA breach: rec=%s milestone=%s elapsed=%.0f%%",
+                    rec.id[:8],
+                    breach["milestone"],
+                    breach["elapsed_pct"] * 100,
+                )
+                # Fire escalation (Sentry → Telegram)
+                import asyncio
+
+                asyncio.get_event_loop().run_until_complete(svc.escalate_breach(rec.id, breach))
+        except Exception as e:
+            logger.error("Milestone deadline check failed: %s", e)
+
     def add_recommendation_expiry_job(self, interval_seconds: int = 21600):
         """Add a job to expire stale recommendations and dedup duplicate noise.
 
         Runs every 6 hours by default. For each (site_id, action_type):
           - Keeps the 10 most recent pending recommendations
-          - Expires any remaining pending recommendations older than 48 hours
+          - Expires any remaining pending recommendations older than 7 days
 
         Args:
             interval_seconds: How often to run (default 6h). Run daily via cron
@@ -1188,7 +1329,7 @@ class BackgroundSchedulerService:
             coalesce=True,
         )
         logger.info(
-            "Added recommendation expiry job: dedup top-10 + expire >48h pending (every %ds)",
+            "Added recommendation expiry job: dedup top-10 + expire >7d pending (every %ds)",
             interval_seconds,
         )
 
@@ -1233,7 +1374,7 @@ class BackgroundSchedulerService:
             logger.debug("Could not fetch site IDs for recommendation expiry")
             return 0, 0
 
-        cutoff_48h = datetime.now(UTC) - timedelta(hours=48)
+        cutoff = datetime.now(UTC) - timedelta(hours=EXPIRY_HOURS)
 
         for site_id in site_ids:
             try:
@@ -1263,7 +1404,7 @@ class BackgroundSchedulerService:
                     # Keep top 10 most recent regardless of age
                     for r in typed_records[10:]:
                         ts = datetime.fromisoformat(r["timestamp"].replace("Z", "+00:00"))
-                        if ts < cutoff_48h:
+                        if ts < cutoff:
                             ids_to_expire.add(r["id"])
 
                 if ids_to_expire:
@@ -1634,6 +1775,50 @@ class BackgroundSchedulerService:
                     )
 
                     module_registry.add_recommendation(site_code, ai_rec)
+                    self._notify_recommendation_alert(site_code, ai_rec)
+
+                    # Persist to recommendations table for Cockpit UI
+                    try:
+                        from app.models.recommendation import ActionRiskLevel, RecommendationStatus
+
+                        _priority_map = {
+                            RecommendationPriority.LOW: ActionRiskLevel.LOW,
+                            RecommendationPriority.MEDIUM: ActionRiskLevel.MEDIUM,
+                            RecommendationPriority.HIGH: ActionRiskLevel.HIGH,
+                            RecommendationPriority.CRITICAL: ActionRiskLevel.CRITICAL,
+                        }
+                        _conf_str = (
+                            "high" if ai_rec.confidence >= 0.85 else "medium" if ai_rec.confidence >= 0.6 else "low"
+                        )
+                        _eq_id = ai_rec.telemetry_context.get("equipment_id", "") if ai_rec.telemetry_context else ""
+                        _action_type = (
+                            "optimization"
+                            if ai_rec.recommendation_type and ai_rec.recommendation_type.name == "OPTIMIZATION"
+                            else "maintenance"
+                        )
+
+                        client.table("recommendations").insert(
+                            {
+                                "id": str(uuid.uuid4()),
+                                "site_id": site_code,
+                                "timestamp": datetime.utcnow().isoformat(),
+                                "action_type": _action_type,
+                                "risk_level": _priority_map.get(ai_rec.priority, ActionRiskLevel.MEDIUM).value,
+                                "target_equipment": _eq_id,
+                                "action": ai_rec.suggested_action or {},
+                                "reason": (ai_rec.title + ": " + ai_rec.description)[:500],
+                                "expected_impact": {},
+                                "confidence": _conf_str,
+                                "confidence_score": ai_rec.confidence or 0.0,
+                                "profile": "health_monitor",
+                                "multi_objective_score": 0.0,
+                                "status": RecommendationStatus.PENDING.value,
+                                "requires_approval": True,
+                                "shadow_mode": False,
+                            }
+                        ).execute()
+                    except Exception as e:
+                        logger.warning("Failed to persist recommendation to DB: %s", e)
 
                     generated += 1
 
@@ -1646,9 +1831,9 @@ class BackgroundSchedulerService:
             logger.error(f"Failed to run recommendation generation: {e}")
 
     def _notify_recommendation_alert(self, site_code: str, ai_rec) -> None:
-        """Send Telegram alert for critical severity recommendations (fire-and-forget via thread pool)."""
+        """Send Telegram alert for critical/high severity recommendations (fire-and-forget via thread pool)."""
         priority = ai_rec.priority.name.lower() if hasattr(ai_rec.priority, "name") else "low"
-        if priority != "critical":
+        if priority not in ("critical", "high"):
             return
 
         equipment_id = (
@@ -1660,13 +1845,15 @@ class BackgroundSchedulerService:
             ai_rec.suggested_action.get("type", "pending_approval") if ai_rec.suggested_action else "pending_approval"
         )
 
+        level_icon = "\xf0\x9f\x94\xb4" if priority == "critical" else "\xf0\x9f\x9f\xa1"
         message = (
-            f"\xf0\x9f\x94\x8b *SENTINEL Advisory — {site_code.upper()}\n"
+            f"{level_icon} *SENTINEL Advisory — {site_code.upper()}*\n"
             f"Equipment: `{equipment_id}`\n"
+            f"Priority: {priority.upper()}\n"
             f"Finding: {title}\n"
             f"Confidence: {confidence:.0%}\n"
-            f"Action required: {enforcement}\n"
-            f"-> Review in Cockpit approval queue"
+            f"Action: {enforcement}\n"
+            f"→ Review in Cockpit approval queue"
         )
 
         # Fire-and-forget: dispatch to a background thread so it never blocks the scheduler cycle.
@@ -1687,7 +1874,7 @@ class BackgroundSchedulerService:
                             settings, "sentry_fm_chat_id", None
                         )
                         if chat_id:
-                            await sender.send_text(str(chat_id), message, parse_mode="HTML")
+                            await sender.send_text(str(chat_id), message, parse_mode="Markdown")
 
                     asyncio.run(_send_async())
                 except Exception as e:
@@ -1716,6 +1903,28 @@ class BackgroundSchedulerService:
             misfire_grace_time=3600,
         )
         logger.info("recommendation_digest job registered — 07:45 SAST Mon-Fri")
+
+    def add_daily_health_sweep_job(self):
+        """Run a full equipment health sweep every weekday at 08:00 SAST.
+
+        Generates recommendations for all equipment with health_score < 90 or
+        elevated anomaly scores, bypassing the normal occupancy schedule gate.
+        This ensures issues are caught even outside business hours.
+        """
+        from apscheduler.triggers.cron import CronTrigger
+
+        if self.scheduler.get_job("daily_health_sweep"):
+            self.scheduler.remove_job("daily_health_sweep")
+
+        self.scheduler.add_job(
+            func=_run_daily_health_sweep_sync,
+            trigger=CronTrigger(hour=6, minute=0, day_of_week="mon-fri"),
+            id="daily_health_sweep",
+            name="Daily Health Sweep (08:00 SAST Mon-Fri)",
+            replace_existing=True,
+            misfire_grace_time=3600,
+        )
+        logger.info("daily_health_sweep job registered — 06:00 UTC (08:00 SAST) Mon-Fri")
 
     def add_demand_aware_coordination_job(self, interval_seconds: int = 300):
         """
@@ -2771,6 +2980,54 @@ class BackgroundSchedulerService:
             replace_existing=True,
         )
         logger.info(f"Added site mode policy dry-run job for {site_id} with {interval_seconds}s interval")
+
+    def add_phase_promotion_job(self, interval_hours: int = 1):
+        """Add periodic Trust Ladder phase promotion evaluation.
+
+        Evaluates all sites for promotion eligibility and auto-promotes
+        via the PATCH /api/sites/{site_id}/phase endpoint when gates pass.
+        """
+        job_id = "phase_promotion_evaluator"
+        if self.scheduler.get_job(job_id):
+            self.scheduler.remove_job(job_id)
+            logger.info("Removed existing phase promotion evaluator job")
+
+        self.scheduler.add_job(
+            func=self._run_phase_promotion,
+            trigger=IntervalTrigger(hours=interval_hours),
+            id=job_id,
+            name="Phase Promotion Evaluator",
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+        )
+        logger.info(f"Added phase promotion evaluator job (every {interval_hours}h, coalesce=True)")
+
+    def _run_phase_promotion(self):
+        """Sync wrapper: run phase promotion evaluation on main event loop."""
+        try:
+            evaluator = get_phase_promotion_evaluator()
+
+            if self._main_loop and self._main_loop.is_running():
+                future = asyncio.run_coroutine_threadsafe(
+                    evaluator.evaluate_all_sites(),
+                    self._main_loop,
+                )
+                results = future.result(timeout=120)
+            else:
+                results = asyncio.run(evaluator.evaluate_all_sites())
+
+            promoted = [r for r in results if r.promoted]
+            if promoted:
+                logger.info(
+                    "Phase promotion: %d site(s) promoted (%s)",
+                    len(promoted),
+                    ", ".join(f"{r.from_phase}→{r.to_phase}" for r in promoted),
+                )
+            else:
+                logger.debug("Phase promotion evaluation complete: no sites promoted")
+        except Exception as e:
+            logger.error("Phase promotion evaluation failed: %s", e, exc_info=True)
 
     def _run_site_mode_policy_dry_run(self, site_id: str):
         """Sync wrapper: evaluate site mode policy on main loop and log result."""
@@ -4127,38 +4384,24 @@ class BackgroundSchedulerService:
         )
 
     def _run_shadow_mode_polling(self):
-        """Poll bridge and feed to ML pipeline. Runs synchronously via APScheduler."""
+        """Poll all enabled bridge sites and feed to ML pipeline.
+
+        Uses MultiSitePollingCoordinator, which reads active sites from
+        site_adapter_config and polls each via a ShadowModePollingService
+        instance. S002 behaviour is unchanged; new sites are included
+        automatically when their bridge adapter is enabled in the database.
+        """
         import sys as _sys_shadow
 
         _sys_shadow.stderr.write("SHADOW_POLL_EXEC: _run_shadow_mode_polling ENTERED\n")
         _sys_shadow.stderr.flush()
         try:
-            import asyncio
+            from app.services.multi_site_polling_coordinator import get_multi_site_polling_coordinator
 
-            from app.services.shadow_mode_polling import get_shadow_mode_polling_service
-
-            svc = get_shadow_mode_polling_service()
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            try:
-                result = loop.run_until_complete(svc.poll())
-                _sys_shadow.stderr.write(f"SHADOW_POLL_EXEC: poll result={result}\n")
-                _sys_shadow.stderr.flush()
-                if result.get("errors"):
-                    _sys_shadow.stderr.write(f"SHADOW_POLL_EXEC: errors={result.get('errors')}\n")
-                    _sys_shadow.stderr.flush()
-                    logger.warning(
-                        "[SHADOW] poll errors: %s",
-                        result["errors"],
-                    )
-                else:
-                    logger.debug(
-                        "[SHADOW] poll OK: states=%s ml_hours=%s",
-                        result.get("equipment_states", 0),
-                        result.get("ml_hours_ingested", "?"),
-                    )
-            finally:
-                loop.close()
+            coordinator = get_multi_site_polling_coordinator()
+            results = coordinator.poll_all()
+            _sys_shadow.stderr.write(f"SHADOW_POLL_EXEC: sites_polled={list(results)}\n")
+            _sys_shadow.stderr.flush()
         except Exception as e:
             _sys_shadow.stderr.write(f"SHADOW_POLL_EXEC: EXCEPTION={e}\n")
             _sys_shadow.stderr.flush()
@@ -4286,8 +4529,7 @@ class BackgroundSchedulerService:
 
 # Sync wrapper — APScheduler passes sync functions to job executors
 def _run_compiler_worker_sync():
-    """Sync wrapper — runs the async CompilerWorker in a new event loop."""
-    import asyncio
+    """Sync wrapper — runs the CompilerWorker directly (it's a sync method)."""
     import logging
 
     from app.services.compiler_worker import CompilerWorker
@@ -4295,10 +4537,12 @@ def _run_compiler_worker_sync():
     logger = logging.getLogger(__name__)
     try:
         worker = CompilerWorker()
-        asyncio.run(worker.poll_and_process())
+        count = worker.poll_and_process()
+        if count:
+            logger.info("[CompilerWorker] Processed %d records", count)
     except Exception as exc:
         logger.critical("[CompilerWorker] sync runner failed: %s", exc, exc_info=True)
-        raise  # re-raise so APScheduler marks job as failed
+        raise
 
 
 def _run_email_intake_poll():
@@ -4317,6 +4561,101 @@ def _run_email_intake_poll():
             logger.debug("[EmailIntake] No new emails in this poll cycle")
     except Exception as exc:
         logger.error("[EmailIntake] poll runner failed: %s", exc, exc_info=True)
+
+
+def _run_daily_health_sweep_sync():
+    """Sync wrapper for daily health sweep — evaluates all sites for promotion gates.
+
+    Iterates all sites in 'shadow_live' or 'advisory' phase and runs a full
+    equipment sweep on each, then persists recommendations and notifies on Telegram.
+    """
+    import asyncio
+
+    logger.info("[HEALTH-SWEEP] Daily sweep triggered")
+
+    async def _sweep():
+        from app.database.repositories.site_repository import SiteRepository
+        from app.services.ai_optimizer import get_ai_optimizer
+
+        repo = SiteRepository()
+        optimizer = get_ai_optimizer()
+
+        # Get sites in onboarding phases that need active monitoring
+        active_phases = ["shadow_live", "advisory", "supervised"]
+        all_sites = repo.get_all()
+        target_sites = [s for s in all_sites if s.get("onboarding_phase", "").lower() in active_phases]
+
+        if not target_sites:
+            logger.info("[HEALTH-SWEEP] No sites in active onboarding phases")
+            return
+
+        total_recs = 0
+        for site in target_sites:
+            site_code = site.get("code", "")
+            if not site_code:
+                continue
+            try:
+                recs = await optimizer.run_full_equipment_sweep(site_code, bypass_occupancy_gate=True)
+                # Persist recommendations
+                for rec in recs:
+                    try:
+                        from app.models.recommendation import ActionRiskLevel, Recommendation, RecommendationStatus
+
+                        recommendation = Recommendation(
+                            site_id=site_code,
+                            timestamp=datetime.utcnow(),
+                            action_type=rec.get("action_type", "health_sweep"),
+                            risk_level=ActionRiskLevel.LOW,
+                            target_equipment=rec.get("equipment_id", ""),
+                            action=rec.get("action", {}),
+                            reason=rec.get("reason", ""),
+                            expected_impact=rec.get("expected_impact", {}),
+                            confidence=rec.get("confidence", 0.5),
+                            confidence_score=rec.get("confidence", 0.5),
+                            profile=rec.get("profile", ""),
+                            source="health_sweep",
+                            source_type="health_sweep",
+                            status=RecommendationStatus.PENDING,
+                        )
+                        from app.database.repositories.recommendation_repository import RecommendationRepository
+
+                        repo_rec = RecommendationRepository()
+                        repo_rec.create(recommendation)
+                    except Exception as rec_err:
+                        logger.warning(f"[HEALTH-SWEEP] Failed to persist rec for {rec.get('equipment_id')}: {rec_err}")
+                total_recs += len(recs)
+                logger.info(f"[HEALTH-SWEEP] {site_code}: {len(recs)} recommendations generated")
+            except Exception as site_err:
+                logger.warning(f"[HEALTH-SWEEP] Sweep failed for {site_code}: {site_err}")
+
+        logger.info(f"[HEALTH-SWEEP] Complete: {total_recs} total recommendations across {len(target_sites)} sites")
+
+        # Telegram notification if any recommendations generated
+        if total_recs > 0:
+            try:
+                from app.config.settings import settings
+
+                chat_id = getattr(settings, "telegram_alert_chat_id", None) or getattr(
+                    settings, "sentry_fm_chat_id", None
+                )
+                if chat_id:
+                    from app.services.telegram_message_sender import get_telegram_sender
+
+                    sender = get_telegram_sender()
+                    body = (
+                        f"\xf0\x9f\x9f\x8a *SENTINEL Health Sweep*\n"
+                        f"{total_recs} recommendations generated across {len(target_sites)} active sites"
+                    )
+                    await sender.send_text(str(chat_id), body, parse_mode="HTML")
+            except Exception as tf_err:
+                logger.warning(f"[HEALTH-SWEEP] Telegram notification failed: {tf_err}")
+
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        loop.run_until_complete(_sweep())
+    finally:
+        loop.close()
 
 
 def _run_recommendation_digest_sync(site_id: str = "S002"):
@@ -4344,18 +4683,30 @@ def _run_recommendation_digest_sync(site_id: str = "S002"):
             if not chat_id:
                 return
 
-            lines = [
-                f"\xf0\x9f\x93\x9b *SENTINEL Morning Digest — {site_id.upper()}*",
-                f"{len(pending)} recommendations pending approval:\n",
-            ]
+            header = (
+                f"\xf0\x9f\x93\x9b *SENTINEL Morning Digest \u2014 {site_id.upper()}*\n"
+                f"{len(pending)} recommendations pending approval:\n"
+            )
+            await sender.send_text(str(chat_id), header, parse_mode="HTML")
+
+            from app.services.telegram_message_sender import InlineButton, InlineKeyboard
+
             for rec in pending[:5]:
                 eq = rec.target_equipment or rec.action_type or "unknown"
-                reason = rec.reason[:60] if rec.reason else ""
+                reason = rec.reason[:70] if rec.reason else ""
                 sev = rec.risk_level.value if hasattr(rec.risk_level, "value") else rec.risk_level or "info"
-                lines.append(f"\u2022 `{eq}` \u2014 {reason} ({sev})")
-            if len(pending) > 5:
-                lines.append(f"_...and {len(pending) - 5} more in Cockpit_")
-            await sender.send_text(str(chat_id), "\n".join(lines), parse_mode="HTML")
+                body = f"`{eq}` \u2014 {reason}\nSeverity: {sev}"
+                rec_id = getattr(rec, "id", "") or ""
+                keyboard = InlineKeyboard(
+                    rows=[
+                        [
+                            InlineButton(label="Accept", callback_data=f"rec:accept:{rec_id}"),
+                            InlineButton(label="Dismiss", callback_data=f"rec:dismiss:{rec_id}"),
+                            InlineButton(label="Open", callback_data=f"rec:open:{rec_id}"),
+                        ],
+                    ]
+                )
+                await sender.send_text(str(chat_id), body, keyboard=keyboard, parse_mode="HTML")
 
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)

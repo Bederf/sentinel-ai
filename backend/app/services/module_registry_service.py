@@ -34,26 +34,9 @@ from app.services.health_threshold_service import get_health_thresholds
 
 logger = logging.getLogger(__name__)
 
-# Base modules (non-deactivatable) — 15 total: 7 platform + 8 building systems
-NON_DEACTIVATABLE_MODULES = {
-    # Base Platform (7)
-    ModuleType.KPI,
-    ModuleType.ML,
-    ModuleType.NOTIFICATIONS,
-    ModuleType.INTEGRATIONS,
-    ModuleType.SIMBIOT,
-    ModuleType.LOGGING,
-    ModuleType.ASSETS,
-    # Base Building Systems (8)
-    ModuleType.HVAC,
-    ModuleType.ENERGY,
-    ModuleType.LIGHTING,
-    ModuleType.SOLAR,
-    ModuleType.WATER,
-    ModuleType.FIRE,
-    ModuleType.SECURITY,
-    ModuleType.DIGITAL_TWIN,
-}
+NON_DEACTIVATABLE_MODULES = frozenset(
+    module_type for module_type, definition in MODULE_DEFINITIONS.items() if definition.mandatory
+)
 
 
 class ModuleRegistryService:
@@ -339,11 +322,15 @@ class ModuleRegistryService:
 
     def get_available_modules(self) -> list[ModuleDefinition]:
         """Get all available module definitions."""
-        return list(MODULE_DEFINITIONS.values())
+        return list(self.get_module_registry().values())
+
+    def get_module_registry(self) -> dict[ModuleType, ModuleDefinition]:
+        """Get the full module registry definition payload."""
+        return MODULE_DEFINITIONS
 
     def get_module_definition(self, module_type: ModuleType) -> ModuleDefinition | None:
         """Get definition for a specific module type."""
-        return MODULE_DEFINITIONS.get(module_type)
+        return self.get_module_registry().get(module_type)
 
     def get_site_config(self, site_id: str) -> SiteModuleConfig | None:
         """Get module configuration for a site."""

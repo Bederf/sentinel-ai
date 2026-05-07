@@ -5,6 +5,7 @@
  */
 
 import { authorizedFetch } from './client';
+import type { ModuleType } from '../moduleRegistry';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:9095';
 
@@ -33,15 +34,24 @@ export interface IntegrationStatusResponse {
  * Module definition with capabilities
  */
 export interface ModuleDefinition {
-  module_type: string;
+  module_type: ModuleType;
   name: string;
   version: string;
   description: string;
+  enabled: boolean;
+  mandatory: boolean;
   status?: 'active' | 'inactive' | 'error';
   capabilities?: Array<{ id: string; name: string; description: string }>;
-  integrates_with?: string[];
+  integrates_with?: ModuleType[];
+  telemetry_points?: string[];
   ai_features?: string[];
   health_score?: number;
+}
+
+type ModuleRegistryPayload = Record<string, ModuleDefinition> | ModuleDefinition[];
+
+function normalizeModuleRegistryPayload(payload: ModuleRegistryPayload): ModuleDefinition[] {
+  return Array.isArray(payload) ? payload : Object.values(payload);
 }
 
 /**
@@ -85,15 +95,14 @@ export const modulesApi = {
    */
   async getAvailableModules(): Promise<ModuleDefinition[]> {
     const response = await authorizedFetch(
-      `${API_BASE}/api/modules/available`
+      `${API_BASE}/api/modules/registry`
     );
     if (!response.ok) {
       throw new Error(
-        `Failed to fetch available modules: ${response.statusText}`
+        `Failed to fetch module registry: ${response.statusText}`
       );
     }
-    const data = await response.json();
-    return Array.isArray(data) ? data : (data.modules || []);
+    return normalizeModuleRegistryPayload(await response.json() as ModuleRegistryPayload);
   },
 
   /**

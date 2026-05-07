@@ -144,7 +144,7 @@ export const BUILDING_TAB_ITEMS: BuildingTabItem[] = [
   { id: "digital-twin", label: "Digital Twin", icon: Activity, controlModule: "digital_twin_control", requiredModule: "digital_twin" },
   { id: "controls", label: "Controls", icon: Sliders },
   { id: "space", label: "Space", icon: LayoutGrid, requiredModule: "space_optimization" },
-  { id: "fuel", label: "Fuel", icon: Fuel, requiredModule: "fuel_monitoring" },
+  { id: "fuel", label: "Fuel", icon: Fuel, requiredModule: "fuel" },
   { id: "esg", label: "ESG", icon: Leaf, requiredModule: "compliance" },
 ];
 

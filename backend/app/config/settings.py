@@ -94,6 +94,9 @@ class Settings(BaseSettings):
     # Backend URL (for external service health checks)
     backend_url: str = ""
 
+    # Internal service key for service-to-service API auth (X-Internal-Service header)
+    internal_service_key: str = Field(default="sentinel-internal", validation_alias="INTERNAL_SERVICE_KEY")
+
     # Claude AI settings
     anthropic_api_key: str = ""
     claude_model: str = "claude-sonnet-4-20250514"

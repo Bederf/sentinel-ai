@@ -149,7 +149,7 @@ class BaselineSeedService:
     async def _get_equipment_type_fallback(self, equipment_id: str) -> str:
         """Get equipment type from equipment_id or repository."""
         # Try to get from device manager
-        if self._capture_service.device_manager and self._capture_service.device_manager.initialized:
+        if self._capture_service.device_manager and hasattr(self._capture_service.device_manager, "initialized") and self._capture_service.device_manager.initialized:
             try:
                 device = await self._capture_service.device_manager.get_device(equipment_id)
                 if device and hasattr(device, "equipment_type"):

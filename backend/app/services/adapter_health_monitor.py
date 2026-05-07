@@ -273,6 +273,113 @@ class AdapterHealthMonitor:
         except Exception as e:
             logger.error(f"Failed to write adapter health alert: {e}")
 
+    async def _write_bridge_alerts(self, site_id: str, alarms: list[dict[str, Any]]) -> None:
+        """Write active bridge alarms to the alerts table for cockpit posture.
+
+        Deduplicates by alarm code + source to avoid flooding on repeated polls.
+        Only writes alarms from the last poll cycle that are still active.
+        """
+        from app.database.supabase_client import get_supabase_client
+        import uuid
+
+        if not alarms:
+            return
+
+        supabase = get_supabase_client()
+        now = datetime.now(UTC)
+
+        # Resolve site UUID
+        try:
+            site_row = supabase.table("sites").select("id").eq("code", site_id).execute()
+            if not site_row.data:
+                logger.warning(f"[BRIDGE ALERTS] Site not found: {site_id}")
+                return
+            site_uuid = site_row.data[0]["id"]
+        except Exception as e:
+            logger.warning(f"[BRIDGE ALERTS] Could not resolve site UUID for {site_id}: {e}")
+            return
+
+        # Build a dedupe key from each alarm: use code + message hash
+        seen_keys: set[str] = set()
+        rows_to_insert = []
+
+        for alarm in alarms:
+            code = alarm.get("code") or alarm.get("alarm_code") or ""
+            alarm_msg = alarm.get("message") or alarm.get("description") or alarm.get("alarm_text") or ""
+            # Dedupe key
+            dedupe_key = f"{code}:{alarm_msg[:80]}"
+            if dedupe_key in seen_keys:
+                continue
+            seen_keys.add(dedupe_key)
+
+            # Severity mapping
+            raw_severity = str(alarm.get("severity") or alarm.get("priority") or "medium").lower()
+            if raw_severity in ("critical", "high", "fault", "active"):
+                severity = "critical"
+            elif raw_severity in ("warning", "warn", "elevated"):
+                severity = "warning"
+            else:
+                severity = "warning"
+
+            # Equipment ID resolution
+            equipment_id = alarm.get("equipment_id") or alarm.get("equipment_code") or None
+            if equipment_id:
+                try:
+                    eq_row = (
+                        supabase.table("equipment")
+                        .select("id")
+                        .eq("code", equipment_id)
+                        .maybe_single()
+                        .execute()
+                    )
+                    if eq_row.data:
+                        equipment_id = eq_row.data["id"]
+                except Exception:
+                    equipment_id = None
+
+            rows_to_insert.append(
+                {
+                    "id": str(uuid.uuid4()),
+                    "site_id": site_uuid,
+                    "equipment_id": equipment_id,
+                    "type": "fault",
+                    "severity": severity,
+                    "status": "active",
+                    "title": f"Bridge fault: {code}" if code else "Bridge fault",
+                    "message": alarm_msg or f"BACnet alarm from bridge (code={code})",
+                    "created_at": now.isoformat(),
+                    "updated_at": now.isoformat(),
+                }
+            )
+
+        if not rows_to_insert:
+            return
+
+        # Check for existing recent alerts to avoid duplicates
+        recent_cutoff = (now - timedelta(minutes=30)).isoformat()
+        try:
+            existing = (
+                supabase.table("alerts")
+                .select("title, message")
+                .eq("site_id", site_uuid)
+                .eq("status", "active")
+                .gte("created_at", recent_cutoff)
+                .execute()
+            )
+            existing_keys = {f"{r['title']}:{r['message'][:80]}" for r in (existing.data or [])}
+            rows_to_insert = [r for r in rows_to_insert if f"{r['title']}:{r['message'][:80]}" not in existing_keys]
+        except Exception as e:
+            logger.warning(f"[BRIDGE ALERTS] Dedup query failed, inserting anyway: {e}")
+
+        if not rows_to_insert:
+            return
+
+        try:
+            supabase.table("alerts").insert(rows_to_insert).execute()
+            logger.info(f"[BRIDGE ALERTS] Wrote {len(rows_to_insert)} alerts for {site_id}")
+        except Exception as e:
+            logger.error(f"[BRIDGE ALERTS] Failed to insert alerts: {e}")
+
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------

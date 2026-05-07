@@ -225,6 +225,9 @@ export {
   type ErrorLogFilters,
   type ErrorLogResponse,
   type HealthHistoryData,
+  type CommissioningSnapshot,
+  type QualityMetricDetail,
+  type QualityGateStatus,
 } from './system';
 export {
   aegisApi,

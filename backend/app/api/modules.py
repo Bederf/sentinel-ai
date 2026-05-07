@@ -48,8 +48,11 @@ class ModuleDefinitionResponse(BaseModel):
     name: str
     version: str
     description: str
+    enabled: bool
+    mandatory: bool
     capabilities: list[dict]
     integrates_with: list[str]
+    telemetry_points: list[str]
     ai_features: list[str]
 
 
@@ -94,24 +97,37 @@ class IntegrationSummaryResponse(BaseModel):
 # ==================== Module Management Endpoints ====================
 
 
+def _serialize_module_definition(module_def) -> ModuleDefinitionResponse:
+    return ModuleDefinitionResponse(
+        module_type=module_def.module_type.value,
+        name=module_def.name,
+        version=module_def.version,
+        description=module_def.description,
+        enabled=module_def.enabled,
+        mandatory=module_def.mandatory,
+        capabilities=[
+            {"id": c.capability_id, "name": c.name, "description": c.description} for c in module_def.capabilities
+        ],
+        integrates_with=[t.value for t in module_def.integrates_with],
+        telemetry_points=module_def.telemetry_points,
+        ai_features=module_def.ai_features,
+    )
+
+
+@router.get("/registry", response_model=dict[str, ModuleDefinitionResponse])
+async def get_module_registry():
+    """Get the authoritative module registry payload."""
+    return {
+        module_type.value: _serialize_module_definition(module_def)
+        for module_type, module_def in module_registry.get_module_registry().items()
+    }
+
+
 @router.get("/available", response_model=list[ModuleDefinitionResponse])
 async def get_available_modules():
     """Get all available module definitions."""
     modules = module_registry.get_available_modules()
-    return [
-        ModuleDefinitionResponse(
-            module_type=m.module_type.value,
-            name=m.name,
-            version=m.version,
-            description=m.description,
-            capabilities=[
-                {"id": c.capability_id, "name": c.name, "description": c.description} for c in m.capabilities
-            ],
-            integrates_with=[t.value for t in m.integrates_with],
-            ai_features=m.ai_features,
-        )
-        for m in modules
-    ]
+    return [_serialize_module_definition(module_def) for module_def in modules]
 
 
 @router.get("/definition/{module_type}", response_model=ModuleDefinitionResponse)
@@ -126,17 +142,7 @@ async def get_module_definition(module_type: str):
     if not module_def:
         raise HTTPException(status_code=404, detail="Module definition not found")
 
-    return ModuleDefinitionResponse(
-        module_type=module_def.module_type.value,
-        name=module_def.name,
-        version=module_def.version,
-        description=module_def.description,
-        capabilities=[
-            {"id": c.capability_id, "name": c.name, "description": c.description} for c in module_def.capabilities
-        ],
-        integrates_with=[t.value for t in module_def.integrates_with],
-        ai_features=module_def.ai_features,
-    )
+    return _serialize_module_definition(module_def)
 
 
 @router.get("/site/{site_id}/active", response_model=list[ModuleResponse])

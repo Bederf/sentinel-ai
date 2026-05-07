@@ -18,6 +18,7 @@ When 500+ events are buffered → train Fault Classifier.
 """
 
 import logging
+import traceback
 from datetime import UTC, datetime
 from typing import Any
 
@@ -31,8 +32,15 @@ logger = logging.getLogger("sentinel.shadow_mode")
 class ShadowModePollingService:
     """Polls the site bridge and feeds live data to the ML pipeline."""
 
-    def __init__(self, site_id: str = "site-002"):
+    def __init__(
+        self,
+        site_id: str = "site-002",
+        bridge_url: str | None = None,
+        bridge_token: str | None = None,
+    ):
         self.site_id = site_id
+        self._override_bridge_url = bridge_url
+        self._override_bridge_token = bridge_token
         self._poll_count = 0
         self._last_poll_result: dict[str, Any] | None = None  # Cached result of last poll
         # Cached BACnet object catalog: maps object_id → metadata
@@ -87,7 +95,14 @@ class ShadowModePollingService:
             return {}
 
     def _get_bridge_credentials(self) -> tuple[str, str]:
-        """Return (base_url, api_token) from settings."""
+        """Return (base_url, api_token).
+
+        Uses per-instance overrides (injected by MultiSitePollingCoordinator from DB)
+        when present, otherwise falls back to settings env vars.
+        """
+        if self._override_bridge_url and self._override_bridge_token:
+            return self._override_bridge_url.rstrip("/"), self._override_bridge_token
+
         from app.config.settings import settings
 
         base = getattr(settings, "simbiot_api_url", None) or getattr(settings, "bridge_base_url", None)
@@ -361,8 +376,10 @@ class ShadowModePollingService:
                 from datetime import timezone
 
                 stale_count = 0
+                active_alarms_for_db: list[dict[str, Any]] = []
                 for alarm in alarms:
                     alarm_time_str = alarm.get("timestamp") or alarm.get("time")
+                    is_stale = False
                     if alarm_time_str:
                         try:
                             alarm_time = datetime.fromisoformat(alarm_time_str.replace("Z", "+00:00"))
@@ -371,11 +388,25 @@ class ShadowModePollingService:
                             age_minutes = (datetime.now(tz=timezone.utc) - alarm_time).total_seconds() / 60
                             if age_minutes > app_settings.alarm_recency_window_minutes:
                                 stale_count += 1
-                                continue
+                                is_stale = True
                         except (ValueError, TypeError):
                             pass  # timestamp unparseable — allow through
 
+                    if is_stale:
+                        continue
+
+                    active_alarms_for_db.append(alarm)
                     sync.ml_feeder.ingest_fault_event(alarm)
+
+                # Persist active bridge alarms to DB so they feed cockpit posture
+                if active_alarms_for_db:
+                    try:
+                        from app.services.adapter_health_monitor import AdapterHealthMonitor
+
+                        monitor = AdapterHealthMonitor()
+                        await monitor._write_bridge_alerts(self.site_id, active_alarms_for_db)
+                    except Exception as e:
+                        logger.warning(f"[SHADOW] Failed to write bridge alarms to alerts table: {e}")
 
                 fault_count = len(alarms) - stale_count
                 logger.info(
@@ -398,11 +429,13 @@ class ShadowModePollingService:
             # Poll up to 20 sensors per cycle to stay within time budget
             sensor_batch = self._trends_sensor_codes[:20]
             try:
+                # Reuse a single client for all trend calls — prevents connection pool
+                # starvation that causes downstream /points calls to timeout (issue #shadow-poll).
+                async with httpx.AsyncClient(timeout=30.0) as trend_client:
 
-                async def fetch_trend(sensor_code: str) -> tuple[str, dict[str, Any] | None]:
-                    try:
-                        async with httpx.AsyncClient(timeout=10.0) as client:
-                            r = await client.get(
+                    async def fetch_trend(sensor_code: str) -> tuple[str, dict[str, Any] | None]:
+                        try:
+                            r = await trend_client.get(
                                 f"{base}/api/sites/{self.site_id}/trends/{sensor_code}",
                                 headers=headers,
                                 params={"limit": 100},
@@ -419,15 +452,15 @@ class ShadowModePollingService:
                                     "unit": d.get("unit"),
                                 }
                             return sensor_code, None
-                    except Exception:
-                        return sensor_code, None
+                        except Exception:
+                            return sensor_code, None
 
-                import asyncio
+                    import asyncio
 
-                trend_results = await asyncio.gather(
-                    *[fetch_trend(sc) for sc in sensor_batch],
-                    return_exceptions=True,
-                )
+                    trend_results = await asyncio.gather(
+                        *[fetch_trend(sc) for sc in sensor_batch],
+                        return_exceptions=True,
+                    )
 
                 for tr in trend_results:
                     if isinstance(tr, Exception):
@@ -591,8 +624,10 @@ class ShadowModePollingService:
             return {"connected": False, "reason": "not_polled", "poll_count": 0, "last_poll": None}
 
         last = self._last_poll_result or {}
-        connected = last.get("telemetry_fetched", False) and not last.get("errors")
-        reason = None if connected else last.get("errors", ["unknown"])[0] if last.get("errors") else "poll_failed"
+        errors = last.get("errors", [])
+        real_errors = [e for e in errors if e]  # Filter empty strings from stale errors
+        connected = last.get("telemetry_fetched", False) and not real_errors
+        reason = None if connected else (real_errors[0] if real_errors else "poll_failed")
 
         return {
             "connected": connected,
@@ -821,6 +856,83 @@ class ShadowModePollingService:
             name = code
         return eq_type, name
 
+    def _classify_from_catalog(self, code: str) -> str:
+        """Fallback classification using the loaded object catalog for codes without
+        a recognizable type segment (e.g. S002-G-001, S002-R-042).
+
+        Cross-references the BACnet object catalog to infer equipment type from
+        point metadata (object types, point names, parent paths).
+        """
+        if not self._object_catalog:
+            return "unknown"
+
+        # Collect all catalog entries for this equipment code
+        candidates = [o for o in self._object_catalog.values()
+                      if o.get("equipment_id") == code]
+        if not candidates:
+            return "unknown"
+
+        point_types: set[str] = set()
+        object_types: set[str] = set()
+        point_names: list[str] = []
+        descriptions: list[str] = []
+        parent_paths: set[str] = set()
+
+        for obj in candidates:
+            point_types.add(obj.get("point_type", "").lower())
+            ot = obj.get("object_type", "").lower()
+            object_types.add(ot)
+            point_names.append(obj.get("point_name", "").lower())
+            descriptions.append(obj.get("description", "").lower())
+            if obj.get("parent_path"):
+                parent_paths.add(obj["parent_path"].lower())
+
+        search_text = " ".join(point_names + descriptions)
+
+        # ── Heuristic rules (ordered most to least specific) ────────────
+
+        # Power / electrical metering
+        if "active_power" in search_text or "power" in search_text:
+            if "kw" in search_text or "kwh" in search_text:
+                return "meter"
+
+        # Temperature sensors in a zone context
+        if "temp" in search_text or "temperature" in search_text:
+            if "zone" in search_text or "space" in search_text:
+                return "zone_sensor"
+            if "return" in search_text or "supply" in search_text:
+                return "ahu"
+            return "zone_sensor"
+
+        # Humidity sensors
+        if "humidity" in search_text or "rh" in search_text.split():
+            return "zone_sensor"
+
+        # CO2 sensors
+        if "co2" in search_text:
+            return "zone_sensor"
+
+        # Binary outputs / relays → likely lighting or contactor control
+        if "binary_output" in object_types or "binary_value" in object_types:
+            return "lighting_zone"
+
+        # Presence / occupancy
+        if "occupancy" in search_text or "presence" in search_text:
+            return "zone_sensor"
+
+        # Parent-path hints
+        for path in parent_paths:
+            if "/lighting/" in path or "/dali/" in path:
+                return "lighting_zone"
+            if "/hvac/" in path or "/ahu/" in path:
+                return "ahu"
+
+        # All points are analog_inputs with no specific keyword → generic sensor
+        if object_types == {"analog_input"}:
+            return "zone_sensor"
+
+        return "unknown"
+
     def _equip_type_from_sensor(self, sensor_code: str) -> str:
         """Infer equipment type from sensor code string."""
         if "AHU" in sensor_code:
@@ -978,6 +1090,12 @@ class ShadowModePollingService:
                     bridge_status = bridge_status_data.get("status", "offline")
                     db_status = "normal" if bridge_status in ("online", "normal", "ok") else bridge_status
                     eq_type, eq_name = self._parse_equipment_code(bcode)
+                    # Fallback: classify from BACnet object catalog metadata
+                    # when the code doesn't have a recognizable type segment
+                    if eq_type == "unknown":
+                        catalog_type = self._classify_from_catalog(bcode)
+                        if catalog_type != "unknown":
+                            eq_type = catalog_type
                     # Skip luminaries
                     if "-LUM-" in bcode:
                         continue
@@ -1008,7 +1126,12 @@ class ShadowModePollingService:
                 )
 
         except Exception as e:
-            logger.warning(f"[SHADOW] Equipment status sync failed: {e}")
+            logger.error(
+                "[SHADOW] Equipment status sync failed for %s: %s\n%s",
+                self.site_id,
+                e,
+                traceback.format_exc(),
+            )
 
         return result
 

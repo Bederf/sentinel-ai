@@ -321,6 +321,7 @@ class AuditLogger:
         result: AuditResultType,
         correlation_id: str | None = None,
         metadata: dict[str, Any] | None = None,
+        escalation_level: str | None = None,
     ) -> str:
         """
         Log a safety validation event.
@@ -332,6 +333,7 @@ class AuditLogger:
             result: Validation result
             correlation_id: Correlation ID
             metadata: Additional context
+            escalation_level: Severity — "critical", "warning", "none" (from EscalationLevel)
 
         Returns:
             Audit log entry ID
@@ -344,6 +346,7 @@ class AuditLogger:
             safety_validation=validation_result,
             correlation_id=correlation_id,
             metadata=metadata or {},
+            escalation_level=escalation_level,
         )
 
         return self._add_entry(entry)

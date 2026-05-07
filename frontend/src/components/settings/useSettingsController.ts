@@ -5,7 +5,6 @@ import { useModules } from "../../contexts/ModuleHooks";
 import { useBuildingsList } from "../../hooks/useBuildingsList";
 import { setStoredSelectedSite } from "../../lib/siteSelection";
 import {
-  BASE_PACK_LOCKED_MODULES,
   type FeatureToggleCard,
 } from "./settingsCatalog";
 
@@ -119,6 +118,7 @@ function useFeatureToggleActions({
   canManageFeatureAccess: _canManageFeatureAccess,
   deactivateModule,
   isAdmin,
+  isMandatory,
   isModuleActive,
   onError,
   settingsPageUnlocked,
@@ -128,6 +128,7 @@ function useFeatureToggleActions({
   canManageFeatureAccess: boolean;
   deactivateModule: ReturnType<typeof useModules>["deactivateModule"];
   isAdmin: boolean;
+  isMandatory: ReturnType<typeof useModules>["isMandatory"];
   isModuleActive: ReturnType<typeof useModules>["isModuleActive"];
   onError?: (error: string) => void;
   settingsPageUnlocked: boolean;
@@ -146,7 +147,7 @@ function useFeatureToggleActions({
     }
 
     const currentlyActive = isModuleActive(card.moduleType);
-    const locked = currentlyActive && BASE_PACK_LOCKED_MODULES.includes(card.moduleType);
+    const locked = currentlyActive && isMandatory(card.moduleType);
     if (locked) return;
 
     setTogglingCardId(card.id);
@@ -167,6 +168,7 @@ function useFeatureToggleActions({
     activateModule,
     isAdmin,
     deactivateModule,
+    isMandatory,
     isModuleActive,
     onError,
     settingsPageUnlocked,
@@ -190,7 +192,7 @@ export function useSettingsController({ siteId, onError }: UseSettingsController
     updateThresholds: updateRiskThresholds,
   } = useRiskThresholds();
   const { data: buildings = [] } = useBuildingsList();
-  const { isModuleActive, activateModule, deactivateModule, setSite: setModuleSite } = useModules();
+  const { availableModules, isModuleActive, isMandatory, activateModule, deactivateModule, setSite: setModuleSite } = useModules();
 
   const currentUser = getStoredSentinelUser();
   const currentUserRole = currentUser.role || "auditor";
@@ -232,6 +234,7 @@ export function useSettingsController({ siteId, onError }: UseSettingsController
     canManageFeatureAccess,
     deactivateModule,
     isAdmin: currentUserRole === "admin",
+    isMandatory,
     isModuleActive,
     onError,
     settingsPageUnlocked,
@@ -287,6 +290,7 @@ export function useSettingsController({ siteId, onError }: UseSettingsController
     handleSiteChange,
     handleSuccess,
     hasSessionToken,
+    availableModules,
     healthThresholdError,
     healthThresholds,
     isModuleActive,

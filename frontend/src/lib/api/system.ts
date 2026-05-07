@@ -95,6 +95,24 @@ export interface CommissioningSnapshot {
   can_promote: boolean;
 }
 
+export interface QualityMetricDetail {
+  metric: string;
+  value: number;
+  state: 'pass' | 'warn' | 'fail' | 'na';
+  pass_bound: number | null;
+  warn_bound: number | null;
+}
+
+export interface QualityGateStatus {
+  overall_status: 'pass' | 'warn' | 'fail';
+  enforcement_action: string;
+  mode: string;
+  failed_rules: string[];
+  warn_rules: string[];
+  reason_codes: string[];
+  rule_results: QualityMetricDetail[];
+}
+
 export interface IngestionKPIs {
   freshness_hours: number;
   error_rate: number;

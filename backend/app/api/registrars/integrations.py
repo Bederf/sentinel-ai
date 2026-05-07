@@ -16,6 +16,7 @@ from app.api import (
     niagara,
     niagara_bacnet,
     niagara_discovery,
+    simbiot,
     solar,
     water,
 )
@@ -41,6 +42,9 @@ def register_integrations_routers(app: FastAPI) -> None:
 
     # Water meter integration
     app.include_router(water.router, prefix="/api", tags=["water"])
+
+    # SIMBIOT site & adapter configuration (Phase 206)
+    app.include_router(simbiot.router, tags=["simbiot"])
 
     # BMS/CAFM integrations
     app.include_router(integration.router)

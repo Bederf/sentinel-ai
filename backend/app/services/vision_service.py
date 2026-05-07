@@ -98,6 +98,7 @@ class VisionService:
                     input_tokens=getattr(u, "input_tokens", 0),
                     output_tokens=getattr(u, "output_tokens", 0),
                     source="vision_analysis",
+                    feature="image_analysis",
                 )
             except Exception:
                 pass  # Never break vision for tracking

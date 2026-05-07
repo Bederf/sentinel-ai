@@ -334,7 +334,36 @@ class CommissioningService:
         return result
 
     def get_consecutive_pass_days(self, site_id: str) -> int:
-        """Count consecutive days where all gates passed (walking backward)."""
+        """Count consecutive days where all gates passed, reading from DB then memory."""
+        # Primary: read from persistent commissioning_scorecards table
+        try:
+            resolved = self._repo._resolve_site_id(site_id)
+            result = (
+                self._repo.client.table("commissioning_scorecards")
+                .select("checked_at, all_gates_passed")
+                .eq("site_id", resolved)
+                .order("checked_at", desc=True)
+                .execute()
+            )
+            if result.data:
+                by_date: dict[str, bool] = {}
+                for row in result.data:
+                    dt = row["checked_at"]
+                    date_str = dt[:10] if isinstance(dt, str) else dt.date().isoformat()
+                    by_date[date_str] = row["all_gates_passed"]
+
+                sorted_dates = sorted(by_date.keys(), reverse=True)
+                count = 0
+                for d in sorted_dates:
+                    if by_date[d]:
+                        count += 1
+                    else:
+                        break
+                return count
+        except Exception:
+            pass
+
+        # Fallback: in-memory history
         history = self._scorecard_history.get(site_id, [])
         if not history:
             return 0

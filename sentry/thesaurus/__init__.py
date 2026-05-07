@@ -10,12 +10,12 @@ Exports:
     ComplaintCategory  — enum
 """
 
-from complaint_thesaurus import (
+from .complaint_thesaurus import (
     ComplaintCategory,
     TOTAL_PHRASES,
     get_category_summary,
 )
-from thesaurus_service import (
+from .thesaurus_service import (
     MATCH_THRESHOLD,
     ThesaurusService,
     classify_complaint,

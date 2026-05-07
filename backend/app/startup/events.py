@@ -333,6 +333,11 @@ async def startup_event(app: FastAPI) -> None:
     # Recommendation lifecycle: expire stale + dedup duplicates (every 6h)
     scheduler_service.add_recommendation_expiry_job(interval_seconds=21600)  # 6h
 
+    # Recommendation processing: route pending recs through tier engine, handle
+    # Tier 2 approval requests / Tier 3 auto-execution, fill outcome={} placeholders.
+    # Without this job, recommendations expire after 48h before any outcome is written.
+    scheduler_service.add_recommendation_processing_job(interval_seconds=300)  # 5 min
+
     scheduler_service.add_ghost_room_monitor_job(interval_seconds=60)
 
     # Optional ESP32 MQTT listener for room-presence nodes
@@ -574,6 +579,21 @@ async def startup_event(app: FastAPI) -> None:
         _logger.info("✅ LLM judge evaluation job initialized (top of every hour)")
     except Exception as e:
         _logger.warning(f"⚠️ LLM judge job initialization failed: {e}")
+
+    # Daily health sweep — generates recommendations for all equipment below health threshold
+    # Runs weekdays at 08:00 SAST (06:00 UTC). Bypasses occupancy gate to catch issues outside hours.
+    try:
+        scheduler_service.add_daily_health_sweep_job()
+        _logger.info("✅ Daily health sweep job initialized (06:00 UTC Mon-Fri = 08:00 SAST)")
+    except Exception as e:
+        _logger.warning(f"⚠️ Daily health sweep job initialization failed: {e}")
+
+    # Morning recommendation digest — top 5 pending by severity, sent to FM Telegram at 07:45 SAST Mon-Fri
+    try:
+        scheduler_service.add_recommendation_digest_job()
+        _logger.info("✅ Recommendation digest job initialized (07:45 SAST Mon-Fri → FM Telegram)")
+    except Exception as e:
+        _logger.warning(f"⚠️ Recommendation digest job initialization failed: {e}")
 
     # Ensure all sites have the 15 mandatory base modules (Phase 142)
     try:
@@ -921,6 +941,13 @@ async def startup_event(app: FastAPI) -> None:
             _logger.info("Shadow mode bridge polling initialized (5min interval)")
         except Exception as e:
             _logger.error(f"Shadow mode polling initialization failed: {e}", exc_info=True)
+
+        # Phase promotion evaluator — hourly Trust Ladder promotion check
+        try:
+            scheduler_service.add_phase_promotion_job(interval_hours=1)
+            _logger.info("✅ Phase promotion evaluator initialized (hourly, coalesce=True)")
+        except Exception as e:
+            _logger.error(f"⚠️ Phase promotion evaluator initialization failed: {e}")
 
         # Phase 179: Document MRI sync — polls Concept API every N hours (default 4)
         try:

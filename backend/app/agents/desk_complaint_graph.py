@@ -26,6 +26,7 @@ from langgraph.graph import END, StateGraph
 from langgraph.graph.message import add_messages
 
 from app.agents.complaint_nlp import (
+    detect_comfort_complaint,
     extract_complaint_types,
     extract_desk_id,
     extract_duration,
@@ -49,12 +50,17 @@ class ComplaintState(TypedDict):
 
     messages: Annotated[list, add_messages]  # LangGraph message history
     user_id: str
+    user_name: str | None
     channel: str  # "chat" | "whatsapp" | "telegram"
 
     # Extracted info
     desk_id: str | None
     complaint_types: list[str]  # supports compound: ["too_cold", "noise"]
+    complaint_text: str | None  # raw text for escalation record
     description: str | None
+
+    # Classification gate: did NLP detect a comfort complaint?
+    is_comfort_complaint: bool  # False = route to escalation
 
     # Resolved context (from existing handlers)
     desk: dict | None
@@ -66,6 +72,7 @@ class ComplaintState(TypedDict):
     diagnosis: dict | None
     response: str  # Final formatted response for channel
     needs_input: bool  # True = waiting for user reply
+    escalation_sent: bool  # True = helpdesk email was sent
 
 
 # ---------------------------------------------------------------------------
@@ -79,6 +86,8 @@ def parse_input_node(state: ComplaintState) -> dict:
 
     Uses regex/keyword matching (zero LLM).
     Merges newly extracted info with any existing state (for multi-turn).
+    Also classifies whether the message is a comfort complaint at all —
+    if not, it will be routed to the escalation path instead of diagnosis.
     """
     messages = state.get("messages", [])
     if not messages:
@@ -94,7 +103,11 @@ def parse_input_node(state: ComplaintState) -> dict:
     if not latest_text:
         return {}
 
-    updates: dict = {}
+    updates: dict = {
+        "complaint_text": latest_text,
+        # Classifier gate: did NLP detect a comfort complaint?
+        "is_comfort_complaint": detect_comfort_complaint(latest_text),
+    }
 
     # If we previously asked for desk, accept bare numbers
     waiting_for_desk = state.get("needs_input") and not state.get("desk_id")
@@ -137,10 +150,15 @@ def check_complete(state: ComplaintState) -> str:
     Route based on what info we have.
 
     Returns:
-      "need_desk" - missing desk_id, ask user
-      "need_type" - missing complaint type, ask user
-      "complete"  - have both, proceed to diagnosis
+      "need_desk"         - missing desk_id, ask user
+      "need_type"         - missing complaint type, ask user
+      "complete"           - have both, proceed to diagnosis
+      "escalate"          - not a comfort complaint, send to helpdesk
     """
+    # Classifier gate: if message is not a comfort complaint at all, escalate
+    if not state.get("is_comfort_complaint"):
+        return "escalate"
+
     desk_id = state.get("desk_id")
     complaint_types = state.get("complaint_types") or []
 
@@ -329,6 +347,126 @@ def format_response_node(state: ComplaintState) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Node: escalate_unclassified
+# ---------------------------------------------------------------------------
+
+
+def _send_escalation_email(state: ComplaintState) -> None:
+    """Send escalation email to helpdesk in a fire-and-forget thread."""
+    import json
+    import os
+    import threading
+    from datetime import UTC, datetime
+
+    # Defer import to avoid circular / import-time issues
+    from app.services.email_reply_service import get_email_reply_service
+
+    escalation_record = {
+        "reporter_name": state.get("user_name") or state.get("user_id"),
+        "reporter_telegram_id": state.get("user_id"),
+        "original_message": state.get("complaint_text") or "",
+        "reason": "No matching comfort-complaint pattern in call log taxonomy",
+        "timestamp": datetime.now(UTC).isoformat(),
+        "status": "pending_helpdesk_review",
+    }
+
+    email_service = get_email_reply_service()
+
+    subject = (
+        f"Unclassified complaint from {escalation_record['reporter_name']} "
+        f"(Telegram ID: {escalation_record['reporter_telegram_id']})"
+    )
+
+    body = f"""Unclassified Facilities Complaint
+
+User: {escalation_record['reporter_name']}
+Telegram ID: {escalation_record['reporter_telegram_id']}
+Timestamp: {escalation_record['timestamp']}
+
+Complaint:
+{escalation_record['original_message']}
+
+---
+Action Required:
+Review the complaint and create a work order if applicable.
+
+Status: {escalation_record['status']}
+"""
+
+    def _send():
+        import asyncio
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            result = loop.run_until_complete(
+                email_service.send_reply(
+                    to_email="helpdesk@sentinel-ai.co.za",
+                    to_name=None,
+                    subject=subject,
+                    body_plain=body,
+                    body_html=None,
+                )
+            )
+            if result.sent:
+                logger.info("Escalation email sent for user %s", state.get("user_id"))
+            else:
+                logger.error("Escalation email failed: %s", result.error)
+        finally:
+            loop.close()
+
+    thread = threading.Thread(target=_send, daemon=True)
+    thread.start()
+
+    # Persist to local escalation tracker (non-blocking)
+    _append_escalation_record(escalation_record)
+
+
+def _append_escalation_record(record: dict) -> None:
+    """Append to call_log_escalations.json (fire-and-forget)."""
+    import json
+    import os
+
+    # Resolve path relative to backend/app — go up to project root
+    backend_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    escalations_path = os.path.join(backend_dir, "app", "data", "call_log_escalations.json")
+
+    try:
+        if os.path.exists(escalations_path):
+            with open(escalations_path, "r") as f:
+                data = json.load(f)
+        else:
+            data = []
+
+        data.append(record)
+
+        with open(escalations_path, "w") as f:
+            json.dump(data, f, indent=2)
+    except Exception as e:
+        logger.warning("Failed to persist escalation record: %s", e)
+
+
+def escalate_node(state: ComplaintState) -> dict:
+    """
+    Route for unclassified messages that are not comfort complaints.
+    Sends an email to helpdesk and returns a user-facing message.
+    """
+    _send_escalation_email(state)
+
+    escalation_message = (
+        "I've flagged this for the helpdesk team. "
+        "They'll review and create a work order if needed. "
+        "You should hear back within 2 hours."
+    )
+
+    return {
+        "messages": [AIMessage(content=escalation_message)],
+        "response": escalation_message,
+        "needs_input": False,
+        "escalation_sent": True,
+    }
+
+
+# ---------------------------------------------------------------------------
 # Graph definition
 # ---------------------------------------------------------------------------
 
@@ -345,6 +483,7 @@ def build_desk_complaint_graph() -> StateGraph:
     graph.add_node("resolve_zone", resolve_zone_node)
     graph.add_node("diagnose", diagnose_node)
     graph.add_node("format_response", format_response_node)
+    graph.add_node("escalate", escalate_node)
 
     # Entry point
     graph.set_entry_point("parse_input")
@@ -357,6 +496,7 @@ def build_desk_complaint_graph() -> StateGraph:
             "need_desk": "ask_desk",
             "need_type": "ask_type",
             "complete": "check_history",
+            "escalate": "escalate",
         },
     )
 
@@ -369,6 +509,9 @@ def build_desk_complaint_graph() -> StateGraph:
     graph.add_edge("resolve_zone", "diagnose")
     graph.add_edge("diagnose", "format_response")
     graph.add_edge("format_response", END)
+
+    # Escalation path terminates directly
+    graph.add_edge("escalate", END)
 
     return graph
 

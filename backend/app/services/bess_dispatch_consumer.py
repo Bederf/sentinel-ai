@@ -328,7 +328,9 @@ def run_bess_dispatch_consumer(site_id: str) -> dict[str, Any]:
     """Single execution cycle for one site. Called by APScheduler (sync context)."""
     import psycopg2
 
-    database_url = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@127.0.0.1:55322/postgres")
+    database_url = os.getenv("DATABASE_URL")
+    if not database_url:
+        raise ValueError("DATABASE_URL not set")
 
     summary: dict[str, Any] = {
         "site_id": site_id,

@@ -415,7 +415,7 @@ async def get_adapter_health(site_id: str):
     # Get configured adapters for this site
     config_result = (
         supabase.table("site_adapter_config")
-        .select("adapter_name")
+        .select("protocol")
         .eq("site_id", site_id)
         .eq("enabled", True)
         .execute()
@@ -433,7 +433,7 @@ async def get_adapter_health(site_id: str):
             "status": "no_adapter_config",
         }
 
-    configured_names = [r["adapter_name"] for r in config_result.data]
+    configured_names = [r["protocol"] for r in config_result.data]
 
     current = (
         supabase.table("adapter_health_current")

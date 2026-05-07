@@ -2,7 +2,7 @@
 
 import pytest
 
-from app.models.module_registry import ModuleType
+from app.models.module_registry import MODULE_DEFINITIONS, ModuleType
 from app.services.module_registry_service import (
     NON_DEACTIVATABLE_MODULES,
     ModuleRegistryService,
@@ -68,5 +68,13 @@ def test_deactivate_addon_succeeds(monkeypatch):
 
 
 def test_module_type_count():
-    """There should be exactly 35 module types (7 platform + 8 building + 8 control + 12 standalone)."""
-    assert len(ModuleType.__members__) == 35
+    """There should be exactly 34 module types and all must be defined in the registry."""
+    assert len(ModuleType.__members__) == 34
+
+
+def test_module_definitions_cover_all_module_types():
+    """Registry definitions should exist for every persisted module ID."""
+    assert set(MODULE_DEFINITIONS) == set(ModuleType)
+    assert ModuleType.BLOCK_BOOKING in MODULE_DEFINITIONS
+    assert MODULE_DEFINITIONS[ModuleType.HVAC].mandatory is True
+    assert MODULE_DEFINITIONS[ModuleType.MAINTENANCE].mandatory is False

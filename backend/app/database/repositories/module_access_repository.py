@@ -10,28 +10,9 @@ from app.config.access_profiles import has_profile_module_access, has_profile_si
 from app.database.supabase_client import get_supabase_client
 from app.models.auth import SentinelRole
 from app.models.module_registry import ModuleType
+from app.services.module_registry_service import module_registry
 
 logger = logging.getLogger(__name__)
-
-
-# Modules included in the default/base package for all authenticated users.
-#
-# BASE PACKAGE (every user gets these):
-# - HVAC: monitor building systems (read-only, no automated control)
-# - Energy: energy monitoring and consumption data (read-only)
-# - ML: feedback loop, health scoring, risk predictions
-# - Notifications: alert notifications
-# - Integrations: system health monitoring (SIMBIOT connection status)
-#
-# All other modules (Control, Solar, Lighting, Assets, etc.) are PAID ADD-ONS
-# and require explicit grants via user_module_access table.
-BASE_MODULES: set[str] = {
-    ModuleType.HVAC.value,  # Base: monitoring only, no automated control
-    ModuleType.ENERGY.value,  # Base: energy monitoring, consumption data
-    ModuleType.ML.value,  # Base: feedback loop for recommendation improvement
-    ModuleType.NOTIFICATIONS.value,  # Base: alert notifications
-    ModuleType.INTEGRATIONS.value,  # Base: system health / SIMBIOT connection status
-}
 
 
 class ModuleAccessRepository:
@@ -228,6 +209,24 @@ class ModuleAccessRepository:
             logger.error("Failed getting user modules for %s @ %s: %s", email, site_code, exc)
             return []
 
+    def get_active_modules(self, *, site_code: str) -> list[str]:
+        """Return enabled site modules with mandatory registry modules always included."""
+        registry = module_registry.get_module_registry()
+        enabled_modules = {
+            module_type.value for module_type, definition in registry.items() if definition.enabled
+        }
+        mandatory_modules = {
+            module_type.value
+            for module_type, definition in registry.items()
+            if definition.enabled and definition.mandatory
+        }
+        site_active_modules = {
+            module.module_type.value
+            for module in module_registry.get_active_modules(site_code)
+            if module.module_type.value in enabled_modules
+        }
+        return sorted(mandatory_modules | site_active_modules)
+
     def get_effective_modules(
         self,
         *,
@@ -236,10 +235,24 @@ class ModuleAccessRepository:
         site_code: str,
     ) -> list[str]:
         if user_role == SentinelRole.ADMIN:
-            return [module.value for module in ModuleType]
-        effective = set(BASE_MODULES)
+            return self.get_active_modules(site_code=site_code)
+
+        active_modules = set(self.get_active_modules(site_code=site_code))
+        registry = module_registry.get_module_registry()
+        effective = {
+            module_type
+            for module_type in active_modules
+            if (definition := registry.get(ModuleType(module_type))) and definition.mandatory
+        }
         if user_email:
-            effective.update(self.get_user_modules(user_email=user_email, site_code=site_code))
+            profile_modules = {
+                module.value
+                for module in ModuleType
+                if module.value in active_modules and has_profile_module_access(user_email, module.value)
+            }
+            explicit_modules = set(self.get_user_modules(user_email=user_email, site_code=site_code))
+            effective.update(profile_modules)
+            effective.update(explicit_modules & active_modules)
         return sorted(effective)
 
     def has_module_access(
@@ -251,8 +264,14 @@ class ModuleAccessRepository:
         module_type: ModuleType,
     ) -> bool:
         if user_role == SentinelRole.ADMIN:
-            return True
-        if module_type.value in BASE_MODULES:
+            return module_type.value in set(self.get_active_modules(site_code=site_code))
+
+        active_modules = set(self.get_active_modules(site_code=site_code))
+        if module_type.value not in active_modules:
+            return False
+
+        definition = module_registry.get_module_registry().get(module_type)
+        if definition and definition.mandatory:
             return True
         if not user_email:
             return False

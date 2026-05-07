@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Shield } from "lucide-react";
+import { toast } from "sonner";
 import api from "@/lib/api";
 import { ALL_PHASES, PHASE_COLORS, PHASE_DESCRIPTIONS, PHASE_LABELS, type OnboardingPhase } from "@/lib/onboardingPhase";
 
@@ -52,7 +53,12 @@ export function OnboardingPhaseSettings({
       await api.updateSitePhase(selectedSiteId, nextPhase);
       onSuccess?.();
     } catch (error) {
-      onError?.(error instanceof Error ? error.message : "Failed to update onboarding phase.");
+      const msg =
+        typeof error === "object" && error !== null && "message" in error
+          ? String((error as { message: unknown }).message)
+          : "Failed to update onboarding phase.";
+      toast.error(msg, { description: "Site mode advancement blocked." });
+      onError?.(msg);
     } finally {
       setUpdating(false);
     }

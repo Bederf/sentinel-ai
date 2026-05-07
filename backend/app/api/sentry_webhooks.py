@@ -1172,7 +1172,6 @@ async def sentry_call_log(
     the WO reference for the user.
     """
     _require_sentry_secret(x_sentry_secret, endpoint_name="call_log")
-    _require_operator_password(req.operator_password, endpoint_name="call_log")
 
     try:
         from app.database.repositories.work_order_repository import WorkOrderRepository
@@ -1251,6 +1250,7 @@ async def sentry_call_log(
             raise HTTPException(status_code=500, detail="Failed to create work order")
 
         wo_code = created.get("code", "pending")
+        wo_uuid = created.get("id")
         assigned_name = tech.get("name", "maintenance team") if tech else "maintenance team"
 
         logger.info(
@@ -1262,20 +1262,28 @@ async def sentry_call_log(
 
         # Try to send Telegram notification to technician
         notify_sent = False
+        wo_notify_data = {
+            "code": wo_code,
+            "work_order_id": str(wo_uuid) if wo_uuid else wo_code,
+            "equipment_id": f"ZONE-{req.zone_id}" if req.zone_id else req.site_id,
+            "equipment_name": req.title,
+            "site_id": req.site_id,
+            "technician_id": tech.get("telegram_id") if tech else None,
+            "technician_name": tech.get("name") if tech else None,
+            "service_type": "callout",
+            "criticality": req.priority.upper(),
+            "problem_description": req.description,
+        }
+        logger.info(f"Call-log invoking notify_technician with data={wo_notify_data}")
         if tech and tech.get("telegram_id"):
             try:
-                notify_response = await work_order_notifier.notify_technician(
-                    work_order_id=wo_code,
-                    equipment_id=f"ZONE-{req.zone_id}" if req.zone_id else req.site_id,
-                    equipment_name=req.title,
-                    site_id=req.site_id,
-                    technician_id=tech.get("telegram_id"),
-                    technician_name=tech.get("name"),
-                    service_type="callout",
-                    criticality=req.priority.upper(),
-                    problem_description=req.description,
+                notify_response = await work_order_notifier.notify_technician(wo_notify_data)
+                is_success = (
+                    notify_response.get("success")
+                    if isinstance(notify_response, dict)
+                    else bool(notify_response)
                 )
-                notify_sent = bool(notify_response and notify_response.get("success"))
+                notify_sent = is_success and bool(notify_response)
             except Exception as e:
                 logger.warning(f"Telegram notification failed for call-log WO: {e}")
 
@@ -1383,6 +1391,46 @@ async def lookup_call_log_location_memory(
         raise
     except Exception as e:
         logger.error(f"Call-log location memory lookup failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/call-log/location-memory", status_code=status.HTTP_200_OK)
+async def save_call_log_location_memory(
+    req: dict,
+    x_sentry_secret: str | None = Header(None),
+):
+    """Save reporter location memory for future pre-fill.
+
+    Called by bms_desk_wo.py after a work order is created so the
+    reporter's desk is remembered for their next report.
+    """
+    _require_sentry_secret(x_sentry_secret, endpoint_name="call_log_location_memory_save")
+
+    try:
+        from app.database.repositories.reporter_location_repository import (
+            get_reporter_location_repository,
+        )
+
+        repo = get_reporter_location_repository()
+        saved = repo.upsert({
+            "reporter_telegram_id": req.get("reporter_telegram_id", ""),
+            "reporter_phone": req.get("reporter_phone", ""),
+            "reporter_name": req.get("reporter_name", ""),
+            "site_id": req.get("site_id", "site-002"),
+            "zone_id": req.get("zone_id", ""),
+            "floor": req.get("floor", ""),
+            "desk_id": req.get("desk_id", ""),
+            "location_text": req.get("location", ""),
+            "last_work_order_code": req.get("wo_code", ""),
+            "last_confirmed_at": datetime.utcnow().isoformat(),
+            "channel": "telegram",
+            "source": "call_log",
+        })
+        return {"success": True, "saved": bool(saved)}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Call-log location memory save failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -1676,6 +1724,22 @@ async def handle_telegram_callback(
                 "intent": "document_intake",
                 "confidence": 1.0,
             }
+
+    # Recommendation acknowledgement from morning digest inline buttons
+    if payload.data.startswith("rec:accept:") or payload.data.startswith("rec:dismiss:"):
+        from app.services.recommendation_service import get_recommendation_service
+
+        parts = payload.data.split(":")
+        if len(parts) >= 3:
+            rec_id = parts[2]
+            acknowledgement_type = "accepted" if parts[1] == "accept" else "dismissed"
+            svc = get_recommendation_service()
+            await svc.acknowledge_recommendation(rec_id, acknowledgement_type)
+            sender = get_telegram_sender()
+            action = "Accepted" if parts[1] == "accept" else "Dismissed"
+            await sender.send_text(chat_id=payload.chat_id, text=f"✅ Recommendation {action}.")
+            return {"success": True, "intent": "rec_ack", "confirmed": True}
+        return {"success": False, "error": "invalid_rec_callback"}
 
     # Classify and route
     from app.services.telegram_conversation_manager import get_conversation_manager

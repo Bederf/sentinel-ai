@@ -14,7 +14,11 @@ import {
   moduleRegistryApi,
 } from '../lib/moduleRegistry';
 import { isExpectedApiError } from '@/lib/api';
-import { isMandatoryModule as checkMandatoryModule, getMandatoryModuleErrorMessage } from '../lib/mandatoryModules';
+import {
+  getMandatoryModuleErrorMessage,
+  isMandatoryModule as checkMandatoryModule,
+  syncMandatoryModulesFromRegistry,
+} from '../lib/mandatoryModules';
 import type {
   AIRecommendation,
   ModuleType,
@@ -64,6 +68,7 @@ export function ModuleProvider({
   const loadAvailableModules = useCallback(async () => {
     try {
       const modules = await moduleRegistryApi.getAvailableModules();
+      syncMandatoryModulesFromRegistry(modules);
       setAvailableModules(modules);
     } catch (err) {
       // Suppress rate limit errors - they're expected and will retry
@@ -233,8 +238,8 @@ export function ModuleProvider({
     if (!siteId) return;
 
     // Prevent deactivation of mandatory base modules
-    if (checkMandatoryModule(moduleType)) {
-      const errorMessage = getMandatoryModuleErrorMessage(moduleType);
+    if (checkMandatoryModule(moduleType, availableModules)) {
+      const errorMessage = getMandatoryModuleErrorMessage(moduleType, availableModules);
       console.warn(errorMessage);
       throw new Error(errorMessage);
     }
@@ -245,15 +250,15 @@ export function ModuleProvider({
     // Refresh integration summary
     const summary = await moduleRegistryApi.getIntegrationSummary(siteId);
     setIntegrationSummary(summary);
-  }, [siteId]);
+  }, [availableModules, siteId]);
 
   const isModuleActive = useCallback((moduleType: ModuleType): boolean => {
     return activeModules.some(m => m.module_type === moduleType && m.status === 'active');
   }, [activeModules]);
 
   const isMandatory = useCallback((moduleType: ModuleType): boolean => {
-    return checkMandatoryModule(moduleType);
-  }, []);
+    return checkMandatoryModule(moduleType, availableModules);
+  }, [availableModules]);
 
   const addRecommendation = useCallback((
     recommendation: Omit<AIRecommendation, 'recommendation_id' | 'timestamp' | 'acknowledged' | 'resolved'>

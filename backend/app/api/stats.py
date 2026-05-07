@@ -7,8 +7,6 @@ from pathlib import Path
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from app.config.settings import settings
-
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
@@ -18,6 +16,41 @@ DATA_DIR = Path(__file__).parent.parent / "data"
 # Bridge equipment types to exclude from count (DALI lighting)
 _BRIDGE_EXCLUDE_TYPES = {"lum", "lighting", "dali_luminaire", "dali_lum"}
 
+# Supabase REST config — supports local dev and Cloudflare Worker prod
+# Local: http://127.0.0.1:55321 (Supabase local dev instance)
+# Prod: https://xxxx.supabase.co (via SUPABASE_REST_URL env var)
+import os as _os
+_SUPABASE_REST_URL = _os.getenv("SUPABASE_REST_URL", "http://127.0.0.1:55321/rest/v1")
+_SUPABASE_ANON_KEY = _os.getenv("SUPABASE_REST_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0")
+
+
+def _rest_query(table: str, params: str = "", select: str = "*") -> list[dict]:
+    """Execute a direct REST query against local Supabase."""
+    import httpx
+    url = f"{_SUPABASE_REST_URL}/{table}?{params}&select={select}" if params else f"{_SUPABASE_REST_URL}/{table}?select={select}"
+    try:
+        with httpx.Client(timeout=15.0) as client:
+            resp = client.get(url, headers={"apikey": _SUPABASE_ANON_KEY})
+            resp.raise_for_status()
+            return resp.json()
+    except Exception as e:
+        logger.warning(f"REST query failed for {table}: {e}")
+        return []
+
+
+def _rest_count(table: str, filters: str = "") -> int:
+    """Get row count from Supabase via REST."""
+    import httpx
+    url = f"{_SUPABASE_REST_URL}/{table}?{filters}&select=id"
+    try:
+        with httpx.Client(timeout=15.0) as client:
+            resp = client.get(url, headers={"apikey": _SUPABASE_ANON_KEY})
+            resp.raise_for_status()
+            return len(resp.json())
+    except Exception as e:
+        logger.warning(f"REST count failed for {table}: {e}")
+        return 0
+
 
 def _get_bridge_equipment_count(site_id: str = "site-002") -> tuple[int, dict[str, int]]:
     """Query the site bridge for real-time equipment count (excluding luminaires).
@@ -26,15 +59,16 @@ def _get_bridge_equipment_count(site_id: str = "site-002") -> tuple[int, dict[st
         Tuple of (total_equipment, equipment_types) where equipment_types is a
         dict mapping type -> count, derived from the bridge's BACnet object catalog.
     """
+    # Bridge URL and token from environment — avoids settings init dependency
+    import os
+    base_url = os.getenv("SIMBIOT_API_URL") or os.getenv("BRIDGE_BASE_URL")
+    api_token = os.getenv("SIMBIOT_API_KEY") or os.getenv("BRIDGE_API_TOKEN")
+
+    if not base_url or not api_token:
+        return 0, {}
+
     try:
         import httpx
-
-        base_url = getattr(settings, "simbiot_api_url", None) or getattr(settings, "bridge_base_url", None)
-        api_token = getattr(settings, "simbiot_api_key", None) or getattr(settings, "bridge_api_token", None)
-
-        if not base_url or not api_token:
-            return 0, {}
-
         url = f"{base_url.rstrip('/')}/api/sites/{site_id}/objects"
         headers = {"Authorization": f"Bearer {api_token}"}
 
@@ -45,7 +79,6 @@ def _get_bridge_equipment_count(site_id: str = "site-002") -> tuple[int, dict[st
 
         objs = data if isinstance(data, list) else data.get("objects", data.get("data", []))
         equipment_ids: set[str] = set()
-        # Track unique equipment per type (one entry per equipment_id)
         type_to_equipment: dict[str, set[str]] = {}
 
         for obj in objs:
@@ -54,7 +87,6 @@ def _get_bridge_equipment_count(site_id: str = "site-002") -> tuple[int, dict[st
             obj_name = (obj.get("object_name") or "").lower()
             obj_type = (obj.get("object_type") or "").lower()
 
-            # Skip luminaires and DALI lighting objects
             if not eid or etype in _BRIDGE_EXCLUDE_TYPES:
                 continue
             if "lum" in obj_type or "dali" in obj_name or "light" in obj_name:
@@ -82,115 +114,72 @@ def load_json(filename: str) -> list[dict] | dict:
 
 
 def get_stats_from_supabase() -> dict | None:
-    """Get stats from Supabase database.
+    """Get stats from Supabase database via direct REST API.
 
-    Returns None if Supabase is not available or configured for JSON storage.
+    Bypasses Python client to avoid settings initialization issues.
     """
-    if settings.use_json_storage:
-        return None
-
     try:
-        from app.database.supabase_client import get_supabase_client
+        # Get building/site count
+        sites = _rest_query("sites", select="id,region,sqm")
+        total_sites = len(sites)
 
-        client = get_supabase_client()
+        # Equipment count and status breakdown (bridge fallback not available via REST)
+        equipment = _rest_query("equipment", select="status,health_score,type")
+        total_equipment = len(equipment)
+        warning_count = sum(1 for e in equipment if e.get("status") == "warning")
+        critical_count = sum(1 for e in equipment if e.get("status") == "critical")
+        health_scores = [e.get("health_score", 100) for e in equipment if e.get("health_score") is not None]
+        avg_health = round(sum(health_scores) / len(health_scores), 1) if health_scores else 0
 
-        # Get building count
-        buildings_result = client.table("sites").select("id", count="exact").execute()
-        total_sites = buildings_result.count or 0
+        # Equipment type breakdown
+        type_stats = {}
+        for eq in equipment:
+            eq_type = eq.get("type", "unknown")
+            if eq_type not in type_stats:
+                type_stats[eq_type] = {"type": eq_type, "count": 0, "total_health": 0, "warning_count": 0}
+            type_stats[eq_type]["count"] += 1
+            type_stats[eq_type]["total_health"] += eq.get("health_score", 100)
+            if eq.get("status") == "warning":
+                type_stats[eq_type]["warning_count"] += 1
+        by_equipment_type = [
+            {
+                "type": s["type"],
+                "count": s["count"],
+                "avg_health": round(s["total_health"] / s["count"], 1) if s["count"] > 0 else 0,
+                "warning_count": s["warning_count"],
+            }
+            for s in type_stats.values()
+        ]
+        by_equipment_type.sort(key=lambda t: -t["count"])
 
-        # Get total equipment count from bridge (real-time BACnet catalog, no luminaires)
-        total_equipment, bridge_types = _get_bridge_equipment_count()
-        warning_count = 0
-        critical_count = 0
-        total_health = 0
+        # Active risks from predictions (consolidated risk system)
+        predictions = _rest_query("predictions", "status=eq.active", select="severity")
+        alert_critical = sum(1 for p in predictions if p.get("severity") == "critical")
+        alert_warning = sum(1 for p in predictions if p.get("severity") == "warning")
+        alert_info = 0
+        alert_total = alert_critical + alert_warning
 
-        # If bridge is unreachable, fall back to equipment table
-        if total_equipment == 0:
-            eq_detail = client.table("equipment").select("status,health_score").execute()
-            eq_items = eq_detail.data or []
-            total_equipment = len(eq_items)
-            for eq in eq_items:
-                status = eq.get("status", "normal")
-                health = eq.get("health_score", 100)
-                total_health += health
-                if status == "warning":
-                    warning_count += 1
-                elif status == "critical":
-                    critical_count += 1
-            avg_health = round(total_health / total_equipment, 1) if total_equipment > 0 else 0
-            # Build type counts from equipment table when bridge is down
-            type_stats = {}
-            eq_types = client.table("equipment").select("type,health_score,status").execute()
-            for eq in eq_types.data or []:
-                eq_type = eq.get("type", "unknown")
-                if eq_type not in type_stats:
-                    type_stats[eq_type] = {"type": eq_type, "count": 0, "total_health": 0, "warning_count": 0}
-                type_stats[eq_type]["count"] += 1
-                type_stats[eq_type]["total_health"] += eq.get("health_score", 100)
-                if eq.get("status") == "warning":
-                    type_stats[eq_type]["warning_count"] += 1
-            by_equipment_type = [
-                {
-                    "type": s["type"],
-                    "count": s["count"],
-                    "avg_health": round(s["total_health"] / s["count"], 1) if s["count"] > 0 else 0,
-                    "warning_count": s["warning_count"],
-                }
-                for s in type_stats.values()
-            ]
-            by_equipment_type.sort(key=lambda t: -t["count"])
-        else:
-            # Bridge data: equipment count from bridge, no health scores available
-            avg_health = 0
-            by_equipment_type = [
-                {"type": t, "count": c, "avg_health": 0, "warning_count": 0}
-                for t, c in sorted(bridge_types.items(), key=lambda x: -x[1])
-            ]
+        # Sensor count
+        sensors = _rest_query("sensors", select="id")
+        total_sensors = len(sensors)
 
-        # Get active risks from predictions (consolidated risk system)
-        # Predictions with severity 'critical' or 'warning' are considered active risks
-        predictions_result = client.table("predictions").select("severity").eq("status", "active").execute()
-        active_predictions = predictions_result.data or []
+        # Readings count
+        readings = _rest_query("sensor_readings", select="time")
+        total_readings = len(readings)
 
-        alert_critical = sum(1 for p in active_predictions if p.get("severity") == "critical")
-        alert_warning = sum(1 for p in active_predictions if p.get("severity") == "warning")
-        alert_info = 0  # Predictions don't have 'info' severity
-        alert_total = alert_critical + alert_warning  # Only count critical and warning as risks
-
-        # Get sensor count
-        sensors_result = client.table("sensors").select("id", count="exact").execute()
-        total_sensors = sensors_result.count or 0
-
-        # Get readings count (from sensor_readings table - uses time as key)
-        readings_result = client.table("sensor_readings").select("time", count="exact").execute()
-        total_readings = readings_result.count or 0
-
-        # Get anomalies
-        anomalies_result = client.table("anomalies").select("*").execute()
-        anomalies = anomalies_result.data or []
+        # Anomalies
+        anomalies = _rest_query("anomalies", select="repair_cost_zar,damage_cost_zar")
         total_repair = sum(a.get("repair_cost_zar", 0) for a in anomalies)
         total_damage = sum(a.get("damage_cost_zar", 0) for a in anomalies)
 
-        # Get buildings with sqm for total
-        buildings_detail = client.table("sites").select("region,sqm").execute()
-        buildings = buildings_detail.data or []
-        total_sqm = sum(b.get("sqm", 0) for b in buildings)
-
-        # Aggregate by region
+        # Region aggregation
         region_stats = {}
-        for b in buildings:
+        for b in sites:
             region = b.get("region", "Unknown")
             if region not in region_stats:
-                region_stats[region] = {
-                    "region": region,
-                    "site_count": 0,
-                    "equipment_count": 0,
-                    "total_sqm": 0,
-                    "alert_count": 0,
-                }
+                region_stats[region] = {"region": region, "site_count": 0, "equipment_count": 0, "total_sqm": 0, "alert_count": 0}
             region_stats[region]["site_count"] += 1
-            region_stats[region]["total_sqm"] += b.get("sqm", 0)
-
+            region_stats[region]["total_sqm"] += b.get("sqm", 0) or 0
         by_region = list(region_stats.values())
         by_region.sort(key=lambda r: -r["site_count"])
 
@@ -211,7 +200,7 @@ def get_stats_from_supabase() -> dict | None:
             "total_damage": total_damage,
             "by_region": by_region,
             "by_equipment_type": by_equipment_type,
-            "total_sqm": total_sqm,
+            "total_sqm": sum(b.get("sqm", 0) or 0 for b in sites),
         }
     except Exception as e:
         logger.warning(f"Failed to get stats from Supabase: {e}")

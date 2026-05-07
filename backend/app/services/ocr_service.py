@@ -194,6 +194,7 @@ For confidence scores: 1.0 = clearly legible, 0.5 = partially readable, 0.0 = gu
                     input_tokens=getattr(u, "input_tokens", 0),
                     output_tokens=getattr(u, "output_tokens", 0),
                     source="ocr_extraction",
+                    feature="email_ocr",
                 )
             except Exception:
                 pass  # Never break OCR for tracking

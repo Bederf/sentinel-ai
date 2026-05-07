@@ -201,6 +201,47 @@ class SiteModePolicyService:
     def _failed_rules(checks: list[dict[str, Any]]) -> list[dict[str, Any]]:
         return [c for c in checks if not c["passed"]]
 
+    async def get_gate_status(self, site_id: str) -> dict[str, Any]:
+        """Return pass/fail details for the current stage's promotion gates.
+
+        Used to gate manual phase advancement — operators can only advance
+        when all promotion thresholds for the current stage are satisfied.
+        """
+        try:
+            policy = self.load_policy(site_id)
+            state = self._load_state(site_id, policy)
+        except FileNotFoundError:
+            return {"site_id": site_id, "error": "policy_not_found", "gates_pass": None, "failed_gates": []}
+
+        snapshot = await self._monitoring.get_snapshot(site_id=site_id)
+        metrics = self._extract_metrics(snapshot)
+
+        stages = policy.get("stages", {})
+        current_stage = state.get("current_stage", policy.get("default_stage", "commissioning"))
+        stage_cfg = stages.get(current_stage, {})
+        promotion_cfg = stage_cfg.get("promotion", {})
+
+        if not promotion_cfg:
+            return {
+                "site_id": site_id,
+                "current_stage": current_stage,
+                "gates_pass": True,
+                "failed_gates": [],
+                "metrics": metrics,
+            }
+
+        entry_thresholds = promotion_cfg.get("entry_thresholds", {})
+        entry_checks = self._evaluate_thresholds(entry_thresholds, metrics)
+        failed = self._failed_rules(entry_checks)
+
+        return {
+            "site_id": site_id,
+            "current_stage": current_stage,
+            "gates_pass": len(failed) == 0,
+            "failed_gates": failed,
+            "metrics": metrics,
+        }
+
     async def evaluate_site(self, site_id: str) -> dict[str, Any]:
         """Evaluate onboarding policy for a site and persist dry-run state."""
         now = self._clock()

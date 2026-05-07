@@ -1238,6 +1238,35 @@ async def update_site_phase(site_id: str, request: PhaseUpdateRequest) -> PhaseU
                     },
                 )
 
+        # Policy gate check: block manual advancement if current stage's gates haven't passed
+        from app.services.site_mode_policy_service import SiteModePolicyService
+
+        policy_service = SiteModePolicyService()
+        try:
+            gate_status = await policy_service.get_gate_status(site_id)
+        except Exception as gate_err:
+            logger.warning(f"Gate status check failed for {site_id}: {gate_err}")
+            gate_status = {"gates_pass": None, "failed_gates": [], "error": str(gate_err)}
+
+        if gate_status.get("gates_pass") is False:
+            failed = gate_status.get("failed_gates", [])
+            failed_names = [g["rule"] for g in failed]
+            detail_msg = (
+                f"Policy gates not satisfied for {gate_status.get('current_stage', 'current stage')}. "
+                f"Cannot advance until all gates pass. Failed: {', '.join(failed_names) if failed_names else 'see metrics'}."
+            )
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "Policy gates not satisfied",
+                    "current_stage": gate_status.get("current_stage"),
+                    "requested": requested,
+                    "gates_pass": False,
+                    "failed_gates": failed,
+                    "message": detail_msg,
+                },
+            )
+
         client.table("sites").update({"onboarding_phase": requested}).eq("code", site_id).execute()
         supabase_ok = True
         logger.info(f"Onboarding phase set to '{requested}' for {site_id} (Supabase)")
@@ -1297,11 +1326,15 @@ async def update_site_phase(site_id: str, request: PhaseUpdateRequest) -> PhaseU
 
 
 def _get_bridge_status(sentinel_enabled: bool = True) -> dict:
-    """Get SIMBIOT ingestion status (connection, transport source, sync time).
+    """Get bridge/data ingestion status (connection, transport source, sync time).
 
     Bridge status is tied to sentinel_processing_enabled (the data valve).
     When valve is CLOSED (sentinel_enabled=False), no data flows (bridge_data_source="none").
     When valve is OPEN (sentinel_enabled=True), data flows from configured source.
+
+    ShadowModePollingService is the primary bridge data pipeline. SIMBIOT
+    ConceptConnector (CAFM work orders) is a separate feature and should not
+    determine bridge connectivity.
     """
     # Valve closed: no data flows (fast path, no service calls)
     if not sentinel_enabled:
@@ -1319,44 +1352,54 @@ def _get_bridge_status(sentinel_enabled: bool = True) -> dict:
         bridge_last_sync = None
         bridge_sync_error = None
 
-        # Check SIMBIOT remote bridge status when a bridge endpoint is configured
-        if settings.simbiot_api_url:
+        # ShadowModePollingService is the primary bridge data pipeline
+        try:
+            from app.services.multi_site_polling_coordinator import get_multi_site_polling_coordinator
+
+            coordinator = get_multi_site_polling_coordinator()
+            shadow_status = coordinator.get_service_status("site-002")
+            if shadow_status is not None:
+                if shadow_status.get("connected"):
+                    bridge_connected = True
+                    bridge_last_sync = shadow_status.get("last_poll")
+                    bridge_sync_error = None
+                    bridge_data_source = "remote_bridge"
+                else:
+                    reason = shadow_status.get("reason", "not_polled")
+                    bridge_sync_error = f"polling: {reason}"
+                    if not bridge_data_source or bridge_data_source == "none":
+                        bridge_data_source = "remote_bridge"
+        except Exception as e:
+            logger.debug("Shadow polling status unavailable: %s", e)
+            if not bridge_sync_error:
+                bridge_sync_error = "polling service unavailable"
+
+        # Only fall back to SIMBIOT status if shadow polling isn't the data source
+        # SIMBIOT ConceptConnector is for CAFM work orders, not bridge data flow
+        if not bridge_connected and settings.simbiot_api_url:
             try:
                 from app.services.simbiot_service import simbiot_service
 
                 simbiot_status = simbiot_service.status
-                if isinstance(simbiot_status, dict):
-                    bridge_connected = simbiot_status.get("enabled", False)
-                    if not bridge_connected:
-                        bridge_sync_error = simbiot_status.get("reason", "not initialized")
+                if isinstance(simbiot_status, dict) and simbiot_status.get("enabled"):
+                    bridge_connected = True
+                    bridge_data_source = "simbiot"
+                    bridge_sync_error = None
+                elif not bridge_sync_error:
+                    bridge_sync_error = simbiot_status.get("reason", "simbiot not available")
             except Exception as e:
-                logger.warning(f"Failed to get SIMBIOT status: {e}")
-                bridge_sync_error = str(e)[:100]
+                if not bridge_sync_error:
+                    bridge_sync_error = str(e)[:100]
 
-            if bridge_connected or settings.simbiot_api_url:
-                bridge_data_source = "remote_bridge"
-
-        # Check ShadowModePollingService — it has the live bridge connection
-        # when simbiot_service is not enabled but the bridge is configured.
-        try:
-            from app.services.shadow_mode_polling import get_shadow_mode_polling_service
-
-            shadow = get_shadow_mode_polling_service()
-            shadow_status = shadow.status
-            if isinstance(shadow_status, dict) and shadow_status.get("connected"):
-                bridge_connected = True
-                bridge_last_sync = shadow_status.get("last_poll")
-                bridge_sync_error = None
-                bridge_data_source = "remote_bridge"
-        except Exception as e:
-            logger.debug("Shadow polling status unavailable: %s", e)
+        if bridge_connected:
+            bridge_data_source = bridge_data_source or "remote_bridge"
 
         if (
             settings.site002_source_enabled
             and settings.ingestion_mode == "simulation"
         ):
             bridge_data_source = "local_adapter"
-            bridge_connected = True  # Local adapter is connected (data flows)
+            bridge_connected = True
 
         return {
             "bridge_connected": bridge_connected,

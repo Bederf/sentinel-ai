@@ -214,6 +214,7 @@ class OpenAIService:
                     input_tokens=u.get("prompt_tokens", 0),
                     output_tokens=u.get("completion_tokens", 0),
                     source=source,
+                    feature="tool_dispatcher",
                     site_id=site_id or "unknown",
                 )
             except Exception:
@@ -307,6 +308,7 @@ class OpenAIService:
                     input_tokens=u.get("prompt_tokens", 0),
                     output_tokens=u.get("completion_tokens", 0),
                     source=source,
+                    feature="tool_dispatcher",
                     site_id=site_id or "unknown",
                 )
             except Exception:

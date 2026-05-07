@@ -24,6 +24,19 @@ interface TodayModel {
   cost_zar: number;
 }
 
+interface CacheStats {
+  total_input_tokens: number;
+  cache_read_tokens: number;
+  cache_hit_rate: number;
+  cache_hit_pct: number;
+}
+
+interface FeatureUsage {
+  calls: number;
+  tokens: number;
+  cost_usd: number;
+}
+
 interface UsageSummary {
   period_days: number;
   usd_zar_rate: number;
@@ -33,6 +46,8 @@ interface UsageSummary {
   by_provider: Record<string, ModelUsage>;
   by_model: Record<string, ModelUsage>;
   by_source?: Record<string, ModelUsage>;
+  by_feature?: Record<string, FeatureUsage>;
+  cache_stats?: CacheStats;
   daily: DailyCost[];
   budget?: {
     monthly_budget_zar: number;
@@ -370,6 +385,61 @@ export function AiCostTracker({ siteId, onError }: AiCostTrackerProps) {
                       </span>
                     </div>
                   ))}
+                </div>
+              </div>
+            )}
+
+            {/* Cache efficiency */}
+            {summary?.cache_stats && summary.cache_stats.total_input_tokens > 0 && (
+              <div>
+                <h3 className="text-xs font-semibold mb-2" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                  Cache Efficiency
+                </h3>
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="p-2 rounded" style={{ background: "var(--color-sentinel-bg-secondary)", border: "1px solid var(--glass-border)" }}>
+                    <p className="text-[10px]" style={{ color: "var(--color-sentinel-text-secondary)" }}>Input Tokens</p>
+                    <p className="text-sm font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                      {fmtTokens(summary.cache_stats.total_input_tokens)}
+                    </p>
+                  </div>
+                  <div className="p-2 rounded" style={{ background: "var(--color-sentinel-bg-secondary)", border: "1px solid var(--glass-border)" }}>
+                    <p className="text-[10px]" style={{ color: "var(--color-sentinel-text-secondary)" }}>Cache Read</p>
+                    <p className="text-sm font-semibold" style={{ color: "var(--color-sentinel-green)" }}>
+                      {fmtTokens(summary.cache_stats.cache_read_tokens)}
+                    </p>
+                  </div>
+                  <div className="p-2 rounded" style={{ background: "rgba(59, 130, 246, 0.15)", border: "1px solid rgba(59, 130, 246, 0.5)" }}>
+                    <p className="text-[10px]" style={{ color: "var(--color-sentinel-text-secondary)" }}>Hit Rate</p>
+                    <p className="text-sm font-semibold" style={{ color: "var(--color-sentinel-blue)" }}>
+                      {summary.cache_stats.cache_hit_pct.toFixed(1)}%
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* By feature */}
+            {summary?.by_feature && Object.keys(summary.by_feature).length > 0 && (
+              <div>
+                <h3 className="text-xs font-semibold mb-2" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                  By Feature
+                </h3>
+                <div className="space-y-1">
+                  {Object.entries(summary.by_feature)
+                    .sort(([, a], [, b]) => b.tokens - a.tokens)
+                    .map(([feature, data]) => (
+                      <div key={feature} className="flex items-center justify-between py-1.5 px-2 rounded" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
+                        <div>
+                          <span className="text-xs font-mono" style={{ color: "var(--color-sentinel-text-primary)" }}>{feature}</span>
+                          <span className="text-[10px] ml-2" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                            {data.calls} calls · {fmtTokens(data.tokens)} tokens
+                          </span>
+                        </div>
+                        <span className="text-xs font-semibold" style={{ color: "var(--color-sentinel-amber)" }}>
+                          R {fmt(data.cost_usd * summary.usd_zar_rate)}
+                        </span>
+                      </div>
+                    ))}
                 </div>
               </div>
             )}

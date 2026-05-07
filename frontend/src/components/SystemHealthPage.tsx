@@ -33,12 +33,14 @@ import {
   TrendingDown,
 } from 'lucide-react';
 import type { IntegrationHealthSummary } from '@/lib/api';
+import type { CommissioningSnapshot, QualityGateStatus } from '@/lib/api/system';
 import { monitoringApi } from '@/lib/api';
 import { authorizedFetch } from '../lib/api/client';
 
 import { PageLoading } from './PageLoading';
 import { AdapterHealthCard } from './system/AdapterHealthCard';
 import { CriticalPathCard } from './system/CriticalPathCard';
+import { CommissioningGatePanel } from './system/CommissioningGatePanel';
 
 interface _HealthComponent {
   name: string;
@@ -63,6 +65,8 @@ export default function SystemHealthPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dataFreshness, setDataFreshness] = useState<DataFreshnessResponse | null>(null);
+  const [commissioning, setCommissioning] = useState<CommissioningSnapshot | null>(null);
+  const [qualityGate, setQualityGate] = useState<QualityGateStatus | null>(null);
 
   // ---- Data Freshness Types ----
   interface FreshnessSource {
@@ -104,14 +108,17 @@ export default function SystemHealthPage() {
     loadHealthData();
     loadDataFreshness();
     loadUptimeData();
-    // Refresh health every 30s, freshness every 5m, uptime every 10m
+    loadGateData();
+    // Refresh health every 30s, freshness every 5m, uptime every 10m, gates every 30s
     const healthInterval = setInterval(loadHealthData, 30000);
     const freshnessInterval = setInterval(loadDataFreshness, 300000);
     const uptimeInterval = setInterval(loadUptimeData, 600000);
+    const gateInterval = setInterval(loadGateData, 30000);
     return () => {
       clearInterval(healthInterval);
       clearInterval(freshnessInterval);
       clearInterval(uptimeInterval);
+      clearInterval(gateInterval);
     };
   }, []);
 
@@ -176,6 +183,26 @@ export default function SystemHealthPage() {
       }
     } catch (err) {
       console.error('Uptime data fetch error:', err);
+    }
+  };
+
+  const loadGateData = async () => {
+    try {
+      const siteId = 'site-002';
+      const [scorecardRes, qgRes] = await Promise.all([
+        authorizedFetch(`/api/integration/buildings/${siteId}/commissioning-scorecard`),
+        authorizedFetch(`/api/optimization/quality-gate/${siteId}`),
+      ]);
+      if (scorecardRes.ok) {
+        const data = await scorecardRes.json();
+        setCommissioning(data);
+      }
+      if (qgRes.ok) {
+        const data = await qgRes.json();
+        setQualityGate(data);
+      }
+    } catch (err) {
+      console.error('Gate data fetch error:', err);
     }
   };
 
@@ -427,6 +454,12 @@ export default function SystemHealthPage() {
                     <Text style={{ color: "var(--color-sentinel-text-secondary)" }}>Recent errors: {integrationHealth?.recent_errors_count || 0}</Text>
                   </div>
                 </Card>
+
+                {/* Commissioning Gates + Quality Gate */}
+                <CommissioningGatePanel
+                  commissioning={commissioning}
+                  qualityGate={qualityGate}
+                />
 
                 {/* Adapter Health — SLI Tier 1 */}
                 <AdapterHealthCard siteId="site-002" />
