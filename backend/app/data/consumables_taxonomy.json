@@ -1,0 +1,66 @@
+{
+  "consumables": {
+    "sanitation": {
+      "priority": "LOW",
+      "items": [
+        "soap dispenser",
+        "toilet paper",
+        "hand towel",
+        "sanitary bin",
+        "urinal block",
+        "hand dryer",
+        "soap",
+        "tissue",
+        "paper towel",
+        " dispenser empty",
+        "refill soap"
+      ]
+    },
+    "electrical_consumables": {
+      "priority": "MEDIUM",
+      "items": [
+        "battery",
+        "batteries",
+        "light bulb",
+        "LED globe",
+        "fuse",
+        "circuit breaker",
+        "globes",
+        "lamp replacement",
+        "bulb replacement"
+      ]
+    },
+    "hvac_consumables": {
+      "priority": "LOW",
+      "items": [
+        "filter",
+        "belt",
+        "lubricant",
+        "V-belt",
+        "air filter",
+        "belt replacement"
+      ]
+    },
+    "janitorial": {
+      "priority": "LOW",
+      "items": [
+        "refuse bag",
+        "bin liner",
+        "cleaning chemical",
+        "cleaning product",
+        "detergent",
+        "disinfectant",
+        "mop head",
+        "broom"
+      ]
+    }
+  },
+  "_metadata": {
+    "version": "1.0",
+    "description": "SA-context consumables taxonomy for priority correction",
+    "priority_overrides": {
+      "LOW": ["sanitation", "hvac_consumables", "janitorial"],
+      "MEDIUM": ["electrical_consumables"]
+    }
+  }
+}
