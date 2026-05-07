@@ -45,6 +45,11 @@ EQUIPMENT_CRITICALITY: dict[str, float] = {
 }
 
 
+# Cluster boost factor applied to urgency when equipment is in cluster alert state.
+# Configurable via settings; default 1.5× means 50% urgency increase for systemic faults.
+CLUSTER_BOOST_FACTOR = 1.5
+
+
 def _cost_component(fault_type: str, current_hour: int | None) -> float:
     """Return tariff-based cost component (0.0–1.0).
 
@@ -69,6 +74,8 @@ def compute_fault_urgency(
     equipment_id: str,
     posture_weights: dict[str, float],
     current_hour: int | None = None,
+    is_cluster_alert: bool = False,
+    cluster_count: int = 1,
 ) -> tuple[float, dict[str, float]]:
     """Compute urgency score for an equipment fault.
 
@@ -78,6 +85,8 @@ def compute_fault_urgency(
         equipment_id: e.g. "S002-CHILLER-B1-001" — type extracted from code
         posture_weights: {"comfort": 0.70, "cost": 0.15, "asset": 0.15}
         current_hour: 0-23 local hour, or None if unknown
+        is_cluster_alert: True if equipment has >= 3 occurrences in 90-day window
+        cluster_count: Running count of occurrences in window (used for cluster boost)
 
     Returns:
         (urgency_score, urgency_components)
@@ -100,6 +109,10 @@ def compute_fault_urgency(
     cost_component = cost_raw * posture_weights.get("cost", 0.15)
 
     urgency_score = min(1.0, comfort_component + asset_component + cost_component)
+
+    # Cluster boost: systemic faults (3+ occurrences in 90-day window) get urgency multiplier
+    if is_cluster_alert and cluster_count >= 3:
+        urgency_score = min(1.0, urgency_score * CLUSTER_BOOST_FACTOR)
 
     components = {
         "comfort": round(comfort_component, 3),

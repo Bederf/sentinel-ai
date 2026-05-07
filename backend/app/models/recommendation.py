@@ -120,6 +120,15 @@ class Recommendation:
     sla_hours: dict[str, int] = field(default_factory=dict)  # {"assigned": 24, "in_progress": 48, ...}
     sla_deadline_at: datetime | None = None  # Materialised deadline, updated on advance
     external_ticket_id: str | None = None  # FSI/external ticket correlation
+    is_consumable: bool = False  # True if issue is a consumable replace, not a fault
+
+    # Consumables correction metadata (populated by SemanticPriorityClassifier)
+    priority_corrected: bool = False  # True if priority was downgraded from original
+    priority_reason: str | None = None  # Explanation from classifier
+
+    # Cluster detection metadata (Phase 207-04: cluster alert at 3rd occurrence)
+    is_cluster_alert: bool = False  # True if equipment has >= 3 occurrences in 90-day window
+    cluster_count: int = 1  # Running count of occurrences in sliding window
 
     def get_numeric_confidence(self) -> float:
         """Return numeric confidence, converting string if needed.
@@ -191,6 +200,8 @@ class Recommendation:
             if isinstance(self.sla_deadline_at, datetime)
             else self.sla_deadline_at,
             "external_ticket_id": self.external_ticket_id,
+            "is_cluster_alert": self.is_cluster_alert,
+            "cluster_count": self.cluster_count,
         }
 
     @classmethod
@@ -312,4 +323,7 @@ class Recommendation:
             sla_hours=sla_hours,
             sla_deadline_at=sla_deadline_at,
             external_ticket_id=data.get("external_ticket_id"),
+            # Cluster detection metadata
+            is_cluster_alert=data.get("is_cluster_alert", False),
+            cluster_count=data.get("cluster_count", 1),
         )

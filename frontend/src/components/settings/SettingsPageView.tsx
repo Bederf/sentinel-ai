@@ -25,6 +25,7 @@ import { SpaceOptimizationSettings } from "./SpaceOptimizationSettings";
 import { SystemHealthDashboard } from "./SystemHealthDashboard";
 import { TariffManager } from "./TariffManager";
 import { TechnicianRegistry } from "./TechnicianRegistry";
+import { ManagerRegistry } from "./ManagerRegistry";
 import type { useSettingsController } from "./useSettingsController";
 
 interface SettingsPageViewProps {
@@ -110,6 +111,12 @@ function SettingsSections({
         readOnly={controller.readOnly}
       />
       <TechnicianRegistry
+        siteId={controller.selectedSiteId ?? undefined}
+        onError={onError}
+        onSuccess={controller.handleSuccess}
+        readOnly={controller.readOnly}
+      />
+      <ManagerRegistry
         siteId={controller.selectedSiteId ?? undefined}
         onError={onError}
         onSuccess={controller.handleSuccess}

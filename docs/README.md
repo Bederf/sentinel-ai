@@ -225,6 +225,8 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 ### 🔧 Development
 - [Tool Use Best Practices](12-development/tool-use-best-practices.md) - Development workflow
 - [GSD Pipeline Architecture](12-development/gsd-pipeline-architecture.md) - Phase orchestration, Ralph Loop, orthogonal validation
+- [Repo Agents Guidelines](12-development/REPO_AGENTS_GUIDELINES.md) - Repository structure and module organization
+- [Deployment Readiness Audit 2026-04-26](12-development/DEPLOYMENT_READINESS_AUDIT_2026-04-26.md) - Pre-production audit against SENTINEL deployment checklist
 
 ### 🔧 Operations
 - **[Deployment Runbook](10-operations/deployment-runbook.md)** - Step-by-step new site deployment: install → Supabase → config → services → SIMBIOT wizard → technician setup → verification

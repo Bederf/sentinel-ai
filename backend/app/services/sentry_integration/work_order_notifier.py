@@ -49,7 +49,7 @@ class WorkOrderNotifier:
         return text.replace("\\n", "\n")
 
     @staticmethod
-    def _resolve_equipment(equipment_id: str, equipment_name: str = "") -> dict[str, Any] | None:
+    def _resolve_equipment(equipment_id: str, _equipment_name: str = "") -> dict[str, Any] | None:
         """Look up equipment by UUID or code for email body enrichment."""
         if not equipment_id:
             return None
@@ -189,6 +189,7 @@ class WorkOrderNotifier:
         criticality = str(work_order_data.get("criticality") or work_order.get("priority") or "MEDIUM").upper()
         wo_ref = (
             work_order.get("code")
+            or work_order_data.get("code")
             or work_order_data.get("work_order_code")
             or work_order_data.get("work_order_id")
             or "N/A"
@@ -225,6 +226,7 @@ class WorkOrderNotifier:
 
         wo_ref = (
             work_order.get("code")
+            or work_order_data.get("code")
             or work_order_data.get("work_order_code")
             or work_order_data.get("work_order_id")
             or "N/A"
@@ -239,7 +241,7 @@ class WorkOrderNotifier:
         technician_name = work_order_data.get("technician_name", "Technician")
         service_record_code = service_record.get("code", "")
 
-        title = self._normalize_text(work_order.get("title") or work_order_data.get("title"))
+        _title = self._normalize_text(work_order.get("title") or work_order_data.get("title"))
         description = self._normalize_text(
             work_order.get("description")
             or work_order_data.get("problem_description")
@@ -268,6 +270,10 @@ class WorkOrderNotifier:
             f"- Priority: {priority}",
             f"- Service Type: {service_type}",
             "",
+            "LOCATION",
+            f"- Zone: {work_order_data.get('zone_id', 'N/A')}",
+            f"- Desk: {work_order_data.get('desk_id', 'N/A')}",
+            "",
             "EQUIPMENT & SITE",
             f"- Site: {site_name} ({site_code})",
             f"- Equipment: {equipment_name}",
@@ -275,8 +281,8 @@ class WorkOrderNotifier:
             f"- Equipment Type: {equipment_type}",
         ]
 
-        if title:
-            lines.extend(["", "ISSUE TITLE", title])
+        if _title:
+            lines.extend(["", "ISSUE TITLE", _title])
 
         lines.extend(["", "ISSUE DESCRIPTION", description])
 
@@ -337,6 +343,182 @@ class WorkOrderNotifier:
 
         return "\n".join(lines)
 
+    def _build_email_body_html(
+        self,
+        work_order_data: dict[str, Any],
+        service_record: dict[str, Any],
+        work_order: dict[str, Any],
+    ) -> str:
+        """Build Sentinel-branded HTML email body for technician execution."""
+        equipment_obj = work_order.get("equipment") or {}
+        site_obj = work_order.get("sites") or {}
+        diagnostic_context = work_order_data.get("diagnostic_context") or service_record.get("diagnostic_context") or {}
+
+        if not equipment_obj.get("code"):
+            equipment_obj = (
+                self._resolve_equipment(
+                    work_order_data.get("equipment_id", ""),
+                    work_order_data.get("equipment_name", ""),
+                )
+                or equipment_obj
+            )
+        if not site_obj.get("name"):
+            site_obj = (
+                self._resolve_site(
+                    work_order_data.get("site_id", ""),
+                )
+                or site_obj
+            )
+
+        wo_ref = (
+            work_order.get("code")
+            or work_order_data.get("code")
+            or work_order_data.get("work_order_code")
+            or work_order_data.get("work_order_id")
+            or "N/A"
+        )
+        equipment_name = work_order_data.get("equipment_name") or equipment_obj.get("name") or "Unknown Equipment"
+        equipment_code = equipment_obj.get("code") or work_order_data.get("equipment_code") or "N/A"
+        equipment_type = (equipment_obj.get("type") or work_order_data.get("equipment_type") or "N/A").upper()
+        site_name = site_obj.get("name") or work_order_data.get("site_name") or "N/A"
+        site_code = site_obj.get("code") or work_order_data.get("site_code") or "N/A"
+        priority = str(work_order_data.get("criticality") or work_order.get("priority") or "MEDIUM").upper()
+        service_type = str(work_order_data.get("service_type") or "callout").lower()
+        technician_name = work_order_data.get("technician_name", "Technician")
+        service_record_code = service_record.get("code", "")
+
+        _title = self._normalize_text(work_order.get("title") or work_order_data.get("title"))
+        description = self._normalize_text(
+            work_order.get("description")
+            or work_order_data.get("problem_description")
+            or work_order_data.get("description")
+            or "No description provided."
+        )
+
+        diagnostics_text = ""
+        if isinstance(diagnostic_context, dict) and diagnostic_context:
+            diagnostics_text = json.dumps(diagnostic_context, indent=2, ensure_ascii=True)
+        elif diagnostic_context:
+            diagnostics_text = self._normalize_text(diagnostic_context)
+
+        instructions = self._normalize_text(
+            work_order_data.get("instructions") or work_order_data.get("inspection_instructions")
+        )
+
+        # Priority color mapping
+        priority_colors = {
+            "CRITICAL": "#ea4335",
+            "HIGH": "#f57c00",
+            "MEDIUM": "#1a73e8",
+            "LOW": "#188038",
+        }
+        priority_color = priority_colors.get(priority, "#1a73e8")
+
+        # Inspection checklist - build HTML list
+        checklist_raw = self._get_inspection_checklist(equipment_type.lower())
+        if checklist_raw:
+            checklist_items = [f"<li>{line.strip()}</li>" for line in checklist_raw.split("\n") if line.strip()]
+            checklist_html = f"<ul>{''.join(checklist_items)}</ul>"
+        elif instructions:
+            instruction_items = [f"<li>{line.strip()}</li>" for line in instructions.split("\n") if line.strip()]
+            checklist_html = f"<ul>{''.join(instruction_items)}</ul>"
+        else:
+            checklist_html = "<ul><li>Verify site safety controls before touching equipment.</li><li>Inspect the faulted subsystem and capture photos/readings.</li><li>Run diagnostics and record measured values.</li><li>Identify likely root cause and required corrective action.</li></ul>"
+
+        tg_code = equipment_code.replace("-", "_") if equipment_code != "N/A" else ""
+
+        html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Work Order {wo_ref}</title>
+<style>
+  body {{ font-family: Arial, sans-serif; background-color: #f8f9fa; margin: 0; padding: 20px; }}
+  .container {{ max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.12); }}
+  .header {{ background: linear-gradient(135deg, #1a73e8 0%, #0d47a1 100%); color: white; padding: 24px 32px; }}
+  .header h1 {{ margin: 0 0 4px 0; font-size: 20px; font-weight: 600; letter-spacing: 0.5px; }}
+  .header p {{ margin: 0; opacity: 0.85; font-size: 13px; }}
+  .badge-row {{ padding: 20px 32px 0 32px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }}
+  .priority-badge {{ display: inline-block; padding: 4px 12px; border-radius: 16px; color: white; font-size: 12px; font-weight: 600; background-color: {priority_color}; }}
+  .wo-ref {{ background: #e8f0fe; color: #1a73e8; padding: 4px 12px; border-radius: 16px; font-size: 12px; font-weight: 600; }}
+  .content {{ padding: 24px 32px; }}
+  .info-table {{ width: 100%; border-collapse: collapse; margin-bottom: 20px; }}
+  .info-table td {{ padding: 8px 0; vertical-align: top; font-size: 14px; }}
+  .info-table td:first-child {{ color: #5f6368; width: 40%; }}
+  .info-table td:last-child {{ color: #202124; font-weight: 500; }}
+  h2 {{ color: #1a73e8; font-size: 14px; font-weight: 600; margin: 0 0 12px 0; text-transform: uppercase; letter-spacing: 0.5px; }}
+  .description {{ background: #f8f9fa; border-left: 4px solid #1a73e8; padding: 12px 16px; border-radius: 0 4px 4px 0; font-size: 14px; line-height: 1.6; color: #202124; margin-bottom: 20px; white-space: pre-wrap; }}
+  .checklist {{ background: #f8f9fa; border-radius: 8px; padding: 16px 20px; margin-bottom: 20px; }}
+  .checklist ul {{ margin: 0; padding-left: 20px; }}
+  .checklist li {{ font-size: 14px; line-height: 1.8; color: #202124; }}
+  .telegram-section {{ background: #e8f0fe; border-radius: 8px; padding: 16px 20px; margin-bottom: 20px; }}
+  .telegram-section p {{ margin: 0 0 8px 0; font-size: 14px; color: #202124; }}
+  .telegram-section code {{ background: #1a73e8; color: white; padding: 2px 8px; border-radius: 4px; font-size: 13px; }}
+  .footer {{ background: #f8f9fa; border-top: 1px solid #e0e0e0; padding: 16px 32px; text-align: center; }}
+  .footer p {{ margin: 0; font-size: 12px; color: #5f6368; }}
+  .footer .brand {{ color: #1a73e8; font-weight: 600; }}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>SENTINEL BMS Intelligence</h1>
+    <p>New Work Order Assigned</p>
+  </div>
+  <div class="badge-row">
+    <span class="priority-badge">{priority}</span>
+    <span class="wo-ref">WO {wo_ref}</span>
+    <span class="wo-ref">SR {service_record_code}</span>
+  </div>
+  <div class="content">
+    <p>Hi {technician_name},</p>
+    <p>A new work order has been assigned to you. Please review the details below and take action.</p>
+
+    <table class="info-table">
+      <tr><td>Zone</td><td>{work_order_data.get("zone_id", "N/A")}</td></tr>
+      <tr><td>Desk</td><td>{work_order_data.get("desk_id", "N/A")}</td></tr>
+      <tr><td>Site</td><td>{site_name} ({site_code})</td></tr>
+      <tr><td>Equipment</td><td>{equipment_name}</td></tr>
+      <tr><td>Equipment Code</td><td>{equipment_code}</td></tr>
+      <tr><td>Equipment Type</td><td>{equipment_type}</td></tr>
+      <tr><td>Service Type</td><td>{service_type.capitalize()}</td></tr>
+    </table>
+
+    <h2>Issue Description</h2>
+    <div class="description">{description}</div>"""
+
+        if diagnostics_text:
+            html += f"""
+    <h2>Diagnostic Context</h2>
+    <div class="description" style="font-family: monospace; font-size: 12px; white-space: pre-wrap;">{diagnostics_text}</div>"""
+
+        html += f"""
+    <h2>Inspection Checklist</h2>
+    <div class="checklist">{checklist_html}</div>
+
+    <div class="telegram-section">
+      <p><strong>How to Report Completion</strong></p>"""
+
+        if tg_code:
+            html += f"""      <p>Open Telegram and use these commands:</p>
+      <p><code>/info_{tg_code}</code> — Equipment status &amp; readings</p>
+      <p><code>/note_{tg_code}</code> — Add a note during inspection</p>
+      <p><code>done #{wo_ref}</code> — Submit inspection findings</p>"""
+        else:
+            html += f"""      <p>When you have completed the inspection, type: <code>done #{wo_ref}</code></p>"""
+
+        html += """    </div>
+  </div>
+  <div class="footer">
+    <p><span class="brand">SENTINEL BMS Intelligence</span> / Sentry</p>
+    <p>This is an automated message from SENTINEL.</p>
+  </div>
+</div>
+</body>
+</html>"""
+        return html
+
     async def _send_email_via_local_gmail_helper(self, to_email: str, subject: str, body: str) -> bool:
         """Fallback delivery via local gmail helper, still triggered from API flow."""
         if not to_email or "@" not in to_email:
@@ -383,7 +565,7 @@ class WorkOrderNotifier:
             return False
 
     async def _send_email_via_native_smtp(
-        self, to_email: str, subject: str, body: str, technician_name: str = "Technician"
+        self, to_email: str, subject: str, body: str, body_html: str | None = None, technician_name: str = "Technician"
     ) -> bool:
         """Send email via native SMTP (aiosmtplib) using configured SMTP settings.
 
@@ -406,7 +588,7 @@ class WorkOrderNotifier:
                 to_name=technician_name,
                 subject=subject,
                 body_plain=body,
-                body_html=None,
+                body_html=body_html,
             )
 
             if result.sent:
@@ -441,12 +623,10 @@ class WorkOrderNotifier:
                     # Try to resolve via sites table
                     try:
                         from app.database.repositories.site_repository import SiteRepository
+
                         site_repo = SiteRepository()
                         site = site_repo.get_by_id(site_id_val)
-                        if site:
-                            site_id_val = site.get("id")
-                        else:
-                            site_id_val = None
+                        site_id_val = site.get("id") if site else None
                     except Exception:
                         site_id_val = None
 
@@ -458,13 +638,11 @@ class WorkOrderNotifier:
                     # Try to resolve via equipment table
                     try:
                         from app.database.repositories.equipment_repository import get_equipment_repository
+
                         eq_repo = get_equipment_repository()
                         # equipment.code is text like "S002-LIGHTING-L2-001" or "ZONE-207"
                         eqs = await eq_repo.get_equipment_by_code(equipment_id_val)
-                        if eqs:
-                            equipment_id_val = eqs.get("id")
-                        else:
-                            equipment_id_val = None
+                        equipment_id_val = eqs.get("id") if eqs else None
                     except Exception:
                         equipment_id_val = None
 
@@ -474,9 +652,7 @@ class WorkOrderNotifier:
             if not service_record:
                 return {"success": False, "error": "Failed to create service record"}
 
-            logger.info(
-                f"Service record {service_record['code']} created for {work_order_data['equipment_name']}"
-            )
+            logger.info(f"Service record {service_record['code']} created for {work_order_data['equipment_name']}")
 
             # Ensure technician email is available (look up if not passed)
             if not work_order_data.get("technician_email"):
@@ -627,12 +803,11 @@ class WorkOrderNotifier:
             from app.services.sentry_integration.config import get_sentry_bot_cli
 
             # Prefer code from payload; fall back to DB lookup to avoid showing UUID in /done command
-            wo_ref = work_order_data.get("code") or work_order_data.get("work_order_id", "WO-???")
-            if not work_order_data.get("code") and work_order_data.get("work_order_id"):
-                # Look up the work order code from the database to show human-readable reference
-                work_order = await self._load_work_order_context(work_order_data["work_order_id"])
-                if work_order and work_order.get("code"):
-                    wo_ref = work_order["code"]
+            wo_ref = (
+                work_order_data.get("code")
+                or work_order_data.get("work_order_code")  # sent by bms_desk_wo.py
+                or work_order_data.get("work_order_id", "WO-???")
+            )
             eq_name = work_order_data.get("equipment_name", "?")
             pri = work_order_data.get("criticality", "MEDIUM").upper()
             service_type = work_order_data.get("service_type", "callout")
@@ -732,13 +907,15 @@ class WorkOrderNotifier:
                 return False
 
             email_subject = self._build_email_subject(work_order_data, work_order)
-            email_body = self._build_email_body(work_order_data, service_record, work_order)
+            email_body_plain = self._build_email_body(work_order_data, service_record, work_order)
+            email_body_html = self._build_email_body_html(work_order_data, service_record, work_order)
             technician_name = work_order_data.get("technician_name", "Technician")
 
             sent = await self._send_email_via_native_smtp(
                 to_email=recipient,
                 subject=email_subject,
-                body=email_body,
+                body=email_body_plain,
+                body_html=email_body_html,
                 technician_name=technician_name,
             )
 
@@ -749,7 +926,7 @@ class WorkOrderNotifier:
                 status=NotificationStatus.SENT if sent else NotificationStatus.FAILED,
                 recipient_identifier=str(recipient),
                 title=email_subject,
-                body=email_body[:500] if email_body else "",
+                body=email_body_plain[:500] if email_body_plain else "",
                 provider="smtp",
                 error_code=None if sent else "smtp_failed",
                 error_message=None if sent else "Email send returned False",
@@ -1280,12 +1457,13 @@ class WorkOrderNotifier:
                 return "thermal_image"
 
             # Use current step to determine photo type
-            if current_step == "photo_before":
-                return "photo_before"
-            elif current_step == "photo_after":
-                return "photo_after"
-            elif current_step == "parts_replaced":
-                return "parts_replaced"
+            _step_map = {
+                "photo_before": "photo_before",
+                "photo_after": "photo_after",
+                "parts_replaced": "parts_replaced",
+            }
+            if current_step in _step_map:
+                return _step_map[current_step]
 
             # Fallback: determine based on what's already collected
             if "photo_before" not in collected_items:
@@ -1322,7 +1500,8 @@ class WorkOrderNotifier:
 
         if validation["is_complete"]:
             # Mark as complete and trigger equipment health restoration
-            asyncio.create_task(self._complete_service_record_and_restore_equipment(service_record))
+            # fire-and-forget: result discarded intentionally
+            asyncio.create_task(self._complete_service_record_and_restore_equipment(service_record))  # noqa: RUF006
 
         return {
             "is_complete": validation["is_complete"],

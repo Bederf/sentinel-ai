@@ -16,9 +16,9 @@ Usage:
 
 import json
 import sys
-from pathlib import Path
-from typing import Optional
 from datetime import datetime
+from pathlib import Path
+
 from openai import OpenAI
 
 client = OpenAI()
@@ -101,7 +101,7 @@ def load_traces(trace_files: list[str]) -> dict:
         if not path.exists():
             raise FileNotFoundError(f"Trace file not found: {trace_file}")
 
-        with open(path, "r") as f:
+        with open(path) as f:
             for line in f:
                 if line.strip():
                     record = json.loads(line)
@@ -111,7 +111,7 @@ def load_traces(trace_files: list[str]) -> dict:
     return traces
 
 
-def analyze_traces(trace_files: list[str], output_file: Optional[str] = None) -> dict:
+def analyze_traces(trace_files: list[str], output_file: str | None = None) -> dict:
     """
     Analyze GSD Master traces using GPT-4o.
 
@@ -135,18 +135,12 @@ def analyze_traces(trace_files: list[str], output_file: Optional[str] = None) ->
 
     traces_json = json.dumps(traces, indent=2)
 
-    prompt = ANALYSIS_PROMPT_TEMPLATE.format(
-        phase_count=phase_count,
-        traces=traces_json
-    )
+    prompt = ANALYSIS_PROMPT_TEMPLATE.format(phase_count=phase_count, traces=traces_json)
 
-    print(f"Sending analysis to GPT-4o...", file=sys.stderr)
+    print("Sending analysis to GPT-4o...", file=sys.stderr)
 
     response = client.chat.completions.create(
-        model="gpt-4o",
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.7,
-        max_tokens=4000
+        model="gpt-4o", messages=[{"role": "user", "content": prompt}], temperature=0.7, max_tokens=4000
     )
 
     response_text = response.choices[0].message.content
@@ -171,7 +165,7 @@ def analyze_traces(trace_files: list[str], output_file: Optional[str] = None) ->
         "model": "gpt-4o",
         "prompt_tokens": prompt_tokens,
         "completion_tokens": completion_tokens,
-        "cost_usd": round(cost_usd, 4)
+        "cost_usd": round(cost_usd, 4),
     }
 
     output_json = json.dumps(findings, indent=2)
@@ -190,7 +184,10 @@ def main():
     if len(sys.argv) < 2:
         print("Usage: python halo_gsd_analyze.py <trace_file> [trace_file2 ...] [-o output_file]", file=sys.stderr)
         print("Example: python halo_gsd_analyze.py gsd_traces/phase_193_gsd.jsonl", file=sys.stderr)
-        print("Example: python halo_gsd_analyze.py gsd_traces/phase_193_gsd.jsonl gsd_traces/phase_194_gsd.jsonl -o findings.json", file=sys.stderr)
+        print(
+            "Example: python halo_gsd_analyze.py gsd_traces/phase_193_gsd.jsonl gsd_traces/phase_194_gsd.jsonl -o findings.json",  # noqa: E501
+            file=sys.stderr,
+        )
         sys.exit(1)
 
     trace_files = []

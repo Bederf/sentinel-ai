@@ -15,24 +15,24 @@ Usage:
 import asyncio
 import sys
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime
 from pathlib import Path
 
 # Ensure app is importable
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from app.database.repositories import get_recommendation_repository
-from app.services.tier_routing_engine import get_tier_routing_engine
-from app.agents.recommendation_graph import get_recommendation_graph
 from langchain_core.messages import HumanMessage
+
+from app.agents.recommendation_graph import get_recommendation_graph
+from app.database.repositories import get_recommendation_repository
 
 
 async def insert_fresh_recommendation(site_id: str, equipment_code: str) -> str:
     """Insert a fresh recommendation directly in DB."""
-    from app.models.recommendation import Recommendation, RecommendationStatus, ActionRiskLevel
+    from app.models.recommendation import ActionRiskLevel, Recommendation, RecommendationStatus
 
     repo = get_recommendation_repository()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     rec = Recommendation(
         site_id=site_id,
@@ -56,7 +56,7 @@ async def insert_fresh_recommendation(site_id: str, equipment_code: str) -> str:
     return created.id
 
 
-async def invoke_graph_and_check(site_id: str, rec_id: str) -> dict:
+async def invoke_graph_and_check(site_id: str, _rec_id: str = "") -> dict:
     """Invoke recommendation graph for site and check if rec is processed."""
     agent = get_recommendation_graph()
     thread_id = f"phase203_e2e_{uuid.uuid4().hex[:8]}"
@@ -108,12 +108,12 @@ async def run_e2e_test(site_id: str = "S002", equipment_code: str = "S002-CT-R-0
     rec_id_short = rec_id[:8]
 
     # Step 2: Invoke graph (bypass APScheduler timing)
-    print(f"\n[2/4] Invoking recommendation graph (bypassing APScheduler)...")
+    print("\n[2/4] Invoking recommendation graph (bypassing APScheduler)...")
     result = await invoke_graph_and_check(site_id, rec_id)
     print(f"  Graph completed. Nodes visited: {result.get('nodes_visited', [])}")
 
     # Step 3: Check for parasite_decision
-    print(f"\n[3/4] Checking for parasite_decision with populated outcome...")
+    print("\n[3/4] Checking for parasite_decision with populated outcome...")
     decision = await check_parasite_decision(rec_id)
 
     if not decision:
@@ -125,7 +125,7 @@ async def run_e2e_test(site_id: str = "S002", equipment_code: str = "S002-CT-R-0
     print(f"     outcome: {decision['outcome']}")
 
     # Step 4: Evaluate
-    print(f"\n[4/4] Evaluating results...")
+    print("\n[4/4] Evaluating results...")
     outcome = decision["outcome"]
     is_populated = outcome and outcome != {} and outcome != "[]"
 
@@ -162,6 +162,7 @@ async def main():
     except Exception as e:
         print(f"\n❌ Test failed with exception: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)
 

@@ -33,10 +33,7 @@ async def _get_major_mechanical_equipment(site_id: str) -> list[dict[str, Any]]:
         equipment_list = repo.get_by_site_code(site_code=site_id)
 
         major_types = {"chiller", "ahu", "fcu", "pump", "generator", "bess", "cooling_tower", "ct", "crac"}
-        major_equipment = [
-            eq for eq in equipment_list
-            if eq.get("type", "").lower() in major_types
-        ]
+        major_equipment = [eq for eq in equipment_list if eq.get("type", "").lower() in major_types]
 
         return major_equipment
 
@@ -85,20 +82,22 @@ async def check_baseline_eligibility(site_id: str) -> dict[str, Any]:
         if eligibility_status == "eligible":
             eligible_count += 1
 
-        results.append({
-            "equipment_id": eq_id,
-            "equipment_code": eq_code,
-            "equipment_name": eq_name,
-            "equipment_type": eq_type,
-            "status": eligibility_status,
-            "health_score": None,
-            "telemetry_hours": None,
-            "has_active_alerts": False,
-            "is_anomaly_flagged": False,
-            "has_existing_baseline": eligibility_status == "already_baselined",
-            "eligibility_status": eligibility_status,
-            "eligibility_reason": _get_eligibility_reason(eligibility_status),
-        })
+        results.append(
+            {
+                "equipment_id": eq_id,
+                "equipment_code": eq_code,
+                "equipment_name": eq_name,
+                "equipment_type": eq_type,
+                "status": eligibility_status,
+                "health_score": None,
+                "telemetry_hours": None,
+                "has_active_alerts": False,
+                "is_anomaly_flagged": False,
+                "has_existing_baseline": eligibility_status == "already_baselined",
+                "eligibility_status": eligibility_status,
+                "eligibility_reason": _get_eligibility_reason(eligibility_status),
+            }
+        )
 
     return {
         "site_id": site_id,

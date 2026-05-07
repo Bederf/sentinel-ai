@@ -4,12 +4,13 @@ Tests for BaselineSeedService (Phase 206-01)
 Phase: 206-asset-onboarding
 """
 
-import pytest
-from datetime import datetime, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from datetime import UTC, datetime
+from unittest.mock import AsyncMock, patch
 
+import pytest
+
+from app.models.baseline import BaselineSource, BaselineStatus, BaselineType, EquipmentBaseline
 from app.services.baseline_seed_service import BaselineSeedService
-from app.models.baseline import BaselineSource, BaselineType, BaselineStatus, EquipmentBaseline
 
 
 class TestBaselineSeedService:
@@ -26,7 +27,7 @@ class TestBaselineSeedService:
         return EquipmentBaseline(
             id="test-baseline-1",
             equipment_id="S002-CHILLER-B1-001",
-            baseline_date=datetime.now(timezone.utc),
+            baseline_date=datetime.now(UTC),
             captured_by="test",
             baseline_type=BaselineType.INITIAL,
             status=BaselineStatus.ACTIVE,
@@ -35,14 +36,14 @@ class TestBaselineSeedService:
             source_type=BaselineSource.BMS_AVERAGE,
             notes=None,
             attachment_urls=[],
-            created_at=datetime.now(timezone.utc),
-            updated_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
         )
 
     @pytest.mark.asyncio
     async def test_seed_for_equipment_uses_capture_service(self, service, mock_baseline):
         """Test that seed_for_equipment calls capture service."""
-        with patch.object(service, '_capture_service') as mock_capture:
+        with patch.object(service, "_capture_service") as mock_capture:
             mock_capture.capture_equipment_baseline = AsyncMock(return_value=mock_baseline)
 
             result = await service.seed_for_equipment(
@@ -61,16 +62,14 @@ class TestBaselineSeedService:
     @pytest.mark.asyncio
     async def test_seed_for_equipment_fallback(self, service, mock_baseline):
         """Test that fallback is used when device unavailable."""
-        with patch.object(service, '_capture_service') as mock_capture:
+        with patch.object(service, "_capture_service") as mock_capture:
             # Simulate device not available
-            mock_capture.capture_equipment_baseline = AsyncMock(
-                side_effect=Exception("Device not available")
-            )
+            mock_capture.capture_equipment_baseline = AsyncMock(side_effect=Exception("Device not available"))
 
-            with patch.object(service, '_seed_with_defaults', new_callable=AsyncMock) as mock_fallback:
+            with patch.object(service, "_seed_with_defaults", new_callable=AsyncMock) as mock_fallback:
                 mock_fallback.return_value = mock_baseline
 
-                result, status = await service.seed_for_equipment_with_fallback(
+                _result, status = await service.seed_for_equipment_with_fallback(
                     equipment_id="S002-CHILLER-B1-001",
                     site_id="S002",
                     captured_by="test",
@@ -82,7 +81,7 @@ class TestBaselineSeedService:
     @pytest.mark.asyncio
     async def test_seed_batch_returns_results_list(self, service, mock_baseline):
         """Test that seed_batch returns proper results."""
-        with patch.object(service, 'seed_for_equipment_with_fallback', new_callable=AsyncMock) as mock_seed:
+        with patch.object(service, "seed_for_equipment_with_fallback", new_callable=AsyncMock) as mock_seed:
             mock_seed.side_effect = [
                 (mock_baseline, "seeded"),
                 (None, "error: equipment not found"),
@@ -114,7 +113,7 @@ class TestBaselineSeedService:
         """Test that EquipmentNotFound is raised properly."""
         from app.services.baseline_capture_service import EquipmentNotFound
 
-        with patch.object(service, '_capture_service') as mock_capture:
+        with patch.object(service, "_capture_service") as mock_capture:
             mock_capture.capture_equipment_baseline = AsyncMock(
                 side_effect=EquipmentNotFound("S002-CHILLER-B1-001 not found")
             )

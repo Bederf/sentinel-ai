@@ -553,7 +553,7 @@ async def process_service_sheet_ocr(
             image_b64 = image_b64.split(",")[1]
         image_data = base64.b64decode(image_b64)
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Invalid base64 image: {e}")
+        raise HTTPException(status_code=400, detail="Invalid base64 image: " + str(e)) from e
 
     # Get OCR service
     ocr_service = get_ocr_service()
@@ -585,7 +585,7 @@ async def process_service_sheet_ocr(
 
     except Exception as e:
         logger.error(f"OCR processing error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.post("/ocr/correction", status_code=status.HTTP_200_OK)
@@ -690,6 +690,59 @@ async def get_pending_work_orders(
     except Exception as e:
         logger.error(f"Error fetching pending work orders: {e}")
         return {"pending_count": 0, "work_orders": [], "error": str(e)}
+
+
+@router.get("/freshness/breaches")
+async def get_freshness_breaches(
+    x_sentry_secret: str | None = Header(None),
+):
+    """Get active (unresolved) data freshness breaches.
+
+    Returns breaches from data_freshness_breaches where resolved_at is NULL.
+    Used by the dashboard notification bell to alert managers of data freshness issues.
+
+    Authentication: Requires X-Sentry-Secret header.
+    """
+    _require_sentry_secret(x_sentry_secret, endpoint_name="freshness_breaches")
+
+    try:
+        from app.database.supabase_client import get_supabase_client
+
+        supabase = get_supabase_client()
+
+        result = (
+            supabase.table("data_freshness_breaches")
+            .select("*")
+            .is_("resolved_at", None)
+            .order("breach_time", desc=True)
+            .limit(50)
+            .execute()
+        )
+
+        breaches = []
+        for row in result.data or []:
+            site_name = None
+            if row.get("site_id"):
+                site_result = supabase.table("sites").select("name").eq("id", row["site_id"]).limit(1).execute()
+                site_name = site_result.data[0]["name"] if site_result.data else None
+            breaches.append(
+                {
+                    "id": row.get("id"),
+                    "site_id": row.get("site_id"),
+                    "site_name": site_name,
+                    "data_source": row.get("data_source"),
+                    "age_seconds": row.get("age_seconds"),
+                    "sli_target": row.get("sli_target"),
+                    "breach_time": row.get("breach_time"),
+                    "duration_seconds": row.get("duration_seconds"),
+                }
+            )
+
+        return {"breach_count": len(breaches), "breaches": breaches}
+
+    except Exception as e:
+        logger.error(f"Error fetching freshness breaches: {e}")
+        return {"breach_count": 0, "breaches": [], "error": str(e)}
 
 
 @router.post("/process-pending-notifications", status_code=status.HTTP_200_OK)
@@ -1268,6 +1321,8 @@ async def sentry_call_log(
             "equipment_id": f"ZONE-{req.zone_id}" if req.zone_id else req.site_id,
             "equipment_name": req.title,
             "site_id": req.site_id,
+            "zone_id": req.zone_id or "",
+            "desk_id": req.desk_id or "",
             "technician_id": tech.get("telegram_id") if tech else None,
             "technician_name": tech.get("name") if tech else None,
             "service_type": "callout",
@@ -1279,9 +1334,7 @@ async def sentry_call_log(
             try:
                 notify_response = await work_order_notifier.notify_technician(wo_notify_data)
                 is_success = (
-                    notify_response.get("success")
-                    if isinstance(notify_response, dict)
-                    else bool(notify_response)
+                    notify_response.get("success") if isinstance(notify_response, dict) else bool(notify_response)
                 )
                 notify_sent = is_success and bool(notify_response)
             except Exception as e:
@@ -1412,20 +1465,22 @@ async def save_call_log_location_memory(
         )
 
         repo = get_reporter_location_repository()
-        saved = repo.upsert({
-            "reporter_telegram_id": req.get("reporter_telegram_id", ""),
-            "reporter_phone": req.get("reporter_phone", ""),
-            "reporter_name": req.get("reporter_name", ""),
-            "site_id": req.get("site_id", "site-002"),
-            "zone_id": req.get("zone_id", ""),
-            "floor": req.get("floor", ""),
-            "desk_id": req.get("desk_id", ""),
-            "location_text": req.get("location", ""),
-            "last_work_order_code": req.get("wo_code", ""),
-            "last_confirmed_at": datetime.utcnow().isoformat(),
-            "channel": "telegram",
-            "source": "call_log",
-        })
+        saved = repo.upsert(
+            {
+                "reporter_telegram_id": req.get("reporter_telegram_id", ""),
+                "reporter_phone": req.get("reporter_phone", ""),
+                "reporter_name": req.get("reporter_name", ""),
+                "site_id": req.get("site_id", "site-002"),
+                "zone_id": req.get("zone_id", ""),
+                "floor": req.get("floor", ""),
+                "desk_id": req.get("desk_id", ""),
+                "location_text": req.get("location", ""),
+                "last_work_order_code": req.get("wo_code", ""),
+                "last_confirmed_at": datetime.utcnow().isoformat(),
+                "channel": "telegram",
+                "source": "call_log",
+            }
+        )
         return {"success": True, "saved": bool(saved)}
     except HTTPException:
         raise

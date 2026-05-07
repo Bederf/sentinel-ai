@@ -40,6 +40,7 @@ class TestEquipmentBaselinesAPI:
     def client(self):
         """Create test client."""
         from fastapi import FastAPI
+
         app = FastAPI()
         app.include_router(router)
         return TestClient(app)
@@ -48,9 +49,7 @@ class TestEquipmentBaselinesAPI:
         """Test that seed endpoint returns 201 with baseline data."""
         with patch("app.api.equipment_baselines.BaselineSeedService") as MockService:
             mock_service = MockService.return_value
-            mock_service.seed_for_equipment_with_fallback = AsyncMock(
-                return_value=(mock_baseline, "seeded")
-            )
+            mock_service.seed_for_equipment_with_fallback = AsyncMock(return_value=(mock_baseline, "seeded"))
 
             response = client.post(
                 "/api/equipment/baselines/seed",
@@ -105,9 +104,7 @@ class TestEquipmentBaselinesAPI:
         """Test that seed endpoint returns 404 when equipment not found."""
         with patch("app.api.equipment_baselines.BaselineSeedService") as MockService:
             mock_service = MockService.return_value
-            mock_service.seed_for_equipment_with_fallback = AsyncMock(
-                side_effect=Exception("not found")
-            )
+            mock_service.seed_for_equipment_with_fallback = AsyncMock(side_effect=Exception("not found"))
 
             response = client.post(
                 "/api/equipment/baselines/seed",

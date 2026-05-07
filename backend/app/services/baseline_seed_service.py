@@ -12,10 +12,9 @@ Phase: 206-asset-onboarding
 """
 
 import logging
-from datetime import datetime
 from typing import Any
 
-from app.models.baseline import BaselineSource, BaselineStatus, BaselineType, EquipmentBaseline
+from app.models.baseline import BaselineSource, BaselineType, EquipmentBaseline
 from app.services.baseline_capture_service import BaselineCaptureService, EquipmentNotFound
 
 logger = logging.getLogger(__name__)
@@ -110,7 +109,7 @@ class BaselineSeedService:
                 return baseline, "seeded_fallback"
             except Exception as fallback_error:
                 logger.error(f"Fallback baseline seeding also failed for {equipment_id}: {fallback_error}")
-                return None, f"error: {str(fallback_error)}"
+                return None, f"error: {fallback_error!s}"
 
     async def _seed_with_defaults(
         self,
@@ -149,7 +148,11 @@ class BaselineSeedService:
     async def _get_equipment_type_fallback(self, equipment_id: str) -> str:
         """Get equipment type from equipment_id or repository."""
         # Try to get from device manager
-        if self._capture_service.device_manager and hasattr(self._capture_service.device_manager, "initialized") and self._capture_service.device_manager.initialized:
+        if (
+            self._capture_service.device_manager
+            and hasattr(self._capture_service.device_manager, "initialized")
+            and self._capture_service.device_manager.initialized
+        ):
             try:
                 device = await self._capture_service.device_manager.get_device(equipment_id)
                 if device and hasattr(device, "equipment_type"):
@@ -238,18 +241,22 @@ class BaselineSeedService:
                     site_id=site_id,
                     captured_by=captured_by,
                 )
-                results.append({
-                    "equipment_id": equipment_id,
-                    "status": status,
-                    "baseline_id": baseline.id if baseline else None,
-                    "message": f"Baseline {status}",
-                })
+                results.append(
+                    {
+                        "equipment_id": equipment_id,
+                        "status": status,
+                        "baseline_id": baseline.id if baseline else None,
+                        "message": f"Baseline {status}",
+                    }
+                )
             except Exception as e:
-                results.append({
-                    "equipment_id": equipment_id,
-                    "status": "error",
-                    "baseline_id": None,
-                    "message": str(e),
-                })
+                results.append(
+                    {
+                        "equipment_id": equipment_id,
+                        "status": "error",
+                        "baseline_id": None,
+                        "message": str(e),
+                    }
+                )
 
         return results

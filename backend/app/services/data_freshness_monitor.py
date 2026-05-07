@@ -33,6 +33,14 @@ class DataFreshnessMonitor:
     # High-priority sources that trigger Telegram alerts on breach
     _CRITICAL_SOURCES: ClassVar[set[str]] = {"bms_telemetry", "anomalies"}
 
+    # Standard data sources and their SLI targets (seconds)
+    _STANDARD_SOURCES: ClassVar[dict[str, int]] = {
+        "bms_telemetry": 30,
+        "anomalies": 300,
+        "documents": 7200,
+        "recommendations": 900,
+    }
+
     async def run_freshness_cycle(self) -> dict[str, dict[str, FreshnessResult]]:
         """Run one complete freshness check cycle across all sites and sources.
 
@@ -48,6 +56,22 @@ class DataFreshnessMonitor:
             # Get all unique sites registered in data_freshness table
             sites_result = supabase.table("data_freshness").select("site_id").execute()
             sites = list({row["site_id"] for row in sites_result.data})
+
+            # Fallback: discover active sites from bridge adapter config when data_freshness
+            # has no rows yet (first run before any seeding). MultiSitePollingCoordinator uses
+            # the same table to find sites it should poll.
+            if not sites:
+                adapter_result = (
+                    supabase.table("site_adapter_config")
+                    .select("site_id")
+                    .eq("protocol", "ShadowBridge")
+                    .eq("enabled", True)
+                    .execute()
+                )
+                sites = list({row["site_id"] for row in (adapter_result.data or []) if row.get("site_id")})
+                logger.info(
+                    f"Freshness cycle: no data_freshness rows — discovered {len(sites)} sites from ShadowBridge adapters"  # noqa: E501
+                )
 
             logger.debug(f"Freshness cycle: {len(sites)} sites → {sites}")
 
@@ -72,25 +96,75 @@ class DataFreshnessMonitor:
         results: dict[str, FreshnessResult] = {}
         now = datetime.now(UTC)
 
+        # Fetch the latest sync time from log_sources to derive current freshness.
+        # Shadow bridge polling upserts log_sources on every poll cycle, so this
+        # reflects actual bridge activity even though data_freshness.last_updated
+        # is never written by the bridge itself.
+        log_sources = (
+            supabase.table("log_sources")
+            .select("last_sync_at")
+            .like("name", f"%{self._site_code(site_id)}%")
+            .eq("is_active", True)
+            .order("last_sync_at", desc=True)
+            .limit(1)
+            .execute()
+        )
+        latest_sync = log_sources.data[0]["last_sync_at"] if log_sources.data and log_sources.data[0] else None
+        latest_sync_dt = datetime.fromisoformat(latest_sync.replace("Z", "+00:00")) if latest_sync else None
+
+        # Seed standard sources if no rows exist for this site but bridge has polled.
+        # This handles first-run: monitor discovers bridge has polled but data_freshness
+        # has no rows yet, so we create them with the correct sync time as baseline.
+        if not freshness_rows.data and latest_sync_dt is not None:
+            for data_source, sli_target in self._STANDARD_SOURCES.items():
+                supabase.table("data_freshness").insert(
+                    {
+                        "site_id": site_id,
+                        "data_source": data_source,
+                        "sli_target_seconds": sli_target,
+                        "last_updated": latest_sync_dt.isoformat(),
+                        "age_seconds": int((now - latest_sync_dt).total_seconds()),
+                        "sli_pass": True,
+                        "updated_at": now.isoformat(),
+                    }
+                ).execute()
+            freshness_rows = supabase.table("data_freshness").select("*").eq("site_id", site_id).execute()
+            logger.info(f"Seeded data_freshness for {site_id} with {len(self._STANDARD_SOURCES)} sources")
+
         for row in freshness_rows.data:
             data_source = row["data_source"]
             last_updated_str = row["last_updated"]
             sli_target = row["sli_target_seconds"]
 
-            # Calculate age
-            if last_updated_str:
-                last_updated = datetime.fromisoformat(last_updated_str.replace("Z", "+00:00"))
-                age_seconds = int((now - last_updated).total_seconds())
+            # Derive age from log_sources (actual bridge sync time) when available.
+            # Fall back to data_freshness.last_updated when log_sources has no entry.
+            if latest_sync_dt is not None:
+                effective_last_updated = latest_sync_dt
+            elif last_updated_str:
+                effective_last_updated = datetime.fromisoformat(last_updated_str.replace("Z", "+00:00"))
+            else:
+                effective_last_updated = None
+
+            if effective_last_updated is not None:
+                age_seconds = int((now - effective_last_updated).total_seconds())
             else:
                 age_seconds = None
 
             # Determine SLI pass/fail
             sli_pass = age_seconds is not None and age_seconds <= sli_target
 
-            # Update age and SLI in data_freshness table
-            supabase.table("data_freshness").update(
-                {"age_seconds": age_seconds, "sli_pass": sli_pass, "updated_at": now.isoformat()}
-            ).eq("site_id", site_id).eq("data_source", data_source).execute()
+            # Update age, SLI, and derived last_updated in data_freshness so the
+            # column stays current even when the bridge bypasses it directly.
+            update_payload = {
+                "age_seconds": age_seconds,
+                "sli_pass": sli_pass,
+                "updated_at": now.isoformat(),
+            }
+            if effective_last_updated is not None:
+                update_payload["last_updated"] = effective_last_updated.isoformat()
+            supabase.table("data_freshness").update(update_payload).eq("site_id", site_id).eq(
+                "data_source", data_source
+            ).execute()
 
             result = FreshnessResult(
                 site_id=site_id,
@@ -176,20 +250,77 @@ class DataFreshnessMonitor:
 
             return {"breach_started": True, "breach_resolved": False}
 
-        return {"breach_started": False, "breach_resolved": False}
+        elif not sli_pass and active_breach:
+            # Ongoing breach — still stale but already tracked
+            return {"breach_started": False, "breach_resolved": False}
+
+    # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _site_code(site_id: str) -> str:
+        """Convert S002 → 'site-002', leave 'site-002' unchanged."""
+        if site_id.startswith("site-"):
+            return site_id
+        if site_id.startswith("S") and len(site_id) == 4:
+            return f"site-{site_id[1:]}"  # S002[1:] = '002' → site-002
+        return site_id
 
     async def _send_freshness_alert(self, site_id: str, data_source: str, age_seconds: int | None, target: int) -> None:
-        """Send Telegram alert for critical source breaches (bms_telemetry, anomalies)."""
-        try:
-            from app.models.notification import AlertLevel
-            from app.services.notification_service import notification_service
+        """Send Telegram alert for critical source breaches (bms_telemetry, anomalies).
 
-            result = await notification_service.send_alert_direct(
-                title=f"Data Freshness Breach: {data_source}",
-                body=f"{data_source} at {site_id} is stale.\nAge: {age_seconds}s | Target: {target}s",
-                alert_level=AlertLevel.WARNING,
+        Routes via Sentry gateway's default manager bot (***TELEGRAM_BOT_TOKEN_REDACTED***)
+        to preserve consistency with the .sentry tool ecosystem.
+        """
+        try:
+            import httpx
+
+            bot_token = "***TELEGRAM_BOT_TOKEN_REDACTED***"
+            chat_id = "8359288792"  # Manager operator chat ID
+
+            message = (
+                f"🚨 <b>Data Freshness Breach</b>\n\n"
+                f"<b>Source:</b> {data_source}\n"
+                f"<b>Site:</b> {site_id}\n"
+                f"<b>Age:</b> {age_seconds}s (target: {target}s)\n\n"
+                f"S002 may be offline. Check BMS backend."
             )
-            if not result["success"]:
-                logger.warning(f"[FRESHNESS] Telegram alert failed: {result.get('error')}")
+
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                resp = await client.post(
+                    f"https://api.telegram.org/bot{bot_token}/sendMessage",
+                    json={"chat_id": chat_id, "text": message, "parse_mode": "HTML"},
+                )
+                result = resp.json()
+                if not result.get("ok"):
+                    logger.warning(f"[FRESHNESS] Telegram alert failed: {result}")
+                    self._fallback_log(site_id, data_source, age_seconds, target, result)
+
         except Exception as e:
             logger.warning(f"Failed to send freshness Telegram alert: {e}")
+            self._fallback_log(site_id, data_source, age_seconds, target, str(e))
+
+    def _fallback_log(self, site_id: str, data_source: str, age_seconds: int | None, target: int, error: Any) -> None:
+        """Write failed alert to fallback file for manual recovery."""
+        import json
+        from pathlib import Path
+
+        fallback_path = Path("/tmp/sentinel_freshness_alert_fallback.json")
+        entry = {
+            "site_id": site_id,
+            "data_source": data_source,
+            "age_seconds": age_seconds,
+            "target": target,
+            "error": error,
+            "timestamp": datetime.now(UTC).isoformat(),
+        }
+        try:
+            existing = []
+            if fallback_path.exists():
+                existing = json.loads(fallback_path.read_text())
+            existing.append(entry)
+            fallback_path.write_text(json.dumps(existing, indent=2))
+            logger.info(f"[FRESHNESS] Alert written to fallback file: {fallback_path}")
+        except Exception as e:
+            logger.error(f"[FRESHNESS] Failed to write fallback log: {e}")

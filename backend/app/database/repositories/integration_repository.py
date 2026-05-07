@@ -476,11 +476,7 @@ class IntegrationRepository:
                 # Need to filter by log_source site_id via join or subquery
                 # For simplicity, filter sources first then get job IDs
                 source_ids = [s["id"] for s in sources]
-                if source_ids:
-                    failed_jobs_query = failed_jobs_query.in_("log_source_id", source_ids)
-                else:
-                    # No sources for this building
-                    failed_jobs_query = None
+                failed_jobs_query = failed_jobs_query.in_("log_source_id", source_ids) if source_ids else None
 
             if failed_jobs_query:
                 failed_response = failed_jobs_query.execute()
@@ -525,7 +521,10 @@ class IntegrationRepository:
         try:
             # Get point mappings for match coverage
             mappings_response = (
-                self.client.table("point_asset_mappings").select("id,match_confidence").eq("site_id", resolved_site_id).execute()
+                self.client.table("point_asset_mappings")
+                .select("id,match_confidence")
+                .eq("site_id", resolved_site_id)
+                .execute()
             )
             mappings = mappings_response.data or []
         except Exception:
@@ -535,26 +534,26 @@ class IntegrationRepository:
         matched_points = len([m for m in mappings if m.get("match_confidence") != "unmatched"])
         match_coverage = (matched_points / total_points * 100) if total_points > 0 else 0
 
-        # Get data freshness from log sources
+        # Get data freshness from data_freshness table (populated by data_freshness_monitor
+        # every 5 min from log_sources.last_sync_at — the actual bridge sync time).
         try:
-            sources_response = self.client.table("log_sources").select("last_sync_at").eq("site_id", resolved_site_id).execute()
-            sources = sources_response.data or []
+            freshness_response = (
+                self.client.table("data_freshness")
+                .select("age_seconds")
+                .eq("site_id", site_id)  # site-002 format — matches data_freshness.site_id
+                .execute()
+            )
+            freshness_rows = freshness_response.data or []
         except Exception:
-            sources = []
+            freshness_rows = []
 
         data_freshness_hours = float("inf")
-        now = datetime.utcnow()
-        for source in sources:
-            sync_at = source.get("last_sync_at")
-            if sync_at:
-                # Parse ISO format
-                try:
-                    sync_time = datetime.fromisoformat(sync_at.replace("Z", "+00:00").replace("+00:00", ""))
-                    hours = (now - sync_time).total_seconds() / 3600
-                    if hours < data_freshness_hours:
-                        data_freshness_hours = hours
-                except (ValueError, TypeError):
-                    pass
+        for row in freshness_rows:
+            age = row.get("age_seconds")
+            if age is not None:
+                hours = age / 3600.0
+                if hours < data_freshness_hours:
+                    data_freshness_hours = hours
 
         if data_freshness_hours == float("inf"):
             data_freshness_hours = 9999  # Never synced
@@ -569,7 +568,9 @@ class IntegrationRepository:
             cutoff = (datetime.utcnow() - timedelta(days=7)).isoformat()
 
             # Get source IDs for this building
-            source_ids_response = self.client.table("log_sources").select("id").eq("site_id", resolved_site_id).execute()
+            source_ids_response = (
+                self.client.table("log_sources").select("id").eq("site_id", resolved_site_id).execute()
+            )
             source_ids = [s["id"] for s in (source_ids_response.data or [])]
 
             if source_ids:
@@ -663,7 +664,7 @@ class IntegrationRepository:
     # ==================== Building Status / Go-Live Workflow ====================
 
     # In-memory storage for building status (MVP - no new migration needed)
-    _site_status_store: dict[str, dict[str, Any]] = {}
+    _site_status_store: dict[str, dict[str, Any]] = {}  # noqa: RUF012
 
     def get_site_status(self, site_id: str) -> dict[str, Any] | None:
         """Get building status record."""

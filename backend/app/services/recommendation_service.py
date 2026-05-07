@@ -19,6 +19,13 @@ from app.services.profile_service import get_profile_service
 
 logger = logging.getLogger(__name__)
 
+# Priority correction overrides — when consumable is detected,
+# the risk level may be downgraded from HIGH/CRITICAL to match corrected priority.
+_PRIORITY_CORRECTION_RISK_OVERRIDE: dict[str, ActionRiskLevel] = {
+    "low": ActionRiskLevel.LOW,
+    "medium": ActionRiskLevel.MEDIUM,
+}
+
 
 class RecommendationService:
     """Manages recommendation lifecycle through approval and execution workflow.
@@ -65,6 +72,43 @@ class RecommendationService:
         # Classify risk level
         risk_level = self._classify_risk(action_type)
 
+        # Consumables priority correction — detect and correct misclassified consumables
+        is_consumable = rec_data.get("is_consumable", False)
+        priority_corrected = False
+        priority_reason: str | None = None
+
+        issue_title = rec_data.get("issue_title") or rec_data.get("title", "")
+        issue_desc = rec_data.get("issue_description") or rec_data.get("description", "")
+
+        if issue_title or issue_desc:
+            try:
+                from app.services.semantic_priority_classifier import get_semantic_priority_classifier
+
+                classifier = get_semantic_priority_classifier()
+                original_priority = rec_data.get("priority", risk_level.value)
+                classification = classifier.classify_issue(issue_title, issue_desc, original_priority)
+
+                is_consumable = classification.is_consumable
+                if classification.is_consumable and classification.corrected_priority != original_priority:
+                    priority_corrected = True
+                    priority_reason = classification.reason
+                    logger.info(
+                        "Priority corrected for consumable issue '%s': %s → %s (%s)",
+                        issue_title[:60],
+                        original_priority,
+                        classification.corrected_priority,
+                        classification.classification_method,
+                    )
+                    # Downgrade risk level to match corrected priority
+                    corrected_risk = _PRIORITY_CORRECTION_RISK_OVERRIDE.get(classification.corrected_priority)
+                    if corrected_risk and corrected_risk.value != risk_level.value:
+                        risk_level = corrected_risk
+                        logger.info(
+                            "Risk level downgraded from %s to %s for consumable", risk_level.value, corrected_risk.value
+                        )
+            except Exception as e:
+                logger.warning("SemanticPriorityClassifier failed, proceeding with original priority: %s", e)
+
         # Determine if approval required
         requires_approval = self._requires_approval(control_tier, risk_level)
 
@@ -83,7 +127,38 @@ class RecommendationService:
             multi_objective_score=float(rec_data.get("multi_objective_score", 0.0)),
             requires_approval=requires_approval,
             status=RecommendationStatus.PENDING if requires_approval else RecommendationStatus.AUTO_EXECUTED,
+            is_consumable=is_consumable,
+            priority_corrected=priority_corrected,
+            priority_reason=priority_reason,
         )
+
+        # Phase 207-04: Track fault occurrence for cluster detection (3rd occurrence = cluster alert)
+        # Non-blocking: if tracking fails, log warning and proceed without cluster flag
+        equipment_id = rec_data.get("target_equipment", "")
+        issue_type = rec_data.get("issue_type") or rec_data.get("fault_type", "")
+        if equipment_id and issue_type:
+            try:
+                from app.services.fault_occurrence_tracker import get_fault_occurrence_tracker
+
+                tracker = get_fault_occurrence_tracker()
+                occurrence = await tracker.track_fault(
+                    site_code=site_id,
+                    equipment_id=equipment_id,
+                    issue_type=issue_type,
+                    recommendation_id=rec.id,
+                )
+                rec.is_cluster_alert = occurrence.is_cluster_alert
+                rec.cluster_count = occurrence.cluster_count
+                if occurrence.is_cluster_alert:
+                    logger.info(
+                        "Cluster alert attached to recommendation %s: %s/%s (count=%d)",
+                        rec.id,
+                        equipment_id,
+                        issue_type,
+                        occurrence.cluster_count,
+                    )
+            except Exception as e:
+                logger.warning("Fault occurrence tracking failed for rec %s: %s", rec.id, e)
 
         # Auto-execute if not requiring approval
         if not requires_approval:
@@ -216,7 +291,7 @@ class RecommendationService:
             raise
         except Exception as e:
             logger.error(f"Error approving recommendation {rec_id}: {e}")
-            raise ValueError(f"Failed to approve recommendation: {e}")
+            raise ValueError(f"Failed to approve recommendation: {e}") from e
 
     async def reject_recommendation(self, rec_id: str, user_id: str, reason: str) -> Recommendation:
         """Operator rejects recommendation (Tier 2).
@@ -273,7 +348,7 @@ class RecommendationService:
             raise
         except Exception as e:
             logger.error(f"Error rejecting recommendation {rec_id}: {e}")
-            raise ValueError(f"Failed to reject recommendation: {e}")
+            raise ValueError(f"Failed to reject recommendation: {e}") from e
 
     async def acknowledge_recommendation(self, rec_id: str, acknowledgement_type: str) -> None:
         """Acknowledge a recommendation (accept or dismiss) from Telegram inline button.

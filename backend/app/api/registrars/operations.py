@@ -48,6 +48,7 @@ from app.api import (
     inspection,
     inspection_recommendations,
     integration,
+    managers,
     modules,
     onboarding,
     mri_connector,
@@ -203,6 +204,9 @@ def register_operations_routers(app: FastAPI) -> None:
 
     # Technician Registry (handoff blocker)
     app.include_router(technicians_api.router, tags=["technicians"])
+
+    # Manager Registry (Phase 193+)
+    app.include_router(managers.router, tags=["managers"])
 
     # Operational Event Intelligence (Phase 145)
     app.include_router(event_intelligence.router, tags=["event-intelligence"])

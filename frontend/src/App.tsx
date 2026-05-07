@@ -16,6 +16,7 @@ import { SplashScreen } from "./components/SplashScreen";
 import { EmailEntry } from "./components/EmailEntry";
 import { AlertFeed } from "./components/AlertFeed";
 import { CalendarPicker } from "./components/CalendarPicker";
+import { FreshnessAlertPanel } from "./components/FreshnessAlertPanel";
 import { ModuleProvider } from "./contexts/ModuleContext";
 import { useModules } from "./contexts/ModuleHooks";
 import { ThemeProvider } from "./contexts/ThemeContext";
@@ -301,7 +302,28 @@ function App() {
           }
           return false;
         });
-        setUnreadAlertCount(unread.length + (pending_recommendations ?? 0));
+
+        // Fetch active freshness breaches for manager notification bell
+        let freshnessBreaches = 0;
+        try {
+          const sentryToken = localStorage.getItem("sentinel_token");
+          if (sentryToken) {
+            const freshnessRes = await fetch(`${window.location.origin}/api/sentry/freshness/breaches`, {
+              headers: {
+                "Authorization": `Bearer ${sentryToken}`,
+                "X-Sentry-API-Key": "sentry-bot-RncXWQCYticUnuG06L4qnSUj-heKAeV0NnMdHOvIlKM3TNUv",
+              },
+            });
+            if (freshnessRes.ok) {
+              const freshnessData = await freshnessRes.json();
+              freshnessBreaches = freshnessData.breach_count || 0;
+            }
+          }
+        } catch {
+          // Silently ignore freshness fetch errors
+        }
+
+        setUnreadAlertCount(unread.length + (pending_recommendations ?? 0) + freshnessBreaches);
         failureCount = 0;
       } catch (err) {
         failureCount += 1;
@@ -618,6 +640,8 @@ function App() {
 
                 {/* Alert Feed Content */}
                 <div className="overflow-y-auto max-h-[500px]">
+                  <FreshnessAlertPanel />
+                  <div style={{ borderTop: "1px solid var(--color-sentinel-border)" }} />
                   <AlertFeed
                     limit={20}
                     refreshInterval={30000}
