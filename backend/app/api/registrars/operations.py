@@ -37,6 +37,7 @@ from app.api import (
     decisions,
     delivery_tracking,
     dispatch,
+    fairlands_sla_dashboard,
     document_sync,
     event_bus_monitor,
     event_intelligence,
@@ -264,3 +265,6 @@ def register_operations_routers(app: FastAPI) -> None:
 
     # Decision Moment API — Crisis State page (Phase 164)
     app.include_router(decisions.router, tags=["decisions"])
+
+    # Fairlands SLA Dashboard — FM integration (Phase 207-06)
+    app.include_router(fairlands_sla_dashboard.router, tags=["fairlands-sla"])
