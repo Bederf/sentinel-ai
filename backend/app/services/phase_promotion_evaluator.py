@@ -151,16 +151,21 @@ class PhasePromotionEvaluator:
 
         logger.info(
             "Phase readiness set: %s %s → %s (%d/%d gates passed)",
-            site_id, from_phase, to_phase,
-            sum(1 for g in gate_results if g.passed), len(gate_results),
+            site_id,
+            from_phase,
+            to_phase,
+            sum(1 for g in gate_results if g.passed),
+            len(gate_results),
         )
 
         client = create_client(settings.supabase_url, settings.supabase_service_role_key)
-        client.table("sites").update({
-            "phase_promotion_ready": True,
-            "phase_promotion_ready_since": datetime.now(tz=UTC).isoformat(),
-            "phase_promotion_target": to_phase,
-        }).eq("code", site_id).execute()
+        client.table("sites").update(
+            {
+                "phase_promotion_ready": True,
+                "phase_promotion_ready_since": datetime.now(tz=UTC).isoformat(),
+                "phase_promotion_target": to_phase,
+            }
+        ).eq("code", site_id).execute()
 
         await self._notify_ready(site_id, from_phase, to_phase, gate_results)
 
@@ -251,8 +256,10 @@ class PhasePromotionEvaluator:
         if gate.startswith("ml_hours_ingested >="):
             threshold = float(gate.split(">=")[1].strip())
             return GateResult(
-                gate=gate, passed=ml_hours >= threshold,
-                value=round(ml_hours, 1), threshold=threshold,
+                gate=gate,
+                passed=ml_hours >= threshold,
+                value=round(ml_hours, 1),
+                threshold=threshold,
             )
 
         # ── anomaly_scores_writing ──────────────────────────────────────
@@ -260,12 +267,14 @@ class PhasePromotionEvaluator:
             if not site_uuid:
                 return GateResult(gate=gate, passed=False, value=None)
             try:
-                rows = client.table("equipment_analytics") \
-                    .select("id", count="exact") \
-                    .eq("site_id", site_uuid) \
-                    .is_("anomaly_score", "not.null") \
-                    .gte("updated_at", (now - timedelta(minutes=30)).isoformat()) \
+                rows = (
+                    client.table("equipment_analytics")
+                    .select("id", count="exact")
+                    .eq("site_id", site_uuid)
+                    .is_("anomaly_score", "not.null")
+                    .gte("updated_at", (now - timedelta(minutes=30)).isoformat())
                     .execute()
+                )
                 count = rows.count if hasattr(rows, "count") else len(rows.data or [])
                 return GateResult(gate=gate, passed=count > 0, value=count)
             except Exception as e:
@@ -273,12 +282,20 @@ class PhasePromotionEvaluator:
                 return GateResult(gate=gate, passed=False, value=str(e))
 
         # ── bridge_connected ────────────────────────────────────────────
+        # BridgeBMSAdapter.get_status() contract:
+        #   status: "connected" | "disconnected" | "error"
+        #   connection: bool (True = connected)
+        # Also accept legacy "ok" and string "online" for forward compat.
         if gate == "bridge_connected":
             from app.services.simbiot_service import simbiot_service
 
             try:
                 status = await simbiot_service.get_site_status(site_id)
-                connected = status.get("status") == "ok" or status.get("connection") == "online"
+                connected = (
+                    status.get("status") in ("connected", "ok")
+                    or status.get("connection") is True
+                    or status.get("connection") == "online"
+                )
                 return GateResult(gate=gate, passed=connected, value=connected)
             except Exception as e:
                 logger.debug("Gate '%s' check failed: %s", gate, e)
@@ -290,10 +307,7 @@ class PhasePromotionEvaluator:
             if not site_uuid:
                 return GateResult(gate=gate, passed=False, value=None, threshold=threshold)
             try:
-                rows = client.table("recommendations") \
-                    .select("id", count="exact") \
-                    .eq("site_id", site_uuid) \
-                    .execute()
+                rows = client.table("recommendations").select("id", count="exact").eq("site_id", site_uuid).execute()
                 count = rows.count if hasattr(rows, "count") else len(rows.data or [])
                 return GateResult(gate=gate, passed=count >= threshold, value=count, threshold=threshold)
             except Exception as e:
@@ -306,11 +320,13 @@ class PhasePromotionEvaluator:
             if not site_uuid:
                 return GateResult(gate=gate, passed=False, value=None, threshold=threshold)
             try:
-                rows = client.table("recommendations") \
-                    .select("id", count="exact") \
-                    .eq("site_id", site_uuid) \
-                    .neq("status", "pending") \
+                rows = (
+                    client.table("recommendations")
+                    .select("id", count="exact")
+                    .eq("site_id", site_uuid)
+                    .neq("status", "pending")
                     .execute()
+                )
                 count = rows.count if hasattr(rows, "count") else len(rows.data or [])
                 return GateResult(gate=gate, passed=count >= threshold, value=count, threshold=threshold)
             except Exception as e:
@@ -323,11 +339,7 @@ class PhasePromotionEvaluator:
             if not site_uuid:
                 return GateResult(gate=gate, passed=False, value=None, threshold=threshold)
             try:
-                row = client.table("sites") \
-                    .select("advisory_started_at") \
-                    .eq("id", site_uuid) \
-                    .limit(1) \
-                    .execute()
+                row = client.table("sites").select("advisory_started_at").eq("id", site_uuid).limit(1).execute()
                 advisory_start = row.data[0].get("advisory_started_at") if row.data else None
                 if not advisory_start:
                     return GateResult(gate=gate, passed=False, value=None, threshold=threshold)
@@ -344,16 +356,20 @@ class PhasePromotionEvaluator:
             if not site_uuid:
                 return GateResult(gate=gate, passed=False, value=None, threshold=threshold)
             try:
-                rows_accepted = client.table("recommendations") \
-                    .select("id", count="exact") \
-                    .eq("site_id", site_uuid) \
-                    .eq("acknowledgement_type", "accepted") \
+                rows_accepted = (
+                    client.table("recommendations")
+                    .select("id", count="exact")
+                    .eq("site_id", site_uuid)
+                    .eq("acknowledgement_type", "accepted")
                     .execute()
-                rows_dismissed = client.table("recommendations") \
-                    .select("id", count="exact") \
-                    .eq("site_id", site_uuid) \
-                    .eq("acknowledgement_type", "dismissed") \
+                )
+                rows_dismissed = (
+                    client.table("recommendations")
+                    .select("id", count="exact")
+                    .eq("site_id", site_uuid)
+                    .eq("acknowledgement_type", "dismissed")
                     .execute()
+                )
                 accepted_c = rows_accepted.count if hasattr(rows_accepted, "count") else len(rows_accepted.data or [])
                 dismissed_c = (
                     rows_dismissed.count if hasattr(rows_dismissed, "count") else len(rows_dismissed.data or [])
@@ -370,12 +386,14 @@ class PhasePromotionEvaluator:
             if not site_uuid:
                 return GateResult(gate=gate, passed=False, value=None)
             try:
-                rows_obj = client.table("parasite_decisions") \
-                    .select("id", count="exact") \
-                    .eq("site_id", site_uuid) \
-                    .eq("decision", "block") \
-                    .gte("created_at", (now - timedelta(days=30)).isoformat()) \
+                rows_obj = (
+                    client.table("parasite_decisions")
+                    .select("id", count="exact")
+                    .eq("site_id", site_uuid)
+                    .eq("decision", "block")
+                    .gte("created_at", (now - timedelta(days=30)).isoformat())
                     .execute()
+                )
                 count = rows_obj.count if hasattr(rows_obj, "count") else len(rows_obj.data or [])
                 return GateResult(gate=gate, passed=count == 0, value=count)
             except Exception as e:
@@ -411,11 +429,13 @@ class PhasePromotionEvaluator:
             if not site_uuid:
                 return GateResult(gate=gate, passed=False, value=None, threshold=threshold)
             try:
-                rows = client.table("recommendations") \
-                    .select("id", count="exact") \
-                    .eq("site_id", site_uuid) \
-                    .eq("status", "approved") \
+                rows = (
+                    client.table("recommendations")
+                    .select("id", count="exact")
+                    .eq("site_id", site_uuid)
+                    .eq("status", "approved")
                     .execute()
+                )
                 count = rows.count if hasattr(rows, "count") else len(rows.data or [])
                 return GateResult(gate=gate, passed=count >= threshold, value=count, threshold=threshold)
             except Exception as e:
@@ -427,11 +447,13 @@ class PhasePromotionEvaluator:
             if not site_uuid:
                 return GateResult(gate=gate, passed=False, value=None)
             try:
-                rows_obj = client.table("audit_log") \
-                    .select("id", count="exact") \
-                    .eq("action", "ml_scoring_failed") \
-                    .gte("timestamp", (now - timedelta(hours=24)).isoformat()) \
+                rows_obj = (
+                    client.table("audit_log")
+                    .select("id", count="exact")
+                    .eq("action", "ml_scoring_failed")
+                    .gte("timestamp", (now - timedelta(hours=24)).isoformat())
                     .execute()
+                )
                 count = rows_obj.count if hasattr(rows_obj, "count") else len(rows_obj.data or [])
                 return GateResult(gate=gate, passed=count == 0, value=count)
             except Exception as e:
@@ -446,12 +468,14 @@ class PhasePromotionEvaluator:
             if not site_uuid:
                 return GateResult(gate=gate, passed=False, value=None)
             try:
-                rows_obj = client.table("parasite_decisions") \
-                    .select("id", count="exact") \
-                    .eq("site_id", site_uuid) \
-                    .eq("decision", "block") \
-                    .gte("created_at", (now - timedelta(days=7)).isoformat()) \
+                rows_obj = (
+                    client.table("parasite_decisions")
+                    .select("id", count="exact")
+                    .eq("site_id", site_uuid)
+                    .eq("decision", "block")
+                    .gte("created_at", (now - timedelta(days=7)).isoformat())
                     .execute()
+                )
                 count = rows_obj.count if hasattr(rows_obj, "count") else len(rows_obj.data or [])
                 return GateResult(gate=gate, passed=count == 0, value=count)
             except Exception as e:
@@ -466,22 +490,28 @@ class PhasePromotionEvaluator:
             if not site_uuid:
                 return GateResult(gate=gate, passed=False, value=None, threshold=threshold)
             try:
-                total = client.table("recommendations") \
-                    .select("id", count="exact") \
-                    .eq("site_id", site_uuid) \
-                    .neq("status", "pending") \
+                total = (
+                    client.table("recommendations")
+                    .select("id", count="exact")
+                    .eq("site_id", site_uuid)
+                    .neq("status", "pending")
                     .execute()
-                approved = client.table("recommendations") \
-                    .select("id", count="exact") \
-                    .eq("site_id", site_uuid) \
-                    .eq("status", "approved") \
+                )
+                approved = (
+                    client.table("recommendations")
+                    .select("id", count="exact")
+                    .eq("site_id", site_uuid)
+                    .eq("status", "approved")
                     .execute()
+                )
                 total_c = total.count if hasattr(total, "count") else len(total.data or [])
                 approved_c = approved.count if hasattr(approved, "count") else len(approved.data or [])
                 accuracy = approved_c / total_c if total_c > 0 else 0.0
                 return GateResult(
-                    gate=gate, passed=accuracy >= threshold,
-                    value=round(accuracy, 4), threshold=threshold,
+                    gate=gate,
+                    passed=accuracy >= threshold,
+                    value=round(accuracy, 4),
+                    threshold=threshold,
                 )
             except Exception as e:
                 logger.debug("Gate '%s' check failed: %s", gate, e)
@@ -493,16 +523,20 @@ class PhasePromotionEvaluator:
             if not site_uuid:
                 return GateResult(gate=gate, passed=False, value=None, threshold=threshold)
             try:
-                rejected = client.table("recommendations") \
-                    .select("id", count="exact") \
-                    .eq("site_id", site_uuid) \
-                    .eq("status", "rejected") \
+                rejected = (
+                    client.table("recommendations")
+                    .select("id", count="exact")
+                    .eq("site_id", site_uuid)
+                    .eq("status", "rejected")
                     .execute()
-                non_pending = client.table("recommendations") \
-                    .select("id", count="exact") \
-                    .eq("site_id", site_uuid) \
-                    .neq("status", "pending") \
+                )
+                non_pending = (
+                    client.table("recommendations")
+                    .select("id", count="exact")
+                    .eq("site_id", site_uuid)
+                    .neq("status", "pending")
                     .execute()
+                )
                 rejected_c = rejected.count if hasattr(rejected, "count") else len(rejected.data or [])
                 total_c = non_pending.count if hasattr(non_pending, "count") else len(non_pending.data or [])
                 fpr = rejected_c / total_c if total_c > 0 else 0.0
@@ -516,11 +550,7 @@ class PhasePromotionEvaluator:
             if not site_uuid:
                 return GateResult(gate=gate, passed=False, value=None)
             try:
-                row = client.table("sites") \
-                    .select("human_approved_autonomous") \
-                    .eq("id", site_uuid) \
-                    .limit(1) \
-                    .execute()
+                row = client.table("sites").select("human_approved_autonomous").eq("id", site_uuid).limit(1).execute()
                 approved = bool(row.data[0].get("human_approved_autonomous", False)) if row.data else False
                 return GateResult(gate=gate, passed=approved, value=approved)
             except Exception as e:
