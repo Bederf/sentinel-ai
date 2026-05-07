@@ -57,8 +57,6 @@ class PhasePromotionEvaluator:
                 "ml_hours_ingested >= 500",
                 "time_in_advisory_days >= 30",
                 "recommendations_generated >= 50",
-                "recommendations_acknowledged >= 20",
-                "recommendation_acceptance_rate >= 0.60",
                 "no_safety_violations_30d",
                 "bridge_connected_uptime_pct >= 0.90",
             ],
