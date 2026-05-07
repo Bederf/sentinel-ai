@@ -2463,6 +2463,65 @@ class BackgroundSchedulerService:
         except Exception as e:
             logger.debug(f"Telegram session cleanup: {e}")
 
+    def add_fire_pump_compliance_job(self, interval_seconds: int = 86400) -> None:
+        """
+        Add a daily job to check fire pump compliance and emit overdue alerts.
+
+        Args:
+            interval_seconds: How often to check (default: 86400 = 1 day)
+        """
+        if self.scheduler.get_job("check_fire_pump_compliance"):
+            self.scheduler.remove_job("check_fire_pump_compliance")
+            logger.info("Removed existing fire pump compliance job")
+
+        self.scheduler.add_job(
+            func=self._check_fire_pump_compliance,
+            trigger=IntervalTrigger(seconds=interval_seconds),
+            id="check_fire_pump_compliance",
+            name="Check Fire Pump Compliance",
+            replace_existing=True,
+        )
+        logger.info(f"Added fire pump compliance job ({interval_seconds}s interval)")
+
+    def _check_fire_pump_compliance(self) -> None:
+        """Check all sites for overdue fire pump inspections and emit alerts."""
+        try:
+            from app.core.site_resolver import get_registered_site_ids
+            from app.services.fire_pump_compliance_service import (
+                get_fire_pump_compliance_service,
+            )
+
+            site_ids = get_registered_site_ids()
+            if not site_ids:
+                return
+
+            async def _check():
+                svc = get_fire_pump_compliance_service()
+                for site_code in site_ids:
+                    try:
+                        alerts = await svc.get_overdue_alerts(site_code)
+                        if alerts:
+                            for alert in alerts:
+                                logger.warning(
+                                    f"Fire pump compliance alert | "
+                                    f"equipment_id={alert.equipment_id} "
+                                    f"site_code={alert.site_code} "
+                                    f"last_test_date={alert.last_test_date} "
+                                    f"days_overdue={alert.days_overdue} "
+                                    f"regulatory_reference={alert.regulatory_reference}"
+                                )
+                    except Exception as site_err:
+                        logger.warning(f"Fire pump compliance check failed for {site_code}: {site_err}")
+
+            if self._main_loop and self._main_loop.is_running():
+                future = asyncio.run_coroutine_threadsafe(_check(), self._main_loop)
+                future.result(timeout=30)
+            else:
+                asyncio.run(_check())
+
+        except Exception as e:
+            logger.error(f"Failed to check fire pump compliance: {e}")
+
     def add_simulation_queue_processor_job(self, interval_seconds: int = 10) -> None:
         """
         Add background job to process queued lifecycle simulations.
