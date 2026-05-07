@@ -340,6 +340,12 @@ async def startup_event(app: FastAPI) -> None:
 
     scheduler_service.add_ghost_room_monitor_job(interval_seconds=60)
 
+    # Phase 207 SLA monitoring — milestone timer (fires every 5 min)
+    scheduler_service.add_milestone_timer_job(interval_seconds=300)
+
+    # Phase 207 fire pump compliance — daily check
+    scheduler_service.add_fire_pump_compliance_job(interval_seconds=86400)
+
     # Optional ESP32 MQTT listener for room-presence nodes
     from app.services.space_mqtt_listener import get_space_mqtt_listener
 
