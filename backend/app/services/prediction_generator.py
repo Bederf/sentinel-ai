@@ -29,40 +29,140 @@ logger = logging.getLogger(__name__)
 MIN_PROBABILITY_THRESHOLD = 50
 
 
-def health_to_probability(health_score: float) -> float:
+def _health_score_to_base_probability(health_score: float) -> float:
     """
-    Maps health score to failure probability using configured thresholds.
+    Pure rule-based probability derivation from health score.
+    No ML signals involved — fallback when no anomaly scores available.
     Aligned with _calculate_prediction_from_health() in prediction_calculator.py.
-
-    Uses HealthThresholdService to get healthy/warning/critical boundaries,
-    then applies the same continuous probability bands.
     """
     thresholds = get_health_thresholds()
-    h = health_score
 
-    if h >= thresholds["healthy"]:
-        return 0.0  # Healthy equipment — no prediction generated
+    if health_score >= thresholds["healthy"]:
+        return 0.0
 
-    if h < thresholds["critical"]:
-        # Critical: 60-75%
-        base = 75 - (h * 0.3)
-    elif h < thresholds["warning"]:
-        # Severely degraded: 55-65%
-        base = 65 - ((h - thresholds["critical"]) * 0.5)
+    if health_score < thresholds["critical"]:
+        # Critical band: 75 - health * 0.3
+        base = 75 - (health_score * 0.3)
+    elif health_score < thresholds["warning"]:
+        # Warning band: 65 - (health - critical_threshold) * 0.5
+        base = 65 - ((health_score - thresholds["critical"]) * 0.5)
     else:
-        # Moderately degraded: 50-55%
-        base = 55 - ((h - thresholds["warning"]) * 0.5)
+        # Moderate band: 55 - (health - warning_threshold) * 0.5
+        base = 55 - ((health_score - thresholds["warning"]) * 0.5)
 
     return max(50, min(95, base))
+
+
+def health_to_probability(
+    health_score: float,
+    anomaly_score: float | None = None,
+    lstm_anomaly_score: float | None = None,
+    ml_hours_ingested: float = 0.0,
+) -> float:
+    """
+    Maps health score to failure probability.
+
+    Combines rule-based health score mapping with ML anomaly signals when available.
+    LSTM and IF scores are blended with trust_weight governance.
+
+    Args:
+        health_score: Equipment health score (0-100)
+        anomaly_score: Isolation Forest anomaly score [0, 1] or None
+        lstm_anomaly_score: LSTM anomaly score [0, 1] or None
+        ml_hours_ingested: ML training hours for trust_weight calculation
+
+    Returns:
+        Failure probability percentage [0, 100]
+    """
+    from app.services.ml_config import get_ml_trust_weight
+
+    # Rule-based base probability
+    base_prob = _health_score_to_base_probability(health_score)
+
+    # No ML signals available — return pure rule-based
+    if anomaly_score is None and lstm_anomaly_score is None:
+        return base_prob
+
+    # Trust weight for ML blending
+    trust_weight = get_ml_trust_weight(ml_hours_ingested)
+
+    # Collect ML signals
+    ml_signals = []
+    if anomaly_score is not None:
+        ml_signals.append(("if", anomaly_score))
+    if lstm_anomaly_score is not None:
+        ml_signals.append(("lstm", lstm_anomaly_score))
+
+    # Blend ML signals (simple average of available signals)
+    ml_avg = sum(s for _, s in ml_signals) / len(ml_signals)
+
+    # ML contribution: (ml_avg - 0.5) * 2 maps [0,1] → [-1, 1] range
+    # Weighted by trust_weight and capped
+    ml_contribution = (ml_avg - 0.5) * 2 * trust_weight  # ∈ [-trust_weight, +trust_weight]
+
+    # Combine: base_prob is the anchor, ML tilts it up/down
+    final_prob = base_prob + ml_contribution
+
+    return max(0, min(100, final_prob))
 
 
 class PredictionGeneratorService:
     """Service for automatic prediction generation based on equipment health."""
 
-    def __init__(self):
+    def __init__(self, site_id: str | None = None):
         """Initialize the prediction generator service."""
         self.supabase = get_supabase_client()
         self.prediction_repo = PredictionRepository()
+        self.site_id = site_id  # Optional: if set, used for ML hours lookup
+
+    async def _calculate_probability(
+        self,
+        equipment_id: str,
+        health_score: float,
+        operating_data: dict,
+        site_id: str,
+    ) -> float:
+        """Calculate failure probability from health + ML signals.
+
+        Pulls anomaly_score and lstm_anomaly_score from operating_data,
+        fetches ml_hours for trust_weight, then calls health_to_probability.
+        """
+        from app.services.ml_config import get_ml_trust_weight
+
+        anomaly_score = operating_data.get("anomaly_score")
+        lstm_anomaly_score = operating_data.get("lstm_anomaly_score")
+
+        ml_hours = await self._get_ml_hours_for_site(site_id)
+
+        probability = health_to_probability(
+            health_score=health_score,
+            anomaly_score=anomaly_score,
+            lstm_anomaly_score=lstm_anomaly_score,
+            ml_hours_ingested=ml_hours,
+        )
+        trust_weight = get_ml_trust_weight(ml_hours)
+        logger.info(
+            "probability_calculated: equipment_id=%s health_score=%s anomaly_score=%s "
+            "lstm_anomaly_score=%s ml_hours=%s trust_weight=%s final_probability=%s",
+            equipment_id,
+            health_score,
+            anomaly_score,
+            lstm_anomaly_score,
+            ml_hours,
+            trust_weight,
+            probability,
+        )
+        return probability
+
+    async def _get_ml_hours_for_site(self, site_id: str) -> float:
+        """Fetch ml_hours_ingested for a site from the sites table."""
+        try:
+            result = self.supabase.table("sites").select("ml_hours_ingested").eq("id", site_id).execute()
+            if result.data:
+                return float(result.data[0].get("ml_hours_ingested", 0.0))
+        except Exception:
+            pass
+        return 0.0
 
     async def generate_predictions_for_all_sites(self) -> dict[str, Any]:
         """
@@ -106,8 +206,8 @@ class PredictionGeneratorService:
                         results["skipped_duplicate"] += 1
                         continue
 
-                    # Generate prediction
-                    prediction = self._generate_prediction(equipment)
+                    # Generate prediction (async for ML signal integration)
+                    prediction = await self._generate_prediction_async(equipment, equipment.get("site_id", ""))
 
                     # Check probability threshold
                     if prediction["probability_percent"] < MIN_PROBABILITY_THRESHOLD:
@@ -167,9 +267,11 @@ class PredictionGeneratorService:
             logger.error(f"Failed to query at-risk equipment: {e}")
             return []
 
+    # Keep sync version for backward compatibility (used by tests)
+    # Does NOT use ML signals — use _generate_prediction_async for ML-aware predictions.
     def _generate_prediction(self, equipment: dict[str, Any]) -> dict[str, Any]:
         """
-        Generate a prediction record for equipment.
+        Generate a prediction record for equipment (sync, no ML signals).
 
         Args:
             equipment: Equipment record from database
@@ -179,10 +281,77 @@ class PredictionGeneratorService:
         """
         health_score = equipment.get("health_score", 50)
         equipment_type = equipment.get("type", "unknown")
-        _building = equipment.get("building", {})
 
         # Calculate probability based on health (inverse relationship)
         probability = health_to_probability(health_score)
+
+        # Determine severity based on health status - aligned with database constraint
+        health_status = get_health_status(health_score)
+        if health_status == "critical":
+            severity = "critical"
+            timeframe_days = 7
+            urgency = "critical"
+        elif health_status == "warning":
+            severity = "warning"
+            timeframe_days = 14
+            urgency = "warning"
+        else:
+            severity = "healthy"
+            timeframe_days = 30
+            urgency = "healthy"
+
+        predicted_date = datetime.now() + timedelta(days=timeframe_days)
+        code = f"pred-auto-{uuid.uuid4().hex[:8]}"
+        prediction_type = self._determine_prediction_type(equipment_type, health_score)
+        evidence = self._build_evidence(equipment)
+        financial_impact = self._calculate_financial_impact(equipment_type, severity)
+        contributing_factors = self._get_contributing_factors(equipment)
+        recommended_action = self._get_recommended_action(equipment_type, severity, prediction_type)
+
+        return {
+            "code": code,
+            "site_id": equipment.get("site_id"),
+            "equipment_id": equipment.get("id"),
+            "prediction_type": prediction_type,
+            "probability_percent": probability,
+            "confidence": confidence_from_probability(probability, high_threshold=80, medium_threshold=65),
+            "predicted_failure_date": predicted_date.isoformat(),
+            "timeframe_days": timeframe_days,
+            "severity": severity,
+            "status": "active",
+            "evidence": evidence,
+            "contributing_factors": contributing_factors,
+            "similar_failures": [],
+            "repair_cost_zar": financial_impact["repair_cost"],
+            "replacement_cost_zar": financial_impact["replacement_cost"],
+            "downtime_cost_per_hour_zar": financial_impact["downtime_cost_per_hour"],
+            "potential_loss_zar": financial_impact["potential_loss"],
+            "recommended_action": recommended_action,
+            "urgency": normalize_prediction_urgency(urgency) or urgency_from_severity(severity),
+        }
+
+    async def _generate_prediction_async(self, equipment: dict[str, Any], site_id: str) -> dict[str, Any]:
+        """
+        Generate a prediction record for equipment asynchronously.
+
+        Args:
+            equipment: Equipment record from database
+            site_id: Site ID for ML hours lookup
+
+        Returns:
+            Prediction record ready for insertion
+        """
+        health_score = equipment.get("health_score", 50)
+        equipment_type = equipment.get("type", "unknown")
+        operating_data = equipment.get("operating_data") or {}
+
+        # Calculate probability with ML signals (async, uses trust_weight)
+        probability = await self._calculate_probability(
+            equipment_id=equipment.get("id", ""),
+            health_score=health_score,
+            operating_data=operating_data,
+            site_id=site_id,
+        )
 
         # Determine severity based on health status - aligned with database constraint
         # Database allows: critical, warning, healthy (NOT high, medium, low)

@@ -131,23 +131,25 @@ def test_prediction_generator_probability_bounds_and_severity(monkeypatch):
     )
 
     service = PredictionGeneratorService.__new__(PredictionGeneratorService)
-    service._determine_prediction_type = lambda equipment_type, health_score: "general_failure"
-    service._build_evidence = lambda equipment: {}
-    service._calculate_financial_impact = lambda equipment_type, severity: {
+    service._determine_prediction_type = lambda _eq, _hs: "general_failure"
+    service._build_evidence = lambda _eq: {}
+    service._calculate_financial_impact = lambda _eq, _sev: {
         "repair_cost": 1,
         "replacement_cost": 2,
         "downtime_cost_per_hour": 3,
         "potential_loss": 4,
     }
-    service._get_contributing_factors = lambda equipment: []
-    service._get_recommended_action = lambda equipment_type, severity, prediction_type: "Inspect"
+    service._get_contributing_factors = lambda _eq: []
+    service._get_recommended_action = lambda _eq, _sev, _pt: "Inspect"
 
     critical = service._generate_prediction({"id": "eqp-1", "type": "generator", "health_score": 0, "site_id": "b1"})
     warning = service._generate_prediction({"id": "eqp-2", "type": "generator", "health_score": 65, "site_id": "b1"})
 
-    assert critical["probability_percent"] == 95  # upper bound cap
+    # health=0: deep critical → base=75 (no ML signals in sync path)
+    assert critical["probability_percent"] == 75  # upper bound per new formula
     assert critical["severity"] == "critical"
-    assert warning["probability_percent"] == 60  # floor for degraded equipment
+    # health=65: warning band → base=65 - (65-50)*0.5 = 57.5 (floor applied)
+    assert warning["probability_percent"] == 57.5  # actual formula result
     assert warning["severity"] == "warning"
 
 
