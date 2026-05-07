@@ -1164,9 +1164,14 @@ async def get_site_status(
 
 class PhaseUpdateRequest(BaseModel):
     phase: Literal[
-        "commissioning", "shadow_live", "advisory", "supervised", "automatic",
+        "commissioning",
+        "shadow_live",
+        "advisory",
+        "supervised",
+        "automatic",
         # Legacy aliases (normalised on write)
-        "shadow", "auto",
+        "shadow",
+        "auto",
     ]
     reason: str | None = None
     changed_by: str | None = None  # user email; defaults to "system" if omitted
@@ -1206,7 +1211,7 @@ async def update_site_phase(site_id: str, request: PhaseUpdateRequest) -> PhaseU
     - Forward by more than one step: 400 error
     - Backward: 400 error
     """
-    from app.models.onboarding_phase import LEGACY_MAP, normalise_stage, validate_transition
+    from app.models.onboarding_phase import normalise_stage, validate_transition
 
     requested = normalise_stage(request.phase)
     supabase_ok = False
@@ -1220,9 +1225,7 @@ async def update_site_phase(site_id: str, request: PhaseUpdateRequest) -> PhaseU
         # Capture current phase for audit log + transition validation
         current_row = client.table("sites").select("onboarding_phase").eq("code", site_id).limit(1).execute()
         if current_row.data:
-            previous_phase = normalise_stage(
-                current_row.data[0].get("onboarding_phase") or "commissioning"
-            )
+            previous_phase = normalise_stage(current_row.data[0].get("onboarding_phase") or "commissioning")
 
         # Validate transition before writing
         if previous_phase:
@@ -1251,9 +1254,11 @@ async def update_site_phase(site_id: str, request: PhaseUpdateRequest) -> PhaseU
         if gate_status.get("gates_pass") is False:
             failed = gate_status.get("failed_gates", [])
             failed_names = [g["rule"] for g in failed]
+            failed_str = ", ".join(failed_names) if failed_names else "see metrics"
             detail_msg = (
-                f"Policy gates not satisfied for {gate_status.get('current_stage', 'current stage')}. "
-                f"Cannot advance until all gates pass. Failed: {', '.join(failed_names) if failed_names else 'see metrics'}."
+                f"Policy gates not satisfied for "
+                f"{gate_status.get('current_stage', 'current stage')}. "
+                f"Cannot advance until all gates pass. Failed: {failed_str}."
             )
             raise HTTPException(
                 status_code=400,
@@ -1267,9 +1272,14 @@ async def update_site_phase(site_id: str, request: PhaseUpdateRequest) -> PhaseU
                 },
             )
 
-        client.table("sites").update({"onboarding_phase": requested}).eq("code", site_id).execute()
-        supabase_ok = True
-        logger.info(f"Onboarding phase set to '{requested}' for {site_id} (Supabase)")
+        # Supabase write — the authoritative storage
+        try:
+            client.table("sites").update({"onboarding_phase": requested}).eq("code", site_id).execute()
+            supabase_ok = True
+            logger.info(f"Onboarding phase set to '{requested}' for {site_id} (Supabase)")
+        except Exception as e:
+            logger.error(f"Supabase phase update failed for {site_id}: {e}")
+            raise HTTPException(status_code=500, detail=f"Supabase write failed: {e}") from e
 
         # Write phase transition to dedicated immutable log table
         try:
@@ -1286,20 +1296,28 @@ async def update_site_phase(site_id: str, request: PhaseUpdateRequest) -> PhaseU
             ).execute()
         except Exception as audit_err:
             logger.warning(f"Phase transition log insert failed for {site_id}: {audit_err}")
-    except Exception as e:
-        logger.warning(f"Supabase phase update failed for {site_id}: {e}")
 
-    # JSON fallback — persist phase and last transition for offline visibility
-    state = _load_phase_state()
-    state[site_id] = requested
-    state[f"{site_id}:last_transition"] = {
-        "to_phase": requested,
-        "from_phase": previous_phase,
-        "changed_by": request.changed_by or "system",
-        "created_at": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat(),
-        "reason": request.reason,
-    }
-    _save_phase_state(state)
+    except Exception as e:
+        logger.error(f"Phase update failed for {site_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+    # JSON fallback — best-effort persistence for offline/HTTP-only scenarios
+    # NOTE: This is rarely reached now since Supabase failures raise 500.
+    # Kept as safety net for edge cases where Supabase write succeeded but
+    # the connection was dropped before response.
+    try:
+        state = _load_phase_state()
+        state[site_id] = requested
+        state[f"{site_id}:last_transition"] = {
+            "to_phase": requested,
+            "from_phase": previous_phase,
+            "changed_by": request.changed_by or "system",
+            "created_at": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat(),
+            "reason": request.reason,
+        }
+        _save_phase_state(state)
+    except Exception as fallback_err:
+        logger.warning(f"Phase state JSON fallback failed for {site_id}: {fallback_err}")
 
     # Patch sites.json fallback
     if settings.use_json_storage:
@@ -1394,10 +1412,7 @@ def _get_bridge_status(sentinel_enabled: bool = True) -> dict:
         if bridge_connected:
             bridge_data_source = bridge_data_source or "remote_bridge"
 
-        if (
-            settings.site002_source_enabled
-            and settings.ingestion_mode == "simulation"
-        ):
+        if settings.site002_source_enabled and settings.ingestion_mode == "simulation":
             bridge_data_source = "local_adapter"
             bridge_connected = True
 
