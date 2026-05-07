@@ -46,9 +46,12 @@ export function ChannelStatusDashboard({ siteId: _siteId, onError }: ChannelStat
             status: byChannel.get("whatsapp")?.enabled ? "active" : "inactive",
             message_count: 0,
           },
-          // Email channel is displayed for operations visibility, but is not yet part
-          // of the notification provider status API contract.
-          { channel: "Email", status: "inactive", message_count: 0 },
+          {
+            channel: "Email",
+            provider: byChannel.get("email")?.provider,
+            status: byChannel.get("email")?.enabled ? "active" : "inactive",
+            message_count: 0,
+          },
           {
             channel: "SMS",
             provider: byChannel.get("sms")?.provider,
@@ -82,10 +85,6 @@ export function ChannelStatusDashboard({ siteId: _siteId, onError }: ChannelStat
 
   const handleTest = async (channel: string) => {
     const channelKey = channel.toLowerCase();
-    if (channelKey === "email") {
-      onError?.("Email test is not available from this panel yet.");
-      return;
-    }
     setTesting(channel);
     try {
       // Send provider test via notifications API.

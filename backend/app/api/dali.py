@@ -497,7 +497,7 @@ async def get_live_dali_data(
     Example response:
     ```json
     {
-      "site_id": "S002",
+      "site_id": "site-002",
       "data_source": "live",
       "timestamp": "2026-02-18T14:30:00.123456",
       "summary": {

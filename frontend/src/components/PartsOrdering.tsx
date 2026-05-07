@@ -121,7 +121,7 @@ export default function PartsOrdering() {
           items: orderItems,
           total_amount: `R${calculateTotal().toFixed(2)}`,
           technician_id: 'TECH-001', // TODO: get from context
-          site_id: 'S002', // TODO: get from context
+          site_id: 'site-002', // TODO: get from context
           status: 'pending_approval'
         })
       });

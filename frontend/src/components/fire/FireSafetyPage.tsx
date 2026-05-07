@@ -142,7 +142,7 @@ export function FireSafetyPage({ siteId = 'site-002' }: FireSafetyPageProps) {
         period="Monthly"
         collecting
       />
-      <FireEquipmentPanel siteCode="S002" />
+      <FireEquipmentPanel siteCode={siteId} />
       </div>
     </div>
   );

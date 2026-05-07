@@ -190,7 +190,7 @@ class FireEquipmentTracking(BaseModel):
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
-                "site_id": "S002",
+                "site_id": "site-002",
                 "equipment_type": "extinguisher",
                 "location_description": "L1 Corridor B",
                 "unique_identifier": "FE-2024-001",
@@ -239,7 +239,7 @@ class EmergencyLightTesting(BaseModel):
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
-                "site_id": "S002",
+                "site_id": "site-002",
                 "light_code": "S002-EMERG-L2-001",
                 "fixture_location": "Level 2, Corridor A",
                 "test_interval_days": 365,
@@ -296,7 +296,7 @@ class LegionellaRiskAssessment(BaseModel):
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
-                "site_id": "S002",
+                "site_id": "site-002",
                 "tower_code": "S002-CT-B1-001",
                 "risk_level": "high",
                 "water_temperature": 30.0,
@@ -359,7 +359,7 @@ class ElectricalCompliance(BaseModel):
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
-                "site_id": "S002",
+                "site_id": "site-002",
                 "certificate_type": "CoC_new_installation",
                 "issued_by": "John Smith - SABS #12345",
                 "issue_date": "2024-01-15T00:00:00Z",
@@ -412,7 +412,7 @@ class LiftInspectionTracking(BaseModel):
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
-                "site_id": "S002",
+                "site_id": "site-002",
                 "lift_code": "S002-LIFT-R-001",
                 "location_description": "Roof Level - Main Lift",
                 "inspection_type": "periodic_6monthly",
@@ -465,7 +465,7 @@ class ComplianceStatus(BaseModel):
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
-                "site_id": "S002",
+                "site_id": "site-002",
                 "critical_issues_count": 2,
                 "high_risk_items_count": 5,
                 "items_expiring_30days": 3,

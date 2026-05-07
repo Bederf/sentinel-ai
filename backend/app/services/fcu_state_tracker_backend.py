@@ -42,7 +42,7 @@ class SupabaseBackend(FCUStateTrackerBackend):
     Writes every state change via upsert so patterns survive restarts.
     """
 
-    def __init__(self, site_id: str = "S002", supabase_client: "Client | None" = None) -> None:
+    def __init__(self, site_id: str = "site-002", supabase_client: "Client | None" = None) -> None:
         self._site_id = site_id
         self._client = supabase_client
         self._cache: dict[str, _ZoneState] = {}

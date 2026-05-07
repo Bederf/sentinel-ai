@@ -110,7 +110,7 @@ class WikiCompilerService:
                 # Compile wiki for this asset
                 wiki_path = await self.compile_asset_wiki(
                     asset_id=asset_id,
-                    site_id="S002",
+                    site_id="site-002",
                 )
 
                 self._mark_processed(entry["id"])
@@ -132,7 +132,7 @@ class WikiCompilerService:
 
         return {"skipped": False, "processed": processed, "failed": failed, "errors": errors}
 
-    async def compile_asset_wiki(self, asset_id: str, site_id: str = "S002") -> str | None:
+    async def compile_asset_wiki(self, asset_id: str, site_id: str = "site-002") -> str | None:
         """
         Force-compile a specific asset's wiki page.
 
@@ -199,7 +199,7 @@ class WikiCompilerService:
         lines.append("| Field | Value |")
         lines.append("|-------|-------|")
         lines.append(f"| Asset ID | {asset_id} |")
-        lines.append(f"| Site | {doc.get('site_id', 'S002')} |")
+        lines.append(f"| Site | {doc.get('site_id', 'site-002')} |")
         sub_class = doc.get("sub_class") or doc.get("document_type") or "—"
         lines.append(f"| Equipment Type | {sub_class} |")
         lines.append(f"| Description | {equipment_desc} |")

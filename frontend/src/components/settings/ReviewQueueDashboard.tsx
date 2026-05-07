@@ -95,7 +95,7 @@ function ModalPortal({ children }: { children: React.ReactNode }) {
 // --- Main component ---
 
 export function ReviewQueueDashboard({
-  siteId = "S002",
+  siteId = "site-002",
   onError,
   onSuccess,
 }: ReviewQueueDashboardProps) {
@@ -283,8 +283,8 @@ export function ReviewQueueDashboard({
               className="rounded px-2 py-1 text-xs"
               style={inputStyle}
             >
-              <option value="S002">S002 — Fairlands</option>
-              <option value="S001">S001 — Site 1</option>
+              <option value="site-002">site-002 — Sandton City</option>
+              <option value="site-001">site-001 — FNB Fairlands</option>
             </select>
           </div>
           <div>

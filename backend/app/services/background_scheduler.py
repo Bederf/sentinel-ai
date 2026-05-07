@@ -4563,6 +4563,150 @@ class BackgroundSchedulerService:
         )
         logger.info("compiler_worker job registered — interval=%s min", interval_minutes)
 
+    def add_financial_roi_job(self, interval_seconds: int = 86400) -> None:
+        """Add daily financial ROI recommendation generation job.
+
+        Runs AIRecommendationEngine for each site in advisory+ phase and persists
+        financial_roi recommendations (lighting, water, HVAC, occupancy ROI).
+        Deduplicates: skips if a financial_roi rec for the same site already exists
+        within the last 24 hours.
+        """
+        job_id = "financial_roi_generation"
+        if self.scheduler.get_job(job_id):
+            self.scheduler.remove_job(job_id)
+        self.scheduler.add_job(
+            func=self._run_financial_roi,
+            trigger=IntervalTrigger(seconds=interval_seconds),
+            id=job_id,
+            name="Financial ROI Recommendation Generation (daily)",
+            replace_existing=True,
+            max_instances=1,
+        )
+        logger.info("financial_roi_generation job registered — interval=%ds", interval_seconds)
+
+    def _run_financial_roi(self):
+        """Generate and persist financial ROI recommendations for all eligible sites."""
+        import asyncio
+        from datetime import timezone
+
+        try:
+            from app.core.site_resolver import get_registered_site_ids
+            from app.database.repositories.recommendation_repository import get_recommendation_repository
+            from app.models.onboarding_phase import effective_phase
+            from app.models.recommendation import ActionRiskLevel, Recommendation, RecommendationStatus
+            from app.services.ai_recommendation_engine import AIRecommendationEngine
+
+            site_ids = get_registered_site_ids()
+            if not site_ids:
+                return
+
+            repo = get_recommendation_repository()
+            GENERATION_ALLOWED = {"shadow_live", "advisory", "supervised", "automatic"}
+
+            for site_id in site_ids:
+                try:
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    try:
+                        current_stage = loop.run_until_complete(effective_phase(site_id))
+                    finally:
+                        loop.close()
+
+                    if current_stage not in GENERATION_ALLOWED:
+                        logger.info("[ROI] Skipping %s — phase=%s", site_id, current_stage)
+                        continue
+
+                    # Dedup: skip if a financial_roi rec was created in the last 24h
+                    storage_site_id = site_id
+                    if site_id.startswith("site-"):
+                        num = site_id.split("-")[1]
+                        storage_site_id = f"S{num}"
+
+                    try:
+                        from datetime import datetime, timedelta
+
+                        cutoff = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
+                        existing = repo.list_recommendations(
+                            site_id=storage_site_id,
+                            status="pending",
+                            limit=1,
+                        )
+                        roi_recent = any(
+                            r.get("action_type") == "financial_roi" and r.get("timestamp", "") >= cutoff
+                            for r in (existing or [])
+                        )
+                        if roi_recent:
+                            logger.info("[ROI] Skipping %s — financial_roi rec already created today", site_id)
+                            continue
+                    except Exception as e:
+                        logger.warning("[ROI] Dedup check failed for %s: %s — proceeding", site_id, e)
+
+                    engine = AIRecommendationEngine(site_id)
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    try:
+                        result = loop.run_until_complete(engine.generate_recommendations())
+                    finally:
+                        loop.close()
+
+                    recs = result.get("recommendations", [])
+                    if not recs:
+                        logger.info("[ROI] %s: 0 financial recs generated", site_id)
+                        continue
+
+                    created = 0
+                    for rec_dict in recs:
+                        try:
+                            rec = Recommendation(
+                                site_id=storage_site_id,
+                                action_type="financial_roi",
+                                risk_level=ActionRiskLevel.LOW,
+                                target_equipment=site_id,
+                                action={
+                                    "category": rec_dict.get("category", ""),
+                                    "roi_pct": rec_dict.get("roi_pct", 0),
+                                    "payback_months": rec_dict.get("payback_months", 0),
+                                },
+                                reason=rec_dict.get("recommendation", rec_dict.get("reason", "")),
+                                expected_impact={
+                                    "annual_savings_r": rec_dict.get("annual_savings_r", 0),
+                                    "investment_cost_r": rec_dict.get("investment_cost_r", 0),
+                                    "roi_pct": rec_dict.get("roi_pct", 0),
+                                    "payback_months": rec_dict.get("payback_months", 0),
+                                    "messaging": rec_dict.get("messaging", ""),
+                                },
+                                confidence="medium",
+                                confidence_score=0.7,
+                                profile="cost_saving",
+                                source="financial_roi",
+                                source_type="rule_based",
+                                status=RecommendationStatus.PENDING,
+                                requires_approval=True,
+                                metadata={
+                                    "rank": rec_dict.get("rank", 0),
+                                    "priority": rec_dict.get("priority", "medium"),
+                                    "total_annual_savings_r": result.get("total_annual_savings_r", 0),
+                                    "source_panel": "finance",
+                                },
+                            )
+                            loop = asyncio.new_event_loop()
+                            asyncio.set_event_loop(loop)
+                            try:
+                                loop.run_until_complete(repo.create(rec))
+                            finally:
+                                loop.close()
+                            created += 1
+                        except Exception as e:
+                            logger.warning("[ROI] Failed to persist rec for %s: %s", site_id, e)
+
+                    logger.info("[ROI] %s: created %d financial_roi recommendations", site_id, created)
+
+                except Exception as e:
+                    logger.error("[ROI] Site %s failed: %s", site_id, e, exc_info=True)
+
+        except Exception as e:
+            logger.error("[ROI] Job failed: %s", e, exc_info=True)
+
     def add_email_intake_poll_job(self, interval_minutes: int = 5) -> None:
         """
         Add periodic job to poll the intelligence intake IMAP mailbox.
@@ -4717,7 +4861,7 @@ def _run_daily_health_sweep_sync():
         loop.close()
 
 
-def _run_recommendation_digest_sync(site_id: str = "S002"):
+def _run_recommendation_digest_sync(site_id: str = "site-002"):
     """Sync wrapper for recommendation digest — sends Telegram morning digest."""
     import asyncio
     import logging

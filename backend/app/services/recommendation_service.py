@@ -190,18 +190,12 @@ class RecommendationService:
 
         try:
             repo = get_recommendation_repository()
-            # Normalize site_id: "site-002" → "S002"
-            normalized = site_id
-            if site_id.startswith("site-"):
-                num = site_id.split("-")[1]
-                normalized = f"S{num}"
-
             recs = await repo.get_by_status(
-                site_id=normalized,
+                site_id=site_id,
                 status=RecommendationStatus.PENDING,
                 limit=limit,
             )
-            logger.info(f"Found {len(recs)} pending recommendations for {normalized}")
+            logger.info(f"Found {len(recs)} pending recommendations for {site_id}")
             return recs
         except Exception as e:
             logger.error(f"Error fetching pending recommendations for {site_id}: {e}")

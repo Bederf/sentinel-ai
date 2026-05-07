@@ -13,9 +13,9 @@ from app.services.site_operating_mode_service import SentinelOperatingMode
 
 
 def normalize_site_id(site_id: str) -> str:
-    normalized = site_id.strip().upper().replace("_", "-")
-    if normalized == "SITE-002":
-        return "S002"
+    normalized = site_id.strip().lower().replace("_", "-")
+    if normalized == "s002":
+        return "site-002"
     return normalized
 
 
@@ -223,7 +223,7 @@ def _fallback_candidates_for_site(
     """
     canonical_site_id = normalize_site_id(site_id)
 
-    if canonical_site_id != "S002":
+    if canonical_site_id != "site-002":
         return []
 
     t = telemetry or {}

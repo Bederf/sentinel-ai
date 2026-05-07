@@ -151,7 +151,7 @@ export default function SystemHealthPage() {
 
   const loadDataFreshness = async () => {
     try {
-      const siteId = 'S002';
+      const siteId = 'site-002';
       const res = await authorizedFetch(`/api/system/sites/${siteId}/data-freshness`);
       if (res.ok) {
         const data = await res.json();

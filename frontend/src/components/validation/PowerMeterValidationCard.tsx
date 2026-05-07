@@ -97,7 +97,7 @@ interface PowerMeterValidationCardProps {
 }
 
 export function PowerMeterValidationCard({
-  siteId = "S002",
+  siteId = "site-002",
   className = "",
 }: PowerMeterValidationCardProps) {
   const [validation, setValidation] = useState<PowerMeterValidation | null>(null);

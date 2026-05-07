@@ -301,28 +301,60 @@ class TechnicianRepository:
 
     # ==================== CRUD (Phase: Technician Registry UI) ====================
 
-    async def get_technicians_with_assignments(self, site_id: str | None = None) -> list[dict[str, Any]]:
-        """Get all technicians with their site assignments and notification channels.
+    def _resolve_site_uuid(self, site_id: str) -> str:
+        """Resolve a site code (e.g. 'site-002') to its UUID if needed."""
+        import re
 
-        Returns a combined view for the Settings UI.
+        uuid_pattern = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I)
+        if uuid_pattern.match(site_id):
+            return site_id
+        result = self.client.table("sites").select("id").eq("code", site_id).limit(1).execute()
+        if result.data:
+            return result.data[0]["id"]
+        return site_id
+
+    async def get_technicians_with_assignments(self, site_id: str | None = None) -> list[dict[str, Any]]:
+        """Get technicians with their site assignments and notification channels.
+
+        Returns a combined view for the Settings UI. When site_id is provided,
+        only returns technicians assigned to that site.
         """
         if not self.client:
             logger.warning("Supabase client not available for get_technicians_with_assignments")
             return []
 
         try:
-            # Get all technicians
-            result = self.client.table("technicians").select("*").order("name").execute()
-            technicians = result.data or []
+            # Resolve site code → UUID (site_technicians stores UUIDs)
+            resolved_site_uuid = self._resolve_site_uuid(site_id) if site_id else None
 
-            # Get site assignments
+            # Get site assignments (filtered by resolved UUID)
             assign_query = self.client.table("site_technicians").select("*")
-            if site_id:
-                assign_query = assign_query.eq("site_id", site_id)
+            if resolved_site_uuid:
+                assign_query = assign_query.eq("site_id", resolved_site_uuid)
             assignments = (assign_query.execute()).data or []
 
-            # Get notification channels
-            channels = (self.client.table("technician_notification_channels").select("*").execute()).data or []
+            # Build set of technician IDs that have assignments at this site
+            assigned_tech_ids = {a["technician_id"] for a in assignments} if resolved_site_uuid else None
+
+            # Get technicians — filtered to site-assigned ones when a site is specified
+            tech_query = self.client.table("technicians").select("*").order("name")
+            result = tech_query.execute()
+            technicians = result.data or []
+
+            if assigned_tech_ids is not None:
+                technicians = [t for t in technicians if t["id"] in assigned_tech_ids]
+
+            # Get notification channels for relevant technician IDs
+            tech_ids = [t["id"] for t in technicians]
+            if tech_ids:
+                channels = (
+                    self.client.table("technician_notification_channels")
+                    .select("*")
+                    .in_("technician_id", tech_ids)
+                    .execute()
+                ).data or []
+            else:
+                channels = []
 
             # Merge
             for tech in technicians:
@@ -391,14 +423,16 @@ class TechnicianRepository:
             tech = result.data[0]
             tech_id = tech["id"]
 
+            resolved_site_uuid = self._resolve_site_uuid(site_id)
+
             # 2. Create site_technicians for each specialty
             for i, spec in enumerate(specialties):
                 self.client.table("site_technicians").insert(
                     {
-                        "site_id": site_id,
+                        "site_id": resolved_site_uuid,
                         "technician_id": tech_id,
                         "specialty": spec,
-                        "is_primary": i == 0,  # First specialty is primary
+                        "is_primary": i == 0,
                     }
                 ).execute()
 
@@ -469,14 +503,18 @@ class TechnicianRepository:
             return False
 
         try:
+            resolved_site_uuid = self._resolve_site_uuid(site_id)
+
             # Delete existing assignments for this tech at this site
-            self.client.table("site_technicians").delete().eq("technician_id", tech_id).eq("site_id", site_id).execute()
+            self.client.table("site_technicians").delete().eq("technician_id", tech_id).eq(
+                "site_id", resolved_site_uuid
+            ).execute()
 
             # Create new assignments
             for i, spec in enumerate(specialties):
                 self.client.table("site_technicians").insert(
                     {
-                        "site_id": site_id,
+                        "site_id": resolved_site_uuid,
                         "technician_id": tech_id,
                         "specialty": spec,
                         "is_primary": i == 0,

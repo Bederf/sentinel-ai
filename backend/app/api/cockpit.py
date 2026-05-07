@@ -210,11 +210,11 @@ def _build_stub_payload_for_site(site_id: str) -> CockpitDecisionPayload | None:
     When v2 replaces this with real data, the shape stays identical.
     """
 
-    if site_id == "S002":
-        # Fairlands: active advisory decision (one stub recommendation)
+    if site_id == "site-002":
+        # Sandton City: active advisory decision (one stub recommendation)
         return _attach_resolved_contract(
             CockpitDecisionPayload(
-                building_id="S002",
+                building_id="site-002",
                 alert_text="Executive boardroom cooling resilience is slipping.",
                 reasoning_summary=(
                     "Compressor load is rising while boardroom thermal drift accelerates. "

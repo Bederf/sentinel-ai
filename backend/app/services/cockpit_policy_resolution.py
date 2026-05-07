@@ -95,7 +95,7 @@ POSTURE_POLICIES: dict[str, PolicyOverride] = {
 }
 
 SITE_POLICIES: dict[str, PolicyOverride] = {
-    "S002": PolicyOverride(
+    "site-002": PolicyOverride(
         risk_thresholds={"medium": 27, "high": 54, "critical": 74},
         constraint_type="comfort",
         policy_source="site-002.default",
@@ -104,7 +104,7 @@ SITE_POLICIES: dict[str, PolicyOverride] = {
 }
 
 SITE_ASSET_POLICIES: dict[tuple[str, str], PolicyOverride] = {
-    ("S002", "chiller"): PolicyOverride(
+    ("site-002", "chiller"): PolicyOverride(
         risk_thresholds={"medium": 25, "high": 50, "critical": 70},
         constraint_type="comfort",
         policy_source="site-002.chiller.default",
@@ -113,13 +113,13 @@ SITE_ASSET_POLICIES: dict[tuple[str, str], PolicyOverride] = {
 }
 
 SITE_ASSET_CRITICALITY_POLICIES: dict[tuple[str, str, Criticality], PolicyOverride] = {
-    ("S002", "chiller", "high"): PolicyOverride(
+    ("site-002", "chiller", "high"): PolicyOverride(
         risk_thresholds={"medium": 23, "high": 47, "critical": 67},
         constraint_type="comfort",
         policy_source="site-002.chiller.high.comfort",
         policy_level="site_asset_criticality",
     ),
-    ("S002", "generator", "mission_critical"): PolicyOverride(
+    ("site-002", "generator", "mission_critical"): PolicyOverride(
         risk_thresholds={"medium": 18, "high": 36, "critical": 56},
         constraint_type="asset",
         policy_source="site-002.generator.mission-critical.asset",
@@ -167,7 +167,7 @@ def infer_asset_context(site_id: str, primary_asset_id: str | None) -> AssetCont
 
     if asset_class == "generator":
         criticality: Criticality = "mission_critical"
-    elif site_id == "S002" and asset_class == "chiller":
+    elif site_id == "site-002" and asset_class == "chiller":
         criticality = "high"
     elif asset_class in {"pump", "ahu"}:
         criticality = "medium"
@@ -235,7 +235,7 @@ def resolve_affected_scope(
     zones = list(affected_zone_ids or [])
     assets = [primary_asset_id] if primary_asset_id else []
 
-    if site_id == "S002" and zones:
+    if site_id == "site-002" and zones:
         occupants_estimate = 18 if any("boardroom" in zone.lower() for zone in zones) else len(zones) * 6
     elif zones:
         occupants_estimate = len(zones) * 4

@@ -3781,7 +3781,7 @@ async def process_recommendation(
         result = await agent.ainvoke(
             {
                 "messages": [HumanMessage(content="process")],
-                "site_id": site_id or "S002",
+                "site_id": site_id or "site-002",
                 "channel": channel,
                 "trigger": "manual",
             },

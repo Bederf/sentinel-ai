@@ -84,7 +84,7 @@ interface CostValidationCardProps {
 }
 
 export function CostValidationCard({
-  siteId = "S002",
+  siteId = "site-002",
   className = "",
 }: CostValidationCardProps) {
   const [validation, setValidation] = useState<CostValidation | null>(null);
