@@ -41,7 +41,7 @@ def load_alerts() -> list[dict]:
 
         # Get equipment and building lookups for enrichment
         client = get_supabase_client()
-        equipment_resp = client.table("equipment").select("id, name, code, site_id, metadata").execute()
+        equipment_resp = client.table("equipment").select("id, name, code, site_id, device_info").execute()
         buildings_resp = client.table("sites").select("id, name, code").execute()
 
         eq_lookup = {eq["id"]: eq for eq in (equipment_resp.data or [])}
@@ -50,9 +50,9 @@ def load_alerts() -> list[dict]:
         for da in db_alerts:
             equipment = eq_lookup.get(da.get("equipment_id"), {})
             building = building_lookup.get(da.get("site_id"), {})
-            # Extract device_id from equipment metadata for control navigation
-            metadata = equipment.get("metadata") or {}
-            device_id = metadata.get("device_id")
+            # Extract device_id from equipment device_info for control navigation
+            device_info = equipment.get("device_info") or {}
+            device_id = device_info.get("device_id")
 
             # Convert database alert to standard format
             alert = {

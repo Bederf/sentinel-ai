@@ -460,13 +460,6 @@ class BackgroundSchedulerService:
                         )
                         continue
 
-                    # Normalize site_id for storage: "site-002" → "S002"
-                    # (the recommendation service queries with this format)
-                    storage_site_id = site_id
-                    if site_id.startswith("site-"):
-                        num = site_id.split("-")[1]
-                        storage_site_id = f"S{num}"
-
                     loop = asyncio.new_event_loop()
                     asyncio.set_event_loop(loop)
 
@@ -522,7 +515,7 @@ class BackgroundSchedulerService:
                         asyncio.set_event_loop(loop)
                         try:
                             rec = Recommendation(
-                                site_id=storage_site_id,
+                                site_id=site_id,
                                 timestamp=datetime.utcnow(),
                                 action_type=rec_action_type or "health_maintenance",
                                 risk_level=ActionRiskLevel.LOW,
@@ -601,7 +594,7 @@ class BackgroundSchedulerService:
                     asyncio.set_event_loop(loop)
                     try:
                         existing_pending = loop.run_until_complete(
-                            recommendation_repo.get_by_status(storage_site_id, RecommendationStatus.PENDING, limit=500)
+                            recommendation_repo.get_by_status(site_id, RecommendationStatus.PENDING, limit=500)
                         )
                     finally:
                         loop.close()
@@ -702,7 +695,7 @@ class BackgroundSchedulerService:
                         is_sim = orch is not None and orch.running
 
                         rec = Recommendation(
-                            site_id=storage_site_id,
+                            site_id=site_id,
                             timestamp=datetime.utcnow(),
                             action_type=rec_action_type or "ai_optimization",
                             risk_level=ActionRiskLevel.LOW,
@@ -835,11 +828,6 @@ class BackgroundSchedulerService:
 
         for site_id in site_ids:
             try:
-                storage_site_id = site_id
-                if site_id.startswith("site-"):
-                    num = site_id.split("-")[1]
-                    storage_site_id = f"S{num}"
-
                 # Get site UUID
                 site_resp = sb.table("sites").select("id").eq("code", site_id).execute()
                 if not site_resp.data:
@@ -862,7 +850,7 @@ class BackgroundSchedulerService:
                 asyncio.set_event_loop(loop)
                 try:
                     existing_pending = loop.run_until_complete(
-                        recommendation_repo.get_by_status(storage_site_id, RecommendationStatus.PENDING, limit=500)
+                        recommendation_repo.get_by_status(site_id, RecommendationStatus.PENDING, limit=500)
                     )
                 finally:
                     loop.close()
@@ -913,7 +901,7 @@ class BackgroundSchedulerService:
                     is_sim = orch is not None and orch.running
 
                     rec = Recommendation(
-                        site_id=storage_site_id,
+                        site_id=site_id,
                         timestamp=datetime.utcnow(),
                         action_type="health_maintenance",
                         risk_level=action_info["risk"],
@@ -4617,17 +4605,12 @@ class BackgroundSchedulerService:
                         continue
 
                     # Dedup: skip if a financial_roi rec was created in the last 24h
-                    storage_site_id = site_id
-                    if site_id.startswith("site-"):
-                        num = site_id.split("-")[1]
-                        storage_site_id = f"S{num}"
-
                     try:
                         from datetime import datetime, timedelta
 
                         cutoff = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
                         existing = repo.list_recommendations(
-                            site_id=storage_site_id,
+                            site_id=site_id,
                             status="pending",
                             limit=1,
                         )
@@ -4658,7 +4641,7 @@ class BackgroundSchedulerService:
                     for rec_dict in recs:
                         try:
                             rec = Recommendation(
-                                site_id=storage_site_id,
+                                site_id=site_id,
                                 action_type="financial_roi",
                                 risk_level=ActionRiskLevel.LOW,
                                 target_equipment=site_id,

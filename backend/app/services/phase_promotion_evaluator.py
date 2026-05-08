@@ -223,17 +223,10 @@ class PhasePromotionEvaluator:
             ml_hours_raw = ml_row.data[0].get("ml_hours_ingested", 0.0) if ml_row.data else 0.0
         ml_hours = float(ml_hours_raw or 0.0)
         now = datetime.now(tz=UTC)
-        # Normalize site_id for adapter_health_current queries: "site-002" → "S002"
-        if site_id.startswith("site-"):
-            site_id_normalized = f"S{site_id.split('-')[1]}"
-        else:
-            site_id_normalized = site_id
 
         results: list[GateResult] = []
         for gate in gates:
-            result = await self._evaluate_single_gate(
-                client, site_id, site_uuid, site_id_normalized, gate, ml_hours, now
-            )
+            result = await self._evaluate_single_gate(client, site_id, site_uuid, site_id, gate, ml_hours, now)
             results.append(result)
 
         return results
@@ -243,7 +236,7 @@ class PhasePromotionEvaluator:
         client,
         site_id: str,
         site_uuid: str | None,
-        site_id_normalized: str,
+        site_id_for_queries: str,
         gate: str,
         ml_hours: float,
         now: datetime,
@@ -410,7 +403,7 @@ class PhasePromotionEvaluator:
                 row = (
                     client.table("adapter_health_current")
                     .select("uptime_24h_percent")
-                    .eq("site_id", site_id_normalized)
+                    .eq("site_id", site_id_for_queries)
                     .eq("adapter_type", "bridge")
                     .limit(1)
                     .execute()
