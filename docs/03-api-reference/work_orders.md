@@ -4,7 +4,7 @@ type: "reference"
 status: "draft"
 version: "1.0.0"
 created: "2026-03-31"
-updated: "2026-03-31"
+updated: "2026-05-08"
 tags: ["sentinel", "documentation"]
 related: []
 domain: "bms"
@@ -14,6 +14,17 @@ estimated_read_time: 10
 ---
 
 # Work Orders API
+
+## Data model note
+
+**Work orders and service records are distinct entities with different lifecycles.**
+
+| Entity | Purpose | Lifecycle |
+|--------|---------|-----------|
+| `work_orders` | Transient operational task — created, assigned, closed | Deleted after close-out; not permanent history |
+| `service_records` | Permanent equipment maintenance history | Retained forever; `work_order_id` nullable so history survives WO deletion |
+
+When a work order is created for equipment, a service record is automatically created and linked via `work_order_id`. If the work order is later deleted, the service record's `work_order_id` is nullified — the equipment history is preserved.
 
 ## Overview
 
@@ -94,10 +105,31 @@ Each command renders as a **clickable button** in the web chat. Claude is instru
 
 ... and 9 more endpoints
 
+## Claude AI tools
+
+| Tool | Role | Description |
+|------|------|-------------|
+| `create_work_order` | `OPERATOR`+ | Create a WO from chat — routes via Sentry create-work-order endpoint |
+| `close_work_order` | `OPERATOR`+ | Close a WO by code — sets status to `completed`, records resolution and actual duration. Used by FM chat; tech bot uses `technician-closeout` skill instead |
+
+Both require the `MAINTENANCE` module and `OPERATOR` role minimum.
+
+## Technician closeout skill
+
+Tech bot trigger: `done #WO-XXXX`
+
+The `technician-closeout` skill runs a stateful multi-step debrief (one checklist item at a time), collects evidence, and on completion calls `_complete_service_record_and_restore_equipment` in `work_order_notifier.py`, which:
+
+1. Marks SR as `complete`
+2. Resolves active alerts and predictions for the equipment
+3. Sets equipment `status` → `normal`
+4. Restores equipment `health_score` (see [health scoring](../04-features/health-scoring-system.md#service-record-health-impact))
+
 ## Implementation
 
 - Slash command router: `backend/app/services/slash_command_router.py`
-- Sentry WO endpoint: `backend/app/api/sentry_webhooks.py` (line 910)
-- Claude tool: `backend/app/services/chat_tools.py` (`create_work_order_chat`)
+- Sentry WO endpoint: `backend/app/api/sentry_webhooks.py`
+- Claude tools: `backend/app/services/chat_tools.py` (`create_work_order_chat`, `close_work_order_chat`)
+- Closeout handler: `backend/app/services/sentry_integration/work_order_notifier.py` (`_complete_service_record_and_restore_equipment`, `_restore_equipment_health`)
 - Standard API: `backend/app/api/work_orders.py`
 - Repository: `backend/app/database/repositories/work_order_repository.py`

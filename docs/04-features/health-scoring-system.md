@@ -4,7 +4,7 @@ type: "technical"
 status: "approved"
 version: "1.0.0"
 created: "2026-02-02"
-updated: "2026-02-02"
+updated: "2026-05-08"
 author: "Sentinel Development Team"
 tags: ["health", "scoring", "equipment", "thresholds", "condition-monitoring"]
 related: ["../02-architecture/device-abstraction-layer.md", "../06-safety-compliance/safety-interlocks-engine.md", "asset-baseline-assessment.md"]
@@ -549,6 +549,39 @@ Review and update configurations quarterly:
 2. Create default configuration in JSON
 3. Update frontend selector options
 4. Restart backend to load changes
+
+---
+
+## Service Record Health Impact
+
+Health score and equipment status are automatically updated at two points in the service record lifecycle. The recovery target is always derived live from the **configured healthy threshold** (Settings page → Health Thresholds), so changing the threshold automatically changes post-service recovery.
+
+### On service record creation (WO → SR notified)
+
+Equipment status is set to `maintenance` to surface the active service in the dashboard. Health score is left unchanged — it already reflects the degraded state that triggered the work order.
+
+### On technician closeout (`done #WO-XXXX` → SR complete)
+
+Equipment status is restored to `normal`. Health score is recovered based on service type:
+
+| Service type | Recovery score |
+|---|---|
+| `breakdown` | `healthy` threshold (full reset) |
+| `major` | `healthy` threshold (full reset) |
+| `minor` | `warning + 70% of (healthy − warning)` |
+| `callout` | `warning + 30% of (healthy − warning)` — investigation only |
+
+**Example** with default thresholds (`healthy=90`, `warning=70`, gap=20):
+
+| Service type | Recovery score |
+|---|---|
+| breakdown / major | 90 |
+| minor | 70 + (20 × 0.7) = 84 |
+| callout | 70 + (20 × 0.3) = 76 |
+
+Active alerts and predictions for the equipment are also resolved at closeout.
+
+**Implementation:** `backend/app/services/sentry_integration/work_order_notifier.py` — `_restore_equipment_health()`
 
 ---
 

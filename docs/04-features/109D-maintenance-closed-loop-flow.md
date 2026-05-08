@@ -4,7 +4,7 @@ type: "spec"
 status: "approved"
 version: "1.1.0"
 created: "2026-02-21"
-updated: "2026-02-21"
+updated: "2026-05-08"
 author: "Sentinel Development Team"
 tags: ["maintenance", "alerts", "work-orders", "technician", "health-update"]
 related: ["109D-operational-flows-index.md", "45-routine-inspection-maintenance.md"]
@@ -25,11 +25,11 @@ Equipment state transitions to warning or critical health threshold.
 ## Deterministic steps
 
 1. Create equipment alert.
-2. Generate work order with technician assignment.
+2. Generate work order with technician assignment → service record created → equipment status set to `maintenance`.
 3. Deliver WO reference to technician channels (mobile, email, bot).
-4. Technician executes work and submits evidence.
-5. Evidence and completion status ingested.
-6. Recompute equipment health and baseline deviation.
+4. Technician executes work and submits evidence via `done #WO-XXXX` (`technician-closeout` skill).
+5. Stateful multi-step debrief collects evidence (photos, readings, notes).
+6. On completion: equipment status → `normal`; health score restored from service type + configured healthy threshold; alerts and predictions resolved.
 7. Emit closure event and recommendation refresh trigger.
 
 ## Site-002 guided inspection scope (major-equipment-first)
@@ -88,10 +88,13 @@ Work order closed with evidence and updated health state reflected in monitoring
 flowchart TD
     A[Health threshold crossed] --> B[Create alert]
     B --> C[Auto-create work order]
-    C --> D[Dispatch WO to technician channels]
-    D --> E[Technician executes and submits evidence]
-    E --> F[Validate completion package]
-    F --> G[Update equipment health and baseline deviation]
-    G --> H[Close WO and alert]
+    C --> C2[Create service record\nSet equipment → maintenance]
+    C2 --> D[Dispatch WO to technician channels]
+    D --> E[Tech: done #WO-XXXX\ntechnician-closeout skill]
+    E --> E2[Stateful debrief\ncollect evidence]
+    E2 --> F[SR marked complete]
+    F --> G[Restore health score\nservice type × healthy threshold]
+    G --> G2[Set equipment → normal\nResolve alerts + predictions]
+    G2 --> H[Close WO]
     H --> I[Trigger recommendation refresh]
 ```

@@ -4,7 +4,7 @@ type: "guide"
 status: "draft"
 version: "1.0.0"
 created: "2026-03-31"
-updated: "2026-03-31"
+updated: "2026-05-08"
 tags: ["sentinel", "documentation"]
 related: []
 domain: "bms"
@@ -21,6 +21,23 @@ The service records schema supports the **Phase 41-03/44/46 Equipment Baseline D
 
 **Primary Use Case:** Gen Set 5 baseline diagnostic (WO-2026-0042 → SR-2026-ABC123)
 
+### Work order vs service record
+
+| | Work order | Service record |
+|---|---|---|
+| **Purpose** | Transient operational task | Permanent equipment history |
+| **Lifecycle** | Created → closed → deleted | Created once, retained forever |
+| **Drives** | Technician dispatch, FM notifications | Equipment health score, baseline trend |
+
+When a work order is created for equipment, a service record is automatically created and linked via `work_order_id`. Work orders may be deleted (e.g., test data cleanup); the service record survives with `work_order_id = NULL` so equipment history is never lost.
+
+### Health impact
+
+Service record completion drives two equipment field updates (see [health scoring](../04-features/health-scoring-system.md#service-record-health-impact)):
+
+- **On SR creation:** equipment `status` → `maintenance`
+- **On SR completion (`done #WO-XXXX`):** equipment `status` → `normal`; `health_score` restored based on `service_type` and the configured healthy threshold
+
 ## Core Tables
 
 ### 1. service_records
@@ -34,7 +51,7 @@ Stores baseline diagnostic inspection sessions linked to work orders.
 |-------|------|-------------|
 | `id` | UUID | Primary key |
 | `code` | TEXT | Service record code (e.g., "SR-2026-ABC123", unique) |
-| `work_order_id` | UUID | Link to work order (WO-2026-0042) |
+| `work_order_id` | UUID (nullable) | Link to work order — nullified if WO is deleted; SR history is preserved |
 | `equipment_id` | UUID | Link to equipment (S002-GEN-B1-005) |
 | `building_id` | UUID | Link to building/site |
 | `service_type` | TEXT | One of: `minor`, `major`, `breakdown`, `callout` |
