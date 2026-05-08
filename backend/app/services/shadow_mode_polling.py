@@ -18,6 +18,7 @@ When 500+ events are buffered → train Fault Classifier.
 """
 
 import logging
+import re
 import traceback
 from datetime import UTC, datetime
 from typing import Any
@@ -25,6 +26,92 @@ from typing import Any
 import httpx
 
 from app.core.site_resolver import normalize_site_id
+
+
+# ─── Equipment display name formatters ──────────────────────────────────────────
+
+
+def _format_unknown_name(eq_code: str) -> str:
+    """Format display name for UNKNOWN-type equipment (sensors)."""
+    code = eq_code.strip().upper()
+    # e.g. "R-004" or "R004" → outdoor air sensor
+    if code.startswith("R"):
+        return "Outdoor Air Sensor Roof"
+    if code.startswith("B"):
+        return "Sensor Basement"
+    if code.startswith("L"):
+        return f"Sensor {code.replace('-', ' ')}"
+    if "-" in code:
+        return f"Sensor {code.replace('-', ' ')}"
+    return f"Unknown Equipment {code}"
+
+
+def _format_display_name(eq_type: str, eq_code: str) -> str:
+    """Convert equipment code to human-readable name.
+
+    Format: S002-{TYPE}-{LOCATION}  →  "{TYPE} {floor} Zone {N}"
+
+    Location codes:
+      Numeric: 105 → Level 1 Zone 5, 203 → Level 2 Zone 3, 001 → Ground Zone 1
+      Letter:  B01 → Basement Zone 1,  R01 → Roof Zone 1
+      Legacy:   B1-001 → Basement Zone 1  (normalized)
+
+    Examples:
+      _format_display_name("AHU", "105")   → "AHU Level 1 Zone 5"
+      _format_display_name("FCU", "203")   → "FCU Level 2 Zone 3"
+      _format_display_name("VAV", "003")   → "VAV Ground Zone 3"
+      _format_display_name("RTU", "R01")   → "RTU Roof Zone 1"
+      _format_display_name("DB", "B01")    → "DB Basement Zone 1"
+    """
+    if eq_type.upper() == "UNKNOWN":
+        return _format_unknown_name(eq_code)
+
+    code = eq_code.strip().upper()
+
+    # Legacy: B1-001, L2-A — strip the trailing -### or normalize
+    legacy_match = re.match(r"^([BL])(\d)[-]?\d+$", code)
+    if legacy_match:
+        prefix = legacy_match.group(1)  # B or L
+        num = legacy_match.group(2)
+        floor_part = "Basement" if prefix == "B" else f"Level {num}"
+        return f"{eq_type} {floor_part}"
+
+    # Roof: R01, R1
+    if code.startswith("R"):
+        zone = re.sub(r"^R", "", code) or "01"
+        return f"{eq_type} Roof Zone {int(zone):02d}"
+
+    # Basement: B01
+    if code.startswith("B"):
+        zone = re.sub(r"^B", "", code) or "01"
+        return f"{eq_type} Basement Zone {int(zone):02d}"
+
+    # Numeric: 001, 105, 203
+    if code.isdigit():
+        level = int(code[0])  # first digit = floor number
+        zone = int(code[1:])  # remaining digits = zone within floor
+        if level == 0:
+            floor_name = "Ground"
+        else:
+            floor_name = f"Level {level}"
+        return f"{eq_type} {floor_name} Zone {zone}"
+
+    # Fallback: just title-case the code
+    return f"{eq_type} {code}"
+
+
+def _parse_eq_code_parts(code: str) -> tuple[str, str]:
+    """Split S002-{TYPE}-{LOCATION} into (type, location_code)."""
+    # e.g. "S002-AHU-105" → ("AHU", "105")
+    # or    "S002-UNKNOWN-R-004" → ("UNKNOWN", "R-004")
+    parts = code.split("-")
+    if len(parts) >= 3:
+        # site = parts[0]  # "S002"
+        eq_type = parts[1].upper()
+        eq_code = "-".join(parts[2:])  # "105" or "R-004"
+        return eq_type, eq_code
+    return "UNKNOWN", code
+
 
 logger = logging.getLogger("sentinel.shadow_mode")
 
@@ -867,8 +954,7 @@ class ShadowModePollingService:
             return "unknown"
 
         # Collect all catalog entries for this equipment code
-        candidates = [o for o in self._object_catalog.values()
-                      if o.get("equipment_id") == code]
+        candidates = [o for o in self._object_catalog.values() if o.get("equipment_id") == code]
         if not candidates:
             return "unknown"
 
@@ -1089,13 +1175,16 @@ class ShadowModePollingService:
                     bridge_status_data = equip_status_map.get(bcode, {})
                     bridge_status = bridge_status_data.get("status", "offline")
                     db_status = "normal" if bridge_status in ("online", "normal", "ok") else bridge_status
-                    eq_type, eq_name = self._parse_equipment_code(bcode)
+                    eq_type, _ = self._parse_equipment_code(bcode)
                     # Fallback: classify from BACnet object catalog metadata
                     # when the code doesn't have a recognizable type segment
                     if eq_type == "unknown":
                         catalog_type = self._classify_from_catalog(bcode)
                         if catalog_type != "unknown":
                             eq_type = catalog_type
+                    # Normalize name using SENTINEL convention: S002-TYPE-LOC → "TYPE Floor Zone N"
+                    _, eq_loc = _parse_eq_code_parts(bcode)
+                    eq_name = _format_display_name(eq_type, eq_loc)
                     # Skip luminaries
                     if "-LUM-" in bcode:
                         continue

@@ -2,9 +2,9 @@
 title: "Equipment & Device Naming Conventions"
 type: "reference"
 status: "approved"
-version: "2.0.0"
+version: "3.0.0"
 created: "2026-01-30"
-updated: "2026-02-04"
+updated: "2026-05-08"
 author: "Sentinel Development Team"
 tags: ["naming-conventions", "bms", "device-identification", "equipment-id"]
 related: ["system-overview.md", "../07-integrations/cafm-schema.md"]
@@ -425,6 +425,44 @@ The `point_asset_mappings` table stores these mappings with confidence scores.
 
 ---
 
-**Document Version:** 2.1
-**Last Updated:** 2026-02-04
-**Status:** Approved — Migration Complete (Phase 62)
+## 12. Display Name Normalization
+
+Equipment display names shown in the UI (e.g., dashboard, equipment lists) follow a human-readable format derived from the canonical ID. The normalisation is applied at two layers — no DB migration required.
+
+### Display Name Format
+
+| Equipment ID Pattern | Location Part | Display Name | Rule |
+|----------------------|---------------|--------------|------|
+| `S002-AHU-B1-001` | `B1-001` | "AHU Basement" | Basement floor, no zone number |
+| `S002-AHU-105` | `105` | "AHU Level 1 Zone 5" | `1` = Level 1, `05` = Zone 5 |
+| `S002-CHILLER-R01` | `R01` | "CHILLER Roof Zone 01" | Roof with numeric sequence |
+| `S002-VAV-L2-E` | `L2-E` | "VAV L2-E" | Level + zone letter, fallback raw |
+| `S002-LTG-G-021` | `G-021` | "LTG G-021" | Ground zone, fallback raw |
+| `S002-UNKNOWN-R-001` | `R-001` | "Outdoor Air Sensor Roof" | UNKNOWN type + roof → special case |
+| `S002-UNKNOWN-L2-001` | `L2-001` | "Sensor L2 001" | UNKNOWN type, level pattern |
+
+### Normalisation Layers
+
+**Layer 1 — Bridge auto-create** (`shadow_mode_polling.py`):
+New equipment synced from the SIMBIOT bridge is named correctly at creation time. The formatter `_parse_eq_code_parts()` splits the full ID (`S002-AHU-B1-001`) into type and location, then `_format_display_name()` produces the display string.
+
+**Layer 2 — API response** (`buildings.py`):
+The `get_site_equipment()` endpoint normalises names on read via `_normalize_equipment_name()`. Existing DB records retain their stored `name` but the API returns the normalised version. No DB writes required.
+
+### Formatter Reference
+
+```python
+# shadow_mode_polling.py — at module level
+def _format_display_name(eq_type: str, eq_code: str) -> str
+def _format_unknown_name(eq_code: str) -> str
+def _parse_eq_code_parts(code: str) -> tuple[str, str]
+
+# buildings.py — at module level
+def _normalize_equipment_name(eq: dict) -> str
+```
+
+---
+
+**Document Version:** 3.0
+**Last Updated:** 2026-05-08
+**Status:** Approved — Display Name Normalisation (Phase 193+)

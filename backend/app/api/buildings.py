@@ -16,6 +16,7 @@ To remove a building:
 
 import json
 import logging
+import re
 import shutil
 from pathlib import Path
 from typing import Literal
@@ -119,6 +120,100 @@ def _normalize_equipment_type(equipment_code: str, equipment_type: str) -> str:
         pass
 
     return equipment_type.lower() if equipment_type else "unknown"
+
+
+# ─── Equipment display name formatters ─────────────────────────────────────────
+
+
+def _format_unknown_name(eq_code: str) -> str:
+    """Format display name for UNKNOWN-type equipment (sensors)."""
+    code = eq_code.strip().upper()
+    if code.startswith("R"):
+        return "Outdoor Air Sensor Roof"
+    if code.startswith("B"):
+        return "Sensor Basement"
+    if code.startswith("L"):
+        return f"Sensor {code.replace('-', ' ')}"
+    if "-" in code:
+        return f"Sensor {code.replace('-', ' ')}"
+    return f"Unknown Equipment {code}"
+
+
+def _format_display_name(eq_type: str, eq_code: str) -> str:
+    """Convert equipment code location to human-readable name.
+
+    Format: S002-{TYPE}-{LOCATION}  →  "{TYPE} {floor} Zone {N}"
+
+    Location codes:
+      Numeric: 105 → Level 1 Zone 5, 203 → Level 2 Zone 3, 001 → Ground Zone 1
+      Letter:  B01 → Basement Zone 1,  R01 → Roof Zone 1
+      Legacy:  B1-001 → Basement Zone 1
+
+    Examples:
+      _format_display_name("AHU", "105")   → "AHU Level 1 Zone 5"
+      _format_display_name("FCU", "203")   → "FCU Level 2 Zone 3"
+      _format_display_name("VAV", "003")   → "VAV Ground Zone 3"
+      _format_display_name("RTU", "R01")   → "RTU Roof Zone 1"
+      _format_display_name("DB", "B01")    → "DB Basement Zone 1"
+    """
+    if eq_type.upper() == "UNKNOWN":
+        return _format_unknown_name(eq_code)
+
+    code = eq_code.strip().upper()
+
+    # Legacy: B1-001 → Basement Zone 1
+    legacy_match = re.match(r"^([BL])(\d)[-]?\d+$", code)
+    if legacy_match:
+        prefix = legacy_match.group(1)
+        num = legacy_match.group(2)
+        floor_part = "Basement" if prefix == "B" else f"Level {num}"
+        return f"{eq_type} {floor_part}"
+
+    # Roof: R01, R1
+    if code.startswith("R"):
+        zone = re.sub(r"^R", "", code) or "01"
+        return f"{eq_type} Roof Zone {int(zone):02d}"
+
+    # Basement: B01
+    if code.startswith("B"):
+        zone = re.sub(r"^B", "", code) or "01"
+        return f"{eq_type} Basement Zone {int(zone):02d}"
+
+    # Numeric: 001, 105, 203
+    if code.isdigit():
+        level = int(code[0])
+        zone = int(code[1:])
+        if level == 0:
+            floor_name = "Ground"
+        else:
+            floor_name = f"Level {level}"
+        return f"{eq_type} {floor_name} Zone {zone}"
+
+    return f"{eq_type} {code}"
+
+
+def _normalize_equipment_name(eq: dict) -> str:
+    """Derive display name from equipment record.
+
+    Uses the code (S002-{TYPE}-{LOC}) to generate a consistent name.
+    Falls back to the stored name if the code pattern doesn't match.
+    """
+    code = eq.get("code", "")
+    current_name = eq.get("name", "")
+
+    # Try to parse S002-{TYPE}-{LOC} pattern
+    parts = code.split("-")
+    if len(parts) >= 3 and parts[0] == "S002":
+        type_part = parts[1].upper()
+        loc_part = "-".join(parts[2:])
+        return _format_display_name(type_part, loc_part)
+
+    # Fallback: clean up existing name (remove "S002 " prefix)
+    cleaned = current_name.replace("S002 ", "").strip()
+    if cleaned and cleaned != code:
+        return cleaned
+
+    return current_name or code
 
 
 def _is_device_controllable(device_id: str, equipment_points: dict) -> bool:
@@ -1129,7 +1224,7 @@ async def get_site_equipment(site_id: str, auth: AuthContext = Depends(require_s
                     {
                         "id": eq.get("code", eq.get("id")),
                         "code": eq.get("code"),
-                        "name": eq.get("name"),
+                        "name": _normalize_equipment_name(eq),
                         "equipment_type": eq_type,  # Frontend expects equipment_type, not type
                         "type": eq_type,  # Keep for backward compatibility
                         "category": category,
