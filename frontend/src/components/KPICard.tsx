@@ -35,6 +35,14 @@ export interface KPICardProps {
   onClick?: () => void;
   /** Accent color for the card */
   accentColor?: "green" | "orange" | "red" | "blue" | "purple" | "cyan";
+  /** Unit suffix displayed after the value (e.g. "kW", "%") */
+  unit?: string;
+  /** Optional progress bar (0–100), renders below the value */
+  progress?: number;
+  /** Left-border accent override (takes priority over accentColor for the border) */
+  accent?: "green" | "orange" | "red" | "blue" | "purple" | "cyan";
+  /** Density variant — compact reduces padding and height for dense layouts */
+  density?: "default" | "compact";
 }
 
 export function KPICard({
@@ -48,8 +56,12 @@ export function KPICard({
   tooltip,
   onClick,
   accentColor = "blue",
+  unit,
+  progress,
+  accent,
+  density = "default",
 }: KPICardProps) {
-  // Determine if trend is positive based on delta and inverse setting
+  const isCompact = density === "compact";
   const isPositive = delta !== undefined && delta > 0;
   const isNegative = delta !== undefined && delta < 0;
 
@@ -77,8 +89,8 @@ export function KPICard({
     <div
       className={`relative overflow-hidden glass-card glass-highlight ${onClick ? "cursor-pointer hover:brightness-110" : ""}`}
       style={{
-        minHeight: "140px",
-        maxHeight: "180px",
+        minHeight: isCompact ? "100px" : "140px",
+        maxHeight: isCompact ? "130px" : "180px",
       }}
       onClick={onClick}
       title={tooltip}
@@ -86,10 +98,10 @@ export function KPICard({
       {/* Top accent bar */}
       <div
         className="absolute top-0 left-0 right-0 h-1"
-        style={{ background: accentColors[accentColor] }}
+        style={{ background: accentColors[accent ?? accentColor] }}
       />
 
-      <div className="p-4 pt-5 flex flex-col justify-between h-full">
+      <div className={`${isCompact ? "p-3 pt-4" : "p-4 pt-5"} flex flex-col justify-between h-full`}>
         {/* Header row with icon */}
         <div className="flex items-start justify-between mb-3 flex-shrink-0">
           <span
@@ -102,8 +114,8 @@ export function KPICard({
             <div
               className="p-1.5 rounded flex-shrink-0"
               style={{
-                background: `${accentColors[accentColor]}20`,
-                color: accentColors[accentColor],
+                background: `${accentColors[accent ?? accentColor]}20`,
+                color: accentColors[accent ?? accentColor],
               }}
             >
               {icon}
@@ -121,7 +133,30 @@ export function KPICard({
           }}
         >
           {typeof value === "number" ? value.toLocaleString() : value}
+          {unit && (
+            <span className="text-sm font-normal" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+              {unit}
+            </span>
+          )}
         </div>
+
+        {/* Progress bar */}
+        {progress !== undefined && (
+          <div className="mt-2 flex-shrink-0">
+            <div
+              className="h-1 w-full rounded-full overflow-hidden"
+              style={{ background: "var(--color-sentinel-border)" }}
+            >
+              <div
+                className="h-full rounded-full"
+                style={{
+                  width: `${Math.min(100, Math.max(0, progress))}%`,
+                  background: accentColors[accent ?? accentColor],
+                }}
+              />
+            </div>
+          </div>
+        )}
 
         {/* Delta indicator - only show if delta is defined and not zero */}
         {delta !== undefined && delta !== 0 && (
