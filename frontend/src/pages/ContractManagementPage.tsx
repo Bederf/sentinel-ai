@@ -47,6 +47,10 @@ import {
 import type { Contract, BudgetVariance, BudgetAlert } from "../lib/contractApi";
 import type { SLAPerformanceRecord } from "../lib/profitabilityApi";
 import { PageLoading } from "../components/PageLoading";
+import { Panel } from "../components/Panel";
+import { StatusBadge } from "../components/StatusBadge";
+import { EmptyState } from "../components/EmptyState";
+import type { StatusKey } from "../components/StatusBadge";
 
 // ============= Seed Data =============
 
@@ -279,15 +283,6 @@ function getSlaStatusVariant(
   return "success";
 }
 
-function getContractStatusVariant(
-  status: string
-): "success" | "warning" | "error" | "neutral" {
-  if (status === "active") return "success";
-  if (status === "expiring_soon") return "warning";
-  if (status === "expired" || status === "terminated") return "error";
-  return "neutral";
-}
-
 // ============= KPI Card =============
 
 interface KPICardProps {
@@ -323,7 +318,7 @@ function KPICard({ title, value, subtitle, icon, trend }: KPICardProps) {
       </div>
       <div
         className="text-2xl font-bold"
-        style={{ color: "var(--color-sentinel-text-primary)" }}
+        style={{ color: "var(--color-sentinel-text-primary)", fontVariantNumeric: "tabular-nums" }}
       >
         {value}
       </div>
@@ -928,90 +923,65 @@ export function ContractManagementPage() {
         </div>
 
         {/* Section 2: Contract List */}
-        <div
-          className="rounded-lg overflow-hidden"
-          style={{
-            background: "var(--color-sentinel-bg-panel)",
-            border: "1px solid var(--color-sentinel-border)",
+        <Panel
+          style={{ overflow: "hidden" }}
+          header={{
+            icon: <FileText className="h-4 w-4" />,
+            title: "Contract Portfolio",
+            accentColor: "var(--color-sentinel-blue)",
+            actions: (
+              <div className="flex items-center gap-3">
+                <select
+                  value={buildingFilter || "all"}
+                  onChange={(event) =>
+                    setBuildingFilter(event.target.value === "all" ? null : event.target.value)
+                  }
+                  className="w-48 rounded-lg appearance-none cursor-pointer px-3 py-2 text-sm transition-colors focus:outline-none focus:ring-0"
+                  style={{
+                    background: "var(--color-grafana-bg-secondary)",
+                    border: "1px solid var(--color-grafana-border)",
+                    color: "var(--color-grafana-text-primary)",
+                    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)",
+                    outline: "none",
+                  }}
+                  aria-label="Filter buildings"
+                >
+                  <option value="all">All Buildings</option>
+                  {buildings.map((building) => (
+                    <option key={building} value={building}>
+                      {building}
+                    </option>
+                  ))}
+                </select>
+                <div className="flex items-center gap-2">
+                  {["all", "active", "draft", "expired"].map((status) => (
+                    <button
+                      key={status}
+                      onClick={() => setStatusFilter(status)}
+                      className="text-xs px-3 py-1 rounded transition-colors"
+                      style={{
+                        background:
+                          statusFilter === status
+                            ? "var(--color-sentinel-bg-secondary)"
+                            : "transparent",
+                        color:
+                          statusFilter === status
+                            ? "var(--color-sentinel-text-primary)"
+                            : "var(--color-sentinel-text-disabled)",
+                        border:
+                          statusFilter === status
+                            ? "1px solid var(--color-sentinel-border)"
+                            : "1px solid transparent",
+                      }}
+                    >
+                      {status.charAt(0).toUpperCase() + status.slice(1)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ),
           }}
         >
-          <div
-            className="px-4 py-3 flex items-center justify-between"
-            style={{
-              borderBottom: "1px solid var(--color-sentinel-border)",
-            }}
-          >
-            <div className="flex items-center gap-3">
-              <div
-                className="p-2 rounded"
-                style={{ background: "rgba(59, 130, 246, 0.15)" }}
-              >
-                <FileText
-                  className="h-4 w-4"
-                  style={{ color: "var(--color-sentinel-blue)" }}
-                />
-              </div>
-              <h3
-                className="text-sm font-medium"
-                style={{ color: "var(--color-sentinel-text-primary)" }}
-              >
-                Contract Portfolio
-              </h3>
-            </div>
-            {/* Building filter + Status filter */}
-            <div className="flex items-center gap-3">
-              {/* Building selector */}
-              <select
-                value={buildingFilter || "all"}
-                onChange={(event) =>
-                  setBuildingFilter(event.target.value === "all" ? null : event.target.value)
-                }
-                className="w-48 rounded-lg appearance-none cursor-pointer px-3 py-2 text-sm transition-colors focus:outline-none focus:ring-0"
-                style={{
-                  background: "var(--color-grafana-bg-secondary)",
-                  border: "1px solid var(--color-grafana-border)",
-                  color: "var(--color-grafana-text-primary)",
-                  boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)",
-                  outline: "none",
-                }}
-                aria-label="Filter buildings"
-              >
-                <option value="all">All Buildings</option>
-                {buildings.map((building) => (
-                  <option key={building} value={building}>
-                    {building}
-                  </option>
-                ))}
-              </select>
-
-              {/* Status filter buttons */}
-              <div className="flex items-center gap-2">
-                {["all", "active", "draft", "expired"].map((status) => (
-                  <button
-                    key={status}
-                    onClick={() => setStatusFilter(status)}
-                    className="text-xs px-3 py-1 rounded transition-colors"
-                    style={{
-                      background:
-                        statusFilter === status
-                          ? "var(--color-sentinel-bg-secondary)"
-                          : "transparent",
-                      color:
-                        statusFilter === status
-                          ? "var(--color-sentinel-text-primary)"
-                          : "var(--color-sentinel-text-disabled)",
-                      border:
-                        statusFilter === status
-                          ? "1px solid var(--color-sentinel-border)"
-                          : "1px solid transparent",
-                    }}
-                  >
-                    {status.charAt(0).toUpperCase() + status.slice(1)}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
 
           <div className="overflow-x-auto">
             <Table>
@@ -1077,14 +1047,11 @@ export function ContractManagementPage() {
                 {sortedContracts.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7}>
-                      <div
-                        className="text-center py-8"
-                        style={{
-                          color: "var(--color-sentinel-text-disabled)",
-                        }}
-                      >
-                        No contracts found
-                      </div>
+                      <EmptyState
+                        icon={FileText}
+                        title="No contracts found"
+                        subtext="Contracts will appear here once added to the system."
+                      />
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -1169,16 +1136,10 @@ export function ContractManagementPage() {
                           </span>
                         </TableCell>
                         <TableCell>
-                          <SentinelBadge
-                            variant={getContractStatusVariant(
-                              contract.contract.status
-                            )}
-                            size="sm"
-                          >
-                            {contract.contract.status
-                              .replace(/_/g, " ")
-                              .replace(/\b\w/g, (c) => c.toUpperCase())}
-                          </SentinelBadge>
+                          <StatusBadge
+                            status={contract.contract.status === 'expiring_soon' ? 'expiring' : contract.contract.status as StatusKey}
+                            label={contract.contract.status.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())}
+                          />
                         </TableCell>
                         <TableCell className="text-right">
                           <span
@@ -1256,47 +1217,28 @@ export function ContractManagementPage() {
               </TableBody>
             </Table>
           </div>
-        </div>
+        </Panel>
 
         {/* Section 3 & 4: Detail Panels (shown when contract selected) */}
         {selectedContract && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Section 3: SLA Tracking */}
-            <div
-              className="rounded-lg overflow-hidden"
-              style={{
-                background: "var(--color-sentinel-bg-panel)",
-                border: "1px solid var(--color-sentinel-border)",
+            <Panel
+              style={{ overflow: "hidden" }}
+              header={{
+                icon: <Shield className="h-4 w-4" />,
+                title: "SLA Tracking",
+                accentColor: "var(--color-sentinel-amber)",
+                actions: (
+                  <span
+                    className="text-xs"
+                    style={{ color: "var(--color-sentinel-text-disabled)" }}
+                  >
+                    {selectedContract.contract_code}
+                  </span>
+                ),
               }}
             >
-              <div
-                className="px-4 py-3 flex items-center gap-3"
-                style={{
-                  borderBottom: "1px solid var(--color-sentinel-border)",
-                }}
-              >
-                <div
-                  className="p-2 rounded"
-                  style={{ background: "rgba(245, 158, 11, 0.15)" }}
-                >
-                  <Shield
-                    className="h-4 w-4"
-                    style={{ color: "var(--color-sentinel-amber)" }}
-                  />
-                </div>
-                <h3
-                  className="text-sm font-medium"
-                  style={{ color: "var(--color-sentinel-text-primary)" }}
-                >
-                  SLA Tracking
-                </h3>
-                <span
-                  className="text-xs ml-auto"
-                  style={{ color: "var(--color-sentinel-text-disabled)" }}
-                >
-                  {selectedContract.contract_code}
-                </span>
-              </div>
 
               <div className="p-4 space-y-3">
                 {selectedContract.sla_terms.map((term, idx) => {
@@ -1354,13 +1296,10 @@ export function ContractManagementPage() {
                             {formatMetricType(term.metric_type)}
                           </span>
                         </div>
-                        <SentinelBadge variant={variant} size="sm">
-                          {status === "met"
-                            ? "Met"
-                            : status === "at_risk"
-                              ? "At Risk"
-                              : "Breached"}
-                        </SentinelBadge>
+                        <StatusBadge
+                          status={status as StatusKey}
+                          label={status === "met" ? "Met" : status === "at_risk" ? "At Risk" : "Breached"}
+                        />
                       </div>
 
                       <div className="flex items-center justify-between mb-2">
@@ -1568,66 +1507,47 @@ export function ContractManagementPage() {
                   )}
                 </div>
               </div>
-            </div>
+            </Panel>
 
             {/* Section 4: Budget Overview */}
-            <div
-              className="rounded-lg overflow-hidden"
-              style={{
-                background: "var(--color-sentinel-bg-panel)",
-                border: "1px solid var(--color-sentinel-border)",
+            <Panel
+              style={{ overflow: "hidden" }}
+              header={{
+                icon: <DollarSign className="h-4 w-4" />,
+                title: "Budget Overview",
+                accentColor: "var(--color-sentinel-green)",
+                actions: (
+                  <div className="flex items-center gap-2">
+                    <button
+                      className="text-xs px-2 py-1 rounded"
+                      style={{
+                        color: "var(--color-sentinel-text-primary)",
+                        border: "1px solid var(--color-sentinel-border)",
+                      }}
+                      onClick={() => handleBudgetExport("csv")}
+                    >
+                      Export CSV
+                    </button>
+                    <button
+                      className="text-xs px-2 py-1 rounded"
+                      style={{
+                        color: "var(--color-sentinel-text-primary)",
+                        border: "1px solid var(--color-sentinel-border)",
+                      }}
+                      onClick={() => handleBudgetExport("pdf")}
+                    >
+                      Export PDF
+                    </button>
+                    <span
+                      className="text-xs"
+                      style={{ color: "var(--color-sentinel-text-disabled)" }}
+                    >
+                      FY {selectedContract.budget.year}
+                    </span>
+                  </div>
+                ),
               }}
             >
-              <div
-                className="px-4 py-3 flex items-center gap-3"
-                style={{
-                  borderBottom: "1px solid var(--color-sentinel-border)",
-                }}
-              >
-                <div
-                  className="p-2 rounded"
-                  style={{ background: "rgba(34, 197, 94, 0.15)" }}
-                >
-                  <DollarSign
-                    className="h-4 w-4"
-                    style={{ color: "var(--color-sentinel-green)" }}
-                  />
-                </div>
-                <h3
-                  className="text-sm font-medium"
-                  style={{ color: "var(--color-sentinel-text-primary)" }}
-                >
-                  Budget Overview
-                </h3>
-                <div className="ml-auto flex items-center gap-2">
-                  <button
-                    className="text-xs px-2 py-1 rounded"
-                    style={{
-                      color: "var(--color-sentinel-text-primary)",
-                      border: "1px solid var(--color-sentinel-border)",
-                    }}
-                    onClick={() => handleBudgetExport("csv")}
-                  >
-                    Export CSV
-                  </button>
-                  <button
-                    className="text-xs px-2 py-1 rounded"
-                    style={{
-                      color: "var(--color-sentinel-text-primary)",
-                      border: "1px solid var(--color-sentinel-border)",
-                    }}
-                    onClick={() => handleBudgetExport("pdf")}
-                  >
-                    Export PDF
-                  </button>
-                </div>
-                <span
-                  className="text-xs"
-                  style={{ color: "var(--color-sentinel-text-disabled)" }}
-                >
-                  FY {selectedContract.budget.year}
-                </span>
-              </div>
 
               <div className="p-4">
                 {/* Budget summary KPIs */}
@@ -1870,12 +1790,7 @@ export function ContractManagementPage() {
                             {alert.message || "Budget alert"}
                           </span>
                           <div className="flex items-center gap-2">
-                            <SentinelBadge
-                              variant={alert.severity === "critical" ? "error" : "warning"}
-                              size="sm"
-                            >
-                              {alert.severity}
-                            </SentinelBadge>
+                            <StatusBadge status={alert.severity as StatusKey} />
                             {alert.id && alert.status !== "acknowledged" && (
                               <button
                                 className="text-xs"
@@ -2332,31 +2247,20 @@ export function ContractManagementPage() {
                   </div>
                 )}
               </div>
-            </div>
+            </Panel>
           </div>
         )}
 
         {/* Contact details for selected contract */}
         {selectedContract && (
-          <div
-            className="rounded-lg p-4"
-            style={{
-              background: "var(--color-sentinel-bg-panel)",
-              border: "1px solid var(--color-sentinel-border)",
+          <Panel
+            header={{
+              icon: <Users className="h-4 w-4" />,
+              title: "Client Contact",
+              accentColor: "var(--color-sentinel-amber)",
             }}
           >
-            <div className="flex items-center gap-2 mb-3">
-              <Users
-                className="h-4 w-4"
-                style={{ color: "var(--color-sentinel-amber)" }}
-              />
-              <h3
-                className="text-sm font-medium"
-                style={{ color: "var(--color-sentinel-text-primary)" }}
-              >
-                Client Contact
-              </h3>
-            </div>
+            <div className="p-4">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <div
@@ -2440,7 +2344,8 @@ export function ContractManagementPage() {
                 {selectedContract.contract.payment_terms}
               </SentinelBadge>
             </div>
-          </div>
+            </div>
+          </Panel>
         )}
       </div>
     </div>

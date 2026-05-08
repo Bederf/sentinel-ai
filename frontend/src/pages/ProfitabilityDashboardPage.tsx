@@ -23,10 +23,11 @@ import {
   Card,
   Title,
   Text,
-  Badge,
   Callout,
   Button,
 } from "@tremor/react";
+import { StatusBadge } from "../components/StatusBadge";
+import type { StatusKey } from "../components/StatusBadge";
 import {
   Table,
   TableHead,
@@ -55,6 +56,8 @@ import type {
   SLAPerformanceRecord,
 } from "../lib/profitabilityApi";
 import { PageLoading } from "../components/PageLoading";
+import { Panel } from "../components/Panel";
+import { EmptyState } from "../components/EmptyState";
 
 // ============= Period Filter =============
 
@@ -771,104 +774,42 @@ export function ProfitabilityDashboardPage() {
 
       {/* Section 2: Loss Leaders Alert Panel */}
       {lossLeaders.length > 0 && (
-        <div style={{
-          background: "rgba(14, 116, 144, 0.05)",
-          border: "1px solid var(--color-sentinel-border)",
-          borderRadius: "0.5rem",
-          padding: "1rem",
-          marginTop: "0"
-        }}
+        <Panel
+          header={{
+            icon: <AlertTriangle className="h-5 w-5" />,
+            title: "Loss-Making Contracts Detected",
+            accentColor: "var(--color-sentinel-red)",
+          }}
         >
-          <div className="flex items-center gap-2 mb-3">
-            <AlertTriangle className="h-5 w-5 text-[var(--color-sentinel-red)]" />
-            <h3 style={{ color: "var(--color-sentinel-text-primary)" }} className="font-semibold">
-              Loss-Making Contracts Detected
-            </h3>
-          </div>
           <div className="space-y-2">
             {lossLeaders.slice(0, 3).map((leader) => (
-              <div
-                key={leader.contract_id}
-                className="flex items-center justify-between py-2 px-3 rounded"
-                style={{
-                  background: "var(--color-sentinel-bg-secondary)",
-                }}
-              >
+              <div key={leader.contract_id} className="flex items-center justify-between py-2 px-3 rounded" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
                 <div>
-                  <Text
-                    style={{ color: "var(--color-sentinel-text-primary)" }}
-                    className="font-medium"
-                  >
-                    {leader.contract_name}
-                  </Text>
-                  <Text
-                    style={{ color: "var(--color-sentinel-text-secondary)" }}
-                    className="text-xs"
-                  >
-                    {leader.root_causes.join(", ")}
-                  </Text>
+                  <Text style={{ color: "var(--color-sentinel-text-primary)" }} className="font-medium">{leader.contract_name}</Text>
+                  <Text style={{ color: "var(--color-sentinel-text-secondary)" }} className="text-xs">{leader.root_causes.join(", ")}</Text>
                 </div>
                 <div className="text-right">
-                  <Text
-                    style={{ color: "var(--color-sentinel-red)" }}
-                    className="font-semibold"
-                  >
-                    {formatZAR(leader.loss_amount_zar)}
-                  </Text>
-                  <Text
-                    style={{ color: "var(--color-sentinel-text-secondary)" }}
-                    className="text-xs block"
-                  >
-                    {formatPercent(leader.loss_percentage)}
-                  </Text>
+                  <Text style={{ color: "var(--color-sentinel-red)" }} className="font-semibold">{formatZAR(leader.loss_amount_zar)}</Text>
+                  <Text style={{ color: "var(--color-sentinel-text-secondary)" }} className="text-xs block">{formatPercent(leader.loss_percentage)}</Text>
                 </div>
               </div>
             ))}
           </div>
-        </div>
+        </Panel>
       )}
 
       {/* Section 3: Contract Profitability Table */}
-      <div style={{ background: "rgba(14, 116, 144, 0.05)", border: "1px solid var(--color-sentinel-border)", overflow: "hidden", borderRadius: "0.5rem" }}>
-        <div
-          className="px-4 py-4 flex items-center justify-between"
-          style={{
-            borderBottom: "1px solid var(--color-sentinel-border)",
+      <Panel
+          header={{
+            icon: <AlertTriangle className="h-5 w-5" />,
+            title: "Contract Profitability",
+            actions: (
+              <input type="text" placeholder="Search contracts..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="px-3 py-1.5 text-sm rounded" style={{ background: "var(--color-sentinel-bg-secondary)", border: "1px solid var(--color-sentinel-border)", color: "var(--color-sentinel-text-primary)" }} />
+            ),
+            accentColor: "var(--color-sentinel-amber)",
           }}
         >
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded" style={{ background: "rgba(245, 158, 11, 0.15)" }}>
-              <AlertTriangle className="h-5 w-5" style={{ color: "var(--color-sentinel-amber)" }} />
-            </div>
-            <div>
-              <h3
-                className="text-sm font-medium"
-                style={{ color: "var(--color-sentinel-text-primary)" }}
-              >
-                Contract Profitability
-              </h3>
-              <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                Sortable contract details with margins and status
-              </span>
-            </div>
-          </div>
-
-          {/* Search */}
-          <input
-            type="text"
-            placeholder="Search contracts..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="px-3 py-1.5 text-sm rounded"
-            style={{
-              background: "var(--color-sentinel-bg-secondary)",
-              border: "1px solid var(--color-sentinel-border)",
-              color: "var(--color-sentinel-text-primary)",
-            }}
-          />
-        </div>
-
-        <div className="overflow-x-auto">
+          <div className="overflow-x-auto">
           <Table>
             <TableHead>
               <TableRow
@@ -927,11 +868,17 @@ export function ProfitabilityDashboardPage() {
                     className="text-center py-8"
                     style={{ color: "var(--color-sentinel-text-disabled)" }}
                   >
-                    {loading
-                      ? "Loading contracts..."
-                      : searchQuery
-                      ? "No contracts found matching your search"
-                      : "No contracts available"}
+                    {loading ? (
+                      "Loading contracts..."
+                    ) : searchQuery ? (
+                      "No contracts found matching your search"
+                    ) : (
+                      <EmptyState
+                        icon={DollarSign}
+                        title="No contracts available"
+                        subtext="Contracts will appear once data is available."
+                      />
+                    )}
                   </TableCell>
                 </TableRow>
               ) : (
@@ -980,7 +927,10 @@ export function ProfitabilityDashboardPage() {
                       style={{ color: "var(--color-sentinel-text-primary)" }}
                     >
                       <div>
-                        <div className="font-medium">
+                        <div
+                          className="font-medium"
+                          style={{ fontVariantNumeric: "tabular-nums" }}
+                        >
                           {formatZAR(contract.gross_margin_zar)}
                         </div>
                         <div
@@ -1001,8 +951,11 @@ export function ProfitabilityDashboardPage() {
                       style={{ color: "var(--color-sentinel-text-primary)" }}
                     >
                       <div>
-                        <div className="font-medium">
-                          {formatZAR(contract.gross_margin_zar)}
+                        <div
+                          className="font-medium"
+                          style={{ fontVariantNumeric: "tabular-nums" }}
+                        >
+                          {formatZAR(contract.net_revenue_zar)}
                         </div>
                         <div
                           className="text-xs"
@@ -1018,17 +971,10 @@ export function ProfitabilityDashboardPage() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge
-                        color={
-                          contract.status === "profitable"
-                            ? "emerald"
-                            : contract.status === "break_even"
-                            ? "amber"
-                            : "rose"
-                        }
-                      >
-                        {formatStatusLabel(contract.status)}
-                      </Badge>
+                      <StatusBadge
+                        status={contract.status as StatusKey}
+                        label={formatStatusLabel(contract.status)}
+                      />
                     </TableCell>
                   </TableRow>
                 ))
@@ -1036,7 +982,7 @@ export function ProfitabilityDashboardPage() {
             </TableBody>
           </Table>
         </div>
-      </div>
+      </Panel>
 
       {totalPages > 1 && (
         <div className="flex items-center justify-end gap-2">
@@ -1063,46 +1009,44 @@ export function ProfitabilityDashboardPage() {
       )}
 
       {selectedContractId && (
-        <div style={{ background: "rgba(14, 116, 144, 0.05)", border: "1px solid var(--color-sentinel-border)", padding: "1.5rem", borderRadius: "0.5rem" }}>
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h3
-                className="text-sm font-medium"
-                style={{ color: "var(--color-sentinel-text-primary)" }}
-              >
-                Contract Drill-Down
-              </h3>
-              <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                Asset ROI and contract profitability summary
-              </Text>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="secondary"
-                size="xs"
-                disabled={!selectedReport || reportLoading}
-                onClick={() => handleExportFile("csv")}
-              >
-                Export CSV
-              </Button>
-              <Button
-                variant="secondary"
-                size="xs"
-                disabled={!selectedReport || reportLoading}
-                onClick={() => handleExportFile("pdf")}
-              >
-                Export PDF
-              </Button>
-              <Button
-                variant="secondary"
-                size="xs"
-                disabled={!selectedReport || reportLoading}
-                onClick={handleExportReport}
-              >
-                Export JSON
-              </Button>
-            </div>
-          </div>
+        <Panel
+          header={{
+            title: "Contract Drill-Down",
+            accentColor: "var(--color-sentinel-blue)",
+            actions: (
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="secondary"
+                  size="xs"
+                  disabled={!selectedReport || reportLoading}
+                  onClick={() => handleExportFile("csv")}
+                >
+                  Export CSV
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="xs"
+                  disabled={!selectedReport || reportLoading}
+                  onClick={() => handleExportFile("pdf")}
+                >
+                  Export PDF
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="xs"
+                  disabled={!selectedReport || reportLoading}
+                  onClick={handleExportReport}
+                >
+                  Export JSON
+                </Button>
+              </div>
+            ),
+          }}
+        >
+          <div className="p-6">
+          <Text className="text-xs mb-4" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+            Asset ROI and contract profitability summary
+          </Text>
 
           {reportLoading ? (
             <div
@@ -1192,7 +1136,11 @@ export function ProfitabilityDashboardPage() {
                           className="text-center py-6"
                           style={{ color: "var(--color-sentinel-text-disabled)" }}
                         >
-                          No asset ROI data available
+                          <EmptyState
+                            icon={BarChart}
+                            title="No asset ROI data"
+                            subtext="Asset ROI data will appear once contracts are linked."
+                          />
                         </TableCell>
                       </TableRow>
                     ) : (
@@ -1235,19 +1183,16 @@ export function ProfitabilityDashboardPage() {
               </div>
             </div>
           ) : null}
-        </div>
+          </div>
+        </Panel>
       )}
 
       {/* Section 4: Trend Chart */}
-      <div style={{ background: "rgba(14, 116, 144, 0.05)", border: "1px solid var(--color-sentinel-border)", padding: "1.5rem", borderRadius: "0.5rem" }}>
-        <div className="flex items-center justify-between mb-4">
-          <h3
-            className="text-sm font-medium"
-            style={{ color: "var(--color-sentinel-text-primary)" }}
-          >
-            Margin Trend
-          </h3>
-          {selectedContractId && (
+      <Panel
+        header={{
+          title: "Margin Trend",
+          accentColor: "var(--color-sentinel-blue)",
+          actions: selectedContractId ? (
             <Button
               variant="light"
               size="xs"
@@ -1255,9 +1200,9 @@ export function ProfitabilityDashboardPage() {
             >
               Show Portfolio Average
             </Button>
-          )}
-        </div>
-
+          ) : undefined,
+        }}
+      >
         {trends.length === 0 ? (
           <div
             className="h-64 flex items-center justify-center"
@@ -1306,19 +1251,15 @@ export function ProfitabilityDashboardPage() {
             </ResponsiveContainer>
           </div>
         )}
-      </div>
+      </Panel>
 
       {/* Section 5: SLA Penalty Trend */}
-      <div style={{ background: "rgba(14, 116, 144, 0.05)", border: "1px solid var(--color-sentinel-border)", padding: "1.5rem", borderRadius: "0.5rem" }}>
-        <div className="flex items-center justify-between mb-4">
-          <h3
-            className="text-sm font-medium"
-            style={{ color: "var(--color-sentinel-text-primary)" }}
-          >
-            SLA Penalty Trend
-          </h3>
-        </div>
-
+      <Panel
+        header={{
+          title: "SLA Penalty Trend",
+          accentColor: "var(--color-sentinel-amber)",
+        }}
+      >
         {!selectedContractId ? (
           <div
             className="h-48 flex items-center justify-center"
@@ -1386,7 +1327,7 @@ export function ProfitabilityDashboardPage() {
         >
           Units: ZAR per month
         </div>
-      </div>
+      </Panel>
     </div>
   );
 }
