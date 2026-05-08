@@ -423,7 +423,14 @@ class WorkOrderNotifier:
             instruction_items = [f"<li>{line.strip()}</li>" for line in instructions.split("\n") if line.strip()]
             checklist_html = f"<ul>{''.join(instruction_items)}</ul>"
         else:
-            checklist_html = "<ul><li>Verify site safety controls before touching equipment.</li><li>Inspect the faulted subsystem and capture photos/readings.</li><li>Run diagnostics and record measured values.</li><li>Identify likely root cause and required corrective action.</li></ul>"
+            checklist_html = (
+                "<ul>"
+                "<li>Verify site safety controls before touching equipment.</li>"
+                "<li>Inspect the faulted subsystem and capture photos/readings.</li>"
+                "<li>Run diagnostics and record measured values.</li>"
+                "<li>Identify likely root cause and required corrective action.</li>"
+                "</ul>"
+            )
 
         tg_code = equipment_code.replace("-", "_") if equipment_code != "N/A" else ""
 
@@ -435,20 +442,31 @@ class WorkOrderNotifier:
 <title>Work Order {wo_ref}</title>
 <style>
   body {{ font-family: Arial, sans-serif; background-color: #f8f9fa; margin: 0; padding: 20px; }}
-  .container {{ max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.12); }}
-  .header {{ background: linear-gradient(135deg, #1a73e8 0%, #0d47a1 100%); color: white; padding: 24px 32px; }}
-  .header h1 {{ margin: 0 0 4px 0; font-size: 20px; font-weight: 600; letter-spacing: 0.5px; }}
+  .container {{ max-width: 600px; margin: 0 auto; background: #ffffff;
+    border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.12); }}
+  .header {{ background: linear-gradient(135deg, #1a73e8 0%, #0d47a1 100%);
+    color: white; padding: 24px 32px; }}
+  .header h1 {{ margin: 0 0 4px 0; font-size: 20px; font-weight: 600;
+    letter-spacing: 0.5px; }}
   .header p {{ margin: 0; opacity: 0.85; font-size: 13px; }}
-  .badge-row {{ padding: 20px 32px 0 32px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }}
-  .priority-badge {{ display: inline-block; padding: 4px 12px; border-radius: 16px; color: white; font-size: 12px; font-weight: 600; background-color: {priority_color}; }}
-  .wo-ref {{ background: #e8f0fe; color: #1a73e8; padding: 4px 12px; border-radius: 16px; font-size: 12px; font-weight: 600; }}
+  .badge-row {{ padding: 20px 32px 0 32px; display: flex; gap: 12px;
+    align-items: center; flex-wrap: wrap; }}
+  .priority-badge {{ display: inline-block; padding: 4px 12px; border-radius: 16px;
+    color: white; font-size: 12px; font-weight: 600;
+    background-color: {priority_color}; }}
+  .wo-ref {{ background: #e8f0fe; color: #1a73e8; padding: 4px 12px;
+    border-radius: 16px; font-size: 12px; font-weight: 600; }}
   .content {{ padding: 24px 32px; }}
   .info-table {{ width: 100%; border-collapse: collapse; margin-bottom: 20px; }}
   .info-table td {{ padding: 8px 0; vertical-align: top; font-size: 14px; }}
   .info-table td:first-child {{ color: #5f6368; width: 40%; }}
   .info-table td:last-child {{ color: #202124; font-weight: 500; }}
-  h2 {{ color: #1a73e8; font-size: 14px; font-weight: 600; margin: 0 0 12px 0; text-transform: uppercase; letter-spacing: 0.5px; }}
-  .description {{ background: #f8f9fa; border-left: 4px solid #1a73e8; padding: 12px 16px; border-radius: 0 4px 4px 0; font-size: 14px; line-height: 1.6; color: #202124; margin-bottom: 20px; white-space: pre-wrap; }}
+  h2 {{ color: #1a73e8; font-size: 14px; font-weight: 600; margin: 0 0 12px 0;
+    text-transform: uppercase; letter-spacing: 0.5px; }}
+  .description {{ background: #f8f9fa; border-left: 4px solid #1a73e8;
+    padding: 12px 16px; border-radius: 0 4px 4px 0; font-size: 14px;
+    line-height: 1.6; color: #202124; margin-bottom: 20px;
+    white-space: pre-wrap; }}
   .checklist {{ background: #f8f9fa; border-radius: 8px; padding: 16px 20px; margin-bottom: 20px; }}
   .checklist ul {{ margin: 0; padding-left: 20px; }}
   .checklist li {{ font-size: 14px; line-height: 1.8; color: #202124; }}
@@ -1033,7 +1051,14 @@ class WorkOrderNotifier:
             "diagnostic_context": diagnostic_context,  # Store alert context for data collection
         }
 
-        return await self.repository.create(record_data)
+        created = await self.repository.create(record_data)
+
+        # Set equipment to maintenance while service is pending
+        if created and resolved_equipment_id and resolved_equipment_id != _CALL_LOG_PLACEHOLDER_EQUIPMENT_ID:
+            await self._update_equipment_status(resolved_equipment_id, "maintenance")
+            logger.info("Equipment %s set to maintenance (SR %s)", resolved_equipment_id, code)
+
+        return created
 
     async def handle_technician_reply(self, service_record_code: str, reply_data: dict[str, Any]) -> dict[str, Any]:
         """Handle technician's reply to work order notification.
@@ -1527,17 +1552,19 @@ class WorkOrderNotifier:
             await self.repository.update(service_record["id"], {"status": ServiceStatus.COMPLETE.value})
             logger.info(f"Service record {service_record.get('code')} marked as complete")
 
-            # 2. Resolve active alerts for this equipment
             equipment_id = service_record.get("equipment_id")
 
-            # 3. Resolve active alerts for this equipment
+            # 2. Resolve active alerts for this equipment
             await self._resolve_equipment_alerts(equipment_id)
 
-            # 4. Resolve active predictions for this equipment
+            # 3. Resolve active predictions for this equipment
             await self._resolve_equipment_predictions(equipment_id)
 
-            # 5. Update equipment status to 'normal' in Supabase
+            # 4. Update equipment status to 'normal' in Supabase
             await self._update_equipment_status(equipment_id, "normal")
+
+            # 5. Restore health score based on service type + configured healthy threshold
+            await self._restore_equipment_health(equipment_id, service_record.get("service_type"))
 
         except Exception as e:
             logger.error(f"Error completing service record: {e}")
@@ -1578,6 +1605,45 @@ class WorkOrderNotifier:
             logger.info(f"Equipment {equipment_id} status updated to '{status}'")
         except Exception as e:
             logger.warning(f"Could not update equipment status: {e}")
+
+    async def _restore_equipment_health(self, equipment_id: str | None, service_type: str | None):
+        """Restore equipment health score after service, anchored to the configured healthy threshold.
+
+        Recovery scale by service type:
+          breakdown / major  → healthy threshold (full overhaul, full reset)
+          minor              → warning + 70% of (healthy - warning)
+          callout            → warning + 30% of (healthy - warning)  (investigation, partial)
+        """
+        if not equipment_id or equipment_id == _CALL_LOG_PLACEHOLDER_EQUIPMENT_ID:
+            return
+        try:
+            from app.database.repositories.equipment_repository import get_equipment_repository
+            from app.services.health_threshold_service import get_health_thresholds
+
+            thresholds = get_health_thresholds()
+            healthy = thresholds["healthy"]
+            warning = thresholds["warning"]
+            gap = healthy - warning
+
+            recovery_map = {
+                "breakdown": healthy,
+                "major": healthy,
+                "minor": int(warning + gap * 0.7),
+                "callout": int(warning + gap * 0.3),
+            }
+            recovery_score = recovery_map.get(service_type or "", int(warning + gap * 0.5))
+
+            repo = get_equipment_repository()
+            repo.update_health_score(equipment_id, recovery_score)
+            logger.info(
+                "Equipment %s health restored to %d (service_type=%s, healthy_threshold=%d)",
+                equipment_id,
+                recovery_score,
+                service_type,
+                healthy,
+            )
+        except Exception as e:
+            logger.warning(f"Could not restore equipment health score: {e}", exc_info=True)
 
     async def get_collection_status(self, service_record_code: str) -> dict[str, Any]:
         """Get data collection status for a service record.
