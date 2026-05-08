@@ -217,8 +217,8 @@ async def control_device(
         try:
             current = await device_manager.read_device_value(device_id, point)
             old_value = current.value
-        except Exception:
-            pass  # Continue even if we can't read current value
+        except Exception as e:
+            logger.warning(f"write_device_value: could not read old value for {device_id}/{point}: {e}", exc_info=True)
 
         # Execute control with safety validation — audit with real user identity
         success = await device_manager.write_device_value(
@@ -1103,8 +1103,10 @@ async def get_energy_analysis(site_id: str) -> dict[str, Any]:
                     try:
                         value = await adapter.read_value(point_name)
                         device_readings[point_name] = {"value": value.value, "unit": value.unit}
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.warning(
+                            f"get_device_readings_batch: failed to read {point_name} on {device.id}: {e}", exc_info=True
+                        )
                 if device_readings:
                     readings[device.id] = {
                         "device_name": device.name,
@@ -2454,8 +2456,8 @@ async def get_solar_diagnostics(site_id: str | None = None) -> dict[str, Any]:
             maint = get_solar_maintenance_service()
             recs = await maint.evaluate_maintenance_needs(site_id)
             result["maintenance_recommendations"] = [r.to_dict() for r in recs[:5]]
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"get_solar_diagnostics: failed to fetch maintenance recs: {e}", exc_info=True)
         return result
     except Exception as e:
         logger.error(f"get_solar_diagnostics error: {e}")
@@ -3866,7 +3868,8 @@ def _get_setpoint_safety_limits() -> dict:
                 "unit": humidity.get("unit", "%RH"),
             },
         }
-    except Exception:
+    except Exception as e:
+        logger.warning(f"_get_default_control_limits failed, returning fallback: {e}", exc_info=True)
         return _FALLBACK_LIMITS.copy()
 
 
@@ -3928,7 +3931,8 @@ def _get_template_requirements(equipment_type: str | None) -> dict[str, Any] | N
             if template:
                 return template
         return None
-    except Exception:
+    except Exception as e:
+        logger.warning(f"_get_template_requirements({equipment_type}) failed, returning None: {e}", exc_info=True)
         return None
 
 
@@ -4794,8 +4798,8 @@ async def execute_tool(
             from app.security.audit_events import audit_tool_denied
 
             audit_tool_denied(tool_name, reason="unregistered_tool")
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"audit_tool_denied injection failed for {tool_name}: {e}", exc_info=True)
         return {"error": "Unknown tool", "tool": tool_name}
 
     # --- Tier enforcement ---
@@ -4862,12 +4866,12 @@ async def execute_tool(
 
                 for f in findings:
                     audit_secret_detected(f"tool_input:{tool_name}:{f['field']}")
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"audit_secret_detected injection failed: {e}", exc_info=True)
             # Redact credentials from arguments before passing to handler
             tool_input = redact_credentials(tool_input)
-    except Exception:
-        pass  # Never block tool execution for scanner errors
+    except Exception as e:
+        logger.warning(f"credential_scan guard failed for {tool_name}: {e}", exc_info=True)
 
     import time as _time
 
@@ -4886,8 +4890,8 @@ async def execute_tool(
             from app.services.governance_metrics_collector import governance_metrics
 
             governance_metrics.record_tool_error(tool_name, "param_validation")
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"governance_metrics.record_tool_error failed for {tool_name}: {e}", exc_info=True)
         return {"error": f"Invalid parameters for {tool_name}.", "tool": tool_name}
     except TimeoutError as e:
         _outcome = "error"
@@ -4896,8 +4900,8 @@ async def execute_tool(
             from app.services.governance_metrics_collector import governance_metrics
 
             governance_metrics.record_tool_error(tool_name, "timeout")
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"governance_metrics.record_tool_error failed for {tool_name}: {e}", exc_info=True)
         return {"error": "This operation timed out.", "tool": tool_name}
     except PermissionError as e:
         _outcome = "error"
@@ -4906,8 +4910,8 @@ async def execute_tool(
             from app.services.governance_metrics_collector import governance_metrics
 
             governance_metrics.record_tool_error(tool_name, "permission")
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"governance_metrics.record_tool_error failed for {tool_name}: {e}", exc_info=True)
         return {"error": "This operation could not be completed.", "tool": tool_name}
     except Exception as e:
         _outcome = "error"
@@ -4918,8 +4922,8 @@ async def execute_tool(
             from app.services.governance_metrics_collector import governance_metrics
 
             governance_metrics.record_tool_error(tool_name, _error_type)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"governance_metrics.record_tool_error failed for {tool_name}: {e}", exc_info=True)
         logger.error("Tool %s execution error: %s", tool_name, e, exc_info=True)
         return {"error": "This operation could not be completed.", "tool": tool_name}
     finally:
@@ -4932,5 +4936,5 @@ async def execute_tool(
 
             sentinel_tool_calls_total.labels(tool_name=tool_name, outcome=_outcome).inc()
             sentinel_tool_call_duration_seconds.labels(tool_name=tool_name).observe(_duration)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"metrics recording failed for {tool_name}: {e}", exc_info=True)
