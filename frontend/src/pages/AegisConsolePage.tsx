@@ -1,9 +1,11 @@
 import { useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { Activity, AlertTriangle, Clock3, RefreshCw, Shield } from "lucide-react";
+import { AlertTriangle, Clock3, RefreshCw, Shield, List } from "lucide-react";
 import { aegisApi, type AegisDashboardFilters, type AegisDashboardResponse, type AegisDecision } from "../lib/api/aegis";
 import { formatDateTime } from "../lib/timeFormat";
 import { PageLoading } from "../components/PageLoading";
+import { Panel } from "../components/Panel";
 import { ModuleContext } from "../contexts/moduleContextStore";
+import { Filter } from "lucide-react";
 
 interface AegisConsolePageProps {
   siteId?: string;
@@ -238,23 +240,23 @@ export function AegisConsolePage({ siteId: propSiteId }: AegisConsolePageProps) 
               <div className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
                 {card.label}
               </div>
-              <div className="mt-1 text-2xl font-semibold" style={{ color: card.accent }}>
-                {card.value}
-              </div>
+              <div
+              className="mt-1 text-2xl font-semibold"
+              style={{ color: card.accent, fontVariantNumeric: "tabular-nums" }}
+            >
+              {card.value}
+            </div>
             </div>
           ))}
         </div>
 
-        <div
-          className="rounded-lg p-4"
-          style={{
-            background: "var(--color-sentinel-bg-panel)",
-            border: "1px solid var(--color-sentinel-border)",
+        <Panel
+          header={{
+            icon: <Filter className="h-4 w-4" />,
+            title: "Filters",
+            accentColor: "var(--color-sentinel-blue)",
           }}
         >
-          <div className="mb-3 text-sm font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>
-            Filters
-          </div>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
             <select
               value={filters.approval_outcome || ""}
@@ -301,24 +303,17 @@ export function AegisConsolePage({ siteId: propSiteId }: AegisConsolePageProps) 
               <option value="skipped">Skipped</option>
             </select>
           </div>
-        </div>
+        </Panel>
 
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-          <div
-            className="rounded-lg p-4 xl:col-span-2"
-            style={{
-              background: "var(--color-sentinel-bg-panel)",
-              border: "1px solid var(--color-sentinel-border)",
+          <div className="xl:col-span-2">
+          <Panel
+            header={{
+              icon: <AlertTriangle className="h-4 w-4" />,
+              title: "Pending proposals",
+              accentColor: "var(--color-sentinel-amber)",
             }}
           >
-            <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-sm font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>
-                Pending proposals
-              </h3>
-              <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                {snapshot?.pending_proposals.length || 0} pending
-              </span>
-            </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -362,58 +357,51 @@ export function AegisConsolePage({ siteId: propSiteId }: AegisConsolePageProps) 
                 </tbody>
               </table>
             </div>
+          </Panel>
           </div>
 
           <div className="space-y-6">
-            <div
-              className="rounded-lg p-4"
-              style={{
-                background: "var(--color-sentinel-bg-panel)",
-                border: "1px solid var(--color-sentinel-border)",
+            <Panel
+              header={{
+                icon: <AlertTriangle className="h-4 w-4" />,
+                title: "Tripwire signals",
+                accentColor: "var(--color-sentinel-amber)",
               }}
             >
-              <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>
-                <AlertTriangle className="h-4 w-4" />
-                Tripwire signals
-              </h3>
               <div className="space-y-2 text-sm">
                 <div className="flex items-center justify-between">
                   <span style={{ color: "var(--color-sentinel-text-secondary)" }}>Gate-fail signals</span>
-                  <span>{inferredTripwires.gateFailSignals}</span>
+                  <span style={{ fontVariantNumeric: "tabular-nums" }}>{inferredTripwires.gateFailSignals}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span style={{ color: "var(--color-sentinel-text-secondary)" }}>Repeated-hash signals</span>
-                  <span>{inferredTripwires.repeatedHashSignals}</span>
+                  <span style={{ fontVariantNumeric: "tabular-nums" }}>{inferredTripwires.repeatedHashSignals}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span style={{ color: "var(--color-sentinel-text-secondary)" }}>Oldest pending</span>
-                  <span>{inferredTripwires.oldestPendingMinutes} min</span>
+                  <span style={{ fontVariantNumeric: "tabular-nums" }}>{inferredTripwires.oldestPendingMinutes} min</span>
                 </div>
               </div>
               <p className="mt-3 text-xs" style={{ color: "var(--color-sentinel-text-disabled)" }}>
                 Signals are inferred from decisions. Canonical tripwire aging remains in decision logs.
               </p>
-            </div>
+            </Panel>
 
-            <div
-              className="rounded-lg p-4"
-              style={{
-                background: "var(--color-sentinel-bg-panel)",
-                border: "1px solid var(--color-sentinel-border)",
+            <Panel
+              header={{
+                icon: <Shield className="h-4 w-4" />,
+                title: "Readiness",
+                accentColor: "var(--color-sentinel-blue)",
               }}
             >
-              <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>
-                <Shield className="h-4 w-4" />
-                Readiness
-              </h3>
               <div className="space-y-2 text-sm">
                 <div className="flex items-center justify-between">
                   <span style={{ color: "var(--color-sentinel-text-secondary)" }}>Illegal states</span>
-                  <span>{readiness.illegalStates}</span>
+                  <span style={{ fontVariantNumeric: "tabular-nums" }}>{readiness.illegalStates}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span style={{ color: "var(--color-sentinel-text-secondary)" }}>Audit gaps</span>
-                  <span>{readiness.auditMissing}</span>
+                  <span style={{ fontVariantNumeric: "tabular-nums" }}>{readiness.auditMissing}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span style={{ color: "var(--color-sentinel-text-secondary)" }}>Phase 1 blocker</span>
@@ -422,21 +410,17 @@ export function AegisConsolePage({ siteId: propSiteId }: AegisConsolePageProps) 
                   </span>
                 </div>
               </div>
-            </div>
+            </Panel>
           </div>
         </div>
 
-        <div
-          className="rounded-lg p-4"
-          style={{
-            background: "var(--color-sentinel-bg-panel)",
-            border: "1px solid var(--color-sentinel-border)",
+        <Panel
+          header={{
+            icon: <List className="h-4 w-4" />,
+            title: "Activity timeline",
+            accentColor: "var(--color-sentinel-blue)",
           }}
         >
-          <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>
-            <Activity className="h-4 w-4" />
-            Activity timeline
-          </h3>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -466,32 +450,28 @@ export function AegisConsolePage({ siteId: propSiteId }: AegisConsolePageProps) 
               </tbody>
             </table>
           </div>
-        </div>
+        </Panel>
 
         {selectedDecision && (
-          <div
-            className="rounded-lg p-4"
-            style={{
-              background: "var(--color-sentinel-bg-panel)",
-              border: "1px solid var(--color-sentinel-border)",
+          <Panel
+            header={{
+              title: `Decision detail: ${selectedDecision.id}`,
+              actions: (
+                <button
+                  className="rounded-lg px-2 py-1 text-xs"
+                  style={{
+                    background: "var(--color-sentinel-bg-secondary)",
+                    border: "1px solid var(--color-sentinel-border)",
+                    color: "var(--color-sentinel-text-primary)",
+                  }}
+                  onClick={() => setSelectedDecision(null)}
+                >
+                  Close
+                </button>
+              ),
+              accentColor: "var(--color-sentinel-blue)",
             }}
           >
-            <div className="mb-2 flex items-center justify-between">
-              <h3 className="text-sm font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>
-                Decision detail: {selectedDecision.id}
-              </h3>
-              <button
-                className="rounded-lg px-2 py-1 text-xs"
-                style={{
-                  background: "var(--color-sentinel-bg-secondary)",
-                  border: "1px solid var(--color-sentinel-border)",
-                  color: "var(--color-sentinel-text-primary)",
-                }}
-                onClick={() => setSelectedDecision(null)}
-              >
-                Close
-              </button>
-            </div>
             <pre
               className="max-h-[420px] overflow-auto rounded-lg p-3 text-xs"
               style={{
@@ -501,7 +481,7 @@ export function AegisConsolePage({ siteId: propSiteId }: AegisConsolePageProps) 
             >
               {JSON.stringify(selectedDecision, null, 2)}
             </pre>
-          </div>
+          </Panel>
         )}
 
         <div className="text-xs" style={{ color: "var(--color-sentinel-text-disabled)" }}>

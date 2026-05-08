@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import type { Recommendation } from '@/lib/api/optimization'
 import { optimizationApi } from '@/lib/api/optimization'
+import { Panel } from '../Panel'
+import { EmptyState } from '../EmptyState'
 
 interface RecommendationsDashboardProps {
   siteId: string
@@ -69,31 +71,56 @@ export const RecommendationsDashboard: React.FC<
 
   if (loading) {
     return (
-      <div className="bg-white rounded-lg shadow p-6 text-center">
-        <p className="text-gray-600">Loading recommendations...</p>
+      <div
+        className="rounded-lg p-6 text-center"
+        style={{
+          background: "var(--color-sentinel-bg-panel)",
+          border: "1px solid var(--color-sentinel-border)",
+        }}
+      >
+        <p style={{ color: "var(--color-sentinel-text-secondary)" }}>Loading recommendations...</p>
       </div>
     )
   }
 
   if (recommendations.length === 0) {
     return (
-      <div className="bg-white rounded-lg shadow p-6 text-center">
-        <p className="text-gray-600">No pending recommendations</p>
-      </div>
+      <Panel>
+        <EmptyState
+          icon={TrendingUp}
+          title="No pending recommendations"
+          subtext="AI-generated recommendations will appear here when available."
+        />
+      </Panel>
     )
   }
 
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="text-2xl font-bold">Pending Recommendations</h2>
-        <p className="text-xs text-gray-400 italic mt-0.5">
+        <h2
+          className="text-lg font-semibold"
+          style={{ color: "var(--color-sentinel-text-primary)" }}
+        >
+          Pending Recommendations
+        </h2>
+        <p
+          className="text-xs italic"
+          style={{ color: "var(--color-sentinel-text-secondary)" }}
+        >
           AI-generated recommendations &middot; Review before acting
         </p>
       </div>
 
       {error && (
-        <div className="p-4 bg-red-50 border border-red-200 text-red-800 rounded">
+        <div
+          className="p-4 rounded text-sm"
+          style={{
+            background: "rgba(239, 68, 68, 0.08)",
+            border: "1px solid var(--color-sentinel-red)",
+            color: "var(--color-sentinel-red)",
+          }}
+        >
           {error}
         </div>
       )}
@@ -101,25 +128,43 @@ export const RecommendationsDashboard: React.FC<
       {recommendations.map((rec) => (
         <div
           key={rec.id}
-          className="bg-white rounded-lg shadow p-6 border-l-4 border-blue-500"
+          className="rounded-lg p-6"
+          style={{
+            background: "var(--color-sentinel-bg-panel)",
+            border: "1px solid var(--color-sentinel-border)",
+            borderLeft: "4px solid var(--color-sentinel-blue)",
+          }}
         >
           {/* Header */}
           <div className="flex justify-between items-start mb-4">
             <div>
-              <h3 className="text-lg font-semibold">{rec.action_type}</h3>
-              <p className="text-sm text-gray-600">
+              <h3
+                className="text-base font-semibold"
+                style={{ color: "var(--color-sentinel-text-primary)" }}
+              >
+                {rec.action_type}
+              </h3>
+              <p
+                className="text-sm"
+                style={{ color: "var(--color-sentinel-text-secondary)" }}
+              >
                 Target: {rec.target_equipment}
               </p>
             </div>
             <div className="flex gap-2">
               <span
-                className={`px-3 py-1 rounded text-sm ${getRiskBadgeColor(
-                  rec.risk_level
-                )}`}
+                className="px-3 py-1 rounded text-sm font-medium"
+                style={getRiskBadgeStyles(rec.risk_level)}
               >
                 {rec.risk_level}
               </span>
-              <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded text-sm">
+              <span
+                className="px-3 py-1 rounded text-sm font-medium"
+                style={{
+                  background: "rgba(59, 130, 246, 0.15)",
+                  color: "var(--color-sentinel-blue)",
+                }}
+              >
                 Score: {typeof rec.multi_objective_score === 'number' ? rec.multi_objective_score.toFixed(2) : '--'}
               </span>
             </div>
@@ -127,31 +172,74 @@ export const RecommendationsDashboard: React.FC<
 
           {/* Reason */}
           <div className="mb-4">
-            <h4 className="font-semibold text-sm mb-1">Reason</h4>
-            <p className="text-sm text-gray-700">{rec.reason}</p>
+            <h4
+              className="font-semibold text-xs uppercase tracking-wider mb-1"
+              style={{ color: "var(--color-sentinel-text-secondary)" }}
+            >
+              Reason
+            </h4>
+            <p
+              className="text-sm"
+              style={{ color: "var(--color-sentinel-text-primary)" }}
+            >
+              {rec.reason}
+            </p>
           </div>
 
           {/* Expected Impact */}
-          <div className="grid grid-cols-3 gap-4 mb-4">
-            <div className="bg-green-50 p-3 rounded">
-              <p className="text-xs text-gray-600">Cost Saving</p>
-              <p className="text-lg font-bold text-green-700">
+          <div className="grid grid-cols-3 gap-3 mb-4">
+            <div
+              className="p-3 rounded"
+              style={{ background: "rgba(16, 185, 129, 0.08)" }}
+            >
+              <p
+                className="text-xs mb-1"
+                style={{ color: "var(--color-sentinel-text-secondary)" }}
+              >
+                Cost Saving
+              </p>
+              <p
+                className="text-lg font-bold"
+                style={{ color: "var(--color-sentinel-green)" }}
+              >
                 {rec.expected_impact
                   ? `R${typeof rec.expected_impact.cost_zar === 'number' ? rec.expected_impact.cost_zar.toFixed(2) : '0'}`
                   : 'R0'}
               </p>
             </div>
-            <div className="bg-blue-50 p-3 rounded">
-              <p className="text-xs text-gray-600">Comfort Impact</p>
-              <p className="text-lg font-bold text-blue-700">
+            <div
+              className="p-3 rounded"
+              style={{ background: "rgba(59, 130, 246, 0.08)" }}
+            >
+              <p
+                className="text-xs mb-1"
+                style={{ color: "var(--color-sentinel-text-secondary)" }}
+              >
+                Comfort Impact
+              </p>
+              <p
+                className="text-lg font-bold"
+                style={{ color: "var(--color-sentinel-blue)" }}
+              >
                 {rec.expected_impact
                   ? `${typeof rec.expected_impact.comfort_delta === 'number' ? rec.expected_impact.comfort_delta.toFixed(1) : '0'}°C`
                   : '0°C'}
               </p>
             </div>
-            <div className="bg-purple-50 p-3 rounded">
-              <p className="text-xs text-gray-600">Energy Saving</p>
-              <p className="text-lg font-bold text-purple-700">
+            <div
+              className="p-3 rounded"
+              style={{ background: "rgba(167, 139, 250, 0.08)" }}
+            >
+              <p
+                className="text-xs mb-1"
+                style={{ color: "var(--color-sentinel-text-secondary)" }}
+              >
+                Energy Saving
+              </p>
+              <p
+                className="text-lg font-bold"
+                style={{ color: "#a78bfa" }}
+              >
                 {rec.expected_impact
                   ? `${typeof rec.expected_impact.energy_kwh === 'number' ? rec.expected_impact.energy_kwh.toFixed(1) : '0'} kWh`
                   : '0 kWh'}
@@ -160,16 +248,24 @@ export const RecommendationsDashboard: React.FC<
           </div>
 
           {/* Actions */}
-          <div className="flex gap-4">
+          <div className="flex gap-3">
             <button
               onClick={() => handleApprove(rec.id)}
-              className="flex-1 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+              className="flex-1 px-4 py-2 rounded font-medium text-sm transition-opacity hover:opacity-90"
+              style={{
+                background: "var(--color-sentinel-green)",
+                color: "white",
+              }}
             >
               Approve
             </button>
             <button
               onClick={() => setSelectedRec(rec.id)}
-              className="flex-1 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+              className="flex-1 px-4 py-2 rounded font-medium text-sm transition-opacity hover:opacity-90"
+              style={{
+                background: "var(--color-sentinel-red)",
+                color: "white",
+              }}
             >
               Reject
             </button>
@@ -177,19 +273,39 @@ export const RecommendationsDashboard: React.FC<
 
           {/* Rejection Modal */}
           {selectedRec === rec.id && (
-            <div className="mt-4 p-4 bg-red-50 rounded border border-red-200">
-              <p className="font-semibold mb-2">Rejection Reason</p>
+            <div
+              className="mt-4 p-4 rounded"
+              style={{
+                background: "rgba(239, 68, 68, 0.08)",
+                border: "1px solid rgba(239, 68, 68, 0.3)",
+              }}
+            >
+              <p
+                className="font-semibold text-sm mb-2"
+                style={{ color: "var(--color-sentinel-text-primary)" }}
+              >
+                Rejection Reason
+              </p>
               <textarea
                 value={rejectionReason}
                 onChange={(e) => setRejectionReason(e.target.value)}
-                className="w-full px-3 py-2 border rounded mb-3"
+                className="w-full px-3 py-2 rounded text-sm"
+                style={{
+                  background: "var(--color-sentinel-bg-secondary)",
+                  border: "1px solid var(--color-sentinel-border)",
+                  color: "var(--color-sentinel-text-primary)",
+                }}
                 placeholder="Why are you rejecting this recommendation?"
                 rows={3}
               />
-              <div className="flex gap-2">
+              <div className="flex gap-2 mt-3">
                 <button
                   onClick={() => handleReject(rec.id)}
-                  className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+                  className="px-4 py-2 rounded text-sm font-medium transition-opacity hover:opacity-90"
+                  style={{
+                    background: "var(--color-sentinel-red)",
+                    color: "white",
+                  }}
                 >
                   Confirm Rejection
                 </button>
@@ -198,7 +314,12 @@ export const RecommendationsDashboard: React.FC<
                     setSelectedRec(null)
                     setRejectionReason('')
                   }}
-                  className="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+                  className="px-4 py-2 rounded text-sm font-medium transition-opacity hover:opacity-90"
+                  style={{
+                    background: "var(--color-sentinel-bg-secondary)",
+                    color: "var(--color-sentinel-text-secondary)",
+                    border: "1px solid var(--color-sentinel-border)",
+                  }}
                 >
                   Cancel
                 </button>
@@ -211,12 +332,13 @@ export const RecommendationsDashboard: React.FC<
   )
 }
 
-function getRiskBadgeColor(risk: string): string {
-  const colors: Record<string, string> = {
-    low: 'bg-green-100 text-green-800',
-    medium: 'bg-yellow-100 text-yellow-800',
-    high: 'bg-red-100 text-red-800',
-    critical: 'bg-purple-100 text-purple-800',
+function getRiskBadgeStyles(risk: string): React.CSSProperties {
+  const colors: Record<string, { bg: string; color: string }> = {
+    low: { bg: "rgba(16, 185, 129, 0.15)", color: "var(--color-sentinel-green)" },
+    medium: { bg: "rgba(245, 158, 11, 0.15)", color: "var(--color-sentinel-amber)" },
+    high: { bg: "rgba(239, 68, 68, 0.15)", color: "var(--color-sentinel-red)" },
+    critical: { bg: "rgba(167, 139, 250, 0.15)", color: "#a78bfa" },
   }
-  return colors[risk] || 'bg-gray-100 text-gray-800'
+  const style = colors[risk] ?? { bg: "rgba(148, 163, 184, 0.15)", color: "var(--color-sentinel-text-secondary)" }
+  return { background: style.bg, color: style.color }
 }

@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react'
+import { TrendingUp } from 'lucide-react'
 import type { Recommendation } from '@/lib/api/optimization'
 import { optimizationApi } from '@/lib/api/optimization'
+import { Panel } from '../Panel'
+import { EmptyState } from '../EmptyState'
 
 interface RecommendationHistoryProps {
   siteId: string
@@ -39,131 +42,183 @@ export const RecommendationHistory: React.FC<
 
   if (loading) {
     return (
-      <div className="bg-white rounded-lg shadow p-6 text-center">
-        <p className="text-gray-600">Loading recommendation history...</p>
+      <div
+        className="rounded-lg p-6 text-center"
+        style={{
+          background: "var(--color-sentinel-bg-panel)",
+          border: "1px solid var(--color-sentinel-border)",
+        }}
+      >
+        <p style={{ color: "var(--color-sentinel-text-secondary)" }}>Loading recommendation history...</p>
       </div>
     )
   }
 
-  return (
-    <div className="bg-white rounded-lg shadow p-6">
-      <h2 className="text-2xl font-bold mb-6">Recommendation History</h2>
+  const filteredHistory = filter === 'all'
+    ? history
+    : filter === 'executed'
+      ? history.filter(r => r.status === 'executed' || r.status === 'auto_executed')
+      : history.filter(r => r.status === filter)
 
+  return (
+    <Panel
+      header={{
+        icon: <TrendingUp className="h-5 w-5" />,
+        title: "Execution History",
+        accentColor: "var(--color-sentinel-green)",
+      }}
+    >
       {error && (
-        <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-800 rounded">
+        <div
+          className="mx-4 mt-4 p-4 rounded text-sm"
+          style={{
+            background: "rgba(239, 68, 68, 0.08)",
+            border: "1px solid var(--color-sentinel-red)",
+            color: "var(--color-sentinel-red)",
+          }}
+        >
           {error}
         </div>
       )}
 
       {/* Filter */}
-      <div className="mb-6 flex gap-2">
-        <button
-          onClick={() => setFilter('all')}
-          className={`px-4 py-2 rounded ${
-            filter === 'all'
-              ? 'bg-blue-600 text-white'
-              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-          }`}
-        >
-          All
-        </button>
-        <button
-          onClick={() => setFilter('executed')}
-          className={`px-4 py-2 rounded ${
-            filter === 'executed'
-              ? 'bg-green-600 text-white'
-              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-          }`}
-        >
-          Executed
-        </button>
-        <button
-          onClick={() => setFilter('rejected')}
-          className={`px-4 py-2 rounded ${
-            filter === 'rejected'
-              ? 'bg-red-600 text-white'
-              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-          }`}
-        >
-          Rejected
-        </button>
+      <div className="flex gap-2 p-4">
+        {[
+          { key: 'all', label: 'All' },
+          { key: 'executed', label: 'Executed' },
+          { key: 'rejected', label: 'Rejected' },
+        ].map(f => (
+          <button
+            key={f.key}
+            onClick={() => setFilter(f.key)}
+            className="px-4 py-1.5 rounded text-xs font-medium transition-colors"
+            style={{
+              background: filter === f.key
+                ? "var(--color-sentinel-amber)"
+                : "var(--color-sentinel-bg-secondary)",
+              color: filter === f.key
+                ? "white"
+                : "var(--color-sentinel-text-secondary)",
+            }}
+          >
+            {f.label}
+          </button>
+        ))}
       </div>
 
       {/* Table */}
-      {history.length === 0 ? (
-        <p className="text-gray-600 text-center py-8">
-          No recommendations found for the selected filter
-        </p>
+      {filteredHistory.length === 0 ? (
+        <EmptyState
+          icon={TrendingUp}
+          title="No recommendations found"
+          subtext="Recommendations will appear here once executed or reviewed."
+        />
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full border-collapse">
             <thead>
-              <tr className="border-b">
-                <th className="text-left py-3 font-semibold">Action</th>
-                <th className="text-left py-3 font-semibold">Profile</th>
-                <th className="text-left py-3 font-semibold">Score</th>
-                <th className="text-left py-3 font-semibold">Status</th>
-                <th className="text-left py-3 font-semibold">Accuracy</th>
-                <th className="text-left py-3 font-semibold">Date</th>
+              <tr style={{ borderBottom: "1px solid var(--color-sentinel-border)" }}>
+                {['Action', 'Profile', 'Score', 'Status', 'Accuracy', 'Date'].map(h => (
+                  <th
+                    key={h}
+                    className="text-left py-3 pr-4 font-medium text-xs uppercase tracking-wider"
+                    style={{ color: "var(--color-sentinel-text-secondary)" }}
+                  >
+                    {h}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {history.map((rec) => (
-                <tr key={rec.id} className="border-b hover:bg-gray-50">
-                  <td className="py-3">
-                    <div className="font-semibold">{rec.action_type}</div>
-                    <div className="text-sm text-gray-600">
+              {filteredHistory.map((rec) => (
+                <tr
+                  key={rec.id}
+                  style={{ borderBottom: "1px solid var(--color-sentinel-border)" }}
+                >
+                  <td className="py-3 pr-4">
+                    <div
+                      className="font-semibold text-sm"
+                      style={{ color: "var(--color-sentinel-text-primary)" }}
+                    >
+                      {rec.action_type}
+                    </div>
+                    <div
+                      className="text-xs"
+                      style={{ color: "var(--color-sentinel-text-secondary)" }}
+                    >
                       {rec.target_equipment}
                     </div>
                   </td>
-                  <td className="py-3">
-                    <span className="px-2 py-1 bg-blue-50 text-blue-700 rounded text-sm">
-                      {rec.profile}
+                  <td className="py-3 pr-4">
+                    <span
+                      className="px-2 py-1 rounded text-xs font-medium"
+                      style={{
+                        background: "rgba(59, 130, 246, 0.15)",
+                        color: "var(--color-sentinel-blue)",
+                      }}
+                    >
+                      {rec.profile ?? '--'}
                     </span>
                   </td>
-                  <td className="py-3">
+                  <td
+                    className="py-3 pr-4 text-sm"
+                    style={{ color: "var(--color-sentinel-text-primary)" }}
+                  >
                     {typeof rec.multi_objective_score === 'number' ? rec.multi_objective_score.toFixed(2) : '--'}
                   </td>
-                  <td className="py-3">
+                  <td className="py-3 pr-4">
                     <span
-                      className={`px-3 py-1 rounded text-sm ${getStatusColor(
-                        rec.status
-                      )}`}
+                      className="px-3 py-1 rounded text-xs font-medium"
+                      style={getStatusBadgeStyles(rec.status)}
                     >
                       {rec.status}
                     </span>
                   </td>
-                  <td className="py-3">
+                  <td className="py-3 pr-4">
                     {rec.outcome ? (
                       <div className="flex items-center gap-2">
-                        <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center">
+                        <div
+                          className="w-10 h-10 rounded-full flex items-center justify-center"
+                          style={{ background: "var(--color-sentinel-bg-secondary)" }}
+                        >
                           <span
-                            className={
-                              rec.outcome.accuracy > 0.8
-                                ? 'text-green-600'
+                            style={{
+                              color: rec.outcome.accuracy > 0.8
+                                ? "var(--color-sentinel-green)"
                                 : rec.outcome.accuracy > 0.5
-                                ? 'text-yellow-600'
-                                : 'text-red-600'
-                            }
+                                ? "var(--color-sentinel-amber)"
+                                : "var(--color-sentinel-red)",
+                            }}
                           >
                             {(rec.outcome.accuracy * 100).toFixed(0)}%
                           </span>
                         </div>
-                        <div className="text-sm">
-                          <p className="font-semibold">
+                        <div className="text-xs">
+                          <p
+                            className="font-medium"
+                            style={{ color: "var(--color-sentinel-text-primary)" }}
+                          >
                             Pred: {typeof rec.expected_impact?.temperature_c === 'number' ? `${rec.expected_impact.temperature_c.toFixed(1)}°C` : '--'}
                           </p>
-                          <p className="text-gray-600">
+                          <p style={{ color: "var(--color-sentinel-text-secondary)" }}>
                             Actual:{' '}
-                            {rec.outcome.actual.temperature_c?.toFixed(1)}°C
+                            {rec.outcome.actual.temperature_c?.toFixed(1) ?? '--'}°C
                           </p>
                         </div>
                       </div>
                     ) : (
-                      <span className="text-gray-400 italic">Pending...</span>
+                      <span
+                        className="text-xs italic"
+                        style={{ color: "var(--color-sentinel-text-disabled)" }}
+                      >
+                        Pending...
+                      </span>
                     )}
                   </td>
-                  <td className="py-3 text-sm text-gray-600">
+                  <td
+                    className="py-3 text-xs"
+                    style={{ color: "var(--color-sentinel-text-secondary)" }}
+                  >
                     {new Date(rec.timestamp).toLocaleDateString()}
                   </td>
                 </tr>
@@ -172,16 +227,17 @@ export const RecommendationHistory: React.FC<
           </table>
         </div>
       )}
-    </div>
+    </Panel>
   )
 }
 
-function getStatusColor(status: string): string {
-  const colors: Record<string, string> = {
-    executed: 'bg-green-100 text-green-800',
-    rejected: 'bg-red-100 text-red-800',
-    pending: 'bg-yellow-100 text-yellow-800',
-    auto_executed: 'bg-blue-100 text-blue-800',
+function getStatusBadgeStyles(status: string): React.CSSProperties {
+  const map: Record<string, { bg: string; color: string }> = {
+    executed: { bg: "rgba(16, 185, 129, 0.15)", color: "var(--color-sentinel-green)" },
+    rejected: { bg: "rgba(239, 68, 68, 0.15)", color: "var(--color-sentinel-red)" },
+    pending: { bg: "rgba(245, 158, 11, 0.15)", color: "var(--color-sentinel-amber)" },
+    auto_executed: { bg: "rgba(59, 130, 246, 0.15)", color: "var(--color-sentinel-blue)" },
   }
-  return colors[status] || 'bg-gray-100 text-gray-800'
+  const s = map[status] ?? { bg: "rgba(148, 163, 184, 0.15)", color: "var(--color-sentinel-text-secondary)" }
+  return { background: s.bg, color: s.color }
 }
