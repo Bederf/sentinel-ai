@@ -3419,6 +3419,34 @@ CHAT_TOOLS = [
         },
     },
     {
+        "name": "close_work_order",
+        "description": (
+            "Close (complete) an existing work order by code. "
+            "WRITE action — restricted to operators and admins. "
+            "Used by the technician /done flow to mark a work order as completed "
+            "and record resolution notes and actual time spent. "
+            "Requires the work order code (e.g. 'WO-2026-0044')."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "work_order_code": {
+                    "type": "string",
+                    "description": "Work order code (e.g. 'WO-2026-0044')",
+                },
+                "resolution": {
+                    "type": "string",
+                    "description": "Resolution notes — what was done to close the work order",
+                },
+                "actual_duration_hours": {
+                    "type": "number",
+                    "description": "Actual hours spent on the work order",
+                },
+            },
+            "required": ["work_order_code"],
+        },
+    },
+    {
         "name": "approve_recommendation",
         "description": (
             "Approve a pending AI recommendation for execution. "
@@ -3596,6 +3624,7 @@ TOOL_MODULE_REQUIREMENTS: dict[str, ModuleType] = {
     "control_device": ModuleType.HVAC_CONTROL,
     # Maintenance/work order tools
     "create_work_order": ModuleType.MAINTENANCE,
+    "close_work_order": ModuleType.MAINTENANCE,
     # SIMBIOT / onboarding workflows
     "discover_niagara_points": ModuleType.SIMBIOT,
     "review_point_mapping": ModuleType.SIMBIOT,
@@ -3630,6 +3659,7 @@ TOOL_ROLE_REQUIREMENTS: dict[str, SentinelRole] = {
     # New write/action tools
     "adjust_setpoint": SentinelRole.OPERATOR,
     "create_work_order": SentinelRole.OPERATOR,
+    "close_work_order": SentinelRole.OPERATOR,
     "approve_recommendation": SentinelRole.OPERATOR,
     "reject_recommendation": SentinelRole.OPERATOR,
     "reset_equipment_fault": SentinelRole.OPERATOR,
@@ -4176,6 +4206,63 @@ async def _fetch_equipment_diagnostics(equipment_code: str) -> dict[str, Any] | 
     except Exception as e:
         logger.warning(f"Failed to fetch equipment diagnostics for {equipment_code}: {e}")
         return None
+
+
+async def close_work_order_chat(
+    work_order_code: str,
+    resolution: str | None = None,
+    actual_duration_hours: float | None = None,
+    _user_email: str | None = None,
+) -> dict[str, Any]:
+    """Close a work order by code — sets status to completed and records resolution.
+
+    Used by the technician /done flow. Looks up by WO code, updates status
+    to 'completed', stamps completed_at, and records resolution notes.
+    """
+    try:
+        from datetime import timezone
+
+        from app.database.repositories.work_order_repository import get_work_order_repository
+
+        repo = get_work_order_repository()
+        wo = await repo.get_work_order_by_code(work_order_code)
+
+        if not wo:
+            return {"success": False, "error": f"Work order '{work_order_code}' not found"}
+
+        if wo.get("status") == "completed":
+            return {
+                "success": True,
+                "work_order_code": work_order_code,
+                "message": f"Work order {work_order_code} is already completed.",
+            }
+
+        updates: dict[str, Any] = {
+            "status": "completed",
+            "completed_at": datetime.now(timezone.utc).isoformat(),
+        }
+        if resolution:
+            updates["resolution"] = resolution
+        if actual_duration_hours is not None:
+            updates["actual_duration_hours"] = actual_duration_hours
+
+        updated = await repo.update_work_order(wo["id"], updates)
+
+        if not updated:
+            return {"success": False, "error": f"Failed to update work order {work_order_code}"}
+
+        logger.info("close_work_order: %s closed by %s", work_order_code, _user_email or "technician")
+        return {
+            "success": True,
+            "work_order_code": work_order_code,
+            "status": "completed",
+            "message": f"Work order {work_order_code} closed successfully.",
+            "resolution": resolution,
+        }
+
+    except Exception as e:
+        logger.warning(f"close_work_order_chat failed for {work_order_code}: {e}", exc_info=True)
+        return {"success": False, "error": str(e)}
 
 
 async def create_work_order_chat(
@@ -4747,6 +4834,7 @@ TOOL_HANDLERS = {
     "process_recommendation": process_recommendation,
     # Write/action tools (role-gated to operator+)
     "adjust_setpoint": adjust_setpoint,
+    "close_work_order": close_work_order_chat,
     "create_work_order": create_work_order_chat,
     "approve_recommendation": approve_recommendation_chat,
     "reject_recommendation": reject_recommendation_chat,
