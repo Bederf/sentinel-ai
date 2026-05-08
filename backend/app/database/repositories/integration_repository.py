@@ -1,9 +1,12 @@
 """Repository for integration/log source operations."""
 
+import logging
 from datetime import datetime, timedelta
 from typing import Any
 
 from app.database.supabase_client import get_supabase_client
+
+logger = logging.getLogger(__name__)
 
 
 class IntegrationRepository:
@@ -241,7 +244,8 @@ class IntegrationRepository:
                 "points": points,
                 "total": response.count or len(points),
             }
-        except Exception:
+        except Exception as e:
+            logger.warning(f"get_unmatched_points failed: {e}", exc_info=True)
             return {"points": [], "total": 0}
 
     # ==================== Ingested Data ====================
@@ -401,8 +405,8 @@ class IntegrationRepository:
             response = self.client.table("sites").select("id").eq("code", site_id).execute()
             if response.data:
                 return response.data[0]["id"]
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"_resolve_site_id failed: {e}", exc_info=True)
         return site_id  # Fallback: return as-is and let the query fail gracefully
 
     def get_integration_health(self, site_id: str | None = None) -> dict[str, Any]:
@@ -427,8 +431,8 @@ class IntegrationRepository:
                 sources_query = sources_query.eq("site_id", resolved_site_id)
             sources_response = sources_query.execute()
             sources = sources_response.data or []
-        except Exception:
-            # Table doesn't exist - return empty state
+        except Exception as e:
+            logger.warning(f"get_integration_health failed: {e}", exc_info=True)
             return {
                 "sources_count": 0,
                 "active_sources": 0,
@@ -459,7 +463,8 @@ class IntegrationRepository:
                 mappings_query = mappings_query.eq("site_id", resolved_site_id)
             mappings_response = mappings_query.execute()
             mappings = mappings_response.data or []
-        except Exception:
+        except Exception as e:
+            logger.warning(f"get_integration_health point mappings query failed: {e}", exc_info=True)
             mappings = []
 
         total_points_mapped = len(mappings)
@@ -481,8 +486,8 @@ class IntegrationRepository:
             if failed_jobs_query:
                 failed_response = failed_jobs_query.execute()
                 recent_errors_count = len(failed_response.data or [])
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"get_integration_health failed_jobs query failed: {e}", exc_info=True)
 
         return {
             "sources_count": sources_count,
@@ -527,7 +532,8 @@ class IntegrationRepository:
                 .execute()
             )
             mappings = mappings_response.data or []
-        except Exception:
+        except Exception as e:
+            logger.warning(f"get_quality_metrics point mappings query failed: {e}", exc_info=True)
             return default_response
 
         total_points = len(mappings)
@@ -544,7 +550,8 @@ class IntegrationRepository:
                 .execute()
             )
             freshness_rows = freshness_response.data or []
-        except Exception:
+        except Exception as e:
+            logger.warning(f"get_quality_metrics data_freshness query failed: {e}", exc_info=True)
             freshness_rows = []
 
         data_freshness_hours = float("inf")
@@ -588,8 +595,8 @@ class IntegrationRepository:
                 for job in jobs:
                     total_processed += job.get("records_processed") or 0
                     total_skipped += job.get("records_skipped") or 0
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"get_quality_metrics sync_jobs query failed: {e}", exc_info=True)
 
         error_rate = (failed_jobs / total_jobs * 100) if total_jobs > 0 else 0
         duplicate_rate = (total_skipped / total_processed * 100) if total_processed > 0 else 0
@@ -657,8 +664,8 @@ class IntegrationRepository:
 
             response = query.order("started_at", desc=True).limit(100).execute()
             return response.data or []
-        except Exception:
-            # Tables don't exist - return empty list
+        except Exception as e:
+            logger.warning(f"get_sync_jobs_summary failed: {e}", exc_info=True)
             return []
 
     # ==================== Building Status / Go-Live Workflow ====================
@@ -705,7 +712,8 @@ class IntegrationRepository:
         # Check 1: data_source_configured
         try:
             sources = self.get_log_sources(site_id=site_id)
-        except Exception:
+        except Exception as e:
+            logger.warning(f"get_validation_checklist data_source_configured failed: {e}", exc_info=True)
             sources = []
 
         has_source = len(sources) > 0
@@ -782,7 +790,8 @@ class IntegrationRepository:
 
         try:
             mappings = self.get_point_mappings(site_id)
-        except Exception:
+        except Exception as e:
+            logger.warning(f"get_validation_checklist point_mappings check failed: {e}", exc_info=True)
             mappings = []
 
         total_points = len(mappings)
@@ -904,8 +913,8 @@ class IntegrationRepository:
                 if col_mappings:
                     has_mappings = True
                     break
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"get_validation_checklist column_mappings check failed: {e}", exc_info=True)
 
         items.append(
             {

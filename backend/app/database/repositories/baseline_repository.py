@@ -10,12 +10,15 @@ Handles CRUD operations for:
 Phase 44: Asset Baseline Assessment
 """
 
+import logging
 import uuid
 from datetime import datetime, timedelta
 from typing import Any
 
 from app.database.supabase_client import get_supabase_client
 from app.models.baseline import BaselineComparison, ElementBaseline, EquipmentBaseline, EquipmentElement
+
+logger = logging.getLogger(__name__)
 
 
 class BaselineRepository:
@@ -419,7 +422,8 @@ class BaselineRepository:
 
             return status_map
 
-        except Exception:
+        except Exception as e:
+            logger.warning(f"get_bulk_baseline_status failed: {e}", exc_info=True)
             return {}
 
     async def get_bulk_max_deviation_24h(self, equipment_ids: list[str]) -> dict[str, dict]:
@@ -460,5 +464,6 @@ class BaselineRepository:
 
             return deviation_map
 
-        except Exception:
+        except Exception as e:
+            logger.warning(f"get_bulk_max_deviation_24h failed: {e}", exc_info=True)
             return {}
