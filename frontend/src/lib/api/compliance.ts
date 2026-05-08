@@ -244,12 +244,10 @@ export const complianceApi = {
    * Electrical - Get compliance status by site
    */
   getElectricalComplianceStatus: (siteCode: string) =>
-    fetchApi<{ certificates: ElectricalCertificate[] }>('/api/compliance/electrical/status', {
-      method: 'GET',
-      headers: {
-        'X-Query-Params': JSON.stringify({ site_code: siteCode }),
-      },
-    }),
+    fetchApi<{ certificates: ElectricalCertificate[] }>(
+      `/api/compliance/electrical/status?site_code=${encodeURIComponent(siteCode)}`,
+      { method: 'GET' },
+    ),
 
   /**
    * Lift - Schedule inspection
@@ -276,12 +274,10 @@ export const complianceApi = {
    * Overall Compliance Status - Get KPIs by site
    */
   getComplianceStatus: (siteCode: string) =>
-    fetchApi<ComplianceStatus>('/api/compliance/status', {
-      method: 'GET',
-      headers: {
-        'X-Query-Params': JSON.stringify({ site_code: siteCode }),
-      },
-    }),
+    fetchApi<ComplianceStatus>(
+      `/api/compliance/status?site_code=${encodeURIComponent(siteCode)}`,
+      { method: 'GET' },
+    ),
 
   /**
    * Compliance Audits - Get audit history with filtering
@@ -291,18 +287,12 @@ export const complianceApi = {
     complianceType?: ComplianceType,
     status?: AuditStatus,
     limit: number = 50
-  ) =>
-    fetchApi<{ audits: ComplianceAudit[] }>('/api/compliance/audits', {
-      method: 'GET',
-      headers: {
-        'X-Query-Params': JSON.stringify({
-          site_code: siteCode,
-          ...(complianceType && { compliance_type: complianceType }),
-          ...(status && { status }),
-          limit,
-        }),
-      },
-    }),
+  ) => {
+    const params = new URLSearchParams({ site_code: siteCode, limit: String(limit) });
+    if (complianceType) params.set('compliance_type', complianceType);
+    if (status) params.set('status', status);
+    return fetchApi<{ audits: ComplianceAudit[] }>(`/api/compliance/audits?${params}`, { method: 'GET' });
+  },
 }
 
 /**

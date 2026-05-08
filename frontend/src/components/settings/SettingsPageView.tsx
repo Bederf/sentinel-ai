@@ -6,6 +6,7 @@ import { AiRuntimePolicySettings } from "./AiRuntimePolicySettings";
 import { AlertMuting } from "./AlertMuting";
 import { AlertRoutingRules } from "./AlertRoutingRules";
 import { BuildingConfigEditor } from "./BuildingConfigEditor";
+import { BuildingHandbookSettings } from "./BuildingHandbookSettings";
 import { ChannelStatusDashboard } from "./ChannelStatusDashboard";
 import { GlassThemeControls } from "./GlassThemeControls";
 import { HolidayCalendar } from "./HolidayCalendar";
@@ -145,6 +146,12 @@ function SettingsSections({
         />
       ) : null}
       <BuildingConfigEditor
+        siteId={controller.selectedSiteId ?? undefined}
+        onError={onError}
+        onSuccess={controller.handleSuccess}
+        readOnly={controller.readOnly}
+      />
+      <BuildingHandbookSettings
         siteId={controller.selectedSiteId ?? undefined}
         onError={onError}
         onSuccess={controller.handleSuccess}

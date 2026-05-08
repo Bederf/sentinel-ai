@@ -24,6 +24,7 @@ import {
   LayoutGrid,
   Fuel,
   Leaf,
+  ClipboardCheck,
 } from "lucide-react";
 import type { ModuleType } from "./moduleRegistry";
 
@@ -36,7 +37,8 @@ export type View =
   | "simbiot"
   | "settings"
   | "financial"
-  | "fleet-ml";
+  | "fleet-ml"
+  | "compliance";
 
 export type NavCategory = "base" | "addon" | "admin";
 
@@ -62,6 +64,7 @@ export const VIEW_TITLES: Record<View, string> = {
   settings: "Settings",
   financial: "Financial",
   "fleet-ml": "Fleet ML",
+  compliance: "Compliance",
 };
 
 /**
@@ -88,8 +91,9 @@ export const ADMIN_NAV_ITEMS: NavItem[] = [
  * Only visible when the respective add-on module is active.
  */
 export const ADDON_NAV_ITEMS: NavItem[] = [
-  { id: "financial", label: "Financial", icon: DollarSign, description: "Contracts and billing", category: "addon", requiredModule: "financial" },
-  { id: "fleet-ml", label: "Fleet ML", icon: Brain, description: "Cross-site analytics", category: "addon", requiredModule: "fleet_ml" },
+  { id: "financial",   label: "Financial",   icon: DollarSign,      description: "Contracts and billing",            category: "addon", requiredModule: "financial" },
+  { id: "fleet-ml",   label: "Fleet ML",    icon: Brain,           description: "Cross-site analytics",             category: "addon", requiredModule: "fleet_ml" },
+  { id: "compliance", label: "Compliance",  icon: ClipboardCheck,  description: "OHS, Fire, Electrical, Lift safety", category: "addon", requiredModule: "compliance" },
 ];
 
 /** All nav items combined (for lookup) */

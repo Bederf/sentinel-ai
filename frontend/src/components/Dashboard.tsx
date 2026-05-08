@@ -24,7 +24,6 @@ import {
   Shield,
   Bell,
   DollarSign,
-  RefreshCw,
   EyeOff,
 } from "lucide-react";
 import {
@@ -46,9 +45,12 @@ import { authorizedFetch } from '@/lib/api/client';
 import type { DashboardStats, Site, Prediction, EnergyDataPoint } from '@/lib/api';
 import { useBuildingsList } from "@/hooks/useBuildingsList";
 import { SortableKPICard } from "./SortableKPICard";
+import { PageLoading } from "./PageLoading";
 import { DashboardSection } from "./DashboardSection";
 import { SiteCard } from "./SiteCard";
 import { EnergyChart } from "./EnergyChart";
+import { Panel } from "./Panel";
+import { EmptyState } from "./EmptyState";
 import { type View } from "./Sidebar";
 import type { BuildingTabId } from "../lib/navigation";
 import { useModules } from "@/contexts/ModuleHooks";
@@ -416,22 +418,7 @@ export function Dashboard({ onViewChange, autoSelectSiteId, defaultBuildingTab: 
 
   // Loading state
   if (loading) {
-    return (
-      <div
-        className="h-full flex items-center justify-center"
-        style={{ background: "var(--color-sentinel-bg-canvas)" }}
-      >
-        <div className="text-center">
-          <RefreshCw
-            className="h-8 w-8 animate-spin mx-auto mb-4"
-            style={{ color: "var(--color-sentinel-amber)" }}
-          />
-          <span style={{ color: "var(--color-sentinel-text-secondary)" }}>
-            Initializing SENTINEL protection...
-          </span>
-        </div>
-      </div>
-    );
+    return <PageLoading message="Initializing SENTINEL protection..." />;
   }
 
   // Error state
@@ -496,239 +483,179 @@ export function Dashboard({ onViewChange, autoSelectSiteId, defaultBuildingTab: 
 
       {/* Site Protection */}
       <DashboardSection id="site-protection">
-        <div className="lg:col-span-3">
-          <div
-            className="rounded-lg overflow-hidden"
-            style={{
-              background: "var(--color-sentinel-bg-panel)",
-              border: "1px solid var(--color-sentinel-border)",
-            }}
-          >
-          {/* Panel Header */}
-          <div
-            className="p-4 flex items-center justify-between"
-            style={{ borderBottom: "1px solid var(--color-sentinel-border)" }}
-          >
-            <div className="flex items-center gap-3">
-              <div
-                className="p-2 rounded"
-                style={{ background: "rgba(59, 130, 246, 0.15)" }}
-              >
-                <Building2
-                  className="h-5 w-5"
-                  style={{ color: "var(--color-sentinel-blue)" }}
-                />
-              </div>
-              <div>
-                <h3
-                  className="font-medium text-sm"
-                  style={{ color: "var(--color-sentinel-text-primary)" }}
-                  title="Overview of all buildings under SENTINEL monitoring. Click any site card to drill into equipment details."
-                >
-                  Site Protection Status
-                </h3>
+        <Panel
+          header={{
+            icon: <Building2 className="h-5 w-5" />,
+            title: "Site Protection Status",
+            actions: (
+              <div className="flex items-center gap-2">
                 <span
-                  className="text-xs"
-                  style={{ color: "var(--color-sentinel-text-secondary)" }}
+                  className="text-xs px-2 py-1 rounded"
+                  style={{
+                    background:
+                      warningSites > 0 ? "rgba(245, 158, 11, 0.15)" : "rgba(148, 163, 184, 0.15)",
+                    color:
+                      warningSites > 0 ? "var(--color-sentinel-amber)" : "var(--color-sentinel-text-secondary)",
+                  }}
                 >
-                  {visibleSites.length} of {buildingsList.length} sites shown
+                  {warningSites} elevated
                 </span>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <span
-                className="text-xs px-2 py-1 rounded"
-                style={{
-                  background:
-                    warningSites > 0 ? "rgba(245, 158, 11, 0.15)" : "rgba(148, 163, 184, 0.15)",
-                  color:
-                    warningSites > 0 ? "var(--color-sentinel-amber)" : "var(--color-sentinel-text-secondary)",
-                }}
-              >
-                {warningSites} elevated
-              </span>
-              {hiddenSites.length > 0 && (
-                <>
-                  <span
-                    className="text-xs px-2 py-1 rounded"
-                    style={{
-                      background: "rgba(148, 163, 184, 0.15)",
-                      color: "var(--color-sentinel-text-secondary)",
-                    }}
-                  >
-                    {hiddenSites.length} hidden
-                  </span>
-                  <button
-                    type="button"
-                    className="text-xs px-2 py-1 rounded transition-colors"
-                    style={{
-                      background: "rgba(59, 130, 246, 0.15)",
-                      color: "var(--color-sentinel-blue)",
-                    }}
-                    onClick={restoreAllHiddenSiteCards}
-                    title="Restore all hidden site cards"
-                  >
-                    Show all
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* Sites Grid */}
-          <div className="p-4">
-            {visibleSites.length === 0 ? (
-              <div className="text-center py-8">
-                <Building2
-                  className="h-12 w-12 mx-auto mb-2"
-                  style={{ color: "var(--color-sentinel-text-disabled)" }}
-                />
-                <span style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                  {buildingsList.length === 0 ? 'No sites available' : 'All site cards are hidden'}
-                </span>
-                {buildingsList.length > 0 && hiddenSites.length > 0 && (
-                  <div className="mt-3">
+                {hiddenSites.length > 0 && (
+                  <>
+                    <span
+                      className="text-xs px-2 py-1 rounded"
+                      style={{
+                        background: "rgba(148, 163, 184, 0.15)",
+                        color: "var(--color-sentinel-text-secondary)",
+                      }}
+                    >
+                      {hiddenSites.length} hidden
+                    </span>
                     <button
                       type="button"
-                      className="text-xs px-3 py-1.5 rounded transition-colors"
+                      className="text-xs px-2 py-1 rounded transition-colors"
                       style={{
                         background: "rgba(59, 130, 246, 0.15)",
                         color: "var(--color-sentinel-blue)",
-                        border: "1px solid rgba(59, 130, 246, 0.35)",
                       }}
                       onClick={restoreAllHiddenSiteCards}
+                      title="Restore all hidden site cards"
                     >
-                      Show all hidden site cards
+                      Show all
                     </button>
-                  </div>
+                  </>
                 )}
               </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {/* eslint-disable-next-line @typescript-eslint/ban-ts-comment */}
-                {/* @ts-ignore - JSX.Element vs Element type mismatch */}
-                {visibleSites.map((site: Site, _index: number) => {
-                  return (
-                    <div key={site.id} className="relative">
-                      <button
-                        type="button"
-                        className="absolute top-2 right-2 z-10 p-1.5 rounded transition-colors"
-                        style={{
-                          background: "rgba(148, 163, 184, 0.15)",
-                          color: "var(--color-sentinel-text-secondary)",
-                          border: "1px solid var(--color-sentinel-border)",
-                        }}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          hideSiteCard(site.id);
-                        }}
-                        title={`Hide ${site.name} from dashboard`}
-                        aria-label={`Hide ${site.name} from dashboard`}
-                      >
-                        <EyeOff className="h-3.5 w-3.5" />
-                      </button>
-                      <SiteCard
-                        site={site}
-                        onClick={handleSiteClick}
-                        showOptimizationStatus={true}
-                        onEquipmentControlNavigate={handleEquipmentControlNavigate}
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </DashboardSection>
+            ),
+            accentColor: "var(--color-sentinel-blue)",
+          }}
+        >
+          {visibleSites.length === 0 ? (
+            <EmptyState
+              icon={Building2}
+              title={buildingsList.length === 0 ? "No sites available" : "All site cards are hidden"}
+              subtext={buildingsList.length === 0 ? "Sites will appear here once connected to SENTINEL." : undefined}
+              cta={buildingsList.length > 0 && hiddenSites.length > 0 ? (
+                <button
+                  type="button"
+                  className="text-xs px-3 py-1.5 rounded transition-colors"
+                  style={{
+                    background: "rgba(59, 130, 246, 0.15)",
+                    color: "var(--color-sentinel-blue)",
+                    border: "1px solid rgba(59, 130, 246, 0.35)",
+                  }}
+                  onClick={restoreAllHiddenSiteCards}
+                >
+                  Show all hidden site cards
+                </button>
+              ) : undefined}
+            />
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 p-4">
+              {/* eslint-disable-next-line @typescript-eslint/ban-ts-comment */}
+              {/* @ts-ignore - JSX.Element vs Element type mismatch */}
+              {visibleSites.map((site: Site, _index: number) => {
+                return (
+                  <div key={site.id} className="relative">
+                    <button
+                      type="button"
+                      className="absolute top-2 right-2 z-10 p-1.5 rounded transition-colors"
+                      style={{
+                        background: "rgba(148, 163, 184, 0.15)",
+                        color: "var(--color-sentinel-text-secondary)",
+                        border: "1px solid var(--color-sentinel-border)",
+                      }}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        hideSiteCard(site.id);
+                      }}
+                      title={`Hide ${site.name} from dashboard`}
+                      aria-label={`Hide ${site.name} from dashboard`}
+                    >
+                      <EyeOff className="h-3.5 w-3.5" />
+                    </button>
+                    <SiteCard
+                      site={site}
+                      onClick={handleSiteClick}
+                      showOptimizationStatus={true}
+                      onEquipmentControlNavigate={handleEquipmentControlNavigate}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </Panel>
+      </DashboardSection>
 
       {/* Energy Analytics */}
       {(activeModules.length === 0 || isModuleActive('energy')) && (
         <DashboardSection id="energy-analytics">
-          <div className="mt-6">
-            <div
-              className="rounded-lg overflow-hidden"
-              style={{
-                background: "var(--color-sentinel-bg-panel)",
-                border: "1px solid var(--color-sentinel-border)",
-              }}
-            >
-            {/* Panel Header with Filters */}
-            <div
-              className="p-4 flex flex-wrap items-center justify-between gap-4"
-              style={{ borderBottom: "1px solid var(--color-sentinel-border)" }}
-            >
-              <h3
-                className="font-medium text-sm"
-                style={{ color: "var(--color-sentinel-text-primary)" }}
-                title="Energy consumption trends across all sites. Filter by site or adjust the time window."
-              >
-                Energy Analytics
-              </h3>
+          <Panel
+            header={{
+              icon: <Shield className="h-5 w-5" />,
+              title: "Energy Analytics",
+              actions: (
+                <div className="flex items-center gap-4">
+                  {/* Site Filter */}
+                  <select
+                    value={energyFilterSiteId || ""}
+                    onChange={(e) => setEnergyFilterSiteId(e.target.value || null)}
+                    className="text-sm rounded px-3 py-1.5"
+                    style={{
+                      background: "var(--color-sentinel-bg-secondary)",
+                      border: "1px solid var(--color-sentinel-border)",
+                      color: "var(--color-sentinel-text-primary)",
+                    }}
+                  >
+                    <option value="">All Sites</option>
+                    {/* eslint-disable-next-line @typescript-eslint/ban-ts-comment */}
+                    {/* @ts-ignore - JSX.Element vs Element type mismatch */}
+                    {buildingsList.map((site: Site, _index: number) => (
+                      <option key={site.id} value={site.id}>
+                        {site.name}
+                      </option>
+                    ))}
+                  </select>
 
-              <div className="flex items-center gap-4">
-                {/* Site Filter */}
-                <select
-                  value={energyFilterSiteId || ""}
-                  onChange={(e) => setEnergyFilterSiteId(e.target.value || null)}
-                  className="text-sm rounded px-3 py-1.5"
-                  style={{
-                    background: "var(--color-sentinel-bg-secondary)",
-                    border: "1px solid var(--color-sentinel-border)",
-                    color: "var(--color-sentinel-text-primary)",
-                  }}
-                >
-                  <option value="">All Sites</option>
-                  {/* eslint-disable-next-line @typescript-eslint/ban-ts-comment */}
-                  {/* @ts-ignore - JSX.Element vs Element type mismatch */}
-                  {buildingsList.map((site: Site, _index: number) => (
-                    <option key={site.id} value={site.id}>
-                      {site.name}
-                    </option>
-                  ))}
-                </select>
-
-                {/* Time Period Tabs */}
-                <div
-                  className="flex rounded overflow-hidden"
-                  style={{ border: "1px solid var(--color-sentinel-border)" }}
-                >
-                  {TIME_PERIODS.map((period) => (
-                    <button
-                      key={period}
-                      onClick={() => setSelectedDays(period)}
-                      className="px-3 py-1.5 text-xs font-medium transition-colors"
-                      style={{
-                        background:
-                          selectedDays === period
-                            ? "var(--color-sentinel-amber)"
-                            : "var(--color-sentinel-bg-secondary)",
-                        color:
-                          selectedDays === period
-                            ? "white"
-                            : "var(--color-sentinel-text-secondary)",
-                      }}
-                    >
-                      {period}d
-                    </button>
-                  ))}
+                  {/* Time Period Tabs */}
+                  <div
+                    className="flex rounded overflow-hidden"
+                    style={{ border: "1px solid var(--color-sentinel-border)" }}
+                  >
+                    {TIME_PERIODS.map((period) => (
+                      <button
+                        key={period}
+                        onClick={() => setSelectedDays(period)}
+                        className="px-3 py-1.5 text-xs font-medium transition-colors"
+                        style={{
+                          background:
+                            selectedDays === period
+                              ? "var(--color-sentinel-amber)"
+                              : "var(--color-sentinel-bg-secondary)",
+                          color:
+                            selectedDays === period
+                              ? "white"
+                              : "var(--color-sentinel-text-secondary)",
+                        }}
+                      >
+                        {period}d
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            </div>
-
-            {/* Chart Container */}
-            <div className="p-4">
-              <EnergyChart
-                data={energyData}
-                loading={energyLoading}
-                selectedSiteId={energyFilterSiteId}
-                days={selectedDays}
-              />
-            </div>
-          </div>
-        </div>
-      </DashboardSection>
+              ),
+              accentColor: "var(--color-sentinel-amber)",
+            }}
+          >
+            <EnergyChart
+              data={energyData}
+              loading={energyLoading}
+              selectedSiteId={energyFilterSiteId}
+              days={selectedDays}
+            />
+          </Panel>
+        </DashboardSection>
       )}
     </div>
   );

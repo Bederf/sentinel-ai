@@ -32,6 +32,7 @@ const AssetWorkflowDashboard = lazy(() => import("./components/AssetWorkflowDash
 const SimbiotPage = lazy(() => import("./components/SimbiotPage").then(m => ({ default: m.SimbiotPage })));
 const FleetInsights = lazy(() => import("./components/FleetInsights").then(m => ({ default: m.FleetInsights })));
 const ContractManagementPage = lazy(() => import("./pages/ContractManagementPage").then(m => ({ default: m.ContractManagementPage })));
+const CompliancePage = lazy(() => import("./pages/CompliancePage").then(m => ({ default: m.CompliancePage })));
 const SiteDetail = lazy(() => import("./components/SiteDetail").then(m => ({ default: m.SiteDetail })));
 
 interface HealthStatus {
@@ -851,6 +852,8 @@ function App() {
             <ContractManagementPage />
           ) : currentView === "fleet-ml" ? (
             <FleetInsights />
+          ) : currentView === "compliance" ? (
+            <CompliancePage />
           ) : (
             <div className="h-full flex items-center justify-center">
               <div className="text-center">

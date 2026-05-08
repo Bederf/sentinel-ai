@@ -594,6 +594,7 @@ export interface Site {
   contact_email?: string;
   contact_phone?: string;
   active_alerts?: number;
+  prediction_risks?: number;
   // Equipment breakdown (when available from Supabase or JSON)
   equipment_breakdown?: EquipmentBreakdown;
   // Equipment status counts (ok/warning/critical)

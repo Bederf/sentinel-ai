@@ -3,23 +3,18 @@
  */
 
 import { useEffect, useState } from "react";
-import {
-  Card,
-  Title,
-  Text,
-  Button,
-} from "@tremor/react";
-import {
-  Table,
-  TableHead,
-  TableRow,
-  TableHeaderCell,
-  TableBody,
-  TableCell,
-} from "@tremor/react";
-import { FileText } from "lucide-react";
+import { FileText, DollarSign, TrendingUp, TrendingDown } from "lucide-react";
 import { PageLoading } from "../components/PageLoading";
+import { Panel } from "../components/Panel";
+import { KPICard } from "../components/KPICard";
+import { EmptyState } from "../components/EmptyState";
 import type { Contract, BudgetReport } from "../lib/contractApi";
+
+const SELECT_STYLE: React.CSSProperties = {
+  background: "var(--color-sentinel-bg-secondary)",
+  border: "1px solid var(--color-sentinel-border)",
+  color: "var(--color-sentinel-text-primary)",
+};
 
 export function BudgetReportPage() {
   const [contracts, setContracts] = useState<Contract[]>([]);
@@ -30,19 +25,18 @@ export function BudgetReportPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const formatZAR = (amount: number) => {
-    return new Intl.NumberFormat("en-ZA", {
+  const formatZAR = (amount: number) =>
+    new Intl.NumberFormat("en-ZA", {
       style: "currency",
       currency: "ZAR",
       maximumFractionDigits: 0,
     }).format(amount);
-  };
 
   useEffect(() => {
     const loadContracts = async () => {
       setLoading(true);
       try {
-        // Add delay to prevent concurrent requests hitting rate limiter
+        // Delay prevents concurrent requests hitting rate limiter on mount
         await new Promise((resolve) => setTimeout(resolve, 600));
         const { contractApi } = await import("../lib/contractApi");
         const data = await contractApi.getContracts({ status: "active" });
@@ -50,23 +44,19 @@ export function BudgetReportPage() {
         if (!selectedContractId && data.length > 0) {
           setSelectedContractId(data[0].id || data[0].contract_code);
         }
-      } catch (_err) {
+      } catch {
         setError("Failed to load contracts");
       } finally {
         setLoading(false);
       }
     };
-
     loadContracts();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     const loadReport = async () => {
-      if (!selectedContractId) {
-        setReport(null);
-        return;
-      }
+      if (!selectedContractId) { setReport(null); return; }
       try {
         const { contractApi } = await import("../lib/contractApi");
         const data = await contractApi.getBudgetReportByMonth(
@@ -76,12 +66,11 @@ export function BudgetReportPage() {
         );
         setReport(data);
         setError(null);
-      } catch (_err) {
+      } catch {
         setError("Failed to load budget report");
         setReport(null);
       }
     };
-
     loadReport();
   }, [selectedContractId, year, month]);
 
@@ -91,299 +80,278 @@ export function BudgetReportPage() {
       const { contractApi } = await import("../lib/contractApi");
       if (format === "json") {
         if (!report) return;
-        const blob = new Blob([JSON.stringify(report, null, 2)], {
-          type: "application/json",
-        });
+        const blob = new Blob([JSON.stringify(report, null, 2)], { type: "application/json" });
         const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = `budget-report-${selectedContractId}-${year}${month ? `-${month}` : ""}.json`;
-        link.click();
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `budget-report-${selectedContractId}-${year}${month ? `-${month}` : ""}.json`;
+        a.click();
         URL.revokeObjectURL(url);
         return;
       }
-
-      const blob = await contractApi.exportBudgetReport(
-        selectedContractId,
-        year,
-        format,
-        month || undefined
-      );
+      const blob = await contractApi.exportBudgetReport(selectedContractId, year, format, month || undefined);
       const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `budget-report-${selectedContractId}-${year}${month ? `-${month}` : ""}.${format}`;
-      link.click();
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `budget-report-${selectedContractId}-${year}${month ? `-${month}` : ""}.${format}`;
+      a.click();
       URL.revokeObjectURL(url);
     } catch {
       setError(`Failed to export ${format.toUpperCase()}`);
     }
   };
 
-  if (loading) {
-    return <PageLoading message="Loading budget reports..." />;
-  }
+  const variance = report?.totals.variance_zar ?? 0;
 
   return (
-    <div className="space-y-6 p-4 md:p-6" style={{ background: "var(--color-sentinel-bg-canvas)" }}>
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <Title style={{ color: "var(--color-sentinel-text-primary)" }}>
-            Budget Reports
-          </Title>
-          <Text style={{ color: "var(--color-sentinel-text-secondary)" }}>
-            Contract budget summary with monthly and equipment-type breakdowns.
-          </Text>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button size="xs" variant="secondary" onClick={() => handleExport("csv")}>
-            Export CSV
-          </Button>
-          <Button size="xs" variant="secondary" onClick={() => handleExport("pdf")}>
-            Export PDF
-          </Button>
-          <Button size="xs" variant="secondary" onClick={() => handleExport("json")}>
-            Export JSON
-          </Button>
-        </div>
-      </div>
+    <div
+      className="h-full overflow-y-auto"
+      style={{ background: "var(--color-sentinel-bg-canvas)" }}
+    >
+      {loading ? (
+        <PageLoading message="Loading budget reports…" />
+      ) : (
+        <div className="space-y-6 p-4 md:p-6">
 
-      <Card style={{ background: "rgba(14, 116, 144, 0.05)", border: "1px solid var(--color-sentinel-border)" }}>
-        {/* Filters Header */}
-        <div className="pb-4 mb-4 border-b" style={{ borderColor: "var(--color-sentinel-border)" }}>
-          <div className="flex items-center gap-2 mb-4">
-            <div className="p-2 rounded" style={{ background: "rgba(59, 130, 246, 0.15)" }}>
-              <FileText className="h-4 w-4" style={{ color: "var(--color-sentinel-blue)" }} />
-            </div>
+          {/* Page header + export actions */}
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
-              <h3 className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>
-                Filter Reports
-              </h3>
-              <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                Select contract, year, and month
-              </span>
+              <h1
+                className="text-xl font-semibold"
+                style={{ color: "var(--color-sentinel-text-primary)" }}
+              >
+                Budget Reports
+              </h1>
+              <p className="text-sm mt-0.5" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                Contract budget summary with monthly and equipment-type breakdowns.
+              </p>
             </div>
-          </div>
-        </div>
-        <div className="flex flex-col lg:flex-row lg:items-center gap-4">
-          <div className="flex-1 min-w-0">
-            <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-              Contract
-            </Text>
-            <select
-              value={selectedContractId}
-              onChange={(event) => setSelectedContractId(event.target.value)}
-              className="w-full rounded-lg appearance-none cursor-pointer px-3 py-2 text-sm transition-colors focus:outline-none focus:ring-0"
-              style={{
-                background: "var(--color-grafana-bg-secondary)",
-                border: "1px solid var(--color-grafana-border)",
-                color: "var(--color-grafana-text-primary)",
-                boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)",
-                outline: "none",
-              }}
-              aria-label="Select contract"
-            >
-              {contracts.map((contract) => (
-                <option
-                  key={contract.id || contract.contract_code}
-                  value={contract.id || contract.contract_code}
+            <div className="flex items-center gap-2">
+              {(["csv", "pdf", "json"] as const).map((fmt) => (
+                <button
+                  key={fmt}
+                  onClick={() => handleExport(fmt)}
+                  className="px-3 py-1.5 rounded text-xs font-medium transition-colors hover:opacity-80"
+                  style={{
+                    background: "var(--color-sentinel-bg-secondary)",
+                    border: "1px solid var(--color-sentinel-border)",
+                    color: "var(--color-sentinel-text-primary)",
+                  }}
                 >
-                  {contract.contract_code} · {contract.organization.name}
-                </option>
+                  Export {fmt.toUpperCase()}
+                </button>
               ))}
-            </select>
+            </div>
           </div>
-          <div className="w-32 lg:w-40">
-            <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-              Year
-            </Text>
-            <select
-              value={`${year}`}
-              onChange={(event) => setYear(Number(event.target.value))}
-              className="w-full rounded-lg appearance-none cursor-pointer px-3 py-2 text-sm transition-colors focus:outline-none focus:ring-0"
-              style={{
-                background: "var(--color-grafana-bg-secondary)",
-                border: "1px solid var(--color-grafana-border)",
-                color: "var(--color-grafana-text-primary)",
-                boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)",
-                outline: "none",
-              }}
-              aria-label="Select year"
-            >
-              {[year - 1, year, year + 1].map((y) => (
-                <option key={y} value={`${y}`}>
-                  {y}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="w-40">
-            <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-              Month
-            </Text>
-            <select value={month ? `${month}` : "all"} onChange={(event) => {
-              if (event.target.value === "all") {
-                setMonth(null);
-              } else {
-                setMonth(Number(event.target.value));
-              }
+
+          {/* Filters */}
+          <Panel
+            header={{
+              icon: <FileText className="h-4 w-4" />,
+              title: "Filter Reports",
+              accentColor: "var(--color-sentinel-blue)",
             }}
-              className="w-full rounded-lg appearance-none cursor-pointer px-3 py-2 text-sm transition-colors focus:outline-none focus:ring-0"
-              style={{
-                background: "var(--color-grafana-bg-secondary)",
-                border: "1px solid var(--color-grafana-border)",
-                color: "var(--color-grafana-text-primary)",
-                boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)",
-                outline: "none",
-              }}
-              aria-label="Select month"
-            >
-              <option value="all">All</option>
-              {Array.from({ length: 12 }, (_, idx) => idx + 1).map((m) => (
-                <option key={m} value={`${m}`}>
-                  {m}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-      </Card>
-
-      {error && (
-        <Card style={{ background: "rgba(14, 116, 144, 0.05)", border: "1px solid var(--color-sentinel-border)" }}>
-          <Text style={{ color: "var(--color-sentinel-red)" }}>{error}</Text>
-        </Card>
-      )}
-
-      {report && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <Card style={{ background: "rgba(14, 116, 144, 0.05)", border: "1px solid var(--color-sentinel-border)" }}>
-            <div className="flex items-start justify-between">
-              <div>
-                <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                  Total Budget
-                </Text>
-                <Title style={{ color: "var(--color-sentinel-text-primary)" }}>
-                  {formatZAR(report.totals.total_budget_zar)}
-                </Title>
-              </div>
-              <div className="p-2 rounded" style={{ background: "rgba(59, 130, 246, 0.15)" }}>
-                <FileText className="h-5 w-5" style={{ color: "var(--color-sentinel-blue)" }} />
-              </div>
-            </div>
-          </Card>
-          <Card style={{ background: "rgba(14, 116, 144, 0.05)", border: "1px solid var(--color-sentinel-border)" }}>
-            <div className="flex items-start justify-between">
-              <div>
-                <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                  Total Actual
-                </Text>
-                <Title style={{ color: "var(--color-sentinel-text-primary)" }}>
-                  {formatZAR(report.totals.total_actual_zar)}
-                </Title>
-              </div>
-              <div className="p-2 rounded" style={{ background: "rgba(245, 158, 11, 0.15)" }}>
-                <FileText className="h-5 w-5" style={{ color: "var(--color-sentinel-amber)" }} />
-              </div>
-            </div>
-          </Card>
-          <Card style={{ background: "rgba(14, 116, 144, 0.05)", border: "1px solid var(--color-sentinel-border)" }}>
-            <div className="flex items-start justify-between">
-              <div>
-                <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                  Variance
-                </Text>
-                <Title style={{ color: "var(--color-sentinel-text-primary)" }}>
-                  {formatZAR(report.totals.variance_zar)}
-                </Title>
-              </div>
-              <div className="p-2 rounded" style={{ background: "rgba(16, 185, 129, 0.15)" }}>
-                <FileText className="h-5 w-5" style={{ color: "var(--color-sentinel-green)" }} />
-              </div>
-            </div>
-          </Card>
-        </div>
-      )}
-
-      {report && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card style={{ background: "rgba(14, 116, 144, 0.05)", border: "1px solid var(--color-sentinel-border)" }}>
-            {/* Section Header */}
-            <div className="pb-3 mb-4 border-b" style={{ borderColor: "var(--color-sentinel-border)" }}>
-              <div className="flex items-center gap-2">
-                <div className="p-2 rounded" style={{ background: "rgba(59, 130, 246, 0.15)" }}>
-                  <FileText className="h-4 w-4" style={{ color: "var(--color-sentinel-blue)" }} />
-                </div>
-                <div>
-                  <h3 className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>
-                    Monthly Breakdown
-                  </h3>
-                </div>
-              </div>
-            </div>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableHeaderCell>Month</TableHeaderCell>
-                  <TableHeaderCell className="text-right">Budget</TableHeaderCell>
-                  <TableHeaderCell className="text-right">Actual</TableHeaderCell>
-                  <TableHeaderCell className="text-right">Spend %</TableHeaderCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {report.monthly.map((row) => (
-                  <TableRow key={row.month}>
-                    <TableCell>{row.month}</TableCell>
-                    <TableCell className="text-right">{formatZAR(row.total_budget_zar)}</TableCell>
-                    <TableCell className="text-right">{formatZAR(row.total_actual_zar)}</TableCell>
-                    <TableCell className="text-right">{row.spend_percentage.toFixed(1)}%</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </Card>
-
-          <Card style={{ background: "rgba(14, 116, 144, 0.05)", border: "1px solid var(--color-sentinel-border)" }}>
-            {/* Section Header */}
-            <div className="pb-3 mb-4 border-b" style={{ borderColor: "var(--color-sentinel-border)" }}>
-              <div className="flex items-center gap-2">
-                <div className="p-2 rounded" style={{ background: "rgba(245, 158, 11, 0.15)" }}>
-                  <FileText className="h-4 w-4" style={{ color: "var(--color-sentinel-amber)" }} />
-                </div>
-                <div>
-                  <h3 className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>
-                    Equipment-Type Breakdown
-                  </h3>
-                </div>
-              </div>
-            </div>
-            {report.equipment_type_breakdown.length === 0 ? (
-              <Text className="text-xs" style={{ color: "var(--color-sentinel-text-disabled)" }}>
-                No equipment-type budgets available.
-              </Text>
-            ) : (
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableHeaderCell>Type</TableHeaderCell>
-                    <TableHeaderCell className="text-right">Budget</TableHeaderCell>
-                    <TableHeaderCell className="text-right">Actual</TableHeaderCell>
-                    <TableHeaderCell className="text-right">Spend %</TableHeaderCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {report.equipment_type_breakdown.map((row) => (
-                    <TableRow key={row.equipment_type}>
-                      <TableCell>{row.equipment_type}</TableCell>
-                      <TableCell className="text-right">{formatZAR(row.total_budget_zar)}</TableCell>
-                      <TableCell className="text-right">{formatZAR(row.total_actual_zar)}</TableCell>
-                      <TableCell className="text-right">{row.spend_percentage.toFixed(1)}%</TableCell>
-                    </TableRow>
+          >
+            <div className="p-4 flex flex-col lg:flex-row lg:items-end gap-4">
+              <div className="flex-1 min-w-0">
+                <label className="block text-xs mb-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                  Contract
+                </label>
+                <select
+                  value={selectedContractId}
+                  onChange={(e) => setSelectedContractId(e.target.value)}
+                  className="w-full rounded appearance-none cursor-pointer px-3 py-2 text-sm focus:outline-none"
+                  style={SELECT_STYLE}
+                  aria-label="Select contract"
+                >
+                  {contracts.map((c) => (
+                    <option key={c.id || c.contract_code} value={c.id || c.contract_code}>
+                      {c.contract_code} · {c.organization.name}
+                    </option>
                   ))}
-                </TableBody>
-              </Table>
-            )}
-          </Card>
+                </select>
+              </div>
+              <div className="w-32">
+                <label className="block text-xs mb-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                  Year
+                </label>
+                <select
+                  value={`${year}`}
+                  onChange={(e) => setYear(Number(e.target.value))}
+                  className="w-full rounded appearance-none cursor-pointer px-3 py-2 text-sm focus:outline-none"
+                  style={SELECT_STYLE}
+                  aria-label="Select year"
+                >
+                  {[year - 1, year, year + 1].map((y) => (
+                    <option key={y} value={`${y}`}>{y}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="w-40">
+                <label className="block text-xs mb-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                  Month
+                </label>
+                <select
+                  value={month ? `${month}` : "all"}
+                  onChange={(e) => setMonth(e.target.value === "all" ? null : Number(e.target.value))}
+                  className="w-full rounded appearance-none cursor-pointer px-3 py-2 text-sm focus:outline-none"
+                  style={SELECT_STYLE}
+                  aria-label="Select month"
+                >
+                  <option value="all">All</option>
+                  {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                    <option key={m} value={`${m}`}>{m}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </Panel>
+
+          {/* Error banner */}
+          {error && (
+            <div
+              className="rounded px-4 py-3 text-sm"
+              style={{
+                background: "rgba(220,38,38,0.08)",
+                border: "1px solid rgba(220,38,38,0.25)",
+                color: "var(--color-sentinel-red)",
+              }}
+            >
+              {error}
+            </div>
+          )}
+
+          {/* KPI summary */}
+          {report && (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <KPICard
+                title="Total Budget"
+                value={formatZAR(report.totals.total_budget_zar)}
+                icon={<DollarSign className="h-5 w-5" />}
+                accentColor="blue"
+              />
+              <KPICard
+                title="Total Actual"
+                value={formatZAR(report.totals.total_actual_zar)}
+                icon={<DollarSign className="h-5 w-5" />}
+                accentColor="orange"
+              />
+              <KPICard
+                title="Variance"
+                value={formatZAR(variance)}
+                icon={variance >= 0 ? <TrendingUp className="h-5 w-5" /> : <TrendingDown className="h-5 w-5" />}
+                accentColor={variance >= 0 ? "green" : "red"}
+              />
+            </div>
+          )}
+
+          {/* Breakdown tables */}
+          {report && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+              {/* Monthly Breakdown */}
+              <Panel
+                header={{
+                  icon: <FileText className="h-4 w-4" />,
+                  title: "Monthly Breakdown",
+                  accentColor: "var(--color-sentinel-blue)",
+                }}
+              >
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr style={{ borderBottom: "1px solid var(--color-sentinel-border)", background: "var(--color-sentinel-bg-secondary)" }}>
+                        {["Month", "Budget", "Actual", "Spend %"].map((h, i) => (
+                          <th
+                            key={h}
+                            className={`px-4 py-2 text-xs font-medium ${i === 0 ? "text-left" : "text-right"}`}
+                            style={{ color: "var(--color-sentinel-text-secondary)" }}
+                          >
+                            {h}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {report.monthly.map((row) => (
+                        <tr key={row.month} style={{ borderBottom: "1px solid var(--color-sentinel-border)" }}>
+                          <td className="px-4 py-2.5" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                            {row.month}
+                          </td>
+                          <td className="px-4 py-2.5 text-right tabular-nums" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                            {formatZAR(row.total_budget_zar)}
+                          </td>
+                          <td className="px-4 py-2.5 text-right tabular-nums" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                            {formatZAR(row.total_actual_zar)}
+                          </td>
+                          <td className="px-4 py-2.5 text-right tabular-nums" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                            {row.spend_percentage.toFixed(1)}%
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </Panel>
+
+              {/* Equipment-Type Breakdown */}
+              <Panel
+                header={{
+                  icon: <FileText className="h-4 w-4" />,
+                  title: "Equipment-Type Breakdown",
+                  accentColor: "var(--color-sentinel-amber)",
+                }}
+              >
+                {report.equipment_type_breakdown.length === 0 ? (
+                  <div className="p-6">
+                    <EmptyState
+                      icon={FileText}
+                      title="No equipment data"
+                      subtext="No equipment-type budgets available for this period."
+                    />
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr style={{ borderBottom: "1px solid var(--color-sentinel-border)", background: "var(--color-sentinel-bg-secondary)" }}>
+                          {["Type", "Budget", "Actual", "Spend %"].map((h, i) => (
+                            <th
+                              key={h}
+                              className={`px-4 py-2 text-xs font-medium ${i === 0 ? "text-left" : "text-right"}`}
+                              style={{ color: "var(--color-sentinel-text-secondary)" }}
+                            >
+                              {h}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {report.equipment_type_breakdown.map((row) => (
+                          <tr key={row.equipment_type} style={{ borderBottom: "1px solid var(--color-sentinel-border)" }}>
+                            <td className="px-4 py-2.5" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                              {row.equipment_type}
+                            </td>
+                            <td className="px-4 py-2.5 text-right tabular-nums" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                              {formatZAR(row.total_budget_zar)}
+                            </td>
+                            <td className="px-4 py-2.5 text-right tabular-nums" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                              {formatZAR(row.total_actual_zar)}
+                            </td>
+                            <td className="px-4 py-2.5 text-right tabular-nums" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                              {row.spend_percentage.toFixed(1)}%
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </Panel>
+
+            </div>
+          )}
+
         </div>
       )}
     </div>
