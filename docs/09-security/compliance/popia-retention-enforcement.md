@@ -2,9 +2,9 @@
 title: "POPIA Retention Enforcement"
 type: "procedure"
 status: "active"
-version: "1.0.0"
+version: "1.1.0"
 created: "2026-02-23"
-updated: "2026-02-23"
+updated: "2026-05-10"
 author: "SENTINEL Compliance Team"
 tags: ["compliance", "popia", "retention", "privacy"]
 domain: "compliance"
@@ -50,3 +50,33 @@ Retention windows are controlled by settings in `backend/app/config/settings.py`
 
 - Run history and deletion counts: `backend/app/data/popia_retention_runs.json`
 - Audit event `popia_retention_enforcement` written by scheduler.
+
+---
+
+## 6. SQL Table Retention (Supabase)
+
+POPIA Section 14 applies to both JSON files (Section 6 above) and Supabase SQL tables.
+Implemented in `backend/app/services/supabase_retention_service.py`, wired into APScheduler
+(`add_supabase_retention_job`) and startup (`events.py`).
+
+### 6.1 Retention Tiers
+
+| Tier | Tables | Retention | POPIA Basis |
+|------|--------|-----------|-------------|
+| **ML_TRAINING** | `equipment_fault_events` (recorded_at), `adapter_health` (timestamp), `adapter_health_current` (updated_at), `adapter_health_alerts` (created_at), `space_occupancy_events` (timestamp), `equipment_sensor_readings` (recorded_at) | 7 days | S14(1) — data no longer necessary after ML processing |
+| **SNAPSHOT** | `asset_health_snapshots`, `system_health_snapshots` | 30 days | S14(1) — stale operational data |
+| **AUDIT_TRAIL** | `recommendations`, `parasite_decisions` | 5 years | S14(2) — lawful purpose (audit/compliance) |
+
+> **Note (2026-05-10):** Following Phase 208-12 null column cleanup, `recommendations` and `parasite_decisions` retained columns are limited to those with actual data. Execution log is held in-memory by the service (no `retention_execution_log` SQL table — that table was archived in Phase 208-10).
+
+### 6.2 SQL Table Endpoints
+
+- Status snapshot: `GET /api/privacy/retention/sql-status`
+- Execute enforcement: `POST /api/privacy/retention/sql-enforce`
+- Execution history: returned in service response (in-memory log)
+
+### 6.3 Scheduled Enforcement
+
+- **ML_TRAINING & SNAPSHOT**: Daily (via `add_supabase_retention_job`, 86400s interval)
+- **AUDIT_TRAIL**: Weekly (via same job, same schedule — deletion threshold is 5y so weekly is appropriate)
+- Preview (dry run) before first execution: `POST /api/privacy/retention/sql-enforce` with auth level `ADMIN`
