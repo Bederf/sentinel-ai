@@ -226,8 +226,8 @@ def _check_code_references(table_name: str) -> VerifyResult:
         return VerifyResult(ok=False, reason=f"code reference check error: {e}")
 
 
-def _run_sql(client, sql: str) -> list[dict]:
-    """Execute raw SQL via psycopg2 using DATABASE_URL."""
+def _run_sql(client, sql: str, params: dict | None = None) -> list[dict]:
+    """Execute raw SQL via psycopg2 using DATABASE_URL. Supports %(name)s style params."""
     import psycopg2
 
     backend_root = Path(__file__).parent.parent.parent
@@ -249,10 +249,10 @@ def _run_sql(client, sql: str) -> list[dict]:
     conn = psycopg2.connect(database_url)
     try:
         with conn.cursor() as cur:
-            cur.execute(sql)
+            cur.execute(sql, params)
             cols = [desc[0] for desc in cur.description]
             rows = cur.fetchall()
-            return [dict(zip(cols, row)) for row in rows]
+            return [dict(zip(cols, row, strict=True)) for row in rows]
     finally:
         conn.close()
 
@@ -268,15 +268,16 @@ def _check_view_dependencies(client, table_name: str) -> VerifyResult:
     try:
         rows = _run_sql(
             client,
-            f"""
+            """
             SELECT matviewname AS view_name, definition
             FROM pg_matviews
-            WHERE definition ILIKE '%{table_name}%'
+            WHERE definition ILIKE '%' || %(table)s || '%'
             UNION ALL
             SELECT viewname AS view_name, definition
             FROM pg_views
-            WHERE definition ILIKE '%{table_name}%'
+            WHERE definition ILIKE '%' || %(table)s || '%'
             """,
+            {"table": table_name},
         )
         dependent_views = [r["view_name"] for r in rows]
         if dependent_views:
@@ -286,7 +287,7 @@ def _check_view_dependencies(client, table_name: str) -> VerifyResult:
             )
         return VerifyResult(ok=True, reason="no view dependencies")
     except Exception as e:
-        return VerifyResult(ok=True, reason=f"view check skipped (pg_views error: {e})")
+        return VerifyResult(ok=False, reason=f"view check failed: {e}")
 
 
 # ── Check 3: MV Dependencies ──────────────────────────────────────────────────
@@ -302,11 +303,12 @@ def _check_mv_dependencies(client, table_name: str) -> VerifyResult:
     try:
         rows = _run_sql(
             client,
-            f"""
+            """
             SELECT matviewname AS mv_name
             FROM pg_matviews
-            WHERE definition ILIKE '%{table_name}%'
+            WHERE definition ILIKE '%' || %(table)s || '%'
             """,
+            {"table": table_name},
         )
         dependent_mvs = [r["mv_name"] for r in rows]
         if dependent_mvs:
@@ -316,7 +318,7 @@ def _check_mv_dependencies(client, table_name: str) -> VerifyResult:
             )
         return VerifyResult(ok=True, reason="no MV dependencies")
     except Exception as e:
-        return VerifyResult(ok=True, reason=f"MV check skipped (pg_matviews error: {e})")
+        return VerifyResult(ok=False, reason=f"MV check failed: {e}")
 
 
 # ── Check 4: FK Children ───────────────────────────────────────────────────────
@@ -332,7 +334,7 @@ def _check_fk_children(client, table_name: str) -> VerifyResult:
     try:
         rows = _run_sql(
             client,
-            f"""
+            """
             SELECT
                 tc.table_name AS child_table,
                 kcu.column_name AS child_column,
@@ -343,8 +345,9 @@ def _check_fk_children(client, table_name: str) -> VerifyResult:
             JOIN information_schema.key_column_usage AS kcu
                 ON kcu.constraint_name = tc.constraint_name
             WHERE tc.constraint_type = 'FOREIGN KEY'
-              AND ccu.table_name = '{table_name}'
+              AND ccu.table_name = %(table)s
             """,
+            {"table": table_name},
         )
         if not rows:
             return VerifyResult(ok=True, reason="no FK children")
@@ -368,7 +371,7 @@ def _check_fk_children(client, table_name: str) -> VerifyResult:
         return VerifyResult(ok=True, reason="all FK children are TIER-6 or none")
 
     except Exception as e:
-        return VerifyResult(ok=True, reason=f"FK child check skipped (error: {e})")
+        return VerifyResult(ok=False, reason=f"FK child check failed: {e}")
 
 
 def _is_tier_6_labeled(client, table_name: str) -> bool:
@@ -379,16 +382,20 @@ def _is_tier_6_labeled(client, table_name: str) -> bool:
     try:
         rows = _run_sql(
             client,
-            f"""
+            """
             SELECT label
             FROM equipment_classification
-            WHERE table_name = '{table_name}'
-              AND label = '{_TIER_6_LABEL}'
+            WHERE table_name = %(table)s
+              AND label = %(label)s
             LIMIT 1
             """,
+            {"table": table_name, "label": _TIER_6_LABEL},
         )
         return bool(rows)
-    except Exception:
+    except Exception as e:
+        import logging
+
+        logging.warning("equipment_classification check failed for '%s': %s", table_name, e)
         return False
 
 

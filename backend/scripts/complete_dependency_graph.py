@@ -24,6 +24,7 @@ CASCADE silent-drop prevention: MV deps, view deps, FK chain children
 import argparse
 import json
 import logging
+import os
 import sys
 from contextlib import suppress
 from pathlib import Path
@@ -51,19 +52,43 @@ def _setup_path() -> tuple[Path, Any]:
 # ---------------------------------------------------------------------------
 
 
-def _run_sql(supabase, sql: str) -> list[dict[str, Any]]:
-    """Execute raw SQL via exec_sql RPC. Returns list of rows."""
+def _run_sql(supabase, sql: str, params: tuple | None = None) -> list[dict[str, Any]]:
+    """Execute raw SQL via exec_sql RPC. Falls back to psycopg2 direct if RPC unavailable.
+    Uses %s-style placeholder (psycopg2 compatible) when params provided."""
+    # Try RPC first
     try:
-        result = supabase.rpc("exec_sql", {"sql": sql}).execute()
+        result = supabase.rpc("exec_sql", {"sql": sql, "params": params}).execute()
         return result.data if result.data else []
     except Exception as exc:
-        logger.warning("SQL RPC failed: %s", exc)
+        logger.warning("SQL RPC failed (%s), falling back to psycopg2", exc)
+
+    # Fallback: psycopg2 direct connection
+    try:
+        import psycopg2
+        from dotenv import load_dotenv
+
+        load_dotenv(Path(__file__).parent.parent / ".env")
+        database_url = os.getenv("DATABASE_URL")
+        if not database_url:
+            return []
+
+        conn = psycopg2.connect(database_url)
+        try:
+            with conn.cursor() as cur:
+                cur.execute(sql, params)
+                cols = [desc[0] for desc in cur.description]
+                rows = cur.fetchall()
+                return [dict(zip(cols, row, strict=True)) for row in rows]
+        finally:
+            conn.close()
+    except Exception as fallback_exc:
+        logger.error("Both RPC and psycopg2 fallback failed: %s", fallback_exc)
         return []
 
 
 def get_fk_children(supabase, table_name: str) -> list[dict[str, Any]]:
     """Tables with FKs pointing TO target table (what depends on this table)."""
-    sql = f"""
+    sql = """
     SELECT
         tc.table_schema,
         tc.table_name as child_table,
@@ -79,29 +104,29 @@ def get_fk_children(supabase, table_name: str) -> list[dict[str, Any]]:
         ON kcu.constraint_name = tc.constraint_name
     JOIN information_schema.referential_constraints AS rc
         ON rc.constraint_name = tc.constraint_name
-    WHERE ccu.table_name = '{table_name}'
+    WHERE ccu.table_name = %s
       AND tc.constraint_type = 'FOREIGN KEY';
     """
-    return _run_sql(supabase, sql)
+    return _run_sql(supabase, sql, (table_name,))
 
 
 def get_views_depending_on(supabase, table_name: str) -> list[dict[str, Any]]:
     """Regular views (not materialized) that reference this table via view_table_usage."""
-    sql = f"""
+    sql = """
     SELECT
         v.table_schema,
         v.table_name as view_name,
         v.view_definition
-    FROM information_schema.views v
-    WHERE v.view_definition LIKE '%{table_name}%'
+    FROM pg_views v
+    WHERE v.view_definition LIKE '%%' || %s || '%%'
       AND v.table_schema NOT IN ('pg_catalog', 'information_schema');
     """
-    return _run_sql(supabase, sql)
+    return _run_sql(supabase, sql, (table_name,))
 
 
 def get_materialized_views_depending_on(supabase, table_name: str) -> list[dict[str, Any]]:
     """Materialized views that depend on this table (pg_matviews + pg_depends)."""
-    sql = f"""
+    sql = """
     SELECT
         schemaname as table_schema,
         matviewname as view_name
@@ -112,15 +137,15 @@ def get_materialized_views_depending_on(supabase, table_name: str) -> list[dict[
           JOIN pg_class c ON d.refobjid = c.oid
           WHERE d.classid = 'pg_class'::regclass
             AND d.refclassid = 'pg_class'::regclass
-            AND c.relname = '{table_name}'
+            AND c.relname = %s
       );
     """
-    return _run_sql(supabase, sql)
+    return _run_sql(supabase, sql, (table_name,))
 
 
 def get_triggers_and_functions(supabase, table_name: str) -> list[dict[str, Any]]:
     """Triggers and their trigger functions on this table."""
-    sql = f"""
+    sql = """
     SELECT
         t.tgname as trigger_name,
         t.tgtype as trigger_type,
@@ -135,15 +160,15 @@ def get_triggers_and_functions(supabase, table_name: str) -> list[dict[str, Any]
     FROM pg_trigger t
     JOIN pg_proc p ON t.tgfoid = p.oid
     JOIN pg_namespace n ON p.pronamespace = n.oid
-    WHERE t.tgrelid = '{table_name}'::regclass
+    WHERE t.tgrelid = %s::regclass
       AND t.tgname NOT IN (SELECT tgname FROM pg_trigger WHERE tgtype = 0);
     """
-    return _run_sql(supabase, sql)
+    return _run_sql(supabase, sql, (table_name,))
 
 
 def get_fk_chain_children(supabase, table_name: str) -> list[dict[str, Any]]:
     """Tables that this table points TO via its own FKs (cascade risk downward)."""
-    sql = f"""
+    sql = """
     SELECT
         kcu.table_schema,
         kcu.table_name as child_table,
@@ -155,16 +180,16 @@ def get_fk_chain_children(supabase, table_name: str) -> list[dict[str, Any]]:
         ON kcu.constraint_name = ccu.constraint_name
     JOIN information_schema.table_constraints tc
         ON tc.constraint_name = kcu.constraint_name
-    WHERE kcu.table_name = '{table_name}'
+    WHERE kcu.table_name = %s
       AND tc.constraint_type = 'FOREIGN KEY';
     """
-    return _run_sql(supabase, sql)
+    return _run_sql(supabase, sql, (table_name,))
 
 
 def get_table_row_count(supabase, table_name: str) -> int:
     """Row count for a table (0 = empty)."""
-    sql = f"SELECT COUNT(*) as cnt FROM {table_name} LIMIT 1;"
-    result = _run_sql(supabase, sql)
+    sql = "SELECT COUNT(*) as cnt FROM %s LIMIT 1;"
+    result = _run_sql(supabase, sql, (table_name,))
     if result and len(result) > 0:
         return result[0].get("cnt", 0) or 0
     return 0
