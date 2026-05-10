@@ -3407,7 +3407,7 @@ class LifecycleOrchestrator:
             pass  # Prediction linkage is best-effort — WO is created regardless
 
         try:
-            self.work_order_repo.create(
+            self.work_order_repo.create_work_order(
                 {
                     "id": wo_id,
                     "site_id": self.site_id,
