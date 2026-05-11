@@ -11,8 +11,9 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { Card, Text, Grid, Badge, Flex, Tab, TabGroup, TabList, TabPanel, TabPanels } from '@tremor/react';
+import { Card, Text, Grid, Badge, Flex } from '@tremor/react';
 import { Activity } from 'lucide-react';
+import { TabBar } from '../TabBar';
 import { energyCentreApi } from '../../lib/energyCentreApi';
 import type { SCADAOverview } from '../../lib/energyCentreApi';
 import { fetchEnergyComparisonSummary } from '../../lib/api/energy';
@@ -70,7 +71,13 @@ export function EnergyCentreDashboard({ siteId, onAIRecommendation, enabledModul
   const [sentinelEnergy, setSentinelEnergy] = useState<SentinelEnergySummary | null>(null);
   const [sentinelGuidance, setSentinelGuidance] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState(0);
+  const [activeTab, setActiveTab] = useState("overview");
+  const TABS = [
+    { id: "overview", label: "Overview" },
+    { id: "generators", label: "Generators" },
+    { id: "power", label: "Power" },
+    { id: "ups", label: "UPS" },
+  ] as const;
 
   const loadOverview = useCallback(async () => {
     try {
@@ -318,107 +325,102 @@ export function EnergyCentreDashboard({ siteId, onAIRecommendation, enabledModul
         )}
       </Card>
 
-      {/* Tabbed Views */}
-      <TabGroup index={activeTab} onIndexChange={setActiveTab}>
-        <TabList className="mb-4 overflow-x-auto">
-          <Tab>Overview</Tab>
-          <Tab>Generators</Tab>
-          <Tab>Power</Tab>
-          <Tab>UPS</Tab>
-        </TabList>
+      <TabBar
+        tabs={TABS.map(t => ({ id: t.id, label: t.label }))}
+        active={activeTab}
+        onChange={setActiveTab}
+        accentColor="var(--color-sentinel-blue)"
+      />
 
-        <TabPanels>
-          {/* Overview Tab */}
-          <TabPanel>
-            <div className="space-y-4 mb-4">
-              <Card>
-                <Flex justifyContent="between" alignItems="start">
-                  <div>
-                    <Text className="text-sm font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>
-                      Raw Bridge Telemetry
-                    </Text>
-                    <Text className="mt-1 text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                      Zones: {bridgeTelemetry?.zones_with_readings ?? 0}/{bridgeTelemetry?.zone_count ?? 0} ·
-                      HVAC: {(bridgeTelemetry?.power?.hvac_kw ?? 0).toFixed(2)} kW ·
-                      Total: {(bridgeTelemetry?.power?.total_kw ?? 0).toFixed(2)} kW
-                    </Text>
-                  </div>
-                  <Badge color={bridgeTelemetry?.status === 'live' ? 'green' : 'amber'}>
-                    {bridgeTelemetry?.status === 'live' ? 'Live' : 'Unavailable'}
-                  </Badge>
-                </Flex>
-              </Card>
+      <div className="space-y-4">
+        {activeTab === "overview" && (
+          <>
+          <div className="space-y-4 mb-4">
+            <Card>
+              <Flex justifyContent="between" alignItems="start">
+                <div>
+                  <Text className="text-sm font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                    Raw Bridge Telemetry
+                  </Text>
+                  <Text className="mt-1 text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                    Zones: {bridgeTelemetry?.zones_with_readings ?? 0}/{bridgeTelemetry?.zone_count ?? 0} ·
+                    HVAC: {(bridgeTelemetry?.power?.hvac_kw ?? 0).toFixed(2)} kW ·
+                    Total: {(bridgeTelemetry?.power?.total_kw ?? 0).toFixed(2)} kW
+                  </Text>
+                </div>
+                <Badge color={bridgeTelemetry?.status === 'live' ? 'green' : 'amber'}>
+                  {bridgeTelemetry?.status === 'live' ? 'Live' : 'Unavailable'}
+                </Badge>
+              </Flex>
+            </Card>
 
-              <Card>
-                <Text className="text-sm font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>
-                  SENTINEL Energy Intelligence
-                </Text>
-                <Text className="mt-1 text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                  {sentinelEnergy
-                    ? `Savings ${sentinelEnergy.savings_percent.toFixed(1)}% · Baseline ${sentinelEnergy.actual_kwh.toFixed(1)} kWh · With SENTINEL ${sentinelEnergy.sentinel_kwh.toFixed(1)} kWh`
-                    : 'Energy comparison not available yet'}
-                </Text>
-                <Text className="mt-1 text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                  {sentinelGuidance || 'No active guidance yet.'}
-                </Text>
-              </Card>
+            <Card>
+              <Text className="text-sm font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                SENTINEL Energy Intelligence
+              </Text>
+              <Text className="mt-1 text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                {sentinelEnergy
+                  ? `Savings ${sentinelEnergy.savings_percent.toFixed(1)}% · Baseline ${sentinelEnergy.actual_kwh.toFixed(1)} kWh · With SENTINEL ${sentinelEnergy.sentinel_kwh.toFixed(1)} kWh`
+                  : 'Energy comparison not available yet'}
+              </Text>
+              <Text className="mt-1 text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                {sentinelGuidance || 'No active guidance yet.'}
+              </Text>
+            </Card>
+          </div>
+          <Grid className="grid grid-cols-2 gap-4">
+            <SingleLineDiagram siteId={siteId} />
+            <div className="space-y-4">
+              <ATSStatusPanel siteId={siteId} compact />
+              <PowerMeteringCard siteId={siteId} compact />
+              <UPSStatusPanel siteId={siteId} compact />
             </div>
-            <Grid className="grid grid-cols-2 gap-4">
-              <SingleLineDiagram siteId={siteId} />
-              <div className="space-y-4">
-                <ATSStatusPanel siteId={siteId} compact />
-                <PowerMeteringCard siteId={siteId} compact />
-                <UPSStatusPanel siteId={siteId} compact />
-              </div>
-            </Grid>
-          </TabPanel>
+          </Grid>
+        </>
+        )}
 
-          {/* Generators Tab */}
-          <TabPanel>
-            <GeneratorSynoptic
-              siteId={siteId}
-              onHealthAlert={(gen, health) => {
-                if (onAIRecommendation) {
-                  onAIRecommendation({
-                    id: `gen-health-${gen.generator_id}`,
-                    type: 'energy',
-                    priority: health.status === 'critical' ? 'critical' : 'high',
-                    title: `Generator ${gen.name} Health Alert`,
-                    description: `Health score: ${health.overall_score.toFixed(0)}%. ${health.indicators.find(i => i.recommendation)?.recommendation || 'Check generator health.'}`,
-                    source_module: 'energy',
-                    timestamp: new Date().toISOString(),
-                  });
-                }
-              }}
-            />
-          </TabPanel>
+        {activeTab === "generators" && (
+          <GeneratorSynoptic
+            siteId={siteId}
+            onHealthAlert={(gen, health) => {
+              if (onAIRecommendation) {
+                onAIRecommendation({
+                  id: `gen-health-${gen.generator_id}`,
+                  type: 'energy',
+                  priority: health.status === 'critical' ? 'critical' : 'high',
+                  title: `Generator ${gen.name} Health Alert`,
+                  description: `Health score: ${health.overall_score.toFixed(0)}%. ${health.indicators.find(i => i.recommendation)?.recommendation || 'Check generator health.'}`,
+                  source_module: 'energy',
+                  timestamp: new Date().toISOString(),
+                });
+              }
+            }}
+          />
+        )}
 
-          {/* Power Tab */}
-          <TabPanel>
-            <PowerMeteringCard siteId={siteId} />
-          </TabPanel>
+        {activeTab === "power" && (
+          <PowerMeteringCard siteId={siteId} />
+        )}
 
-          {/* UPS Tab */}
-          <TabPanel>
-            <UPSStatusPanel
-              siteId={siteId}
-              onBatteryAlert={(ups) => {
-                if (onAIRecommendation) {
-                  onAIRecommendation({
-                    id: `ups-battery-${ups.ups_id}`,
-                    type: 'energy',
-                    priority: 'critical',
-                    title: 'UPS On Battery',
-                    description: `${ups.name} is running on battery. Runtime: ${ups.runtime_min.toFixed(0)} minutes.`,
-                    source_module: 'energy',
-                    timestamp: new Date().toISOString(),
-                  });
-                }
-              }}
-            />
-          </TabPanel>
-        </TabPanels>
-      </TabGroup>
+        {activeTab === "ups" && (
+          <UPSStatusPanel
+            siteId={siteId}
+            onBatteryAlert={(ups) => {
+              if (onAIRecommendation) {
+                onAIRecommendation({
+                  id: `ups-battery-${ups.ups_id}`,
+                  type: 'energy',
+                  priority: 'critical',
+                  title: 'UPS On Battery',
+                  description: `${ups.name} is running on battery. Runtime: ${ups.runtime_min.toFixed(0)} minutes.`,
+                  source_module: 'energy',
+                  timestamp: new Date().toISOString(),
+                });
+              }
+            }}
+          />
+        )}
+      </div>
       </div>
     </div>
   );

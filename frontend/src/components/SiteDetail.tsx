@@ -71,6 +71,7 @@ import { DEFAULT_KPI_CARDS, DEFAULT_SECTIONS } from "../lib/cardDefinitions";
 import { ArcadeView } from "./arcade/ArcadeView";
 import { OverviewCockpitHost } from "./cockpit/OverviewCockpitHost";
 import { BUILDING_TAB_ITEMS } from "../lib/navigation";
+import { TabBar } from "./TabBar";
 import type { BuildingTabId } from "../lib/navigation";
 import { phaseAllows, PHASE_LABELS, PHASE_COLORS, PHASE_DESCRIPTIONS, type OnboardingPhase } from "../lib/onboardingPhase";
 import { setStoredSelectedSite } from "../lib/siteSelection";
@@ -1087,6 +1088,18 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
                   key={tab.id}
                   onClick={() => setActiveMainTab(tab.id)}
                   className="flex-shrink-0 flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors relative whitespace-nowrap"
+                  onMouseEnter={(e) => {
+                    if (!isActive) {
+                      e.currentTarget.style.color = "var(--color-sentinel-text-primary)";
+                      e.currentTarget.style.background = "rgba(255,255,255,0.03)";
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isActive) {
+                      e.currentTarget.style.color = "var(--color-sentinel-text-secondary)";
+                      e.currentTarget.style.background = "transparent";
+                    }
+                  }}
                   style={{
                     color: isActive
                       ? "var(--color-sentinel-amber)"
@@ -1841,21 +1854,17 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
           {activeMainTab === "lighting" && (
             <>
               <div className="mb-4"><LightingIntelligencePanel siteId={siteId} compact /></div>
-              <div className="flex overflow-x-auto gap-2 mb-4 scrollbar-hide">
-                {(["Lighting", "Occupancy", "Analytics", "Correlation"] as LightingSub[]).map(sub => (
-                  <button
-                    key={sub}
-                    onClick={() => setLightingSub(sub)}
-                    className="flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors whitespace-nowrap"
-                    style={{
-                      background: lightingSub === sub ? "var(--color-sentinel-amber)" : "var(--color-sentinel-bg-secondary)",
-                      color: lightingSub === sub ? "white" : "var(--color-sentinel-text-secondary)",
-                    }}
-                  >
-                    {sub}
-                  </button>
-                ))}
-              </div>
+              <TabBar
+                tabs={[
+                  { id: "Lighting", label: "Lighting" },
+                  { id: "Occupancy", label: "Occupancy" },
+                  { id: "Analytics", label: "Analytics" },
+                  { id: "Correlation", label: "Correlation" },
+                ]}
+                active={lightingSub}
+                onChange={(id) => setLightingSub(id as LightingSub)}
+                accentColor="var(--color-sentinel-blue)"
+              />
               {lightingSub === "Lighting" && <LightingPage siteId={siteId} />}
               {lightingSub === "Occupancy" && (
                 <div className="p-4 md:p-6"><OccupancyFullPanel compact={false} /></div>
@@ -1869,21 +1878,15 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
           {activeMainTab === "solar-bess" && (
             <>
               <div className="mb-4"><SolarIntelligenceCard siteId={siteId} /></div>
-              <div className="flex overflow-x-auto gap-2 mb-4 scrollbar-hide">
-                {(["Dashboard", ...(isModuleActive('solar_control') ? ["AEGIS"] : [])] as SolarBessSub[]).map(sub => (
-                  <button
-                    key={sub}
-                    onClick={() => setSolarBessSub(sub)}
-                    className="flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors whitespace-nowrap"
-                    style={{
-                      background: solarBessSub === sub ? "var(--color-sentinel-amber)" : "var(--color-sentinel-bg-secondary)",
-                      color: solarBessSub === sub ? "white" : "var(--color-sentinel-text-secondary)",
-                    }}
-                  >
-                    {sub}
-                  </button>
-                ))}
-              </div>
+              <TabBar
+                tabs={[
+                  { id: "Dashboard", label: "Dashboard" },
+                  ...(isModuleActive('solar_control') ? [{ id: "AEGIS", label: "AEGIS" }] : []),
+                ]}
+                active={solarBessSub}
+                onChange={(id) => setSolarBessSub(id as SolarBessSub)}
+                accentColor="var(--color-sentinel-blue)"
+              />
               {solarBessSub === "Dashboard" && <SolarDashboard />}
               {solarBessSub === "AEGIS" && isModuleActive('solar_control') && <AegisConsolePage />}
             </>

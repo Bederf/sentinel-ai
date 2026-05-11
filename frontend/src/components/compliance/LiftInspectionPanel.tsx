@@ -68,7 +68,7 @@ export function LiftInspectionPanel({ siteCode: _siteCode }: LiftInspectionPanel
         <Title>Lift Safety Inspection Scheduling</Title>
         <Text className="text-sm mt-2">South African lift safety regulations - Periodic, annual, and post-repair testing</Text>
 
-        <Grid className="grid grid-cols-1 md:grid-cols-3" className="gap-4 mt-4">
+        <Grid className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
           <Card className="border border-gray-200">
             <Title className="text-sm">6-Month Periodic</Title>
             <Text className="text-xs mt-2">Standard periodic inspection cycle for passenger lifts</Text>
@@ -192,7 +192,7 @@ export function LiftInspectionPanel({ siteCode: _siteCode }: LiftInspectionPanel
         <Title>Lift Test Requirements</Title>
         <Text className="text-sm mt-2 mb-4">South African lift safety standards - Key test points</Text>
 
-        <Grid className="grid grid-cols-1 md:grid-cols-3" className="gap-4">
+        <Grid className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card className="border border-gray-200">
             <Title className="text-sm">Brake Load Test</Title>
             <Text className="text-xs mt-2">

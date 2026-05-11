@@ -63,7 +63,7 @@ export function ElectricalCompliancePanel({ siteCode }: ElectricalCompliancePane
 
   return (
     <div className="space-y-6">
-      <Grid className="grid grid-cols-1 md:grid-cols-3" className="gap-4">
+      <Grid className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <Title>Total Certificates</Title>
           <div className="text-3xl font-bold mt-2">{certificates.length}</div>
@@ -92,7 +92,7 @@ export function ElectricalCompliancePanel({ siteCode }: ElectricalCompliancePane
 
         {showAddForm && (
           <div className="border rounded p-4 mb-4 bg-gray-50">
-            <Grid className="grid grid-cols-1 md:grid-cols-2" className="gap-4 mb-4">
+            <Grid className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div>
                 <label className="text-sm font-medium">Certificate Type</label>
                 <select
@@ -115,7 +115,7 @@ export function ElectricalCompliancePanel({ siteCode }: ElectricalCompliancePane
                 />
               </div>
             </Grid>
-            <Grid className="grid grid-cols-1 md:grid-cols-2" className="gap-4 mb-4">
+            <Grid className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div>
                 <label className="text-sm font-medium">Certifying Body</label>
                 <input

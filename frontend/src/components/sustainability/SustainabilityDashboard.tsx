@@ -142,7 +142,7 @@ export function SustainabilityDashboard({
     return (
       <Card className="glass-panel" style={{ border: "1px solid rgba(220, 38, 38, 0.35)" }}>
         <Title>Sustainability & ESG</Title>
-        <Text className="text-red-500 mt-2">{error}</Text>
+        <Text className="mt-2" style={{ color: 'var(--color-sentinel-red)' }}>{error}</Text>
       </Card>
     );
   }
@@ -227,7 +227,11 @@ export function SustainabilityDashboard({
                 <Badge
                   color={dataSource === 'measured' ? 'green' : 'amber'}
                   size="xs"
-                  style={dataSource !== 'measured' ? { background: 'rgba(245, 158, 11, 0.15)', color: 'var(--color-sentinel-amber)', border: '1px solid rgba(245, 158, 11, 0.3)' } : undefined}
+                  style={{
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.03em',
+                    ...(dataSource !== 'measured' ? { background: 'rgba(245, 158, 11, 0.15)', color: 'var(--color-sentinel-amber)', border: '1px solid rgba(245, 158, 11, 0.3)' } : undefined)
+                  }}
                 >
                   {dataSource === 'measured' ? 'Live Data' : 'Estimated'}
                 </Badge>
@@ -372,7 +376,7 @@ export function SustainabilityDashboard({
             data={chartData}
             index="month"
             categories={['Scope 1 (Diesel)', 'Scope 2 (Grid)', 'Scope 3 (Other)']}
-            colors={['orange', 'blue', 'gray']}
+            colors={['green', 'amber', 'gray']}
             stack
             yAxisWidth={56}
             className="h-72"
@@ -397,7 +401,7 @@ export function SustainabilityDashboard({
             data={systemBreakdownData}
             category="value"
             index="name"
-            colors={['blue', 'amber', 'gray', 'red', 'cyan']}
+            colors={['blue', 'amber', 'gray', 'red', 'violet']}
             valueFormatter={(v: number) => `${(v / 1000).toFixed(1)}t`}
           />
         </Card>
@@ -411,7 +415,7 @@ export function SustainabilityDashboard({
           <BarList
             data={energyBars}
             color="amber"
-            className="mt-2 [&>li:first-child>a]:!text-[var(--color-sentinel-blue)] [&>li:first-child>div>div]:!bg-[var(--color-sentinel-blue)]"
+            className="mt-2"
           />
           {efficiency?.vs_typical && (
             <Text className="text-xs mt-3" style={{ color: "var(--color-grafana-text-secondary)" }}>
@@ -427,8 +431,8 @@ export function SustainabilityDashboard({
           <Text className="mb-3" style={{ color: "var(--color-grafana-text-secondary)" }}>kg CO2 per sqm per year</Text>
           <BarList
             data={carbonBars}
-            color="emerald"
-            className="mt-2 [&>li:first-child>a]:!text-[var(--color-sentinel-blue)] [&>li:first-child>div>div]:!bg-[var(--color-sentinel-blue)]"
+            color="green"
+            className="mt-2"
           />
           {efficiency?.vs_typical && (
             <Text className="text-xs mt-3" style={{ color: "var(--color-grafana-text-secondary)" }}>

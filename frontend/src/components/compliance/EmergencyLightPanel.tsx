@@ -42,7 +42,7 @@ export function EmergencyLightPanel({ siteCode }: EmergencyLightPanelProps) {
 
   return (
     <div className="space-y-6">
-      <Grid className="grid grid-cols-1 md:grid-cols-3" className="gap-4">
+      <Grid className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <Title>Total Lights</Title>
           <div className="text-3xl font-bold mt-2">
