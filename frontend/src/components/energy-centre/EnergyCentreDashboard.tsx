@@ -14,6 +14,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Card, Text, Grid, Badge, Flex } from '@tremor/react';
 import { Activity } from 'lucide-react';
 import { TabBar } from '../TabBar';
+import { PageLoading } from '../PageLoading';
 import { energyCentreApi } from '../../lib/energyCentreApi';
 import type { SCADAOverview } from '../../lib/energyCentreApi';
 import { fetchEnergyComparisonSummary } from '../../lib/api/energy';
@@ -223,20 +224,7 @@ export function EnergyCentreDashboard({ siteId, onAIRecommendation, enabledModul
   }, []);
 
   if (loading) {
-    return (
-      <div className="h-full p-4 md:p-6">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="p-2 rounded" style={{ background: "rgba(234, 179, 8, 0.15)" }}>
-            <Activity className="h-6 w-6" style={{ color: "var(--color-sentinel-amber)" }} />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold" style={{ color: "var(--color-sentinel-text-primary)" }}>Energy Centre</h1>
-            <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>Power Distribution & Generation Management</p>
-          </div>
-        </div>
-        <div className="animate-pulse h-96 bg-gray-100 dark:bg-gray-800 rounded" />
-      </div>
-    );
+    return <PageLoading message="Loading energy centre..." />;
   }
 
   if (!overview) {

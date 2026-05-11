@@ -72,6 +72,7 @@ import { ArcadeView } from "./arcade/ArcadeView";
 import { OverviewCockpitHost } from "./cockpit/OverviewCockpitHost";
 import { BUILDING_TAB_ITEMS } from "../lib/navigation";
 import { TabBar } from "./TabBar";
+import { PageLoading } from "./PageLoading";
 import type { BuildingTabId } from "../lib/navigation";
 import { phaseAllows, PHASE_LABELS, PHASE_COLORS, PHASE_DESCRIPTIONS, type OnboardingPhase } from "../lib/onboardingPhase";
 import { setStoredSelectedSite } from "../lib/siteSelection";
@@ -606,23 +607,7 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
   };
 
   if (loading) {
-    return (
-      <div
-        className="h-full flex items-center justify-center"
-        style={{ background: "var(--color-sentinel-bg-canvas)" }}
-      >
-        <div className="text-center">
-          <div
-            className="animate-spin h-8 w-8 border-4 rounded-full mx-auto mb-4"
-            style={{
-              borderColor: "var(--color-sentinel-blue)",
-              borderTopColor: "transparent",
-            }}
-          />
-          <p style={{ color: "var(--color-sentinel-text-secondary)" }}>Loading site details...</p>
-        </div>
-      </div>
-    );
+    return <PageLoading message="Loading site details..." />;
   }
 
   if (error || !site) {
