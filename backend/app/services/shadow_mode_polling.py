@@ -19,7 +19,6 @@ When 500+ events are buffered → train Fault Classifier.
 
 import logging
 import re
-import traceback
 from datetime import UTC, datetime
 from typing import Any
 
@@ -1043,7 +1042,7 @@ class ShadowModePollingService:
         """
         result = {"updated": 0, "missing_from_bridge": [], "created": 0}
         try:
-            async with httpx.AsyncClient(timeout=20.0) as client:
+            async with httpx.AsyncClient(timeout=60.0) as client:
                 resp = await client.get(
                     f"{base}/api/sites/{self.site_id}/points",
                     headers=headers,
@@ -1215,11 +1214,11 @@ class ShadowModePollingService:
                 )
 
         except Exception as e:
-            logger.error(
-                "[SHADOW] Equipment status sync failed for %s: %s\n%s",
+            logger.warning(
+                "[SHADOW] Equipment status sync failed for %s (non-fatal): %s",
                 self.site_id,
                 e,
-                traceback.format_exc(),
+                exc_info=True,
             )
 
         return result
