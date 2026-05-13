@@ -11,15 +11,9 @@
  */
 
 import { useState, useEffect } from "react";
-import {
-  Card,
-  Title,
-  Text,
-  Badge,
-  Grid,
-  ProgressBar,
-} from "@tremor/react";
+
 import { AlertTriangle, Zap, TrendingDown } from "lucide-react";
+import { authorizedFetch } from "@/lib/api";
 
 interface PowerMeterValidationRaw {
   // API field names
@@ -108,15 +102,8 @@ export function PowerMeterValidationCard({
     const fetchValidation = async () => {
       try {
         setLoading(true);
-        const token = localStorage.getItem("sentinel_token");
-        const response = await fetch(
-          `/api/validation/power-meter/baseline?site_id=${siteId}`,
-          {
-            headers: {
-              Authorization: `Bearer ${token || ""}`,
-              "Content-Type": "application/json",
-            },
-          }
+        const response = await authorizedFetch(
+          `/api/validation/power-meter/baseline?site_id=${siteId}`
         );
         if (!response.ok) throw new Error("Failed to fetch validation data");
         const data = await response.json();

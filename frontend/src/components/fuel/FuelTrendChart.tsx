@@ -1,12 +1,4 @@
-/**
- * FuelTrendChart - Time-series chart of fuel level % over time.
- *
- * Shows level trend with period toggle (24h/7d/30d), tank selector,
- * and consumption rate overlay. Uses Tremor AreaChart.
- */
-
 import { useState, useEffect, useCallback } from 'react';
-import { Card, Title, Text, AreaChart, Flex } from '@tremor/react';
 import { fuelApi } from '../../lib/api';
 import type { FuelTank, FuelTelemetryReading } from '../../lib/api';
 
@@ -45,7 +37,6 @@ export function FuelTrendChart({ tanks }: FuelTrendChartProps) {
     fetchHistory();
   }, [fetchHistory]);
 
-  // Transform readings for Tremor AreaChart
   const chartData = readings.map(r => ({
     time: new Date(r.ts * 1000).toLocaleString(undefined, {
       month: 'short',
@@ -57,22 +48,17 @@ export function FuelTrendChart({ tanks }: FuelTrendChartProps) {
     ...(r.temperature_c != null ? { 'Temp C': Number(r.temperature_c.toFixed(1)) } : {}),
   }));
 
-  const categories = ['Level %'];
-  if (readings.some(r => r.temperature_c != null)) {
-    categories.push('Temp C');
-  }
-
   return (
-    <Card>
-      <Flex justifyContent="between" alignItems="center" className="mb-4">
-        <Title>Fuel Level Trend</Title>
-        <Flex className="gap-2" alignItems="center">
-          {/* Tank Selector */}
+    <div className="rounded-lg p-4" style={{ background: "var(--sentinel-bg-panel)", border: "1px solid var(--sentinel-border)" }}>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-sm font-medium" style={{ color: "var(--sentinel-text-primary)" }}>Fuel Level Trend</h3>
+        <div className="flex items-center gap-2">
           {tanks.length > 1 && (
             <select
               value={selectedTankId}
               onChange={e => setSelectedTankId(e.target.value)}
-              className="text-sm border border-gray-300 rounded-md px-2 py-1 bg-white"
+              className="text-sm border rounded-md px-2 py-1"
+              style={{ borderColor: "var(--sentinel-border)", background: "var(--sentinel-bg-secondary)", color: "var(--sentinel-text-primary)" }}
             >
               {tanks.map(t => (
                 <option key={t.tank_id} value={t.tank_id}>
@@ -81,47 +67,49 @@ export function FuelTrendChart({ tanks }: FuelTrendChartProps) {
               ))}
             </select>
           )}
-
-          {/* Period Toggle */}
-          <div className="flex rounded-lg border border-gray-200 overflow-hidden">
+          <div className="flex rounded-lg overflow-hidden" style={{ border: "1px solid var(--sentinel-border)" }}>
             {(['24h', '7d', '30d'] as Period[]).map(p => (
               <button
                 key={p}
                 onClick={() => setPeriod(p)}
-                className={`px-3 py-1 text-sm font-medium transition-colors ${
-                  period === p
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-white text-gray-600 hover:bg-gray-50'
-                }`}
+                className="px-3 py-1 text-sm font-medium transition-colors"
+                style={{
+                  background: period === p ? "var(--sentinel-blue)" : "transparent",
+                  color: period === p ? "white" : "var(--sentinel-text-secondary)",
+                }}
               >
                 {p}
               </button>
             ))}
           </div>
-        </Flex>
-      </Flex>
+        </div>
+      </div>
 
       {loading ? (
         <div className="h-64 flex items-center justify-center">
-          <Text className="text-gray-400">Loading chart data...</Text>
+          <span style={{ color: "var(--sentinel-text-secondary)" }}>Loading chart data...</span>
         </div>
       ) : chartData.length === 0 ? (
         <div className="h-64 flex items-center justify-center">
-          <Text className="text-gray-400">No telemetry data for the selected period</Text>
+          <span style={{ color: "var(--sentinel-text-secondary)" }}>No telemetry data for the selected period</span>
         </div>
       ) : (
-        <AreaChart
-          className="h-64"
-          data={chartData}
-          index="time"
-          categories={categories}
-          colors={['blue', 'orange']}
-          showLegend={categories.length > 1}
-          showGridLines
-          curveType="monotone"
-          yAxisWidth={48}
-        />
+        <div className="h-64 flex items-end gap-px p-2" style={{ background: "var(--sentinel-bg-secondary)", borderRadius: "0.5rem" }}>
+          {chartData.map((d, i) => (
+            <div key={i} className="flex-1 flex flex-col items-center justify-end" title={`${d.time}: ${d['Level %']}%`}>
+              <div
+                className="w-full rounded-t"
+                style={{
+                  height: `${d['Level %']}%`,
+                  background: "var(--sentinel-blue)",
+                  minHeight: '1px',
+                  transition: 'height 0.2s ease',
+                }}
+              />
+            </div>
+          ))}
+        </div>
       )}
-    </Card>
+    </div>
   );
 }

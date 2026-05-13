@@ -6,7 +6,6 @@
  * Generates and tracks safety compliance checklists across zones.
  */
 
-import { Card, Title, Text, Button, Grid } from '@tremor/react'
 import { useGenerateOhsChecklist } from '@/lib/api/compliance'
 
 interface OHSPanelProps {
@@ -31,62 +30,61 @@ export function OHSPanel({ siteCode }: OHSPanelProps) {
 
   return (
     <div className="space-y-6">
-      <Card>
-        <Title>OHS Act Compliance Checklists</Title>
-        <Text className="mt-2 mb-4">Generate and track safety compliance across zones</Text>
+      <div className="rounded-lg p-4" style={{ background: "var(--sentinel-bg-panel)", border: "1px solid var(--sentinel-border)" }}>
+        <h3 className="text-sm font-medium" style={{ color: "var(--sentinel-text-primary)" }}>OHS Act Compliance Checklists</h3>
+        <span className="mt-2 mb-4 block" style={{ color: "var(--sentinel-text-secondary)" }}>Generate and track safety compliance across zones</span>
 
-        <Grid className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {zones.map((zone) => (
-            <Card key={zone} className="border border-gray-200">
+            <div key={zone} className="rounded-lg p-4" style={{ background: "var(--sentinel-bg-panel)", border: "1px solid var(--sentinel-border)" }}>
               <div className="flex justify-between items-center">
                 <div>
-                  <Title className="text-lg">{zone}</Title>
+                  <h3 className="text-lg font-medium" style={{ color: "var(--sentinel-text-primary)" }}>{zone}</h3>
                 </div>
-                <Button
-                  size="sm"
+                <button
+                  className="px-3 py-1.5 text-xs rounded font-medium"
+                  style={{ background: "var(--sentinel-bg-secondary)", color: "var(--sentinel-text-primary)" }}
+                  disabled={isPending}
                   onClick={() => handleGenerateChecklist(zone)}
-                  loading={isPending}
                 >
                   Generate
-                </Button>
+                </button>
               </div>
-            </Card>
+            </div>
           ))}
-        </Grid>
-      </Card>
+        </div>
+      </div>
 
-      {/* Active Checklists */}
-      <Card>
-        <Title>Active Checklists</Title>
+      <div className="rounded-lg p-4" style={{ background: "var(--sentinel-bg-panel)", border: "1px solid var(--sentinel-border)" }}>
+        <h3 className="text-sm font-medium" style={{ color: "var(--sentinel-text-primary)" }}>Active Checklists</h3>
         <div className="mt-4">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b">
-                <th className="text-left py-2">Zone</th>
-                <th className="text-left py-2">Items</th>
-                <th className="text-left py-2">Status</th>
-                <th className="text-left py-2">Action</th>
+              <tr className="border-b" style={{ borderColor: "var(--sentinel-border)" }}>
+                <th className="text-left py-2 font-medium" style={{ color: "var(--sentinel-text-secondary)" }}>Zone</th>
+                <th className="text-left py-2 font-medium" style={{ color: "var(--sentinel-text-secondary)" }}>Items</th>
+                <th className="text-left py-2 font-medium" style={{ color: "var(--sentinel-text-secondary)" }}>Status</th>
+                <th className="text-left py-2 font-medium" style={{ color: "var(--sentinel-text-secondary)" }}>Action</th>
               </tr>
             </thead>
             <tbody>
-              <tr className="border-b hover:bg-gray-50">
-                <td colSpan={4} className="py-4 text-center text-gray-500">
+              <tr className="border-b" style={{ borderColor: "var(--sentinel-border)" }}>
+                <td colSpan={4} className="py-4 text-center" style={{ color: "var(--sentinel-text-disabled)" }}>
                   No active checklists yet. Generate a new checklist above.
                 </td>
               </tr>
             </tbody>
           </table>
         </div>
-      </Card>
+      </div>
 
-      {/* Information */}
-      <Card className="border-l-4 border-blue-500 bg-blue-50">
-        <Title className="text-sm">OHS Act Requirements</Title>
-        <Text className="text-xs mt-2">
+      <div className="rounded-lg p-4" style={{ background: "rgba(59, 130, 246, 0.1)", borderLeft: "4px solid var(--sentinel-blue)" }}>
+        <h3 className="text-sm font-medium" style={{ color: "var(--sentinel-text-primary)" }}>OHS Act Requirements</h3>
+        <span className="text-xs mt-2 block" style={{ color: "var(--sentinel-text-secondary)" }}>
           Checklists are generated for each zone following South African OHS Act requirements. Each checklist
           tracks hazard identification, risk assessment, and control measures.
-        </Text>
-      </Card>
+        </span>
+      </div>
     </div>
   )
 }

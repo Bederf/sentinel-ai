@@ -17,8 +17,8 @@ import {
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 30 * 1000, // 30s default - data fresh for 30s
-      gcTime: 5 * 60 * 1000, // 5m - keep in cache 5m after all observers unsubscribe
+      staleTime: 60 * 1000, // 60s — reduce refetch churn (was 30s)
+      gcTime: 10 * 60 * 1000, // 10m — keep in cache longer after unsubscribe (was 5m)
       retry: (failureCount, error: unknown) => {
         // Check for ApiError object structure (status property)
         const apiError = error as { status?: number; message?: string } | null;

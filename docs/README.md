@@ -71,11 +71,13 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 - **[Privacy & Consent API](03-api-reference/privacy-api.md)** - POPIA consent, cross-border gating, data subject requests (DSR), and retention automation endpoints
 - [Block Bookings API](03-api-reference/block-bookings-api.md) - Azure AD OAuth + Graph API ingestion, security-hardened (Phase 184 v1.1)
 - **[ServiceNow API](03-api-reference/servicenow-api.md)** - Read-only ITSM endpoints for incidents, work orders, table queries, schema, history, and aggregates (Phase 138)
+- **[Work Orders API](03-api-reference/work_orders.md)** - 4-milestone SLA tracking (assigned → in_progress → resolved → verified), PATCH milestone endpoint, technician closeout flow, per-site SLA configuration (Phase 209)
 - **[Event Bus Monitoring API](03-api-reference/event-bus-api.md)** - Metrics, history, event chain lookup, subscription listing for the async event bus (Phase 139)
 - **[Dashboard Generator API](03-api-reference/dashboard-generator-api.md)** - Auto-generate dashboard cards, monitoring rules, health weights, and module suggestions from discovered equipment (Phase 141)
 - **[Plant Alerts API](04-features/plant-room-notification-pipeline.md#api-reference)** - Desigo fault email ingest, alarm retrieval, throttle status, acknowledgement (Phase 146)
 - **[Gateway Log API](03-api-reference/gateway-log-api.md)** - Sentry gateway tool-level observability, activity log query (ADR-001)
 - **[AI Usage & Cost Tracking API](03-api-reference/ai-usage-api.md)** - Token usage summaries, daily breakdowns, exchange rate config, per-provider/model cost tracking (v48.0)
+- **[IPMVP M&V API](03-api-reference/ipmvp-api.md)** - IPMVP 2022 Option C (Whole Facility) and Option A (Retrofit Isolation) reporting, OLS baseline regression, CV(RMSE)% uncertainty, load shedding exclusion (Sprint 2)
 - **[Alert Routing API](03-api-reference/buildings.md)** - Configurable alert routing rules, equipment muting, channel status (Phase 159)
 - **[Semantic Classification API](03-api-reference/semantic-classification-api.md)** - Classify BACnet/DALI points against 47-tag Haystack dictionary, batch equipment classification, tag dictionary inspection (Phase 162)
 

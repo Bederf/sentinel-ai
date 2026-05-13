@@ -39,8 +39,10 @@ def describe_focus_session_state(
     overstay red-light indicator should be on right now.
     """
     current_time = now or datetime.utcnow()
-    extended_threshold = extended_use_seconds or _get_extended_use_seconds()
+    base_threshold = extended_use_seconds or _get_extended_use_seconds()
     cooldown_threshold = red_light_cooldown_seconds or _get_red_light_cooldown_seconds()
+    grace_seconds = (session.overstay_grace_minutes or 0) * 60
+    extended_threshold = base_threshold + grace_seconds
 
     if session.is_active:
         duration_seconds = max(int((current_time - session.start_time).total_seconds()), 0)

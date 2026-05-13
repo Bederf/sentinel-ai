@@ -44,12 +44,14 @@ def _resolve_model_metadata(state: SentinelAgentState) -> dict[str, Any]:
     routing_reason = "default_lightweight_local_path"
     escalation_trigger = ""
     hitl_required = bool(state.get("pending_approval"))
-    _mode, provider, model = model_gateway._resolve(selected_class)
+    _mode, _fallback_enabled, _routes = model_gateway._resolve(selected_class)
+    _primary_provider = _routes[0][0] if _routes else None
+    _primary_model = _routes[0][1] if _routes else None
     evidence_bundle = state.get("evidence_bundle") or {}
     evidence_present = {key: len(evidence_bundle.get(key, [])) for key in ("hybrid", "brick", "docs", "memory")}
     return {
-        "selected_model": model,
-        "selected_provider": provider,
+        "selected_model": _primary_model,
+        "selected_provider": _primary_provider,
         "selected_task_class": selected_class,
         "routing_reason": routing_reason,
         "confidence_score": (state.get("output_state") or {}).get("confidence_score", 0.0),

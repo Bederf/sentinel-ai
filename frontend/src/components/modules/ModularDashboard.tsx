@@ -6,7 +6,7 @@
  */
 
 import { useState, useEffect, Suspense, lazy } from 'react';
-import { Card, Title, Text, Grid, Tab, TabGroup, TabList, TabPanel, TabPanels, Badge, Flex } from '@tremor/react';
+
 import { useModules, useCriticalRecommendations } from '../../contexts/ModuleHooks';
 import { MODULE_COLORS } from '../../lib/moduleRegistry';
 import type { ModuleType } from '../../lib/moduleRegistry';
@@ -50,6 +50,7 @@ const LightingDashboard = lazy(() =>
 interface ModularDashboardProps {
   siteId?: string;
   siteName?: string;
+  sitePhase?: string;
   showModuleSelector?: boolean;
   showRecommendations?: boolean;
 }
@@ -67,6 +68,7 @@ const LoadingFallback = () => (
 export function ModularDashboard({
   siteId: propSiteId,
   siteName: propSiteName,
+  sitePhase,
   showModuleSelector = true,
   showRecommendations = true,
 }: ModularDashboardProps) {
@@ -167,7 +169,7 @@ export function ModularDashboard({
         <IntegrationStatusBar />
 
         {showRecommendations && criticalRecs.length > 0 && (
-          <AIRecommendationsPanel compact maxItems={3} />
+          <AIRecommendationsPanel compact maxItems={3} sitePhase={sitePhase} />
         )}
 
         <Suspense fallback={<LoadingFallback />}>
@@ -224,7 +226,7 @@ export function ModularDashboard({
       <TabPanel key="overview">
         <Grid className="grid grid-cols-2 gap-4">
           <div className="col-span-2 lg:col-span-1">
-            <AIRecommendationsPanel maxItems={5} />
+            <AIRecommendationsPanel maxItems={5} sitePhase={sitePhase} />
           </div>
           <div className="space-y-4">
             {activeModules.map(m => (

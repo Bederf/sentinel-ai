@@ -28,7 +28,14 @@ async def app_lifespan(app: FastAPI):
     try:
         yield
     finally:
-        await shutdown_event(app)
+        try:
+            await shutdown_event(app)
+        except asyncio.CancelledError:
+            # Suppress CancelledError during shutdown — suppress_exceptions=True
+            # prevents APScheduler jobs from propagating cancellation into the lifespan.
+            # The error log still shows the traceback from the old worker, which is
+            # harmless (it reflects the pre-fix state; the new code handles it cleanly).
+            pass
 
 
 def _parse_task_timestamp(value: object) -> datetime | None:
@@ -571,6 +578,14 @@ async def startup_event(app: FastAPI) -> None:
             _logger.info("✅ POPIA retention enforcement job initialized")
         except Exception as e:
             _logger.warning(f"⚠️ POPIA retention job initialization failed: {e}")
+
+    # Supabase SQL table retention (POPIA S14 — ML data 7d, snapshots 30d, audit 5y)
+    if settings.popia_retention_enabled:
+        try:
+            scheduler_service.add_supabase_retention_job(interval_seconds=settings.popia_retention_job_interval_seconds)
+            _logger.info("✅ Supabase SQL retention enforcement job initialized")
+        except Exception as e:
+            _logger.warning(f"⚠️ Supabase retention job initialization failed: {e}")
 
     # Daily AI cost report email (23:55 every day)
     try:

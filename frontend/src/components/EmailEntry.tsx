@@ -11,7 +11,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Mail, AlertCircle, Loader2, Info } from "lucide-react";
-import { authApi, type AuthUser } from '@/lib/api';
+import { authApi, type AuthUser, getAccessToken, setAccessToken, clearAccessToken } from '@/lib/api';
 
 interface EmailEntryProps {
   onSuccess: (user: AuthUser, token: string) => void;
@@ -30,7 +30,7 @@ export function EmailEntry({ onSuccess }: EmailEntryProps) {
 
   // Check for existing valid token on mount
   useEffect(() => {
-    const existingToken = localStorage.getItem("sentinel_token");
+    const existingToken = getAccessToken();
     if (existingToken) {
       // Verify the token is still valid
       authApi
@@ -41,14 +41,14 @@ export function EmailEntry({ onSuccess }: EmailEntryProps) {
             onSuccess(response.user, existingToken);
           } else {
             // Token invalid, clear it
-            localStorage.removeItem("sentinel_token");
+            clearAccessToken();
             localStorage.removeItem("sentinel_refresh_token");
             localStorage.removeItem("sentinel_user");
           }
         })
         .catch(() => {
           // Token verification failed, clear it
-          localStorage.removeItem("sentinel_token");
+          clearAccessToken();
           localStorage.removeItem("sentinel_refresh_token");
           localStorage.removeItem("sentinel_user");
         });
@@ -85,8 +85,8 @@ export function EmailEntry({ onSuccess }: EmailEntryProps) {
         throw new Error("Login did not return an access token");
       }
 
-      // Store token and user info
-      localStorage.setItem("sentinel_token", accessToken);
+      // Store access token in memory, refresh token in localStorage
+      setAccessToken(accessToken);
       if (refreshToken) {
         localStorage.setItem("sentinel_refresh_token", refreshToken);
       } else {

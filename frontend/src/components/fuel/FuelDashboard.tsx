@@ -8,7 +8,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { Card, Title, Text, Badge, Flex, Table, TableHead, TableRow, TableHeaderCell, TableBody, TableCell } from '@tremor/react';
+
 import { FuelTankCard } from './FuelTankCard';
 import { FuelTrendChart } from './FuelTrendChart';
 import { fuelApi } from '../../lib/api';

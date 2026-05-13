@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 # Pattern: /command_EQUIPMENT_CODE [optional trailing text]
 # Equipment codes use underscores in chat (S002_FCU_301), converted to dashes for APIs.
 _SLASH_RE = re.compile(
-    r"^/(info|WO|inspect|reset|note)_([A-Za-z0-9][\w-]*)(?:\s+(.+))?$",
+    r"^/(info|WO|inspect|reset|note|status_WO)[-_]([A-Za-z0-9][\w-]*)(?:\s+(.+))?$",
     re.DOTALL,
 )
 
@@ -301,6 +301,7 @@ async def execute(
         "inspect": _handle_inspect,
         "reset": _handle_reset,
         "note": _handle_note,
+        "status_WO": _handle_status_wo,
     }
     handler = handlers.get(command)
     if not handler:
@@ -599,4 +600,66 @@ async def _handle_note(code: str, extra: str | None, user: str | None) -> Comman
     c = _code_for_buttons(code)
     return CommandResult(
         message=(f"**Note saved** for `{code}`\n\n> {extra}\n\n---\n**Quick Actions:** `/info_{c}` \u00b7 `/WO_{c}`")
+    )
+
+
+async def _handle_status_wo(code: str, _extra: str | None, user: str | None) -> CommandResult:
+    """GET /api/sentry/wo-status?code={code} \u2014 check work order status.
+
+    Staff use this to check on their own reported issues.
+    """
+    async with httpx.AsyncClient(timeout=15) as client:
+        resp = await client.get(
+            f"{_base_url()}/api/sentry/wo-status",
+            params={"code": code},
+            headers=_sentry_headers(),
+        )
+
+    if resp.status_code == 404 or resp.status_code == 200:
+        data = resp.json()
+        if not data.get("found"):
+            return CommandResult(
+                message=f"Work order `{code}` not found. Please check the reference number.",
+                success=False,
+            )
+
+        status = data.get("status", "unknown")
+        priority = data.get("priority", "")
+        category = data.get("category", "")
+        title = data.get("title", "")
+        notes = data.get("notes", "")
+        assigned_to = data.get("assigned_to", "")
+        created_at = data.get("created_at", "")
+        updated_at = data.get("updated_at", "")
+        completed_at = data.get("completed_at", "")
+
+        lines = [
+            f"## \ud83d\udccb Work Order {code}",
+            "",
+            f"| Field | Value |",
+            f"|-------|-------|",
+            f"| **Status** | {status} |",
+        ]
+        if priority:
+            lines.append(f"| **Priority** | {priority} |")
+        if category:
+            lines.append(f"| **Category** | {category} |")
+        if title:
+            lines.append(f"| **Title** | {title} |")
+        if assigned_to:
+            lines.append(f"| **Assigned To** | {assigned_to} |")
+        if created_at:
+            lines.append(f"| **Created** | {created_at[:16] if len(created_at) > 16 else created_at} |")
+        if updated_at:
+            lines.append(f"| **Updated** | {updated_at[:16] if len(updated_at) > 16 else updated_at} |")
+        if completed_at:
+            lines.append(f"| **Completed** | {completed_at[:16] if len(completed_at) > 16 else completed_at} |")
+        if notes:
+            lines.append(f"| **Notes** | {notes} |")
+
+        return CommandResult(message="\n".join(lines))
+
+    return CommandResult(
+        message=f"Failed to look up `{code}` (HTTP {resp.status_code}). Please try again shortly.",
+        success=False,
     )

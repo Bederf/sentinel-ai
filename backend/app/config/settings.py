@@ -127,6 +127,11 @@ class Settings(BaseSettings):
     popia_retention_audit_days: int = 1825  # 5 years
     popia_retention_job_interval_seconds: int = 86400  # Daily
 
+    # Supabase SQL table retention (POPIA Section 14)
+    popia_retention_ml_training_days: int = 7  # ML training data — 7-day window
+    popia_retention_snapshot_days: int = 30  # Operational snapshots — 30-day window
+    popia_retention_audit_trail_days: int = 1825  # 5 years
+
     # ElevenLabs TTS (Voice Chat)
     elevenlabs_api_key: str = ""
     elevenlabs_voice_id: str = "21m00Tcm4TlvDq8ikWAM"  # Rachel
@@ -153,8 +158,8 @@ class Settings(BaseSettings):
     jwt_expiration_hours: int = 8  # DEPRECATED: Use jwt_access_token_ttl_minutes instead
     jwt_expiry_days: int = 30  # DEPRECATED: legacy compatibility only
 
-    # JWT access token TTL (Phase 65-02: short-lived tokens with refresh)
-    jwt_access_token_ttl_minutes: int = 15  # 15 minutes for access tokens
+    # JWT access token TTL (Phase 193: short-lived tokens for XSS risk reduction)
+    jwt_access_token_ttl_minutes: int = 12  # 12 minutes — balance UX vs security
 
     # JWT refresh token TTL (Phase 65-02: long-lived refresh tokens)
     jwt_refresh_token_ttl_days: int = 7  # 7 days for refresh tokens

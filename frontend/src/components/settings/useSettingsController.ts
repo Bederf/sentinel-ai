@@ -4,6 +4,7 @@ import { useRiskThresholds } from "../../hooks/useRiskThresholds";
 import { useModules } from "../../contexts/ModuleHooks";
 import { useBuildingsList } from "../../hooks/useBuildingsList";
 import { setStoredSelectedSite } from "../../lib/siteSelection";
+import { authorizedFetch, getAccessToken } from "@/lib/api";
 import {
   type FeatureToggleCard,
 } from "./settingsCatalog";
@@ -54,13 +55,7 @@ function useMlTrainingSettings(
   const [mlTrainingLoading, setMlTrainingLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem("sentinel_token");
-    if (!token) {
-      setMlTrainingLoading(false);
-      return;
-    }
-
-    fetch("/api/settings/ml-training", { headers: { Authorization: `Bearer ${token}` } })
+    authorizedFetch("/api/settings/ml-training")
       .then((response) => (response.ok ? response.json() : null))
       .then((data) => {
         if (data) setMlTrainingEnabled(!!data.enabled);
@@ -79,15 +74,11 @@ function useMlTrainingSettings(
       return;
     }
 
-    const token = localStorage.getItem("sentinel_token");
-    if (!token) return;
-
     const newValue = !mlTrainingEnabled;
     setMlTrainingLoading(true);
     try {
-      const response = await fetch("/api/settings/ml-training", {
+      const response = await authorizedFetch("/api/settings/ml-training", {
         method: "PUT",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ enabled: newValue }),
       });
       if (!response.ok) throw new Error("Failed to update ML training setting");
@@ -197,7 +188,7 @@ export function useSettingsController({ siteId, onError }: UseSettingsController
   const currentUser = getStoredSentinelUser();
   const currentUserRole = currentUser.role || "auditor";
   const currentUserEmail = currentUser.email || "";
-  const hasSessionToken = !!localStorage.getItem("sentinel_token");
+  const hasSessionToken = !!getAccessToken();
 
   const [selectedSiteId, setSelectedSiteId] = useState<string | null>(siteId || null);
   const [settingsPageUnlocked, setSettingsPageUnlocked] = useState(false);

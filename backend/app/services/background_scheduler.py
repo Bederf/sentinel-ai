@@ -1724,7 +1724,7 @@ class BackgroundSchedulerService:
                         source_module=ModuleType.HVAC,
                         recommendation_type=rec_type,
                         priority=priority,
-                        title=f"{title_prefix}: {eq['name']}",
+                        title=f"{title_prefix}: {eq.get('code', eq['name'])}",
                         description=description,
                         confidence=0.90 if prediction else 0.75,
                         related_modules=[],
@@ -2881,6 +2881,79 @@ class BackgroundSchedulerService:
                 logger.warning("Failed to write retention enforcement audit event: %s", exc)
         except Exception as e:
             logger.error(f"Failed to run POPIA retention enforcement: {e}", exc_info=True)
+
+    def add_supabase_retention_job(self, interval_seconds: int = 86400):
+        """Add periodic Supabase SQL table retention enforcement (POPIA S14)."""
+        job_id = "supabase_retention_enforcement"
+        if self.scheduler.get_job(job_id):
+            self.scheduler.remove_job(job_id)
+            logger.info("Removed existing Supabase retention enforcement job")
+
+        self.scheduler.add_job(
+            func=self._run_supabase_retention_enforcement,
+            trigger=IntervalTrigger(seconds=interval_seconds),
+            id=job_id,
+            name="Supabase SQL Retention Enforcement",
+            replace_existing=True,
+        )
+        logger.info(
+            "Added Supabase retention enforcement job with %ss interval (ML: 7d, Snapshots: 30d, Audit: 5y)",
+            interval_seconds,
+        )
+
+    def _run_supabase_retention_enforcement(self):
+        """Execute Supabase table retention enforcement and log summary."""
+        try:
+            from app.services.supabase_retention_service import get_supabase_retention_service
+
+            service = get_supabase_retention_service()
+
+            # TIER 2: ML training data — 7-day rolling delete
+            ml_result = service.run_ml_training_deletion(dry_run=False)
+
+            # TIER 4: Operational snapshots — 30-day rolling delete
+            snapshot_result = service.run_snapshot_deletion(dry_run=False)
+
+            # TIER 5: Audit trail — 5-year retention (weekly, low urgency)
+            audit_result = service.run_audit_trail_deletion(dry_run=False)
+
+            total_deleted = (
+                ml_result.total_deleted + snapshot_result.total_deleted + audit_result.total_deleted
+            )
+            total_reviewed = (
+                ml_result.total_reviewed + snapshot_result.total_reviewed + audit_result.total_reviewed
+            )
+            error_count = (
+                len(ml_result.errors) + len(snapshot_result.errors) + len(audit_result.errors)
+            )
+
+            logger.info(
+                "Supabase retention enforcement completed: deleted=%s reviewed=%s errors=%s",
+                total_deleted,
+                total_reviewed,
+                error_count,
+            )
+
+            try:
+                from app.services.audit_logger import AuditLogger
+
+                audit_logger = AuditLogger()
+                audit_logger.log_system_event(
+                    event_type="supabase_retention_enforcement",
+                    metadata={
+                        "total_deleted": total_deleted,
+                        "total_reviewed": total_reviewed,
+                        "error_count": error_count,
+                        "ml_deleted": ml_result.total_deleted,
+                        "snapshot_deleted": snapshot_result.total_deleted,
+                        "audit_deleted": audit_result.total_deleted,
+                        "dry_run": False,
+                    },
+                )
+            except Exception as exc:
+                logger.warning("Failed to write retention enforcement audit event: %s", exc)
+        except Exception as e:
+            logger.error(f"Failed to run Supabase retention enforcement: {e}", exc_info=True)
 
     def add_mip_dispatch_optimize_job(self, interval_seconds: int = 900):
         """Add a job to run MIP dispatch optimization every 15 minutes.

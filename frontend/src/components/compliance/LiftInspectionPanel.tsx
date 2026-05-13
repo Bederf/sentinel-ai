@@ -6,7 +6,6 @@
  * 6-month periodic, annual insurance, and post-repair inspection scheduling.
  */
 
-import { Card, Title, Table, TableHead, TableRow, TableHeaderCell, TableBody, TableCell, Button, Badge, Text, Grid } from '@tremor/react'
 import { useRecordLiftTestResults } from '@/lib/api/compliance'
 import { useState } from 'react'
 
@@ -64,42 +63,47 @@ export function LiftInspectionPanel({ siteCode: _siteCode }: LiftInspectionPanel
 
   return (
     <div className="space-y-6">
-      <Card>
-        <Title>Lift Safety Inspection Scheduling</Title>
-        <Text className="text-sm mt-2">South African lift safety regulations - Periodic, annual, and post-repair testing</Text>
+      <div className="rounded-lg p-4" style={{ background: "var(--sentinel-bg-panel)", border: "1px solid var(--sentinel-border)" }}>
+        <h3 className="text-sm font-medium" style={{ color: "var(--sentinel-text-primary)" }}>Lift Safety Inspection Scheduling</h3>
+        <span className="text-sm mt-2 block" style={{ color: "var(--sentinel-text-secondary)" }}>South African lift safety regulations - Periodic, annual, and post-repair testing</span>
 
-        <Grid className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-          <Card className="border border-gray-200">
-            <Title className="text-sm">6-Month Periodic</Title>
-            <Text className="text-xs mt-2">Standard periodic inspection cycle for passenger lifts</Text>
-          </Card>
-          <Card className="border border-gray-200">
-            <Title className="text-sm">Annual Insurance</Title>
-            <Text className="text-xs mt-2">Annual compliance check required for insurance validity</Text>
-          </Card>
-          <Card className="border border-gray-200">
-            <Title className="text-sm">Post-Repair</Title>
-            <Text className="text-xs mt-2">Required after major repair or component replacement</Text>
-          </Card>
-        </Grid>
-      </Card>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+          <div className="rounded-lg p-4" style={{ background: "var(--sentinel-bg-panel)", border: "1px solid var(--sentinel-border)" }}>
+            <h3 className="text-sm font-medium" style={{ color: "var(--sentinel-text-primary)" }}>6-Month Periodic</h3>
+            <span className="text-xs mt-2 block" style={{ color: "var(--sentinel-text-secondary)" }}>Standard periodic inspection cycle for passenger lifts</span>
+          </div>
+          <div className="rounded-lg p-4" style={{ background: "var(--sentinel-bg-panel)", border: "1px solid var(--sentinel-border)" }}>
+            <h3 className="text-sm font-medium" style={{ color: "var(--sentinel-text-primary)" }}>Annual Insurance</h3>
+            <span className="text-xs mt-2 block" style={{ color: "var(--sentinel-text-secondary)" }}>Annual compliance check required for insurance validity</span>
+          </div>
+          <div className="rounded-lg p-4" style={{ background: "var(--sentinel-bg-panel)", border: "1px solid var(--sentinel-border)" }}>
+            <h3 className="text-sm font-medium" style={{ color: "var(--sentinel-text-primary)" }}>Post-Repair</h3>
+            <span className="text-xs mt-2 block" style={{ color: "var(--sentinel-text-secondary)" }}>Required after major repair or component replacement</span>
+          </div>
+        </div>
+      </div>
 
-      <Card>
+      <div className="rounded-lg p-4" style={{ background: "var(--sentinel-bg-panel)", border: "1px solid var(--sentinel-border)" }}>
         <div className="flex justify-between items-center mb-4">
-          <Title>Lift Equipment Inventory</Title>
-          <Button size="sm" onClick={() => setShowTestForm(!showTestForm)}>
+          <h3 className="text-sm font-medium" style={{ color: "var(--sentinel-text-primary)" }}>Lift Equipment Inventory</h3>
+          <button
+            className="px-3 py-1.5 text-xs rounded font-medium"
+            style={{ background: "var(--sentinel-bg-secondary)", color: "var(--sentinel-text-primary)" }}
+            onClick={() => setShowTestForm(!showTestForm)}
+          >
             {showTestForm ? 'Cancel' : 'Record Test'}
-          </Button>
+          </button>
         </div>
 
         {showTestForm && (
-          <div className="border rounded p-4 mb-4 bg-gray-50">
+          <div className="rounded p-4 mb-4" style={{ background: "var(--sentinel-bg-secondary)", border: "1px solid var(--sentinel-border)" }}>
             <div className="mb-4">
-              <label className="text-sm font-medium">Lift Code</label>
+              <label className="text-sm font-medium" style={{ color: "var(--sentinel-text-primary)" }}>Lift Code</label>
               <select
                 value={testFormData.liftCode}
                 onChange={(e) => setTestFormData({ ...testFormData, liftCode: e.target.value })}
                 className="w-full mt-1 px-3 py-2 border rounded text-sm"
+                style={{ borderColor: "var(--sentinel-border)", background: "var(--sentinel-bg-panel)", color: "var(--sentinel-text-primary)" }}
               >
                 <option value="">Select lift...</option>
                 {lifts.map((lift) => (
@@ -119,7 +123,7 @@ export function LiftInspectionPanel({ siteCode: _siteCode }: LiftInspectionPanel
                   onChange={(e) => setTestFormData({ ...testFormData, brake_load_test: e.target.checked })}
                   className="h-4 w-4"
                 />
-                <label htmlFor="brake-test" className="ml-2 text-sm">
+                <label htmlFor="brake-test" className="ml-2 text-sm" style={{ color: "var(--sentinel-text-primary)" }}>
                   Brake Load Test
                 </label>
               </div>
@@ -131,7 +135,7 @@ export function LiftInspectionPanel({ siteCode: _siteCode }: LiftInspectionPanel
                   onChange={(e) => setTestFormData({ ...testFormData, speed_governor_test: e.target.checked })}
                   className="h-4 w-4"
                 />
-                <label htmlFor="governor-test" className="ml-2 text-sm">
+                <label htmlFor="governor-test" className="ml-2 text-sm" style={{ color: "var(--sentinel-text-primary)" }}>
                   Speed Governor Test
                 </label>
               </div>
@@ -143,89 +147,95 @@ export function LiftInspectionPanel({ siteCode: _siteCode }: LiftInspectionPanel
                   onChange={(e) => setTestFormData({ ...testFormData, emergency_stop_test: e.target.checked })}
                   className="h-4 w-4"
                 />
-                <label htmlFor="emc-test" className="ml-2 text-sm">
+                <label htmlFor="emc-test" className="ml-2 text-sm" style={{ color: "var(--sentinel-text-primary)" }}>
                   Emergency Stop Test
                 </label>
               </div>
             </div>
 
-            <Button onClick={handleRecordTestResults} loading={isPending}>
+            <button
+              className="px-3 py-1.5 text-xs rounded font-medium"
+              style={{ background: "var(--sentinel-blue)", color: "white" }}
+              disabled={isPending}
+              onClick={handleRecordTestResults}
+            >
               Save Test Results
-            </Button>
+            </button>
           </div>
         )}
 
-        <Table className="mt-4">
-          <TableHead>
-            <TableRow>
-              <TableHeaderCell>Lift Code</TableHeaderCell>
-              <TableHeaderCell>Location</TableHeaderCell>
-              <TableHeaderCell>Inspection Type</TableHeaderCell>
-              <TableHeaderCell>Last Inspection</TableHeaderCell>
-              <TableHeaderCell>Next Due</TableHeaderCell>
-              <TableHeaderCell>Compliance</TableHeaderCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
+        <table className="w-full text-sm mt-4">
+          <thead>
+            <tr className="border-b" style={{ borderColor: "var(--sentinel-border)" }}>
+              <th className="text-left py-2 font-medium" style={{ color: "var(--sentinel-text-secondary)" }}>Lift Code</th>
+              <th className="text-left py-2 font-medium" style={{ color: "var(--sentinel-text-secondary)" }}>Location</th>
+              <th className="text-left py-2 font-medium" style={{ color: "var(--sentinel-text-secondary)" }}>Inspection Type</th>
+              <th className="text-left py-2 font-medium" style={{ color: "var(--sentinel-text-secondary)" }}>Last Inspection</th>
+              <th className="text-left py-2 font-medium" style={{ color: "var(--sentinel-text-secondary)" }}>Next Due</th>
+              <th className="text-left py-2 font-medium" style={{ color: "var(--sentinel-text-secondary)" }}>Compliance</th>
+            </tr>
+          </thead>
+          <tbody>
             {lifts.map((lift) => (
-              <TableRow key={lift.code}>
-                <TableCell className="font-medium">{lift.code}</TableCell>
-                <TableCell>{lift.location}</TableCell>
-                <TableCell className="capitalize">{lift.type.replace(/_/g, ' ')}</TableCell>
-                {/* eslint-disable-next-line react-hooks/purity */}
-                <TableCell>{new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toLocaleDateString()}</TableCell>
-                <TableCell>
-                  {/* eslint-disable-next-line react-hooks/purity */}
+              <tr key={lift.code} className="border-b" style={{ borderColor: "var(--sentinel-border)" }}>
+                <td className="py-2 font-medium">{lift.code}</td>
+                <td className="py-2">{lift.location}</td>
+                <td className="py-2 capitalize">{lift.type.replace(/_/g, ' ')}</td>
+                <td className="py-2">{new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toLocaleDateString()}</td>
+                <td className="py-2">
                   {new Date(Date.now() + (lift.type === 'periodic_6monthly' ? 180 : 365) * 24 * 60 * 60 * 1000).toLocaleDateString()}
-                </TableCell>
-                <TableCell>
-                  <Badge color="green">Compliant</Badge>
-                </TableCell>
-              </TableRow>
+                </td>
+                <td className="py-2">
+                  <span
+                    className="text-xs px-2 py-0.5 rounded font-medium"
+                    style={{ background: "rgba(34, 197, 94, 0.15)", color: "var(--sentinel-green)" }}
+                  >
+                    Compliant
+                  </span>
+                </td>
+              </tr>
             ))}
-          </TableBody>
-        </Table>
-      </Card>
+          </tbody>
+        </table>
+      </div>
 
-      {/* Test Requirements */}
-      <Card>
-        <Title>Lift Test Requirements</Title>
-        <Text className="text-sm mt-2 mb-4">South African lift safety standards - Key test points</Text>
+      <div className="rounded-lg p-4" style={{ background: "var(--sentinel-bg-panel)", border: "1px solid var(--sentinel-border)" }}>
+        <h3 className="text-sm font-medium" style={{ color: "var(--sentinel-text-primary)" }}>Lift Test Requirements</h3>
+        <span className="text-sm mt-2 mb-4 block" style={{ color: "var(--sentinel-text-secondary)" }}>South African lift safety standards - Key test points</span>
 
-        <Grid className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card className="border border-gray-200">
-            <Title className="text-sm">Brake Load Test</Title>
-            <Text className="text-xs mt-2">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="rounded-lg p-4" style={{ background: "var(--sentinel-bg-panel)", border: "1px solid var(--sentinel-border)" }}>
+            <h3 className="text-sm font-medium" style={{ color: "var(--sentinel-text-primary)" }}>Brake Load Test</h3>
+            <span className="text-xs mt-2 block" style={{ color: "var(--sentinel-text-secondary)" }}>
               Verifies emergency brake capacity and safe stopping distance from full speed
-            </Text>
-          </Card>
-          <Card className="border border-gray-200">
-            <Title className="text-sm">Speed Governor Test</Title>
-            <Text className="text-xs mt-2">
+            </span>
+          </div>
+          <div className="rounded-lg p-4" style={{ background: "var(--sentinel-bg-panel)", border: "1px solid var(--sentinel-border)" }}>
+            <h3 className="text-sm font-medium" style={{ color: "var(--sentinel-text-primary)" }}>Speed Governor Test</h3>
+            <span className="text-xs mt-2 block" style={{ color: "var(--sentinel-text-secondary)" }}>
               Confirms overspeed protection triggers at designated threshold
-            </Text>
-          </Card>
-          <Card className="border border-gray-200">
-            <Title className="text-sm">Emergency Stop Test</Title>
-            <Text className="text-xs mt-2">
+            </span>
+          </div>
+          <div className="rounded-lg p-4" style={{ background: "var(--sentinel-bg-panel)", border: "1px solid var(--sentinel-border)" }}>
+            <h3 className="text-sm font-medium" style={{ color: "var(--sentinel-text-primary)" }}>Emergency Stop Test</h3>
+            <span className="text-xs mt-2 block" style={{ color: "var(--sentinel-text-secondary)" }}>
               Tests all emergency stop buttons and rope-break switches for immediate halt
-            </Text>
-          </Card>
-        </Grid>
-      </Card>
+            </span>
+          </div>
+        </div>
+      </div>
 
-      {/* Non-Compliance Alert */}
-      <Card className="border-l-4 border-red-500 bg-red-50">
-        <Title className="text-sm">Non-Compliance Alert Protocol</Title>
-        <Text className="text-xs mt-2">
+      <div className="rounded-lg p-4" style={{ background: "rgba(239, 68, 68, 0.1)", borderLeft: "4px solid var(--sentinel-red)" }}>
+        <h3 className="text-sm font-medium" style={{ color: "var(--sentinel-text-primary)" }}>Non-Compliance Alert Protocol</h3>
+        <div className="text-xs mt-2" style={{ color: "var(--sentinel-text-secondary)" }}>
           <ul className="list-disc list-inside space-y-1 mt-2">
             <li>Failed test items must be recorded and remediated before next use</li>
             <li>Work orders auto-generated for non-compliant test results</li>
             <li>Lift taken out of service until remediation verified</li>
             <li>Post-repair inspection required after any failed component replacement</li>
           </ul>
-        </Text>
-      </Card>
+        </div>
+      </div>
     </div>
   )
 }

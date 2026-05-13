@@ -11,7 +11,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { Card, Badge, Button } from '@tremor/react';
+
 import {
   Calendar,
   CheckCircle,
@@ -134,24 +134,24 @@ export default function InspectionPanel({
 
   if (loading) {
     return (
-      <Card className="animate-pulse">
+      <div className="rounded-lg p-4 animate-pulse" style={{ background: 'var(--color-sentinel-bg-panel)', border: '1px solid var(--color-sentinel-border)' }}>
         <div className="h-8 bg-gray-200 rounded w-1/3 mb-4"></div>
         <div className="space-y-3">
           <div className="h-16 bg-gray-200 rounded"></div>
           <div className="h-16 bg-gray-200 rounded"></div>
         </div>
-      </Card>
+      </div>
     );
   }
 
   if (error) {
     return (
-      <Card>
-        <div className="flex items-center gap-2 text-red-600">
+      <div className="rounded-lg p-4" style={{ background: 'var(--color-sentinel-bg-panel)', border: '1px solid var(--color-sentinel-border)' }}>
+        <div className="flex items-center gap-2" style={{ color: 'var(--color-sentinel-red)' }}>
           <AlertTriangle className="h-5 w-5" />
           <span>{error}</span>
         </div>
-      </Card>
+      </div>
     );
   }
 
@@ -159,50 +159,44 @@ export default function InspectionPanel({
     <div className={`space-y-4 ${compact ? '' : 'pb-6'}`}>
       {/* Quick Stats */}
       <div className="grid grid-cols-3 gap-2">
-        <Card className="p-3">
-          <div className="text-center">
-            <Calendar className="mx-auto h-5 w-5 text-blue-500" />
-            <p className="mt-1 text-xl font-semibold">{schedule.length}</p>
-            <p className="text-xs text-gray-500">Scheduled</p>
-          </div>
-        </Card>
-        <Card className="p-3">
-          <div className="text-center">
-            <CheckCircle className="mx-auto h-5 w-5 text-green-500" />
-            <p className="mt-1 text-xl font-semibold">{completedCount}</p>
-            <p className="text-xs text-gray-500">Completed</p>
-          </div>
-        </Card>
-        <Card className="p-3">
-          <div className="text-center">
-            <AlertTriangle className="mx-auto h-5 w-5 text-amber-500" />
-            <p className="mt-1 text-xl font-semibold">{deficiencyCount}</p>
-            <p className="text-xs text-gray-500">Deficiencies</p>
-          </div>
-        </Card>
+        <div className="p-3 rounded-lg text-center" style={{ background: 'var(--color-sentinel-bg-panel)', border: '1px solid var(--color-sentinel-border)' }}>
+          <Calendar className="mx-auto h-5 w-5" style={{ color: 'var(--color-sentinel-blue)' }} />
+          <p className="mt-1 text-xl font-semibold" style={{ color: 'var(--color-sentinel-text-primary)' }}>{schedule.length}</p>
+          <p className="text-xs" style={{ color: 'var(--color-sentinel-text-secondary)' }}>Scheduled</p>
+        </div>
+        <div className="p-3 rounded-lg text-center" style={{ background: 'var(--color-sentinel-bg-panel)', border: '1px solid var(--color-sentinel-border)' }}>
+          <CheckCircle className="mx-auto h-5 w-5" style={{ color: 'var(--color-sentinel-green)' }} />
+          <p className="mt-1 text-xl font-semibold" style={{ color: 'var(--color-sentinel-text-primary)' }}>{completedCount}</p>
+          <p className="text-xs" style={{ color: 'var(--color-sentinel-text-secondary)' }}>Completed</p>
+        </div>
+        <div className="p-3 rounded-lg text-center" style={{ background: 'var(--color-sentinel-bg-panel)', border: '1px solid var(--color-sentinel-border)' }}>
+          <AlertTriangle className="mx-auto h-5 w-5" style={{ color: 'var(--color-sentinel-amber)' }} />
+          <p className="mt-1 text-xl font-semibold" style={{ color: 'var(--color-sentinel-text-primary)' }}>{deficiencyCount}</p>
+          <p className="text-xs" style={{ color: 'var(--color-sentinel-text-secondary)' }}>Deficiencies</p>
+        </div>
       </div>
 
       {/* Overdue Alert */}
       {overdueCount > 0 && (
-        <Card className="bg-red-50 border-red-200">
-          <div className="flex items-center gap-2 text-red-700">
+        <div className="p-3 rounded-lg" style={{ background: 'rgba(220, 38, 38, 0.1)', border: '1px solid rgba(220, 38, 38, 0.3)' }}>
+          <div className="flex items-center gap-2" style={{ color: 'var(--color-sentinel-red)' }}>
             <AlertTriangle className="h-5 w-5" />
             <span className="font-medium">
               {overdueCount} overdue inspection{overdueCount > 1 ? 's' : ''}
             </span>
           </div>
-        </Card>
+        </div>
       )}
 
       {/* Upcoming Schedule */}
-      <Card>
+      <div className="rounded-lg p-4" style={{ background: 'var(--color-sentinel-bg-panel)', border: '1px solid var(--color-sentinel-border)' }}>
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-medium text-gray-900">Upcoming Inspections</h3>
-          <Badge color="blue">{schedule.length}</Badge>
+          <h3 className="text-sm font-medium" style={{ color: 'var(--color-sentinel-text-primary)' }}>Upcoming Inspections</h3>
+          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium" style={{ background: 'rgba(59, 130, 246, 0.15)', color: 'var(--color-sentinel-blue)' }}>{schedule.length}</span>
         </div>
 
         {schedule.length === 0 ? (
-          <p className="text-sm text-gray-500 py-4 text-center">
+          <p className="text-sm py-4 text-center" style={{ color: 'var(--color-sentinel-text-secondary)' }}>
             No inspections scheduled
           </p>
         ) : (
@@ -210,77 +204,85 @@ export default function InspectionPanel({
             {schedule.slice(0, compact ? 3 : 5).map((item) => (
               <div
                 key={item.id}
-                className="flex items-center justify-between p-2 bg-gray-50 rounded-lg"
+                className="flex items-center justify-between p-2 rounded-lg"
+                style={{ background: 'var(--color-sentinel-bg-secondary)' }}
               >
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900 truncate">
+                  <p className="text-sm font-medium truncate" style={{ color: 'var(--color-sentinel-text-primary)' }}>
                     {item.schedule_name}
                   </p>
-                  <div className="flex items-center gap-2 text-xs text-gray-500">
+                  <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--color-sentinel-text-secondary)' }}>
                     <Clock className="h-3 w-3" />
                     <span>Due: {formatDate(item.next_due_date)}</span>
                     <span className="text-gray-300">|</span>
                     <span>{item.duration_minutes}min</span>
                   </div>
                 </div>
-                <Badge color={getPriorityColor(item.priority)} size="xs">
+                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium" style={{
+                  background: getPriorityColor(item.priority) === 'red' ? 'rgba(220, 38, 38, 0.15)' : getPriorityColor(item.priority) === 'yellow' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(59, 130, 246, 0.15)',
+                  color: getPriorityColor(item.priority) === 'red' ? 'var(--color-sentinel-red)' : getPriorityColor(item.priority) === 'yellow' ? 'var(--color-sentinel-amber)' : 'var(--color-sentinel-blue)',
+                }}>
                   {item.priority}
-                </Badge>
+                </span>
               </div>
             ))}
           </div>
         )}
-      </Card>
+      </div>
 
       {/* Recent History */}
       {!compact && history.length > 0 && (
-        <Card>
+        <div className="rounded-lg p-4" style={{ background: 'var(--color-sentinel-bg-panel)', border: '1px solid var(--color-sentinel-border)' }}>
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-medium text-gray-900">Recent Inspections</h3>
-            <Badge color="gray">{history.length}</Badge>
+            <h3 className="text-sm font-medium" style={{ color: 'var(--color-sentinel-text-primary)' }}>Recent Inspections</h3>
+            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium" style={{ background: 'rgba(107, 114, 128, 0.15)', color: 'var(--color-sentinel-text-secondary)' }}>{history.length}</span>
           </div>
 
           <div className="space-y-2">
             {history.slice(0, 5).map((task) => (
               <div
                 key={task.id}
-                className="flex items-center justify-between p-2 bg-gray-50 rounded-lg"
+                className="flex items-center justify-between p-2 rounded-lg"
+                style={{ background: 'var(--color-sentinel-bg-secondary)' }}
               >
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900 truncate">
+                  <p className="text-sm font-medium truncate" style={{ color: 'var(--color-sentinel-text-primary)' }}>
                     {task.task_name}
                   </p>
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs" style={{ color: 'var(--color-sentinel-text-secondary)' }}>
                     {formatDate(task.completed_date || task.due_date)}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
                   {task.deficiencies_found && task.deficiencies_found > 0 && (
-                    <Badge color="red" size="xs">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium" style={{ background: 'rgba(220, 38, 38, 0.15)', color: 'var(--color-sentinel-red)' }}>
                       {task.deficiencies_found} issues
-                    </Badge>
+                    </span>
                   )}
-                  <Badge color={getStatusColor(task.status)} size="xs">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium" style={{
+                    background: getStatusColor(task.status) === 'green' ? 'rgba(16, 185, 129, 0.15)' : getStatusColor(task.status) === 'yellow' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(107, 114, 128, 0.15)',
+                    color: getStatusColor(task.status) === 'green' ? 'var(--color-sentinel-green)' : getStatusColor(task.status) === 'yellow' ? 'var(--color-sentinel-amber)' : 'var(--color-sentinel-text-secondary)',
+                  }}>
                     {task.status}
-                  </Badge>
+                  </span>
                 </div>
               </div>
             ))}
           </div>
-        </Card>
+        </div>
       )}
 
       {/* Start Inspection Button */}
       {equipmentId && onStartInspection && (
-        <Button
-          size="lg"
-          className="w-full"
+        <button
+          className="w-full px-4 py-3 rounded-lg text-sm font-medium flex items-center justify-center transition-colors"
+          style={{ background: 'var(--color-sentinel-blue)', color: '#fff', border: 'none', cursor: 'pointer' }}
           onClick={() => onStartInspection(equipmentId)}
         >
           <ClipboardList className="h-5 w-5 mr-2" />
           Start Inspection
           <ChevronRight className="h-5 w-5 ml-2" />
-        </Button>
+        </button>
       )}
     </div>
   );

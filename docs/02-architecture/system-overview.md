@@ -599,7 +599,7 @@ flowchart TB
 - **Framework:** React 18 + TypeScript
 - **Build:** Vite
 - **State:** React hooks (no Redux)
-- **UI:** Tailwind CSS + Tremor
+- **UI:** Tailwind CSS + Sentinel design system (CSS variables, no Tremor)
 - **Testing:** Vitest
 - **Linting:** ESLint
 

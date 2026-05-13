@@ -339,9 +339,10 @@ interface BlockBookingDetailProps {
   roomId: string;
   signalId: string;
   onBack: () => void;
+  onResolved?: () => void;
 }
 
-function BlockBookingDetail({ detail, siteId, roomId, signalId, onBack }: BlockBookingDetailProps) {
+function BlockBookingDetail({ detail, siteId, roomId, signalId, onBack, onResolved }: BlockBookingDetailProps) {
   const [processing, setProcessing] = useState<"resolve" | "archive" | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -399,6 +400,7 @@ function BlockBookingDetail({ detail, siteId, roomId, signalId, onBack }: BlockB
           : "Archived via block booking detail",
       );
       setFeedback(mode === "resolve" ? "Resolved" : "Archived");
+      onResolved?.();
       onBack();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to update status");
@@ -773,6 +775,7 @@ export function SignalDrillDown({ siteId, roomId, signalId, room, onSignalSelect
               roomId={roomId}
               signalId={signalId}
               onBack={onBack}
+              onResolved={onResolved}
             />
           ) : (
             <>

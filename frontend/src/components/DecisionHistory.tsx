@@ -3,6 +3,7 @@ import { Card } from './Card';
 import { Badge } from './Badge';
 import { Download, Filter, ChevronDown, ChevronUp } from 'lucide-react';
 import { api } from '@/lib/api';
+import { PageLoading } from './PageLoading';
 
 interface Decision {
   id: string;
@@ -320,9 +321,7 @@ export const DecisionHistory: React.FC<DecisionHistoryProps> = ({
 
         {/* Decision List */}
         {isLoading ? (
-          <div className="flex items-center justify-center py-8">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
-          </div>
+          <PageLoading compact message="Loading decisions..." />
         ) : (
           <div className="space-y-2">
             {filteredDecisions.length === 0 ? (

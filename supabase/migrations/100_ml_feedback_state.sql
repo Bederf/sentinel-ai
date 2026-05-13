@@ -15,3 +15,6 @@ CREATE TRIGGER update_ml_feedback_state_updated_at
 
 CREATE INDEX IF NOT EXISTS idx_ml_feedback_state_updated_at
   ON public.ml_feedback_state(updated_at DESC);
+
+-- Allow service role (anon + authenticated bypass RLS for backend service account)
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.ml_feedback_state TO service_role;

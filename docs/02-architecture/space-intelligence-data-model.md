@@ -65,15 +65,16 @@ estimated_read_time: 10
                      |                                     |
                      v                                     v
           +----------------------+             +----------------------+
-          |  occupancy_events    |             | meeting_audit        |
-          |----------------------|             |----------------------|
-          | event_id (PK)        |             | audit_id (PK)        |
-          | sensor_id (FK)       |             | booking_id (FK)      |
-          | room_id (FK)         |             | room_id (FK)         |
-          | event_time           |             | occupied_within_20m  |
-          | occupied             |             | ghost_booking        |
-          | source               |             | actual_first_seen    |
-          | raw_payload          |             | actual_last_seen     |
+           |  occupancy_events    |             | meeting_audit        |
+           |----------------------|             |----------------------|
+           | event_id (PK)        |             | audit_id (PK)        |
+           | sensor_id (FK)       |             | booking_id (FK)      |
+           | room_id (FK)         |             | room_id (FK)         |
+           | event_time           |             | occupied_within_20m  |
+           | occupied             |             | ghost_booking        |
+           | source               |             | actual_first_seen    |
+           | raw_payload          |             | actual_last_seen     |
+           | door_closed          |             | notes                |
           +----------+-----------+             | notes                |
                      |                         +----------------------+
                      |
@@ -86,11 +87,12 @@ estimated_read_time: 10
 | session_id (PK)      |   | session_id (PK)      |
 | room_id (FK)         |   | room_id (FK)         |
 | sensor_id (FK)       |   | sensor_id (FK)       |
-| start_time           |   | start_time           |
-| end_time             |   | end_time             |
-| duration_seconds     |   | duration_seconds     |
-| occupied_peak        |   | extended_use         |
-| derived_from_events  |   | over_limit_minutes   |
+           | start_time           |   | start_time           |
+           | end_time             |   | end_time             |
+           | duration_seconds     |   | duration_seconds     |
+           | occupied_peak        |   | extended_use         |
+           | derived_from_events  |   | door_closed          |
+           |                      |   | overstay_grace_min   |
 +----------+-----------+   +----------+-----------+
            |                              |
            +---------------+--------------+

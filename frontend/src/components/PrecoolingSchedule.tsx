@@ -11,7 +11,7 @@
  */
 
 import { useState } from "react";
-import { Card, Title, Text, Badge } from "@tremor/react";
+
 import { Clock, Thermometer, Zap, CheckCircle, AlertTriangle, Play } from "lucide-react";
 
 interface ScheduleSegment {
@@ -386,7 +386,7 @@ export function PrecoolingSchedule({
 
       {/* Legend */}
       <div className="mt-6 pt-6 border-t border-gray-700">
-        <Text className="font-medium mb-3">Timeline Legend</Text>
+        <span className="text-sm font-medium mb-3" style={{ color: 'var(--color-sentinel-text-primary)' }}>Timeline Legend</span>
         <div className="flex flex-wrap gap-4">
           <div className="flex items-center gap-2">
             <div className="w-4 h-4 rounded bg-blue-900/20 border border-blue-500/50"></div>

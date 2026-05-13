@@ -13,19 +13,7 @@
  */
 
 import { useContext, useState, useEffect, useCallback, type ReactElement } from "react";
-import {
-  Text,
-  Badge,
-  Flex,
-  Grid,
-  Tab,
-  TabGroup,
-  TabList,
-  TabPanel,
-  TabPanels,
-  AreaChart,
-  BarChart,
-} from "@tremor/react";
+
 import {
   Shield,
   ShieldCheck,

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card } from './Card';
 import { AlertCircle, Save, RotateCcw } from 'lucide-react';
 import { api } from '@/lib/api';
+import { PageLoading } from './PageLoading';
 
 interface BoundaryConfig {
   device_id: string;
@@ -161,9 +162,7 @@ export const SafetyBoundaryConfig: React.FC<SafetyBoundaryConfigProps> = ({
       </div>
 
       {isLoading ? (
-        <div className="flex items-center justify-center py-8">
-          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
-        </div>
+        <PageLoading compact message="Loading boundary configuration..." />
       ) : (
         <div className="space-y-4">
           {boundaries.length === 0 ? (

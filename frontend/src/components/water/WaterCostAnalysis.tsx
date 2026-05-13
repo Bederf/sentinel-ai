@@ -1,25 +1,4 @@
-/**
- * WaterCostAnalysis - Water cost tracking and forecasting dashboard
- *
- * Displays:
- * - Current period costs and KPIs
- * - 30-day cost forecast with confidence band
- * - Monthly/annual projections
- * - Scenario analysis (what-if reduction)
- * - Tariff breakdown by tier
- */
-
 import { useState } from "react";
-import {
-  Text,
-  LineChart,
-  BarChart,
-  Tab,
-  TabGroup,
-  TabList,
-  TabPanels,
-  TabPanel,
-} from "@tremor/react";
 import { useQuery } from "@tanstack/react-query";
 
 interface CostAnalysis {
@@ -131,9 +110,9 @@ export const WaterCostAnalysis: React.FC<WaterCostAnalysisProps> = ({
     return (
       <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
         <div className="flex items-center justify-center h-64">
-          <Text style={{ color: "var(--color-sentinel-text-secondary)" }}>
+          <span style={{ color: "var(--color-sentinel-text-secondary)" }}>
             Loading cost analysis...
-          </Text>
+          </span>
         </div>
       </div>
     );
@@ -178,127 +157,185 @@ export const WaterCostAnalysis: React.FC<WaterCostAnalysisProps> = ({
     },
   ];
 
-  return (
-    <TabGroup index={activeTabIndex} onIndexChange={setActiveTabIndex}>
-      <TabList className="mb-6 overflow-x-auto">
-        <Tab>Current</Tab>
-        <Tab>Forecast</Tab>
-        <Tab>Tariff</Tab>
-      </TabList>
+  const TABS = ["Current", "Forecast", "Tariff"];
+  const maxCostBreakdown = Math.max(...costBreakdownData.map(d => d["Cost (R)"]));
+  const maxForecast = forecastChartData.length > 0 ? Math.max(...forecastChartData.map(d => d["Projected Cost"])) : 0;
 
-      <TabPanels>
+  return (
+    <div>
+      <div className="flex gap-1 mb-6 overflow-x-auto border-b" style={{ borderColor: "var(--color-sentinel-border)" }}>
+        {TABS.map((tab, i) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTabIndex(i)}
+            className="px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors rounded-t"
+            style={{
+              color: activeTabIndex === i ? "var(--color-sentinel-text-primary)" : "var(--color-sentinel-text-secondary)",
+              borderBottom: activeTabIndex === i ? "2px solid var(--color-sentinel-blue)" : "2px solid transparent",
+              background: activeTabIndex === i ? "var(--color-sentinel-bg-panel)" : "transparent",
+            }}
+          >
+            {tab}
+          </button>
+        ))}
+      </div>
+
+      <div>
         {/* Current Period Tab */}
-        <TabPanel>
+        {activeTabIndex === 0 && (
           <div className="space-y-6">
             {/* KPI Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
-                <Text
+                <span
                   style={{ color: "var(--color-sentinel-text-secondary)" }}
                   className="text-xs"
                 >
                   Current Period Total
-                </Text>
+                </span>
                 <p className="text-xl font-semibold mt-2" style={{ color: "var(--color-sentinel-text-primary)" }}>
                   R{costData.total_cost.toLocaleString()}
                 </p>
-                <Text className="text-xs mt-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                <span className="text-xs mt-1 block" style={{ color: "var(--color-sentinel-text-secondary)" }}>
                   February 2026
-                </Text>
+                </span>
               </div>
 
               <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
-                <Text
+                <span
                   style={{ color: "var(--color-sentinel-text-secondary)" }}
                   className="text-xs"
                 >
                   Average Daily Cost
-                </Text>
+                </span>
                 <p className="text-xl font-semibold mt-2" style={{ color: "var(--color-sentinel-text-primary)" }}>
                   R{costData.avg_daily_cost.toLocaleString()}
                 </p>
-                <Text className="text-xs mt-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                <span className="text-xs mt-1 block" style={{ color: "var(--color-sentinel-text-secondary)" }}>
                   Last 7 days
-                </Text>
+                </span>
               </div>
 
               <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
-                <Text
+                <span
                   style={{ color: "var(--color-sentinel-text-secondary)" }}
                   className="text-xs"
                 >
                   Top Zone by Cost
-                </Text>
+                </span>
                 <p className="text-xl font-semibold mt-2" style={{ color: "var(--color-sentinel-text-primary)" }}>
                   R{(costData.top_zone_cost || 0).toLocaleString()}
                 </p>
-                <Text className="text-xs mt-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                <span className="text-xs mt-1 block" style={{ color: "var(--color-sentinel-text-secondary)" }}>
                   {costData.top_zone_name}
-                </Text>
+                </span>
               </div>
             </div>
 
             {/* Cost Breakdown Chart */}
             <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
-              <h4 className="font-medium text-base" style={{ color: "var(--color-sentinel-text-primary)" }}>Cost Breakdown by Tier</h4>
-              <BarChart
-                data={costBreakdownData}
-                index="name"
-                categories={["Cost (R)"]}
-                colors={["emerald"]}
-              />
+              <h4 className="font-medium text-base mb-4" style={{ color: "var(--color-sentinel-text-primary)" }}>Cost Breakdown by Tier</h4>
+              <div className="space-y-3">
+                {costBreakdownData.map((item) => {
+                  const pct = maxCostBreakdown > 0 ? (item["Cost (R)"] / maxCostBreakdown) * 100 : 0;
+                  return (
+                    <div key={item.name} className="flex items-center gap-3">
+                      <span className="text-xs w-16 shrink-0" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                        {item.name}
+                      </span>
+                      <div className="flex-grow h-6 rounded" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
+                        <div
+                          className="h-full rounded transition-all"
+                          style={{
+                            width: `${pct}%`,
+                            background: "var(--color-sentinel-emerald)",
+                          }}
+                        />
+                      </div>
+                      <span className="text-xs font-medium w-20 text-right" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                        R{item["Cost (R)"].toLocaleString()}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
 
             {/* Monthly & Annual Projections */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
-                <Text
+                <span
                   style={{ color: "var(--color-sentinel-text-secondary)" }}
                   className="text-xs"
                 >
                   Monthly Projection
-                </Text>
+                </span>
                 <p className="text-xl font-semibold mt-2" style={{ color: "var(--color-sentinel-text-primary)" }}>
                   R{Math.round(monthlyProjection).toLocaleString()}
                 </p>
-                <Text className="text-xs mt-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                <span className="text-xs mt-1 block" style={{ color: "var(--color-sentinel-text-secondary)" }}>
                   Based on current usage pattern
-                </Text>
+                </span>
               </div>
 
               <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
-                <Text
+                <span
                   style={{ color: "var(--color-sentinel-text-secondary)" }}
                   className="text-xs"
                 >
                   Annual Projection
-                </Text>
+                </span>
                 <p className="text-xl font-semibold mt-2" style={{ color: "var(--color-sentinel-text-primary)" }}>
                   R{Math.round(annualProjection).toLocaleString()}
                 </p>
-                <Text className="text-xs mt-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                <span className="text-xs mt-1 block" style={{ color: "var(--color-sentinel-text-secondary)" }}>
                   Annualized run rate
-                </Text>
+                </span>
               </div>
             </div>
           </div>
-        </TabPanel>
+        )}
 
         {/* Forecast Tab */}
-        <TabPanel>
+        {activeTabIndex === 1 && (
           <div className="space-y-6">
             {/* Forecast Chart */}
             <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
               <h4 className="font-medium text-base" style={{ color: "var(--color-sentinel-text-primary)" }}>30-Day Cost Forecast</h4>
-              <Text className="text-xs mb-4" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+              <span className="text-xs mb-4 block" style={{ color: "var(--color-sentinel-text-secondary)" }}>
                 Projected daily costs with confidence band
-              </Text>
-              {forecastChartData.length > 0 && (
-                <LineChart
-                  data={forecastChartData}
-                  index="date"
-                  categories={["Projected Cost"]}
-                />
+              </span>
+              {forecastChartData.length > 0 ? (
+                <div className="space-y-1 mt-4">
+                  {forecastChartData.slice(0, 30).map((item) => {
+                    const pct = maxForecast > 0 ? (item["Projected Cost"] / maxForecast) * 100 : 0;
+                    return (
+                      <div key={item.date} className="flex items-center gap-2">
+                        <span className="text-xs w-16 shrink-0 text-right" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                          {item.date}
+                        </span>
+                        <div className="flex-grow h-4 rounded" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
+                          <div
+                            className="h-full rounded transition-all"
+                            style={{
+                              width: `${pct}%`,
+                              background: "var(--color-sentinel-blue)",
+                            }}
+                          />
+                        </div>
+                        <span className="text-xs w-14 text-right" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                          R{item["Projected Cost"]}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="h-64 flex items-center justify-center">
+                  <span style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                    No forecast data available
+                  </span>
+                </div>
               )}
             </div>
 
@@ -309,12 +346,12 @@ export const WaterCostAnalysis: React.FC<WaterCostAnalysisProps> = ({
               <div className="space-y-4">
                 <div>
                   <div className="flex justify-between items-center mb-2">
-                    <Text
+                    <span
                       style={{ color: "var(--color-sentinel-text-secondary)" }}
                     >
                       Reduction Target
-                    </Text>
-                    <Text className="font-semibold">{scenarioReduction}%</Text>
+                    </span>
+                    <span className="font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>{scenarioReduction}%</span>
                   </div>
                   <input
                     type="range"
@@ -329,38 +366,38 @@ export const WaterCostAnalysis: React.FC<WaterCostAnalysisProps> = ({
                   />
                 </div>
 
-                <div className="grid grid-cols-3 gap-3 pt-4 border-t border-gray-200 dark:border-gray-800">
+                <div className="grid grid-cols-3 gap-3 pt-4 border-t" style={{ borderColor: "var(--color-sentinel-border)" }}>
                   <div>
-                    <Text
+                    <span
                       style={{ color: "var(--color-sentinel-text-secondary)" }}
                       className="text-xs"
                     >
                       Baseline Monthly
-                    </Text>
+                    </span>
                     <p className="text-lg font-semibold mt-1" style={{ color: "var(--color-sentinel-text-primary)" }}>
                       R{Math.round(monthlyProjection).toLocaleString()}
                     </p>
                   </div>
 
                   <div>
-                    <Text
+                    <span
                       style={{ color: "var(--color-sentinel-text-secondary)" }}
                       className="text-xs"
                     >
                       With {scenarioReduction}% Reduction
-                    </Text>
+                    </span>
                     <p className="text-lg font-semibold mt-1" style={{ color: "var(--color-sentinel-text-primary)" }}>
                       R{Math.round(scenarioMonthly).toLocaleString()}
                     </p>
                   </div>
 
                   <div>
-                    <Text
+                    <span
                       style={{ color: "var(--color-sentinel-text-secondary)" }}
                       className="text-xs"
                     >
                       Monthly Savings
-                    </Text>
+                    </span>
                     <p className="text-lg font-semibold mt-1 text-green-500">
                       R{Math.round(scenarioSavings).toLocaleString()}
                     </p>
@@ -369,23 +406,23 @@ export const WaterCostAnalysis: React.FC<WaterCostAnalysisProps> = ({
               </div>
             </div>
           </div>
-        </TabPanel>
+        )}
 
         {/* Tariff Tab */}
-        <TabPanel>
+        {activeTabIndex === 2 && (
           <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
             <h4 className="font-medium text-base mb-4" style={{ color: "var(--color-sentinel-text-primary)" }}>Current Tariff Structure</h4>
 
-            <div className="mb-6 p-4 rounded border border-gray-200 dark:border-gray-800">
-              <Text
+            <div className="mb-6 p-4 rounded" style={{ border: "1px solid var(--color-sentinel-border)" }}>
+              <span
                 style={{ color: "var(--color-sentinel-text-secondary)" }}
                 className="text-xs"
               >
                 Tariff Name & Period
-              </Text>
-              <Text className="font-semibold mt-1">
+              </span>
+              <p className="font-semibold mt-1" style={{ color: "var(--color-sentinel-text-primary)" }}>
                 City Water Schedule 2026 (Effective 2026-01-01)
-              </Text>
+              </p>
             </div>
 
             <div className="overflow-x-auto">
@@ -431,45 +468,45 @@ export const WaterCostAnalysis: React.FC<WaterCostAnalysisProps> = ({
                       }}
                     >
                       <td className="py-3 px-2">
-                        <Text className="font-semibold">Tier {tier.tier}</Text>
+                        <span className="font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>Tier {tier.tier}</span>
                       </td>
                       <td className="py-3 px-2">
-                        <Text className="text-xs">
+                        <span className="text-xs" style={{ color: "var(--color-sentinel-text-primary)" }}>
                           {tier.min_liters.toLocaleString()} -{" "}
                           {tier.max_liters === 999999
                             ? "∞"
                             : tier.max_liters.toLocaleString()}{" "}
                           L
-                        </Text>
+                        </span>
                       </td>
                       <td className="py-3 px-2">
-                        <Text className="font-semibold">
+                        <span className="font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>
                           R{tier.rate_per_liter.toFixed(2)}/L
-                        </Text>
+                        </span>
                       </td>
                       <td className="py-3 px-2">
-                        <Text className="font-semibold">
+                        <span className="font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>
                           R{tier.current_cost.toLocaleString()}
-                        </Text>
+                        </span>
                       </td>
                     </tr>
                   ))}
                   <tr style={{ fontWeight: "bold" }}>
                     <td colSpan={3} className="py-3 px-2">
-                      Fixed Charge
+                      <span style={{ color: "var(--color-sentinel-text-primary)" }}>Fixed Charge</span>
                     </td>
                     <td className="py-3 px-2">
-                      <Text className="font-semibold">
+                      <span className="font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>
                         R{costData.fixed_charge.toLocaleString()}
-                      </Text>
+                      </span>
                     </td>
                   </tr>
                 </tbody>
               </table>
             </div>
           </div>
-        </TabPanel>
-      </TabPanels>
-    </TabGroup>
+        )}
+      </div>
+    </div>
   );
 };

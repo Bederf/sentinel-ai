@@ -14,6 +14,7 @@ Manager control additions:
 """
 
 import base64
+from pathlib import Path
 import hmac
 import logging
 import os
@@ -127,10 +128,6 @@ def _require_sentry_secret(
     """Validate Sentry webhook secret with live-mode fail-closed behavior."""
     configured_secret = get_sentry_webhook_secret()
 
-    # Backward-compatible fallback: allow env var in simulation only.
-    if not configured_secret and not settings.is_live_mode:
-        configured_secret = (os.getenv("SENTRY_WEBHOOK_SECRET", "") or "").strip()
-
     if not configured_secret:
         if settings.is_live_mode:
             logger.error("Missing SENTRY_WEBHOOK_SECRET in live mode for endpoint %s", endpoint_name)
@@ -144,6 +141,40 @@ def _require_sentry_secret(
 
     if not provided_secret or not hmac.compare_digest(provided_secret, configured_secret):
         raise HTTPException(status_code=403, detail="Unauthorized")
+
+
+def _require_sentry_secret_or_key(
+    secret: str | None,
+    api_key: str | None,
+    *,
+    endpoint_name: str,
+) -> None:
+    """Validate either Sentry secret or API key.
+
+    Allow public in simulation if neither is provided.
+    """
+    configured_secret = get_sentry_webhook_secret()
+    configured_key = os.getenv("SENTRY_BOT_API_KEY", "").strip()
+
+    if settings.is_live_mode and not configured_secret and not configured_key:
+        logger.error("Missing Sentry auth in live mode for endpoint %s", endpoint_name)
+        raise HTTPException(status_code=503, detail="Sentry integration misconfigured")
+
+    if settings.is_live_mode:
+        secret_ok = secret and hmac.compare_digest(secret, configured_secret)
+        key_ok = api_key and hmac.compare_digest(api_key, configured_key)
+        if not secret_ok and not key_ok:
+            raise HTTPException(status_code=403, detail="Unauthorized")
+        return
+
+    # Simulation: allow if any credential matches, or allow public
+    if not secret and not api_key:
+        return
+    if secret and configured_secret and hmac.compare_digest(secret, configured_secret):
+        return
+    if api_key and configured_key and hmac.compare_digest(api_key, configured_key):
+        return
+    raise HTTPException(status_code=403, detail="Unauthorized")
 
 
 def _require_operator_password(
@@ -787,8 +818,97 @@ async def process_pending_sentry_notifications(
 
 
 # ============================================================================
-# Inspection Checklist for Telegram
+# Building Handbook (GET + POST)
 # ============================================================================
+
+class BuildingHandbookPost(BaseModel):
+    site_id: str
+    content: str
+    uploaded_by: str | None = None
+
+
+@router.get("/building-handbook")
+async def get_building_handbook(
+    site_id: str = Query(..., description="Site ID"),
+    x_sentry_api_key: str | None = Header(None),
+    x_sentry_secret: str | None = Header(None),
+):
+    """Fetch the building handbook for a site.
+
+    Reads from site_handbooks table. Falls back to filesystem
+    BUILDING_HANDBOOK.md if not found in DB.
+
+    Authentication: X-Sentry-API-Key or X-Sentry-Secret header.
+    """
+    _require_sentry_secret_or_key(x_sentry_secret, x_sentry_api_key, endpoint_name="building-handbook")
+
+    from app.database.supabase_client import get_supabase_client
+
+    supabase = get_supabase_client()
+
+    # Try DB first
+    result = supabase.table("site_handbooks").select("content, uploaded_by, version, updated_at").eq("site_id", site_id).limit(1).execute()
+    if result.data:
+        return {
+            "content": result.data[0]["content"],
+            "source": "database",
+            "version": result.data[0]["version"],
+            "uploaded_by": result.data[0].get("uploaded_by"),
+            "updated_at": result.data[0].get("updated_at"),
+        }
+
+    # Fallback: check filesystem
+    handbook_path = Path(__file__).parent.parent.parent.parent / "sentry-agents" / "staff-workspace" / "BUILDING_HANDBOOK.md"
+    if handbook_path.exists():
+        return {
+            "content": handbook_path.read_text(),
+            "source": "filesystem",
+            "version": 0,
+        }
+
+    return {"content": "", "source": "not_found", "version": 0}
+
+
+@router.post("/building-handbook", status_code=status.HTTP_200_OK)
+async def save_building_handbook(
+    data: BuildingHandbookPost,
+    x_sentry_api_key: str | None = Header(None),
+    x_sentry_secret: str | None = Header(None),
+):
+    """Save the building handbook for a site.
+
+    Upserts into site_handbooks table.
+
+    Authentication: X-Sentry-API-Key or X-Sentry-Secret header.
+    """
+    _require_sentry_secret_or_key(x_sentry_secret, x_sentry_api_key, endpoint_name="building-handbook")
+
+    from app.database.supabase_client import get_supabase_client
+    from datetime import UTC
+
+    supabase = get_supabase_client()
+    now = datetime.now(UTC).isoformat()
+
+    # Check if exists
+    existing = supabase.table("site_handbooks").select("version").eq("site_id", data.site_id).limit(1).execute()
+    next_version = (existing.data[0]["version"] + 1) if existing.data else 1
+
+    payload = {
+        "site_id": data.site_id,
+        "content": data.content,
+        "version": next_version,
+        "updated_at": now,
+    }
+    if data.uploaded_by:
+        payload["uploaded_by"] = data.uploaded_by
+
+    if existing.data:
+        supabase.table("site_handbooks").update(payload).eq("site_id", data.site_id).execute()
+    else:
+        payload["created_at"] = now
+        supabase.table("site_handbooks").insert(payload).execute()
+
+    return {"success": True, "version": next_version, "source": "database"}
 
 
 @router.get("/inspection-checklist/{equipment_type}", status_code=status.HTTP_200_OK)
@@ -1245,7 +1365,6 @@ async def sentry_call_log(
         # Try to find a technician for this specialty at this site
         tech = None
         try:
-            # Look up technician by specialty
             from app.database.supabase_client import get_supabase_client
 
             sb = get_supabase_client()
@@ -1254,29 +1373,47 @@ async def sentry_call_log(
                 bld = sb.table("sites").select("id").eq("code", req.site_id).execute()
                 if bld.data:
                     site_id = bld.data[0]["id"]
-                    tech_result = (
-                        sb.table("site_technicians")
-                        .select("specialty, technicians(id, name, email, phone, telegram_id)")
-                        .eq("site_id", site_id)
-                        .eq("specialty", req.specialty)
-                        .eq("is_primary", True)
-                        .execute()
-                    )
-                    if tech_result.data:
-                        tech = tech_result.data[0].get("technicians", {})
 
-                    # Fallback to general specialty
-                    if not tech and req.specialty != "general":
+                    # Try specialty match via site_technicians (if table exists)
+                    try:
                         tech_result = (
                             sb.table("site_technicians")
                             .select("specialty, technicians(id, name, email, phone, telegram_id)")
                             .eq("site_id", site_id)
-                            .eq("specialty", "general")
+                            .eq("specialty", req.specialty)
                             .eq("is_primary", True)
                             .execute()
                         )
                         if tech_result.data:
                             tech = tech_result.data[0].get("technicians", {})
+
+                        # Fallback: general specialty
+                        if not tech and req.specialty != "general":
+                            tech_result = (
+                                sb.table("site_technicians")
+                                .select("specialty, technicians(id, name, email, phone, telegram_id)")
+                                .eq("site_id", site_id)
+                                .eq("specialty", "general")
+                                .eq("is_primary", True)
+                                .execute()
+                            )
+                            if tech_result.data:
+                                tech = tech_result.data[0].get("technicians", {})
+                    except Exception:
+                        pass  # site_technicians table may not exist
+
+                    # Last resort: any active technician with a Telegram ID
+                    if not tech:
+                        try:
+                            tech_result = sb.table("technicians").select(
+                                "id, name, email, phone, telegram_id"
+                            ).eq("active", True).execute()
+                            # Filter to ones with telegram_id
+                            with_telegram = [t for t in (tech_result.data or []) if t.get("telegram_id")]
+                            if with_telegram:
+                                tech = with_telegram[0]
+                        except Exception:
+                            pass
         except Exception as e:
             logger.warning(f"Technician lookup failed for call-log: {e}")
 
@@ -1487,6 +1624,214 @@ async def save_call_log_location_memory(
     except Exception as e:
         logger.error(f"Call-log location memory save failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+class WoStatusResponse(BaseModel):
+    """Work order status response for staff WO lookup."""
+    success: bool
+    found: bool
+    code: str = ""
+    status: str = ""
+    priority: str = ""
+    category: str = ""
+    title: str = ""
+    description: str = ""
+    notes: str = ""
+    assigned_to: str = ""
+    created_at: str = ""
+    updated_at: str = ""
+    completed_at: str = ""
+
+
+@router.get("/wo-status", response_model=WoStatusResponse)
+async def sentry_wo_status(
+    code: str = Query(..., description="Work order code (e.g. WO-2026-0001)"),
+    reporter_telegram_id: str = Query("", description="Reporter Telegram ID for privacy filter"),
+    x_sentry_secret: str | None = Header(None),
+):
+    """Return work order status for staff WO lookup.
+
+    Staff can check their own WO by code. Results are filtered by reporter
+    Telegram ID to ensure privacy — staff only see their own WOs.
+    """
+    _require_sentry_secret(x_sentry_secret, endpoint_name="wo_status")
+
+    try:
+        from app.database.repositories.work_order_repository import WorkOrderRepository
+
+        wo_repo = WorkOrderRepository()
+        wo = await wo_repo.get_work_order_by_code(code)
+
+        if not wo:
+            return WoStatusResponse(success=True, found=False)
+
+        # Privacy filter: if reporter_telegram_id is provided, verify ownership
+        if reporter_telegram_id:
+            created_by = wo.get("created_by", "")
+            # created_by format: "sentry:call_log:{telegram_id}" or "sentry:telegram:{telegram_id}"
+            if reporter_telegram_id not in created_by:
+                return WoStatusResponse(success=True, found=False, code=code)
+
+        return WoStatusResponse(
+            success=True,
+            found=True,
+            code=wo.get("code", ""),
+            status=wo.get("status", ""),
+            priority=wo.get("priority", ""),
+            category=wo.get("category", ""),
+            title=wo.get("title", ""),
+            description=wo.get("description", ""),
+            notes=wo.get("notes", ""),
+            assigned_to=wo.get("assigned_to", ""),
+            created_at=wo.get("created_at", ""),
+            updated_at=wo.get("updated_at", ""),
+            completed_at=wo.get("completed_at", ""),
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"WO status lookup failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class WoMilestoneRequest(BaseModel):
+    """Advance a work order's SLA milestone."""
+    wo_code: str = Field(..., description="Work order code (e.g. WO-2026-0001)")
+    milestone: str = Field(..., description="New milestone: assigned|in_progress|resolved|verified")
+    notes: str = Field("", description="Technician notes for the work order")
+    outcome: str = Field("", description="Outcome: fixed|parts_needed|escalate (for logging/context)")
+    operator_password: str | None = Field(None, description="SENTINEL operator password")
+
+
+class WoMilestoneResponse(BaseModel):
+    """Response after advancing a work order milestone."""
+    success: bool
+    wo_id: str = ""
+    wo_code: str = ""
+    milestone_status: str = ""
+    assigned_at: str = ""
+    in_progress_at: str = ""
+    resolved_at: str = ""
+    verified_at: str = ""
+    sla_deadline_at: str = ""
+    status: str = ""
+
+
+@router.patch("/wo-milestone", response_model=WoMilestoneResponse)
+async def advance_wo_milestone(
+    req: WoMilestoneRequest,
+    x_sentry_secret: str | None = Header(None),
+):
+    """Advance a work order's SLA milestone and update notes.
+
+    Called by technician bot after closeout inspection.
+    - Resolves the SLA deadline clock
+    - Updates notes with technician's findings
+    - Notifies staff (via Telegram) when resolved
+    """
+    _require_sentry_secret(x_sentry_secret, endpoint_name="wo_milestone")
+
+    from datetime import UTC
+    from app.database.repositories.work_order_repository import WorkOrderRepository
+    from app.services.telegram_message_sender import get_telegram_sender
+
+    VALID_MILESTONES = {"assigned", "in_progress", "resolved", "verified"}
+
+    if req.milestone not in VALID_MILESTONES:
+        raise HTTPException(status_code=400, detail=f"Invalid milestone: {req.milestone}")
+
+    try:
+        wo_repo = WorkOrderRepository()
+        wo = await wo_repo.get_work_order_by_code(req.wo_code)
+
+        if not wo:
+            raise HTTPException(status_code=404, detail=f"Work order not found: {req.wo_code}")
+
+        wo_id = wo["id"]
+        prev_milestone = wo.get("milestone_status", "assigned")
+        created_by = wo.get("created_by", "")
+
+        # Advance milestone
+        updated = await wo_repo.advance_work_order_milestone(wo_id, req.milestone)
+        if not updated:
+            raise HTTPException(status_code=500, detail="Failed to advance milestone")
+
+        # Update notes field
+        existing_notes = wo.get("notes", "") or ""
+        new_notes = req.notes
+        if existing_notes:
+            new_notes = f"{existing_notes}\n---\n{new_notes}"
+        await wo_repo.update_work_order(wo_id, {"notes": new_notes})
+
+        # Notify staff if resolved
+        if req.milestone == "resolved":
+            # Extract reporter Telegram ID from created_by (format: sentry:call_log:{telegram_id})
+            reporter_telegram_id = None
+            if "sentry:call_log:" in created_by:
+                reporter_telegram_id = created_by.split("sentry:call_log:")[-1].split(":")[0]
+            elif "sentry:telegram:" in created_by:
+                reporter_telegram_id = created_by.split("sentry:telegram:")[-1].split(":")[0]
+
+            if reporter_telegram_id:
+                try:
+                    sender = get_telegram_sender()
+                    # Format outcome emoji
+                    outcome_emoji = {
+                        "fixed": "✅",
+                        "parts_needed": "⏳",
+                        "escalate": "⚠️",
+                    }.get(req.outcome, "✅")
+
+                    notify_text = (
+                        f"{outcome_emoji} Work order {req.wo_code} resolved.\n"
+                        f"Technician notes: {req.notes or 'No additional notes.'}"
+                    )
+                    await sender.send_text(reporter_telegram_id, notify_text)
+                except Exception as notify_err:
+                    logger.warning(f"Staff notification failed for WO {req.wo_code}: {notify_err}")
+
+        # If escalated, notify manager
+        if req.outcome == "escalate":
+            try:
+                sender = get_telegram_sender()
+                escalate_text = (
+                    f"⚠️ Escalation: WO {req.wo_code}\n"
+                    f"Equipment: {wo.get('equipment_id', 'unknown')}\n"
+                    f"Notes: {req.notes or 'No notes.'}\n"
+                    f"Outcome: {req.outcome}"
+                )
+                await sender.send_text(8359288792, escalate_text)
+            except Exception as esc_err:
+                logger.warning(f"Escalation notification failed for WO {req.wo_code}: {esc_err}")
+
+        return WoMilestoneResponse(
+            success=True,
+            wo_id=updated.get("id", ""),
+            wo_code=updated.get("code", ""),
+            milestone_status=updated.get("milestone_status", ""),
+            assigned_at=_dt_iso(updated.get("assigned_at")),
+            in_progress_at=_dt_iso(updated.get("in_progress_at")),
+            resolved_at=_dt_iso(updated.get("resolved_at")),
+            verified_at=_dt_iso(updated.get("verified_at")),
+            sla_deadline_at=_dt_iso(updated.get("sla_deadline_at")),
+            status="success",
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"WO milestone advance failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+def _dt_iso(val) -> str:
+    """Convert datetime to ISO string, returns empty string for None."""
+    if val is None:
+        return ""
+    if isinstance(val, str):
+        return val
+    return val.isoformat()
 
 
 @router.post("/call-log/escalate", status_code=status.HTTP_200_OK)

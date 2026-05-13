@@ -315,7 +315,7 @@ curl http://localhost:9095/api/predictions | jq '.predictions | length'
 ## Post-Demo Discussion Points
 
 ### Technical Architecture
-- **Frontend:** React 18 + Tremor UI components
+- **Frontend:** React 18 + Sentinel design system (CSS variables, no Tremor)
 - **Backend:** FastAPI with SSE streaming
 - **AI:** Claude Sonnet 4 with RAG pipeline
 - **Demo Cache:** 8 verified responses for reliability

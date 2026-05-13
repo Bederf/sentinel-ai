@@ -1,27 +1,4 @@
-/**
- * WaterZoneBreakdown - Zone-based water consumption breakdown with cost attribution
- *
- * Displays:
- * - Table with zones ranked by consumption/cost
- * - Color-coded status indicators (normal/elevated/critical)
- * - Trend indicators (up/down/stable)
- * - Cost attribution per zone
- * - Drill-down capability
- */
-
 import { useState } from "react";
-import {
-  Text,
-  BarChart,
-  Table,
-  TableHead,
-  TableRow,
-  TableHeaderCell,
-  TableBody,
-  TableCell,
-  Badge,
-  Flex,
-} from "@tremor/react";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 
@@ -40,6 +17,14 @@ interface ZoneBreakdown {
 interface WaterZoneBreakdownProps {
   siteId: string;
   days?: number;
+}
+
+function badgeStyle(status: string): React.CSSProperties {
+  switch (status) {
+    case "critical": return { background: "rgba(239, 68, 68, 0.15)", color: "#ef4444" };
+    case "elevated": return { background: "rgba(234, 179, 8, 0.15)", color: "#eab308" };
+    default: return { background: "rgba(34, 197, 94, 0.15)", color: "#22c55e" };
+  }
 }
 
 export const WaterZoneBreakdown: React.FC<WaterZoneBreakdownProps> = ({
@@ -119,9 +104,9 @@ export const WaterZoneBreakdown: React.FC<WaterZoneBreakdownProps> = ({
     return (
       <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
         <div className="flex items-center justify-center h-64">
-          <Text style={{ color: "var(--color-sentinel-text-secondary)" }}>
+          <span style={{ color: "var(--color-sentinel-text-secondary)" }}>
             Loading zone data...
-          </Text>
+          </span>
         </div>
       </div>
     );
@@ -133,77 +118,75 @@ export const WaterZoneBreakdown: React.FC<WaterZoneBreakdownProps> = ({
       : b.total_cost - a.total_cost
   );
 
-  const statusColors: Record<string, "green" | "yellow" | "red"> = {
-    normal: "green",
-    elevated: "yellow",
-    critical: "red",
-  };
-
   const chartData = sorted.map((z) => ({
     name: z.zone_name.substring(0, 15),
     "Consumption (L)": z.consumption_liters,
   }));
 
   const highestCost = sorted[0];
+  const maxConsumption = Math.max(...chartData.map((d) => d["Consumption (L)"]));
 
   return (
     <div className="space-y-6">
       {/* Highest Cost Zone Card */}
       <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
-        <Flex justifyContent="between" alignItems="center">
+        <div className="flex items-center justify-between">
           <div>
-            <Text
+            <span
               style={{ color: "var(--color-sentinel-text-secondary)" }}
               className="text-xs"
             >
               Highest Cost Zone
-            </Text>
+            </span>
             <h4 className="text-xl font-medium mt-1" style={{ color: "var(--color-sentinel-text-primary)" }}>{highestCost.zone_name}</h4>
-            <Flex justifyContent="start" alignItems="center" className="gap-4 mt-2">
+            <div className="flex items-center gap-4 mt-2">
               <div>
-                <Text
+                <span
                   style={{ color: "var(--color-sentinel-text-secondary)" }}
                   className="text-xs"
                 >
                   Volume
-                </Text>
-                <Text className="font-semibold">
+                </span>
+                <p className="font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>
                   {(highestCost.consumption_liters / 1000).toFixed(1)}k L
-                </Text>
+                </p>
               </div>
               <div>
-                <Text
+                <span
                   style={{ color: "var(--color-sentinel-text-secondary)" }}
                   className="text-xs"
                 >
                   Cost
-                </Text>
-                <Text className="font-semibold">
+                </span>
+                <p className="font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>
                   R{highestCost.total_cost.toLocaleString()}
-                </Text>
+                </p>
               </div>
               <div>
-                <Text
+                <span
                   style={{ color: "var(--color-sentinel-text-secondary)" }}
                   className="text-xs"
                 >
                   % of Total
-                </Text>
-                <Text className="font-semibold">
+                </span>
+                <p className="font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>
                   {highestCost.consumption_percent.toFixed(1)}%
-                </Text>
+                </p>
               </div>
-            </Flex>
+            </div>
           </div>
-          <Badge color={statusColors[highestCost.status]}>
+          <span
+            className="text-xs px-2 py-0.5 rounded font-medium"
+            style={badgeStyle(highestCost.status)}
+          >
             {highestCost.status.toUpperCase()}
-          </Badge>
-        </Flex>
+          </span>
+        </div>
       </div>
 
       {/* Consumption Chart */}
       <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
-        <Flex justifyContent="between" alignItems="center" className="mb-4">
+        <div className="flex items-center justify-between mb-4">
           <h4 className="font-medium text-base" style={{ color: "var(--color-sentinel-text-primary)" }}>Consumption by Zone</h4>
           <div className="flex gap-2">
             <button
@@ -239,85 +222,111 @@ export const WaterZoneBreakdown: React.FC<WaterZoneBreakdownProps> = ({
               By Cost
             </button>
           </div>
-        </Flex>
-        <BarChart data={chartData} index="name" categories={["Consumption (L)"]} />
+        </div>
+        <div className="space-y-2">
+          {chartData.map((item) => {
+            const pct = maxConsumption > 0 ? (item["Consumption (L)"] / maxConsumption) * 100 : 0;
+            return (
+              <div key={item.name} className="flex items-center gap-3">
+                <span className="text-xs w-24 shrink-0 truncate" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                  {item.name}
+                </span>
+                <div className="flex-grow h-5 rounded" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
+                  <div
+                    className="h-full rounded transition-all"
+                    style={{
+                      width: `${pct}%`,
+                      background: "var(--color-sentinel-blue)",
+                    }}
+                  />
+                </div>
+                <span className="text-xs font-medium w-16 text-right" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                  {(item["Consumption (L)"] / 1000).toFixed(1)}k L
+                </span>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {/* Zones Table */}
       <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
         <h4 className="font-medium text-base mb-4" style={{ color: "var(--color-sentinel-text-primary)" }}>Zone Details</h4>
         <div className="overflow-x-auto">
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableHeaderCell>Zone</TableHeaderCell>
-                <TableHeaderCell>Consumption</TableHeaderCell>
-                <TableHeaderCell>Cost</TableHeaderCell>
-                <TableHeaderCell>% of Total</TableHeaderCell>
-                <TableHeaderCell>Cost/Liter</TableHeaderCell>
-                <TableHeaderCell>Trend</TableHeaderCell>
-                <TableHeaderCell>Status</TableHeaderCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
+          <table className="w-full text-sm">
+            <thead>
+              <tr style={{ borderBottom: "1px solid var(--color-sentinel-border)" }}>
+                <th className="text-left py-2 px-2 font-semibold" style={{ color: "var(--color-sentinel-text-secondary)" }}>Zone</th>
+                <th className="text-left py-2 px-2 font-semibold" style={{ color: "var(--color-sentinel-text-secondary)" }}>Consumption</th>
+                <th className="text-left py-2 px-2 font-semibold" style={{ color: "var(--color-sentinel-text-secondary)" }}>Cost</th>
+                <th className="text-left py-2 px-2 font-semibold" style={{ color: "var(--color-sentinel-text-secondary)" }}>% of Total</th>
+                <th className="text-left py-2 px-2 font-semibold" style={{ color: "var(--color-sentinel-text-secondary)" }}>Cost/Liter</th>
+                <th className="text-left py-2 px-2 font-semibold" style={{ color: "var(--color-sentinel-text-secondary)" }}>Trend</th>
+                <th className="text-left py-2 px-2 font-semibold" style={{ color: "var(--color-sentinel-text-secondary)" }}>Status</th>
+              </tr>
+            </thead>
+            <tbody>
               {sorted.map((zone) => (
-                <TableRow key={zone.zone_id}>
-                  <TableCell>
-                    <Text className="font-medium text-sm">
+                <tr key={zone.zone_id} style={{ borderBottom: "1px solid var(--color-sentinel-border)" }}>
+                  <td className="py-3 px-2">
+                    <span className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>
                       {zone.zone_name}
-                    </Text>
-                  </TableCell>
-                  <TableCell>
-                    <Text className="text-sm">
+                    </span>
+                  </td>
+                  <td className="py-3 px-2">
+                    <span className="text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>
                       {(zone.consumption_liters / 1000).toFixed(1)}k L
-                    </Text>
-                  </TableCell>
-                  <TableCell>
-                    <Text className="text-sm font-semibold">
+                    </span>
+                  </td>
+                  <td className="py-3 px-2">
+                    <span className="text-sm font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>
                       R{zone.total_cost.toLocaleString()}
-                    </Text>
-                  </TableCell>
-                  <TableCell>
-                    <Text className="text-sm">
+                    </span>
+                  </td>
+                  <td className="py-3 px-2">
+                    <span className="text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>
                       {zone.consumption_percent.toFixed(1)}%
-                    </Text>
-                  </TableCell>
-                  <TableCell>
-                    <Text className="text-sm">
+                    </span>
+                  </td>
+                  <td className="py-3 px-2">
+                    <span className="text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>
                       R{zone.cost_per_liter.toFixed(3)}/L
-                    </Text>
-                  </TableCell>
-                  <TableCell>
-                    <Flex justifyContent="start" alignItems="center" className="gap-1">
+                    </span>
+                  </td>
+                  <td className="py-3 px-2">
+                    <div className="flex items-center gap-1">
                       {zone.trend === "up" && (
                         <>
                           <TrendingUp className="h-4 w-4 text-red-500" />
-                          <Text className="text-xs text-red-500">Up</Text>
+                          <span className="text-xs text-red-500">Up</span>
                         </>
                       )}
                       {zone.trend === "down" && (
                         <>
                           <TrendingDown className="h-4 w-4 text-green-500" />
-                          <Text className="text-xs text-green-500">Down</Text>
+                          <span className="text-xs text-green-500">Down</span>
                         </>
                       )}
                       {zone.trend === "stable" && (
                         <>
                           <Minus className="h-4 w-4" style={{color: "var(--color-sentinel-text-secondary)"}} />
-                          <Text className="text-xs" style={{color: "var(--color-sentinel-text-secondary)"}}>Stable</Text>
+                          <span className="text-xs" style={{color: "var(--color-sentinel-text-secondary)"}}>Stable</span>
                         </>
                       )}
-                    </Flex>
-                  </TableCell>
-                  <TableCell>
-                    <Badge color={statusColors[zone.status]}>
+                    </div>
+                  </td>
+                  <td className="py-3 px-2">
+                    <span
+                      className="text-xs px-2 py-0.5 rounded font-medium"
+                      style={badgeStyle(zone.status)}
+                    >
                       {zone.status.substring(0, 3).toUpperCase()}
-                    </Badge>
-                  </TableCell>
-                </TableRow>
+                    </span>
+                  </td>
+                </tr>
               ))}
-            </TableBody>
-          </Table>
+            </tbody>
+          </table>
         </div>
       </div>
     </div>

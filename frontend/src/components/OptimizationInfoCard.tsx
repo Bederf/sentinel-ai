@@ -14,10 +14,10 @@ import { useState, useEffect } from "react";
 import {
   Brain,
   TrendingUp,
-  CheckCircle,
   Clock,
   Lightbulb,
-  Zap,
+  Shield,
+  Sliders,
 } from "lucide-react";
 import { OptimizationToggle } from "./OptimizationToggle";
 import { OptimizationRecommendationModal } from "./OptimizationRecommendationModal";
@@ -50,31 +50,32 @@ export function OptimizationInfoCard({
   const [monthlySavings, setMonthlySavings] = useState<MonthlySavingsSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [showRecommendationModal, setShowRecommendationModal] = useState(false);
-  const [mode, setMode] = useState<"supervised" | "automatic">("supervised");
+  const [mode, setMode] = useState("supervised");
+  const [activeProfile, setActiveProfile] = useState<string>("balanced");
+  const [sitePhase, setSitePhase] = useState<string>(onboardingPhase || "shadow_live");
 
-  // Phase-aware mode label (shadow/advisory override the API mode to reflect reality)
-  const effectiveMode = (() => {
-    if (onboardingPhase === "shadow" || onboardingPhase === "advisory") return "advisory";
-    return mode;
-  })();
-  const isAdvisory = effectiveMode === "advisory";
-  const isAutoMode = effectiveMode === "automatic";
+  // Phase-aware mode label: onboarding_phase from settings page is the master
+  const effectivePhase = sitePhase;
+  const isAdvisory = effectivePhase === "shadow_live" || effectivePhase === "advisory";
+  const isAutoMode = mode === "automatic" && effectivePhase === "automatic";
 
   // Always fetch optimization status (both modes run optimization)
   useEffect(() => {
-    console.log("[OptimizationInfoCard] Component mounted", { siteId, optimizationEnabled });
-
     const fetchStatus = async () => {
       try {
-        console.log("[OptimizationInfoCard] Fetching status for", siteId);
         const status = await api.getOptimizationStatus(siteId);
-        console.log("[OptimizationInfoCard] Status response:", status);
         setOptimizationStatus(status.optimization_status);
         setLastOptimization(status.last_optimization);
         setCurrentRecommendation(status.last_recommendation);
         setMonthlySavings(status.monthly_savings || null);
         if (status.optimization_settings?.mode) {
           setMode(status.optimization_settings.mode);
+        }
+        if (status.onboarding_phase) {
+          setSitePhase(status.onboarding_phase);
+        }
+        if (status.active_profile) {
+          setActiveProfile(status.active_profile);
         }
       } catch (error) {
         console.error("[OptimizationInfoCard] Failed to fetch optimization status:", error);
@@ -85,7 +86,6 @@ export function OptimizationInfoCard({
     };
 
     fetchStatus();
-    // Refresh every 30 seconds
     const interval = setInterval(fetchStatus, 30000);
     return () => clearInterval(interval);
   }, [siteId, optimizationEnabled]);
@@ -173,6 +173,26 @@ export function OptimizationInfoCard({
     }
   };
 
+  const profileLabels: Record<string, string> = {
+    comfort: "Comfort First",
+    cost_saving: "Cost Saving",
+    asset_preservation: "Asset Preservation",
+    balanced: "Balanced",
+  };
+
+  const statusLabels: Record<string, { label: string; color: string; bg: string }> = {
+    learning: { label: "Learning", color: "var(--color-sentinel-amber)", bg: "rgba(245, 158, 11, 0.15)" },
+    active: { label: "Active", color: "var(--color-sentinel-green)", bg: "rgba(16, 185, 129, 0.15)" },
+    optimized: { label: "Optimized", color: "var(--color-sentinel-green)", bg: "rgba(16, 185, 129, 0.2)" },
+    recommendation_pending: { label: "Pending", color: "var(--color-sentinel-amber)", bg: "rgba(245, 158, 11, 0.2)" },
+    disabled: { label: "Disabled", color: "var(--color-sentinel-text-secondary)", bg: "var(--color-sentinel-bg-secondary)" },
+    error: { label: "Error", color: "var(--color-sentinel-red)", bg: "rgba(239, 68, 68, 0.15)" },
+    unknown: { label: "Unknown", color: "var(--color-sentinel-text-secondary)", bg: "var(--color-sentinel-bg-secondary)" },
+    warning: { label: "Warning", color: "var(--color-sentinel-amber)", bg: "rgba(245, 158, 11, 0.15)" },
+  };
+
+  const st = statusLabels[optimizationStatus] || statusLabels.unknown;
+
   return (
     <div
       className="rounded-md overflow-hidden"
@@ -195,61 +215,31 @@ export function OptimizationInfoCard({
             >
               AI Optimization
             </h3>
-            <p
-              className="text-sm"
-              style={{ color: "var(--color-sentinel-text-secondary)" }}
-            >
-              {isAdvisory
-                ? "Monitoring & recommendations"
-                : isAutoMode
-                  ? "Auto-applying changes"
-                  : "Recommendations require approval"}
-              {lastOptimization && ` \u00B7 Last: ${formatRelativeTime(lastOptimization)}`}
-            </p>
+            <div className="flex items-center gap-2 mt-0.5">
+              {/* Policy badge */}
+              <span
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium"
+                style={{
+                  background: effectivePhase === "automatic" ? "rgba(16, 185, 129, 0.15)" : "rgba(245, 158, 11, 0.15)",
+                  color: effectivePhase === "automatic" ? "var(--color-sentinel-green)" : "var(--color-sentinel-amber)",
+                }}
+              >
+                <Shield className="h-3 w-3" />
+                {effectivePhase.replace(/_/g, " ")}
+              </span>
+              {/* Status badge */}
+              <span
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium"
+                style={{ background: st.bg, color: st.color }}
+              >
+                {st.label}
+              </span>
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-3">
-          {/* Advisory: amber learning badge */}
-          {isAdvisory && (
-            <div
-              className="p-2 rounded"
-              style={{
-                background: "rgba(245, 158, 11, 0.15)",
-                border: "1px solid var(--color-sentinel-amber)",
-              }}
-              title="Learning mode — monitoring and generating recommendations"
-            >
-              <Brain className="h-4 w-4" style={{ color: "var(--color-sentinel-amber)" }} />
-            </div>
-          )}
-          {/* Automatic mode: show auto-applied indicator */}
-          {isAutoMode && optimizationStatus === "optimized" && (
-            <div
-              className="p-2 rounded"
-              style={{
-                background: "rgba(16, 185, 129, 0.2)",
-                border: "1px solid var(--color-sentinel-green)",
-              }}
-              title="AI auto-applied optimizations"
-            >
-              <Zap className="h-4 w-4" style={{ color: "var(--color-sentinel-green)" }} />
-            </div>
-          )}
-          {/* Supervised mode: show success checkmark when optimized (manually approved) */}
-          {!isAutoMode && !isAdvisory && optimizationStatus === "optimized" && (
-            <div
-              className="p-2 rounded"
-              style={{
-                background: "rgba(16, 185, 129, 0.2)",
-                border: "1px solid var(--color-sentinel-green)",
-              }}
-              title="Recommendation applied successfully"
-            >
-              <CheckCircle className="h-4 w-4" style={{ color: "var(--color-sentinel-green)" }} />
-            </div>
-          )}
-          {/* Supervised mode: show recommendation button when pending */}
-          {!isAutoMode && !isAdvisory && currentRecommendation && (optimizationStatus === "recommendation_pending" || optimizationStatus === "warning") && (
+          {/* Pending recommendation button */}
+          {currentRecommendation && optimizationStatus === "recommendation_pending" && (
             <button
               onClick={() => setShowRecommendationModal(true)}
               className="p-2 rounded transition-all hover:scale-110 animate-pulse"
@@ -262,7 +252,6 @@ export function OptimizationInfoCard({
               <Lightbulb className="h-4 w-4" style={{ color: "var(--color-sentinel-amber)" }} />
             </button>
           )}
-          {/* Toggle only shown in automatic mode */}
           {isAutoMode && (
             <OptimizationToggle siteId={siteId} enabled={optimizationEnabled} />
           )}
@@ -271,7 +260,7 @@ export function OptimizationInfoCard({
 
       {/* Stats Row */}
       <div className="p-4">
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-3 gap-3">
           <div
             className="p-3 rounded-md"
             style={{
@@ -301,7 +290,9 @@ export function OptimizationInfoCard({
               className="text-xs"
               style={{ color: "var(--color-sentinel-text-secondary)" }}
             >
-              Saved {monthlySavings?.applied_recommendations ? `(${monthlySavings.applied_recommendations} optimizations)` : ""}
+              {monthlySavings?.applied_recommendations
+                ? `${monthlySavings.applied_recommendations} optimizations`
+                : "No optimizations yet"}
             </div>
           </div>
 
@@ -315,38 +306,69 @@ export function OptimizationInfoCard({
             <div className="flex items-center gap-2 mb-1">
               <Clock
                 className="h-4 w-4"
-                style={{ color: isAutoMode ? "var(--color-sentinel-green)" : isAdvisory ? "var(--color-sentinel-amber)" : "var(--color-sentinel-blue)" }}
+                style={{ color: mode === "automatic" ? "var(--color-sentinel-green)" : "var(--color-sentinel-blue)" }}
               />
               <span
                 className="text-xs"
                 style={{ color: "var(--color-sentinel-text-secondary)" }}
               >
-                Mode
+                Control
               </span>
             </div>
             <div
               className="text-lg font-semibold"
               style={{ color: "var(--color-sentinel-text-primary)" }}
             >
-              {onboardingPhase === "shadow"
-                ? "Shadow"
-                : isAdvisory
-                  ? "Advisory"
-                  : isAutoMode
-                    ? "Auto"
-                    : "Supervised"}
+              {mode === "automatic" ? "Auto" : mode === "auto_execute" ? "Auto" : mode === "monitor" ? "Monitor" : "Supervised"}
             </div>
             <div
               className="text-xs"
               style={{ color: "var(--color-sentinel-text-secondary)" }}
             >
-              {onboardingPhase === "shadow"
-                ? "Learning & monitoring"
-                : isAdvisory
-                  ? "Learning & advising"
-                  : isAutoMode
-                    ? "AI auto-applies"
-                    : "Human approval"}
+              {mode === "automatic" || mode === "auto_execute"
+                ? "AI auto-applies"
+                : mode === "monitor"
+                  ? "View only"
+                  : "Human approval"}
+            </div>
+          </div>
+
+          <div
+            className="p-3 rounded-md"
+            style={{
+              background: "var(--color-sentinel-bg-secondary)",
+              border: "1px solid var(--color-sentinel-border)",
+            }}
+          >
+            <div className="flex items-center gap-2 mb-1">
+              <Sliders
+                className="h-4 w-4"
+                style={{ color: "var(--color-sentinel-purple)" }}
+              />
+              <span
+                className="text-xs"
+                style={{ color: "var(--color-sentinel-text-secondary)" }}
+              >
+                Profile
+              </span>
+            </div>
+            <div
+              className="text-lg font-semibold"
+              style={{ color: "var(--color-sentinel-text-primary)" }}
+            >
+              {profileLabels[activeProfile] || activeProfile}
+            </div>
+            <div
+              className="text-xs"
+              style={{ color: "var(--color-sentinel-text-secondary)" }}
+            >
+              {activeProfile === "comfort"
+                ? "Prioritise comfort"
+                : activeProfile === "cost_saving"
+                  ? "Minimise energy spend"
+                  : activeProfile === "asset_preservation"
+                    ? "Protect equipment"
+                    : "Balance cost & comfort"}
             </div>
           </div>
         </div>
@@ -371,7 +393,7 @@ export function OptimizationInfoCard({
                     className="text-xs font-medium"
                     style={{ color: "var(--color-sentinel-amber)" }}
                   >
-                    {isAdvisory ? "Recommendation" : isAutoMode ? "Next Optimization" : "Pending Approval"}
+                    {isAdvisory ? "Advisory Recommendation" : "Pending Approval"}
                   </span>
                 </div>
                 <div
@@ -400,7 +422,7 @@ export function OptimizationInfoCard({
         )}
       </div>
 
-      {/* Recommendation Modal — open in all modes, readOnly in advisory */}
+      {/* Recommendation Modal — readOnly in advisory modes */}
       {showRecommendationModal && currentRecommendation && (
         <OptimizationRecommendationModal
           isOpen={showRecommendationModal}

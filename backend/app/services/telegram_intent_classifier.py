@@ -20,6 +20,8 @@ class TelegramIntent(StrEnum):
     AD_HOC_FAULT = "ad_hoc_fault"
     DOCUMENT_INTAKE = "document_intake"
     GHOST_ROOM = "ghost_room"
+    FOCUS_ROOM = "focus_room"
+    STAFF_STATUS = "staff_status"
     UNKNOWN = "unknown"
 
 
@@ -84,6 +86,7 @@ _CALLBACK_FLOW_MAP = {
     "inspect": TelegramIntent.TECHNICIAN_REPORT,
     "adhoc": TelegramIntent.AD_HOC_FAULT,
     "ghost": TelegramIntent.GHOST_ROOM,
+    "focus": TelegramIntent.FOCUS_ROOM,
 }
 
 
@@ -98,6 +101,14 @@ def classify_intent(
     """
     text = (message_text or "").strip()
     text_lower = text.lower()
+    # Rule 0: /report slash command -> start client complaint flow
+    if text_lower in ("/report", "/report@sentinelstaffbot"):
+        return TelegramIntent.CLIENT_COMPLAINT, 1.0
+
+    # Rule 0b: /status_WO slash command -> staff WO status lookup
+    _STATUS_WO_RE = re.compile(r"^/status_WO[-_]\s*([A-Za-z0-9][\w-]*)\s*$", re.DOTALL)
+    if _STATUS_WO_RE.match(text):
+        return TelegramIntent.STAFF_STATUS, 1.0
 
     # Rule 1: callback_data present + active session -> CHECKLIST_REPLY
     if callback_data and has_active_session:

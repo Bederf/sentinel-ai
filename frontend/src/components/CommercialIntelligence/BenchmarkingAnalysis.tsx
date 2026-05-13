@@ -1,26 +1,7 @@
 /* eslint-disable @typescript-eslint/ban-ts-comment */
 // @ts-nocheck
 import React, { useState, useMemo, useEffect } from 'react'
-import {
-  Card,
-  CardHeader,
-  Title,
-  Text,
-  BarChart,
-  PieChart,
 
-  Table,
-  TableHead,
-  TableRow,
-  TableHeaderCell,
-  TableBody,
-  TableCell,
-  Badge,
-  Button,
-  Flex,
-  Grid,
-  Metric,
-} from '@tremor/react'
 import { DocumentDownloadIcon } from '@heroicons/react/24/solid'
 import { pricingApi } from '@/lib/api'
 import type { EquipmentBenchmarkResponse, WinLossAnalysisResponse, PortfolioBenchmarkResponse } from '@/lib/api'

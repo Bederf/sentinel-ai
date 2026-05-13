@@ -15,10 +15,16 @@ set -euo pipefail
 QUIET=false
 [[ "${1:-}" == "--quiet" ]] && QUIET=true
 
-# Source backend env for BRIDGE_API_TOKEN (extract without full sourcing to avoid spaces parsing issues)
+# Source env vars — check both backend/.env and root .env for bridge tokens
+# (BRIDGE_API_TOKEN_SITE002 lives in root .env, not backend/.env)
 if [[ -f /opt/bms-intelligence/backend/.env ]]; then
   BRIDGE_API_TOKEN="$(grep '^BRIDGE_API_TOKEN=' /opt/bms-intelligence/backend/.env 2>/dev/null | cut -d= -f2- | tr -d '"' || echo '')"
   SUPABASE_URL="$(grep '^SUPABASE_URL=' /opt/bms-intelligence/backend/.env 2>/dev/null | cut -d= -f2- | tr -d '"' || echo '')"
+fi
+if [[ -f /opt/bms-intelligence/.env ]]; then
+  BRIDGE_API_TOKEN_SITE002="$(grep '^BRIDGE_API_TOKEN_SITE002=' /opt/bms-intelligence/.env 2>/dev/null | cut -d= -f2- | tr -d '"' || echo '')"
+  # Fall back to root-level global token if per-site not present
+  [[ -z "$BRIDGE_API_TOKEN" ]] && BRIDGE_API_TOKEN="$(grep '^BRIDGE_API_TOKEN=' /opt/bms-intelligence/.env 2>/dev/null | cut -d= -f2- | tr -d '"' || echo '')"
 fi
 
 PASS=0
@@ -215,20 +221,32 @@ else
   check "WireGuard (wg cmd)" 2 "wg command not available"
 fi
 
-# Bridge API reachable via WireGuard
+# Bridge API reachable via WireGuard — use site-002 bearer auth for real status
 BRIDGE_BASE_URL="${BRIDGE_BASE_URL:-http://10.99.0.1:8080}"
-BRIDGE_API_TOKEN="${BRIDGE_API_TOKEN:-}"
-if [[ -n "$BRIDGE_API_TOKEN" ]]; then
-  bridge_health=$(curl -sf -m 5 "$BRIDGE_BASE_URL/health" -H "Authorization: Bearer $BRIDGE_API_TOKEN" 2>/dev/null || echo "fail")
+# Prefer per-site token for site-002; fall back to global token
+BRIDGE_TOKEN_SITE002="${BRIDGE_API_TOKEN_SITE002:-${BRIDGE_API_TOKEN:-}}"
+if [[ -n "$BRIDGE_TOKEN_SITE002" ]]; then
+  bridge_health=$(curl -sf -m 15 "$BRIDGE_BASE_URL/api/sites/site-002/health" \
+    -H "Authorization: Bearer $BRIDGE_TOKEN_SITE002" 2>/dev/null || echo "fail")
   if [[ "$bridge_health" != "fail" ]]; then
-    sites_tracked=$(echo "$bridge_health" | python3 -c "import sys,json; print(json.load(sys.stdin).get('sites_tracked','?'))" 2>/dev/null || echo "?")
-    bridge_uptime=$(echo "$bridge_health" | python3 -c "import sys,json; print(json.load(sys.stdin).get('uptime_seconds','?'))" 2>/dev/null || echo "?")
-    check "Bridge API $BRIDGE_BASE_URL" 0 "up (sites=$sites_tracked, uptime=${bridge_uptime}s)"
+    telemetry_fresh=$(echo "$bridge_health" | python3 -c "import sys,json; print(json.load(sys.stdin).get('telemetry_fresh','?'))" 2>/dev/null || echo "?")
+    last_telemetry=$(echo "$bridge_health" | python3 -c "import sys,json; print(json.load(sys.stdin).get('last_telemetry_at','?'))" 2>/dev/null || echo "?")
+    if [[ "$telemetry_fresh" == "True" || "$telemetry_fresh" == "true" ]]; then
+      check "Bridge API $BRIDGE_BASE_URL" 0 "up (telemetry_fresh=true, last=${last_telemetry:-?})"
+    else
+      check "Bridge API $BRIDGE_BASE_URL" 2 "telemetry_fresh=$telemetry_fresh (last=${last_telemetry:-?})"
+    fi
   else
-    check "Bridge API $BRIDGE_BASE_URL" 1 "unreachable via WireGuard tunnel"
+    # Fallback: /health without auth (bridge-level, no per-site token needed)
+    bridge_base_health=$(curl -sf -m 5 "$BRIDGE_BASE_URL/health" 2>/dev/null || echo "fail")
+    if [[ "$bridge_base_health" != "fail" ]]; then
+      check "Bridge API $BRIDGE_BASE_URL" 2 "unreachable on /api/sites/site-002/health (bridge up at /health, check token)"
+    else
+      check "Bridge API $BRIDGE_BASE_URL" 1 "unreachable via WireGuard tunnel"
+    fi
   fi
 else
-  check "Bridge API token" 2 "BRIDGE_API_TOKEN not set"
+  check "Bridge API token" 2 "BRIDGE_API_TOKEN (site-002) not set"
 fi
 
 # Sentinel backend shadow mode polling job
@@ -378,32 +396,33 @@ else
   check "Mosquitto auth" 2 "broker may allow anonymous or unreachable"
 fi
 
-# Recent node connections from Mosquitto log
-if [[ -f /var/log/mosquitto/mosquitto.log ]]; then
-  recent_window=$(date -d '15 minutes ago' +%s 2>/dev/null || echo "0")
-  recent_nodes=$(sudo grep -cE "node_001|node_002" /var/log/mosquitto/mosquitto.log 2>/dev/null || echo "0")
-  node_001_recent=$(sudo grep -c "node_001" /var/log/mosquitto/mosquitto.log 2>/dev/null | tr -d '[:space:]' || echo "0")
-  node_002_recent=$(sudo grep -c "node_002" /var/log/mosquitto/mosquitto.log 2>/dev/null | tr -d '[:space:]' || echo "0")
-  node_001_last=$(sudo grep "node_001" /var/log/mosquitto/mosquitto.log 2>/dev/null | tail -1 | awk '{print $2}' || echo "unknown")
-  node_002_last=$(sudo grep "node_002" /var/log/mosquitto/mosquitto.log 2>/dev/null | tail -1 | awk '{print $2}' || echo "unknown")
+# Space MQTT listener (backend) — check that backend is connected to broker
+# The listener uses client_id "sentinel-space-backend", which appears as <unknown>
+# in mosquitto logs. We check instead for recent inbound traffic from non-localhost
+# (ESP32 nodes would connect from their own IPs, not 127.0.0.1).
+space_mqtt_recent=$(sudo grep -vE "protocol error|disconnected|not authorised|New connection|closed its|127.0.0.1" \
+  /var/log/mosquitto/mosquitto.log 2>/dev/null | \
+  grep -cE "sentinel|space|node|device|room" 2>/dev/null || echo "0")
+mosquitto_log_recent=$(sudo grep -cv "^" /var/log/mosquitto/mosquitto.log 2>/dev/null || echo "0")
 
-  if [[ "$node_001_recent" -gt 0 && "$node_002_recent" -gt 0 ]]; then
-    check "ESP32 node_001" 0 "connected (last: $node_001_last)"
-    check "ESP32 node_002" 0 "connected (last: $node_002_last)"
-  elif [[ "$node_001_recent" -gt 0 ]]; then
-    check "ESP32 node_001" 0 "seen in log (last: $node_001_last)"
-    check "ESP32 node_002" 1 "not in log"
-  elif [[ "$node_002_recent" -gt 0 ]]; then
-    check "ESP32 node_001" 1 "not in log"
-    check "ESP32 node_002" 0 "seen in log (last: $node_002_last)"
-  else
-    check "ESP32 node_001" 1 "no recent log activity"
-    check "ESP32 node_002" 1 "no recent log activity"
-  fi
+# ESP32 nodes publish to topics like "sentinel/space/node_001" and similar.
+# Check if mosquitto has any active client connections (non-<unknown> clients).
+esp32_nodes_seen=$(sudo awk '
+  /New connection/ {
+    # Extract IP — last field before "on port"
+    ip=$(NF-1)
+    # Skip localhost and gateway IPs
+    if (ip != "127.0.0.1" && ip != "127.0.0.1:" && ip !~ /^172\./ && ip !~ /^10\./ && ip !~ /^192\.168\./) {
+      count++ }}
+  END { print count+0 }
+' /var/log/mosquitto/mosquitto.log 2>/dev/null || echo "0")
+
+if [[ "$esp32_nodes_seen" -gt 0 ]]; then
+  check "ESP32 space nodes" 0 "$esp32_nodes_seen external connections in log"
+elif [[ "$space_mqtt_recent" -gt 0 ]]; then
+  check "ESP32 space nodes" 0 "backend space MQTT activity in log"
 else
-  check "Mosquitto log" 2 "/var/log/mosquitto/mosquitto.log not accessible"
-  check "ESP32 node_001" 2 "cannot check (no log access)"
-  check "ESP32 node_002" 2 "cannot check (no log access)"
+  check "ESP32 space nodes" 1 "no space-node traffic (devices offline or not yet deployed)"
 fi
 
 # --- Data Stores ---

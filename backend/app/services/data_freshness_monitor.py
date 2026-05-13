@@ -254,6 +254,9 @@ class DataFreshnessMonitor:
             # Ongoing breach — still stale but already tracked
             return {"breach_started": False, "breach_resolved": False}
 
+        # No breach state change
+        return {"breach_started": False, "breach_resolved": False}
+
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------

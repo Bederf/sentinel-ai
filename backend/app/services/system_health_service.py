@@ -1062,7 +1062,7 @@ class SystemHealthService:
 
         try:
             freshness_rows = (
-                await self.supabase.table("data_freshness")
+                await self.client.table("data_freshness")
                 .select("*")
                 .eq("site_id", site_id)
                 .order("data_source")
@@ -1111,7 +1111,7 @@ class SystemHealthService:
 
         try:
             breaches = (
-                await self.supabase.table("data_freshness_breaches")
+                await self.client.table("data_freshness_breaches")
                 .select("*")
                 .eq("site_id", site_id)
                 .eq("data_source", data_source)

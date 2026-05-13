@@ -10,18 +10,7 @@
 
 import { useState, useEffect } from 'react';
 import { useServerEvents } from '@/hooks/useServerEvents';
-import {
-  Card,
-  Metric,
-  TabGroup,
-  TabList,
-  Tab,
-  TabPanels,
-  TabPanel,
-  Text,
-  ProgressBar,
-  LineChart,
-} from '@tremor/react';
+
 import {
   AlertCircle,
   AlertTriangle,

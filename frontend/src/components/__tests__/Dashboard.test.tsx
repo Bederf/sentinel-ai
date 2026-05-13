@@ -24,11 +24,7 @@ import {
 } from '@/test-utils/factories';
 // Types available from '@/lib/api' if needed
 
-// Mock Tremor components - import function directly into factory
-vi.mock('@tremor/react', async () => {
-  const { createTremorMocks } = await import('@/test-utils/mockTremor');
-  return createTremorMocks();
-});
+// No-op: Tremor components have been replaced with plain HTML
 
 // Mock API module
 vi.mock('@/lib/api', () => ({

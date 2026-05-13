@@ -10,7 +10,6 @@
  */
 
 import { useState, useEffect, useMemo } from "react";
-import { Button } from "@tremor/react";
 import { Zap, Clock, Thermometer, CheckCircle, Play, Square, Eye, ShieldCheck } from "lucide-react";
 import { PageLoading } from "./PageLoading";
 import { ThermalRunwayChart } from "./ThermalRunwayChart";

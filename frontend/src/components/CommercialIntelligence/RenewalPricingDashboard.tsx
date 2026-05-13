@@ -1,24 +1,7 @@
 /* eslint-disable @typescript-eslint/ban-ts-comment */
 // @ts-nocheck
 import React, { useState, useMemo } from 'react'
-import {
-  Card,
-  CardHeader,
-  Title,
-  Text,
-  BarChart,
-  PieChart,
-  Table,
-  TableHead,
-  TableRow,
-  TableHeaderCell,
-  TableBody,
-  TableCell,
-  Badge,
-  Button,
-  Flex,
-  Grid,
-} from '@tremor/react'
+
 import { ArrowUpIcon, ArrowDownIcon, CheckCircleIcon } from '@heroicons/react/24/solid'
 import { pricingApi } from '@/lib/api'
 import type { RenewalQuote, RenegotiationAnalysis } from '@/lib/api'

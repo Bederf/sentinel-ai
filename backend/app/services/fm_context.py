@@ -91,7 +91,7 @@ class FMContextService:
             equipment,
             key=lambda e: (
                 0 if e.get("status") == "critical" else (1 if e.get("status") == "warning" else 2),
-                e.get("health_score", 100),
+                e.get("health_score") or 100,
             ),
         )
 
@@ -168,17 +168,20 @@ class FMContextService:
         """
         client = get_supabase_client()
 
-        query = client.table("anomalies").select(
-            "id, severity, type, confidence, status, site_id, equipment_id"
-        ).eq("status", "open")
+        try:
+            query = client.table("anomalies").select(
+                "id, severity, type, confidence, status, site_id, equipment_id"
+            ).eq("status", "open")
 
-        if site_id:
-            site_uuid = self._get_site_uuid(site_id)
-            if site_uuid:
-                query = query.eq("site_id", site_uuid)
+            if site_id:
+                site_uuid = self._get_site_uuid(site_id)
+                if site_uuid:
+                    query = query.eq("site_id", site_uuid)
 
-        resp = query.execute()
-        anomalies = resp.data or []
+            resp = query.execute()
+            anomalies = resp.data or []
+        except Exception:
+            return "No open anomalies."
 
         if not anomalies:
             return "No open anomalies."
@@ -229,19 +232,21 @@ class FMContextService:
         """
         client = get_supabase_client()
 
-        query = client.table("predictions").select(
-            "id, equipment_id, site_id, prediction_type, probability_percent, confidence, "
-            "predicted_failure_date, timeframe_days, severity, urgency, "
-            "repair_cost_zar, potential_loss_zar, evidence, contributing_factors"
-        ).eq("status", "active")
+        try:
+            query = client.table("predictions").select(
+                "id, equipment_id, site_id, prediction_type, probability_percent, confidence, "
+                "predicted_failure_date, horizon_hours, severity, evidence, contributing_factors"
+            ).eq("status", "active")
 
-        if site_id:
-            site_uuid = self._get_site_uuid(site_id)
-            if site_uuid:
-                query = query.eq("site_id", site_uuid)
+            if site_id:
+                site_uuid = self._get_site_uuid(site_id)
+                if site_uuid:
+                    query = query.eq("site_id", site_uuid)
 
-        resp = query.execute()
-        predictions = resp.data or []
+            resp = query.execute()
+            predictions = resp.data or []
+        except Exception:
+            return "No AI failure predictions available."
 
         if not predictions:
             return "No AI failure predictions available."
@@ -268,7 +273,7 @@ class FMContextService:
             site_name = site_lookup.get(pred.get("site_id"), "Unknown")
             eq_name = eq_lookup.get(pred.get("equipment_id"), "Unknown")
             prob = pred.get("probability_percent", 0)
-            timeframe = f"{pred.get('timeframe_days', 0)} days"
+            timeframe = f"{pred.get('horizon_hours', 0) or 0:.0f}h"
             severity = pred.get("severity", "unknown").upper()
             lines.append(
                 f"| {pred['id'][:8]}... | {site_name[:15]} | {eq_name} | "
@@ -289,7 +294,7 @@ class FMContextService:
             lines.append(f"**Prediction:** {pred['prediction_type'].replace('_', ' ').title()}")
             lines.append(f"**Probability:** {pred['probability_percent']}% ({pred.get('confidence', 0):.0%} confidence)")
             lines.append(f"**Predicted Failure:** {pred.get('predicted_failure_date') or 'N/A'}")
-            lines.append(f"**Timeframe:** {pred.get('timeframe_days', 0)} days")
+            lines.append(f"**Timeframe:** {pred.get('horizon_hours', 0) or 0:.0f}h")
 
             # Evidence
             evidence = pred.get("evidence") or {}
@@ -308,8 +313,8 @@ class FMContextService:
                     lines.append(f"- {factor.get('factor', 'unknown')} ({w}%): {factor.get('description', '')}")
 
             # Financial impact
-            repair = pred.get("repair_cost_zar", 0)
-            loss = pred.get("potential_loss_zar", 0)
+            repair = pred.get("repair_cost_zar") or 0
+            loss = pred.get("potential_loss_zar") or 0
             if repair or loss:
                 lines.append("**Financial Impact:**")
                 lines.append(f"- Repair cost: R{repair:,.0f}")

@@ -3,10 +3,25 @@
  */
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || window.location.origin;
-const ACCESS_TOKEN_KEY = "sentinel_token";
 const REFRESH_TOKEN_KEY = "sentinel_refresh_token";
 export const AUTH_EXPIRED_EVENT = "sentinel:auth-expired";
 let refreshInFlight: Promise<string | null> | null = null;
+
+// In-memory access token — not persisted, not XSS-extractable after page unload
+let _accessToken: string | null = null;
+
+export const setAccessToken = (token: string): void => {
+  _accessToken = token;
+};
+
+export const getAccessToken = (): string | null => {
+  return _accessToken;
+};
+
+export const clearAccessToken = (): void => {
+  _accessToken = null;
+};
+
 const MAX_RATE_LIMIT_RETRIES = 0;
 const BASE_RATE_LIMIT_DELAY_MS = 500;
 const MAX_CONCURRENT_API_REQUESTS = 4;
@@ -15,6 +30,35 @@ const apiRequestWaiters: Array<() => void> = [];
 const inFlightGetRequests = new Map<string, Promise<Response>>();
 const cachedGetResponses = new Map<string, { response: Response; expiresAt: number }>();
 const rateLimitedUntilByBucket = new Map<string, number>();
+
+// TTL-based cache eviction to prevent unbounded Map growth
+const MAP_EVICTION_INTERVAL_MS = 60_000;
+const MAX_CACHED_ENTRIES = 100;
+
+function evictExpiredCacheEntries(): void {
+  const now = Date.now();
+  for (const [key, entry] of cachedGetResponses.entries()) {
+    if (entry.expiresAt <= now) {
+      cachedGetResponses.delete(key);
+    }
+  }
+  // Also cap total entries to prevent memory bloat
+  if (cachedGetResponses.size > MAX_CACHED_ENTRIES) {
+    const entries = Array.from(cachedGetResponses.entries());
+    entries.sort((a, b) => a[1].expiresAt - b[1].expiresAt);
+    const toRemove = entries.slice(0, entries.length - MAX_CACHED_ENTRIES);
+    toRemove.forEach(([key]) => cachedGetResponses.delete(key));
+  }
+  // Clear stale rate limit entries
+  for (const [key, until] of rateLimitedUntilByBucket.entries()) {
+    if (until <= now) rateLimitedUntilByBucket.delete(key);
+  }
+  // Clean up completed in-flight requests (only track them for deduplication, not for explicit cleanup)
+  // inFlightGetRequests naturally clears when the promise resolves
+}
+
+setInterval(evictExpiredCacheEntries, MAP_EVICTION_INTERVAL_MS);
+
 const DEFAULT_RATE_LIMIT_COOLDOWN_MS = 30000;
 const DEFAULT_GET_CACHE_TTL_MS = 30000;
 const SITES_CACHE_KEY = "sentinel_cached_sites";
@@ -114,25 +158,27 @@ function createClientRateLimitResponse(bucket: string): Response {
   );
 }
 
-function getAccessToken(): string | null {
-  return localStorage.getItem(ACCESS_TOKEN_KEY);
-}
-
 function getRefreshToken(): string | null {
+  // Primary: HttpOnly cookie set by backend (secure, XSS-proof)
+  const cookieMatch = document.cookie.match(/(?:^|;\s*)sentinel_refresh_token=([^;]*)/);
+  if (cookieMatch) return decodeURIComponent(cookieMatch[1]);
+  // Fallback: localStorage for existing sessions during transition
   return localStorage.getItem(REFRESH_TOKEN_KEY);
 }
 
 function setTokens(accessToken: string, refreshToken?: string): void {
-  localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
+  setAccessToken(accessToken);
   if (refreshToken) {
     localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
   }
 }
 
 export function clearAuthStorage(): void {
-  localStorage.removeItem(ACCESS_TOKEN_KEY);
+  clearAccessToken();
   localStorage.removeItem(REFRESH_TOKEN_KEY);
   localStorage.removeItem("sentinel_user");
+  // Clear HttpOnly refresh token cookie
+  document.cookie = "sentinel_refresh_token=; max-age=0; path=/api/auth";
 }
 
 function notifyAuthExpired(): void {
@@ -1102,10 +1148,14 @@ export interface MonthlySavingsSummary {
 // Full optimization status response
 export interface OptimizationStatusResponse {
   site_id: string;
+  onboarding_phase?: string;
   optimization_enabled: boolean;
-  optimization_status: "optimized" | "recommendation_pending" | "warning" | "error" | "unknown";
+  optimization_status: "optimized" | "recommendation_pending" | "warning" | "error" | "unknown" | "learning" | "active" | "disabled";
+  active_profile?: "comfort" | "cost_saving" | "asset_preservation" | "balanced" | string;
   optimization_settings: {
-    mode: "supervised" | "automatic";
+    mode: "supervised" | "automatic" | string;
+    active_profile?: string;
+    control_tier?: string;
     last_analysis: string | null;
     analysis_interval_minutes: number;
   };
@@ -1392,8 +1442,8 @@ export async function streamChat(
 ): Promise<void> {
   const url = `${API_BASE_URL}/api/chat`;
 
-  // Get JWT token from localStorage if available
-  const token = localStorage.getItem("sentinel_token");
+  // Get JWT token from in-memory store
+  const token = getAccessToken();
 
   const response = await fetch(url, {
     method: "POST",
@@ -1446,7 +1496,7 @@ export const api = {
    * Returns MP3 audio blob for playback
    */
   async textToSpeech(text: string): Promise<Blob> {
-    const token = localStorage.getItem("sentinel_token");
+    const token = getAccessToken();
     const response = await fetch(`${API_BASE_URL}/api/chat/tts`, {
       method: "POST",
       headers: {
@@ -1466,7 +1516,7 @@ export const api = {
    * The text output stays full/lengthy; the voice is condensed to 1-2 sentences.
    */
   async voiceSummary(text: string): Promise<{ text: string; audio_url: string }> {
-    const token = localStorage.getItem("sentinel_token");
+    const token = getAccessToken();
     const response = await fetch(`${API_BASE_URL}/api/chat/voice-summary`, {
       method: "POST",
       headers: {
@@ -2619,6 +2669,19 @@ export const api = {
     });
   },
 
+  // ============= Site Mode API Methods =============
+
+  async getSiteMode(siteId: string): Promise<{ site_id: string; current_stage: string; candidate_stage?: string; candidate_since?: string; last_evaluated_at?: string }> {
+    return fetchApi(`/api/settings/site-mode/${siteId}`);
+  },
+
+  async setSiteMode(siteId: string, stage: string): Promise<{ site_id: string; current_stage: string }> {
+    return fetchApi(`/api/settings/site-mode/${siteId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ stage }),
+    });
+  },
+
   // ============= Safety Rules API Methods =============
 
   /**
@@ -3215,7 +3278,7 @@ export const integrationApi = {
     const formData = new FormData();
     formData.append('file', file);
 
-    const token = localStorage.getItem("sentinel_token");
+    const token = getAccessToken();
     const response = await fetch(`${API_BASE_URL}/api/integration/detect-format`, {
       method: 'POST',
       headers: {
@@ -3238,7 +3301,7 @@ export const integrationApi = {
    * @param mappings - Column mappings to save
    */
   saveColumnMappings: async (siteId: string, logSourceId: string, mappings: ColumnMapping[]): Promise<void> => {
-    const token = localStorage.getItem("sentinel_token");
+    const token = getAccessToken();
     const response = await fetch(`${API_BASE_URL}/api/integration/mappings`, {
       method: 'POST',
       headers: {
@@ -3260,7 +3323,7 @@ export const integrationApi = {
    * @param bmsPoints - List of BMS point IDs
    */
   matchPoints: async (siteId: string, logSourceId: string, bmsPoints: string[]): Promise<PointMatch[]> => {
-    const token = localStorage.getItem("sentinel_token");
+    const token = getAccessToken();
     const response = await fetch(`${API_BASE_URL}/api/integration/match-points`, {
       method: 'POST',
       headers: {
@@ -3284,7 +3347,7 @@ export const integrationApi = {
    * @param dryRun - If true, validate without processing
    */
   ingestLogs: async (siteId: string, logSourceId: string, dryRun: boolean = false): Promise<void> => {
-    const token = localStorage.getItem("sentinel_token");
+    const token = getAccessToken();
     const response = await fetch(`${API_BASE_URL}/api/integration/ingest`, {
       method: 'POST',
       headers: {
@@ -5070,11 +5133,7 @@ export const authApi = {
 
   /** Get current user info */
   me: () =>
-    fetchApi<AuthUser>("/api/auth/me", {
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem("sentinel_token") || ""}`,
-      },
-    }),
+    fetchApi<AuthUser>("/api/auth/me"),
 
   /** Logout */
   logout: () => {

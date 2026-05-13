@@ -355,11 +355,11 @@ async def list_bookings(
                 "organiser_name": b.organiser_name,
                 "room_name": b.room_name,
                 "booking_date": b.booking_date.isoformat(),
-                "start_time": b.start_time.isoformat(),
-                "end_time": b.end_time.isoformat(),
+                "start_time": b.start_time.isoformat() + "Z",
+                "end_time": b.end_time.isoformat() + "Z",
                 "flagged": b.flagged,
-                "ingested_at": b.ingested_at.isoformat() if getattr(b, "ingested_at", None) else None,
-                "created_at": b.created_at.isoformat() if getattr(b, "created_at", None) else None,
+                "ingested_at": b.ingested_at.isoformat() + "Z" if getattr(b, "ingested_at", None) else None,
+                "created_at": b.created_at.isoformat() + "Z" if getattr(b, "created_at", None) else None,
             }
             for b in all_bookings
         ],

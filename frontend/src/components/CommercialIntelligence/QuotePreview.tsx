@@ -16,21 +16,7 @@
  */
 
 import { useState, useRef } from 'react'
-import {
-  Card,
-  Title,
-  Text,
-  Button,
-  Badge,
-  Table,
-  TableHead,
-  TableBody,
-  TableRow,
-  TableCell,
-  Grid,
-  Col,
-  Metric,
-} from '@tremor/react'
+
 import {
   Download,
   Copy,

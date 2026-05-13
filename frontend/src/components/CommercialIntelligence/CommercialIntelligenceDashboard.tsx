@@ -14,17 +14,7 @@
  */
 
 import { useState } from 'react'
-import {
-  Card,
-  Title,
-  Text,
-  TabGroup,
-  TabList,
-  Tab,
-  TabPanels,
-  TabPanel,
-  Button,
-} from '@tremor/react'
+
 import {
   FileText,
   BarChart3,

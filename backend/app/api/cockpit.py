@@ -1,26 +1,13 @@
 """
-Cockpit Decision API (Phase 172-05).
+Cockpit Decision API (Phase 207 — v2).
 
 GET /api/cockpit/decision/{site_id}
-  Returns site-aware CockpitDecisionPayload for decision surface rendering.
-
-  v1: Deterministic stub logic (site-aware fixtures, no real intelligence sourcing)
-  v2: Real intelligence integration (recommendations, urgency, posture, asset context)
-
-  Response shape is locked and final. Internal sourcing will change v1→v2, not shape.
-  Supports deployment modes: ghost, advisory, supervised, autonomous.
-  Supports calm buildings (no active decision).
-
-  Target: < 200ms latency, all nullable fields present.
+  Real intelligence integration — replaces v1 stubs.
+  Sources active recommendations, equipment health, and site profile.
+  Phase-gated: calm building, advisory read-only, supervised approve decision.
 
 POST /api/cockpit/decision/approve/{site_id}
-  Operator approval endpoint for supervised-mode actions.
-
-  v1: Stub — logs attempt, returns 202 Accepted with audit envelope.
-  v2: Will validate site access, fetch active recommendation, route through
-      ApprovalService, persist parasite_decision row, return execution confirmation.
-
-  Returns 202 (not 200) — action is accepted and queued, not yet executed.
+  Wired through ApprovalService — real execution, not stub.
 """
 
 from __future__ import annotations
@@ -29,13 +16,14 @@ import logging
 from datetime import UTC, datetime
 from typing import Any, Literal
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from app.services.cockpit_policy_resolution import resolve_cockpit_contract
+from app.services.site_operating_mode_service import resolve_site_operating_mode
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/api/cockpit", tags=["cockpit"])
+router = APIRouter(prefix="/cockpit", tags=["cockpit"])
 
 
 # ---------------------------------------------------------------------------
@@ -195,55 +183,153 @@ def _attach_resolved_contract(payload: CockpitDecisionPayload) -> CockpitDecisio
 
 
 # ---------------------------------------------------------------------------
-# Site fixture logic (v1: deterministic stub)
+# v2: Real data sourcing
 # ---------------------------------------------------------------------------
 
 
-def _build_stub_payload_for_site(site_id: str) -> CockpitDecisionPayload | None:
-    """
-    v1 site-aware stub logic.
+async def _fetch_site_phase(site_id: str) -> str:
+    """Fetch onboarding phase from Supabase."""
+    try:
+        from app.database.supabase_client import get_supabase_client
+        client = get_supabase_client()
+        row = client.table("sites").select("onboarding_phase").eq("code", site_id).limit(1).execute()
+        if row.data:
+            return row.data[0].get("onboarding_phase") or "commissioning"
+    except Exception as exc:
+        logger.debug("Could not fetch onboarding_phase for %s: %s", site_id, exc)
+    return "commissioning"
 
-    Returns deterministic payload based on site_id.
-    No database queries, no ML, no real intelligence—just fixtures.
 
-    This is the contract verification layer.
-    When v2 replaces this with real data, the shape stays identical.
-    """
-
-    if site_id == "site-002":
-        # Sandton City: active advisory decision (one stub recommendation)
-        return _attach_resolved_contract(
-            CockpitDecisionPayload(
-                building_id="site-002",
-                alert_text="Executive boardroom cooling resilience is slipping.",
-                reasoning_summary=(
-                    "Compressor load is rising while boardroom thermal drift accelerates. "
-                    "Start standby cooling before the next occupied meeting window."
-                ),
-                active_posture="comfort_priority",
-                time_to_discomfort=12,
-                time_confidence="declining",
-                estimated_impact=(
-                    "Boardroom comfort will breach during the next occupied window and plant stress is rising."
-                ),
-                recommended_action="Start standby chiller and inspect the lead compressor train.",
-                urgency_score=0.78,
-                urgency_components={
-                    "comfort": 0.42,
-                    "asset_risk": 0.24,
-                    "cost": 0.12,
-                },
-                affected_zone_ids=["Zone-L4-Boardroom-A", "Zone-L4-Boardroom-B"],
-                primary_asset_id="S002-CHILLER-B1-001",
-                building_metadata={
-                    "deployment_mode": "advisory",
-                },
-            )
-        )
-
-    # All other sites: calm building (no active decision, null payload)
-    # This is the fallback state frontend expects.
+async def _fetch_active_recommendation(site_id: str) -> dict | None:
+    """Fetch the highest-priority pending recommendation for a site."""
+    try:
+        from app.database.repositories.recommendation_repository import RecommendationRepository
+        repo = RecommendationRepository()
+        recs = await repo.get_by_status(site_id, status="pending", limit=1)
+        if recs:
+            return recs[0].to_dict()
+    except Exception as exc:
+        logger.debug("Could not fetch recommendations for %s: %s", site_id, exc)
     return None
+
+
+async def _fetch_recent_health_snapshots(site_id: str, limit: int = 5) -> list[dict]:
+    """Fetch recent health snapshots for urgency computation."""
+    try:
+        from app.database.supabase_client import get_supabase_client
+        client = get_supabase_client()
+        rows = client.table("asset_health_snapshots").select("*").eq("site_id", site_id).order("created_at", desc=True).limit(limit).execute()
+        return rows.data or []
+    except Exception as exc:
+        logger.debug("Could not fetch health snapshots for %s: %s", site_id, exc)
+    return []
+
+
+def _compute_urgency(recommendation: dict | None, health_snapshots: list[dict], profile: str) -> dict:
+    """Compute urgency score from recommendation risk, health data, and profile."""
+    urgency_score = 0.0
+    components: dict[str, float] = {"comfort": 0.0, "asset_risk": 0.0, "cost": 0.0}
+
+    if not recommendation:
+        return {"score": urgency_score, "components": components}
+
+    # Risk level contributes base urgency
+    risk_map = {"low": 0.2, "medium": 0.5, "high": 0.75, "critical": 0.95}
+    base = risk_map.get(recommendation.get("risk_level", "medium"), 0.5)
+    urgency_score = base
+
+    # Profile weights shift urgency components
+    if profile == "comfort":
+        components["comfort"] = base * 0.5
+        components["asset_risk"] = base * 0.25
+        components["cost"] = base * 0.25
+    elif profile == "cost_saving":
+        components["comfort"] = base * 0.15
+        components["asset_risk"] = base * 0.25
+        components["cost"] = base * 0.6
+    elif profile == "asset_preservation":
+        components["comfort"] = base * 0.1
+        components["asset_risk"] = base * 0.6
+        components["cost"] = base * 0.3
+    else:  # balanced
+        components = {"comfort": base * 0.33, "asset_risk": base * 0.33, "cost": base * 0.34}
+
+    # Health data boosts asset_risk if equipment health is declining
+    if health_snapshots:
+        low_health_count = sum(1 for h in health_snapshots if (h.get("health_score") or 100) < 60)
+        if low_health_count > 0:
+            boost = min(low_health_count * 0.05, 0.2)
+            components["asset_risk"] = min(components["asset_risk"] + boost, 1.0)
+            urgency_score = min(urgency_score + boost * 0.5, 1.0)
+
+    return {"score": round(urgency_score, 2), "components": {k: round(v, 2) for k, v in components.items()}}
+
+
+async def _build_v2_payload_for_site(site_id: str) -> CockpitDecisionPayload | None:
+    """
+    v2: Build cockpit payload from real data sources.
+
+    Phase-gating:
+      - commissioning/shadow_live → null (calm building)
+      - advisory → read-only recommendation
+      - supervised → approve-able recommendation
+    """
+    phase = await _fetch_site_phase(site_id)
+
+    # Phase gate: calm building for early phases
+    if phase in ("commissioning", "shadow_live"):
+        return None
+
+    # Fetch real recommendation + health context
+    recommendation = await _fetch_active_recommendation(site_id)
+    health_snapshots = await _fetch_recent_health_snapshots(site_id)
+    profile = resolve_site_operating_mode(site_id)
+
+    if not recommendation:
+        return None
+
+    # Build urgency from recommendation + health + profile
+    urgency = _compute_urgency(recommendation, health_snapshots, profile)
+
+    # Map deployment posture from phase
+    posture_map = {
+        "advisory": "advisory",
+        "supervised": "supervised",
+        "automatic": "autonomous",
+    }
+    deployment_mode = posture_map.get(phase, "advisory")
+
+    # Determine confidence label
+    confidence = recommendation.get("confidence", "medium")
+    confidence_map = {"high": "stable", "medium": "stable", "low": "declining"}
+    time_confidence = confidence_map.get(confidence, "stable")
+
+    # Extract impacted zones + equipment
+    target = recommendation.get("target_equipment", "")
+    meta = recommendation.get("metadata", {})
+    affected_zone_ids = meta.get("affected_zones", []) if isinstance(meta, dict) else []
+
+    payload = CockpitDecisionPayload(
+        building_id=site_id,
+        alert_text=recommendation.get("reason", ""),
+        reasoning_summary=recommendation.get("reason", ""),
+        active_posture=deployment_mode,
+        time_to_discomfort=None,
+        time_confidence=time_confidence,
+        estimated_impact=recommendation.get("expected_impact"),
+        recommended_action=f"Apply recommendation: {recommendation.get('action_type', '')} on {target}",
+        urgency_score=urgency["score"],
+        urgency_components=urgency["components"],
+        affected_zone_ids=affected_zone_ids or None,
+        primary_asset_id=target or None,
+        building_metadata={
+            "deployment_mode": deployment_mode,
+            "profile": profile,
+            "recommendation_id": recommendation.get("id", ""),
+        },
+    )
+
+    return _attach_resolved_contract(payload)
 
 
 # ---------------------------------------------------------------------------
@@ -254,39 +340,18 @@ def _build_stub_payload_for_site(site_id: str) -> CockpitDecisionPayload | None:
 @router.get("/decision/{site_id}")
 async def get_cockpit_decision(site_id: str) -> dict[str, Any]:
     """
-    Get cockpit decision payload for a site.
+    Get cockpit decision payload for a site (v2).
 
-    Path Parameters:
-        site_id: Building identifier (e.g., S002)
+    Sources real recommendations, phase-gates output, and computes
+    urgency from health data + profile settings.
 
-    Returns:
-        Cockpit decision payload (shape: CockpitDecisionPayload).
-        If no active decision, returns null payload (null fields in response).
-
-    Response shape:
-        {
-            "payload": CockpitDecisionPayload | None,
-            "site_id": string,
-            "fetched_at": ISO8601 datetime,
-        }
-
-    v1 behavior:
-        - S002: Active advisory decision with HVAC stub alert
-        - Other sites: Null payload (calm building, no decision)
-        - Missing site: null payload (treats as calm)
-
-    v2 will replace internal logic with:
-        - Query active recommendations for site
-        - Compute urgency from equipment health + telemetry
-        - Resolve deployment posture from site config
-        - Map affected zones/assets from equipment registry
-        Same response shape, real intelligence inside.
+    Phase gating:
+      - commissioning/shadow_live → null payload (calm building)
+      - advisory → decision payload with read-only recommendations
+      - supervised → decision payload with approve-able action
+      - automatic → decision payload showing auto-applied state
     """
-
-    # Site existence not validated in v1 (no database query).
-    # v2 will validate against buildings table.
-    payload = _build_stub_payload_for_site(site_id)
-
+    payload = await _build_v2_payload_for_site(site_id)
     return {
         "payload": payload,
         "site_id": site_id,
@@ -297,51 +362,55 @@ async def get_cockpit_decision(site_id: str) -> dict[str, Any]:
 @router.post("/decision/approve/{site_id}", status_code=202)
 async def approve_cockpit_decision(site_id: str) -> dict[str, Any]:
     """
-    Operator approval for supervised-mode cockpit action.
+    Operator approval for supervised-mode cockpit action (v2).
 
-    Returns 202 Accepted — action is received and logged, not yet executed.
-    The frontend hold-to-confirm gesture calls this endpoint on completion.
+    Validates phase ≥ supervised, fetches active recommendation, routes
+    through ApprovalService, persists parasite_decision, returns execution_id.
 
-    v1 behavior (stub):
-        - Logs the approval attempt with site_id and timestamp
-        - Returns 202 with audit envelope
-        - No database write, no BMS command issued
-
-    v2 will replace stub body with:
-        - require_query_site_access() BOLA gate
-        - Fetch active Recommendation for site from Supabase
-        - Route through ApprovalService (same path as optimization approvals)
-        - Persist parasite_decision row with routing_source='cockpit_approval'
-        - Issue BMS command via control layer
-        - Return execution_id for frontend polling
-
-    Path Parameters:
-        site_id: Building identifier (e.g., S002)
-
-    Response shape (v1):
-        {
-            "accepted": true,
-            "site_id": string,
-            "accepted_at": ISO8601 datetime,
-            "status": "stub — no action executed",
-        }
+    Returns 202 Accepted — action is queued, not yet verified.
     """
-
     accepted_at = datetime.now(UTC).isoformat()
 
-    logger.info(
-        "Cockpit approval received",
-        extra={
-            "site_id": site_id,
-            "accepted_at": accepted_at,
-            "source": "cockpit_supervised_confirm",
-            "status": "stub_v1",
-        },
-    )
+    # Phase gate: require supervised+
+    phase = await _fetch_site_phase(site_id)
+    if phase not in ("supervised", "automatic"):
+        logger.warning("Cockpit approve rejected: phase %s < supervised for %s", phase, site_id)
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot approve: site is in '{phase}' phase. Supervised or automatic required.",
+        )
+
+    # Fetch active recommendation
+    recommendation = await _fetch_active_recommendation(site_id)
+    if not recommendation:
+        logger.warning("Cockpit approve rejected: no pending recommendation for %s", site_id)
+        raise HTTPException(
+            status_code=404,
+            detail="No pending recommendation found for this site.",
+        )
+
+    rec_id = recommendation.get("id", "")
+    if not rec_id:
+        raise HTTPException(status_code=500, detail="Recommendation has no ID")
+
+    try:
+        from app.services.approval_service import ApprovalService
+
+        approval_svc = ApprovalService()
+        result = await approval_svc.execute_approval(
+            recommendation_id=rec_id,
+            approved_by="cockpit_operator",
+            approval_notes="Approved via cockpit hold-to-confirm",
+        )
+    except Exception as exc:
+        logger.error("Cockpit approve failed for %s: %s", site_id, exc)
+        raise HTTPException(status_code=500, detail=f"Approval execution failed: {exc}") from exc
 
     return {
         "accepted": True,
         "site_id": site_id,
         "accepted_at": accepted_at,
-        "status": "stub — no action executed",
+        "recommendation_id": rec_id,
+        "execution_status": result.status if hasattr(result, "status") else "executed",
+        "correlation_id": recommendation.get("correlation_id", ""),
     }

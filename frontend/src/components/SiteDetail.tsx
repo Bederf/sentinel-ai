@@ -39,7 +39,7 @@ import {
   Shield,
   ClipboardList,
 } from "lucide-react";
-import api, { createWorkOrder } from '@/lib/api';
+import api, { createWorkOrder, getAccessToken } from '@/lib/api';
 import type {
   Alert,
   Prediction,
@@ -74,7 +74,7 @@ import { BUILDING_TAB_ITEMS } from "../lib/navigation";
 import { TabBar } from "./TabBar";
 import { PageLoading } from "./PageLoading";
 import type { BuildingTabId } from "../lib/navigation";
-import { phaseAllows, PHASE_LABELS, PHASE_COLORS, PHASE_DESCRIPTIONS, type OnboardingPhase } from "../lib/onboardingPhase";
+import { phaseAllows, PHASE_LABELS, PHASE_COLORS, PHASE_DESCRIPTIONS, ALL_PHASES, type OnboardingPhase } from "../lib/onboardingPhase";
 import { setStoredSelectedSite } from "../lib/siteSelection";
 
 // ─── Lazy-loaded tab components ─────────────────────────────────────
@@ -321,8 +321,10 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
 
         // Live runtime bridge status: status/telemetry endpoints are source of truth
         // over possibly stale persisted bridge_* metadata.
-        const token = localStorage.getItem("access_token") || localStorage.getItem("sentinel_token");
-        const authHeaders: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+        // Use authorizedFetch for consistent auth with refresh interceptor
+        const authHeaders: Record<string, string> = {};
+        const token = getAccessToken();
+        if (token) authHeaders["Authorization"] = `Bearer ${token}`;
         try {
           const [statusRes, telemetryRes] = await Promise.all([
             fetch(`/api/sites/${encodeURIComponent(siteId)}/status`, { headers: authHeaders }),
@@ -817,10 +819,21 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
                   </div>
                 ) : null}
 
-                {/* Onboarding phase badge (change phase in Settings) */}
+                {/* Onboarding phase selector */}
                 <div className="flex items-center gap-2">
-                  <div
-                    className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium"
+                  <select
+                    value={sitePhase}
+                    onChange={async (e) => {
+                      const newPhase = e.target.value as OnboardingPhase;
+                      try {
+                        setSitePhase(newPhase);
+                        await api.updateSitePhase(siteId, newPhase);
+                      } catch {
+                        // Backend validates gate status — revert on failure
+                        setSitePhase(sitePhase);
+                      }
+                    }}
+                    className="text-xs font-medium rounded px-2 py-1 cursor-pointer outline-none"
                     style={{
                       backgroundColor: `${PHASE_COLORS[sitePhase]}22`,
                       color: PHASE_COLORS[sitePhase],
@@ -828,8 +841,12 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
                     }}
                     title={PHASE_DESCRIPTIONS[sitePhase]}
                   >
-                    {PHASE_LABELS[sitePhase]}
-                  </div>
+                    {ALL_PHASES.map((p) => (
+                      <option key={p} value={p} style={{ color: "#000", background: "#fff" }}>
+                        {PHASE_LABELS[p]}
+                      </option>
+                    ))}
+                  </select>
                   {site?.last_phase_transition && (() => {
                     const d = new Date(site.last_phase_transition.created_at);
                     const dateStr = isNaN(d.getTime()) ? "unknown date" : d.toLocaleDateString("en-ZA");

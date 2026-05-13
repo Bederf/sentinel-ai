@@ -6,16 +6,7 @@
  */
 
 import { useEffect, useState } from "react";
-import {
-  Card,
-  Title,
-  AreaChart,
-  Badge,
-  Flex,
-  Text,
-  Grid,
-  Metric,
-} from "@tremor/react";
+
 import type { TrendData } from "../../lib/mlApi";
 import { getPredictionTrend, formatPrediction } from "../../lib/mlApi";
 

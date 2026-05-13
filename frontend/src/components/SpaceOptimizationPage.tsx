@@ -27,6 +27,7 @@ import { gsap } from "gsap";
 
 import { authorizedFetch } from "@/lib/api";
 import { ConciergeDashboardPage } from "./intelligence/ConciergeDashboardPage";
+import { PageLoading } from "./PageLoading";
 
 interface BlockBookingAlert {
   id: string;
@@ -392,20 +393,7 @@ export function SpaceOptimizationPage({ siteId: propSiteId }: { siteId?: string 
 
   if (loading) {
     return (
-      <div
-        className="h-full flex items-center justify-center"
-        style={{ background: "var(--color-sentinel-bg-canvas)" }}
-      >
-        <div className="text-center">
-          <div
-            className="animate-spin h-8 w-8 border-2 rounded-full mx-auto mb-3"
-            style={{ borderColor: "var(--color-sentinel-blue)", borderTopColor: "transparent" }}
-          />
-          <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-            Loading space optimization...
-          </p>
-        </div>
-      </div>
+      <PageLoading message="Loading space optimization..." />
     );
   }
 
@@ -450,7 +438,7 @@ export function SpaceOptimizationPage({ siteId: propSiteId }: { siteId?: string 
         </div>
       )}
 
-      <div ref={kpiGridRef} className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
+      <div ref={kpiGridRef} className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
         <KpiCard
           icon={<Orbit className="h-5 w-5" />}
           label="Meeting Room Intelligence"
@@ -458,42 +446,48 @@ export function SpaceOptimizationPage({ siteId: propSiteId }: { siteId?: string 
           color="#3b82f6"
           bgColor="rgba(59, 130, 246, 0.15)"
           subtitle="room signals for this building"
+          onClick={() => setActiveTab("intelligence")}
+          isActive={activeTab === "intelligence"}
         />
         <KpiCard
           icon={<Mail className="h-5 w-5" />}
           label="Block Booking Alerts"
           value={openBlockAlerts}
-          total={blockAlerts.length}
           color={openBlockAlerts > 0 ? "var(--color-sentinel-red)" : "var(--color-sentinel-green)"}
           bgColor={openBlockAlerts > 0 ? "rgba(220, 38, 38, 0.15)" : "rgba(16, 185, 129, 0.15)"}
           subtitle={openBlockAlerts > 0 ? "concierge follow-up required" : "all clear"}
+          onClick={() => setActiveTab("block")}
+          isActive={activeTab === "block"}
         />
         <KpiCard
           icon={<AlertTriangle className="h-5 w-5" />}
           label="Ghost Rooms"
           value={openGhostFindings}
-          total={ghostFindings.length}
           color={openGhostFindings > 0 ? "var(--color-sentinel-red)" : "var(--color-sentinel-green)"}
           bgColor={openGhostFindings > 0 ? "rgba(220, 38, 38, 0.15)" : "rgba(16, 185, 129, 0.15)"}
           subtitle={openGhostFindings > 0 ? "inspection in progress" : "no open ghost rooms"}
+          onClick={() => setActiveTab("ghost")}
+          isActive={activeTab === "ghost"}
         />
         <KpiCard
           icon={<TrendingDown className="h-5 w-5" />}
           label="Right-Sizing"
           value={openRightsizing}
-          total={rightsizingFindings.length}
           color={openRightsizing > 0 ? "var(--color-sentinel-amber)" : "var(--color-sentinel-green)"}
           bgColor={openRightsizing > 0 ? "rgba(245, 158, 11, 0.15)" : "rgba(16, 185, 129, 0.15)"}
           subtitle={openRightsizing > 0 ? "patterns detected" : "well utilized"}
+          onClick={() => setActiveTab("rightsizing")}
+          isActive={activeTab === "rightsizing"}
         />
         <KpiCard
           icon={<Focus className="h-5 w-5" />}
           label="Active Focus Sessions"
           value={activeFocusSessions}
-          total={focusSessions.length}
-          color="var(--color-sentinel-blue)"
-          bgColor="rgba(59, 130, 246, 0.15)"
-          subtitle={`${focusSessions.filter((session) => session.extended_use).length} extended`}
+          color="var(--color-sentinel-green)"
+          bgColor={activeFocusSessions > 0 ? "rgba(16, 185, 129, 0.15)" : "rgba(59, 130, 246, 0.15)"}
+          subtitle={activeFocusSessions > 0 ? "currently occupied" : "none active"}
+          onClick={() => setActiveTab("focus")}
+          isActive={activeTab === "focus"}
         />
         <KpiCard
           icon={<Clock className="h-5 w-5" />}
@@ -502,34 +496,9 @@ export function SpaceOptimizationPage({ siteId: propSiteId }: { siteId?: string 
           color="var(--color-sentinel-teal)"
           bgColor="rgba(13, 148, 136, 0.15)"
           subtitle={`${flaggedBookings} flagged`}
+          onClick={() => setActiveTab("block")}
+          isActive={activeTab === "block"}
         />
-      </div>
-
-      <div ref={tabBarRef} className="flex gap-1 border-b opacity-0" style={{ borderColor: "var(--color-sentinel-border)" }}>
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className="space-optim-tab px-4 py-2.5 text-sm font-medium border-b-2 transition-colors"
-            style={{
-              borderColor: activeTab === tab.id ? "var(--color-sentinel-teal)" : "transparent",
-              color: activeTab === tab.id ? "var(--color-sentinel-teal)" : "var(--color-sentinel-text-secondary)",
-            }}
-          >
-            {tab.label}
-            {tab.count !== undefined && tab.count > 0 && (
-              <span
-                className="ml-2 text-xs px-1.5 py-0.5 rounded-full"
-                style={{
-                  background: activeTab === tab.id ? "rgba(13,148,136,0.2)" : "var(--color-sentinel-bg-secondary)",
-                  color: activeTab === tab.id ? "var(--color-sentinel-teal)" : "var(--color-sentinel-text-secondary)",
-                }}
-              >
-                {tab.count}
-              </span>
-            )}
-          </button>
-        ))}
       </div>
 
       <div ref={tabContentRef} className="opacity-0">
@@ -728,6 +697,8 @@ function KpiCard({
   color,
   bgColor,
   subtitle,
+  onClick,
+  isActive,
 }: {
   icon: React.ReactNode;
   label: string;
@@ -736,11 +707,22 @@ function KpiCard({
   color: string;
   bgColor: string;
   subtitle: string;
+  onClick?: () => void;
+  isActive?: boolean;
 }) {
   return (
-    <div
-      className="kpi-card rounded-md p-4 opacity-0"
-      style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}
+    <button
+      onClick={onClick}
+      className="kpi-card rounded-md p-4 opacity-0 text-left w-full cursor-pointer transition-all"
+      style={{
+        background: isActive
+          ? "var(--color-sentinel-bg-elevated)"
+          : "var(--color-sentinel-bg-panel)",
+        border: isActive
+          ? "1px solid var(--color-sentinel-teal)"
+          : "1px solid var(--color-sentinel-border)",
+        boxShadow: isActive ? "0 0 0 1px var(--color-sentinel-teal), 0 4px 16px rgba(13,148,136,0.15)" : undefined,
+      }}
     >
       <div className="flex items-center gap-2 mb-3">
         <div className="p-2 rounded" style={{ background: bgColor, color }}>
@@ -763,7 +745,7 @@ function KpiCard({
           {subtitle}
         </p>
       </div>
-    </div>
+    </button>
   );
 }
 
@@ -1101,10 +1083,6 @@ function FocusRoomsPanel({
   analytics: FocusAnalytics | null;
 }) {
   const activeSessions = sessions.filter((session) => session.is_active);
-  const recentCompleted = sessions
-    .filter((session) => !session.is_active)
-    .sort((a, b) => new Date(b.end_time || "").getTime() - new Date(a.end_time || "").getTime())
-    .slice(0, 10);
 
   return (
     <div className="space-y-6">
@@ -1117,37 +1095,7 @@ function FocusRoomsPanel({
         </div>
       )}
 
-      {analytics && Object.keys(analytics.sessions_by_room).length > 0 && (
-        <div
-          className="rounded-md p-4"
-          style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}
-        >
-          <h3 className="text-sm font-medium mb-3" style={{ color: "var(--color-sentinel-text-primary)" }}>
-            Sessions by Room
-          </h3>
-          <div className="space-y-2">
-            {Object.entries(analytics.sessions_by_room)
-              .sort(([, a], [, b]) => b - a)
-              .map(([room, count]) => {
-                const maxCount = Math.max(...Object.values(analytics.sessions_by_room));
-                const pct = maxCount > 0 ? (count / maxCount) * 100 : 0;
-                return (
-                  <div key={room} className="flex items-center gap-3">
-                    <span className="text-xs w-28 truncate" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                      {shortRoom(room)}
-                    </span>
-                    <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.06)" }}>
-                      <div className="h-full rounded-full" style={{ width: `${pct}%`, background: "var(--color-sentinel-teal)" }} />
-                    </div>
-                    <span className="text-xs w-8 text-right font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>
-                      {count}
-                    </span>
-                  </div>
-                );
-              })}
-          </div>
-        </div>
-      )}
+
 
       {activeSessions.length > 0 && (
         <div>
@@ -1156,19 +1104,6 @@ function FocusRoomsPanel({
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {activeSessions.map((session) => (
-              <SessionCard key={session.session_id} session={session} />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {recentCompleted.length > 0 && (
-        <div>
-          <h3 className="text-sm font-medium mb-3" style={{ color: "var(--color-sentinel-text-primary)" }}>
-            Recent Sessions
-          </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {recentCompleted.map((session) => (
               <SessionCard key={session.session_id} session={session} />
             ))}
           </div>
@@ -1187,66 +1122,67 @@ function FocusRoomsPanel({
 }
 
 function SessionCard({ session }: { session: FocusSession }) {
-  const overLimit = session.red_light_on;
+  const pct = Math.min((session.duration_minutes / session.max_allowed_minutes) * 100, 100);
+  const barColor =
+    pct >= 100 ? "var(--color-sentinel-red)"
+      : pct >= 80 ? "var(--color-sentinel-amber)"
+        : "var(--color-sentinel-green)";
+
   return (
     <div
-      className="rounded-md p-3 flex items-center gap-3"
+      className="rounded-md p-4"
       style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}
     >
-      <div
-        className="p-2 rounded"
-        style={{
-          background: overLimit
-            ? "rgba(239, 68, 68, 0.16)"
-            : session.is_active
-              ? "rgba(16, 185, 129, 0.15)"
-              : "rgba(59, 130, 246, 0.1)",
-        }}
-      >
-        {overLimit ? (
-          <AlertTriangle className="h-4 w-4" style={{ color: "var(--color-sentinel-red)" }} />
-        ) : session.is_active ? (
-          <Users className="h-4 w-4" style={{ color: "var(--color-sentinel-green)" }} />
-        ) : (
-          <CheckCircle2 className="h-4 w-4" style={{ color: "var(--color-sentinel-blue)" }} />
-        )}
-      </div>
-      <div className="flex-1 min-w-0">
-        <span className="text-sm font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>
-          {shortRoom(session.room_code)}
-        </span>
+      <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-            {session.duration_minutes.toFixed(0)} min
-          </span>
-          <span className="text-xs" style={{ color: "var(--color-sentinel-text-disabled)" }}>
-            max {session.max_allowed_minutes} min
-          </span>
-          {session.red_light_on && (
-            <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: "rgba(239, 68, 68, 0.16)", color: "var(--color-sentinel-red)" }}>
-              Red Light On
-            </span>
-          )}
-          {session.red_light_on && !session.is_active && (session.red_light_cooldown_remaining_seconds ?? 0) > 0 && (
-            <span className="text-xs" style={{ color: "var(--color-sentinel-text-disabled)" }}>
-              cooldown {Math.ceil((session.red_light_cooldown_remaining_seconds ?? 0) / 60)} min
-            </span>
-          )}
-          {session.extended_use && (
-            <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: "rgba(245, 158, 11, 0.15)", color: "var(--color-sentinel-amber)" }}>
-              Extended
-            </span>
-          )}
           {session.is_active && (
-            <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: "rgba(16, 185, 129, 0.15)", color: "var(--color-sentinel-green)" }}>
-              Active
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ background: barColor }} />
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5" style={{ background: barColor }} />
+            </span>
+          )}
+          <span className="text-sm font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>
+            {shortRoom(session.room_code)}
+          </span>
+          {session.is_active && (
+            <span
+              className="text-xs px-1.5 py-0.5 rounded"
+              style={{ background: `${barColor}22`, color: barColor }}
+            >
+              {pct >= 100 ? "Over" : "Active"}
             </span>
           )}
         </div>
+        <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+          {formatTime(session.start_time)}
+        </span>
       </div>
-      <span className="text-xs" style={{ color: "var(--color-sentinel-text-disabled)" }}>
-        {formatTime(session.start_time)}
-      </span>
+
+      <div className="flex items-baseline gap-2 mb-2">
+        <span className="text-xl font-semibold tabular-nums" style={{ color: barColor }}>
+          {session.duration_minutes.toFixed(0)}
+        </span>
+        <span className="text-xs" style={{ color: "var(--color-sentinel-text-disabled)" }}>
+          / {session.max_allowed_minutes} min
+        </span>
+      </div>
+
+      <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: "var(--color-sentinel-border)" }}>
+        <div
+          className="h-full rounded-full transition-all duration-500"
+          style={{ width: `${pct}%`, background: barColor }}
+        />
+      </div>
+
+      <div className="flex justify-between mt-1">
+        <span className="text-[10px]" style={{ color: "var(--color-sentinel-green)" }}>0</span>
+        <span className="text-[10px]" style={{ color: "var(--color-sentinel-amber)" }}>
+          {Math.round(session.max_allowed_minutes * 0.8)}
+        </span>
+        <span className="text-[10px]" style={{ color: "var(--color-sentinel-red)" }}>
+          {session.max_allowed_minutes}
+        </span>
+      </div>
     </div>
   );
 }

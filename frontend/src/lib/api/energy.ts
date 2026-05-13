@@ -4,6 +4,8 @@
  * Handles fetching energy comparison, actual, and prediction data
  */
 
+import { authorizedFetch } from './client';
+
 export interface EnergyMetrics {
   total_kwh: number
   total_cost_zar: number
@@ -53,14 +55,8 @@ const API_BASE = '/api'
 export async function fetchEnergyComparisonSummary(
   siteId: string,
 ): Promise<ComparisonSummary> {
-  const token = localStorage.getItem('sentinel_token')
-  const headers: Record<string, string> = {}
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`
-  }
-  const response = await fetch(
+  const response = await authorizedFetch(
     `${API_BASE}/energy/comparison-summary?site_id=${encodeURIComponent(siteId)}`,
-    { headers },
   )
   if (!response.ok) {
     throw new Error(`Failed to fetch energy comparison: ${response.statusText}`)

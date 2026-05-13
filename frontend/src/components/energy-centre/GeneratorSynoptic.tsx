@@ -9,7 +9,6 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { Card, Title, Text, Badge, Grid, Metric, ProgressBar, Flex } from '@tremor/react';
 import { generatorApi } from '../../lib/energyCentreApi';
 import type { Generator, GeneratorGroupStatus, GeneratorHealth, FuelStatus } from '../../lib/energyCentreApi';
 
@@ -18,6 +17,18 @@ interface GeneratorSynopticProps {
   groupId?: string;
   onHealthAlert?: (generator: Generator, health: GeneratorHealth) => void;
 }
+
+const sentinelColors: Record<string, string> = {
+  blue: 'var(--sentinel-blue)',
+  amber: 'var(--sentinel-amber)',
+  gray: 'var(--sentinel-text-disabled)',
+  green: 'var(--sentinel-green)',
+  red: 'var(--sentinel-red)',
+  cyan: 'var(--sentinel-cyan)',
+  purple: '#7c3aed',
+  yellow: '#eab308',
+  slate: '#64748b',
+};
 
 const statusColors: Record<string, string> = {
   standby: 'gray',
@@ -100,106 +111,109 @@ export function GeneratorSynoptic({ siteId, groupId, onHealthAlert }: GeneratorS
 
   if (loading) {
     return (
-      <Card>
-        <Title>Generator Plant</Title>
+      <div className="rounded-lg p-4" style={{ background: "var(--sentinel-bg-panel)", border: "1px solid var(--sentinel-border)" }}>
+        <h3 className="text-sm font-medium" style={{ color: "var(--sentinel-text-primary)" }}>Generator Plant</h3>
         <div className="animate-pulse h-64 bg-gray-100 rounded mt-4" />
-      </Card>
+      </div>
     );
   }
 
   if (error || !groupStatus) {
     return (
-      <Card>
-        <Title>Generator Plant</Title>
-        <Text className="text-red-500">{error || 'No generator data available'}</Text>
-      </Card>
+      <div className="rounded-lg p-4" style={{ background: "var(--sentinel-bg-panel)", border: "1px solid var(--sentinel-border)" }}>
+        <h3 className="text-sm font-medium" style={{ color: "var(--sentinel-text-primary)" }}>Generator Plant</h3>
+        <span className="text-red-500">{error || 'No generator data available'}</span>
+      </div>
     );
   }
 
   return (
     <div className="space-y-4">
       {/* Group Overview */}
-      <Card>
-        <Flex justifyContent="between" alignItems="start">
+      <div className="rounded-lg p-4" style={{ background: "var(--sentinel-bg-panel)", border: "1px solid var(--sentinel-border)" }}>
+        <div className="flex items-start justify-between">
           <div>
-            <Title>{groupStatus.name}</Title>
-            <Text>N+1 Redundancy: {groupStatus.generators.required}/{groupStatus.generators.total} required</Text>
+            <h3 className="text-sm font-medium" style={{ color: "var(--sentinel-text-primary)" }}>{groupStatus.name}</h3>
+            <span style={{ color: "var(--sentinel-text-secondary)" }}>N+1 Redundancy: {groupStatus.generators.required}/{groupStatus.generators.total} required</span>
           </div>
-          <Badge color={groupStatus.ats.mains_healthy ? 'green' : 'red'} size="lg">
+          <span className="text-xs px-2 py-0.5 rounded font-medium" style={{ background: sentinelColors[groupStatus.ats.mains_healthy ? 'green' : 'red'], color: "white" }}>
             {groupStatus.ats.position.toUpperCase()}
-          </Badge>
-        </Flex>
+          </span>
+        </div>
 
-        <Grid className="grid grid-cols-4 gap-4 mt-4">
-          <Card decoration="top" decorationColor="green">
-            <Text>Running</Text>
-            <Metric>{groupStatus.generators.running}</Metric>
-          </Card>
-          <Card decoration="top" decorationColor="blue">
-            <Text>On Load</Text>
-            <Metric>{groupStatus.generators.on_load}</Metric>
-          </Card>
-          <Card decoration="top" decorationColor="yellow">
-            <Text>Load</Text>
-            <Metric>{groupStatus.load.percent.toFixed(0)}%</Metric>
-          </Card>
-          <Card decoration="top" decorationColor={groupStatus.ats.mains_healthy ? 'green' : 'red'}>
-            <Text>Mains</Text>
-            <Metric>{groupStatus.ats.mains_healthy ? 'OK' : 'FAIL'}</Metric>
-          </Card>
-        </Grid>
+        <div className="grid grid-cols-4 gap-4 mt-4">
+          <div className="rounded-lg p-4" style={{ background: "var(--sentinel-bg-panel)", border: "1px solid var(--sentinel-border)", borderTop: "3px solid var(--sentinel-green)" }}>
+            <span style={{ color: "var(--sentinel-text-secondary)" }}>Running</span>
+            <span className="text-2xl font-bold tabular-nums block" style={{ color: "var(--sentinel-text-primary)" }}>{groupStatus.generators.running}</span>
+          </div>
+          <div className="rounded-lg p-4" style={{ background: "var(--sentinel-bg-panel)", border: "1px solid var(--sentinel-border)", borderTop: "3px solid var(--sentinel-blue)" }}>
+            <span style={{ color: "var(--sentinel-text-secondary)" }}>On Load</span>
+            <span className="text-2xl font-bold tabular-nums block" style={{ color: "var(--sentinel-text-primary)" }}>{groupStatus.generators.on_load}</span>
+          </div>
+          <div className="rounded-lg p-4" style={{ background: "var(--sentinel-bg-panel)", border: "1px solid var(--sentinel-border)", borderTop: "3px solid var(--sentinel-amber)" }}>
+            <span style={{ color: "var(--sentinel-text-secondary)" }}>Load</span>
+            <span className="text-2xl font-bold tabular-nums block" style={{ color: "var(--sentinel-text-primary)" }}>{groupStatus.load.percent.toFixed(0)}%</span>
+          </div>
+          <div className="rounded-lg p-4" style={{ background: "var(--sentinel-bg-panel)", border: "1px solid var(--sentinel-border)", borderTop: `3px solid ${sentinelColors[groupStatus.ats.mains_healthy ? 'green' : 'red']}` }}>
+            <span style={{ color: "var(--sentinel-text-secondary)" }}>Mains</span>
+            <span className="text-2xl font-bold tabular-nums block" style={{ color: "var(--sentinel-text-primary)" }}>{groupStatus.ats.mains_healthy ? 'OK' : 'FAIL'}</span>
+          </div>
+        </div>
 
         {/* Load bar */}
         <div className="mt-4">
-          <Flex justifyContent="between" className="mb-1">
-            <Text>Total Load: {groupStatus.load.current_kw.toFixed(0)} kW</Text>
-            <Text>Capacity: {groupStatus.load.capacity_kw} kW</Text>
-          </Flex>
-          <ProgressBar value={groupStatus.load.percent} color="green" />
+          <div className="flex items-center justify-between mb-1">
+            <span style={{ color: "var(--sentinel-text-secondary)" }}>Total Load: {groupStatus.load.current_kw.toFixed(0)} kW</span>
+            <span style={{ color: "var(--sentinel-text-secondary)" }}>Capacity: {groupStatus.load.capacity_kw} kW</span>
+          </div>
+          <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: "var(--sentinel-border)" }}>
+            <div className="h-full rounded-full" style={{ width: `${groupStatus.load.percent}%`, background: "var(--sentinel-green)" }} />
+          </div>
         </div>
-      </Card>
+      </div>
 
       {/* Generator Cards */}
-      <Grid className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 gap-4">
         {groupStatus.generator_details.map((gen) => {
           const health = healthData[gen.generator_id];
+          const genAccent = sentinelColors[statusColors[gen.status]] || sentinelColors.gray;
           return (
-            <Card key={gen.generator_id} decoration="left" decorationColor={statusColors[gen.status] || 'gray'}>
-              <Flex justifyContent="between" alignItems="start">
+            <div key={gen.generator_id} className="rounded-lg p-4" style={{ background: "var(--sentinel-bg-panel)", border: "1px solid var(--sentinel-border)", borderLeft: `3px solid ${genAccent}` }}>
+              <div className="flex items-start justify-between">
                 <div>
-                  <Title className="text-sm">{gen.name}</Title>
-                  <Text className="text-xs">Priority {gen.priority}</Text>
+                  <h3 className="text-sm font-medium" style={{ color: "var(--sentinel-text-primary)" }}>{gen.name}</h3>
+                  <span className="text-xs" style={{ color: "var(--sentinel-text-secondary)" }}>Priority {gen.priority}</span>
                 </div>
                 <div className="text-right">
-                  <Badge color={statusColors[gen.status] || 'gray'}>
+                  <span className="text-xs px-2 py-0.5 rounded font-medium" style={{ background: sentinelColors[statusColors[gen.status]] || sentinelColors.gray, color: "white" }}>
                     {gen.status.toUpperCase().replace('_', ' ')}
-                  </Badge>
+                  </span>
                   {health && (
-                    <Badge color={trendColors[health.status] || 'gray'} className="ml-1">
+                    <span className="text-xs px-2 py-0.5 rounded font-medium ml-1" style={{ background: sentinelColors[trendColors[health.status]] || sentinelColors.gray, color: "white" }}>
                       {health.overall_score.toFixed(0)}%
-                    </Badge>
+                    </span>
                   )}
                 </div>
-              </Flex>
+              </div>
 
-              <Grid className="grid grid-cols-3 gap-2 mt-3">
+              <div className="grid grid-cols-3 gap-2 mt-3">
                 <div>
-                  <Text className="text-xs text-gray-500">Battery</Text>
-                  <Text className={gen.battery_voltage < 25.5 ? 'text-red-500 font-bold' : ''}>
+                  <span className="text-xs" style={{ color: "var(--sentinel-text-secondary)" }}>Battery</span>
+                  <span className={gen.battery_voltage < 25.5 ? 'text-red-500 font-bold block' : 'block'} style={{ color: "var(--sentinel-text-primary)" }}>
                     {gen.battery_voltage.toFixed(1)}V
-                  </Text>
+                  </span>
                 </div>
                 <div>
-                  <Text className="text-xs text-gray-500">Fuel</Text>
-                  <Text className={gen.fuel_level_pct < 20 ? 'text-red-500 font-bold' : ''}>
+                  <span className="text-xs" style={{ color: "var(--sentinel-text-secondary)" }}>Fuel</span>
+                  <span className={gen.fuel_level_pct < 20 ? 'text-red-500 font-bold block' : 'block'} style={{ color: "var(--sentinel-text-primary)" }}>
                     {gen.fuel_level_pct}%
-                  </Text>
+                  </span>
                 </div>
                 <div>
-                  <Text className="text-xs text-gray-500">Load</Text>
-                  <Text>{gen.load_kw.toFixed(0)} kW</Text>
+                  <span className="text-xs" style={{ color: "var(--sentinel-text-secondary)" }}>Load</span>
+                  <span style={{ color: "var(--sentinel-text-primary)" }}>{gen.load_kw.toFixed(0)} kW</span>
                 </div>
-              </Grid>
+              </div>
 
               {/* Health indicators */}
               {health && health.indicators.some(i => i.recommendation) && (
@@ -208,48 +222,46 @@ export function GeneratorSynoptic({ siteId, groupId, onHealthAlert }: GeneratorS
                     .filter(i => i.recommendation)
                     .slice(0, 2)
                     .map((ind, idx) => (
-                      <Text key={idx} className="text-xs text-amber-600">
+                      <span key={idx} className="text-xs text-amber-600 block">
                         {ind.parameter}: {ind.recommendation}
-                      </Text>
+                      </span>
                     ))}
                 </div>
               )}
-            </Card>
+            </div>
           );
         })}
-      </Grid>
+      </div>
 
       {/* Fuel Tank */}
       {fuelStatus && (
-        <Card>
-          <Flex justifyContent="between" alignItems="start">
+        <div className="rounded-lg p-4" style={{ background: "var(--sentinel-bg-panel)", border: "1px solid var(--sentinel-border)" }}>
+          <div className="flex items-start justify-between">
             <div>
-              <Title className="text-sm">{fuelStatus.name}</Title>
-              <Text className="text-xs">
+              <h3 className="text-sm font-medium" style={{ color: "var(--sentinel-text-primary)" }}>{fuelStatus.name}</h3>
+              <span className="text-xs" style={{ color: "var(--sentinel-text-secondary)" }}>
                 {fuelStatus.current_liters.toLocaleString()}L / {fuelStatus.capacity_liters.toLocaleString()}L
-              </Text>
+              </span>
             </div>
             {fuelStatus.hours_remaining && (
-              <Badge color={fuelStatus.current_pct < 20 ? 'red' : fuelStatus.current_pct < 30 ? 'yellow' : 'green'}>
+              <span className="text-xs px-2 py-0.5 rounded font-medium" style={{ background: sentinelColors[fuelStatus.current_pct < 20 ? 'red' : fuelStatus.current_pct < 30 ? 'yellow' : 'green'], color: fuelStatus.current_pct < 30 && fuelStatus.current_pct >= 20 ? 'black' : 'white' }}>
                 {fuelStatus.hours_remaining.toFixed(0)}h remaining
-              </Badge>
+              </span>
             )}
-          </Flex>
-          <ProgressBar
-            value={fuelStatus.current_pct}
-            color={fuelStatus.current_pct < 20 ? 'red' : fuelStatus.current_pct < 30 ? 'yellow' : 'green'}
-            className="mt-2"
-          />
+          </div>
+          <div className="w-full h-2 rounded-full overflow-hidden mt-2" style={{ background: "var(--sentinel-border)" }}>
+            <div className="h-full rounded-full" style={{ width: `${fuelStatus.current_pct}%`, background: sentinelColors[fuelStatus.current_pct < 20 ? 'red' : fuelStatus.current_pct < 30 ? 'yellow' : 'green'] }} />
+          </div>
           {fuelStatus.alerts.length > 0 && (
             <div className="mt-2">
               {fuelStatus.alerts.map((alert, idx) => (
-                <Text key={idx} className={`text-xs ${alert.severity === 'alarm' ? 'text-red-500' : 'text-amber-500'}`}>
+                <span key={idx} className={`text-xs block ${alert.severity === 'alarm' ? 'text-red-500' : 'text-amber-500'}`}>
                   {alert.message} - {alert.action}
-                </Text>
+                </span>
               ))}
             </div>
           )}
-        </Card>
+        </div>
       )}
     </div>
   );

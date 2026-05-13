@@ -14,7 +14,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { Card, Badge, Button, TextInput, NumberInput } from '@tremor/react';
+
 import {
   Camera,
   Save,

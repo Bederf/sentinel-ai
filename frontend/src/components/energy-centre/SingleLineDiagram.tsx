@@ -8,7 +8,6 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { Card, Title, Text, Badge } from '@tremor/react';
 import { energyCentreApi } from '../../lib/energyCentreApi';
 import type { SLDData, SLDNode } from '../../lib/energyCentreApi';
 
@@ -16,6 +15,18 @@ interface SingleLineDiagramProps {
   siteId: string;
   compact?: boolean;
 }
+
+const sentinelColors: Record<string, string> = {
+  blue: 'var(--sentinel-blue)',
+  amber: 'var(--sentinel-amber)',
+  gray: 'var(--sentinel-text-disabled)',
+  green: 'var(--sentinel-green)',
+  red: 'var(--sentinel-red)',
+  cyan: 'var(--sentinel-cyan)',
+  purple: '#7c3aed',
+  yellow: '#eab308',
+  slate: '#64748b',
+};
 
 const nodeColors: Record<string, { bg: string; border: string; text: string }> = {
   healthy: { bg: 'bg-green-100', border: 'border-green-500', text: 'text-green-700' },
@@ -47,28 +58,28 @@ function NodeBox({ node, compact }: { node: SLDNode; compact: boolean }) {
         transition-all duration-300
       `}
     >
-      <Text className={`text-xs font-bold ${style.text}`}>{node.label}</Text>
+      <span className={`text-xs font-bold ${style.text}`}>{node.label}</span>
       {!compact && (
         <div className="mt-1">
           {node.voltage !== undefined && (
-            <Text className="text-xs">{node.voltage.toFixed(1)} {node.type === 'mv_incomer' ? 'kV' : 'V'}</Text>
+            <span className="text-xs" style={{ color: "var(--sentinel-text-secondary)" }}>{node.voltage.toFixed(1)} {node.type === 'mv_incomer' ? 'kV' : 'V'}</span>
           )}
           {node.load_percent !== undefined && (
-            <Text className="text-xs">{node.load_percent}% load</Text>
+            <span className="text-xs" style={{ color: "var(--sentinel-text-secondary)" }}>{node.load_percent}% load</span>
           )}
           {node.temp_c !== undefined && (
-            <Text className="text-xs">{node.temp_c}°C</Text>
+            <span className="text-xs" style={{ color: "var(--sentinel-text-secondary)" }}>{node.temp_c}°C</span>
           )}
           {node.power_kw !== undefined && (
-            <Text className="text-xs">{node.power_kw.toFixed(0)} kW</Text>
+            <span className="text-xs" style={{ color: "var(--sentinel-text-secondary)" }}>{node.power_kw.toFixed(0)} kW</span>
           )}
           {node.battery_pct !== undefined && (
-            <Text className="text-xs">Bat: {node.battery_pct}%</Text>
+            <span className="text-xs" style={{ color: "var(--sentinel-text-secondary)" }}>Bat: {node.battery_pct}%</span>
           )}
           {node.position && (
-            <Badge size="xs" color={node.position === 'mains' ? 'blue' : 'amber'}>
+            <span className="text-xs px-1 py-0.5 rounded font-medium" style={{ background: sentinelColors[node.position === 'mains' ? 'blue' : 'amber'], color: "white" }}>
               {node.position.toUpperCase()}
-            </Badge>
+            </span>
           )}
         </div>
       )}
@@ -120,19 +131,19 @@ export function SingleLineDiagram({ siteId, compact = false }: SingleLineDiagram
 
   if (loading) {
     return (
-      <Card>
-        <Title>Single-Line Diagram</Title>
+      <div className="rounded-lg p-4" style={{ background: "var(--sentinel-bg-panel)", border: "1px solid var(--sentinel-border)" }}>
+        <h3 className="text-sm font-medium" style={{ color: "var(--sentinel-text-primary)" }}>Single-Line Diagram</h3>
         <div className="animate-pulse h-48 bg-gray-100 rounded mt-4" />
-      </Card>
+      </div>
     );
   }
 
   if (error || !sldData) {
     return (
-      <Card>
-        <Title>Single-Line Diagram</Title>
-        <Text className="text-red-500">{error || 'No SLD data available'}</Text>
-      </Card>
+      <div className="rounded-lg p-4" style={{ background: "var(--sentinel-bg-panel)", border: "1px solid var(--sentinel-border)" }}>
+        <h3 className="text-sm font-medium" style={{ color: "var(--sentinel-text-primary)" }}>Single-Line Diagram</h3>
+        <span className="text-red-500">{error || 'No SLD data available'}</span>
+      </div>
     );
   }
 
@@ -149,15 +160,15 @@ export function SingleLineDiagram({ siteId, compact = false }: SingleLineDiagram
   const isGenEnergized = sldData.status.on_generator;
 
   return (
-    <Card>
+    <div className="rounded-lg p-4" style={{ background: "var(--sentinel-bg-panel)", border: "1px solid var(--sentinel-border)" }}>
       <div className="flex justify-between items-center mb-4">
-        <Title>Single-Line Diagram</Title>
+        <h3 className="text-sm font-medium" style={{ color: "var(--sentinel-text-primary)" }}>Single-Line Diagram</h3>
         <div className="flex gap-2">
-          <Badge color={sldData.status.mains_healthy ? 'green' : 'red'}>
+          <span className="text-xs px-2 py-0.5 rounded font-medium" style={{ background: sentinelColors[sldData.status.mains_healthy ? 'green' : 'red'], color: "white" }}>
             Mains {sldData.status.mains_healthy ? 'OK' : 'FAIL'}
-          </Badge>
+          </span>
           {sldData.status.on_generator && (
-            <Badge color="amber">ON GENERATOR</Badge>
+            <span className="text-xs px-2 py-0.5 rounded font-medium" style={{ background: "var(--sentinel-amber)", color: "white" }}>ON GENERATOR</span>
           )}
         </div>
       </div>
@@ -186,7 +197,7 @@ export function SingleLineDiagram({ siteId, compact = false }: SingleLineDiagram
         <div className="flex items-center">
           {/* Mains side */}
           <div className="flex flex-col items-center">
-            <Text className="text-xs text-gray-500 mb-1">MAINS</Text>
+            <span className="text-xs mb-1" style={{ color: "var(--sentinel-text-secondary)" }}>MAINS</span>
             <div className={`w-3 h-3 rounded-full ${isMainsEnergized ? 'bg-green-500' : 'bg-gray-300'}`} />
           </div>
 
@@ -201,7 +212,7 @@ export function SingleLineDiagram({ siteId, compact = false }: SingleLineDiagram
 
           {/* Generator side */}
           <div className="flex flex-col items-center">
-            <Text className="text-xs text-gray-500 mb-1">GEN</Text>
+            <span className="text-xs mb-1" style={{ color: "var(--sentinel-text-secondary)" }}>GEN</span>
             <div className={`w-3 h-3 rounded-full ${isGenEnergized ? 'bg-amber-500' : 'bg-gray-300'}`} />
           </div>
         </div>
@@ -250,22 +261,22 @@ export function SingleLineDiagram({ siteId, compact = false }: SingleLineDiagram
       <div className="flex justify-center gap-4 mt-4 pt-4 border-t border-gray-200">
         <div className="flex items-center gap-1">
           <div className="w-3 h-3 bg-green-500 rounded" />
-          <Text className="text-xs">Energized</Text>
+          <span className="text-xs" style={{ color: "var(--sentinel-text-secondary)" }}>Energized</span>
         </div>
         <div className="flex items-center gap-1">
           <div className="w-3 h-3 bg-gray-300 rounded" />
-          <Text className="text-xs">De-energized</Text>
+          <span className="text-xs" style={{ color: "var(--sentinel-text-secondary)" }}>De-energized</span>
         </div>
         <div className="flex items-center gap-1">
           <div className="w-3 h-3 bg-amber-500 rounded" />
-          <Text className="text-xs">Generator</Text>
+          <span className="text-xs" style={{ color: "var(--sentinel-text-secondary)" }}>Generator</span>
         </div>
         <div className="flex items-center gap-1">
           <div className="w-3 h-3 bg-red-500 rounded" />
-          <Text className="text-xs">Fault</Text>
+          <span className="text-xs" style={{ color: "var(--sentinel-text-secondary)" }}>Fault</span>
         </div>
       </div>
-    </Card>
+    </div>
   );
 }
 

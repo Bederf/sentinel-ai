@@ -17,7 +17,8 @@ export class ApiError extends Error {
   }
 }
 
-const ACCESS_TOKEN_KEY = 'sentinel_token';
+import { getAccessToken } from './client';
+export { getAccessToken };
 
 async function parseErrorResponse(response: Response): Promise<unknown> {
   try {
@@ -45,7 +46,7 @@ export async function apiFetch<T>(
   url: string,
   options: RequestInit = {},
 ): Promise<T> {
-  const token = localStorage.getItem(ACCESS_TOKEN_KEY);
+  const token = getAccessToken();
   const headers = new Headers(options.headers || {});
   headers.set('Content-Type', 'application/json');
   if (token) headers.set('Authorization', `Bearer ${token}`);

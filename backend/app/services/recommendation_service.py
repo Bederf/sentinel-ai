@@ -65,6 +65,24 @@ class RecommendationService:
         if not action_type:
             raise ValueError("action_type is required")
 
+        # Phase gate: check onboarding_phase before creating recommendation
+        try:
+            from app.models.onboarding_phase import phase_allows as _rec_phase_allows
+            from app.database.supabase_client import get_supabase_client
+            _sb = get_supabase_client()
+            _row = _sb.table("sites").select("onboarding_phase").eq("code", site_id).limit(1).execute()
+            _phase = (_row.data[0].get("onboarding_phase") or "commissioning") if _row.data else "commissioning"
+            if _phase in ("commissioning", "shadow_live"):
+                logger.info("Phase %s blocks recommendation creation for %s", _phase, site_id)
+                raise ValueError(f"Recommendations not allowed in phase '{_phase}'")
+            if not _rec_phase_allows(_phase, "recommendations_ui"):
+                logger.info("Phase %s limits to advisory recommendations for %s", _phase, site_id)
+                rec_data["status"] = "advisory_display_only"
+        except Exception as _exc:
+            if "not allowed in phase" in str(_exc):
+                raise
+            logger.debug("Phase gate check failed, proceeding: %s", _exc)
+
         # Get control tier from profile
         config = self.profile_service.load_site_profile_config(site_id)
         control_tier = config.control_tier if config else "supervised"

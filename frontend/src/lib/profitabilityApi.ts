@@ -12,6 +12,7 @@
  * Integrates with /api/contracts/profitability/* endpoints.
  */
 
+import { getAccessToken } from "./api";
 const RAW_API_BASE_URL = import.meta.env.VITE_API_URL || "";
 
 function resolveApiBaseUrl(): string {
@@ -24,18 +25,14 @@ function resolveApiBaseUrl(): string {
 
 const isSeedContract = (contractId: string) => contractId.startsWith("seed-");
 
-function authHeaders(): Record<string, string> {
-  const token = localStorage.getItem("sentinel_token");
-  return {
-    "Content-Type": "application/json",
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  };
-}
-
 async function fetchJson<T>(endpoint: string): Promise<T> {
   const baseUrl = resolveApiBaseUrl();
+  const token = getAccessToken();
   const res = await fetch(`${baseUrl}${endpoint}`, {
-    headers: authHeaders(),
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
   });
   if (!res.ok) {
     let msg = res.statusText;
@@ -494,7 +491,12 @@ export const profitabilityApi = {
     const qs = params.toString();
     const res = await fetch(
       `${baseUrl}/api/contracts/profitability/report/${encodeURIComponent(contractId)}/export?${qs}`,
-      { headers: authHeaders() }
+      {
+        headers: {
+          "Content-Type": "application/json",
+          ...(getAccessToken() ? { Authorization: `Bearer ${getAccessToken()}` } : {}),
+        },
+      }
     );
     if (!res.ok) {
       throw new Error(`Export failed: ${res.statusText}`);

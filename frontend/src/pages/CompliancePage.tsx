@@ -15,6 +15,7 @@ import {
   Droplets,
   Zap,
   ArrowUpDown,
+  Database,
 } from "lucide-react";
 import { PageLoading } from "../components/PageLoading";
 import { Panel } from "../components/Panel";
@@ -27,6 +28,8 @@ import type { StatusKey } from "../components/StatusBadge";
 import {
   useComplianceStatus,
   useComplianceAudits,
+  useRetentionStatus,
+  useRetentionHistory,
   type AuditStatus,
 } from "../lib/api/compliance";
 import { OHSPanel } from "../components/compliance/OHSPanel";
@@ -85,6 +88,8 @@ export function CompliancePage() {
 
   const { data: status, isLoading } = useComplianceStatus(SITE_CODE);
   const { data: auditsData } = useComplianceAudits(SITE_CODE);
+  const { data: retentionStatus } = useRetentionStatus();
+  const { data: retentionHistory } = useRetentionHistory(5);
 
   const score = status?.compliance_score_percent ?? 0;
   const criticalCount = status?.critical_issues_count ?? 0;
@@ -279,6 +284,158 @@ export function CompliancePage() {
                   </table>
                 </div>
               )}
+            </Panel>
+
+            {/* POPIA Data Retention */}
+            <Panel
+              header={{
+                icon: <Database className="h-4 w-4" />,
+                title: "POPIA Data Retention",
+                accentColor: "var(--color-sentinel-blue)",
+              }}
+            >
+              <div className="p-4 space-y-4">
+                {retentionStatus?.categories ? (
+                  <>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      {retentionStatus.categories
+                        .reduce<Array<{ tier: string; label: string; count: number; days: number }>>(
+                          (acc, cat) => {
+                            const existing = acc.find((a) => a.tier === cat.tier);
+                            if (existing) {
+                              existing.count += cat.overdue_count;
+                            } else {
+                              const labels: Record<string, string> = {
+                                ML_TRAINING: "ML Training (7d)",
+                                SNAPSHOT: "Snapshots (30d)",
+                                AUDIT_TRAIL: "Audit Trail (5y)",
+                              };
+                              acc.push({
+                                tier: cat.tier,
+                                label: labels[cat.tier] ?? cat.tier,
+                                count: cat.overdue_count,
+                                days: cat.retention_days,
+                              });
+                            }
+                            return acc;
+                          },
+                          []
+                        )
+                        .map(({ tier, label, count, days }) => (
+                          <div
+                            key={tier}
+                            className="flex items-center justify-between py-2 px-3 rounded"
+                            style={{ background: "var(--color-sentinel-bg-secondary)" }}
+                          >
+                            <div className="flex flex-col">
+                              <span
+                                className="text-xs font-medium"
+                                style={{ color: "var(--color-sentinel-text-primary)" }}
+                              >
+                                {label}
+                              </span>
+                              <span
+                                className="text-xs"
+                                style={{ color: "var(--color-sentinel-text-secondary)" }}
+                              >
+                                {days} day retention
+                              </span>
+                            </div>
+                            <span
+                              className="text-sm font-medium"
+                              style={{
+                                color:
+                                  count > 0
+                                    ? "var(--color-sentinel-amber)"
+                                    : "var(--color-sentinel-green)",
+                              }}
+                            >
+                              {count.toLocaleString()}
+                            </span>
+                          </div>
+                        ))}
+                    </div>
+
+                    {retentionHistory?.items && retentionHistory.items.length > 0 && (
+                      <div>
+                        <p
+                          className="text-xs font-medium mb-2"
+                          style={{ color: "var(--color-sentinel-text-secondary)" }}
+                        >
+                          Recent Enforcement Runs
+                        </p>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-xs">
+                            <thead>
+                              <tr
+                                style={{
+                                  borderBottom: "1px solid var(--color-sentinel-border)",
+                                  background: "var(--color-sentinel-bg-secondary)",
+                                }}
+                              >
+                                {["Tier", "Reviewed", "Deleted", "Status", "Time"].map((h) => (
+                                  <th
+                                    key={h}
+                                    className="px-3 py-1.5 text-left font-medium"
+                                    style={{ color: "var(--color-sentinel-text-secondary)" }}
+                                  >
+                                    {h}
+                                  </th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {retentionHistory.items.slice(0, 5).map((log) => (
+                                <tr
+                                  key={log.id}
+                                  style={{ borderBottom: "1px solid var(--color-sentinel-border)" }}
+                                >
+                                  <td
+                                    className="px-3 py-1.5"
+                                    style={{ color: "var(--color-sentinel-text-primary)" }}
+                                  >
+                                    {log.tier}
+                                  </td>
+                                  <td
+                                    className="px-3 py-1.5"
+                                    style={{ color: "var(--color-sentinel-text-secondary)" }}
+                                  >
+                                    {log.rows_reviewed?.toLocaleString() ?? "—"}
+                                  </td>
+                                  <td
+                                    className="px-3 py-1.5"
+                                    style={{ color: "var(--color-sentinel-text-secondary)" }}
+                                  >
+                                    {log.rows_deleted?.toLocaleString() ?? "—"}
+                                  </td>
+                                  <td className="px-3 py-1.5">
+                                    <StatusBadge
+                                      status={log.status === "success" ? "compliant" : "high_risk"}
+                                      label={log.status}
+                                    />
+                                  </td>
+                                  <td
+                                    className="px-3 py-1.5"
+                                    style={{ color: "var(--color-sentinel-text-secondary)" }}
+                                  >
+                                    {new Date(log.execution_time).toLocaleDateString("en-ZA")}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <EmptyState
+                    icon={Database}
+                    title="Retention status unavailable"
+                    subtext="POPIA retention service may be offline."
+                  />
+                )}
+              </div>
             </Panel>
           </>
         )}

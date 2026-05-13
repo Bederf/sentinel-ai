@@ -5,7 +5,7 @@
  * and last reading timestamp for a single fuel tank.
  */
 
-import { Card, Text, Badge, Flex } from '@tremor/react';
+
 import type { FuelTank } from '../../lib/api';
 
 interface FuelTankCardProps {

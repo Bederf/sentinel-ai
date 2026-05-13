@@ -17,33 +17,49 @@ import { secureConsoleLog } from './security-utils';
 
 // VITE_API_URL set = use it (production/self-hosted)
 const API_BASE_URL = import.meta.env.VITE_API_URL || window.location.origin;
-const ACCESS_TOKEN_KEY = "sentinel_token";
 const REFRESH_TOKEN_KEY = "sentinel_refresh_token";
 export const AUTH_EXPIRED_EVENT = "sentinel:auth-expired";
 
 let refreshInFlight: Promise<string | null> | null = null;
 
+// In-memory access token — not persisted, not XSS-extractable after page unload
+let _accessToken: string | null = null;
+
+export const setAccessToken = (token: string): void => {
+  _accessToken = token;
+};
+
+export const getAccessToken = (): string | null => {
+  return _accessToken;
+};
+
+export const clearAccessToken = (): void => {
+  _accessToken = null;
+};
+
 // ============= Auth Token Management =============
 
-function getAccessToken(): string | null {
-  return localStorage.getItem(ACCESS_TOKEN_KEY);
-}
-
 function getRefreshToken(): string | null {
+  // Primary: HttpOnly cookie set by backend (secure, XSS-proof)
+  const cookieMatch = document.cookie.match(/(?:^|;\s*)sentinel_refresh_token=([^;]*)/);
+  if (cookieMatch) return decodeURIComponent(cookieMatch[1]);
+  // Fallback: localStorage for existing sessions during transition
   return localStorage.getItem(REFRESH_TOKEN_KEY);
 }
 
 function setTokens(accessToken: string, refreshToken?: string): void {
-  localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
+  setAccessToken(accessToken);
   if (refreshToken) {
     localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
   }
 }
 
 export function clearAuthStorage(): void {
-  localStorage.removeItem(ACCESS_TOKEN_KEY);
+  clearAccessToken();
   localStorage.removeItem(REFRESH_TOKEN_KEY);
   localStorage.removeItem("sentinel_user");
+  // Clear HttpOnly refresh token cookie
+  document.cookie = "sentinel_refresh_token=; max-age=0; path=/api/auth";
 }
 
 function notifyAuthExpired(): void {

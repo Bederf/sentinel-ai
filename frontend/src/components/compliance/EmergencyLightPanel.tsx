@@ -6,7 +6,6 @@
  * IEC 62034 battery health monitoring and daily auto-test scheduling.
  */
 
-import { Card, Title, Text, Grid } from '@tremor/react'
 import { useEmergencyLightStatus, useRecordEmergencyLightTest } from '@/lib/api/compliance'
 
 interface EmergencyLightPanelProps {
@@ -42,73 +41,71 @@ export function EmergencyLightPanel({ siteCode }: EmergencyLightPanelProps) {
 
   return (
     <div className="space-y-6">
-      <Grid className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <Title>Total Lights</Title>
-          <div className="text-3xl font-bold mt-2">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="rounded-lg p-4" style={{ background: "var(--sentinel-bg-panel)", border: "1px solid var(--sentinel-border)" }}>
+          <h3 className="text-sm font-medium" style={{ color: "var(--sentinel-text-primary)" }}>Total Lights</h3>
+          <div className="text-3xl font-bold mt-2" style={{ color: "var(--sentinel-text-primary)" }}>
             {statusData?.summary ? Object.keys(statusData.summary).length : 0}
           </div>
-        </Card>
-        <Card>
-          <Title>Battery Alerts</Title>
-          <div className="text-3xl font-bold mt-2 text-yellow-600">
+        </div>
+        <div className="rounded-lg p-4" style={{ background: "var(--sentinel-bg-panel)", border: "1px solid var(--sentinel-border)" }}>
+          <h3 className="text-sm font-medium" style={{ color: "var(--sentinel-text-primary)" }}>Battery Alerts</h3>
+          <div className="text-3xl font-bold mt-2" style={{ color: "var(--sentinel-amber)" }}>
             {statusData?.high_risk_items_count || 0}
           </div>
-          <Text className="text-xs mt-2">Battery health &lt; 75%</Text>
-        </Card>
-        <Card>
-          <Title>Auto-Test Schedule</Title>
-          <div className="text-sm mt-2 text-gray-600">Daily: 01:00-01:30 UTC</div>
-        </Card>
-      </Grid>
+          <span className="text-xs mt-2 block" style={{ color: "var(--sentinel-text-secondary)" }}>Battery health &lt; 75%</span>
+        </div>
+        <div className="rounded-lg p-4" style={{ background: "var(--sentinel-bg-panel)", border: "1px solid var(--sentinel-border)" }}>
+          <h3 className="text-sm font-medium" style={{ color: "var(--sentinel-text-primary)" }}>Auto-Test Schedule</h3>
+          <div className="text-sm mt-2" style={{ color: "var(--sentinel-text-secondary)" }}>Daily: 01:00-01:30 UTC</div>
+        </div>
+      </div>
 
-      <Card>
-        <Title>Emergency Light Status</Title>
-        <Text className="text-sm mt-2 mb-4">IEC 62034 compliance - Battery health trend monitoring</Text>
+      <div className="rounded-lg p-4" style={{ background: "var(--sentinel-bg-panel)", border: "1px solid var(--sentinel-border)" }}>
+        <h3 className="text-sm font-medium" style={{ color: "var(--sentinel-text-primary)" }}>Emergency Light Status</h3>
+        <span className="text-sm mt-2 mb-4 block" style={{ color: "var(--sentinel-text-secondary)" }}>IEC 62034 compliance - Battery health trend monitoring</span>
 
         <div className="mt-4">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b">
-                <th className="text-left py-2">Light Code</th>
-                <th className="text-left py-2">Location</th>
-                <th className="text-left py-2">Battery Health</th>
-                <th className="text-left py-2">Last Test</th>
-                <th className="text-left py-2">Status</th>
-                <th className="text-left py-2">Action</th>
+              <tr className="border-b" style={{ borderColor: "var(--sentinel-border)" }}>
+                <th className="text-left py-2 font-medium" style={{ color: "var(--sentinel-text-secondary)" }}>Light Code</th>
+                <th className="text-left py-2 font-medium" style={{ color: "var(--sentinel-text-secondary)" }}>Location</th>
+                <th className="text-left py-2 font-medium" style={{ color: "var(--sentinel-text-secondary)" }}>Battery Health</th>
+                <th className="text-left py-2 font-medium" style={{ color: "var(--sentinel-text-secondary)" }}>Last Test</th>
+                <th className="text-left py-2 font-medium" style={{ color: "var(--sentinel-text-secondary)" }}>Status</th>
+                <th className="text-left py-2 font-medium" style={{ color: "var(--sentinel-text-secondary)" }}>Action</th>
               </tr>
             </thead>
             <tbody>
-              <tr className="border-b hover:bg-gray-50">
-                <td colSpan={6} className="py-4 text-center text-gray-500">
+              <tr className="border-b" style={{ borderColor: "var(--sentinel-border)" }}>
+                <td colSpan={6} className="py-4 text-center" style={{ color: "var(--sentinel-text-disabled)" }}>
                   No emergency lights configured. Emergency lights are automatically tested daily between 01:00-01:30 UTC.
                 </td>
               </tr>
             </tbody>
           </table>
         </div>
-      </Card>
+      </div>
 
-      {/* Battery Health Trends */}
-      <Card>
-        <Title>Battery Health Trends</Title>
-        <Text className="text-sm mt-2 mb-4">Historical battery degradation over time</Text>
-        <div className="mt-4 p-8 text-center text-gray-500">
+      <div className="rounded-lg p-4" style={{ background: "var(--sentinel-bg-panel)", border: "1px solid var(--sentinel-border)" }}>
+        <h3 className="text-sm font-medium" style={{ color: "var(--sentinel-text-primary)" }}>Battery Health Trends</h3>
+        <span className="text-sm mt-2 mb-4 block" style={{ color: "var(--sentinel-text-secondary)" }}>Historical battery degradation over time</span>
+        <div className="mt-4 p-8 text-center" style={{ color: "var(--sentinel-text-disabled)" }}>
           Trend chart placeholder - Shows 90-day battery health history
         </div>
-      </Card>
+      </div>
 
-      {/* Alert Thresholds */}
-      <Card className="border-l-4 border-yellow-500 bg-yellow-50">
-        <Title className="text-sm">Battery Alert Thresholds</Title>
-        <Text className="text-xs mt-2">
+      <div className="rounded-lg p-4" style={{ background: "rgba(245, 158, 11, 0.1)", borderLeft: "4px solid var(--sentinel-amber)" }}>
+        <h3 className="text-sm font-medium" style={{ color: "var(--sentinel-text-primary)" }}>Battery Alert Thresholds</h3>
+        <div className="text-xs mt-2" style={{ color: "var(--sentinel-text-secondary)" }}>
           <ul className="list-disc list-inside mt-2 space-y-1">
             <li>75% battery health: Alert (3-hour runtime minimum)</li>
             <li>Daily auto-tests run 01:00-01:30 UTC per IEC 62034</li>
             <li>Trend tracking shows degradation over 90 days</li>
           </ul>
-        </Text>
-      </Card>
+        </div>
+      </div>
     </div>
   )
 }

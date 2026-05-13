@@ -614,7 +614,7 @@ class ClaudeService:
         # Calm scratchpad: inject as system prompt suffix when in interactive/recommendation mode.
         # Not injected for background/lean calls (include_site_context=False).
         if include_site_context:
-            system_blocks.append(SCRATCHPAD_PREFIX.strip())
+            system_blocks.append({"type": "text", "text": SCRATCHPAD_PREFIX.strip()})
             logger.debug(
                 "Calm scratchpad injected: source=%s include_site_context=%s",
                 source,
@@ -747,13 +747,14 @@ class ClaudeService:
             include_system_docs=include_system_docs,
         )
 
-        # Anthropic tool schema does not accept output_schema on tool definitions.
+        # Anthropic tool schema does not accept output_schema or safety_profiles on tool definitions.
         # Strip unsupported keys before sending to the API and avoid mutating shared defs.
         if available_tools:
             normalized_tools = []
             for tool in available_tools:
                 normalized = dict(tool)
                 normalized.pop("output_schema", None)
+                normalized.pop("safety_profiles", None)
                 normalized_tools.append(normalized)
             # Cache one tool definition too — they rarely change between requests.
             normalized_tools[-1] = {**normalized_tools[-1], "cache_control": {"type": "ephemeral"}}

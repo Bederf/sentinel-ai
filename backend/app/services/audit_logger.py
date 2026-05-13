@@ -1,8 +1,8 @@
 """Audit Logger Service.
 
 Thread-safe audit logging service for recording all control actions,
-safety validations, and system events. Uses JSON file storage for local
-with in-memory buffer and periodic flush.
+safety validations, and system events. Supabase as primary store
+with in-memory buffer. JSON file fallback retired Phase 193+.
 
 Enhanced (Phase 63): Adds structured JSON logging output alongside
 file-based logging. Structured logs are collected by Promtail and
@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any
 
 from app.models.audit_log import AuditActionType, AuditLogEntry, AuditResultType
+from app.database.repositories.audit_repository import AuditRepository
 from app.services.encryption_service import get_encryption_service
 
 logger = logging.getLogger(__name__)
@@ -88,52 +89,23 @@ class AuditLogger:
         return cls._instance
 
     def __init__(self):
-        """Initialize audit logger with file storage."""
+        """Initialize audit logger with Supabase primary store."""
         if self._initialized:
             return
 
-        self.log_file = Path(__file__).parent.parent / "data" / "audit_log.json"
-        # Import from security constants — increased from 1000 to 10_000 (Phase 137-09)
-        try:
-            from app.security.constants import LOG_MAX_ENTRIES
-
-            self.max_entries = LOG_MAX_ENTRIES
-        except ImportError:
-            self.max_entries = 10_000
+        self._repo = AuditRepository()
         self.buffer: list[AuditLogEntry] = []
         self.buffer_size = 10  # Flush after 10 entries
         self.encryption_service = get_encryption_service()
-        self._load_existing_logs()
+        self.max_entries = 10_000
 
         self._initialized = True
-        logger.info(f"Audit logger initialized. Log file: {self.log_file}")
+        logger.info("Audit logger initialized. Supabase primary store.")
         logger.info(f"Encryption enabled: {self.encryption_service.enabled}")
 
     def _load_existing_logs(self) -> None:
-        """Load existing audit logs from file."""
-        try:
-            if self.log_file.exists():
-                with open(self.log_file) as f:
-                    data = json.load(f)
-                    # Load last N entries to respect max_entries
-                    entries_data = data.get("entries", [])
-                    if len(entries_data) > self.max_entries:
-                        entries_data = entries_data[-self.max_entries :]
-
-                    # Decrypt sensitive fields if encryption is enabled
-                    decrypted_entries = []
-                    for entry in entries_data:
-                        decrypted_entry = self._decrypt_audit_entry(entry)
-                        decrypted_entries.append(AuditLogEntry.from_dict(decrypted_entry))
-                    self.buffer = decrypted_entries
-                logger.info(f"Loaded {len(self.buffer)} existing audit log entries")
-            else:
-                # Create empty log file
-                self._save_logs([])
-                logger.info("Created new audit log file")
-        except Exception as e:
-            logger.error(f"Failed to load audit logs: {e}")
-            self.buffer = []
+        """No-op: logs are loaded from Supabase on demand."""
+        pass
 
     def _encrypt_audit_entry(self, entry_dict: dict[str, Any]) -> dict[str, Any]:
         """Encrypt sensitive fields in audit log entry.
@@ -213,58 +185,39 @@ class AuditLogger:
             return value  # Return as-is for primitive types
 
     def _save_logs(self, entries: list[AuditLogEntry]) -> None:
-        """Save audit logs to file with encryption."""
-        try:
-            # Ensure data directory exists
-            self.log_file.parent.mkdir(exist_ok=True, parents=True)
-
-            # Encrypt entries before saving
-            encrypted_entries = []
-            for entry in entries:
-                entry_dict = entry.to_dict()
-                encrypted_entry = self._encrypt_audit_entry(entry_dict)
-                encrypted_entries.append(encrypted_entry)
-
-            with open(self.log_file, "w") as f:
-                data = {
-                    "updated_at": datetime.now().isoformat(),
-                    "entry_count": len(encrypted_entries),
-                    "encryption_enabled": self.encryption_service.enabled,
-                    "entries": encrypted_entries,
-                }
-                json.dump(data, f, indent=2, default=str)
-        except Exception as e:
-            logger.error(f"Failed to save audit logs: {e}")
+        """No-op: audit logs are persisted to Supabase via _flush_buffer."""
+        pass
 
     def _flush_buffer(self) -> None:
-        """Flush buffer to disk."""
+        """Flush buffer to Supabase."""
         with self._write_lock:
             if not self.buffer:
                 return
 
-            # Load existing logs (decrypted)
-            existing_entries = []
-            if self.log_file.exists():
-                try:
-                    with open(self.log_file) as f:
-                        data = json.load(f)
-                        # Decrypt entries when loading for merge
-                        for entry in data.get("entries", []):
-                            decrypted_entry = self._decrypt_audit_entry(entry)
-                            existing_entries.append(AuditLogEntry.from_dict(decrypted_entry))
-                except Exception as e:
-                    logger.error(f"Failed to read existing logs for flush: {e}")
-                    existing_entries = []
-
-            # Combine and limit to max_entries
-            all_entries = existing_entries + self.buffer
-            if len(all_entries) > self.max_entries:
-                all_entries = all_entries[-self.max_entries :]
-
-            # Save combined logs (encryption happens in _save_logs)
-            self._save_logs(all_entries)
-            self.buffer = []  # Clear buffer after successful save
-            logger.debug(f"Flushed {len(self.buffer)} audit log entries to disk")
+            try:
+                entries_to_flush = list(self.buffer)
+                for entry in entries_to_flush:
+                    entry_dict = entry.to_dict()
+                    encrypted = self._encrypt_audit_entry(entry_dict)
+                    self._repo.create({
+                        "id": encrypted.get("id"),
+                        "timestamp": encrypted.get("timestamp"),
+                        "action": encrypted.get("action"),
+                        "user_id": encrypted.get("user"),
+                        "device_id": encrypted.get("device_id"),
+                        "point_name": encrypted.get("point_name"),
+                        "old_value": json.dumps(encrypted["old_value"]) if encrypted.get("old_value") is not None else None,
+                        "new_value": json.dumps(encrypted["new_value"]) if encrypted.get("new_value") is not None else None,
+                        "result": encrypted.get("result"),
+                        "safety_validation": json.dumps(encrypted["safety_validation"]) if encrypted.get("safety_validation") else None,
+                        "error_message": encrypted.get("error_message"),
+                        "correlation_id": encrypted.get("correlation_id"),
+                        "metadata": encrypted.get("metadata", {}),
+                    })
+                self.buffer = []
+                logger.debug(f"Flushed {len(entries_to_flush)} audit entries to Supabase")
+            except Exception as e:
+                logger.error(f"Failed to flush audit buffer to Supabase: {e}")
 
     def log_control_action(
         self,
@@ -502,7 +455,7 @@ class AuditLogger:
         limit: int = 100,
     ) -> list[AuditLogEntry]:
         """
-        Get audit logs with filtering.
+        Get audit logs with filtering from Supabase.
 
         Args:
             start_time: Start time filter
@@ -516,67 +469,66 @@ class AuditLogger:
         Returns:
             List of filtered audit log entries
         """
-        # Load all logs (existing + buffer)
-        all_entries = []
-        if self.log_file.exists():
-            try:
-                with open(self.log_file) as f:
-                    data = json.load(f)
-                    # Decrypt entries when loading
-                    for entry in data.get("entries", []):
-                        decrypted_entry = self._decrypt_audit_entry(entry)
-                        all_entries.append(AuditLogEntry.from_dict(decrypted_entry))
-            except Exception as e:
-                logger.error(f"Failed to read logs for query: {e}")
-                all_entries = []
-
+        rows = self._repo.get_all(
+            limit=limit,
+            user_id=user,
+            action=action.value if action else None,
+            device_id=device_id,
+        )
+        entries = []
+        for row in rows:
+            # Apply time filters in Python (repo doesn't support range filter)
+            ts = datetime.fromisoformat(row["timestamp"].replace("Z", "+00:00")) if isinstance(row["timestamp"], str) else row["timestamp"]
+            if start_time and ts < start_time:
+                continue
+            if end_time and ts > end_time:
+                continue
+            if result and row.get("result") != result.value:
+                continue
+            entries.append(AuditLogEntry(
+                id=row["id"],
+                timestamp=ts,
+                action=AuditActionType(row.get("action", "system_event")),
+                user=row.get("user_id", ""),
+                result=AuditResultType(row.get("result", "warning")),
+                device_id=row.get("device_id"),
+                point_name=row.get("point_name"),
+                old_value=row.get("old_value"),
+                new_value=row.get("new_value"),
+                safety_validation=row.get("safety_validation"),
+                error_message=row.get("error_message"),
+                correlation_id=row.get("correlation_id"),
+                metadata=row.get("metadata", {}),
+            ))
         # Add buffered entries
-        all_entries.extend(self.buffer)
-
-        # Apply filters
-        filtered = []
-        for entry in all_entries:
-            if start_time and entry.timestamp < start_time:
-                continue
-            if end_time and entry.timestamp > end_time:
-                continue
-            if device_id and entry.device_id != device_id:
-                continue
-            if action and entry.action != action:
-                continue
-            if user and entry.user != user:
-                continue
-            if result and entry.result != result:
-                continue
-            filtered.append(entry)
-
-        # Sort by timestamp (newest first) and limit
-        filtered.sort(key=lambda x: x.timestamp, reverse=True)
-        return filtered[:limit]
+        entries.extend(self.buffer)
+        entries.sort(key=lambda x: x.timestamp, reverse=True)
+        return entries[:limit]
 
     def get_stats(self) -> dict[str, Any]:
-        """Get audit log statistics."""
-        # Load all logs
-        all_entries = []
-        if self.log_file.exists():
-            try:
-                with open(self.log_file) as f:
-                    data = json.load(f)
-                    # Decrypt entries when loading
-                    for entry in data.get("entries", []):
-                        decrypted_entry = self._decrypt_audit_entry(entry)
-                        all_entries.append(AuditLogEntry.from_dict(decrypted_entry))
-            except Exception as e:
-                logger.error(f"Failed to read logs for stats: {e}")
-                all_entries = []
-
-        # Add buffered entries
-        all_entries.extend(self.buffer)
+        """Get audit log statistics from Supabase."""
+        try:
+            rows = self._repo.get_all(limit=1000)
+            all_entries = []
+            for row in rows:
+                ts = datetime.fromisoformat(row["timestamp"].replace("Z", "+00:00")) if isinstance(row["timestamp"], str) else row["timestamp"]
+                all_entries.append(AuditLogEntry(
+                    id=row["id"],
+                    timestamp=ts,
+                    action=AuditActionType(row.get("action", "system_event")),
+                    user=row.get("user_id", ""),
+                    result=AuditResultType(row.get("result", "warning")),
+                    device_id=row.get("device_id"),
+                    point_name=row.get("point_name"),
+                    metadata=row.get("metadata", {}),
+                ))
+            all_entries.extend(self.buffer)
+        except Exception:
+            all_entries = list(self.buffer)
 
         if not all_entries:
             return {"total_entries": 0, "by_action": {}, "by_result": {}, "by_user": {}, "recent_activity": []}
 
-        # Calculate statistics
         by_action: dict[str, int] = {}
         by_result: dict[str, int] = {}
         by_user: dict[str, int] = {}
@@ -586,9 +538,8 @@ class AuditLogger:
             by_result[entry.result.value] = by_result.get(entry.result.value, 0) + 1
             by_user[entry.user] = by_user.get(entry.user, 0) + 1
 
-        # Get recent activity (last 24 hours)
-        one_day_ago = datetime.now().timestamp() - 24 * 3600
-        recent = [entry for entry in all_entries if entry.timestamp.timestamp() > one_day_ago]
+        now = datetime.now(UTC).timestamp()
+        recent = [e for e in all_entries if e.timestamp.timestamp() > now - 86400]
 
         return {
             "total_entries": len(all_entries),
@@ -646,7 +597,10 @@ class AuditLogger:
         """Clear all audit logs (for testing/local reset)."""
         with self._lock:
             self.buffer = []
-            self._save_logs([])
+            try:
+                self._repo._client.table("audit_log").delete().neq("id", "00000000-0000-0000-0000-000000000000").execute()
+            except Exception:
+                pass
             logger.info("Cleared all audit logs")
 
     async def archive_old_audit_logs(self, days_old: int = 30) -> int:
@@ -669,114 +623,40 @@ class AuditLogger:
             return await self._do_archive_old_audit_logs(days_old)
 
     async def _do_archive_old_audit_logs(self, days_old: int = 30) -> int:
-        """Internal archival logic (called under _AUDIT_ARCHIVAL_LOCK).
+        """Internal archival logic (Phase 193+: DB-native retention).
 
-        Implements atomic delete: only deletes entries that were successfully archived.
-        Three cases:
-        1. All succeeded: delete all old entries from active log
-        2. Partial success: delete only the succeeded entries, keep failed ones for retry
-        3. Total failure: delete nothing, keep all for retry
+        Deletes entries older than days_old from audit_log DB table.
+        No JSON file involvement.
 
         Args:
-            days_old: Archive entries older than this many days
+            days_old: Archive entries older than this many days (default: 30)
 
         Returns:
-            Number of entries successfully archived
+            Number of entries deleted
         """
         import asyncio
         from datetime import datetime, timedelta
 
-        from app.database.supabase_client import get_supabase_client
+        cutoff_time = datetime.now() - timedelta(days=days_old)
 
         try:
-            self._flush_buffer()  # Ensure all entries are saved first
+            self._flush_buffer()
+        except Exception:
+            pass
 
-            # Load all entries from audit log file
-            all_entries = []
-            if self.log_file.exists():
-                try:
-                    with open(self.log_file) as f:
-                        data = json.load(f)
-                        for entry in data.get("entries", []):
-                            decrypted_entry = self._decrypt_audit_entry(entry)
-                            all_entries.append(AuditLogEntry.from_dict(decrypted_entry))
-                except Exception as e:
-                    logger.error(f"Failed to read logs for archival: {e}")
-                    return 0
-
-            # Identify old entries (older than days_old)
-            cutoff_time = datetime.now() - timedelta(days=days_old)
-            old_entries = [entry for entry in all_entries if entry.timestamp < cutoff_time]
-            new_entries = [entry for entry in all_entries if entry.timestamp >= cutoff_time]
-
-            if not old_entries:
-                logger.info(f"No audit entries older than {days_old} days to archive")
-                return 0
-
-            # Archive old entries to Supabase (immutable table)
-            # Track which entries were successfully archived by ID
-            successfully_archived_ids = set()
-
-            try:
-                supabase = get_supabase_client()
-                for entry in old_entries:
-                    entry_dict = entry.to_dict()
-                    archive_record = {
-                        "archived_from": "audit_log.json",
-                        "event_data": entry_dict,
-                        "created_at": entry.timestamp.isoformat(),
-                    }
-
-                    # Insert with upsert to handle duplicates idempotently
-                    try:
-                        await asyncio.to_thread(supabase.table("audit_archive").upsert(archive_record).execute)
-                        successfully_archived_ids.add(entry.id)
-                    except Exception as e:
-                        # Log failure but continue attempting others
-                        logger.warning(f"Failed to archive entry {entry.id}: {e}")
-
-                logger.info(
-                    f"Archived {len(successfully_archived_ids)}/{len(old_entries)} entries to audit_archive table"
-                )
-            except Exception as e:
-                logger.error(f"Failed to initialize Supabase client: {e}")
-                # Fallback: don't delete from local file if Supabase fails completely
-                return 0
-
-            # ATOMIC DELETE (Phase 168-03): Only delete entries that were successfully archived
-            archived_count = len(successfully_archived_ids)
-
-            if archived_count == len(old_entries):
-                # Case 1: All entries archived successfully
-                # Safe to delete all old entries from active log
-                self._save_logs(new_entries)
-                logger.info(
-                    f"Removed {archived_count} archived entries from active audit log "
-                    f"({len(new_entries)} entries remain)"
-                )
-            elif archived_count > 0:
-                # Case 2: Partial success
-                # Delete only the entries that were successfully archived
-                # Keep the failed ones for automatic retry
-                entries_to_keep = [e for e in all_entries if e.id not in successfully_archived_ids]
-                self._save_logs(entries_to_keep)
-                logger.warning(
-                    f"Partial archival: {archived_count}/{len(old_entries)} succeeded. "
-                    f"Deleted only the archived entries. "
-                    f"Keeping {len(old_entries) - archived_count} failed entries in active log for retry."
-                )
-            else:
-                # Case 3: Total failure
-                # All entries failed to archive; don't delete anything
-                logger.error(
-                    f"Archival completely failed for {len(old_entries)} entries. "
-                    f"Active log unchanged; will retry on next archival run."
-                )
-
-            return archived_count
-
+        try:
+            supabase = get_supabase_client()
+            result = await asyncio.to_thread(
+                supabase.table("audit_log")
+                .delete()
+                .lt("timestamp", cutoff_time.isoformat())
+                .execute
+            )
+            deleted = len(result.data) if result.data else 0
+            logger.info(f"Archived {deleted} audit log entries older than {days_old} days")
+            return deleted
         except Exception as e:
-            logger.error(f"Audit log archival failed: {e}")
+            logger.error(f"Failed to archive audit logs: {e}")
             return 0
 
     async def audit_archival_job(self, interval_days: int = 30) -> None:

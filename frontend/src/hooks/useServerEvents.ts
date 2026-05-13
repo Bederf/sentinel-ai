@@ -14,6 +14,7 @@
 import { useEffect, useRef, useCallback } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
+import { getAccessToken } from '@/lib/api'
 
 // Event types that can be received
 export type ServerEvent =
@@ -238,7 +239,7 @@ export function useServerEvents(
     connectingRef.current = true
 
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:9095'
-    const token = localStorage.getItem('sentinel_token')
+    const token = getAccessToken()
 
     // Async ticket acquisition then EventSource connection
     const doConnect = async () => {

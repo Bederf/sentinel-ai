@@ -387,6 +387,7 @@ async def get_equipment_info_for_technician(equipment_code: str):
 
     # Format response for technician (easy to read in Telegram)
     response = {
+        "id": metadata.get("id"),
         "equipment_code": metadata.get("code", equipment_code),
         "name": metadata.get("name", "Unknown"),
         "type": metadata.get("type", "unknown"),

@@ -348,7 +348,7 @@ async def test_feature_flag_off_preserves_legacy_chat_path(monkeypatch):
     monkeypatch.setattr(settings, "sentinel_advisory_kernel_enabled", False)
     monkeypatch.setattr("app.api.chat.log_chat_query", lambda _message: None)
     monkeypatch.setattr("app.api.chat.slash_command_router.parse", lambda _message: None)
-    monkeypatch.setattr("app.api.chat.model_gateway._resolve", lambda _task_class: ("local", "openai", "stub-model"))
+    monkeypatch.setattr("app.api.chat.model_gateway._resolve", lambda _task_class: ("local", False, []))
     monkeypatch.setattr("app.api.chat.claude_service.is_configured", lambda: False)
     monkeypatch.setattr("app.api.chat.openai_service.is_configured", lambda: False)
     monkeypatch.setattr("app.api.chat.work_order_service.detect_work_order_request", lambda _message: None)

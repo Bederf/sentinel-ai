@@ -4,6 +4,7 @@
  * Supports renewal pricing and benchmarking.
  */
 
+import { getAccessToken } from "./api";
 const RAW_API_BASE_URL = import.meta.env.VITE_API_URL || "";
 
 function resolveApiBaseUrl(): string {
@@ -14,18 +15,14 @@ function resolveApiBaseUrl(): string {
   return RAW_API_BASE_URL;
 }
 
-function authHeaders(): Record<string, string> {
-  const token = localStorage.getItem("sentinel_token");
-  return {
-    "Content-Type": "application/json",
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  };
-}
-
 async function fetchJson<T>(endpoint: string): Promise<T> {
   const baseUrl = resolveApiBaseUrl();
+  const token = getAccessToken();
   const res = await fetch(`${baseUrl}${endpoint}`, {
-    headers: authHeaders(),
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
   });
   if (!res.ok) {
     let msg = res.statusText;
@@ -42,9 +39,13 @@ async function fetchJson<T>(endpoint: string): Promise<T> {
 
 async function postJson<T>(endpoint: string, data: unknown): Promise<T> {
   const baseUrl = resolveApiBaseUrl();
+  const token = getAccessToken();
   const res = await fetch(`${baseUrl}${endpoint}`, {
     method: "POST",
-    headers: authHeaders(),
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     body: JSON.stringify(data),
   });
   if (!res.ok) {

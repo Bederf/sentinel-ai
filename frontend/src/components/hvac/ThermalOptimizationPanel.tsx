@@ -8,7 +8,6 @@
  */
 
 import { useState, useEffect, useRef } from "react";
-import { Text, Flex, Grid, Tab, TabGroup, TabList, TabPanel, TabPanels } from "@tremor/react";
 import { Thermometer, Clock, Zap, AlertTriangle } from "lucide-react";
 import { hvacApi, type ThermalRunway } from "../../lib/hvacApi";
 import api from "../../lib/api";
@@ -165,7 +164,7 @@ export function ThermalOptimizationPanel({ siteId, compact = false, scenarioRunw
     return (
       <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
         <h3 className="font-medium text-lg" style={{ color: "var(--color-sentinel-text-primary)" }}>Thermal Optimization</h3>
-        <Text className="text-red-500 mt-4">{error}</Text>
+        <span className="text-red-500 mt-4">{error}</span>
       </div>
     );
   }
@@ -174,7 +173,7 @@ export function ThermalOptimizationPanel({ siteId, compact = false, scenarioRunw
     return (
       <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
         <h3 className="font-medium text-lg" style={{ color: "var(--color-sentinel-text-primary)" }}>Thermal Optimization</h3>
-        <Text className="mt-4" style={{ color: "var(--color-sentinel-text-disabled)" }}>No thermal data available</Text>
+        <span className="mt-4" style={{ color: "var(--color-sentinel-text-disabled)" }}>No thermal data available</span>
       </div>
     );
   }
@@ -207,40 +206,44 @@ export function ThermalOptimizationPanel({ siteId, compact = false, scenarioRunw
   if (compact) {
     return (
       <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
-        <Flex justifyContent="between" alignItems="center" className="mb-4">
-          <Flex alignItems="center" className="gap-2">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
             <Thermometer className="w-5 h-5" style={{ color: "var(--color-sentinel-blue)" }} />
-            <Text className="font-medium">Thermal Runway</Text>
-          </Flex>
+            <span className="font-medium">Thermal Runway</span>
+          </div>
           <span className="text-base px-3.5 py-0.5 rounded font-medium" style={chipStyle("blue")}>
             +{metrics.improvement_percent}% with pre-cooling
           </span>
-        </Flex>
+        </div>
 
-        <Grid className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-4">
           <div
             className="p-3 rounded-lg"
             style={{ background: "var(--color-sentinel-bg-secondary)" }}
           >
-            <Text className="text-xs" style={{ color: "var(--color-sentinel-text-disabled)" }}>Without Pre-cooling</Text>
-            <Text className="text-2xl font-bold" style={{ color: "var(--color-sentinel-text-disabled)" }}>
+            <span className="text-xs" style={{ color: "var(--color-sentinel-text-disabled)" }}>Without Pre-cooling</span>
+            <span className="text-2xl font-bold" style={{ color: "var(--color-sentinel-text-disabled)" }}>
               {metrics.runway_without} min
-            </Text>
-            <Text className="text-xs text-red-400">
-              Breach at {metrics.comfort_breach_time}
-            </Text>
+            </span>
+            <div>
+              <span className="text-xs text-red-400">
+                Breach at {metrics.comfort_breach_time}
+              </span>
+            </div>
           </div>
           <div
             className="p-3 rounded-lg border border-blue-500/30"
             style={{ background: "rgba(59, 130, 246, 0.1)" }}
           >
-            <Text className="text-xs text-blue-300">With Pre-cooling</Text>
-            <Text className="text-2xl font-bold text-blue-300">
+            <span className="text-xs text-blue-300">With Pre-cooling</span>
+            <span className="text-2xl font-bold text-blue-300">
               {metrics.runway_with} min
-            </Text>
-            <Text className="text-xs text-green-400">Comfort maintained</Text>
+            </span>
+            <div>
+              <span className="text-xs text-green-400">Comfort maintained</span>
+            </div>
           </div>
-        </Grid>
+        </div>
       </div>
     );
   }
@@ -248,10 +251,10 @@ export function ThermalOptimizationPanel({ siteId, compact = false, scenarioRunw
   // Full view with tabs
   return (
     <div className="space-y-4">
-      <Flex justifyContent="between" alignItems="center">
+      <div className="flex items-center justify-between">
         <div>
           <h3 className="font-medium text-lg" style={{ color: "var(--color-sentinel-text-primary)" }}>Thermal Optimization</h3>
-          <Text>Load shedding preparation and thermal modeling</Text>
+          <span>Load shedding preparation and thermal modeling</span>
         </div>
         <div className="flex gap-2">
           <span className="text-xs px-2 py-0.5 rounded" style={chipStyle("gray")}>
@@ -261,170 +264,196 @@ export function ThermalOptimizationPanel({ siteId, compact = false, scenarioRunw
             Comfort Limit: {current_conditions.comfort_limit}°C
           </span>
         </div>
-      </Flex>
+      </div>
 
       {/* Key Metrics Summary */}
       <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
-        <Grid className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-4 gap-4">
           <div
             className="p-4 rounded-lg text-center"
             style={{ background: "var(--color-sentinel-bg-secondary)" }}
           >
             <Thermometer className="w-6 h-6 mx-auto mb-2" style={{ color: "var(--color-sentinel-blue)" }} />
-            <Text className="text-xs" style={{ color: "var(--color-sentinel-text-disabled)" }}>Current Temp</Text>
-            <Text className="text-2xl font-bold">{current_conditions.avg_temperature}°C</Text>
+            <span className="text-xs" style={{ color: "var(--color-sentinel-text-disabled)" }}>Current Temp</span>
+            <div>
+              <span className="text-2xl font-bold">{current_conditions.avg_temperature}°C</span>
+            </div>
           </div>
           <div
             className="p-4 rounded-lg text-center"
             style={{ background: "var(--color-sentinel-bg-secondary)" }}
           >
             <Clock className="w-6 h-6 mx-auto mb-2" style={{ color: "var(--color-sentinel-amber)" }} />
-            <Text className="text-xs" style={{ color: "var(--color-sentinel-text-disabled)" }}>Runway (No Pre-cool)</Text>
-            <Text className="text-2xl font-bold" style={{ color: "var(--color-sentinel-text-disabled)" }}>{metrics.runway_without} min</Text>
+            <span className="text-xs" style={{ color: "var(--color-sentinel-text-disabled)" }}>Runway (No Pre-cool)</span>
+            <div>
+              <span className="text-2xl font-bold" style={{ color: "var(--color-sentinel-text-disabled)" }}>{metrics.runway_without} min</span>
+            </div>
           </div>
           <div
             className="p-4 rounded-lg text-center border border-blue-500/30"
             style={{ background: "rgba(59, 130, 246, 0.1)" }}
           >
             <Zap className="w-6 h-6 mx-auto mb-2 text-blue-400" />
-            <Text className="text-xs text-blue-300">Runway (Pre-cooled)</Text>
-            <Text className="text-2xl font-bold text-blue-300">{metrics.runway_with} min</Text>
+            <span className="text-xs text-blue-300">Runway (Pre-cooled)</span>
+            <div>
+              <span className="text-2xl font-bold text-blue-300">{metrics.runway_with} min</span>
+            </div>
           </div>
           <div
             className="p-4 rounded-lg text-center border border-green-500/30"
             style={{ background: "rgba(16, 185, 129, 0.1)" }}
           >
             <AlertTriangle className="w-6 h-6 mx-auto mb-2 text-green-400" />
-            <Text className="text-xs text-green-300">Improvement</Text>
-            <Text className="text-2xl font-bold text-green-300">+{metrics.improvement_percent}%</Text>
+            <span className="text-xs text-green-300">Improvement</span>
+            <div>
+              <span className="text-2xl font-bold text-green-300">+{metrics.improvement_percent}%</span>
+            </div>
           </div>
-        </Grid>
+        </div>
       </div>
 
-      {/* Tabs for different views */}
-      <TabGroup index={activeTab} onIndexChange={setActiveTab}>
-        <TabList className="mb-4 overflow-x-auto">
-          <Tab>Temp Curves</Tab>
-          <Tab>Pre-cooling</Tab>
-        </TabList>
+      {/* Custom Tabs */}
+      <div role="tablist" className="flex gap-1 mb-4 overflow-x-auto">
+        <button
+          role="tab"
+          aria-selected={activeTab === 0}
+          onClick={() => setActiveTab(0)}
+          className="px-4 py-2 text-sm font-medium rounded-md transition-colors"
+          style={{
+            background: activeTab === 0 ? "var(--color-sentinel-bg-secondary)" : "transparent",
+            color: activeTab === 0 ? "var(--color-sentinel-text-primary)" : "var(--color-sentinel-text-secondary)",
+          }}
+        >
+          Temp Curves
+        </button>
+        <button
+          role="tab"
+          aria-selected={activeTab === 1}
+          onClick={() => setActiveTab(1)}
+          className="px-4 py-2 text-sm font-medium rounded-md transition-colors"
+          style={{
+            background: activeTab === 1 ? "var(--color-sentinel-bg-secondary)" : "transparent",
+            color: activeTab === 1 ? "var(--color-sentinel-text-primary)" : "var(--color-sentinel-text-secondary)",
+          }}
+        >
+          Pre-cooling
+        </button>
+      </div>
 
-        <TabPanels>
-          <TabPanel>
-            <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
-              <ThermalRunwayChart
-                data={data}
-                outagePeriod={outage_period}
-                metrics={{
-                  runwayWithout: metrics.runway_without,
-                  runwayWith: metrics.runway_with,
-                  comfortBreachTime: metrics.comfort_breach_time,
-                  recoveryTime: metrics.recovery_time,
-                }}
-              />
-            </div>
-          </TabPanel>
+      {activeTab === 0 && (
+        <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+          <ThermalRunwayChart
+            data={data}
+            outagePeriod={outage_period}
+            metrics={{
+              runwayWithout: metrics.runway_without,
+              runwayWith: metrics.runway_with,
+              comfortBreachTime: metrics.comfort_breach_time,
+              recoveryTime: metrics.recovery_time,
+            }}
+          />
+        </div>
+      )}
 
-          <TabPanel>
-            <PrecoolingSchedule
-              schedule={[
+      {activeTab === 1 && (
+        <PrecoolingSchedule
+          schedule={[
+            {
+              type: "precooling",
+              start: "14:45",
+              end: outage_period.start,
+              label: "PRE-COOLING",
+              color: "blue",
+              actions: [
                 {
-                  type: "precooling",
-                  start: "14:45",
-                  end: outage_period.start,
-                  label: "PRE-COOLING",
-                  color: "blue",
-                  actions: [
-                    {
-                      time: "14:45",
-                      action: "CHW setpoint",
-                      value: "7°C → 5°C",
-                      description: "Lower chilled water setpoint for maximum pre-cooling",
-                    },
-                    {
-                      time: "14:50",
-                      action: "AHU fan speed",
-                      value: "70% → 90%",
-                      description: "Increase air handling for faster cooling",
-                    },
-                    {
-                      time: "15:30",
-                      action: "Temperature check",
-                      value: `${(current_conditions.avg_temperature - 2).toFixed(1)}°C`,
-                      description: "Verify pre-cooling target achieved",
-                    },
-                  ],
+                  time: "14:45",
+                  action: "CHW setpoint",
+                  value: "7°C → 5°C",
+                  description: "Lower chilled water setpoint for maximum pre-cooling",
                 },
                 {
-                  type: "load_shedding",
-                  start: outage_period.start,
-                  end: outage_period.end,
-                  label: "LOAD SHEDDING",
-                  color: "red",
-                  actions: [
-                    {
-                      time: outage_period.start,
-                      action: "Power loss",
-                      value: "Grid offline",
-                      description: "Load shedding begins",
-                    },
-                    {
-                      time: "17:30",
-                      action: "Monitor",
-                      value: `${(current_conditions.avg_temperature + 1.5).toFixed(1)}°C`,
-                      description: "Temperature drift within limits",
-                    },
-                  ],
+                  time: "14:50",
+                  action: "AHU fan speed",
+                  value: "70% → 90%",
+                  description: "Increase air handling for faster cooling",
                 },
                 {
-                  type: "recovery",
-                  start: outage_period.end,
-                  end: "19:30",
-                  label: "RECOVERY",
-                  color: "green",
-                  actions: [
-                    {
-                      time: outage_period.end,
-                      action: "Power restored",
-                      value: "Grid online",
-                      description: "Begin staged restart",
-                    },
-                    {
-                      time: "19:00",
-                      action: "Temperature recovery",
-                      value: `${current_conditions.avg_setpoint}°C`,
-                      description: "Return to normal setpoint",
-                    },
-                  ],
+                  time: "15:30",
+                  action: "Temperature check",
+                  value: `${(current_conditions.avg_temperature - 2).toFixed(1)}°C`,
+                  description: "Verify pre-cooling target achieved",
                 },
-              ]}
-              currentTime={new Date().toLocaleTimeString("en-GB", {
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
-              readinessChecks={[
+              ],
+            },
+            {
+              type: "load_shedding",
+              start: outage_period.start,
+              end: outage_period.end,
+              label: "LOAD SHEDDING",
+              color: "red",
+              actions: [
                 {
-                  check: "Chiller status",
-                  status: "Normal operation",
-                  time: "Current",
-                  passed: true,
+                  time: outage_period.start,
+                  action: "Power loss",
+                  value: "Grid offline",
+                  description: "Load shedding begins",
                 },
                 {
-                  check: "Generator test",
-                  status: "PASSED",
-                  time: "13:45",
-                  passed: true,
+                  time: "17:30",
+                  action: "Monitor",
+                  value: `${(current_conditions.avg_temperature + 1.5).toFixed(1)}°C`,
+                  description: "Temperature drift within limits",
+                },
+              ],
+            },
+            {
+              type: "recovery",
+              start: outage_period.end,
+              end: "19:30",
+              label: "RECOVERY",
+              color: "green",
+              actions: [
+                {
+                  time: outage_period.end,
+                  action: "Power restored",
+                  value: "Grid online",
+                  description: "Begin staged restart",
                 },
                 {
-                  check: "UPS capacity",
-                  status: "96%",
-                  time: "Current",
-                  passed: true,
+                  time: "19:00",
+                  action: "Temperature recovery",
+                  value: `${current_conditions.avg_setpoint}°C`,
+                  description: "Return to normal setpoint",
                 },
-              ]}
-            />
-          </TabPanel>
-        </TabPanels>
-      </TabGroup>
+              ],
+            },
+          ]}
+          currentTime={new Date().toLocaleTimeString("en-GB", {
+            hour: "2-digit",
+            minute: "2-digit",
+          })}
+          readinessChecks={[
+            {
+              check: "Chiller status",
+              status: "Normal operation",
+              time: "Current",
+              passed: true,
+            },
+            {
+              check: "Generator test",
+              status: "PASSED",
+              time: "13:45",
+              passed: true,
+            },
+            {
+              check: "UPS capacity",
+              status: "96%",
+              time: "Current",
+              passed: true,
+            },
+          ]}
+        />
+      )}
     </div>
   );
 }

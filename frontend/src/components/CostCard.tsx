@@ -10,7 +10,7 @@
  * - PRED-03: Cost impact analysis ("R12,500 repair vs R180,000 damage")
  */
 
-import { Card, Metric, Text } from "@tremor/react";
+
 
 interface CostImpact {
   estimatedFailureCost: number;
@@ -38,35 +38,35 @@ export function CostCard({ costImpact }: CostCardProps) {
   );
 
   return (
-    <Card>
+    <div className="rounded-lg p-4" style={{ background: 'var(--color-sentinel-bg-panel)', border: '1px solid var(--color-sentinel-border)' }}>
       {/* Failure Cost */}
       <div className="mb-3">
-        <Metric className="text-red-600">
+        <div className="text-2xl font-bold" style={{ color: 'var(--color-sentinel-red)' }}>
           {formatZAR(costImpact.estimatedFailureCost)}
-        </Metric>
-        <Text className="text-gray-500">If failure occurs</Text>
+        </div>
+        <span style={{ color: 'var(--color-sentinel-text-secondary)' }}>If failure occurs</span>
       </div>
 
       {/* Preventive Cost */}
       <div className="mb-3">
-        <Metric className="text-emerald-600">
+        <div className="text-2xl font-bold" style={{ color: 'var(--color-sentinel-green)' }}>
           {formatZAR(costImpact.estimatedPreventiveCost)}
-        </Metric>
-        <Text className="text-gray-500">Preventive action</Text>
+        </div>
+        <span style={{ color: 'var(--color-sentinel-text-secondary)' }}>Preventive action</span>
       </div>
 
       {/* Divider */}
-      <div className="border-t border-gray-200 my-3" />
+      <div className="border-t my-3" style={{ borderColor: 'var(--color-sentinel-border)' }} />
 
       {/* Potential Savings */}
       <div>
-        <Metric className="text-blue-600">
+        <div className="text-2xl font-bold" style={{ color: 'var(--color-sentinel-blue)' }}>
           {formatZAR(costImpact.potentialSavings)}
-        </Metric>
-        <Text className="text-gray-500">
+        </div>
+        <span style={{ color: 'var(--color-sentinel-text-secondary)' }}>
           POTENTIAL SAVINGS ({savingsPercent}%)
-        </Text>
+        </span>
       </div>
-    </Card>
+    </div>
   );
 }

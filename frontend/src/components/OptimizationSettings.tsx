@@ -87,6 +87,7 @@ export function OptimizationSettings({
   const [refreshing, setRefreshing] = useState(false);
   const [filterMode, setFilterMode] = useState<FilterMode>("all");
   const [expandedSite, setExpandedSite] = useState<string | null>(null);
+  const [siteModes, setSiteModes] = useState<Record<string, string>>({});
   // Reserved for future bulk operations
 
   const [, setShowBulkConfirm] = useState<"enable" | "disable" | null>(null);
@@ -166,20 +167,34 @@ export function OptimizationSettings({
   }, [sites]);
 
   /**
-   * Load initial data
+   * Fetch deployment stage for all sites
    */
+  const fetchSiteModes = useCallback(async () => {
+    const modes: Record<string, string> = {};
+    for (const site of sites) {
+      try {
+        const mode = await api.getSiteMode(site.id);
+        modes[site.id] = mode.current_stage;
+      } catch {
+        modes[site.id] = "supervised";
+      }
+    }
+    setSiteModes(modes);
+  }, [sites]);
+
   useEffect(() => {
     fetchSites();
   }, [fetchSites]);
 
   /**
-   * Fetch optimization statuses after sites are loaded
+   * Fetch optimization statuses and site modes after sites are loaded
    */
   useEffect(() => {
     if (sites.length > 0) {
       fetchOptimizationStatuses();
+      fetchSiteModes();
     }
-  }, [sites, fetchOptimizationStatuses]);
+  }, [sites, fetchOptimizationStatuses, fetchSiteModes]);
 
   /**
    * Set up auto-refresh
@@ -472,14 +487,25 @@ export function OptimizationSettings({
                 {isExpanded && (
                   <div className="p-4 border-t border-gray-800 bg-gray-800/30">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* Optimization Mode */}
+                      {/* Deployment Stage */}
                       <div>
-                        <div className="text-xs text-gray-400 mb-1">Mode</div>
-                        <div className="text-sm text-gray-200">
-                          {site.optimization_settings?.mode === "automatic"
-                            ? "Automatic (Supervised)"
-                            : "Supervised"}
-                        </div>
+                        <div className="text-xs text-gray-400 mb-1">Deployment Stage</div>
+                        <select
+                          value={siteModes[site.id] || "supervised"}
+                          onChange={(e) => {
+                            const newStage = e.target.value;
+                            setSiteModes((prev) => ({ ...prev, [site.id]: newStage }));
+                            api.setSiteMode(site.id, newStage).then(() => {
+                              if (onSettingsChange) onSettingsChange();
+                            });
+                          }}
+                          className="w-full bg-gray-900 border border-gray-700 text-gray-200 text-sm rounded px-2 py-1"
+                        >
+                          <option value="shadow">Shadow</option>
+                          <option value="advisory">Advisory</option>
+                          <option value="supervised">Supervised</option>
+                          <option value="commissioning">Commissioning</option>
+                        </select>
                       </div>
 
                       {/* Analysis Interval */}

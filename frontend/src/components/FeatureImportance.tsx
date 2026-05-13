@@ -4,7 +4,7 @@ This component displays feature importance for Random Forest classifiers,
 showing which features are most predictive of equipment failures.
 */
 
-import { Card, Title, BarChart, Table, TableHead, TableHeaderCell, TableRow, TableBody, TableCell, Badge, Callout } from "@tremor/react";
+
 import { AlertCircle, TrendingUp } from "lucide-react";
 import { classificationApi, type FeatureImportanceItem } from "@/lib/api";
 import { useState, useEffect } from "react";

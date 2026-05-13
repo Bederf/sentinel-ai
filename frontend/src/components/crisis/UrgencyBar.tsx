@@ -1,4 +1,4 @@
-import { ProgressBar } from "@tremor/react";
+
 
 interface UrgencyBarProps {
   score: number;
@@ -28,7 +28,9 @@ export function UrgencyBar({ score }: UrgencyBarProps) {
           {percentage}%
         </span>
       </div>
-      <ProgressBar value={percentage} color={color} />
+      <div className="w-full rounded-full h-2" style={{ background: 'var(--color-sentinel-bg-secondary)' }}>
+        <div className="h-2 rounded-full transition-all" style={{ width: `${percentage}%`, background: score >= 0.8 ? 'var(--color-sentinel-red)' : score >= 0.6 ? 'var(--color-sentinel-amber)' : 'var(--color-sentinel-blue)' }} />
+      </div>
     </div>
   );
 }

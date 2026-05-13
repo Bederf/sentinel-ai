@@ -830,16 +830,24 @@ class WorkOrderNotifier:
             pri = work_order_data.get("criticality", "MEDIUM").upper()
             service_type = work_order_data.get("service_type", "callout")
             tech_name = work_order_data.get("technician_name", "Technician")
+            desk_id = work_order_data.get("desk_id", "")
+            zone_id = work_order_data.get("zone_id", "")
+            location_line = f"📍 Desk {desk_id}, {zone_id}" if desk_id or zone_id else ""
 
             # Build message — include WO ref, priority, equipment name, and Telegram commands
             equipment_code = work_order_data.get("equipment_code", "")
             code_underscored = equipment_code.replace("-", "_") if equipment_code else ""
             wo_ref_underscored = wo_ref.replace("-", "_")
+            desk_id = work_order_data.get("desk_id", "")
+            zone_id = work_order_data.get("zone_id", "")
+            location_line = f"📍 Desk {desk_id}, {zone_id}" if desk_id or zone_id else ""
+            location_part = (location_line + "\n") if location_line else ""
             msg = (
                 f"📋 Work Order {wo_ref}\n"
                 f"🔧 {eq_name}\n"
                 f"🔴 Priority: {pri} | Type: {service_type}\n"
                 f"👤 Assigned: {tech_name}\n"
+                f"{location_part}"
                 f"─────────────────\n"
                 f"/info_{code_underscored} - Equipment details\n"
                 f"/note_{code_underscored} - Add note\n"

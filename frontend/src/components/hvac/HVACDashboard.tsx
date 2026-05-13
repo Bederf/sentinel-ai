@@ -9,14 +9,7 @@
  * 5. Health Config - HealthConfigEditor (engineer-only)
  */
 
-import { useState, useEffect, useRef } from "react";
-import {
-  Tab,
-  TabGroup,
-  TabList,
-  TabPanel,
-  TabPanels,
-} from "@tremor/react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   Thermometer,
   Wind,
@@ -212,19 +205,11 @@ export function HVACDashboard({
     );
   }
 
-  // Build tab arrays — clean labels matching Lighting tab style
-  const tabs = [
-    <Tab key="overview">Overview</Tab>,
-    <Tab key="zones">Zones</Tab>,
-    <Tab key="equipment">Equipment</Tab>,
-    <Tab key="optimization">Optimize</Tab>,
-    <Tab key="health-config">Health</Tab>,
-  ];
+  const tabLabels = ["Overview", "Zones", "Equipment", "Optimize", "Health"];
 
-  const panels = [
-    // Overview Tab
-    <TabPanel key="overview">
-      <div className="space-y-4">
+  const panel = (() => {
+    switch (activeTab) {
+      case 0: return <div className="space-y-4">
         {/* SENTINEL Value Card */}
         {comparison ? (
           <SentinelValueCard
@@ -377,13 +362,7 @@ export function HVACDashboard({
                 {overview.raw_telemetry.status}
               </span>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
-              <div style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                Zones:{" "}
-                <span style={{ color: "var(--color-sentinel-text-primary)" }}>
-                  {overview.raw_telemetry.zones_with_readings ?? 0}/{overview.raw_telemetry.zone_count ?? 0}
-                </span>
-              </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
               <div style={{ color: "var(--color-sentinel-text-secondary)" }}>
                 HVAC Power:{" "}
                 <span style={{ color: "var(--color-sentinel-text-primary)" }}>
@@ -443,32 +422,23 @@ export function HVACDashboard({
             <ComfortAssistant compact />
           </div>
         </div>
-      </div>
-    </TabPanel>,
-
-    // Zones Tab
-    <TabPanel key="zones">
-      <ZoneOverviewPanel siteId={siteId} />
-    </TabPanel>,
-
-    // Equipment Tab
-    <TabPanel key="equipment">
-      <div className="space-y-6">
+      </div>;
+      case 1: return <div className="space-y-4">
+        <ZoneOverviewPanel siteId={siteId} />
+      </div>;
+      case 2: return <div className="space-y-6">
         <EquipmentStatusPanel siteId={siteId} />
         <ChillerControlPanel siteId={siteId} />
-      </div>
-    </TabPanel>,
-
-    // Optimization Tab
-    <TabPanel key="optimization">
-      <ThermalOptimizationPanelGated siteId={siteId} />
-    </TabPanel>,
-
-    // Health Config Tab
-    <TabPanel key="health-config">
-      <HealthConfigEditor />
-    </TabPanel>,
-  ];
+      </div>;
+      case 3: return <div className="space-y-4">
+        <ThermalOptimizationPanelGated siteId={siteId} />
+      </div>;
+      case 4: return <div className="space-y-4">
+        <HealthConfigEditor />
+      </div>;
+      default: return null;
+    }
+  })();
 
   return (
     <div className="h-full overflow-y-auto p-4 md:p-6">
@@ -491,19 +461,24 @@ export function HVACDashboard({
         </div>
       </div>
 
-      {/* Tabbed Views */}
-      <TabGroup index={activeTab} onIndexChange={setActiveTab}>
-        <TabList
-          className="mb-4 overflow-x-auto [&>*]:whitespace-nowrap rounded-lg"
-          style={{
-            border: "1px solid var(--color-sentinel-border)",
-            background: "var(--color-sentinel-bg-panel)",
-          }}
-        >
-          {tabs as unknown as React.ReactElement}
-        </TabList>
-        <TabPanels>{panels as unknown as React.ReactElement}</TabPanels>
-      </TabGroup>
+      {/* Custom Tabbed Views */}
+      <div className="flex gap-1 mb-4 p-1 rounded-lg overflow-x-auto" style={{ background: "var(--color-sentinel-bg-panel)" }}>
+        {tabLabels.map((label, idx) => (
+          <button
+            key={label}
+            onClick={() => setActiveTab(idx)}
+            className="px-4 py-1.5 text-sm font-medium rounded-md transition-colors whitespace-nowrap"
+            style={{
+              background: activeTab === idx ? "var(--color-sentinel-bg-elevated)" : "transparent",
+              color: activeTab === idx ? "var(--color-sentinel-text-primary)" : "var(--color-sentinel-text-secondary)",
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {panel}
     </div>
   );
 }

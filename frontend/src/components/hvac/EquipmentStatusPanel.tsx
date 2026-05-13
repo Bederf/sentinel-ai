@@ -9,7 +9,6 @@
  */
 
 import { useState, useEffect, useRef } from "react";
-import { Text, Flex, Grid, Tab, TabGroup, TabList, TabPanel, TabPanels } from "@tremor/react";
 import { Fan, Thermometer, Activity, AlertTriangle, CheckCircle, Clock, Wrench, ClipboardList } from "lucide-react";
 import { hvacApi, type HVACEquipment } from "../../lib/hvacApi";
 
@@ -145,7 +144,7 @@ export function EquipmentStatusPanel({ siteId, compact = false, onEquipmentSelec
     return (
       <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
         <h3 className="font-medium text-lg" style={{ color: "var(--color-sentinel-text-primary)" }}>Equipment Status</h3>
-        <Text className="text-red-500 mt-4">{error}</Text>
+        <span className="text-red-500 mt-4">{error}</span>
       </div>
     );
   }
@@ -177,14 +176,14 @@ export function EquipmentStatusPanel({ siteId, compact = false, onEquipmentSelec
       onClick={() => onEquipmentSelect?.(eq)}
     >
       {/* Header */}
-      <Flex justifyContent="between" alignItems="start" className="mb-3">
-        <Flex alignItems="center" className="gap-2">
+      <div className="flex items-start justify-between mb-3">
+        <div className="flex items-center gap-2">
           {getEquipmentIcon(eq.type)}
           <div>
-            <Text className="font-medium">{eq.name}</Text>
-            <Text className="text-xs" style={{ color: "var(--color-sentinel-text-disabled)" }}>{eq.location}</Text>
+            <span className="font-medium">{eq.name}</span>
+            <span className="text-xs" style={{ color: "var(--color-sentinel-text-disabled)" }}>{eq.location}</span>
           </div>
-        </Flex>
+        </div>
         <div className="flex items-center gap-2">
           {getStatusIcon(eq.status)}
           <span
@@ -194,37 +193,32 @@ export function EquipmentStatusPanel({ siteId, compact = false, onEquipmentSelec
             {eq.status}
           </span>
         </div>
-      </Flex>
+      </div>
 
       {/* Health Score */}
       <div
         className="p-3 rounded-lg mb-3"
         style={{ background: "var(--color-sentinel-bg-secondary)" }}
       >
-        <Flex justifyContent="between" alignItems="center" className="mb-2">
-          <Text className="text-sm">Health Score</Text>
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-sm">Health Score</span>
           <span
             className="text-sm px-2.5 py-0.5 rounded font-medium"
             style={chipStyle(getHealthColor(eq.calculated_health ?? eq.health_score))}
           >
             {(() => { const h = eq.calculated_health ?? eq.health_score; return h != null ? h.toFixed(0) : "--"; })()}%
           </span>
-        </Flex>
+        </div>
 
         {/* Health Factors Breakdown */}
         {!compact && eq.health_factors && (
           <div className="space-y-1">
             {Object.entries(eq.health_factors).map(([key, factor]) => (
-              <Flex
-                key={key}
-                justifyContent="between"
-                alignItems="center"
-                className="text-xs"
-              >
+              <div key={key} className="flex items-center justify-between text-xs">
                 <span className="capitalize" style={{ color: "var(--color-sentinel-text-disabled)" }}>
                   {key.replace("_", " ")}
                 </span>
-                <Flex alignItems="center" className="gap-2">
+                <div className="flex items-center gap-2">
                   <div
                     className="w-16 h-1.5 rounded-full overflow-hidden"
                     style={{ background: "var(--color-sentinel-border)" }}
@@ -242,8 +236,8 @@ export function EquipmentStatusPanel({ siteId, compact = false, onEquipmentSelec
                       }}
                     />
                   </div>
-                </Flex>
-              </Flex>
+                </div>
+              </div>
             ))}
           </div>
         )}
@@ -253,44 +247,44 @@ export function EquipmentStatusPanel({ siteId, compact = false, onEquipmentSelec
       {!compact && (
         <div className="space-y-2 text-xs" style={{ color: "var(--color-sentinel-text-disabled)" }}>
           {isMeaningfulValue(eq.manufacturer) && (
-            <Flex justifyContent="between">
+            <div className="flex justify-between">
               <span>Manufacturer</span>
               <span style={{ color: "var(--color-sentinel-text-secondary)" }}>{eq.manufacturer}</span>
-            </Flex>
+            </div>
           )}
           {isMeaningfulValue(eq.model) && (
-            <Flex justifyContent="between">
+            <div className="flex justify-between">
               <span>Model</span>
               <span style={{ color: "var(--color-sentinel-text-secondary)" }}>{eq.model}</span>
-            </Flex>
+            </div>
           )}
           {isMeaningfulValue(eq.capacity) && (
-            <Flex justifyContent="between">
+            <div className="flex justify-between">
               <span>Capacity</span>
               <span style={{ color: "var(--color-sentinel-text-secondary)" }}>{eq.capacity}</span>
-            </Flex>
+            </div>
           )}
           {formatDateOrNull(eq.last_service) && (
-            <Flex justifyContent="between" alignItems="center">
-              <Flex alignItems="center" className="gap-1">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1">
                 <Wrench className="w-3 h-3" />
                 <span>Last Service</span>
-              </Flex>
+              </div>
               <span style={{ color: "var(--color-sentinel-text-secondary)" }}>
                 {formatDateOrNull(eq.last_service)}
               </span>
-            </Flex>
+            </div>
           )}
           {formatDateOrNull(eq.install_date) && (
-            <Flex justifyContent="between" alignItems="center">
-              <Flex alignItems="center" className="gap-1">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1">
                 <Clock className="w-3 h-3" />
                 <span>Installed</span>
-              </Flex>
+              </div>
               <span style={{ color: "var(--color-sentinel-text-secondary)" }}>
                 {formatDateOrNull(eq.install_date)}
               </span>
-            </Flex>
+            </div>
           )}
         </div>
       )}
@@ -327,27 +321,27 @@ export function EquipmentStatusPanel({ siteId, compact = false, onEquipmentSelec
   if (compact) {
     return (
       <div className="space-y-3">
-        <Flex justifyContent="between" alignItems="center">
-          <Text className="font-medium">Equipment</Text>
+        <div className="flex items-center justify-between">
+          <span className="font-medium">Equipment</span>
           <span className="text-xs px-2 py-0.5 rounded" style={chipStyle("gray")}>
             {equipment.length} total
           </span>
-        </Flex>
-        <Grid className="grid grid-cols-2 gap-2">
+        </div>
+        <div className="grid grid-cols-2 gap-2">
           {equipment.slice(0, 4).map((eq) => (
             <EquipmentCard key={eq.id} eq={eq} />
           ))}
-        </Grid>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="space-y-4">
-      <Flex justifyContent="between" alignItems="center">
+      <div className="flex items-center justify-between">
         <div>
           <h3 className="font-medium text-lg" style={{ color: "var(--color-sentinel-text-primary)" }}>Equipment Status</h3>
-          <Text>{equipment.length} HVAC equipment items</Text>
+          <span style={{ color: "var(--color-sentinel-text-secondary)" }}>{equipment.length} HVAC equipment items</span>
         </div>
         <div className="flex gap-2">
           <span className="text-sm px-2.5 py-0.5 rounded" style={chipStyle("green")}>
@@ -360,40 +354,47 @@ export function EquipmentStatusPanel({ siteId, compact = false, onEquipmentSelec
             {equipment.filter((e) => e.health_status === "critical").length} Critical
           </span>
         </div>
-      </Flex>
+      </div>
 
-      <TabGroup index={activeTab} onIndexChange={setActiveTab}>
-        <TabList className="mb-4 overflow-x-auto">
-          <Tab>All</Tab>
-          {types.map((type) => (
-            <Tab key={type}>
+      <div>
+        <div className="flex gap-2 mb-4 overflow-x-auto">
+          <button
+            className={`px-3 py-1.5 text-sm rounded-md font-medium transition-colors whitespace-nowrap ${activeTab === 0 ? 'bg-blue-500/20 text-blue-400' : ''}`}
+            style={{ color: activeTab === 0 ? undefined : "var(--color-sentinel-text-secondary)" }}
+            onClick={() => setActiveTab(0)}
+          >
+            All
+          </button>
+          {types.map((type, idx) => (
+            <button
+              key={type}
+              className={`px-3 py-1.5 text-sm rounded-md font-medium transition-colors whitespace-nowrap ${activeTab === idx + 1 ? 'bg-blue-500/20 text-blue-400' : ''}`}
+              style={{ color: activeTab === idx + 1 ? undefined : "var(--color-sentinel-text-secondary)" }}
+              onClick={() => setActiveTab(idx + 1)}
+            >
               {typeLabels[type] || type.toUpperCase()} ({equipmentByType[type].length})
-            </Tab>
-          )) as any}
-        </TabList>
+            </button>
+          ))}
+        </div>
 
-        {(() => {
-          const allTabs = [
-            <TabPanel key="all">
-              <Grid className="grid grid-cols-3 gap-4">
-                {equipment.map((eq) => (
+        {activeTab === 0 ? (
+          <div className="grid grid-cols-3 gap-4">
+            {equipment.map((eq) => (
+              <EquipmentCard key={eq.id} eq={eq} />
+            ))}
+          </div>
+        ) : (
+          types.map((type, idx) =>
+            activeTab === idx + 1 ? (
+              <div key={type} className="grid grid-cols-3 gap-4">
+                {equipmentByType[type].map((eq) => (
                   <EquipmentCard key={eq.id} eq={eq} />
                 ))}
-              </Grid>
-            </TabPanel>,
-            ...types.map((type) => (
-              <TabPanel key={type}>
-                <Grid className="grid grid-cols-3 gap-4">
-                  {equipmentByType[type].map((eq) => (
-                    <EquipmentCard key={eq.id} eq={eq} />
-                  ))}
-                </Grid>
-              </TabPanel>
-            )),
-          ];
-          return <TabPanels>{allTabs as any}</TabPanels>;
-        })()}
-      </TabGroup>
+              </div>
+            ) : null
+          )
+        )}
+      </div>
     </div>
   );
 }

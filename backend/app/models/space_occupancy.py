@@ -50,6 +50,8 @@ class OccupancyEvent:
     distance_m: float | None = None
     moving_gate: int | None = None
     static_gate: int | None = None
+    # Door state (optional — magnetic reed switch on GPIO; True=closed, False=open, None=no sensor)
+    door_closed: bool | None = None
 
 
 @dataclass
@@ -159,6 +161,8 @@ class FocusRoomSession:
     vacant_since: datetime | None = None  # When room went vacant (gap tolerance)
     # Door state: True = closed (person left belongings, gap frozen); None = no sensor
     door_closed: bool | None = None
+    # Concierge-granted grace extensions (minutes added to overstay threshold)
+    overstay_grace_minutes: int = 0
 
     @property
     def is_active(self) -> bool:

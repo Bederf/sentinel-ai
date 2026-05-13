@@ -4,7 +4,7 @@
  * Handles user login, MFA, token verification, and account management.
  */
 
-import { fetchApi, getRefreshToken, type ApiError } from './client';
+import { fetchApi, getAccessToken, getRefreshToken, type ApiError } from './client';
 
 // Re-export shared error types
 export type { ApiError };
@@ -64,7 +64,7 @@ export const authApi = {
   me: () =>
     fetchApi<AuthUser>("/api/auth/me", {
       headers: {
-        Authorization: `Bearer ${localStorage.getItem("sentinel_token") || ""}`,
+        Authorization: `Bearer ${getAccessToken() || ""}`,
       },
     }),
 

@@ -1,3 +1,4 @@
+
 """Chat tool handlers for Claude AI BMS intelligence.
 
 This module implements the tool functions that Claude can call to:

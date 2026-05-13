@@ -94,7 +94,7 @@ class LightingService:
         json_file = config.get("json_file", "dali_mock_data.json")
         data_path = Path(__file__).parent.parent / "data" / json_file
         if not data_path.exists():
-            logger.warning("DALI JSON data not found at %s for site %s", data_path, site_id)
+            logger.debug("DALI JSON data not found at %s for site %s", data_path, site_id)
             return
 
         with open(data_path) as f:

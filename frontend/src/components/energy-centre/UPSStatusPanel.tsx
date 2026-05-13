@@ -9,7 +9,6 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { Card, Title, Text, Badge, Grid, Metric, ProgressBar, Flex } from '@tremor/react';
 import { energyCentreApi } from '../../lib/energyCentreApi';
 import type { UPSSummary } from '../../lib/energyCentreApi';
 
@@ -18,6 +17,18 @@ interface UPSStatusPanelProps {
   compact?: boolean;
   onBatteryAlert?: (ups: any) => void;
 }
+
+const sentinelColors: Record<string, string> = {
+  blue: 'var(--sentinel-blue)',
+  amber: 'var(--sentinel-amber)',
+  gray: 'var(--sentinel-text-disabled)',
+  green: 'var(--sentinel-green)',
+  red: 'var(--sentinel-red)',
+  cyan: 'var(--sentinel-cyan)',
+  purple: '#7c3aed',
+  yellow: '#eab308',
+  slate: '#64748b',
+};
 
 const modeColors: Record<string, string> = {
   online: 'green',
@@ -57,126 +68,129 @@ export function UPSStatusPanel({ siteId, compact = false, onBatteryAlert }: UPSS
 
   if (loading) {
     return (
-      <Card>
-        <Title>UPS Systems</Title>
+      <div className="rounded-lg p-4" style={{ background: "var(--sentinel-bg-panel)", border: "1px solid var(--sentinel-border)" }}>
+        <h3 className="text-sm font-medium" style={{ color: "var(--sentinel-text-primary)" }}>UPS Systems</h3>
         <div className="animate-pulse h-32 bg-gray-100 rounded mt-4" />
-      </Card>
+      </div>
     );
   }
 
   if (!summary) {
     return (
-      <Card>
-        <Title>UPS Systems</Title>
-        <Text className="text-gray-500">No UPS data available</Text>
-      </Card>
+      <div className="rounded-lg p-4" style={{ background: "var(--sentinel-bg-panel)", border: "1px solid var(--sentinel-border)" }}>
+        <h3 className="text-sm font-medium" style={{ color: "var(--sentinel-text-primary)" }}>UPS Systems</h3>
+        <p style={{ color: "var(--sentinel-text-secondary)" }}>No UPS data available</p>
+      </div>
     );
   }
 
   if (compact) {
+    const compactAccent = summary.any_on_battery ? 'var(--sentinel-red)' : summary.all_healthy ? 'var(--sentinel-green)' : 'var(--sentinel-amber)';
     return (
-      <Card decoration="top" decorationColor={summary.any_on_battery ? 'red' : summary.all_healthy ? 'green' : 'amber'}>
-        <Flex justifyContent="between" alignItems="start">
+      <div className="rounded-lg p-4" style={{ background: "var(--sentinel-bg-panel)", border: "1px solid var(--sentinel-border)", borderTop: `3px solid ${compactAccent}` }}>
+        <div className="flex items-start justify-between">
           <div>
-            <Text>UPS Fleet</Text>
-            <Metric>{summary.systems.length}</Metric>
+            <span style={{ color: "var(--sentinel-text-secondary)" }}>UPS Fleet</span>
+            <span className="text-2xl font-bold tabular-nums block" style={{ color: "var(--sentinel-text-primary)" }}>{summary.systems.length}</span>
           </div>
           <div className="text-right">
             {summary.any_on_battery ? (
-              <Badge color="red" size="lg">ON BATTERY</Badge>
+              <span className="text-sm px-3 py-1 rounded font-medium" style={{ background: "var(--sentinel-red)", color: "white" }}>ON BATTERY</span>
             ) : (
-              <Badge color="green" size="lg">ONLINE</Badge>
+              <span className="text-sm px-3 py-1 rounded font-medium" style={{ background: "var(--sentinel-green)", color: "white" }}>ONLINE</span>
             )}
           </div>
-        </Flex>
-        <Text className="text-xs mt-2">
+        </div>
+        <span className="text-xs mt-2 block" style={{ color: "var(--sentinel-text-secondary)" }}>
           Load: {summary.total_load_kw.toFixed(0)} kW / {summary.total_capacity_kva.toFixed(0)} kVA
-        </Text>
-      </Card>
+        </span>
+      </div>
     );
   }
 
   return (
-    <Card>
-      <Flex justifyContent="between" alignItems="start">
-        <Title>UPS Systems</Title>
+    <div className="rounded-lg p-4" style={{ background: "var(--sentinel-bg-panel)", border: "1px solid var(--sentinel-border)" }}>
+      <div className="flex items-start justify-between">
+        <h3 className="text-sm font-medium" style={{ color: "var(--sentinel-text-primary)" }}>UPS Systems</h3>
         <div className="flex gap-2">
           {summary.any_on_battery && (
-            <Badge color="red" size="lg">ON BATTERY</Badge>
+            <span className="text-sm px-3 py-1 rounded font-medium" style={{ background: "var(--sentinel-red)", color: "white" }}>ON BATTERY</span>
           )}
-          <Badge color={summary.all_healthy ? 'green' : 'amber'}>
+          <span className="text-xs px-2 py-0.5 rounded font-medium" style={{ background: sentinelColors[summary.all_healthy ? 'green' : 'amber'], color: "white" }}>
             {summary.all_healthy ? 'All Healthy' : 'Attention Required'}
-          </Badge>
+          </span>
         </div>
-      </Flex>
+      </div>
 
       <div className="mt-4 space-y-4">
-        {summary.systems.map((ups) => (
-          <Card
-            key={ups.ups_id}
-            decoration="left"
-            decorationColor={modeColors[ups.mode] || 'gray'}
-            className={ups.on_battery ? 'border-red-500 border-2' : ''}
-          >
-            <Flex justifyContent="between" alignItems="start">
-              <div>
-                <Text className="font-bold">{ups.name}</Text>
-                <Badge color={modeColors[ups.mode] || 'gray'}>
-                  {ups.mode.toUpperCase()}
-                </Badge>
+        {summary.systems.map((ups) => {
+          const upsAccent = sentinelColors[modeColors[ups.mode]] || sentinelColors.gray;
+          return (
+            <div
+              key={ups.ups_id}
+              className="rounded-lg p-4"
+              style={{
+                background: "var(--sentinel-bg-panel)",
+                border: ups.on_battery ? "2px solid var(--sentinel-red)" : "1px solid var(--sentinel-border)",
+                borderLeft: `3px solid ${upsAccent}`,
+              }}
+            >
+              <div className="flex items-start justify-between">
+                <div>
+                  <span className="font-bold" style={{ color: "var(--sentinel-text-primary)" }}>{ups.name}</span>
+                  <span className="text-xs px-2 py-0.5 rounded font-medium ml-2" style={{ background: sentinelColors[modeColors[ups.mode]] || sentinelColors.gray, color: "white" }}>
+                    {ups.mode.toUpperCase()}
+                  </span>
+                </div>
+                {ups.on_battery && (
+                  <div className="text-right">
+                    <span className="text-red-500 font-bold text-xl block">
+                      {ups.runtime_min.toFixed(0)} min
+                    </span>
+                    <span className="text-xs text-red-500">runtime</span>
+                  </div>
+                )}
               </div>
-              {ups.on_battery && (
-                <div className="text-right">
-                  <Text className="text-red-500 font-bold text-xl">
-                    {ups.runtime_min.toFixed(0)} min
-                  </Text>
-                  <Text className="text-xs text-red-500">runtime</Text>
+
+              <div className="grid grid-cols-3 gap-4 mt-3">
+                <div>
+                  <span className="text-xs" style={{ color: "var(--sentinel-text-secondary)" }}>Load</span>
+                  <span className={ups.load_percent > 80 ? 'text-amber-500 font-bold block' : 'block'} style={{ color: "var(--sentinel-text-primary)" }}>
+                    {ups.load_percent}%
+                  </span>
+                  <div className="w-full h-2 rounded-full overflow-hidden mt-1" style={{ background: "var(--sentinel-border)" }}>
+                    <div className="h-full rounded-full" style={{ width: `${ups.load_percent}%`, background: ups.load_percent > 80 ? 'var(--sentinel-amber)' : 'var(--sentinel-blue)' }} />
+                  </div>
+                </div>
+                <div>
+                  <span className="text-xs" style={{ color: "var(--sentinel-text-secondary)" }}>Battery</span>
+                  <span className={ups.battery_charge_pct < 50 ? 'text-amber-500 font-bold block' : 'block'} style={{ color: "var(--sentinel-text-primary)" }}>
+                    {ups.battery_charge_pct}%
+                  </span>
+                  <div className="w-full h-2 rounded-full overflow-hidden mt-1" style={{ background: "var(--sentinel-border)" }}>
+                    <div className="h-full rounded-full" style={{ width: `${ups.battery_charge_pct}%`, background: ups.battery_charge_pct < 50 ? 'var(--sentinel-amber)' : 'var(--sentinel-green)' }} />
+                  </div>
+                </div>
+                <div>
+                  <span className="text-xs" style={{ color: "var(--sentinel-text-secondary)" }}>Runtime</span>
+                  <span style={{ color: "var(--sentinel-text-primary)" }}>{ups.runtime_min.toFixed(0)} min</span>
+                </div>
+              </div>
+
+              {ups.alarms.length > 0 && (
+                <div className="mt-2 pt-2 border-t border-gray-200">
+                  {ups.alarms.map((alarm, idx) => (
+                    <span key={idx} className="text-xs px-2 py-0.5 rounded font-medium mr-1" style={{ background: "var(--sentinel-red)", color: "white" }}>
+                      {alarm}
+                    </span>
+                  ))}
                 </div>
               )}
-            </Flex>
-
-            <Grid className="grid grid-cols-3 gap-4 mt-3">
-              <div>
-                <Text className="text-xs text-gray-500">Load</Text>
-                <Text className={ups.load_percent > 80 ? 'text-amber-500 font-bold' : ''}>
-                  {ups.load_percent}%
-                </Text>
-                <ProgressBar
-                  value={ups.load_percent}
-                  color={ups.load_percent > 80 ? 'amber' : 'blue'}
-                  className="mt-1"
-                />
-              </div>
-              <div>
-                <Text className="text-xs text-gray-500">Battery</Text>
-                <Text className={ups.battery_charge_pct < 50 ? 'text-amber-500 font-bold' : ''}>
-                  {ups.battery_charge_pct}%
-                </Text>
-                <ProgressBar
-                  value={ups.battery_charge_pct}
-                  color={ups.battery_charge_pct < 50 ? 'amber' : 'green'}
-                  className="mt-1"
-                />
-              </div>
-              <div>
-                <Text className="text-xs text-gray-500">Runtime</Text>
-                <Text>{ups.runtime_min.toFixed(0)} min</Text>
-              </div>
-            </Grid>
-
-            {ups.alarms.length > 0 && (
-              <div className="mt-2 pt-2 border-t border-gray-200">
-                {ups.alarms.map((alarm, idx) => (
-                  <Badge key={idx} color="red" className="mr-1">
-                    {alarm}
-                  </Badge>
-                ))}
-              </div>
-            )}
-          </Card>
-        ))}
+            </div>
+          );
+        })}
       </div>
-    </Card>
+    </div>
   );
 }
 

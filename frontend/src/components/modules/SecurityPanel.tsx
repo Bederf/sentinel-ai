@@ -11,21 +11,7 @@
 
 import { useContext, useState } from 'react';
 import type { ReactElement } from 'react';
-import {
-  Card,
-  Title,
-  Text,
-  Metric,
-  Flex,
-  Button,
-  Badge,
-  Tab,
-  TabGroup,
-  TabList,
-  TabPanels,
-  TabPanel,
-  Grid,
-} from '@tremor/react';
+
 import {
   Lock,
   Users,

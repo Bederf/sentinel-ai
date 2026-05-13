@@ -61,11 +61,6 @@ export function NotificationSettings({ onSuccess, onError }: NotificationSetting
 
   const load = useCallback(async () => {
     try {
-      const token = localStorage.getItem("sentinel_token");
-      if (!token) {
-        setLoading(false);
-        return;
-      }
       const response = await authorizedFetch("/api/settings/notifications");
       if (!response.ok) throw new Error("Failed to load");
       const data = await response.json();

@@ -16,6 +16,9 @@ import {
   clearAuthStorage,
   AUTH_EXPIRED_EVENT,
   setTokens,
+  setAccessToken,
+  getAccessToken,
+  clearAccessToken,
 } from '../client';
 
 const _API_BASE_URL = 'http://localhost:9095';
@@ -51,27 +54,29 @@ describe('Client - Auth Token Management', () => {
     vi.clearAllMocks();
     localStorage.clear();
     mockFetch.mockClear();
+    // Clear in-memory access token before each test
+    clearAccessToken();
   });
 
   afterEach(() => {
     localStorage.clear();
+    clearAccessToken();
   });
 
   describe('Token Storage', () => {
-    it('should get access token from localStorage', () => {
-      localStorage.setItem('sentinel_token', 'test-token-123');
-      // Note: getAccessToken is not exported, but we can test via setTokens/storage
-      expect(localStorage.getItem('sentinel_token')).toBe('test-token-123');
+    it('should get access token from in-memory storage', () => {
+      setAccessToken('test-token-123');
+      expect(getAccessToken()).toBe('test-token-123');
     });
 
-    it('should set access token in localStorage', () => {
+    it('should set access token in memory', () => {
       setTokens('access-token-456');
-      expect(localStorage.getItem('sentinel_token')).toBe('access-token-456');
+      expect(getAccessToken()).toBe('access-token-456');
     });
 
     it('should set both access and refresh tokens', () => {
       setTokens('access-789', 'refresh-999');
-      expect(localStorage.getItem('sentinel_token')).toBe('access-789');
+      expect(getAccessToken()).toBe('access-789');
       expect(localStorage.getItem('sentinel_refresh_token')).toBe('refresh-999');
     });
 
@@ -81,7 +86,7 @@ describe('Client - Auth Token Management', () => {
 
       clearAuthStorage();
 
-      expect(localStorage.getItem('sentinel_token')).toBeNull();
+      expect(getAccessToken()).toBeNull();
       expect(localStorage.getItem('sentinel_refresh_token')).toBeNull();
       expect(localStorage.getItem('sentinel_user')).toBeNull();
     });
@@ -90,22 +95,20 @@ describe('Client - Auth Token Management', () => {
       setTokens('access-token-1', 'refresh-token-1');
       setTokens('access-token-2'); // Only update access token
 
-      expect(localStorage.getItem('sentinel_token')).toBe('access-token-2');
+      expect(getAccessToken()).toBe('access-token-2');
       expect(localStorage.getItem('sentinel_refresh_token')).toBe('refresh-token-1');
     });
   });
 
   describe('Token Retrieval', () => {
-    it('should retrieve access token from storage', () => {
-      localStorage.setItem('sentinel_token', 'my-access-token');
-      // Access via private function through API
-      setTokens('test-token');
-      expect(localStorage.getItem('sentinel_token')).toBe('test-token');
+    it('should retrieve access token from memory', () => {
+      setAccessToken('test-token');
+      expect(getAccessToken()).toBe('test-token');
     });
 
     it('should return null when no access token exists', () => {
-      localStorage.clear();
-      expect(localStorage.getItem('sentinel_token')).toBeNull();
+      clearAccessToken();
+      expect(getAccessToken()).toBeNull();
     });
 
     it('should retrieve refresh token from storage', () => {
@@ -119,10 +122,12 @@ describe('Client - Auth Retry Logic', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    clearAccessToken();
   });
 
   afterEach(() => {
     localStorage.clear();
+    clearAccessToken();
   });
 
   describe('401 Response Handling', () => {
@@ -173,7 +178,7 @@ describe('Client - Auth Retry Logic', () => {
       const result = await authorizedFetch('/api/test');
 
       expect(result.status).toBe(401);
-      expect(localStorage.getItem('sentinel_token')).toBeNull();
+      expect(getAccessToken()).toBeNull();
       expect(localStorage.getItem('sentinel_refresh_token')).toBeNull();
     });
 

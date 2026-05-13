@@ -215,6 +215,44 @@ class SentinelDataSync:
                                 score
                             )
                     results["autoencoder_scores_written"] = len(ae_scores)
+
+                # 1d. Persist ML scores to equipment_analytics for promotion gate queries.
+                if site_uuid and (anomaly_scores or lstm_scores or ae_scores):
+                    try:
+                        # Build equipment code → id mapping for upsert
+                        equip_code_to_id: dict[str, str] = {}
+                        for eq in equipment_states.values():
+                            meta = eq.get("_meta", {})
+                            if meta.get("equipment_id"):
+                                equip_code_to_id[meta.get("code", "")] = meta["equipment_id"]
+
+                        if not equip_code_to_id:
+                            # Fallback: query equipment table for code→id mapping
+                            from app.database.supabase_client import get_supabase_client
+
+                            client = get_supabase_client()
+                            codes = list(equipment_states.keys())
+                            resp = (
+                                client.table("equipment")
+                                .select("id, code")
+                                .in_("code", codes)
+                                .execute()
+                            )
+                            equip_code_to_id = {r["code"]: r["id"] for r in (resp.data or [])}
+
+                        model_ver = getattr(self.ml_feeder, "model_version", None) or "sentinel-v1"
+                        count = self._upsert_equipment_analytics(
+                            site_uuid=site_uuid,
+                            equipment_code_to_id=equip_code_to_id,
+                            anomaly_scores=anomaly_scores,
+                            lstm_scores=lstm_scores,
+                            ae_scores=ae_scores,
+                            model_version=model_ver,
+                            simulated_time=simulated_time,
+                        )
+                        results["equipment_analytics_written"] = count
+                    except Exception as e:
+                        logger.debug("equipment_analytics persist skipped: %s", e)
             except Exception as e:
                 results["errors"].append(f"ml_feeder: {e}")
 
@@ -340,6 +378,82 @@ class SentinelDataSync:
         except Exception as e:
             logger.error(f"Supabase equipment sync failed: {e}")
             raise
+
+    def _upsert_equipment_analytics(
+        self,
+        site_uuid: str,
+        equipment_code_to_id: dict[str, str],
+        anomaly_scores: dict[str, float],
+        lstm_scores: dict[str, float],
+        ae_scores: dict[str, float],
+        model_version: str | None,
+        simulated_time: datetime,
+    ) -> int:
+        """Batch upsert ML anomaly scores to equipment_analytics table.
+
+        One row per equipment that has at least one score. Uses ON CONFLICT
+        (equipment_id, scored_at) to handle same-cycle duplicates.
+        """
+        import psycopg2
+
+        database_url = os.getenv("DATABASE_URL")
+        if not database_url:
+            return 0
+
+        rows = []
+        for code, score in anomaly_scores.items():
+            equip_id = equipment_code_to_id.get(code)
+            if not equip_id:
+                continue
+            rows.append({
+                "equipment_id": equip_id,
+                "site_id": site_uuid,
+                "anomaly_score": score,
+                "lstm_anomaly_score": lstm_scores.get(code),
+                "autoencoder_anomaly_score": ae_scores.get(code),
+                "model_version": model_version,
+                "scored_at": simulated_time,
+            })
+
+        if not rows:
+            return 0
+
+        try:
+            conn = psycopg2.connect(database_url)
+            conn.autocommit = True
+            cur = conn.cursor()
+
+            for row in rows:
+                cur.execute(
+                    """
+                    INSERT INTO equipment_analytics
+                        (site_id, equipment_id, anomaly_score, lstm_anomaly_score,
+                         autoencoder_anomaly_score, model_version, scored_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (equipment_id, scored_at) DO UPDATE SET
+                        anomaly_score = EXCLUDED.anomaly_score,
+                        lstm_anomaly_score = EXCLUDED.lstm_anomaly_score,
+                        autoencoder_anomaly_score = EXCLUDED.autoencoder_anomaly_score,
+                        model_version = EXCLUDED.model_version
+                    """,
+                    (
+                        row["site_id"],
+                        row["equipment_id"],
+                        row["anomaly_score"],
+                        row["lstm_anomaly_score"],
+                        row["autoencoder_anomaly_score"],
+                        row["model_version"],
+                        row["scored_at"],
+                    ),
+                )
+
+            count = len(rows)
+            cur.close()
+            conn.close()
+            return count
+        except Exception as e:
+            logger.warning(f"equipment_analytics upsert failed: {e}")
+            return 0
 
     def _write_sensor_readings(
         self,

@@ -141,6 +141,32 @@ export interface ComplianceStatus {
 }
 
 /**
+ * POPIA Data Retention Status (SQL table retention enforcement)
+ */
+export interface RetentionStatus {
+  categories: Array<{
+    table: string
+    tier: string
+    retention_days: number
+    description: string
+    overdue_count: number
+    cutoff: string
+  }>
+  updated_at: string
+}
+
+export interface RetentionExecutionLog {
+  id: string
+  tier: string
+  execution_time: string
+  rows_reviewed: number
+  rows_deleted: number
+  status: string
+  details: Record<string, unknown>
+  created_at: string
+}
+
+/**
  * API Client Functions
  */
 export const complianceApi = {
@@ -280,6 +306,21 @@ export const complianceApi = {
     ),
 
   /**
+   * POPIA Retention - Get SQL table retention status (overdue counts)
+   */
+  getRetentionStatus: () =>
+    fetchApi<RetentionStatus>('/api/privacy/retention/sql-status', { method: 'GET' }),
+
+  /**
+   * POPIA Retention - Get last N execution log entries
+   */
+  getRetentionHistory: (limit: number = 10) =>
+    fetchApi<{ items: RetentionExecutionLog[]; count: number }>(
+      `/api/privacy/retention/sql-history?limit=${limit}`,
+      { method: 'GET' },
+    ),
+
+  /**
    * Compliance Audits - Get audit history with filtering
    */
   listComplianceAudits: (
@@ -366,6 +407,31 @@ export function useComplianceAudits(
     queryFn: () => complianceApi.listComplianceAudits(siteCode!, complianceType, status, 50),
     staleTime: 60_000,
     enabled: !!siteCode,
+  })
+}
+
+/**
+ * Get POPIA SQL table retention status
+ */
+export function useRetentionStatus(): UseQueryResult<RetentionStatus, unknown> {
+  return useQuery({
+    queryKey: ['retention-status'],
+    queryFn: () => complianceApi.getRetentionStatus(),
+    staleTime: 30_000,
+    refetchInterval: 30_000,
+  })
+}
+
+/**
+ * Get POPIA retention execution history
+ */
+export function useRetentionHistory(
+  limit: number = 10
+): UseQueryResult<{ items: RetentionExecutionLog[]; count: number }, unknown> {
+  return useQuery({
+    queryKey: ['retention-history', limit],
+    queryFn: () => complianceApi.getRetentionHistory(limit),
+    staleTime: 30_000,
   })
 }
 

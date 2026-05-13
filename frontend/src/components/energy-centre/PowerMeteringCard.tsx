@@ -9,7 +9,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { Card, Title, Text, Metric, Grid, Badge, Flex } from '@tremor/react';
+
 import { energyCentreApi } from '../../lib/energyCentreApi';
 import type { PowerMeter } from '../../lib/energyCentreApi';
 

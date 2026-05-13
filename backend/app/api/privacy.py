@@ -12,6 +12,7 @@ from app.services.privacy_request_service import (
     RequestStatus,
     get_privacy_request_service,
 )
+from app.services.supabase_retention_service import get_supabase_retention_service
 
 router = APIRouter(prefix="/api/privacy", tags=["privacy"])
 
@@ -158,3 +159,92 @@ async def enforce_retention(
 ):
     """Execute or preview retention cleanup."""
     return get_popia_retention_service().enforce_policies(dry_run=body.dry_run)
+
+
+# =============================================================================
+# Supabase SQL Table Retention (POPIA Section 14 — S14(1) / S14(2))
+# =============================================================================
+
+@router.get("/retention/sql-status", response_model=dict)
+async def get_sql_retention_status(
+    _auth: AuthContext = Depends(require_auth(AuthLevel.OPERATOR)),
+):
+    """Get Supabase SQL table retention overdue counts per tier.
+
+    Returns current overdue row counts for ML training (7d), operational
+    snapshots (30d), and audit trail (5y) without deleting anything.
+    """
+    service = get_supabase_retention_service()
+    return service.get_retention_status()
+
+
+@router.post("/retention/sql-enforce", response_model=dict)
+async def enforce_sql_retention(
+    _auth: AuthContext = Depends(require_auth(AuthLevel.ADMIN)),
+):
+    """Execute Supabase SQL table retention enforcement.
+
+    Runs deletion for all three tiers (ML training, operational, audit trail)
+    and logs results to retention_execution_log table.
+    """
+    service = get_supabase_retention_service()
+
+    ml = service.run_ml_training_deletion(dry_run=False)
+    snap = service.run_snapshot_deletion(dry_run=False)
+    audit = service.run_audit_trail_deletion(dry_run=False)
+
+    total_deleted = ml.total_deleted + snap.total_deleted + audit.total_deleted
+    total_reviewed = ml.total_reviewed + snap.total_reviewed + audit.total_reviewed
+    errors = len(ml.errors) + len(snap.errors) + len(audit.errors)
+
+    # Log to retention_execution_log
+    try:
+        from app.config.database import supabase_client
+        for result, tier_label in [
+            (ml, "ml_training"),
+            (snap, "operational"),
+            (audit, "audit_trail"),
+        ]:
+            for r in result.results:
+                supabase_client.table("retention_execution_log").insert(
+                    {
+                        "tier": tier_label,
+                        "execution_time": result.executed_at,
+                        "rows_reviewed": r.reviewed,
+                        "rows_deleted": r.deleted,
+                        "status": "success" if r.error is None else "error",
+                        "details": {"table": r.table_name, "error": r.error},
+                    }
+                ).execute()
+    except Exception as e:
+        import logging
+        logging.warning(f"Failed to log retention execution: {e}")
+
+    return {
+        "ml_training": {"reviewed": ml.total_reviewed, "deleted": ml.total_deleted, "errors": ml.errors},
+        "operational": {"reviewed": snap.total_reviewed, "deleted": snap.total_deleted, "errors": snap.errors},
+        "audit_trail": {"reviewed": audit.total_reviewed, "deleted": audit.total_deleted, "errors": audit.errors},
+        "total_reviewed": total_reviewed,
+        "total_deleted": total_deleted,
+        "total_errors": errors,
+    }
+
+
+@router.get("/retention/sql-history", response_model=dict)
+async def get_sql_retention_history(
+    limit: int = Query(default=10, ge=1, le=100),
+    _auth: AuthContext = Depends(require_auth(AuthLevel.OPERATOR)),
+):
+    """Get last N retention execution log entries."""
+    try:
+        from app.config.database import supabase_client
+        result = (
+            supabase_client.table("retention_execution_log")
+            .select("*")
+            .order("execution_time", desc=True)
+            .limit(limit)
+            .execute()
+        )
+        return {"items": result.data, "count": len(result.data)}
+    except Exception as e:
+        return {"items": [], "count": 0, "error": str(e)}

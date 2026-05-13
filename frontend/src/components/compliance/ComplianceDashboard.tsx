@@ -8,7 +8,7 @@
  */
 
 import { useState } from 'react'
-import { TabGroup, TabList, Tab, TabPanels, TabPanel, Grid, Card, Title, Text, Badge } from '@tremor/react'
+
 import { OHSPanel } from './OHSPanel'
 import { FireEquipmentPanel } from './FireEquipmentPanel'
 import { EmergencyLightPanel } from './EmergencyLightPanel'

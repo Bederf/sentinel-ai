@@ -318,7 +318,7 @@ class DeviceManager:
         device = create_device_from_dict(device_data)
 
         if device.id in self._devices:
-            logger.warning(f"Device {device.id} already exists, updating")
+            logger.debug(f"Device {device.id} already exists, updating")
             # Update existing device
             self._devices[device.id] = device
         else:

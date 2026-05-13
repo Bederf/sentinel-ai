@@ -6,6 +6,7 @@ Phase 137-09: CONFIG_CHANGE audit events on all PUT endpoints.
 
 import json
 import logging
+from datetime import datetime, UTC
 from pathlib import Path
 from typing import Any
 
@@ -64,6 +65,23 @@ def save_settings(settings_data: dict[str, Any]) -> None:
             json.dump(settings_data, f, indent=2)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to save settings: {e!s}")
+
+
+# Path to onboarding phase state file (mirrors sites.py _ONBOARDING_PHASE_FILE)
+_ONBOARDING_PHASE_FILE = Path(__file__).parent.parent / "data" / "onboarding_phase_state.json"
+
+
+def _save_phase_state_for_site(site_id: str, stage: str) -> None:
+    """Update onboarding phase in the JSON state file so get_sites_from_supabase picks it up."""
+    try:
+        if _ONBOARDING_PHASE_FILE.exists():
+            state = json.loads(_ONBOARDING_PHASE_FILE.read_text())
+        else:
+            state = {}
+        state[site_id] = stage
+        _ONBOARDING_PHASE_FILE.write_text(json.dumps(state, indent=2))
+    except Exception as e:
+        logger.warning("Failed to write onboarding phase state for %s: %s", site_id, e)
 
 
 @router.get("/settings")
@@ -381,3 +399,87 @@ async def update_site_ai_policy_settings(
     source_ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else None)
     audit_config_change(f"settings.ai-policy.{site_id}", user=auth.user_id, source_ip=source_ip)
     return stored
+
+
+# Valid site deployment stages
+VALID_DEPLOYMENT_STAGES = {"shadow", "advisory", "supervised", "commissioning"}
+
+
+class SiteModeUpdate(BaseModel):
+    stage: str
+
+
+@router.get("/settings/site-mode/{site_id}")
+async def get_site_mode(
+    site_id: str,
+    auth: AuthContext = Depends(require_role(1)),
+) -> dict[str, Any]:
+    """Get current deployment stage for a site. Requires AUDITOR (level 1)."""
+    from app.services.site_mode_policy_service import SiteModePolicyService
+
+    svc = SiteModePolicyService()
+    try:
+        state = svc._load_state(site_id, svc.load_policy(site_id))
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"No mode policy found for {site_id}")
+    return {
+        "site_id": site_id,
+        "current_stage": state.get("current_stage"),
+        "candidate_stage": state.get("candidate_stage"),
+        "candidate_since": state.get("candidate_since"),
+        "last_evaluated_at": state.get("last_evaluated_at"),
+    }
+
+
+@router.patch("/settings/site-mode/{site_id}")
+async def set_site_mode(
+    site_id: str,
+    payload: SiteModeUpdate,
+    request: Request,
+    auth: AuthContext = Depends(require_role(4)),
+) -> dict[str, Any]:
+    """Force-set deployment stage for a site. Requires ADMIN (level 4).
+
+    Use this to manually override the mode without going through the
+    automatic promotion/demotion evaluation cycle.
+    """
+    from app.services.site_mode_policy_service import SiteModePolicyService
+
+    if payload.stage not in VALID_DEPLOYMENT_STAGES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid stage '{payload.stage}'. Valid: {', '.join(sorted(VALID_DEPLOYMENT_STAGES))}",
+        )
+
+    # Normalise frontend stage names (shadow → shadow_live, auto → automatic)
+    from app.models.onboarding_phase import normalise_stage
+    canonical_stage = normalise_stage(payload.stage)
+
+    svc = SiteModePolicyService()
+    try:
+        state = svc._load_state(site_id, svc.load_policy(site_id))
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"No mode policy found for {site_id}")
+
+    state["current_stage"] = canonical_stage
+    state["candidate_stage"] = None
+    state["candidate_since"] = None
+    state["violation_stage"] = None
+    state["violation_since"] = None
+    state["last_evaluated_at"] = datetime.now(UTC).isoformat()
+    svc._save_state(site_id, state)
+
+    # Also persist to onboarding_phase_state.json so get_sites_from_supabase picks it up
+    _save_phase_state_for_site(site_id, canonical_stage)
+
+    # Sync stage to Supabase so mode gates and downstream services stay in sync
+    try:
+        from app.models.onboarding_phase import sync_site_phase_to_supabase
+        await sync_site_phase_to_supabase(site_id, canonical_stage)
+    except Exception as e:
+        logger.error("Failed to sync site mode to Supabase for %s: %s", site_id, e)
+
+    source_ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else None)
+    audit_config_change(f"settings.site-mode.{site_id}", user=auth.user_id, source_ip=source_ip)
+
+    return {"site_id": site_id, "current_stage": canonical_stage}

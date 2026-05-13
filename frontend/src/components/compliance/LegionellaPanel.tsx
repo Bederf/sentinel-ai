@@ -6,7 +6,6 @@
  * SABS standard risk matrix, water temperature monitoring, and biocide treatment scheduling.
  */
 
-import { Card, Title, Text, Button, Grid, Badge } from '@tremor/react'
 import { useAssessLegionellaRisk } from '@/lib/api/compliance'
 import { useState } from 'react'
 
@@ -32,7 +31,6 @@ export function LegionellaPanel({ siteCode: _siteCode }: LegionellaPanelProps) {
       },
       {
         onSuccess: () => {
-          // Risk assessed, data will refresh
           setFormData({ towerCode: '', waterTemp: 30, lastTreatment: new Date().toISOString().split('T')[0] })
         },
       }
@@ -41,23 +39,24 @@ export function LegionellaPanel({ siteCode: _siteCode }: LegionellaPanelProps) {
 
   return (
     <div className="space-y-6">
-      <Card>
-        <Title>Legionella Risk Assessment</Title>
-        <Text className="text-sm mt-2 mb-4">SABS standard - Water temperature monitoring and control measures</Text>
+      <div className="rounded-lg p-4" style={{ background: "var(--sentinel-bg-panel)", border: "1px solid var(--sentinel-border)" }}>
+        <h3 className="text-sm font-medium" style={{ color: "var(--sentinel-text-primary)" }}>Legionella Risk Assessment</h3>
+        <span className="text-sm mt-2 mb-4 block" style={{ color: "var(--sentinel-text-secondary)" }}>SABS standard - Water temperature monitoring and control measures</span>
 
-        <Grid className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <label className="text-sm font-medium">Cooling Tower Code</label>
+            <label className="text-sm font-medium" style={{ color: "var(--sentinel-text-primary)" }}>Cooling Tower Code</label>
             <input
               type="text"
               placeholder="e.g., CT-001"
               value={formData.towerCode}
               onChange={(e) => setFormData({ ...formData, towerCode: e.target.value })}
               className="w-full mt-1 px-3 py-2 border rounded text-sm"
+              style={{ borderColor: "var(--sentinel-border)", background: "var(--sentinel-bg-panel)", color: "var(--sentinel-text-primary)" }}
             />
           </div>
           <div>
-            <label className="text-sm font-medium">Water Temperature (°C)</label>
+            <label className="text-sm font-medium" style={{ color: "var(--sentinel-text-primary)" }}>Water Temperature (°C)</label>
             <input
               type="number"
               min="0"
@@ -65,113 +64,129 @@ export function LegionellaPanel({ siteCode: _siteCode }: LegionellaPanelProps) {
               value={formData.waterTemp}
               onChange={(e) => setFormData({ ...formData, waterTemp: parseInt(e.target.value) })}
               className="w-full mt-1 px-3 py-2 border rounded text-sm"
+              style={{ borderColor: "var(--sentinel-border)", background: "var(--sentinel-bg-panel)", color: "var(--sentinel-text-primary)" }}
             />
           </div>
           <div>
-            <label className="text-sm font-medium">Last Treatment Date</label>
+            <label className="text-sm font-medium" style={{ color: "var(--sentinel-text-primary)" }}>Last Treatment Date</label>
             <input
               type="date"
               value={formData.lastTreatment}
               onChange={(e) => setFormData({ ...formData, lastTreatment: e.target.value })}
               className="w-full mt-1 px-3 py-2 border rounded text-sm"
+              style={{ borderColor: "var(--sentinel-border)", background: "var(--sentinel-bg-panel)", color: "var(--sentinel-text-primary)" }}
             />
           </div>
-        </Grid>
+        </div>
 
-        <Button className="mt-4" onClick={handleAssessRisk} loading={isPending}>
+        <button
+          className="mt-4 px-3 py-1.5 text-xs rounded font-medium"
+          style={{ background: "var(--sentinel-blue)", color: "white" }}
+          disabled={isPending}
+          onClick={handleAssessRisk}
+        >
           Assess Risk
-        </Button>
-      </Card>
+        </button>
+      </div>
 
-      {/* Risk Matrix */}
-      <Card>
-        <Title>Risk Assessment Matrix</Title>
-        <Text className="text-sm mt-2 mb-4">Assessment based on water temperature and treatment history</Text>
+      <div className="rounded-lg p-4" style={{ background: "var(--sentinel-bg-panel)", border: "1px solid var(--sentinel-border)" }}>
+        <h3 className="text-sm font-medium" style={{ color: "var(--sentinel-text-primary)" }}>Risk Assessment Matrix</h3>
+        <span className="text-sm mt-2 mb-4 block" style={{ color: "var(--sentinel-text-secondary)" }}>Assessment based on water temperature and treatment history</span>
 
-        <Grid className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-          <Card className="border-l-4 border-red-500 bg-red-50">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+          <div className="rounded-lg p-4" style={{ background: "rgba(239, 68, 68, 0.1)", borderLeft: "4px solid var(--sentinel-red)" }}>
             <div className="flex items-center justify-between">
               <div>
-                <Title className="text-sm">High Risk</Title>
-                <Text className="text-xs">20-45°C + &gt;30 days untreated</Text>
+                <h3 className="text-sm font-medium" style={{ color: "var(--sentinel-text-primary)" }}>High Risk</h3>
+                <span className="text-xs" style={{ color: "var(--sentinel-text-secondary)" }}>20-45°C + &gt;30 days untreated</span>
               </div>
-              <Badge color="red">⚠️</Badge>
+              <span className="text-xs px-2 py-0.5 rounded font-medium" style={{ background: "rgba(239, 68, 68, 0.15)", color: "var(--sentinel-red)" }}>
+                ⚠️
+              </span>
             </div>
-          </Card>
+          </div>
 
-          <Card className="border-l-4 border-yellow-500 bg-yellow-50">
+          <div className="rounded-lg p-4" style={{ background: "rgba(245, 158, 11, 0.1)", borderLeft: "4px solid var(--sentinel-amber)" }}>
             <div className="flex items-center justify-between">
               <div>
-                <Title className="text-sm">Medium Risk</Title>
-                <Text className="text-xs">45-50°C or recent treatment</Text>
+                <h3 className="text-sm font-medium" style={{ color: "var(--sentinel-text-primary)" }}>Medium Risk</h3>
+                <span className="text-xs" style={{ color: "var(--sentinel-text-secondary)" }}>45-50°C or recent treatment</span>
               </div>
-              <Badge color="yellow">⚠️</Badge>
+              <span className="text-xs px-2 py-0.5 rounded font-medium" style={{ background: "rgba(245, 158, 11, 0.15)", color: "var(--sentinel-amber)" }}>
+                ⚠️
+              </span>
             </div>
-          </Card>
+          </div>
 
-          <Card className="border-l-4 border-green-500 bg-green-50">
+          <div className="rounded-lg p-4" style={{ background: "rgba(34, 197, 94, 0.1)", borderLeft: "4px solid var(--sentinel-green)" }}>
             <div className="flex items-center justify-between">
               <div>
-                <Title className="text-sm">Low Risk</Title>
-                <Text className="text-xs">&lt;20°C or &lt;30 days treated</Text>
+                <h3 className="text-sm font-medium" style={{ color: "var(--sentinel-text-primary)" }}>Low Risk</h3>
+                <span className="text-xs" style={{ color: "var(--sentinel-text-secondary)" }}>&lt;20°C or &lt;30 days treated</span>
               </div>
-              <Badge color="green">✓</Badge>
+              <span className="text-xs px-2 py-0.5 rounded font-medium" style={{ background: "rgba(34, 197, 94, 0.15)", color: "var(--sentinel-green)" }}>
+                ✓
+              </span>
             </div>
-          </Card>
-        </Grid>
-      </Card>
+          </div>
+        </div>
+      </div>
 
-      {/* Treatment Schedule */}
-      <Card>
-        <Title>Treatment Schedule</Title>
-        <Text className="text-sm mt-2 mb-4">Maintenance intervals by risk level</Text>
+      <div className="rounded-lg p-4" style={{ background: "var(--sentinel-bg-panel)", border: "1px solid var(--sentinel-border)" }}>
+        <h3 className="text-sm font-medium" style={{ color: "var(--sentinel-text-primary)" }}>Treatment Schedule</h3>
+        <span className="text-sm mt-2 mb-4 block" style={{ color: "var(--sentinel-text-secondary)" }}>Maintenance intervals by risk level</span>
 
         <table className="w-full text-sm mt-4">
           <thead>
-            <tr className="border-b">
-              <th className="text-left py-2">Risk Level</th>
-              <th className="text-left py-2">Biocide Interval</th>
-              <th className="text-left py-2">Cleaning</th>
+            <tr className="border-b" style={{ borderColor: "var(--sentinel-border)" }}>
+              <th className="text-left py-2 font-medium" style={{ color: "var(--sentinel-text-secondary)" }}>Risk Level</th>
+              <th className="text-left py-2 font-medium" style={{ color: "var(--sentinel-text-secondary)" }}>Biocide Interval</th>
+              <th className="text-left py-2 font-medium" style={{ color: "var(--sentinel-text-secondary)" }}>Cleaning</th>
             </tr>
           </thead>
           <tbody>
-            <tr className="border-b">
+            <tr className="border-b" style={{ borderColor: "var(--sentinel-border)" }}>
               <td className="py-2">
-                <Badge color="red">High</Badge>
+                <span className="text-xs px-2 py-0.5 rounded font-medium" style={{ background: "rgba(239, 68, 68, 0.15)", color: "var(--sentinel-red)" }}>
+                  High
+                </span>
               </td>
               <td className="py-2">14 days</td>
               <td className="py-2">Weekly</td>
             </tr>
-            <tr className="border-b">
+            <tr className="border-b" style={{ borderColor: "var(--sentinel-border)" }}>
               <td className="py-2">
-                <Badge color="yellow">Medium</Badge>
+                <span className="text-xs px-2 py-0.5 rounded font-medium" style={{ background: "rgba(245, 158, 11, 0.15)", color: "var(--sentinel-amber)" }}>
+                  Medium
+                </span>
               </td>
               <td className="py-2">30 days</td>
               <td className="py-2">Bi-weekly</td>
             </tr>
             <tr>
               <td className="py-2">
-                <Badge color="green">Low</Badge>
+                <span className="text-xs px-2 py-0.5 rounded font-medium" style={{ background: "rgba(34, 197, 94, 0.15)", color: "var(--sentinel-green)" }}>
+                  Low
+                </span>
               </td>
               <td className="py-2">90 days</td>
               <td className="py-2">Monthly</td>
             </tr>
           </tbody>
         </table>
-      </Card>
+      </div>
 
-      {/* Information */}
-      <Card className="border-l-4 border-blue-500 bg-blue-50">
-        <Title className="text-sm">Legionella Control Measures</Title>
-        <Text className="text-xs mt-2">
+      <div className="rounded-lg p-4" style={{ background: "rgba(59, 130, 246, 0.1)", borderLeft: "4px solid var(--sentinel-blue)" }}>
+        <h3 className="text-sm font-medium" style={{ color: "var(--sentinel-text-primary)" }}>Legionella Control Measures</h3>
+        <div className="text-xs mt-2" style={{ color: "var(--sentinel-text-secondary)" }}>
           <ul className="list-disc list-inside space-y-1 mt-2">
             <li>Temperature control: Maintain &lt;20°C (low) or &gt;55°C (hot water)</li>
             <li>Biocide treatment: 14-day to 90-day intervals based on risk</li>
             <li>UV systems and filtration for additional control</li>
             <li>Regular cleaning and descaling to remove biofilm</li>
           </ul>
-        </Text>
-      </Card>
+        </div>
+      </div>
     </div>
   )
 }

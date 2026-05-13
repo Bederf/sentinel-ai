@@ -19,6 +19,7 @@ from app.api import (
     features,
     fleet_learning,
     hybrid_chat,
+    ipmvp,
     load_forecast,
     local_chat,
     mcp,
@@ -113,6 +114,9 @@ def register_analytics_routers(app: FastAPI) -> None:
 
     # Dashboard Generator (Phase 141: auto-dashboard from equipment discovery)
     app.include_router(dashboard_generator.router, tags=["dashboard-generator"])
+
+    # IPMVP M&V (Phase 2 Sprint: IPMVP Option C + A baseline methodology)
+    app.include_router(ipmvp.router, prefix="/api", tags=["ipmvp"])
 
     # RLM Runner orchestration (Phase 113 — feature-gated)
     if settings.rlm_runner_enabled:

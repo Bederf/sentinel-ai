@@ -52,31 +52,7 @@ vi.mock('@/lib/api', () => ({
   },
 }));
 
-// Mock Tremor components
-vi.mock('@tremor/react', async () => {
-  const { createTremorMocks } = await import('@/test-utils/mockTremor');
-  const React = await import('react');
-  const baseMocks = createTremorMocks();
-  return {
-    ...baseMocks,
-    // Text: render children directly
-    Text: ({ children }: any) =>
-      React.default.createElement('div', { 'data-testid': 'text', children }),
-    // ProgressBar: include color in testid for color assertions
-    ProgressBar: ({ value, color }: any) =>
-      React.default.createElement('div', {
-        'data-testid': `progress-bar-${color}`,
-        children: `${value}%`,
-      }),
-    // Metric: render children (component passes values as children, not props)
-    Metric: ({ children, ...props }: any) =>
-      React.default.createElement('div', {
-        'data-testid': 'metric',
-        ...props,
-        children,
-      }),
-    // Badge: include color in testid for color assertions
-    Badge: ({ children, color }: any) =>
+// No-op: Tremor components have been replaced with plain HTML
       React.default.createElement('span', {
         'data-testid': `badge-${color}`,
         children,

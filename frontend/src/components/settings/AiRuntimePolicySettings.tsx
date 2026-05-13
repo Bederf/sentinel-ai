@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Bot, Save } from "lucide-react";
+import { authorizedFetch } from "@/lib/api";
 
 interface AiRuntimePolicy {
   chat_local_ai_only: boolean;
@@ -38,13 +39,9 @@ export function AiRuntimePolicySettings({
 
   useEffect(() => {
     if (!siteId) return;
-    const token = localStorage.getItem("sentinel_token");
-    if (!token) return;
 
     setLoading(true);
-    fetch(`/api/settings/ai-policy/${encodeURIComponent(siteId)}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
+    authorizedFetch(`/api/settings/ai-policy/${encodeURIComponent(siteId)}`)
       .then((response) => (response.ok ? response.json() : DEFAULT_POLICY))
       .then((data) => {
         setPolicy({
@@ -65,17 +62,11 @@ export function AiRuntimePolicySettings({
 
   const savePolicy = async () => {
     if (!siteId || !canEdit) return;
-    const token = localStorage.getItem("sentinel_token");
-    if (!token) return;
 
     setSaving(true);
     try {
-      const response = await fetch(`/api/settings/ai-policy/${encodeURIComponent(siteId)}`, {
+      const response = await authorizedFetch(`/api/settings/ai-policy/${encodeURIComponent(siteId)}`, {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify(policy),
       });
       if (!response.ok) {

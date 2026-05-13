@@ -498,7 +498,7 @@ Full interactive API documentation: http://localhost:9095/docs
 
 ### Frontend
 - **Framework:** Vite + React + TypeScript
-- **Styling:** Tailwind CSS v4 + Tremor v3
+- **Styling:** Tailwind CSS v4 + Sentinel design system (CSS variables, no Tremor)
 - **State:** React Context (ModuleContext for bolt-on modules)
 
 ### Protocols

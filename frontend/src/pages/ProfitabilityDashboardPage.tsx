@@ -18,24 +18,12 @@ import {
   ArrowUp,
   ArrowDown,
   DollarSign,
+  BarChart,
 } from "lucide-react";
-import {
-  Card,
-  Title,
-  Text,
-  Callout,
-  Button,
-} from "@tremor/react";
+
 import { StatusBadge } from "../components/StatusBadge";
 import type { StatusKey } from "../components/StatusBadge";
-import {
-  Table,
-  TableHead,
-  TableRow,
-  TableHeaderCell,
-  TableBody,
-  TableCell,
-} from "@tremor/react";
+
 import {
   LineChart,
   Line,

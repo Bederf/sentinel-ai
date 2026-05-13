@@ -3,6 +3,7 @@ import { Card } from './Card';
 import { Badge } from './Badge';
 import { Thermometer } from 'lucide-react';
 import { api } from '@/lib/api';
+import { PageLoading } from './PageLoading';
 
 interface BoundaryStatusPanelProps {
   deviceId?: string;
@@ -63,9 +64,7 @@ export const BoundaryStatusPanel: React.FC<BoundaryStatusPanelProps> = ({
       </div>
 
       {isLoading ? (
-        <div className="flex items-center justify-center py-8">
-          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
-        </div>
+        <PageLoading compact message="Loading boundary status..." />
       ) : (
         <div className="space-y-3">
           {boundaryStatuses.length === 0 ? (

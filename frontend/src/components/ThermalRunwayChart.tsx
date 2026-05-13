@@ -21,7 +21,6 @@ import {
   ResponsiveContainer,
   Area
 } from "recharts";
-import { Card } from "@tremor/react";
 import { Thermometer, Clock } from "lucide-react";
 
 interface ThermalRunwayChartProps {
@@ -297,7 +296,7 @@ export function ThermalRunwayChart({ data, outagePeriod, metrics }: ThermalRunwa
 
       {/* Key metrics comparison */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card className="bg-gray-800/50">
+        <div className="rounded-lg p-4" style={{ background: 'rgba(31, 41, 55, 0.5)' }}>
           <div className="flex items-center gap-2 mb-2">
             <div className="w-3 h-3 rounded-full bg-gray-400"></div>
             <h4 className="font-medium text-gray-300">Without Pre-cooling</h4>
@@ -315,9 +314,9 @@ export function ThermalRunwayChart({ data, outagePeriod, metrics }: ThermalRunwa
               Building reaches uncomfortable temperature during outage
             </div>
           </div>
-        </Card>
+        </div>
 
-        <Card className="bg-blue-900/30 border border-blue-700/50">
+        <div className="rounded-lg p-4" style={{ background: 'rgba(30, 58, 138, 0.3)', border: '1px solid rgba(59, 130, 246, 0.5)' }}>
           <div className="flex items-center gap-2 mb-2">
             <div className="w-3 h-3 rounded-full bg-blue-500"></div>
             <h4 className="font-medium text-blue-300">With SENTINEL Pre-cooling</h4>
@@ -335,7 +334,7 @@ export function ThermalRunwayChart({ data, outagePeriod, metrics }: ThermalRunwa
               Pre-cooling extends comfort through entire outage
             </div>
           </div>
-        </Card>
+        </div>
       </div>
 
       {/* Improvement summary */}

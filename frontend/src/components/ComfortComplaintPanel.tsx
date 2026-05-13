@@ -12,7 +12,7 @@
  */
 
 import { useState, useRef, useEffect } from "react";
-import { Button, Badge, Callout } from "@tremor/react";
+
 import {
   Thermometer,
   Send,

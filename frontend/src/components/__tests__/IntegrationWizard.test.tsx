@@ -64,23 +64,7 @@ vi.mock('../PointMatchingStep', () => ({
   ),
 }));
 
-// Mock Tremor components
-vi.mock('@tremor/react', () => ({
-  Card: ({ children }: any) => <div data-testid="card">{children}</div>,
-  Title: ({ children }: any) => <h1 data-testid="title">{children}</h1>,
-  Text: ({ children }: any) => <p data-testid="text">{children}</p>,
-  Button: ({ children, onClick, disabled, ...props }: any) => (
-    <button onClick={onClick} disabled={disabled} {...props}>
-      {children}
-    </button>
-  ),
-  Callout: ({ title, children }: any) => (
-    <div data-testid="callout">
-      <h3>{title}</h3>
-      {children}
-    </div>
-  ),
-}));
+// No-op: Tremor components have been replaced with plain HTML
 
 import { authorizedFetch } from '@/lib/api/client';
 

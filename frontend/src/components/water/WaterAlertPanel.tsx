@@ -1,25 +1,5 @@
-/**
- * WaterAlertPanel - Real-time water alerts with work order integration
- *
- * Displays:
- * - Real-time alert feed with severity indicators
- * - Filter tabs: All, Unacknowledged, Critical, In Progress, Resolved
- * - Work order status and assignment
- * - Create work order button
- * - Acknowledge/Resolve actions
- */
-
 import { useState } from "react";
 import { useModules } from "@/contexts/ModuleHooks";
-import {
-  Text,
-  Badge,
-  Button,
-  Flex,
-  Tab,
-  TabGroup,
-  TabList,
-} from "@tremor/react";
 import { useQuery } from "@tanstack/react-query";
 import {
   AlertCircle,
@@ -37,6 +17,15 @@ interface WaterAlertPanelProps {
 
 const FILTER_OPTIONS = ["all", "unacknowledged", "critical", "in_progress", "resolved"] as const;
 type _FilterStatus = (typeof FILTER_OPTIONS)[number];
+
+function severityBadgeStyle(severity: string): React.CSSProperties {
+  switch (severity) {
+    case "critical": return { background: "rgba(239, 68, 68, 0.15)", color: "#ef4444" };
+    case "high": return { background: "rgba(251, 146, 60, 0.15)", color: "#f97316" };
+    case "medium": return { background: "rgba(234, 179, 8, 0.15)", color: "#eab308" };
+    default: return { background: "rgba(59, 130, 246, 0.15)", color: "#3b82f6" };
+  }
+}
 
 export const WaterAlertPanel: React.FC<WaterAlertPanelProps> = ({
   siteId,
@@ -115,20 +104,6 @@ export const WaterAlertPanel: React.FC<WaterAlertPanelProps> = ({
     }
   };
 
-  // Get badge color
-  const getSeverityBadgeColor = (severity: string): "red" | "orange" | "yellow" | "blue" => {
-    switch (severity) {
-      case "critical":
-        return "red";
-      case "high":
-        return "orange";
-      case "medium":
-        return "yellow";
-      default:
-        return "blue";
-    }
-  };
-
   // Format relative time
   const getRelativeTime = (timestamp: string) => {
     const date = new Date(timestamp);
@@ -170,89 +145,104 @@ export const WaterAlertPanel: React.FC<WaterAlertPanelProps> = ({
     critical: (alerts || []).filter((a) => a.severity === "critical").length,
   };
 
+  const FILTER_TABS = [
+    { label: "All", count: stats.total },
+    { label: "Open", count: stats.unacknowledged },
+    { label: "Critical", count: stats.critical },
+    { label: "In Progress", hasCount: false },
+    { label: "Resolved", hasCount: false },
+  ];
+
   return (
     <div className="space-y-4">
       {/* Alert Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
-          <Flex justifyContent="between" alignItems="start">
+          <div className="flex items-start justify-between">
             <div>
-              <Text
+              <span
                 style={{ color: "var(--color-sentinel-text-secondary)" }}
                 className="text-xs"
               >
                 Active Alerts
-              </Text>
-              <Text className="font-semibold text-lg">{stats.total}</Text>
+              </span>
+              <p className="font-semibold text-lg" style={{ color: "var(--color-sentinel-text-primary)" }}>{stats.total}</p>
             </div>
             <AlertCircle className="h-5 w-5" style={{color: "var(--color-sentinel-blue)"}} />
-          </Flex>
+          </div>
         </div>
 
         <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
-          <Flex justifyContent="between" alignItems="start">
+          <div className="flex items-start justify-between">
             <div>
-              <Text
+              <span
                 style={{ color: "var(--color-sentinel-text-secondary)" }}
                 className="text-xs"
               >
                 Unacknowledged
-              </Text>
-              <Text className="font-semibold text-lg">
+              </span>
+              <p className="font-semibold text-lg" style={{ color: "var(--color-sentinel-text-primary)" }}>
                 {stats.unacknowledged}
-              </Text>
+              </p>
             </div>
             <Clock className="h-5 w-5" style={{color: "var(--color-sentinel-amber)"}} />
-          </Flex>
+          </div>
         </div>
 
         <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
-          <Flex justifyContent="between" alignItems="start">
+          <div className="flex items-start justify-between">
             <div>
-              <Text
+              <span
                 style={{ color: "var(--color-sentinel-text-secondary)" }}
                 className="text-xs"
               >
                 Critical
-              </Text>
-              <Text className="font-semibold text-lg text-red-500">
+              </span>
+              <p className="font-semibold text-lg text-red-500">
                 {stats.critical}
-              </Text>
+              </p>
             </div>
             <AlertTriangle className="h-5 w-5 text-red-500" />
-          </Flex>
+          </div>
         </div>
       </div>
 
       {/* Filter Tabs */}
-      <TabGroup index={activeTabIndex} onIndexChange={setActiveTabIndex}>
-        <TabList className="mb-4 overflow-x-auto">
-          <Tab>All ({stats.total})</Tab>
-          <Tab>Open ({stats.unacknowledged})</Tab>
-          <Tab>Critical ({stats.critical})</Tab>
-          <Tab>In Progress</Tab>
-          <Tab>Resolved</Tab>
-        </TabList>
-      </TabGroup>
+      <div className="flex gap-1 mb-4 overflow-x-auto border-b" style={{ borderColor: "var(--color-sentinel-border)" }}>
+        {FILTER_TABS.map((tab, i) => (
+          <button
+            key={tab.label}
+            onClick={() => setActiveTabIndex(i)}
+            className="px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors rounded-t"
+            style={{
+              color: activeTabIndex === i ? "var(--color-sentinel-text-primary)" : "var(--color-sentinel-text-secondary)",
+              borderBottom: activeTabIndex === i ? "2px solid var(--color-sentinel-blue)" : "2px solid transparent",
+              background: activeTabIndex === i ? "var(--color-sentinel-bg-panel)" : "transparent",
+            }}
+          >
+            {tab.label}{tab.hasCount !== false ? ` (${tab.count ?? 0})` : ""}
+          </button>
+        ))}
+      </div>
 
       {/* Alert List */}
       <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
         {isLoading ? (
           <div className="flex items-center justify-center h-40">
-            <Text style={{ color: "var(--color-sentinel-text-secondary)" }}>
+            <span style={{ color: "var(--color-sentinel-text-secondary)" }}>
               Loading alerts...
-            </Text>
+            </span>
           </div>
         ) : filteredAlerts.length === 0 ? (
           <div className="text-center py-8">
             <CheckCircle className="h-12 w-12 mx-auto mb-3" style={{color: "var(--color-sentinel-green)"}} />
-            <Text className="font-semibold">No active alerts</Text>
-            <Text
-              className="text-xs mt-1"
+            <p className="font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>No active alerts</p>
+            <span
+              className="text-xs mt-1 block"
               style={{ color: "var(--color-sentinel-text-secondary)" }}
             >
               All systems operating normally
-            </Text>
+            </span>
           </div>
         ) : (
           <div className="space-y-3">
@@ -294,31 +284,32 @@ export const WaterAlertPanel: React.FC<WaterAlertPanelProps> = ({
 
                       {/* Content */}
                       <div className="flex-grow">
-                        <Flex justifyContent="between" alignItems="start">
+                        <div className="flex items-start justify-between">
                           <div>
                             <div className="flex items-center gap-2">
-                              <Text className="font-semibold text-sm">
+                              <span className="font-semibold text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>
                                 {alert.alert_type
                                   .replace(/_/g, " ")
                                   .toUpperCase()}
-                              </Text>
-                              <Badge
-                                color={getSeverityBadgeColor(alert.severity)}
+                              </span>
+                              <span
+                                className="text-xs px-2 py-0.5 rounded font-medium"
+                                style={severityBadgeStyle(alert.severity)}
                               >
                                 {alert.severity.toUpperCase()}
-                              </Badge>
+                              </span>
                             </div>
 
                             {/* Zone/Location */}
-                            <Text
-                              className="text-xs mt-1"
+                            <span
+                              className="text-xs mt-1 block"
                               style={{ color: "var(--color-sentinel-text-secondary)" }}
                             >
                               {alert.details?.location || "Building-wide"}
-                            </Text>
+                            </span>
 
                             {/* Details */}
-                            <Text className="text-xs mt-1">
+                            <span className="text-xs mt-1 block" style={{ color: "var(--color-sentinel-text-primary)" }}>
                               {alert.details?.flow_rate_lpm && (
                                 <>Flow: {alert.details.flow_rate_lpm} LPM</>
                               )}
@@ -332,45 +323,52 @@ export const WaterAlertPanel: React.FC<WaterAlertPanelProps> = ({
                                   baseline
                                 </>
                               )}
-                            </Text>
+                            </span>
 
                             {/* Time */}
-                            <Text
-                              className="text-xs mt-1"
+                            <span
+                              className="text-xs mt-1 block"
                               style={{ color: "var(--color-sentinel-text-secondary)" }}
                             >
                               {getRelativeTime(alert.timestamp)}
-                            </Text>
+                            </span>
                           </div>
 
-                          <Text className="text-xs" style={{color: "var(--color-sentinel-text-secondary)"}}>
+                          <span className="text-xs" style={{color: "var(--color-sentinel-text-secondary)"}}>
                             {isAcknowledged ? "Acknowledged" : "New"}
-                          </Text>
-                        </Flex>
+                          </span>
+                        </div>
                       </div>
                     </div>
 
                     {/* Actions */}
                     <div className="flex gap-2 mt-3 pt-3 border-t border-current border-opacity-10">
                       {!isAcknowledged ? (
-                        <Button
-                          size="xs"
-                          color="blue"
-                          variant="secondary"
+                        <button
                           onClick={() => handleAcknowledge(alert.alert_id)}
+                          className="text-xs px-3 py-1.5 rounded font-medium transition-colors"
+                          style={{
+                            color: "var(--color-sentinel-blue)",
+                            border: "1px solid var(--color-sentinel-border)",
+                            background: "transparent",
+                          }}
                         >
                           Acknowledge
-                        </Button>
+                        </button>
                       ) : null}
 
                       {isModuleActive('maintenance') && (
-                      <Button
-                        size="xs"
-                        color={alert.severity === "critical" ? "red" : "blue"}
+                      <button
                         onClick={() => handleCreateWorkOrder(alert)}
+                        className="text-xs px-3 py-1.5 rounded font-medium transition-colors"
+                        style={{
+                          color: alert.severity === "critical" ? "#ef4444" : "var(--color-sentinel-blue)",
+                          border: "1px solid var(--color-sentinel-border)",
+                          background: alert.severity === "critical" ? "rgba(239,68,68,0.1)" : "transparent",
+                        }}
                       >
                         Create Work Order
-                      </Button>
+                      </button>
                       )}
                     </div>
                   </div>

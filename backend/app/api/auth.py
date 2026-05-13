@@ -14,7 +14,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 
 import bcrypt
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel, EmailStr, Field
 
 from app.config.settings import settings
@@ -41,6 +41,52 @@ from app.services.token_blacklist_service import token_blacklist
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# HttpOnly cookie helpers (Phase 193 security hardening)
+# ---------------------------------------------------------------------------
+_REFRESH_COOKIE_NAME = "sentinel_refresh_token"
+_ACCESS_COOKIE_NAME = "sentinel_access_token"
+
+
+def _make_refresh_cookie(refresh_token: str) -> dict:
+    """Build Set-Cookie params for the refresh token HttpOnly cookie."""
+    return {
+        "key": _REFRESH_COOKIE_NAME,
+        "value": refresh_token,
+        "max_age": settings.jwt_refresh_token_ttl_days * 86400,
+        "path": "/api/auth",
+        "httponly": True,
+        "secure": True,
+        "samesite": "strict",
+    }
+
+
+def _make_access_cookie(access_token: str) -> dict:
+    """Build Set-Cookie params for the access token (non-HttpOnly, for read by JS)."""
+    return {
+        "key": _ACCESS_COOKIE_NAME,
+        "value": access_token,
+        "max_age": settings.jwt_access_token_ttl_minutes * 60,
+        "path": "/",
+        "httponly": False,
+        "secure": True,
+        "samesite": "lax",
+    }
+
+
+def _clear_auth_cookies() -> list[dict]:
+    """Build Set-Cookie params to clear all auth cookies."""
+    return [
+        {"key": _REFRESH_COOKIE_NAME, "value": "", "max_age": 0, "path": "/api/auth", "httponly": True, "secure": True, "samesite": "strict"},
+        {"key": _ACCESS_COOKIE_NAME, "value": "", "max_age": 0, "path": "/", "httponly": False, "secure": True, "samesite": "lax"},
+    ]
+
+
+def _set_auth_cookies(response: Response, access_token: str, refresh_token: str) -> None:
+    """Attach both auth cookies to a response object."""
+    for params in [_make_access_cookie(access_token), _make_refresh_cookie(refresh_token)]:
+        response.set_cookie(**params)
 
 # ---------------------------------------------------------------------------
 # Brute-force protection (Phase 58-04 M-5)
@@ -353,7 +399,11 @@ async def login_with_email(request: Request, email: str):
         if mfa_required and not mfa_enrolled:
             response["message"] = "MFA enrollment required for admin users. Please set up MFA."
 
-        return response
+        # Set HttpOnly refresh cookie + access cookie on successful login
+        from fastapi.responses import JSONResponse
+        json_response = JSONResponse(content=response)
+        _set_auth_cookies(json_response, access_token, refresh_token)
+        return json_response
 
     except HTTPException:
         raise
@@ -692,7 +742,11 @@ async def complete_mfa_login(request: Request, email: str, mfa_code: str):
         "session_id": session_id,
     }
 
-    return response
+    # Set HttpOnly refresh cookie + access cookie on successful MFA login
+    from fastapi.responses import JSONResponse
+    json_response = JSONResponse(content=response)
+    _set_auth_cookies(json_response, access_token, refresh_token)
+    return json_response
 
 
 @router.post("/verify")
@@ -846,7 +900,12 @@ async def logout(request: Request, refresh_token: str | None = None):
         except Exception as e:
             logger.warning(f"Failed to audit log logout for {user_id}: {e}")
 
-    return {"message": "Logged out successfully"}
+    # Clear auth cookies on logout
+    from fastapi.responses import JSONResponse
+    json_response = JSONResponse(content={"message": "Logged out successfully"})
+    for params in _clear_auth_cookies():
+        json_response.set_cookie(**params)
+    return json_response
 
 
 @router.post("/refresh")
@@ -958,13 +1017,17 @@ async def refresh_access_token(request: Request, body: RefreshTokenRequest):
 
     logger.info(f"Token refresh for user {user_info['user_id']}")
 
-    return {
+    from fastapi.responses import JSONResponse
+    response = {
         "access_token": new_access_token,
         "refresh_token": new_refresh_token,
         "token_type": "bearer",
         "expires_at": (datetime.utcnow() + timedelta(minutes=settings.jwt_access_token_ttl_minutes)).isoformat(),
         "session_id": session_id,
     }
+    json_response = JSONResponse(content=response)
+    _set_auth_cookies(json_response, new_access_token, new_refresh_token)
+    return json_response
 
 
 @router.get("/sessions")

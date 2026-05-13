@@ -1,26 +1,4 @@
-/**
- * WaterPanel - Water Consumption Dashboard
- *
- * Integrated water monitoring with:
- * - Quick stats: Current flow, today's volume, monthly cost, efficiency
- * - 4 main tabs:
- *   - Overview: Anomaly chart + real-time alerts
- *   - Zones: Zone breakdown by consumption/cost
- *   - Costs: Cost tracking, forecasting, scenario analysis
- *   - Alerts: Real-time alert feed with work order integration
- * - Site selector for multi-site support
- */
-
 import { useState, useEffect } from "react";
-import {
-  Flex,
-  Tab,
-  TabGroup,
-  TabList,
-  TabPanels,
-  TabPanel,
-  Text,
-} from "@tremor/react";
 import { Droplets, AlertTriangle } from "lucide-react";
 import { authorizedFetch } from "@/lib/api/client";
 import { SentinelValueCard } from "../SentinelValueCard";
@@ -267,6 +245,8 @@ export function WaterPanel({ siteId: propSiteId }: WaterPanelProps) {
     }
   };
 
+  const TABS = ["Overview", "Zones", "Costs", "Alerts"];
+
   return (
     <div
       className="h-full overflow-y-auto p-4 md:p-6"
@@ -349,7 +329,7 @@ export function WaterPanel({ siteId: propSiteId }: WaterPanelProps) {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
         <div className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
           <div className="flex items-center justify-between mb-2">
-            <Text className="text-sm font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>Raw Bridge Telemetry</Text>
+            <span className="text-sm font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>Raw Bridge Telemetry</span>
             <span
               className="text-xs px-2 py-1 rounded"
               style={{
@@ -360,112 +340,124 @@ export function WaterPanel({ siteId: propSiteId }: WaterPanelProps) {
               {bridgeTelemetry?.status === "live" ? "Live" : "Unavailable"}
             </span>
           </div>
-          <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+          <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
             Zones: {bridgeTelemetry?.zones_with_readings ?? 0}/{bridgeTelemetry?.zone_count ?? 0}
-          </Text>
-          <Text className="text-xs mt-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+          </span>
+          <span className="text-xs mt-1 block" style={{ color: "var(--color-sentinel-text-secondary)" }}>
             Power: HVAC {(bridgeTelemetry?.power?.hvac_kw ?? 0).toFixed(2)} kW · Total {(bridgeTelemetry?.power?.total_kw ?? 0).toFixed(2)} kW
-          </Text>
+          </span>
         </div>
         <div className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
-          <Text className="text-sm font-semibold mb-2" style={{ color: "var(--color-sentinel-text-primary)" }}>SENTINEL Water Interpretation</Text>
-          <Text className="text-xs capitalize" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+          <span className="text-sm font-semibold mb-2 block" style={{ color: "var(--color-sentinel-text-primary)" }}>SENTINEL Water Interpretation</span>
+          <span className="text-xs capitalize block" style={{ color: "var(--color-sentinel-text-secondary)" }}>
             Posture: <span style={{ color: "var(--color-sentinel-text-primary)" }}>{sentinelPosture || "unknown"}</span>
-          </Text>
-          <Text className="text-xs mt-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+          </span>
+          <span className="text-xs mt-1 block" style={{ color: "var(--color-sentinel-text-secondary)" }}>
             {sentinelGuidance || "No active guidance yet."}
-          </Text>
+          </span>
         </div>
       </div>
 
       {/* Quick Stats KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <div className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
-          <Flex justifyContent="between" alignItems="center">
-            <Text style={{ color: "var(--color-sentinel-text-secondary)" }} className="text-xs">
+          <div className="flex items-center justify-between">
+            <span style={{ color: "var(--color-sentinel-text-secondary)" }} className="text-xs">
               Today's Consumption
-            </Text>
+            </span>
             <Droplets className="h-4 w-4" style={{ color: "var(--color-sentinel-blue)" }} />
-          </Flex>
+          </div>
           <p className="text-xl font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>{todayVolume.toLocaleString()}</p>
-          <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+          <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
             Liters
-          </Text>
+          </span>
         </div>
 
         <div className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
-          <Flex justifyContent="between" alignItems="center">
-            <Text style={{ color: "var(--color-sentinel-text-secondary)" }} className="text-xs">
+          <div className="flex items-center justify-between">
+            <span style={{ color: "var(--color-sentinel-text-secondary)" }} className="text-xs">
               Monthly Cost
-            </Text>
+            </span>
             <Droplets className="h-4 w-4" style={{ color: "var(--color-sentinel-amber)" }} />
-          </Flex>
+          </div>
           <p className="text-xl font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>R2,480</p>
-          <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+          <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
             Feb estimate
-          </Text>
+          </span>
         </div>
 
         <div className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
-          <Flex justifyContent="between" alignItems="center">
-            <Text style={{ color: "var(--color-sentinel-text-secondary)" }} className="text-xs">
+          <div className="flex items-center justify-between">
+            <span style={{ color: "var(--color-sentinel-text-secondary)" }} className="text-xs">
               Active Alerts
-            </Text>
+            </span>
             <AlertTriangle className="h-4 w-4" style={{ color: "var(--color-sentinel-red)" }} />
-          </Flex>
+          </div>
           <p className="text-xl font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>{alerts.length}</p>
-          <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+          <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
             {alerts.some((a) => a.severity === "critical" || a.severity === "high")
               ? "Critical"
               : "Check required"}
-          </Text>
+          </span>
         </div>
 
         <div className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
-          <Flex justifyContent="between" alignItems="center">
-            <Text style={{ color: "var(--color-sentinel-text-secondary)" }} className="text-xs">
+          <div className="flex items-center justify-between">
+            <span style={{ color: "var(--color-sentinel-text-secondary)" }} className="text-xs">
               Efficiency
-            </Text>
+            </span>
             <Droplets className="h-4 w-4" style={{ color: "var(--color-sentinel-green)" }} />
-          </Flex>
+          </div>
           <p className="text-xl font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>
             {trending ? `${Math.abs(trending.baseline_comparison_percent).toFixed(1)}%` : "---"}
           </p>
-          <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+          <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
             {trending && trending.baseline_comparison_percent > 0 ? "Above" : "Below"} baseline
-          </Text>
+          </span>
         </div>
       </div>
 
       {/* Tab Navigation and Content */}
-      <TabGroup index={activeTabIndex} onIndexChange={setActiveTabIndex}>
-        <TabList
-          className="mb-6 overflow-x-auto"
-        >
-          <Tab>Overview</Tab>
-          <Tab>Zones</Tab>
-          <Tab>Costs</Tab>
-          <Tab>Alerts</Tab>
-        </TabList>
-
-        <TabPanels>
-          <TabPanel className="space-y-6">
-            <WaterAnomalyChart zoneId={selectedSiteId} days={7} />
-          </TabPanel>
-
-          <TabPanel className="space-y-6">
-            <WaterZoneBreakdown siteId={selectedSiteId} days={30} />
-          </TabPanel>
-
-          <TabPanel className="space-y-6">
-            <WaterCostAnalysis siteId={selectedSiteId} />
-          </TabPanel>
-
-          <TabPanel className="space-y-6">
-            <WaterAlertPanel siteId={selectedSiteId} />
-          </TabPanel>
-        </TabPanels>
-      </TabGroup>
+      <div>
+        <div className="flex gap-1 mb-6 overflow-x-auto border-b" style={{ borderColor: "var(--color-sentinel-border)" }}>
+          {TABS.map((tab, i) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTabIndex(i)}
+              className="px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors rounded-t"
+              style={{
+                color: activeTabIndex === i ? "var(--color-sentinel-text-primary)" : "var(--color-sentinel-text-secondary)",
+                borderBottom: activeTabIndex === i ? "2px solid var(--color-sentinel-blue)" : "2px solid transparent",
+                background: activeTabIndex === i ? "var(--color-sentinel-bg-panel)" : "transparent",
+              }}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
+        <div>
+          {activeTabIndex === 0 && (
+            <div className="space-y-6">
+              <WaterAnomalyChart zoneId={selectedSiteId} days={7} />
+            </div>
+          )}
+          {activeTabIndex === 1 && (
+            <div className="space-y-6">
+              <WaterZoneBreakdown siteId={selectedSiteId} days={30} />
+            </div>
+          )}
+          {activeTabIndex === 2 && (
+            <div className="space-y-6">
+              <WaterCostAnalysis siteId={selectedSiteId} />
+            </div>
+          )}
+          {activeTabIndex === 3 && (
+            <div className="space-y-6">
+              <WaterAlertPanel siteId={selectedSiteId} />
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

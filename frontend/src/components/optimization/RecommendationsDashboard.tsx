@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { TrendingUp } from 'lucide-react'
 import type { Recommendation } from '@/lib/api/optimization'
 import { optimizationApi } from '@/lib/api/optimization'
 import { Panel } from '../Panel'

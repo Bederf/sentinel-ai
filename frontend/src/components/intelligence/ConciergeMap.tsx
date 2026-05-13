@@ -12,6 +12,7 @@ import cytoscape from "cytoscape";
 import type { Core } from "cytoscape";
 import type { ConciergeRoom, ConciergeSignalSummary } from "../../lib/api";
 import { conciergeApi } from "../../lib/api";
+import { PageLoading } from "../PageLoading";
 
 // ---- Severity colour mapping ----
 
@@ -887,10 +888,7 @@ export function ConciergeMap({ siteId, onSignalSelect }: ConciergeMapProps) {
   if (loading) {
     return (
       <MapPlaceholder>
-        <div className="text-center">
-          <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-          <p className="text-xs text-gray-500">Loading meeting room signals...</p>
-        </div>
+        <PageLoading message="Loading meeting room signals..." />
       </MapPlaceholder>
     );
   }

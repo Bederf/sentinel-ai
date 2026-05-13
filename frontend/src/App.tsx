@@ -3,7 +3,7 @@ import { Routes, Route, useParams, useNavigate } from "react-router-dom";
 import { Clock, Wifi, WifiOff, Bell, X, LogOut } from "lucide-react";
 import { Toaster, toast } from "sonner";
 import { formatTime } from "./lib/timeFormat";
-import api, { AUTH_EXPIRED_EVENT, isExpectedApiError, type Alert, type AuthUser } from "./lib/api";
+import api, { AUTH_EXPIRED_EVENT, isExpectedApiError, getAccessToken, setAccessToken, clearAccessToken, clearAuthStorage, type Alert, type AuthUser } from "./lib/api";
 import { useRecommendationToasts, RecommendationCard } from "./components/RecommendationToast";
 import { useBuildingsList } from "./hooks/useBuildingsList";
 import { SITE_SELECTION_CHANGED_EVENT, getStoredSelectedSite } from "./lib/siteSelection";
@@ -90,6 +90,7 @@ function ViewGuard({
       }
     }
     // Simulation is now a building tab, not a sidebar view
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- ALL_NAV_ITEMS is constant, currentNavItem derived from currentView
   }, [currentView, isModuleActive, loading, siteId, userRole, onRedirect]);
 
   return <>{children}</>;
@@ -100,7 +101,7 @@ function App() {
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(() => {
     // Check for stored user on mount
     const storedUser = localStorage.getItem("sentinel_user");
-    const storedToken = localStorage.getItem("sentinel_token");
+    const storedToken = getAccessToken();
     if (!storedUser || !storedToken) return null;
     return JSON.parse(storedUser);
   });
@@ -123,7 +124,7 @@ function App() {
 
   useEffect(() => {
     if (!currentUser?.email || buildings.length === 0) return;
-    const token = localStorage.getItem("sentinel_token");
+    const token = getAccessToken();
     if (!token) return;
     const headers = { Authorization: `Bearer ${token}` };
 
@@ -193,7 +194,6 @@ function App() {
   const [lastViewedAlertTime, setLastViewedAlertTime] = useState<Date | null>(null);
   const alertsPanelRef = useRef<HTMLDivElement | null>(null);
   const calendarButtonRef = useRef<HTMLDivElement | null>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // Security: Initialize protections on app startup (Phase 75-07)
   useEffect(() => {
@@ -206,6 +206,19 @@ function App() {
     return () => clearInterval(timer);
   }, []);
 
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  const handleSentinelLogoClick = () => {
+    if (!audioRef.current) {
+      audioRef.current = new Audio('/audio/sentinel-logo.mp3');
+      audioRef.current.volume = 0.6;
+    }
+    audioRef.current.currentTime = 0;
+    audioRef.current.play().catch((error) => {
+      console.error('Error playing audio:', error);
+    });
+  };
+
   // AI Recommendation card state
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- RecommendationData type not exported from RecommendationToast
   const [selectedRec, setSelectedRec] = useState<any>(null);
@@ -213,7 +226,7 @@ function App() {
   const handleShowRecCard = useCallback((rec: any) => setSelectedRec(rec), []);
   const handleApproveRec = useCallback(async (id: string) => {
     try {
-      const token = localStorage.getItem('sentinel_token');
+      const token = getAccessToken();
       await fetch(`/api/approvals/recommendations/${id}/approve`, {
         method: 'POST',
         headers: {
@@ -237,7 +250,7 @@ function App() {
 
     const initializeDevices = async () => {
       try {
-        const token = localStorage.getItem('sentinel_token');
+        const token = getAccessToken();
         if (!token) return;
 
         const apiUrl = import.meta.env.VITE_API_URL || '';
@@ -260,41 +273,53 @@ function App() {
     initializeDevices();
   }, [currentUser]);
 
+  // Health check polling — ref to avoid stale closure issues
+  const healthCheckRef = useRef<{ abort: boolean }>({ abort: false });
+
   useEffect(() => {
     const checkHealth = async () => {
+      if (healthCheckRef.current.abort) return;
       try {
         const response = await api.health();
+        if (healthCheckRef.current.abort) return;
         setHealth(response);
         setError(null);
       } catch (err) {
+        if (healthCheckRef.current.abort) return;
         setError("Failed to connect to backend");
         console.error("Health check failed:", err);
       } finally {
-        setLoading(false);
+        if (!healthCheckRef.current.abort) {
+          setLoading(false);
+        }
       }
     };
 
     checkHealth();
-
-    // Periodic health check every 30 seconds
     const healthInterval = setInterval(checkHealth, 30000);
-    return () => clearInterval(healthInterval);
+    return () => {
+      healthCheckRef.current.abort = true;
+      clearInterval(healthInterval);
+    };
   }, []);
 
-  // Fetch and count unread alerts
+  // Fetch and count unread alerts — uses ref to prevent stale closures and ensure proper cleanup
+  const unreadCountRef = useRef<{ stop: boolean; timeoutId: number | null }>({ stop: false, timeoutId: null });
+
   useEffect(() => {
     let failureCount = 0;
-    let timeoutId: number | null = null;
 
     const fetchUnreadCount = async () => {
-      const token = localStorage.getItem("sentinel_token");
+      if (unreadCountRef.current.stop) return;
+      const token = getAccessToken();
       if (!token) return;
       if (document.hidden) {
-        timeoutId = window.setTimeout(fetchUnreadCount, 60000);
+        unreadCountRef.current.timeoutId = window.setTimeout(fetchUnreadCount, 60000);
         return;
       }
       try {
         const { alerts, pending_recommendations } = await api.getAlerts();
+        if (unreadCountRef.current.stop) return;
         // Count unread alerts (not acknowledged or created after last viewed time)
         const unread = alerts.filter((alert) => {
           if (!alert.acknowledged) return true;
@@ -307,12 +332,13 @@ function App() {
         // Fetch active freshness breaches for manager notification bell
         let freshnessBreaches = 0;
         try {
-          const sentryToken = localStorage.getItem("sentinel_token");
+          const sentryToken = getAccessToken();
           if (sentryToken) {
             const freshnessRes = await fetch(`${window.location.origin}/api/sentry/freshness/breaches`, {
               headers: {
                 "Authorization": `Bearer ${sentryToken}`,
                 "X-Sentry-API-Key": "sentry-bot-RncXWQCYticUnuG06L4qnSUj-heKAeV0NnMdHOvIlKM3TNUv",
+                "X-Sentry-Secret": "sentry-bms-phase-41",
               },
             });
             if (freshnessRes.ok) {
@@ -324,7 +350,9 @@ function App() {
           // Silently ignore freshness fetch errors
         }
 
-        setUnreadAlertCount(unread.length + (pending_recommendations ?? 0) + freshnessBreaches);
+        if (!unreadCountRef.current.stop) {
+          setUnreadAlertCount(unread.length + (pending_recommendations ?? 0) + freshnessBreaches);
+        }
         failureCount = 0;
       } catch (err) {
         failureCount += 1;
@@ -333,15 +361,18 @@ function App() {
         }
       }
 
-      const baseIntervalMs = 60000;
-      const backoffIntervalMs = Math.min(300000, baseIntervalMs * (2 ** failureCount));
-      timeoutId = window.setTimeout(fetchUnreadCount, backoffIntervalMs);
+      if (!unreadCountRef.current.stop) {
+        const baseIntervalMs = 60000;
+        const backoffIntervalMs = Math.min(300000, baseIntervalMs * (2 ** failureCount));
+        unreadCountRef.current.timeoutId = window.setTimeout(fetchUnreadCount, backoffIntervalMs);
+      }
     };
 
     fetchUnreadCount();
     return () => {
-      if (timeoutId !== null) {
-        window.clearTimeout(timeoutId);
+      unreadCountRef.current.stop = true;
+      if (unreadCountRef.current.timeoutId !== null) {
+        window.clearTimeout(unreadCountRef.current.timeoutId);
       }
     };
   }, [lastViewedAlertTime]);
@@ -398,31 +429,14 @@ function App() {
     });
   };
 
-  const handleSentinelLogoClick = () => {
-    // Create audio element if it doesn't exist
-    if (!audioRef.current) {
-      audioRef.current = new Audio('/audio/sentinel-logo.mp3');
-    }
-
-    // Reset to start so re-clicks always play
-    audioRef.current.currentTime = 0;
-
-    // Play audio
-    audioRef.current.play().catch((error) => {
-      console.error('Error playing audio:', error);
-    });
-  };
-
   const handleLogout = async () => {
     try {
       await api.logout();
     } catch (err) {
       console.error('Logout error:', err);
     } finally {
-      // Clear local storage
-      localStorage.removeItem("sentinel_token");
-      localStorage.removeItem("sentinel_refresh_token");
-      localStorage.removeItem("sentinel_user");
+      // Clear auth storage (in-memory token + localStorage + HttpOnly cookie)
+      clearAuthStorage();
       setCurrentUser(null);
       toast.success("Logged out successfully");
     }

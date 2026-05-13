@@ -3,6 +3,7 @@ import { Card } from './Card';
 import { Badge } from './Badge';
 import { AlertTriangle, Bell, CheckCircle, X } from 'lucide-react';
 import { api } from '@/lib/api';
+import { PageLoading } from './PageLoading';
 
 interface EscalationAlert {
   id: string;
@@ -156,9 +157,7 @@ export const EscalationAlerts: React.FC<EscalationAlertsProps> = ({
         </div>
 
         {isLoading ? (
-          <div className="flex items-center justify-center py-8">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
-          </div>
+          <PageLoading compact message="Loading escalation alerts..." />
         ) : (
           <div className="space-y-3">
             {alerts.length === 0 ? (

@@ -1,6 +1,6 @@
 // IntegrationWizard.tsx
 import { useState } from 'react';
-import { Button, Card, Title, Text, Callout } from '@tremor/react';
+
 import { CheckCircle } from 'lucide-react';
 import { authorizedFetch } from '../lib/api/client';
 import { FileUploadStep } from './FileUploadStep';
@@ -92,8 +92,8 @@ function ReviewStep({ siteId, wizardData, onActivate, onBack }: ReviewStepProps)
       </div>
 
       {/* Summary Card */}
-      <Card className="p-4">
-        <Title className="text-lg">Configuration Summary</Title>
+      <div className="rounded-lg p-4" style={{ background: 'var(--color-sentinel-bg-panel)', border: '1px solid var(--color-sentinel-border)' }}>
+        <h3 className="text-lg font-semibold" style={{ color: 'var(--color-sentinel-text-primary)' }}>Configuration Summary</h3>
         <div className="mt-4 space-y-4">
           <div>
             <h3 className="font-medium text-gray-700">Source File</h3>

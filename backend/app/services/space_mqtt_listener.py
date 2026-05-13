@@ -120,8 +120,9 @@ def parse_mqtt_presence_message(topic: str, payload: bytes | str | dict[str, Any
     static_gate = raw_data.get("static_gate")
 
     # Extract door state (magnetic reed switch on GPIO — ground truth for "did they leave?")
-    # None = no door sensor installed; True = door closed; False = door open
-    door_closed_raw = raw_data.get("door_closed")
+    # Firmware sends reed_closed: True = door closed (magnet contact closed), False = door open
+    # None = no door sensor installed or field not present
+    door_closed_raw = raw_data.get("reed_closed")
     door_closed: bool | None = None if door_closed_raw is None else bool(door_closed_raw)
 
     # Derive presence from radar fields if not explicitly set
@@ -228,6 +229,8 @@ class SpaceMqttListener:
                 client.username_pw_set(settings.space_mqtt_username, settings.space_mqtt_password)
 
             def _on_connect(client, _userdata, _flags, reason_code, _properties=None):
+                # reason_code is an int (MQTTConnellError) in paho-mqtt 1.x and 2.x
+                logger.warning("Space MQTT _on_connect fired: rc=%s", reason_code)
                 if reason_code == 0:
                     radar_topic = settings.space_mqtt_radar_topic
                     if radar_topic:
@@ -243,9 +246,10 @@ class SpaceMqttListener:
                             settings.space_mqtt_topic,
                         )
                 else:
-                    logger.warning("Space MQTT listener connect failed: %s", reason_code)
+                    logger.warning("Space MQTT listener connect failed: reason_code=%s (%s)", reason_code, type(reason_code))
 
             def _on_message(_client, _userdata, message):
+                logger.warning("Space MQTT _on_message fired: topic=%s", message.topic)
                 try:
                     logger.debug("Space MQTT rx: %s → %s", message.topic, message.payload[:120])
                     if self._loop and self._loop.is_running():
@@ -262,13 +266,14 @@ class SpaceMqttListener:
                         )
                     else:
                         logger.warning("Space MQTT message dropped: listener loop unavailable")
-                except Exception:
-                    logger.warning("Space MQTT message dropped: no running loop")
+                except Exception as exc:
+                    logger.warning("Space MQTT message dropped: %s", exc)
 
             client.on_connect = _on_connect
             client.on_message = _on_message
             client.connect_async(settings.space_mqtt_broker, settings.space_mqtt_port, keepalive=30)
             client.loop_start()
+            logger.info("Space MQTT client started — connecting to %s:%d", settings.space_mqtt_broker, settings.space_mqtt_port)
             self._client = client
 
     async def stop(self) -> None:

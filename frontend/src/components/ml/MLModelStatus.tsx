@@ -6,22 +6,7 @@
  */
 
 import { useEffect, useState } from "react";
-import {
-  Card,
-  Title,
-  Table,
-  TableHead,
-  TableHeaderCell,
-  TableBody,
-  TableRow,
-  TableCell,
-  Badge,
-  Button,
-  Flex,
-  Text,
-  Grid,
-  NumberInput,
-} from "@tremor/react";
+
 import {
   Play,
   CheckCircle,

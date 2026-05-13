@@ -11,7 +11,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { Card, Text, Grid, Badge, Flex } from '@tremor/react';
+
 import { Activity } from 'lucide-react';
 import { TabBar } from '../TabBar';
 import { PageLoading } from '../PageLoading';

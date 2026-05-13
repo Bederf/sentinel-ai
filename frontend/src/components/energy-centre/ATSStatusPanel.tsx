@@ -9,7 +9,6 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { Card, Title, Text, Badge, Grid, Flex, Metric } from '@tremor/react';
 import { energyCentreApi } from '../../lib/energyCentreApi';
 import type { ATSStatus } from '../../lib/energyCentreApi';
 
@@ -18,6 +17,18 @@ interface ATSStatusPanelProps {
   compact?: boolean;
   onTransferEvent?: (ats: ATSStatus, previousPosition: string) => void;
 }
+
+const sentinelColors: Record<string, string> = {
+  blue: 'var(--sentinel-blue)',
+  amber: 'var(--sentinel-amber)',
+  gray: 'var(--sentinel-text-disabled)',
+  green: 'var(--sentinel-green)',
+  red: 'var(--sentinel-red)',
+  cyan: 'var(--sentinel-cyan)',
+  purple: '#7c3aed',
+  yellow: '#eab308',
+  slate: '#64748b',
+};
 
 const positionColors: Record<string, string> = {
   mains: 'blue',
@@ -79,56 +90,59 @@ export function ATSStatusPanel({ siteId, compact = false, onTransferEvent }: ATS
 
   if (loading) {
     return (
-      <Card>
-        <Title>Transfer Switch</Title>
+      <div className="rounded-lg p-4" style={{ background: "var(--sentinel-bg-panel)", border: "1px solid var(--sentinel-border)" }}>
+        <h3 className="text-sm font-medium" style={{ color: "var(--sentinel-text-primary)" }}>Transfer Switch</h3>
         <div className="animate-pulse h-24 bg-gray-100 rounded mt-4" />
-      </Card>
+      </div>
     );
   }
 
   if (atsUnits.length === 0) {
     return (
-      <Card>
-        <Title>Transfer Switch</Title>
-        <Text className="text-gray-500">No ATS data available</Text>
-      </Card>
+      <div className="rounded-lg p-4" style={{ background: "var(--sentinel-bg-panel)", border: "1px solid var(--sentinel-border)" }}>
+        <h3 className="text-sm font-medium" style={{ color: "var(--sentinel-text-primary)" }}>Transfer Switch</h3>
+        <p style={{ color: "var(--sentinel-text-secondary)" }}>No ATS data available</p>
+      </div>
     );
   }
 
   const ats = atsUnits[0]; // Primary ATS
 
   if (compact) {
+    const accentColor = sentinelColors[positionColors[ats.position]] || sentinelColors.gray;
     return (
-      <Card decoration="top" decorationColor={positionColors[ats.position] || 'gray'}>
-        <Flex justifyContent="between" alignItems="center">
+      <div className="rounded-lg p-4" style={{ background: "var(--sentinel-bg-panel)", border: "1px solid var(--sentinel-border)", borderTop: `3px solid ${accentColor}` }}>
+        <div className="flex items-center justify-between">
           <div>
-            <Text>ATS Position</Text>
-            <Metric className="capitalize">{ats.position}</Metric>
+            <span style={{ color: "var(--sentinel-text-secondary)" }}>ATS Position</span>
+            <span className="text-2xl font-bold tabular-nums capitalize" style={{ color: "var(--sentinel-text-primary)" }}>{ats.position}</span>
           </div>
           <div className="flex flex-col items-center gap-1">
             <div className={`w-4 h-4 rounded-full ${ats.sources.mains.available ? 'bg-green-500' : 'bg-gray-300'}`} />
-            <Text className="text-xs">Mains</Text>
+            <span className="text-xs" style={{ color: "var(--sentinel-text-secondary)" }}>Mains</span>
           </div>
           <div className="flex flex-col items-center gap-1">
             <div className={`w-4 h-4 rounded-full ${ats.sources.generator.available ? 'bg-amber-500' : 'bg-gray-300'}`} />
-            <Text className="text-xs">Gen</Text>
+            <span className="text-xs" style={{ color: "var(--sentinel-text-secondary)" }}>Gen</span>
           </div>
-        </Flex>
-      </Card>
+        </div>
+      </div>
     );
   }
 
+  const positionColor = sentinelColors[positionColors[ats.position]] || sentinelColors.gray;
+
   return (
-    <Card>
-      <Flex justifyContent="between" alignItems="start">
+    <div className="rounded-lg p-4" style={{ background: "var(--sentinel-bg-panel)", border: "1px solid var(--sentinel-border)" }}>
+      <div className="flex items-start justify-between">
         <div>
-          <Title>{ats.name}</Title>
-          <Text className="text-xs">{ats.type} - {ats.transfer_mode} transition</Text>
+          <h3 className="text-sm font-medium" style={{ color: "var(--sentinel-text-primary)" }}>{ats.name}</h3>
+          <span className="text-xs" style={{ color: "var(--sentinel-text-secondary)" }}>{ats.type} - {ats.transfer_mode} transition</span>
         </div>
-        <Badge color={positionColors[ats.position] || 'gray'} size="lg">
+        <span className="text-xs px-2 py-0.5 rounded font-medium" style={{ background: positionColor, color: "white" }}>
           {ats.position.toUpperCase()}
-        </Badge>
-      </Flex>
+        </span>
+      </div>
 
       {/* Visual ATS Representation */}
       <div className="mt-4 p-4 bg-gray-50 rounded-lg">
@@ -139,13 +153,13 @@ export function ATSStatusPanel({ siteId, compact = false, onTransferEvent }: ATS
               w-12 h-12 rounded-lg flex items-center justify-center
               ${ats.sources.mains.available ? 'bg-blue-100 border-2 border-blue-500' : 'bg-gray-100 border border-gray-300'}
             `}>
-              <Text className={ats.sources.mains.available ? 'text-blue-700 font-bold' : 'text-gray-400'}>
+              <span className={ats.sources.mains.available ? 'text-blue-700 font-bold' : 'text-gray-400'}>
                 MAINS
-              </Text>
+              </span>
             </div>
-            <Badge color={breakerColors[ats.sources.mains.breaker]} className="mt-1">
+            <span className="text-xs px-1 py-0.5 rounded font-medium mt-1" style={{ background: sentinelColors[breakerColors[ats.sources.mains.breaker]] || sentinelColors.gray, color: "white" }}>
               {ats.sources.mains.breaker.toUpperCase()}
-            </Badge>
+            </span>
           </div>
 
           {/* Connection Lines */}
@@ -160,7 +174,7 @@ export function ATSStatusPanel({ siteId, compact = false, onTransferEvent }: ATS
               positionColors[ats.position] === 'amber' ? 'bg-amber-100 border-2 border-amber-500' :
                 'bg-gray-100 border-2 border-gray-400'}
           `}>
-            <Text className="font-bold">ATS</Text>
+            <span className="font-bold">ATS</span>
           </div>
 
           {/* Connection Lines */}
@@ -174,50 +188,50 @@ export function ATSStatusPanel({ siteId, compact = false, onTransferEvent }: ATS
               w-12 h-12 rounded-lg flex items-center justify-center
               ${ats.sources.generator.available ? 'bg-amber-100 border-2 border-amber-500' : 'bg-gray-100 border border-gray-300'}
             `}>
-              <Text className={ats.sources.generator.available ? 'text-amber-700 font-bold' : 'text-gray-400'}>
+              <span className={ats.sources.generator.available ? 'text-amber-700 font-bold' : 'text-gray-400'}>
                 GEN
-              </Text>
+              </span>
             </div>
-            <Badge color={breakerColors[ats.sources.generator.breaker]} className="mt-1">
+            <span className="text-xs px-1 py-0.5 rounded font-medium mt-1" style={{ background: sentinelColors[breakerColors[ats.sources.generator.breaker]] || sentinelColors.gray, color: "white" }}>
               {ats.sources.generator.breaker.toUpperCase()}
-            </Badge>
+            </span>
           </div>
         </div>
       </div>
 
       {/* Status Details */}
-      <Grid className="grid grid-cols-3 gap-4 mt-4">
-        <Card>
-          <Text className="text-xs text-gray-500">Interlocks</Text>
+      <div className="grid grid-cols-3 gap-4 mt-4">
+        <div className="rounded-lg p-4" style={{ background: "var(--sentinel-bg-panel)", border: "1px solid var(--sentinel-border)" }}>
+          <span className="text-xs" style={{ color: "var(--sentinel-text-secondary)" }}>Interlocks</span>
           <div className="flex gap-1 mt-1">
-            <Badge color={ats.interlocks.mechanical_ok ? 'green' : 'red'} size="xs">
+            <span className="text-xs px-1 py-0.5 rounded font-medium" style={{ background: sentinelColors[ats.interlocks.mechanical_ok ? 'green' : 'red'], color: "white" }}>
               Mech {ats.interlocks.mechanical_ok ? 'OK' : 'FAIL'}
-            </Badge>
-            <Badge color={ats.interlocks.electrical_ok ? 'green' : 'red'} size="xs">
+            </span>
+            <span className="text-xs px-1 py-0.5 rounded font-medium" style={{ background: sentinelColors[ats.interlocks.electrical_ok ? 'green' : 'red'], color: "white" }}>
               Elec {ats.interlocks.electrical_ok ? 'OK' : 'FAIL'}
-            </Badge>
+            </span>
           </div>
-        </Card>
-        <Card>
-          <Text className="text-xs text-gray-500">Transfer Time</Text>
-          <Text className="font-bold">{ats.transfer_stats.last_transfer_time_ms} ms</Text>
-        </Card>
-        <Card>
-          <Text className="text-xs text-gray-500">Total Transfers</Text>
-          <Text className="font-bold">{ats.transfer_stats.total_transfers}</Text>
-        </Card>
-      </Grid>
+        </div>
+        <div className="rounded-lg p-4" style={{ background: "var(--sentinel-bg-panel)", border: "1px solid var(--sentinel-border)" }}>
+          <span className="text-xs" style={{ color: "var(--sentinel-text-secondary)" }}>Transfer Time</span>
+          <span className="font-bold" style={{ color: "var(--sentinel-text-primary)" }}>{ats.transfer_stats.last_transfer_time_ms} ms</span>
+        </div>
+        <div className="rounded-lg p-4" style={{ background: "var(--sentinel-bg-panel)", border: "1px solid var(--sentinel-border)" }}>
+          <span className="text-xs" style={{ color: "var(--sentinel-text-secondary)" }}>Total Transfers</span>
+          <span className="font-bold" style={{ color: "var(--sentinel-text-primary)" }}>{ats.transfer_stats.total_transfers}</span>
+        </div>
+      </div>
 
       {/* Last Transfer */}
       {ats.transfer_stats.last_transfer && (
         <div className="mt-4 pt-4 border-t border-gray-200">
-          <Text className="text-xs text-gray-500">Last Transfer</Text>
-          <Text>
+          <span className="text-xs" style={{ color: "var(--sentinel-text-secondary)" }}>Last Transfer</span>
+          <span style={{ color: "var(--sentinel-text-secondary)" }}>
             {new Date(ats.transfer_stats.last_transfer).toLocaleString()} - {ats.transfer_stats.last_reason || 'Unknown'}
-          </Text>
+          </span>
         </div>
       )}
-    </Card>
+    </div>
   );
 }
 

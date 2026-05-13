@@ -22,9 +22,9 @@ Inspection endpoints support two workflows:
 1. **Standard inspections** — Scheduled/ad-hoc inspection tasks managed via the inspection module (`backend/app/api/inspection.py`)
 2. **Sentry Telegram inspections** — Guided debrief flow triggered by technicians via Telegram slash commands (`backend/app/api/sentry_webhooks.py`)
 
-## Sentry Inspection Endpoints
+## Sentry Telegram Inspection Endpoints
 
-These endpoints are used by the Sentry Telegram bot during the inspection skill flow.
+These endpoints are used by the Sentry Telegram bot during the inspection skill flow. The bot routes via `sentry_ai_bridge.py` — see [call-log-api.md](call-log-api.md) for the full routing architecture.
 
 ### GET /api/sentry/inspection-checklist/{equipment_type}
 
@@ -173,7 +173,8 @@ X-Sentry-Secret: sentry-bms-phase-41
 1. Creates `inspection_tasks` record (status: `completed`)
 2. Creates `inspection_results` record with `item_results` JSONB
 3. Creates `inspection_deficiencies` records for each warning/critical item
-4. Updates linked work order to `completed` status
+
+**Note:** Work order milestone advancement (`assigned` → `in_progress` → `resolved`) is handled separately by the technician closeout skill via `PATCH /api/sentry/wo-milestone`. The inspection-result endpoint does NOT update the work order status.
 
 **Error responses:**
 

@@ -11,16 +11,9 @@
  */
 
 import { useState, useEffect, useRef } from "react";
-import {
-  Card,
-  Title,
-  Text,
-  Badge,
-  Grid,
-  ProgressBar,
-  Button,
-} from "@tremor/react";
+
 import { DollarSign, AlertTriangle, TrendingUp, Upload, Loader2, CheckCircle } from "lucide-react";
+import { getAccessToken } from "@/lib/api";
 
 interface CostValidationRaw {
   // API field names
@@ -111,7 +104,6 @@ export function CostValidationCard({
     setUploadResult(null);
 
     try {
-      const token = localStorage.getItem("sentinel_token");
       const formData = new FormData();
       formData.append("file", file);
       formData.append("site_id", siteId);
@@ -121,7 +113,7 @@ export function CostValidationCard({
 
       const response = await fetch("/api/municipal-billing/invoices/upload", {
         method: "POST",
-        headers: { Authorization: `Bearer ${token || ""}` },
+        headers: { Authorization: `Bearer ${getAccessToken() || ""}` },
         body: formData,
       });
 
@@ -149,7 +141,7 @@ export function CostValidationCard({
           {
             method: "POST",
             headers: {
-              Authorization: `Bearer ${token || ""}`,
+              Authorization: `Bearer ${getAccessToken() || ""}`,
               "Content-Type": "application/json",
             },
           }
@@ -181,12 +173,11 @@ export function CostValidationCard({
     const fetchValidation = async () => {
       try {
         setLoading(true);
-        const token = localStorage.getItem("sentinel_token");
         const response = await fetch(
           `/api/validation/cost/daily?site_id=${siteId}`,
           {
             headers: {
-              Authorization: `Bearer ${token || ""}`,
+              Authorization: `Bearer ${getAccessToken() || ""}`,
               "Content-Type": "application/json",
             },
           }

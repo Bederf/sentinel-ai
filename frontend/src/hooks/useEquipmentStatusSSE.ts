@@ -8,6 +8,7 @@
 
 import { useEffect, useRef, useCallback, useState } from 'react'
 import type { EquipmentStatusUpdate, PredictiveFault, EquipmentStatusFrame } from '@/lib/api'
+import { getAccessToken } from '@/lib/api'
 
 const DT_TICKET_RETRY_COOLDOWN_MS = 30000
 let dtTicketRequestInFlight: Promise<string | null> | null = null
@@ -84,7 +85,7 @@ export function useEquipmentStatusSSE(siteId: string): UseEquipmentStatusSSEResu
     connectingRef.current = true
 
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:9095'
-    const token = localStorage.getItem('sentinel_token')
+    const token = getAccessToken()
 
     const doConnect = async () => {
       const scheduleReconnect = () => {

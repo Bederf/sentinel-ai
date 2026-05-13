@@ -6,20 +6,18 @@
  * Phase 45-03: MLOps Monitoring and Success Metrics.
  */
 
+import { getAccessToken } from "./api";
 const API_BASE_URL = import.meta.env.VITE_API_URL || window.location.origin;
 
-function authHeaders(): Record<string, string> {
-  const token = localStorage.getItem("sentinel_token");
-  return {
-    "Content-Type": "application/json",
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  };
-}
-
 async function fetchJson<T>(endpoint: string, options?: RequestInit): Promise<T> {
+  const token = getAccessToken();
   const res = await fetch(`${API_BASE_URL}${endpoint}`, {
     ...options,
-    headers: { ...authHeaders(), ...options?.headers },
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...options?.headers,
+    },
   });
   if (!res.ok) {
     let msg = res.statusText;

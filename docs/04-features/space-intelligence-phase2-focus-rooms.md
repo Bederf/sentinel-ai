@@ -113,19 +113,44 @@ Session duration: 11:33 - 09:01 = 2h 32m
 
 Focus rooms typically have a recommended maximum occupancy duration of **2 hours**.
 
-SENTINEL flags sessions exceeding this threshold.
+SENTINEL flags sessions exceeding this threshold and automatically notifies the concierge.
 
 **Rule:**
 
 ```
 if session_duration > 2 hours:
     mark session = extended_use
+    red_light_on = true
+    notify_concierge()
 ```
 
-**Optional actions:**
-- Dashboard alert
-- Concierge notification
-- Usage analytics
+### Automatic Notification
+
+The overstay alert fires on every MQTT event — decoupled from relay state transitions. This ensures reliable notification even after backend restarts.
+
+**Notification channels:**
+- **Telegram** — sent to concierge chat with inline buttons:
+  - "Still occupied" → extends session by **+10 minutes** (updates `overstay_grace_minutes`)
+  - "Room empty now" → closes session immediately, turns relay/LED off
+- **WhatsApp** — sent via Twilio directly to configured number
+
+### Concierge Flow
+
+```
+1. Session exceeds 2h → Telegram alert with buttons
+2. Concierge goes to room, informs occupant
+3a. Occupant asks for more time → tap "Still occupied" → +10min grace
+3b. Occupant leaves → concierge opens door → tap "Room empty" → session closes
+4. Buttons update to show confirmation
+```
+
+### Door State Handling
+
+The LD2410C firmware v3.2.0 (ESP32) supports a magnetic reed switch on GPIO18:
+
+- `door_closed: true` → gap timer **frozen** (belongings inside, session stays open)
+- `door_closed: false` → normal gap tolerance applies
+- `door_closed: null` → no sensor installed (D1 Mini / older firmware)
 
 ---
 
@@ -219,6 +244,8 @@ Phase 3 creates the foundation for additional smart workspace features.
 | duration_seconds | integer | Computed on close |
 | extended_use | boolean | True if duration > 7200s (2 hours) |
 | created_at | timestamp | Record creation time |
+| door_closed | boolean | Reed switch state: true=closed (gap frozen), null=no sensor |
+| overstay_grace_minutes | integer | Concierge-granted additional minutes (default 0) |
 
 ### Service Layer
 
@@ -229,6 +256,8 @@ Phase 3 creates the foundation for additional smart workspace features.
 `backend/app/services/occupancy_store.py` (session persistence):
 - `save_session()`, `get_active_session()`, `close_session()`, `discard_session()`
 - `get_sessions_for_room()`, `get_sessions_for_site()`
+- `set_door_closed()` — Update door state per session
+- `extend_overstay_grace()` — Add concierge-granted minutes (called via Telegram "Still occupied")
 
 ### API Endpoints
 

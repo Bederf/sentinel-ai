@@ -36,14 +36,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import {
-  Table,
-  TableHead,
-  TableRow,
-  TableHeaderCell,
-  TableBody,
-  TableCell,
-} from "@tremor/react";
+
 import type { Contract, BudgetVariance, BudgetAlert } from "../lib/contractApi";
 import type { SLAPerformanceRecord } from "../lib/profitabilityApi";
 import { PageLoading } from "../components/PageLoading";

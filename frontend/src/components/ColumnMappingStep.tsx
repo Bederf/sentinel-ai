@@ -1,6 +1,6 @@
 // ColumnMappingStep.tsx
 import { useState, useEffect } from 'react';
-import { Button, Card, Callout, Table, TableBody, TableCell, TableHead, TableRow, Text, Title } from '@tremor/react';
+
 import { CheckCircle2, XCircle } from 'lucide-react';
 import type { ColumnMapping } from '@/lib/api';
 

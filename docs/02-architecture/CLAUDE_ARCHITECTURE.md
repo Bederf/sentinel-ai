@@ -24,7 +24,7 @@ Complete system architecture for SENTINEL BMS Intelligence Platform.
 **SENTINEL BMS Intelligence Platform** — AI-powered building management system combining predictive maintenance, conversational AI, and device control.
 
 - **Backend:** FastAPI + Python 3.11 | Supabase (PostgreSQL) | TensorFlow | Claude API + Ollama
-- **Frontend:** React + TypeScript (Vite) | Tremor UI + Tailwind | React Query v5
+- **Frontend:** React + TypeScript (Vite) | Sentinel design system + Tailwind (no Tremor)
 - **Scale:** 70+ API endpoints, 31 MCP tools, 3 buildings, 542+ equipment
 - **Multi-Protocol:** BACnet, Modbus, DALI, OPC-UA, Telegram
 - **Automation:** PostgreSQL triggers + APScheduler + Sentry webhook integration

@@ -369,8 +369,8 @@ function RailAction({ state, onApprove }: { state: CockpitState; onApprove?: () 
     )
   }
 
-  // Advisory phase: recommendations only, no hold-to-confirm action UI
-  if (state.site.onboardingPhase === 'advisory') {
+  // Shadow + Advisory phase: no hold-to-confirm action UI (read-only observation)
+  if (state.site.onboardingPhase === 'shadow' || state.site.onboardingPhase === 'advisory') {
     return null
   }
 
@@ -378,7 +378,7 @@ function RailAction({ state, onApprove }: { state: CockpitState; onApprove?: () 
     return (
       <div className="border-t border-white/8 p-4">
         <SupervisedConfirmBar
-          mode={state.site.onboardingPhase === 'supervised' ? 'supervised' : 'advisory'}
+          mode="supervised"
           onConfirm={onApprove ?? (() => {
             document
               .querySelector('[data-cockpit-root]')

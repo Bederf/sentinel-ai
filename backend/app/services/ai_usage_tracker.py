@@ -24,6 +24,7 @@ from zoneinfo import ZoneInfo
 from pathlib import Path
 from threading import Lock
 from typing import Optional
+from app.database.supabase_client import get_supabase_client
 
 logger = logging.getLogger(__name__)
 
@@ -119,13 +120,39 @@ class AiUsageTracker:
         self._redis_checked = False
         self._memory_daily_totals: dict[str, int] = {}  # site_id -> total tokens today
         self._memory_alert_sent: dict[str, bool] = {}  # site_id -> alert sent today
+        # Supabase primary store (Phase 193+)
+        self._client = None
+        self._pending_rows: list[dict] = []  # daily usage rows waiting to flush
+
+    @property
+    def _supabase(self):
+        if self._client is None:
+            self._client = get_supabase_client()
+        return self._client
 
     def _load_today(self):
-        """Load today's usage from disk."""
+        """Load today's usage from DB (Supabase primary, JSON fallback retired)."""
         today = date.today().isoformat()
         self._today_key = today
-        data = self._read_file()
-        self._today_cache = data.get("daily", {}).get(today, {})
+        self._today_cache = {}
+        try:
+            result = self._supabase.table("ai_usage_daily").select("*").eq("date", today).execute()
+            for row in result.data:
+                key = f"{row['provider']}/{row['model']}|{row.get('site_id','unknown')}"
+                self._today_cache[key] = {
+                    "provider": row["provider"],
+                    "model": row["model"],
+                    "site_id": row.get("site_id", "unknown"),
+                    "calls": row.get("calls", 0),
+                    "input_tokens": row.get("input_tokens", 0),
+                    "output_tokens": row.get("output_tokens", 0),
+                    "cache_read_tokens": row.get("cache_read_tokens", 0),
+                    "cache_creation_tokens": row.get("cache_creation_tokens", 0),
+                    "cost_usd": float(row.get("cost_usd", 0)),
+                    "sources": row.get("sources", {}),
+                }
+        except Exception:
+            pass
 
     def _sast_date(self) -> str:
         """Return today's date in SAST (UTC+2)."""
@@ -261,6 +288,7 @@ class AiUsageTracker:
             raise TokenBudgetExceeded(site_id, new_total, budget)
 
     def _read_file(self) -> dict:
+        """Legacy fallback — reads from JSON (not used for new writes)."""
         if not USAGE_FILE.exists():
             return {"daily": {}, "usd_zar_rate": self._usd_zar}
         try:
@@ -268,6 +296,30 @@ class AiUsageTracker:
                 return json.load(f)
         except Exception:
             return {"daily": {}, "usd_zar_rate": self._usd_zar}
+
+    def _flush_daily_to_db(self, key: str, entry: dict):
+        """Write a daily usage row to Supabase."""
+        parts = key.split('|')
+        provider = parts[0].split('/')[0] if '/' in parts[0] else parts[0]
+        model = parts[0].split('/')[1] if '/' in parts[0] else parts[0]
+        site_id = parts[1] if len(parts) > 1 else 'unknown'
+        today = date.today().isoformat()
+        try:
+            self._supabase.table("ai_usage_daily").upsert({
+                "date": today,
+                "provider": provider,
+                "model": model,
+                "site_id": site_id,
+                "calls": entry.get("calls", 0),
+                "input_tokens": entry.get("input_tokens", 0),
+                "output_tokens": entry.get("output_tokens", 0),
+                "cache_read_tokens": entry.get("cache_read_tokens", 0),
+                "cache_creation_tokens": entry.get("cache_creation_tokens", 0),
+                "cost_usd": entry.get("cost_usd", 0),
+                "sources": entry.get("sources", {}),
+            }, on_conflict="date,provider,model,site_id").execute()
+        except Exception as exc:
+            logger.warning("Failed to flush usage to DB: %s", exc)
 
     def _write_file(self, data: dict):
         USAGE_FILE.parent.mkdir(parents=True, exist_ok=True)
@@ -495,13 +547,21 @@ class AiUsageTracker:
 
         with self._write_lock:
             try:
-                data = self._read_file()
-                if "escalations" not in data:
-                    data["escalations"] = []
-                data["escalations"].append(event)
-                self._write_file(data)
+                self._supabase.table("ai_usage_escalations").insert({
+                    "timestamp": event["timestamp"],
+                    "provider": event.get("provider", ""),
+                    "escalation_type": "escalation_triggered",
+                    "site_id": event.get("mode", ""),
+                    "details": json.dumps({
+                        "from_class": event.get("from_class"),
+                        "to_class": event.get("to_class"),
+                        "reason": event.get("reason"),
+                        "resolved_model": event.get("resolved_model"),
+                        "session_id": event.get("session_id"),
+                    }),
+                }).execute()
             except Exception as exc:
-                logger.error("Failed to write escalation event: %s", exc)
+                logger.warning("Failed to write escalation to DB: %s", exc)
 
     def _check_cost_alert(self):
         """Send Telegram alert if daily spend exceeds threshold."""
@@ -549,16 +609,9 @@ class AiUsageTracker:
             pass  # Never let alert logic break tracking
 
     def _flush(self):
-        """Persist today's cache to disk."""
-        try:
-            data = self._read_file()
-            if "daily" not in data:
-                data["daily"] = {}
-            data["daily"][self._today_key] = self._today_cache
-            data["usd_zar_rate"] = self._usd_zar
-            self._write_file(data)
-        except Exception as e:
-            logger.error(f"Failed to flush AI usage data: {e}")
+        """Persist today's cache to Supabase (DB primary, JSON retired in Phase 193+)."""
+        for key, entry in self._today_cache.items():
+            self._flush_daily_to_db(key, entry)
 
     def _get_cache_stats(self, days: int = 30) -> dict:
         """Calculate cache efficiency metrics from JSON storage."""

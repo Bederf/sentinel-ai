@@ -3,7 +3,7 @@ Work Order Repository - Database operations for work orders.
 """
 
 import logging
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 from ..supabase_client import get_supabase_client
@@ -18,7 +18,7 @@ class WorkOrderRepository:
         "id, code, title, description, priority, status, "
         "assigned_to, assigned_team, equipment_id, site_id, "
         "scheduled_date, completed_at, created_at, created_by, "
-        "estimated_duration_hours"
+        "estimated_duration_hours, milestone_status, sla_hours, sla_deadline_at"
     )
 
     _DETAIL_COLUMNS = (
@@ -28,6 +28,8 @@ class WorkOrderRepository:
         "estimated_duration_hours, actual_duration_hours, "
         "labour_cost_zar, parts_cost_zar, total_cost_zar, "
         "notes, resolution, category, updated_at, "
+        "milestone_status, assigned_at, in_progress_at, resolved_at, verified_at, "
+        "sla_hours, sla_deadline_at, "
         "equipment(code, name, type), buildings(code, name)"
     )
 
@@ -82,6 +84,8 @@ class WorkOrderRepository:
                 "scheduled_date": work_order.get("scheduled_date"),
                 "estimated_duration_hours": work_order.get("estimated_duration_hours"),
                 "created_by": work_order.get("created_by", "SENTINEL"),
+                "milestone_status": work_order.get("milestone_status", "assigned"),
+                "sla_hours": work_order.get("sla_hours", {"assigned": 24, "in_progress": 48, "resolved": 72, "verified": 168}),
             }
 
             if equipment_id:
@@ -194,6 +198,100 @@ class WorkOrderRepository:
             logger.error(f"Error updating work order {work_order_id}: {e}")
             return None
 
+    async def advance_work_order_milestone(
+        self,
+        work_order_id: str,
+        new_milestone: str,
+        by_user: str | None = None,
+    ) -> dict[str, Any] | None:
+        """Advance a work order to the next milestone, updating timestamp and recalculating SLA deadline.
+
+        Args:
+            work_order_id: UUID of the work order
+            new_milestone: One of 'assigned', 'in_progress', 'resolved', 'verified'
+            by_user: User advancing the milestone (for audit)
+
+        Returns:
+            Updated work order dict, or None on error
+        """
+        if not self.client:
+            return None
+
+        from datetime import UTC, datetime, timedelta
+        SAST = timezone(timedelta(hours=2))
+        from app.database.repositories.recommendation_sla_repository import get_recommendation_sla_repository
+
+        # Get current work order
+        wo = await self.get_work_order(work_order_id)
+        if not wo:
+            logger.warning(f"Work order {work_order_id} not found for milestone advance")
+            return None
+
+        now = datetime.now(SAST)
+        updates: dict[str, Any] = {
+            "milestone_status": new_milestone,
+        }
+
+        # Sync legacy status with milestone_status
+        status_map = {
+            "assigned": "scheduled",
+            "in_progress": "in_progress",
+            "resolved": "in_progress",
+            "verified": "completed",
+        }
+        if new_milestone in status_map:
+            updates["status"] = status_map[new_milestone]
+
+        # Set per-milestone timestamp
+        if new_milestone == "in_progress":
+            updates["in_progress_at"] = now.isoformat()
+        elif new_milestone == "resolved":
+            updates["resolved_at"] = now.isoformat()
+        elif new_milestone == "verified":
+            updates["verified_at"] = now.isoformat()
+
+        # Compute new sla_deadline_at
+        sla_hours = wo.get("sla_hours", {})
+        milestone_hours = sla_hours.get(new_milestone, 24)
+
+        # Get milestone start time
+        if new_milestone == "in_progress":
+            milestone_start = wo.get("in_progress_at") or wo.get("assigned_at") or now
+        elif new_milestone == "resolved":
+            milestone_start = wo.get("resolved_at") or wo.get("in_progress_at") or now
+        elif new_milestone == "verified":
+            milestone_start = wo.get("verified_at") or wo.get("resolved_at") or now
+        else:
+            milestone_start = wo.get("assigned_at") or now
+
+        if isinstance(milestone_start, str):
+            milestone_start = datetime.fromisoformat(milestone_start.replace("Z", "+00:00"))
+        if milestone_start.tzinfo is None:
+            milestone_start = milestone_start.replace(tzinfo=SAST)
+
+        # Override with per-site SLA config if available
+        try:
+            site_id = wo.get("site_id")
+            sla_repo = get_recommendation_sla_repository()
+            sla_term = await sla_repo.get_by_site_milestone(site_id, new_milestone)
+            if sla_term:
+                milestone_hours = sla_term.deadline_hours
+        except Exception:
+            pass
+
+        if new_milestone != "verified":
+            deadline = milestone_start + timedelta(hours=milestone_hours)
+            updates["sla_deadline_at"] = deadline.isoformat()
+        else:
+            updates["sla_deadline_at"] = None
+
+        logger.info(
+            f"Advancing WO {wo.get('code')} milestone to {new_milestone} "
+            f"(deadline={updates.get('sla_deadline_at')}, by={by_user})"
+        )
+
+        return await self.update_work_order(work_order_id, updates)
+
     async def get_work_orders_for_equipment_list(
         self,
         equipment_ids: list[str],
@@ -289,6 +387,46 @@ class WorkOrderRepository:
             return filtered
 
         return [o for o in orders if str(o.get("created_by") or "").lower() == source_normalized]
+
+    async def get_open_work_orders_for_equipment(self, equipment_code: str) -> list[dict[str, Any]]:
+        """Get open (non-completed, non-cancelled) work orders for equipment by code.
+
+        Args:
+            equipment_code: Equipment code (e.g., "S002-FCU-201")
+
+        Returns:
+            List of open work orders for the equipment
+        """
+        if not self.client:
+            return []
+
+        try:
+            # Resolve equipment_code → equipment_id (UUID)
+            eq_result = (
+                self.client.table("equipment")
+                .select("id")
+                .eq("code", equipment_code)
+                .limit(1)
+                .execute()
+            )
+            if not eq_result.data:
+                return []
+            equipment_id = eq_result.data[0]["id"]
+
+            result = (
+                self.client.table("work_orders")
+                .select(self._LIST_COLUMNS)
+                .eq("equipment_id", equipment_id)
+                .in_("status", ["scheduled", "assigned", "in_progress", "pending"])
+                .order("created_at", desc=True)
+                .limit(10)
+                .execute()
+            )
+            return result.data or []
+
+        except Exception as e:
+            logger.error(f"Error getting open work orders for {equipment_code}: {e}")
+            return []
 
 
 # Singleton instance

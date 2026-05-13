@@ -15,21 +15,7 @@
  */
 
 import { useState, useMemo } from 'react'
-import {
-  Card,
-  Title,
-  Text,
-  Button,
-  BarChart,
-  Table,
-  TableHead,
-  TableBody,
-  TableRow,
-  TableCell,
-  Badge,
-  Grid,
-  Col,
-} from '@tremor/react'
+
 import {
   Copy,
   TrendingUp,

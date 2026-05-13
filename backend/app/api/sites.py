@@ -1274,7 +1274,9 @@ async def update_site_phase(site_id: str, request: PhaseUpdateRequest) -> PhaseU
 
         # Supabase write — the authoritative storage
         try:
-            client.table("sites").update({"onboarding_phase": requested}).eq("code", site_id).execute()
+            response = client.table("sites").update({"onboarding_phase": requested}).eq("code", site_id).execute()
+            if not response.data:
+                raise HTTPException(status_code=500, detail=f"Phase update failed: no rows affected for {site_id}")
             supabase_ok = True
             logger.info(f"Onboarding phase set to '{requested}' for {site_id} (Supabase)")
         except Exception as e:
@@ -1282,20 +1284,19 @@ async def update_site_phase(site_id: str, request: PhaseUpdateRequest) -> PhaseU
             raise HTTPException(status_code=500, detail=f"Supabase write failed: {e}") from e
 
         # Write phase transition to dedicated immutable log table
-        try:
-            client.table("phase_transition_log").insert(
-                {
-                    "site_id": site_id,
-                    "from_phase": previous_phase,
-                    "to_phase": requested,
-                    "changed_by": request.changed_by
-                    if hasattr(request, "changed_by") and request.changed_by
-                    else "system",
-                    "reason": request.reason if hasattr(request, "reason") else None,
-                }
-            ).execute()
-        except Exception as audit_err:
-            logger.warning(f"Phase transition log insert failed for {site_id}: {audit_err}")
+        log_response = client.table("phase_transition_log").insert(
+            {
+                "site_id": site_id,
+                "from_phase": previous_phase,
+                "to_phase": requested,
+                "changed_by": request.changed_by
+                if hasattr(request, "changed_by") and request.changed_by
+                else "system",
+                "reason": request.reason if hasattr(request, "reason") else None,
+            }
+        ).execute()
+        if not log_response.data:
+            raise HTTPException(status_code=500, detail=f"Audit trail failed: could not record phase transition for {site_id}")
 
     except Exception as e:
         logger.error(f"Phase update failed for {site_id}: {e}")

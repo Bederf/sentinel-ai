@@ -242,7 +242,7 @@ export function OccupancyEnergyCorrelationPage() {
                     <YAxis yAxisId="right" orientation="right" stroke={T.red} unit=" kWh" tick={{ fontSize: 11 }} />
                     <Tooltip
                       contentStyle={{ backgroundColor: "var(--color-sentinel-bg-secondary)", border: `1px solid ${T.border}`, borderRadius: 4 }}
-                      formatter={(value: unknown) => typeof value === 'number' ? value.toFixed(2) : value}
+                      formatter={(value) => typeof value === 'number' ? value.toFixed(2) : value}
                     />
                     <Legend />
                     <Line type="monotone" dataKey="occupancy_percent" stroke={T.blue} name="Occupancy %" yAxisId="left" dot={false} />

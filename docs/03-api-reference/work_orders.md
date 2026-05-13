@@ -1,16 +1,16 @@
 ---
 title: "Work Orders API"
 type: "reference"
-status: "draft"
-version: "1.0.0"
+status: "active"
+version: "2.0.0"
 created: "2026-03-31"
-updated: "2026-05-08"
+updated: "2026-05-10"
 tags: ["sentinel", "documentation"]
 related: []
 domain: "bms"
 audience: "all"
 complexity: "intermediate"
-estimated_read_time: 10
+estimated_read_time: 12
 ---
 
 # Work Orders API
@@ -21,24 +21,41 @@ estimated_read_time: 10
 
 | Entity | Purpose | Lifecycle |
 |--------|---------|-----------|
-| `work_orders` | Transient operational task — created, assigned, closed | Deleted after close-out; not permanent history |
+| `work_orders` | Operational task with SLA milestones | Retained; `milestone_status` tracks lifecycle |
 | `service_records` | Permanent equipment maintenance history | Retained forever; `work_order_id` nullable so history survives WO deletion |
 
 When a work order is created for equipment, a service record is automatically created and linked via `work_order_id`. If the work order is later deleted, the service record's `work_order_id` is nullified — the equipment history is preserved.
 
-## Overview
+---
 
-Work Orders are created through three paths, all persisting to Supabase via the work order repository:
+## 4-Milestone SLA Model
 
-| Path | Trigger | Endpoint |
-|------|---------|----------|
-| **Slash command** (`/WO_`, `/inspect_`) | User types command in chat or Telegram | `POST /api/sentry/create-work-order` |
-| **Claude AI tool** (`create_work_order`) | Claude decides a WO is needed during chat | `POST /api/sentry/create-work-order` (same) |
-| **Standard API** | Direct API call from integrations | `POST /api/work-orders` |
+Each work order progresses through four milestones, each with a configurable SLA deadline in hours. Deadlines are computed from milestone entry time and are materialised in `sla_deadline_at` — not derived at query time.
 
-## FM Workflow (Recommended)
+```
+assigned ──► in_progress ──► resolved ──► verified
+   │              │              │            │
+   │  SLA hours   │  SLA hours   │  SLA hours  │  None (terminal)
+   ▼              ▼              ▼            ▼
+ deadline_at   deadline_at    deadline_at     null
+```
 
-The AI chat guides users through the proper FM process using clickable slash commands:
+**Milestones:**
+
+| Milestone | Trigger | SLA clock |
+|-----------|---------|-----------|
+| `assigned` | WO created | Starts at WO creation; first deadline |
+| `in_progress` | Technician acknowledges work | Restarts from `in_progress_at` |
+| `resolved` | Technician completes on-site work, calls `done #WO-XXXX` | Restarts from `resolved_at` |
+| `verified` | FM reviews and closes WO | Terminal — no deadline |
+
+**SLA hours are per-site configurable** via `recommendation_sla_per_site` table. Site-level overrides take precedence over the default JSONB hours stored on the work order itself.
+
+**Note:** `recommendations` (AI-generated BMS proposals) are a separate system with no SLA columns in the database. Only `work_orders` carries SLA milestone tracking.
+
+---
+
+## Slash Command Workflow
 
 ```
 Alert / User Question
@@ -54,9 +71,15 @@ Alert / User Question
 
 Each command renders as a **clickable button** in the web chat. Claude is instructed to present these commands rather than calling `create_work_order` directly, ensuring the FM workflow is followed.
 
-## Sentry Work Order Endpoint
+---
 
-`POST /api/sentry/create-work-order` — Primary creation path used by both slash commands and Claude tool.
+## Endpoints
+
+### Create Work Order
+
+`POST /api/sentry/create-work-order`
+
+Primary creation path used by slash commands and Claude tool.
 
 **Authentication:** `X-Sentry-Secret` header required.
 
@@ -89,47 +112,124 @@ Each command renders as a **clickable button** in the web chat. Claude is instru
 - Auto-assigns technician by equipment specialty
 - Returns technician contact info for Telegram notification
 
-## Standard Endpoints
+---
+
+### Advance Work Order Milestone
+
+`PATCH /api/sentry/wo-milestone`
+
+Advances a work order to the next milestone and recalculates the SLA deadline. Called by the technician bot after closeout inspection.
+
+**Authentication:** `X-Sentry-Secret` header required.
+
+**Request:**
+```json
+{
+  "wo_code": "WO-2026-0030",
+  "milestone": "resolved",
+  "notes": "Blocked filter replaced. Fan noise resolved after filter change.",
+  "outcome": "fixed",
+  "operator_password": ""
+}
+```
+
+**Fields:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `wo_code` | string | Yes | Work order code (e.g. `WO-2026-0001`) |
+| `milestone` | string | Yes | One of: `assigned`, `in_progress`, `resolved`, `verified` |
+| `notes` | string | No | Technician's findings (appended to existing notes) |
+| `outcome` | string | No | `fixed` / `parts_needed` / `escalate` — drives notification routing |
+| `operator_password` | string | No | Not used; pass empty string |
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "wo_id": "8fdfe233-7bdb-4244-acd9-289b82a5aa1d",
+  "wo_code": "WO-2026-0030",
+  "milestone_status": "resolved",
+  "assigned_at": "2026-05-08T09:00:00+02:00",
+  "in_progress_at": "2026-05-08T10:30:00+02:00",
+  "resolved_at": "2026-05-08T14:00:00+02:00",
+  "verified_at": "",
+  "sla_deadline_at": "2026-05-09T14:00:00+02:00",
+  "status": "in_progress"
+}
+```
+
+**Side effects:**
+- Recalculates `sla_deadline_at` from milestone entry time + per-site SLA hours
+- Appends `notes` to existing notes with `---` separator
+- On `resolved`: notifies staff (from `created_by` provenance string) via Telegram
+- On `escalate`: notifies FM manager via Telegram
+- On `verified`: clears SLA deadline (`sla_deadline_at = null`)
+
+**Error responses:**
+- `400` — Invalid milestone value
+- `404` — Work order not found
+- `401` — Missing or invalid `X-Sentry-Secret`
+
+---
+
+### Other Endpoints
 
 - `GET /work-orders` — List work orders (filterable by site, status, assignee)
 - `GET /work-orders/{work_order_id}` — Get work order details
-- `POST /work-orders` — Create work order (standard API path)
-- `GET /assets` — List assets
-- `GET /assets/{asset_id}` — Asset details
-- `GET /assets/{asset_id}/history` — Asset maintenance history
-- `GET /failure-stories` — Equipment failure case studies
-- `GET /stats/work-orders` — Work order statistics
-- `POST /work-orders/technician` — Assign technician
-- `GET /work-orders/technician` — List technician assignments
-- `GET /work-orders/technician/{work_order_id}` — Technician WO details
+- `GET /api/sentry/work-order/status/{service_record_code}` — Get by code
+- `GET /api/sentry/work-order/pending` — List pending work orders
+- `POST /api/sentry/work-order/complete/{service_record_code}` — Mark complete
+- `POST /api/sentry/inspection-result` — Submit technician inspection checklist results
+- `GET /api/sentry/inspection-checklist/{equipment_type}` — Get inspection checklist
 
-... and 9 more endpoints
+---
 
-## Claude AI tools
+## Technician Closeout Flow
 
-| Tool | Role | Description |
-|------|------|-------------|
-| `create_work_order` | `OPERATOR`+ | Create a WO from chat — routes via Sentry create-work-order endpoint |
-| `close_work_order` | `OPERATOR`+ | Close a WO by code — sets status to `completed`, records resolution and actual duration. Used by FM chat; tech bot uses `technician-closeout` skill instead |
+**Trigger:** Technician sends `done #WO-XXXX` (or `done WO-XXXX`) on Telegram.
 
-Both require the `MAINTENANCE` module and `OPERATOR` role minimum.
+**Steps:**
 
-## Technician closeout skill
+1. **Parse** — Extract WO code, look up equipment type
+2. **Checklist** — Prompt one inspection item at a time (mobile-friendly), map answers to `ok`/`warning`/`critical`
+3. **AI Diagnosis** — Cross-reference checklist answers, generate findings summary
+4. **POST** — Submit inspection result to `POST /api/sentry/inspection-result`
+5. **Advance Milestone** — `PATCH /api/sentry/wo-milestone` with `milestone: "resolved"`, `outcome: "fixed"|"parts_needed"|"escalate"`, `notes: "{ai_diagnosis}"`
+6. **Notify FM** — Send findings summary to FM manager via `sentrybot message send`
 
-Tech bot trigger: `done #WO-XXXX`
+If milestone advance fails, FM notification includes: `⚠️ WO milestone sync pending — FM to verify closeout in SENTINEL.`
 
-The `technician-closeout` skill runs a stateful multi-step debrief (one checklist item at a time), collects evidence, and on completion calls `_complete_service_record_and_restore_equipment` in `work_order_notifier.py`, which:
+---
 
-1. Marks SR as `complete`
-2. Resolves active alerts and predictions for the equipment
-3. Sets equipment `status` → `normal`
-4. Restores equipment `health_score` (see [health scoring](../04-features/health-scoring-system.md#service-record-health-impact))
+## Work Orders Table Columns
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | UUID | Primary key |
+| `code` | TEXT | Unique work order code (e.g. `WO-2026-0001`) |
+| `milestone_status` | TEXT | Current milestone: `assigned`, `in_progress`, `resolved`, `verified` |
+| `status` | TEXT | Legacy status: `scheduled`, `in_progress`, `completed`, `cancelled` |
+| `assigned_at` | TIMESTAMPTZ | When WO was assigned (SAST, UTC+02:00) |
+| `in_progress_at` | TIMESTAMPTZ | When technician started work |
+| `resolved_at` | TIMESTAMPTZ | When on-site work completed |
+| `verified_at` | TIMESTAMPTZ | When FM verified closeout |
+| `sla_hours` | JSONB | Per-milestone hours: `{"assigned": 24, "in_progress": 48, "resolved": 72, "verified": 168}` |
+| `sla_deadline_at` | TIMESTAMPTZ | Materialised deadline for current milestone (null when verified) |
+| `assigned_to` | TEXT | Technician name |
+| `equipment_id` | UUID | Link to equipment |
+| `site_id` | UUID | Link to site |
+
+Indexes: `idx_work_orders_milestone_status`, `idx_work_orders_sla_deadline`, `idx_work_orders_assigned_at`
+
+---
 
 ## Implementation
 
-- Slash command router: `backend/app/services/slash_command_router.py`
-- Sentry WO endpoint: `backend/app/api/sentry_webhooks.py`
-- Claude tools: `backend/app/services/chat_tools.py` (`create_work_order_chat`, `close_work_order_chat`)
-- Closeout handler: `backend/app/services/sentry_integration/work_order_notifier.py` (`_complete_service_record_and_restore_equipment`, `_restore_equipment_health`)
-- Standard API: `backend/app/api/work_orders.py`
-- Repository: `backend/app/database/repositories/work_order_repository.py`
+- **Sentry WO endpoint:** `backend/app/api/sentry_webhooks.py`
+- **Milestone advance:** `WorkOrderRepository.advance_work_order_milestone()` in `backend/app/database/repositories/work_order_repository.py`
+- **Technician closeout skill:** `/home/bederf/.sentry/technician-workspace/skills/technician-closeout/SKILL.md`
+- **Slash command router:** `backend/app/services/slash_command_router.py`
+- **Standard API:** `backend/app/api/work_orders.py`
+- **Repository:** `backend/app/database/repositories/work_order_repository.py`
+- **Migration:** `supabase/migrations/209_milestone_sla_work_orders.sql`

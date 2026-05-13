@@ -11,7 +11,7 @@
  */
 
 import { useState } from "react";
-import { Dialog, DialogPanel } from "@tremor/react";
+
 import {
   X,
   AlertTriangle,
@@ -193,9 +193,10 @@ export function PredictionDetail({ prediction, isOpen, onClose, onCreateWorkOrde
     : 0;
 
   return (
-    <Dialog open={isOpen} onClose={onClose} className="z-50">
-      <DialogPanel
-        className="w-full h-full md:w-2/3 md:h-auto md:max-w-5xl md:max-h-[90vh] md:overflow-y-auto md:rounded"
+    <>{isOpen && <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
+      <div
+        className="relative z-10 w-full h-full md:w-2/3 md:h-auto md:max-w-5xl md:max-h-[90vh] md:overflow-y-auto md:rounded"
         style={{
           background: "var(--color-grafana-bg-canvas)",
           border: "1px solid var(--color-grafana-border)",
@@ -906,8 +907,8 @@ export function PredictionDetail({ prediction, isOpen, onClose, onCreateWorkOrde
             </button>
           </div>
         </div>
-      </DialogPanel>
-    </Dialog>
+      </div>
+    </div>}</>
   );
 }
 

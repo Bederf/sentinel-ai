@@ -375,18 +375,18 @@ async def handle_client_complaint(
         if wo_code:
             await sender.send_text(
                 chat_id,
-                f"Work order <b>{wo_code}</b> created.\n\n"
-                f"Category: {session.answers.get('category', 'general')}\n"
+                f"Logged! Ref: <b>{wo_code}</b>\n"
+                f"Issue: {session.answers.get('category', 'general').title()}\n"
                 f"Location: {session.answers.get('location_text', 'Not specified')}\n"
-                f"Priority: {priority}\n\n"
-                "A technician will be assigned shortly.",
+                "Our team has been notified.",
             )
         else:
             await sender.send_text(
                 chat_id,
-                "Your report has been logged. A work order will be created shortly.\n\n"
-                f"Category: {session.answers.get('category', 'general')}\n"
-                f"Location: {session.answers.get('location_text', 'Not specified')}",
+                "Your report has been logged.\n"
+                f"Issue: {session.answers.get('category', 'general').title()}\n"
+                f"Location: {session.answers.get('location_text', 'Not specified')}\n"
+                "Our team has been notified.",
             )
 
         mgr.end_session(chat_id)
@@ -774,7 +774,7 @@ async def handle_unknown(
     kb = InlineKeyboard(
         rows=[
             [InlineButton("Report a problem", "menu:start:complaint")],
-            [InlineButton("Start inspection", "menu:start:inspection")],
+            [InlineButton("Equipment info", "menu:start:inspection")],
             [InlineButton("Check work order", "menu:start:wo_check")],
         ]
     )
@@ -871,6 +871,79 @@ async def handle_ghost_room(
         logger.warning("Failed to resolve ghost signal: %s", exc)
 
 
+async def handle_focus_room(
+    chat_id: str,
+    text: str,
+    callback_data: str | None = None,
+    message_id: int | None = None,
+) -> None:
+    """Handle focus room confirm-buttons: focus:occupied:{room_code} or focus:empty:{room_code}."""
+    sender = get_telegram_sender()
+
+    if not callback_data:
+        await sender.send_text(chat_id, "Invalid button press.")
+        return
+
+    parts = callback_data.split(":")
+    if len(parts) != 3 or parts[0] != "focus":
+        await sender.send_text(chat_id, "Unknown focus room action.")
+        return
+
+    action, room_code = parts[1], parts[2]
+
+    confirmed_by = f"telegram:{chat_id}"
+
+    if action == "occupied":
+        from app.services import occupancy_store
+
+        active = occupancy_store.get_active_session(room_code)
+        if active:
+            occupancy_store.extend_overstay_grace(active.session_id, 10)
+            logger.info(
+                "Overstay grace +10min via concierge confirm: room=%s session=%s",
+                room_code, active.session_id,
+            )
+        status_text = "occupied"
+    else:
+        # Room is now empty — close the session, turn off the relay.
+        from datetime import datetime
+
+        from app.services import occupancy_store
+        from app.services.focus_room_relay_service import sync_focus_room_relay
+        from app.services.space_mqtt_listener import get_node_room_mapping
+
+        mapping = get_node_room_mapping()
+        resolved_site = "site-002"
+        for _node_id, node in mapping.items():
+            if node.get("room_code") == room_code and node.get("site_id"):
+                resolved_site = node["site_id"]
+                break
+
+        active = occupancy_store.get_active_session(room_code)
+        if active:
+            occupancy_store.close_session(active.session_id, datetime.utcnow())
+            logger.info("Focus session closed via concierge confirm: room=%s session=%s", room_code, active.session_id)
+
+        sync_focus_room_relay(site_id=resolved_site, room_code=room_code)
+        status_text = "empty"
+
+    # Update inline buttons to show selection
+    kb = InlineKeyboard(rows=[[InlineButton(f"✓ {status_text.capitalize()}", callback_data)]])
+    if message_id:
+        try:
+            await sender.edit_message_reply_markup(chat_id, message_id, keyboard=kb)
+        except Exception:
+            pass
+
+    with contextlib.suppress(Exception):
+        await sender.edit_message_reply_markup(chat_id, message_id, keyboard=None)
+
+    await sender.send_text(
+        chat_id,
+        f"Recorded: {room_code} marked {status_text}. Thank you!",
+    )
+
+
 # ===================================================================
 # Router
 # ===================================================================
@@ -891,6 +964,8 @@ async def route_to_handler(
         TelegramIntent.CHECKLIST_REPLY: _handle_checklist_reply,
         TelegramIntent.AD_HOC_FAULT: handle_adhoc_fault,
         TelegramIntent.GHOST_ROOM: handle_ghost_room,
+        TelegramIntent.FOCUS_ROOM: handle_focus_room,
+        TelegramIntent.STAFF_STATUS: _handle_staff_wo_status,
         TelegramIntent.UNKNOWN: handle_unknown,
     }
     handler = handlers.get(intent, handle_unknown)
@@ -982,29 +1057,46 @@ async def _create_complaint_wo(
                 site_result = sb.table("sites").select("id").eq("code", "site-002").execute()
                 if site_result.data:
                     site_id = site_result.data[0]["id"]
-                    tech_result = (
-                        sb.table("site_technicians")
-                        .select("specialty, technicians(id, name, email, phone, telegram_id)")
-                        .eq("site_id", site_id)
-                        .eq("specialty", category)
-                        .eq("is_primary", True)
-                        .execute()
-                    )
-                    if tech_result.data:
-                        tech = tech_result.data[0].get("technicians", {})
 
-                    # Fallback to general specialty
-                    if not tech and category != "general":
+                    # Try site_technicians specialty match (if table exists)
+                    try:
                         tech_result = (
                             sb.table("site_technicians")
                             .select("specialty, technicians(id, name, email, phone, telegram_id)")
                             .eq("site_id", site_id)
-                            .eq("specialty", "general")
+                            .eq("specialty", category)
                             .eq("is_primary", True)
                             .execute()
                         )
                         if tech_result.data:
                             tech = tech_result.data[0].get("technicians", {})
+
+                        # Fallback: general specialty
+                        if not tech and category != "general":
+                            tech_result = (
+                                sb.table("site_technicians")
+                                .select("specialty, technicians(id, name, email, phone, telegram_id)")
+                                .eq("site_id", site_id)
+                                .eq("specialty", "general")
+                                .eq("is_primary", True)
+                                .execute()
+                            )
+                            if tech_result.data:
+                                tech = tech_result.data[0].get("technicians", {})
+                    except Exception:
+                        pass  # site_technicians may not exist
+
+                    # Last resort: any active technician with a Telegram ID
+                    if not tech:
+                        try:
+                            tech_result = sb.table("technicians").select(
+                                "id, name, email, phone, telegram_id"
+                            ).eq("active", True).execute()
+                            with_telegram = [t for t in (tech_result.data or []) if t.get("telegram_id")]
+                            if with_telegram:
+                                tech = with_telegram[0]
+                        except Exception:
+                            pass
         except Exception as e:
             logger.warning("Complaint WO technician lookup failed: %s", e)
 
@@ -1026,6 +1118,12 @@ async def _create_complaint_wo(
                 })
             except Exception as e:
                 logger.warning("Complaint WO notification failed: %s", e)
+
+        # Notify manager (FM) via Telegram — direct send bypassing technician routing
+        await _notify_manager_of_complaint_wo(wo_code, title, category, location, priority, str(wo_uuid) if wo_uuid else None)
+
+        # Email facilities desk
+        await _email_facilities_desk(wo_code, title, category, location, priority, description)
 
         return wo_code
     except Exception as e:
@@ -1100,7 +1198,226 @@ async def _update_wo_status(wo_code: str, new_status: str) -> bool:
         if new_status == "completed":
             update_data["completed_at"] = datetime.utcnow().isoformat()
         await wo_repo.update_work_order(wo["id"], update_data)
+
+        # Notify staff reporter when WO is completed
+        if new_status == "completed":
+            created_by = wo.get("created_by", "")
+            if created_by and "sentry:call_log:" in created_by:
+                reporter_telegram_id = created_by.split("sentry:call_log:")[-1].split(":")[0].strip()
+                if reporter_telegram_id:
+                    _notify_reporter_completed.delay(wo_code, reporter_telegram_id, wo.get("title", "Your report"))
+
         return True
     except Exception as e:
         logger.warning("WO status update failed for %s: %s", wo_code, e)
         return False
+
+
+def _notify_reporter_completed(wo_code: str, reporter_telegram_id: str, title: str) -> None:
+    """Send Telegram message to staff reporter when their WO is resolved."""
+    try:
+        from app.services.notification_providers import TelegramProvider
+
+        provider = TelegramProvider()
+        if not provider.is_enabled():
+            return
+
+        msg = (
+            f"✅ Your report has been resolved.\n"
+            f"Ref: {wo_code}\n"
+            f"Issue: {title}\n\n"
+            f"If you need any follow-up, message me again."
+        )
+        # Fire-and-forget — TelegramProvider.send is sync but we don't need to await
+        provider.send(reporter_telegram_id, "Work Order Resolved", msg)
+    except Exception as e:
+        logger.warning("Failed to notify reporter %s for WO %s: %s", reporter_telegram_id, wo_code, e)
+
+
+async def _handle_staff_wo_status(
+    chat_id: str,
+    text: str,
+    callback_data: str | None = None,
+    message_id: int | None = None,
+) -> None:
+    """Handle /status_WO-{code} — staff follow-up on their own reported WO."""
+    import httpx
+    from app.services.telegram_message_sender import get_telegram_sender
+
+    sender = get_telegram_sender()
+
+    # Extract WO code from message (e.g., "/status_WO-2026-0004" -> "WO-2026-0004")
+    m = re.match(r"^/status_WO[-_]\s*([A-Za-z0-9][\w-]*)\s*$", text.strip(), re.DOTALL)
+    if not m:
+        await sender.send_text(chat_id, "Usage: /status_WO-{code} (e.g. /status_WO-2026-0004)")
+        return
+
+    raw_code = m.group(1).strip()
+    # Normalize: "2026-0004" -> "WO-2026-0004", "WO-2026-0004" -> "WO-2026-0004"
+    if raw_code.startswith("WO-"):
+        wo_code = raw_code
+    else:
+        wo_code = f"WO-{raw_code}"
+
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.get(
+                f"{settings.api_base_url}/api/sentry/wo-status",
+                params={"code": wo_code},
+                headers={
+                    "X-Sentry-API-Key": settings.sentry_bot_api_key or "",
+                    "X-Sentry-Secret": settings.sentry_webhook_secret or "",
+                },
+            )
+        if resp.status_code == 200:
+            data = resp.json()
+        else:
+            data = {}
+    except Exception:
+        data = {}
+
+    if not data.get("found"):
+        await sender.send_text(
+            chat_id,
+            f"Couldn't find work order `{wo_code}`. Please check the reference number and try again.",
+        )
+        return
+
+    status = data.get("status", "unknown")
+    priority = data.get("priority", "")
+    category = data.get("category", "")
+    title = data.get("title", "")
+    notes = data.get("notes", "")
+    assigned_to = data.get("assigned_to", "")
+    created_at = data.get("created_at", "")
+    updated_at = data.get("updated_at", "")
+    completed_at = data.get("completed_at", "")
+
+    status_emoji = {"completed": "✅", "in_progress": "🔄", "scheduled": "📋", "blocked": "⛔"}.get(
+        status, "📋"
+    )
+
+    lines = [
+        f"{status_emoji} Work Order {wo_code}",
+        "",
+        f"**Status:** {status.title()}",
+    ]
+    if priority:
+        lines.append(f"**Priority:** {priority.title()}")
+    if category:
+        lines.append(f"**Category:** {category}")
+    if title:
+        lines.append(f"**Issue:** {title}")
+    if assigned_to:
+        lines.append(f"**Assigned to:** {assigned_to}")
+    if created_at:
+        lines.append(f"**Created:** {created_at[:16] if len(created_at) > 16 else created_at}")
+    if updated_at:
+        lines.append(f"**Updated:** {updated_at[:16] if len(updated_at) > 16 else updated_at}")
+    if completed_at:
+        lines.append(f"**Completed:** {completed_at[:16] if len(completed_at) > 16 else completed_at}")
+    if notes:
+        lines.append(f"**Notes:** {notes}")
+
+    await sender.send_text(chat_id, "\n".join(lines))
+
+
+async def _notify_manager_of_complaint_wo(
+    wo_code: str,
+    title: str,
+    category: str,
+    location: str,
+    priority: str,
+    wo_uuid: str | None,
+) -> None:
+    """Send Telegram notification to FM/manager when a complaint WO is created.
+
+    Manager is the FM bot (@bederf_bot) — sent directly via Telegram Bot API,
+    not through Sentry CLI (which routes through technician account).
+    """
+    from app.config.settings import settings
+    from app.services.notification_providers import TelegramProvider
+
+    fm_chat_id = str(getattr(settings, "sentinel_fm_chat_id", "") or "").strip()
+    if not fm_chat_id:
+        fm_chat_id = str(getattr(settings, "telegram_alert_chat_id", "") or "").strip()
+    if not fm_chat_id:
+        logger.warning("[COMPLAINT-WO] No FM chat ID configured — skipping manager notification")
+        return
+
+    pri_label = priority.upper()
+    msg = (
+        f"📋 New work order: <b>{wo_code}</b>\n"
+        f"Issue: {title}\n"
+        f"Location: {location}\n"
+        f"Category: {category}\n"
+        f"Priority: {pri_label}\n"
+        f"Source: Staff complaint via Telegram"
+    )
+
+    provider = TelegramProvider()
+    if not provider.is_enabled():
+        logger.warning("[COMPLAINT-WO] Telegram provider not enabled — skipping FM notification")
+        return
+
+    try:
+        result = await provider.send(recipient=fm_chat_id, title=f"Work Order {wo_code}", body=msg)
+        if result.success:
+            logger.info("[COMPLAINT-WO] FM notification sent for %s", wo_code)
+        else:
+            logger.warning("[COMPLAINT-WO] FM notification failed for %s: %s", wo_code, result.error_message)
+    except Exception as e:
+        logger.warning("[COMPLAINT-WO] FM notification error for %s: %s", wo_code, e)
+
+
+
+async def _email_facilities_desk(
+    wo_code: str,
+    title: str,
+    category: str,
+    location: str,
+    priority: str,
+    description: str,
+) -> None:
+    """Send email to facilities desk when a complaint work order is created.
+
+    Uses the native SMTP notification service (workorder@sentinel-ai.co.za).
+    """
+    facilities_email = "facilities@sentinel-ai.co.za"
+    subject = f"New Work Order: {wo_code} — {title}"
+    body = (
+        f"New work order logged via Sentinel Staff Bot.\n\n"
+        f"WO Reference: {wo_code}\n"
+        f"Issue: {title}\n"
+        f"Category: {category}\n"
+        f"Location: {location}\n"
+        f"Priority: {priority.upper()}\n"
+        f"Status: OPEN (pending technician assignment)\n\n"
+        f"Description:\n{description}\n\n"
+        f"---\n"
+        f"SENTINEL BMS Intelligence\n"
+        f"Report: https://bms.sentinel-ai.co.za/work-orders/{wo_code}"
+    )
+
+    try:
+        from app.services.email_reply_service import get_email_reply_service
+
+        email_svc = get_email_reply_service()
+        if not email_svc.is_configured():
+            logger.warning("[COMPLAINT-WO] Email service not configured — skipping facilities email")
+            return
+
+        # Reuse the same SMTP path as WO email notifications
+        from app.services.sentry_integration.work_order_notifier import WorkOrderNotifier
+        notifier = WorkOrderNotifier()
+        sent = await notifier._send_email_via_native_smtp(
+            to_email=facilities_email,
+            subject=subject,
+            body=body,
+        )
+        if sent:
+            logger.info("[COMPLAINT-WO] Facilities email sent for %s", wo_code)
+        else:
+            logger.warning("[COMPLAINT-WO] Facilities email returned False for %s", wo_code)
+    except Exception as e:
+        logger.warning("[COMPLAINT-WO] Facilities email failed for %s: %s", wo_code, e)

@@ -9,8 +9,7 @@
  */
 
 import { useState, useEffect, useRef } from "react";
-import { Flex, Grid, Button, Text } from "@tremor/react";
-import { Thermometer, AlertTriangle, Fan, Settings } from "lucide-react";
+import { Thermometer, AlertTriangle, Settings, Pencil } from "lucide-react";
 import { hvacApi, type HVACZone } from "../../lib/hvacApi";
 import TemperatureControl from "../TemperatureControl";
 
@@ -131,9 +130,13 @@ export function ZoneOverviewPanel({ siteId, compact = false, onZoneSelect }: Zon
       <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
         <h3 className="font-medium text-lg" style={{ color: "var(--color-sentinel-text-primary)" }}>Zone Overview</h3>
         <p className="text-red-500 mt-4">{error}</p>
-        <Button size="xs" className="mt-2" onClick={() => { setError(null); loadZonesRef.current?.(); }}>
+        <button
+          className="mt-2 text-xs px-3 py-1.5 rounded font-medium"
+          style={{ background: "var(--color-sentinel-bg-secondary)", color: "var(--color-sentinel-text-primary)", border: "1px solid var(--color-sentinel-border)" }}
+          onClick={() => { setError(null); loadZonesRef.current?.(); }}
+        >
           Retry
-        </Button>
+        </button>
       </div>
     );
   }
@@ -170,61 +173,39 @@ export function ZoneOverviewPanel({ siteId, compact = false, onZoneSelect }: Zon
           {!compact && (
             <Text className="font-medium text-sm mb-2" style={{ color: "var(--color-sentinel-text-disabled)" }}>Floor {floor}</Text>
           )}
-          <Grid className={`grid ${compact ? 'grid-cols-2' : 'grid-cols-3'} gap-3`}>
+          <div className={`grid ${compact ? 'grid-cols-2' : 'grid-cols-3'} gap-3`}>
             {floorZones.map((zone) => (
               <div
                 key={zone.zone_id}
-                className="rounded-md p-4 cursor-pointer hover:ring-2 hover:ring-blue-500/30 transition-all"
+                className="rounded-md p-3 cursor-pointer hover:ring-2 hover:ring-blue-500/30 transition-all"
                 style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}
                 onClick={() => !editingZone && onZoneSelect?.(zone)}
               >
-                {/* Zone Header */}
-                <Flex justifyContent="between" alignItems="start" className="mb-3">
-                  <div>
-                    <span className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>{zone.zone_name}</span>
-                    <p className="text-xs" style={{ color: "var(--color-sentinel-text-disabled)" }}>
-                      {zone.fcu_id || zone.ahu_id || "No FCU"}
-                    </p>
-                  </div>
+                {/* Header */}
+                <div className="flex items-start justify-between mb-2">
+                  <span className="text-xs font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                    {zone.fcu_id || zone.ahu_id || zone.zone_name}
+                  </span>
                   <span
-                    className="text-xs px-2 py-0.5 rounded capitalize"
+                    className="text-[10px] px-1.5 py-0.5 rounded capitalize"
                     style={getChipStyle(getStatusColor(zone.status))}
                   >
                     {zone.status}
                   </span>
-                </Flex>
-
-                {/* Temperature Display */}
-                <div className="mb-3">
-                  <Flex alignItems="baseline" className="gap-1">
-                    <span
-                      className="text-3xl font-bold"
-                      style={{ color: getDeviationColor(zone.temp_deviation ?? 0) }}
-                    >
-                      {zone.current_temp != null ? zone.current_temp.toFixed(1) : "--"}
-                    </span>
-                    <span style={{ color: "var(--color-sentinel-text-disabled)" }}>°C</span>
-                  </Flex>
-
-                  {/* Deviation indicator */}
-                  {zone.temp_deviation != null && Math.abs(zone.temp_deviation) > 0.5 && (
-                    <Flex alignItems="center" className="gap-1 mt-1">
-                      <AlertTriangle
-                        className="w-3 h-3"
-                        style={{ color: getDeviationColor(zone.temp_deviation) }}
-                      />
-                      <Text
-                        className="text-xs"
-                        style={{ color: getDeviationColor(zone.temp_deviation) }}
-                      >
-                        {zone.temp_deviation > 0 ? "+" : ""}
-                        {zone.temp_deviation.toFixed(1)}°C from setpoint
-                      </Text>
-                    </Flex>
-                  )}
                 </div>
 
-                {/* Setpoint Control */}
+                {/* Temp */}
+                <div className="flex items-baseline gap-1 mb-2">
+                  <span
+                    className="text-2xl font-bold tabular-nums"
+                    style={{ color: getDeviationColor(zone.temp_deviation ?? 0) }}
+                  >
+                    {zone.current_temp != null ? zone.current_temp.toFixed(1) : "--"}
+                  </span>
+                  <span className="text-xs" style={{ color: "var(--color-sentinel-text-disabled)" }}>°C</span>
+                </div>
+
+                {/* Setpoint row */}
                 {editingZone === zone.zone_id ? (
                   <div onClick={(e) => e.stopPropagation()}>
                     <TemperatureControl
@@ -237,70 +218,39 @@ export function ZoneOverviewPanel({ siteId, compact = false, onZoneSelect }: Zon
                       onChange={(value) => handleSetpointChange(zone.zone_id, value)}
                       disabled={zone.status === "offline"}
                     />
-                    <Button
-                      size="xs"
-                      variant="secondary"
-                      className="mt-2"
+                    <button
                       onClick={() => setEditingZone(null)}
+                      className="mt-2 text-xs px-2 py-1 rounded"
+                      style={{ background: "var(--color-sentinel-bg-secondary)", color: "var(--color-sentinel-text-secondary)" }}
                     >
                       Cancel
-                    </Button>
+                    </button>
                   </div>
                 ) : (
-                  <Flex
-                    justifyContent="between"
-                    alignItems="center"
-                    className="p-2 rounded"
+                  <div
+                    className="flex items-center justify-between px-2 py-1 rounded"
                     style={{ background: "var(--color-sentinel-bg-secondary)" }}
                   >
-                    <Flex alignItems="center" className="gap-2">
-                      <Thermometer
-                        className="w-4 h-4"
-                        style={{ color: "var(--color-sentinel-blue)" }}
-                      />
-                      <Text className="text-sm">
-                        Setpoint: <span className="font-medium">{zone.setpoint}°C</span>
-                      </Text>
-                    </Flex>
-                    <Button
-                      size="xs"
-                      variant="secondary"
-                      icon={Settings}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setEditingZone(zone.zone_id);
-                      }}
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <Thermometer className="w-3 h-3 shrink-0" style={{ color: "var(--color-sentinel-blue)" }} />
+                      <span className="text-xs truncate" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                        {zone.setpoint}°C
+                      </span>
+                    </div>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setEditingZone(zone.zone_id); }}
                       disabled={zone.status === "offline"}
+                      className="p-1 rounded transition-colors shrink-0"
+                      style={{ color: "var(--color-sentinel-text-disabled)" }}
+                      title="Adjust setpoint"
                     >
-                      Adjust
-                    </Button>
-                  </Flex>
-                )}
-
-                {/* Equipment Info */}
-                {!compact && (
-                  <Flex className="mt-3 gap-4 text-xs" style={{ color: "var(--color-sentinel-text-disabled)" }}>
-                    {zone.fcu_id && (
-                      <Flex alignItems="center" className="gap-1">
-                        <Fan className="w-3 h-3" />
-                        <span>{zone.fcu_id}</span>
-                        {zone.fcu_health !== undefined && zone.fcu_health !== null && (
-                          <span
-                            className="text-xs px-2 py-0.5 rounded"
-                            style={getChipStyle(zone.fcu_health >= 80 ? "green" : zone.fcu_health >= 60 ? "amber" : "red")}
-                          >
-                            {zone.fcu_health}%
-                          </span>
-                        )}
-                      </Flex>
-                    )}
-                    <span>Area: {zone.area_sqm}m²</span>
-                    <span>Occ: {zone.typical_occupancy}</span>
-                  </Flex>
+                      <Pencil className="w-3 h-3" />
+                    </button>
+                  </div>
                 )}
               </div>
             ))}
-          </Grid>
+          </div>
         </div>
       ))}
     </div>

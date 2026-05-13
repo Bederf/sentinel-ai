@@ -22,17 +22,16 @@ function normalizeSiteId(siteId: string): string {
 }
 
 function authHeaders(): Record<string, string> {
-  const token = localStorage.getItem("sentinel_token");
+  // Note: authorizedFetch handles auth internally via in-memory access token
   return {
     "Content-Type": "application/json",
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 }
 
 async function fetchJson<T>(endpoint: string): Promise<T> {
   try {
     const res = await authorizedFetch(`${API_BASE_URL}${endpoint}`, {
-      headers: authHeaders(),
+      headers: { "Content-Type": "application/json" },
     }, true);
     if (!res.ok) {
       let msg = res.statusText;

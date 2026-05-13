@@ -7,19 +7,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Leaf, CloudOff } from 'lucide-react';
-import {
-  Card,
-  Title,
-  Text,
-  Grid,
-  Badge,
-  Button,
-  Flex,
-  BarChart,
-  DonutChart,
-  Metric,
-  BarList,
-} from '@tremor/react';
+
 import { PageLoading } from '../PageLoading';
 import { sustainabilityApi } from '../../lib/sustainabilityApi';
 import type {

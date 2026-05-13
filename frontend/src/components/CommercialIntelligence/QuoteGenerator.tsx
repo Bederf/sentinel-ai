@@ -18,16 +18,7 @@
  */
 
 import { useState, useEffect } from 'react'
-import {
-  Card,
-  Button,
-  TextInput,
-  Text,
-  Title,
-  Badge,
-  Grid,
-  Col,
-} from '@tremor/react'
+
 import {
   AlertCircle,
   CheckCircle2,

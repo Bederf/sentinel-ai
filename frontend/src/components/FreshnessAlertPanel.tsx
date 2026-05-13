@@ -7,6 +7,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { WifiOff, Clock, RefreshCw, AlertTriangle } from "lucide-react";
+import { getAccessToken } from "@/lib/api";
 
 interface FreshnessBreach {
   id: string;
@@ -127,7 +128,7 @@ export function FreshnessAlertPanel({ onDismiss: _onDismiss }: FreshnessAlertPan
 
   const fetchBreaches = useCallback(async () => {
     try {
-      const sentryToken = localStorage.getItem("sentinel_token");
+      const sentryToken = getAccessToken();
       if (!sentryToken) {
         setError("Not authenticated");
         setLoading(false);
@@ -138,6 +139,7 @@ export function FreshnessAlertPanel({ onDismiss: _onDismiss }: FreshnessAlertPan
         headers: {
           "Authorization": `Bearer ${sentryToken}`,
           "X-Sentry-API-Key": "sentry-bot-RncXWQCYticUnuG06L4qnSUj-heKAeV0NnMdHOvIlKM3TNUv",
+          "X-Sentry-Secret": "sentry-bms-phase-41",
         },
       });
 

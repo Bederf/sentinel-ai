@@ -1337,8 +1337,8 @@ async def get_optimization_status(site_id: str, request: Request) -> dict[str, A
         Site optimization status with history
     """
     try:
-        sites = load_sites() or []
-        site = next((s for s in sites if s.get("id") == site_id), None)
+        site_repo = SiteRepository()
+        site = site_repo.get_by_id(site_id)
 
         if not site:
             raise HTTPException(status_code=404, detail=f"Site {site_id} not found")
@@ -1347,26 +1347,55 @@ async def get_optimization_status(site_id: str, request: Request) -> dict[str, A
         history = site.get("optimization_history") or []
         savings_summary = calculate_monthly_savings(history)
 
-        # Build status response (use 'or' pattern since .get() default doesn't work when key exists with None)
-        default_settings = {
-            "mode": "supervised",
-            "last_analysis": None,
-            "analysis_interval_minutes": 15,
+        # Fetch onboarding phase from Supabase — this is the master policy gate
+        try:
+            from app.database.supabase_client import get_supabase_client
+            client = get_supabase_client()
+            phase_row = client.table("sites").select("onboarding_phase").eq("code", site_id).limit(1).execute()
+            onboarding_phase = phase_row.data[0].get("onboarding_phase", "commissioning") if phase_row.data else "commissioning"
+        except Exception:
+            onboarding_phase = site.get("onboarding_phase", "commissioning")
+
+        # Build optimization_settings response with canonical fields
+        raw_settings = site.get("optimization_settings") or {}
+        normalized_settings = {
+            "mode": raw_settings.get("control_tier") or "supervised",
+            "active_profile": raw_settings.get("active_profile", "balanced"),
+            "control_tier": raw_settings.get("control_tier", "supervised"),
+            "last_analysis": raw_settings.get("last_analysis"),
+            "analysis_interval_minutes": raw_settings.get("analysis_interval_minutes", 15),
         }
 
-        # Extract routing info from last recommendation (Phase 82-04)
+        # Derive a meaningful optimization_status from actual state
         last_recommendation = site.get("last_recommendation")
+        last_optimization = site.get("last_optimization")
+        if not site.get("optimization_enabled"):
+            derived_status = "disabled"
+        elif last_recommendation and last_recommendation.get("status") == "pending":
+            derived_status = "recommendation_pending"
+        elif last_optimization:
+            derived_status = "optimized"
+        elif site.get("error_message"):
+            derived_status = "error"
+        elif onboarding_phase in ("commissioning", "shadow_live"):
+            derived_status = "learning"
+        else:
+            derived_status = "active"
+
+        # Extract routing info from last recommendation (Phase 82-04)
         routing_summary = last_recommendation.get("routing_summary") if last_recommendation else None
         control_tier = last_recommendation.get("control_tier") if last_recommendation else None
 
         status = {
             "site_id": site.get("id"),
             "site_name": site.get("name"),
+            "onboarding_phase": onboarding_phase,
             "optimization_enabled": site.get("optimization_enabled") or False,
-            "optimization_status": site.get("optimization_status") or OptimizationStatus.UNKNOWN.value,
-            "optimization_settings": site.get("optimization_settings") or default_settings,
+            "optimization_status": derived_status,
+            "active_profile": raw_settings.get("active_profile", "balanced"),
+            "optimization_settings": normalized_settings,
             "last_recommendation": last_recommendation,
-            "last_optimization": site.get("last_optimization"),
+            "last_optimization": last_optimization,
             "optimization_history": history,
             "error_message": site.get("error_message"),
             "monthly_savings": savings_summary,
@@ -1398,14 +1427,11 @@ async def toggle_optimization(site_id: str, request: ToggleRequest) -> dict[str,
         Updated optimization settings
     """
     try:
-        sites = load_sites() or []
-        site = next((s for s in sites if s.get("id") == site_id), None)
+        site_repo = SiteRepository()
+        site = site_repo.get_by_id(site_id)
 
         if not site:
             raise HTTPException(status_code=404, detail=f"Site {site_id} not found")
-
-        # Update optimization enabled flag
-        site["optimization_enabled"] = request.enabled
 
         # Initialize optimization settings if not present or None
         if not site.get("optimization_settings"):
@@ -1424,8 +1450,12 @@ async def toggle_optimization(site_id: str, request: ToggleRequest) -> dict[str,
             site["optimization_status"] = OptimizationStatus.UNKNOWN.value
             site["last_recommendation"] = None
 
-        # Save to file
-        save_sites(sites)
+        # Update in Supabase
+        site_repo.update(site_id, {
+            "optimization_enabled": request.enabled,
+            "optimization_settings": site["optimization_settings"],
+            "optimization_status": site["optimization_status"],
+        })
 
         logger.info(f"Optimization {'enabled' if request.enabled else 'disabled'} for site {site_id}")
 

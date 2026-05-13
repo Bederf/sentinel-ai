@@ -6,7 +6,7 @@
  */
 
 import { useState } from 'react';
-import { Card, Text, Badge, Flex, Grid } from '@tremor/react';
+
 import { useModules } from '../../contexts/ModuleHooks';
 import { MODULE_COLORS } from '../../lib/moduleRegistry';
 import type { ModuleType, ModuleDefinition } from '../../lib/moduleRegistry';

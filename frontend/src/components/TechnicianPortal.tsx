@@ -38,12 +38,6 @@ export default function TechnicianPortal(): ReactElement {
   const fetchDashboardData = async () => {
     try {
       setLoading(true)
-      const token = localStorage.getItem('sentinel_token')
-      if (!token) {
-        setError('Session expired. Please sign in again.')
-        return
-      }
-
       const response = await authorizedFetch('/api/technician/dashboard')
       if (response.status === 401) {
         setError('Session expired. Please sign in again.')

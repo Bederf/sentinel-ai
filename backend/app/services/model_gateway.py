@@ -643,7 +643,9 @@ class ModelGateway:
         from_class_active = _settings_module.SENTINEL_BOT_DEFAULT_CLASS  # log as generic default
         to_class = _settings_module.SENTINEL_BOT_ESCALATION_CLASS  # "heavy"
 
-        mode, provider, model = self._resolve(to_class)
+        _mode, _fallback_enabled, _routes = self._resolve(to_class)
+        _primary_provider = _routes[0][0] if _routes else None
+        _primary_model = _routes[0][1] if _routes else None
 
         # Log the escalation BEFORE dispatching the call
         try:
@@ -653,17 +655,17 @@ class ModelGateway:
                 from_class=from_class_active,
                 to_class=to_class,
                 reason=reason.strip(),
-                mode=mode,
-                resolved_model=model,
+                mode=_mode,
+                resolved_model=_primary_model,
                 session_id=session_id,
-                provider=provider,
+                provider=_primary_provider,
             )
         except Exception as log_exc:
             # Never let logging failure block the escalated call
             logger.warning("escalation logging failed: %s", log_exc)
 
         logger.info(
-            "model_gateway.escalate reason='%s' to_class=%s mode=%s model=%s", reason.strip(), to_class, mode, model
+            "model_gateway.escalate reason='%s' to_class=%s mode=%s model=%s", reason.strip(), to_class, _mode, _primary_model
         )
 
         # Dispatch as a new routed call — not a retry

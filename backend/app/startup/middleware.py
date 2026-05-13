@@ -46,6 +46,7 @@ _PUBLIC_PATHS = {
     "/api/chat/status",  # Chat service availability check (no sensitive data)
     "/api/events/stream",  # SSE stream (handles own ticket-based auth, no JWT in URL)
     "/api/events/health",  # SSE health check
+    "/api/complaints/submit",  # Comfort complaint reporting (read-only, no controls)
 }
 _PUBLIC_PREFIXES = (
     "/api/visits/qr/",  # Visitor QR code images — token is the secret, no JWT needed

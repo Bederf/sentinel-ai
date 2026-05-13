@@ -1,10 +1,3 @@
-/**
- * Fire Equipment Tracking Panel
- *
- * NFPA 10 and SABS 4066 compliance for fire extinguishers, hose reels, hydrants, etc.
- */
-
-import { Card, Title, Table, TableHead, TableRow, TableHeaderCell, TableBody, TableCell, Button, Badge, Text } from '@tremor/react'
 import { useFireEquipment, useScheduleFireInspection } from '@/lib/api/compliance'
 
 interface FireEquipmentPanelProps {
@@ -29,82 +22,83 @@ export function FireEquipmentPanel({ siteCode }: FireEquipmentPanelProps) {
 
   return (
     <div className="space-y-6">
-      <Card>
-        <Title>Fire Equipment Inventory & Inspection Scheduling</Title>
-        <Text className="text-sm mt-2 mb-4">NFPA 10 & SABS 4066 Compliance</Text>
+      <div className="rounded-lg p-4" style={{ background: "var(--sentinel-bg-panel)", border: "1px solid var(--sentinel-border)" }}>
+        <h3 className="text-sm font-medium" style={{ color: "var(--sentinel-text-primary)" }}>Fire Equipment Inventory & Inspection Scheduling</h3>
+        <span className="text-sm mt-2 mb-4 block" style={{ color: "var(--sentinel-text-secondary)" }}>NFPA 10 & SABS 4066 Compliance</span>
 
         {equipment && equipment.length > 0 ? (
-          <Table className="mt-4">
-            <TableHead>
-              <TableRow>
-                <TableHeaderCell>Equipment Type</TableHeaderCell>
-                <TableHeaderCell>Location</TableHeaderCell>
-                <TableHeaderCell>Last Inspection</TableHeaderCell>
-                <TableHeaderCell>Next Due</TableHeaderCell>
-                <TableHeaderCell>Status</TableHeaderCell>
-                <TableHeaderCell>Action</TableHeaderCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
+          <table className="w-full text-sm mt-4">
+            <thead>
+              <tr className="border-b" style={{ borderColor: "var(--sentinel-border)" }}>
+                <th className="text-left py-2 font-medium" style={{ color: "var(--sentinel-text-secondary)" }}>Equipment Type</th>
+                <th className="text-left py-2 font-medium" style={{ color: "var(--sentinel-text-secondary)" }}>Location</th>
+                <th className="text-left py-2 font-medium" style={{ color: "var(--sentinel-text-secondary)" }}>Last Inspection</th>
+                <th className="text-left py-2 font-medium" style={{ color: "var(--sentinel-text-secondary)" }}>Next Due</th>
+                <th className="text-left py-2 font-medium" style={{ color: "var(--sentinel-text-secondary)" }}>Status</th>
+                <th className="text-left py-2 font-medium" style={{ color: "var(--sentinel-text-secondary)" }}>Action</th>
+              </tr>
+            </thead>
+            <tbody>
               {equipment.map((item) => {
-                /* eslint-disable react-hooks/purity */
                 const daysUntilDue = Math.ceil(
                   (new Date(item.next_inspection_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
                 )
-                /* eslint-enable react-hooks/purity */
                 const isOverdue = daysUntilDue < 0
                 const isDueSoon = daysUntilDue < 30 && daysUntilDue >= 0
 
                 return (
-                  <TableRow key={item.id}>
-                    <TableCell className="capitalize">{item.equipment_type.replace(/_/g, ' ')}</TableCell>
-                    <TableCell>{item.location_description}</TableCell>
-                    <TableCell>{new Date(item.last_inspection_date).toLocaleDateString()}</TableCell>
-                    <TableCell>{new Date(item.next_inspection_date).toLocaleDateString()}</TableCell>
-                    <TableCell>
-                      <Badge
-                        color={isOverdue ? 'red' : isDueSoon ? 'yellow' : 'green'}
+                  <tr key={item.id} className="border-b" style={{ borderColor: "var(--sentinel-border)" }}>
+                    <td className="py-2 capitalize">{item.equipment_type.replace(/_/g, ' ')}</td>
+                    <td className="py-2">{item.location_description}</td>
+                    <td className="py-2">{new Date(item.last_inspection_date).toLocaleDateString()}</td>
+                    <td className="py-2">{new Date(item.next_inspection_date).toLocaleDateString()}</td>
+                    <td className="py-2">
+                      <span
+                        className="text-xs px-2 py-0.5 rounded font-medium"
+                        style={{
+                          background: isOverdue ? "rgba(239, 68, 68, 0.15)" : isDueSoon ? "rgba(245, 158, 11, 0.15)" : "rgba(34, 197, 94, 0.15)",
+                          color: isOverdue ? "var(--sentinel-red)" : isDueSoon ? "var(--sentinel-amber)" : "var(--sentinel-green)",
+                        }}
                       >
                         {isOverdue ? 'OVERDUE' : isDueSoon ? 'DUE SOON' : 'OK'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Button
-                        size="xs"
+                      </span>
+                    </td>
+                    <td className="py-2">
+                      <button
+                        className="px-2 py-1 text-xs rounded font-medium"
+                        style={{ background: "var(--sentinel-bg-secondary)", color: "var(--sentinel-text-primary)" }}
                         onClick={() => handleScheduleInspection(item.id)}
                       >
                         Schedule
-                      </Button>
-                    </TableCell>
-                  </TableRow>
+                      </button>
+                    </td>
+                  </tr>
                 )
               })}
-            </TableBody>
-          </Table>
+            </tbody>
+          </table>
         ) : (
-          <div className="mt-4 p-4 text-center text-gray-500">
+          <div className="mt-4 p-4 text-center" style={{ color: "var(--sentinel-text-disabled)" }}>
             No fire equipment configured for this site.
           </div>
         )}
-      </Card>
+      </div>
 
-      {/* Inspection History */}
-      <Card>
-        <Title>Recent Inspections (12 months)</Title>
-        <Text className="text-sm mt-2">Calendar view of inspection schedules and completion dates</Text>
-        <div className="mt-4 p-4 text-center text-gray-500">
+      <div className="rounded-lg p-4" style={{ background: "var(--sentinel-bg-panel)", border: "1px solid var(--sentinel-border)" }}>
+        <h3 className="text-sm font-medium" style={{ color: "var(--sentinel-text-primary)" }}>Recent Inspections (12 months)</h3>
+        <span className="text-sm mt-2 block" style={{ color: "var(--sentinel-text-secondary)" }}>Calendar view of inspection schedules and completion dates</span>
+        <div className="mt-4 p-4 text-center" style={{ color: "var(--sentinel-text-disabled)" }}>
           Inspection calendar visualization
         </div>
-      </Card>
+      </div>
 
-      {/* Compliance Info */}
-      <Card className="border-l-4 border-red-500 bg-red-50">
-        <Title className="text-sm">Fire Safety Standards</Title>
-        <Text className="text-xs mt-2">
+      <div className="rounded-lg p-4" style={{ background: "rgba(239, 68, 68, 0.1)", borderLeft: "4px solid var(--sentinel-red)" }}>
+        <h3 className="text-sm font-medium" style={{ color: "var(--sentinel-text-primary)" }}>Fire Safety Standards</h3>
+        <span className="text-xs mt-2 block" style={{ color: "var(--sentinel-text-secondary)" }}>
           Fire equipment is subject to 12-month inspection intervals per NFPA 10. Pressure tests validate
           extinguisher integrity. Certification expiry must be tracked and renewed before expiration.
-        </Text>
-      </Card>
+        </span>
+      </div>
     </div>
   )
 }

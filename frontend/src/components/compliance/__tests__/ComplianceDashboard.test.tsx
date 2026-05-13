@@ -12,30 +12,7 @@ import React from 'react'
 import { ComplianceDashboard } from '../ComplianceDashboard'
 import * as complianceApi from '@/lib/api/compliance'
 
-vi.mock('@tremor/react', async () => {
-  const { createTremorMocks } = await import('@/test-utils/mockTremor')
-  return {
-    ...createTremorMocks(),
-    Title: ({ children, ...props }: any) =>
-      React.createElement('h3', { 'data-testid': 'title', ...props }, children),
-    Text: ({ children, ...props }: any) =>
-      React.createElement('span', { 'data-testid': 'text', ...props }, children),
-    Button: ({ children, onClick, size: _size, ...props }: any) =>
-      React.createElement('button', { onClick, ...props }, children),
-    Table: ({ children, ...props }: any) =>
-      React.createElement('table', props, children),
-    TableHead: ({ children }: any) =>
-      React.createElement('thead', null, children),
-    TableBody: ({ children }: any) =>
-      React.createElement('tbody', null, children),
-    TableRow: ({ children }: any) =>
-      React.createElement('tr', null, children),
-    TableHeaderCell: ({ children }: any) =>
-      React.createElement('th', null, children),
-    TableCell: ({ children, ...props }: any) =>
-      React.createElement('td', props, children),
-  }
-})
+// No-op: Tremor components have been replaced with plain HTML
 
 vi.mock('@/lib/api/compliance')
 

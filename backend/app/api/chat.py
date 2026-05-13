@@ -19,7 +19,6 @@ from app.security.constants import MAX_CHAT_MESSAGE_LENGTH
 from app.security.pipeline import prompt_guard, require_role
 from app.security.sse_buffer import SecureSSEBuffer
 from app.services import slash_command_router
-from app.services.ai_interfaces import get_chat_tools
 from app.services.claude_service import claude_service
 from app.services.feature_request_logger import log_chat_query
 from app.services.hybrid_ai_service import hybrid_ai_service
@@ -492,12 +491,6 @@ async def generate_sse_stream(
     # Secure SSE buffer: filters output through the 5-stage pipeline
     buffer = SecureSSEBuffer(user_role=user_role)
 
-    # Get tools if enabled (Minimax accepts OpenAI-format tools but won't use them)
-    available_tools = None
-    if use_tools:
-        with contextlib.suppress(Exception):
-            available_tools = get_chat_tools(site_id, user_email=user_email, user_role=user_role)
-
     try:
         if use_local_fallback:
             async for chunk in hybrid_ai_service.stream_response(
@@ -512,14 +505,54 @@ async def generate_sse_stream(
                     yield format_sse_chunk(safe_text)
                 if buffer.killed:
                     break
+        elif use_tools:
+            streamed = False
+            global _claude_credits_exhausted
+            if claude_service.is_configured() and not _claude_credits_exhausted:
+                try:
+                    async for chunk in claude_service.stream_response_with_tools(
+                        messages,
+                        site_id=site_id,
+                        user_email=user_email,
+                        user_role=user_role,
+                        include_system_docs=include_system_docs,
+                    ):
+                        safe_text = buffer.add_token(chunk)
+                        if safe_text is not None:
+                            assistant_parts.append(safe_text)
+                            yield format_sse_chunk(safe_text)
+                        if buffer.killed:
+                            break
+                    streamed = True
+                except Exception as claude_err:
+                    if "credit balance" in str(claude_err).lower():
+                        _claude_credits_exhausted = True
+                        logger.warning("Claude credits exhausted, switching to OpenAI")
+                    else:
+                        logger.error("Claude tool chat error: %s", claude_err)
+            if not streamed and openai_service.is_configured():
+                try:
+                    buffer = SecureSSEBuffer(user_role=user_role)
+                    async for chunk in openai_service.stream_response_with_tools(messages):
+                        safe_text = buffer.add_token(chunk)
+                        if safe_text is not None:
+                            assistant_parts.append(safe_text)
+                            yield format_sse_chunk(safe_text)
+                        if buffer.killed:
+                            break
+                    streamed = True
+                except Exception as oai_err:
+                    logger.error("OpenAI tool chat fallback error: %s", oai_err)
+            if not streamed:
+                msg = "AI services are temporarily unavailable. Please try again shortly."
+                assistant_parts.append(msg)
+                yield format_sse_chunk(msg)
         else:
-            # Route all LLM calls through model_gateway (Minimax for everything in cloud_dev/api_prod)
             try:
                 stream_gen = await model_gateway.call(
                     task_class=SENTINEL_BOT_DEFAULT_CLASS,
                     messages=messages,
                     stream=True,
-                    tools=available_tools,
                 )
                 async for chunk in stream_gen:
                     safe_text = buffer.add_token(chunk)
@@ -665,8 +698,9 @@ async def chat(
     # Only fall back to direct detection when tools are not available.
     # Tools are enabled in api mode when Claude is configured.
     try:
-        _mode, _provider, _model = model_gateway._resolve(SENTINEL_BOT_DEFAULT_CLASS)
-        tools_enabled = _mode == "api" and _provider == "anthropic" and claude_service.is_configured()
+        _mode, _fallback_enabled, _routes = model_gateway._resolve(SENTINEL_BOT_DEFAULT_CLASS)
+        _primary_provider = _routes[0][0] if _routes else None
+        tools_enabled = _mode == "api" and _primary_provider == "anthropic" and claude_service.is_configured()
     except Exception:
         tools_enabled = claude_service.is_configured() or openai_service.is_configured()
     # Respect per-site allow_tool_calling policy (default True if not set)

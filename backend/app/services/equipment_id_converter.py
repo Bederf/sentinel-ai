@@ -42,8 +42,13 @@ class EquipmentIDConverter:
         "kef": "KEF",
         # Lighting
         "dali": "DALI",
+        "dali_zone": "DALI",
+        "dali_controller": "DALI",
         "lum": "LUM",
+        "luminaire": "LUM",
         "lighting": "LUM",
+        "zone": "DALI",          # Niagara zone controller → DALI lighting
+        "zone_controller": "DALI",
         # Energy
         "gen": "GEN",
         "generator": "GEN",

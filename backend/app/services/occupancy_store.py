@@ -78,6 +78,8 @@ def _event_to_dict(e: OccupancyEvent) -> dict:
         d["moving_gate"] = e.moving_gate
     if e.static_gate is not None:
         d["static_gate"] = e.static_gate
+    if e.door_closed is not None:
+        d["door_closed"] = e.door_closed
     return d
 
 
@@ -96,6 +98,7 @@ def _dict_to_event(d: dict) -> OccupancyEvent:
         distance_m=d.get("distance_m"),
         moving_gate=d.get("moving_gate"),
         static_gate=d.get("static_gate"),
+        door_closed=d.get("door_closed"),
     )
 
 
@@ -613,6 +616,7 @@ def _session_to_dict(s: FocusRoomSession) -> dict:
         "created_at": _dt_to_str(s.created_at),
         "vacant_since": _dt_to_str(s.vacant_since) if s.vacant_since else None,
         "door_closed": s.door_closed,
+        "overstay_grace_minutes": s.overstay_grace_minutes,
     }
 
 
@@ -631,6 +635,7 @@ def _dict_to_session(d: dict) -> FocusRoomSession:
         created_at=_str_to_dt(d.get("created_at", d["start_time"])),
         vacant_since=_str_to_dt(d["vacant_since"]) if d.get("vacant_since") else None,
         door_closed=d.get("door_closed"),
+        overstay_grace_minutes=d.get("overstay_grace_minutes", 0),
     )
 
 
@@ -694,6 +699,31 @@ def set_door_closed(session_id: str, door_closed: bool | None) -> None:
             ).execute()
         except Exception as exc:
             logger.error("Canonical set_door_closed failed: %s", exc)
+
+
+def extend_overstay_grace(session_id: str, additional_minutes: int = 10) -> bool:
+    """Add grace minutes to a focus room session (concierge-granted extension)."""
+    with _lock:
+        try:
+            client = _client()
+            resp = client.table("space_focus_room_sessions").select("overstay_grace_minutes").eq(
+                "session_id", session_id
+            ).limit(1).execute()
+            if not resp.data:
+                return False
+            current = resp.data[0].get("overstay_grace_minutes", 0) or 0
+            new_total = current + additional_minutes
+            client.table("space_focus_room_sessions").update(
+                {"overstay_grace_minutes": new_total}
+            ).eq("session_id", session_id).execute()
+            logger.info(
+                "Overstay grace extended: session=%s +%d min (now %d min)",
+                session_id, additional_minutes, new_total,
+            )
+            return True
+        except Exception as exc:
+            logger.error("Canonical extend_overstay_grace failed: %s", exc)
+            return False
 
 
 def close_session(

@@ -463,6 +463,7 @@ DISCIPLINE_TO_CATEGORY: dict[str, str] = {
     "Pest Control": "pest",
     "Cleaning": "general",
     "Grounds & Parking": "general",
+    "Lighting": "electrical",
 }
 
 

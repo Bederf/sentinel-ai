@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Title, Text, Badge, Button, Grid } from '@tremor/react';
+
 import { SafetyIndicator } from './SafetyIndicator';
 import type { SafetyStatus } from './SafetyIndicator';
 import api from '@/lib/api';

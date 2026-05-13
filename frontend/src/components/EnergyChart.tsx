@@ -10,7 +10,6 @@
  * - Category breakdown with colored indicators
  */
 
-import { AreaChart } from "@tremor/react";
 import { Zap, TrendingUp } from "lucide-react";
 import type { EnergyDataPoint } from '@/lib/api';
 
@@ -226,20 +225,21 @@ export function EnergyChart({
 
       {/* Chart */}
       <div className="p-4 overflow-hidden flex-1">
-        <div className="h-64 w-full flex">
-          <AreaChart
-            className="h-64 w-full"
-            data={chartData}
-          index="date"
-          categories={["HVAC", "Lighting", "Other"]}
-          colors={["cyan", "amber", "slate"]}
-          valueFormatter={(value) => `${value.toLocaleString()} kWh`}
-          showLegend={false}
-          showGridLines={true}
-          showAnimation={true}
-          stack={true}
-          curveType="monotone"
-          />
+        <div className="h-64 w-full flex flex-col justify-end gap-1" style={{ padding: '0 4px' }}>
+          <div className="w-full h-full flex items-end gap-1" style={{ minHeight: '200px' }}>
+            {chartData.slice(0, 30).map((point, i) => {
+              const total = point.HVAC + point.Lighting + point.Other;
+              const maxTotal = Math.max(...chartData.map(d => d.HVAC + d.Lighting + d.Other), 1);
+              const pct = (total / maxTotal) * 100;
+              return (
+                <div key={i} className="flex-1 flex flex-col justify-end" style={{ height: `${pct}%`, minHeight: '4px' }}>
+                  <div style={{ background: 'var(--color-grafana-cyan)', height: `${(point.HVAC / total) * 100}%` }} title={`HVAC: ${point.HVAC} kWh`} />
+                  <div style={{ background: 'var(--color-grafana-yellow)', height: `${(point.Lighting / total) * 100}%` }} title={`Lighting: ${point.Lighting} kWh`} />
+                  <div style={{ background: '#64748b', height: `${(point.Other / total) * 100}%` }} title={`Other: ${point.Other} kWh`} />
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
 

@@ -8,7 +8,6 @@
  */
 
 import { useState } from "react";
-import { Text, Flex, Button } from "@tremor/react";
 import { MessageSquare, ThermometerSun, ThermometerSnowflake, Wind, Cloud } from "lucide-react";
 import ComfortComplaintPanel from "../ComfortComplaintPanel";
 
@@ -52,34 +51,38 @@ export function ComfortAssistant({ compact = true, onViewDetails }: ComfortAssis
         </Flex>
 
         {/* Quick complaint type icons */}
-        <Flex className="mt-3 gap-3">
+        <Flex className="mt-3 gap-2">
           <div
-            className="flex items-center gap-1 px-2 py-1 rounded text-xs cursor-pointer hover:bg-white/10"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium cursor-pointer transition-colors"
+            style={{ background: "rgba(239, 68, 68, 0.12)", color: "var(--color-sentinel-red)" }}
             onClick={() => setShowFullPanel(true)}
           >
-            <ThermometerSun className="w-4 h-4 text-red-400" />
-            <span className="text-red-300">Too Hot</span>
+            <ThermometerSun className="w-3.5 h-3.5" />
+            Too Hot
           </div>
           <div
-            className="flex items-center gap-1 px-2 py-1 rounded text-xs cursor-pointer hover:bg-white/10"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium cursor-pointer transition-colors"
+            style={{ background: "rgba(59, 130, 246, 0.12)", color: "var(--color-sentinel-blue)" }}
             onClick={() => setShowFullPanel(true)}
           >
-            <ThermometerSnowflake className="w-4 h-4 text-blue-400" />
-            <span className="text-blue-300">Too Cold</span>
+            <ThermometerSnowflake className="w-3.5 h-3.5" />
+            Too Cold
           </div>
           <div
-            className="flex items-center gap-1 px-2 py-1 rounded text-xs cursor-pointer hover:bg-white/10"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium cursor-pointer transition-colors"
+            style={{ background: "rgba(148, 163, 184, 0.12)", color: "var(--color-sentinel-text-secondary)" }}
             onClick={() => setShowFullPanel(true)}
           >
-            <Cloud className="w-4 h-4" style={{ color: "var(--color-sentinel-text-secondary)" }} />
-            <span style={{ color: "var(--color-sentinel-text-primary)" }}>Stuffy</span>
+            <Cloud className="w-3.5 h-3.5" />
+            Stuffy
           </div>
           <div
-            className="flex items-center gap-1 px-2 py-1 rounded text-xs cursor-pointer hover:bg-white/10"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium cursor-pointer transition-colors"
+            style={{ background: "rgba(34, 211, 238, 0.12)", color: "var(--color-sentinel-cyan)" }}
             onClick={() => setShowFullPanel(true)}
           >
-            <Wind className="w-4 h-4 text-cyan-400" />
-            <span className="text-cyan-300">Drafty</span>
+            <Wind className="w-3.5 h-3.5" />
+            Drafty
           </div>
         </Flex>
       </div>

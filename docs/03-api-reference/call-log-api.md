@@ -417,9 +417,13 @@ Handles inline keyboard button taps (Telegram `callback_query`). Dismisses the b
 
 ## Implementation
 
+- Sentry AI Bridge (routing + LLM fallback): `$SENTRY_HOME/tools/sentry_ai_bridge.py`
+  - `detect_and_route()` — pattern-matches commands and structured workflows; returns `route=general` for unmatched free-text
+  - `route_to_handler()` — executes handlers; `route=general` calls `_get_llm_response()` → Claude with BMS tools
+  - `_get_llm_response()` — sync wrapper for `ClaudeService.stream_response_with_tools()` + `get_chat_tools()`
+  - `_BMS_CHAT_SYSTEM_PROMPT` — SENTINEL system prompt for Claude
 - Handler (legacy): `$SENTRY_HOME/handlers/call_log_handler.py`
 - CLI tool (legacy): `$SENTRY_HOME/tools/call_log.py`
-- Skill doc (deprecated): `$SENTRY_HOME/skills/sentry_call_logging.md`
 - Backend endpoints: `backend/app/api/sentry_webhooks.py`
 - Intent classifier: `backend/app/services/telegram_intent_classifier.py`
 - Conversation manager: `backend/app/services/telegram_conversation_manager.py`
@@ -428,3 +432,19 @@ Handles inline keyboard button taps (Telegram `callback_query`). Dismisses the b
 - Reporter memory repository: `backend/app/database/repositories/reporter_location_repository.py`
 - Reporter memory fallback store: `backend/app/data/reporter_location_memory.json`
 - Escalation log: `backend/app/data/call_log_escalations.json`
+
+## LLM Chat (Sprint 3 — Free-Text AI Fallback)
+
+When `detect_and_route()` cannot match a message to any structured command or workflow, it returns `route=general`. The `route_to_handler()` then routes to `_get_llm_response()`, which calls `ClaudeService.stream_response_with_tools()` with the BMS chat tools (`get_chat_tools(site_id="site-002")`).
+
+**Active bots:** manager (main) + technician Telegram bots. Staff/client bot is out-of-scope for this Sprint.
+
+**Tools available to Claude:**
+- `get_equipment_status` — current status, mode, alarms, key metrics
+- `get_energy_kwh` — site energy consumption (current_15min, today, yesterday, last_hour)
+- `list_alerts` — active alerts by severity
+- `acknowledge_alert` — acknowledge an alert
+- `get_bess_status` — BESS SOC, charge/discharge power, grid status
+- `get_load_shedding_status` — generator/mains status and load shedding stage
+
+**Implementation:** `sentry_ai_bridge.py` `_get_llm_response()` → `claude_service.stream_response_with_tools()`
