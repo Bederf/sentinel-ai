@@ -640,10 +640,10 @@ export default function SystemHealthPage() {
                       </div>
                       <div className="text-right">
                         <p className="text-sm font-bold" style={{ color: monthlyUptime.slo_pass ? "var(--color-sentinel-green)" : "var(--color-sentinel-red)" }}>
-                          {monthlyUptime.uptime_percent >= 99.5 ? "\u2713" : "\u2717"} {monthlyUptime.uptime_percent.toFixed(3)}%
+                          {monthlyUptime.uptime_percent >= 99.5 ? "\u2713" : "\u2717"} {(monthlyUptime.uptime_percent ?? 0).toFixed(3)}%
                         </p>
                         <p className="text-xs mt-0.5" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                          Budget: {monthlyUptime.error_budget_remaining.toFixed(3)}% remaining
+                          Budget: {(monthlyUptime.error_budget_remaining ?? 0).toFixed(3)}% remaining
                         </p>
                       </div>
                     </div>
@@ -654,7 +654,7 @@ export default function SystemHealthPage() {
                       <p className="text-xs font-medium" style={{ color: "var(--color-sentinel-text-secondary)" }}>Last 30 Days</p>
                       <div className="grid grid-cols-10 gap-1 mt-2">
                         {dailyUptime.slice(-30).map((day: DailyUptimeRow) => {
-                          const pct = day.uptime_percent;
+                          const pct = day.uptime_percent ?? 0;
                           const color = pct >= 99.5 ? "#22c55e" : pct >= 95 ? "#eab308" : "#ef4444";
                           return (
                             <div
@@ -673,7 +673,7 @@ export default function SystemHealthPage() {
                     <div className="rounded p-2.5" style={{ background: "var(--color-sentinel-bg-secondary)", border: "1px solid var(--color-sentinel-border)" }}>
                       <p className="text-xs uppercase tracking-wide" style={{ color: "var(--color-sentinel-text-secondary)" }}>Downtime</p>
                       <p className="text-base font-bold font-mono" style={{ color: "var(--color-sentinel-text-primary)" }}>
-                        {monthlyUptime.downtime_minutes.toFixed(1)} min
+                        {(monthlyUptime.downtime_minutes ?? 0).toFixed(1)} min
                       </p>
                     </div>
                     <div className="rounded p-2.5" style={{ background: "var(--color-sentinel-bg-secondary)", border: "1px solid var(--color-sentinel-border)" }}>
