@@ -281,10 +281,15 @@ class WorkOrderNotifier:
             f"- Equipment Type: {equipment_type}",
         ]
 
+        original_msg = self._normalize_text(work_order.get("notes") or work_order_data.get("original_message") or "")
+
         if _title:
             lines.extend(["", "ISSUE TITLE", _title])
 
         lines.extend(["", "ISSUE DESCRIPTION", description])
+
+        if original_msg:
+            lines.extend(["", "REPORTER'S DESCRIPTION", original_msg])
 
         if diagnostics_text:
             lines.extend(
@@ -486,8 +491,8 @@ class WorkOrderNotifier:
   </div>
   <div class="badge-row">
     <span class="priority-badge">{priority}</span>
-    <span class="wo-ref">WO {wo_ref}</span>
-    <span class="wo-ref">SR {service_record_code}</span>
+    <span class="wo-ref">{wo_ref}</span>
+    <span class="wo-ref">{service_record_code}</span>
   </div>
   <div class="content">
     <p>Hi {technician_name},</p>
@@ -664,13 +669,16 @@ class WorkOrderNotifier:
                     except Exception:
                         equipment_id_val = None
 
-            # Create service record first
-            service_record = await self.create_service_record(work_order_data, site_id_val, equipment_id_val)
-
-            if not service_record:
-                return {"success": False, "error": "Failed to create service record"}
-
-            logger.info(f"Service record {service_record['code']} created for {work_order_data['equipment_name']}")
+            # Create service record only if real equipment is involved
+            create_sr = work_order_data.get("create_service_record", True)
+            service_record = None
+            if create_sr:
+                service_record = await self.create_service_record(work_order_data, site_id_val, equipment_id_val)
+                if not service_record:
+                    return {"success": False, "error": "Failed to create service record"}
+                logger.info(f"Service record {service_record['code']} created for {work_order_data['equipment_name']}")
+            else:
+                logger.info(f"Skipping service record — general complaint, no equipment involved")
 
             # Ensure technician email is available (look up if not passed)
             if not work_order_data.get("technician_email"):
@@ -842,6 +850,7 @@ class WorkOrderNotifier:
             zone_id = work_order_data.get("zone_id", "")
             location_line = f"📍 Desk {desk_id}, {zone_id}" if desk_id or zone_id else ""
             location_part = (location_line + "\n") if location_line else ""
+            eq_cmds = f"/info_{code_underscored} - Equipment details\n/note_{code_underscored} - Add note\n" if code_underscored else ""
             msg = (
                 f"📋 Work Order {wo_ref}\n"
                 f"🔧 {eq_name}\n"
@@ -849,9 +858,8 @@ class WorkOrderNotifier:
                 f"👤 Assigned: {tech_name}\n"
                 f"{location_part}"
                 f"─────────────────\n"
-                f"/info_{code_underscored} - Equipment details\n"
-                f"/note_{code_underscored} - Add note\n"
-                f"/done_{wo_ref_underscored} - Submit inspection"
+                f"{eq_cmds}"
+                f"done #{wo_ref} - Submit inspection"
             )
 
             cli = get_sentry_bot_cli()

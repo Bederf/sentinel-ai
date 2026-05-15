@@ -1,13 +1,3 @@
-/**
- * Power Metering Card - Bolt-on Module
- *
- * Real-time power metrics with:
- * - kW/kVA/PF readings
- * - TOU tariff indicator
- * - Demand tracking
- * - Power quality (THD)
- */
-
 import { useState, useEffect, useCallback } from 'react';
 
 import { energyCentreApi } from '../../lib/energyCentreApi';
@@ -19,10 +9,12 @@ interface PowerMeteringCardProps {
 }
 
 const touColors: Record<string, string> = {
-  peak: 'red',
-  standard: 'yellow',
-  'off-peak': 'green',
+  peak: 'var(--color-sentinel-red)',
+  standard: 'var(--color-sentinel-amber)',
+  'off-peak': 'var(--color-sentinel-green)',
 };
+
+const getTouColor = (period?: string): string => touColors[period || 'standard'] || 'var(--color-sentinel-text-secondary)';
 
 export function PowerMeteringCard({ siteId, compact = false }: PowerMeteringCardProps) {
   const [meter, setMeter] = useState<PowerMeter | null>(null);
@@ -48,146 +40,146 @@ export function PowerMeteringCard({ siteId, compact = false }: PowerMeteringCard
 
   if (loading) {
     return (
-      <Card>
-        <Title>Power Metering</Title>
+      <div style={{background:'var(--color-sentinel-bg-panel)', border:'1px solid var(--color-sentinel-border)', borderRadius:8}}>
+        <h3 className="text-sm font-semibold" style={{color:'var(--color-sentinel-text-primary)'}}>Power Metering</h3>
         <div className="animate-pulse h-32 bg-gray-100 rounded mt-4" />
-      </Card>
+      </div>
     );
   }
 
   if (!meter) {
     return (
-      <Card>
-        <Title>Power Metering</Title>
-        <Text className="text-gray-500">No meter data available</Text>
-      </Card>
+      <div style={{background:'var(--color-sentinel-bg-panel)', border:'1px solid var(--color-sentinel-border)', borderRadius:8}}>
+        <h3 className="text-sm font-semibold" style={{color:'var(--color-sentinel-text-primary)'}}>Power Metering</h3>
+        <p className="text-sm" style={{color:'var(--color-sentinel-text-secondary)'}}>No meter data available</p>
+      </div>
     );
   }
 
   if (compact) {
     return (
-      <Card decoration="top" decorationColor={touColors[meter.tou_period || 'standard'] || 'gray'}>
-        <Flex justifyContent="between" alignItems="start">
+      <div style={{background:'var(--color-sentinel-bg-panel)', border:'1px solid var(--color-sentinel-border)', borderRadius:8, borderTop:'3px solid ' + getTouColor(meter.tou_period)}}>
+        <div className="flex justify-between items-start">
           <div>
-            <Text>Power</Text>
-            <Metric>{meter.active_power_kw.toFixed(0)} kW</Metric>
+            <p className="text-sm" style={{color:'var(--color-sentinel-text-secondary)'}}>Power</p>
+            <div className="text-3xl font-semibold tabular-nums">{meter.active_power_kw.toFixed(0)} kW</div>
           </div>
           <div className="text-right">
-            <Text>PF</Text>
-            <Metric className={meter.power_factor < 0.9 ? 'text-amber-500' : ''}>
+            <p className="text-sm" style={{color:'var(--color-sentinel-text-secondary)'}}>PF</p>
+            <div className={`text-3xl font-semibold tabular-nums ${meter.power_factor < 0.9 ? 'text-amber-500' : ''}`}>
               {meter.power_factor.toFixed(2)}
-            </Metric>
+            </div>
           </div>
-        </Flex>
+        </div>
         {meter.tou_period && (
-          <Badge color={touColors[meter.tou_period] || 'gray'} className="mt-2">
+          <span className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full mt-2" style={{background:'color-mix(in srgb, ' + getTouColor(meter.tou_period) + ' 15%, transparent)', color: getTouColor(meter.tou_period)}}>
             {meter.tariff_type} - {meter.tou_period.toUpperCase()}
-          </Badge>
+          </span>
         )}
-      </Card>
+      </div>
     );
   }
 
   return (
-    <Card>
-      <Flex justifyContent="between" alignItems="start">
+    <div style={{background:'var(--color-sentinel-bg-panel)', border:'1px solid var(--color-sentinel-border)', borderRadius:8}}>
+      <div className="flex justify-between items-start">
         <div>
-          <Title>Main Incomer</Title>
-          <Text className="text-xs">{meter.manufacturer} {meter.model}</Text>
+          <h3 className="text-sm font-semibold" style={{color:'var(--color-sentinel-text-primary)'}}>Main Incomer</h3>
+          <p className="text-xs" style={{color:'var(--color-sentinel-text-secondary)'}}>{meter.manufacturer} {meter.model}</p>
         </div>
         {meter.tou_period && (
-          <Badge color={touColors[meter.tou_period] || 'gray'} size="lg">
+          <span className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full" style={{background:'color-mix(in srgb, ' + getTouColor(meter.tou_period) + ' 15%, transparent)', color: getTouColor(meter.tou_period)}}>
             {meter.tariff_type} - {meter.tou_period.toUpperCase()}
-          </Badge>
+          </span>
         )}
-      </Flex>
+      </div>
 
-      <Grid className="grid grid-cols-4 gap-4 mt-4">
-        <Card decoration="top" decorationColor="blue">
-          <Text>Active Power</Text>
-          <Metric>{meter.active_power_kw.toFixed(0)}</Metric>
-          <Text className="text-xs">kW</Text>
-        </Card>
-        <Card decoration="top" decorationColor="purple">
-          <Text>Apparent Power</Text>
-          <Metric>{meter.apparent_power_kva.toFixed(0)}</Metric>
-          <Text className="text-xs">kVA</Text>
-        </Card>
-        <Card decoration="top" decorationColor={meter.power_factor < 0.9 ? 'amber' : 'green'}>
-          <Text>Power Factor</Text>
-          <Metric>{meter.power_factor.toFixed(2)}</Metric>
-          <Text className="text-xs">target 0.95</Text>
-        </Card>
-        <Card decoration="top" decorationColor="cyan">
-          <Text>Frequency</Text>
-          <Metric>{meter.frequency_hz.toFixed(1)}</Metric>
-          <Text className="text-xs">Hz</Text>
-        </Card>
-      </Grid>
+      <div className="grid grid-cols-4 gap-4 mt-4">
+        <div style={{background:'var(--color-sentinel-bg-panel)', border:'1px solid var(--color-sentinel-border)', borderRadius:8, borderTop:'3px solid var(--color-sentinel-blue)'}}>
+          <p className="text-sm" style={{color:'var(--color-sentinel-text-secondary)'}}>Active Power</p>
+          <div className="text-3xl font-semibold tabular-nums">{meter.active_power_kw.toFixed(0)}</div>
+          <p className="text-xs" style={{color:'var(--color-sentinel-text-secondary)'}}>kW</p>
+        </div>
+        <div style={{background:'var(--color-sentinel-bg-panel)', border:'1px solid var(--color-sentinel-border)', borderRadius:8, borderTop:'3px solid #a855f7'}}>
+          <p className="text-sm" style={{color:'var(--color-sentinel-text-secondary)'}}>Apparent Power</p>
+          <div className="text-3xl font-semibold tabular-nums">{meter.apparent_power_kva.toFixed(0)}</div>
+          <p className="text-xs" style={{color:'var(--color-sentinel-text-secondary)'}}>kVA</p>
+        </div>
+        <div style={{background:'var(--color-sentinel-bg-panel)', border:'1px solid var(--color-sentinel-border)', borderRadius:8, borderTop:'3px solid ' + (meter.power_factor < 0.9 ? 'var(--color-sentinel-amber)' : 'var(--color-sentinel-green)')}}>
+          <p className="text-sm" style={{color:'var(--color-sentinel-text-secondary)'}}>Power Factor</p>
+          <div className="text-3xl font-semibold tabular-nums">{meter.power_factor.toFixed(2)}</div>
+          <p className="text-xs" style={{color:'var(--color-sentinel-text-secondary)'}}>target 0.95</p>
+        </div>
+        <div style={{background:'var(--color-sentinel-bg-panel)', border:'1px solid var(--color-sentinel-border)', borderRadius:8, borderTop:'3px solid var(--color-sentinel-blue)'}}>
+          <p className="text-sm" style={{color:'var(--color-sentinel-text-secondary)'}}>Frequency</p>
+          <div className="text-3xl font-semibold tabular-nums">{meter.frequency_hz.toFixed(1)}</div>
+          <p className="text-xs" style={{color:'var(--color-sentinel-text-secondary)'}}>Hz</p>
+        </div>
+      </div>
 
       {/* Voltage & Current */}
       <div className="mt-4 grid grid-cols-3 gap-2 text-center">
         <div>
-          <Text className="text-xs text-gray-500">L1</Text>
-          <Text>{meter.voltage_l1_n.toFixed(0)}V / {meter.current_l1.toFixed(0)}A</Text>
+          <p className="text-xs" style={{color:'var(--color-sentinel-text-secondary)'}}>L1</p>
+          <p className="text-sm" style={{color:'var(--color-sentinel-text-primary)'}}>{meter.voltage_l1_n.toFixed(0)}V / {meter.current_l1.toFixed(0)}A</p>
         </div>
         <div>
-          <Text className="text-xs text-gray-500">L2</Text>
-          <Text>{meter.voltage_l2_n.toFixed(0)}V / {meter.current_l2.toFixed(0)}A</Text>
+          <p className="text-xs" style={{color:'var(--color-sentinel-text-secondary)'}}>L2</p>
+          <p className="text-sm" style={{color:'var(--color-sentinel-text-primary)'}}>{meter.voltage_l2_n.toFixed(0)}V / {meter.current_l2.toFixed(0)}A</p>
         </div>
         <div>
-          <Text className="text-xs text-gray-500">L3</Text>
-          <Text>{meter.voltage_l3_n.toFixed(0)}V / {meter.current_l3.toFixed(0)}A</Text>
+          <p className="text-xs" style={{color:'var(--color-sentinel-text-secondary)'}}>L3</p>
+          <p className="text-sm" style={{color:'var(--color-sentinel-text-primary)'}}>{meter.voltage_l3_n.toFixed(0)}V / {meter.current_l3.toFixed(0)}A</p>
         </div>
       </div>
 
       {/* Energy totals */}
-      <div className="mt-4 pt-4 border-t border-gray-200">
-        <Flex justifyContent="between">
+      <div className="mt-4 pt-4 border-t" style={{borderColor:'var(--color-sentinel-border)'}}>
+        <div className="flex justify-between">
           <div>
-            <Text className="text-xs text-gray-500">Total Import</Text>
-            <Text className="font-bold">{(meter.kwh_import / 1000).toFixed(1)} MWh</Text>
+            <p className="text-xs" style={{color:'var(--color-sentinel-text-secondary)'}}>Total Import</p>
+            <p className="font-bold" style={{color:'var(--color-sentinel-text-primary)'}}>{(meter.kwh_import / 1000).toFixed(1)} MWh</p>
           </div>
           <div className="text-right">
-            <Text className="text-xs text-gray-500">Max Demand</Text>
-            <Text className="font-bold">{meter.max_demand_kw.toFixed(0)} kW</Text>
+            <p className="text-xs" style={{color:'var(--color-sentinel-text-secondary)'}}>Max Demand</p>
+            <p className="font-bold" style={{color:'var(--color-sentinel-text-primary)'}}>{meter.max_demand_kw.toFixed(0)} kW</p>
           </div>
-        </Flex>
+        </div>
       </div>
 
       {/* Power Quality */}
       {(meter.thd_voltage_pct || meter.thd_current_pct) && (
-        <div className="mt-4 pt-4 border-t border-gray-200">
-          <Text className="text-xs text-gray-500 mb-2">Power Quality</Text>
-          <Grid className="grid grid-cols-3 gap-2">
+        <div className="mt-4 pt-4 border-t" style={{borderColor:'var(--color-sentinel-border)'}}>
+          <p className="text-xs mb-2" style={{color:'var(--color-sentinel-text-secondary)'}}>Power Quality</p>
+          <div className="grid grid-cols-3 gap-2">
             {meter.thd_voltage_pct !== undefined && (
               <div>
-                <Text className="text-xs">THD-V</Text>
-                <Text className={meter.thd_voltage_pct > 5 ? 'text-amber-500' : ''}>
+                <p className="text-xs" style={{color:'var(--color-sentinel-text-secondary)'}}>THD-V</p>
+                <p className="text-sm" style={{color: meter.thd_voltage_pct > 5 ? 'var(--color-sentinel-amber)' : 'var(--color-sentinel-text-primary)'}}>
                   {meter.thd_voltage_pct.toFixed(1)}%
-                </Text>
+                </p>
               </div>
             )}
             {meter.thd_current_pct !== undefined && (
               <div>
-                <Text className="text-xs">THD-I</Text>
-                <Text className={meter.thd_current_pct > 15 ? 'text-amber-500' : ''}>
+                <p className="text-xs" style={{color:'var(--color-sentinel-text-secondary)'}}>THD-I</p>
+                <p className="text-sm" style={{color: meter.thd_current_pct > 15 ? 'var(--color-sentinel-amber)' : 'var(--color-sentinel-text-primary)'}}>
                   {meter.thd_current_pct.toFixed(1)}%
-                </Text>
+                </p>
               </div>
             )}
             {meter.voltage_unbalance_pct !== undefined && (
               <div>
-                <Text className="text-xs">Unbalance</Text>
-                <Text className={meter.voltage_unbalance_pct > 2 ? 'text-amber-500' : ''}>
+                <p className="text-xs" style={{color:'var(--color-sentinel-text-secondary)'}}>Unbalance</p>
+                <p className="text-sm" style={{color: meter.voltage_unbalance_pct > 2 ? 'var(--color-sentinel-amber)' : 'var(--color-sentinel-text-primary)'}}>
                   {meter.voltage_unbalance_pct.toFixed(1)}%
-                </Text>
+                </p>
               </div>
             )}
-          </Grid>
+          </div>
         </div>
       )}
-    </Card>
+    </div>
   );
 }
 

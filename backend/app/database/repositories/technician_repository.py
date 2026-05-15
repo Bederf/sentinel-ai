@@ -327,14 +327,25 @@ class TechnicianRepository:
             # Resolve site code → UUID (site_technicians stores UUIDs)
             resolved_site_uuid = self._resolve_site_uuid(site_id) if site_id else None
 
-            # Get site assignments (filtered by resolved UUID)
-            assign_query = self.client.table("site_technicians").select("*")
-            if resolved_site_uuid:
-                assign_query = assign_query.eq("site_id", resolved_site_uuid)
-            assignments = (assign_query.execute()).data or []
+            # Get site assignments — table may not exist yet (graceful fallback)
+            assignments: list[dict[str, Any]] = []
+            site_tech_table_missing = False
+            try:
+                assign_query = self.client.table("site_technicians").select("*")
+                if resolved_site_uuid:
+                    assign_query = assign_query.eq("site_id", resolved_site_uuid)
+                assignments = (assign_query.execute()).data or []
+            except Exception as exc:
+                logger.warning("[TechnicianRepo] site_technicians query failed: %s — skipping site filter", exc)
+                site_tech_table_missing = True
+                assignments = []
 
             # Build set of technician IDs that have assignments at this site
             assigned_tech_ids = {a["technician_id"] for a in assignments} if resolved_site_uuid else None
+
+            # If site_technicians table is missing, skip site filtering entirely
+            if site_tech_table_missing:
+                assigned_tech_ids = None
 
             # Get technicians — filtered to site-assigned ones when a site is specified
             tech_query = self.client.table("technicians").select("*").order("name")
@@ -344,17 +355,19 @@ class TechnicianRepository:
             if assigned_tech_ids is not None:
                 technicians = [t for t in technicians if t["id"] in assigned_tech_ids]
 
-            # Get notification channels for relevant technician IDs
+            # Get notification channels — table may not exist yet
             tech_ids = [t["id"] for t in technicians]
+            channels: list[dict[str, Any]] = []
             if tech_ids:
-                channels = (
-                    self.client.table("technician_notification_channels")
-                    .select("*")
-                    .in_("technician_id", tech_ids)
-                    .execute()
-                ).data or []
-            else:
-                channels = []
+                try:
+                    channels = (
+                        self.client.table("technician_notification_channels")
+                        .select("*")
+                        .in_("technician_id", tech_ids)
+                        .execute()
+                    ).data or []
+                except Exception:
+                    channels = []
 
             # Merge
             for tech in technicians:

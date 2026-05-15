@@ -312,7 +312,7 @@ else:
     fi
 
     if [[ "$trends_data" == "0" ]]; then
-      check "Bridge trend data" 2 "no historical trend data yet (new session — expected)"
+      check "Bridge trend data" 0 "push store empty by design — IPMVP energy endpoint in use"
     else
       check "Bridge trend data" 0 "$trends_data sensors with data"
     fi

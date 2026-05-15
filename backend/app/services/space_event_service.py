@@ -142,8 +142,6 @@ async def process_occupancy_event(
             focus_session_result = result.get("focus_session", {})
             session_id = focus_session_result.get("session_id", "")
             if session_id and session_id not in _overstay_alert_sent:
-                from app.services import occupancy_store
-
                 active = occupancy_store.get_active_session(room_code)
                 if active and active.session_id == session_id:
                     state = describe_focus_session_state(active, now=now)

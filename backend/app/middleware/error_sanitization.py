@@ -30,6 +30,7 @@ class ErrorSanitizationMiddleware(BaseHTTPMiddleware):
 
     def __init__(self, app, debug_mode: bool | None = None):
         super().__init__(app)
+        self.app = app
         self.debug_mode = debug_mode if debug_mode is not None else settings.debug
 
     async def dispatch(self, request: Request, call_next) -> Response:

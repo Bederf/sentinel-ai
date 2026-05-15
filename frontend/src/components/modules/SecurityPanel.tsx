@@ -1,14 +1,3 @@
-/**
- * SecurityPanel - Access Control & Security Monitoring Dashboard
- *
- * Integrated security monitoring with:
- * - Tab 1: Overview (cards showing events, visitors, alerts, after-hours access)
- * - Tab 2: Access Events (table with filtering by location/after-hours)
- * - Tab 3: Visitors (card view with check-in/out actions)
- * - Tab 4: Alerts (alert list with severity badges and acknowledge buttons)
- * - Tab 5: Access Points (list of readers, locks, sensors with status)
- */
-
 import { useContext, useState } from 'react';
 import type { ReactElement } from 'react';
 
@@ -36,6 +25,9 @@ import {
   type AccessPoint,
 } from '@/lib/api/index';
 import { ModuleContext } from '@/contexts/moduleContextStore';
+import { Badge } from '../Badge';
+import { TabBar } from '../TabBar';
+import type { TabDef } from '../TabBar';
 
 interface SecurityPanelProps {
   siteId?: string;
@@ -44,16 +36,14 @@ interface SecurityPanelProps {
 export function SecurityPanel({ siteId: propSiteId }: SecurityPanelProps): ReactElement {
   const moduleContext = useContext(ModuleContext);
   const [selectedSiteId] = useState<string>(propSiteId || moduleContext?.siteId || '');
-  const [activeTabIndex, setActiveTabIndex] = useState<number>(0);
+  const [activeTab, setActiveTab] = useState<string>('overview');
 
-  // Fetch data with React Query hooks
   const overviewQuery = useSecurityOverview(selectedSiteId);
   const eventsQuery = useAccessEvents(selectedSiteId);
   const pointsQuery = useAccessPoints(selectedSiteId);
   const visitorsQuery = useVisitors(selectedSiteId);
   const alertsQuery = useSecurityAlerts(selectedSiteId);
 
-  // Mutations
   const checkInMutation = useCheckInVisitor();
   const checkOutMutation = useCheckOutVisitor();
   const acknowledgeMutation = useAcknowledgeAlert();
@@ -64,7 +54,6 @@ export function SecurityPanel({ siteId: propSiteId }: SecurityPanelProps): React
   const visitors = visitorsQuery.data?.visitors || [];
   const alerts = alertsQuery.data?.alerts || [];
 
-  // Helper to format time
   const formatTime = (isoString: string) => {
     const date = new Date(isoString);
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -75,24 +64,23 @@ export function SecurityPanel({ siteId: propSiteId }: SecurityPanelProps): React
     return date.toLocaleDateString();
   };
 
-  // Severity color mapping
   const severityColor = (severity: string) => {
     switch (severity) {
       case 'critical':
-        return 'red';
+        return { background: 'rgba(220,38,38,0.15)', color: 'var(--color-sentinel-red)' };
       case 'warning':
-        return 'yellow';
+        return { background: 'rgba(234,179,8,0.15)', color: 'var(--color-sentinel-amber)' };
       default:
-        return 'blue';
+        return { background: 'rgba(59,130,246,0.15)', color: 'var(--color-sentinel-blue)' };
     }
   };
 
-  // Access status color
   const accessStatusColor = (status: string) => {
-    return status === 'granted' ? 'green' : 'red';
+    return status === 'granted'
+      ? { background: 'rgba(16,185,129,0.15)', color: 'var(--color-sentinel-green)' }
+      : { background: 'rgba(220,38,38,0.15)', color: 'var(--color-sentinel-red)' };
   };
 
-  // Point status icon
   const getPointStatusIcon = (status: string) => {
     switch (status) {
       case 'active':
@@ -106,277 +94,278 @@ export function SecurityPanel({ siteId: propSiteId }: SecurityPanelProps): React
     }
   };
 
+  const tabDefs: TabDef[] = [
+    { id: 'overview', label: 'Overview' },
+    { id: 'access', label: 'Access' },
+    { id: 'visitors', label: 'Visitors' },
+    { id: 'alerts', label: 'Alerts' },
+    { id: 'points', label: 'Points' },
+  ];
+
   return (
     <div className="space-y-6">
-      {/* Quick Stats */}
       {overview && (
-        <Grid className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card>
-            <Flex alignItems="center" justifyContent="between">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="rounded-lg p-4" style={{ background: 'var(--color-sentinel-bg-panel)', border: '1px solid var(--color-sentinel-border)' }}>
+            <div className="flex items-center justify-between">
               <div>
-                <Text className="text-tremor-default">Access Events Today</Text>
-                <Metric className="text-tremor-metric">{overview.total_access_events_today}</Metric>
+                <p className="text-sm" style={{ color: 'var(--color-sentinel-text-secondary)' }}>Access Events Today</p>
+                <div className="text-3xl font-semibold tabular-nums" style={{ color: 'var(--color-sentinel-text-primary)' }}>{overview.total_access_events_today}</div>
               </div>
               <Clock className="h-8 w-8 text-blue-500" />
-            </Flex>
-          </Card>
+            </div>
+          </div>
 
-          <Card>
-            <Flex alignItems="center" justifyContent="between">
+          <div className="rounded-lg p-4" style={{ background: 'var(--color-sentinel-bg-panel)', border: '1px solid var(--color-sentinel-border)' }}>
+            <div className="flex items-center justify-between">
               <div>
-                <Text className="text-tremor-default">Active Visitors</Text>
-                <Metric className="text-tremor-metric">{overview.active_visitors}</Metric>
+                <p className="text-sm" style={{ color: 'var(--color-sentinel-text-secondary)' }}>Active Visitors</p>
+                <div className="text-3xl font-semibold tabular-nums" style={{ color: 'var(--color-sentinel-text-primary)' }}>{overview.active_visitors}</div>
               </div>
               <Users className="h-8 w-8 text-green-500" />
-            </Flex>
-          </Card>
+            </div>
+          </div>
 
-          <Card>
-            <Flex alignItems="center" justifyContent="between">
+          <div className="rounded-lg p-4" style={{ background: 'var(--color-sentinel-bg-panel)', border: '1px solid var(--color-sentinel-border)' }}>
+            <div className="flex items-center justify-between">
               <div>
-                <Text className="text-tremor-default">Open Alerts</Text>
-                <Metric className="text-tremor-metric">{overview.open_alerts}</Metric>
+                <p className="text-sm" style={{ color: 'var(--color-sentinel-text-secondary)' }}>Open Alerts</p>
+                <div className="text-3xl font-semibold tabular-nums" style={{ color: 'var(--color-sentinel-text-primary)' }}>{overview.open_alerts}</div>
               </div>
               <AlertTriangle className="h-8 w-8 text-red-500" />
-            </Flex>
-          </Card>
+            </div>
+          </div>
 
-          <Card>
-            <Flex alignItems="center" justifyContent="between">
+          <div className="rounded-lg p-4" style={{ background: 'var(--color-sentinel-bg-panel)', border: '1px solid var(--color-sentinel-border)' }}>
+            <div className="flex items-center justify-between">
               <div>
-                <Text className="text-tremor-default">After-Hours Access</Text>
-                <Metric className="text-tremor-metric">{overview.after_hours_access_count}</Metric>
+                <p className="text-sm" style={{ color: 'var(--color-sentinel-text-secondary)' }}>After-Hours Access</p>
+                <div className="text-3xl font-semibold tabular-nums" style={{ color: 'var(--color-sentinel-text-primary)' }}>{overview.after_hours_access_count}</div>
               </div>
               <Lock className="h-8 w-8 text-yellow-500" />
-            </Flex>
-          </Card>
-        </Grid>
+            </div>
+          </div>
+        </div>
       )}
 
-      {/* Tabs */}
-      <Card>
-        <TabGroup index={activeTabIndex} onIndexChange={setActiveTabIndex}>
-          <TabList className="mt-4 overflow-x-auto">
-            <Tab>Overview</Tab>
-            <Tab>Access</Tab>
-            <Tab>Visitors</Tab>
-            <Tab>Alerts</Tab>
-            <Tab>Points</Tab>
-          </TabList>
+      <div className="rounded-lg" style={{ background: 'var(--color-sentinel-bg-panel)', border: '1px solid var(--color-sentinel-border)' }}>
+        <TabBar tabs={tabDefs} active={activeTab} onChange={setActiveTab} />
 
-          <TabPanels>
-            {/* Tab 1: Overview */}
-            <TabPanel>
-              <div className="mt-6 space-y-4">
-                <Title>Security Status Summary</Title>
-                {overview && (
-                  <Grid className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4">
-                    <Card>
-                      <Text>System Status</Text>
-                      <Flex alignItems="center" justifyContent="between" className="mt-2">
-                        <Badge className="capitalize">{overview.system_status}</Badge>
-                        <CheckCircle className="h-5 w-5 text-green-500" />
-                      </Flex>
-                    </Card>
-                    <Card>
-                      <Text>Last Updated</Text>
-                      <Text className="mt-2 text-tremor-default font-semibold">
-                        {formatTime(overview.last_updated)}
-                      </Text>
-                    </Card>
-                  </Grid>
-                )}
-                <Card>
-                  <Text>Alert Summary</Text>
-                  <div className="mt-4 space-y-3">
+        {activeTab === 'overview' && (
+          <div className="p-4 space-y-4">
+            <h3 className="text-lg font-semibold" style={{ color: 'var(--color-sentinel-text-primary)' }}>Security Status Summary</h3>
+            {overview && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4">
+                <div className="rounded-lg p-4" style={{ background: 'var(--color-sentinel-bg-panel)', border: '1px solid var(--color-sentinel-border)' }}>
+                  <p style={{ color: 'var(--color-sentinel-text-secondary)' }}>System Status</p>
+                  <div className="flex items-center justify-between mt-2">
+                    <Badge className="capitalize">{overview.system_status}</Badge>
+                    <CheckCircle className="h-5 w-5 text-green-500" />
+                  </div>
+                </div>
+                <div className="rounded-lg p-4" style={{ background: 'var(--color-sentinel-bg-panel)', border: '1px solid var(--color-sentinel-border)' }}>
+                  <p style={{ color: 'var(--color-sentinel-text-secondary)' }}>Last Updated</p>
+                  <p className="mt-2 text-sm font-semibold" style={{ color: 'var(--color-sentinel-text-primary)' }}>
+                    {formatTime(overview.last_updated)}
+                  </p>
+                </div>
+              </div>
+            )}
+            <div className="rounded-lg p-4" style={{ background: 'var(--color-sentinel-bg-panel)', border: '1px solid var(--color-sentinel-border)' }}>
+              <p style={{ color: 'var(--color-sentinel-text-secondary)' }}>Alert Summary</p>
+              <div className="mt-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm" style={{ color: 'var(--color-sentinel-text-primary)' }}>Open Alerts</span>
+                  <Badge style={{ background: 'rgba(220,38,38,0.15)', color: 'var(--color-sentinel-red)' }}>{alerts.filter((a) => a.status === 'open').length}</Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm" style={{ color: 'var(--color-sentinel-text-primary)' }}>Acknowledged</span>
+                  <Badge style={{ background: 'rgba(234,179,8,0.15)', color: 'var(--color-sentinel-amber)' }}>{alerts.filter((a) => a.status === 'acknowledged').length}</Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm" style={{ color: 'var(--color-sentinel-text-primary)' }}>Resolved</span>
+                  <Badge style={{ background: 'rgba(16,185,129,0.15)', color: 'var(--color-sentinel-green)' }}>{alerts.filter((a) => a.status === 'resolved').length}</Badge>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'access' && (
+          <div className="p-4 space-y-4">
+            <h3 className="text-lg font-semibold" style={{ color: 'var(--color-sentinel-text-primary)' }}>Recent Access Events</h3>
+            <div className="space-y-2 max-h-96 overflow-y-auto">
+              {events.length > 0 ? (
+                events.slice(0, 20).map((event: AccessEvent) => (
+                  <div key={event.event_id} className="rounded-lg p-3" style={{ background: 'var(--color-sentinel-bg-panel)', border: '1px solid var(--color-sentinel-border)' }}>
                     <div className="flex items-center justify-between">
-                      <span className="text-sm">Open Alerts</span>
-                      <Badge color="red">{alerts.filter((a) => a.status === 'open').length}</Badge>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm">Acknowledged</span>
-                      <Badge color="yellow">{alerts.filter((a) => a.status === 'acknowledged').length}</Badge>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm">Resolved</span>
-                      <Badge color="green">{alerts.filter((a) => a.status === 'resolved').length}</Badge>
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between">
+                          <p className="font-semibold" style={{ color: 'var(--color-sentinel-text-primary)' }}>{event.person_name}</p>
+                          <Badge className="capitalize" style={accessStatusColor(event.status)}>
+                            {event.status}
+                          </Badge>
+                        </div>
+                        <p className="mt-1 text-xs" style={{ color: 'var(--color-sentinel-text-secondary)' }}>
+                          {event.location} &bull; {formatTime(event.timestamp)}
+                        </p>
+                      </div>
                     </div>
                   </div>
-                </Card>
-              </div>
-            </TabPanel>
+                ))
+              ) : (
+                <p className="text-center py-6" style={{ color: 'var(--color-sentinel-text-secondary)' }}>No events recorded</p>
+              )}
+            </div>
+          </div>
+        )}
 
-            {/* Tab 2: Access Events */}
-            <TabPanel>
-              <div className="mt-6 space-y-4">
-                <Title>Recent Access Events</Title>
-                <div className="space-y-2 max-h-96 overflow-y-auto">
-                  {events.length > 0 ? (
-                    events.slice(0, 20).map((event: AccessEvent) => (
-                      <Card key={event.event_id} className="p-3">
-                        <Flex alignItems="center" justifyContent="between">
-                          <div className="flex-1">
-                            <Flex alignItems="center" justifyContent="between">
-                              <Text className="font-semibold">{event.person_name}</Text>
-                              <Badge color={accessStatusColor(event.status)} className="capitalize">
-                                {event.status}
-                              </Badge>
-                            </Flex>
-                            <Text className="mt-1 text-xs text-gray-600">
-                              {event.location} • {formatTime(event.timestamp)}
-                            </Text>
-                          </div>
-                        </Flex>
-                      </Card>
-                    ))
-                  ) : (
-                    <Text className="text-center py-6 text-gray-500">No events recorded</Text>
-                  )}
-                </div>
-              </div>
-            </TabPanel>
+        {activeTab === 'visitors' && (
+          <div className="p-4 space-y-4">
+            <h3 className="text-lg font-semibold" style={{ color: 'var(--color-sentinel-text-primary)' }}>Visitor Management</h3>
+            <div className="space-y-3 max-h-96 overflow-y-auto">
+              {visitors.length > 0 ? (
+                visitors.map((visitor: Visitor) => (
+                  <div key={visitor.visitor_id} className="rounded-lg p-4" style={{ background: 'var(--color-sentinel-bg-panel)', border: '1px solid var(--color-sentinel-border)' }}>
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <p className="font-semibold" style={{ color: 'var(--color-sentinel-text-primary)' }}>{visitor.name}</p>
+                        <p className="text-xs" style={{ color: 'var(--color-sentinel-text-secondary)' }}>{visitor.company}</p>
+                        <p className="text-xs mt-1" style={{ color: 'var(--color-sentinel-text-secondary)' }}>Host: {visitor.host_contact}</p>
+                        {visitor.checkin_time && (
+                          <p className="text-xs" style={{ color: 'var(--color-sentinel-text-secondary)' }}>
+                            Check-in: {formatTime(visitor.checkin_time)}
+                          </p>
+                        )}
+                        <Badge className="mt-2 capitalize">{visitor.status}</Badge>
+                      </div>
+                      <div className="flex flex-col items-end gap-2">
+                        {visitor.status === 'pending' && (
+                          <button
+                            className="px-2 py-1 text-xs rounded font-medium"
+                            style={{
+                              background: 'rgba(16,185,129,0.15)',
+                              color: 'var(--color-sentinel-green)',
+                              border: '1px solid rgba(16,185,129,0.3)',
+                            }}
+                            onClick={() => checkInMutation.mutate(visitor.visitor_id)}
+                            disabled={checkInMutation.isPending}
+                          >
+                            Check In
+                          </button>
+                        )}
+                        {visitor.status === 'checked_in' && (
+                          <button
+                            className="px-2 py-1 text-xs rounded font-medium"
+                            style={{
+                              background: 'rgba(59,130,246,0.15)',
+                              color: 'var(--color-sentinel-blue)',
+                              border: '1px solid rgba(59,130,246,0.3)',
+                            }}
+                            onClick={() => checkOutMutation.mutate(visitor.visitor_id)}
+                            disabled={checkOutMutation.isPending}
+                          >
+                            Check Out
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="text-center py-6" style={{ color: 'var(--color-sentinel-text-secondary)' }}>No active visitors</p>
+              )}
+            </div>
+          </div>
+        )}
 
-            {/* Tab 3: Visitors */}
-            <TabPanel>
-              <div className="mt-6 space-y-4">
-                <Title>Visitor Management</Title>
-                <div className="space-y-3 max-h-96 overflow-y-auto">
-                  {visitors.length > 0 ? (
-                    visitors.map((visitor: Visitor) => (
-                      <Card key={visitor.visitor_id} className="p-4">
-                        <Flex alignItems="start" justifyContent="between">
-                          <div className="flex-1">
-                            <Text className="font-semibold">{visitor.name}</Text>
-                            <Text className="text-xs text-gray-600">{visitor.company}</Text>
-                            <Text className="text-xs text-gray-600 mt-1">Host: {visitor.host_contact}</Text>
-                            {visitor.checkin_time && (
-                              <Text className="text-xs text-gray-600">
-                                Check-in: {formatTime(visitor.checkin_time)}
-                              </Text>
-                            )}
-                            <Badge className="mt-2 capitalize">{visitor.status}</Badge>
-                          </div>
-                          <Flex flexDirection="col" alignItems="end" className="gap-2">
-                            {visitor.status === 'pending' && (
-                              <Button
-                                size="xs"
-                                color="green"
-                                onClick={() => checkInMutation.mutate(visitor.visitor_id)}
-                                loading={checkInMutation.isPending}
-                              >
-                                Check In
-                              </Button>
-                            )}
-                            {visitor.status === 'checked_in' && (
-                              <Button
-                                size="xs"
-                                color="blue"
-                                onClick={() => checkOutMutation.mutate(visitor.visitor_id)}
-                                loading={checkOutMutation.isPending}
-                              >
-                                Check Out
-                              </Button>
-                            )}
-                          </Flex>
-                        </Flex>
-                      </Card>
-                    ))
-                  ) : (
-                    <Text className="text-center py-6 text-gray-500">No active visitors</Text>
-                  )}
-                </div>
-              </div>
-            </TabPanel>
+        {activeTab === 'alerts' && (
+          <div className="p-4 space-y-4">
+            <h3 className="text-lg font-semibold" style={{ color: 'var(--color-sentinel-text-primary)' }}>Security Alerts</h3>
+            <div className="space-y-2 max-h-96 overflow-y-auto">
+              {alerts.length > 0 ? (
+                alerts.map((alert: SecurityAlert) => (
+                  <div key={alert.alert_id} className="rounded-lg p-3" style={{ background: 'var(--color-sentinel-bg-panel)', border: '1px solid var(--color-sentinel-border)' }}>
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="font-semibold capitalize" style={{ color: 'var(--color-sentinel-text-primary)' }}>{alert.alert_type.replace(/_/g, ' ')}</p>
+                          <Badge className="capitalize" style={severityColor(alert.severity)}>
+                            {alert.severity}
+                          </Badge>
+                        </div>
+                        <p className="text-xs" style={{ color: 'var(--color-sentinel-text-secondary)' }}>{alert.description}</p>
+                        <p className="text-xs mt-1" style={{ color: 'var(--color-sentinel-text-secondary)' }}>
+                          {alert.location} &bull; {formatTime(alert.timestamp)}
+                        </p>
+                        <Badge className="mt-2 capitalize text-xs">{alert.status}</Badge>
+                      </div>
+                      {alert.status === 'open' && (
+                        <button
+                          className="px-2 py-1 text-xs rounded font-medium ml-2"
+                          style={{
+                            background: 'var(--color-sentinel-bg-secondary)',
+                            color: 'var(--color-sentinel-text-primary)',
+                            border: '1px solid var(--color-sentinel-border)',
+                          }}
+                          onClick={() =>
+                            acknowledgeMutation.mutate({
+                              alertId: alert.alert_id,
+                              acknowledgedBy: 'Current User',
+                            })
+                          }
+                          disabled={acknowledgeMutation.isPending}
+                        >
+                          Ack
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="text-center py-6" style={{ color: 'var(--color-sentinel-text-secondary)' }}>No alerts</p>
+              )}
+            </div>
+          </div>
+        )}
 
-            {/* Tab 4: Alerts */}
-            <TabPanel>
-              <div className="mt-6 space-y-4">
-                <Title>Security Alerts</Title>
-                <div className="space-y-2 max-h-96 overflow-y-auto">
-                  {alerts.length > 0 ? (
-                    alerts.map((alert: SecurityAlert) => (
-                      <Card key={alert.alert_id} className="p-3">
-                        <Flex alignItems="start" justifyContent="between">
-                          <div className="flex-1">
-                            <Flex alignItems="center" justifyContent="between" className="mb-2">
-                              <Text className="font-semibold capitalize">{alert.alert_type.replace(/_/g, ' ')}</Text>
-                              <Badge color={severityColor(alert.severity)} className="capitalize">
-                                {alert.severity}
-                              </Badge>
-                            </Flex>
-                            <Text className="text-xs text-gray-600">{alert.description}</Text>
-                            <Text className="text-xs text-gray-600 mt-1">
-                              {alert.location} • {formatTime(alert.timestamp)}
-                            </Text>
-                            <Badge className="mt-2 capitalize text-xs">{alert.status}</Badge>
-                          </div>
-                          {alert.status === 'open' && (
-                            <Button
-                              size="xs"
-                              color="gray"
-                              onClick={() =>
-                                acknowledgeMutation.mutate({
-                                  alertId: alert.alert_id,
-                                  acknowledgedBy: 'Current User',
-                                })
-                              }
-                              loading={acknowledgeMutation.isPending}
-                              className="ml-2"
-                            >
-                              Ack
-                            </Button>
-                          )}
-                        </Flex>
-                      </Card>
-                    ))
-                  ) : (
-                    <Text className="text-center py-6 text-gray-500">No alerts</Text>
-                  )}
-                </div>
-              </div>
-            </TabPanel>
+        {activeTab === 'points' && (
+          <div className="p-4 space-y-4">
+            <h3 className="text-lg font-semibold" style={{ color: 'var(--color-sentinel-text-primary)' }}>Access Control Points</h3>
+            <div className="space-y-2 max-h-96 overflow-y-auto">
+              {points.length > 0 ? (
+                points.map((point: AccessPoint) => (
+                  <div key={point.point_id} className="rounded-lg p-3" style={{ background: 'var(--color-sentinel-bg-panel)', border: '1px solid var(--color-sentinel-border)' }}>
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between">
+                          <p className="font-semibold" style={{ color: 'var(--color-sentinel-text-primary)' }}>{point.location}</p>
+                          {getPointStatusIcon(point.status)}
+                        </div>
+                        <p className="text-xs mt-1" style={{ color: 'var(--color-sentinel-text-secondary)' }}>
+                          Zone {point.zone} &bull; {point.device_type}
+                        </p>
+                        {point.last_activity && (
+                          <p className="text-xs" style={{ color: 'var(--color-sentinel-text-secondary)' }}>
+                            Last activity: {formatTime(point.last_activity)}
+                          </p>
+                        )}
+                      </div>
+                      <Badge className="capitalize">{point.status}</Badge>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="text-center py-6" style={{ color: 'var(--color-sentinel-text-secondary)' }}>No access points configured</p>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
 
-            {/* Tab 5: Access Points */}
-            <TabPanel>
-              <div className="mt-6 space-y-4">
-                <Title>Access Control Points</Title>
-                <div className="space-y-2 max-h-96 overflow-y-auto">
-                  {points.length > 0 ? (
-                    points.map((point: AccessPoint) => (
-                      <Card key={point.point_id} className="p-3">
-                        <Flex alignItems="center" justifyContent="between">
-                          <div className="flex-1">
-                            <Flex alignItems="center" justifyContent="between">
-                              <Text className="font-semibold">{point.location}</Text>
-                              {getPointStatusIcon(point.status)}
-                            </Flex>
-                            <Text className="text-xs text-gray-600 mt-1">
-                              Zone {point.zone} • {point.device_type}
-                            </Text>
-                            {point.last_activity && (
-                              <Text className="text-xs text-gray-600">
-                                Last activity: {formatTime(point.last_activity)}
-                              </Text>
-                            )}
-                          </div>
-                          <Badge className="capitalize">{point.status}</Badge>
-                        </Flex>
-                      </Card>
-                    ))
-                  ) : (
-                    <Text className="text-center py-6 text-gray-500">No access points configured</Text>
-                  )}
-                </div>
-              </div>
-            </TabPanel>
-          </TabPanels>
-        </TabGroup>
-      </Card>
-
-      {/* System Status Footer */}
-      <Card>
-        <Flex alignItems="center" justifyContent="between">
-          <Text className="text-xs text-gray-600">
+      <div className="rounded-lg p-4" style={{ background: 'var(--color-sentinel-bg-panel)', border: '1px solid var(--color-sentinel-border)' }}>
+        <div className="flex items-center justify-between">
+          <p className="text-xs" style={{ color: 'var(--color-sentinel-text-secondary)' }}>
             {overview?.system_status === 'online' ? (
               <>
                 <CheckCircle className="inline h-4 w-4 text-green-500 mr-1" />
@@ -388,10 +377,10 @@ export function SecurityPanel({ siteId: propSiteId }: SecurityPanelProps): React
                 Security system in polling mode
               </>
             )}
-          </Text>
-          {overview && <Text className="text-xs text-gray-500">Last update: {formatTime(overview.last_updated)}</Text>}
-        </Flex>
-      </Card>
+          </p>
+          {overview && <p className="text-xs" style={{ color: 'var(--color-sentinel-text-disabled)' }}>Last update: {formatTime(overview.last_updated)}</p>}
+        </div>
+      </div>
     </div>
   );
 }

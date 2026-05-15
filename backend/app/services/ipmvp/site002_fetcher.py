@@ -11,11 +11,11 @@ The bridge runs at BRIDGE_BASE and exposes:
 
 Authentication: Bearer token from BRIDGE_API_TOKEN_SITE_002 env var.
 """
-
 from __future__ import annotations
 
+import logging
 import os
-from datetime import datetime, date
+from datetime import UTC, datetime, date, timedelta
 from typing import Any
 
 from app.services.ipmvp.ipmvp_engine import (
@@ -24,8 +24,10 @@ from app.services.ipmvp.ipmvp_engine import (
     IPMVPDataFetcher,
 )
 
-BRIDGE_BASE = os.getenv("BRIDGE_BASE_SITE002", "http://localhost:8080")
-TOKEN = os.getenv("BRIDGE_API_TOKEN_SITE_002", "")
+logger = logging.getLogger(__name__)
+
+BRIDGE_BASE = os.getenv("BRIDGE_BASE_SITE002") or os.getenv("BRIDGE_BASE_URL", "http://localhost:8080")
+TOKEN = os.getenv("BRIDGE_API_TOKEN_SITE_002") or os.getenv("BRIDGE_API_TOKEN_SITE002") or os.getenv("BRIDGE_API_TOKEN", "")
 
 
 class Site002DataFetcher(IPMVPDataFetcher):
@@ -219,6 +221,202 @@ class Site002DataFetcher(IPMVPDataFetcher):
             resp.raise_for_status()
             self._occupancy = resp.json()
         return self._occupancy
+
+    # ── Persistence to Supabase ───────────────────────────────────────────
+
+    def _supabase(self):
+        from app.database.supabase_client import get_supabase_client
+        return get_supabase_client()
+
+    async def persist_energy(self, records: list[EnergyRecord]) -> int:
+        """Upsert energy records into ipmvp_energy."""
+        if not records:
+            return 0
+        rows = [
+            {
+                "site_id": self.site_id,
+                "timestamp": r.timestamp.isoformat(),
+                "import_kwh": r.kwh if r.kwh >= 0 else None,
+                "export_kwh": abs(r.kwh) if r.kwh < 0 else None,
+                "hvac_kwh": None,
+                "lighting_kwh": None,
+                "solar_generation_kwh": None,
+                "source": "bridge_ipmvp",
+            }
+            for r in records
+        ]
+        sb = self._supabase()
+        result = sb.table("ipmvp_energy").upsert(
+            rows,
+            on_conflict="site_id,timestamp",
+            ignore_duplicates=False,
+        ).execute()
+        count = len(result.data) if result.data else 0
+        logger.info("[IPMVP] Persisted %d energy records", count)
+        return count
+
+    async def persist_oat(self, oat_data: dict) -> int:
+        """Upsert OAT records into ipmvp_oat."""
+        records = oat_data.get("records", [])
+        if not records:
+            return 0
+        rows = [
+            {
+                "site_id": self.site_id,
+                "timestamp": r["timestamp"],
+                "oat_celsius": r.get("oat_celsius", r.get("outdoor_air_temp")),
+                "source": "bridge_ipmvp",
+            }
+            for r in records if r.get("timestamp")
+        ]
+        if not rows:
+            return 0
+        sb = self._supabase()
+        result = sb.table("ipmvp_oat").upsert(
+            rows,
+            on_conflict="site_id,timestamp",
+            ignore_duplicates=False,
+        ).execute()
+        count = len(result.data) if result.data else 0
+        logger.info("[IPMVP] Persisted %d OAT records", count)
+        return count
+
+    async def persist_events(self, events_data: dict) -> int:
+        """Insert events into ipmvp_events."""
+        events = events_data.get("events", [])
+        if not events:
+            return 0
+        rows = [
+            {
+                "site_id": self.site_id,
+                "event_id": e.get("event_id", f"evt-{i}"),
+                "timestamp": e.get("timestamp"),
+                "event_type": e.get("event_type", "unknown"),
+                "target_id": e.get("target_id"),
+                "value": e.get("value"),
+                "unit": e.get("unit"),
+                "reason": e.get("reason"),
+                "source": "bridge_ipmvp",
+            }
+            for i, e in enumerate(events) if e.get("timestamp")
+        ]
+        if not rows:
+            return 0
+        sb = self._supabase()
+        result = sb.table("ipmvp_events").upsert(
+            rows,
+            on_conflict="site_id,event_id",
+            ignore_duplicates=True,
+        ).execute()
+        count = len(result.data) if result.data else 0
+        logger.info("[IPMVP] Persisted %d events", count)
+        return count
+
+    async def persist_occupancy(self, occupancy_data: dict) -> bool:
+        """Upsert occupancy schedule into ipmvp_occupancy."""
+        if not occupancy_data:
+            return False
+        sb = self._supabase()
+        result = sb.table("ipmvp_occupancy").upsert(
+            {
+                "site_id": self.site_id,
+                "schedule_data": occupancy_data,
+                "source": "bridge_ipmvp",
+                "updated_at": datetime.now(UTC).isoformat(),
+            },
+            on_conflict="site_id",
+        ).execute()
+        ok = bool(result.data)
+        if ok:
+            logger.info("[IPMVP] Occupancy schedule persisted")
+        return ok
+
+    async def persist_tariff(self, tariff_data: dict) -> bool:
+        """Upsert tariff into ipmvp_tariff."""
+        if not tariff_data:
+            return False
+        sb = self._supabase()
+        result = sb.table("ipmvp_tariff").upsert(
+            {
+                "site_id": self.site_id,
+                "tariff_data": tariff_data,
+                "source": "bridge_ipmvp",
+                "updated_at": datetime.now(UTC).isoformat(),
+            },
+            on_conflict="site_id",
+        ).execute()
+        ok = bool(result.data)
+        if ok:
+            logger.info("[IPMVP] Tariff data persisted")
+        return ok
+
+    async def _purge_older_than(self, days: int = 7) -> None:
+        """Delete IPMVP rows older than `days` to enforce rolling window."""
+        cutoff = (datetime.now(UTC) - timedelta(days=days)).isoformat()
+        sb = self._supabase()
+        for table in ("ipmvp_energy", "ipmvp_oat", "ipmvp_events"):
+            try:
+                sb.table(table).delete().lt("timestamp", cutoff).eq("site_id", self.site_id).execute()
+            except Exception:
+                pass
+
+    async def run_full_sync(self, days_back: int = 7) -> dict[str, Any]:
+        """Fetch all IPMVP data and persist to Supabase."""
+        now = datetime.now(UTC)
+        start = now - timedelta(days=days_back)
+        summary: dict[str, Any] = {"status": "ok", "counts": {}}
+
+        try:
+            energy = await self.fetch_energy_and_oat(start, now)
+            summary["counts"]["energy"] = await self.persist_energy(energy)
+        except Exception as e:
+            logger.warning("[IPMVP] Energy sync failed: %s", e)
+            summary.setdefault("errors", []).append(f"energy:{e}")
+
+        try:
+            client = await self._get_client()
+            resp = await client.get(
+                "/api/sites/site-002/ipmvp/oat",
+                params={"start": start.isoformat(), "end": now.isoformat(), "limit": 50000},
+            )
+            oat_data = resp.json()
+            summary["counts"]["oat"] = await self.persist_oat(oat_data)
+        except Exception as e:
+            logger.warning("[IPMVP] OAT sync failed: %s", e)
+            summary.setdefault("errors", []).append(f"oat:{e}")
+
+        try:
+            resp = await client.get(
+                "/api/sites/site-002/ipmvp/events",
+                params={"start": start.isoformat(), "end": now.isoformat(), "limit": 5000},
+            )
+            events_data = resp.json()
+            summary["counts"]["events"] = await self.persist_events(events_data)
+        except Exception as e:
+            logger.warning("[IPMVP] Events sync failed: %s", e)
+            summary.setdefault("errors", []).append(f"events:{e}")
+
+        try:
+            occupancy = await self._fetch_occupancy()
+            summary["counts"]["occupancy"] = await self.persist_occupancy(occupancy)
+        except Exception as e:
+            logger.warning("[IPMVP] Occupancy sync failed: %s", e)
+            summary.setdefault("errors", []).append(f"occupancy:{e}")
+
+        try:
+            tariff = await self.fetch_tariff()
+            summary["counts"]["tariff"] = await self.persist_tariff(tariff)
+        except Exception as e:
+            logger.warning("[IPMVP] Tariff sync failed: %s", e)
+            summary.setdefault("errors", []).append(f"tariff:{e}")
+
+        # Rolling 7-day window
+        self._purge_older_than(days_back)
+
+        if summary.get("errors"):
+            summary["status"] = "partial"
+        logger.info("[IPMVP] Full sync complete: %s", summary)
+        return summary
 
     def _is_occupied(self, dt: datetime, occupancy: dict[str, Any]) -> bool:
         """Check if dt falls within occupied hours per schedule."""

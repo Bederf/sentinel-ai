@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from app.database.repositories.equipment_metadata_repository import EquipmentMetadataRepository
+from app.database.supabase_client import get_supabase_client
 
 router = APIRouter()
 
@@ -68,7 +69,8 @@ async def get_equipment_metadata(equipment_id: str) -> dict:
     """Get full metadata for equipment.
 
     Returns all metadata fields including notes, network info, device info,
-    and operating data.
+    and operating data. Falls back to the latest health snapshot if
+    equipment.health_score is stale.
 
     Args:
         equipment_id: Equipment UUID or code (e.g., S002-DALI-L1-A)
@@ -81,6 +83,25 @@ async def get_equipment_metadata(equipment_id: str) -> dict:
 
     if not equipment:
         raise HTTPException(status_code=404, detail=f"Equipment {equipment_id} not found")
+
+    # Fall back to latest health snapshot if equipment.health_score is stale
+    eq_id = equipment.get("id")
+    if eq_id and equipment.get("health_score") is None:
+        try:
+            supabase = get_supabase_client()
+            snap = (
+                supabase.table("asset_health_snapshots")
+                .select("health_score, health_status")
+                .eq("equipment_id", eq_id)
+                .order("snapshot_at", desc=True)
+                .limit(1)
+                .execute()
+            )
+            if snap.data:
+                equipment["health_score"] = snap.data[0]["health_score"]
+                equipment["health_status"] = snap.data[0]["health_status"]
+        except Exception:
+            pass
 
     return {
         "equipment": equipment,

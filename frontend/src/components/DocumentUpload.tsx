@@ -8,9 +8,22 @@
  * - File size validation (max 10MB)
  */
 
-import { useRef, useState } from 'react';
-import { Paperclip, Loader, X, Calendar, FileText } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Paperclip, Loader, X, Calendar, FileText, Wrench } from 'lucide-react';
 import { documentsApi } from '@/lib/api/documents';
+import { workflowApi } from '@/lib/api/workflow';
+
+const PRIORITY_EQUIPMENT_KEYWORDS = [
+  'GEN', 'GENERATOR', 'AHU', 'FCU', 'CHILLER', 'PUMP',
+  'UPS', 'BESS', 'INVERTER', 'BOILER', 'COOLING_TOWER', 'CT',
+];
+
+function isPriorityEquipmentType(type: string): boolean {
+  const normalized = type.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  return PRIORITY_EQUIPMENT_KEYWORDS.some((keyword) =>
+    normalized.includes(keyword.replace(/[^A-Z0-9]/g, ''))
+  );
+}
 
 interface DocumentUploadProps {
   siteId: string;
@@ -55,10 +68,31 @@ export function DocumentUpload({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [documentType, setDocumentType] = useState<string>('');
   const [documentDate, setDocumentDate] = useState<string>('');
+  const [equipmentList, setEquipmentList] = useState<{ equipment_id: string; name: string; type: string }[]>([]);
+  const [selectedEquipment, setSelectedEquipment] = useState<string>('');
+  const [loadingEquipment, setLoadingEquipment] = useState(false);
 
   const SUPPORTED_TYPES = ['.pdf', '.docx', '.txt'];
   const MAX_SIZE_MB = 10;
   const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024;
+
+  // Fetch priority equipment list (same data as Maintenance page)
+  useEffect(() => {
+    if (!isPanelOpen || !siteId || equipmentList.length > 0) return;
+    const fetchEquipment = async () => {
+      setLoadingEquipment(true);
+      try {
+        const data = await workflowApi.getDashboardEquipment(siteId);
+        const filtered = (data.equipment || []).filter((eq) => isPriorityEquipmentType(eq.type));
+        setEquipmentList(filtered);
+      } catch {
+        setEquipmentList([]);
+      } finally {
+        setLoadingEquipment(false);
+      }
+    };
+    fetchEquipment();
+  }, [isPanelOpen, siteId, equipmentList.length]);
 
   const handleOpenPanel = () => {
     setIsPanelOpen(true);
@@ -67,6 +101,7 @@ export function DocumentUpload({
     setSelectedFile(null);
     setDocumentType('');
     setDocumentDate('');
+    setSelectedEquipment('');
   };
 
   const handleClosePanel = () => {
@@ -106,10 +141,13 @@ export function DocumentUpload({
     setError(null);
 
     try {
+      const title = selectedEquipment
+        ? `${selectedEquipment} - ${documentType}`
+        : documentType;
       await documentsApi.uploadDocument(
         siteId,
         selectedFile,
-        documentType,
+        title,
         'service_report'
       );
 
@@ -213,6 +251,44 @@ export function DocumentUpload({
                     </option>
                   ))}
                 </select>
+              </div>
+
+              {/* Equipment Selection (same list as Maintenance page) */}
+              <div>
+                <label
+                  className="block text-sm font-medium mb-2"
+                  style={{ color: 'var(--color-grafana-text-secondary)' }}
+                >
+                  Equipment
+                </label>
+                <div className="relative">
+                  <Wrench
+                    className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4"
+                    style={{ color: 'var(--color-grafana-text-disabled)' }}
+                  />
+                  <select
+                    value={selectedEquipment}
+                    onChange={(e) => setSelectedEquipment(e.target.value)}
+                    className="w-full pl-10 pr-3 py-2 rounded border"
+                    style={{
+                      background: 'var(--color-grafana-bg-secondary)',
+                      borderColor: 'var(--color-grafana-border)',
+                      color: loadingEquipment
+                        ? 'var(--color-grafana-text-disabled)'
+                        : 'var(--color-grafana-text-primary)',
+                    }}
+                    disabled={loadingEquipment}
+                  >
+                    <option value="">
+                      {loadingEquipment ? 'Loading equipment...' : 'Select equipment (optional)'}
+                    </option>
+                    {equipmentList.map((eq) => (
+                      <option key={eq.equipment_id} value={eq.equipment_id}>
+                        {eq.equipment_id} — {eq.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               {/* Document Date */}

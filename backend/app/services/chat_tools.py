@@ -1391,56 +1391,80 @@ async def lookup_desk(desk_id: str, building: str | None = None) -> dict[str, An
 async def _get_zone_equipment_status(zone: dict, site_code: str) -> dict[str, Any]:
     """Query all equipment in a zone and return their status/health.
 
-    Gathers FCU, VAV, AHU, temp sensor, CO2 sensor, humidity sensor,
-    and diffusers. Also queries latest zone history for live readings.
+    Derives equipment codes from the zone-code naming convention:
+    S002-{TYPE}-{ZONE_CODE}. Falls back to reading equipment operating_data
+    for live readings when hvac_zone_history is unavailable.
     """
     client = get_supabase_client()
-    equip_codes = []
+    zone_id = zone.get("zone_id", "")
+    zone_code = zone_id.replace("Zone-", "")
+
+    # Derive equipment codes from zone-code naming convention
+    equip_candidates = [
+        f"S002-FCU-{zone_code}",
+        f"S002-VAV-{zone_code}",
+    ]
+    # Also check for legacy zone-record fields
     for key in ("fcu_id", "vav_id", "ahu_id", "temp_sensor", "co2_sensor", "humidity_sensor"):
         val = zone.get(key)
-        if val:
-            equip_codes.append(val)
-
-    # Also get diffusers for this zone
-    zone_id = zone.get("zone_id", "")
-    zone_num = zone_id.replace("Zone-", "")
-    diff_prefix = f"S002-DIFF-{zone_num}-"
+        if val and val not in equip_candidates:
+            equip_candidates.append(val)
 
     equipment_status = {}
-    if equip_codes:
-        resp = client.table("equipment").select("code, type, status, health_score").in_("code", equip_codes).execute()
+    if equip_candidates:
+        resp = client.table("equipment").select("code, type, status, health_score").in_("code", equip_candidates).execute()
         for e in resp.data or []:
             equipment_status[e["code"]] = e
 
-    # Get diffusers
-    diff_resp = (
-        client.table("equipment").select("code, type, status, health_score").like("code", f"{diff_prefix}%").execute()
-    )
-    diffusers = diff_resp.data or []
-    for d in diffusers:
-        equipment_status[d["code"]] = d
+    # Also try zone-matching VAV and AHU by zone-code pattern
+    for eq_type in ("VAV", "AHU"):
+        candidate = f"S002-{eq_type}-{zone_code}"
+        if candidate not in equipment_status:
+            try:
+                eq_resp = client.table("equipment").select("code, type, status, health_score").eq("code", candidate).limit(1).execute()
+                if eq_resp.data:
+                    equipment_status[eq_resp.data[0]["code"]] = eq_resp.data[0]
+            except Exception:
+                pass
 
-    # Get latest zone history readings (temp, humidity, co2)
-    bld_resp = client.table("sites").select("id").eq("code", site_code).execute()
-    site_uuid = bld_resp.data[0]["id"] if bld_resp.data else None
-
+    # Get live readings from FCU operating_data (most recent source)
     live_readings = {}
-    if site_uuid:
-        hist_resp = (
-            client.table("hvac_zone_history")
-            .select("temp, humidity, co2, setpoint, status, occupancy, time")
-            .eq("zone_id", zone_id)
-            .eq("site_id", site_uuid)
-            .order("time", desc=True)
-            .limit(1)
-            .execute()
-        )
-        if hist_resp.data:
-            live_readings = hist_resp.data[0]
+    fcu_code = f"S002-FCU-{zone_code}"
+    if fcu_code in equipment_status:
+        try:
+            fcu_resp = client.table("equipment").select("operating_data").eq("code", fcu_code).limit(1).execute()
+            if fcu_resp.data:
+                op = fcu_resp.data[0].get("operating_data", {})
+                for point_name, point_data in op.items():
+                    if isinstance(point_data, dict):
+                        live_readings[point_name] = point_data.get("value")
+                    else:
+                        live_readings[point_name] = point_data
+        except Exception:
+            pass
+
+    # Also try hvac_zone_history if it exists (graceful fallback)
+    try:
+        bld_resp = client.table("sites").select("id").eq("code", site_code).execute()
+        site_uuid = bld_resp.data[0]["id"] if bld_resp.data else None
+        if site_uuid:
+            hist_resp = (
+                client.table("hvac_zone_history")
+                .select("temp, humidity, co2, setpoint, status, occupancy, time")
+                .eq("zone_id", zone_id)
+                .eq("site_id", site_uuid)
+                .order("time", desc=True)
+                .limit(1)
+                .execute()
+            )
+            if hist_resp.data:
+                live_readings = {**live_readings, **hist_resp.data[0]}
+    except Exception:
+        pass  # hvac_zone_history may not exist — readings from operating_data are sufficient
 
     return {
         "equipment": equipment_status,
-        "diffusers": diffusers,
+        "diffusers": [],
         "live_readings": live_readings,
         "equipment_count": len(equipment_status),
     }

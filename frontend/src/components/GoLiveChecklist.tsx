@@ -2,12 +2,6 @@
  * GoLiveChecklist Component
  *
  * Displays validation checklist for building go-live activation.
- * Features:
- * - Header with building status badge and action buttons
- * - Checklist grid with 4 categories
- * - Summary section with counts and blocking issues
- * - Activation flow with confirmation modal
- *
  * Follows SENTINEL dark theme design.
  */
 
@@ -37,40 +31,46 @@ interface GoLiveChecklistProps {
   onStatusChange?: (status: BuildingStatus) => void;
 }
 
-// Status badge component
+const statusBadgeStyles: Record<BuildingStatus, { bg: string; color: string }> = {
+  draft: { bg: "rgba(142,142,142,0.15)", color: "var(--color-sentinel-text-secondary)" },
+  pending_validation: { bg: "rgba(245,158,11,0.15)", color: "var(--color-sentinel-amber)" },
+  active: { bg: "rgba(16,185,129,0.15)", color: "var(--color-sentinel-green)" },
+  suspended: { bg: "rgba(220,38,38,0.15)", color: "var(--color-sentinel-red)" },
+};
+
 function StatusBadge({ status }: { status: BuildingStatus }) {
-  const statusStyles: Record<BuildingStatus, { color: "gray" | "yellow" | "green" | "red"; text: string }> = {
-    draft: { color: "gray", text: "Draft" },
-    pending_validation: { color: "yellow", text: "Pending Validation" },
-    active: { color: "green", text: "Active" },
-    suspended: { color: "red", text: "Suspended" },
+  const style = statusBadgeStyles[status];
+  const labels: Record<BuildingStatus, string> = {
+    draft: "Draft",
+    pending_validation: "Pending Validation",
+    active: "Active",
+    suspended: "Suspended",
   };
 
-  const style = statusStyles[status];
-
   return (
-    <Badge color={style.color} size="lg">
-      {style.text}
-    </Badge>
+    <span
+      className="inline-flex items-center px-3 py-1 text-sm font-medium rounded-full"
+      style={{ background: style.bg, color: style.color }}
+    >
+      {labels[status]}
+    </span>
   );
 }
 
-// Checklist item status icon
 function StatusIcon({ status }: { status: ChecklistItem["status"] }) {
   switch (status) {
     case "pass":
-      return <CheckCircle className="w-5 h-5 text-green-500" />;
+      return <CheckCircle className="w-5 h-5" style={{ color: "var(--color-sentinel-green)" }} />;
     case "fail":
-      return <XCircle className="w-5 h-5 text-red-500" />;
+      return <XCircle className="w-5 h-5" style={{ color: "var(--color-sentinel-red)" }} />;
     case "warning":
-      return <AlertTriangle className="w-5 h-5 text-amber-500" />;
+      return <AlertTriangle className="w-5 h-5" style={{ color: "var(--color-sentinel-amber)" }} />;
     case "not_checked":
     default:
-      return <Circle className="w-5 h-5 text-gray-500" />;
+      return <Circle className="w-5 h-5" style={{ color: "var(--color-sentinel-text-disabled)" }} />;
   }
 }
 
-// Format value for display
 function formatValue(value: any, threshold: any): string {
   if (value === undefined || value === null) return "";
 
@@ -88,7 +88,6 @@ function formatValue(value: any, threshold: any): string {
       : threshold.toFixed(1)
     : String(threshold);
 
-  // Add % if it looks like a percentage
   if (typeof value === "number" && value <= 100 && value >= 0) {
     return `${valueStr}% / ${thresholdStr}% required`;
   }
@@ -96,7 +95,6 @@ function formatValue(value: any, threshold: any): string {
   return `${valueStr} / ${thresholdStr} required`;
 }
 
-// Confirmation modal component
 function ConfirmationModal({
   isOpen,
   title,
@@ -120,13 +118,11 @@ function ConfirmationModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/60"
         onClick={onCancel}
       />
 
-      {/* Modal */}
       <div
         className="relative z-10 max-w-md w-full mx-4 p-6 rounded-lg"
         style={{
@@ -148,34 +144,43 @@ function ConfirmationModal({
         </p>
 
         <div className="flex justify-end gap-3">
-          <Button
-            variant="secondary"
+          <button
             onClick={onCancel}
             disabled={isLoading}
+            className="px-4 py-2 text-sm font-medium rounded-md transition-colors disabled:opacity-50"
+            style={{
+              background: "var(--color-sentinel-bg-secondary)",
+              border: "1px solid var(--color-sentinel-border)",
+              color: "var(--color-sentinel-text-primary)",
+            }}
           >
             {cancelText}
-          </Button>
-          <Button
+          </button>
+          <button
             onClick={onConfirm}
             disabled={isLoading}
-            className="bg-green-600 hover:bg-green-700"
+            className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-md transition-colors disabled:opacity-50"
+            style={{
+              background: "var(--color-sentinel-green)",
+              border: "1px solid var(--color-sentinel-green)",
+              color: "#fff",
+            }}
           >
             {isLoading ? (
               <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                <Loader2 className="w-4 h-4 animate-spin" />
                 Processing...
               </>
             ) : (
               confirmText
             )}
-          </Button>
+          </button>
         </div>
       </div>
     </div>
   );
 }
 
-// Group checklist items by category
 function groupByCategory(items: ChecklistItem[]): Record<string, ChecklistItem[]> {
   return items.reduce((acc, item) => {
     if (!acc[item.category]) {
@@ -186,7 +191,6 @@ function groupByCategory(items: ChecklistItem[]): Record<string, ChecklistItem[]
   }, {} as Record<string, ChecklistItem[]>);
 }
 
-// Category display names
 const categoryLabels: Record<string, string> = {
   data_source: "Data Sources",
   point_mapping: "Point Mapping",
@@ -195,7 +199,6 @@ const categoryLabels: Record<string, string> = {
 };
 
 export function GoLiveChecklist({ siteId, onStatusChange }: GoLiveChecklistProps) {
-  // State
   const [checklist, setChecklist] = useState<ValidationChecklist | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isValidating, setIsValidating] = useState(false);
@@ -204,19 +207,15 @@ export function GoLiveChecklist({ siteId, onStatusChange }: GoLiveChecklistProps
   const [error, setError] = useState<string | null>(null);
   const [activationResult, setActivationResult] = useState<ActivationResult | null>(null);
 
-  // Fetch checklist
   const fetchChecklist = useCallback(async () => {
     setIsLoading(true);
     setError(null);
 
     try {
-      // Add delay to stagger requests and avoid 429 rate limiting
-      // Increased to 2s to prevent concurrent request bursts
       await new Promise((resolve) => setTimeout(resolve, 2000));
       const data = await validationApi.getChecklist(siteId);
       setChecklist(data);
     } catch (err: any) {
-      // Retry on rate limit with exponential backoff
       if (err?.status === 429) {
         console.warn("Rate limited, retrying in 3 seconds...");
         await new Promise((resolve) => setTimeout(resolve, 3000));
@@ -236,12 +235,10 @@ export function GoLiveChecklist({ siteId, onStatusChange }: GoLiveChecklistProps
     }
   }, [siteId]);
 
-  // Initial load
   useEffect(() => {
     fetchChecklist();
   }, [fetchChecklist]);
 
-  // Run validation
   const handleValidate = async () => {
     setIsValidating(true);
     setError(null);
@@ -259,7 +256,6 @@ export function GoLiveChecklist({ siteId, onStatusChange }: GoLiveChecklistProps
     }
   };
 
-  // Activate building
   const handleActivate = async () => {
     setIsActivating(true);
     setError(null);
@@ -270,7 +266,6 @@ export function GoLiveChecklist({ siteId, onStatusChange }: GoLiveChecklistProps
       setShowConfirmModal(false);
 
       if (result.success) {
-        // Refresh checklist to get updated status
         await fetchChecklist();
         onStatusChange?.(result.new_status);
       }
@@ -283,13 +278,17 @@ export function GoLiveChecklist({ siteId, onStatusChange }: GoLiveChecklistProps
     }
   };
 
-  // Group items by category
   const groupedItems = checklist ? groupByCategory(checklist.items) : {};
 
-  // Loading state
+  const cardStyle: React.CSSProperties = {
+    background: "var(--color-sentinel-bg-panel)",
+    border: "1px solid var(--color-sentinel-border)",
+    borderRadius: 8,
+  };
+
   if (isLoading) {
     return (
-      <Card className="p-6">
+      <div style={{ ...cardStyle, padding: 24 }}>
         <div className="flex items-center justify-center py-8">
           <Loader2
             className="w-8 h-8 animate-spin"
@@ -302,27 +301,36 @@ export function GoLiveChecklist({ siteId, onStatusChange }: GoLiveChecklistProps
             Loading validation checklist...
           </span>
         </div>
-      </Card>
+      </div>
     );
   }
 
-  // Error state
   if (error && !checklist) {
     return (
-      <Card className="p-6">
-        <Callout title="Error" color="rose">
+      <div style={{ ...cardStyle, padding: 24 }}>
+        <div
+          className="p-3 rounded-md text-sm"
+          style={{
+            background: "rgba(220,38,38,0.15)",
+            border: "1px solid rgba(220,38,38,0.3)",
+            color: "var(--color-sentinel-red)",
+          }}
+        >
           <div>{error}</div>
-          <Button
-            variant="secondary"
-            size="sm"
-            className="mt-4"
+          <button
             onClick={fetchChecklist}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors mt-4"
+            style={{
+              background: "var(--color-sentinel-bg-secondary)",
+              border: "1px solid var(--color-sentinel-border)",
+              color: "var(--color-sentinel-text-primary)",
+            }}
           >
-            <RefreshCw className="w-4 h-4 mr-2" />
+            <RefreshCw className="w-4 h-4" />
             Retry
-          </Button>
-        </Callout>
-      </Card>
+          </button>
+        </div>
+      </div>
     );
   }
 
@@ -332,8 +340,7 @@ export function GoLiveChecklist({ siteId, onStatusChange }: GoLiveChecklistProps
 
   return (
     <>
-      <Card className="p-0 overflow-hidden">
-        {/* Header Section */}
+      <div className="overflow-hidden" style={cardStyle}>
         <div
           className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
           style={{ borderBottom: "1px solid var(--color-sentinel-border)" }}
@@ -359,60 +366,77 @@ export function GoLiveChecklist({ siteId, onStatusChange }: GoLiveChecklistProps
           </div>
 
           <div className="flex items-center gap-2">
-            <Button
-              variant="secondary"
-              size="sm"
+            <button
               onClick={handleValidate}
               disabled={isValidating}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors disabled:opacity-50"
+              style={{
+                background: "var(--color-sentinel-bg-secondary)",
+                border: "1px solid var(--color-sentinel-border)",
+                color: "var(--color-sentinel-text-primary)",
+              }}
             >
               {isValidating ? (
                 <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  <Loader2 className="w-4 h-4 animate-spin" />
                   Validating...
                 </>
               ) : (
                 <>
-                  <Play className="w-4 h-4 mr-2" />
+                  <Play className="w-4 h-4" />
                   Run Validation
                 </>
               )}
-            </Button>
+            </button>
 
-            <Button
-              size="sm"
+            <button
               onClick={() => setShowConfirmModal(true)}
               disabled={!checklist.can_activate || isValidating}
-              className={
-                checklist.can_activate
-                  ? "bg-green-600 hover:bg-green-700"
-                  : "opacity-50 cursor-not-allowed"
-              }
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors disabled:opacity-50"
+              style={{
+                background: checklist.can_activate ? "var(--color-sentinel-green)" : "var(--color-sentinel-bg-secondary)",
+                border: "1px solid var(--color-sentinel-green)",
+                color: checklist.can_activate ? "#fff" : "var(--color-sentinel-text-disabled)",
+              }}
             >
-              <Power className="w-4 h-4 mr-2" />
+              <Power className="w-4 h-4" />
               Activate
-            </Button>
+            </button>
           </div>
         </div>
 
-        {/* Error Alert */}
         {error && (
           <div className="p-4">
-            <Callout title="Error" color="rose">
-              {error}
-            </Callout>
+            <div
+              className="p-3 rounded-md text-sm flex items-center gap-2"
+              style={{
+                background: "rgba(220,38,38,0.15)",
+                border: "1px solid rgba(220,38,38,0.3)",
+                color: "var(--color-sentinel-red)",
+              }}
+            >
+              <span className="font-medium">Error</span>
+              <span>{error}</span>
+            </div>
           </div>
         )}
 
-        {/* Activation Success Alert */}
         {activationResult?.success && (
           <div className="p-4">
-            <Callout title="Success" color="green">
-              {activationResult.message}
-            </Callout>
+            <div
+              className="p-3 rounded-md text-sm flex items-center gap-2"
+              style={{
+                background: "rgba(16,185,129,0.15)",
+                border: "1px solid rgba(16,185,129,0.3)",
+                color: "var(--color-sentinel-green)",
+              }}
+            >
+              <span className="font-medium">Success</span>
+              <span>{activationResult.message}</span>
+            </div>
           </div>
         )}
 
-        {/* Checklist Grid */}
         <div className="p-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {Object.entries(groupedItems).map(([category, items]) => (
@@ -452,7 +476,6 @@ export function GoLiveChecklist({ siteId, onStatusChange }: GoLiveChecklistProps
                           {item.description}
                         </div>
 
-                        {/* Value vs threshold */}
                         {(item.value !== undefined || item.threshold !== undefined) && (
                           <div
                             className="text-xs mt-1 font-mono"
@@ -469,7 +492,6 @@ export function GoLiveChecklist({ siteId, onStatusChange }: GoLiveChecklistProps
                           </div>
                         )}
 
-                        {/* Details */}
                         {item.details && (
                           <div
                             className="text-xs mt-1 italic"
@@ -487,32 +509,38 @@ export function GoLiveChecklist({ siteId, onStatusChange }: GoLiveChecklistProps
           </div>
         </div>
 
-        {/* Summary Section */}
         <div
           className="p-4"
           style={{ borderTop: "1px solid var(--color-sentinel-border)" }}
         >
-          {/* Count badges */}
           <div className="flex flex-wrap items-center gap-3 mb-4">
-            <Badge color="green" size="lg">
+            <span
+              className="inline-flex items-center px-3 py-1 text-sm font-medium rounded-full"
+              style={{ background: "rgba(16,185,129,0.15)", color: "var(--color-sentinel-green)" }}
+            >
               {checklist.summary.passed} passed
-            </Badge>
-            <Badge color="red" size="lg">
+            </span>
+            <span
+              className="inline-flex items-center px-3 py-1 text-sm font-medium rounded-full"
+              style={{ background: "rgba(220,38,38,0.15)", color: "var(--color-sentinel-red)" }}
+            >
               {checklist.summary.failed} failed
-            </Badge>
-            <Badge color="yellow" size="lg">
+            </span>
+            <span
+              className="inline-flex items-center px-3 py-1 text-sm font-medium rounded-full"
+              style={{ background: "rgba(245,158,11,0.15)", color: "var(--color-sentinel-amber)" }}
+            >
               {checklist.summary.warnings} warnings
-            </Badge>
+            </span>
           </div>
 
-          {/* Blocking issues */}
           {checklist.blocking_issues.length > 0 && (
-            <div className="mb-4 p-3 rounded-md border border-red-500/50 bg-red-500/10">
-              <div className="font-medium text-sm text-red-500 mb-2">Blocking Issues</div>
+            <div className="mb-4 p-3 rounded-md border" style={{ borderColor: "rgba(220,38,38,0.5)", background: "rgba(220,38,38,0.1)" }}>
+              <div className="font-medium text-sm mb-2" style={{ color: "var(--color-sentinel-red)" }}>Blocking Issues</div>
               <div className="space-y-1">
                 {checklist.blocking_issues.map((issue, index) => (
-                  <div key={index} className="text-sm text-red-400 flex items-start gap-2">
-                    <span className="text-red-500 flex-shrink-0">•</span>
+                  <div key={index} className="text-sm flex items-start gap-2" style={{ color: "var(--color-sentinel-red)", opacity: 0.8 }}>
+                    <span className="flex-shrink-0" style={{ color: "var(--color-sentinel-red)" }}>•</span>
                     <span>{issue}</span>
                   </div>
                 ))}
@@ -520,7 +548,6 @@ export function GoLiveChecklist({ siteId, onStatusChange }: GoLiveChecklistProps
             </div>
           )}
 
-          {/* Activation status message */}
           <div
             className="text-sm"
             style={{
@@ -536,15 +563,14 @@ export function GoLiveChecklist({ siteId, onStatusChange }: GoLiveChecklistProps
               </span>
             ) : (
               <span className="flex items-center gap-2">
-                <XCircle className="w-4 h-4 text-red-500" />
+                <XCircle className="w-4 h-4" style={{ color: "var(--color-sentinel-red)" }} />
                 Building cannot be activated until all critical issues are resolved.
               </span>
             )}
           </div>
         </div>
-      </Card>
+      </div>
 
-      {/* Confirmation Modal */}
       <ConfirmationModal
         isOpen={showConfirmModal}
         title="Activate Building"

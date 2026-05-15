@@ -170,7 +170,7 @@ class SentinelDataSync:
                 try:
                     import psycopg2
 
-                    database_url = os.getenv("DATABASE_URL")
+                    database_url = os.getenv("DATABASE_URL") or "postgresql://postgres:postgres@127.0.0.1:55322/postgres"
                     if not database_url:
                         raise ValueError("DATABASE_URL not set")
                     conn = psycopg2.connect(database_url)

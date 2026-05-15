@@ -755,6 +755,7 @@ async def seed_energy_data(
                 batch_records.append(
                     {
                         "site_id": point.site_id,
+                        "building_id": point.site_id,
                         "date": point.date,
                         "hvac_kwh": point.hvac_kwh,
                         "lighting_kwh": point.lighting_kwh,

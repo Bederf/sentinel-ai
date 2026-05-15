@@ -160,13 +160,13 @@ export function WorkOrderHistoryList({ equipmentId, limit = 10 }: WorkOrderHisto
           className="text-sm block"
           style={{ color: 'var(--color-grafana-text-secondary)' }}
         >
-          No work orders found
+          No service records found
         </span>
         <span
           className="text-xs block mt-1"
           style={{ color: 'var(--color-grafana-text-disabled)' }}
         >
-          Equipment has clean maintenance history
+          Equipment has clean service history
         </span>
       </div>
     );

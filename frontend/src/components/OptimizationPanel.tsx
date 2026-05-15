@@ -305,9 +305,17 @@ export function OptimizationPanel({ siteId: initialSiteId = "", scenarioId, comp
                 </span>
               </div>
 
-              <Button size="xs" variant="secondary" icon={Eye}>
+              <button
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium rounded transition-colors"
+                style={{
+                  background: "var(--color-sentinel-bg-secondary)",
+                  border: "1px solid var(--color-sentinel-border)",
+                  color: "var(--color-sentinel-text-primary)",
+                }}
+              >
+                <Eye className="h-3 w-3" />
                 View Details
-              </Button>
+              </button>
             </div>
           ) : (
             <div className="flex items-center gap-2 py-2">
@@ -349,19 +357,36 @@ export function OptimizationPanel({ siteId: initialSiteId = "", scenarioId, comp
             {isLoadShedding ? `Stage ${currentStage} Active` : "No Load Shedding"}
           </SentinelBadge>
           {precoolingStatus === "running" ? (
-            <Button size="xs" variant="secondary" icon={Square} onClick={handleStopPrecooling}>
-              Stop Pre-cool
-            </Button>
-          ) : (
-            <Button
-              size="xs"
-              variant="secondary"
-              icon={Play}
-              onClick={handleStartPrecooling}
-              loading={precoolingStatus === "starting"}
+            <button
+              onClick={handleStopPrecooling}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded transition-colors"
+              style={{
+                background: "var(--color-sentinel-bg-secondary)",
+                border: "1px solid var(--color-sentinel-border)",
+                color: "var(--color-sentinel-text-primary)",
+              }}
             >
+              <Square className="h-3 w-3" />
+              Stop Pre-cool
+            </button>
+          ) : (
+            <button
+              onClick={handleStartPrecooling}
+              disabled={precoolingStatus === "starting"}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded transition-colors disabled:opacity-50"
+              style={{
+                background: "var(--color-sentinel-bg-secondary)",
+                border: "1px solid var(--color-sentinel-border)",
+                color: "var(--color-sentinel-text-primary)",
+              }}
+            >
+              {precoolingStatus === "starting" ? (
+                <div className="animate-spin h-3 w-3 border-2 border-current border-t-transparent rounded-full" />
+              ) : (
+                <Play className="h-3 w-3" />
+              )}
               Start Pre-cool
-            </Button>
+            </button>
           )}
         </div>
       </div>
@@ -622,15 +647,23 @@ export function OptimizationPanel({ siteId: initialSiteId = "", scenarioId, comp
             {precoolingStatus === "running" ? (
               <SentinelBadge variant="success" size="sm">Running</SentinelBadge>
             ) : (
-              <Button
-                size="xs"
-                variant="primary"
-                icon={Play}
+              <button
                 onClick={handleStartPrecooling}
-                loading={precoolingStatus === "starting"}
+                disabled={precoolingStatus === "starting"}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded transition-colors disabled:opacity-50"
+                style={{
+                  background: "var(--color-sentinel-blue)",
+                  border: "1px solid var(--color-sentinel-blue)",
+                  color: "#fff",
+                }}
               >
+                {precoolingStatus === "starting" ? (
+                  <div className="animate-spin h-3 w-3 border-2 border-white border-t-transparent rounded-full" />
+                ) : (
+                  <Play className="h-3 w-3" />
+                )}
                 Start Now
-              </Button>
+              </button>
             )}
           </div>
 

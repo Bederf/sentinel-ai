@@ -616,7 +616,6 @@ def _session_to_dict(s: FocusRoomSession) -> dict:
         "created_at": _dt_to_str(s.created_at),
         "vacant_since": _dt_to_str(s.vacant_since) if s.vacant_since else None,
         "door_closed": s.door_closed,
-        "overstay_grace_minutes": s.overstay_grace_minutes,
     }
 
 

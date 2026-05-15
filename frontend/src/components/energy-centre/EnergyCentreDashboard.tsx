@@ -1,15 +1,3 @@
-/**
- * Energy Centre Dashboard - Bolt-on Module
- *
- * Complete energy centre monitoring view combining:
- * - Single-line diagram
- * - Generator synoptic
- * - Power metering
- * - UPS status
- * - ATS status
- * - AI recommendations integration
- */
-
 import { useState, useEffect, useCallback } from 'react';
 
 import { Activity } from 'lucide-react';
@@ -239,7 +227,7 @@ export function EnergyCentreDashboard({ siteId, onAIRecommendation, enabledModul
             <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>Power Distribution & Generation Management</p>
           </div>
         </div>
-        <Text className="text-red-500">Failed to load energy centre data</Text>
+        <p className="text-red-500">Failed to load energy centre data</p>
       </div>
     );
   }
@@ -279,13 +267,10 @@ export function EnergyCentreDashboard({ siteId, onAIRecommendation, enabledModul
       </div>
 
       <div className="space-y-4">
-      {/* AI Alerts Card */}
-      <Card>
-
         {/* AI Alerts */}
         {alerts.length > 0 && (
-          <div className="mt-4 pt-4 border-t border-gray-200">
-            <Text className="text-sm font-bold mb-2">AI Recommendations</Text>
+          <div>
+            <p className="text-sm font-bold mb-2">AI Recommendations</p>
             <div className="space-y-2">
               {alerts.slice(0, 3).map(alert => (
                 <div
@@ -296,119 +281,129 @@ export function EnergyCentreDashboard({ siteId, onAIRecommendation, enabledModul
                     'bg-blue-50 border border-blue-200'
                   }`}
                 >
-                  <Flex justifyContent="between">
-                    <Text className="font-medium">{alert.title}</Text>
-                    <Badge color={
-                      alert.priority === 'critical' ? 'red' :
-                      alert.priority === 'high' ? 'amber' : 'blue'
-                    }>
+                  <div className="flex justify-between">
+                    <p className="font-medium">{alert.title}</p>
+                    <span
+                      className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full"
+                      style={{
+                        background: alert.priority === 'critical' ? 'rgba(220,38,38,0.15)' :
+                          alert.priority === 'high' ? 'rgba(245,158,11,0.15)' : 'rgba(59,130,246,0.15)',
+                        color: alert.priority === 'critical' ? 'var(--color-sentinel-red)' :
+                          alert.priority === 'high' ? 'var(--color-sentinel-amber)' : 'var(--color-sentinel-blue)',
+                      }}
+                    >
                       {alert.type === 'cross_system' ? 'Cross-System' : 'Energy'}
-                    </Badge>
-                  </Flex>
-                  <Text className="text-xs mt-1">{alert.description}</Text>
+                    </span>
+                  </div>
+                  <p className="text-xs mt-1">{alert.description}</p>
                 </div>
               ))}
             </div>
           </div>
         )}
-      </Card>
 
-      <TabBar
-        tabs={TABS.map(t => ({ id: t.id, label: t.label }))}
-        active={activeTab}
-        onChange={setActiveTab}
-        accentColor="var(--color-sentinel-blue)"
-      />
+        <TabBar
+          tabs={TABS.map(t => ({ id: t.id, label: t.label }))}
+          active={activeTab}
+          onChange={setActiveTab}
+          accentColor="var(--color-sentinel-blue)"
+        />
 
-      <div className="space-y-4">
-        {activeTab === "overview" && (
-          <>
-          <div className="space-y-4 mb-4">
-            <Card>
-              <Flex justifyContent="between" alignItems="start">
-                <div>
-                  <Text className="text-sm font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>
-                    Raw Bridge Telemetry
-                  </Text>
-                  <Text className="mt-1 text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                    Zones: {bridgeTelemetry?.zones_with_readings ?? 0}/{bridgeTelemetry?.zone_count ?? 0} ·
-                    HVAC: {(bridgeTelemetry?.power?.hvac_kw ?? 0).toFixed(2)} kW ·
-                    Total: {(bridgeTelemetry?.power?.total_kw ?? 0).toFixed(2)} kW
-                  </Text>
+        <div className="space-y-4">
+          {activeTab === "overview" && (
+            <>
+              <div className="space-y-4 mb-4">
+                <div style={{background:'var(--color-sentinel-bg-panel)', border:'1px solid var(--color-sentinel-border)', borderRadius:8}}>
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="text-sm font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                        Raw Bridge Telemetry
+                      </p>
+                      <p className="mt-1 text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                        Zones: {bridgeTelemetry?.zones_with_readings ?? 0}/{bridgeTelemetry?.zone_count ?? 0} ·
+                        HVAC: {(bridgeTelemetry?.power?.hvac_kw ?? 0).toFixed(2)} kW ·
+                        Total: {(bridgeTelemetry?.power?.total_kw ?? 0).toFixed(2)} kW
+                      </p>
+                    </div>
+                    <span
+                      className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full"
+                      style={{
+                        background: bridgeTelemetry?.status === 'live' ? 'rgba(16,185,129,0.15)' : 'rgba(245,158,11,0.15)',
+                        color: bridgeTelemetry?.status === 'live' ? 'var(--color-sentinel-green)' : 'var(--color-sentinel-amber)',
+                      }}
+                    >
+                      {bridgeTelemetry?.status === 'live' ? 'Live' : 'Unavailable'}
+                    </span>
+                  </div>
                 </div>
-                <Badge color={bridgeTelemetry?.status === 'live' ? 'green' : 'amber'}>
-                  {bridgeTelemetry?.status === 'live' ? 'Live' : 'Unavailable'}
-                </Badge>
-              </Flex>
-            </Card>
 
-            <Card>
-              <Text className="text-sm font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>
-                SENTINEL Energy Intelligence
-              </Text>
-              <Text className="mt-1 text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                {sentinelEnergy
-                  ? `Savings ${sentinelEnergy.savings_percent.toFixed(1)}% · Baseline ${sentinelEnergy.actual_kwh.toFixed(1)} kWh · With SENTINEL ${sentinelEnergy.sentinel_kwh.toFixed(1)} kWh`
-                  : 'Energy comparison not available yet'}
-              </Text>
-              <Text className="mt-1 text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                {sentinelGuidance || 'No active guidance yet.'}
-              </Text>
-            </Card>
-          </div>
-          <Grid className="grid grid-cols-2 gap-4">
-            <SingleLineDiagram siteId={siteId} />
-            <div className="space-y-4">
-              <ATSStatusPanel siteId={siteId} compact />
-              <PowerMeteringCard siteId={siteId} compact />
-              <UPSStatusPanel siteId={siteId} compact />
-            </div>
-          </Grid>
-        </>
-        )}
+                <div style={{background:'var(--color-sentinel-bg-panel)', border:'1px solid var(--color-sentinel-border)', borderRadius:8}}>
+                  <p className="text-sm font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                    SENTINEL Energy Intelligence
+                  </p>
+                  <p className="mt-1 text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                    {sentinelEnergy
+                      ? `Savings ${sentinelEnergy.savings_percent.toFixed(1)}% · Baseline ${sentinelEnergy.actual_kwh.toFixed(1)} kWh · With SENTINEL ${sentinelEnergy.sentinel_kwh.toFixed(1)} kWh`
+                      : 'Energy comparison not available yet'}
+                  </p>
+                  <p className="mt-1 text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                    {sentinelGuidance || 'No active guidance yet.'}
+                  </p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <SingleLineDiagram siteId={siteId} />
+                <div className="space-y-4">
+                  <ATSStatusPanel siteId={siteId} compact />
+                  <PowerMeteringCard siteId={siteId} compact />
+                  <UPSStatusPanel siteId={siteId} compact />
+                </div>
+              </div>
+            </>
+          )}
 
-        {activeTab === "generators" && (
-          <GeneratorSynoptic
-            siteId={siteId}
-            onHealthAlert={(gen, health) => {
-              if (onAIRecommendation) {
-                onAIRecommendation({
-                  id: `gen-health-${gen.generator_id}`,
-                  type: 'energy',
-                  priority: health.status === 'critical' ? 'critical' : 'high',
-                  title: `Generator ${gen.name} Health Alert`,
-                  description: `Health score: ${health.overall_score.toFixed(0)}%. ${health.indicators.find(i => i.recommendation)?.recommendation || 'Check generator health.'}`,
-                  source_module: 'energy',
-                  timestamp: new Date().toISOString(),
-                });
-              }
-            }}
-          />
-        )}
+          {activeTab === "generators" && (
+            <GeneratorSynoptic
+              siteId={siteId}
+              onHealthAlert={(gen, health) => {
+                if (onAIRecommendation) {
+                  onAIRecommendation({
+                    id: `gen-health-${gen.generator_id}`,
+                    type: 'energy',
+                    priority: health.status === 'critical' ? 'critical' : 'high',
+                    title: `Generator ${gen.name} Health Alert`,
+                    description: `Health score: ${health.overall_score.toFixed(0)}%. ${health.indicators.find(i => i.recommendation)?.recommendation || 'Check generator health.'}`,
+                    source_module: 'energy',
+                    timestamp: new Date().toISOString(),
+                  });
+                }
+              }}
+            />
+          )}
 
-        {activeTab === "power" && (
-          <PowerMeteringCard siteId={siteId} />
-        )}
+          {activeTab === "power" && (
+            <PowerMeteringCard siteId={siteId} />
+          )}
 
-        {activeTab === "ups" && (
-          <UPSStatusPanel
-            siteId={siteId}
-            onBatteryAlert={(ups) => {
-              if (onAIRecommendation) {
-                onAIRecommendation({
-                  id: `ups-battery-${ups.ups_id}`,
-                  type: 'energy',
-                  priority: 'critical',
-                  title: 'UPS On Battery',
-                  description: `${ups.name} is running on battery. Runtime: ${ups.runtime_min.toFixed(0)} minutes.`,
-                  source_module: 'energy',
-                  timestamp: new Date().toISOString(),
-                });
-              }
-            }}
-          />
-        )}
-      </div>
+          {activeTab === "ups" && (
+            <UPSStatusPanel
+              siteId={siteId}
+              onBatteryAlert={(ups) => {
+                if (onAIRecommendation) {
+                  onAIRecommendation({
+                    id: `ups-battery-${ups.ups_id}`,
+                    type: 'energy',
+                    priority: 'critical',
+                    title: 'UPS On Battery',
+                    description: `${ups.name} is running on battery. Runtime: ${ups.runtime_min.toFixed(0)} minutes.`,
+                    source_module: 'energy',
+                    timestamp: new Date().toISOString(),
+                  });
+                }
+              }}
+            />
+          )}
+        </div>
       </div>
     </div>
   );

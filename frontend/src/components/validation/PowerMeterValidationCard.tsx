@@ -1,32 +1,19 @@
-/**
- * PowerMeterValidationCard - Real-time HVAC Power Anomaly Detection
- *
- * Displays:
- * - Baseline power statistics (mean, std dev, min/max)
- * - Current hourly power reading with Z-score anomaly detection
- * - COP (Coefficient of Performance) tracking vs design value
- * - Anomaly severity badge
- *
- * Used for validating simulated HVAC power against real meter data.
- */
-
 import { useState, useEffect } from "react";
 
 import { AlertTriangle, Zap, TrendingDown } from "lucide-react";
 import { authorizedFetch } from "@/lib/api";
+import { Card } from "../Card";
+import { Badge } from "../Badge";
 
 interface PowerMeterValidationRaw {
-  // API field names
   mean_kw?: number;
   stdev_kw?: number;
   min_kw?: number;
   max_kw?: number;
-  // Legacy/alternate field names
   baseline_mean?: number;
   baseline_stdev?: number;
   baseline_min?: number;
   baseline_max?: number;
-  // Common fields
   median_kw?: number;
   p95_kw?: number;
   samples?: number;
@@ -62,7 +49,6 @@ interface PowerMeterValidation {
   reason?: string;
 }
 
-/** Map API response fields to component fields */
 function mapPowerMeterResponse(raw: PowerMeterValidationRaw): PowerMeterValidation {
   return {
     baseline_mean: raw.mean_kw ?? raw.baseline_mean ?? 0,
@@ -115,7 +101,7 @@ export function PowerMeterValidationCard({
       }
     };
 
-    const interval = setInterval(fetchValidation, 30000); // Refresh every 30 seconds
+    const interval = setInterval(fetchValidation, 30000);
     fetchValidation();
 
     return () => clearInterval(interval);
@@ -139,14 +125,13 @@ export function PowerMeterValidationCard({
 
   if (!validation) return null;
 
-  // Check if we have required baseline data
   if (validation.baseline_mean === undefined || validation.baseline_stdev === undefined) {
     return (
       <Card className={className}>
         <div className="bg-yellow-900/20 border border-yellow-700/30 rounded-lg p-4">
-          <Text className="text-yellow-300 text-sm">
+          <span className="text-yellow-300 text-sm">
             ⚠️ Power Meter Baseline data not yet available. Please ensure power meter data is being collected.
-          </Text>
+          </span>
         </div>
       </Card>
     );
@@ -168,36 +153,36 @@ export function PowerMeterValidationCard({
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center gap-2">
           <Zap className="w-5 h-5 text-blue-400" />
-          <Title className="text-lg">Power Meter Validation</Title>
+          <h2 className="text-lg font-semibold" style={{ color: 'var(--color-sentinel-text-primary)' }}>Power Meter Validation</h2>
         </div>
         {isAnomalous && (
           <Badge
-            color={isCritical ? "rose" : "yellow"}
-            className="text-xs"
+            style={{
+              background: isCritical ? 'rgba(220, 38, 38, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+              color: isCritical ? 'var(--color-sentinel-red)' : 'var(--color-sentinel-amber)',
+            }}
           >
             {isCritical ? "🔴 Critical" : "🟡 Anomaly"}
           </Badge>
         )}
       </div>
 
-      <Grid className="grid grid-cols-2 gap-4 mb-4">
-        {/* Baseline Stats */}
+      <div className="grid grid-cols-2 gap-4 mb-4">
         <div>
           <div className="bg-slate-700/50 rounded-lg p-3">
-            <Text className="text-xs text-gray-400">Mean Power</Text>
+            <span className="text-xs text-gray-400">Mean Power</span>
             <div className="text-2xl font-bold text-white mt-1">
               {validation.baseline_mean.toFixed(1)} kW
             </div>
-            <Text className="text-xs text-gray-500 mt-1">
+            <span className="text-xs text-gray-500 mt-1 block">
               Std Dev: ±{validation.baseline_stdev.toFixed(1)} kW
-            </Text>
+            </span>
           </div>
         </div>
 
-        {/* Statistics */}
         <div>
           <div className="bg-slate-700/50 rounded-lg p-3">
-            <Text className="text-xs text-gray-400">Statistics</Text>
+            <span className="text-xs text-gray-400">Statistics</span>
             <div className="text-sm font-semibold text-white mt-1">
               {validation.baseline_min !== undefined && validation.baseline_max !== undefined ? (
                 <>Min: {validation.baseline_min.toFixed(1)} kW</>
@@ -206,34 +191,32 @@ export function PowerMeterValidationCard({
               )}
             </div>
             {validation.p95_kw !== undefined && (
-              <Text className="text-xs text-gray-500 mt-1">
+              <span className="text-xs text-gray-500 mt-1 block">
                 P95: {validation.p95_kw.toFixed(1)} kW
-              </Text>
+              </span>
             )}
           </div>
         </div>
 
-        {/* Range Info */}
         {validation.baseline_min !== undefined && validation.baseline_max !== undefined && (
           <div>
             <div className="bg-slate-700/50 rounded-lg p-3">
-              <Text className="text-xs text-gray-400">Operating Range</Text>
+              <span className="text-xs text-gray-400">Operating Range</span>
               <div className="text-lg font-semibold text-white mt-1">
                 {validation.baseline_min.toFixed(1)} - {validation.baseline_max.toFixed(1)} kW
               </div>
-              <Text className="text-xs text-gray-500 mt-1">
+              <span className="text-xs text-gray-500 mt-1 block">
                 Lookback: {validation.lookback_days ?? 7} days
-              </Text>
+              </span>
             </div>
           </div>
         )}
 
-        {/* COP Performance - only show if data exists */}
         {hasCOPData && (
           <div>
             <div className="bg-slate-700/50 rounded-lg p-3">
               <div className="flex items-center justify-between mb-2">
-                <Text className="text-xs text-gray-400">COP Performance</Text>
+                <span className="text-xs text-gray-400">COP Performance</span>
                 <TrendingDown
                   className={`w-4 h-4 ${
                     copPercent < 80
@@ -247,40 +230,47 @@ export function PowerMeterValidationCard({
               <div className="text-lg font-semibold text-white">
                 {validation.cop_current?.toFixed(2)} / {validation.cop_design?.toFixed(2)}
               </div>
-              <ProgressBar
-                value={Math.min(100, copPercent)}
-                color={copPercent < 80 ? "red" : copPercent < 90 ? "yellow" : "green"}
-                className="mt-2"
-              />
-              <Text className="text-xs text-gray-500 mt-1">
+              <div className="w-full h-2 rounded-full mt-2 overflow-hidden" style={{ background: 'var(--color-sentinel-border)' }}>
+                <div
+                  className="h-full rounded-full"
+                  style={{
+                    width: `${Math.min(100, copPercent)}%`,
+                    background: copPercent < 80
+                      ? 'var(--color-sentinel-red)'
+                      : copPercent < 90
+                      ? 'var(--color-sentinel-amber)'
+                      : 'var(--color-sentinel-green)',
+                  }}
+                />
+              </div>
+              <span className="text-xs text-gray-500 mt-1 block">
                 {copPercent.toFixed(0)}% of Design
-              </Text>
+              </span>
             </div>
           </div>
         )}
-      </Grid>
+      </div>
 
       {isAnomalous && (
         <div className="bg-rose-900/20 border border-rose-700/30 rounded-lg p-3 flex gap-3">
           <AlertTriangle className="w-5 h-5 text-rose-400 flex-shrink-0 mt-0.5" />
           <div>
-            <Text className="text-sm font-semibold text-rose-300">
+            <span className="text-sm font-semibold text-rose-300">
               Anomaly Detected
-            </Text>
-            <Text className="text-xs text-rose-400/70 mt-1">
+            </span>
+            <span className="text-xs text-rose-400/70 mt-1 block">
               {validation.reason ||
                 "Anomaly detected in power meter data. Review baseline statistics above."}
-            </Text>
+            </span>
           </div>
         </div>
       )}
 
-      {/* Info Message for Baseline Data */}
       <div className="bg-blue-900/20 border border-blue-700/30 rounded-lg p-3 mt-4">
-        <Text className="text-xs text-blue-300">
+        <span className="text-xs text-blue-300">
           📊 Baseline Analysis: {validation.samples ?? 0} readings over{" "}
           {validation.lookback_days ?? 7} days
-        </Text>
+        </span>
       </div>
     </Card>
   );

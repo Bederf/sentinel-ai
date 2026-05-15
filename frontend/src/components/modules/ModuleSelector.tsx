@@ -15,6 +15,7 @@ import {
   Brain, Leaf, FileText, Gamepad2, Package, Plug, Link2, Bell
 } from 'lucide-react';
 import { ModuleDependencyWarning } from './ModuleDependencyWarning';
+import { Badge } from '../Badge';
 
 interface ModuleSelectorProps {
   onModuleActivated?: (moduleType: ModuleType) => void;
@@ -35,7 +36,6 @@ export function ModuleSelector({ onModuleActivated, onModuleDeactivated }: Modul
   const [showWarning, setShowWarning] = useState<ModuleType | null>(null);
   const [isDeactivating, setIsDeactivating] = useState(false);
 
-  // No cascading dependencies in the new architecture — each add-on is independent
   const getDependentsToDisable = (_moduleType: ModuleType): ModuleType[] => {
     return [];
   };
@@ -46,7 +46,6 @@ export function ModuleSelector({ onModuleActivated, onModuleDeactivated }: Modul
       return;
     }
 
-    // If deactivating, check for cascading dependents
     if (currentlyActive) {
       const dependents = getDependentsToDisable(moduleType);
       if (dependents.length > 0) {
@@ -84,7 +83,6 @@ export function ModuleSelector({ onModuleActivated, onModuleDeactivated }: Modul
     }
   }
 
-  // Get potential integrations for showing what activating a module enables
   const getPotentialIntegrations = (moduleType: ModuleType): string[] => {
     const moduleDef = availableModules.find(m => m.module_type === moduleType);
     if (!moduleDef) return [];
@@ -100,7 +98,6 @@ export function ModuleSelector({ onModuleActivated, onModuleDeactivated }: Modul
 
   return (
     <div>
-      {/* Dependency Warning Modal */}
       {showWarning && (
         <ModuleDependencyWarning
           moduleType={showWarning}
@@ -110,7 +107,6 @@ export function ModuleSelector({ onModuleActivated, onModuleDeactivated }: Modul
         />
       )}
 
-      {/* Integration Status */}
       {integrationSummary && integrationSummary.active_integrations.length > 0 && (
         <div
           className="mb-4 p-3 rounded-lg border"
@@ -119,9 +115,8 @@ export function ModuleSelector({ onModuleActivated, onModuleDeactivated }: Modul
             borderColor: 'rgba(99, 102, 241, 0.3)',
           }}
         >
-          <Flex alignItems="center" className="gap-2 mb-2">
+          <div className="flex items-center gap-2 mb-2">
             <Badge
-              color="purple"
               style={{
                 background: 'rgba(99, 102, 241, 0.2)',
                 color: 'rgba(99, 102, 241, 0.9)',
@@ -129,23 +124,22 @@ export function ModuleSelector({ onModuleActivated, onModuleDeactivated }: Modul
             >
               Cross-System Integration Active
             </Badge>
-          </Flex>
+          </div>
           <div className="space-y-1">
             {integrationSummary.active_integrations.map(integration => (
-              <Text
+              <p
                 key={integration.id}
                 className="text-xs"
                 style={{ color: 'rgba(99, 102, 241, 0.8)' }}
               >
                 {integration.name}: {integration.source.toUpperCase()} + {integration.target.toUpperCase()}
-              </Text>
+              </p>
             ))}
           </div>
         </div>
       )}
 
-      {/* Module Grid */}
-      <Grid className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 gap-4">
         {availableModules.map(moduleDef => {
           const isActive = isModuleActive(moduleDef.module_type);
           const isProtectedBasePack = moduleDef.mandatory;
@@ -166,9 +160,8 @@ export function ModuleSelector({ onModuleActivated, onModuleDeactivated }: Modul
             />
           );
         })}
-      </Grid>
+      </div>
 
-      {/* Potential Integrations */}
       {integrationSummary && integrationSummary.potential_integrations.length > 0 && (
         <div
           className="mt-4 p-3 rounded-lg"
@@ -177,19 +170,17 @@ export function ModuleSelector({ onModuleActivated, onModuleDeactivated }: Modul
             border: '1px solid var(--glass-border)',
           }}
         >
-          <Text
+          <p
             className="text-xs font-medium mb-2"
             style={{ color: 'var(--color-sentinel-text-primary)' }}
           >
             Unlock More Integrations
-          </Text>
+          </p>
           <div className="space-y-1">
             {integrationSummary.potential_integrations.slice(0, 3).map(potential => (
-              <Text key={potential.id} className="text-xs" style={{ color: 'var(--color-sentinel-text-secondary)' }}>
+              <p key={potential.id} className="text-xs" style={{ color: 'var(--color-sentinel-text-secondary)' }}>
                 Activate{' '}
                 <Badge
-                  color="blue"
-                  size="xs"
                   style={{
                     background: 'rgba(59, 130, 246, 0.15)',
                     color: 'var(--color-sentinel-blue)',
@@ -198,7 +189,7 @@ export function ModuleSelector({ onModuleActivated, onModuleDeactivated }: Modul
                   {potential.requires_module}
                 </Badge>{' '}
                 to enable <span className="font-medium">{potential.name}</span>
-              </Text>
+              </p>
             ))}
           </div>
         </div>
@@ -207,9 +198,7 @@ export function ModuleSelector({ onModuleActivated, onModuleDeactivated }: Modul
   );
 }
 
-// Map module types to icons
 const MODULE_ICONS: Partial<Record<ModuleType, React.ComponentType<any>>> = {
-  // Base Platform
   kpi: Package,
   ml: Brain,
   notifications: Bell,
@@ -217,7 +206,6 @@ const MODULE_ICONS: Partial<Record<ModuleType, React.ComponentType<any>>> = {
   simbiot: Plug,
   logging: FileText,
   assets: Package,
-  // Base Building Systems
   hvac: Wind,
   energy: Zap,
   lighting: Lightbulb,
@@ -226,7 +214,6 @@ const MODULE_ICONS: Partial<Record<ModuleType, React.ComponentType<any>>> = {
   fire: Flame,
   security: Lock,
   digital_twin: Package,
-  // Control Add-ons
   hvac_control: Gamepad2,
   energy_control: Gamepad2,
   lighting_control: Gamepad2,
@@ -234,7 +221,6 @@ const MODULE_ICONS: Partial<Record<ModuleType, React.ComponentType<any>>> = {
   water_control: Gamepad2,
   security_control: Gamepad2,
   digital_twin_control: Gamepad2,
-  // Standalone Add-ons
   maintenance: Package,
   financial: FileText,
   compliance: Leaf,
@@ -251,7 +237,6 @@ interface ModuleCardProps {
   onToggle: () => void;
 }
 
-// SENTINEL custom switch component - defined outside ModuleCard to avoid re-creation
 const SentinelSwitch = ({ checked, onChange, disabled }: { checked: boolean; onChange: () => void; disabled: boolean }) => (
   <button
     onClick={onChange}
@@ -289,15 +274,15 @@ function ModuleCard({
   const IconComponent = MODULE_ICONS[module.module_type] || Zap;
 
   return (
-    <Card
-      className={`transition-all overflow-hidden`}
+    <div
+      className="rounded-lg p-4 transition-all overflow-hidden"
       style={{
-        background: 'var(--color-sentinel-bg-secondary)',
-        border: `1px solid ${isActive ? `var(--color-sentinel-${color})` : 'var(--glass-border)'}`,
+        background: 'var(--color-sentinel-bg-panel)',
+        border: `1px solid ${isActive ? `var(--color-sentinel-${color})` : 'var(--color-sentinel-border)'}`,
         opacity: isActive ? 1 : 0.75,
       }}
     >
-      <Flex justifyContent="between" alignItems="start">
+      <div className="flex items-start justify-between">
         <div className="flex items-start gap-3 flex-1">
           <div
             className="p-2 rounded-lg mt-0.5"
@@ -326,16 +311,14 @@ function ModuleCard({
             />
           </div>
           <div className="flex-1">
-            <Flex alignItems="center" className="gap-2">
-              <Text
+            <div className="flex items-center gap-2">
+              <p
                 className="font-bold"
                 style={{ color: 'var(--color-sentinel-text-primary)' }}
               >
                 {module.name}
-              </Text>
+              </p>
               <Badge
-                color={isActive ? 'green' : 'gray'}
-                size="xs"
                 style={{
                   background: isActive ? 'rgba(16, 185, 129, 0.15)' : 'rgba(107, 114, 128, 0.15)',
                   color: isActive ? 'var(--color-sentinel-green)' : 'var(--color-sentinel-text-secondary)',
@@ -345,8 +328,6 @@ function ModuleCard({
               </Badge>
               {isProtectedBasePack && (
                 <Badge
-                  color="blue"
-                  size="xs"
                   style={{
                     background: 'rgba(59, 130, 246, 0.15)',
                     color: 'var(--color-sentinel-blue)',
@@ -355,13 +336,13 @@ function ModuleCard({
                   Base Pack
                 </Badge>
               )}
-            </Flex>
-            <Text
+            </div>
+            <p
               className="text-xs mt-1"
               style={{ color: 'var(--color-sentinel-text-secondary)' }}
             >
               {module.description}
-            </Text>
+            </p>
           </div>
         </div>
         <SentinelSwitch
@@ -369,20 +350,17 @@ function ModuleCard({
           onChange={onToggle}
           disabled={isLoading || (isActive && isProtectedBasePack)}
         />
-      </Flex>
+      </div>
 
-      {/* Health Score */}
       {isActive && healthScore !== undefined && (
-        <Flex className="mt-3 gap-2" alignItems="center">
-          <Text
+        <div className="flex items-center gap-2 mt-3">
+          <span
             className="text-xs"
             style={{ color: 'var(--color-sentinel-text-secondary)' }}
           >
             Health:
-          </Text>
+          </span>
           <Badge
-            color={healthScore >= 80 ? 'green' : healthScore >= 50 ? 'amber' : 'red'}
-            size="xs"
             style={{
               background: healthScore >= 80 ? 'rgba(16, 185, 129, 0.15)' :
                 healthScore >= 50 ? 'rgba(245, 158, 11, 0.15)' :
@@ -394,15 +372,13 @@ function ModuleCard({
           >
             {healthScore.toFixed(0)}%
           </Badge>
-        </Flex>
+        </div>
       )}
 
-      {/* Capabilities Preview */}
       <div className="mt-2 flex flex-wrap gap-1">
         {module.capabilities.slice(0, 3).map(cap => (
           <Badge
             key={cap.id}
-            size="xs"
             style={{
               background: 'rgba(107, 114, 128, 0.15)',
               color: 'var(--color-sentinel-text-secondary)',
@@ -413,7 +389,6 @@ function ModuleCard({
         ))}
         {module.capabilities.length > 3 && (
           <Badge
-            size="xs"
             style={{
               background: 'rgba(107, 114, 128, 0.15)',
               color: 'var(--color-sentinel-text-secondary)',
@@ -424,18 +399,16 @@ function ModuleCard({
         )}
       </div>
 
-      {/* AI Features */}
       <div className="mt-2">
-        <Text
+        <p
           className="text-xs"
           style={{ color: 'var(--color-sentinel-text-secondary)' }}
         >
           AI: {module.ai_features.slice(0, 2).join(', ')}
           {module.ai_features.length > 2 && ` +${module.ai_features.length - 2}`}
-        </Text>
+        </p>
       </div>
 
-      {/* Integration Opportunity */}
       {!isActive && potentialIntegrations.length > 0 && (
         <div
           className="mt-2 p-2 rounded text-xs"
@@ -449,24 +422,23 @@ function ModuleCard({
         </div>
       )}
 
-      {/* Integrates With */}
       {isActive && module.integrates_with.length > 0 && (
         <div className="mt-2">
-          <Text
+          <p
             className="text-xs"
             style={{ color: 'var(--color-sentinel-text-disabled)' }}
           >
             Integrates with: {module.integrates_with.join(', ')}
-          </Text>
+          </p>
         </div>
       )}
 
       {isActive && isProtectedBasePack && (
-        <Text className="text-xs mt-2" style={{ color: 'var(--color-sentinel-text-secondary)' }}>
+        <p className="text-xs mt-2" style={{ color: 'var(--color-sentinel-text-secondary)' }}>
           Base pack module: cannot be deactivated.
-        </Text>
+        </p>
       )}
-    </Card>
+    </div>
   );
 }
 

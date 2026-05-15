@@ -161,7 +161,7 @@ class CommissioningService:
         all_gates_passed = failed_count == 0
         blocking = [g.id.value for g in gates if not g.passed]
 
-        # Record in history
+        # Record in memory
         today = date.today()
         history = self._scorecard_history.setdefault(site_id, [])
         history.append(
@@ -171,6 +171,9 @@ class CommissioningService:
                 "checked_at": datetime.utcnow().isoformat(),
             }
         )
+
+        # Persist to Supabase for cross-restart consecutive-day tracking
+        self._persist_scorecard(site_id, all_gates_passed, gates)
 
         consecutive = self.get_consecutive_pass_days(site_id)
 
@@ -333,15 +336,48 @@ class CommissioningService:
         self._truth_checks[site_id] = result
         return result
 
+    def _persist_scorecard(
+        self,
+        site_id: str,
+        all_gates_passed: bool,
+        gates: list[CommissioningGate],
+    ) -> None:
+        """Persist scorecard result to Supabase commissioning_scorecards table."""
+        try:
+            gate_data = [
+                {
+                    "id": g.id.value,
+                    "name": g.name,
+                    "category": g.category,
+                    "target": g.target,
+                    "actual": g.actual,
+                    "passed": g.passed,
+                    "details": g.details,
+                }
+                for g in gates
+            ]
+            self._repo.client.table("commissioning_scorecards").insert(
+                {
+                    "site_id": site_id,
+                    "checked_at": datetime.utcnow().isoformat(),
+                    "all_gates_passed": all_gates_passed,
+                    "scorecard_data": {
+                        "gates": gate_data,
+                        "summary": {"passed": sum(1 for g in gates if g.passed), "failed": sum(1 for g in gates if not g.passed), "total": len(gates)},
+                    },
+                }
+            ).execute()
+        except Exception:
+            pass  # Non-fatal — memory fallback covers consecutive-day counting
+
     def get_consecutive_pass_days(self, site_id: str) -> int:
         """Count consecutive days where all gates passed, reading from DB then memory."""
         # Primary: read from persistent commissioning_scorecards table
         try:
-            resolved = self._repo._resolve_site_id(site_id)
             result = (
                 self._repo.client.table("commissioning_scorecards")
                 .select("checked_at, all_gates_passed")
-                .eq("site_id", resolved)
+                .eq("site_id", site_id)
                 .order("checked_at", desc=True)
                 .execute()
             )

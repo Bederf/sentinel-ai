@@ -35,6 +35,7 @@ class VisitIntakeRequest(BaseModel):
     """
 
     visitor_email: EmailStr = Field(description="External visitor's email address")
+    visitor_name: str | None = Field(default=None, description="Visitor's display name")
     host_email: EmailStr = Field(description="Organizer/host's email address")
     host_name: str | None = Field(default=None, description="Organizer/host's name")
     host_mobile: str | None = Field(default=None, description="Organizer/host's mobile number")
@@ -63,6 +64,7 @@ class VisitIntakeResponse(BaseModel):
     meeting_start: str | None
     meeting_end: str | None
     message: str
+    email_already_sent: bool = False
     email_already_sent: bool = False  # True when idempotency matched — n8n should skip email
 
 
@@ -123,8 +125,7 @@ async def create_visit_from_intake(
                 email_already_sent=True,
             )
 
-    # Create visit with PENDING status — awaiting visitor RSVP acceptance.
-    # Backend will send QR confirmation email when acceptance is detected.
+    # Create visit with PENDING status — awaiting visitor acceptance.
     try:
         visit = service.create_visit(
             visitor_email=request.visitor_email,
@@ -134,6 +135,7 @@ async def create_visit_from_intake(
             meeting_end=meeting_end,
             host_name=request.host_name,
             host_mobile=request.host_mobile,
+            visitor_name=request.visitor_name,
             status=VisitStatus.PENDING,
         )
     except Exception as exc:
@@ -142,7 +144,7 @@ async def create_visit_from_intake(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to create visit: {exc}"
         ) from exc
 
-    # Update with external_event_id and meeting_subject if provided
+    # Update with meeting_subject and any additional info
     from app.database.repositories.visit_repository import VisitRepository
 
     repo = VisitRepository()
@@ -151,14 +153,16 @@ async def create_visit_from_intake(
         updates["external_event_id"] = request.external_event_id
     if request.meeting_subject:
         updates["meeting_subject"] = request.meeting_subject
+    if request.visitor_name:
+        updates["visitor_name"] = request.visitor_name
     if updates:
         repo.update_visit(visit.id, updates)
 
-    # Reload to get updated meeting_subject
+    # Reload to get updated fields
     visit = repo.get_visit_by_id(visit.id) or visit
 
     logger.info(
-        "[VisitorIntake] Created visit %s for %s (event=%s)", visit.id, request.visitor_email, request.external_event_id
+        "[VisitorIntake] Created visit %s for %s — awaiting acceptance", visit.id, request.visitor_email
     )
 
     return VisitIntakeResponse(
@@ -169,12 +173,13 @@ async def create_visit_from_intake(
         qr_code=visit.qr_code,
         visitor_email=visit.visitor_email,
         host_email=visit.host_email,
-        host_name=request.host_name,
+        host_name=request.host_name or visit.host_name,
         building_id=visit.building_id,
         meeting_subject=visit.meeting_subject,
         meeting_start=meeting_start.isoformat(),
         meeting_end=meeting_end.isoformat(),
-        message="Visit pending — awaiting visitor RSVP",
+        message="Visit created. Waiting for visitor acceptance.",
+        email_already_sent=False,
     )
 
 
@@ -320,3 +325,46 @@ async def handle_rsvp(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid response '{request.response}' — must be 'accepted' or 'declined'",
         )
+
+
+@router.post("/confirm/{token}")
+async def confirm_visitor(token: str):
+    """Confirm a visitor by token and send QR code — called by concierge when visitor accepts."""
+    from uuid import UUID
+    from app.database.repositories.visit_repository import VisitRepository
+
+    try:
+        visit_uuid = UUID(token)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid token format")
+
+    repo = VisitRepository()
+    visit = repo.get_visit_by_token(visit_uuid)
+
+    if not visit:
+        raise HTTPException(status_code=404, detail="Visit not found")
+
+    if visit.status != VisitStatus.PENDING:
+        return {
+            "success": True,
+            "message": f"Visit already in status {visit.status}",
+            "qr_code": visit.qr_code,
+        }
+
+    updated = repo.update_visit(visit.id, {"status": VisitStatus.CREATED})
+    email_sent = False
+    try:
+        from app.services.visitor_email_service import VisitorEmailService
+        email_svc = VisitorEmailService()
+        email_sent = email_svc.send_visitor_confirmation(updated)
+    except Exception as exc:
+        logger.error("[Confirm] Failed to send QR email for %s: %s", updated.id, exc)
+
+    return {
+        "success": True,
+        "visit_id": str(updated.id),
+        "pin": updated.pin,
+        "qr_code": updated.qr_code,
+        "email_sent": email_sent,
+        "message": "QR emailed to visitor" if email_sent else "Visit confirmed but email failed — QR below",
+    }

@@ -282,6 +282,24 @@ async def route_incoming_message(
         except Exception as e:
             logger.warning(f"Ghost-room reply handler error: {e}")
 
+        # --- Focus-room concierge reply ---
+        try:
+            from app.services.focus_room_notifier import process_focus_room_whatsapp_reply
+
+            result = await process_focus_room_whatsapp_reply(
+                from_number,
+                content,
+                reply_to_message_id=reply_to_message_id,
+                message_id=message_id,
+            )
+            if result.get("handled"):
+                response_message = result.get("response_message")
+                if response_message:
+                    await whatsapp_service.send_text_message(from_number, response_message)
+                return
+        except Exception as e:
+            logger.warning(f"Focus-room reply handler error: {e}")
+
         # --- Comfort complaint agent (multi-turn) ---
         try:
             from langchain_core.messages import HumanMessage

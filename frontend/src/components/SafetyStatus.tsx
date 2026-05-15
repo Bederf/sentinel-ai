@@ -13,11 +13,34 @@ interface SafetyStatusPanelProps {
   className?: string;
 }
 
+const badgeColors: Record<string, { bg: string; color: string }> = {
+  safe: { bg: "rgba(16,185,129,0.15)", color: "var(--color-sentinel-green)" },
+  warning: { bg: "rgba(245,158,11,0.15)", color: "var(--color-sentinel-amber)" },
+  blocked: { bg: "rgba(220,38,38,0.15)", color: "var(--color-sentinel-red)" },
+  alarm: { bg: "rgba(249,115,22,0.15)", color: "#fb923c" },
+  unknown: { bg: "rgba(142,142,142,0.15)", color: "var(--color-sentinel-text-secondary)" },
+  green: { bg: "rgba(16,185,129,0.15)", color: "var(--color-sentinel-green)" },
+  yellow: { bg: "rgba(245,158,11,0.15)", color: "var(--color-sentinel-amber)" },
+  red: { bg: "rgba(220,38,38,0.15)", color: "var(--color-sentinel-red)" },
+  orange: { bg: "rgba(249,115,22,0.15)", color: "#fb923c" },
+  gray: { bg: "rgba(142,142,142,0.15)", color: "var(--color-sentinel-text-secondary)" },
+};
+
+function SentinelBadge({ color, size = "xs", children }: { color: string; size?: string; children: React.ReactNode }) {
+  const c = badgeColors[color] || badgeColors.gray;
+  const sizeClass = size === "lg" ? "px-3 py-1 text-sm" : size === "sm" ? "px-2 py-0.5 text-xs" : "px-1.5 py-0.5 text-xs";
+  return (
+    <span className={`inline-flex items-center font-medium rounded-full ${sizeClass}`} style={{ background: c.bg, color: c.color }}>
+      {children}
+    </span>
+  );
+}
+
 export const SafetyStatusPanel: React.FC<SafetyStatusPanelProps> = ({
   siteId,
   deviceType,
   autoRefresh = true,
-  refreshInterval = 30000, // 30 seconds
+  refreshInterval = 30000,
   className = '',
 }) => {
   const [safetyStatuses, setSafetyStatuses] = useState<DeviceSafetyStatus[]>([]);
@@ -31,10 +54,8 @@ export const SafetyStatusPanel: React.FC<SafetyStatusPanelProps> = ({
       setLoading(true);
       setError(null);
 
-      // First, get all devices
       const devices = await api.getDevices(siteId, deviceType);
 
-      // Fetch safety status for each device
       const statusPromises = devices.map(async (device) => {
         try {
           const status = await api.getDeviceFullSafetyStatus(device.id);
@@ -63,13 +84,11 @@ export const SafetyStatusPanel: React.FC<SafetyStatusPanelProps> = ({
     }
   };
 
-  // Initial fetch
   useEffect(() => {
     fetchSafetyStatuses();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [siteId, deviceType]);
 
-  // Auto-refresh
   useEffect(() => {
     if (!autoRefresh) return;
 
@@ -78,7 +97,6 @@ export const SafetyStatusPanel: React.FC<SafetyStatusPanelProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoRefresh, refreshInterval, siteId, deviceType]);
 
-  // Filter safety statuses
   const filteredStatuses = safetyStatuses.filter((status) => {
     if (filterStatus === 'all') return true;
     if (filterStatus === 'warning') return status.overall_status === 'warning';
@@ -88,7 +106,6 @@ export const SafetyStatusPanel: React.FC<SafetyStatusPanelProps> = ({
     return true;
   });
 
-  // Statistics
   const stats = {
     total: safetyStatuses.length,
     safe: safetyStatuses.filter(s => s.overall_status === 'safe').length,
@@ -98,15 +115,21 @@ export const SafetyStatusPanel: React.FC<SafetyStatusPanelProps> = ({
     unknown: safetyStatuses.filter(s => s.overall_status === 'unknown').length,
   };
 
-  // Format time
   const formatTime = (isoString: string) => {
     const date = new Date(isoString);
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
   };
 
+  const cardStyle: React.CSSProperties = {
+    background: "var(--color-sentinel-bg-panel)",
+    border: "1px solid var(--color-sentinel-border)",
+    borderRadius: 8,
+    padding: 16,
+  };
+
   if (loading && safetyStatuses.length === 0) {
     return (
-      <Card className={className}>
+      <div className={className} style={cardStyle}>
         <div className="animate-pulse">
           <div
             className="h-6 rounded w-1/3 mb-4"
@@ -127,18 +150,18 @@ export const SafetyStatusPanel: React.FC<SafetyStatusPanelProps> = ({
             />
           </div>
         </div>
-      </Card>
+      </div>
     );
   }
 
   return (
-    <Card className={className}>
+    <div className={className} style={cardStyle}>
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-          <Title>Safety Status</Title>
-          <Text className="mt-1">
+          <h3 className="text-lg font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>Safety Status</h3>
+          <p className="mt-1 text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
             Real-time safety validation status for all devices
-          </Text>
+          </p>
         </div>
 
         <div className="flex items-center gap-3">
@@ -162,68 +185,78 @@ export const SafetyStatusPanel: React.FC<SafetyStatusPanelProps> = ({
             <option value="alarm">Alarms</option>
           </select>
 
-          <Button
-            size="xs"
-            variant="secondary"
+          <button
             onClick={fetchSafetyStatuses}
-            loading={loading}
+            disabled={loading}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md transition-colors disabled:opacity-50"
+            style={{
+              background: "var(--color-sentinel-bg-secondary)",
+              border: "1px solid var(--color-sentinel-border)",
+              color: "var(--color-sentinel-text-primary)",
+            }}
           >
+            {loading && <div className="animate-spin h-3 w-3 border-2 border-current border-t-transparent rounded-full" />}
             Refresh
-          </Button>
+          </button>
         </div>
       </div>
 
       {error ? (
-        <div className="bg-red-50 border border-red-200 rounded-md p-4">
-          <Text className="text-red-700">{error}</Text>
-          <Button
-            size="xs"
-            variant="light"
-            className="mt-2"
+        <div className="rounded-md p-4" style={{ background: "rgba(220,38,38,0.15)", border: "1px solid rgba(220,38,38,0.3)" }}>
+          <p style={{ color: "var(--color-sentinel-red)" }}>{error}</p>
+          <button
             onClick={fetchSafetyStatuses}
+            className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md transition-colors"
+            style={{
+              background: "var(--color-sentinel-bg-secondary)",
+              border: "1px solid var(--color-sentinel-border)",
+              color: "var(--color-sentinel-text-primary)",
+            }}
           >
             Retry
-          </Button>
+          </button>
         </div>
       ) : (
         <>
-          {/* Statistics */}
-          <Grid className="grid grid-cols-5 gap-4 mb-6">
+          <div className="grid grid-cols-5 gap-4 mb-6">
             <div className="text-center">
-              <div className="text-2xl font-bold text-gray-900">{stats.total}</div>
-              <Text className="text-gray-600">Total</Text>
+              <div className="text-2xl font-bold" style={{ color: "var(--color-sentinel-text-primary)" }}>{stats.total}</div>
+              <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>Total</p>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-green-600">{stats.safe}</div>
-              <Text className="text-gray-600">Safe</Text>
+              <div className="text-2xl font-bold" style={{ color: "var(--color-sentinel-green)" }}>{stats.safe}</div>
+              <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>Safe</p>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-yellow-600">{stats.warning}</div>
-              <Text className="text-gray-600">Warning</Text>
+              <div className="text-2xl font-bold" style={{ color: "var(--color-sentinel-amber)" }}>{stats.warning}</div>
+              <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>Warning</p>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-red-600">{stats.blocked}</div>
-              <Text className="text-gray-600">Blocked</Text>
+              <div className="text-2xl font-bold" style={{ color: "var(--color-sentinel-red)" }}>{stats.blocked}</div>
+              <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>Blocked</p>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-orange-600">{stats.alarm}</div>
-              <Text className="text-gray-600">Alarm</Text>
+              <div className="text-2xl font-bold" style={{ color: "#fb923c" }}>{stats.alarm}</div>
+              <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>Alarm</p>
             </div>
-          </Grid>
+          </div>
 
-          {/* Device List */}
           <div className="space-y-4">
             {filteredStatuses.length === 0 ? (
               <div className="text-center py-8">
-                <Text className="text-gray-500">
+                <p style={{ color: "var(--color-sentinel-text-disabled)" }}>
                   No devices match the current filter
-                </Text>
+                </p>
               </div>
             ) : (
               filteredStatuses.map((status) => (
                 <div
                   key={status.device_id}
-                  className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors"
+                  className="border rounded-lg p-4 transition-colors"
+                  style={{
+                    borderColor: "var(--color-sentinel-border)",
+                    background: "var(--color-sentinel-bg-panel)",
+                  }}
                 >
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-3">
@@ -235,66 +268,63 @@ export const SafetyStatusPanel: React.FC<SafetyStatusPanelProps> = ({
                         showLabel
                       />
                       <div>
-                        <Text className="font-semibold text-gray-900">
+                        <p className="font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>
                           {status.device_name}
-                        </Text>
-                        <Text className="text-xs text-gray-500">
+                        </p>
+                        <p className="text-xs" style={{ color: "var(--color-sentinel-text-disabled)" }}>
                           ID: {status.device_id}
-                        </Text>
+                        </p>
                       </div>
                     </div>
 
                     <div className="flex items-center gap-3">
-                      <Badge
-                        size="xs"
-                        color={
-                          status.overall_status === 'safe' ? 'green' :
-                          status.overall_status === 'warning' ? 'yellow' :
-                          status.overall_status === 'blocked' ? 'red' :
-                          status.overall_status === 'alarm' ? 'orange' : 'gray'
-                        }
-                      >
+                      <SentinelBadge color={
+                        status.overall_status === 'safe' ? 'green' :
+                        status.overall_status === 'warning' ? 'yellow' :
+                        status.overall_status === 'blocked' ? 'red' :
+                        status.overall_status === 'alarm' ? 'orange' : 'gray'
+                      } size="xs">
                         {status.active_rule_count} rules
-                      </Badge>
-                      <Text className="text-xs text-gray-500">
+                      </SentinelBadge>
+                      <span className="text-xs" style={{ color: "var(--color-sentinel-text-disabled)" }}>
                         {formatTime(status.last_check)}
-                      </Text>
+                      </span>
                     </div>
                   </div>
 
-                  {/* Point Statuses */}
                   {Object.keys(status.point_statuses).length > 0 && (
-                    <div className="mt-3 pt-3 border-t border-gray-100">
-                      <Text className="text-sm font-medium text-gray-700 mb-2">
+                    <div className="mt-3 pt-3 border-t" style={{ borderColor: "var(--color-sentinel-border)" }}>
+                      <p className="text-sm font-medium mb-2" style={{ color: "var(--color-sentinel-text-primary)" }}>
                         Point Status
-                      </Text>
+                      </p>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         {Object.entries(status.point_statuses).map(([pointName, pointStatus]) => (
                           <div
                             key={pointName}
-                            className="flex items-center justify-between p-2 bg-gray-50 rounded"
+                            className="flex items-center justify-between p-2 rounded"
+                            style={{ background: "var(--color-sentinel-bg-secondary)" }}
                           >
                             <div>
-                              <Text className="text-sm font-medium text-gray-900">
+                              <p className="text-sm font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>
                                 {pointName}
-                              </Text>
-                              <Text className="text-xs text-gray-600">
+                              </p>
+                              <p className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
                                 Value: {String(pointStatus.value)}
-                              </Text>
+                              </p>
                             </div>
                             <div className="flex items-center gap-2">
                               {!pointStatus.allowed && (
-                                <Badge size="xs" color="red">Blocked</Badge>
+                                <SentinelBadge color="red" size="xs">Blocked</SentinelBadge>
                               )}
                               {pointStatus.warnings.length > 0 && (
-                                <Badge size="xs" color="yellow">
+                                <SentinelBadge color="yellow" size="xs">
                                   {pointStatus.warnings.length} warning(s)
-                                </Badge>
+                                </SentinelBadge>
                               )}
                               {pointStatus.alarms.length > 0 && (
-                                <Badge size="xs" color="orange">
+                                <SentinelBadge color="orange" size="xs">
                                   {pointStatus.alarms.length} alarm(s)
-                                </Badge>
+                                </SentinelBadge>
                               )}
                             </div>
                           </div>
@@ -307,24 +337,22 @@ export const SafetyStatusPanel: React.FC<SafetyStatusPanelProps> = ({
             )}
           </div>
 
-          {/* Footer */}
-          <div className="mt-6 pt-4 border-t border-gray-200">
+          <div className="mt-6 pt-4 border-t" style={{ borderColor: "var(--color-sentinel-border)" }}>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <Text className="text-sm text-gray-500">
+              <p className="text-sm" style={{ color: "var(--color-sentinel-text-disabled)" }}>
                 Showing {filteredStatuses.length} of {safetyStatuses.length} devices
-              </Text>
-              <Text className="text-sm text-gray-500">
+              </p>
+              <p className="text-sm" style={{ color: "var(--color-sentinel-text-disabled)" }}>
                 Last updated: {lastUpdated ? formatTime(lastUpdated) : 'Never'}
-              </Text>
+              </p>
             </div>
           </div>
         </>
       )}
-    </Card>
+    </div>
   );
 };
 
-// Compact version for dashboard
 interface CompactSafetyStatusProps {
   className?: string;
 }
@@ -342,7 +370,6 @@ export const CompactSafetyStatus: React.FC<CompactSafetyStatusProps> = ({ classN
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        // For compact version, just get a summary
         const devices = await api.getDevices();
         const statusPromises = devices.slice(0, 10).map(async (device) => {
           try {
@@ -372,9 +399,16 @@ export const CompactSafetyStatus: React.FC<CompactSafetyStatusProps> = ({ classN
     fetchStats();
   }, []);
 
+  const cardStyle: React.CSSProperties = {
+    background: "var(--color-sentinel-bg-panel)",
+    border: "1px solid var(--color-sentinel-border)",
+    borderRadius: 8,
+    padding: 16,
+  };
+
   if (loading) {
     return (
-      <Card className={className}>
+      <div className={className} style={cardStyle}>
         <div className="animate-pulse">
           <div
             className="h-4 rounded w-1/2 mb-4"
@@ -395,57 +429,57 @@ export const CompactSafetyStatus: React.FC<CompactSafetyStatusProps> = ({ classN
             />
           </div>
         </div>
-      </Card>
+      </div>
     );
   }
 
   return (
-    <Card className={className}>
-      <Title className="mb-4">Safety Overview</Title>
+    <div className={className} style={cardStyle}>
+      <h3 className="text-lg font-semibold mb-4" style={{ color: "var(--color-sentinel-text-primary)" }}>Safety Overview</h3>
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-6">
           <div className="text-center">
-            <div className="text-3xl font-bold text-gray-900">{stats.total}</div>
-            <Text className="text-gray-600">Devices</Text>
+            <div className="text-3xl font-bold" style={{ color: "var(--color-sentinel-text-primary)" }}>{stats.total}</div>
+            <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>Devices</p>
           </div>
 
           <div className="flex items-center gap-4">
             <div className="text-center">
               <SafetyIndicator status="safe" size="lg" />
-              <Text className="text-gray-600 mt-1">{stats.safe}</Text>
+              <p className="text-sm mt-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>{stats.safe}</p>
             </div>
             <div className="text-center">
               <SafetyIndicator status="warning" size="lg" />
-              <Text className="text-gray-600 mt-1">{stats.warning}</Text>
+              <p className="text-sm mt-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>{stats.warning}</p>
             </div>
             <div className="text-center">
               <SafetyIndicator status="blocked" size="lg" />
-              <Text className="text-gray-600 mt-1">{stats.blocked}</Text>
+              <p className="text-sm mt-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>{stats.blocked}</p>
             </div>
             <div className="text-center">
               <SafetyIndicator status="alarm" size="lg" />
-              <Text className="text-gray-600 mt-1">{stats.alarm}</Text>
+              <p className="text-sm mt-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>{stats.alarm}</p>
             </div>
           </div>
         </div>
 
         <div className="text-right">
-          <Text className="text-sm text-gray-500">
+          <p className="text-sm" style={{ color: "var(--color-sentinel-text-disabled)" }}>
             {stats.blocked > 0 || stats.alarm > 0 ? (
-              <span className="text-red-600 font-medium">
+              <span style={{ color: "var(--color-sentinel-red)" }}>
                 Safety issues detected
               </span>
             ) : (
-              <span className="text-green-600 font-medium">
+              <span style={{ color: "var(--color-sentinel-green)" }}>
                 All systems safe
               </span>
             )}
-          </Text>
-          <Text className="text-xs text-gray-400 mt-1">
+          </p>
+          <p className="text-xs mt-1" style={{ color: "var(--color-sentinel-text-disabled)" }}>
             Real-time monitoring
-          </Text>
+          </p>
         </div>
       </div>
-    </Card>
+    </div>
   );
 };

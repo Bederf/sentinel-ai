@@ -1,10 +1,3 @@
-/**
- * ML Model Status Panel
- *
- * Shows status of trained ML models, their metrics,
- * and allows training new models.
- */
-
 import { useEffect, useState } from "react";
 
 import {
@@ -14,6 +7,7 @@ import {
 } from "lucide-react";
 import type { MLModel, TrainResponse } from "../../lib/mlApi";
 import { listMLModels, trainModel, activateModel } from "../../lib/mlApi";
+import { Badge } from "../Badge";
 
 interface MLModelStatusProps {
   onModelTrained?: (result: TrainResponse) => void;
@@ -25,7 +19,6 @@ export function MLModelStatus({ onModelTrained }: MLModelStatusProps) {
   const [training, setTraining] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Training form state
   const [selectedModelType, setSelectedModelType] = useState<"lstm" | "autoencoder">("lstm");
   const [selectedEquipmentType, setSelectedEquipmentType] = useState("chiller");
   const [epochs, setEpochs] = useState(50);
@@ -57,10 +50,9 @@ export function MLModelStatus({ onModelTrained }: MLModelStatusProps) {
         selectedModelType,
         selectedEquipmentType,
         epochs,
-        true // use seeded data
+        true
       );
 
-      // Refresh model list
       await fetchModels();
 
       if (onModelTrained) {
@@ -96,28 +88,52 @@ export function MLModelStatus({ onModelTrained }: MLModelStatusProps) {
     }
   };
 
+  const cardStyle: React.CSSProperties = {
+    background: "var(--color-sentinel-bg-panel)",
+    border: "1px solid var(--color-sentinel-border)",
+    borderRadius: 8,
+    padding: 16,
+  };
+
   if (loading) {
     return (
-      <Card>
-        <Title>ML Model Status</Title>
+      <div style={cardStyle}>
+        <h3 className="text-lg font-semibold mb-4" style={{ color: "var(--color-sentinel-text-primary)" }}>ML Model Status</h3>
         <div className="h-48 flex items-center justify-center">
-          <Text>Loading models...</Text>
+          <p style={{ color: "var(--color-sentinel-text-secondary)" }}>Loading models...</p>
         </div>
-      </Card>
+      </div>
     );
   }
 
   const lstmModels = models.filter((m) => m.model_type === "lstm");
   const autoencoderModels = models.filter((m) => m.model_type === "autoencoder");
 
+  const thStyle: React.CSSProperties = {
+    color: "var(--color-sentinel-text-secondary)",
+    borderBottom: "1px solid var(--color-sentinel-border)",
+    padding: "8px 12px",
+    textAlign: "left",
+    fontSize: 12,
+    fontWeight: 500,
+    textTransform: "uppercase",
+    letterSpacing: "0.05em",
+  };
+
+  const tdStyle: React.CSSProperties = {
+    color: "var(--color-sentinel-text-primary)",
+    borderBottom: "1px solid var(--color-sentinel-border)",
+    padding: "8px 12px",
+    fontSize: 14,
+  };
+
   return (
     <div className="space-y-6">
-      {/* Training Panel */}
-      <Card>
-        <Title>Train New Model</Title>
-        <Grid className="grid grid-cols-1 sm:grid-cols-4 gap-4 mt-4">
+      <div style={cardStyle}>
+        <h3 className="text-lg font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>Train New Model</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mt-4">
           <div>
-            <Text className="mb-1">Model Type</Text>
+            <p className="mb-1 text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>Model Type</p>
             <select
               value={selectedModelType}
               onChange={(event) => setSelectedModelType(event.target.value as "lstm" | "autoencoder")}
@@ -137,7 +153,7 @@ export function MLModelStatus({ onModelTrained }: MLModelStatusProps) {
           </div>
 
           <div>
-            <Text className="mb-1">Equipment Type</Text>
+            <p className="mb-1 text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>Equipment Type</p>
             <select
               value={selectedEquipmentType}
               onChange={(event) => setSelectedEquipmentType(event.target.value)}
@@ -160,159 +176,194 @@ export function MLModelStatus({ onModelTrained }: MLModelStatusProps) {
           </div>
 
           <div>
-            <Text className="mb-1">Epochs</Text>
-            <NumberInput
+            <p className="mb-1 text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>Epochs</p>
+            <input
+              type="number"
               value={epochs}
-              onValueChange={setEpochs}
+              onChange={(e) => setEpochs(parseInt(e.target.value, 10) || 10)}
               min={10}
               max={200}
               step={10}
+              className="w-full rounded-md px-3 py-2 text-sm"
+              style={{
+                background: "var(--color-grafana-bg-secondary)",
+                border: "1px solid var(--color-grafana-border)",
+                color: "var(--color-grafana-text-primary)",
+                boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)",
+                outline: "none",
+              }}
             />
           </div>
 
           <div className="flex items-end">
-            <Button
-              icon={Play}
+            <button
               onClick={handleTrain}
-              loading={training}
               disabled={training}
-              color="blue"
+              className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-md transition-colors disabled:opacity-50"
+              style={{
+                background: "var(--color-sentinel-blue)",
+                border: "1px solid var(--color-sentinel-blue)",
+                color: "#fff",
+              }}
             >
+              {training ? (
+                <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
+              ) : (
+                <Play className="h-4 w-4" />
+              )}
               {training ? "Training..." : "Train Model"}
-            </Button>
+            </button>
           </div>
-        </Grid>
+        </div>
 
         {error && (
-          <Text color="red" className="mt-4">
+          <p className="mt-4 text-sm" style={{ color: "var(--color-sentinel-red)" }}>
             {error}
-          </Text>
+          </p>
         )}
-      </Card>
+      </div>
 
-      {/* LSTM Models */}
-      <Card>
-        <Flex justifyContent="between" alignItems="center">
-          <Title>LSTM Forecasting Models</Title>
-          <Badge color="blue">{lstmModels.length} models</Badge>
-        </Flex>
+      <div style={cardStyle}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>LSTM Forecasting Models</h3>
+          <Badge style={{ background: "rgba(59,130,246,0.15)", color: "var(--color-sentinel-blue)" }}>
+            {lstmModels.length} models
+          </Badge>
+        </div>
 
         {lstmModels.length === 0 ? (
-          <Text className="mt-4">No LSTM models trained yet. Train one above!</Text>
+          <p style={{ color: "var(--color-sentinel-text-secondary)" }}>No LSTM models trained yet. Train one above!</p>
         ) : (
-          <Table className="mt-4">
-            <TableHead>
-              <TableRow>
-                <TableHeaderCell>Model ID</TableHeaderCell>
-                <TableHeaderCell>Equipment</TableHeaderCell>
-                <TableHeaderCell>Status</TableHeaderCell>
-                <TableHeaderCell>Metrics</TableHeaderCell>
-                <TableHeaderCell>Trained</TableHeaderCell>
-                <TableHeaderCell>Actions</TableHeaderCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
+          <table className="w-full mt-4">
+            <thead>
+              <tr>
+                <th style={thStyle}>Model ID</th>
+                <th style={thStyle}>Equipment</th>
+                <th style={thStyle}>Status</th>
+                <th style={thStyle}>Metrics</th>
+                <th style={thStyle}>Trained</th>
+                <th style={thStyle}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
               {lstmModels.map((model) => (
-                <TableRow key={model.model_id}>
-                  <TableCell>
-                    <Text className="font-mono text-xs">{model.model_id}</Text>
-                  </TableCell>
-                  <TableCell>{model.equipment_type}</TableCell>
-                  <TableCell>
-                    <Badge
-                      color={model.status === "active" ? "green" : "gray"}
-                      icon={model.status === "active" ? CheckCircle : Clock}
+                <tr key={model.model_id}>
+                  <td style={tdStyle}>
+                    <span className="font-mono text-xs">{model.model_id}</span>
+                  </td>
+                  <td style={tdStyle}>{model.equipment_type}</td>
+                  <td style={tdStyle}>
+                    <span
+                      className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full"
+                      style={{
+                        background: model.status === "active" ? "rgba(16,185,129,0.15)" : "rgba(142,142,142,0.15)",
+                        color: model.status === "active" ? "var(--color-sentinel-green)" : "var(--color-sentinel-text-secondary)",
+                      }}
                     >
+                      {model.status === "active" ? <CheckCircle className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
                       {model.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Text className="text-sm">
+                    </span>
+                  </td>
+                  <td style={tdStyle}>
+                    <span className="text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>
                       {formatMetrics(model.metrics, "lstm")}
-                    </Text>
-                  </TableCell>
-                  <TableCell>
-                    <Text className="text-sm">{formatDate(model.registered_at)}</Text>
-                  </TableCell>
-                  <TableCell>
+                    </span>
+                  </td>
+                  <td style={tdStyle}>
+                    <span className="text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>{formatDate(model.registered_at)}</span>
+                  </td>
+                  <td style={tdStyle}>
                     {model.status !== "active" && (
-                      <Button
-                        size="xs"
-                        variant="secondary"
+                      <button
                         onClick={() => handleActivate(model.model_id)}
+                        className="px-2 py-1 text-xs font-medium rounded-md transition-colors"
+                        style={{
+                          background: "var(--color-sentinel-bg-secondary)",
+                          border: "1px solid var(--color-sentinel-border)",
+                          color: "var(--color-sentinel-text-primary)",
+                        }}
                       >
                         Activate
-                      </Button>
+                      </button>
                     )}
-                  </TableCell>
-                </TableRow>
+                  </td>
+                </tr>
               ))}
-            </TableBody>
-          </Table>
+            </tbody>
+          </table>
         )}
-      </Card>
+      </div>
 
-      {/* Autoencoder Models */}
-      <Card>
-        <Flex justifyContent="between" alignItems="center">
-          <Title>Autoencoder Anomaly Models</Title>
-          <Badge color="orange">{autoencoderModels.length} models</Badge>
-        </Flex>
+      <div style={cardStyle}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>Autoencoder Anomaly Models</h3>
+          <Badge style={{ background: "rgba(245,158,11,0.15)", color: "var(--color-sentinel-amber)" }}>
+            {autoencoderModels.length} models
+          </Badge>
+        </div>
 
         {autoencoderModels.length === 0 ? (
-          <Text className="mt-4">No autoencoder models trained yet. Train one above!</Text>
+          <p style={{ color: "var(--color-sentinel-text-secondary)" }}>No autoencoder models trained yet. Train one above!</p>
         ) : (
-          <Table className="mt-4">
-            <TableHead>
-              <TableRow>
-                <TableHeaderCell>Model ID</TableHeaderCell>
-                <TableHeaderCell>Equipment</TableHeaderCell>
-                <TableHeaderCell>Status</TableHeaderCell>
-                <TableHeaderCell>Metrics</TableHeaderCell>
-                <TableHeaderCell>Trained</TableHeaderCell>
-                <TableHeaderCell>Actions</TableHeaderCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
+          <table className="w-full mt-4">
+            <thead>
+              <tr>
+                <th style={thStyle}>Model ID</th>
+                <th style={thStyle}>Equipment</th>
+                <th style={thStyle}>Status</th>
+                <th style={thStyle}>Metrics</th>
+                <th style={thStyle}>Trained</th>
+                <th style={thStyle}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
               {autoencoderModels.map((model) => (
-                <TableRow key={model.model_id}>
-                  <TableCell>
-                    <Text className="font-mono text-xs">{model.model_id}</Text>
-                  </TableCell>
-                  <TableCell>{model.equipment_type}</TableCell>
-                  <TableCell>
-                    <Badge
-                      color={model.status === "active" ? "green" : "gray"}
-                      icon={model.status === "active" ? CheckCircle : Clock}
+                <tr key={model.model_id}>
+                  <td style={tdStyle}>
+                    <span className="font-mono text-xs">{model.model_id}</span>
+                  </td>
+                  <td style={tdStyle}>{model.equipment_type}</td>
+                  <td style={tdStyle}>
+                    <span
+                      className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full"
+                      style={{
+                        background: model.status === "active" ? "rgba(16,185,129,0.15)" : "rgba(142,142,142,0.15)",
+                        color: model.status === "active" ? "var(--color-sentinel-green)" : "var(--color-sentinel-text-secondary)",
+                      }}
                     >
+                      {model.status === "active" ? <CheckCircle className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
                       {model.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Text className="text-sm">
+                    </span>
+                  </td>
+                  <td style={tdStyle}>
+                    <span className="text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>
                       {formatMetrics(model.metrics, "autoencoder")}
-                    </Text>
-                  </TableCell>
-                  <TableCell>
-                    <Text className="text-sm">{formatDate(model.registered_at)}</Text>
-                  </TableCell>
-                  <TableCell>
+                    </span>
+                  </td>
+                  <td style={tdStyle}>
+                    <span className="text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>{formatDate(model.registered_at)}</span>
+                  </td>
+                  <td style={tdStyle}>
                     {model.status !== "active" && (
-                      <Button
-                        size="xs"
-                        variant="secondary"
+                      <button
                         onClick={() => handleActivate(model.model_id)}
+                        className="px-2 py-1 text-xs font-medium rounded-md transition-colors"
+                        style={{
+                          background: "var(--color-sentinel-bg-secondary)",
+                          border: "1px solid var(--color-sentinel-border)",
+                          color: "var(--color-sentinel-text-primary)",
+                        }}
                       >
                         Activate
-                      </Button>
+                      </button>
                     )}
-                  </TableCell>
-                </TableRow>
+                  </td>
+                </tr>
               ))}
-            </TableBody>
-          </Table>
+            </tbody>
+          </table>
         )}
-      </Card>
+      </div>
     </div>
   );
 }

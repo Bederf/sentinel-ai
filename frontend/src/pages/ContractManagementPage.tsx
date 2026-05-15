@@ -977,76 +977,76 @@ export function ContractManagementPage() {
         >
 
           <div className="overflow-x-auto">
-            <Table>
-              <TableHead>
-                <TableRow
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr
                   style={{
                     background: "var(--color-sentinel-bg-secondary)",
                   }}
                 >
-                  <TableHeaderCell
+                  <th
                     className="cursor-pointer select-none"
                     onClick={() => handleSort("client")}
                     style={{ color: "var(--color-sentinel-text-secondary)" }}
                   >
                     Client
                     <SortIcon field="client" />
-                  </TableHeaderCell>
-                  <TableHeaderCell
+                  </th>
+                  <th
                     style={{ color: "var(--color-sentinel-text-secondary)" }}
                   >
                     Building
-                  </TableHeaderCell>
-                  <TableHeaderCell
+                  </th>
+                  <th
                     className="cursor-pointer select-none"
                     onClick={() => handleSort("type")}
                     style={{ color: "var(--color-sentinel-text-secondary)" }}
                   >
                     Type
                     <SortIcon field="type" />
-                  </TableHeaderCell>
-                  <TableHeaderCell
+                  </th>
+                  <th
                     className="cursor-pointer select-none"
                     onClick={() => handleSort("status")}
                     style={{ color: "var(--color-sentinel-text-secondary)" }}
                   >
                     Status
                     <SortIcon field="status" />
-                  </TableHeaderCell>
-                  <TableHeaderCell
+                  </th>
+                  <th
                     className="cursor-pointer select-none text-right"
                     onClick={() => handleSort("fee")}
                     style={{ color: "var(--color-sentinel-text-secondary)" }}
                   >
                     Monthly Fee
                     <SortIcon field="fee" />
-                  </TableHeaderCell>
-                  <TableHeaderCell
+                  </th>
+                  <th
                     style={{ color: "var(--color-sentinel-text-secondary)" }}
                   >
                     SLA Score
-                  </TableHeaderCell>
-                  <TableHeaderCell
+                  </th>
+                  <th
                     className="cursor-pointer select-none text-right"
                     onClick={() => handleSort("margin")}
                     style={{ color: "var(--color-sentinel-text-secondary)" }}
                   >
                     Margin %
                     <SortIcon field="margin" />
-                  </TableHeaderCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
                 {sortedContracts.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7}>
+                  <tr>
+                    <td colSpan={7}>
                       <EmptyState
                         icon={FileText}
                         title="No contracts found"
                         subtext="Contracts will appear here once added to the system."
                       />
-                    </TableCell>
-                  </TableRow>
+                    </td>
+                  </tr>
                 ) : (
                   sortedContracts.map((contract) => {
                     const isSelected =
@@ -1062,7 +1062,7 @@ export function ContractManagementPage() {
                         : 100;
 
                     return (
-                      <TableRow
+                      <tr
                         key={contract.contract_code}
                         className="cursor-pointer transition-colors"
                         onClick={() => handleContractClick(contract)}
@@ -1075,7 +1075,7 @@ export function ContractManagementPage() {
                             : "3px solid transparent",
                         }}
                       >
-                        <TableCell>
+                        <td>
                           <div>
                             <div
                               className="text-sm font-medium"
@@ -1096,8 +1096,8 @@ export function ContractManagementPage() {
                               {contract.contract_code}
                             </div>
                           </div>
-                        </TableCell>
-                        <TableCell>
+                        </td>
+                        <td>
                           <div className="flex items-center gap-1.5">
                             <Building2
                               className="h-3.5 w-3.5"
@@ -1116,8 +1116,8 @@ export function ContractManagementPage() {
                               Sandton City
                             </span>
                           </div>
-                        </TableCell>
-                        <TableCell>
+                        </td>
+                        <td>
                           <span
                             className="text-sm capitalize"
                             style={{
@@ -1127,14 +1127,14 @@ export function ContractManagementPage() {
                           >
                             {contract.contract.type.replace(/_/g, " ")}
                           </span>
-                        </TableCell>
-                        <TableCell>
+                        </td>
+                        <td>
                           <StatusBadge
                             status={contract.contract.status === 'expiring_soon' ? 'expiring' : contract.contract.status as StatusKey}
                             label={contract.contract.status.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())}
                           />
-                        </TableCell>
-                        <TableCell className="text-right">
+                        </td>
+                        <td className="text-right">
                           <span
                             className="text-sm font-medium"
                             style={{
@@ -1144,8 +1144,8 @@ export function ContractManagementPage() {
                           >
                             {formatZAR(contract.contract.monthly_fee_zar)}
                           </span>
-                        </TableCell>
-                        <TableCell>
+                        </td>
+                        <td>
                           <div className="flex items-center gap-2">
                             <div
                               className="flex-1 h-2 rounded-full max-w-[60px]"
@@ -1181,8 +1181,8 @@ export function ContractManagementPage() {
                               {slasMet}/{totalSlas}
                             </span>
                           </div>
-                        </TableCell>
-                        <TableCell className="text-right">
+                        </td>
+                        <td className="text-right">
                           <span
                             className="text-sm font-medium"
                             style={{
@@ -1202,13 +1202,13 @@ export function ContractManagementPage() {
                             ).toFixed(1)}
                             %
                           </span>
-                        </TableCell>
-                      </TableRow>
+                        </td>
+                      </tr>
                     );
                   })
                 )}
-              </TableBody>
-            </Table>
+              </tbody>
+            </table>
           </div>
         </Panel>
 

@@ -7,6 +7,7 @@
 
 import { useEffect, useState } from "react";
 
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import type { TrendData } from "../../lib/mlApi";
 import { getPredictionTrend, formatPrediction } from "../../lib/mlApi";
 
@@ -59,23 +60,23 @@ export function PredictionTrendChart({
 
   if (loading) {
     return (
-      <Card>
-        <Title>{title}</Title>
+      <div style={{background:'var(--color-sentinel-bg-panel)', border:'1px solid var(--color-sentinel-border)', borderRadius:8}}>
+        <h3 className="text-sm font-semibold" style={{color:'var(--color-sentinel-text-primary)'}}>{title}</h3>
         <div className="h-72 flex items-center justify-center">
-          <Text>Loading prediction data...</Text>
+          <p className="text-sm" style={{color:'var(--color-sentinel-text-secondary)'}}>Loading prediction data...</p>
         </div>
-      </Card>
+      </div>
     );
   }
 
   if (error || !data) {
     return (
-      <Card>
-        <Title>{title}</Title>
+      <div style={{background:'var(--color-sentinel-bg-panel)', border:'1px solid var(--color-sentinel-border)', borderRadius:8}}>
+        <h3 className="text-sm font-semibold" style={{color:'var(--color-sentinel-text-primary)'}}>{title}</h3>
         <div className="h-72 flex items-center justify-center">
-          <Text color="red">{error || "No data available"}</Text>
+          <p style={{color:'var(--color-sentinel-red)'}}>{error || "No data available"}</p>
         </div>
-      </Card>
+      </div>
     );
   }
 
@@ -107,70 +108,72 @@ export function PredictionTrendChart({
   ];
 
   return (
-    <Card>
-      <Flex justifyContent="between" alignItems="center" className="mb-4">
+    <div style={{background:'var(--color-sentinel-bg-panel)', border:'1px solid var(--color-sentinel-border)', borderRadius:8}}>
+      <div className="flex justify-between items-center mb-4">
         <div>
-          <Title>{title}</Title>
-          <Text className="text-sm text-gray-500">
+          <h3 className="text-sm font-semibold" style={{color:'var(--color-sentinel-text-primary)'}}>{title}</h3>
+          <p className="text-sm" style={{color:'var(--color-sentinel-text-secondary)'}}>
             {equipmentId} ({equipmentType})
-          </Text>
+          </p>
         </div>
-        <Badge color="blue" size="lg">
+        <span className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full" style={{background:'rgba(59,130,246,0.15)', color:'var(--color-sentinel-blue)'}}>
           Confidence: 85%
-        </Badge>
-      </Flex>
+        </span>
+      </div>
 
-      <AreaChart
-        className="h-72"
-        data={chartData}
-        index="hour"
-        categories={["value"]}
-        colors={["blue"]}
-        valueFormatter={(v) => `${v.toFixed(1)}${unit}`}
-        showAnimation
-        curveType="monotone"
-        showLegend={false}
-        customTooltip={({ payload }) => {
-          if (!payload?.[0]) return null;
-          const point = payload[0].payload as ChartDataPoint;
-          return (
-            <div className="bg-white p-2 shadow-lg rounded border">
-              <Text className="font-medium">
-                {point.hour < 0
-                  ? `${Math.abs(point.hour)}h ago`
-                  : point.hour === 0
-                  ? "Now"
-                  : `+${point.hour}h`}
-              </Text>
-              <Text color={point.type === "Predicted" ? "blue" : "gray"}>
-                {point.type}: {point.value.toFixed(1)}
-                {unit}
-              </Text>
-            </div>
-          );
-        }}
-      />
+      <ResponsiveContainer width="100%" height={288}>
+        <AreaChart data={chartData}>
+          <defs>
+            <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="var(--color-sentinel-blue)" stopOpacity={0.3}/>
+              <stop offset="95%" stopColor="var(--color-sentinel-blue)" stopOpacity={0}/>
+            </linearGradient>
+          </defs>
+          <CartesianGrid stroke="var(--color-sentinel-border)" strokeDasharray="2 4" />
+          <XAxis dataKey="hour" stroke="var(--color-sentinel-text-secondary)" tick={{fontSize:11}} />
+          <YAxis stroke="var(--color-sentinel-text-secondary)" tick={{fontSize:11}} />
+          <Tooltip contentStyle={{background:'var(--color-sentinel-bg-panel)', border:'1px solid var(--color-sentinel-border)', borderRadius:6, fontSize:12}} content={({ active, payload }) => {
+            if (!active || !payload?.[0]) return null;
+            const point = payload[0].payload as ChartDataPoint;
+            return (
+              <div className="p-2 shadow-lg rounded" style={{background:'var(--color-sentinel-bg-panel)', border:'1px solid var(--color-sentinel-border)'}}>
+                <p className="font-medium" style={{color:'var(--color-sentinel-text-primary)'}}>
+                  {point.hour < 0
+                    ? `${Math.abs(point.hour)}h ago`
+                    : point.hour === 0
+                    ? "Now"
+                    : `+${point.hour}h`}
+                </p>
+                <p style={{color: point.type === "Predicted" ? 'var(--color-sentinel-blue)' : 'var(--color-sentinel-text-secondary)'}}>
+                  {point.type}: {point.value.toFixed(1)}{unit}
+                </p>
+              </div>
+            );
+          }} />
+          <Area type="monotone" dataKey="value" stroke="var(--color-sentinel-blue)" fill="url(#colorValue)" isAnimationActive />
+        </AreaChart>
+      </ResponsiveContainer>
 
       {/* Prediction cards */}
-      <Grid className="grid grid-cols-4 gap-4 mt-4">
-        <Card decoration="top" decorationColor="gray">
-          <Text>Current</Text>
-          <Metric>{formatPrediction(currentValue, unit)}</Metric>
-        </Card>
-        <Card decoration="top" decorationColor="blue">
-          <Text>24h Forecast</Text>
-          <Metric>{formatPrediction(data.predicted["24h"], unit)}</Metric>
-        </Card>
-        <Card decoration="top" decorationColor="blue">
-          <Text>48h Forecast</Text>
-          <Metric>{formatPrediction(data.predicted["48h"], unit)}</Metric>
-        </Card>
-        <Card decoration="top" decorationColor="blue">
-          <Text>72h Forecast</Text>
-          <Metric>{formatPrediction(data.predicted["72h"], unit)}</Metric>
-        </Card>
-      </Grid>
-    </Card>
+      <div className="grid grid-cols-4 gap-4 mt-4">
+        <div style={{background:'var(--color-sentinel-bg-panel)', border:'1px solid var(--color-sentinel-border)', borderRadius:8, borderTop:'3px solid var(--color-sentinel-text-secondary)'}}>
+          <p className="text-sm" style={{color:'var(--color-sentinel-text-secondary)'}}>Current</p>
+          <div className="text-3xl font-semibold tabular-nums">{formatPrediction(currentValue, unit)}</div>
+        </div>
+        <div style={{background:'var(--color-sentinel-bg-panel)', border:'1px solid var(--color-sentinel-border)', borderRadius:8, borderTop:'3px solid var(--color-sentinel-blue)'}}>
+          <p className="text-sm" style={{color:'var(--color-sentinel-text-secondary)'}}>24h Forecast</p>
+          <div className="text-3xl font-semibold tabular-nums">{formatPrediction(data.predicted["24h"], unit)}</div>
+        </div>
+        <div style={{background:'var(--color-sentinel-bg-panel)', border:'1px solid var(--color-sentinel-border)', borderRadius:8, borderTop:'3px solid var(--color-sentinel-blue)'}}>
+          <p className="text-sm" style={{color:'var(--color-sentinel-text-secondary)'}}>48h Forecast</p>
+          <div className="text-3xl font-semibold tabular-nums">{formatPrediction(data.predicted["48h"], unit)}</div>
+        </div>
+        <div style={{background:'var(--color-sentinel-bg-panel)', border:'1px solid var(--color-sentinel-border)', borderRadius:8, borderTop:'3px solid var(--color-sentinel-blue)'}}>
+          <p className="text-sm" style={{color:'var(--color-sentinel-text-secondary)'}}>72h Forecast</p>
+          <div className="text-3xl font-semibold tabular-nums">{formatPrediction(data.predicted["72h"], unit)}</div>
+        </div>
+      </div>
+    </div>
   );
 }
 

@@ -241,6 +241,12 @@ export function Chat() {
     sendMessage(command);
   };
 
+  // Handle clickable equipment IDs — inserts into input box
+  const handleEquipmentClick = (equipmentId: string) => {
+    setInput(equipmentId + " ");
+    inputRef.current?.focus();
+  };
+
   // Handle Enter key
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -373,6 +379,7 @@ export function Chat() {
             content={msg.content}
             isStreaming={msg.isStreaming}
             onCommandClick={msg.role === "assistant" ? handleCommandClick : undefined}
+            onEquipmentClick={msg.role === "assistant" && !msg.isStreaming ? handleEquipmentClick : undefined}
             onSpeak={
               tts.isAvailable && msg.role === "assistant" && !msg.isStreaming
                 ? (text, id) => tts.speak(text, id)

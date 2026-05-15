@@ -1,8 +1,7 @@
 """Focus room overstay notifier.
 
 Sends operator alerts when a focus room exceeds the allowed occupancy window.
-Telegram via sentry CLI (concierge-targeted with inline confirm buttons);
-WhatsApp via NotificationService.broadcast_alert() (Phase 102).
+WhatsApp via OpenClaw gateway message send.
 """
 
 from __future__ import annotations
@@ -12,10 +11,12 @@ import os
 from typing import Any
 
 from app.config.settings import settings
-from app.services.sentry_integration.alert_notifier import alert_notifier
-from app.services.telegram_message_sender import InlineButton, InlineKeyboard, get_telegram_sender
 
 logger = logging.getLogger(__name__)
+
+# In-memory mapping of WhatsApp message IDs to focus room codes
+# Populated when alerts are sent, used to match swipe-replies
+_focus_alert_messages: dict[str, str] = {}
 
 
 def _resolve_site_label(site_id: str) -> str:
@@ -31,56 +32,6 @@ def _resolve_site_label(site_id: str) -> str:
     return site_id
 
 
-async def _send_focus_alert_telegram(
-    *,
-    site_id: str,
-    room_code: str,
-    site_label: str,
-    max_allowed_minutes: int,
-    cooldown_minutes: int,
-) -> dict[str, Any]:
-    """Send focus overstay alert to concierge via Telegram with inline confirm buttons."""
-    from app.services.space_booking_simulator import get_block_booking_config
-
-    config = get_block_booking_config(site_id)
-    # Fall back to SENTRY_FM_CHAT_ID if per-site Telegram ID not configured
-    target_chat = (
-        config.concierge_telegram_chat_id
-        if config and config.concierge_telegram_chat_id
-        else (os.getenv("SENTRY_FM_CHAT_ID") or "").strip()
-        or str(getattr(settings, "sentry_fm_chat_id", "") or "").strip()
-        or str(getattr(settings, "telegram_alert_chat_id", "") or "").strip()
-    )
-    if not target_chat:
-        return {"success": False, "reason": "No Telegram chat ID configured for focus alerts"}
-
-    message = f"""⚠️ FOCUS ROOM OVERSTAY ALERT
-
-Site: {site_label}
-Room: {room_code}
-Occupancy exceeded {max_allowed_minutes} minutes.
-LED/relay is ON.
-Cooldown: LED remains ON for {cooldown_minutes} minutes after room becomes vacant.
-
-Is anyone still in this room?"""
-
-    kb = InlineKeyboard(
-        rows=[
-            [InlineButton("✅ Still occupied", f"focus:occupied:{room_code}")],
-            [InlineButton("❌ Room empty now", f"focus:empty:{room_code}")],
-        ]
-    )
-
-    try:
-        sender = get_telegram_sender()
-        result = await sender.send_text(target_chat, message, keyboard=kb, parse_mode="HTML")
-        ok = result.get("ok", False)
-        return {"success": ok, "message_id": result.get("result", {}).get("message_id")}
-    except Exception as exc:
-        logger.warning("Focus overstay Telegram send failed: %s", exc)
-        return {"success": False, "error": str(exc)}
-
-
 async def send_focus_overstay_alert(
     *,
     site_id: str,
@@ -88,65 +39,75 @@ async def send_focus_overstay_alert(
     max_allowed_minutes: int,
     cooldown_minutes: int,
 ) -> dict:
-    """Dispatch a focus overstay alert via Telegram (concierge-targeted) + WhatsApp via NotificationService."""
+    """Dispatch a focus overstay alert via WhatsApp to concierge."""
     site_label = _resolve_site_label(site_id)
 
     try:
-        # 1) Telegram via sentry CLI — concierge-targeted with inline confirm buttons
-        telegram_result = await _send_focus_alert_telegram(
-            site_id=site_id,
-            room_code=room_code,
-            site_label=site_label,
-            max_allowed_minutes=max_allowed_minutes,
-            cooldown_minutes=cooldown_minutes,
-        )
-        telegram_ok = telegram_result.get("success", False)
-
-        # 2) WhatsApp via Twilio directly (not broadcast_alert — that duplicates Telegram)
         whatsapp_ok = False
         whatsapp_result: dict = {}
-        whatsapp_to = (settings.twilio_whatsapp_to or "").strip()
-        whatsapp_from = (settings.twilio_whatsapp_from or "").strip()
-        if whatsapp_to and whatsapp_from:
-            try:
-                from twilio.rest import Client as TwilioClient
+        try:
+            from app.services.space_booking_simulator import get_block_booking_config
+            from app.services.concierge_store import find_all_concierges_for_room
 
-                account_sid = getattr(settings, "twilio_account_sid", None)
-                auth_token = getattr(settings, "twilio_auth_token", None)
-                if account_sid and auth_token:
-                    twilio_client = TwilioClient(account_sid, auth_token)
-                    body = (
-                        f"⚠️ Focus Room Overstay Alert\n"
-                        f"Site: {site_label}\n"
-                        f"Room: {room_code}\n"
-                        f"Occupancy exceeded {max_allowed_minutes} minutes.\n"
-                        f"LED/relay is ON.\n"
-                        f"Cooldown: LED remains ON for {cooldown_minutes} minutes after room becomes vacant."
-                    )
-                    msg = twilio_client.messages.create(
-                        body=body,
-                        from_=whatsapp_from,
-                        to=whatsapp_to,
-                    )
-                    whatsapp_ok = bool(msg.sid)
-                    whatsapp_result = {"success": whatsapp_ok, "sid": msg.sid}
-                else:
-                    whatsapp_result = {"success": False, "error": "Twilio credentials not configured"}
-            except Exception as wa_exc:
-                logger.warning("Focus overstay WhatsApp via Twilio failed: %s", wa_exc)
-                whatsapp_result = {"success": False, "error": str(wa_exc)}
-        else:
-            whatsapp_result = {"success": False, "error": "whatsapp_not_configured"}
+            config = get_block_booking_config(site_id)
+            concierges = find_all_concierges_for_room(site_id, room_code.split("-")[0] if "-" in room_code else site_id)
+            whatsapp_targets = []
+            if concierges:
+                for c in concierges:
+                    if c.mobile and c.mobile.strip():
+                        whatsapp_targets.append(c.mobile.strip())
+            if not whatsapp_targets and config and config.concierge_whatsapp:
+                whatsapp_targets.append(config.concierge_whatsapp.replace("whatsapp:", ""))
+            if whatsapp_targets:
+                import subprocess
 
-        success = telegram_ok or whatsapp_ok
+                body = (
+                    f"⚠️ Focus Room Overstay Alert\n"
+                    f"Site: {site_label}\n"
+                    f"Room: {room_code}\n"
+                    f"Occupancy exceeded {max_allowed_minutes} minutes.\n"
+                    f"LED/relay is ON.\n"
+                    f"Cooldown: LED remains ON for {cooldown_minutes} minutes after room becomes vacant."
+                )
+                sent_any = False
+                import shutil
+                cli = shutil.which("openclaw") or "/home/bederf/.local/bin/openclaw"
+                for target in whatsapp_targets:
+                    try:
+                        env = os.environ.copy()
+                        env["SENTRY_CONFIG_DIR"] = "/home/bederf/.sentry/gateway"
+                        result = subprocess.run(
+                            [cli, "message", "send", "--channel", "whatsapp", "--target", target, "--message", body],
+                            capture_output=True, text=True, timeout=30, env=env,
+                            capture_output=True, text=True, timeout=30,
+                        )
+                        if result.returncode == 0:
+                            sent_any = True
+                            if result.stdout:
+                                import json
+                                try:
+                                    msg_data = json.loads(result.stdout)
+                                    msg_id = msg_data.get("message_id") or msg_data.get("id") or ""
+                                    if msg_id:
+                                        _focus_alert_messages[msg_id] = room_code
+                                except Exception:
+                                    pass
+                    except Exception as e:
+                        logger.warning("Focus overstay WhatsApp send to %s failed: %s", target, e)
+                whatsapp_ok = sent_any
+                whatsapp_result = {"success": sent_any, "sent_to": len(whatsapp_targets)}
+            else:
+                whatsapp_result = {"success": False, "error": "whatsapp_not_configured"}
+        except Exception as wa_exc:
+            logger.warning("Focus overstay WhatsApp send failed: %s", wa_exc)
+            whatsapp_result = {"success": False, "error": str(wa_exc)}
+
         result = {
-            "success": success,
-            "telegram_sent": telegram_ok,
-            "telegram_result": telegram_result,
+            "success": whatsapp_ok,
             "whatsapp_sent": whatsapp_ok,
             "whatsapp_result": whatsapp_result,
         }
-        if success:
+        if whatsapp_ok:
             logger.info("Focus overstay alert sent: site=%s room=%s result=%s", site_id, room_code, result)
         else:
             logger.warning("Focus overstay alert failed: site=%s room=%s result=%s", site_id, room_code, result)
@@ -154,3 +115,72 @@ async def send_focus_overstay_alert(
     except Exception as exc:
         logger.warning("Focus overstay notifier exception: site=%s room=%s err=%s", site_id, room_code, exc)
         return {"success": False, "error": str(exc)}
+
+
+async def process_focus_room_whatsapp_reply(
+    from_number: str,
+    content: str,
+    *,
+    reply_to_message_id: str | None = None,
+    message_id: str | None = None,
+) -> dict[str, Any]:
+    """Handle concierge yes/no reply for a focus room overstay alert via WhatsApp."""
+    reply = (content or "").strip().lower()
+    if reply not in {"yes", "no"}:
+        return {"handled": False}
+
+    from app.services import occupancy_store
+
+    # Try to match by replied-to message ID first
+    room_code = ""
+    if reply_to_message_id and reply_to_message_id in _focus_alert_messages:
+        room_code = _focus_alert_messages[reply_to_message_id]
+
+    # Fallback: find active sessions
+    if not room_code:
+        all_sessions = []
+        try:
+            from app.database.supabase_client import get_supabase_client
+            sb = get_supabase_client()
+            if sb:
+                result = sb.table("space_focus_room_sessions").select("*").is_("end_time", None).execute()
+                all_sessions = result.data or []
+        except Exception:
+            pass
+
+        if not all_sessions:
+            return {"handled": True, "response_message": "No active focus room sessions found."}
+
+        if len(all_sessions) > 1:
+            rooms = [s.get("room_code", "?") for s in all_sessions]
+            return {
+                "handled": True,
+                "response_message": f"Multiple active focus rooms: {', '.join(rooms)}. Please reply with the room code."
+            }
+
+        room_code = all_sessions[0].get("room_code", "")
+
+    active = occupancy_store.get_active_session(room_code) if room_code else None
+    if not active:
+        return {"handled": True, "response_message": f"No active session for {room_code}."}
+
+    session_id = active.session_id
+
+    from datetime import datetime
+
+    if reply == "yes":
+        occupancy_store.extend_overstay_grace(session_id, 10)
+        logger.info("Focus overstay grace +10min via WhatsApp concierge: room=%s", room_code)
+        return {
+            "handled": True,
+            "response_message": f"{room_code} — session extended by 10 minutes.",
+        }
+    else:
+        occupancy_store.close_session(session_id, datetime.utcnow())
+        logger.info("Focus session closed via WhatsApp concierge: room=%s", room_code)
+        from app.services.focus_room_relay_service import sync_focus_room_relay
+        sync_focus_room_relay(site_id="site-002", room_code=room_code)
+        return {
+            "handled": True,
+            "response_message": f"Recorded: {room_code} marked empty.",
+        }

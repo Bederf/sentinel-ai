@@ -1,16 +1,3 @@
-/**
- * ComfortComplaintPanel - Quick comfort complaint submission from dashboard
- *
- * Features:
- * - Desk ID input with auto-complete hints
- * - Complaint type selector (too hot, too cold, stuffy, drafty)
- * - Instant AI diagnosis display
- * - Confidence badge (high/medium/low)
- * - Actionable suggestions list
- *
- * Part of Phase 23: Desk-Level HVAC Intelligence
- */
-
 import { useState, useRef, useEffect } from "react";
 
 import {
@@ -26,8 +13,8 @@ import {
   MessageSquare,
 } from "lucide-react";
 import { complaintsApi, type ComplaintDiagnosis, type Desk, type HVACZone } from '@/lib/api';
+import { Badge } from './Badge';
 
-// Complaint type options with emojis
 const COMPLAINT_TYPES = [
   { value: "too_hot", label: "Too Hot", icon: "fire" },
   { value: "too_cold", label: "Too Cold", icon: "snowflake" },
@@ -41,26 +28,21 @@ interface Props {
 }
 
 export default function ComfortComplaintPanel({ compact = true, onViewDetails }: Props) {
-  // Form state
   const [deskId, setDeskId] = useState("");
   const [complaintType, setComplaintType] = useState<string>("too_hot");
 
-  // API state
   const [diagnosis, setDiagnosis] = useState<ComplaintDiagnosis | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Ref for auto-focus
   const deskInputRef = useRef<HTMLInputElement>(null);
 
-  // Auto-focus desk input on load
   useEffect(() => {
     if (deskInputRef.current && !diagnosis) {
       deskInputRef.current.focus();
     }
   }, [diagnosis]);
 
-  // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -83,7 +65,6 @@ export default function ComfortComplaintPanel({ compact = true, onViewDetails }:
     }
   };
 
-  // Handle clear/reset
   const handleClear = () => {
     setDiagnosis(null);
     setDeskId("");
@@ -91,17 +72,15 @@ export default function ComfortComplaintPanel({ compact = true, onViewDetails }:
     setError(null);
   };
 
-  // Get confidence badge color
-  const getConfidenceBadgeColor = (confidence: string): "green" | "yellow" | "gray" => {
+  const getConfidenceBadgeStyle = (confidence: string) => {
     switch (confidence) {
-      case "high": return "green";
-      case "medium": return "yellow";
-      case "low": return "gray";
-      default: return "gray";
+      case "high": return { background: 'rgba(16,185,129,0.15)', color: 'var(--color-sentinel-green)' };
+      case "medium": return { background: 'rgba(234,179,8,0.15)', color: 'var(--color-sentinel-amber)' };
+      case "low": return { background: 'rgba(107,114,128,0.15)', color: 'var(--color-sentinel-text-secondary)' };
+      default: return { background: 'rgba(107,114,128,0.15)', color: 'var(--color-sentinel-text-secondary)' };
     }
   };
 
-  // Get icon for suggestion type
   const getSuggestionIcon = (suggestion: string) => {
     if (suggestion.toLowerCase().includes("auto") || suggestion.toLowerCase().includes("adjusted")) {
       return <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />;
@@ -112,7 +91,6 @@ export default function ComfortComplaintPanel({ compact = true, onViewDetails }:
     return <HelpCircle className="w-4 h-4 text-blue-500 flex-shrink-0" />;
   };
 
-  // Render desk info card
   const renderDeskInfo = (desk: Desk) => (
     <div
       className="p-3 rounded-lg"
@@ -150,7 +128,6 @@ export default function ComfortComplaintPanel({ compact = true, onViewDetails }:
     </div>
   );
 
-  // Render zone status card
   const renderZoneStatus = (zone: HVACZone) => (
     <div
       className="p-3 rounded-lg"
@@ -189,19 +166,30 @@ export default function ComfortComplaintPanel({ compact = true, onViewDetails }:
     </div>
   );
 
-  // Render diagnosis result
+  const renderCallout = (title: string, color: 'amber' | 'green' | 'red', icon?: React.ReactNode, children?: React.ReactNode) => {
+    const borderColor = color === 'amber' ? '#f59e0b' : color === 'green' ? '#22c55e' : '#ef4444';
+    const bgColor = color === 'amber' ? 'rgba(245,158,11,0.12)' : color === 'green' ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.12)';
+    return (
+      <div className="p-3 rounded-lg flex items-start gap-2" style={{ background: bgColor, borderLeft: `4px solid ${borderColor}` }}>
+        {icon && <span className="flex-shrink-0 mt-0.5">{icon}</span>}
+        <div>
+          <p className="text-sm font-medium" style={{ color: 'var(--color-sentinel-text-primary)' }}>{title}</p>
+          <div className="text-xs mt-1" style={{ color: 'var(--color-sentinel-text-secondary)' }}>{children}</div>
+        </div>
+      </div>
+    );
+  };
+
   const renderDiagnosis = () => {
     if (!diagnosis) return null;
 
     return (
       <div className="space-y-4 mt-4">
-        {/* Desk and Zone Info */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {renderDeskInfo(diagnosis.desk)}
           {renderZoneStatus(diagnosis.zone)}
         </div>
 
-        {/* Root Cause with Confidence */}
         <div
           className="p-4 rounded-lg"
           style={{
@@ -217,7 +205,7 @@ export default function ComfortComplaintPanel({ compact = true, onViewDetails }:
             <span className="text-sm font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>
               Diagnosis
             </span>
-            <Badge color={getConfidenceBadgeColor(diagnosis.confidence)} size="sm">
+            <Badge style={getConfidenceBadgeStyle(diagnosis.confidence)}>
               {diagnosis.confidence} confidence
             </Badge>
           </div>
@@ -226,7 +214,6 @@ export default function ComfortComplaintPanel({ compact = true, onViewDetails }:
           </p>
         </div>
 
-        {/* Suggestions */}
         <div className="space-y-2">
           <span className="text-sm font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>
             Recommendations
@@ -247,40 +234,53 @@ export default function ComfortComplaintPanel({ compact = true, onViewDetails }:
           </div>
         </div>
 
-        {/* Dispatch Alert */}
         {diagnosis.needs_dispatch && (
-          <Callout title="Technician Required" color="amber">
-            This issue requires a technician visit. A work order has been created.
-          </Callout>
+          renderCallout("Technician Required", "amber", undefined,
+            <>This issue requires a technician visit. A work order has been created.</>
+          )
         )}
 
-        {/* Auto Action */}
         {diagnosis.auto_action_taken && (
-          <Callout title="Auto Action Taken" color="green">
-            {diagnosis.auto_action_taken}
-          </Callout>
+          renderCallout("Auto Action Taken", "green", undefined,
+            <>{diagnosis.auto_action_taken}</>
+          )
         )}
 
-        {/* Action Buttons */}
         <div className="flex items-center gap-3 pt-2">
-          <Button size="xs" variant="secondary" onClick={handleClear} icon={RefreshCw}>
+          <button
+            onClick={handleClear}
+            className="px-2 py-1 text-xs rounded font-medium inline-flex items-center gap-1"
+            style={{
+              background: 'var(--color-sentinel-bg-secondary)',
+              color: 'var(--color-sentinel-text-primary)',
+              border: '1px solid var(--color-sentinel-border)',
+            }}
+          >
+            <RefreshCw className="w-3 h-3" />
             Submit Another
-          </Button>
+          </button>
           {onViewDetails && (
-            <Button size="xs" variant="primary" onClick={onViewDetails} icon={MessageSquare}>
+            <button
+              onClick={onViewDetails}
+              className="px-2 py-1 text-xs rounded font-medium inline-flex items-center gap-1"
+              style={{
+                background: 'var(--color-sentinel-bg-secondary)',
+                color: 'var(--color-sentinel-text-primary)',
+                border: '1px solid var(--color-sentinel-border)',
+              }}
+            >
+              <MessageSquare className="w-3 h-3" />
               Need More Help?
-            </Button>
+            </button>
           )}
         </div>
       </div>
     );
   };
 
-  // Render complaint form
   const renderForm = () => (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className={compact ? "flex flex-col sm:flex-row gap-3" : "space-y-4"}>
-        {/* Desk ID Input */}
         <div className={compact ? "flex-grow" : ""}>
           <label className="block text-xs mb-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>
             Desk ID
@@ -300,7 +300,6 @@ export default function ComfortComplaintPanel({ compact = true, onViewDetails }:
           />
         </div>
 
-        {/* Complaint Type Selector */}
         <div className={compact ? "flex-shrink-0" : ""}>
           <label className="block text-xs mb-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>
             Issue
@@ -323,26 +322,26 @@ export default function ComfortComplaintPanel({ compact = true, onViewDetails }:
           </select>
         </div>
 
-        {/* Submit Button */}
         <div className={compact ? "flex items-end" : ""}>
-          <Button
+          <button
             type="submit"
-            size="sm"
-            variant="primary"
             disabled={loading || !deskId.trim()}
-            icon={loading ? RefreshCw : Send}
-            className={loading ? "animate-spin" : ""}
+            className={`px-3 py-2 text-sm rounded font-medium inline-flex items-center gap-1 ${loading ? "animate-spin" : ""}`}
+            style={{
+              background: 'rgba(59,130,246,0.15)',
+              color: 'var(--color-sentinel-blue)',
+              border: '1px solid rgba(59,130,246,0.3)',
+              opacity: loading || !deskId.trim() ? 0.6 : 1,
+            }}
           >
+            {loading ? <RefreshCw className="w-3.5 h-3.5" /> : <Send className="w-3.5 h-3.5" />}
             {loading ? "Analyzing..." : "Submit"}
-          </Button>
+          </button>
         </div>
       </div>
 
-      {/* Error Display */}
       {error && (
-        <Callout title="Error" color="red" icon={XCircle}>
-          {error}
-        </Callout>
+        renderCallout("Error", "red", <XCircle className="w-4 h-4" />, <>{error}</>)
       )}
     </form>
   );
@@ -355,7 +354,6 @@ export default function ComfortComplaintPanel({ compact = true, onViewDetails }:
         border: "1px solid var(--color-sentinel-border)",
       }}
     >
-      {/* Panel Header */}
       <div
         className="p-4 flex items-center justify-between"
         style={{ borderBottom: "1px solid var(--color-sentinel-border)" }}
@@ -387,13 +385,12 @@ export default function ComfortComplaintPanel({ compact = true, onViewDetails }:
         </div>
 
         {diagnosis && (
-          <Badge color={getConfidenceBadgeColor(diagnosis.confidence)}>
+          <Badge style={getConfidenceBadgeStyle(diagnosis.confidence)}>
             Diagnosed
           </Badge>
         )}
       </div>
 
-      {/* Panel Content */}
       <div className="p-4">
         {diagnosis ? renderDiagnosis() : renderForm()}
       </div>

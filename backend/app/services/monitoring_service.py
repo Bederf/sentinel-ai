@@ -310,6 +310,8 @@ class MonitoringService:
                     ls_dt = datetime.fromisoformat(last_sync.replace("Z", "+00:00").replace("+00:00", ""))
                 else:
                     ls_dt = last_sync
+                if ls_dt.tzinfo is not None:
+                    ls_dt = ls_dt.replace(tzinfo=None)
                 hours_since = (datetime.utcnow() - ls_dt).total_seconds() / 3600
                 if hours_since > 24:
                     severity = "critical" if hours_since >= 48 else "warning"

@@ -128,7 +128,7 @@ def get_stats_from_supabase() -> dict | None:
         total_equipment = len(equipment)
         warning_count = sum(1 for e in equipment if e.get("status") == "warning")
         critical_count = sum(1 for e in equipment if e.get("status") == "critical")
-        health_scores = [e.get("health_score", 100) for e in equipment if e.get("health_score") is not None]
+        health_scores = [e.get("health_score") for e in equipment if e.get("health_score") is not None]
         avg_health = round(sum(health_scores) / len(health_scores), 1) if health_scores else 0
 
         # Equipment type breakdown
@@ -138,7 +138,7 @@ def get_stats_from_supabase() -> dict | None:
             if eq_type not in type_stats:
                 type_stats[eq_type] = {"type": eq_type, "count": 0, "total_health": 0, "warning_count": 0}
             type_stats[eq_type]["count"] += 1
-            type_stats[eq_type]["total_health"] += eq.get("health_score", 100)
+            type_stats[eq_type]["total_health"] += eq.get("health_score") or 100
             if eq.get("status") == "warning":
                 type_stats[eq_type]["warning_count"] += 1
         by_equipment_type = [
@@ -179,7 +179,7 @@ def get_stats_from_supabase() -> dict | None:
             if region not in region_stats:
                 region_stats[region] = {"region": region, "site_count": 0, "equipment_count": 0, "total_sqm": 0, "alert_count": 0}
             region_stats[region]["site_count"] += 1
-            region_stats[region]["total_sqm"] += b.get("sqm", 0) or 0
+            region_stats[region]["total_sqm"] += b.get("sqm") or 0
         by_region = list(region_stats.values())
         by_region.sort(key=lambda r: -r["site_count"])
 
@@ -200,7 +200,7 @@ def get_stats_from_supabase() -> dict | None:
             "total_damage": total_damage,
             "by_region": by_region,
             "by_equipment_type": by_equipment_type,
-            "total_sqm": sum(b.get("sqm", 0) or 0 for b in sites),
+            "total_sqm": sum((b.get("sqm") or 0) for b in sites),
         }
     except Exception as e:
         logger.warning(f"Failed to get stats from Supabase: {e}")

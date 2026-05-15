@@ -1362,17 +1362,17 @@ async def sentry_call_log(
         else:
             location = "Location not specified"
 
-        # Try to find a technician for this specialty at this site
+        # Resolve site code to UUID
+        resolved_site_uuid = None
         tech = None
         try:
             from app.database.supabase_client import get_supabase_client
 
             sb = get_supabase_client()
             if sb:
-                # Get site_id from site code
                 bld = sb.table("sites").select("id").eq("code", req.site_id).execute()
                 if bld.data:
-                    site_id = bld.data[0]["id"]
+                    resolved_site_uuid = bld.data[0]["id"]
 
                     # Try specialty match via site_technicians (if table exists)
                     try:
@@ -1428,7 +1428,11 @@ async def sentry_call_log(
             "created_by": who,
             "service_type": "callout",
             "category": req.category,
+            "notes": req.original_message,
         }
+
+        if resolved_site_uuid:
+            wo_data["site_id"] = resolved_site_uuid
 
         if tech:
             wo_data["assigned_to"] = tech.get("name")
@@ -1450,32 +1454,34 @@ async def sentry_call_log(
             f"Assigned: {assigned_name}"
         )
 
-        # Try to send Telegram notification to technician
+        # Staff call-log never creates a service record — only WO + notification
         notify_sent = False
         wo_notify_data = {
             "code": wo_code,
             "work_order_id": str(wo_uuid) if wo_uuid else wo_code,
-            "equipment_id": f"ZONE-{req.zone_id}" if req.zone_id else req.site_id,
+            "equipment_id": req.site_id,
             "equipment_name": req.title,
             "site_id": req.site_id,
             "zone_id": req.zone_id or "",
             "desk_id": req.desk_id or "",
             "technician_id": tech.get("telegram_id") if tech else None,
             "technician_name": tech.get("name") if tech else None,
+            "technician_email": tech.get("email") if tech else None,
             "service_type": "callout",
             "criticality": req.priority.upper(),
             "problem_description": req.description,
+            "original_message": req.original_message,
+            "create_service_record": False,
         }
         logger.info(f"Call-log invoking notify_technician with data={wo_notify_data}")
-        if tech and tech.get("telegram_id"):
-            try:
-                notify_response = await work_order_notifier.notify_technician(wo_notify_data)
-                is_success = (
-                    notify_response.get("success") if isinstance(notify_response, dict) else bool(notify_response)
-                )
-                notify_sent = is_success and bool(notify_response)
-            except Exception as e:
-                logger.warning(f"Telegram notification failed for call-log WO: {e}")
+        try:
+            notify_response = await work_order_notifier.notify_technician(wo_notify_data)
+            is_success = (
+                notify_response.get("success") if isinstance(notify_response, dict) else bool(notify_response)
+            )
+            notify_sent = is_success and bool(notify_response)
+        except Exception as e:
+            logger.warning(f"Notification failed for call-log WO: {e}")
 
         # Persist reporter -> last confirmed location memory for next mobile report.
         location_memory_saved = False
@@ -1764,8 +1770,8 @@ async def advance_wo_milestone(
             new_notes = f"{existing_notes}\n---\n{new_notes}"
         await wo_repo.update_work_order(wo_id, {"notes": new_notes})
 
-        # Notify staff if resolved
-        if req.milestone == "resolved":
+        # Notify staff if resolved or verified
+        if req.milestone in ("resolved", "verified"):
             # Extract reporter Telegram ID from created_by (format: sentry:call_log:{telegram_id})
             reporter_telegram_id = None
             if "sentry:call_log:" in created_by:
@@ -1775,16 +1781,19 @@ async def advance_wo_milestone(
 
             if reporter_telegram_id:
                 try:
-                    sender = get_telegram_sender()
-                    # Format outcome emoji
+                    from app.services.telegram_message_sender import TelegramMessageSender
+
+                    staff_bot_token = os.getenv("SENTRY_CLIENT_BOT_TOKEN") or "***TELEGRAM_BOT_TOKEN_REDACTED***"
+                    sender = TelegramMessageSender(staff_bot_token)
                     outcome_emoji = {
                         "fixed": "✅",
                         "parts_needed": "⏳",
                         "escalate": "⚠️",
                     }.get(req.outcome, "✅")
 
+                    label = "resolved" if req.milestone == "resolved" else "completed"
                     notify_text = (
-                        f"{outcome_emoji} Work order {req.wo_code} resolved.\n"
+                        f"{outcome_emoji} Work order {req.wo_code} {label}.\n"
                         f"Technician notes: {req.notes or 'No additional notes.'}"
                     )
                     await sender.send_text(reporter_telegram_id, notify_text)
@@ -1826,12 +1835,16 @@ async def advance_wo_milestone(
 
 
 def _dt_iso(val) -> str:
-    """Convert datetime to ISO string, returns empty string for None."""
+    """Convert datetime to SAST ISO string, returns empty string for None."""
     if val is None:
         return ""
     if isinstance(val, str):
         return val
-    return val.isoformat()
+    from datetime import timedelta, timezone
+    sast = timezone(timedelta(hours=2))
+    if val.tzinfo is None:
+        val = val.replace(tzinfo=timezone.utc)
+    return val.astimezone(sast).isoformat()
 
 
 @router.post("/call-log/escalate", status_code=status.HTTP_200_OK)
@@ -2264,3 +2277,52 @@ async def get_gateway_log(
         "total_in_buffer": len(_gateway_log),
         "showing": min(limit, len(entries)),
     }
+
+
+@router.get("/rooms")
+async def list_rooms(site_id: str = Query("site-002")):
+    """List meeting rooms for a site."""
+    try:
+        from app.database.supabase_client import get_supabase_client
+        sb = get_supabase_client()
+        if not sb:
+            return {"rooms": [], "source": "unavailable"}
+        result = sb.table("meeting_rooms").select("*").eq("site_id", site_id).neq("room_type", "focus").order("floor").execute()
+        return {"rooms": result.data or [], "source": "supabase"}
+    except Exception as e:
+        logger.error(f"Failed to fetch rooms: {e}")
+        return {"rooms": [], "source": "error"}
+
+
+@router.get("/building-info")
+async def get_building_info(site_id: str = Query("site-002")):
+    """Get building info for a site."""
+    try:
+        from app.database.supabase_client import get_supabase_client
+        sb = get_supabase_client()
+        if not sb:
+            return {"error": "unavailable"}
+        result = sb.table("building_info").select("*").eq("site_id", site_id).single().execute()
+        return result.data or {}
+    except Exception as e:
+        logger.error(f"Failed to fetch building info: {e}")
+        return {}
+
+
+@router.put("/building-info")
+async def update_building_info(data: dict, x_sentry_secret: str | None = Header(None)):
+    """Update building info for a site."""
+    _require_sentry_secret(x_sentry_secret, endpoint_name="building_info")
+    site_id = data.get("site_id", "site-002")
+    try:
+        from app.database.supabase_client import get_supabase_client
+        sb = get_supabase_client()
+        if not sb:
+            return {"success": False, "error": "unavailable"}
+        from datetime import datetime, timezone
+        data["updated_at"] = datetime.now(timezone.utc).isoformat()
+        result = sb.table("building_info").upsert(data, on_conflict="site_id").execute()
+        return {"success": True, "data": result.data[0] if result.data else data}
+    except Exception as e:
+        logger.error(f"Failed to update building info: {e}")
+        return {"success": False, "error": str(e)}

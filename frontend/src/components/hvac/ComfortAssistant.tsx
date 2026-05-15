@@ -1,12 +1,3 @@
-/**
- * ComfortAssistant - Compact wrapper for ComfortComplaintPanel
- *
- * Features:
- * - Compact form for quick desk complaint submission
- * - Shows recent complaints summary
- * - Links to full complaint panel for details
- */
-
 import { useState } from "react";
 import { MessageSquare, ThermometerSun, ThermometerSnowflake, Wind, Cloud } from "lucide-react";
 import ComfortComplaintPanel from "../ComfortComplaintPanel";
@@ -19,12 +10,11 @@ interface ComfortAssistantProps {
 export function ComfortAssistant({ compact = true, onViewDetails }: ComfortAssistantProps) {
   const [showFullPanel, setShowFullPanel] = useState(false);
 
-  // Ultra-compact version - just a button that expands
   if (compact && !showFullPanel) {
     return (
       <div className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
-        <Flex justifyContent="between" alignItems="center">
-          <Flex alignItems="center" className="gap-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
             <div
               className="p-2 rounded-lg"
               style={{ background: "rgba(245, 158, 11, 0.2)" }}
@@ -35,23 +25,26 @@ export function ComfortAssistant({ compact = true, onViewDetails }: ComfortAssis
               />
             </div>
             <div>
-              <Text className="font-medium">Comfort Complaints</Text>
-              <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+              <p className="font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>Comfort Complaints</p>
+              <p className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
                 Too hot? Too cold? Report here
-              </Text>
+              </p>
             </div>
-          </Flex>
-          <Button
-            size="sm"
-            variant="secondary"
+          </div>
+          <button
+            className="px-3 py-1.5 text-xs rounded font-medium transition-colors"
+            style={{
+              background: "var(--color-sentinel-bg-secondary)",
+              color: "var(--color-sentinel-text-primary)",
+              border: "1px solid var(--color-sentinel-border)",
+            }}
             onClick={() => setShowFullPanel(true)}
           >
             Report Issue
-          </Button>
-        </Flex>
+          </button>
+        </div>
 
-        {/* Quick complaint type icons */}
-        <Flex className="mt-3 gap-2">
+        <div className="flex gap-2 mt-3">
           <div
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium cursor-pointer transition-colors"
             style={{ background: "rgba(239, 68, 68, 0.12)", color: "var(--color-sentinel-red)" }}
@@ -84,25 +77,28 @@ export function ComfortAssistant({ compact = true, onViewDetails }: ComfortAssis
             <Wind className="w-3.5 h-3.5" />
             Drafty
           </div>
-        </Flex>
+        </div>
       </div>
     );
   }
 
-  // Full panel view
   return (
     <div className="space-y-4">
       {compact && (
-        <Flex justifyContent="between" alignItems="center">
+        <div className="flex items-center justify-between">
           <h3 className="font-medium text-lg" style={{ color: "var(--color-sentinel-text-primary)" }}>Comfort Assistant</h3>
-          <Button
-            size="xs"
-            variant="secondary"
+          <button
+            className="px-2 py-1 text-xs rounded font-medium transition-colors"
+            style={{
+              background: "var(--color-sentinel-bg-secondary)",
+              color: "var(--color-sentinel-text-primary)",
+              border: "1px solid var(--color-sentinel-border)",
+            }}
             onClick={() => setShowFullPanel(false)}
           >
             Minimize
-          </Button>
-        </Flex>
+          </button>
+        </div>
       )}
 
       <ComfortComplaintPanel

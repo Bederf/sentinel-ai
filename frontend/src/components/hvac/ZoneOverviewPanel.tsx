@@ -1,13 +1,3 @@
-/**
- * ZoneOverviewPanel - Grid view of HVAC zones with status and setpoint control
- *
- * Features:
- * - Zone status cards with temperature display
- * - Inline setpoint adjustment
- * - Temperature deviation indicators
- * - FCU/AHU association display
- */
-
 import { useState, useEffect, useRef } from "react";
 import { Thermometer, AlertTriangle, Settings, Pencil } from "lucide-react";
 import { hvacApi, type HVACZone } from "../../lib/hvacApi";
@@ -141,7 +131,6 @@ export function ZoneOverviewPanel({ siteId, compact = false, onZoneSelect }: Zon
     );
   }
 
-  // Group zones by floor
   const zonesByFloor = zones.reduce((acc, zone) => {
     const floor = zone.floor || "Unknown";
     if (!acc[floor]) acc[floor] = [];
@@ -152,7 +141,7 @@ export function ZoneOverviewPanel({ siteId, compact = false, onZoneSelect }: Zon
   return (
     <div className="space-y-4">
       {!compact && (
-        <Flex justifyContent="between" alignItems="center" className="mb-4">
+        <div className="flex items-center justify-between mb-4">
           <div>
             <h3 className="font-medium text-lg" style={{ color: "var(--color-sentinel-text-primary)" }}>Zone Overview</h3>
             <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>{zones.length} zones configured</p>
@@ -165,13 +154,13 @@ export function ZoneOverviewPanel({ siteId, compact = false, onZoneSelect }: Zon
               {zones.filter(z => z.status === "fault").length} Fault
             </span>
           </div>
-        </Flex>
+        </div>
       )}
 
       {Object.entries(zonesByFloor).map(([floor, floorZones]) => (
         <div key={floor}>
           {!compact && (
-            <Text className="font-medium text-sm mb-2" style={{ color: "var(--color-sentinel-text-disabled)" }}>Floor {floor}</Text>
+            <p className="font-medium text-sm mb-2" style={{ color: "var(--color-sentinel-text-disabled)" }}>Floor {floor}</p>
           )}
           <div className={`grid ${compact ? 'grid-cols-2' : 'grid-cols-3'} gap-3`}>
             {floorZones.map((zone) => (
@@ -181,7 +170,6 @@ export function ZoneOverviewPanel({ siteId, compact = false, onZoneSelect }: Zon
                 style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}
                 onClick={() => !editingZone && onZoneSelect?.(zone)}
               >
-                {/* Header */}
                 <div className="flex items-start justify-between mb-2">
                   <span className="text-xs font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>
                     {zone.fcu_id || zone.ahu_id || zone.zone_name}
@@ -194,7 +182,6 @@ export function ZoneOverviewPanel({ siteId, compact = false, onZoneSelect }: Zon
                   </span>
                 </div>
 
-                {/* Temp */}
                 <div className="flex items-baseline gap-1 mb-2">
                   <span
                     className="text-2xl font-bold tabular-nums"
@@ -205,7 +192,6 @@ export function ZoneOverviewPanel({ siteId, compact = false, onZoneSelect }: Zon
                   <span className="text-xs" style={{ color: "var(--color-sentinel-text-disabled)" }}>°C</span>
                 </div>
 
-                {/* Setpoint row */}
                 {editingZone === zone.zone_id ? (
                   <div onClick={(e) => e.stopPropagation()}>
                     <TemperatureControl

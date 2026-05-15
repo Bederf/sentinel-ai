@@ -11,7 +11,6 @@ from app.models.booking_record import BlockBookingConfig
 from app.models.space_occupancy import GhostBookingFinding
 from app.services import occupancy_store
 from app.services.ghost_booking_detector import concierge_confirm_empty, concierge_confirm_occupied
-from app.services.n8n_service import get_n8n_service
 from app.services.telegram_message_sender import InlineButton, InlineKeyboard, get_telegram_sender
 
 logger = logging.getLogger(__name__)
@@ -296,134 +295,6 @@ def _send_email_direct_smtp(to_email: str, subject: str, body: str, body_html: s
         return False
 
 
-async def _send_email(
-    finding: GhostBookingFinding,
-    config: BlockBookingConfig,
-    site_name: str,
-    *,
-    is_reminder: bool = False,
-) -> bool:
-    if not (config.concierge_email and config.concierge_email.strip()):
-        return False
-    to_email = config.concierge_email.strip()
-
-    subject = f"{'REMINDER — ' if is_reminder else ''}Ghost booking alert: {finding.room_code}"
-    body = format_ghost_email_message(finding, site_name, is_reminder=is_reminder)
-    body_html = format_ghost_email_html(finding, site_name, is_reminder=is_reminder)
-
-    # Try n8n webhook first (also carries WhatsApp fields so n8n can send in parallel)
-    wa_number = (config.concierge_whatsapp or "").strip().replace("whatsapp:", "")
-    try:
-        result = await get_n8n_service().trigger_webhook(
-            webhook_path="space-ghost-room-alert",
-            payload={
-                "site_id": finding.site_id,
-                "site_name": site_name or finding.site_id,
-                "finding_id": finding.id,
-                "room_code": finding.room_code,
-                "room_name": finding.room_name,
-                "to_email": to_email,
-                "subject": subject,
-                "message": body_html,
-                "to_whatsapp": wa_number,
-                "whatsapp_message": format_ghost_whatsapp_message(finding, is_reminder=is_reminder),
-                "booking_date": finding.booking_start.date().isoformat(),
-                "flagged_at": finding.detected_at.isoformat(),
-                "organiser_email": finding.organiser_email,
-                "organiser_name": finding.organiser_name,
-                "source_booking_flagged": finding.source_booking_flagged,
-                "booking_start": finding.booking_start.isoformat(),
-                "booking_end": finding.booking_end.isoformat(),
-            },
-        )
-        if result.get("success"):
-            return True
-    except Exception as exc:
-        logger.warning("n8n webhook failed, falling back to direct SMTP: %s", exc)
-
-    # Fallback: send directly via SMTP
-    return _send_email_direct_smtp(to_email, subject, body, body_html)
-
-
-async def _send_telegram(
-    finding: GhostBookingFinding,
-    config: BlockBookingConfig,
-    *,
-    is_reminder: bool = False,
-) -> dict[str, Any]:
-    """Send ghost booking alert to concierge via Telegram with inline confirm-buttons."""
-    from app.config.settings import settings
-
-    # Fall back to SENTRY_FM_CHAT_ID if per-site Telegram ID not configured
-    target_chat = (
-        config.concierge_telegram_chat_id
-        or (os.getenv("SENTRY_FM_CHAT_ID") or "").strip()
-        or str(getattr(settings, "sentry_fm_chat_id", "") or "").strip()
-        or str(getattr(settings, "telegram_alert_chat_id", "") or "").strip()
-    )
-    if not target_chat:
-        return {"success": False, "reason": "No Telegram chat ID configured"}
-
-    start_local = _to_sast(finding.booking_start, assume_utc_if_naive=False)
-    end_local = _to_sast(finding.booking_end, assume_utc_if_naive=False)
-    booking_date = start_local.strftime("%d %b %Y")
-    start = start_local.strftime("%H:%M")
-    end = end_local.strftime("%H:%M")
-
-    prefix = "REMINDER — " if is_reminder else ""
-    alert_type = "GHOST BOOKING ALERT" if not is_reminder else "GHOST BOOKING REMINDER"
-
-    message = f"""{prefix}{alert_type}
-
-Room: {finding.room_name or finding.room_code} ({finding.room_code})
-Organiser: {finding.organiser_name or finding.organiser_email}
-Date: {booking_date}
-Time: {start} - {end}
-No presence detected for {finding.grace_period_minutes} min.
-
-Is this room currently occupied?"""
-
-    kb = InlineKeyboard(
-        rows=[
-            [InlineButton("✅ Room occupied", f"ghost:occupied:{finding.id}")],
-            [InlineButton("❌ Room empty", f"ghost:empty:{finding.id}")],
-        ]
-    )
-
-    try:
-        sender = get_telegram_sender()
-        result = await sender.send_text(
-            target_chat,
-            message,
-            keyboard=kb,
-            parse_mode="HTML",
-        )
-        ok = result.get("ok", False)
-        return {"success": ok, "message_id": result.get("result", {}).get("message_id")}
-    except Exception as exc:
-        logger.warning("Ghost booking Telegram send failed: %s", exc)
-        return {"success": False, "error": str(exc)}
-
-
-async def _send_whatsapp(
-    finding: GhostBookingFinding,
-    config: BlockBookingConfig,
-    *,
-    is_reminder: bool = False,
-) -> dict[str, Any]:
-    if not config.concierge_whatsapp:
-        return {"success": False, "reason": "No concierge WhatsApp configured"}
-
-    from app.integrations.whatsapp_service import get_whatsapp_service
-
-    service = get_whatsapp_service()
-    result = await service.send_text_message(
-        config.concierge_whatsapp,
-        format_ghost_whatsapp_message(finding, is_reminder=is_reminder),
-    )
-    return result
-
-
 async def send_ghost_booking_alert(
     finding: GhostBookingFinding,
     config: BlockBookingConfig,
@@ -431,58 +302,60 @@ async def send_ghost_booking_alert(
     *,
     is_reminder: bool = False,
 ) -> dict[str, Any]:
-    """Dispatch email + WhatsApp + Telegram via n8n (parallel branches). Falls back to direct APIs."""
-    email_sent = False
+    """Dispatch WhatsApp + email alerts for ghost bookings.
+
+    WhatsApp via sentry/OpenClaw CLI (same as focus room notifier).
+    Email via direct SMTP as fallback.
+    """
     whatsapp_sent = False
     whatsapp_message_id: str | None = None
-    telegram_sent = False
-    telegram_message_id: str | None = None
 
-    try:
-        email_sent = await _send_email(finding, config, site_name, is_reminder=is_reminder)
-        # n8n workflow also sends WhatsApp in parallel — credit it here if a number is configured
-        if email_sent and config.concierge_whatsapp:
-            whatsapp_sent = True
-    except Exception as exc:
-        logger.error("Ghost booking email/WhatsApp dispatch failed: %s", exc)
-
-    # Only fall back to direct WhatsApp if n8n did not handle it
-    if not whatsapp_sent:
+    wa_number = (config.concierge_whatsapp or "").strip().replace("whatsapp:", "")
+    if wa_number:
         try:
-            whatsapp_result = await _send_whatsapp(finding, config, is_reminder=is_reminder)
-            whatsapp_sent = bool(whatsapp_result.get("success"))
-            whatsapp_message_id = whatsapp_result.get("message_id")
+            import subprocess
+
+            msg = format_ghost_whatsapp_message(finding, is_reminder=is_reminder)
+            result = subprocess.run(
+                ["sentry", "message", "send", "--channel", "whatsapp", "--target", wa_number, "--message", msg],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            whatsapp_sent = result.returncode == 0
+            whatsapp_message_id = result.stdout.strip() or None
+            if not whatsapp_sent:
+                logger.warning("Ghost booking WhatsApp send failed: %s", result.stderr)
         except Exception as exc:
-            logger.error("Ghost booking WhatsApp fallback dispatch failed: %s", exc)
+            logger.error("Ghost booking WhatsApp dispatch failed: %s", exc)
+    else:
+        logger.warning("Ghost booking alert skipped: no WhatsApp number configured")
 
-    # Send Telegram with inline confirm buttons (always direct — no n8n path)
-    try:
-        telegram_result = await _send_telegram(finding, config, is_reminder=is_reminder)
-        telegram_sent = bool(telegram_result.get("success"))
-        telegram_message_id = telegram_result.get("message_id")
-    except Exception as exc:
-        logger.error("Ghost booking Telegram dispatch failed: %s", exc)
-
-    if email_sent or whatsapp_sent or telegram_sent:
+    if whatsapp_sent:
         occupancy_store.mark_ghost_finding_notified(
             finding.id,
             concierge_email=config.concierge_email,
             concierge_whatsapp=config.concierge_whatsapp,
-            email_sent=email_sent,
+            email_sent=False,
             whatsapp_sent=whatsapp_sent,
             whatsapp_message_id=whatsapp_message_id,
-            telegram_sent=telegram_sent,
-            telegram_message_id=telegram_message_id,
+            telegram_sent=False,
+            telegram_message_id=None,
             reset_reminder_cycle=not is_reminder,
         )
 
+    # Email fallback — direct SMTP, no n8n
+    if config.concierge_email and config.concierge_email.strip():
+        to_email = config.concierge_email.strip()
+        subject = f"{'REMINDER — ' if is_reminder else ''}Ghost booking alert: {finding.room_code}"
+        email_body = format_ghost_email_message(finding, site_name, is_reminder=is_reminder)
+        email_html = format_ghost_email_html(finding, site_name, is_reminder=is_reminder)
+        _send_email_direct_smtp(to_email, subject, email_body, email_html)
+
     return {
-        "success": email_sent or whatsapp_sent or telegram_sent,
-        "email_sent": email_sent,
+        "success": whatsapp_sent,
         "whatsapp_sent": whatsapp_sent,
         "whatsapp_message_id": whatsapp_message_id,
-        "telegram_sent": telegram_sent,
-        "telegram_message_id": telegram_message_id,
     }
 
 

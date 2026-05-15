@@ -169,14 +169,14 @@ def _format_display_name(eq_type: str, eq_code: str) -> str:
         floor_part = "Basement" if prefix == "B" else f"Level {num}"
         return f"{eq_type} {floor_part}"
 
-    # Roof: R01, R1
-    if code.startswith("R"):
-        zone = re.sub(r"^R", "", code) or "01"
+    # Roof: R01, R1 (not R-SOLAR style suffix)
+    if code.startswith("R") and code[1:].isdigit():
+        zone = code[1:]
         return f"{eq_type} Roof Zone {int(zone):02d}"
 
-    # Basement: B01
-    if code.startswith("B"):
-        zone = re.sub(r"^B", "", code) or "01"
+    # Basement: B01 (not B1-MAIN style — handled by legacy match above)
+    if code.startswith("B") and code[1:].isdigit():
+        zone = code[1:]
         return f"{eq_type} Basement Zone {int(zone):02d}"
 
     # Numeric: 001, 105, 203
@@ -304,7 +304,7 @@ async def list_sites(current_user: dict | None = None) -> dict:
         - inactive: List of inactive buildings (folders exist but not in registry)
         - default_building: The default building ID
     """
-    from app.services.supabase_service import Supabase
+    from app.database.supabase_client import Supabase
 
     loader = get_site_loader()
     loader.load(force=True)  # Refresh
@@ -313,41 +313,96 @@ async def list_sites(current_user: dict | None = None) -> dict:
     active_ids = set(registry.get("active_sites", []))
 
     # Get user's accessible sites from database
-    accessible_site_ids = set()
+    # user_site_access stores site UUIDs; resolve to site codes for comparison
+    accessible_codes: set[str] | None = set()
     if current_user and current_user.get("email"):
         try:
             supabase = Supabase.instance()
-            response = (
+
+            # Step 1: get UUIDs the user has access to
+            uuids_response = (
                 supabase.table("user_site_access").select("site_id").eq("user_email", current_user["email"]).execute()
             )
+            uuids = [str(row["site_id"]) for row in (uuids_response.data or [])]
 
-            if response.data:
-                accessible_site_ids = {str(row["site_id"]) for row in response.data}
+            # Step 2: resolve UUIDs → site codes
+            if uuids:
+                codes_response = (
+                    supabase.table("sites").select("code").in_("id", uuids).execute()
+                )
+                accessible_codes = {row["code"] for row in (codes_response.data or [])}
+            else:
+                accessible_codes = set()
         except Exception as e:
             logger.warning(f"Could not fetch user site access: {e}")
             # Fall back to showing all buildings if DB query fails
-            accessible_site_ids = None
-
-    # Find all building folders
-    all_building_folders = []
-    if DATA_PATH.exists():
-        for folder in DATA_PATH.iterdir():
-            if folder.is_dir() and not folder.name.startswith("_"):
-                all_building_folders.append(folder.name)
+            accessible_codes = None
+    else:
+        accessible_codes = None
 
     # Categorize
     active = []
     inactive = []
 
-    for site_id in all_building_folders:
+    for site_id in loader.get_active_site_ids():
         building = loader.get_site(site_id)
         if building:
             # Check if user has access to this building
-            if accessible_site_ids is not None and site_id not in accessible_site_ids:
+            if accessible_codes is not None and site_id not in accessible_codes:
                 continue  # Skip buildings user doesn't have access to
 
             info = building.to_dict()
             info["status"] = "active" if site_id in active_ids else "inactive"
+
+            # Derive site status from equipment health and active alerts
+            try:
+                from app.database.supabase_client import get_supabase_client
+
+                client = get_supabase_client()
+
+                # Get equipment health scores for this site
+                site_row = client.table("sites").select("id").eq("code", site_id).limit(1).execute()
+                if site_row.data:
+                    site_uuid = site_row.data[0]["id"]
+
+                    # Derive site status from equipment health scores
+                    from app.services.health_threshold_service import get_health_status
+
+                    equip = (
+                        client.table("equipment")
+                        .select("health_score")
+                        .eq("site_id", site_uuid)
+                        .execute()
+                    )
+                    if equip.data:
+                        statuses = {get_health_status(e.get("health_score") or 100) for e in equip.data}
+                        if "critical" in statuses:
+                            info["status"] = "critical"
+                        elif "warning" in statuses:
+                            info["status"] = "warning"
+
+                    # Override with alert severity if higher
+                    alerts = (
+                        client.table("alerts")
+                        .select("severity")
+                        .eq("site_id", site_uuid)
+                        .eq("resolved", False)
+                        .execute()
+                    )
+                    if alerts.data:
+                        has_critical_alert = any(
+                            a.get("severity") == "critical" for a in alerts.data
+                        )
+                        has_warning_alert = any(
+                            a.get("severity") == "warning" for a in alerts.data
+                        )
+                        if has_critical_alert:
+                            info["status"] = "critical"
+                        elif has_warning_alert and info.get("status") != "critical":
+                            info["status"] = "warning"
+            except Exception:
+                pass
+
             if site_id in active_ids:
                 active.append(info)
             else:
@@ -1134,13 +1189,17 @@ async def get_site_equipment(site_id: str, auth: AuthContext = Depends(require_s
                     "sensor": "Sensors",
                     "daylight_sensor": "Sensors",
                     "occupancy_sensor": "Sensors",
-                    "vav": "HVAC",
+                    "zone_sensor": "Sensors",
+                    "outdoor_air_sensor": "Sensors",
+                    "vav": "HVAC", "VAV": "HVAC",
                     "ahu": "HVAC",
-                    "fcu": "HVAC",
+                    "fcu": "HVAC", "FCU": "HVAC",
                     "chiller": "HVAC",
                     "split_unit": "HVAC",
                     "cooling_tower": "HVAC",
                     "hvac_zone": "HVAC",
+                    "pump": "HVAC",
+                    "zone": "HVAC",
                     "generator": "Generator Plant",
                     "diesel_tank": "Generator Plant",
                     "generator_group": "Generator Plant",
@@ -1152,9 +1211,14 @@ async def get_site_equipment(site_id: str, auth: AuthContext = Depends(require_s
                     "power_meter": "Energy Centre",
                     "pfc_bank": "Energy Centre",
                     "feeder": "Energy Centre",
+                    "bess": "Energy Centre",
+                    "inverter": "Energy Centre",
+                    "meter": "Energy Centre",
                     "dali_controller": "Lighting",
+                    "dali": "Lighting",
+                    "dali_zone": "Lighting",
                     "luminaire": "Lighting",
-                    "luminaire_group": "Lighting",
+                    "lighting_zone": "Lighting",
                     "bms_controller": "Building Systems",
                     "bms_scada": "Building Systems",
                     "lift-passenger": "Lifts",

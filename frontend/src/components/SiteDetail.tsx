@@ -74,7 +74,7 @@ import { BUILDING_TAB_ITEMS } from "../lib/navigation";
 import { TabBar } from "./TabBar";
 import { PageLoading } from "./PageLoading";
 import type { BuildingTabId } from "../lib/navigation";
-import { phaseAllows, PHASE_LABELS, PHASE_COLORS, PHASE_DESCRIPTIONS, ALL_PHASES, type OnboardingPhase } from "../lib/onboardingPhase";
+import { phaseAllows, PHASE_LABELS, PHASE_COLORS, PHASE_DESCRIPTIONS, type OnboardingPhase } from "../lib/onboardingPhase";
 import { setStoredSelectedSite } from "../lib/siteSelection";
 
 // ─── Lazy-loaded tab components ─────────────────────────────────────
@@ -98,8 +98,6 @@ const WaterPanel = lazy(() => import("./water").then(m => ({ default: m.WaterPan
 const FireSafetyPage = lazy(() => import("./fire/FireSafetyPage").then(m => ({ default: m.FireSafetyPage })));
 // Security
 const SecurityDashboard = lazy(() => import("./security").then(m => ({ default: m.SecurityDashboard })));
-// Digital Twin
-const DigitalTwin = lazy(() => import("./digital-twin").then(m => ({ default: m.DigitalTwin })));
 // Space Optimization
 const SpaceOptimizationPage = lazy(() => import("./SpaceOptimizationPage").then(m => ({ default: m.SpaceOptimizationPage })));
 // Fuel
@@ -819,21 +817,10 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
                   </div>
                 ) : null}
 
-                {/* Onboarding phase selector */}
+                {/* Onboarding phase — view-only badge (set via Settings page) */}
                 <div className="flex items-center gap-2">
-                  <select
-                    value={sitePhase}
-                    onChange={async (e) => {
-                      const newPhase = e.target.value as OnboardingPhase;
-                      try {
-                        setSitePhase(newPhase);
-                        await api.updateSitePhase(siteId, newPhase);
-                      } catch {
-                        // Backend validates gate status — revert on failure
-                        setSitePhase(sitePhase);
-                      }
-                    }}
-                    className="text-xs font-medium rounded px-2 py-1 cursor-pointer outline-none"
+                  <span
+                    className="text-xs font-medium rounded px-2 py-1"
                     style={{
                       backgroundColor: `${PHASE_COLORS[sitePhase]}22`,
                       color: PHASE_COLORS[sitePhase],
@@ -841,12 +828,8 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
                     }}
                     title={PHASE_DESCRIPTIONS[sitePhase]}
                   >
-                    {ALL_PHASES.map((p) => (
-                      <option key={p} value={p} style={{ color: "#000", background: "#fff" }}>
-                        {PHASE_LABELS[p]}
-                      </option>
-                    ))}
-                  </select>
+                    {PHASE_LABELS[sitePhase]}
+                  </span>
                   {site?.last_phase_transition && (() => {
                     const d = new Date(site.last_phase_transition.created_at);
                     const dateStr = isNaN(d.getTime()) ? "unknown date" : d.toLocaleDateString("en-ZA");
@@ -1076,7 +1059,6 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
                 const CONTROL_MODULES = [
                   'hvac_control', 'energy_control', 'lighting_control',
                   'solar_control', 'water_control', 'security_control',
-                  'digital_twin_control',
                 ] as const;
                 return CONTROL_MODULES.some(mod => isModuleActive(mod));
               }
@@ -1916,12 +1898,7 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
               <div className="mb-4"><SecurityIntelligenceCard siteId={siteId} /></div>
               <SecurityDashboard />
             </>
-          )}
-
-          {/* Digital Twin (write actions gated by digital_twin_control) */}
-          {activeMainTab === "digital-twin" && (
-            <div className="h-[calc(100vh-180px)]"><DigitalTwin siteId={siteId} /></div>
-          )}
+           )}
 
           {/* Controls — all-device control panel (visible when any control add-on active) */}
           {activeMainTab === "controls" && (
@@ -2022,7 +1999,7 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
                     }}
                   />
                 </div>
-              ) : selectedDevice ? (
+              ) : selectedDevice && phaseAllows(sitePhase, "approve_reject") ? (
                 <ControlPanel
                   device={selectedDevice}
                   onControl={handleEquipmentControl}
@@ -2040,6 +2017,19 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
                     status: selectedEquipment.status as "normal" | "warning" | "critical",
                   }}
                 />
+              ) : selectedDevice ? (
+                <div
+                  className="flex flex-col items-center justify-center py-12"
+                  style={{ color: "var(--color-sentinel-text-secondary)" }}
+                >
+                  <Shield className="h-10 w-10 mb-3 opacity-40" />
+                  <p className="text-sm font-medium">
+                    Device controls not available in {PHASE_LABELS[sitePhase]} mode
+                  </p>
+                  <p className="text-xs mt-1">
+                    Controls are enabled in Supervised or Automatic phases.
+                  </p>
+                </div>
               ) : (
                 <div style={{ color: "var(--color-sentinel-text-secondary)" }}>
                   {/* ── A. Equipment Overview Header ── */}

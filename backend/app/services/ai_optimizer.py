@@ -48,27 +48,80 @@ HEALTH_THRESHOLDS: dict[str, dict[str, int]] = {
 DATA_DIR = Path(__file__).parent.parent / "data"
 
 
-async def ensure_device_manager_initialized() -> None:
-    """Ensure device manager is initialized with reference + building devices if not already."""
-    if not device_manager._initialized:
-        logger.info("Device manager not initialized, loading devices...")
-        try:
-            # Load Site-002 reference devices (only when data source is enabled)
-            devices_data = []
-            ref_count = 0
-            if settings.site002_source_enabled:
-                ref_devices_path = Path(__file__).parent / "bms_simulator" / "data" / "reference_devices.json"
-                if ref_devices_path.exists():
-                    with open(ref_devices_path) as f:
-                        devices_data = json.load(f)
-                ref_count = len(devices_data)
+async def load_equipment_from_supabase() -> list[dict]:
+    """Load equipment from Supabase (source of truth) for device manager initialization."""
+    from app.database.supabase_client import get_supabase_client
 
-            # Load all building equipment (including monitoring-only solar/meters)
+    client = get_supabase_client()
+
+    # Get site UUID → site code mapping
+    sites_resp = client.table("sites").select("id, code").execute()
+    site_map: dict[str, str] = {s["id"]: s["code"] for s in sites_resp.data or []}
+
+    # Get all equipment from Supabase
+    eq_resp = client.table("equipment").select("*").execute()
+    equipment = eq_resp.data or []
+
+    devices = []
+    for eq in equipment:
+        site_uuid = eq.get("site_id", "")
+        site_code = site_map.get(site_uuid, site_uuid)
+
+        # Map equipment type to device_type
+        raw_type = (eq.get("type") or "other").lower()
+        type_map = {
+            "ahu": "hvac", "chiller": "hvac", "vav": "hvac", "fcu": "hvac",
+            "boiler": "hvac", "pump": "hvac", "cooling_tower": "hvac",
+            "dali": "lighting", "dali_controller": "lighting", "dali_zone": "lighting",
+            "lighting_zone": "lighting", "luminaire": "lighting",
+            "meter": "meter", "generator": "power", "ups": "power",
+            "inverter": "solar", "bess": "solar",
+            "zone_sensor": "sensor", "outdoor_air_sensor": "sensor",
+            "zone": "hvac", "general": "other",
+        }
+        device_type = type_map.get(raw_type, raw_type)
+
+        # Map status
+        status = (eq.get("status") or "unknown").lower()
+        if status in ("normal", "online", "running"):
+            mapped_status = "online"
+        elif status in ("offline", "unknown"):
+            mapped_status = "offline"
+        else:
+            mapped_status = status
+
+        device = {
+            "id": eq.get("code", ""),
+            "name": eq.get("name") or eq.get("code", ""),
+            "device_type": device_type,
+            "protocol": "http",
+            "site_id": site_code,
+            "status": mapped_status,
+            "location": eq.get("location") or "",
+            "metadata": {
+                "source": "supabase",
+                "equipment_type": raw_type,
+                "health_score": eq.get("health_score"),
+                "operating_data": eq.get("operating_data", {}),
+            },
+        }
+        devices.append(device)
+
+    return devices
+
+
+async def ensure_device_manager_initialized() -> None:
+    """Ensure device manager is initialized with equipment from Supabase (source of truth)."""
+    if not device_manager._initialized:
+        logger.info("Device manager not initialized, loading devices from Supabase...")
+        try:
+            devices_data = await load_equipment_from_supabase()
+
+            # Also load building equipment files as supplement (may add points data)
             from app.api.devices import load_equipment_from_buildings
 
             site_devices = await load_equipment_from_buildings()
 
-            # Merge building devices with reference devices (dedup by ID)
             existing_ids = {d["id"] for d in devices_data}
             added_count = 0
             for device in site_devices:
@@ -79,12 +132,23 @@ async def ensure_device_manager_initialized() -> None:
 
             await device_manager.initialize(devices_data)
             logger.info(
-                f"Device manager initialized with {ref_count} reference + "
-                f"{added_count} building = {len(devices_data)} total devices"
+                f"Device manager initialized with {len(devices_data)} devices "
+                f"({len(devices_data) - added_count} from Supabase, {added_count} from files)"
             )
         except Exception as e:
-            logger.error(f"Failed to initialize device manager: {e}")
-            await device_manager.initialize([])
+            logger.error(f"Failed to initialize device manager from Supabase: {e}")
+            # Fallback: try loading from archived reference file
+            try:
+                ref_devices_path = DATA_DIR / "_archive" / "bms_simulator_data" / "reference_devices.json"
+                if ref_devices_path.exists():
+                    with open(ref_devices_path) as f:
+                        devices_data = json.load(f)
+                    await device_manager.initialize(devices_data)
+                    logger.warning(f"Fell back to archived reference_devices.json ({len(devices_data)} devices)")
+                else:
+                    await device_manager.initialize([])
+            except Exception:
+                await device_manager.initialize([])
 
 
 def load_sites() -> list[dict[str, Any]]:

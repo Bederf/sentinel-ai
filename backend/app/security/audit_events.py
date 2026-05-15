@@ -199,7 +199,7 @@ def _resolve_user_display(user_id: str) -> str:
         from app.database.supabase_client import get_supabase_client
 
         client = get_supabase_client()
-        result = client.table("users").select("email").eq("id", user_id).single().execute()
+        result = client.table("sentinel_users").select("email, full_name").eq("id", user_id).single().execute()
         if result.data:
             email = result.data.get("email")
             if email:

@@ -18,6 +18,8 @@ import {
 import {
   api,
   workflowApi,
+  type EquipmentMetadata,
+  type ServiceRecord,
   type WorkflowEquipmentItem,
   type WorkflowState,
   type WorkflowOnboardAssetRequest,
@@ -99,6 +101,8 @@ export function AssetWorkflowDashboard() {
   const [workflowStates, setWorkflowStates] = useState<Record<string, WorkflowState>>({});
   const [selectedEquipment, setSelectedEquipment] = useState<string | null>(null);
   const [workflowState, setWorkflowState] = useState<WorkflowState | null>(null);
+  const [equipmentMetadata, setEquipmentMetadata] = useState<EquipmentMetadata | null>(null);
+  const [serviceRecords, setServiceRecords] = useState<ServiceRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -129,18 +133,23 @@ export function AssetWorkflowDashboard() {
     const cached = workflowStates[equipmentId];
     if (cached) {
       setWorkflowState(cached);
-      return;
     }
 
-    // Fallback: fetch workflow status directly so card click always opens detail.
+    // Fetch metadata and service records in parallel
     try {
       setLoading(true);
-      const freshState = await workflowApi.getWorkflowStatus(equipmentId);
-      setWorkflowState(freshState);
+      const [freshState, metadata, records] = await Promise.all([
+        cached ? Promise.resolve(cached) : workflowApi.getWorkflowStatus(equipmentId),
+        api.getEquipmentMetadata(equipmentId).then(r => r.equipment).catch(() => null),
+        api.getServiceRecords(equipmentId).catch(() => []),
+      ]);
+      if (!cached) setWorkflowState(freshState);
+      setEquipmentMetadata(metadata);
+      setServiceRecords(records);
     } catch (err) {
-      console.error('Failed to fetch workflow state for equipment:', equipmentId, err);
+      console.error('Failed to fetch equipment data:', equipmentId, err);
       setWorkflowState(null);
-      setError('Failed to load selected equipment workflow');
+      setError('Failed to load selected equipment data');
     } finally {
       setLoading(false);
     }
@@ -423,7 +432,13 @@ export function AssetWorkflowDashboard() {
         <div className="mb-6">
           <EquipmentWorkflowDetail
             workflowState={workflowState}
-            onBack={() => setSelectedEquipment(null)}
+            metadata={equipmentMetadata}
+            serviceRecords={serviceRecords}
+            onBack={() => {
+              setSelectedEquipment(null);
+              setEquipmentMetadata(null);
+              setServiceRecords([]);
+            }}
             maintenanceActive={maintenanceActive}
           />
         </div>
@@ -709,10 +724,14 @@ export function AssetWorkflowDashboard() {
 
 function EquipmentWorkflowDetail({
   workflowState,
+  metadata,
+  serviceRecords,
   onBack,
   maintenanceActive,
 }: {
   workflowState: WorkflowState;
+  metadata: EquipmentMetadata | null;
+  serviceRecords: ServiceRecord[];
   onBack: () => void;
   maintenanceActive: boolean;
 }) {
@@ -807,6 +826,146 @@ function EquipmentWorkflowDetail({
           />
         )}
       </div>
+
+      {/* Equipment Details */}
+      {metadata && (
+        <div
+          className="rounded-lg overflow-hidden"
+          style={{
+            background: 'var(--color-sentinel-bg-panel)',
+            border: '1px solid var(--color-sentinel-border)',
+          }}
+        >
+          <div
+            className="p-4"
+            style={{ borderBottom: '1px solid var(--color-sentinel-border)' }}
+          >
+            <h3
+              className="font-medium text-sm"
+              style={{ color: 'var(--color-sentinel-text-primary)' }}
+            >
+              Equipment Details
+            </h3>
+          </div>
+          <div className="p-4 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 text-xs">
+            <div>
+              <span style={{ color: 'var(--color-sentinel-text-secondary)' }}>Type</span>
+              <p style={{ color: 'var(--color-sentinel-text-primary)' }} className="font-medium mt-0.5">{metadata.type}</p>
+            </div>
+            {metadata.manufacturer && (
+              <div>
+                <span style={{ color: 'var(--color-sentinel-text-secondary)' }}>Manufacturer</span>
+                <p style={{ color: 'var(--color-sentinel-text-primary)' }} className="font-medium mt-0.5">{metadata.manufacturer}</p>
+              </div>
+            )}
+            {metadata.model && (
+              <div>
+                <span style={{ color: 'var(--color-sentinel-text-secondary)' }}>Model</span>
+                <p style={{ color: 'var(--color-sentinel-text-primary)' }} className="font-medium mt-0.5">{metadata.model}</p>
+              </div>
+            )}
+            {metadata.serial_number && (
+              <div>
+                <span style={{ color: 'var(--color-sentinel-text-secondary)' }}>Serial</span>
+                <p style={{ color: 'var(--color-sentinel-text-primary)' }} className="font-medium mt-0.5">{metadata.serial_number}</p>
+              </div>
+            )}
+            {metadata.location && (
+              <div>
+                <span style={{ color: 'var(--color-sentinel-text-secondary)' }}>Location</span>
+                <p style={{ color: 'var(--color-sentinel-text-primary)' }} className="font-medium mt-0.5">{metadata.location}</p>
+              </div>
+            )}
+            {metadata.status && (
+              <div>
+                <span style={{ color: 'var(--color-sentinel-text-secondary)' }}>Status</span>
+                <p style={{ color: 'var(--color-sentinel-text-primary)' }} className="font-medium mt-0.5">{metadata.status}</p>
+              </div>
+            )}
+            {metadata.health_score !== undefined && (
+              <div>
+                <span style={{ color: 'var(--color-sentinel-text-secondary)' }}>Health</span>
+                <p style={{ color: 'var(--color-sentinel-text-primary)' }} className="font-medium mt-0.5">{metadata.health_score}%</p>
+              </div>
+            )}
+            {metadata.install_date && (
+              <div>
+                <span style={{ color: 'var(--color-sentinel-text-secondary)' }}>Installed</span>
+                <p style={{ color: 'var(--color-sentinel-text-primary)' }} className="font-medium mt-0.5">{new Date(metadata.install_date).toLocaleDateString('en-ZA')}</p>
+              </div>
+            )}
+            {metadata.last_service && (
+              <div>
+                <span style={{ color: 'var(--color-sentinel-text-secondary)' }}>Last Service</span>
+                <p style={{ color: 'var(--color-sentinel-text-primary)' }} className="font-medium mt-0.5">{new Date(metadata.last_service).toLocaleDateString('en-ZA')}</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Service Records */}
+      {serviceRecords.length > 0 && (
+        <div
+          className="rounded-lg overflow-hidden"
+          style={{
+            background: 'var(--color-sentinel-bg-panel)',
+            border: '1px solid var(--color-sentinel-border)',
+          }}
+        >
+          <div
+            className="p-4"
+            style={{ borderBottom: '1px solid var(--color-sentinel-border)' }}
+          >
+            <h3
+              className="font-medium text-sm"
+              style={{ color: 'var(--color-sentinel-text-primary)' }}
+            >
+              Service Records ({serviceRecords.length})
+            </h3>
+          </div>
+          <div className="divide-y" style={{ borderColor: 'var(--color-sentinel-border)' }}>
+            {serviceRecords.map((rec) => (
+              <div key={rec.code} className="p-4 flex items-start justify-between gap-4">
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-medium" style={{ color: 'var(--color-sentinel-text-primary)' }}>
+                    {rec.code} — {rec.service_type.replace(/_/g, ' ')}
+                  </p>
+                  {rec.confirmed_fault && (
+                    <p className="text-xs mt-0.5" style={{ color: 'var(--color-sentinel-text-secondary)' }}>
+                      Fault: {rec.confirmed_fault}
+                    </p>
+                  )}
+                  {rec.actual_repair && (
+                    <p className="text-xs" style={{ color: 'var(--color-sentinel-text-secondary)' }}>
+                      Repair: {rec.actual_repair}
+                    </p>
+                  )}
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
+                  <span className="text-xs" style={{ color: 'var(--color-sentinel-text-secondary)' }}>
+                    {rec.technician_name}
+                  </span>
+                  <span
+                    className="text-xs px-2 py-0.5 rounded"
+                    style={{
+                      background: rec.status === 'completed' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                      color: rec.status === 'completed' ? 'var(--color-sentinel-green)' : 'var(--color-sentinel-amber)',
+                    }}
+                  >
+                    {rec.status}
+                  </span>
+                  {rec.completed_at && (
+                    <span className="text-xs" style={{ color: 'var(--color-sentinel-text-secondary)' }}>
+                      {new Date(rec.completed_at).toLocaleDateString('en-ZA')}
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Workflow Timeline — maintenance only */}
       {maintenanceActive && (

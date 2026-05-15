@@ -1,10 +1,3 @@
-/**
- * AI Recommendations Panel - Unified View
- *
- * Aggregates and displays AI recommendations from all active modules.
- * Shows cross-system recommendations when multiple modules are active.
- */
-
 import { useState } from 'react';
 
 import { useModules, useCriticalRecommendations, useCrossSystemRecommendations } from '../../contexts/ModuleHooks';
@@ -12,6 +5,8 @@ import { PRIORITY_COLORS, MODULE_COLORS } from '../../lib/moduleRegistry';
 import type { AIRecommendation, ModuleType } from '../../lib/moduleRegistry';
 import { phaseAllows } from '../../lib/onboardingPhase';
 import type { OnboardingPhase } from '../../lib/onboardingPhase';
+import { Panel } from '../Panel';
+import { Badge } from '../Badge';
 
 interface AIRecommendationsPanelProps {
   compact?: boolean;
@@ -38,7 +33,6 @@ export function AIRecommendationsPanel({
 
   const [filter, setFilter] = useState<'all' | 'critical' | 'cross_system' | ModuleType>('all');
 
-  // Filter recommendations
   let filteredRecs = recommendations.filter(r => !r.resolved);
 
   if (moduleFilter) {
@@ -53,30 +47,36 @@ export function AIRecommendationsPanel({
     filteredRecs = filteredRecs.filter(r => r.source_module === filter);
   }
 
-  // Limit items
   const displayRecs = filteredRecs.slice(0, maxItems);
 
-  // Phase gate: advisory+ required for recommendations_ui
   if (!phaseAllows(sitePhase, "recommendations_ui")) {
     return null;
   }
 
   if (compact) {
+    const borderColor = criticalRecs.length > 0 ? 'var(--color-sentinel-red)' : 'var(--color-sentinel-blue)';
     return (
-      <Card decoration="top" decorationColor={criticalRecs.length > 0 ? 'red' : 'blue'}>
-        <Flex justifyContent="between" alignItems="center">
+      <div
+        className="rounded-lg p-4"
+        style={{
+          background: 'var(--color-sentinel-bg-panel)',
+          border: '1px solid var(--color-sentinel-border)',
+          borderTop: `4px solid ${borderColor}`,
+        }}
+      >
+        <div className="flex items-center justify-between">
           <div>
-            <Text className="text-sm font-medium">AI Recommendations</Text>
-            <Text className="text-2xl font-bold">{filteredRecs.length}</Text>
-            <Text className="text-xs text-gray-400 italic">AI-generated</Text>
+            <p className="text-sm font-medium" style={{ color: 'var(--color-sentinel-text-primary)' }}>AI Recommendations</p>
+            <p className="text-2xl font-bold" style={{ color: 'var(--color-sentinel-text-primary)' }}>{filteredRecs.length}</p>
+            <p className="text-xs italic" style={{ color: 'var(--color-sentinel-text-disabled)' }}>AI-generated</p>
           </div>
           {criticalRecs.length > 0 && (
-            <Badge color="red" size="lg">{criticalRecs.length} Critical</Badge>
+            <Badge style={{ background: 'rgba(220,38,38,0.15)', color: 'var(--color-sentinel-red)' }}>{criticalRecs.length} Critical</Badge>
           )}
           {crossSystemRecs.length > 0 && (
-            <Badge color="purple" size="lg">{crossSystemRecs.length} Cross-System</Badge>
+            <Badge style={{ background: 'rgba(147,51,234,0.15)', color: '#a78bfa' }}>{crossSystemRecs.length} Cross-System</Badge>
           )}
-        </Flex>
+        </div>
         {displayRecs.length > 0 && (
           <div className="mt-3 space-y-2">
             {displayRecs.slice(0, 3).map(rec => (
@@ -88,40 +88,39 @@ export function AIRecommendationsPanel({
                   'bg-gray-50'
                 }`}
               >
-                <Text className="font-medium truncate">{rec.title}</Text>
+                <p className="font-medium truncate">{rec.title}</p>
               </div>
             ))}
           </div>
         )}
-      </Card>
+      </div>
     );
   }
 
   return (
-    <Card>
-      <Flex justifyContent="between" alignItems="start">
+    <Panel>
+      <div className="flex items-start justify-between px-4 pt-4">
         <div>
-          <Title>AI Recommendations</Title>
-          <Text className="text-xs text-gray-500">
+          <h2 className="text-lg font-semibold" style={{ color: 'var(--color-sentinel-text-primary)' }}>AI Recommendations</h2>
+          <p className="text-xs" style={{ color: 'var(--color-sentinel-text-secondary)' }}>
             {activeModules.length} module(s) active
-          </Text>
-          <Text className="text-xs text-gray-400 mt-0.5 italic">
+          </p>
+          <p className="text-xs mt-0.5 italic" style={{ color: 'var(--color-sentinel-text-disabled)' }}>
             AI-generated recommendations &middot; Review before acting
-          </Text>
+          </p>
         </div>
         <div className="flex gap-2">
           {criticalRecs.length > 0 && (
-            <Badge color="red" size="lg">{criticalRecs.length} Critical</Badge>
+            <Badge style={{ background: 'rgba(220,38,38,0.15)', color: 'var(--color-sentinel-red)' }}>{criticalRecs.length} Critical</Badge>
           )}
           {crossSystemRecs.length > 0 && (
-            <Badge color="purple">{crossSystemRecs.length} Cross-System</Badge>
+            <Badge style={{ background: 'rgba(147,51,234,0.15)', color: '#a78bfa' }}>{crossSystemRecs.length} Cross-System</Badge>
           )}
         </div>
-      </Flex>
+      </div>
 
-      {/* Filter */}
       {!moduleFilter && (
-        <div className="mt-4">
+        <div className="px-4 pt-4">
           <select
             value={filter}
             onChange={(event) => setFilter(event.target.value as typeof filter)}
@@ -147,12 +146,11 @@ export function AIRecommendationsPanel({
         </div>
       )}
 
-      {/* Recommendations List */}
-      <div className="mt-4 space-y-3">
+      <div className="px-4 pt-4 pb-4 space-y-3">
         {displayRecs.length === 0 ? (
-          <Text className="text-gray-500 text-center py-4">
+          <p className="text-center py-4" style={{ color: 'var(--color-sentinel-text-secondary)' }}>
             No active recommendations
-          </Text>
+          </p>
         ) : (
           displayRecs.map(rec => (
             <RecommendationCard
@@ -166,11 +164,11 @@ export function AIRecommendationsPanel({
       </div>
 
       {filteredRecs.length > maxItems && (
-        <Text className="text-center text-gray-500 mt-4 text-sm">
+        <p className="text-center pb-4 text-sm" style={{ color: 'var(--color-sentinel-text-secondary)' }}>
           +{filteredRecs.length - maxItems} more recommendations
-        </Text>
+        </p>
       )}
-    </Card>
+    </Panel>
   );
 }
 
@@ -181,7 +179,7 @@ interface RecommendationCardProps {
 }
 
 function RecommendationCard({ recommendation, onAcknowledge, onResolve }: RecommendationCardProps) {
-  const priorityStyles = {
+  const priorityStyles: Record<string, string> = {
     critical: 'border-red-500 bg-red-50',
     high: 'border-amber-500 bg-amber-50',
     medium: 'border-blue-500 bg-blue-50',
@@ -190,68 +188,84 @@ function RecommendationCard({ recommendation, onAcknowledge, onResolve }: Recomm
 
   return (
     <div
-      className={`p-3 rounded-lg border-l-4 ${priorityStyles[recommendation.priority]}`}
+      className={`p-3 rounded-lg border-l-4 ${priorityStyles[recommendation.priority] || priorityStyles.low}`}
     >
-      <Flex justifyContent="between" alignItems="start">
+      <div className="flex items-start justify-between">
         <div className="flex-1">
-          <Flex alignItems="center" className="gap-2 mb-1">
-            <Badge color={recommendation.source === 'health_alert' ? 'orange' : recommendation.source === 'ai_optimizer' ? 'sky' : 'sky'} size="xs">
+          <div className="flex items-center gap-2 mb-1">
+            <Badge className="text-[10px] px-1.5 py-0.5" style={{
+              background: recommendation.source === 'health_alert' ? 'rgba(249,115,22,0.15)' : recommendation.source === 'ai_optimizer' ? 'rgba(14,165,233,0.15)' : 'rgba(14,165,233,0.15)',
+              color: recommendation.source === 'health_alert' ? 'var(--color-sentinel-orange)' : recommendation.source === 'ai_optimizer' ? 'var(--color-sentinel-sky)' : 'var(--color-sentinel-sky)',
+            }}>
               {recommendation.source === 'health_alert' ? 'Health Alert'
                 : recommendation.source === 'ai_optimizer' ? 'AI Optimization'
                 : recommendation.source === 'financial_roi' ? 'ROI'
                 : 'AI'}
             </Badge>
-            <Badge color={MODULE_COLORS[recommendation.source_module] || 'gray'} size="xs">
+            <Badge className="text-[10px] px-1.5 py-0.5" style={{ background: 'rgba(107,114,128,0.15)', color: 'var(--color-sentinel-text-secondary)' }}>
               {recommendation.source_module.toUpperCase()}
             </Badge>
-            <Badge color={PRIORITY_COLORS[recommendation.priority]} size="xs">
+            <Badge className="text-[10px] px-1.5 py-0.5" style={{
+              background: recommendation.priority === 'critical' ? 'rgba(220,38,38,0.15)' : recommendation.priority === 'high' ? 'rgba(245,158,11,0.15)' : 'rgba(107,114,128,0.15)',
+              color: recommendation.priority === 'critical' ? 'var(--color-sentinel-red)' : recommendation.priority === 'high' ? 'var(--color-sentinel-amber)' : 'var(--color-sentinel-text-secondary)',
+            }}>
               {recommendation.priority}
             </Badge>
             {recommendation.recommendation_type === 'cross_system' && (
-              <Badge color="purple" size="xs">Cross-System</Badge>
+              <Badge className="text-[10px] px-1.5 py-0.5" style={{ background: 'rgba(147,51,234,0.15)', color: '#a78bfa' }}>Cross-System</Badge>
             )}
             {recommendation.auto_actionable && (
-              <Badge color="green" size="xs">Auto</Badge>
+              <Badge className="text-[10px] px-1.5 py-0.5" style={{ background: 'rgba(16,185,129,0.15)', color: 'var(--color-sentinel-green)' }}>Auto</Badge>
             )}
-          </Flex>
-          <Text className="font-medium">{recommendation.title}</Text>
-          <Text className="text-xs text-gray-600 mt-1">{recommendation.description}</Text>
+          </div>
+          <p className="font-medium" style={{ color: 'var(--color-sentinel-text-primary)' }}>{recommendation.title}</p>
+          <p className="text-xs mt-1" style={{ color: 'var(--color-sentinel-text-secondary)' }}>{recommendation.description}</p>
 
-          {/* Related modules */}
           {recommendation.related_modules.length > 0 && (
             <div className="flex gap-1 mt-2">
-              <Text className="text-xs text-gray-500">Related:</Text>
+              <span className="text-xs" style={{ color: 'var(--color-sentinel-text-secondary)' }}>Related:</span>
               {recommendation.related_modules.map(m => (
-                <Badge key={m} color={MODULE_COLORS[m] || 'gray'} size="xs">
-                  {m}
-                </Badge>
+                <Badge key={m} className="text-[10px] px-1.5 py-0.5" style={{ background: 'rgba(107,114,128,0.15)', color: 'var(--color-sentinel-text-secondary)' }}>{m}</Badge>
               ))}
             </div>
           )}
 
-          {/* Confidence */}
-          <Text className="text-xs text-gray-400 mt-1">
+          <p className="text-xs mt-1" style={{ color: 'var(--color-sentinel-text-disabled)' }}>
             Confidence: {((recommendation.confidence ?? 0) * 100).toFixed(0)}%
-          </Text>
+          </p>
         </div>
 
-        {/* Actions */}
         <div className="flex flex-col gap-1 ml-2">
           {!recommendation.acknowledged && (
-            <Button size="xs" variant="secondary" onClick={onAcknowledge}>
+            <button
+              onClick={onAcknowledge}
+              className="px-2 py-1 text-xs rounded font-medium transition-colors"
+              style={{
+                background: 'var(--color-sentinel-bg-secondary)',
+                color: 'var(--color-sentinel-text-primary)',
+                border: '1px solid var(--color-sentinel-border)',
+              }}
+            >
               Ack
-            </Button>
+            </button>
           )}
-          <Button size="xs" variant="primary" color="green" onClick={onResolve}>
+          <button
+            onClick={onResolve}
+            className="px-2 py-1 text-xs rounded font-medium transition-colors"
+            style={{
+              background: 'rgba(16, 185, 129, 0.15)',
+              color: 'var(--color-sentinel-green)',
+              border: '1px solid rgba(16, 185, 129, 0.3)',
+            }}
+          >
             Resolve
-          </Button>
+          </button>
         </div>
-      </Flex>
+      </div>
 
-      {/* Timestamp */}
-      <Text className="text-xs text-gray-400 mt-2">
+      <p className="text-xs mt-2" style={{ color: 'var(--color-sentinel-text-disabled)' }}>
         {new Date(recommendation.timestamp).toLocaleString()}
-      </Text>
+      </p>
     </div>
   );
 }

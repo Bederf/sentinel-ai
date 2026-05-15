@@ -2,6 +2,7 @@
 
 from datetime import UTC, datetime
 from typing import Any
+from uuid import UUID
 
 from app.database.supabase_client import get_supabase_client
 
@@ -46,6 +47,10 @@ class AuditRepository:
         if action:
             query = query.eq("action", action)
         if device_id:
+            try:
+                UUID(device_id)
+            except ValueError:
+                return []
             query = query.eq("device_id", device_id)
 
         response = query.execute()

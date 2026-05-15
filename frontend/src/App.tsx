@@ -31,6 +31,7 @@ const SystemHealthPage = lazy(() => import("./components/SystemHealthPage"));
 const AssetWorkflowDashboard = lazy(() => import("./components/AssetWorkflowDashboard").then(m => ({ default: m.AssetWorkflowDashboard })));
 const SimbiotPage = lazy(() => import("./components/SimbiotPage").then(m => ({ default: m.SimbiotPage })));
 const FleetInsights = lazy(() => import("./components/FleetInsights").then(m => ({ default: m.FleetInsights })));
+const DigitalTwin = lazy(() => import("./components/digital-twin").then(m => ({ default: m.DigitalTwin })));
 const ContractManagementPage = lazy(() => import("./pages/ContractManagementPage").then(m => ({ default: m.ContractManagementPage })));
 const CompliancePage = lazy(() => import("./pages/CompliancePage").then(m => ({ default: m.CompliancePage })));
 const SiteDetail = lazy(() => import("./components/SiteDetail").then(m => ({ default: m.SiteDetail })));
@@ -866,6 +867,8 @@ function App() {
             <ContractManagementPage />
           ) : currentView === "fleet-ml" ? (
             <FleetInsights />
+          ) : currentView === "digital-twin" ? (
+            <div className="h-full"><DigitalTwin siteId={selectedSite?.id || siteId} /></div>
           ) : currentView === "compliance" ? (
             <CompliancePage />
           ) : (

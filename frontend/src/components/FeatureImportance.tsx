@@ -1,13 +1,7 @@
-/** Feature Importance Visualization Component.
-
-This component displays feature importance for Random Forest classifiers,
-showing which features are most predictive of equipment failures.
-*/
-
-
 import { AlertCircle, TrendingUp } from "lucide-react";
 import { classificationApi, type FeatureImportanceItem } from "@/lib/api";
 import { useState, useEffect } from "react";
+import { Badge } from "./Badge";
 
 interface FeatureImportanceProps {
   equipmentType: string;
@@ -36,115 +30,146 @@ export function FeatureImportance({ equipmentType }: FeatureImportanceProps) {
 
   if (isLoading) {
     return (
-      <Card className="animate-pulse">
+      <div
+        className="animate-pulse rounded-lg p-4"
+        style={{
+          background: "var(--color-sentinel-bg-panel)",
+          border: "1px solid var(--color-sentinel-border)",
+        }}
+      >
         <div className="h-6 bg-gray-200 rounded w-1/3 mb-4"></div>
         <div className="h-64 bg-gray-200 rounded mb-4"></div>
         <div className="h-40 bg-gray-200 rounded"></div>
-      </Card>
+      </div>
     );
   }
 
   if (error) {
     return (
-      <Callout
-        title="Error loading feature importance"
-        icon={AlertCircle}
-        color="rose"
+      <div
+        className="p-3 rounded-md text-sm flex items-center gap-2"
+        style={{
+          background: "rgba(220,38,38,0.15)",
+          border: "1px solid rgba(220,38,38,0.3)",
+          color: "var(--color-sentinel-red)",
+        }}
       >
-        {(error as Error).message || "Unknown error"}
-      </Callout>
+        <AlertCircle className="w-4 h-4 flex-shrink-0" />
+        <span className="font-medium">Error loading feature importance</span>
+        <span>{(error as Error).message || "Unknown error"}</span>
+      </div>
     );
   }
 
   if (!data || data.length === 0) {
     return (
-      <Callout
-        title="No feature importance data available"
-        icon={AlertCircle}
-        color="yellow"
+      <div
+        className="p-3 rounded-md text-sm flex items-center gap-2"
+        style={{
+          background: "rgba(245,158,11,0.15)",
+          border: "1px solid rgba(245,158,11,0.3)",
+          color: "var(--color-sentinel-amber)",
+        }}
       >
-        No classifier trained for {equipmentType}
-      </Callout>
+        <AlertCircle className="w-4 h-4 flex-shrink-0" />
+        <span className="font-medium">No feature importance data available</span>
+        <span>No classifier trained for {equipmentType}</span>
+      </div>
     );
   }
 
-  // Format importance as percentage
   const chartData = data.map((item: FeatureImportanceItem) => ({
     feature: formatFeatureName(item.feature),
     importance: item.importance * 100,
   }));
 
+  const maxImportance = Math.max(...chartData.map(d => d.importance), 0.1);
+
   return (
-    <Card>
+    <div
+      style={{
+        background: "var(--color-sentinel-bg-panel)",
+        border: "1px solid var(--color-sentinel-border)",
+        borderRadius: 8,
+        padding: 16,
+      }}
+    >
       <div className="flex items-center justify-between mb-4">
-        <Title className="flex items-center gap-2">
+        <h3 className="flex items-center gap-2 text-lg font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>
           <TrendingUp className="w-5 h-5 text-blue-500" />
           Key Failure Indicators - {equipmentType.toUpperCase()}
-        </Title>
-        <Badge color="blue" size="sm">
+        </h3>
+        <Badge style={{ background: "rgba(59,130,246,0.15)", color: "var(--color-sentinel-blue)" }}>
           Top {data.length} Features
         </Badge>
       </div>
 
-      {/* Bar Chart */}
-      <div className="mb-6">
-        <BarChart
-          data={chartData}
-          index="feature"
-          categories={["importance"]}
-          colors={["blue"]}
-          valueFormatter={(value) => `${value.toFixed(1)}%`}
-          layout="vertical"
-          showAnimation={true}
-          showLegend={false}
-          className="h-64"
-        />
+      <div className="mb-6 space-y-2">
+        {chartData.map((item) => (
+          <div key={item.feature} className="flex items-center gap-3">
+            <span className="text-xs font-medium w-32 text-right truncate" style={{ color: "var(--color-sentinel-text-secondary)", flexShrink: 0 }}>
+              {item.feature}
+            </span>
+            <div className="flex-1 h-5 rounded" style={{ background: "var(--color-sentinel-bg-secondary)", overflow: "hidden" }}>
+              <div
+                className="h-full rounded transition-all"
+                style={{
+                  width: `${(item.importance / maxImportance) * 100}%`,
+                  background: "var(--color-sentinel-blue)",
+                }}
+              />
+            </div>
+            <span className="text-xs font-medium w-12 text-right" style={{ color: "var(--color-sentinel-text-primary)" }}>
+              {item.importance.toFixed(1)}%
+            </span>
+          </div>
+        ))}
       </div>
 
-      {/* Detailed Table */}
-      <Table>
-        <TableHead>
-          <TableRow>
-            <TableHeaderCell>Rank</TableHeaderCell>
-            <TableHeaderCell>Feature</TableHeaderCell>
-            <TableHeaderCell>Importance</TableHeaderCell>
-            <TableHeaderCell>Description</TableHeaderCell>
-          </TableRow>
-        </TableHead>
-        <TableBody>
+      <table className="w-full">
+        <thead>
+          <tr style={{ borderBottom: "1px solid var(--color-sentinel-border)" }}>
+            <th className="text-left text-xs font-medium uppercase tracking-wider px-3 py-2" style={{ color: "var(--color-sentinel-text-secondary)" }}>Rank</th>
+            <th className="text-left text-xs font-medium uppercase tracking-wider px-3 py-2" style={{ color: "var(--color-sentinel-text-secondary)" }}>Feature</th>
+            <th className="text-left text-xs font-medium uppercase tracking-wider px-3 py-2" style={{ color: "var(--color-sentinel-text-secondary)" }}>Importance</th>
+            <th className="text-left text-xs font-medium uppercase tracking-wider px-3 py-2" style={{ color: "var(--color-sentinel-text-secondary)" }}>Description</th>
+          </tr>
+        </thead>
+        <tbody>
           {data.map((item: FeatureImportanceItem, index: number) => (
-            <TableRow key={item.feature}>
-              <TableCell>
+            <tr key={item.feature} style={{ borderBottom: "1px solid var(--color-sentinel-border)" }}>
+              <td className="px-3 py-2">
                 <Badge
-                  color={index < 3 ? "blue" : "gray"}
-                  size="sm"
+                  style={{
+                    background: index < 3 ? "rgba(59,130,246,0.15)" : "rgba(142,142,142,0.15)",
+                    color: index < 3 ? "var(--color-sentinel-blue)" : "var(--color-sentinel-text-secondary)",
+                  }}
                 >
                   #{index + 1}
                 </Badge>
-              </TableCell>
-              <TableCell className="font-medium">
+              </td>
+              <td className="px-3 py-2 text-sm font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>
                 {formatFeatureName(item.feature)}
-              </TableCell>
-              <TableCell>
+              </td>
+              <td className="px-3 py-2 text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>
                 {(item.importance * 100).toFixed(1)}%
-              </TableCell>
-              <TableCell className="text-gray-500">
+              </td>
+              <td className="px-3 py-2 text-sm" style={{ color: "var(--color-sentinel-text-disabled)" }}>
                 {getFeatureDescription(item.feature)}
-              </TableCell>
-            </TableRow>
+              </td>
+            </tr>
           ))}
-        </TableBody>
-      </Table>
+        </tbody>
+      </table>
 
-      <p className="text-xs text-gray-500 mt-4">
+      <p className="text-xs mt-4" style={{ color: "var(--color-sentinel-text-disabled)" }}>
         Feature importance shows which factors contribute most to failure predictions.
         Higher importance = stronger predictive power.
       </p>
-    </Card>
+    </div>
   );
 }
 
-// Helper function to format feature names for display
 function formatFeatureName(feature: string): string {
   return feature
     .replace(/_/g, " ")
@@ -155,10 +180,8 @@ function formatFeatureName(feature: string): string {
     .join(" ");
 }
 
-// Helper function to get human-readable feature descriptions
 function getFeatureDescription(feature: string): string {
   const descriptions: Record<string, string> = {
-    // Common features
     "age_years": "Equipment age in years",
     "criticality_score": "Building criticality (0-1)",
     "total_work_orders": "Total maintenance work orders",
@@ -186,18 +209,15 @@ function getFeatureDescription(feature: string): string {
     "last_test_days": "Days since last test",
   };
 
-  // Check for exact match
   if (descriptions[feature]) {
     return descriptions[feature];
   }
 
-  // Check for partial matches (e.g., "avg_temp_xxx")
   for (const [key, desc] of Object.entries(descriptions)) {
     if (feature.includes(key)) {
       return `${desc} (${feature.replace(key, "").replace(/_/g, " ")})`;
     }
   }
 
-  // Default: return formatted feature name
   return formatFeatureName(feature);
 }

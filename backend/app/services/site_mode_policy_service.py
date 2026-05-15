@@ -210,6 +210,7 @@ class SiteModePolicyService:
         try:
             policy = self.load_policy(site_id)
             state = self._load_state(site_id, policy)
+            await self._sync_state_from_supabase(site_id, state, policy)
         except FileNotFoundError:
             return {"site_id": site_id, "error": "policy_not_found", "gates_pass": None, "failed_gates": []}
 
@@ -242,11 +243,40 @@ class SiteModePolicyService:
             "metrics": metrics,
         }
 
+    async def _sync_state_from_supabase(self, site_id: str, state: dict[str, Any], policy: dict[str, Any]) -> bool:
+        """Sync state file if Supabase onboarding_phase diverges from local state.
+
+        Supabase is the authoritative source — PATCH endpoint and direct DB writes
+        go there. The state file is a secondary cache that must follow.
+        """
+        stages = set(policy.get("stage_order", []))
+        try:
+            from app.database.supabase_client import get_supabase_client
+            client = get_supabase_client()
+            result = client.table("sites").select("onboarding_phase").eq("code", site_id).execute()
+            if result.data and result.data[0].get("onboarding_phase"):
+                sb_phase = result.data[0]["onboarding_phase"]
+                if sb_phase in stages and sb_phase != state.get("current_stage"):
+                    state["current_stage"] = sb_phase
+                    state["candidate_stage"] = None
+                    state["candidate_since"] = None
+                    state["violation_stage"] = None
+                    state["violation_since"] = None
+                    self._save_state(site_id, state)
+                    logger.info("Synced state file to Supabase onboarding_phase=%s", sb_phase)
+                    return True
+        except Exception:
+            pass
+        return False
+
     async def evaluate_site(self, site_id: str) -> dict[str, Any]:
         """Evaluate onboarding policy for a site and persist dry-run state."""
         now = self._clock()
         policy = self.load_policy(site_id)
         state = self._load_state(site_id, policy)
+
+        # Sync state file if Supabase onboarding_phase changed externally
+        await self._sync_state_from_supabase(site_id, state, policy)
 
         snapshot = await self._monitoring.get_snapshot(site_id=site_id)
         metrics = self._extract_metrics(snapshot)

@@ -110,8 +110,14 @@ export const sitesApi = {
    *
    * Returns { total, sites[] } - extract .sites for array of sites
    */
-  getSites: () =>
-    fetchApi<SiteListResponse>("/api/sites"),
+  getSites: async () => {
+    const res = await fetchApi<{
+      active: Site[]
+      inactive: Site[]
+      total: number
+    }>("/api/buildings")
+    return { sites: [...res.active, ...res.inactive], total: res.total }
+  },
 
   /**
    * Get single site (batched to prevent 429 rate limit errors)
@@ -127,7 +133,7 @@ export const sitesApi = {
    * Create new site
    */
   create: (data: CreateSiteRequest) =>
-    fetchApi<Site>("/api/sites", {
+    fetchApi<Site>("/api/buildings", {
       method: "POST",
       body: JSON.stringify(data),
     }),

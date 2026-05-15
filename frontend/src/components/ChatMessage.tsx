@@ -15,6 +15,10 @@ import { Volume2, Loader2 } from "lucide-react";
 /** Regex to detect slash commands in inline code: /info_S002_FCU_301 etc. */
 const COMMAND_RE = /^\/(info|WO|inspect|reset|note)_[A-Za-z0-9][\w]*$/;
 
+/** Regex to detect equipment IDs like S002-CHILLER-B1-001 */
+const EQUIPMENT_ID_RE = /^S\d{3}-[A-Z0-9]+(?:-[A-Za-z0-9]+)+$/;
+const EQUIPMENT_REPLACE_RE = /(?<!\w)(S\d{3}-[A-Z0-9]+(?:-[A-Za-z0-9]+)+)(?!\w)/g;
+
 interface ChatMessageProps {
   role: "user" | "assistant";
   content: string;
@@ -26,9 +30,11 @@ interface ChatMessageProps {
   ttsState?: { isLoading: boolean; isPlaying: boolean };
   /** Callback when a slash command button is clicked */
   onCommandClick?: (command: string) => void;
+  /** Callback when an equipment ID is clicked — inserts into chat input */
+  onEquipmentClick?: (equipmentId: string) => void;
 }
 
-export function ChatMessage({ role, content, isStreaming, messageId, onSpeak, ttsState, onCommandClick }: ChatMessageProps) {
+export function ChatMessage({ role, content, isStreaming, messageId, onSpeak, ttsState, onCommandClick, onEquipmentClick }: ChatMessageProps) {
   const isUser = role === "user";
   const [displayedContent, setDisplayedContent] = useState(isUser ? content : "");
   const charIndexRef = useRef(0);
@@ -95,6 +101,13 @@ export function ChatMessage({ role, content, isStreaming, messageId, onSpeak, tt
     // Add spacing after headings
     processed = processed.replace(/(#{1,6}\s+[^\n]+)\n([^\n#])/g, "$1\n\n$2");
 
+    // Strip square brackets around equipment IDs (AI often wraps in [code])
+    processed = processed.replace(/\[(S\d{3}-[A-Z0-9]+(?:-[A-Za-z0-9]+)+)\]/g, '$1');
+    // Wrap equipment IDs in backticks so they render as clickable inline code
+    if (onEquipmentClick) {
+      processed = processed.replace(EQUIPMENT_REPLACE_RE, '`$1`');
+    }
+
     return processed;
   };
 
@@ -103,21 +116,23 @@ export function ChatMessage({ role, content, isStreaming, messageId, onSpeak, tt
   const processedContent = isUser ? contentToRender : preprocessMarkdown(contentToRender);
 
   return (
-    <div
-      className={`flex ${isUser ? "justify-end" : "justify-start"} mb-4`}
-      role="listitem"
-    >
       <div
-        className="max-w-[85%] md:max-w-[80%] rounded-lg px-4 py-3"
-        style={{
-          background: isUser
-            ? "var(--color-grafana-blue)"
-            : "var(--color-grafana-bg-secondary)",
-          color: isUser ? "white" : "var(--color-grafana-text-primary)",
-          borderBottomRightRadius: isUser ? "4px" : undefined,
-          borderBottomLeftRadius: !isUser ? "4px" : undefined,
-          border: !isUser ? "1px solid var(--color-grafana-border)" : undefined,
-        }}
+        className={`flex ${isUser ? "justify-end" : "justify-start"} mb-4`}
+        role="listitem"
+        style={{ userSelect: "text" }}
+      >
+        <div
+          className="max-w-[85%] md:max-w-[80%] rounded-lg px-4 py-3"
+          style={{
+            userSelect: "text",
+            background: isUser
+              ? "var(--color-grafana-blue)"
+              : "var(--color-grafana-bg-secondary)",
+            color: isUser ? "white" : "var(--color-grafana-text-primary)",
+            borderBottomRightRadius: isUser ? "4px" : undefined,
+            borderBottomLeftRadius: !isUser ? "4px" : undefined,
+            border: !isUser ? "1px solid var(--color-grafana-border)" : undefined,
+          }}
       >
         {/* User messages: plain text */}
         {isUser ? (
@@ -235,6 +250,22 @@ export function ChatMessage({ role, content, isStreaming, messageId, onSpeak, tt
                       >
                         {text}
                       </button>
+                    );
+                  }
+                  // Equipment IDs rendered as clickable spans (inserts into chat input)
+                  if (inline && onEquipmentClick && EQUIPMENT_ID_RE.test(text)) {
+                    return (
+                      <span
+                        onClick={() => onEquipmentClick(text)}
+                        className="px-2 py-0.5 rounded text-xs font-mono cursor-pointer transition-all hover:brightness-125 select-all"
+                        style={{
+                          background: "rgba(16, 185, 129, 0.15)",
+                          color: "var(--color-grafana-green)",
+                          border: "1px solid rgba(16, 185, 129, 0.3)",
+                        }}
+                      >
+                        {text}
+                      </span>
                     );
                   }
                   return inline ? (

@@ -367,6 +367,7 @@ function ModelCard({
 export function FleetInsights() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [fleetMlDisabled, setFleetMlDisabled] = useState(false);
 
   const [summary, setSummary] = useState<FleetSummary | null>(null);
   const [patterns, setPatterns] = useState<FailurePattern[]>([]);
@@ -379,6 +380,7 @@ export function FleetInsights() {
   const fetchData = async () => {
     setLoading(true);
     setError(null);
+    setFleetMlDisabled(false);
     try {
       // Stagger requests with 600ms delays to prevent rate limiting (100 req/min limit)
       const sumRes = await fleetApi.getSummary();
@@ -408,7 +410,13 @@ export function FleetInsights() {
       const impRes = await fleetApi.getImprovementSummary();
       setImprovement(impRes);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load fleet data");
+      const msg = err instanceof Error ? err.message : "";
+      // Fleet ML not enabled — show placeholder
+      if (msg.includes("not enabled") || msg.includes("404")) {
+        setFleetMlDisabled(true);
+      } else {
+        setError(msg || "Failed to load fleet data");
+      }
     } finally {
       setLoading(false);
     }
@@ -417,6 +425,47 @@ export function FleetInsights() {
   useEffect(() => {
     fetchData();
   }, []);
+
+  // Fleet ML disabled placeholder
+  if (fleetMlDisabled) {
+    return (
+      <div className="h-full overflow-y-auto p-4 md:p-6">
+        <div
+          className="rounded-lg p-8 text-center max-w-lg mx-auto mt-12"
+          style={{
+            background: "var(--color-sentinel-bg-panel)",
+            border: "1px solid var(--color-sentinel-border)",
+          }}
+        >
+          <BarChart3
+            className="h-10 w-10 mx-auto mb-3"
+            style={{ color: "var(--color-sentinel-text-disabled)" }}
+          />
+          <h2
+            className="text-lg font-semibold mb-2"
+            style={{ color: "var(--color-sentinel-text-primary)" }}
+          >
+            Fleet ML Analytics
+          </h2>
+          <p
+            className="text-sm leading-6"
+            style={{ color: "var(--color-sentinel-text-secondary)" }}
+          >
+            Fleet ML activates when multiple sites reach Advisory phase.
+            <br />
+            Currently 1 of 2 required sites active.
+          </p>
+          <p
+            className="text-xs mt-4"
+            style={{ color: "var(--color-sentinel-text-disabled)" }}
+          >
+            Real portfolio comparison across sites will appear here once
+            available.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (loading && !summary) {
     return <PageLoading message="Loading fleet analytics..." />;

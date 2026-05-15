@@ -467,6 +467,52 @@ class PredictionGeneratorService:
             except Exception:
                 pass
 
+        # Query fault events for alarm frequency (last 60 days)
+        eq_code = equipment.get("code", "")
+        site_id_val = equipment.get("site_id", "")
+        if eq_code or site_id_val:
+            try:
+                from app.database.supabase_client import get_supabase_client
+
+                supabase = get_supabase_client()
+                lookback = (datetime.now() - timedelta(days=60)).isoformat()
+
+                faults = None
+                # Try exact match on equipment_code
+                if eq_code:
+                    faults = (
+                        supabase.table("equipment_fault_events")
+                        .select("alarm_code")
+                        .eq("equipment_code", eq_code)
+                        .gte("recorded_at", lookback)
+                        .limit(100)
+                        .execute()
+                    )
+                # Fallback: site-level top alarms (bridge codes differ from catalog)
+                if not faults or not faults.data:
+                    if site_id_val:
+                        # Fault events use S002 format (not site-002), alarm_code is always null
+                        bridge_site_id = site_id_val.replace("site-", "S").upper()
+                        faults = (
+                            supabase.table("equipment_fault_events")
+                            .select("event_type")
+                            .eq("site_id", bridge_site_id)
+                            .gte("recorded_at", lookback)
+                            .limit(100)
+                            .execute()
+                        )
+
+                if faults and faults.data:
+                    from collections import Counter
+
+                    key = "alarm_code" if faults.data[0].get("alarm_code") else "event_type"
+                    freq = Counter(f[key] for f in faults.data)
+                    evidence["alarm_frequency"] = dict(freq.most_common(10))
+            except Exception:
+                pass
+            except Exception:
+                pass
+
         return evidence
 
     def _calculate_financial_impact(self, equipment_type: str, severity: str) -> dict[str, int]:

@@ -105,17 +105,17 @@ function PlatformModuleCard({ controller }: { controller: ReturnType<typeof useS
 }
 
 function BuildingSystemToggle({
-  canToggle,
   card,
   controlActive,
   loadingCard,
   onToggle,
+  canToggleControl,
 }: {
-  canToggle: boolean;
   card: BuildingSystemCard;
   controlActive: boolean;
   loadingCard: boolean;
   onToggle: (card: FeatureToggleCard) => void;
+  canToggleControl: boolean;
 }) {
   if (!card.controlModule) return null;
 
@@ -124,7 +124,7 @@ function BuildingSystemToggle({
       <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>Control:</span>
       <button
         onClick={() => onToggle({ id: card.id, label: `${card.label} Control`, moduleType: card.controlModule!, description: "" })}
-        disabled={loadingCard || !canToggle}
+        disabled={loadingCard || !canToggleControl}
         className="relative inline-flex h-5 w-9 items-center rounded-full transition-colors"
         style={{
           background: controlActive ? "var(--color-sentinel-green)" : "var(--color-sentinel-bg-hover)",
@@ -143,6 +143,7 @@ function BuildingSystemToggle({
 
 function BuildingSystemsCard({ controller }: { controller: ReturnType<typeof useSettingsController> }) {
   const buildingSystemCards = getBuildingSystemCards(controller.availableModules);
+  const canToggleControl = controller.canToggleControl ?? false;
 
   return (
     <ModuleCard description="Monitoring always on. Toggle control features per discipline." icon={<Gauge className="h-5 w-5" />} title="Building Systems">
@@ -162,11 +163,11 @@ function BuildingSystemsCard({ controller }: { controller: ReturnType<typeof use
                   </div>
                   <p className="mt-1 text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>{card.description}</p>
                   <BuildingSystemToggle
-                    canToggle={controller.canToggleModules}
                     card={card}
                     controlActive={controlActive}
                     loadingCard={loadingCard}
-                    onToggle={(nextCard) => void controller.handleFeatureToggle(nextCard)}
+                    onToggle={controller.toggleCard}
+                    canToggleControl={canToggleControl}
                   />
                 </div>
               </div>

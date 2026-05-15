@@ -9,6 +9,7 @@ from fastapi import FastAPI
 from app.api import (
     ai_usage,
     alert_muting,
+    security,
     alert_routing,
     alerts,
     approval,
@@ -41,7 +42,6 @@ from app.api import (
     document_sync,
     event_bus_monitor,
     event_intelligence,
-    google_calendar_webhook_endpoint,
     graph_webhook_endpoint,
     health_config,
     health_rating,
@@ -124,7 +124,6 @@ def register_operations_routers(app: FastAPI) -> None:
     app.include_router(sentry_webhooks.router, tags=["sentry"])
     app.include_router(whatsapp_webhooks.router, tags=["whatsapp"])
     app.include_router(graph_webhook_endpoint.router, tags=["graph_webhook"])
-    app.include_router(google_calendar_webhook_endpoint.router, tags=["google_calendar_webhook"])
 
     # Module registry and configuration
     app.include_router(modules.router, prefix="/api", tags=["modules"])
@@ -162,6 +161,8 @@ def register_operations_routers(app: FastAPI) -> None:
     app.include_router(sustainability.router, prefix="/api", tags=["sustainability"])
 
     # Security module (Phase 27)
+    app.include_router(security.router, tags=["security"])
+
     # Compliance module (Phase 28)
     app.include_router(compliance.router, tags=["compliance"])
 

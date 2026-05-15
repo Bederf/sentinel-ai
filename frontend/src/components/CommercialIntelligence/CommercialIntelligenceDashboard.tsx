@@ -28,6 +28,8 @@ import SensitivityAnalysis from './SensitivityAnalysis'
 import QuotePreview from './QuotePreview'
 import { RenewalPricingDashboard } from './RenewalPricingDashboard'
 import { BenchmarkingAnalysis } from './BenchmarkingAnalysis'
+import { TabBar } from '../TabBar'
+import type { TabDef } from '../TabBar'
 
 interface CommercialIntelligenceDashboardProps {
   siteId: string
@@ -36,6 +38,15 @@ interface CommercialIntelligenceDashboardProps {
 }
 
 type ViewMode = 'quote-tools' | 'renewal-pipeline' | 'renewal-analysis' | 'benchmarks' | 'win-loss'
+
+const MAIN_TABS: TabDef[] = [
+  { id: 'quote-tools', label: 'Quotes', icon: <FileText className="h-4 w-4" /> },
+  { id: 'renewal-analysis', label: 'Renewals', icon: <FileText className="h-4 w-4" /> },
+  { id: 'benchmarks', label: 'Benchmarks', icon: <BarChart3 className="h-4 w-4" /> },
+  { id: 'win-loss', label: 'Win/Loss', icon: <TrendingUp className="h-4 w-4" /> },
+]
+
+const INNER_TABS = ['details', 'what-if', 'preview'] as const
 
 export default function CommercialIntelligenceDashboard({
   siteId,
@@ -74,7 +85,8 @@ export default function CommercialIntelligenceDashboard({
       {onClose && (
         <button
           onClick={onClose}
-          className="flex items-center gap-2 text-tremor-brand hover:underline"
+          className="flex items-center gap-2 hover:underline"
+          style={{ color: 'var(--color-sentinel-blue)' }}
         >
           <ChevronLeft className="h-4 w-4" />
           Back to Buildings
@@ -82,143 +94,164 @@ export default function CommercialIntelligenceDashboard({
       )}
 
       {/* Header */}
-      <Card>
+      <div
+        className="rounded-lg p-4"
+        style={{
+          background: 'var(--color-sentinel-bg-panel)',
+          border: '1px solid var(--color-sentinel-border)',
+        }}
+      >
         <div className="flex items-start justify-between">
           <div>
-            <Title>Commercial Intelligence Tools</Title>
-            <Text className="text-tremor-content-subtitle mt-2">
+            <h2 className="text-lg font-semibold" style={{ color: 'var(--color-sentinel-text-primary)' }}>
+              Commercial Intelligence Tools
+            </h2>
+            <p className="mt-2 text-sm" style={{ color: 'var(--color-sentinel-text-secondary)' }}>
               Generate professional quotes, analyze pricing scenarios, manage renewals,
               and benchmark contract performance
-            </Text>
+            </p>
           </div>
           {currentQuote && viewMode === 'quote-tools' && (
-            <Button
-              icon={Plus}
+            <button
               onClick={handleNewQuote}
-              variant="secondary"
+              className="flex items-center gap-2 px-4 py-2 rounded text-sm font-medium"
+              style={{
+                background: 'var(--color-sentinel-bg-secondary)',
+                color: 'var(--color-sentinel-text-primary)',
+                border: '1px solid var(--color-sentinel-border)',
+              }}
             >
+              <Plus className="h-4 w-4" />
               New Quote
-            </Button>
+            </button>
           )}
         </div>
-      </Card>
+      </div>
 
       {/* Main Navigation Tabs */}
-      <TabGroup index={viewMode === 'quote-tools' ? 0 : viewMode === 'renewal-analysis' ? 1 : viewMode === 'benchmarks' ? 2 : 3}>
-        <TabList className="mb-4 overflow-x-auto">
-          <Tab icon={FileText} onClick={() => { setViewMode('quote-tools'); setActiveTab(0) }}>
-            Quotes
-          </Tab>
-          <Tab icon={FileText} onClick={() => { setViewMode('renewal-analysis'); setActiveTab(0) }}>
-            Renewals
-          </Tab>
-          <Tab icon={BarChart3} onClick={() => { setViewMode('benchmarks'); setActiveTab(0) }}>
-            Benchmarks
-          </Tab>
-          <Tab icon={TrendingUp} onClick={() => { setViewMode('win-loss'); setActiveTab(0) }}>
-            Win/Loss
-          </Tab>
-        </TabList>
-        <TabPanels>
-          {/* Quote Tools Tab */}
-          <TabPanel>
-            {currentQuote ? (
-              // After quote generation: show generator, analysis, and preview tabs
-              <TabGroup index={activeTab} onIndexChange={setActiveTab}>
-                <TabList className="mb-4 overflow-x-auto">
-                  <Tab icon={FileText}>Details</Tab>
-                  <Tab icon={BarChart3}>What-If</Tab>
-                  <Tab icon={FileText}>Preview</Tab>
-                </TabList>
-                <TabPanels>
-                  <TabPanel>
-                    <Card>
-                      <QuoteGenerator
-                        siteId={siteId}
-                        onQuoteGenerated={() => {}} // Already generated
-                      />
-                    </Card>
-                  </TabPanel>
-                  <TabPanel>
-                    <SensitivityAnalysis
-                      quote={currentQuote}
-                      onCopyToNegotiation={(range) => {
-                        console.log('Range copied:', range)
-                      }}
-                    />
-                  </TabPanel>
-                  <TabPanel>
-                    <QuotePreview
-                      quote={currentQuote}
-                      siteName={siteName}
-                      clientName="Client Name"
-                      equipmentCodes={equipmentCodes}
-                      slaTier={slaTier}
-                      contractMonths={contractMonths}
-                      onEdit={handleNewQuote}
-                    />
-                  </TabPanel>
-                </TabPanels>
-              </TabGroup>
-            ) : (
-              // Before quote generation: show only the generator
-              <>
-                <Card>
-                  <QuoteGenerator
-                    siteId={siteId}
-                    onQuoteGenerated={(quote) => {
-                      handleQuoteGenerated(quote, [], 'standard', 12)
-                    }}
-                  />
-                </Card>
+      <TabBar
+        tabs={MAIN_TABS}
+        active={viewMode}
+        onChange={(id) => { setViewMode(id as ViewMode); setActiveTab(0) }}
+      />
 
-                {/* Quick Start Tips */}
-                <Card className="bg-blue-50 border border-blue-200">
-                  <Title className="text-blue-900">Getting Started with Quotes</Title>
-                  <div className="mt-4 space-y-3 text-blue-800 text-sm">
-                    <p>
-                      1. Select one or more equipment types to include in the quote
-                    </p>
-                    <p>
-                      2. Choose an SLA tier that matches your service level commitment
-                    </p>
-                    <p>
-                      3. Set the contract duration in months (1-60)
-                    </p>
-                    <p>
-                      4. Click "Generate Quote" to see the pricing calculation
-                    </p>
-                    <p>
-                      5. Use the What-If analysis tab to explore different pricing scenarios
-                    </p>
-                    <p>
-                      6. Export your final quote as PDF from the Preview tab
-                    </p>
-                  </div>
-                </Card>
-              </>
+      {/* Quote Tools Tab */}
+      {viewMode === 'quote-tools' && (
+        currentQuote ? (
+          <>
+            {/* Inner tabs: Details / What-If / Preview */}
+            <TabBar
+              tabs={[
+                { id: 'details', label: 'Details', icon: <FileText className="h-4 w-4" /> },
+                { id: 'what-if', label: 'What-If', icon: <BarChart3 className="h-4 w-4" /> },
+                { id: 'preview', label: 'Preview', icon: <FileText className="h-4 w-4" /> },
+              ]}
+              active={INNER_TABS[activeTab]}
+              onChange={(id) => setActiveTab(INNER_TABS.indexOf(id as typeof INNER_TABS[number]))}
+            />
+
+            {activeTab === 0 && (
+              <div
+                className="rounded-lg p-4"
+                style={{
+                  background: 'var(--color-sentinel-bg-panel)',
+                  border: '1px solid var(--color-sentinel-border)',
+                }}
+              >
+                <QuoteGenerator
+                  siteId={siteId}
+                  onQuoteGenerated={() => {}}
+                />
+              </div>
             )}
-          </TabPanel>
 
-          {/* Renewal Analysis Tab */}
-          <TabPanel>
-            <RenewalPricingDashboard selectedContractId={selectedContractId} />
-          </TabPanel>
+            {activeTab === 1 && (
+              <SensitivityAnalysis
+                quote={currentQuote}
+                onCopyToNegotiation={(range) => {
+                  console.log('Range copied:', range)
+                }}
+              />
+            )}
 
-          {/* Benchmarks Tab */}
-          <TabPanel>
-            <BenchmarkingAnalysis />
-          </TabPanel>
+            {activeTab === 2 && (
+              <QuotePreview
+                quote={currentQuote}
+                siteName={siteName}
+                clientName="Client Name"
+                equipmentCodes={equipmentCodes}
+                slaTier={slaTier}
+                contractMonths={contractMonths}
+                onEdit={handleNewQuote}
+              />
+            )}
+          </>
+        ) : (
+          <>
+            <div
+              className="rounded-lg p-4"
+              style={{
+                background: 'var(--color-sentinel-bg-panel)',
+                border: '1px solid var(--color-sentinel-border)',
+              }}
+            >
+              <QuoteGenerator
+                siteId={siteId}
+                onQuoteGenerated={(quote) => {
+                  handleQuoteGenerated(quote, [], 'standard', 12)
+                }}
+              />
+            </div>
 
-          {/* Win/Loss Analysis Tab */}
-          <TabPanel>
-            <Card>
-              <Title>Win/Loss Analysis</Title>
-              <Text className="mt-2">Integrated in the Benchmarking Analysis tab with market insights</Text>
-            </Card>
-          </TabPanel>
-        </TabPanels>
-      </TabGroup>
+            {/* Quick Start Tips */}
+            <div
+              className="rounded-lg p-4"
+              style={{
+                background: '#eff6ff',
+                border: '1px solid #bfdbfe',
+              }}
+            >
+              <h3 className="text-base font-semibold text-blue-900">Getting Started with Quotes</h3>
+              <div className="mt-4 space-y-3 text-blue-800 text-sm">
+                <p>1. Select one or more equipment types to include in the quote</p>
+                <p>2. Choose an SLA tier that matches your service level commitment</p>
+                <p>3. Set the contract duration in months (1-60)</p>
+                <p>4. Click "Generate Quote" to see the pricing calculation</p>
+                <p>5. Use the What-If analysis tab to explore different pricing scenarios</p>
+                <p>6. Export your final quote as PDF from the Preview tab</p>
+              </div>
+            </div>
+          </>
+        )
+      )}
+
+      {/* Renewal Analysis Tab */}
+      {viewMode === 'renewal-analysis' && (
+        <RenewalPricingDashboard selectedContractId={selectedContractId} />
+      )}
+
+      {/* Benchmarks Tab */}
+      {viewMode === 'benchmarks' && (
+        <BenchmarkingAnalysis />
+      )}
+
+      {/* Win/Loss Analysis Tab */}
+      {viewMode === 'win-loss' && (
+        <div
+          className="rounded-lg p-4"
+          style={{
+            background: 'var(--color-sentinel-bg-panel)',
+            border: '1px solid var(--color-sentinel-border)',
+          }}
+        >
+          <h2 className="text-lg font-semibold" style={{ color: 'var(--color-sentinel-text-primary)' }}>
+            Win/Loss Analysis
+          </h2>
+          <p className="mt-2 text-sm" style={{ color: 'var(--color-sentinel-text-secondary)' }}>
+            Integrated in the Benchmarking Analysis tab with market insights
+          </p>
+        </div>
+      )}
     </div>
   )
 }

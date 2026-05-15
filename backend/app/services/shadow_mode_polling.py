@@ -401,6 +401,67 @@ class ShadowModePollingService:
                     "sensor_readings": agg_readings,
                 }
 
+            # ── Map chiller telemetry to individual equipment ────────────────
+            chiller_data = data.get("chiller", {})
+            chiller_readings: dict[str, float] = {}
+            chiller_field_map = {
+                "supply_temp_c": "chw_supply_temp",
+                "return_temp_c": "chw_return_temp",
+                "condenser_flow_ls": "condenser_flow",
+                "condenser_supply_temp_c": "cond_supply_temp",
+                "condenser_return_temp_c": "cond_return_temp",
+                "compressor_current_1_a": "compressor_current_1",
+                "compressor_current_2_a": "compressor_current_2",
+                "staging_state": "staging_state",
+            }
+            for bridge_key, op_key in chiller_field_map.items():
+                val = chiller_data.get(bridge_key)
+                if val is not None:
+                    chiller_readings[op_key] = float(val)
+            if chiller_readings:
+                agg_states["S002-CHILLER-B1-001"] = {
+                    "type": "chiller",
+                    "health_score": 72,
+                    "sensor_readings": chiller_readings,
+                }
+
+            # Map cooling tower fan speed from chiller block
+            ct_fan = chiller_data.get("cooling_tower_fan_speed_pct")
+            if ct_fan is not None:
+                agg_states["S002-CT-R-001"] = {
+                    "type": "cooling_tower",
+                    "health_score": 72,
+                    "sensor_readings": {"fan_speed_pct": float(ct_fan)},
+                }
+
+            # ── Map AHU telemetry to individual equipment ────────────────────
+            # Bridge telemetry ahu1/ahu2/ahu3 maps to zone-code format in Supabase
+            ahu_data = data.get("ahu", {})
+            ahu_map = {
+                "ahu1": "S002-AHU-001",    # Basement AHU
+                "ahu2": "S002-AHU-002",    # Rooftop AHU
+                "ahu3": "S002-AHU-201",    # Level 2 AHU
+            }
+            ahu_field_map = {
+                "supply_temp_c": "supply_air_temp",
+                "return_temp_c": "return_air_temp",
+                "fan_speed_hz": "fan_speed",
+                "filter_dp_pa": "filter_dp",
+            }
+            for ahu_prefix, equip_code in ahu_map.items():
+                ahu_readings: dict[str, float] = {}
+                for bridge_suffix, op_key in ahu_field_map.items():
+                    key = f"{ahu_prefix}_{bridge_suffix}"
+                    val = ahu_data.get(key)
+                    if val is not None:
+                        ahu_readings[op_key] = float(val)
+                if ahu_readings:
+                    agg_states[equip_code] = {
+                        "type": "ahu",
+                        "health_score": 72,
+                        "sensor_readings": ahu_readings,
+                    }
+
             zone_count = data.get("zone_count", 0)
             equip_online = equip_summary.get("online", 0)
             if zone_count or equip_online:
@@ -1109,7 +1170,20 @@ class ShadowModePollingService:
             # Bridge returns truncated codes (up to 15 chars) that may cut mid-word
             # (e.g. "S002-MTR-B1-MAI" = DB "S002-MTR-B1-MAIN", "S002-MTR-R-SOL" = DB "S002-MTR-R-SOLAR").
             # We match by checking if the bridge code is a prefix of the DB code.
+            # Also normalises naming differences: bridge uses underscores (DALI_L1_B),
+            # DB uses S002- prefix + hyphens (S002-DALI-L1-B).
             db_full_codes = [eq.get("code") for eq in all_equipment]
+
+            def _normalise(code: str) -> str:
+                """Strip S002- prefix and replace underscores with hyphens for matching."""
+                c = code.replace("_", "-")
+                if c.startswith("S002-"):
+                    c = c[5:]
+                return c
+
+            db_norm_to_full: dict[str, str] = {}
+            for dbc in db_full_codes:
+                db_norm_to_full.setdefault(_normalise(dbc), dbc)
 
             # Build sets for membership tests
             db_full_set = set(db_full_codes)
@@ -1122,6 +1196,11 @@ class ShadowModePollingService:
                 if bcode in db_full_set:
                     bridge_to_db[bcode] = bcode  # exact match
                 else:
+                    # Try normalised match: strip S002- and replace _ with -
+                    bcode_norm = _normalise(bcode)
+                    if bcode_norm in db_norm_to_full:
+                        bridge_to_db[bcode] = db_norm_to_full[bcode_norm]
+                        continue
                     # Try prefix match: bridge code as prefix of DB code
                     matched = None
                     for db_code in db_full_codes:

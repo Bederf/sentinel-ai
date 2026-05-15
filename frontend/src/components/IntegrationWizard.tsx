@@ -1,4 +1,3 @@
-// IntegrationWizard.tsx
 import { useState } from 'react';
 
 import { CheckCircle } from 'lucide-react';
@@ -61,13 +60,13 @@ function ReviewStep({ siteId, wizardData, onActivate, onBack }: ReviewStepProps)
         <div className="flex justify-center">
           <CheckCircle className="w-16 h-16 text-green-500" />
         </div>
-        <Title>Integration Activated!</Title>
-        <Text>
+        <h2 className="text-lg font-semibold" style={{ color: 'var(--color-sentinel-text-primary)' }}>Integration Activated!</h2>
+        <p style={{ color: 'var(--color-sentinel-text-secondary)' }}>
           Your BMS integration has been successfully configured and activated.
           Data sync will begin according to your settings.
-        </Text>
-        <div className="bg-gray-50 rounded-lg p-4 mt-4 text-left">
-          <Title className="text-lg">Configuration Summary</Title>
+        </p>
+        <div className="rounded-lg p-4 mt-4 text-left" style={{ background: 'var(--color-sentinel-bg-secondary)', border: '1px solid var(--glass-border)' }}>
+          <h3 className="text-base font-semibold" style={{ color: 'var(--color-sentinel-text-primary)' }}>Configuration Summary</h3>
           <div className="mt-4 space-y-2 text-sm">
             <p><strong>Building ID:</strong> {siteId}</p>
             <p><strong>File:</strong> {wizardData.file?.name}</p>
@@ -85,33 +84,32 @@ function ReviewStep({ siteId, wizardData, onActivate, onBack }: ReviewStepProps)
   return (
     <div className="space-y-6">
       <div>
-        <Title>Review & Activate Integration</Title>
-        <Text className="mt-2">
+        <h2 className="text-lg font-semibold" style={{ color: 'var(--color-sentinel-text-primary)' }}>Review & Activate Integration</h2>
+        <p className="mt-2 text-sm" style={{ color: 'var(--color-sentinel-text-secondary)' }}>
           Review your integration configuration before activating. You can go back to make changes if needed.
-        </Text>
+        </p>
       </div>
 
-      {/* Summary Card */}
       <div className="rounded-lg p-4" style={{ background: 'var(--color-sentinel-bg-panel)', border: '1px solid var(--color-sentinel-border)' }}>
         <h3 className="text-lg font-semibold" style={{ color: 'var(--color-sentinel-text-primary)' }}>Configuration Summary</h3>
         <div className="mt-4 space-y-4">
           <div>
-            <h3 className="font-medium text-gray-700">Source File</h3>
-            <p className="text-sm text-gray-600">{wizardData.file?.name}</p>
+            <h3 className="font-medium" style={{ color: 'var(--color-sentinel-text-primary)' }}>Source File</h3>
+            <p className="text-sm" style={{ color: 'var(--color-sentinel-text-secondary)' }}>{wizardData.file?.name}</p>
           </div>
 
           <div>
-            <h3 className="font-medium text-gray-700">Format Detection</h3>
+            <h3 className="font-medium" style={{ color: 'var(--color-sentinel-text-primary)' }}>Format Detection</h3>
             <div className="grid grid-cols-2 gap-2 mt-2 text-sm">
               <div><strong>Format:</strong> {wizardData.formatDetection?.file_format.toUpperCase()}</div>
               <div><strong>Vendor:</strong> {wizardData.formatDetection?.vendor}</div>
-              <div><strong>Delimiter:</strong> "{wizardData.formatDetection?.delimiter}"</div>
+              <div><strong>Delimiter:</strong> &ldquo;{wizardData.formatDetection?.delimiter}&rdquo;</div>
               <div><strong>Rows:</strong> {wizardData.formatDetection?.row_count.toLocaleString()}</div>
             </div>
           </div>
 
           <div>
-            <h3 className="font-medium text-gray-700">Point Matching</h3>
+            <h3 className="font-medium" style={{ color: 'var(--color-sentinel-text-primary)' }}>Point Matching</h3>
             <div className="grid grid-cols-2 gap-2 mt-2 text-sm">
               <div><strong>Total Points:</strong> {wizardData.pointMatches.length}</div>
               <div><strong>Matched:</strong> {wizardData.pointMatches.filter((m: any) => m.asset_id).length}</div>
@@ -121,7 +119,7 @@ function ReviewStep({ siteId, wizardData, onActivate, onBack }: ReviewStepProps)
           </div>
 
           <div>
-            <h3 className="font-medium text-gray-700">Sync Settings</h3>
+            <h3 className="font-medium" style={{ color: 'var(--color-sentinel-text-primary)' }}>Sync Settings</h3>
             <div className="grid grid-cols-2 gap-2 mt-2 text-sm">
               <div><strong>Poll Frequency:</strong> {wizardData.syncSettings.poll_frequency_minutes} minutes</div>
               <div><strong>Store Raw:</strong> {wizardData.syncSettings.store_raw_days} days</div>
@@ -129,36 +127,55 @@ function ReviewStep({ siteId, wizardData, onActivate, onBack }: ReviewStepProps)
             </div>
           </div>
         </div>
-      </Card>
+      </div>
 
-      {/* Error */}
       {error && (
-        <Callout title="Error" color="rose">{error}</Callout>
+        <div className="p-3 rounded-lg flex items-start gap-2" style={{ background: 'rgba(239,68,68,0.12)', borderLeft: '4px solid #ef4444' }}>
+          <div>
+            <p className="text-sm font-medium" style={{ color: 'var(--color-sentinel-text-primary)' }}>Error</p>
+            <p className="text-xs mt-1" style={{ color: 'var(--color-sentinel-text-secondary)' }}>{error}</p>
+          </div>
+        </div>
       )}
 
-      {/* Warning callout */}
-      <Callout title="Before you activate" color="yellow">
-        <ul className="list-disc list-inside text-sm space-y-1 mt-2">
+      <div className="p-3 rounded-lg" style={{ background: 'rgba(234,179,8,0.12)', borderLeft: '4px solid #eab308' }}>
+        <p className="text-sm font-medium" style={{ color: 'var(--color-sentinel-text-primary)' }}>Before you activate</p>
+        <ul className="list-disc list-inside text-sm space-y-1 mt-2" style={{ color: 'var(--color-sentinel-text-secondary)' }}>
           <li>Ensure your file contains at least 30 days of historical data for best results</li>
           <li>Verify that high-confidence matches look correct</li>
           <li>Review unmatched points and manually match critical assets</li>
           <li>Check that sync settings align with your data retention policies</li>
         </ul>
-      </Callout>
+      </div>
 
-      {/* Actions */}
       <div className="flex justify-between">
-        <Button onClick={onBack} variant="secondary" color="gray" disabled={activating}>
+        <button
+          onClick={onBack}
+          disabled={activating}
+          className="px-4 py-2 text-sm rounded font-medium transition-colors"
+          style={{
+            background: 'var(--color-sentinel-bg-secondary)',
+            color: 'var(--color-sentinel-text-primary)',
+            border: '1px solid var(--color-sentinel-border)',
+            opacity: activating ? 0.5 : 1,
+          }}
+        >
           Back
-        </Button>
+        </button>
 
-        <Button
+        <button
           onClick={handleActivate}
           disabled={activating}
-          color="green"
+          className="px-4 py-2 text-sm rounded font-medium transition-colors"
+          style={{
+            background: 'rgba(16,185,129,0.15)',
+            color: 'var(--color-sentinel-green)',
+            border: '1px solid rgba(16,185,129,0.3)',
+            opacity: activating ? 0.5 : 1,
+          }}
         >
           {activating ? 'Activating...' : 'Activate Integration'}
-        </Button>
+        </button>
       </div>
     </div>
   );
@@ -203,7 +220,7 @@ export function IntegrationWizard({ siteId, onClose, onComplete: _onComplete }: 
   const currentStepIndex = steps.findIndex(s => s.id === currentStep);
 
   return (
-    <Card className="p-6 max-w-4xl mx-auto">
+    <div className="p-6 max-w-4xl mx-auto" style={{ background: 'var(--color-sentinel-bg-panel)', border: '1px solid var(--color-sentinel-border)', borderRadius: 8 }}>
       {/* Progress stepper */}
       <div className="mb-8">
         <div className="flex items-center justify-between">
@@ -232,7 +249,6 @@ export function IntegrationWizard({ siteId, onClose, onComplete: _onComplete }: 
         </div>
       </div>
 
-      {/* Step content */}
       {currentStep === 'upload' && (
         <FileUploadStep
           siteId={siteId}
@@ -272,7 +288,6 @@ export function IntegrationWizard({ siteId, onClose, onComplete: _onComplete }: 
           siteId={siteId}
           wizardData={wizardData}
           onActivate={async () => {
-            // Activate integration
             const response = await authorizedFetch(`${API_BASE_URL}/api/integration/ingest`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -292,9 +307,8 @@ export function IntegrationWizard({ siteId, onClose, onComplete: _onComplete }: 
         />
       )}
 
-      {/* Navigation buttons - hide on review step (handled internally) */}
       {currentStep !== 'review' && (
-        <div className="flex justify-between mt-6 pt-6 border-t">
+        <div className="flex justify-between mt-6 pt-6 border-t" style={{ borderColor: 'var(--color-sentinel-border)' }}>
           {currentStep !== 'upload' && (
             <button
               onClick={() => {
@@ -302,19 +316,21 @@ export function IntegrationWizard({ siteId, onClose, onComplete: _onComplete }: 
                 const idx = stepOrder.indexOf(currentStep);
                 setCurrentStep(stepOrder[idx - 1]);
               }}
-              className="px-4 py-2 text-gray-600 hover:text-gray-800"
+              className="px-4 py-2 text-sm rounded transition-colors"
+              style={{ color: 'var(--color-sentinel-text-secondary)' }}
             >
               Back
             </button>
           )}
           <button
             onClick={onClose}
-            className="px-4 py-2 text-gray-600 hover:text-gray-800 ml-auto"
+            className="px-4 py-2 text-sm rounded transition-colors ml-auto"
+            style={{ color: 'var(--color-sentinel-text-secondary)' }}
           >
             Cancel
           </button>
         </div>
       )}
-    </Card>
+    </div>
   );
 }

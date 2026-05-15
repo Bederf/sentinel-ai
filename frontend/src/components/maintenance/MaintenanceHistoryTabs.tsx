@@ -20,7 +20,7 @@ export function MaintenanceHistoryTabs({ equipmentId }: MaintenanceHistoryTabsPr
         className="text-sm font-semibold mb-3"
         style={{ color: 'var(--color-grafana-text-primary)' }}
       >
-        🔧 Work Order History
+        Service Record History
       </h3>
 
       {/* Work Order List */}

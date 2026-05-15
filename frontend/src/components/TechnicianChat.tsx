@@ -842,42 +842,40 @@ export default function TechnicianChat({ siteId, siteLabel }: TechnicianChatProp
           borderBottom: "1px solid var(--color-sentinel-border)",
         }}
       >
-        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-          <div className="min-w-0">
-            <h2 className="text-lg font-semibold flex items-center gap-2" style={{ color: "var(--color-sentinel-text-primary)" }}>
-              <Wrench className="w-5 h-5" style={{ color: "var(--color-sentinel-blue)" }} />
+        <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
+          <div className="min-w-0 flex items-center gap-3 flex-wrap">
+            <h2 className="text-base font-semibold flex items-center gap-1.5 shrink-0" style={{ color: "var(--color-sentinel-text-primary)" }}>
+              <Wrench className="w-4 h-4" style={{ color: "var(--color-sentinel-blue)" }} />
               SENTINEL Tech Chat
             </h2>
-            <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+            <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
               Your expert colleague in your pocket
-            </p>
+            </span>
             {siteLabel && (
-              <p className="mt-1 text-xs uppercase tracking-[0.16em]" style={{ color: "var(--color-sentinel-text-disabled)" }}>
-                Site scoped to {siteLabel}
-              </p>
+              <span className="text-[10px] uppercase tracking-[0.12em]" style={{ color: "var(--color-sentinel-text-disabled)" }}>
+                · {siteLabel}
+              </span>
             )}
-            <div className="mt-2 flex flex-wrap items-center gap-2">
-              <span
-                className="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em]"
-                style={{
-                  background: "rgba(59, 130, 246, 0.18)",
-                  border: "1px solid rgba(59, 130, 246, 0.4)",
-                  color: "var(--color-sentinel-blue)",
-                }}
-              >
-                Tech-RAG Scope: Technician docs only
-              </span>
-              <span
-                className="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-medium"
-                style={{
-                  background: "var(--color-sentinel-bg-secondary)",
-                  border: "1px solid var(--color-sentinel-border)",
-                  color: "var(--color-sentinel-text-secondary)",
-                }}
-              >
-                Provenance: equipment/work-order scoped
-              </span>
-            </div>
+            <span
+              className="inline-flex items-center rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.1em]"
+              style={{
+                background: "rgba(59, 130, 246, 0.18)",
+                border: "1px solid rgba(59, 130, 246, 0.4)",
+                color: "var(--color-sentinel-blue)",
+              }}
+            >
+              Tech docs only
+            </span>
+            <span
+              className="inline-flex items-center rounded-full px-2 py-0.5 text-[9px] font-medium"
+              style={{
+                background: "var(--color-sentinel-bg-secondary)",
+                border: "1px solid var(--color-sentinel-border)",
+                color: "var(--color-sentinel-text-secondary)",
+              }}
+            >
+              Equipment scoped
+            </span>
           </div>
 
           <div className="flex flex-col items-start gap-2 md:items-end">

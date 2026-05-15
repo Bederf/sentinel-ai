@@ -4,15 +4,18 @@ Security: GET endpoints require AUDITOR (level 1), PUT endpoints require ADMIN (
 Phase 137-09: CONFIG_CHANGE audit events on all PUT endpoints.
 """
 
+from __future__ import annotations
+
 import json
 import logging
-from datetime import datetime, UTC
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
+from app.database.supabase_client import get_supabase_client
 from app.middleware.auth_middleware import require_site_access
 from app.models.auth import AuthContext
 from app.security.audit_events import audit_config_change
@@ -20,51 +23,68 @@ from app.security.pipeline import require_role
 from app.services.site_ai_policy_service import get_site_ai_policy, set_site_ai_policy
 
 logger = logging.getLogger(__name__)
-
-router = APIRouter()
-
-
-class SiteAiPolicyUpdate(BaseModel):
-    """Site-scoped AI policy update payload."""
-
-    chat_local_ai_only: bool
-    allow_tool_calling: bool
-    show_recommendations_in_shadow: bool
+router = APIRouter(dependencies=[Depends(require_role(1))])
 
 
-# Path to settings data file
-DATA_DIR = Path(__file__).parent.parent / "data"
-SETTINGS_FILE = DATA_DIR / "settings.json"
+DEFAULT_SETTINGS = {
+    "healthThresholds": {"healthy": 90, "warning": 70, "critical": 0},
+    "riskThresholds": {"medium": 31, "high": 61, "critical": 81},
+    "notifications": {},
+    "display": {},
+    "siteAiPolicies": {},
+}
 
 
-def load_settings() -> dict[str, Any]:
-    """Load settings from JSON file."""
-    if not SETTINGS_FILE.exists():
-        # Create default settings if file doesn't exist
-        default_settings = {
-            "healthThresholds": {"healthy": 90, "warning": 70, "critical": 0},
-            "riskThresholds": {"medium": 31, "high": 61, "critical": 81},
-            "notifications": {},
-            "display": {},
-        }
-        save_settings(default_settings)
-        return default_settings
-
+def _load_all() -> dict[str, Any]:
+    """Load settings from Supabase system_settings table, merged with defaults."""
     try:
-        with open(SETTINGS_FILE) as f:
-            return json.load(f)
+        supabase = get_supabase_client()
+        result = supabase.table("system_settings").select("key, value").execute()
+        merged = dict(DEFAULT_SETTINGS)
+        for row in result.data or []:
+            merged[row["key"]] = row["value"]
+        return merged
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to load settings: {e!s}")
+        logger.warning(f"Failed to load settings from Supabase: {e}")
+        return dict(DEFAULT_SETTINGS)
 
 
-def save_settings(settings_data: dict[str, Any]) -> None:
-    """Save settings to JSON file."""
+def _get_setting(key: str) -> Any:
+    """Get a single setting by key from Supabase."""
     try:
-        SETTINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
-        with open(SETTINGS_FILE, "w") as f:
-            json.dump(settings_data, f, indent=2)
+        supabase = get_supabase_client()
+        result = supabase.table("system_settings").select("value").eq("key", key).limit(1).execute()
+        if result.data:
+            return result.data[0]["value"]
+    except Exception:
+        pass
+    return DEFAULT_SETTINGS.get(key)
+
+
+def _upsert_setting(key: str, value: Any) -> None:
+    """Upsert a setting into Supabase system_settings table."""
+    try:
+        supabase = get_supabase_client()
+        existing = supabase.table("system_settings").select("id").eq("key", key).limit(1).execute()
+        now = datetime.utcnow().isoformat()
+        if existing.data:
+            supabase.table("system_settings").update({"value": value, "updated_at": now}).eq("key", key).execute()
+        else:
+            supabase.table("system_settings").insert({
+                "key": key,
+                "value": value,
+                "category": key,
+                "data_type": "object",
+                "created_at": now,
+                "updated_at": now,
+            }).execute()
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to save settings: {e!s}")
+        logger.error(f"Failed to save setting '{key}': {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to save setting: {e!s}")
+
+
+# Public alias for external consumers (cockpit_policy_resolution, etc.)
+load_settings = _load_all
 
 
 # Path to onboarding phase state file (mirrors sites.py _ONBOARDING_PHASE_FILE)
@@ -87,7 +107,12 @@ def _save_phase_state_for_site(site_id: str, stage: str) -> None:
 @router.get("/settings")
 async def get_all_settings(auth: AuthContext = Depends(require_role(1))) -> dict[str, Any]:
     """Get all settings. Requires AUDITOR (level 1)."""
-    return load_settings()
+    try:
+        return _load_all()
+    except Exception as e:
+        import traceback
+        logger.error(f"settings/all error: {e}\n{traceback.format_exc()}")
+        raise
 
 
 @router.put("/settings")
@@ -144,18 +169,15 @@ async def update_all_settings(
         if "critical" in thresholds and "high" in thresholds and thresholds["critical"] <= thresholds["high"]:
             raise HTTPException(status_code=400, detail="critical risk threshold must be greater than high threshold")
 
-    # Merge with existing settings
-    current_settings = load_settings()
-    current_settings.update(settings_data)
-
-    # Save to file
-    save_settings(current_settings)
+    # Upsert each key to Supabase
+    for key, value in settings_data.items():
+        _upsert_setting(key, value)
 
     # Audit: CONFIG_CHANGE
     source_ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else None)
     audit_config_change("settings.all", user=auth.user_id, source_ip=source_ip)
 
-    return current_settings
+    return _load_all()
 
 
 # Default notification settings (used when not configured)
@@ -176,8 +198,7 @@ VALID_ALERT_COMMANDS = {"reset", "info", "note", "wo"}
 @router.get("/settings/notifications")
 async def get_notification_settings(auth: AuthContext = Depends(require_role(1))) -> dict[str, Any]:
     """Get notification settings including alert command config. Requires AUDITOR (level 1)."""
-    settings_data = load_settings()
-    return settings_data.get("notifications", DEFAULT_NOTIFICATION_SETTINGS)
+    return _get_setting("notifications") or DEFAULT_NOTIFICATION_SETTINGS
 
 
 @router.put("/settings/notifications")
@@ -222,35 +243,35 @@ async def update_notification_settings(
         if not isinstance(blocked, list) or not all(isinstance(t, str) for t in blocked):
             raise HTTPException(status_code=400, detail="resetBlockedTypes must be an array of strings")
 
-    # Merge with existing settings
-    current_settings = load_settings()
-    current_notifications = current_settings.get("notifications", {})
-
-    # Deep merge alertCommands
-    if "alertCommands" in notifications and "alertCommands" in current_notifications:
+    # Merge with existing
+    current = _get_setting("notifications") or {}
+    if "alertCommands" in notifications and "alertCommands" in current:
         for key, config in notifications["alertCommands"].items():
-            if key in current_notifications["alertCommands"]:
-                current_notifications["alertCommands"][key].update(config)
+            if key in current["alertCommands"]:
+                current["alertCommands"][key].update(config)
             else:
-                current_notifications["alertCommands"][key] = config
-        notifications["alertCommands"] = current_notifications["alertCommands"]
+                current["alertCommands"][key] = config
+        notifications["alertCommands"] = current["alertCommands"]
 
-    current_notifications.update(notifications)
-    current_settings["notifications"] = current_notifications
-    save_settings(current_settings)
+    current.update(notifications)
+    _upsert_setting("notifications", current)
 
     # Audit: CONFIG_CHANGE
     source_ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else None)
     audit_config_change("settings.notifications", user=auth.user_id, source_ip=source_ip)
 
-    return current_notifications
+    return current
 
 
 @router.get("/settings/health-thresholds")
 async def get_health_thresholds(auth: AuthContext = Depends(require_role(1))) -> dict[str, int]:
     """Get health score thresholds. Requires AUDITOR (level 1)."""
-    settings_data = load_settings()
-    return settings_data.get("healthThresholds", {"healthy": 90, "warning": 70, "critical": 0})
+    try:
+        return _get_setting("healthThresholds") or {"healthy": 90, "warning": 70, "critical": 0}
+    except Exception as e:
+        import traceback
+        logger.error(f"settings/health-thresholds error: {e}\n{traceback.format_exc()}")
+        raise
 
 
 @router.put("/settings/health-thresholds")
@@ -260,38 +281,28 @@ async def update_health_thresholds(
     auth: AuthContext = Depends(require_role(4)),
 ) -> dict[str, int]:
     """Update health score thresholds. Requires ADMIN (level 4)."""
-    # Validate required fields
     required_fields = ["healthy", "warning", "critical"]
     for field in required_fields:
         if field not in thresholds:
             raise HTTPException(status_code=400, detail=f"Missing required field: {field}")
 
-    # Validate threshold values are numbers
     for field in required_fields:
         if not isinstance(thresholds[field], (int, float)):
             raise HTTPException(status_code=400, detail=f"{field} must be a number")
 
-    # Validate threshold ranges (0-100)
     for field in required_fields:
         value = thresholds[field]
         if not (0 <= value <= 100):
             raise HTTPException(status_code=400, detail=f"{field} must be between 0 and 100")
 
-    # Validate threshold ordering (healthy > warning > critical)
     if thresholds["healthy"] <= thresholds["warning"]:
         raise HTTPException(status_code=400, detail="healthy threshold must be greater than warning threshold")
 
     if thresholds["warning"] <= thresholds["critical"]:
         raise HTTPException(status_code=400, detail="warning threshold must be greater than critical threshold")
 
-    # Load current settings and update thresholds
-    current_settings = load_settings()
-    current_settings["healthThresholds"] = thresholds
+    _upsert_setting("healthThresholds", thresholds)
 
-    # Save to file
-    save_settings(current_settings)
-
-    # Audit: CONFIG_CHANGE
     source_ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else None)
     audit_config_change("settings.health-thresholds", user=auth.user_id, source_ip=source_ip)
 
@@ -301,8 +312,7 @@ async def update_health_thresholds(
 @router.get("/settings/risk-thresholds")
 async def get_risk_thresholds(auth: AuthContext = Depends(require_role(1))) -> dict[str, int]:
     """Get risk score thresholds. Requires AUDITOR (level 1)."""
-    settings_data = load_settings()
-    return settings_data.get("riskThresholds", {"medium": 31, "high": 61, "critical": 81})
+    return _get_setting("riskThresholds") or {"medium": 31, "high": 61, "critical": 81}
 
 
 @router.put("/settings/risk-thresholds")
@@ -332,9 +342,7 @@ async def update_risk_thresholds(
     if thresholds["critical"] <= thresholds["high"]:
         raise HTTPException(status_code=400, detail="critical threshold must be greater than high threshold")
 
-    current_settings = load_settings()
-    current_settings["riskThresholds"] = thresholds
-    save_settings(current_settings)
+    _upsert_setting("riskThresholds", thresholds)
 
     source_ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else None)
     audit_config_change("settings.risk-thresholds", user=auth.user_id, source_ip=source_ip)
@@ -347,11 +355,9 @@ async def get_ml_training_status(auth: AuthContext = Depends(require_role(1))) -
     """Get ML background training status."""
     from app.config.settings import settings as app_settings
 
-    settings_data = load_settings()
-    return {
-        "enabled": settings_data.get("mlBackgroundTraining", app_settings.ml_background_training_enabled),
-        "env_default": app_settings.ml_background_training_enabled,
-    }
+    stored = _get_setting("mlBackgroundTraining")
+    enabled = stored if isinstance(stored, bool) else app_settings.ml_background_training_enabled
+    return {"enabled": enabled, "env_default": app_settings.ml_background_training_enabled}
 
 
 @router.put("/settings/ml-training")
@@ -362,10 +368,7 @@ async def toggle_ml_training(
 ) -> dict[str, Any]:
     """Toggle ML background training. Requires ADMIN. Takes effect on next restart."""
     enabled = body.get("enabled", False)
-
-    current_settings = load_settings()
-    current_settings["mlBackgroundTraining"] = enabled
-    save_settings(current_settings)
+    _upsert_setting("mlBackgroundTraining", enabled)
 
     source_ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else None)
     audit_config_change("settings.ml-training", user=auth.user_id, source_ip=source_ip)
@@ -403,6 +406,14 @@ async def update_site_ai_policy_settings(
 
 # Valid site deployment stages
 VALID_DEPLOYMENT_STAGES = {"shadow", "advisory", "supervised", "commissioning"}
+
+
+class SiteAiPolicyUpdate(BaseModel):
+    """Site-scoped AI policy update payload."""
+
+    chat_local_ai_only: bool = False
+    allow_tool_calling: bool = True
+    show_recommendations_in_shadow: bool = False
 
 
 class SiteModeUpdate(BaseModel):
@@ -466,7 +477,7 @@ async def set_site_mode(
     state["candidate_since"] = None
     state["violation_stage"] = None
     state["violation_since"] = None
-    state["last_evaluated_at"] = datetime.now(UTC).isoformat()
+    state["last_evaluated_at"] = datetime.now(timezone.utc).isoformat()
     svc._save_state(site_id, state)
 
     # Also persist to onboarding_phase_state.json so get_sites_from_supabase picks it up

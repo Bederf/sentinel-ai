@@ -198,6 +198,7 @@ export function useSettingsController({ siteId, onError }: UseSettingsController
   const canManageFeatureAccess = currentUserRole === "admin";
   const readOnly = currentUserRole !== "admin" && !settingsPageUnlocked;
   const canToggleModules = currentUserRole === "admin";
+  const [sitePhase, setSitePhase] = useState<string | null>(null);
   const loading = healthThresholdLoading || riskThresholdLoading;
 
   useEffect(() => {
@@ -212,6 +213,12 @@ export function useSettingsController({ siteId, onError }: UseSettingsController
     if (!selectedSiteId) return;
     const selectedSiteName = buildings.find((building) => building.id === selectedSiteId)?.name || selectedSiteId;
     setModuleSite(selectedSiteId, selectedSiteName);
+    // Fetch site phase for control toggle gating
+    import('@/lib/api').then(({ api }) =>
+      api.getSiteSettings?.(selectedSiteId).then((r: any) =>
+        setSitePhase(r.onboarding_phase || null)
+      ).catch(() => {})
+    ).catch(() => {});
   }, [buildings, selectedSiteId, setModuleSite]);
 
   const { handleMlTrainingToggle, mlTrainingEnabled, mlTrainingLoading } = useMlTrainingSettings(
@@ -298,5 +305,6 @@ export function useSettingsController({ siteId, onError }: UseSettingsController
     setShowPasswordModal,
     showPasswordModal,
     togglingCardId,
+    canToggleControl: sitePhase === "supervised" || sitePhase === "auto",
   };
 }

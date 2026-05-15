@@ -213,7 +213,7 @@ class EnergyConsumptionRepository:
         if not records:
             return []
 
-        response = self.client.table("energy_consumption_history").upsert(records, on_conflict="site_id,date").execute()
+        response = self.client.table("energy_consumption_history").upsert(records, on_conflict="building_id,date").execute()
 
         return response.data
 

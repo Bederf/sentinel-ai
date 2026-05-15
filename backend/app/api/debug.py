@@ -135,14 +135,8 @@ async def trigger_energy_poll() -> dict:
     except Exception as e:
         raise HTTPException(status_code=503, detail=f"Service not initialized: {e}")
 
-    # Run a synchronous poll in async context
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    try:
-        result = loop.run_until_complete(svc.poll())
-        _ = result.get("errors", [])  # trigger errors field for logging visibility
-    finally:
-        loop.close()
+    result = await svc.poll()
+    _ = result.get("errors", [])
 
     now = datetime.now(UTC)
     next_hour = (now + timedelta(hours=1)).replace(minute=0, second=0, microsecond=0)

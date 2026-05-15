@@ -38,7 +38,8 @@ export type View =
   | "settings"
   | "financial"
   | "fleet-ml"
-  | "compliance";
+  | "compliance"
+  | "digital-twin";
 
 export type NavCategory = "base" | "addon" | "admin";
 
@@ -65,6 +66,7 @@ export const VIEW_TITLES: Record<View, string> = {
   financial: "Financial",
   "fleet-ml": "Fleet ML",
   compliance: "Compliance",
+  "digital-twin": "Digital Twin",
 };
 
 /**
@@ -91,6 +93,7 @@ export const ADMIN_NAV_ITEMS: NavItem[] = [
  * Only visible when the respective add-on module is active.
  */
 export const ADDON_NAV_ITEMS: NavItem[] = [
+  { id: "digital-twin", label: "Digital Twin", icon: Activity, description: "3D building visualization", category: "addon", requiredModule: "digital_twin" },
   { id: "financial",   label: "Financial",   icon: DollarSign,      description: "Contracts and billing",            category: "addon", requiredModule: "financial" },
   { id: "fleet-ml",   label: "Fleet ML",    icon: Brain,           description: "Cross-site analytics",             category: "addon", requiredModule: "fleet_ml" },
   { id: "compliance", label: "Compliance",  icon: ClipboardCheck,  description: "OHS, Fire, Electrical, Lift safety", category: "addon", requiredModule: "compliance" },
@@ -145,7 +148,6 @@ export const BUILDING_TAB_ITEMS: BuildingTabItem[] = [
   { id: "water", label: "Water", icon: Droplets, controlModule: "water_control", requiredModule: "water" },
   { id: "fire", label: "Fire", icon: Activity, requiredModule: "fire" },
   { id: "security", label: "Security", icon: Shield, controlModule: "security_control", requiredModule: "security" },
-  { id: "digital-twin", label: "Digital Twin", icon: Activity, controlModule: "digital_twin_control", requiredModule: "digital_twin" },
   { id: "controls", label: "Controls", icon: Sliders },
   { id: "space", label: "Space", icon: LayoutGrid, requiredModule: "space_optimization" },
   { id: "fuel", label: "Fuel", icon: Fuel, requiredModule: "fuel" },

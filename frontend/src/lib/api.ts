@@ -593,6 +593,23 @@ export interface EquipmentMetadataResponse {
   last_discovery?: string;
 }
 
+export interface ServiceRecord {
+  id?: string;
+  code: string;
+  work_order_id?: string;
+  equipment_id: string;
+  site_id?: string;
+  service_type: string;
+  technician_id: string;
+  technician_name: string;
+  started_at?: string;
+  completed_at?: string;
+  status: string;
+  confirmed_fault?: string;
+  actual_repair?: string;
+  created_at?: string;
+}
+
 export interface NotesHistoryItem {
   id: string;
   equipment_id: string;
@@ -1708,6 +1725,10 @@ export const api = {
    * @param equipmentId - Equipment UUID or code
    * @param limit - Max records to return
    */
+  async getServiceRecords(equipmentId: string): Promise<ServiceRecord[]> {
+    return fetchApi<ServiceRecord[]>(`/api/service-records?equipment_id=${encodeURIComponent(equipmentId)}`);
+  },
+
   async getEquipmentNotesHistory(
     equipmentId: string,
     limit: number = 20

@@ -18,6 +18,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from app.database.supabase_client import get_supabase_client
 from app.models.audit_log import AuditActionType, AuditLogEntry, AuditResultType
 from app.database.repositories.audit_repository import AuditRepository
 from app.services.encryption_service import get_encryption_service
@@ -477,28 +478,39 @@ class AuditLogger:
         )
         entries = []
         for row in rows:
+            # Decrypt sensitive fields before display
+            # DB stores as user_id; decrypt expects user — remap before/after
+            decrypted = dict(row)
+            user_val = decrypted.pop("user_id", None)
+            if user_val is not None:
+                decrypted["user"] = user_val
+            decrypted = self._decrypt_audit_entry(decrypted) if self.encryption_service.enabled else decrypted
+            decrypted["user_id"] = decrypted.pop("user", "")
+
             # Apply time filters in Python (repo doesn't support range filter)
-            ts = datetime.fromisoformat(row["timestamp"].replace("Z", "+00:00")) if isinstance(row["timestamp"], str) else row["timestamp"]
+            ts = datetime.fromisoformat(decrypted["timestamp"].replace("Z", "+00:00")) if isinstance(decrypted["timestamp"], str) else decrypted["timestamp"]
+            if hasattr(ts, "tzinfo") and ts.tzinfo is not None:
+                ts = ts.replace(tzinfo=None)
             if start_time and ts < start_time:
                 continue
             if end_time and ts > end_time:
                 continue
-            if result and row.get("result") != result.value:
+            if result and decrypted.get("result") != result.value:
                 continue
             entries.append(AuditLogEntry(
-                id=row["id"],
+                id=decrypted["id"],
                 timestamp=ts,
-                action=AuditActionType(row.get("action", "system_event")),
-                user=row.get("user_id", ""),
-                result=AuditResultType(row.get("result", "warning")),
-                device_id=row.get("device_id"),
-                point_name=row.get("point_name"),
-                old_value=row.get("old_value"),
-                new_value=row.get("new_value"),
-                safety_validation=row.get("safety_validation"),
-                error_message=row.get("error_message"),
-                correlation_id=row.get("correlation_id"),
-                metadata=row.get("metadata", {}),
+                action=AuditActionType(decrypted.get("action", "system_event")),
+                user=decrypted.get("user_id", ""),
+                result=AuditResultType(decrypted.get("result", "warning")),
+                device_id=decrypted.get("device_id"),
+                point_name=decrypted.get("point_name"),
+                old_value=decrypted.get("old_value"),
+                new_value=decrypted.get("new_value"),
+                safety_validation=decrypted.get("safety_validation"),
+                error_message=decrypted.get("error_message"),
+                correlation_id=decrypted.get("correlation_id"),
+                metadata=decrypted.get("metadata", {}),
             ))
         # Add buffered entries
         entries.extend(self.buffer)

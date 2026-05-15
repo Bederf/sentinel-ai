@@ -371,6 +371,13 @@ class Settings(BaseSettings):
     intelligence_intake_imap_password: str = ""
     intelligence_intake_imap_folder: str = "INBOX"
 
+    # Rooms mailbox IMAP (replaces n8n block-booking email ingest)
+    rooms_imap_host: str = ""
+    rooms_imap_port: int = 993
+    rooms_imap_username: str = ""
+    rooms_imap_password: str = ""
+    rooms_imap_folder: str = "INBOX"
+
     # Edge mode: disables ML training, simulation queue, and AEGIS evidence jobs
     # for resource-constrained deployments (Jetson, lightweight VPS)
     edge_mode: bool = False
@@ -485,6 +492,11 @@ class Settings(BaseSettings):
     desigo_sender_email: str = "noreply@fnb.co.za"  # Authorised Desigo sender address
     plant_site_id: str = Field(default="", validation_alias="PLANT_SITE_ID")  # Required env var
     plant_building_name: str = Field(default="", validation_alias="BUILDING_NAME")  # Required env var
+
+    # Fleet ML cross-portfolio analytics (Phase 45)
+    # False by default — synthetic benchmark data must not be shown
+    # as real portfolio analysis. Enable when 2+ sites reach advisory.
+    fleet_ml_enabled: bool = False
 
     # MRI Evolution Connector (Phase 178)
     mri_evolution_base_url: str = Field(default="", validation_alias="MRI_EVOLUTION_BASE_URL")

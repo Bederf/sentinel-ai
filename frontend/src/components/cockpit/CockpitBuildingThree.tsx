@@ -540,38 +540,6 @@ function ZoneMarkers({
   )
 }
 
-function CameraToolbar({
-  onZoomIn,
-  onZoomOut,
-  onReset,
-}: {
-  onZoomIn: () => void
-  onZoomOut: () => void
-  onReset: () => void
-}) {
-  const btn =
-    'rounded-full border border-white/15 bg-slate-950/80 px-3 py-1.5 text-[10px] font-medium uppercase tracking-[0.14em] text-slate-200 backdrop-blur-sm transition hover:border-cyan-500/40 hover:text-white'
-  return (
-    <div className="pointer-events-auto absolute left-3 top-3 z-20 flex flex-wrap gap-2">
-      <button type="button" className={btn} onClick={onZoomOut}>Zoom out</button>
-      <button type="button" className={btn} onClick={onZoomIn}>Zoom in</button>
-      <button type="button" className={btn} onClick={onReset}>Reset view</button>
-    </div>
-  )
-}
-
-function zoomCameraTowardTarget(oc: OrbitControlsImpl, factor: number) {
-  const dir = oc.object.position.clone().sub(oc.target)
-  const len = dir.length()
-  if (len < 0.02) return
-  dir.normalize()
-  const minD = oc.minDistance ?? 2
-  const maxD = oc.maxDistance ?? 50
-  const nextLen = THREE.MathUtils.clamp(len * factor, minD, maxD)
-  oc.object.position.copy(oc.target.clone().add(dir.multiplyScalar(nextLen)))
-  oc.update()
-}
-
 function SceneR3F({
   state,
   controlsRef,
@@ -690,18 +658,6 @@ export function CockpitBuildingThree({ state, className, onZoneSelect }: Cockpit
 
   const { computedTarget, defaultCam } = layout
 
-  const zoomIn = useCallback(() => {
-    const oc = controlsRef.current
-    if (!oc) return
-    zoomCameraTowardTarget(oc, 0.92)
-  }, [])
-
-  const zoomOut = useCallback(() => {
-    const oc = controlsRef.current
-    if (!oc) return
-    zoomCameraTowardTarget(oc, 1.09)
-  }, [])
-
   const reset = useCallback(() => {
     const oc = controlsRef.current
     if (!oc) return
@@ -714,7 +670,6 @@ export function CockpitBuildingThree({ state, className, onZoneSelect }: Cockpit
 
   return (
     <div className={`relative w-full ${className ?? ''}`} style={{ height: viewportHeight }}>
-      <CameraToolbar onZoomIn={zoomIn} onZoomOut={zoomOut} onReset={reset} />
       <Canvas
         className="h-full w-full"
         style={{ width: '100%', height: '100%' }}

@@ -152,18 +152,16 @@ export function DecisionMomentPage({ payload, onDismiss, siteId: _siteId }: Deci
               Crisis View
             </span>
           </div>
-          <button
-            onClick={onDismiss}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs transition-colors hover:brightness-110"
-            style={{
-              background: "var(--color-sentinel-bg-secondary)",
-              border: "1px solid var(--color-sentinel-border)",
-              color: "var(--color-sentinel-text-secondary)",
-            }}
-          >
-            <X className="h-3.5 w-3.5" />
-            Dismiss Crisis View
-          </button>
+              <button
+                className="px-3 py-1.5 text-sm rounded transition-colors"
+                style={{
+                  background: "var(--color-sentinel-bg-secondary)",
+                  border: "1px solid var(--color-sentinel-border)",
+                  color: "var(--color-sentinel-text-primary)",
+                }}
+              >
+                {surface.action.summary}
+              </button>
         </div>
 
         {/* Default weights warning banner */}
@@ -183,7 +181,7 @@ export function DecisionMomentPage({ payload, onDismiss, siteId: _siteId }: Deci
         )}
 
         {/* CAUSE */}
-        <Card
+        <div
           className="p-0 overflow-hidden"
           style={{
             background: "var(--color-sentinel-bg-panel)",
@@ -236,12 +234,12 @@ export function DecisionMomentPage({ payload, onDismiss, siteId: _siteId }: Deci
             </p>
             {payload.affected_zone_ids.length > 0 && <ZoneChips zoneIds={payload.affected_zone_ids} />}
           </div>
-        </Card>
+        </div>
 
         {/* IMPACT + TIME */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Impact */}
-          <Card
+          <div
             className="p-0 overflow-hidden"
             style={{
               background: "var(--color-sentinel-bg-panel)",
@@ -287,10 +285,10 @@ export function DecisionMomentPage({ payload, onDismiss, siteId: _siteId }: Deci
               </div>
               <UrgencyBar score={payload.urgency_score} />
             </div>
-          </Card>
+          </div>
 
           {/* Time */}
-          <Card
+          <div
             className="p-0 overflow-hidden"
             style={{
               background: "var(--color-sentinel-bg-panel)",
@@ -324,11 +322,11 @@ export function DecisionMomentPage({ payload, onDismiss, siteId: _siteId }: Deci
                 {surface.time.detail}
               </span>
             </div>
-          </Card>
+          </div>
         </div>
 
         {/* ACTION */}
-        <Card
+        <div
           className="p-0 overflow-hidden"
           style={{
             background: "var(--color-sentinel-bg-panel)",
@@ -347,13 +345,16 @@ export function DecisionMomentPage({ payload, onDismiss, siteId: _siteId }: Deci
           </div>
           <div className="px-4 py-4 flex flex-col gap-3">
             <div>
-              <Button
-                size="sm"
-                color={score >= 0.8 ? "red" : score >= 0.6 ? "amber" : "blue"}
-                variant="secondary"
+              <button
+                className="px-3 py-1.5 text-sm rounded transition-colors"
+                style={{
+                  background: "var(--color-sentinel-bg-secondary)",
+                  border: "1px solid var(--color-sentinel-border)",
+                  color: "var(--color-sentinel-text-primary)",
+                }}
               >
                 {surface.action.summary}
-              </Button>
+              </button>
             </div>
             <p className="text-sm font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>
               {surface.action.operatorPrompt}
@@ -398,7 +399,7 @@ export function DecisionMomentPage({ payload, onDismiss, siteId: _siteId }: Deci
               </div>
             )}
           </div>
-        </Card>
+        </div>
       </div>
     </div>
   );

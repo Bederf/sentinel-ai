@@ -8,9 +8,25 @@ Phase 45-02: Fleet Learning and Cross-Site Insights.
 """
 
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
-router = APIRouter(prefix="/api/fleet", tags=["fleet-learning"])
+from app.config.settings import settings
+
+
+async def _require_fleet_ml_enabled():
+    """Gate: Fleet ML must be explicitly enabled."""
+    if not settings.fleet_ml_enabled:
+        raise HTTPException(
+            status_code=404,
+            detail="Fleet ML is not enabled. It activates when multiple sites reach Advisory phase.",
+        )
+
+
+router = APIRouter(
+    prefix="/api/fleet",
+    tags=["fleet-learning"],
+    dependencies=[Depends(_require_fleet_ml_enabled)],
+)
 
 
 # --- Fleet Aggregation ---

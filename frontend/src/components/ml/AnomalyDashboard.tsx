@@ -25,6 +25,30 @@ interface AnomalyDashboardProps {
   refreshInterval?: number;
 }
 
+const severityBgColor = (severity: string): string => {
+  const tremorColor = getSeverityColor(severity as AnomalyResult["severity"]);
+  const map: Record<string, string> = {
+    red: 'rgba(220,38,38,0.15)',
+    orange: 'rgba(245,158,11,0.15)',
+    yellow: 'rgba(245,158,11,0.15)',
+    green: 'rgba(16,185,129,0.15)',
+    gray: 'rgba(139,148,158,0.15)',
+  };
+  return map[tremorColor] || 'rgba(139,148,158,0.15)';
+};
+
+const severityTextColor = (severity: string): string => {
+  const tremorColor = getSeverityColor(severity as AnomalyResult["severity"]);
+  const map: Record<string, string> = {
+    red: 'var(--color-sentinel-red)',
+    orange: 'var(--color-sentinel-amber)',
+    yellow: 'var(--color-sentinel-amber)',
+    green: 'var(--color-sentinel-green)',
+    gray: 'var(--color-sentinel-text-secondary)',
+  };
+  return map[tremorColor] || 'var(--color-sentinel-text-secondary)';
+};
+
 export function AnomalyDashboard({ refreshInterval = 30000 }: AnomalyDashboardProps) {
   const [anomalies, setAnomalies] = useState<AnomalyResult[]>([]);
   const [alerts, setAlerts] = useState<AnomalyResult[]>([]);
@@ -67,170 +91,167 @@ export function AnomalyDashboard({ refreshInterval = 30000 }: AnomalyDashboardPr
 
   if (loading) {
     return (
-      <Card>
-        <Title>Anomaly Detection Dashboard</Title>
+      <div style={{background:'var(--color-sentinel-bg-panel)', border:'1px solid var(--color-sentinel-border)', borderRadius:8}}>
+        <h2 className="text-sm font-semibold" style={{color:'var(--color-sentinel-text-primary)'}}>Anomaly Detection Dashboard</h2>
         <div className="h-96 flex items-center justify-center">
-          <Text>Loading anomaly data...</Text>
+          <p className="text-sm" style={{color:'var(--color-sentinel-text-secondary)'}}>Loading anomaly data...</p>
         </div>
-      </Card>
+      </div>
     );
   }
 
   return (
     <div className="space-y-6">
       {/* Summary Cards */}
-      <Grid className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card decoration="top" decorationColor="green">
-          <Flex justifyContent="start" className="space-x-4">
-            <Icon icon={CheckCircle} color="green" size="lg" />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div style={{background:'var(--color-sentinel-bg-panel)', border:'1px solid var(--color-sentinel-border)', borderRadius:8, borderTop:'3px solid var(--color-sentinel-green)'}}>
+          <div className="flex items-start space-x-4">
+            <CheckCircle className="h-6 w-6" style={{color:'var(--color-sentinel-green)'}} />
             <div>
-              <Text>Normal Equipment</Text>
-              <Metric>{normalCount}</Metric>
+              <p className="text-sm" style={{color:'var(--color-sentinel-text-secondary)'}}>Normal Equipment</p>
+              <div className="text-3xl font-semibold tabular-nums">{normalCount}</div>
             </div>
-          </Flex>
-        </Card>
+          </div>
+        </div>
 
-        <Card decoration="top" decorationColor="red">
-          <Flex justifyContent="start" className="space-x-4">
-            <Icon icon={AlertTriangle} color="red" size="lg" />
+        <div style={{background:'var(--color-sentinel-bg-panel)', border:'1px solid var(--color-sentinel-border)', borderRadius:8, borderTop:'3px solid var(--color-sentinel-red)'}}>
+          <div className="flex items-start space-x-4">
+            <AlertTriangle className="h-6 w-6" style={{color:'var(--color-sentinel-red)'}} />
             <div>
-              <Text>Active Anomalies</Text>
-              <Metric>{anomalyCount}</Metric>
+              <p className="text-sm" style={{color:'var(--color-sentinel-text-secondary)'}}>Active Anomalies</p>
+              <div className="text-3xl font-semibold tabular-nums">{anomalyCount}</div>
             </div>
-          </Flex>
-        </Card>
+          </div>
+        </div>
 
-        <Card decoration="top" decorationColor="blue">
-          <Text>Active Models</Text>
-          <Metric>{health?.active_models || 0}</Metric>
-          <Text className="text-sm text-gray-500">
+        <div style={{background:'var(--color-sentinel-bg-panel)', border:'1px solid var(--color-sentinel-border)', borderRadius:8, borderTop:'3px solid var(--color-sentinel-blue)'}}>
+          <p className="text-sm" style={{color:'var(--color-sentinel-text-secondary)'}}>Active Models</p>
+          <div className="text-3xl font-semibold tabular-nums">{health?.active_models || 0}</div>
+          <p className="text-sm" style={{color:'var(--color-sentinel-text-secondary)'}}>
             {health?.equipment_types_covered?.join(", ") || "None"}
-          </Text>
-        </Card>
+          </p>
+        </div>
 
-        <Card decoration="top" decorationColor="gray">
-          <Text>Last Updated</Text>
-          <Metric className="text-lg">
+        <div style={{background:'var(--color-sentinel-bg-panel)', border:'1px solid var(--color-sentinel-border)', borderRadius:8, borderTop:'3px solid var(--color-sentinel-text-secondary)'}}>
+          <p className="text-sm" style={{color:'var(--color-sentinel-text-secondary)'}}>Last Updated</p>
+          <div className="text-lg font-semibold tabular-nums">
             {lastRefresh.toLocaleTimeString()}
-          </Metric>
-          <Button
-            size="xs"
-            variant="secondary"
-            icon={RefreshCw}
+          </div>
+          <button
             onClick={fetchData}
-            className="mt-2"
+            className="mt-2 inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded"
+            style={{background:'var(--color-sentinel-bg-secondary)', color:'var(--color-sentinel-text-primary)', border:'1px solid var(--color-sentinel-border)'}}
           >
-            Refresh
-          </Button>
-        </Card>
-      </Grid>
+            <RefreshCw className="h-3 w-3" /> Refresh
+          </button>
+        </div>
+      </div>
 
       {/* Active Alerts */}
       {alerts.length > 0 && (
-        <Card>
+        <div style={{background:'var(--color-sentinel-bg-panel)', border:'1px solid var(--color-sentinel-border)', borderRadius:8}}>
           <div className="flex items-center gap-2">
-            <Title>Active Anomaly Alerts</Title>
-            <Badge color="sky" size="xs">AI</Badge>
+            <h3 className="text-sm font-semibold" style={{color:'var(--color-sentinel-text-primary)'}}>Active Anomaly Alerts</h3>
+            <span className="inline-flex items-center px-1.5 py-0.5 text-xs font-medium rounded-full" style={{background:'rgba(59,130,246,0.15)', color:'var(--color-sentinel-blue)'}}>AI</span>
           </div>
-          <Text className="text-xs text-gray-400 italic -mt-2 mb-2">
+          <p className="text-xs italic -mt-2 mb-2" style={{color:'var(--color-sentinel-text-disabled)'}}>
             AI-generated anomaly detection &middot; Review before acting
-          </Text>
-          <Table className="mt-4">
-            <TableHead>
-              <TableRow>
-                <TableHeaderCell>Equipment</TableHeaderCell>
-                <TableHeaderCell>Type</TableHeaderCell>
-                <TableHeaderCell>Severity</TableHeaderCell>
-                <TableHeaderCell>Score</TableHeaderCell>
-                <TableHeaderCell>Threshold</TableHeaderCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
+          </p>
+          <table className="w-full text-sm mt-4">
+            <thead>
+              <tr className="border-b" style={{borderColor:'var(--color-sentinel-border)'}}>
+                <th className="text-left py-2 px-1 font-medium" style={{color:'var(--color-sentinel-text-secondary)'}}>Equipment</th>
+                <th className="text-left py-2 px-1 font-medium" style={{color:'var(--color-sentinel-text-secondary)'}}>Type</th>
+                <th className="text-left py-2 px-1 font-medium" style={{color:'var(--color-sentinel-text-secondary)'}}>Severity</th>
+                <th className="text-left py-2 px-1 font-medium" style={{color:'var(--color-sentinel-text-secondary)'}}>Score</th>
+                <th className="text-left py-2 px-1 font-medium" style={{color:'var(--color-sentinel-text-secondary)'}}>Threshold</th>
+              </tr>
+            </thead>
+            <tbody>
               {alerts.map((alert) => (
-                <TableRow key={alert.equipment_id}>
-                  <TableCell>
-                    <Text className="font-medium">{alert.equipment_id}</Text>
-                  </TableCell>
-                  <TableCell>{alert.equipment_type}</TableCell>
-                  <TableCell>
-                    <Badge color={getSeverityColor(alert.severity) as any}>
+                <tr key={alert.equipment_id} className="border-b" style={{borderColor:'var(--color-sentinel-border)'}}>
+                  <td className="py-2 px-1">
+                    <p className="font-medium" style={{color:'var(--color-sentinel-text-primary)'}}>{alert.equipment_id}</p>
+                  </td>
+                  <td className="py-2 px-1" style={{color:'var(--color-sentinel-text-primary)'}}>{alert.equipment_type}</td>
+                  <td className="py-2 px-1">
+                    <span className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full" style={{background: severityBgColor(alert.severity ?? ''), color: severityTextColor(alert.severity ?? '')}}>
                       {getSeverityBadge(alert.severity)}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Text>{alert.anomaly_score?.toFixed(6) || "N/A"}</Text>
-                  </TableCell>
-                  <TableCell>
-                    <Text>{alert.threshold?.toFixed(6) || "N/A"}</Text>
-                  </TableCell>
-                </TableRow>
+                    </span>
+                  </td>
+                  <td className="py-2 px-1">
+                    <span className="text-sm" style={{color:'var(--color-sentinel-text-primary)'}}>{alert.anomaly_score?.toFixed(6) || "N/A"}</span>
+                  </td>
+                  <td className="py-2 px-1">
+                    <span className="text-sm" style={{color:'var(--color-sentinel-text-primary)'}}>{alert.threshold?.toFixed(6) || "N/A"}</span>
+                  </td>
+                </tr>
               ))}
-            </TableBody>
-          </Table>
-        </Card>
+            </tbody>
+          </table>
+        </div>
       )}
 
       {/* All Equipment Status */}
-      <Card>
-        <Title>All Equipment Anomaly Status</Title>
+      <div style={{background:'var(--color-sentinel-bg-panel)', border:'1px solid var(--color-sentinel-border)', borderRadius:8}}>
+        <h3 className="text-sm font-semibold" style={{color:'var(--color-sentinel-text-primary)'}}>All Equipment Anomaly Status</h3>
         {error ? (
-          <Text color="red" className="mt-4">
+          <p className="mt-4" style={{color:'var(--color-sentinel-red)'}}>
             {error}
-          </Text>
+          </p>
         ) : (
-          <Table className="mt-4">
-            <TableHead>
-              <TableRow>
-                <TableHeaderCell>Equipment</TableHeaderCell>
-                <TableHeaderCell>Type</TableHeaderCell>
-                <TableHeaderCell>Status</TableHeaderCell>
-                <TableHeaderCell>Score vs Threshold</TableHeaderCell>
-                <TableHeaderCell>Severity</TableHeaderCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
+          <table className="w-full text-sm mt-4">
+            <thead>
+              <tr className="border-b" style={{borderColor:'var(--color-sentinel-border)'}}>
+                <th className="text-left py-2 px-1 font-medium" style={{color:'var(--color-sentinel-text-secondary)'}}>Equipment</th>
+                <th className="text-left py-2 px-1 font-medium" style={{color:'var(--color-sentinel-text-secondary)'}}>Type</th>
+                <th className="text-left py-2 px-1 font-medium" style={{color:'var(--color-sentinel-text-secondary)'}}>Status</th>
+                <th className="text-left py-2 px-1 font-medium" style={{color:'var(--color-sentinel-text-secondary)'}}>Score vs Threshold</th>
+                <th className="text-left py-2 px-1 font-medium" style={{color:'var(--color-sentinel-text-secondary)'}}>Severity</th>
+              </tr>
+            </thead>
+            <tbody>
               {anomalies.map((item) => (
-                <TableRow key={item.equipment_id}>
-                  <TableCell>
-                    <Text className="font-medium">{item.equipment_id}</Text>
-                  </TableCell>
-                  <TableCell>{item.equipment_type || "N/A"}</TableCell>
-                  <TableCell>
+                <tr key={item.equipment_id} className="border-b" style={{borderColor:'var(--color-sentinel-border)'}}>
+                  <td className="py-2 px-1">
+                    <p className="font-medium" style={{color:'var(--color-sentinel-text-primary)'}}>{item.equipment_id}</p>
+                  </td>
+                  <td className="py-2 px-1" style={{color:'var(--color-sentinel-text-primary)'}}>{item.equipment_type || "N/A"}</td>
+                  <td className="py-2 px-1">
                     {item.is_anomaly ? (
-                      <Badge color="red">Anomaly</Badge>
+                      <span className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full" style={{background:'rgba(220,38,38,0.15)', color:'var(--color-sentinel-red)'}}>Anomaly</span>
                     ) : (
-                      <Badge color="green">Normal</Badge>
+                      <span className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full" style={{background:'rgba(16,185,129,0.15)', color:'var(--color-sentinel-green)'}}>Normal</span>
                     )}
-                  </TableCell>
-                  <TableCell>
-                    <Flex className="space-x-2">
-                      <ProgressBar
-                        value={Math.min(item.score_pct || 0, 100)}
-                        color={
-                          (item.score_pct || 0) > 100
-                            ? "red"
+                  </td>
+                  <td className="py-2 px-1">
+                    <div className="flex space-x-2">
+                      <div className="w-24 h-1.5 rounded" style={{background:'var(--color-sentinel-border)'}}>
+                        <div style={{
+                          width: `${Math.min(item.score_pct || 0, 100)}%`,
+                          background: (item.score_pct || 0) > 100
+                            ? 'var(--color-sentinel-red)'
                             : (item.score_pct || 0) > 70
-                            ? "yellow"
-                            : "green"
-                        }
-                        className="w-24"
-                      />
-                      <Text className="text-sm">
+                            ? 'var(--color-sentinel-amber)'
+                            : 'var(--color-sentinel-green)',
+                        }} className="h-full rounded" />
+                      </div>
+                      <span className="text-sm" style={{color:'var(--color-sentinel-text-primary)'}}>
                         {item.score_pct?.toFixed(0) || 0}%
-                      </Text>
-                    </Flex>
-                  </TableCell>
-                  <TableCell>
-                    <Badge color={getSeverityColor(item.severity) as any}>
+                      </span>
+                    </div>
+                  </td>
+                  <td className="py-2 px-1">
+                    <span className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full" style={{background: severityBgColor(item.severity ?? ''), color: severityTextColor(item.severity ?? '')}}>
                       {getSeverityBadge(item.severity)}
-                    </Badge>
-                  </TableCell>
-                </TableRow>
+                    </span>
+                  </td>
+                </tr>
               ))}
-            </TableBody>
-          </Table>
+            </tbody>
+          </table>
         )}
-      </Card>
+      </div>
     </div>
   );
 }

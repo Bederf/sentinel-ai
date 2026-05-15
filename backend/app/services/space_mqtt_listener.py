@@ -251,7 +251,6 @@ class SpaceMqttListener:
             def _on_message(_client, _userdata, message):
                 logger.warning("Space MQTT _on_message fired: topic=%s", message.topic)
                 try:
-                    logger.debug("Space MQTT rx: %s → %s", message.topic, message.payload[:120])
                     if self._loop and self._loop.is_running():
                         future = asyncio.run_coroutine_threadsafe(
                             process_mqtt_presence_message(message.topic, message.payload),

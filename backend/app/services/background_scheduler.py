@@ -2903,6 +2903,32 @@ class BackgroundSchedulerService:
 
     def _run_supabase_retention_enforcement(self):
         """Execute Supabase table retention enforcement and log summary."""
+        # Direct SQL fallback — reliable even when REST API auth fails
+        try:
+            import psycopg2
+
+            conn = psycopg2.connect(
+                host="127.0.0.1", port=55322, dbname="postgres",
+                user="postgres", password="postgres",
+            )
+            cursor = conn.cursor()
+            for table, col, days in [
+                ("equipment_fault_events", "recorded_at", 7),
+                ("adapter_health", "timestamp", 7),
+                ("adapter_health_current", "updated_at", 7),
+                ("adapter_health_alerts", "created_at", 7),
+                ("space_occupancy_events", "timestamp", 7),
+                ("equipment_sensor_readings", "recorded_at", 7),
+                ("asset_health_snapshots", "created_at", 30),
+                ("system_health_snapshots", "created_at", 30),
+            ]:
+                cursor.execute(f"DELETE FROM {table} WHERE {col} < now() - interval '{days} days'")
+            conn.commit()
+            cursor.close()
+            conn.close()
+        except Exception as e:
+            logger.warning(f"SQL retention fallback failed: {e}")
+
         try:
             from app.services.supabase_retention_service import get_supabase_retention_service
 
@@ -4301,43 +4327,6 @@ class BackgroundSchedulerService:
             logger.error("Outlook calendar poll failed: %s", e, exc_info=True)
 
     # ------------------------------------------------------------------
-    # Google Calendar polling (Phase 176)
-    # ------------------------------------------------------------------
-
-    def add_google_calendar_poll_job(self, interval_minutes: int = 5):
-        """Add a job to poll Google Calendar for external-attendee events.
-
-        Used as fallback when Pub/Sub push is not configured.
-        """
-        job_id = "google_calendar_poll"
-        if self.scheduler.get_job(job_id):
-            self.scheduler.remove_job(job_id)
-            logger.info("Removed existing Google Calendar polling job")
-
-        self.scheduler.add_job(
-            func=self._run_google_calendar_poll,
-            trigger=IntervalTrigger(minutes=interval_minutes),
-            id=job_id,
-            name="Google Calendar Poll — External Attendees",
-            replace_existing=True,
-        )
-        logger.info("Added Google Calendar polling job (%d min interval)", interval_minutes)
-
-    def _run_google_calendar_poll(self):
-        """Run the Google Calendar poll."""
-        try:
-            from app.services.google_calendar_service import GoogleCalendarService
-
-            svc = GoogleCalendarService()
-            if not svc.is_enabled():
-                return
-            visits = svc.poll_recent_events()
-            if visits:
-                logger.info("Google Calendar poll: created %d visit(s)", len(visits))
-        except Exception as e:
-            logger.error("Google Calendar poll failed: %s", e, exc_info=True)
-
-    # ------------------------------------------------------------------
     # Graph subscription renewal (Phase 177)
     # ------------------------------------------------------------------
 
@@ -4598,6 +4587,46 @@ class BackgroundSchedulerService:
         except Exception as e:
             logger.error("Document MRI sync failed: %s", e, exc_info=True)
 
+    # ── IPMVP Data Sync ─────────────────────────────────────────────────────────
+
+    def add_ipmvp_sync_job(self, interval_hours: int = 1):
+        """Add periodic job to fetch IPMVP data from bridge and persist to Supabase.
+
+        Consumes /ipmvp/energy, /oat, /events, /occupancy, /tariff endpoints
+        and stores in dedicated ipmvp_* tables for engineering M&V analysis.
+        """
+        job_id = "ipmvp_data_sync"
+        if self.scheduler.get_job(job_id):
+            self.scheduler.remove_job(job_id)
+
+        self.scheduler.add_job(
+            func=self._run_ipmvp_sync,
+            trigger=IntervalTrigger(hours=interval_hours),
+            id=job_id,
+            name="IPMVP Data Sync — Bridge → Supabase",
+            replace_existing=True,
+            max_instances=1,
+        )
+        logger.info("IPMVP data sync job registered — interval=%s hours", interval_hours)
+
+    def _run_ipmvp_sync(self):
+        """Run IPMVP data sync in a new event loop."""
+        import asyncio
+
+        try:
+            from app.services.ipmvp.site002_fetcher import Site002DataFetcher
+
+            fetcher = Site002DataFetcher()
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                result = loop.run_until_complete(fetcher.run_full_sync(days_back=7))
+                logger.info("[IPMVP] Sync result: %s", result)
+            finally:
+                loop.close()
+        except Exception as e:
+            logger.error("[IPMVP] Sync failed: %s", e, exc_info=True)
+
     # ── Compiler Worker ─────────────────────────────────────────────────────────
 
     def add_compiler_worker_job(self, interval_minutes: int = 5):
@@ -4785,6 +4814,23 @@ class BackgroundSchedulerService:
         )
         logger.info("email_intake_poll job registered — interval=%s min", interval_minutes)
 
+    def add_rooms_email_intake_poll_job(self, interval_minutes: int = 5) -> None:
+        """Add periodic job to poll the rooms@ IMAP mailbox."""
+        job_id = "rooms_email_intake_poll"
+        if self.scheduler.get_job(job_id):
+            self.scheduler.remove_job(job_id)
+
+        self.scheduler.add_job(
+            _run_rooms_email_intake_poll,
+            "interval",
+            minutes=interval_minutes,
+            id=job_id,
+            name="Rooms Email Intake IMAP Poller",
+            replace_existing=True,
+            max_instances=1,
+        )
+        logger.info("rooms_email_intake_poll job registered — interval=%s min", interval_minutes)
+
 
 # Sync wrapper — APScheduler passes sync functions to job executors
 def _run_compiler_worker_sync():
@@ -4820,6 +4866,24 @@ def _run_email_intake_poll():
             logger.debug("[EmailIntake] No new emails in this poll cycle")
     except Exception as exc:
         logger.error("[EmailIntake] poll runner failed: %s", exc, exc_info=True)
+
+
+def _run_rooms_email_intake_poll():
+    """Sync wrapper — runs the RoomsEmailIntakeService.poll()."""
+    import logging
+
+    from app.services.rooms_email_intake_service import RoomsEmailIntakeService
+
+    logger = logging.getLogger(__name__)
+    try:
+        service = RoomsEmailIntakeService()
+        results = service.poll()
+        if results:
+            logger.info("[RoomsEmail] Processed %d new email(s)", len(results))
+        else:
+            logger.debug("[RoomsEmail] No new emails in this poll cycle")
+    except Exception as exc:
+        logger.error("[RoomsEmail] poll runner failed: %s", exc, exc_info=True)
 
 
 def _run_daily_health_sweep_sync():

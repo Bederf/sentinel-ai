@@ -1,27 +1,15 @@
-/**
- * PrecoolingSchedule Component - Timeline visualization of pre-cooling actions
- *
- * Shows a horizontal timeline from current time to end of outage with:
- * - Color-coded segments: PRE-COOLING (blue), LOAD SHEDDING (red), RECOVERY (green)
- * - Action markers within segments with tooltips
- * - Status indicators for generator readiness checks
- * - Interactive click and hover features
- *
- * Follows SENTINEL dark theme design.
- */
-
 import { useState } from "react";
 
 import { Clock, Thermometer, Zap, CheckCircle, AlertTriangle, Play } from "lucide-react";
 
 interface ScheduleSegment {
   type: "precooling" | "load_shedding" | "recovery";
-  start: string; // HH:MM format
-  end: string;   // HH:MM format
+  start: string;
+  end: string;
   label: string;
   color: string;
   actions: Array<{
-    time: string; // HH:MM format
+    time: string;
     action: string;
     value: string;
     description: string;
@@ -45,20 +33,17 @@ interface ReadinessCheck {
 
 interface PrecoolingScheduleProps {
   schedule: ScheduleSegment[];
-  currentTime: string; // HH:MM format
+  currentTime: string;
   readinessChecks: ReadinessCheck[];
   onSegmentClick?: (segment: ScheduleSegment) => void;
   onActionClick?: (action: ActionMarker) => void;
 }
 
-// Convert time string to minutes since midnight
 function timeToMinutes(time: string): number {
   const [hours, minutes] = time.split(":").map(Number);
   return hours * 60 + minutes;
 }
 
-
-// Get segment color classes
 function getSegmentColor(type: ScheduleSegment["type"]): { bg: string; border: string; text: string } {
   switch (type) {
     case "precooling":
@@ -82,7 +67,6 @@ function getSegmentColor(type: ScheduleSegment["type"]): { bg: string; border: s
   }
 }
 
-// Get action icon
 function getActionIcon(action: string): React.ReactNode {
   switch (action.toLowerCase()) {
     case "chw":
@@ -100,6 +84,22 @@ function getActionIcon(action: string): React.ReactNode {
   }
 }
 
+function badgeSpan(variant: "blue" | "red" | "green" | "gray" | "emerald", size: "xs" | "sm" | "lg" = "xs", children: React.ReactNode) {
+  const colorMap: Record<string, { bg: string; color: string }> = {
+    blue: { bg: "rgba(59,130,246,0.15)", color: "var(--color-sentinel-blue)" },
+    red: { bg: "rgba(220,38,38,0.15)", color: "var(--color-sentinel-red)" },
+    green: { bg: "rgba(16,185,129,0.15)", color: "var(--color-sentinel-green)" },
+    emerald: { bg: "rgba(16,185,129,0.15)", color: "var(--color-sentinel-green)" },
+    gray: { bg: "rgba(142,142,142,0.15)", color: "var(--color-sentinel-text-secondary)" },
+  };
+  const sizeClass = size === "lg" ? "px-3 py-1 text-sm" : size === "sm" ? "px-2 py-0.5 text-xs" : "px-1.5 py-0.5 text-xs";
+  return (
+    <span className={`inline-flex items-center font-medium rounded-full ${sizeClass}`} style={colorMap[variant] || colorMap.gray}>
+      {children}
+    </span>
+  );
+}
+
 export function PrecoolingSchedule({
   schedule,
   currentTime,
@@ -110,16 +110,13 @@ export function PrecoolingSchedule({
   const [hoveredAction, setHoveredAction] = useState<string | null>(null);
   const [selectedSegment, setSelectedSegment] = useState<string | null>(null);
 
-  // Calculate timeline dimensions
   const timelineStart = Math.min(...schedule.map(s => timeToMinutes(s.start)));
   const timelineEnd = Math.max(...schedule.map(s => timeToMinutes(s.end)));
   const timelineDuration = timelineEnd - timelineStart;
   const currentMinutes = timeToMinutes(currentTime);
 
-  // Check if current time is within timeline
   const isCurrentTimeInTimeline = currentMinutes >= timelineStart && currentMinutes <= timelineEnd;
 
-  // Calculate countdown to next action
   const allActions = schedule.flatMap(segment =>
     segment.actions.map(action => ({
       ...action,
@@ -132,24 +129,20 @@ export function PrecoolingSchedule({
   const nextAction = futureActions.length > 0 ? futureActions[0] : null;
   const countdownMinutes = nextAction ? timeToMinutes(nextAction.time) - currentMinutes : 0;
 
-  // Handle segment click
   const handleSegmentClick = (segment: ScheduleSegment) => {
     setSelectedSegment(segment.label);
     onSegmentClick?.(segment);
   };
 
-  // Handle action hover
   const handleActionHover = (actionTime: string) => {
     setHoveredAction(actionTime);
   };
 
-  // Calculate position percentage on timeline
   function getPositionPercent(time: string): number {
     const minutes = timeToMinutes(time);
     return ((minutes - timelineStart) / timelineDuration) * 100;
   }
 
-  // Calculate width percentage for segment
   function getSegmentWidth(start: string, end: string): number {
     const startMinutes = timeToMinutes(start);
     const endMinutes = timeToMinutes(end);
@@ -157,40 +150,43 @@ export function PrecoolingSchedule({
   }
 
   return (
-    <Card>
+    <div
+      style={{
+        background: "var(--color-sentinel-bg-panel)",
+        border: "1px solid var(--color-sentinel-border)",
+        borderRadius: 8,
+        padding: 16,
+      }}
+    >
       <div className="flex items-center justify-between mb-6">
         <div>
-          <Title>Pre-cooling Schedule Timeline</Title>
-          <Text>Visualization of optimization actions before and during load shedding</Text>
+          <h3 className="text-lg font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>Pre-cooling Schedule Timeline</h3>
+          <p className="text-sm mt-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>Visualization of optimization actions before and during load shedding</p>
         </div>
         {nextAction && (
-          <div className="flex items-center gap-2 bg-gray-800 px-3 py-2 rounded">
-            <Clock className="h-4 w-4 text-blue-400" />
+          <div className="flex items-center gap-2 px-3 py-2 rounded" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
+            <Clock className="h-4 w-4" style={{ color: "var(--color-sentinel-blue)" }} />
             <div>
-              <Text className="text-sm">Next action in</Text>
-              <Text className="font-medium">{countdownMinutes} min</Text>
+              <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>Next action in</p>
+              <p className="font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>{countdownMinutes} min</p>
             </div>
           </div>
         )}
       </div>
 
-      {/* Main Timeline */}
       <div className="relative mb-8">
-        {/* Timeline track */}
-        <div className="h-2 bg-gray-800 rounded-full relative">
-          {/* Current time indicator */}
+        <div className="h-2 rounded-full relative" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
           {isCurrentTimeInTimeline && (
             <div
               className="absolute top-1/2 transform -translate-y-1/2 w-1 h-6 bg-white z-20"
               style={{ left: `${getPositionPercent(currentTime)}%` }}
             >
               <div className="absolute -top-6 left-1/2 transform -translate-x-1/2 whitespace-nowrap">
-                <Badge color="gray" size="xs">NOW</Badge>
+                {badgeSpan("gray", "xs", "NOW")}
               </div>
             </div>
           )}
 
-          {/* Timeline segments */}
           {schedule.map((segment, idx) => {
             const color = getSegmentColor(segment.type);
             const left = getPositionPercent(segment.start);
@@ -204,79 +200,72 @@ export function PrecoolingSchedule({
                 onClick={() => handleSegmentClick(segment)}
                 onMouseEnter={() => setHoveredAction(null)}
               >
-                {/* Segment label */}
                 <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 whitespace-nowrap">
-                  <Badge color={segment.type === "precooling" ? "blue" : segment.type === "load_shedding" ? "red" : "green"} size="xs">
-                    {segment.label}
-                  </Badge>
+                  {badgeSpan(segment.type === "precooling" ? "blue" : segment.type === "load_shedding" ? "red" : "green", "xs", segment.label)}
                 </div>
 
-                {/* Action markers within segment */}
                 {segment.actions.map((action, actionIdx) => {
                   const actionLeft = getPositionPercent(action.time) - left;
                   const isHovered = hoveredAction === `${segment.label}-${action.time}`;
 
                   return (
-                      <div
-                        key={actionIdx}
-                        className={`absolute top-1/2 transform -translate-y-1/2 -translate-x-1/2 w-8 h-8 rounded-full border-2 cursor-pointer transition-all hover:scale-110 ${isHovered ? 'ring-2 ring-white ring-opacity-50' : ''}`}
-                        style={{
-                          left: `${actionLeft}%`,
-                          backgroundColor: color.bg.replace("/20", "/40"),
-                          borderColor: color.border.replace("/50", "")
-                        }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onActionClick?.({
-                            time: action.time,
-                            label: action.action,
-                            icon: getActionIcon(action.action),
-                            color: color.border,
-                            details: `${action.value}: ${action.description}`
-                          });
-                        }}
-                        onMouseEnter={() => handleActionHover(`${segment.label}-${action.time}`)}
-                        onMouseLeave={() => setHoveredAction(null)}
-                        title={action.description}
-                      >
-                        <div className="flex items-center justify-center h-full">
-                          {getActionIcon(action.action)}
-                        </div>
-                        {/* Action time label */}
-                        <div className="absolute -bottom-6 left-1/2 transform -translate-x-1/2 whitespace-nowrap">
-                          <Text className="text-xs font-medium">{action.time}</Text>
-                        </div>
+                    <div
+                      key={actionIdx}
+                      className={`absolute top-1/2 transform -translate-y-1/2 -translate-x-1/2 w-8 h-8 rounded-full border-2 cursor-pointer transition-all hover:scale-110 ${isHovered ? 'ring-2 ring-white ring-opacity-50' : ''}`}
+                      style={{
+                        left: `${actionLeft}%`,
+                        backgroundColor: color.bg.replace("/20", "/40"),
+                        borderColor: color.border.replace("/50", "")
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onActionClick?.({
+                          time: action.time,
+                          label: action.action,
+                          icon: getActionIcon(action.action),
+                          color: color.border,
+                          details: `${action.value}: ${action.description}`
+                        });
+                      }}
+                      onMouseEnter={() => handleActionHover(`${segment.label}-${action.time}`)}
+                      onMouseLeave={() => setHoveredAction(null)}
+                      title={action.description}
+                    >
+                      <div className="flex items-center justify-center h-full">
+                        {getActionIcon(action.action)}
                       </div>
+                      <div className="absolute -bottom-6 left-1/2 transform -translate-x-1/2 whitespace-nowrap">
+                        <span className="text-xs font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>{action.time}</span>
+                      </div>
+                    </div>
                   );
                 })}
               </div>
             );
           })}
 
-          {/* Time markers */}
           <div className="absolute -bottom-8 left-0 right-0 flex justify-between">
             {schedule.map((segment, idx) => (
               <div key={idx} className="flex flex-col items-center">
-                <Text className="text-xs text-gray-400">{segment.start}</Text>
+                <span className="text-xs" style={{ color: "var(--color-sentinel-text-disabled)" }}>{segment.start}</span>
                 {idx === schedule.length - 1 && (
-                  <Text className="text-xs text-gray-400 mt-1">{segment.end}</Text>
+                  <span className="text-xs mt-1" style={{ color: "var(--color-sentinel-text-disabled)" }}>{segment.end}</span>
                 )}
               </div>
             ))}
           </div>
         </div>
 
-        {/* Segment details panel */}
         {selectedSegment && (
-          <div className="mt-12 p-4 bg-gray-800 rounded">
+          <div className="mt-12 p-4 rounded" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
             <div className="flex items-center justify-between mb-3">
-              <Title className="text-lg">Segment Details</Title>
-              <Badge
-                color={schedule.find(s => s.label === selectedSegment)?.type === "precooling" ? "blue" :
-                       schedule.find(s => s.label === selectedSegment)?.type === "load_shedding" ? "red" : "green"}
-              >
-                {selectedSegment}
-              </Badge>
+              <h3 className="text-lg" style={{ color: "var(--color-sentinel-text-primary)" }}>Segment Details</h3>
+              {badgeSpan(
+                schedule.find(s => s.label === selectedSegment)?.type === "precooling" ? "blue" :
+                schedule.find(s => s.label === selectedSegment)?.type === "load_shedding" ? "red" : "green",
+                "xs",
+                selectedSegment
+              )}
             </div>
             {schedule
               .filter(s => s.label === selectedSegment)
@@ -284,27 +273,27 @@ export function PrecoolingSchedule({
                 <div key={idx} className="space-y-3">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <Text className="text-sm text-gray-400">Start Time</Text>
-                      <Text className="font-medium">{segment.start}</Text>
+                      <span className="text-sm" style={{ color: "var(--color-sentinel-text-disabled)" }}>Start Time</span>
+                      <p className="font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>{segment.start}</p>
                     </div>
                     <div>
-                      <Text className="text-sm text-gray-400">End Time</Text>
-                      <Text className="font-medium">{segment.end}</Text>
+                      <span className="text-sm" style={{ color: "var(--color-sentinel-text-disabled)" }}>End Time</span>
+                      <p className="font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>{segment.end}</p>
                     </div>
                   </div>
                   <div>
-                    <Text className="text-sm text-gray-400 mb-2">Actions</Text>
+                    <span className="text-sm mb-2 block" style={{ color: "var(--color-sentinel-text-disabled)" }}>Actions</span>
                     <div className="space-y-2">
                       {segment.actions.map((action, actionIdx) => (
-                        <div key={actionIdx} className="flex items-center gap-3 p-2 bg-gray-900 rounded">
+                        <div key={actionIdx} className="flex items-center gap-3 p-2 rounded" style={{ background: "var(--color-sentinel-bg-panel)" }}>
                           <div className="flex-shrink-0">
                             {getActionIcon(action.action)}
                           </div>
                           <div className="flex-grow">
-                            <Text className="font-medium">{action.action}</Text>
-                            <Text className="text-sm text-gray-400">{action.value}</Text>
+                            <p className="font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>{action.action}</p>
+                            <p className="text-sm" style={{ color: "var(--color-sentinel-text-disabled)" }}>{action.value}</p>
                           </div>
-                          <Badge color="gray" size="xs">{action.time}</Badge>
+                          {badgeSpan("gray", "xs", action.time)}
                         </div>
                       ))}
                     </div>
@@ -315,102 +304,98 @@ export function PrecoolingSchedule({
         )}
       </div>
 
-      {/* Generator Readiness Checks */}
-      <div className="border-t border-gray-700 pt-6">
-        <Title className="text-lg">Generator Readiness Checks</Title>
-        <Text className="mb-4">System verification before load shedding begins</Text>
+      <div className="border-t pt-6" style={{ borderColor: "var(--color-sentinel-border)" }}>
+        <h3 className="text-lg font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>Generator Readiness Checks</h3>
+        <p className="mb-4" style={{ color: "var(--color-sentinel-text-secondary)" }}>System verification before load shedding begins</p>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {readinessChecks.map((check, idx) => (
             <div
               key={idx}
-              className={`p-4 rounded ${check.passed ? 'bg-green-900/20 border border-green-500/30' : 'bg-red-900/20 border border-red-500/30'}`}
+              className={`p-4 rounded ${check.passed ? 'border' : 'border'}`}
+              style={{
+                background: check.passed ? "rgba(16,185,129,0.1)" : "rgba(220,38,38,0.1)",
+                borderColor: check.passed ? "rgba(16,185,129,0.3)" : "rgba(220,38,38,0.3)",
+              }}
             >
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
                   {check.passed ? (
-                    <CheckCircle className="h-5 w-5 text-green-400" />
+                    <CheckCircle className="h-5 w-5" style={{ color: "var(--color-sentinel-green)" }} />
                   ) : (
-                    <AlertTriangle className="h-5 w-5 text-red-400" />
+                    <AlertTriangle className="h-5 w-5" style={{ color: "var(--color-sentinel-red)" }} />
                   )}
-                  <Text className="font-medium">{check.check}</Text>
+                  <p className="font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>{check.check}</p>
                 </div>
-                <Badge color={check.passed ? "emerald" : "red"} size="xs">
-                  {check.passed ? "PASSED" : "FAILED"}
-                </Badge>
+                {badgeSpan(check.passed ? "emerald" : "red", "xs", check.passed ? "PASSED" : "FAILED")}
               </div>
               <div className="flex items-center justify-between">
-                <Text className="text-sm text-gray-400">Status</Text>
-                <Text className={`font-medium ${check.passed ? 'text-green-400' : 'text-red-400'}`}>
+                <span className="text-sm" style={{ color: "var(--color-sentinel-text-disabled)" }}>Status</span>
+                <p className={`font-medium ${check.passed ? '' : ''}`} style={{ color: check.passed ? "var(--color-sentinel-green)" : "var(--color-sentinel-red)" }}>
                   {check.status}
-                </Text>
+                </p>
               </div>
               <div className="flex items-center justify-between mt-2">
-                <Text className="text-sm text-gray-400">Time</Text>
-                <Text className="text-sm text-gray-400">{check.time}</Text>
+                <span className="text-sm" style={{ color: "var(--color-sentinel-text-disabled)" }}>Time</span>
+                <span className="text-sm" style={{ color: "var(--color-sentinel-text-disabled)" }}>{check.time}</span>
               </div>
             </div>
           ))}
         </div>
 
-        {/* Overall status */}
-        <div className="mt-6 p-4 bg-gray-800 rounded">
+        <div className="mt-6 p-4 rounded" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               {readinessChecks.every(c => c.passed) ? (
                 <>
-                  <CheckCircle className="h-6 w-6 text-green-400" />
+                  <CheckCircle className="h-6 w-6" style={{ color: "var(--color-sentinel-green)" }} />
                   <div>
-                    <Text className="font-medium">All checks passed</Text>
-                    <Text className="text-sm text-gray-400">Generator ready for load shedding</Text>
+                    <p className="font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>All checks passed</p>
+                    <p className="text-sm" style={{ color: "var(--color-sentinel-text-disabled)" }}>Generator ready for load shedding</p>
                   </div>
                 </>
               ) : (
                 <>
-                  <AlertTriangle className="h-6 w-6 text-red-400" />
+                  <AlertTriangle className="h-6 w-6" style={{ color: "var(--color-sentinel-red)" }} />
                   <div>
-                    <Text className="font-medium">Checks require attention</Text>
-                    <Text className="text-sm text-gray-400">
+                    <p className="font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>Checks require attention</p>
+                    <p className="text-sm" style={{ color: "var(--color-sentinel-text-disabled)" }}>
                       {readinessChecks.filter(c => !c.passed).length} of {readinessChecks.length} checks failed
-                    </Text>
+                    </p>
                   </div>
                 </>
               )}
             </div>
-            <Badge color={readinessChecks.every(c => c.passed) ? "emerald" : "red"} size="lg">
-              {readinessChecks.every(c => c.passed) ? "READY" : "NOT READY"}
-            </Badge>
+            {badgeSpan(readinessChecks.every(c => c.passed) ? "emerald" : "red", "lg", readinessChecks.every(c => c.passed) ? "READY" : "NOT READY")}
           </div>
         </div>
       </div>
 
-      {/* Legend */}
-      <div className="mt-6 pt-6 border-t border-gray-700">
-        <span className="text-sm font-medium mb-3" style={{ color: 'var(--color-sentinel-text-primary)' }}>Timeline Legend</span>
+      <div className="mt-6 pt-6 border-t" style={{ borderColor: "var(--color-sentinel-border)" }}>
+        <span className="text-sm font-medium mb-3 block" style={{ color: "var(--color-sentinel-text-primary)" }}>Timeline Legend</span>
         <div className="flex flex-wrap gap-4">
           <div className="flex items-center gap-2">
             <div className="w-4 h-4 rounded bg-blue-900/20 border border-blue-500/50"></div>
-            <Text className="text-sm">Pre-cooling phase</Text>
+            <span className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>Pre-cooling phase</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-4 h-4 rounded bg-red-900/20 border border-red-500/50"></div>
-            <Text className="text-sm">Load shedding phase</Text>
+            <span className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>Load shedding phase</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-4 h-4 rounded bg-green-900/20 border border-green-500/50"></div>
-            <Text className="text-sm">Recovery phase</Text>
+            <span className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>Recovery phase</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-6 h-6 rounded-full border-2 border-blue-400"></div>
-            <Text className="text-sm">Action marker (click for details)</Text>
+            <span className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>Action marker (click for details)</span>
           </div>
         </div>
       </div>
-    </Card>
+    </div>
   );
 }
 
-// Default props for local fallback mode
 PrecoolingSchedule.defaultProps = {
   schedule: [
     {

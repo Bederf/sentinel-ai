@@ -2,10 +2,8 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode }
 import { motion } from 'framer-motion'
 import gsap from 'gsap'
 import {
-  AlertTriangle,
   ArrowRight,
   Brain,
-  CheckCircle2,
   Clock3,
   Gauge,
   Layers3,
@@ -15,7 +13,6 @@ import {
   Shield,
   Sparkles,
   TimerReset,
-  Waves,
 } from 'lucide-react'
 import type { CockpitRenderMode, CockpitRiskItem, CockpitState, CockpitTwinZoneSignal, ModelReadiness } from './types'
 import { SupervisedConfirmBar } from './useHoldToConfirm'
@@ -167,10 +164,6 @@ function railTitle(state: CockpitState) {
   const sys = systemLabel(state.systemFilter)
   if (sys) return `${sys} Focus`
   return state.site.onboardingPhase === 'shadow' ? 'Observation' : 'Decision'
-}
-
-function modeLabelTitle(state: CockpitState) {
-  return state.site.onboardingPhase === 'shadow' ? 'Observation Mode' : 'Mode'
 }
 
 function evidenceLabel(state: CockpitState) {
@@ -374,7 +367,8 @@ function RailAction({ state, onApprove }: { state: CockpitState; onApprove?: () 
     return null
   }
 
-  if (state.site.mode === 'prepare' || state.site.mode === 'intervene_soon') {
+  // Supervised phase only: hold-to-confirm action UI
+  if (state.site.onboardingPhase === 'supervised' && (state.site.mode === 'prepare' || state.site.mode === 'intervene_soon')) {
     return (
       <div className="border-t border-white/8 p-4">
         <SupervisedConfirmBar
@@ -592,98 +586,108 @@ export function CockpitView({ state, renderMode, spatialCanvas, onApprove, selec
         transition={{ duration: 0.45, ease: FRAMER_EASE }}
         className="rounded-[26px] border border-white/8 bg-[linear-gradient(180deg,rgba(10,16,28,0.94),rgba(4,9,20,0.92))] px-5 py-4 md:px-6"
       >
-        <div className="flex flex-wrap items-start justify-between gap-5">
+        {/* Row 1 — Hero */}
+        <div className="flex items-start gap-4">
+          <div className={`mt-1.5 h-2.5 w-2.5 rounded-full ${palette.dot} ${palette.glow}`} />
           <div className="min-w-0 flex-1">
-            <div className="flex items-start gap-4">
-              <div className={`mt-1.5 h-2.5 w-2.5 rounded-full ${palette.dot} ${palette.glow}`} />
-              <div className="min-w-0">
-                <div className="text-[10px] uppercase tracking-[0.34em] text-slate-500">Sentinel Cockpit</div>
-                <h1 className={`mt-3 max-w-none overflow-hidden text-ellipsis whitespace-nowrap font-semibold tracking-[-0.045em] text-white ${largeHeadline ? 'text-4xl' : 'text-[2rem] leading-[1.02]'}`}>
-                  {heroHeadline(state)}
-                </h1>
-                <p className="mt-3 max-w-4xl text-sm leading-7 text-slate-300 md:text-[15px]">
-                  {heroSubheadline(state)}
-                </p>
-              </div>
+            <div className="text-[10px] uppercase tracking-[0.34em] text-slate-500">
+              Sentinel Cockpit · {state.site.name}
             </div>
-          </div>
-
-          <div className="min-w-[16rem] text-right">
-            <div className="text-[10px] uppercase tracking-[0.28em] text-slate-500">{state.site.name}</div>
-            <div className="mt-3 flex flex-wrap justify-end gap-2">
-              <span className={`rounded-full border px-3 py-1 text-[10px] uppercase tracking-[0.22em] ${palette.chip}`}>
-                {state.site.posture}
-              </span>
-              <span className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-[10px] uppercase tracking-[0.22em] text-slate-300">
-                Phase: {phaseLabel(state.site.onboardingPhase)}
-              </span>
-              <span className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-[10px] uppercase tracking-[0.22em] text-slate-300">
-                {timeToImpact(state)}
-              </span>
-              {state.site.onboardingPhase === 'shadow' && modelReadiness && (
-                <span
-                  className={`rounded-full border px-3 py-1 text-[10px] uppercase tracking-[0.22em] ${
-                    modelReadiness.ready
-                      ? 'border-cyan-400/40 bg-cyan-400/10 text-cyan-300'
-                      : 'border-amber-400/40 bg-amber-400/10 text-amber-300'
-                  }`}
-                  title={modelReadiness.message}
-                >
-                  {modelReadiness.ready ? 'ML Ready' : `Training (${modelReadiness.activeModelCount})`}
-                </span>
-              )}
-            </div>
-            <div className={`mt-3 text-sm font-medium ${palette.text}`}>{state.decision.summary}</div>
+            <h1
+              className={`mt-3 max-w-none overflow-hidden text-ellipsis whitespace-nowrap font-semibold tracking-[-0.045em] text-white ${
+                largeHeadline ? 'text-4xl' : 'text-[2rem] leading-[1.02]'
+              }`}
+            >
+              {heroHeadline(state)}
+            </h1>
+            <p className="mt-3 max-w-4xl text-sm leading-7 text-slate-300 md:text-[15px]">
+              {heroSubheadline(state)}
+            </p>
           </div>
         </div>
 
-        <div className="mt-5 border-t border-white/8 pt-4">
+        {/* Row 2 — Chrome strip: summary · status chips · zoom · fullscreen */}
+        <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-white/8 pt-4">
+          {/* Left: site summary + mode */}
           <div className="flex flex-wrap items-center gap-3 text-[10px] uppercase tracking-[0.22em] text-slate-500">
             <span>{summary}</span>
             <span className="text-slate-700">/</span>
             <span className={palette.text}>{modeLabel(state.site.mode)}</span>
           </div>
+
+          {/* Right: chips + zoom + fullscreen */}
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            {/* Status chips — deduped (drop redundant "Waiting" when posture already says it) */}
+            {state.site.posture && state.site.posture !== state.primaryMetric.value && (
+              <span className={`rounded-full border px-3 py-1 text-[10px] uppercase tracking-[0.22em] ${palette.chip}`}>
+                {state.site.posture}
+              </span>
+            )}
+            <span className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-[10px] uppercase tracking-[0.22em] text-slate-300">
+              {phaseLabel(state.site.onboardingPhase)}
+            </span>
+            {!waiting && (
+              <span className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-[10px] uppercase tracking-[0.22em] text-slate-300">
+                {timeToImpact(state)}
+              </span>
+            )}
+            {state.site.onboardingPhase === 'shadow' && modelReadiness && (
+              <span
+                className={`rounded-full border px-3 py-1 text-[10px] uppercase tracking-[0.22em] ${
+                  modelReadiness.ready
+                    ? 'border-cyan-400/40 bg-cyan-400/10 text-cyan-300'
+                    : 'border-amber-400/40 bg-amber-400/10 text-amber-300'
+                }`}
+                title={modelReadiness.message}
+              >
+                {modelReadiness.ready ? 'ML Ready' : `Training (${modelReadiness.activeModelCount})`}
+              </span>
+            )}
+
+            {/* Divider */}
+            <span className="h-4 w-px bg-white/8" />
+
+            {/* Zoom controls — keep ONE set. Remove duplicates from CockpitBuildingThree. */}
+            <button
+              type="button"
+              onClick={() => handleZoom(-ZOOM_STEP)}
+              className="rounded-full border border-white/15 bg-white/5 p-1.5 transition hover:border-white/40"
+              aria-label="Zoom out"
+            >
+              <Minimize2 className="h-3 w-3" />
+            </button>
+            <button
+              type="button"
+              onClick={resetZoom}
+              className="rounded-full border border-white/15 bg-white/5 px-2.5 py-1 text-[10px] uppercase tracking-[0.18em] text-slate-300 transition hover:border-white/40"
+            >
+              {Math.round(zoomLevel * 100)}%
+            </button>
+            <button
+              type="button"
+              onClick={() => handleZoom(ZOOM_STEP)}
+              className="rounded-full border border-white/15 bg-white/5 p-1.5 transition hover:border-white/40"
+              aria-label="Zoom in"
+            >
+              <Maximize2 className="h-3 w-3" />
+            </button>
+
+            {/* Divider */}
+            <span className="h-4 w-px bg-white/8" />
+
+            {/* Fullscreen */}
+            <button
+              type="button"
+              onClick={toggleFullscreen}
+              className="flex items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[10px] uppercase tracking-[0.22em] text-slate-200 transition hover:border-white/40"
+              aria-label={isFullscreen ? 'Exit full screen' : 'Enter full screen'}
+            >
+              {isFullscreen ? <Minimize2 className="h-3 w-3" /> : <Maximize2 className="h-3 w-3" />}
+              <span>{isFullscreen ? 'Exit' : 'Full screen'}</span>
+            </button>
+          </div>
         </div>
       </motion.div>
-
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.3em] text-slate-400">
-          <button
-            type="button"
-            onClick={() => handleZoom(-ZOOM_STEP)}
-            className="rounded-full border border-white/20 bg-white/5 px-3 py-1 transition hover:border-white/50"
-            aria-label="Zoom out"
-          >
-            <Minimize2 className="h-3 w-3" />
-            <span className="ml-1 text-[10px]">Zoom out</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => handleZoom(ZOOM_STEP)}
-            className="rounded-full border border-white/20 bg-white/5 px-3 py-1 transition hover:border-white/50"
-            aria-label="Zoom in"
-          >
-            <Maximize2 className="h-3 w-3" />
-            <span className="ml-1 text-[10px]">Zoom in</span>
-          </button>
-          <button
-            type="button"
-            onClick={resetZoom}
-            className="rounded-full border border-white/20 bg-white/5 px-3 py-1 transition hover:border-white/50"
-            aria-label="Reset zoom"
-          >
-            <span className="text-[10px]">Zoom {Math.round(zoomLevel * 100)}%</span>
-          </button>
-        </div>
-        <button
-          type="button"
-          onClick={toggleFullscreen}
-          className="flex items-center gap-2 rounded-full border border-white/20 bg-white/5 px-3 py-1 text-[10px] uppercase tracking-[0.3em] text-slate-200 transition hover:border-white/50"
-        >
-          {isFullscreen ? <Minimize2 className="h-3 w-3" /> : <Maximize2 className="h-3 w-3" />}
-          <span>{isFullscreen ? 'Exit full screen' : 'Enter full screen'}</span>
-        </button>
-      </div>
 
       <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1fr)_300px]">
         <motion.div
@@ -863,22 +867,47 @@ export function CockpitView({ state, renderMode, spatialCanvas, onApprove, selec
         </motion.aside>
       </div>
 
-      <div className="mt-5 flex flex-wrap items-center gap-3 rounded-[24px] border border-white/8 bg-[linear-gradient(180deg,rgba(8,12,22,0.9),rgba(4,7,16,0.95))] px-5 py-4">
-        <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.22em] text-slate-500">
-          <Waves className="h-3.5 w-3.5" />
-          <span>{modeLabelTitle(state)}</span>
-          <span className="text-slate-200">{modeLabel(state.site.mode)}</span>
+      {!waiting && (
+        <div className="mt-5 flex items-center gap-4 rounded-[20px] border border-white/8 bg-black/30 px-5 py-3">
+          {/* Live telemetry — the one thing not shown elsewhere */}
+          <div className="flex items-center gap-2">
+            <span className={`h-2 w-2 rounded-full ${palette.dot} animate-pulse`} />
+            <span className="font-mono text-xs text-slate-200 tabular-nums">
+              {telemetrySnapshot(state)}
+            </span>
+          </div>
+
+          <span className="h-4 w-px bg-white/8" />
+
+          {/* Freshness countdown */}
+          <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.22em] text-slate-500">
+            <TimerReset className="h-3 w-3" />
+            <span className="text-slate-300 normal-case tracking-normal">
+              {state.site.dataFreshnessLabel}
+            </span>
+          </div>
+
+          <span className="h-4 w-px bg-white/8" />
+
+          {/* System dots */}
+          <div className="flex items-center gap-2">
+            {activeModuleLabels(state).map((mod) => (
+              <span
+                key={mod}
+                className="flex items-center gap-1 text-[10px] uppercase tracking-[0.18em] text-slate-400"
+              >
+                <span className="h-1.5 w-1.5 rounded-full bg-cyan-400/70" />
+                {mod}
+              </span>
+            ))}
+          </div>
+
+          {/* Right: only the actionable bit */}
+          <div className="ml-auto text-[10px] uppercase tracking-[0.22em] text-slate-500">
+            {state.evidence.refs.length} evidence refs
+          </div>
         </div>
-        <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.22em] text-slate-500">
-          {waiting ? <TimerReset className="h-3.5 w-3.5" /> : state.primaryMetric.tone === 'critical' ? <AlertTriangle className="h-3.5 w-3.5" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
-          <span>Status</span>
-          <span className="text-slate-200">{waiting ? 'Waiting for live state' : 'Live building signal'}</span>
-        </div>
-        <div className="ml-auto flex items-center gap-2 text-[10px] uppercase tracking-[0.22em] text-slate-500">
-          <Sparkles className={`h-3.5 w-3.5 ${palette.text}`} />
-          <span className="text-slate-300">{state.site.name}</span>
-        </div>
-      </div>
+      )}
     </section>
   )
 }

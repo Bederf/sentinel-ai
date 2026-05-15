@@ -1,0 +1,8 @@
+feat(162-03): integrate StaticValidationEngine into RuleBasedPointClassifier
+
+Classification pipeline now runs static validation after tagging:
+bounds, data quality, rate-of-change, and tag conflicts are checked
+before the point enters the review queue. validation_passed and
+validation_errors fields are populated from the ValidationReport.
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>

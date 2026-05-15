@@ -12,7 +12,7 @@
  * Phase 69-01: Security Module Dashboard
  */
 
-import { useContext, useState, useEffect, useCallback, type ReactElement } from "react";
+import { useContext, useState, useEffect, useCallback } from "react";
 
 import {
   Shield,
@@ -30,6 +30,18 @@ import {
   Sun,
   Thermometer,
 } from "lucide-react";
+import {
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+  Legend,
+} from "recharts";
 import { SentinelValueCard } from "../SentinelValueCard";
 import { securityApi } from "@/lib/api";
 import type { SecurityOccupancy } from "@/lib/api";
@@ -37,6 +49,9 @@ import { authorizedFetch } from "@/lib/api/client";
 import { AccessEventsPanel } from "../AccessEventsPanel";
 import { SecurityOccupancyPanel } from "../SecurityOccupancyPanel";
 import { ModuleContext } from "../../contexts/moduleContextStore";
+import { Badge } from "../Badge";
+import { TabBar } from "../TabBar";
+import type { TabDef } from "../TabBar";
 
 interface SecurityDashboardProps {
   siteId?: string;
@@ -86,10 +101,35 @@ interface BridgeTelemetrySummary {
   };
 }
 
+const badgeColors: Record<string, string> = {
+  green: "bg-green-500/15 text-[var(--color-sentinel-green)]",
+  amber: "bg-amber-500/15 text-[var(--color-sentinel-amber)]",
+  red: "bg-red-500/15 text-[var(--color-sentinel-red)]",
+  blue: "bg-blue-500/15 text-[var(--color-sentinel-blue)]",
+  gray: "bg-gray-500/15 text-[var(--color-sentinel-text-secondary)]",
+};
+
+const badgeXs = " text-[10px] px-1.5 py-0.5";
+
+const tooltipStyle: React.CSSProperties = {
+  background: "var(--color-sentinel-bg-secondary)",
+  border: "1px solid var(--color-sentinel-border)",
+  borderRadius: 4,
+  color: "var(--color-sentinel-text-primary)",
+};
+
+const TAB_DEFS: TabDef[] = [
+  { id: "overview", label: "Overview" },
+  { id: "access", label: "Access" },
+  { id: "cameras", label: "Cameras" },
+  { id: "analysis", label: "Occupancy" },
+  { id: "integrations", label: "Integrations" },
+];
+
 export function SecurityDashboard({ siteId: propSiteId }: SecurityDashboardProps) {
   const moduleContext = useContext(ModuleContext);
   const siteId = propSiteId || moduleContext?.siteId || '';
-  const [activeTab, setActiveTab] = useState(0);
+  const [activeTab, setActiveTab] = useState("overview");
   const [loading, setLoading] = useState(true);
   const [occupancyData, setOccupancyData] = useState<{
     total_occupancy: number;
@@ -105,7 +145,6 @@ export function SecurityDashboard({ siteId: propSiteId }: SecurityDashboardProps
 
   const fetchData = useCallback(async () => {
     try {
-      // Fetch occupancy data
       const [occ, rawTelemetryResp, stateResp] = await Promise.all([
         securityApi.getOccupancy(siteId),
         authorizedFetch(`/api/sites/${encodeURIComponent(siteId)}/telemetry`).catch(() => null),
@@ -223,380 +262,7 @@ export function SecurityDashboard({ siteId: propSiteId }: SecurityDashboardProps
   const totalCapacity = zoneOccupancies.reduce((s, z) => s + (z.max_capacity || 50), 0);
   const capacityPercent = totalCapacity > 0 ? Math.round((totalOccupancy / totalCapacity) * 100) : 0;
   const onlineCameras = demoCameras.filter((c) => c.status === "online").length;
-  const breachEvents = 0; // Placeholder for breach alert count
-
-  // Build tab arrays — clean labels matching Lighting tab style
-  const tabs = [
-    <Tab key="overview">Overview</Tab>,
-    <Tab key="access">Access</Tab>,
-    <Tab key="cameras">Cameras</Tab>,
-    <Tab key="analysis">Occupancy</Tab>,
-    <Tab key="integrations">Integrations</Tab>,
-  ];
-
-  const panels = [
-    // ===== Tab 1: Overview =====
-    <TabPanel key="overview">
-      <div className="space-y-4 mt-4">
-        {/* SENTINEL Value Card */}
-        <SentinelValueCard
-          title="Security Intelligence Impact"
-          icon={ShieldCheck}
-          baseline={{ label: "", value: 0, unit: "incidents" }}
-          sentinel={{ label: "", value: 0, unit: "incidents" }}
-          savingsPercent={0}
-          period="Monthly"
-          collecting
-        />
-
-        {/* Raw + SENTINEL Security View */}
-        <Grid className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <div className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
-            <Flex justifyContent="between" alignItems="start" className="mb-2">
-              <Text className="text-sm font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>Raw Bridge Telemetry</Text>
-              <Badge color={bridgeTelemetry?.status === "live" ? "green" : "amber"}>
-                {bridgeTelemetry?.status === "live" ? "Live" : "Unavailable"}
-              </Badge>
-            </Flex>
-            <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-              Zones: {bridgeTelemetry?.zones_with_readings ?? 0}/{bridgeTelemetry?.zone_count ?? 0}
-            </Text>
-            <Text className="text-xs mt-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-              Power: HVAC {(bridgeTelemetry?.power?.hvac_kw ?? 0).toFixed(2)} kW · Total {(bridgeTelemetry?.power?.total_kw ?? 0).toFixed(2)} kW
-            </Text>
-          </div>
-
-          <div className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
-            <Text className="text-sm font-semibold mb-2" style={{ color: "var(--color-sentinel-text-primary)" }}>SENTINEL Security Interpretation</Text>
-            <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-              Posture: <span className="capitalize" style={{ color: "var(--color-sentinel-text-primary)" }}>{sentinelPosture || "unknown"}</span>
-            </Text>
-            <Text className="text-xs mt-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-              {sentinelGuidance || "No active guidance yet."}
-            </Text>
-          </div>
-        </Grid>
-
-        {/* KPI Cards */}
-        <Grid className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
-            <Flex alignItems="center" className="gap-2 mb-2">
-              <Users className="w-5 h-5 text-blue-400" />
-              <Text className="font-medium">Total Occupancy</Text>
-            </Flex>
-            <div className="text-3xl font-bold">{totalOccupancy}</div>
-            <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-              {capacityPercent}% of {totalCapacity} capacity
-            </Text>
-          </div>
-
-          <div className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
-            <Flex alignItems="center" className="gap-2 mb-2">
-              <CheckCircle className="w-5 h-5 text-green-400" />
-              <Text className="font-medium">Active Zones</Text>
-            </Flex>
-            <div className="text-3xl font-bold">{zoneOccupancies.filter((z) => z.occupancy_count > 0).length}</div>
-            <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>of {zoneOccupancies.length} zones</Text>
-          </div>
-
-          <div className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
-            <Flex alignItems="center" className="gap-2 mb-2">
-              <Camera className="w-5 h-5 text-cyan-400" />
-              <Text className="font-medium">Cameras Online</Text>
-            </Flex>
-            <div className="text-3xl font-bold">{onlineCameras}/{demoCameras.length}</div>
-            <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-              {demoCameras.filter((c) => c.has_analytics).length} with AI analytics
-            </Text>
-          </div>
-
-          <div className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
-            <Flex alignItems="center" className="gap-2 mb-2">
-              <AlertTriangle className="w-5 h-5 text-amber-400" />
-              <Text className="font-medium">Breach Events (24h)</Text>
-            </Flex>
-            <div className="text-3xl font-bold">{breachEvents}</div>
-            <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>Unauthorized access attempts</Text>
-          </div>
-        </Grid>
-
-        {/* Floor Occupancy Cards */}
-        <div className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
-          <h4 className="font-medium text-sm mb-3" style={{ color: "var(--color-sentinel-text-primary)" }}>Zone Occupancy</h4>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            {zoneOccupancies.map((zone) => {
-              const pct = zone.percent_full || 0;
-              const barColor = pct > 80 ? "var(--color-sentinel-red)" : pct > 50 ? "var(--color-sentinel-amber)" : "var(--color-sentinel-green)";
-              const badgeBg = pct > 80 ? "rgba(220, 38, 38, 0.15)" : pct > 50 ? "rgba(245, 158, 11, 0.15)" : "rgba(16, 185, 129, 0.15)";
-              return (
-                <div
-                  key={zone.zone_id}
-                  className="p-3 rounded-lg"
-                  style={{
-                    background: "var(--color-sentinel-bg-secondary)",
-                    border: "1px solid var(--color-sentinel-border)",
-                  }}
-                >
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>{zone.zone_name}</span>
-                    <span
-                      className="text-xs font-medium px-2 py-0.5 rounded"
-                      style={{ background: badgeBg, color: barColor }}
-                    >
-                      {Math.round(pct)}%
-                    </span>
-                  </div>
-                  <div className="text-2xl font-bold" style={{ color: "var(--color-sentinel-text-primary)" }}>
-                    {zone.occupancy_count}
-                    <span className="text-sm font-normal" style={{ color: "var(--color-sentinel-text-secondary)" }}>/{zone.max_capacity}</span>
-                  </div>
-                  {/* Progress bar */}
-                  <div className="w-full rounded-full h-2 mt-2" style={{ background: "var(--color-sentinel-bg-panel)" }}>
-                    <div className="h-2 rounded-full transition-all" style={{ width: `${Math.min(100, pct)}%`, background: barColor }} />
-                  </div>
-                  <div className="flex justify-between mt-1">
-                    <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                      <ArrowUpRight className="w-3 h-3 inline" /> {zone.badge_entries}
-                    </span>
-                    <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                      <ArrowDownLeft className="w-3 h-3 inline" /> {zone.badge_exits}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-    </TabPanel>,
-
-    // ===== Tab 2: Access Control =====
-    <TabPanel key="access">
-      <div className="space-y-4 mt-4">
-        <AccessEventsPanel siteId={siteId} refreshKey={0} />
-      </div>
-    </TabPanel>,
-
-    // ===== Tab 3: Cameras =====
-    <TabPanel key="cameras">
-      <div className="space-y-4 mt-4">
-        <div className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
-          <h4 className="font-medium text-sm mb-3" style={{ color: "var(--color-sentinel-text-primary)" }}>CCTV Camera Status</h4>
-          <div className="space-y-2">
-            {demoCameras.map((cam) => (
-              <div
-                key={cam.camera_id}
-                className="flex items-center justify-between p-3 rounded-lg"
-                style={{ border: "1px solid var(--color-sentinel-border)", background: "var(--color-sentinel-bg-secondary)" }}
-              >
-                <div className="flex items-center gap-3">
-                  {cam.status === "online" ? (
-                    <Video className="w-5 h-5 text-green-400" />
-                  ) : (
-                    <VideoOff className="w-5 h-5 text-red-400" />
-                  )}
-                  <div>
-                    <Text className="font-medium">{cam.name}</Text>
-                    <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                      {cam.floor} | {cam.camera_type.toUpperCase()} | {cam.resolution}
-                      {cam.has_analytics ? " | AI Analytics" : ""}
-                    </Text>
-                    {cam.camera_model && (
-                      <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>{cam.camera_model}</Text>
-                    )}
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  {cam.motion_detected && (
-                    <Badge color="amber" size="xs">
-                      Motion
-                    </Badge>
-                  )}
-                  <Badge color={cam.status === "online" ? "green" : cam.status === "fault" ? "amber" : "red"} size="xs">
-                    {cam.status}
-                  </Badge>
-                  {cam.stream_url && (
-                    <Text className="text-xs text-blue-400 cursor-pointer" title={cam.stream_url}>
-                      Stream
-                    </Text>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </TabPanel>,
-
-    // ===== Tab 4: Occupancy Analysis =====
-    <TabPanel key="analysis">
-      <div className="space-y-4 mt-4">
-        {/* 24-hour trend chart */}
-        <div className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
-          <h4 className="font-medium text-sm mb-3" style={{ color: "var(--color-sentinel-text-primary)" }}>24-Hour Occupancy Trend</h4>
-          <AreaChart
-            className="h-64"
-            data={demoTrendData.map((d) => ({
-              hour: d.hour,
-              Occupancy: d.net_occupancy,
-              Entries: d.entries,
-              Exits: d.exits,
-            }))}
-            index="hour"
-            categories={["Occupancy", "Entries", "Exits"]}
-            colors={["blue", "green", "red"]}
-            showLegend={true}
-            showGridLines={false}
-            curveType="monotone"
-          />
-        </div>
-
-        {/* Peak hours and floor breakdown */}
-        <Grid className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <div className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
-            <h4 className="font-medium text-sm mb-3" style={{ color: "var(--color-sentinel-text-primary)" }}>Peak Hours</h4>
-            <div className="space-y-3">
-              {[
-                { time: "08:00-09:00", label: "Morning Arrival", occupancy: 35, icon: <ArrowUpRight className="w-4 h-4 text-green-400" /> },
-                { time: "12:00-13:00", label: "Lunch Peak", occupancy: 28, icon: <Clock className="w-4 h-4 text-blue-400" /> },
-                { time: "17:00-18:00", label: "Evening Departure", occupancy: 30, icon: <ArrowDownLeft className="w-4 h-4 text-amber-400" /> },
-              ].map((peak) => (
-                <div
-                  key={peak.time}
-                  className="flex items-center justify-between p-2 rounded-lg"
-                  style={{ border: "1px solid var(--color-sentinel-border)", background: "var(--color-sentinel-bg-secondary)" }}
-                >
-                  <div className="flex items-center gap-2">
-                    {peak.icon}
-                    <div>
-                      <Text className="font-medium text-sm">{peak.time}</Text>
-                      <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>{peak.label}</Text>
-                    </div>
-                  </div>
-                  <Badge color="blue">{peak.occupancy} people</Badge>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
-            <h4 className="font-medium text-sm mb-3" style={{ color: "var(--color-sentinel-text-primary)" }}>Floor-by-Floor Breakdown</h4>
-            <BarChart
-              className="h-48"
-              data={zoneOccupancies.map((z) => ({
-                zone: z.zone_name,
-                Occupancy: z.occupancy_count,
-                Capacity: z.max_capacity || 50,
-              }))}
-              index="zone"
-              categories={["Occupancy", "Capacity"]}
-              colors={["blue", "gray"]}
-              showLegend={true}
-              showGridLines={false}
-              layout="vertical"
-            />
-          </div>
-        </Grid>
-
-        {/* Occupancy panel with cross-module recommendations */}
-        <SecurityOccupancyPanel siteId={siteId} refreshKey={0} />
-      </div>
-    </TabPanel>,
-
-    // ===== Tab 5: Integrations =====
-    <TabPanel key="integrations">
-      <div className="space-y-4 mt-4">
-        {/* HVAC Integration */}
-        <div className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
-          <Flex alignItems="center" className="gap-2 mb-4">
-            <Thermometer className="w-5 h-5 text-blue-400" />
-            <h4 className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>Security + HVAC Integration</h4>
-            <Badge color="green" size="xs">Active</Badge>
-          </Flex>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between p-3 rounded-lg" style={{ border: "1px solid var(--color-sentinel-border)", background: "var(--color-sentinel-bg-secondary)" }}>
-              <div>
-                <Text className="font-medium">Occupancy-Based Setpoint Adjustment</Text>
-                <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                  Empty zones: relax cooling setpoint by +2 deg C. Low occupancy: +1 deg C.
-                </Text>
-              </div>
-              <div className="flex items-center gap-2">
-                <Badge color="green" size="xs">Enabled</Badge>
-                <CheckCircle className="w-4 h-4 text-green-400" />
-              </div>
-            </div>
-            <div className="flex items-center justify-between p-3 rounded-lg" style={{ border: "1px solid var(--color-sentinel-border)", background: "var(--color-sentinel-bg-secondary)" }}>
-              <div>
-                <Text className="font-medium">Low Occupancy Mode</Text>
-                <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                  Cool to +2 deg C setback, reduce ventilation for unoccupied zones.
-                </Text>
-              </div>
-              <div className="flex items-center gap-2">
-                <Badge color="green" size="xs">Enabled</Badge>
-                <Zap className="w-4 h-4 text-green-400" />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Lighting Integration */}
-        <div className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
-          <Flex alignItems="center" className="gap-2 mb-4">
-            <Sun className="w-5 h-5 text-amber-400" />
-            <h4 className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>Security + Lighting Integration</h4>
-            <Badge color="green" size="xs">Active</Badge>
-          </Flex>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between p-3 rounded-lg" style={{ border: "1px solid var(--color-sentinel-border)", background: "var(--color-sentinel-bg-secondary)" }}>
-              <div>
-                <Text className="font-medium">Occupancy-Based Lighting Control</Text>
-                <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                  Empty zones: dim to 20%. Low occupancy: dim to 50%.
-                </Text>
-              </div>
-              <div className="flex items-center gap-2">
-                <Badge color="green" size="xs">Enabled</Badge>
-                <CheckCircle className="w-4 h-4 text-green-400" />
-              </div>
-            </div>
-            <div className="flex items-center justify-between p-3 rounded-lg" style={{ border: "1px solid var(--color-sentinel-border)", background: "var(--color-sentinel-bg-secondary)" }}>
-              <div>
-                <Text className="font-medium">Unoccupied Zone Auto-Dim</Text>
-                <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                  Lights auto-dim to 20% after 15 min of no occupancy detected.
-                </Text>
-              </div>
-              <div className="flex items-center gap-2">
-                <Badge color="green" size="xs">Enabled</Badge>
-                <Zap className="w-4 h-4 text-green-400" />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Integration Status Summary */}
-        <div className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
-          <h4 className="font-medium text-sm mb-3" style={{ color: "var(--color-sentinel-text-primary)" }}>Cross-Module Integration Status</h4>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="text-center p-4 rounded-lg border border-green-500/30 bg-green-500/5">
-              <Text className="text-2xl font-bold text-green-400">2</Text>
-              <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>Active Integrations</Text>
-            </div>
-            <div className="text-center p-4 rounded-lg border border-blue-500/30 bg-blue-500/5">
-              <Text className="text-2xl font-bold text-blue-400">{zoneOccupancies.length}</Text>
-              <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>Monitored Zones</Text>
-            </div>
-            <div className="text-center p-4 rounded-lg border border-amber-500/30 bg-amber-500/5">
-              <Text className="text-2xl font-bold text-amber-400">~15%</Text>
-              <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>Est. Energy Savings</Text>
-            </div>
-          </div>
-        </div>
-      </div>
-    </TabPanel>,
-  ];
+  const breachEvents = 0;
 
   return (
     <div className="h-full overflow-y-auto p-4 md:p-6" style={{ background: "var(--color-sentinel-bg-canvas)" }}>
@@ -619,18 +285,380 @@ export function SecurityDashboard({ siteId: propSiteId }: SecurityDashboardProps
         </div>
       </div>
 
-      {/* Tabbed Layout */}
-      <TabGroup index={activeTab} onIndexChange={setActiveTab}>
-        <TabList
-          className="mb-4 overflow-x-auto [&>*]:whitespace-nowrap rounded-lg p-1"
-          style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}
-        >
-          {tabs as unknown as ReactElement[]}
-        </TabList>
-        <TabPanels>
-          {panels as unknown as ReactElement[]}
-        </TabPanels>
-      </TabGroup>
+      {/* TabBar */}
+      <TabBar tabs={TAB_DEFS} active={activeTab} onChange={setActiveTab} />
+
+      {/* ===== Tab 1: Overview ===== */}
+      {activeTab === "overview" && (
+        <div className="space-y-4 mt-4">
+          <SentinelValueCard
+            title="Security Intelligence Impact"
+            icon={ShieldCheck}
+            baseline={{ label: "", value: 0, unit: "incidents" }}
+            sentinel={{ label: "", value: 0, unit: "incidents" }}
+            savingsPercent={0}
+            period="Monthly"
+            collecting
+          />
+
+          {/* Raw + SENTINEL Security View */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+              <div className="flex justify-between items-start mb-2">
+                <p className="text-sm font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>Raw Bridge Telemetry</p>
+                <Badge className={bridgeTelemetry?.status === "live" ? badgeColors.green : badgeColors.amber}>
+                  {bridgeTelemetry?.status === "live" ? "Live" : "Unavailable"}
+                </Badge>
+              </div>
+              <p className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                Zones: {bridgeTelemetry?.zones_with_readings ?? 0}/{bridgeTelemetry?.zone_count ?? 0}
+              </p>
+              <p className="text-xs mt-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                Power: HVAC {(bridgeTelemetry?.power?.hvac_kw ?? 0).toFixed(2)} kW · Total {(bridgeTelemetry?.power?.total_kw ?? 0).toFixed(2)} kW
+              </p>
+            </div>
+
+            <div className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+              <p className="text-sm font-semibold mb-2" style={{ color: "var(--color-sentinel-text-primary)" }}>SENTINEL Security Interpretation</p>
+              <p className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                Posture: <span className="capitalize" style={{ color: "var(--color-sentinel-text-primary)" }}>{sentinelPosture || "unknown"}</span>
+              </p>
+              <p className="text-xs mt-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                {sentinelGuidance || "No active guidance yet."}
+              </p>
+            </div>
+          </div>
+
+          {/* KPI Cards */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+              <div className="flex items-center gap-2 mb-2">
+                <Users className="w-5 h-5 text-blue-400" />
+                <p className="font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>Total Occupancy</p>
+              </div>
+              <div className="text-3xl font-bold" style={{ color: "var(--color-sentinel-text-primary)" }}>{totalOccupancy}</div>
+              <p className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                {capacityPercent}% of {totalCapacity} capacity
+              </p>
+            </div>
+
+            <div className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+              <div className="flex items-center gap-2 mb-2">
+                <CheckCircle className="w-5 h-5 text-green-400" />
+                <p className="font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>Active Zones</p>
+              </div>
+              <div className="text-3xl font-bold" style={{ color: "var(--color-sentinel-text-primary)" }}>{zoneOccupancies.filter((z) => z.occupancy_count > 0).length}</div>
+              <p className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>of {zoneOccupancies.length} zones</p>
+            </div>
+
+            <div className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+              <div className="flex items-center gap-2 mb-2">
+                <Camera className="w-5 h-5 text-cyan-400" />
+                <p className="font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>Cameras Online</p>
+              </div>
+              <div className="text-3xl font-bold" style={{ color: "var(--color-sentinel-text-primary)" }}>{onlineCameras}/{demoCameras.length}</div>
+              <p className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                {demoCameras.filter((c) => c.has_analytics).length} with AI analytics
+              </p>
+            </div>
+
+            <div className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+              <div className="flex items-center gap-2 mb-2">
+                <AlertTriangle className="w-5 h-5 text-amber-400" />
+                <p className="font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>Breach Events (24h)</p>
+              </div>
+              <div className="text-3xl font-bold" style={{ color: "var(--color-sentinel-text-primary)" }}>{breachEvents}</div>
+              <p className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>Unauthorized access attempts</p>
+            </div>
+          </div>
+
+          {/* Floor Occupancy Cards */}
+          <div className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+            <h4 className="font-medium text-sm mb-3" style={{ color: "var(--color-sentinel-text-primary)" }}>Zone Occupancy</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {zoneOccupancies.map((zone) => {
+                const pct = zone.percent_full || 0;
+                const barColor = pct > 80 ? "var(--color-sentinel-red)" : pct > 50 ? "var(--color-sentinel-amber)" : "var(--color-sentinel-green)";
+                const badgeBg = pct > 80 ? "rgba(220, 38, 38, 0.15)" : pct > 50 ? "rgba(245, 158, 11, 0.15)" : "rgba(16, 185, 129, 0.15)";
+                return (
+                  <div
+                    key={zone.zone_id}
+                    className="p-3 rounded-lg"
+                    style={{
+                      background: "var(--color-sentinel-bg-secondary)",
+                      border: "1px solid var(--color-sentinel-border)",
+                    }}
+                  >
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>{zone.zone_name}</span>
+                      <span
+                        className="text-xs font-medium px-2 py-0.5 rounded"
+                        style={{ background: badgeBg, color: barColor }}
+                      >
+                        {Math.round(pct)}%
+                      </span>
+                    </div>
+                    <div className="text-2xl font-bold" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                      {zone.occupancy_count}
+                      <span className="text-sm font-normal" style={{ color: "var(--color-sentinel-text-secondary)" }}>/{zone.max_capacity}</span>
+                    </div>
+                    {/* Progress bar */}
+                    <div className="w-full rounded-full h-2 mt-2" style={{ background: "var(--color-sentinel-bg-panel)" }}>
+                      <div className="h-2 rounded-full transition-all" style={{ width: `${Math.min(100, pct)}%`, background: barColor }} />
+                    </div>
+                    <div className="flex justify-between mt-1">
+                      <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                        <ArrowUpRight className="w-3 h-3 inline" /> {zone.badge_entries}
+                      </span>
+                      <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                        <ArrowDownLeft className="w-3 h-3 inline" /> {zone.badge_exits}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== Tab 2: Access Control ===== */}
+      {activeTab === "access" && (
+        <div className="space-y-4 mt-4">
+          <AccessEventsPanel siteId={siteId} refreshKey={0} />
+        </div>
+      )}
+
+      {/* ===== Tab 3: Cameras ===== */}
+      {activeTab === "cameras" && (
+        <div className="space-y-4 mt-4">
+          <div className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+            <h4 className="font-medium text-sm mb-3" style={{ color: "var(--color-sentinel-text-primary)" }}>CCTV Camera Status</h4>
+            <div className="space-y-2">
+              {demoCameras.map((cam) => (
+                <div
+                  key={cam.camera_id}
+                  className="flex items-center justify-between p-3 rounded-lg"
+                  style={{ border: "1px solid var(--color-sentinel-border)", background: "var(--color-sentinel-bg-secondary)" }}
+                >
+                  <div className="flex items-center gap-3">
+                    {cam.status === "online" ? (
+                      <Video className="w-5 h-5 text-green-400" />
+                    ) : (
+                      <VideoOff className="w-5 h-5 text-red-400" />
+                    )}
+                    <div>
+                      <p className="font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>{cam.name}</p>
+                      <p className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                        {cam.floor} | {cam.camera_type.toUpperCase()} | {cam.resolution}
+                        {cam.has_analytics ? " | AI Analytics" : ""}
+                      </p>
+                      {cam.camera_model && (
+                        <p className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>{cam.camera_model}</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {cam.motion_detected && (
+                      <Badge className={badgeColors.amber + badgeXs}>
+                        Motion
+                      </Badge>
+                    )}
+                    <Badge className={`${cam.status === "online" ? badgeColors.green : cam.status === "fault" ? badgeColors.amber : badgeColors.red}${badgeXs}`}>
+                      {cam.status}
+                    </Badge>
+                    {cam.stream_url && (
+                      <span className="text-xs" style={{ color: "var(--color-sentinel-blue)", cursor: "pointer" }} title={cam.stream_url}>
+                        Stream
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== Tab 4: Occupancy Analysis ===== */}
+      {activeTab === "analysis" && (
+        <div className="space-y-4 mt-4">
+          {/* 24-hour trend chart */}
+          <div className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+            <h4 className="font-medium text-sm mb-3" style={{ color: "var(--color-sentinel-text-primary)" }}>24-Hour Occupancy Trend</h4>
+            <div style={{ height: 256 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart
+                  data={demoTrendData.map((d) => ({
+                    hour: d.hour,
+                    Occupancy: d.net_occupancy,
+                    Entries: d.entries,
+                    Exits: d.exits,
+                  }))}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-sentinel-border)" vertical={false} />
+                  <XAxis dataKey="hour" stroke="var(--color-sentinel-text-secondary)" style={{ fontSize: 12 }} />
+                  <YAxis stroke="var(--color-sentinel-text-secondary)" style={{ fontSize: 12 }} />
+                  <Tooltip contentStyle={tooltipStyle} />
+                  <Area type="monotone" dataKey="Occupancy" stroke="var(--color-sentinel-blue)" fill="var(--color-sentinel-blue)" fillOpacity={0.1} />
+                  <Area type="monotone" dataKey="Entries" stroke="var(--color-sentinel-green)" fill="var(--color-sentinel-green)" fillOpacity={0.1} />
+                  <Area type="monotone" dataKey="Exits" stroke="var(--color-sentinel-red)" fill="var(--color-sentinel-red)" fillOpacity={0.1} />
+                  <Legend />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Peak hours and floor breakdown */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+              <h4 className="font-medium text-sm mb-3" style={{ color: "var(--color-sentinel-text-primary)" }}>Peak Hours</h4>
+              <div className="space-y-3">
+                {[
+                  { time: "08:00-09:00", label: "Morning Arrival", occupancy: 35, icon: <ArrowUpRight className="w-4 h-4 text-green-400" /> },
+                  { time: "12:00-13:00", label: "Lunch Peak", occupancy: 28, icon: <Clock className="w-4 h-4 text-blue-400" /> },
+                  { time: "17:00-18:00", label: "Evening Departure", occupancy: 30, icon: <ArrowDownLeft className="w-4 h-4 text-amber-400" /> },
+                ].map((peak) => (
+                  <div
+                    key={peak.time}
+                    className="flex items-center justify-between p-2 rounded-lg"
+                    style={{ border: "1px solid var(--color-sentinel-border)", background: "var(--color-sentinel-bg-secondary)" }}
+                  >
+                    <div className="flex items-center gap-2">
+                      {peak.icon}
+                      <div>
+                        <p className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>{peak.time}</p>
+                        <p className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>{peak.label}</p>
+                      </div>
+                    </div>
+                    <Badge className={badgeColors.blue}>{peak.occupancy} people</Badge>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+              <h4 className="font-medium text-sm mb-3" style={{ color: "var(--color-sentinel-text-primary)" }}>Floor-by-Floor Breakdown</h4>
+              <div style={{ height: 192 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={zoneOccupancies.map((z) => ({
+                      zone: z.zone_name,
+                      Occupancy: z.occupancy_count,
+                      Capacity: z.max_capacity || 50,
+                    }))}
+                    layout="vertical"
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--color-sentinel-border)" horizontal={false} />
+                    <XAxis type="number" stroke="var(--color-sentinel-text-secondary)" style={{ fontSize: 12 }} />
+                    <YAxis type="category" dataKey="zone" stroke="var(--color-sentinel-text-secondary)" style={{ fontSize: 12 }} width={120} />
+                    <Tooltip contentStyle={tooltipStyle} />
+                    <Bar dataKey="Occupancy" fill="var(--color-sentinel-blue)" radius={[0, 4, 4, 0]} />
+                    <Bar dataKey="Capacity" fill="var(--color-sentinel-text-secondary)" radius={[0, 4, 4, 0]} />
+                    <Legend />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </div>
+
+          <SecurityOccupancyPanel siteId={siteId} refreshKey={0} />
+        </div>
+      )}
+
+      {/* ===== Tab 5: Integrations ===== */}
+      {activeTab === "integrations" && (
+        <div className="space-y-4 mt-4">
+          {/* HVAC Integration */}
+          <div className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+            <div className="flex items-center gap-2 mb-4">
+              <Thermometer className="w-5 h-5 text-blue-400" />
+              <h4 className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>Security + HVAC Integration</h4>
+              <Badge className={badgeColors.green + badgeXs}>Active</Badge>
+            </div>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between p-3 rounded-lg" style={{ border: "1px solid var(--color-sentinel-border)", background: "var(--color-sentinel-bg-secondary)" }}>
+                <div>
+                  <p className="font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>Occupancy-Based Setpoint Adjustment</p>
+                  <p className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                    Empty zones: relax cooling setpoint by +2 deg C. Low occupancy: +1 deg C.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge className={badgeColors.green + badgeXs}>Enabled</Badge>
+                  <CheckCircle className="w-4 h-4 text-green-400" />
+                </div>
+              </div>
+              <div className="flex items-center justify-between p-3 rounded-lg" style={{ border: "1px solid var(--color-sentinel-border)", background: "var(--color-sentinel-bg-secondary)" }}>
+                <div>
+                  <p className="font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>Low Occupancy Mode</p>
+                  <p className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                    Cool to +2 deg C setback, reduce ventilation for unoccupied zones.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge className={badgeColors.green + badgeXs}>Enabled</Badge>
+                  <Zap className="w-4 h-4 text-green-400" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Lighting Integration */}
+          <div className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+            <div className="flex items-center gap-2 mb-4">
+              <Sun className="w-5 h-5 text-amber-400" />
+              <h4 className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>Security + Lighting Integration</h4>
+              <Badge className={badgeColors.green + badgeXs}>Active</Badge>
+            </div>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between p-3 rounded-lg" style={{ border: "1px solid var(--color-sentinel-border)", background: "var(--color-sentinel-bg-secondary)" }}>
+                <div>
+                  <p className="font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>Occupancy-Based Lighting Control</p>
+                  <p className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                    Empty zones: dim to 20%. Low occupancy: dim to 50%.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge className={badgeColors.green + badgeXs}>Enabled</Badge>
+                  <CheckCircle className="w-4 h-4 text-green-400" />
+                </div>
+              </div>
+              <div className="flex items-center justify-between p-3 rounded-lg" style={{ border: "1px solid var(--color-sentinel-border)", background: "var(--color-sentinel-bg-secondary)" }}>
+                <div>
+                  <p className="font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>Unoccupied Zone Auto-Dim</p>
+                  <p className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                    Lights auto-dim to 20% after 15 min of no occupancy detected.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge className={badgeColors.green + badgeXs}>Enabled</Badge>
+                  <Zap className="w-4 h-4 text-green-400" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Integration Status Summary */}
+          <div className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+            <h4 className="font-medium text-sm mb-3" style={{ color: "var(--color-sentinel-text-primary)" }}>Cross-Module Integration Status</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="text-center p-4 rounded-lg" style={{ border: "1px solid rgba(16, 185, 129, 0.3)", background: "rgba(16, 185, 129, 0.05)" }}>
+                <p className="text-2xl font-bold" style={{ color: "var(--color-sentinel-green)" }}>2</p>
+                <p className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>Active Integrations</p>
+              </div>
+              <div className="text-center p-4 rounded-lg" style={{ border: "1px solid rgba(59, 130, 246, 0.3)", background: "rgba(59, 130, 246, 0.05)" }}>
+                <p className="text-2xl font-bold" style={{ color: "var(--color-sentinel-blue)" }}>{zoneOccupancies.length}</p>
+                <p className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>Monitored Zones</p>
+              </div>
+              <div className="text-center p-4 rounded-lg" style={{ border: "1px solid rgba(245, 158, 11, 0.3)", background: "rgba(245, 158, 11, 0.05)" }}>
+                <p className="text-2xl font-bold" style={{ color: "var(--color-sentinel-amber)" }}>~15%</p>
+                <p className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>Est. Energy Savings</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

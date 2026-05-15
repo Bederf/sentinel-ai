@@ -14,12 +14,21 @@ import { FuelTrendChart } from './FuelTrendChart';
 import { fuelApi } from '../../lib/api';
 import { authorizedFetch } from '@/lib/api/client';
 import type { FuelTank, FuelEvent, GeneratorRuntimeSession, RefillRecord } from '../../lib/api';
+import { Badge } from '../Badge';
 
 interface FuelDashboardProps {
   siteId?: string;
 }
 
 const POLL_INTERVAL_MS = 30_000;
+
+const badgeEventColor: Record<string, string> = {
+  red: 'bg-red-500/15 text-[var(--color-sentinel-red)]',
+  amber: 'bg-amber-500/15 text-[var(--color-sentinel-amber)]',
+  green: 'bg-green-500/15 text-[var(--color-sentinel-green)]',
+  blue: 'bg-blue-500/15 text-[var(--color-sentinel-blue)]',
+  gray: 'bg-gray-500/15 text-[var(--color-sentinel-text-secondary)]',
+};
 
 function eventTypeBadgeColor(eventType: string): string {
   switch (eventType) {
@@ -157,7 +166,7 @@ export function FuelDashboard({ siteId }: FuelDashboardProps) {
   if (loading) {
     return (
       <div className="space-y-4">
-        <Title>Fuel Monitoring</Title>
+        <h2 className="text-lg font-semibold" style={{ color: 'var(--color-sentinel-text-primary)' }}>Fuel Monitoring</h2>
         <LoadingSkeleton />
       </div>
     );
@@ -165,21 +174,33 @@ export function FuelDashboard({ siteId }: FuelDashboardProps) {
 
   if (error) {
     return (
-      <Card>
-        <Title>Fuel Monitoring</Title>
-        <Text className="text-red-600 mt-2">{error}</Text>
-      </Card>
+      <div
+        className="rounded-lg p-4"
+        style={{
+          background: 'var(--color-sentinel-bg-panel)',
+          border: '1px solid var(--color-sentinel-border)',
+        }}
+      >
+        <h2 className="text-lg font-semibold" style={{ color: 'var(--color-sentinel-text-primary)' }}>Fuel Monitoring</h2>
+        <p className="mt-2" style={{ color: 'var(--color-sentinel-red)' }}>{error}</p>
+      </div>
     );
   }
 
   if (tanks.length === 0) {
     return (
-      <Card>
-        <Title>Fuel Monitoring</Title>
-        <Text className="text-gray-500 mt-2">
+      <div
+        className="rounded-lg p-4"
+        style={{
+          background: 'var(--color-sentinel-bg-panel)',
+          border: '1px solid var(--color-sentinel-border)',
+        }}
+      >
+        <h2 className="text-lg font-semibold" style={{ color: 'var(--color-sentinel-text-primary)' }}>Fuel Monitoring</h2>
+        <p className="mt-2 text-gray-500">
           No fuel tanks configured. Configure tanks via the fuel monitoring module settings.
-        </Text>
-      </Card>
+        </p>
+      </div>
     );
   }
 
@@ -196,46 +217,65 @@ export function FuelDashboard({ siteId }: FuelDashboardProps) {
 
   return (
     <div className="space-y-6">
-      <Flex justifyContent="between" alignItems="center">
-        <Title>Fuel Monitoring</Title>
-        <Text className="text-xs text-gray-400">Auto-refresh every 30s</Text>
-      </Flex>
+      <div className="flex justify-between items-center">
+        <h2 className="text-lg font-semibold" style={{ color: 'var(--color-sentinel-text-primary)' }}>Fuel Monitoring</h2>
+        <p className="text-xs text-gray-400">Auto-refresh every 30s</p>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Card>
+        <div
+          className="rounded-lg p-4"
+          style={{
+            background: 'var(--color-sentinel-bg-panel)',
+            border: '1px solid var(--color-sentinel-border)',
+          }}
+        >
           <div className="flex items-center justify-between mb-2">
-            <Text className="text-sm font-semibold">Raw Bridge Telemetry</Text>
-            <Badge color={bridgeTelemetry?.status === 'live' ? 'green' : 'amber'} size="sm">
+            <p className="text-sm font-semibold" style={{ color: 'var(--color-sentinel-text-primary)' }}>Raw Bridge Telemetry</p>
+            <Badge className={bridgeTelemetry?.status === 'live' ? badgeEventColor.green : badgeEventColor.amber}>
               {bridgeTelemetry?.status === 'live' ? 'Live' : 'Unavailable'}
             </Badge>
           </div>
-          <Text className="text-xs text-gray-500">Zones: {bridgeTelemetry?.zones_with_readings ?? 0}/{bridgeTelemetry?.zone_count ?? 0}</Text>
-        </Card>
-        <Card>
-          <Text className="text-sm font-semibold mb-2">SENTINEL Fuel Interpretation</Text>
-          <Text className="text-xs text-gray-500">Posture: {sentinelPosture || 'unknown'}</Text>
-          <Text className="text-xs text-gray-500 mt-1">{sentinelGuidance || 'No active guidance yet.'}</Text>
-        </Card>
+          <p className="text-xs text-gray-500">Zones: {bridgeTelemetry?.zones_with_readings ?? 0}/{bridgeTelemetry?.zone_count ?? 0}</p>
+        </div>
+        <div
+          className="rounded-lg p-4"
+          style={{
+            background: 'var(--color-sentinel-bg-panel)',
+            border: '1px solid var(--color-sentinel-border)',
+          }}
+        >
+          <p className="text-sm font-semibold mb-2" style={{ color: 'var(--color-sentinel-text-primary)' }}>SENTINEL Fuel Interpretation</p>
+          <p className="text-xs text-gray-500">Posture: {sentinelPosture || 'unknown'}</p>
+          <p className="text-xs text-gray-500 mt-1">{sentinelGuidance || 'No active guidance yet.'}</p>
+        </div>
       </div>
 
       {/* Summary Stats Row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Card className="p-3 text-center">
-          <Text className="text-sm text-gray-500">Total Tanks</Text>
-          <Text className="text-2xl font-bold">{tanks.length}</Text>
-        </Card>
-        <Card className="p-3 text-center">
-          <Text className="text-sm text-gray-500">Warning</Text>
-          <Text className="text-2xl font-bold text-amber-600">{tanksWarning}</Text>
-        </Card>
-        <Card className="p-3 text-center">
-          <Text className="text-sm text-gray-500">Critical</Text>
-          <Text className="text-2xl font-bold text-red-600">{tanksCritical}</Text>
-        </Card>
-        <Card className="p-3 text-center">
-          <Text className="text-sm text-gray-500">Avg Days to Empty</Text>
-          <Text className="text-2xl font-bold">{avgDaysToEmpty > 0 ? avgDaysToEmpty.toFixed(0) : '--'}</Text>
-        </Card>
+        {[
+          { label: 'Total Tanks', value: tanks.length, color: undefined },
+          { label: 'Warning', value: tanksWarning, color: 'var(--color-sentinel-amber)' },
+          { label: 'Critical', value: tanksCritical, color: 'var(--color-sentinel-red)' },
+          { label: 'Avg Days to Empty', value: avgDaysToEmpty > 0 ? avgDaysToEmpty.toFixed(0) : '--', color: undefined },
+        ].map((stat, i) => (
+          <div
+            key={i}
+            className="p-3 text-center rounded-lg"
+            style={{
+              background: 'var(--color-sentinel-bg-panel)',
+              border: '1px solid var(--color-sentinel-border)',
+            }}
+          >
+            <p className="text-sm" style={{ color: 'var(--color-sentinel-text-secondary)' }}>{stat.label}</p>
+            <p
+              className="text-2xl font-bold mt-1"
+              style={{ color: stat.color || 'var(--color-sentinel-text-primary)' }}
+            >
+              {stat.value}
+            </p>
+          </div>
+        ))}
       </div>
 
       {/* Tank Cards Grid */}
@@ -251,104 +291,139 @@ export function FuelDashboard({ siteId }: FuelDashboardProps) {
       )}
 
       {/* Recent Events Feed */}
-      <Card>
-        <Title className="mb-3">Recent Fuel Events</Title>
+      <div
+        className="rounded-lg p-4"
+        style={{
+          background: 'var(--color-sentinel-bg-panel)',
+          border: '1px solid var(--color-sentinel-border)',
+        }}
+      >
+        <h3 className="text-base font-semibold mb-3" style={{ color: 'var(--color-sentinel-text-primary)' }}>Recent Fuel Events</h3>
         {events.length === 0 ? (
-          <Text className="text-gray-500">No recent fuel events</Text>
+          <p className="text-gray-500">No recent fuel events</p>
         ) : (
           <div className="space-y-2">
             {events.map(evt => (
-              <Flex key={evt.event_id} justifyContent="between" alignItems="center"
-                className="py-2 border-b border-gray-100 last:border-0">
-                <Flex alignItems="center" className="gap-2">
-                  <Badge color={eventTypeBadgeColor(evt.event_type)} size="sm">
+              <div
+                key={evt.event_id}
+                className="flex justify-between items-center py-2 border-b last:border-0"
+                style={{ borderColor: 'var(--color-sentinel-border)' }}
+              >
+                <div className="flex items-center gap-2">
+                  <Badge className={badgeEventColor[eventTypeBadgeColor(evt.event_type)]}>
                     {formatEventType(evt.event_type)}
                   </Badge>
-                  <Text className="text-sm text-gray-600">{evt.tank_id}</Text>
-                </Flex>
-                <Text className="text-xs text-gray-400">{formatTimestamp(evt.ts)}</Text>
-              </Flex>
+                  <p className="text-sm text-gray-600">{evt.tank_id}</p>
+                </div>
+                <p className="text-xs text-gray-400">{formatTimestamp(evt.ts)}</p>
+              </div>
             ))}
           </div>
         )}
-      </Card>
+      </div>
 
       {/* Refill Log Table */}
-      <Card>
-        <Title className="mb-3">Refill Log</Title>
+      <div
+        className="rounded-lg p-4"
+        style={{
+          background: 'var(--color-sentinel-bg-panel)',
+          border: '1px solid var(--color-sentinel-border)',
+        }}
+      >
+        <h3 className="text-base font-semibold mb-3" style={{ color: 'var(--color-sentinel-text-primary)' }}>Refill Log</h3>
         {refills.length === 0 ? (
-          <Text className="text-gray-500">No refill events recorded</Text>
+          <p className="text-gray-500">No refill events recorded</p>
         ) : (
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableHeaderCell>Date</TableHeaderCell>
-                <TableHeaderCell>Tank</TableHeaderCell>
-                <TableHeaderCell>Litres Added</TableHeaderCell>
-                <TableHeaderCell>Previous Level</TableHeaderCell>
-                <TableHeaderCell>New Level</TableHeaderCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
+          <table className="w-full">
+            <thead>
+              <tr
+                className="text-left text-xs font-medium uppercase tracking-wider"
+                style={{ color: 'var(--color-sentinel-text-secondary)' }}
+              >
+                <th className="pb-2">Date</th>
+                <th className="pb-2">Tank</th>
+                <th className="pb-2">Litres Added</th>
+                <th className="pb-2">Previous Level</th>
+                <th className="pb-2">New Level</th>
+              </tr>
+            </thead>
+            <tbody>
               {refills.map(r => {
                 const details = r.details || {};
                 return (
-                  <TableRow key={r.event_id}>
-                    <TableCell>{formatTimestamp(r.ts)}</TableCell>
-                    <TableCell>{r.tank_id}</TableCell>
-                    <TableCell>{typeof details.litres_added === 'number' ? `${(details.litres_added as number).toFixed(0)} L` : '--'}</TableCell>
-                    <TableCell>{typeof details.previous_pct === 'number' ? `${(details.previous_pct as number).toFixed(1)}%` : '--'}</TableCell>
-                    <TableCell>{typeof details.new_pct === 'number' ? `${(details.new_pct as number).toFixed(1)}%` : '--'}</TableCell>
-                  </TableRow>
+                  <tr
+                    key={r.event_id}
+                    className="border-b last:border-0"
+                    style={{ borderColor: 'var(--color-sentinel-border)' }}
+                  >
+                    <td className="py-2 pr-4 text-sm" style={{ color: 'var(--color-sentinel-text-primary)' }}>{formatTimestamp(r.ts)}</td>
+                    <td className="py-2 pr-4 text-sm" style={{ color: 'var(--color-sentinel-text-primary)' }}>{r.tank_id}</td>
+                    <td className="py-2 pr-4 text-sm" style={{ color: 'var(--color-sentinel-text-primary)' }}>{typeof details.litres_added === 'number' ? `${(details.litres_added as number).toFixed(0)} L` : '--'}</td>
+                    <td className="py-2 pr-4 text-sm" style={{ color: 'var(--color-sentinel-text-primary)' }}>{typeof details.previous_pct === 'number' ? `${(details.previous_pct as number).toFixed(1)}%` : '--'}</td>
+                    <td className="py-2 text-sm" style={{ color: 'var(--color-sentinel-text-primary)' }}>{typeof details.new_pct === 'number' ? `${(details.new_pct as number).toFixed(1)}%` : '--'}</td>
+                  </tr>
                 );
               })}
-            </TableBody>
-          </Table>
+            </tbody>
+          </table>
         )}
-      </Card>
+      </div>
 
       {/* Generator Runtime History */}
-      <Card>
-        <Title className="mb-3">Generator Runtime History</Title>
+      <div
+        className="rounded-lg p-4"
+        style={{
+          background: 'var(--color-sentinel-bg-panel)',
+          border: '1px solid var(--color-sentinel-border)',
+        }}
+      >
+        <h3 className="text-base font-semibold mb-3" style={{ color: 'var(--color-sentinel-text-primary)' }}>Generator Runtime History</h3>
         {runtimeSessions.length === 0 ? (
-          <Text className="text-gray-500">No generator runtime sessions recorded</Text>
+          <p className="text-gray-500">No generator runtime sessions recorded</p>
         ) : (
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableHeaderCell>Date</TableHeaderCell>
-                <TableHeaderCell>Tank</TableHeaderCell>
-                <TableHeaderCell>Duration</TableHeaderCell>
-                <TableHeaderCell>Fuel Consumed</TableHeaderCell>
-                <TableHeaderCell>Anomaly</TableHeaderCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
+          <table className="w-full">
+            <thead>
+              <tr
+                className="text-left text-xs font-medium uppercase tracking-wider"
+                style={{ color: 'var(--color-sentinel-text-secondary)' }}
+              >
+                <th className="pb-2">Date</th>
+                <th className="pb-2">Tank</th>
+                <th className="pb-2">Duration</th>
+                <th className="pb-2">Fuel Consumed</th>
+                <th className="pb-2">Anomaly</th>
+              </tr>
+            </thead>
+            <tbody>
               {runtimeSessions.map(s => {
                 const details = s.details || {};
                 const duration = typeof details.duration_seconds === 'number' ? details.duration_seconds as number : null;
                 const consumed = typeof details.fuel_consumed_litres === 'number' ? details.fuel_consumed_litres as number : null;
                 const anomaly = Boolean(details.anomaly);
                 return (
-                  <TableRow key={s.event_id}>
-                    <TableCell>{formatTimestamp(s.ts)}</TableCell>
-                    <TableCell>{s.tank_id}</TableCell>
-                    <TableCell>{duration != null ? formatDuration(duration) : '--'}</TableCell>
-                    <TableCell>{consumed != null ? `${consumed.toFixed(1)} L` : '--'}</TableCell>
-                    <TableCell>
+                  <tr
+                    key={s.event_id}
+                    className="border-b last:border-0"
+                    style={{ borderColor: 'var(--color-sentinel-border)' }}
+                  >
+                    <td className="py-2 pr-4 text-sm" style={{ color: 'var(--color-sentinel-text-primary)' }}>{formatTimestamp(s.ts)}</td>
+                    <td className="py-2 pr-4 text-sm" style={{ color: 'var(--color-sentinel-text-primary)' }}>{s.tank_id}</td>
+                    <td className="py-2 pr-4 text-sm" style={{ color: 'var(--color-sentinel-text-primary)' }}>{duration != null ? formatDuration(duration) : '--'}</td>
+                    <td className="py-2 pr-4 text-sm" style={{ color: 'var(--color-sentinel-text-primary)' }}>{consumed != null ? `${consumed.toFixed(1)} L` : '--'}</td>
+                    <td className="py-2 text-sm">
                       {anomaly ? (
-                        <Badge color="red" size="sm">Anomaly</Badge>
+                        <Badge className={badgeEventColor.red}>Anomaly</Badge>
                       ) : (
-                        <Badge color="green" size="sm">Normal</Badge>
+                        <Badge className={badgeEventColor.green}>Normal</Badge>
                       )}
-                    </TableCell>
-                  </TableRow>
+                    </td>
+                  </tr>
                 );
               })}
-            </TableBody>
-          </Table>
+            </tbody>
+          </table>
         )}
-      </Card>
+      </div>
     </div>
   );
 }

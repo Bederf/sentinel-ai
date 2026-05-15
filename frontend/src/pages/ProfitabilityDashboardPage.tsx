@@ -112,28 +112,28 @@ function KPICard({ title, value, subtitle, trend, color = "blue" }: KPICardProps
   const TrendIcon = trend === "up" ? ArrowUp : trend === "down" ? ArrowDown : Minus;
 
   return (
-    <Card style={{ background: "rgba(14, 116, 144, 0.05)", border: "1px solid var(--color-sentinel-border)" }}>
+    <div style={{ background: "rgba(14, 116, 144, 0.05)", border: "1px solid var(--color-sentinel-border)" }}>
       <div className="flex items-center justify-between">
         <div>
-          <Text
+          <span
             style={{ color: "var(--color-sentinel-text-secondary)" }}
             className="text-xs"
           >
             {title}
-          </Text>
-          <Title
+          </span>
+          <h3
             style={{ color: "var(--color-sentinel-text-primary)" }}
             className="text-2xl font-semibold mt-1"
           >
             {value}
-          </Title>
+          </h3>
           {subtitle && (
-            <Text
+            <span
               style={{ color: "var(--color-sentinel-text-disabled)" }}
               className="text-xs mt-1"
             >
               {subtitle}
-            </Text>
+            </span>
           )}
         </div>
         {trend && (
@@ -145,7 +145,7 @@ function KPICard({ title, value, subtitle, trend, color = "blue" }: KPICardProps
           </div>
         )}
       </div>
-    </Card>
+    </div>
   );
 }
 
@@ -591,17 +591,29 @@ export function ProfitabilityDashboardPage() {
   // Error state
   if (error) {
     return (
-      <Callout
-        title="Error"
-        color="rose"
-        className="rounded-lg"
+      <div
+        className="rounded-lg p-4 flex items-center gap-3"
         style={{
           background: "var(--color-sentinel-bg-panel)",
           border: "1px solid rgba(220, 38, 38, 0.35)",
         }}
       >
-        {error}
-      </Callout>
+        <AlertTriangle className="h-5 w-5 flex-shrink-0" style={{ color: "var(--color-sentinel-red)" }} />
+        <div>
+          <h3
+            className="font-semibold text-sm"
+            style={{ color: "var(--color-sentinel-text-primary)" }}
+          >
+            Error
+          </h3>
+          <span
+            className="text-sm"
+            style={{ color: "var(--color-sentinel-text-secondary)" }}
+          >
+            {error}
+          </span>
+        </div>
+      </div>
     );
   }
 
@@ -610,18 +622,18 @@ export function ProfitabilityDashboardPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-2">
         <div>
-          <Title
+          <h3
             style={{ color: "var(--color-sentinel-text-primary)" }}
             className="text-2xl"
           >
             Profitability Dashboard
-          </Title>
-          <Text
+          </h3>
+          <span
             style={{ color: "var(--color-sentinel-text-secondary)" }}
             className="text-sm"
           >
             Portfolio financial performance and margin analysis
-          </Text>
+          </span>
         </div>
 
         {/* Filters */}
@@ -673,14 +685,18 @@ export function ProfitabilityDashboardPage() {
             )}
           </select>
 
-          <Button
-            variant="secondary"
-            size="sm"
-            icon={RefreshCw}
+          <button
             onClick={() => window.location.reload()}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded transition-colors"
+            style={{
+              background: "var(--color-sentinel-bg-secondary)",
+              border: "1px solid var(--color-sentinel-border)",
+              color: "var(--color-sentinel-text-primary)",
+            }}
           >
+            <RefreshCw className="h-3.5 w-3.5" />
             Refresh
-          </Button>
+          </button>
         </div>
       </div>
 
@@ -773,12 +789,12 @@ export function ProfitabilityDashboardPage() {
             {lossLeaders.slice(0, 3).map((leader) => (
               <div key={leader.contract_id} className="flex items-center justify-between py-2 px-3 rounded" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
                 <div>
-                  <Text style={{ color: "var(--color-sentinel-text-primary)" }} className="font-medium">{leader.contract_name}</Text>
-                  <Text style={{ color: "var(--color-sentinel-text-secondary)" }} className="text-xs">{leader.root_causes.join(", ")}</Text>
+                  <span style={{ color: "var(--color-sentinel-text-primary)" }} className="font-medium">{leader.contract_name}</span>
+                  <span style={{ color: "var(--color-sentinel-text-secondary)" }} className="text-xs">{leader.root_causes.join(", ")}</span>
                 </div>
                 <div className="text-right">
-                  <Text style={{ color: "var(--color-sentinel-red)" }} className="font-semibold">{formatZAR(leader.loss_amount_zar)}</Text>
-                  <Text style={{ color: "var(--color-sentinel-text-secondary)" }} className="text-xs block">{formatPercent(leader.loss_percentage)}</Text>
+                  <span style={{ color: "var(--color-sentinel-red)" }} className="font-semibold">{formatZAR(leader.loss_amount_zar)}</span>
+                  <span style={{ color: "var(--color-sentinel-text-secondary)" }} className="text-xs block">{formatPercent(leader.loss_percentage)}</span>
                 </div>
               </div>
             ))}
@@ -798,60 +814,60 @@ export function ProfitabilityDashboardPage() {
           }}
         >
           <div className="overflow-x-auto">
-          <Table>
-            <TableHead>
-              <TableRow
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr
                 style={{
                   background: "var(--color-sentinel-bg-secondary)",
                 }}
               >
-                <TableHeaderCell
+                <th
                   style={{ color: "var(--color-sentinel-text-secondary)" }}
                 >
                   Contract
-                </TableHeaderCell>
-                <TableHeaderCell
+                </th>
+                <th
                   className="cursor-pointer select-none text-right"
                   onClick={() => handleSort("revenue")}
                   style={{ color: "var(--color-sentinel-text-secondary)" }}
                 >
                   Revenue
                   <SortIcon field="revenue" />
-                </TableHeaderCell>
-                <TableHeaderCell
+                </th>
+                <th
                   className="text-right"
                   style={{ color: "var(--color-sentinel-text-secondary)" }}
                 >
                   Costs
-                </TableHeaderCell>
-                <TableHeaderCell
+                </th>
+                <th
                   className="cursor-pointer select-none text-right"
                   onClick={() => handleSort("margin")}
                   style={{ color: "var(--color-sentinel-text-secondary)" }}
                 >
                   Gross Margin
                   <SortIcon field="margin" />
-                </TableHeaderCell>
-                <TableHeaderCell
+                </th>
+                <th
                   className="text-right"
                   style={{ color: "var(--color-sentinel-text-secondary)" }}
                 >
                   Net Margin
-                </TableHeaderCell>
-                <TableHeaderCell
+                </th>
+                <th
                   className="cursor-pointer select-none"
                   onClick={() => handleSort("status")}
                   style={{ color: "var(--color-sentinel-text-secondary)" }}
                 >
                   Status
                   <SortIcon field="status" />
-                </TableHeaderCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
               {paginatedContracts.length === 0 ? (
-                <TableRow>
-                  <TableCell
+                <tr>
+                  <td
                     colSpan={6}
                     className="text-center py-8"
                     style={{ color: "var(--color-sentinel-text-disabled)" }}
@@ -867,11 +883,11 @@ export function ProfitabilityDashboardPage() {
                         subtext="Contracts will appear once data is available."
                       />
                     )}
-                  </TableCell>
-                </TableRow>
+                  </td>
+                </tr>
               ) : (
                 paginatedContracts.map((contract) => (
-                  <TableRow
+                  <tr
                     key={contract.contract_id}
                     className="cursor-pointer hover:bg-opacity-50 transition-colors"
                     style={{
@@ -883,7 +899,7 @@ export function ProfitabilityDashboardPage() {
                     }}
                     onClick={() => setSelectedContractId(contract.contract_id)}
                   >
-                    <TableCell
+                    <td
                       style={{ color: "var(--color-sentinel-text-primary)" }}
                     >
                       <div>
@@ -897,20 +913,20 @@ export function ProfitabilityDashboardPage() {
                           {contract.site_name || contract.site_id}
                         </div>
                       </div>
-                    </TableCell>
-                    <TableCell
+                    </td>
+                    <td
                       className="text-right"
                       style={{ color: "var(--color-sentinel-text-primary)" }}
                     >
                       {formatZAR(contract.net_revenue_zar)}
-                    </TableCell>
-                    <TableCell
+                    </td>
+                    <td
                       className="text-right"
                       style={{ color: "var(--color-sentinel-text-primary)" }}
                     >
                       {formatZAR(contract.total_cost_zar)}
-                    </TableCell>
-                    <TableCell
+                    </td>
+                    <td
                       className="text-right"
                       style={{ color: "var(--color-sentinel-text-primary)" }}
                     >
@@ -933,8 +949,8 @@ export function ProfitabilityDashboardPage() {
                           {formatPercent(contract.gross_margin_percentage)}
                         </div>
                       </div>
-                    </TableCell>
-                    <TableCell
+                    </td>
+                    <td
                       className="text-right"
                       style={{ color: "var(--color-sentinel-text-primary)" }}
                     >
@@ -957,42 +973,50 @@ export function ProfitabilityDashboardPage() {
                           {formatPercent(contract.gross_margin_percentage)}
                         </div>
                       </div>
-                    </TableCell>
-                    <TableCell>
+                    </td>
+                    <td>
                       <StatusBadge
                         status={contract.status as StatusKey}
                         label={formatStatusLabel(contract.status)}
                       />
-                    </TableCell>
-                  </TableRow>
+                    </td>
+                  </tr>
                 ))
               )}
-            </TableBody>
-          </Table>
+            </tbody>
+          </table>
         </div>
       </Panel>
 
       {totalPages > 1 && (
         <div className="flex items-center justify-end gap-2">
-          <Button
-            variant="secondary"
-            size="xs"
+          <button
             disabled={currentPage === 1}
             onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+            className="px-2 py-1 text-xs rounded transition-colors disabled:opacity-40"
+            style={{
+              background: "var(--color-sentinel-bg-secondary)",
+              border: "1px solid var(--color-sentinel-border)",
+              color: "var(--color-sentinel-text-primary)",
+            }}
           >
             Previous
-          </Button>
-          <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+          </button>
+          <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
             Page {currentPage} of {totalPages}
-          </Text>
-          <Button
-            variant="secondary"
-            size="xs"
+          </span>
+          <button
             disabled={currentPage === totalPages}
             onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+            className="px-2 py-1 text-xs rounded transition-colors disabled:opacity-40"
+            style={{
+              background: "var(--color-sentinel-bg-secondary)",
+              border: "1px solid var(--color-sentinel-border)",
+              color: "var(--color-sentinel-text-primary)",
+            }}
           >
             Next
-          </Button>
+          </button>
         </div>
       )}
 
@@ -1003,38 +1027,50 @@ export function ProfitabilityDashboardPage() {
             accentColor: "var(--color-sentinel-blue)",
             actions: (
               <div className="flex items-center gap-2">
-                <Button
-                  variant="secondary"
-                  size="xs"
+                <button
                   disabled={!selectedReport || reportLoading}
                   onClick={() => handleExportFile("csv")}
+                  className="px-2 py-1 text-xs rounded transition-colors disabled:opacity-40"
+                  style={{
+                    background: "var(--color-sentinel-bg-secondary)",
+                    border: "1px solid var(--color-sentinel-border)",
+                    color: "var(--color-sentinel-text-primary)",
+                  }}
                 >
                   Export CSV
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="xs"
+                </button>
+                <button
                   disabled={!selectedReport || reportLoading}
                   onClick={() => handleExportFile("pdf")}
+                  className="px-2 py-1 text-xs rounded transition-colors disabled:opacity-40"
+                  style={{
+                    background: "var(--color-sentinel-bg-secondary)",
+                    border: "1px solid var(--color-sentinel-border)",
+                    color: "var(--color-sentinel-text-primary)",
+                  }}
                 >
                   Export PDF
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="xs"
+                </button>
+                <button
                   disabled={!selectedReport || reportLoading}
                   onClick={handleExportReport}
+                  className="px-2 py-1 text-xs rounded transition-colors disabled:opacity-40"
+                  style={{
+                    background: "var(--color-sentinel-bg-secondary)",
+                    border: "1px solid var(--color-sentinel-border)",
+                    color: "var(--color-sentinel-text-primary)",
+                  }}
                 >
                   Export JSON
-                </Button>
+                </button>
               </div>
             ),
           }}
         >
           <div className="p-6">
-          <Text className="text-xs mb-4" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+          <span className="text-xs mb-4" style={{ color: "var(--color-sentinel-text-secondary)" }}>
             Asset ROI and contract profitability summary
-          </Text>
+          </span>
 
           {reportLoading ? (
             <div
@@ -1051,9 +1087,9 @@ export function ProfitabilityDashboardPage() {
                   Report unavailable
                 </h3>
               </div>
-              <Text style={{ color: "var(--color-sentinel-text-secondary)" }}>
+              <span style={{ color: "var(--color-sentinel-text-secondary)" }}>
                 {reportError}
-              </Text>
+              </span>
             </div>
           ) : selectedReport ? (
             <div className="space-y-4">
@@ -1065,61 +1101,61 @@ export function ProfitabilityDashboardPage() {
                       Data quality flags
                     </h3>
                   </div>
-                  <Text style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                  <span style={{ color: "var(--color-sentinel-text-secondary)" }}>
                     {selectedReport.data_quality_flags.join(", ")}
-                  </Text>
+                  </span>
                 </div>
               )}
 
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <Card style={{ background: "rgba(14, 116, 144, 0.05)", border: "1px solid var(--color-sentinel-border)" }}>
-                  <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                <div style={{ background: "rgba(14, 116, 144, 0.05)", border: "1px solid var(--color-sentinel-border)" }}>
+                  <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
                     Net Revenue
-                  </Text>
-                  <Title className="text-xl" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                  </span>
+                  <h3 className="text-xl" style={{ color: "var(--color-sentinel-text-primary)" }}>
                     {formatZAR(selectedReport.profitability.net_revenue_zar)}
-                  </Title>
-                </Card>
-                <Card style={{ background: "rgba(14, 116, 144, 0.05)", border: "1px solid var(--color-sentinel-border)" }}>
-                  <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                  </h3>
+                </div>
+                <div style={{ background: "rgba(14, 116, 144, 0.05)", border: "1px solid var(--color-sentinel-border)" }}>
+                  <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
                     Total Cost
-                  </Text>
-                  <Title className="text-xl" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                  </span>
+                  <h3 className="text-xl" style={{ color: "var(--color-sentinel-text-primary)" }}>
                     {formatZAR(selectedReport.profitability.total_cost_zar)}
-                  </Title>
-                </Card>
-                <Card style={{ background: "rgba(14, 116, 144, 0.05)", border: "1px solid var(--color-sentinel-border)" }}>
-                  <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                  </h3>
+                </div>
+                <div style={{ background: "rgba(14, 116, 144, 0.05)", border: "1px solid var(--color-sentinel-border)" }}>
+                  <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
                     Gross Margin
-                  </Text>
-                  <Title className="text-xl" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                  </span>
+                  <h3 className="text-xl" style={{ color: "var(--color-sentinel-text-primary)" }}>
                     {formatZAR(selectedReport.profitability.gross_margin_zar)}
-                  </Title>
-                </Card>
-                <Card style={{ background: "rgba(14, 116, 144, 0.05)", border: "1px solid var(--color-sentinel-border)" }}>
-                  <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                  </h3>
+                </div>
+                <div style={{ background: "rgba(14, 116, 144, 0.05)", border: "1px solid var(--color-sentinel-border)" }}>
+                  <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
                     Asset Count
-                  </Text>
-                  <Title className="text-xl" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                  </span>
+                  <h3 className="text-xl" style={{ color: "var(--color-sentinel-text-primary)" }}>
                     {selectedReport.profitability.asset_count}
-                  </Title>
-                </Card>
+                  </h3>
+                </div>
               </div>
 
               <div style={{ border: "1px solid var(--color-sentinel-border)", borderRadius: "0.5rem", overflow: "hidden" }}>
-                <Table>
-                  <TableHead>
-                    <TableRow>
-                      <TableHeaderCell>Asset</TableHeaderCell>
-                      <TableHeaderCell className="text-right">Revenue</TableHeaderCell>
-                      <TableHeaderCell className="text-right">Cost</TableHeaderCell>
-                      <TableHeaderCell className="text-right">ROI</TableHeaderCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
+                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                  <thead>
+                    <tr>
+                      <th>Asset</th>
+                      <th className="text-right">Revenue</th>
+                      <th className="text-right">Cost</th>
+                      <th className="text-right">ROI</th>
+                    </tr>
+                  </thead>
+                  <tbody>
                     {selectedAssets.length === 0 ? (
-                      <TableRow>
-                        <TableCell
+                      <tr>
+                        <td
                           colSpan={4}
                           className="text-center py-6"
                           style={{ color: "var(--color-sentinel-text-disabled)" }}
@@ -1129,12 +1165,12 @@ export function ProfitabilityDashboardPage() {
                             title="No asset ROI data"
                             subtext="Asset ROI data will appear once contracts are linked."
                           />
-                        </TableCell>
-                      </TableRow>
+                        </td>
+                      </tr>
                     ) : (
                       selectedAssets.map((asset) => (
-                        <TableRow key={asset.equipment_id}>
-                          <TableCell>
+                        <tr key={asset.equipment_id}>
+                          <td>
                             <div className="text-sm font-medium">
                               {asset.equipment_name || asset.equipment_code || asset.equipment_id}
                             </div>
@@ -1144,14 +1180,14 @@ export function ProfitabilityDashboardPage() {
                             >
                               {asset.equipment_type || "Unknown type"}
                             </div>
-                          </TableCell>
-                          <TableCell className="text-right">
+                          </td>
+                          <td className="text-right">
                             {formatZAR(asset.allocated_revenue_zar)}
-                          </TableCell>
-                          <TableCell className="text-right">
+                          </td>
+                          <td className="text-right">
                             {formatZAR(asset.allocated_cost_zar)}
-                          </TableCell>
-                          <TableCell className="text-right">
+                          </td>
+                          <td className="text-right">
                             <span
                               style={{
                                 color:
@@ -1162,12 +1198,12 @@ export function ProfitabilityDashboardPage() {
                             >
                               {formatPercent(asset.roi_percentage)}
                             </span>
-                          </TableCell>
-                        </TableRow>
+                          </td>
+                        </tr>
                       ))
                     )}
-                  </TableBody>
-                </Table>
+                  </tbody>
+                </table>
               </div>
             </div>
           ) : null}
@@ -1181,13 +1217,17 @@ export function ProfitabilityDashboardPage() {
           title: "Margin Trend",
           accentColor: "var(--color-sentinel-blue)",
           actions: selectedContractId ? (
-            <Button
-              variant="light"
-              size="xs"
+            <button
               onClick={() => setSelectedContractId(null)}
+              className="px-2 py-1 text-xs rounded transition-colors"
+              style={{
+                background: "var(--color-sentinel-bg-secondary)",
+                border: "1px solid var(--color-sentinel-border)",
+                color: "var(--color-sentinel-text-primary)",
+              }}
             >
               Show Portfolio Average
-            </Button>
+            </button>
           ) : undefined,
         }}
       >

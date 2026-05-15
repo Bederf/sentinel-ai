@@ -1,18 +1,3 @@
-/**
- * InspectionForm - Mobile-optimized inspection submission form
- *
- * Features:
- * - Loads checklist template for equipment type
- * - Grouped items by category
- * - Supports checklist, measurement, and visual inspection items
- * - Photo capture for items requiring photos
- * - Tolerance display for measurements
- * - Progress tracking
- * - Mobile-friendly with large touch targets
- *
- * Part of Phase 55: Routine Inspection & Maintenance
- */
-
 import { useState, useEffect } from 'react';
 
 import {
@@ -57,7 +42,6 @@ export default function InspectionForm({
   const [error, setError] = useState<string | null>(null);
   const [startTime] = useState<Date>(new Date());
 
-  // Load template on mount
   useEffect(() => {
     async function loadTemplate() {
       setLoading(true);
@@ -80,7 +64,6 @@ export default function InspectionForm({
     loadTemplate();
   }, [equipmentType]);
 
-  // Handle response changes
   const handleResponseChange = (itemId: string, value: any) => {
     setResponses((prev) => ({
       ...prev,
@@ -91,7 +74,6 @@ export default function InspectionForm({
     }));
   };
 
-  // Handle photo addition via file input
   const handlePhotoAdd = (itemId: string) => {
     const input = document.createElement('input');
     input.type = 'file';
@@ -114,7 +96,6 @@ export default function InspectionForm({
     input.click();
   };
 
-  // Calculate completion progress
   const getCompletionProgress = (): { completed: number; total: number; percent: number } => {
     if (!template) return { completed: 0, total: 0, percent: 0 };
 
@@ -131,7 +112,6 @@ export default function InspectionForm({
     };
   };
 
-  // Check if measurement is within tolerance
   const isWithinTolerance = (item: ChecklistItemDef, value: number): boolean | null => {
     if (item.tolerance_min === undefined || item.tolerance_max === undefined) {
       return null;
@@ -139,7 +119,6 @@ export default function InspectionForm({
     return value >= item.tolerance_min && value <= item.tolerance_max;
   };
 
-  // Handle form submission
   const handleSubmit = async () => {
     if (!template) return;
 
@@ -173,7 +152,6 @@ export default function InspectionForm({
     }
   };
 
-  // Group items by category
   const groupedItems = template
     ? template.checklist_items.reduce(
         (acc, item) => {
@@ -190,17 +168,30 @@ export default function InspectionForm({
 
   const progress = getCompletionProgress();
 
+  const panelStyle: React.CSSProperties = {
+    background: "var(--color-sentinel-bg-panel)",
+    border: "1px solid var(--color-sentinel-border)",
+    borderRadius: 8,
+    padding: 16,
+  };
+
+  const cardStyle: React.CSSProperties = {
+    background: "var(--color-sentinel-bg-panel)",
+    border: "1px solid var(--color-sentinel-border)",
+    borderRadius: 8,
+  };
+
   if (loading) {
     return (
       <div className="space-y-4 p-4">
-        <Card className="animate-pulse">
-          <div className="h-8 bg-gray-200 rounded w-2/3 mb-4"></div>
+        <div className="animate-pulse" style={cardStyle}>
+          <div className="h-8 bg-gray-200 rounded w-2/3 mb-4" style={cardStyle}></div>
           <div className="space-y-3">
             <div className="h-12 bg-gray-200 rounded"></div>
             <div className="h-12 bg-gray-200 rounded"></div>
             <div className="h-12 bg-gray-200 rounded"></div>
           </div>
-        </Card>
+        </div>
       </div>
     );
   }
@@ -208,18 +199,26 @@ export default function InspectionForm({
   if (error && !template) {
     return (
       <div className="p-4">
-        <Card>
-          <div className="flex items-center gap-2 text-red-600 mb-4">
+        <div style={cardStyle}>
+          <div className="flex items-center gap-2 mb-4" style={{ color: "var(--color-sentinel-red)" }}>
             <AlertTriangle className="h-5 w-5" />
             <span>{error}</span>
           </div>
           {onCancel && (
-            <Button variant="secondary" onClick={onCancel}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
+            <button
+              onClick={onCancel}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors"
+              style={{
+                background: "var(--color-sentinel-bg-secondary)",
+                border: "1px solid var(--color-sentinel-border)",
+                color: "var(--color-sentinel-text-primary)",
+              }}
+            >
+              <ArrowLeft className="h-4 w-4" />
               Go Back
-            </Button>
+            </button>
           )}
-        </Card>
+        </div>
       </div>
     );
   }
@@ -230,25 +229,32 @@ export default function InspectionForm({
 
   return (
     <div className="space-y-4 pb-24">
-      {/* Header */}
-      <Card>
-        <div className="flex items-start justify-between">
+      <div style={cardStyle}>
+        <div className="flex items-start justify-between p-4">
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">
+            <h2 className="text-lg font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>
               {template.template_name}
             </h2>
             {equipmentName && (
-              <p className="text-sm text-gray-500">{equipmentName}</p>
+              <p className="text-sm mt-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>{equipmentName}</p>
             )}
           </div>
           {onCancel && (
-            <Button variant="light" size="xs" onClick={onCancel}>
+            <button
+              onClick={onCancel}
+              className="inline-flex items-center p-1.5 rounded-md transition-colors"
+              style={{
+                background: "var(--color-sentinel-bg-secondary)",
+                border: "1px solid var(--color-sentinel-border)",
+                color: "var(--color-sentinel-text-primary)",
+              }}
+            >
               <ArrowLeft className="h-4 w-4" />
-            </Button>
+            </button>
           )}
         </div>
 
-        <div className="flex items-center gap-4 mt-3 text-sm text-gray-500">
+        <div className="flex items-center gap-4 px-4 pb-2 text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
           <div className="flex items-center gap-1">
             <Clock className="h-4 w-4" />
             <span>~{template.estimated_duration_minutes} min</span>
@@ -259,203 +265,249 @@ export default function InspectionForm({
           </div>
         </div>
 
-        {/* Progress Bar */}
-        <div className="mt-4">
+        <div className="p-4 pt-2">
           <div className="flex items-center justify-between text-sm mb-1">
-            <span className="text-gray-500">Progress</span>
-            <span className="font-medium">
+            <span style={{ color: "var(--color-sentinel-text-secondary)" }}>Progress</span>
+            <span className="font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>
               {progress.completed}/{progress.total} ({progress.percent}%)
             </span>
           </div>
-          <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+          <div className="h-2 rounded-full overflow-hidden" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
             <div
-              className="h-full bg-blue-500 transition-all duration-300"
-              style={{ width: `${progress.percent}%` }}
+              className="h-full transition-all duration-300"
+              style={{ width: `${progress.percent}%`, background: "var(--color-sentinel-blue)" }}
             />
           </div>
         </div>
-      </Card>
+      </div>
 
-      {/* Error Display */}
       {error && (
-        <Card className="bg-red-50 border-red-200">
-          <div className="flex items-center gap-2 text-red-700">
-            <AlertTriangle className="h-5 w-5" />
-            <span>{error}</span>
-          </div>
-        </Card>
+        <div
+          className="p-3 rounded-md text-sm flex items-center gap-2"
+          style={{
+            background: "rgba(220,38,38,0.15)",
+            border: "1px solid rgba(220,38,38,0.3)",
+            color: "var(--color-sentinel-red)",
+          }}
+        >
+          <AlertTriangle className="h-5 w-5 flex-shrink-0" />
+          <span>{error}</span>
+        </div>
       )}
 
-      {/* Checklist Items by Category */}
       {Object.entries(groupedItems).map(([category, items]) => (
-        <Card key={category}>
-          <h3 className="text-base font-medium text-gray-900 mb-4">{category}</h3>
+        <div key={category} style={cardStyle}>
+          <div className="p-4">
+            <h3 className="text-base font-medium mb-4" style={{ color: "var(--color-sentinel-text-primary)" }}>{category}</h3>
 
-          <div className="space-y-4">
-            {items.map((item) => (
-              <div key={item.item_id} className="space-y-2">
-                <div className="flex items-start justify-between">
-                  <label className="text-sm font-medium text-gray-700">
-                    {item.question}
-                    {item.required && <span className="text-red-500 ml-1">*</span>}
-                  </label>
-                  {responses[item.item_id]?.value && (
-                    <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0" />
-                  )}
-                </div>
-
-                {/* Checklist Item (Multiple Choice) */}
-                {item.item_type === 'checklist' && item.options && (
-                  <select
-                    value={responses[item.item_id]?.value || ''}
-                    onChange={(event) => handleResponseChange(item.item_id, event.target.value)}
-                    className="w-full rounded-md appearance-none cursor-pointer px-3 py-2 text-sm transition-colors focus:outline-none focus:ring-0"
-                    style={{
-                      background: "var(--color-grafana-bg-secondary)",
-                      border: "1px solid var(--color-grafana-border)",
-                      color: "var(--color-grafana-text-primary)",
-                      boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)",
-                      outline: "none",
-                    }}
-                    aria-label={`Select option for ${item.question}`}
-                  >
-                    <option value="">Select option</option>
-                    {item.options.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                )}
-
-                {/* Measurement Item (Numerical) */}
-                {item.item_type === 'measurement' && (
-                  <div className="space-y-1">
-                    <div className="flex gap-2 items-center">
-                      <NumberInput
-                        placeholder={`Enter value (${item.unit || ''})`}
-                        value={responses[item.item_id]?.value || ''}
-                        onValueChange={(value: number) =>
-                          handleResponseChange(item.item_id, value)
-                        }
-                        className="flex-1"
-                      />
-                      {item.photos_required && (
-                        <Button
-                          variant="secondary"
-                          size="xs"
-                          onClick={() => handlePhotoAdd(item.item_id)}
-                        >
-                          <Camera className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-
-                    {/* Tolerance Display */}
-                    {item.tolerance_min !== undefined &&
-                      item.tolerance_max !== undefined && (
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-gray-500">
-                            Range: {item.tolerance_min} - {item.tolerance_max} {item.unit}
-                          </span>
-                          {responses[item.item_id]?.value !== undefined && (
-                            <Badge
-                              color={
-                                isWithinTolerance(
-                                  item,
-                                  responses[item.item_id].value
-                                )
-                                  ? 'green'
-                                  : 'red'
-                              }
-                              size="xs"
-                            >
-                              {isWithinTolerance(item, responses[item.item_id].value)
-                                ? 'OK'
-                                : 'Out of range'}
-                            </Badge>
-                          )}
-                        </div>
-                      )}
-                  </div>
-                )}
-
-                {/* Visual Inspection Item (Text + Photo) */}
-                {item.item_type === 'visual_inspection' && (
-                  <div className="space-y-2">
-                    <TextInput
-                      placeholder="Enter observations"
-                      value={responses[item.item_id]?.value || ''}
-                      onChange={(e) =>
-                        handleResponseChange(item.item_id, e.target.value)
-                      }
-                    />
-                    {item.photos_required && (
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => handlePhotoAdd(item.item_id)}
-                      >
-                        <Camera className="h-4 w-4 mr-2" />
-                        Add Photo
-                      </Button>
+            <div className="space-y-4">
+              {items.map((item) => (
+                <div key={item.item_id} className="space-y-2">
+                  <div className="flex items-start justify-between">
+                    <label className="text-sm font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                      {item.question}
+                      {item.required && <span className="text-red-500 ml-1">*</span>}
+                    </label>
+                    {responses[item.item_id]?.value && (
+                      <CheckCircle className="h-4 w-4 flex-shrink-0" style={{ color: "var(--color-sentinel-green)" }} />
                     )}
                   </div>
-                )}
-              </div>
-            ))}
+
+                  {item.item_type === 'checklist' && item.options && (
+                    <select
+                      value={responses[item.item_id]?.value || ''}
+                      onChange={(event) => handleResponseChange(item.item_id, event.target.value)}
+                      className="w-full rounded-md appearance-none cursor-pointer px-3 py-2 text-sm transition-colors focus:outline-none focus:ring-0"
+                      style={{
+                        background: "var(--color-grafana-bg-secondary)",
+                        border: "1px solid var(--color-grafana-border)",
+                        color: "var(--color-grafana-text-primary)",
+                        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)",
+                        outline: "none",
+                      }}
+                      aria-label={`Select option for ${item.question}`}
+                    >
+                      <option value="">Select option</option>
+                      {item.options.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+
+                  {item.item_type === 'measurement' && (
+                    <div className="space-y-1">
+                      <div className="flex gap-2 items-center">
+                        <input
+                          type="number"
+                          placeholder={`Enter value (${item.unit || ''})`}
+                          value={responses[item.item_id]?.value || ''}
+                          onChange={(e) => handleResponseChange(item.item_id, parseFloat(e.target.value))}
+                          className="flex-1 rounded-md px-3 py-2 text-sm"
+                          style={{
+                            background: "var(--color-grafana-bg-secondary)",
+                            border: "1px solid var(--color-grafana-border)",
+                            color: "var(--color-grafana-text-primary)",
+                            boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)",
+                            outline: "none",
+                          }}
+                        />
+                        {item.photos_required && (
+                          <button
+                            onClick={() => handlePhotoAdd(item.item_id)}
+                            className="inline-flex items-center p-1.5 rounded-md transition-colors"
+                            style={{
+                              background: "var(--color-sentinel-bg-secondary)",
+                              border: "1px solid var(--color-sentinel-border)",
+                              color: "var(--color-sentinel-text-primary)",
+                            }}
+                          >
+                            <Camera className="h-4 w-4" />
+                          </button>
+                        )}
+                      </div>
+
+                      {item.tolerance_min !== undefined &&
+                        item.tolerance_max !== undefined && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs" style={{ color: "var(--color-sentinel-text-disabled)" }}>
+                              Range: {item.tolerance_min} - {item.tolerance_max} {item.unit}
+                            </span>
+                            {responses[item.item_id]?.value !== undefined && (
+                              <span
+                                className="inline-flex items-center px-1.5 py-0.5 text-xs font-medium rounded-full"
+                                style={{
+                                  background: isWithinTolerance(item, responses[item.item_id].value)
+                                    ? "rgba(16,185,129,0.15)"
+                                    : "rgba(220,38,38,0.15)",
+                                  color: isWithinTolerance(item, responses[item.item_id].value)
+                                    ? "var(--color-sentinel-green)"
+                                    : "var(--color-sentinel-red)",
+                                }}
+                              >
+                                {isWithinTolerance(item, responses[item.item_id].value) ? 'OK' : 'Out of range'}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                    </div>
+                  )}
+
+                  {item.item_type === 'visual_inspection' && (
+                    <div className="space-y-2">
+                      <input
+                        type="text"
+                        placeholder="Enter observations"
+                        value={responses[item.item_id]?.value || ''}
+                        onChange={(e) => handleResponseChange(item.item_id, e.target.value)}
+                        className="w-full rounded-md px-3 py-2 text-sm"
+                        style={{
+                          background: "var(--color-grafana-bg-secondary)",
+                          border: "1px solid var(--color-grafana-border)",
+                          color: "var(--color-grafana-text-primary)",
+                          boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)",
+                          outline: "none",
+                        }}
+                      />
+                      {item.photos_required && (
+                        <button
+                          onClick={() => handlePhotoAdd(item.item_id)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors"
+                          style={{
+                            background: "var(--color-sentinel-bg-secondary)",
+                            border: "1px solid var(--color-sentinel-border)",
+                            color: "var(--color-sentinel-text-primary)",
+                          }}
+                        >
+                          <Camera className="h-4 w-4" />
+                          Add Photo
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
-        </Card>
+        </div>
       ))}
 
-      {/* Notes Section */}
-      <Card>
-        <label className="text-sm font-medium text-gray-700 block mb-2">
-          Additional Notes (optional)
-        </label>
-        <TextInput
-          placeholder="Any additional observations or comments"
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-        />
-      </Card>
+      <div style={cardStyle}>
+        <div className="p-4">
+          <label className="text-sm font-medium block mb-2" style={{ color: "var(--color-sentinel-text-primary)" }}>
+            Additional Notes (optional)
+          </label>
+          <input
+            type="text"
+            placeholder="Any additional observations or comments"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            className="w-full rounded-md px-3 py-2 text-sm"
+            style={{
+              background: "var(--color-grafana-bg-secondary)",
+              border: "1px solid var(--color-grafana-border)",
+              color: "var(--color-grafana-text-primary)",
+              boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)",
+              outline: "none",
+            }}
+          />
+        </div>
+      </div>
 
-      {/* Photo Attachments Summary */}
       {photos.length > 0 && (
-        <Card>
-          <h3 className="text-sm font-medium text-gray-900 mb-2">
-            Photos Attached ({photos.length})
-          </h3>
-          <div className="flex flex-wrap gap-2">
-            {photos.map((photo, idx) => (
-              <Badge key={idx} color="blue" size="xs">
-                {photo.file_name}
-              </Badge>
-            ))}
+        <div style={cardStyle}>
+          <div className="p-4">
+            <h3 className="text-sm font-medium mb-2" style={{ color: "var(--color-sentinel-text-primary)" }}>
+              Photos Attached ({photos.length})
+            </h3>
+            <div className="flex flex-wrap gap-2">
+              {photos.map((photo, idx) => (
+                <span
+                  key={idx}
+                  className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full"
+                  style={{
+                    background: "rgba(59,130,246,0.15)",
+                    color: "var(--color-sentinel-blue)",
+                  }}
+                >
+                  {photo.file_name}
+                </span>
+              ))}
+            </div>
           </div>
-        </Card>
+        </div>
       )}
 
-      {/* Submit Button - Fixed at bottom on mobile */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t shadow-lg">
-        <Button
-          size="lg"
-          className="w-full"
+      <div
+        className="fixed bottom-0 left-0 right-0 p-4"
+        style={{
+          background: "var(--color-sentinel-bg-panel)",
+          borderTop: "1px solid var(--color-sentinel-border)",
+        }}
+      >
+        <button
+          className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium rounded-md transition-colors disabled:opacity-50"
           onClick={handleSubmit}
           disabled={submitting || progress.percent === 0}
+          style={{
+            background: "var(--color-sentinel-blue)",
+            border: "1px solid var(--color-sentinel-blue)",
+            color: "#fff",
+          }}
         >
           {submitting ? (
             <>
-              <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2" />
+              <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
               Submitting...
             </>
           ) : (
             <>
-              <Save className="h-5 w-5 mr-2" />
+              <Save className="h-5 w-5" />
               Submit Inspection ({progress.percent}% complete)
             </>
           )}
-        </Button>
+        </button>
       </div>
     </div>
   );

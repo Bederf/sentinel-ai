@@ -13,7 +13,7 @@
 import { Lightbulb, XCircle } from "lucide-react";
 import { useMemo } from "react";
 
-export type OptimizationStatus = "optimized" | "recommendation_pending" | "warning" | "error" | "unknown";
+export type OptimizationStatus = "optimized" | "recommendation_pending" | "warning" | "error" | "unknown" | "learning" | "active" | "disabled";
 export type OptimizationMode = "automatic" | "supervised";
 
 interface OptimizationStatusBadgeProps {

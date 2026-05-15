@@ -1,4 +1,3 @@
-// ColumnMappingStep.tsx
 import { useState, useEffect } from 'react';
 
 import { CheckCircle2, XCircle } from 'lucide-react';
@@ -46,7 +45,6 @@ export function ColumnMappingStep({ siteId: _siteId, formatDetection, onNext, on
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Initialize from suggested mappings
   useEffect(() => {
     if (formatDetection?.suggested_mappings) {
       const initial: Record<string, { target_field: string; transform_type: string }> = {};
@@ -67,7 +65,6 @@ export function ColumnMappingStep({ siteId: _siteId, formatDetection, onNext, on
     setError(null);
 
     try {
-      // Validate required fields
       const hasTimestamp = Object.values(mappings).some(m => m.target_field === 'timestamp');
       const hasPointId = Object.values(mappings).some(m => m.target_field === 'point_id');
 
@@ -75,7 +72,6 @@ export function ColumnMappingStep({ siteId: _siteId, formatDetection, onNext, on
         throw new Error('Timestamp and Point ID are required fields');
       }
 
-      // Convert to array
       const columnMappings: ColumnMapping[] = Object.entries(mappings)
         .filter(([_, config]) => config.target_field !== 'ignore')
         .map(([source_column, config]) => ({
@@ -84,9 +80,6 @@ export function ColumnMappingStep({ siteId: _siteId, formatDetection, onNext, on
           transform_type: config.transform_type as 'none' | 'date_parse' | 'number_parse' | 'boolean_parse'
         }));
 
-      // Note: In the full implementation, we would need a log_source_id
-      // For now, we pass the mappings to the next step
-      // TODO: Create log source or use existing log_source_id from formatDetection
       onNext({ columnMappings });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save');
@@ -98,35 +91,48 @@ export function ColumnMappingStep({ siteId: _siteId, formatDetection, onNext, on
   return (
     <div className="space-y-6">
       <div>
-        <Title>Map Columns</Title>
-        <Text className="mt-2">
+        <h3 className="text-lg font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>
+          Map Columns
+        </h3>
+        <p className="mt-2 text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
           Confirm or adjust the auto-detected column mappings. Required fields: Timestamp, Point ID.
-        </Text>
+        </p>
       </div>
 
-      {/* Mapping table */}
-      <Card>
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableHead>Source Column</TableHead>
-              <TableHead>SENTINEL Field</TableHead>
-              <TableHead>Transform</TableHead>
-              <TableHead>Status</TableHead>
-            </TableRow>
-          </TableHead>
-          <TableBody>
+      <div
+        style={{
+          background: "var(--color-sentinel-bg-panel)",
+          border: "1px solid var(--color-sentinel-border)",
+          borderRadius: 8,
+          overflow: "hidden",
+        }}
+      >
+        <table className="w-full">
+          <thead>
+            <tr
+              style={{
+                background: "var(--color-sentinel-bg-secondary)",
+                borderBottom: "1px solid var(--color-sentinel-border)",
+              }}
+            >
+              <th className="text-left text-xs font-medium uppercase tracking-wider px-4 py-3" style={{ color: "var(--color-sentinel-text-secondary)" }}>Source Column</th>
+              <th className="text-left text-xs font-medium uppercase tracking-wider px-4 py-3" style={{ color: "var(--color-sentinel-text-secondary)" }}>SENTINEL Field</th>
+              <th className="text-left text-xs font-medium uppercase tracking-wider px-4 py-3" style={{ color: "var(--color-sentinel-text-secondary)" }}>Transform</th>
+              <th className="text-left text-xs font-medium uppercase tracking-wider px-4 py-3" style={{ color: "var(--color-sentinel-text-secondary)" }}>Status</th>
+            </tr>
+          </thead>
+          <tbody>
             {sourceColumns.map((source) => {
               const mapping = mappings[source];
               const field = SENTINEL_FIELDS.find(f => f.value === mapping?.target_field);
               const isRequired = field?.required;
 
               return (
-                <TableRow key={source}>
-                  <TableCell>
-                    <span className="font-mono text-sm">{source}</span>
-                  </TableCell>
-                  <TableCell>
+                <tr key={source} style={{ borderBottom: "1px solid var(--color-sentinel-border)" }}>
+                  <td className="px-4 py-3">
+                    <span className="font-mono text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>{source}</span>
+                  </td>
+                  <td className="px-4 py-3">
                     <select
                       value={mapping?.target_field || 'ignore'}
                       onChange={(event) => {
@@ -156,8 +162,8 @@ export function ColumnMappingStep({ siteId: _siteId, formatDetection, onNext, on
                         </option>
                       ))}
                     </select>
-                  </TableCell>
-                  <TableCell>
+                  </td>
+                  <td className="px-4 py-3">
                     {mapping?.target_field && mapping?.target_field !== 'ignore' && (
                       <select
                         value={mapping?.transform_type || 'none'}
@@ -188,47 +194,68 @@ export function ColumnMappingStep({ siteId: _siteId, formatDetection, onNext, on
                         ))}
                       </select>
                     )}
-                  </TableCell>
-                  <TableCell>
+                  </td>
+                  <td className="px-4 py-3">
                     {mapping?.target_field === 'ignore' && (
                       <XCircle className="w-5 h-5 text-gray-400" />
                     )}
                     {mapping?.target_field && mapping?.target_field !== 'ignore' && (
                       <CheckCircle2 className={`w-5 h-5 ${isRequired ? 'text-green-500' : 'text-blue-500'}`} />
                     )}
-                  </TableCell>
-                </TableRow>
+                  </td>
+                </tr>
               );
             })}
-          </TableBody>
-        </Table>
-      </Card>
+          </tbody>
+        </table>
+      </div>
 
-      {/* Validation status */}
       {error && (
-        <Callout title="Error" color="rose">{error}</Callout>
+        <div
+          className="p-3 rounded-md text-sm flex items-center gap-2"
+          style={{
+            background: "rgba(220,38,38,0.15)",
+            border: "1px solid rgba(220,38,38,0.3)",
+            color: "var(--color-sentinel-red)",
+          }}
+        >
+          <span className="font-medium">Error</span>
+          <span>{error}</span>
+        </div>
       )}
 
-      <div className="flex items-center gap-2 text-sm text-gray-600">
+      <div className="flex items-center gap-2 text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
         <CheckCircle2 className="w-4 h-4" />
         <span>
           {Object.values(mappings).filter(m => m.target_field !== 'ignore').length} of {sourceColumns.length} columns mapped
         </span>
       </div>
 
-      {/* Actions */}
       <div className="flex justify-between">
-        <Button onClick={onBack} variant="secondary" color="gray">
+        <button
+          onClick={onBack}
+          className="px-4 py-2 text-sm font-medium rounded-md transition-colors"
+          style={{
+            background: "var(--color-sentinel-bg-secondary)",
+            border: "1px solid var(--color-sentinel-border)",
+            color: "var(--color-sentinel-text-primary)",
+          }}
+        >
           Back
-        </Button>
+        </button>
 
-        <Button
+        <button
           onClick={handleSave}
           disabled={saving}
-          color="blue"
+          className="px-4 py-2 text-sm font-medium rounded-md transition-colors disabled:opacity-50"
+          style={{
+            background: "var(--color-sentinel-blue)",
+            border: "1px solid var(--color-sentinel-blue)",
+            color: "#fff",
+          }}
         >
           {saving ? 'Saving...' : 'Next: Match Points'}
-        </Button>
+        </button>
       </div>
     </div>
   );
