@@ -1,6 +1,0 @@
-{"timestamp": "2026-01-06T08:30:00Z", "alarm_code": "ZONE-TEMP-WARN-001", "severity": "WARNING", "source": "S002-VAV-203", "message": "Zone L2-C temperature 18.5 degC (setpoint 22 degC) — 3.5 degC below setpoint"}
-{"timestamp": "2026-01-06T09:00:00Z", "alarm_code": "DAMP-WARN-001", "severity": "WARNING", "source": "S002-VAV-203", "message": "Damper commanded to 40% but feedback reads 98% — actuator fault suspected"}
-{"timestamp": "2026-01-07T08:15:00Z", "alarm_code": "ZONE-TEMP-WARN-002", "severity": "WARNING", "source": "S002-VAV-203", "message": "Zone L2-C temperature 17.8 degC — persistent overcooling"}
-{"timestamp": "2026-01-08T07:45:00Z", "alarm_code": "DAMP-CRIT-001", "severity": "CRITICAL", "source": "S002-VAV-203", "message": "Damper stuck open: commanded 0% (heating mode), feedback 97%. Actuator not responding."}
-{"timestamp": "2026-01-09T14:00:00Z", "alarm_code": "ENERGY-WARN-001", "severity": "WARNING", "source": "S002-VAV-203", "message": "Zone L2-C airflow 30% above design — excess cooling energy waste estimated R45/hour"}
-{"timestamp": "2026-01-13T08:00:00Z", "alarm_code": "ZONE-TEMP-WARN-003", "severity": "WARNING", "source": "S002-VAV-203", "message": "Zone L2-C still overcooled: 18.2 degC. Multiple comfort complaints received."}

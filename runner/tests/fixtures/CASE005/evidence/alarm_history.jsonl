@@ -1,9 +1,0 @@
-{"timestamp": "2026-02-10T18:00:00Z", "alarm_code": "MAINS-FAIL-001", "severity": "INFO", "source": "S002-GEN-B1-001", "message": "Mains power failure detected — Stage 4 loadshedding commenced"}
-{"timestamp": "2026-02-10T18:00:05Z", "alarm_code": "GEN-START-001", "severity": "INFO", "source": "S002-GEN-B1-001", "message": "Generator auto-start initiated — cranking attempt 1"}
-{"timestamp": "2026-02-10T18:00:15Z", "alarm_code": "GEN-CRANK-WARN-001", "severity": "WARNING", "source": "S002-GEN-B1-001", "message": "Crank attempt 1 failed — engine did not reach ignition speed (120 RPM vs required 180 RPM)"}
-{"timestamp": "2026-02-10T18:00:25Z", "alarm_code": "GEN-START-002", "severity": "INFO", "source": "S002-GEN-B1-001", "message": "Cranking attempt 2"}
-{"timestamp": "2026-02-10T18:00:35Z", "alarm_code": "GEN-CRANK-WARN-002", "severity": "WARNING", "source": "S002-GEN-B1-001", "message": "Crank attempt 2 failed — starter motor sluggish, battery voltage 22.8V (min 24V)"}
-{"timestamp": "2026-02-10T18:00:45Z", "alarm_code": "GEN-START-003", "severity": "INFO", "source": "S002-GEN-B1-001", "message": "Cranking attempt 3 (final)"}
-{"timestamp": "2026-02-10T18:00:55Z", "alarm_code": "GEN-CRANK-CRIT-001", "severity": "CRITICAL", "source": "S002-GEN-B1-001", "message": "All 3 crank attempts failed. Generator OFFLINE. Battery voltage 21.5V — below minimum cranking threshold."}
-{"timestamp": "2026-02-10T18:01:00Z", "alarm_code": "GEN-FAIL-CRIT-001", "severity": "CRITICAL", "source": "S002-GEN-B1-001", "message": "GENERATOR FAIL TO START — building on UPS only. Estimated runtime 12 minutes. Manual intervention required."}
-{"timestamp": "2026-02-10T18:08:00Z", "alarm_code": "GEN-MANUAL-001", "severity": "INFO", "source": "S002-GEN-B1-001", "message": "Manual start successful after battery charger boost. Generator online, 480V 50Hz stable."}
