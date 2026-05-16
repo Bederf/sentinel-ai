@@ -2,11 +2,12 @@
 Deferred baseline capture task.
 
 APScheduler 5-min task: finds equipment with NULL health_score,
-calculates an age-only baseline, and updates the record.
+calculates an age-only baseline or synthetic fallback, and updates the record.
 
-Handles two cases:
-1. Newly discovered equipment (health_score=NULL, replaced_on=NULL)
+Handles three cases:
+1. Newly discovered equipment (health_score=NULL, replaced_on=NULL, has service_history)
 2. Recently replaced equipment (health_score=NULL, replaced_on IS NOT NULL)
+3. VAV/FCU without service_history (synthetic fallback to 82, low confidence)
 """
 
 import logging
@@ -17,9 +18,12 @@ from app.services.health.baseline_calculator import calculate_baseline_health
 
 logger = logging.getLogger(__name__)
 
+# VAV/FCU types eligible for synthetic fallback baseline
+SYNTHETIC_FALLBACK_TYPES = {"vav", "VAV", "FCU", "fcu"}
+
 
 async def capture_baselines_for_unscored_equipment():
-    """Find equipment with NULL health_score and capture age-only baselines."""
+    """Find equipment with NULL health_score and capture baselines."""
     supabase = get_supabase_client()
 
     unscored = (
@@ -37,16 +41,38 @@ async def capture_baselines_for_unscored_equipment():
     logger.info("Baseline capture: found %s unscored equipment", len(items))
 
     captured = 0
+    synthetic = 0
     failed = 0
 
     for eq in items:
         eq_id = eq["id"]
         code = eq.get("code", "?")
+        eq_type = eq.get("type", "")
         sh_id = eq.get("service_history_id")
         replaced_on = eq.get("replaced_on")
 
+        # Case 3: VAV/FCU synthetic fallback (no service history needed)
+        if not sh_id and eq_type in SYNTHETIC_FALLBACK_TYPES:
+            try:
+                supabase.table("equipment").update(
+                    {
+                        "health_score": 82,
+                        "health_score_confidence": 0.25,
+                        "baseline_sourced_from": "synthetic_type_default",
+                        "last_baseline_update": datetime.utcnow().isoformat(),
+                    }
+                ).eq("id", eq_id).execute()
+                logger.info("synthetic_fallback | %s | health=82 | conf=0.25 | VAV/FCU no service history", code)
+                synthetic += 1
+                continue
+            except Exception as e:
+                logger.error("%s: synthetic fallback failed: %s", code, e)
+                failed += 1
+                continue
+
+        # Cases 1 & 2: require service_history_id
         if not sh_id:
-            logger.warning("%s: no service_history_id, skipping", code)
+            logger.debug("%s: no service_history_id and not VAV/FCU, skipping", code)
             failed += 1
             continue
 
@@ -99,8 +125,8 @@ async def capture_baselines_for_unscored_equipment():
             logger.error("%s: equipment update failed: %s", code, e)
             failed += 1
 
-    skipped = len(items) - captured - failed
+    skipped = len(items) - captured - synthetic - failed
     logger.info(
-        "Baseline capture done: %s captured, %s failed, %s skipped",
-        captured, failed, skipped,
+        "Baseline capture done: %s age-only, %s synthetic, %s failed, %s skipped",
+        captured, synthetic, failed, skipped,
     )

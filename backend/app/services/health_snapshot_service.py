@@ -456,6 +456,26 @@ class HealthSnapshotService:
         mode = self._resolve_mode()
 
         for equip in equipment_list:
+            eq_type = equip.get("type", "")
+            eq_code = equip.get("code", "?")
+
+            # Gate: check if equipment type is scoreable
+            from app.config.health_config import get_scoreability
+            score_cfg = get_scoreability(eq_type)
+            if not score_cfg.get("scoreable", False):
+                logger.debug(f"[HEALTH-SNAP] Skipping {eq_code} ({eq_type}): {score_cfg.get('reason', 'not scoreable')}")
+                continue
+
+            # Skip synthetic fallback types (VAV/FCU) — static placeholder until real service data
+            if score_cfg.get("method") == "synthetic_fallback":
+                logger.debug(f"[HEALTH-SNAP] Skipping {eq_code} ({eq_type}): synthetic fallback (no service data)")
+                continue
+
+            # Skip if no baseline
+            if equip.get("health_score") is None:
+                logger.debug(f"[HEALTH-SNAP] Skipping {eq_code} ({eq_type}): no baseline")
+                continue
+
             try:
                 eq_id = equip.get("code") or equip.get("id", "")
                 rating = await calculator.compute_rating(
