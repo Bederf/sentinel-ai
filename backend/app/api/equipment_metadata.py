@@ -314,3 +314,42 @@ async def search_by_network_info(
     results = repo.search_by_network_info(key, value)
 
     return {"search_key": key, "search_value": value, "results": results, "count": len(results)}
+
+
+class MarkReplacedRequest(BaseModel):
+    """Request to mark equipment as replaced."""
+
+    replaced_on: str = Field(..., description="Date equipment was replaced (YYYY-MM-DD)")
+    replacement_notes: str | None = Field(None, description="Optional notes about replacement")
+
+
+@router.patch("/equipment/{equipment_id}/mark-replaced")
+async def mark_equipment_replaced(equipment_id: str, request: MarkReplacedRequest) -> dict:
+    """Mark equipment as replaced.
+
+    Resets health_score to NULL so the baseline capture task picks it up
+    and recalculates from the new commissioning date. The old record stays
+    in place with its historical health data for audit.
+    """
+    from datetime import datetime
+
+    supabase = get_supabase_client()
+
+    eq = supabase.table("equipment").select("id,code").eq("id", equipment_id).limit(1).execute()
+    if not eq.data:
+        raise HTTPException(status_code=404, detail=f"Equipment {equipment_id} not found")
+
+    supabase.table("equipment").update({
+        "replaced_on": request.replaced_on,
+        "replacement_notes": request.replacement_notes or "",
+        "health_score": None,
+        "health_score_confidence": None,
+        "baseline_sourced_from": "pending_replacement",
+        "last_baseline_update": None,
+    }).eq("id", equipment_id).execute()
+
+    return {
+        "status": "marked_replaced",
+        "equipment_code": eq.data[0]["code"],
+        "replaced_on": request.replaced_on,
+    }

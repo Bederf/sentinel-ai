@@ -2644,6 +2644,43 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
                       </p>
                     </div>
                   )}
+
+                  {/* Mark as Replaced */}
+                  <div className="mt-4 pt-4 border-t" style={{ borderColor: "var(--color-sentinel-border)" }}>
+                    <button
+                      onClick={async () => {
+                        const date = window.prompt("Enter replacement date (YYYY-MM-DD):");
+                        if (!date) return;
+                        const notes = window.prompt("Replacement notes (optional):");
+                        try {
+                          const resp = await fetch(
+                            `/api/equipment/${selectedEquipment.id}/mark-replaced`,
+                            {
+                              method: "PATCH",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ replaced_on: date, replacement_notes: notes || "" }),
+                            }
+                          );
+                          if (resp.ok) {
+                            alert("Equipment marked as replaced. Baseline will be recalculated.");
+                          } else {
+                            const err = await resp.json();
+                            alert(`Failed: ${err.detail || "unknown error"}`);
+                          }
+                        } catch (e) {
+                          alert(`Error: ${e}`);
+                        }
+                      }}
+                      className="text-xs px-3 py-1.5 rounded transition-colors cursor-pointer"
+                      style={{
+                        background: "rgba(245, 158, 11, 0.15)",
+                        color: "var(--color-sentinel-amber)",
+                        border: "1px solid rgba(245, 158, 11, 0.3)",
+                      }}
+                    >
+                      Mark as Replaced
+                    </button>
+                  </div>
                 </div>
               )}
             </div>

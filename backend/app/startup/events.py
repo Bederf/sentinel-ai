@@ -1038,6 +1038,9 @@ async def startup_event(app: FastAPI) -> None:
     # Error auto-resolution job (daily) - resolves errors if component healthy for 24+ hours
     scheduler_service.add_error_auto_resolve_job(interval_seconds=86400)
 
+    # Baseline capture job (5 min) - captures age-only baselines for newly discovered or replaced equipment
+    scheduler_service.add_baseline_capture_job(interval_minutes=5)
+
     # Database archival (daily) - removes resolved alerts/predictions older than 90 days
     scheduler_service.add_db_archival_job(interval_seconds=86400)
 

@@ -3777,6 +3777,48 @@ class BackgroundSchedulerService:
         )
         logger.info(f"Added error auto-resolve job with {interval_seconds}s interval")
 
+    def add_baseline_capture_job(self, interval_minutes: int = 5):
+        """
+        Add a job to capture baselines for unscored equipment.
+
+        Runs every 5 minutes to find equipment with NULL health_score
+        (newly discovered or recently replaced) and calculates age-only baselines.
+        """
+        job_id = "baseline_capture"
+        if self.scheduler.get_job(job_id):
+            self.scheduler.remove_job(job_id)
+            logger.info("Removed existing baseline capture job")
+
+        self.scheduler.add_job(
+            func=self._run_baseline_capture,
+            trigger=IntervalTrigger(minutes=interval_minutes),
+            id=job_id,
+            name="Baseline Capture",
+            replace_existing=True,
+            max_instances=1,
+        )
+        logger.info(f"Added baseline capture job ({interval_minutes}min interval)")
+
+    def _run_baseline_capture(self):
+        """Sync wrapper for async baseline capture."""
+        try:
+            if self._main_loop and self._main_loop.is_running():
+                future = asyncio.run_coroutine_threadsafe(
+                    self._run_baseline_capture_async(),
+                    self._main_loop,
+                )
+                future.result(timeout=60)
+            else:
+                asyncio.run(self._run_baseline_capture_async())
+        except Exception as e:
+            logger.error(f"Baseline capture failed: {e}", exc_info=True)
+
+    async def _run_baseline_capture_async(self):
+        """Run baseline capture for unscored equipment."""
+        from app.tasks.baseline_capture_task import capture_baselines_for_unscored_equipment
+
+        await capture_baselines_for_unscored_equipment()
+
     def add_adapter_health_monitor_job(self, interval_seconds: int = 60):
         """
         Add a job to run adapter health checks every 60 seconds.
