@@ -476,20 +476,66 @@ class BackgroundSchedulerService:
                             timeout=10,
                         )
                         if resp.is_success:
-                            power = resp.json().get("power", {})
+                            data = resp.json()
+                            power = data.get("power", {})
                             current_kw = power.get("total_kw") or 0
-                            prev_kw = self._last_conditions.get(site_id, {}).get("total_kw")
+                            current_temp = data.get("chiller", {}).get("supply_temp_c") or data.get("ahu", {}).get("ahu1_supply_temp_c") or 0
+                            current_occ = 100 if data.get("security", {}).get("entries", 0) > 500 else \
+                                          50 if data.get("security", {}).get("entries", 0) > 100 else 10
+                            current_tariff = "peak" if 7 <= datetime.now().hour < 10 else "off_peak"
+                            is_occupied = datetime.now().weekday() < 5 and 7 <= datetime.now().hour < 18
 
+                            prev = self._last_conditions.get(site_id, {})
+                            prev_kw = prev.get("total_kw")
+                            prev_temp = prev.get("outdoor_temp")
+                            prev_occ = prev.get("occupancy")
+                            prev_tariff = prev.get("tariff_band")
+                            prev_occupied = prev.get("is_occupied")
+
+                            changed = False
+
+                            # 1. Power change >5%
                             if prev_kw is not None:
-                                kw_change_pct = abs(current_kw - prev_kw) / max(prev_kw, 1) * 100
-                                if kw_change_pct < 5.0:
-                                    logger.info(
-                                        f"[AI-OPT] Skipping {site_id}: power changed {kw_change_pct:.1f}% "
-                                        f"({prev_kw}→{current_kw} kW) — below 5% threshold"
-                                    )
-                                    continue
+                                if abs(current_kw - prev_kw) / max(prev_kw, 1) * 100 > 5.0:
+                                    logger.info("[AI-OPT] Power changed — triggering cycle")
+                                    changed = True
 
-                            self._last_conditions[site_id] = {"total_kw": current_kw}
+                            # 2. Tariff band changed
+                            if not changed and prev_tariff is not None and prev_tariff != current_tariff:
+                                logger.info("[AI-OPT] Tariff band changed — triggering cycle")
+                                changed = True
+
+                            # 3. Occupancy crossed a threshold
+                            if not changed and prev_occ is not None:
+                                for t in [10, 50, 80]:
+                                    if (prev_occ < t) != (current_occ < t):
+                                        logger.info(f"[AI-OPT] Occupancy crossed {t}% threshold — triggering cycle")
+                                        changed = True
+                                        break
+
+                            # 4. Outdoor temp changed >3°C
+                            if not changed and prev_temp is not None and current_temp:
+                                if abs(current_temp - prev_temp) > 3.0:
+                                    logger.info("[AI-OPT] Outdoor temp changed >3°C — triggering cycle")
+                                    changed = True
+
+                            # 5. First cycle after occupied hours start
+                            if not changed and is_occupied and not prev_occupied:
+                                logger.info("[AI-OPT] Building entered occupied hours — triggering cycle")
+                                changed = True
+
+                            # Store current conditions
+                            self._last_conditions[site_id] = {
+                                "total_kw": current_kw,
+                                "outdoor_temp": current_temp,
+                                "occupancy": current_occ,
+                                "tariff_band": current_tariff,
+                                "is_occupied": is_occupied,
+                            }
+
+                            if not changed and prev_kw is not None:
+                                logger.info("[AI-OPT] No condition changed — skipping cycle")
+                                continue
                     except Exception:
                         pass
 
