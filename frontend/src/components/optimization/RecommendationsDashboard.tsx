@@ -200,61 +200,22 @@ export const RecommendationsDashboard: React.FC<
 
           {/* Expected Impact */}
           <div className="grid grid-cols-3 gap-3 mb-4">
-            <div
-              className="p-3 rounded"
-              style={{ background: "rgba(16, 185, 129, 0.08)" }}
-            >
-              <p
-                className="text-xs mb-1"
-                style={{ color: "var(--color-sentinel-text-secondary)" }}
-              >
-                Cost Saving
-              </p>
-              <p
-                className="text-lg font-bold"
-                style={{ color: "var(--color-sentinel-green)" }}
-              >
-                {rec.expected_impact
-                  ? `R${typeof rec.expected_impact.cost_zar === 'number' ? rec.expected_impact.cost_zar.toFixed(2) : '0'}`
-                  : 'R0'}
+            <div className="p-3 rounded" style={{ background: "rgba(16, 185, 129, 0.08)" }}>
+              <p className="text-xs mb-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>Cost Saving</p>
+              <p className="text-lg font-bold" style={{ color: "var(--color-sentinel-green)" }}>
+                {rec.expected_impact?.cost_zar ? `R${Number(rec.expected_impact.cost_zar).toFixed(2)}` : 'R0'}
               </p>
             </div>
-            <div
-              className="p-3 rounded"
-              style={{ background: "rgba(59, 130, 246, 0.08)" }}
-            >
-              <p
-                className="text-xs mb-1"
-                style={{ color: "var(--color-sentinel-text-secondary)" }}
-              >
-                Comfort Impact
-              </p>
-              <p
-                className="text-lg font-bold"
-                style={{ color: "var(--color-sentinel-blue)" }}
-              >
-                {rec.expected_impact
-                  ? `${typeof rec.expected_impact.comfort_delta === 'number' ? rec.expected_impact.comfort_delta.toFixed(1) : '0'}°C`
-                  : '0°C'}
+            <div className="p-3 rounded" style={{ background: "rgba(59, 130, 246, 0.08)" }}>
+              <p className="text-xs mb-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>Comfort Impact</p>
+              <p className="text-lg font-bold" style={{ color: "var(--color-sentinel-blue)" }}>
+                {rec.expected_impact?.comfort_delta != null ? `${rec.expected_impact.comfort_delta.toFixed(1)}°C` : '0°C'}
               </p>
             </div>
-            <div
-              className="p-3 rounded"
-              style={{ background: "rgba(167, 139, 250, 0.08)" }}
-            >
-              <p
-                className="text-xs mb-1"
-                style={{ color: "var(--color-sentinel-text-secondary)" }}
-              >
-                Energy Saving
-              </p>
-              <p
-                className="text-lg font-bold"
-                style={{ color: "#a78bfa" }}
-              >
-                {rec.expected_impact
-                  ? `${typeof rec.expected_impact.energy_kwh === 'number' ? rec.expected_impact.energy_kwh.toFixed(1) : '0'} kWh`
-                  : '0 kWh'}
+            <div className="p-3 rounded" style={{ background: "rgba(167, 139, 250, 0.08)" }}>
+              <p className="text-xs mb-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>Energy Saving</p>
+              <p className="text-lg font-bold" style={{ color: "#a78bfa" }}>
+                {rec.expected_impact?.energy_kwh != null ? `${rec.expected_impact.energy_kwh.toFixed(1)} kWh` : '0 kWh'}
               </p>
             </div>
           </div>

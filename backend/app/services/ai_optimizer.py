@@ -890,16 +890,21 @@ class AIOptimizerService:
 
             # ── Electrical aggregate from site telemetry ──────────────────
             try:
-                from app.services.shadow_mode_polling import get_shadow_mode_polling_service
-                telemetry = getattr(get_shadow_mode_polling_service(), "get_telemetry_summary", None)
-                if telemetry:
-                    summary = telemetry(site_id)
-                    if summary:
+                import httpx
+                async with httpx.AsyncClient(timeout=10) as client:
+                    token = os.getenv("BRIDGE_API_TOKEN_SITE002") or os.getenv("BRIDGE_API_TOKEN", "")
+                    resp = await client.get(
+                        f"http://10.99.0.1:8080/api/sites/{site_id}/telemetry",
+                        headers={"Authorization": f"Bearer {token}"},
+                    )
+                    if resp.is_success:
+                        telemetry = resp.json()
+                        power = telemetry.get("power", {})
                         conditions["electrical"] = {
-                            "total_kw": summary.get("total_kw"),
-                            "hvac_kw": summary.get("hvac_kw"),
-                            "lighting_kw": summary.get("lighting_kw"),
-                            "solar_kw": summary.get("solar_kw"),
+                            "total_kw": power.get("total_kw"),
+                            "hvac_kw": power.get("hvac_kw"),
+                            "lighting_kw": power.get("lighting_kw"),
+                            "solar_kw": power.get("solar_kw"),
                         }
             except Exception:
                 pass
@@ -911,6 +916,12 @@ class AIOptimizerService:
                     conditions["active_modules"] = [m["module_type"] for m in mod_resp.data if m.get("status") == "active"]
             except Exception:
                 conditions["active_modules"] = []
+
+            # ── Carbon context (calculated from electrical telemetry) ──
+            try:
+                conditions["carbon"] = await self._gather_carbon_context(site_id, conditions)
+            except Exception:
+                pass
 
             return conditions
 
@@ -1608,6 +1619,23 @@ If a pattern suggests a zone will empty soon, recommend action now.
     def _format_full_context(self, conditions: dict) -> str:
         """Layer 2B — Full building telemetry context block."""
         blocks = []
+
+        # Carbon/ESG context
+        carbon = conditions.get("carbon")
+        if carbon:
+            variance_line = ""
+            if carbon.get("carbon_vs_baseline_kgco2") is not None:
+                direction = "above" if carbon["carbon_vs_baseline_kgco2"] > 0 else "below"
+                variance_line = f"vs baseline: {abs(carbon['carbon_vs_baseline_kgco2'])} kgCO2/h {direction}\n"
+            blocks.append(f"""CARBON & ESG:
+Grid intensity: {carbon['grid_intensity_kgco2_kwh']} kgCO2/kWh (Eskom 2024)
+Building footprint: {carbon['building_kgco2_hour']} kgCO2/hour
+{variance_line}Renewable fraction: {carbon['renewable_fraction_pct']}% (solar)
+Solar carbon offset: {carbon['solar_offset_kgco2_hour']} kgCO2/hour
+Grid import: {carbon['grid_import_kw']} kW
+Source: {carbon['source']}
+""")
+
         elec = conditions.get("electrical")
         if elec:
             blocks.append(f"""ELECTRICAL:
@@ -1939,7 +1967,8 @@ This is the correct response when no interventions are needed.
       "unit": "°C",
       "reason": "Indoor temp 22.1°C with occupancy at 12% — raise setpoint 2°C to reduce cooling energy",
       "system": "hvac",
-      "savings_kwh": 1.5
+      "savings_kwh": 1.5,
+      "carbon_saving": "1.2 kgCO2 this evening (Eskom 0.9 kgCO2/kWh)"
     }}
   ],
   "no_action_reasons": [
@@ -1963,8 +1992,12 @@ This is the correct response when no interventions are needed.
   "confidence": 0.72,
   "reasoning": "Summary of optimization strategy for this building's specific equipment"
 }}
-```
 
+IMPORTANT: For each recommendation, include carbon_saving field where relevant.
+Use Eskom grid intensity 0.9 kgCO2/kWh to calculate carbon savings from energy reduction.
+Example: "carbon_saving": "1.2 kgCO2 this evening (Eskom 0.9 kgCO2/kWh)"
+```
+ 
 Provide ONLY the JSON response, no additional text."""
 
         return prompt
@@ -2180,6 +2213,13 @@ Provide ONLY the JSON response, no additional text."""
             point = primary.get("point", "")
             val = primary.get("recommended_value")
 
+            import re
+
+            # Parse saving text into expected_impact numeric fields
+            saving_text = rec.get("saving", "")
+            cost_match = re.search(r'[RZ](\d+(?:[\s,.]\d+)?)', saving_text.replace(",", ""))
+            cost_val = float(cost_match.group(1)) if cost_match else 0.0
+
             metadata = {
                 "group_id": str(uuid.uuid4()),
                 "group_recommendation": True,
@@ -2201,6 +2241,7 @@ Provide ONLY the JSON response, no additional text."""
                 },
                 "reason": reason,
                 "confidence": confidence,
+                "expected_impact": {"cost_zar": cost_val} if cost_val > 0 else {},
                 "metadata": metadata,
             }
             result.append(canonical)
@@ -2258,6 +2299,14 @@ Provide ONLY the JSON response, no additional text."""
                 out["metadata"] = {}
             out["metadata"]["affected_equipment"] = affected
             out["metadata"]["group_recommendation"] = True
+
+        # Parse saving text into expected_impact numeric fields
+        if "expected_impact" not in out:
+            import re
+            saving_text = out.get("metadata", {}).get("saving", "") or out.get("saving", "")
+            cost_match = re.search(r'[RZ](\d+(?:[\s,.]\d+)?)', saving_text.replace(",", ""))
+            if cost_match:
+                out["expected_impact"] = {"cost_zar": float(cost_match.group(1))}
 
         return out
 

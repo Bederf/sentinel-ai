@@ -82,6 +82,11 @@ class RecommendationResponse(BaseModel):
     auto_actionable: bool
     acknowledged: bool
     resolved: bool
+    target_equipment: str = ""
+    action_type: str = ""
+    risk_level: str = "low"
+    multi_objective_score: float = 0.0
+    expected_impact: dict = {}
 
 
 class IntegrationSummaryResponse(BaseModel):
@@ -435,6 +440,11 @@ async def get_recommendations(
                     RecommendationStatus.AUTO_EXECUTED,
                     RecommendationStatus.ROLLED_BACK,
                 ),
+                target_equipment=rec.target_equipment or "",
+                action_type=rec.action_type or "",
+                risk_level=rec.risk_level or "low",
+                multi_objective_score=rec.multi_objective_score or 0.0,
+                expected_impact=rec.expected_impact or {},
             )
             recommendations.append(rec_resp)
 
