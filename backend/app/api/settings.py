@@ -493,4 +493,23 @@ async def set_site_mode(
     source_ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else None)
     audit_config_change(f"settings.site-mode.{site_id}", user=auth.user_id, source_ip=source_ip)
 
+    # Sync bridge policy stage when phase is changed manually
+    try:
+        import httpx
+        import os
+        bridge_url = f"http://10.99.0.1:8080/api/sites/{site_id}/ipmvp/policy-state"
+        bridge_token = os.getenv("BRIDGE_API_TOKEN_SITE002") or os.getenv("BRIDGE_API_TOKEN", "")
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.put(
+                bridge_url,
+                json={"policy_stage": canonical_stage},
+                headers={"Authorization": f"Bearer {bridge_token}"},
+            )
+            if resp.is_success:
+                logger.info("Bridge policy stage synced to %s for %s", canonical_stage, site_id)
+            else:
+                logger.warning("Bridge policy sync returned %s: %s", resp.status_code, resp.text[:200])
+    except Exception as e:
+        logger.warning("Failed to sync bridge policy stage for %s: %s", site_id, e)
+
     return {"site_id": site_id, "current_stage": canonical_stage}

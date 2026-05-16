@@ -32,6 +32,7 @@ const AssetWorkflowDashboard = lazy(() => import("./components/AssetWorkflowDash
 const SimbiotPage = lazy(() => import("./components/SimbiotPage").then(m => ({ default: m.SimbiotPage })));
 const FleetInsights = lazy(() => import("./components/FleetInsights").then(m => ({ default: m.FleetInsights })));
 const DigitalTwin = lazy(() => import("./components/digital-twin").then(m => ({ default: m.DigitalTwin })));
+const OptimizationPage = lazy(() => import("./pages/OptimizationPage").then(m => ({ default: m.OptimizationPage })));
 const ContractManagementPage = lazy(() => import("./pages/ContractManagementPage").then(m => ({ default: m.ContractManagementPage })));
 const CompliancePage = lazy(() => import("./pages/CompliancePage").then(m => ({ default: m.CompliancePage })));
 const SiteDetail = lazy(() => import("./components/SiteDetail").then(m => ({ default: m.SiteDetail })));

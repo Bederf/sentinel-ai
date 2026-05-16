@@ -39,7 +39,8 @@ export type View =
   | "financial"
   | "fleet-ml"
   | "compliance"
-  | "digital-twin";
+  | "digital-twin"
+  | "optimization";
 
 export type NavCategory = "base" | "addon" | "admin";
 
@@ -67,6 +68,7 @@ export const VIEW_TITLES: Record<View, string> = {
   "fleet-ml": "Fleet ML",
   compliance: "Compliance",
   "digital-twin": "Digital Twin",
+  optimization: "AI Optimization",
 };
 
 /**
@@ -94,6 +96,7 @@ export const ADMIN_NAV_ITEMS: NavItem[] = [
  */
 export const ADDON_NAV_ITEMS: NavItem[] = [
   { id: "digital-twin", label: "Digital Twin", icon: Activity, description: "3D building visualization", category: "addon", requiredModule: "digital_twin" },
+  { id: "optimization", label: "AI Optimization", icon: TrendingUp, description: "Recommendations setpoint adjustments", category: "addon", requiredModule: "optimization" },
   { id: "financial",   label: "Financial",   icon: DollarSign,      description: "Contracts and billing",            category: "addon", requiredModule: "financial" },
   { id: "fleet-ml",   label: "Fleet ML",    icon: Brain,           description: "Cross-site analytics",             category: "addon", requiredModule: "fleet_ml" },
   { id: "compliance", label: "Compliance",  icon: ClipboardCheck,  description: "OHS, Fire, Electrical, Lift safety", category: "addon", requiredModule: "compliance" },

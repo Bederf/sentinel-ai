@@ -188,6 +188,30 @@ class HealthSnapshotService:
                         "updated_at": datetime.utcnow().isoformat() + "Z",
                     }
                 ).eq("id", eq_uuid).execute()
+
+                # Create alert when equipment status is warning or critical
+                if health_status in ("warning", "critical"):
+                    eq_code = rating.equipment_id
+                    eq_name = rating.equipment_name or eq_code
+
+                    # Check if there's already an active alert for this equipment
+                    existing = self._supabase.table("alerts").select("id").eq(
+                        "equipment_id", eq_uuid
+                    ).eq("resolved", False).limit(1).execute()
+
+                    if not existing.data:
+                        alert_severity = "critical" if health_status == "critical" else "warning"
+                        self._supabase.table("alerts").insert({
+                            "site_id": site_id,
+                            "equipment_id": eq_uuid,
+                            "title": f"{eq_name} health is {health_status}",
+                            "description": f"Equipment health score {int(rating.health_score)} is in '{health_status}' range.",
+                            "severity": alert_severity,
+                            "status": "active",
+                            "source": "health_scorer",
+                        }).execute()
+                        logger.info("Alert created: %s health=%d status=%s", eq_code, int(rating.health_score), health_status)
+
             except Exception as e:
                 logger.warning(f"Could not update equipment health_score for {eq_uuid}: {e}")
 

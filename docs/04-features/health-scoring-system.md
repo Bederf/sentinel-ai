@@ -591,6 +591,64 @@ Active alerts and predictions for the equipment are also resolved at closeout.
 - [Safety Interlocks Engine](../06-safety-compliance/safety-interlocks-engine.md) - Safety validation
 - [Asset Baseline Assessment](asset-baseline-assessment.md) - Equipment condition monitoring
 - [Routine Inspection & Maintenance](45-routine-inspection-maintenance.md) - Preventative maintenance
+- [Equipment Naming Convention](../02-architecture/EQUIPMENT_NAMING.md) - Zone-based naming standard
+
+---
+
+## 2026-05-16 Updates: Age-Only Baselines, Scoreability Gating, and Deferred Baseline Capture
+
+### Age-Only Baseline Calculation
+
+For equipment with only `commissioning_date` available, health is calculated from age alone:
+
+```
+health = 100 - age_penalty
+age_penalty tiers: 0-2yr @ 1.5%/yr, 2-5yr @ 2.5%/yr, 5-10yr @ 4%/yr, 10+yr @ 5%/yr
+Cap at 40% (floor = 60)
+Confidence: 0.30 (base) + 0.15 for <2yr, +0.05 for 2-5yr, -0.05 for 10+yr
+```
+
+**Implementation:** `backend/app/services/health/baseline_calculator.py`
+
+### Equipment Scoreability Classification
+
+Equipment types are classified in `health_config.py` with per-type scoreability:
+
+| Category | Method | Types |
+|----------|--------|-------|
+| Large serviceable | `age_only` | chiller, ahu, pump, generator, cooling_tower, ups, bess |
+| Energy equipment | `age_only` | inverter, meter, zone |
+| VAV/FCU | `synthetic_fallback` | vav, fcu (seeded 82, conf 0.25, skipped by scorer) |
+| Not scoreable | excluded | lighting_zone, luminaire, dali, sensor, general |
+
+**Source of truth:** Supabase `equipment_type_config` table (runtime overrides, empty by default, falls back to hardcoded `health_config.py`)
+
+### Deferred Baseline Capture
+
+Equipment discovered by SIMBIOT bridge/shadow polling is created with `health_score=NULL`. An APScheduler task runs every 5 minutes (`baseline_capture_task.py`) to:
+
+1. Find unscored equipment
+2. Look up `equipment_service_history` by FK
+3. Calculate age-only baseline
+4. Update equipment record
+
+**Replacement flow:** Admin clicks "Mark as Replaced" on equipment detail → `replaced_on` set, `health_score` reset to NULL → baseline capture task detects it → recalculates from new commissioning date
+
+### Alert Generation from Health Scoring
+
+When `store_snapshot()` updates equipment status to `warning` or `critical`, an alert is created in the `alerts` table (deduplicated — won't create duplicate active alerts for the same equipment).
+
+### Daily Retention Cleanup
+
+SQL fallback in `background_scheduler.py` runs daily:
+
+| Table | Retention |
+|-------|-----------|
+| equipment_fault_events | 7 days |
+| recommendations | 7 days |
+| predictions | 14 days |
+| asset_health_snapshots | 30 days |
+| adapter_health | 7 days |
 
 ---
 
