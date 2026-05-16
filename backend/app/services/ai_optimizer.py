@@ -2076,6 +2076,17 @@ Provide ONLY the JSON response, no additional text."""
                     filtered.append(r)
                 normalised_recommendations = filtered
 
+                # Cap: max 3 recommendations per cycle — holistic prompt should produce 1-3
+                MAX_RECS = 3
+                if len(normalised_recommendations) > MAX_RECS:
+                    logger.warning(
+                        "[AI-OPT] Capping %d recommendations to %d (holistic limit)",
+                        len(normalised_recommendations), MAX_RECS,
+                    )
+                    normalised_recommendations = normalised_recommendations[:MAX_RECS]
+
+                # Validate allowed control points before proceeding
+
                 return OptimizationRecommendation(
                     site_id=site_id,
                     timestamp=datetime.now().isoformat(),

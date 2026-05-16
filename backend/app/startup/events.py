@@ -329,7 +329,7 @@ async def startup_event(app: FastAPI) -> None:
     # At 10x sim speed: 4 sim-hours = 24 real seconds → fires ~6× per sim-day.
 
     # Start AI optimization analysis job (LLM-driven, sim-time gated)
-    scheduler_service.add_optimization_analysis_job(interval_seconds=900)  # 15 min real-time fallback
+    scheduler_service.add_optimization_analysis_job(interval_seconds=1800)  # 30 min real-time fallback
 
     # Start prediction generation job (no LLM, can run more often)
     scheduler_service.add_prediction_generation_job(interval_seconds=300)  # 5 min

@@ -9,6 +9,7 @@ Handles periodic background tasks such as:
 
 import asyncio
 import logging
+import os
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -246,6 +247,8 @@ class BackgroundSchedulerService:
     OPTIMIZATION_SIM_HOURS: float = 8.0
     # Target interval in simulated hours between recommendation cycles
     RECOMMENDATION_SIM_HOURS: float = 8.0
+    # Previous conditions for change detection gate
+    _last_conditions: dict[str, Any] = {}
 
     def add_optimization_analysis_job(self, interval_seconds: int = 900):
         """
@@ -462,6 +465,33 @@ class BackgroundSchedulerService:
 
                     loop = asyncio.new_event_loop()
                     asyncio.set_event_loop(loop)
+
+                    # Condition-change gate: skip if nothing material changed since last cycle
+                    try:
+                        import httpx
+                        token = os.getenv("BRIDGE_API_TOKEN_SITE002") or os.getenv("BRIDGE_API_TOKEN", "")
+                        resp = httpx.get(
+                            f"http://10.99.0.1:8080/api/sites/{site_id}/telemetry",
+                            headers={"Authorization": f"Bearer {token}"},
+                            timeout=10,
+                        )
+                        if resp.is_success:
+                            power = resp.json().get("power", {})
+                            current_kw = power.get("total_kw") or 0
+                            prev_kw = self._last_conditions.get(site_id, {}).get("total_kw")
+
+                            if prev_kw is not None:
+                                kw_change_pct = abs(current_kw - prev_kw) / max(prev_kw, 1) * 100
+                                if kw_change_pct < 5.0:
+                                    logger.info(
+                                        f"[AI-OPT] Skipping {site_id}: power changed {kw_change_pct:.1f}% "
+                                        f"({prev_kw}→{current_kw} kW) — below 5% threshold"
+                                    )
+                                    continue
+
+                            self._last_conditions[site_id] = {"total_kw": current_kw}
+                    except Exception:
+                        pass
 
                     try:
                         optimization_result = loop.run_until_complete(get_ai_optimizer().analyze_building(site_id))
