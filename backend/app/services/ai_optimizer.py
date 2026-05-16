@@ -955,43 +955,9 @@ class AIOptimizerService:
 
         Tariff data is loaded by the bridge and stored in ipmvp_tariff.
         Determines current band (peak/standard/off_peak) from the current hour.
+        Also loads NMD and demand charge from sites table.
         """
-        if site_id:
-            try:
-                from app.database.supabase_client import get_supabase_client
-                sb = get_supabase_client()
-                result = sb.table("ipmvp_tariff").select("tariff_data").eq("site_id", site_id).limit(1).execute()
-                if result.data:
-                    td = result.data[0]["tariff_data"]
-                    peak_hours = td.get("peak_hours", [])
-                    hour = datetime.now().hour
-                    # Determine current band
-                    if hour in peak_hours:
-                        band = "peak"
-                        current = td.get("peak_zar_per_kwh", 4.52)
-                    elif td.get("weekday_only") and datetime.now().weekday() >= 5:
-                        band = "off_peak"
-                        current = td.get("offpeak_zar_per_kwh", 0.63)
-                    else:
-                        # Default to standard (inter-peak) between peak hours
-                        band = "standard"
-                        current = td.get("standard_zar_per_kwh", 1.87)
-                    return {
-                        "current_rate": current,
-                        "peak_rate": td.get("peak_zar_per_kwh", 4.52),
-                        "off_peak_rate": td.get("offpeak_zar_per_kwh", 0.63),
-                        "standard_rate": td.get("standard_zar_per_kwh", 1.87),
-                        "band": band,
-                        "peak_hours": peak_hours,
-                        "weekday_only": td.get("weekday_only", True),
-                        "currency": "ZAR",
-                        "source": "ipmvp_tariff",
-                    }
-            except Exception as e:
-                logger.warning(f"Failed to load tariff from ipmvp_tariff: {e}")
-
-        # Fallback defaults
-        return {
+        result = {
             "current_rate": 2.28,
             "peak_rate": 3.01,
             "off_peak_rate": 1.77,
@@ -1001,7 +967,56 @@ class AIOptimizerService:
             "weekday_only": True,
             "currency": "ZAR",
             "source": "fallback_defaults",
+            "nmd_kva": None,
+            "demand_charge_per_kva": None,
         }
+
+        if site_id:
+            try:
+                from app.database.supabase_client import get_supabase_client
+                sb = get_supabase_client()
+
+                # Load demand charge and NMD from sites table
+                site_row = sb.table("sites").select("nmd_limit_kva,demand_charge_per_kva").eq("code", site_id).limit(1).execute()
+                if site_row.data:
+                    s = site_row.data[0]
+                    result["nmd_kva"] = s.get("nmd_limit_kva")
+                    result["demand_charge_per_kva"] = s.get("demand_charge_per_kva")
+
+                # Load tariff rates from ipmvp_tariff
+                tariff_row = sb.table("ipmvp_tariff").select("tariff_data").eq("site_id", site_id).limit(1).execute()
+                if tariff_row.data:
+                    td = tariff_row.data[0]["tariff_data"]
+                    peak_hours = td.get("peak_hours", result["peak_hours"])
+                    hour = datetime.now().hour
+                    weekday_only = td.get("weekday_only", True)
+                    is_weekend = weekday_only and datetime.now().weekday() >= 5
+
+                    if hour in peak_hours and not is_weekend:
+                        band = "peak"
+                        current = td.get("peak_zar_per_kwh", result["peak_rate"])
+                    elif is_weekend:
+                        band = "off_peak"
+                        current = td.get("offpeak_zar_per_kwh", result["off_peak_rate"])
+                    else:
+                        band = "standard"
+                        current = td.get("standard_zar_per_kwh", result["standard_rate"])
+
+                    result.update({
+                        "current_rate": current,
+                        "peak_rate": td.get("peak_zar_per_kwh", result["peak_rate"]),
+                        "off_peak_rate": td.get("offpeak_zar_per_kwh", result["off_peak_rate"]),
+                        "standard_rate": td.get("standard_zar_per_kwh", result["standard_rate"]),
+                        "band": band,
+                        "peak_hours": peak_hours,
+                        "weekday_only": weekday_only,
+                        "currency": "ZAR",
+                        "source": "ipmvp_tariff + sites",
+                    })
+            except Exception as e:
+                logger.warning(f"Failed to load tariff data: {e}")
+
+        return result
 
     async def _gather_decision_memory(self, site_id: str) -> str:
         """Gather learned decision patterns for this site from Decision Memory Service.
@@ -1582,6 +1597,8 @@ If no action needed, return empty recommendations array.
         band = energy_prices.get("band", "standard")
         schedule = energy_prices.get("schedule", [])
         next_change = "unknown"
+        demand_charge = energy_prices.get("demand_charge_per_kva")
+        nmd = energy_prices.get("nmd_kva")
         if isinstance(schedule, list) and schedule:
             next_entry = schedule[0]
             if isinstance(next_entry, dict):
@@ -1594,6 +1611,7 @@ If no action needed, return empty recommendations array.
 Optimise for minimum energy cost.
 Current TOU: R{current_rate:.2f}/kWh ({band.upper()})
 Next tariff change: {next_change}
+{f'Demand charge: R{demand_charge:.2f}/kVA/month · NMD: {nmd} kVA' if demand_charge else ''}
 Every recommendation must include ZAR saving estimate.
 Comfort may be relaxed within safe bounds.
 Equipment health is secondary unless failure is imminent.
@@ -1613,6 +1631,7 @@ Current TOU: R{current_rate:.2f}/kWh — cost context only.
             "balanced": f"""
 Balance cost, comfort, and asset health equally.
 Current TOU: R{current_rate:.2f}/kWh ({band.upper()})
+{f'Demand charge: R{demand_charge:.2f}/kVA/month · NMD: {nmd} kVA' if demand_charge else ''}
 Prioritise actions that improve multiple dimensions simultaneously.
 """,
         }
