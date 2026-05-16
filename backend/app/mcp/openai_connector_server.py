@@ -36,7 +36,12 @@ ALERTS_FILE = DATA_DIR / "alerts.json"
 SITES_DIR = DATA_DIR / "sites"
 
 # Base URL for document links (set from settings at runtime)
-BASE_URL = None
+try:
+    from app.config.settings import settings
+
+    BASE_URL = settings.backend_url or "http://localhost:9095"
+except Exception:
+    BASE_URL = "http://localhost:9095"
 
 
 def _load_json(filepath: Path) -> Any:
@@ -85,7 +90,7 @@ class SupabaseDataLoader:
             while True:
                 response = (
                     self.client.table("equipment")
-                    .select("*, buildings(name, code)")
+                    .select("*, sites(name, code)")
                     .range(offset, offset + page_size - 1)
                     .execute()
                 )
@@ -110,7 +115,7 @@ class SupabaseDataLoader:
         try:
             response = (
                 self.client.table("alerts")
-                .select("*, equipment(name, code, type), buildings(name, code)")
+                .select("*, equipment(name, code, type), sites(name, code)")
                 .order("created_at", desc=True)
                 .limit(100)
                 .execute()
@@ -131,7 +136,7 @@ class SupabaseDataLoader:
             while len(all_predictions) < max_records:
                 response = (
                     self.client.table("predictions")
-                    .select("*, equipment(name, code, type, manufacturer, model), buildings(name, code)")
+                    .select("*, equipment(name, code, type, manufacturer, model), sites(name, code)")
                     .order("created_at", desc=True)
                     .range(offset, offset + page_size - 1)
                     .execute()
@@ -157,7 +162,7 @@ class SupabaseDataLoader:
         try:
             response = (
                 self.client.table("work_orders")
-                .select("*, equipment(name, code, type), buildings(name, code)")
+                .select("*, equipment(name, code, type), sites(name, code)")
                 .order("created_at", desc=True)
                 .limit(100)
                 .execute()

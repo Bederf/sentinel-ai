@@ -1288,23 +1288,35 @@ class ShadowModePollingService:
                     bridge_status_data = equip_status_map.get(bcode, {})
                     bridge_status = bridge_status_data.get("status", "offline")
                     db_status = "normal" if bridge_status in ("online", "normal", "ok") else bridge_status
-                    eq_type, _ = self._parse_equipment_code(bcode)
-                    # Fallback: classify from BACnet object catalog metadata
-                    # when the code doesn't have a recognizable type segment
-                    if eq_type == "unknown":
-                        catalog_type = self._classify_from_catalog(bcode)
-                        if catalog_type != "unknown":
-                            eq_type = catalog_type
-                    # Normalize name using SENTINEL convention: S002-TYPE-LOC → "TYPE Floor Zone N"
-                    _, eq_loc = _parse_eq_code_parts(bcode)
-                    eq_name = _format_display_name(eq_type, eq_loc)
                     # Skip luminaries
                     if "-LUM-" in bcode:
                         continue
+                    # Normalize bridge code to canonical SENTINEL format
+                    # B1-001 → B01, R-XXX → R01, L{N}-{LETTER} → {N*100+ZONE}
+                    bcode_norm = _normalise(bcode)
+                    conv = _letter_zone_to_numeric(bcode_norm)
+                    canonical_code = f"S002-{conv}" if conv else bcode
+                    # If canonical code already exists in DB, update it instead of creating duplicate
+                    if canonical_code != bcode:
+                        existing = eq_repo.get_by_id(canonical_code)
+                        if existing:
+                            eq_repo.update(canonical_code, {"status": db_status})
+                            created += 1
+                            continue
+                    eq_type, _ = self._parse_equipment_code(canonical_code)
+                    # Fallback: classify from BACnet object catalog metadata
+                    # when the code doesn't have a recognizable type segment
+                    if eq_type == "unknown":
+                        catalog_type = self._classify_from_catalog(canonical_code)
+                        if catalog_type != "unknown":
+                            eq_type = catalog_type
+                    # Normalize name using SENTINEL convention: S002-TYPE-LOC → "TYPE Floor Zone N"
+                    _, eq_loc = _parse_eq_code_parts(canonical_code)
+                    eq_name = _format_display_name(eq_type, eq_loc)
                     try:
                         eq_repo.create(
                             {
-                                "code": bcode,
+                                "code": canonical_code,
                                 "name": eq_name,
                                 "type": eq_type,
                                 "status": db_status,
@@ -1314,7 +1326,7 @@ class ShadowModePollingService:
                         )
                         created += 1
                     except Exception as e:
-                        logger.warning(f"[SHADOW] Failed to create {bcode}: {e}")
+                        logger.warning(f"[SHADOW] Failed to create {canonical_code} (bridge {bcode}): {e}")
 
                 if created > 0:
                     logger.info(f"[SHADOW] Auto-created {created} equipment from bridge")

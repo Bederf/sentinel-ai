@@ -12,6 +12,7 @@ import logging
 import os
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
@@ -5259,6 +5260,170 @@ def _run_recommendation_digest_sync(site_id: str = "site-002"):
                     )
                 )
                 logger.info("Focus overstay alert triggered via periodic check: %s", room_code)
+
+
+    # -----------------------------------------------------------------
+    # BACnet Discovery Polling — detect equipment changes on site-002
+    # -----------------------------------------------------------------
+
+    def add_bacnet_discovery_polling_job(self, interval_seconds: int = 21600, site_id: str = "site-002"):
+        """Add a job to periodically discover BACnet devices and detect equipment changes.
+
+        Polls the bridge at 10.99.0.1:8080 for the BACnet object catalog, then
+        compares discovered equipment against known records in the database.
+        New devices, missing devices, and metadata changes are logged and tracked.
+
+        Args:
+            interval_seconds: How often to scan (default: 21600 = 6 hours)
+            site_id: Site to scan (default: site-002)
+        """
+        job_id = "bacnet_discovery_polling"
+        if self.scheduler.get_job(job_id):
+            self.scheduler.remove_job(job_id)
+            logger.info("Removed existing BACnet discovery polling job")
+
+        first_run = datetime.now() + timedelta(minutes=15)  # give system time to settle
+
+        self.scheduler.add_job(
+            func=self._run_bacnet_discovery,
+            trigger=IntervalTrigger(seconds=interval_seconds),
+            id=job_id,
+            name=f"BACnet Discovery Polling ({site_id})",
+            args=[site_id],
+            replace_existing=True,
+            next_run_time=first_run,
+            max_instances=1,
+            coalesce=True,
+        )
+        logger.info(
+            "Added BACnet discovery polling job for %s: every %ds (first run at %s)",
+            site_id,
+            interval_seconds,
+            first_run.strftime("%H:%M:%S"),
+        )
+
+    def _run_bacnet_discovery(self, site_id: str = "site-002"):
+        """Query the bridge for BACnet objects and detect equipment changes.
+
+        Fetches the full BACnet object catalog from the bridge at 10.99.0.1:8080,
+        extracts equipment IDs, and compares against known equipment in the DB.
+        Logs new, missing, or changed equipment.
+        """
+        try:
+            import asyncio
+            import os
+
+            import httpx
+
+            token = os.getenv("BRIDGE_API_TOKEN_SITE002") or os.getenv("BRIDGE_API_TOKEN", "")
+            if not token:
+                logger.warning("[BACNET-DISCOVERY] No bridge token configured — skipping")
+                return
+
+            base_url = "http://10.99.0.1:8080"
+            headers = {"Authorization": f"Bearer {token}"}
+
+            async def _fetch_objects() -> list[dict]:
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    resp = await client.get(
+                        f"{base_url}/api/sites/{site_id}/objects",
+                        headers=headers,
+                        params={"limit": 2000},
+                    )
+                    resp.raise_for_status()
+                    data = resp.json()
+                    return data.get("objects", [])
+
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                objects = loop.run_until_complete(_fetch_objects())
+            finally:
+                loop.close()
+
+            if not objects:
+                logger.info("[BACNET-DISCOVERY] No BACnet objects returned from bridge for %s", site_id)
+                return
+
+            # Extract unique equipment IDs from bridge objects
+            bridge_equipment_ids: set[str] = set()
+            object_by_equipment: dict[str, list[dict]] = {}
+            for obj in objects:
+                eq_id = (obj.get("equipment_id") or "").strip()
+                if eq_id:
+                    bridge_equipment_ids.add(eq_id)
+                    object_by_equipment.setdefault(eq_id, []).append(obj)
+
+            logger.info(
+                "[BACNET-DISCOVERY] Bridge reports %d BACnet objects across %d equipment for %s",
+                len(objects),
+                len(bridge_equipment_ids),
+                site_id,
+            )
+
+            # Fetch known equipment from the database
+            known_codes: set[str] = set()
+            try:
+                from app.database.supabase_client import get_supabase_client
+
+                sb = get_supabase_client()
+                # Resolve site UUID from site code (e.g. "site-002" → UUID)
+                site_resp = sb.table("sites").select("id").eq("code", site_id).limit(1).execute()
+                if not site_resp.data:
+                    logger.warning("[BACNET-DISCOVERY] Site %s not found in database", site_id)
+                    return
+                site_uuid = site_resp.data[0]["id"]
+                resp = sb.table("equipment").select("code").eq("site_id", site_uuid).execute()
+                known_codes = {row["code"] for row in (resp.data or [])}
+            except Exception as db_err:
+                logger.warning("[BACNET-DISCOVERY] DB query failed: %s", db_err)
+
+            # Compare: find new / missing equipment
+            bridge_prefixes = {e.split("-")[0] if "-" in e else e for e in bridge_equipment_ids}
+            known_prefixes = {e.split("-")[0] if "-" in e else e for e in known_codes}
+
+            new_equipment = bridge_equipment_ids - known_codes
+            missing_equipment = known_codes - bridge_equipment_ids
+
+            if new_equipment:
+                logger.warning(
+                    "[BACNET-DISCOVERY] NEW equipment detected on %s (%d): %s",
+                    site_id,
+                    len(new_equipment),
+                    sorted(new_equipment)[:20],
+                )
+            if missing_equipment:
+                logger.warning(
+                    "[BACNET-DISCOVERY] MISSING equipment on %s (%d): %s",
+                    site_id,
+                    len(missing_equipment),
+                    sorted(missing_equipment)[:20],
+                )
+
+            if not new_equipment and not missing_equipment:
+                logger.info(
+                    "[BACNET-DISCOVERY] Equipment inventory in sync for %s (%d bridge objects, %d known devices)",
+                    site_id,
+                    len(objects),
+                    len(known_codes),
+                )
+
+            logger.info(
+                "[BACNET-DISCOVERY] Summary for %s: %d objects, %d bridge equipment, %d known, %d new, %d missing",
+                site_id,
+                len(objects),
+                len(bridge_equipment_ids),
+                len(known_codes),
+                len(new_equipment),
+                len(missing_equipment),
+            )
+
+        except httpx.ConnectError:
+            logger.warning("[BACNET-DISCOVERY] Bridge unreachable for %s — will retry next cycle", site_id)
+        except httpx.TimeoutException:
+            logger.warning("[BACNET-DISCOVERY] Bridge timed out for %s — will retry next cycle", site_id)
+        except Exception as e:
+            logger.error("[BACNET-DISCOVERY] Failed for %s: %s", site_id, e, exc_info=True)
 
 
 # Global scheduler instance

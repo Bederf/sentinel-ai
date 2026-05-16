@@ -17,6 +17,7 @@ equipment combinations.
 import asyncio
 import json
 import logging
+import os
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -891,12 +892,14 @@ class AIOptimizerService:
             # ── Electrical aggregate from site telemetry ──────────────────
             try:
                 import httpx
-                async with httpx.AsyncClient(timeout=10) as client:
-                    token = os.getenv("BRIDGE_API_TOKEN_SITE002") or os.getenv("BRIDGE_API_TOKEN", "")
-                    resp = await client.get(
-                        f"http://10.99.0.1:8080/api/sites/{site_id}/telemetry",
-                        headers={"Authorization": f"Bearer {token}"},
-                    )
+                bridge_site = site_id if site_id.startswith("site-") else site_id
+                token = (os.environ.get("BRIDGE_API_TOKEN_SITE002") or
+                         os.environ.get("BRIDGE_API_TOKEN") or
+                         "ScUAjUet7i2vvcE0fuzn6dsF3C+YRMWbf8yMWwdoYbw")
+                # Use sync client — async is flaky with WireGuard bridge
+                with httpx.Client(timeout=10) as client:
+                    url = f"http://10.99.0.1:8080/api/sites/{bridge_site}/telemetry"
+                    resp = client.get(url, headers={"Authorization": f"Bearer {token}"})
                     if resp.is_success:
                         telemetry = resp.json()
                         power = telemetry.get("power", {})
@@ -906,8 +909,10 @@ class AIOptimizerService:
                             "lighting_kw": power.get("lighting_kw"),
                             "solar_kw": power.get("solar_kw"),
                         }
-            except Exception:
-                pass
+                    else:
+                        logger.warning(f"[AI-OPT] Bridge telemetry returned {resp.status_code}")
+            except Exception as e:
+                logger.warning(f"[AI-OPT] Bridge telemetry failed: {e}")
 
             # ── Active modules ────────────────────────────────────────────
             try:
@@ -2059,7 +2064,7 @@ IMPORTANT: For each recommendation, include carbon_saving field where relevant.
 Use Eskom grid intensity 0.9 kgCO2/kWh to calculate carbon savings from energy reduction.
 Example: "carbon_saving": "1.2 kgCO2 this evening (Eskom 0.9 kgCO2/kWh)"
 ```
- 
+
 Provide ONLY the JSON response, no additional text."""
 
         return prompt
