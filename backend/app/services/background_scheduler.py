@@ -2946,6 +2946,8 @@ class BackgroundSchedulerService:
             cursor = conn.cursor()
             for table, col, days in [
                 ("equipment_fault_events", "recorded_at", 7),
+                ("recommendations", "created_at", 7),
+                ("predictions", "created_at", 14),
                 ("adapter_health", "timestamp", 7),
                 ("adapter_health_current", "updated_at", 7),
                 ("adapter_health_alerts", "created_at", 7),
