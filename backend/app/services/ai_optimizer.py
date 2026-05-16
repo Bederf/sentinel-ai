@@ -259,7 +259,7 @@ class AIOptimizerService:
 
         # Generate mock energy prices if not provided
         if not energy_prices:
-            energy_prices = self._generate_mock_energy_prices()
+            energy_prices = self._get_energy_prices(site_id)
 
         # Get ALL site devices - equipment inventory varies by building
         all_devices = await device_manager.list_devices_by_site(site_id)
@@ -950,14 +950,57 @@ class AIOptimizerService:
             "conditions": "partly_cloudy",
         }
 
-    def _generate_mock_energy_prices(self) -> dict[str, Any]:
-        """Generate mock energy pricing (South African time-of-use)."""
+    def _get_energy_prices(self, site_id: str | None = None) -> dict[str, Any]:
+        """Get energy pricing from Supabase ipmvp_tariff, with fallback to defaults.
+
+        Tariff data is loaded by the bridge and stored in ipmvp_tariff.
+        Determines current band (peak/standard/off_peak) from the current hour.
+        """
+        if site_id:
+            try:
+                from app.database.supabase_client import get_supabase_client
+                sb = get_supabase_client()
+                result = sb.table("ipmvp_tariff").select("tariff_data").eq("site_id", site_id).limit(1).execute()
+                if result.data:
+                    td = result.data[0]["tariff_data"]
+                    peak_hours = td.get("peak_hours", [])
+                    hour = datetime.now().hour
+                    # Determine current band
+                    if hour in peak_hours:
+                        band = "peak"
+                        current = td.get("peak_zar_per_kwh", 4.52)
+                    elif td.get("weekday_only") and datetime.now().weekday() >= 5:
+                        band = "off_peak"
+                        current = td.get("offpeak_zar_per_kwh", 0.63)
+                    else:
+                        # Default to standard (inter-peak) between peak hours
+                        band = "standard"
+                        current = td.get("standard_zar_per_kwh", 1.87)
+                    return {
+                        "current_rate": current,
+                        "peak_rate": td.get("peak_zar_per_kwh", 4.52),
+                        "off_peak_rate": td.get("offpeak_zar_per_kwh", 0.63),
+                        "standard_rate": td.get("standard_zar_per_kwh", 1.87),
+                        "band": band,
+                        "peak_hours": peak_hours,
+                        "weekday_only": td.get("weekday_only", True),
+                        "currency": "ZAR",
+                        "source": "ipmvp_tariff",
+                    }
+            except Exception as e:
+                logger.warning(f"Failed to load tariff from ipmvp_tariff: {e}")
+
+        # Fallback defaults
         return {
-            "current_rate": 2.28,  # R/kWh standard (City Power LPU-TOU 2025/26)
-            "peak_rate": 3.01,  # R/kWh peak
-            "off_peak_rate": 1.77,  # R/kWh off-peak
-            "period": "standard",  # peak, off_peak, standard
+            "current_rate": 2.28,
+            "peak_rate": 3.01,
+            "off_peak_rate": 1.77,
+            "standard_rate": 1.87,
+            "band": "standard",
+            "peak_hours": [6, 7, 8, 17, 18, 19, 20],
+            "weekday_only": True,
             "currency": "ZAR",
+            "source": "fallback_defaults",
         }
 
     async def _gather_decision_memory(self, site_id: str) -> str:
@@ -1330,7 +1373,7 @@ class AIOptimizerService:
                 "zone_occupancy": {},
             }
             weather = self._generate_mock_weather_forecast()
-            energy = self._generate_mock_energy_prices()
+            energy = self._get_energy_prices(site_id)
 
             # For each candidate, build a targeted prompt
             for eq in candidates:
