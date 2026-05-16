@@ -656,4 +656,5 @@ SQL fallback in `background_scheduler.py` runs daily:
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 2.0.0 | 2026-05-16 | Age-only baselines, scoreability gating, deferred capture, alert generation, carbon/ESG pipeline |
 | 1.0.0 | 2026-02-02 | Initial documentation |
