@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { Shield } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
+import { Shield, AlertTriangle, Lock } from "lucide-react";
 import { toast } from "sonner";
 import api from "@/lib/api";
 import { ALL_PHASES, PHASE_COLORS, PHASE_DESCRIPTIONS, PHASE_LABELS, type OnboardingPhase } from "@/lib/onboardingPhase";
@@ -19,6 +19,8 @@ interface OnboardingPhaseSettingsProps {
   onSuccess?: () => void;
 }
 
+const HOLD_MS = 2000;
+
 export function OnboardingPhaseSettings({
   selectedSiteId,
   sites,
@@ -28,29 +30,58 @@ export function OnboardingPhaseSettings({
   onSuccess,
 }: OnboardingPhaseSettingsProps) {
   const [updating, setUpdating] = useState(false);
+  const [selectedPhase, setSelectedPhase] = useState<OnboardingPhase | null>(null);
+  const holdRef = useRef<{ timer: ReturnType<typeof setTimeout> | null; start: number }>({ timer: null, start: 0 });
+  const [holdProgress, setHoldProgress] = useState(0);
 
   const selectedSite = useMemo(
     () => sites.find((site) => site.id === selectedSiteId) ?? null,
     [sites, selectedSiteId],
   );
   const currentPhase = (selectedSite?.onboarding_phase as OnboardingPhase) ?? "shadow";
-  const isAdmin = currentUserRole === "admin";
+  const confirmPhase = selectedPhase ?? currentPhase;
+  const locked = readOnly || !selectedSiteId;
 
-  const handlePhaseChange = async (nextPhase: OnboardingPhase) => {
-    if (!selectedSiteId) {
-      onError?.("Select a site before changing onboarding phase.");
+  const handlePhaseSelect = (next: OnboardingPhase) => {
+    if (next === currentPhase) {
+      setSelectedPhase(null);
+      setHoldProgress(0);
       return;
     }
-    if (!isAdmin || readOnly) {
-      onError?.("Only admins can change onboarding phase.");
-      return;
+    setSelectedPhase(next);
+    setHoldProgress(0);
+  };
+
+  const startHold = () => {
+    if (updating || locked || !selectedPhase || selectedPhase === currentPhase) return;
+    holdRef.current.start = Date.now();
+    const tick = () => {
+      const elapsed = Date.now() - holdRef.current.start;
+      setHoldProgress(Math.min(elapsed / HOLD_MS, 1));
+      if (elapsed >= HOLD_MS) {
+        setHoldProgress(0);
+        commitChange(selectedPhase);
+        return;
+      }
+      holdRef.current.timer = setTimeout(tick, 50);
+    };
+    tick();
+  };
+
+  const cancelHold = () => {
+    if (holdRef.current.timer) {
+      clearTimeout(holdRef.current.timer);
+      holdRef.current.timer = null;
     }
-    if (nextPhase === currentPhase) {
-      return;
-    }
+    setHoldProgress(0);
+  };
+
+  const commitChange = async (phase: OnboardingPhase) => {
+    if (!selectedSiteId) return;
     setUpdating(true);
     try {
-      await api.updateSitePhase(selectedSiteId, nextPhase);
+      await api.updateSitePhase(selectedSiteId, phase);
+      setSelectedPhase(null);
       onSuccess?.();
     } catch (error) {
       const msg =
@@ -59,6 +90,7 @@ export function OnboardingPhaseSettings({
           : "Failed to update onboarding phase.";
       toast.error(msg, { description: "Site mode advancement blocked." });
       onError?.(msg);
+      setSelectedPhase(null);
     } finally {
       setUpdating(false);
     }
@@ -109,26 +141,84 @@ export function OnboardingPhaseSettings({
             <label className="block text-sm font-medium mb-2" style={{ color: "var(--color-sentinel-text-primary)" }}>
               Site Mode
             </label>
-            <select
-              value={currentPhase}
-              disabled={updating || !isAdmin || readOnly || !selectedSiteId}
-              onChange={(e) => void handlePhaseChange(e.target.value as OnboardingPhase)}
-              className="w-full md:w-64 rounded-md appearance-none cursor-pointer pl-3 pr-3 py-2.5 text-sm transition-colors focus:outline-none focus:ring-0"
-              style={{
-                background: "var(--color-grafana-bg-secondary)",
-                border: "1px solid var(--color-grafana-border)",
-                color: "var(--color-grafana-text-primary)",
-                boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)",
-                opacity: updating ? 0.6 : 1,
-              }}
-              title="Set SENTINEL onboarding phase for this site"
-            >
-              {ALL_PHASES.map((phase) => (
-                <option key={phase} value={phase}>
-                  {PHASE_LABELS[phase]}
-                </option>
-              ))}
-            </select>
+            {locked ? (
+              <div className="flex items-center gap-2 p-3 rounded" style={{ background: "rgba(220, 38, 38, 0.08)", border: "1px solid rgba(220, 38, 38, 0.2)" }}>
+                <Lock className="h-4 w-4" style={{ color: "var(--color-sentinel-red)" }} />
+                <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                  {currentUserRole !== "admin" ? "Unlock settings at the top of the page to change site mode." : "Select a site to change site mode."}
+                </span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3 flex-wrap">
+                <select
+                  value={confirmPhase}
+                  disabled={updating}
+                  onChange={(e) => handlePhaseSelect(e.target.value as OnboardingPhase)}
+                  className="w-full md:w-64 rounded-md appearance-none cursor-pointer pl-3 pr-3 py-2.5 text-sm transition-colors focus:outline-none focus:ring-0"
+                  style={{
+                    background: "var(--color-grafana-bg-secondary)",
+                    border: "1px solid var(--color-grafana-border)",
+                    color: "var(--color-grafana-text-primary)",
+                    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)",
+                    opacity: updating ? 0.6 : 1,
+                  }}
+                  title="Set SENTINEL onboarding phase for this site"
+                >
+                  {ALL_PHASES.map((phase) => (
+                    <option key={phase} value={phase}>
+                      {PHASE_LABELS[phase]}
+                    </option>
+                  ))}
+                </select>
+
+                {selectedPhase && selectedPhase !== currentPhase && (
+                  <div className="flex items-center gap-2">
+                    <button
+                      onMouseDown={startHold}
+                      onMouseUp={cancelHold}
+                      onMouseLeave={cancelHold}
+                      onTouchStart={startHold}
+                      onTouchEnd={cancelHold}
+                      disabled={updating}
+                      className="relative px-4 py-2 rounded text-sm font-medium overflow-hidden select-none"
+                      style={{
+                        background: "rgba(220, 38, 38, 0.15)",
+                        color: "var(--color-sentinel-red)",
+                        border: "1px solid rgba(220, 38, 38, 0.3)",
+                        cursor: updating ? "not-allowed" : "pointer",
+                      }}
+                    >
+                      <span className="relative z-10 flex items-center gap-1.5">
+                        <AlertTriangle className="h-3.5 w-3.5" />
+                        Hold to Confirm
+                      </span>
+                      {holdProgress > 0 && (
+                        <span
+                          className="absolute inset-0"
+                          style={{
+                            background: "rgba(220, 38, 38, 0.2)",
+                            width: `${holdProgress * 100}%`,
+                            transition: "width 50ms linear",
+                          }}
+                        />
+                      )}
+                    </button>
+                    <button
+                      onClick={() => { setSelectedPhase(null); setHoldProgress(0); }}
+                      disabled={updating}
+                      className="px-3 py-2 rounded text-xs font-medium"
+                      style={{
+                        background: "var(--color-grafana-bg-secondary)",
+                        border: "1px solid var(--color-grafana-border)",
+                        color: "var(--color-grafana-text-secondary)",
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>

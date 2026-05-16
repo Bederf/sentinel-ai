@@ -213,16 +213,18 @@ Load shedding events corrupt energy baseline data (genset running ≠ normal ope
 
 ## Data Sources
 
-| Data | Source | Endpoint |
-|------|--------|----------|
-| 15-min energy | Site 002 bridge API | `GET /api/sites/{site_id}/ipmvp/energy` |
-| Outdoor air temp | Site 002 bridge API | `GET /api/sites/{site_id}/ipmvp/oat` |
-| Load shedding events | Site 002 bridge API | `GET /api/sites/{site_id}/ipmvp/load-shedding` |
-| Tariff | Site 002 bridge API | `GET /api/sites/{site_id}/ipmvp/tariff` |
-| Occupancy schedule | Site 002 bridge API | `GET /api/sites/{site_id}/ipmvp/occupancy` |
-| Equipment events | Site 002 bridge API | `GET /api/sites/{site_id}/ipmvp/events` |
+| Data | Source | Storage |
+|------|--------|---------|
+| 15-min energy | Bridge `/ipmvp/energy` → hourly sync | `ipmvp_energy` table |
+| Outdoor air temp | Bridge `/ipmvp/oat` → hourly sync | `ipmvp_oat` table |
+| Equipment events | Bridge `/ipmvp/events` → hourly sync | `ipmvp_events` table |
+| Load shedding | Bridge `/ipmvp/load-shedding` → hourly sync | Inferred from events |
+| Tariff | Bridge `/ipmvp/tariff` → hourly sync | `ipmvp_tariff` table |
+| Occupancy schedule | Bridge `/ipmvp/occupancy` → hourly sync | `ipmvp_occupancy` table |
 
-Bridge auth: `BRIDGE_API_TOKEN_SITE_002` env var; base URL from `BRIDGE_BASE_SITE002`.
+**Sync pipeline:** `Site002DataFetcher.run_full_sync()` fetches all IPMVP endpoints from the bridge and upserts into dedicated `ipmvp_*` Supabase tables. Runs hourly via APScheduler. Rolling 7-day retention — older data auto-purged on each sync.
+
+Bridge auth: `BRIDGE_API_TOKEN` env var (falls back to `BRIDGE_API_TOKEN_SITE002`); base URL from `BRIDGE_BASE_URL`.
 
 ---
 
@@ -230,8 +232,9 @@ Bridge auth: `BRIDGE_API_TOKEN_SITE_002` env var; base URL from `BRIDGE_BASE_SIT
 
 - API router: `backend/app/api/ipmvp.py`
 - Engine: `backend/app/services/ipmvp/ipmvp_engine.py`
-- Data fetcher: `backend/app/services/ipmvp/site002_fetcher.py`
+- Data fetcher: `backend/app/services/ipmvp/site002_fetcher.py` (includes `persist_*()` methods + `run_full_sync()`)
 - Models: `backend/app/services/ipmvp/`
+- Scheduler: `background_scheduler.py` → `add_ipmvp_sync_job()` (hourly)
 - Register: `backend/app/api/registrars/analytics.py` → `register_analytics_routers()`
 
 ---

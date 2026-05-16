@@ -687,6 +687,12 @@ class BackgroundSchedulerService:
                         except (TypeError, ValueError):
                             confidence_num = 0.7
 
+                        # Skip DALI equipment — Tridonic handles autonomously
+                        eq_upper = (equipment_id or "").upper()
+                        if eq_upper.startswith("S002-DALI") or eq_upper.startswith("DALI"):
+                            logger.info(f"[AI-OPT] Skipped DALI equipment {equipment_id}")
+                            continue
+
                         # Determine sim_hour for traceability
                         import app.services.lifecycle_orchestrator as _orch_mod_local
 
@@ -750,6 +756,33 @@ class BackgroundSchedulerService:
                                 )
                             except Exception as emit_err:
                                 logger.warning(f"Failed to emit recommendation_created SSE event: {emit_err}")
+
+                            # Send Telegram notification for AI optimization recs
+                            try:
+                                if self._is_sendable_ai_recommendation(rec):
+                                    from app.services.notification_service import NotificationService
+                                    from app.config.settings import settings as _app_settings
+
+                                    _chat_id = getattr(_app_settings, "telegram_alert_chat_id", None) or getattr(
+                                        _app_settings, "sentry_fm_chat_id", None
+                                    )
+                                    if _chat_id:
+                                        _msg = self._format_advisory_notification(rec)
+                                        _svc = NotificationService()
+                                        loop.run_until_complete(
+                                            _svc.send_certified(
+                                                site_id=site_id,
+                                                recipient_telegram_id=str(_chat_id),
+                                                title=rec.reason or "SENTINEL Advisory",
+                                                message=_msg,
+                                                reference_id=rec.target_equipment,
+                                            )
+                                        )
+                                        logger.info(
+                                            f"[NOTIFY] Advisory notification sent for {rec.target_equipment}"
+                                        )
+                            except Exception as notify_err:
+                                logger.warning(f"Failed to send Telegram notification: {notify_err}")
                         except Exception as e:
                             logger.warning(f"Failed to persist recommendation for {equipment_id}: {e}")
                             error_count += 1
@@ -760,14 +793,8 @@ class BackgroundSchedulerService:
                     logger.error(f"Error analyzing site {site_id}: {e}")
                     error_count += 1
 
-            # === RULE-BASED HEALTH RECOMMENDATIONS (no LLM) ===
-            # Uses thresholds from settings page to generate maintenance recs
-            try:
-                health_created, health_deduped = self._generate_health_recommendations(site_ids, recommendation_repo)
-                created_count += health_created
-                skipped_count += health_deduped
-            except Exception as e:
-                logger.warning(f"[HEALTH-REC] Failed: {e}")
+            # Health engine disabled — data exists in equipment (health scores) and predictions tables.
+            # Maintenance panel reads directly from those tables. No duplication needed.
 
             logger.warning(
                 f"[AI-OPT] Cycle complete: {created_count} created, {skipped_count} deduped, {error_count} errors"
@@ -1075,7 +1102,7 @@ class BackgroundSchedulerService:
 
         self._recommendation_real_interval = interval_seconds
 
-        poll_seconds = 30
+        poll_seconds = interval_seconds
         first_run = datetime.now() + timedelta(seconds=90)  # 90s warmup
 
         self.scheduler.add_job(
@@ -1366,12 +1393,15 @@ class BackgroundSchedulerService:
 
         for site_id in site_ids:
             try:
+                # Expire ALL pending records older than cutoff regardless of type
+                # Uses timestamp comparison directly — no limit, no pagination needed
                 result = await asyncio.to_thread(
-                    lambda sid=site_id: (
+                    lambda sid=site_id, c=cutoff.isoformat(): (
                         sb.table("recommendations")
                         .select("id, timestamp, action_type")
                         .eq("site_id", sid)
                         .eq("status", "pending")
+                        .lt("timestamp", c)
                         .order("timestamp", desc=True)
                         .execute()
                     )
@@ -1381,7 +1411,7 @@ class BackgroundSchedulerService:
                 if not records:
                     continue
 
-                # Partition by action_type within this site
+                # Partition by action_type — keep the 10 most recent per type
                 by_type: dict[str, list[dict]] = {}
                 for r in records:
                     by_type.setdefault(r["action_type"], []).append(r)
@@ -1389,11 +1419,8 @@ class BackgroundSchedulerService:
                 ids_to_expire: set[str] = set()
 
                 for _action_type, typed_records in by_type.items():
-                    # Keep top 10 most recent regardless of age
                     for r in typed_records[10:]:
-                        ts = datetime.fromisoformat(r["timestamp"].replace("Z", "+00:00"))
-                        if ts < cutoff:
-                            ids_to_expire.add(r["id"])
+                        ids_to_expire.add(r["id"])
 
                 if ids_to_expire:
                     expire_ids = list(ids_to_expire)
@@ -1456,10 +1483,6 @@ class BackgroundSchedulerService:
                 )
                 return
         else:
-            if self._last_recommendation_sim_time is not None:
-                elapsed = (datetime.now() - self._last_recommendation_sim_time).total_seconds()
-                if elapsed < self._recommendation_real_interval:
-                    return
             self._last_recommendation_sim_time = datetime.now()
 
         self._run_recommendation_generation()
@@ -1483,7 +1506,7 @@ class BackgroundSchedulerService:
             from app.services.maintenance_recommender import get_maintenance_recommender
             from app.services.module_registry_service import ModuleRegistryService
 
-            logger.info("Running scheduled AI recommendation generation...")
+            logger.warning("Running scheduled AI recommendation generation...")
 
             # Mode gate: build sets for generation + visibility control
             # Generation runs for shadow_live/supervised/automatic (not commissioning)
@@ -1763,7 +1786,6 @@ class BackgroundSchedulerService:
                     )
 
                     module_registry.add_recommendation(site_code, ai_rec)
-                    self._notify_recommendation_alert(site_code, ai_rec)
 
                     # Persist to recommendations table for Cockpit UI
                     try:
@@ -1818,60 +1840,70 @@ class BackgroundSchedulerService:
         except Exception as e:
             logger.error(f"Failed to run recommendation generation: {e}")
 
-    def _notify_recommendation_alert(self, site_code: str, ai_rec) -> None:
-        """Send Telegram alert for critical/high severity recommendations (fire-and-forget via thread pool)."""
-        priority = ai_rec.priority.name.lower() if hasattr(ai_rec.priority, "name") else "low"
-        if priority not in ("critical", "high"):
-            return
+    def _is_sendable_ai_recommendation(self, rec) -> bool:
+        """Gate: only send notifications that meet the advisory standard."""
+        if rec.action_type != 'ai_optimization':
+            logger.warning(f"[NOTIFY] Suppressed — not ai_optimization: {rec.action_type}")
+            return False
+        if rec.target_equipment and 'DALI' in rec.target_equipment.upper():
+            logger.warning(f"[NOTIFY] Suppressed — DALI equipment: {rec.target_equipment}")
+            return False
+        action = rec.action or {}
+        if not action.get('point') or action.get('value') is None:
+            logger.warning(f"[NOTIFY] Suppressed — no specific action: {rec.target_equipment}")
+            return False
+        reason = rec.reason or ''
+        GENERIC_PHRASES = [
+            'health score', 'failure probability', 'maintenance schedule',
+            'no service history', 'add to maintenance queue', 'establish maintenance',
+        ]
+        if any(phrase in reason.lower() for phrase in GENERIC_PHRASES):
+            logger.warning(f"[NOTIFY] Suppressed — maintenance content: {reason[:60]}")
+            return False
+        return True
 
-        equipment_id = (
-            ai_rec.telemetry_context.get("equipment_id", "unknown") if ai_rec.telemetry_context else "unknown"
-        )
-        title = ai_rec.title[:100]
-        confidence = ai_rec.confidence or 0
-        enforcement = (
-            ai_rec.suggested_action.get("type", "pending_approval") if ai_rec.suggested_action else "pending_approval"
-        )
+    def _format_advisory_notification(self, rec) -> str:
+        """Format AI optimization notification with holistic building view."""
+        metadata = rec.metadata or {}
+        adjustments = metadata.get('all_adjustments', [])
+        building_assessment = metadata.get('building_assessment', '')
+        title = metadata.get('title', f"Adjustment for {rec.target_equipment}")
+        saving = metadata.get('saving', '')
+        confidence = rec.confidence_score or 0.0
+        confidence_basis = metadata.get('confidence_basis', '')
+        profile = (rec.profile or 'cost_saving').replace('_', ' ').title()
+        reason = rec.reason or ''
 
-        level_icon = "\xf0\x9f\x94\xb4" if priority == "critical" else "\xf0\x9f\x9f\xa1"
-        message = (
-            f"{level_icon} *SENTINEL Advisory — {site_code.upper()}*\n"
-            f"Equipment: `{equipment_id}`\n"
-            f"Priority: {priority.upper()}\n"
-            f"Finding: {title}\n"
-            f"Confidence: {confidence:.0%}\n"
-            f"Action: {enforcement}\n"
-            f"→ Review in Cockpit approval queue"
-        )
+        adj_lines = []
+        for adj in adjustments[:5]:
+            equip = adj.get('equipment_id', '')
+            point = adj.get('point', '').replace('_', ' ').title()
+            curr = adj.get('current_value', '')
+            recd = adj.get('recommended_value', '')
+            unit = adj.get('unit', '')
+            if curr:
+                adj_lines.append(f"\u2022 `{equip}`: {point} {curr}{unit} \u2192 {recd}{unit}")
+            else:
+                adj_lines.append(f"\u2022 `{equip}`: Set {point} to {recd}{unit}")
+        if len(adjustments) > 5:
+            adj_lines.append(f"\u2022 ...and {len(adjustments)-5} more zones")
 
-        # Fire-and-forget: dispatch to a background thread so it never blocks the scheduler cycle.
-        try:
-            import asyncio
-            import concurrent.futures
-
-            def _thread_target():
-                try:
-
-                    async def _send_async():
-                        from app.services.telegram_message_sender import get_telegram_sender
-
-                        sender = get_telegram_sender()
-                        from app.config.settings import settings
-
-                        chat_id = getattr(settings, "telegram_alert_chat_id", None) or getattr(
-                            settings, "sentry_fm_chat_id", None
-                        )
-                        if chat_id:
-                            await sender.send_text(str(chat_id), message, parse_mode="Markdown")
-
-                    asyncio.run(_send_async())
-                except Exception as e:
-                    logger.warning(f"Failed to send Telegram alert for {equipment_id}: {e}")
-
-            with concurrent.futures.ThreadPoolExecutor(max_workers=4, thread_name_prefix="telegram_alert") as pool:
-                pool.submit(_thread_target)
-        except Exception as e:
-            logger.warning(f"Failed to dispatch Telegram alert for {equipment_id}: {e}")
+        lines = [
+            f"\xe2\x9a\x99\xef\xb8\x8f *SENTINEL Advisory \u2014 Sandton City Office Tower*",
+            f"",
+            f"*{title}*",
+            f"",
+        ]
+        if building_assessment:
+            lines.extend(["*Building state:*", f"{building_assessment}", ""])
+        lines.extend(["*Adjustments needed:*", *adj_lines, "", "*Why:*", f"{reason[:250]}", "", f"*Goal:* {profile}"])
+        if saving:
+            lines.append(f"*Saving:* {saving}")
+        if confidence > 0:
+            basis = f" ({confidence_basis})" if confidence_basis else ""
+            lines.append(f"*Confidence:* {round(confidence * 100)}%{basis}")
+        lines.extend(["", "\u2192 Acknowledge once all adjustments are made"])
+        return "\n".join(lines)
 
     def add_recommendation_digest_job(self):
         """Send a recommendation digest to Telegram at 07:45 SAST Mon-Fri."""
@@ -3650,12 +3682,12 @@ class BackgroundSchedulerService:
 
     # ── Equipment Health Snapshot jobs ──────────────────────────────────
 
-    def add_equipment_health_snapshot_job(self, interval_hours: int = 2):
+    def add_equipment_health_snapshot_job(self, interval_minutes: int = 15):
         """
         Add a job to compute and store equipment health snapshots periodically.
 
         Args:
-            interval_hours: How often to recompute snapshots (default: 2 hours)
+            interval_minutes: How often to recompute snapshots (default: 15 minutes)
         """
         job_id = "equipment_health_snapshot"
         if self.scheduler.get_job(job_id):
@@ -3665,7 +3697,7 @@ class BackgroundSchedulerService:
         first_run = datetime.now(UTC) + timedelta(seconds=30)  # 30s warmup
         self.scheduler.add_job(
             func=self._run_equipment_health_snapshot,
-            trigger=IntervalTrigger(hours=interval_hours),
+            trigger=IntervalTrigger(minutes=interval_minutes),
             id=job_id,
             name="Equipment Health Snapshot",
             replace_existing=True,
@@ -5039,6 +5071,74 @@ def _run_recommendation_digest_sync(site_id: str = "site-002"):
             loop.close()
     except Exception as e:
         logger.warning(f"Recommendation digest failed: {e}")
+
+
+    def add_focus_overstay_check_job(self, interval_seconds: int = 120):
+        """Periodic check for focus room overstays — fires alerts for sessions past the limit."""
+        job_id = "focus_overstay_check"
+        self.scheduler.add_job(
+            func=self._run_focus_overstay_check,
+            trigger="interval",
+            seconds=interval_seconds,
+            id=job_id,
+            replace_existing=True,
+            name="Focus room overstay check",
+        )
+        logger.info(f"Focus overstay check scheduled every {interval_seconds}s")
+
+    def _run_focus_overstay_check(self):
+        try:
+            import asyncio
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                loop.run_until_complete(self._check_focus_overstays())
+            finally:
+                loop.close()
+        except Exception as e:
+            logger.warning(f"Focus overstay check failed: {e}")
+
+    async def _check_focus_overstays(self):
+        from app.database.supabase_client import get_supabase_client
+
+        sb = get_supabase_client()
+        if not sb:
+            return
+        try:
+            active = sb.table("space_focus_room_sessions").select("*").is_("end_time", None).execute()
+        except Exception:
+            return
+        from app.services.space_event_service import _overstay_alert_sent
+        from app.services.focus_room_notifier import send_focus_overstay_alert
+        from app.config.settings import settings
+        from app.services.focus_room_session_service import describe_focus_session_state
+
+        for session in (active.data or []):
+            session_id = session.get("session_id") or session.get("id", "")
+            if not session_id or session_id in _overstay_alert_sent:
+                continue
+            room_code = session.get("room_code", "")
+            site_id = session.get("site_id", "site-002")
+            from app.services import occupancy_store
+            from datetime import datetime, timezone
+
+            active_sesh = occupancy_store.get_active_session(room_code)
+            if not active_sesh or active_sesh.session_id != session_id:
+                continue
+            state = describe_focus_session_state(active_sesh, now=datetime.now(timezone.utc))
+            if state.get("red_light_on"):
+                _overstay_alert_sent.add(session_id)
+                cooldown = max(1, int((settings.focus_red_light_cooldown_seconds or 300) / 60))
+                loop = asyncio.get_event_loop()
+                loop.create_task(
+                    send_focus_overstay_alert(
+                        site_id=site_id,
+                        room_code=room_code,
+                        max_allowed_minutes=max(1, int((settings.focus_extended_use_seconds or 7200) / 60)),
+                        cooldown_minutes=cooldown,
+                    )
+                )
+                logger.info("Focus overstay alert triggered via periodic check: %s", room_code)
 
 
 # Global scheduler instance

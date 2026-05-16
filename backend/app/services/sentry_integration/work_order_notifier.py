@@ -737,16 +737,17 @@ class WorkOrderNotifier:
                     logger.warning(f"Could not look up Telegram ID: {e}")
 
             # Send Telegram notification directly via Sentry CLI
-            telegram_sent = await self._send_telegram_notification(work_order_data, service_record)
+            sr = service_record or {}
+            telegram_sent = await self._send_telegram_notification(work_order_data, sr)
 
             # Send Email notification via native SMTP
-            email_sent = await self._send_email_notification(work_order_data, service_record)
+            email_sent = await self._send_email_notification(work_order_data, sr)
 
             logger.warning(f"[WO-NOTIFY] Notifications sent — Telegram: {telegram_sent}, Email: {email_sent}")
 
             return {
                 "success": True,
-                "service_record_code": service_record["code"],
+                "service_record_code": service_record["code"] if service_record else "",
                 "telegram_sent": telegram_sent,
                 "email_sent": email_sent,
             }
@@ -840,23 +841,43 @@ class WorkOrderNotifier:
             tech_name = work_order_data.get("technician_name", "Technician")
             desk_id = work_order_data.get("desk_id", "")
             zone_id = work_order_data.get("zone_id", "")
-            location_line = f"📍 Desk {desk_id}, {zone_id}" if desk_id or zone_id else ""
+            reporter = work_order_data.get("reported_by") or work_order_data.get("reporter_name", "")
+            reporter_contact = work_order_data.get("reporter_phone", "")
+            description = work_order_data.get("problem_description") or work_order_data.get("description", "")
 
-            # Build message — include WO ref, priority, equipment name, and Telegram commands
+            # Build location line
+            location_parts = []
+            if zone_id:
+                location_parts.append(f"📍 Zone: {zone_id}")
+            if desk_id:
+                location_parts.append(f"🪑 Desk: {desk_id}")
+            location_line = "\n".join(location_parts)
+            location_part = (location_line + "\n") if location_parts else ""
+
+            # Build reporter info
+            reporter_parts = []
+            if reporter:
+                reporter_parts.append(f"👤 Reported by: {reporter}")
+            if reporter_contact:
+                reporter_parts.append(f"📞 {reporter_contact}")
+            reporter_part = "\n".join(reporter_parts)
+            reporter_section = (reporter_part + "\n") if reporter_parts else ""
+
+            # Build issue snippet
+            issue_snippet = (f"💬 {description[:150]}{'...' if len(description) > 150 else ''}\n") if description else ""
+
             equipment_code = work_order_data.get("equipment_code", "")
             code_underscored = equipment_code.replace("-", "_") if equipment_code else ""
-            wo_ref_underscored = wo_ref.replace("-", "_")
-            desk_id = work_order_data.get("desk_id", "")
-            zone_id = work_order_data.get("zone_id", "")
-            location_line = f"📍 Desk {desk_id}, {zone_id}" if desk_id or zone_id else ""
-            location_part = (location_line + "\n") if location_line else ""
-            eq_cmds = f"/info_{code_underscored} - Equipment details\n/note_{code_underscored} - Add note\n" if code_underscored else ""
+            eq_cmds = f"/info_{code_underscored} - Equipment details\n" if code_underscored else ""
+
             msg = (
                 f"📋 Work Order {wo_ref}\n"
                 f"🔧 {eq_name}\n"
                 f"🔴 Priority: {pri} | Type: {service_type}\n"
                 f"👤 Assigned: {tech_name}\n"
                 f"{location_part}"
+                f"{reporter_section}"
+                f"{issue_snippet}"
                 f"─────────────────\n"
                 f"{eq_cmds}"
                 f"done #{wo_ref} - Submit inspection"

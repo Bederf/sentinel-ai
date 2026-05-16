@@ -1298,6 +1298,25 @@ async def update_site_phase(site_id: str, request: PhaseUpdateRequest) -> PhaseU
         if not log_response.data:
             raise HTTPException(status_code=500, detail=f"Audit trail failed: could not record phase transition for {site_id}")
 
+        # Sync optimization_settings to match the new phase
+        phase_mode_map = {
+            "commissioning": "monitor",
+            "shadow_live": "monitor",
+            "advisory": "advisory",
+            "supervised": "supervised",
+            "automatic": "automatic",
+        }
+        new_mode = phase_mode_map.get(requested, "monitor")
+        try:
+            current_opt = client.table("sites").select("optimization_settings").eq("code", site_id).limit(1).execute()
+            opt = dict(current_opt.data[0].get("optimization_settings", {})) if current_opt.data else {}
+            opt["mode"] = new_mode
+            opt["control_tier"] = new_mode
+            client.table("sites").update({"optimization_settings": opt}).eq("code", site_id).execute()
+            logger.info(f"Optimization settings synced to '{new_mode}' for {site_id}")
+        except Exception as opt_err:
+            logger.warning(f"Failed to sync optimization settings for {site_id}: {opt_err}")
+
     except Exception as e:
         logger.error(f"Phase update failed for {site_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e

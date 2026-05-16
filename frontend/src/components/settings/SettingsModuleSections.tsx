@@ -129,8 +129,8 @@ function BuildingSystemToggle({
         style={{
           background: controlActive ? "var(--color-sentinel-green)" : "var(--color-sentinel-bg-hover)",
           border: `1px solid ${controlActive ? "var(--color-sentinel-green)" : "var(--glass-border)"}`,
-          cursor: !canToggle ? "not-allowed" : "pointer",
-          opacity: !canToggle ? 0.6 : 1,
+          cursor: !canToggleControl ? "not-allowed" : "pointer",
+          opacity: !canToggleControl ? 0.6 : 1,
         }}
         aria-label={`Toggle ${card.label} control`}
         type="button"

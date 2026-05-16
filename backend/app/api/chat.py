@@ -3,8 +3,9 @@
 import contextlib
 import logging
 from collections.abc import AsyncGenerator
+from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from fastapi import Request as FastAPIRequest
 from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel, Field
@@ -395,6 +396,32 @@ async def _prefetch_doc_results(query: str) -> str | None:
         return None
 
 
+def _format_preference_summary(pref: Any) -> str:
+    """Format a UserPreference into a human-readable summary string."""
+    t = pref.preference_type
+    v = pref.preference_value or {}
+    if t == "setpoint":
+        zone = v.get("zone_id", "?")
+        parts = []
+        if v.get("min_temp") is not None:
+            parts.append(f"minimum {v['min_temp']}°C")
+        if v.get("max_temp") is not None:
+            parts.append(f"maximum {v['max_temp']}°C")
+        if v.get("unit"):
+            parts.append(f"({v['unit']})")
+        temps = ", ".join(parts)
+        if v.get("hours"):
+            return f"Zone {zone} {temps} during {v['hours']}"
+        return f"Zone {zone} {temps}"
+    if t == "priority":
+        return f"Priority: {v.get('priority', 'unknown').replace('_', ' ')}"
+    if t == "timing":
+        return f"Prefers adjustments {v.get('start_time', '?')}-{v.get('end_time', '?')}"
+    if t == "equipment":
+        return f"Equipment preference: {v.get('preference', 'unknown')}"
+    return f"{t}: {v}"
+
+
 async def generate_sse_stream(
     user_message: str,
     use_tools: bool = True,
@@ -404,6 +431,7 @@ async def generate_sse_stream(
     data_subject_id: str | None = None,
     include_system_docs: bool = False,
     conversation_id: str | None = None,
+    background_tasks: BackgroundTasks | None = None,
 ) -> AsyncGenerator[str, None]:
     """
     Generate SSE-formatted stream from Claude response.
@@ -440,6 +468,28 @@ async def generate_sse_stream(
             messages = prior + messages
         except Exception:
             pass  # Never fail chat due to storage errors
+
+    # Inject FM preferences from previous sessions as context
+    if site_id and user_email:
+        try:
+            from app.repositories.preference_repository import preference_repo
+            from datetime import datetime, timezone
+
+            prefs = await preference_repo.fetch_active_by_user(site_id, user_email)
+            if prefs:
+                pref_lines = ["## FM Preferences (from previous sessions):"]
+                now = datetime.now(tz=timezone.utc)
+                for p in prefs:
+                    days_ago = (now - p.created_at).days if p.created_at else 0
+                    summary = _format_preference_summary(p)
+                    pref_lines.append(
+                        f"- {summary} (confidence {p.confidence:.0%}, set {days_ago} days ago)"
+                    )
+                pref_context = "\n".join(pref_lines)
+                # Inject as a system message before the conversation history
+                messages.insert(0, {"role": "system", "content": pref_context})
+        except Exception:
+            pass  # Never fail chat due to preference lookup errors
 
     # Suggest enabling platform documentation when relevant
     if not include_system_docs and _is_platform_doc_query(user_message):
@@ -580,6 +630,18 @@ async def generate_sse_stream(
             with contextlib.suppress(Exception):
                 chat_context_repository.add_message(conversation_id, "assistant", assistant_text)
 
+        # Stage 03 Distillation: fire-and-forget preference extraction
+        if background_tasks is not None and assistant_text and site_id and user_email:
+            from app.services.preference_extractor import extract_preference_from_chat
+
+            background_tasks.add_task(
+                extract_preference_from_chat,
+                user_message=user_message,
+                assistant_response=assistant_text,
+                site_id=site_id,
+                user_id=user_email,
+            )
+
         # Send completion sentinel
         yield "data: [DONE]\n\n"
 
@@ -629,6 +691,7 @@ async def generate_static_sse(message: str) -> AsyncGenerator[str, None]:
 async def chat(
     request: FastAPIRequest,
     chat_request: ChatRequest,
+    background_tasks: BackgroundTasks,
     auth: AuthContext = Depends(require_role(1)),
     guarded_message: str = Depends(prompt_guard(field="message", source="direct")),
 ) -> StreamingResponse:
@@ -744,6 +807,7 @@ async def chat(
             data_subject_id=data_subject_id,
             include_system_docs=chat_request.include_system_docs,
             conversation_id=chat_request.conversation_id,
+            background_tasks=background_tasks,
         ),
         media_type="text/event-stream",
         headers={

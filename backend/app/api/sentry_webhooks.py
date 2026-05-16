@@ -1471,6 +1471,8 @@ async def sentry_call_log(
             "criticality": req.priority.upper(),
             "problem_description": req.description,
             "original_message": req.original_message,
+            "reported_by": req.reported_by,
+            "reporter_phone": req.reporter_phone,
             "create_service_record": False,
         }
         logger.info(f"Call-log invoking notify_technician with data={wo_notify_data}")
@@ -2325,4 +2327,98 @@ async def update_building_info(data: dict, x_sentry_secret: str | None = Header(
         return {"success": True, "data": result.data[0] if result.data else data}
     except Exception as e:
         logger.error(f"Failed to update building info: {e}")
+        return {"success": False, "error": str(e)}
+
+
+@router.get("/focus-room/status")
+async def focus_room_status(site_id: str = Query("site-002")):
+    """Get focus room active sessions and recent history."""
+    try:
+        from app.database.supabase_client import get_supabase_client
+        sb = get_supabase_client()
+        if not sb:
+            return {"error": "unavailable"}
+
+        active = sb.table("space_focus_room_sessions").select("*").is_("end_time", None).eq("site_id", site_id).execute()
+        recent = sb.table("space_focus_room_sessions").select("*").eq("site_id", site_id).not_.is_("end_time", None).order("end_time", desc=True).limit(20).execute()
+
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc)
+        nearing = []
+        for s in (active.data or []):
+            start = s.get("start_time")
+            if start:
+                start_dt = start if start.tzinfo else start.replace(tzinfo=timezone.utc)
+                elapsed_min = (now - start_dt).total_seconds() / 60
+                s["elapsed_minutes"] = round(elapsed_min, 1)
+                s["nearing_limit"] = elapsed_min >= 90
+
+        return {
+            "site_id": site_id,
+            "active_sessions": active.data or [],
+            "recent_sessions": recent.data or [],
+            "limit_minutes": 120,
+        }
+    except Exception as e:
+        logger.error(f"Focus room status failed: {e}")
+        return {"error": str(e)}
+
+
+@router.get("/rooms/available")
+async def available_rooms(
+    site_id: str = Query("site-002"),
+    date: str = Query(...),
+    start_time: str = Query(...),
+    end_time: str = Query(...),
+    capacity: int = Query(1),
+):
+    """List meeting rooms available for a given date/time slot."""
+    try:
+        from app.database.supabase_client import get_supabase_client
+        sb = get_supabase_client()
+        if not sb:
+            return {"error": "unavailable"}
+
+        rooms = sb.table("meeting_rooms").select("*").eq("site_id", site_id).neq("room_type", "focus").gte("capacity", capacity).execute()
+        all_rooms = rooms.data or []
+
+        bookings = sb.table("room_bookings").select("room_id,start_time,end_time").eq("site_id", site_id).eq("meeting_date", date).execute()
+
+        booked_room_ids = set()
+        for b in (bookings.data or []):
+            bs = b.get("start_time", "")
+            be = b.get("end_time", "")
+            if bs and be and start_time < be and end_time > bs:
+                booked_room_ids.add(b["room_id"])
+
+        available = [r for r in all_rooms if r.get("name") not in booked_room_ids]
+        return {"available": available, "total": len(available), "booked": len(booked_room_ids)}
+    except Exception as e:
+        logger.error(f"Room availability failed: {e}")
+        return {"error": str(e)}
+
+
+@router.post("/rooms/book")
+async def book_room(data: dict, x_sentry_secret: str | None = Header(None)):
+    """Book a meeting room."""
+    _require_sentry_secret(x_sentry_secret, endpoint_name="book_room")
+    try:
+        from app.database.supabase_client import get_supabase_client
+        sb = get_supabase_client()
+        if not sb:
+            return {"success": False, "error": "unavailable"}
+        result = sb.table("room_bookings").insert({
+            "room_id": data.get("room_name"),
+            "site_id": data.get("site_id", "site-002"),
+            "booker_name": data.get("booker_name", ""),
+            "booker_email": data.get("booker_email", ""),
+            "meeting_title": data.get("meeting_title", ""),
+            "meeting_date": data.get("date"),
+            "start_time": data.get("start_time"),
+            "end_time": data.get("end_time"),
+            "attendees": data.get("attendees", 1),
+        }).execute()
+        return {"success": True, "booking_id": str(result.data[0]["id"])} if result.data else {"success": False}
+    except Exception as e:
+        logger.error(f"Room booking failed: {e}")
         return {"success": False, "error": str(e)}

@@ -19,7 +19,7 @@ Update here when upgrading models.
 from typing import Any
 
 # Task classes — valid values for model_gateway.call(task_class=...)
-VALID_TASK_CLASSES = frozenset({"heavy", "medium", "light", "chat_ai", "chat_tech"})
+VALID_TASK_CLASSES = frozenset({"heavy", "medium", "light", "chat_ai", "chat_tech", "extraction"})
 
 ROUTING_PROFILES: dict[str, dict[str, Any]] = {
     "api_prod": {
@@ -48,6 +48,13 @@ ROUTING_PROFILES: dict[str, dict[str, Any]] = {
             "chat_tech": [
                 {"provider": "anthropic", "model": "claude-sonnet-4-6"},
                 {"provider": "minimax", "model": "MiniMax-M2.7"},
+            ],
+            # extraction: lightweight JSON classification (preferences, summarization). Routes to Haiku by default.
+            # Separately routed to enable future edge deployment — swapping to local SmolLM2 on Jetson
+            # requires only this file change, not extraction service code changes.
+            "extraction": [
+                {"provider": "anthropic", "model": "claude-haiku-4-20250507"},
+                {"provider": "minimax", "model": "MiniMax-M2.5"},  # fallback if Haiku unavailable
             ],
         },
     },
@@ -78,6 +85,10 @@ ROUTING_PROFILES: dict[str, dict[str, Any]] = {
                 {"provider": "anthropic", "model": "claude-sonnet-4-6"},
                 {"provider": "minimax", "model": "MiniMax-M2.7"},
             ],
+            "extraction": [
+                {"provider": "anthropic", "model": "claude-haiku-4-20250507"},
+                {"provider": "minimax", "model": "MiniMax-M2.5"},
+            ],
         },
     },
     "local_full": {
@@ -99,6 +110,9 @@ ROUTING_PROFILES: dict[str, dict[str, Any]] = {
             "chat_tech": [
                 {"provider": "ollama", "model": "deepseek-r1:14b"},
             ],
+            "extraction": [
+                {"provider": "ollama", "model": "qwen2.5:7b-instruct"},
+            ],
         },
     },
     "idna": {
@@ -119,6 +133,9 @@ ROUTING_PROFILES: dict[str, dict[str, Any]] = {
             ],
             "chat_tech": [
                 {"provider": "azure_openai", "model": "gpt-4o"},
+            ],
+            "extraction": [
+                {"provider": "azure_openai", "model": "gpt-4o-mini"},
             ],
         },
     },

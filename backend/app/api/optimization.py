@@ -1337,39 +1337,35 @@ async def get_optimization_status(site_id: str, request: Request) -> dict[str, A
         Site optimization status with history
     """
     try:
-        site_repo = SiteRepository()
-        site = site_repo.get_by_id(site_id)
+        from app.database.supabase_client import get_supabase_client
 
-        if not site:
+        client = get_supabase_client()
+        site_row = client.table("sites").select("*").eq("code", site_id).limit(1).execute()
+        if not site_row.data:
             raise HTTPException(status_code=404, detail=f"Site {site_id} not found")
 
-        # Calculate monthly savings from history (handle None)
+        site = site_row.data[0]
+        onboarding_phase = site.get("onboarding_phase", "commissioning")
+        raw_settings = site.get("optimization_settings") or {}
+        optimization_enabled = site.get("optimization_enabled") or False
+
+        # Calculate monthly savings from history
         history = site.get("optimization_history") or []
         savings_summary = calculate_monthly_savings(history)
 
-        # Fetch onboarding phase from Supabase — this is the master policy gate
-        try:
-            from app.database.supabase_client import get_supabase_client
-            client = get_supabase_client()
-            phase_row = client.table("sites").select("onboarding_phase").eq("code", site_id).limit(1).execute()
-            onboarding_phase = phase_row.data[0].get("onboarding_phase", "commissioning") if phase_row.data else "commissioning"
-        except Exception:
-            onboarding_phase = site.get("onboarding_phase", "commissioning")
-
-        # Build optimization_settings response with canonical fields
-        raw_settings = site.get("optimization_settings") or {}
+        # Build optimization_settings response
         normalized_settings = {
-            "mode": raw_settings.get("control_tier") or "supervised",
-            "active_profile": raw_settings.get("active_profile", "balanced"),
-            "control_tier": raw_settings.get("control_tier", "supervised"),
+            "mode": raw_settings.get("mode") or raw_settings.get("control_tier", "advisory"),
+            "active_profile": raw_settings.get("active_profile", "asset_preservation"),
+            "control_tier": raw_settings.get("control_tier") or raw_settings.get("mode", "advisory"),
             "last_analysis": raw_settings.get("last_analysis"),
             "analysis_interval_minutes": raw_settings.get("analysis_interval_minutes", 15),
         }
 
-        # Derive a meaningful optimization_status from actual state
+        # Derive optimization_status from actual state
         last_recommendation = site.get("last_recommendation")
         last_optimization = site.get("last_optimization")
-        if not site.get("optimization_enabled"):
+        if not optimization_enabled:
             derived_status = "disabled"
         elif last_recommendation and last_recommendation.get("status") == "pending":
             derived_status = "recommendation_pending"
@@ -1382,15 +1378,15 @@ async def get_optimization_status(site_id: str, request: Request) -> dict[str, A
         else:
             derived_status = "active"
 
-        # Extract routing info from last recommendation (Phase 82-04)
+        # Extract routing info from last recommendation
         routing_summary = last_recommendation.get("routing_summary") if last_recommendation else None
         control_tier = last_recommendation.get("control_tier") if last_recommendation else None
 
-        status = {
-            "site_id": site.get("id"),
+        return {
+            "site_id": site.get("code"),
             "site_name": site.get("name"),
             "onboarding_phase": onboarding_phase,
-            "optimization_enabled": site.get("optimization_enabled") or False,
+            "optimization_enabled": optimization_enabled,
             "optimization_status": derived_status,
             "active_profile": raw_settings.get("active_profile", "balanced"),
             "optimization_settings": normalized_settings,
@@ -1402,8 +1398,6 @@ async def get_optimization_status(site_id: str, request: Request) -> dict[str, A
             "routing_summary": routing_summary,
             "control_tier": control_tier,
         }
-
-        return status
 
     except HTTPException:
         raise

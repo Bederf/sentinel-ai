@@ -379,3 +379,24 @@ When adding new documentation:
 - [CLAUDE.md](../CLAUDE.md) - Claude Code project instructions
 - [README_MCP_INTEGRATION.md](../backend/README_MCP_INTEGRATION.md) - MCP server guide
 - [NAMING_CONVENTIONS.md](02-architecture/NAMING_CONVENTIONS.md) - Device naming
+
+---
+
+## Changelog
+
+### 2026-05-15 — Phase 202
+
+| Change | Files |
+|--------|-------|
+| **IPMVP data pipeline** | `migrations/20260514_003_ipmvp_tables.sql`, `site002_fetcher.py` (+persist), `background_scheduler.py` (+ipmvp job) |
+| **Supabase source of truth** | `site_mode_policy_service.py` (+`_sync_state_from_supabase`) |
+| **Site mode settings** | `OnboardingPhaseSettings.tsx` (hold-to-confirm, password gate), `SettingsPageView.tsx` (moved to top) |
+| **Commissioning scorecards** | `migrations/20260514_001_commissioning_scorecards.sql`, `commissioning_service.py` (+`_persist_scorecard`) |
+| **Recommendations Telegram** | `background_scheduler.py` (`_notify_recommendation_alert` → all recs, certified ack) |
+| **Telegram feedback loop** | `notification_service.py` (`handle_acknowledgement` → decision memory) |
+| **Recommendations API** | `modules.py` (`get_recommendations` — both S002/site-002) |
+| **Missing DB columns** | `migrations/20260514_002_restore_missing_columns.sql` (predictions + ml_models) |
+| **DB schema fixes** | `ALTER TABLE` added `updated_at` to predictions, `approved_at`/`executed_at` to recommendations |
+| **Code fixes** | `audit_logger.py` (import), `monitoring_service.py` (tzinfo guard), `debug.py` (await poll) |
+| **Google Calendar removed** | Deleted service, API, sentry tools, env vars |
+| **Health check** | `health-check.sh` (trend data → info, not warning) |

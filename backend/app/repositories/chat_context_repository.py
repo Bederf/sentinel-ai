@@ -1,9 +1,11 @@
 """Chat context repository — stores conversation history for AI contextual memory."""
 
+from datetime import datetime, timezone
+
 from app.database.supabase_client import get_supabase_client
 
-# Cap: keep last N exchange pairs per conversation (user + assistant = 1 pair)
-MAX_CHAT_HISTORY_PAIRS = 4
+# No cap — keep full conversation history per session
+MAX_CHAT_HISTORY_PAIRS = 999999
 
 
 class ChatContextRepository:

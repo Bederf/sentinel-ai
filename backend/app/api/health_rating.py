@@ -1,11 +1,12 @@
 """
 Health Rating API endpoints — Phase 109B-02
 
-Four endpoints for health assessment timeline:
+Five endpoints for health assessment timeline:
 1. GET /api/equipment/{equipment_id}/health-rating — current rating + breakdown
 2. GET /api/equipment/{equipment_id}/health-rating/history — timeline snapshots
 3. GET /api/sites/{site_id}/assets/health-summary — all assets with health fields
 4. POST /api/health-assessment/recompute — trigger recompute (202 accepted)
+5. POST /api/health/rescore/{site_id} — quick rescore for a single site
 
 HARD RULES:
 - Status ONLY from HealthThresholdService
@@ -349,4 +350,25 @@ async def recompute_health_assessment(request: RecomputeRequest) -> dict:
             "status": "completed",
             "result": result.model_dump(),
         },
+    )
+
+
+# ---------------------------------------------------------------------------
+# 5. POST /api/health/rescore/{site_id} — quick rescore alias
+# ---------------------------------------------------------------------------
+
+
+@router.post("/health/rescore/{site_id}", status_code=202)
+async def rescore_site_health(site_id: str) -> dict:
+    """Quick health rescore for all equipment at a site.
+
+    This is a convenience alias around the recompute endpoint.
+    Calls HealthSnapshotService.recompute(scope='site') and returns results.
+
+    Returns 202 Accepted with processed/failed counts.
+    """
+    from app.models.health_rating import RecomputeRequest
+
+    return await recompute_health_assessment(
+        RecomputeRequest(scope="site", site_id=site_id),
     )

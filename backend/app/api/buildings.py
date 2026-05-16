@@ -354,34 +354,14 @@ async def list_sites(current_user: dict | None = None) -> dict:
             info = building.to_dict()
             info["status"] = "active" if site_id in active_ids else "inactive"
 
-            # Derive site status from equipment health and active alerts
+            # Override site status with active alert severity if present
             try:
                 from app.database.supabase_client import get_supabase_client
 
                 client = get_supabase_client()
-
-                # Get equipment health scores for this site
                 site_row = client.table("sites").select("id").eq("code", site_id).limit(1).execute()
                 if site_row.data:
                     site_uuid = site_row.data[0]["id"]
-
-                    # Derive site status from equipment health scores
-                    from app.services.health_threshold_service import get_health_status
-
-                    equip = (
-                        client.table("equipment")
-                        .select("health_score")
-                        .eq("site_id", site_uuid)
-                        .execute()
-                    )
-                    if equip.data:
-                        statuses = {get_health_status(e.get("health_score") or 100) for e in equip.data}
-                        if "critical" in statuses:
-                            info["status"] = "critical"
-                        elif "warning" in statuses:
-                            info["status"] = "warning"
-
-                    # Override with alert severity if higher
                     alerts = (
                         client.table("alerts")
                         .select("severity")
@@ -398,7 +378,7 @@ async def list_sites(current_user: dict | None = None) -> dict:
                         )
                         if has_critical_alert:
                             info["status"] = "critical"
-                        elif has_warning_alert and info.get("status") != "critical":
+                        elif has_warning_alert:
                             info["status"] = "warning"
             except Exception:
                 pass

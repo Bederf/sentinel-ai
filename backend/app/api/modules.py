@@ -333,20 +333,47 @@ async def get_recommendations(
     """
     recommendations: list[RecommendationResponse] = []
 
-    # Normalise site_id (site-002 → S002 for recommendations table)
-    normalized = site_id
+    # Normalise site_id to match both formats (S002 and site-002)
+    alt_id = None
     if site_id.startswith("site-"):
         num = site_id.split("-")[1]
-        normalized = f"S{num}"
+        alt_id = f"S{num}"
+    elif site_id.startswith("S"):
+        alt_id = f"site-{site_id[1:].lower()}"
 
-    # Fetch from recommendations table
+    # Fetch from recommendations table — try both formats
     try:
         rec_repo = get_recommendation_repository()
-        recs = await rec_repo.get_by_status(
-            site_id=normalized,
-            status=RecommendationStatus.PENDING,
-            limit=limit,
-        )
+        recs = []
+        for sid in {site_id, alt_id}:
+            if not sid:
+                continue
+            try:
+                batch = await rec_repo.get_by_status(
+                    site_id=sid,
+                    status=RecommendationStatus.PENDING,
+                    limit=limit,
+                )
+                recs.extend(batch)
+            except Exception:
+                pass
+
+        # Also fetch ai_optimization recs specifically (they get buried by maintenance)
+        for sid in {site_id, alt_id}:
+            if not sid:
+                continue
+            try:
+                from app.database.supabase_client import get_supabase_client
+                client = get_supabase_client()
+                ai_batch = client.table("recommendations").select("*").eq("site_id", sid).eq("status", "pending").eq("action_type", "ai_optimization").order("timestamp", desc=True).limit(50).execute()
+                from app.models.recommendation import Recommendation
+                seen_ids = {r.id for r in recs}
+                for row in ai_batch.data or []:
+                    if row.get("id") not in seen_ids:
+                        recs.append(Recommendation.from_dict(row))
+                        seen_ids.add(row.get("id"))
+            except Exception:
+                pass
 
         for rec in recs:
             # Map risk_level → priority (AIRecommendationsPanel expects priority)

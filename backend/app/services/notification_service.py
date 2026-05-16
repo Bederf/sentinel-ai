@@ -489,7 +489,9 @@ class NotificationService:
         """Handle [✅ Acknowledged] button press from Telegram.
 
         Called by the Telegram gateway when FM taps the inline button.
-        Updates delivery log and cancels pending escalation.
+        1. Updates delivery log and cancels pending escalation.
+        2. Records acknowledgement in decision memory for learning loop.
+        3. Outcome verification (30-min telemetry check) runs via scheduled job.
         """
         parts = callback_data.split(":")
         if len(parts) < 2 or parts[0] != "ack":
@@ -504,6 +506,25 @@ class NotificationService:
                 acknowledged_by=acknowledged_by_telegram_id,
                 acknowledged_at=datetime.utcnow(),
             )
+
+            # Record acknowledgement in decision memory (learning loop)
+            if reference_id:
+                try:
+                    from app.services.decision_memory_service import get_decision_memory_service
+
+                    dm = get_decision_memory_service()
+                    await dm.record_decision(
+                        equipment_id=reference_id,
+                        action="telegram_acknowledgement",
+                        reason="Acknowledged via Telegram — operator confirmed action taken",
+                        outcome_record={
+                            "acknowledged_by": acknowledged_by_telegram_id,
+                            "notification_id": notification_id,
+                        },
+                    )
+                except Exception as dm_err:
+                    logger.warning(f"[CERTIFIED] Failed to record decision memory for {reference_id}: {dm_err}")
+
             logger.info(f"[CERTIFIED] Notification {notification_id} acknowledged by {acknowledged_by_telegram_id}")
             return {"success": True, "notification_id": notification_id, "reference_id": reference_id}
         except Exception as e:

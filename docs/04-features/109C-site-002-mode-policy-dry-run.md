@@ -173,6 +173,17 @@ Implementation:
 - Startup wiring: `backend/app/startup/events.py`
 - Phase transition API: `backend/app/api/sites.py` → `PATCH /api/sites/{site_id}/phase`
 
+## Authority model (Phase 202)
+
+- **Supabase `sites.onboarding_phase` is authoritative.** The PATCH endpoint and settings page write directly to Supabase.
+- **State file follows Supabase.** `SiteModePolicyService._sync_state_from_supabase()` reads the Supabase phase on every `evaluate_site()` and `get_gate_status()` call. If the state file diverges, it's overwritten to match Supabase.
+- **Settings page gated by password.** Site mode changes require admin password unlock (`POST /api/auth/verify-settings-password`). The dropdown uses a hold-to-confirm button (2-second hold) to prevent accidental changes.
+- **Mode change syncs optimization settings.** When `onboarding_phase` is updated, `optimization_settings.mode` and `optimization_settings.control_tier` are automatically set to match:
+  - `commissioning`/`shadow_live` → `monitor`
+  - `advisory` → `advisory`
+  - `supervised` → `supervised`
+  - `automatic` → `automatic`
+
 ## Decision outputs
 
 Evaluator returns one of:

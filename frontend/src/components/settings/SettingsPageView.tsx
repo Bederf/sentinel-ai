@@ -81,6 +81,14 @@ function SettingsSections({
 }: SettingsPageViewProps) {
   return (
     <div className="space-y-6 max-w-4xl">
+      <OnboardingPhaseSettings
+        selectedSiteId={controller.selectedSiteId ?? undefined}
+        sites={controller.buildings}
+        currentUserRole={controller.currentUserRole}
+        readOnly={controller.readOnly}
+        onError={onError}
+        onSuccess={controller.handleSuccess}
+      />
       <SystemHealthDashboard onError={onError} onNavigate={onNavigate} />
       <AiCostTracker onError={onError} siteId={controller.selectedSiteId ?? undefined} />
       <AiRuntimePolicySettings
@@ -122,14 +130,6 @@ function SettingsSections({
         onError={onError}
         onSuccess={controller.handleSuccess}
         readOnly={controller.readOnly}
-      />
-      <OnboardingPhaseSettings
-        selectedSiteId={controller.selectedSiteId ?? undefined}
-        sites={controller.buildings}
-        currentUserRole={controller.currentUserRole}
-        readOnly={controller.readOnly}
-        onError={onError}
-        onSuccess={controller.handleSuccess}
       />
       <SimbiotBridgeSettings
         siteId={controller.selectedSiteId ?? undefined}

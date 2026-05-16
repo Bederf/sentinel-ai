@@ -457,9 +457,12 @@ curl -sf -m 5 -o /dev/null http://localhost:55323 2>/dev/null \
 $QUIET || echo ""
 $QUIET || echo "=== Streaming WAL Replica ==="
 
-REPLICA_HOST="${REPLICA_HOST:-164.90.235.216}"
-REPLICA_PORT="${REPLICA_PORT:-55432}"
-REPLICA_CONN="postgresql://postgres:postgres@${REPLICA_HOST}:${REPLICA_PORT}/postgres"
+REPLICA_HOST="${REPLICA_HOST:-10.146.169.2}"
+REPLICA_PORT="${REPLICA_PORT:-55322}"
+# Replica is NAT'd behind WireGuard — it initiates outbound but we can't reach it directly.
+# The health check below is best-effort; failure is expected if the replica doesn't expose ports.
+REPLICA_CONN="postgresql://repluser:replic8r_secur3_pw@${REPLICA_HOST}:${REPLICA_PORT}/postgres"
+PRIMARY_CONN="postgresql://postgres:postgres@127.0.0.1:55322/postgres"
 
 if nc -z -w5 "$REPLICA_HOST" "$REPLICA_PORT" 2>/dev/null; then
   check "Replica port :${REPLICA_PORT}" 0 "open"
@@ -511,7 +514,14 @@ if nc -z -w5 "$REPLICA_HOST" "$REPLICA_PORT" 2>/dev/null; then
     check "Replica WAL lag" 2 "psql not installed"
   fi
 else
-  check "Replica port :${REPLICA_PORT}" 1 "closed or unreachable"
+  # Replica is NAT'd behind WireGuard — initiates outbound, not reachable inbound.
+  # Check if the primary's replication slot shows it's connected.
+  slot_active=$(psql "${PRIMARY_CONN}" -t -A -c "SELECT count(*) FROM pg_replication_slots WHERE active AND slot_type='physical'" 2>/dev/null || echo "0")
+  if [[ "$slot_active" -gt 0 ]]; then
+    check "Replica (NAT'd)" 0 "connected via replication slot"
+  else
+    check "Replica (NAT'd)" 2 "no active replication slot — replica may be down"
+  fi
 fi
 
 # Summary

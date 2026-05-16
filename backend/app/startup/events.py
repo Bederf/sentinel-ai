@@ -335,7 +335,7 @@ async def startup_event(app: FastAPI) -> None:
     scheduler_service.add_prediction_generation_job(interval_seconds=300)  # 5 min
 
     # Start AI recommendation generation job (rule-based, sim-time gated)
-    scheduler_service.add_recommendation_generation_job(interval_seconds=600)  # 10 min real-time fallback
+    scheduler_service.add_recommendation_generation_job(interval_seconds=1800)  # 30 min
 
     # Recommendation lifecycle: expire stale + dedup duplicates (every 6h)
     scheduler_service.add_recommendation_expiry_job(interval_seconds=21600)  # 6h
@@ -346,6 +346,8 @@ async def startup_event(app: FastAPI) -> None:
     scheduler_service.add_recommendation_processing_job(interval_seconds=300)  # 5 min
 
     scheduler_service.add_ghost_room_monitor_job(interval_seconds=60)
+    if hasattr(scheduler_service, "add_focus_overstay_check_job"):
+        scheduler_service.add_focus_overstay_check_job(interval_seconds=120)  # Every 2 minutes
 
     # Phase 207 SLA monitoring — milestone timer (fires every 5 min)
     scheduler_service.add_milestone_timer_job(interval_seconds=300)
@@ -1003,10 +1005,10 @@ async def startup_event(app: FastAPI) -> None:
     # System health snapshot job (every 5 minutes)
     scheduler_service.add_health_snapshot_job(interval_seconds=300)
 
-    # Equipment health snapshot job (every 2 hours) — first run ~30s after registration
+    # Equipment health snapshot job (every 15 minutes) — first run ~30s after registration
     # (next_run_time=30s is set inside add_equipment_health_snapshot_job)
     try:
-        scheduler_service.add_equipment_health_snapshot_job(interval_hours=2)
+        scheduler_service.add_equipment_health_snapshot_job(interval_minutes=15)
         _logger.info("Equipment health snapshot job registered")
     except Exception as e:
         _logger.error(f"Equipment health snapshot job failed: {e}", exc_info=True)

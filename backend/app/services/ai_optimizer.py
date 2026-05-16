@@ -425,7 +425,14 @@ class AIOptimizerService:
             from app.services.quality_gate_evaluator import QualityGateEvaluator
 
             evaluator = QualityGateEvaluator()
-            mode = app_settings.resolved_ingestion_mode.value
+            # Use onboarding phase for quality gate mode (ingestion mode may differ)
+            try:
+                from app.database.supabase_client import get_supabase_client
+                client = get_supabase_client()
+                phase_row = client.table("sites").select("onboarding_phase").eq("code", site_id).limit(1).execute()
+                mode = phase_row.data[0].get("onboarding_phase", "shadow_live") if phase_row.data else "shadow_live"
+            except Exception:
+                mode = app_settings.resolved_ingestion_mode.value
             metrics = await evaluator.collect_metrics(site_id)
             result = evaluator.evaluate(mode, metrics)
 
@@ -865,11 +872,50 @@ class AIOptimizerService:
             except Exception as e:
                 logger.warning(f"Could not fetch equipment health: {e}")
 
+            # ── IPMVP baseline comparison ─────────────────────────────────
+            try:
+                sb = get_supabase_client()
+                site_resp = sb.table("sites").select("id").eq("code", site_id).execute()
+                if site_resp.data:
+                    site_uuid = site_resp.data[0]["id"]
+                    ipmvp = sb.table("ipmvp_energy").select("*").eq("site_id", site_id).order("timestamp", desc=True).limit(100).execute()
+                    if ipmvp.data and len(ipmvp.data) > 10:
+                        current_kwh = sum(r.get("import_kwh") or 0 for r in ipmvp.data[:96])
+                        conditions["ipmvp"] = {
+                            "current_kwh": round(current_kwh, 1),
+                            "records_available": len(ipmvp.data),
+                        }
+            except Exception:
+                pass
+
+            # ── Electrical aggregate from site telemetry ──────────────────
+            try:
+                from app.services.shadow_mode_polling import get_shadow_mode_polling_service
+                telemetry = getattr(get_shadow_mode_polling_service(), "get_telemetry_summary", None)
+                if telemetry:
+                    summary = telemetry(site_id)
+                    if summary:
+                        conditions["electrical"] = {
+                            "total_kw": summary.get("total_kw"),
+                            "hvac_kw": summary.get("hvac_kw"),
+                            "lighting_kw": summary.get("lighting_kw"),
+                            "solar_kw": summary.get("solar_kw"),
+                        }
+            except Exception:
+                pass
+
+            # ── Active modules ────────────────────────────────────────────
+            try:
+                mod_resp = sb.table("site_modules").select("module_type,status").eq("site_id", site_id).execute()
+                if mod_resp.data:
+                    conditions["active_modules"] = [m["module_type"] for m in mod_resp.data if m.get("status") == "active"]
+            except Exception:
+                conditions["active_modules"] = []
+
             return conditions
 
         except Exception as e:
             logger.error(f"Error gathering current conditions: {e}")
-            # Return default conditions
             return {
                 "indoor_temp": 22.0,
                 "outdoor_temp": 28.0,
@@ -1516,6 +1562,27 @@ Current TOU: R{current_rate:.2f}/kWh ({band.upper()})
 Prioritise actions that improve multiple dimensions simultaneously.
 """,
         }
+
+        # Append holistic reasoning instruction to all profiles
+        for key in intents:
+            intents[key] += """
+CRITICAL REASONING INSTRUCTION:
+Reason about this building as a single interconnected system.
+HVAC load affects energy cost and equipment wear. Occupancy affects both HVAC and lighting.
+BESS dispatch affects peak demand. Equipment health affects how hard other systems work.
+Weather forecast affects how long current conditions persist.
+
+Do NOT reason about equipment in isolation.
+Do NOT generate separate recommendations for each piece of equipment.
+
+Instead: assess the whole building state, identify the dominant
+condition driving inefficiency, and recommend a coordinated set of
+adjustments across all relevant systems that together achieve the
+profile goal.
+
+One building assessment. One coordinated recommendation.
+Multiple adjustments if needed — but unified by a single insight.
+"""
         return intents.get(profile, intents["balanced"])
 
     def _format_pattern_context(
@@ -1538,22 +1605,53 @@ Use these patterns to anticipate conditions, not just react to them.
 If a pattern suggests a zone will empty soon, recommend action now.
 """
 
-    def _format_constraints(self, site: dict[str, Any]) -> str:
-        """Layer 4 — What autonomous systems handle and safety limits."""
-        return """
-AUTONOMOUS SYSTEMS (already running — do not duplicate):
+    def _format_full_context(self, conditions: dict) -> str:
+        """Layer 2B — Full building telemetry context block."""
+        blocks = []
+        elec = conditions.get("electrical")
+        if elec:
+            blocks.append(f"""ELECTRICAL:
+Total site load: {elec.get('total_kw', '?')} kW
+HVAC load: {elec.get('hvac_kw', '?')} kW
+Lighting load: {elec.get('lighting_kw', '?')} kW
+Solar generating: {elec.get('solar_kw', '?')} kW""")
+        ipmvp = conditions.get("ipmvp")
+        if ipmvp:
+            blocks.append(f"""IPMVP BASELINE:
+Current consumption: {ipmvp.get('current_kwh', '?')} kWh (last 24h)
+Records available: {ipmvp.get('records_available', 0)}""")
+        return "\n\n".join(blocks) if blocks else "Extended telemetry not available."
+
+    def _format_constraints(self, site: dict[str, Any], conditions: dict | None = None) -> str:
+        """Layer 4 — Module permissions, autonomous systems, and safety limits."""
+        active_modules = (conditions or {}).get("active_modules", [])
+        perms = {
+            "hvac_control": "HVAC setpoints, AHU scheduling, FCU adjustments",
+            "energy_control": "Peak shaving, load shifting, demand management",
+            "lighting_control": "Lighting scenes, daylight harvesting schedules",
+            "solar_control": "BESS dispatch, solar optimisation, arbitrage",
+            "water_control": "Valve scheduling, pressure management",
+        }
+        allowed = [f"\u2705 {desc} ({mod} active)" for mod, desc in perms.items() if mod in active_modules]
+        blocked = [f"\u274c {desc} ({mod} not active)" for mod, desc in perms.items() if mod not in active_modules]
+
+        sections = ["ACTIVE CONTROL MODULES \u2014 what you can recommend:"]
+        sections.append("\n".join(allowed) if allowed else "No control modules active \u2014 advisory only")
+        if blocked:
+            sections.append(f"\nINACTIVE MODULES \u2014 do not recommend:\n" + "\n".join(blocked))
+
+        sections.append("""
+AUTONOMOUS SYSTEMS (already running \u2014 do not duplicate):
 - DALI/Tridonic: occupancy dimming, daylight harvesting
 - BESS solar arbitrage: TOU charge/discharge cycles
-- HVAC occupancy setback: +2°C when zone empty
-
-DO NOT recommend what these systems already handle.
-Recommend EARLIER or SMARTER action when patterns justify it.
+- HVAC occupancy setback: +2\u00b0C when zone empty
 
 SAFETY LIMITS:
-- Minimum zone temp (after hours): 18°C
-- Maximum setpoint relaxation: +3°C from comfort baseline
+- Minimum zone temp (after hours): 18\u00b0C
+- Maximum setpoint relaxation: +3\u00b0C from comfort baseline
 - Do not increase load on equipment with health score < 70%
-"""
+""")
+        return "\n".join(sections)
 
     def _format_task(
         self,
@@ -1571,68 +1669,42 @@ SAFETY LIMITS:
 Current time: {time_str} SAST ({period})
 Active profile: {profile.upper().replace("_", " ")}
 
-ANTICIPATORY CHECK:
-Look 60 minutes ahead. Based on the occupancy schedule and energy pricing:
-- Are any zones about to become occupied that need pre-conditioning?
-- Is a peak tariff window approaching that requires pre-cooling now?
-- Is a TOU transition coming that changes the optimal BESS/plant state?
-Recommend NOW if lead time is required — do not wait until conditions arrive.
-
-ADVISORY TASK:
-Based on the waste opportunities above and learned patterns,
-recommend specific actions the operator should take right now.
-
-For each recommendation:
-1. Name the exact equipment (ID)
-2. State what it is doing vs what it should be doing
-3. Reference the source (live telemetry / schedule / learned pattern)
-4. Recommend the specific action
-5. State the benefit in ZAR (cost_saving) or qualitative terms
-
-FORMAT each recommendation as:
+RESPONSE FORMAT:
 {{
-  "target_equipment": "S002-FCU-201",
-  "action": {{"point": "power_state", "value": "off"}},
-  "reason": "Zone-201 empty since 19:45 (18 min). FCU still running. No re-occupancy pattern after 19:30. Switch off.",
-  "benefit": "Saves ~0.3 kWh at R{current_rate:.2f}/kWh = R0.90",
-  "confidence": 0.87,
-  "source": "schedule + pattern"
+  "building_assessment": "One sentence describing the dominant building condition right now",
+  "recommendations": [
+    {{
+      "title": "Short description of the coordinated action",
+      "adjustments": [
+        {{
+          "equipment_id": "S002-FCU-L2-A",
+          "point": "cooling_setpoint",
+          "current_value": 22.0,
+          "recommended_value": 22.9,
+          "unit": "°C"
+        }}
+      ],
+      "reason": "Explanation grounded in live telemetry AND shadow-learned patterns. Must reference actual values — current temp, current tariff, observed pattern frequency.",
+      "affected_zones": ["Zone-201", "Zone-202"],
+      "profile_goal": "{profile}",
+      "saving": "R18.40 this afternoon",
+      "confidence": 0.84,
+      "confidence_basis": "23 similar observations during shadow phase"
+    }}
+  ],
+  "no_action_reasons": [],
+  "data_requests": []
 }}
 
-GROUPING RULE — Important:
-When the same condition affects multiple equipment items identically,
-generate ONE recommendation covering all affected equipment — not one
-per equipment item.
-
-Example of WRONG per-equipment output (7 identical recs):
-[
-  {{"target_equipment": "S002-FCU-L0-A", "action": {{"point": "cooling_setpoint", "value": 22.9}}, ...}},
-  {{"target_equipment": "S002-FCU-L1-A", "action": {{"point": "cooling_setpoint", "value": 22.9}}, ...}},
-  ...
-]
-
-Example of CORRECT grouped output (1 rec covering all zones):
-[
-  {{
-    "target_equipment": "S002-FCU-L0-A",
-    "affected_equipment": ["S002-FCU-L0-A", "S002-FCU-L1-A", "S002-FCU-L1-B", "S002-FCU-L2-C", "S002-FCU-L2-D"],
-    "action": {{"point": "cooling_setpoint", "value": 22.9}},
-    "reason": "Outdoor 28°C, all 5 FCU zones 22°C. Relax cooling 22→22.9°C, saves ~5%.",
-    "benefit": "~R8.50/day at current tariff",
-    "confidence": 0.82
-  }}
-]
-
-Use grouped recommendations when:
-- Same outdoor condition affects multiple zones
-- Same TOU tariff period applies to all affected equipment
-- Same occupancy pattern applies across equipment
-- Recommended action and values are identical per zone
-
-Only generate separate per-equipment recommendations when:
-- Conditions genuinely differ per zone (different indoor temps, different occupancy)
-- The recommended action differs per equipment
-- Equipment is in different risk categories
+RULES:
+- building_assessment is REQUIRED — always describe the whole building state
+- adjustments array can contain multiple equipment items — this is ONE coordinated recommendation
+- reason MUST reference actual telemetry values (temperatures, kW, tariff rate)
+- reason MUST reference shadow learning when available
+- If no adjustment needed — return empty recommendations with no_action_reasons explaining WHY
+- NEVER generate more than 3 recommendations per cycle — consolidate if you have more
+- NEVER generate a recommendation without specific adjustments
+- Each adjustment must have equipment_id, point, current_value, recommended_value
 
 If the building is already running optimally for {profile},
 state specifically why — reference actual values, not generic statements.
@@ -1722,17 +1794,23 @@ LAYER 2 — WASTE OPPORTUNITIES (pre-computed)
 =================================================================
 {waste_block if waste_block else "No waste opportunities detected at current conditions."}"""
 
+        # LAYER 2B — FULL BUILDING TELEMETRY
+        layer2b = f"""=================================================================
+LAYER 2B — FULL BUILDING TELEMETRY
+=================================================================
+{self._format_full_context(current_conditions)}"""
+
         # LAYER 3 — LEARNED PATTERNS
         layer3 = f"""=================================================================
 LAYER 3 — LEARNED PATTERNS
 =================================================================
 {self._format_pattern_context(decision_memory_text, now_sast)}"""
 
-        # LAYER 4 — CONSTRAINTS
+        # LAYER 4 — CONSTRAINTS & MODULE PERMISSIONS
         layer4 = f"""=================================================================
-LAYER 4 — CONSTRAINTS
+LAYER 4 — CONSTRAINTS & MODULE PERMISSIONS
 =================================================================
-{self._format_constraints(site)}"""
+{self._format_constraints(site, current_conditions)}"""
 
         # LAYER 5 — TASK
         layer5 = f"""=================================================================
@@ -1740,7 +1818,7 @@ LAYER 5 — TASK
 =================================================================
 {self._format_task(profile_name, now_sast, energy_prices)}"""
 
-        prompt_parts.extend([layer1, layer2, layer3, layer4, layer5])
+        prompt_parts.extend([layer1, layer2, layer2b, layer3, layer4, layer5])
 
         # ── DATA SECTIONS (unchanged — between LAYER 3 and LAYER 5) ───────
         # Building context
@@ -1945,10 +2023,25 @@ Provide ONLY the JSON response, no additional text."""
                     for reason in no_action_reasons[:5]:
                         logger.warning(f"[AI-OPT]   No action: {reason}")
 
-                # Normalise all recommendations to canonical format before storage
-                normalised_recommendations = [
-                    self._normalise_recommendation(r) for r in result.get("recommendations", [])
-                ]
+                # Parse holistic recommendation format (adjustments array)
+                building_assessment = result.get("building_assessment", "")
+                if building_assessment:
+                    logger.warning(f"[AI-OPT] Building assessment: {building_assessment}")
+
+                normalised_recommendations = self._parse_holistic_recommendations(
+                    result.get("recommendations", []), building_assessment
+                )
+
+                # Hard filter: remove DALI equipment from AI optimization recs
+                filtered = []
+                DALI_PREFIXES = ("S002-DALI", "SITE-002-DALI", "DALI")
+                for r in normalised_recommendations:
+                    eq = (r.get("target_equipment") or "").upper()
+                    if any(eq.startswith(p.upper()) for p in DALI_PREFIXES):
+                        logger.info(f"[AI-OPT] Filtered DALI recommendation for {eq}")
+                        continue
+                    filtered.append(r)
+                normalised_recommendations = filtered
 
                 return OptimizationRecommendation(
                     site_id=site_id,
@@ -2046,6 +2139,73 @@ Provide ONLY the JSON response, no additional text."""
             raw[-300:],
         )
         return clean
+
+    def _parse_holistic_recommendations(
+        self, recommendations: list[dict], building_assessment: str
+    ) -> list[dict]:
+        """Parse holistic recommendations with adjustments array into canonical format.
+
+        The new format uses an 'adjustments' array per recommendation:
+        {
+          "title": "...",
+          "adjustments": [{"equipment_id": "...", "point": "...", "recommended_value": ..., ...}],
+          "reason": "...",
+          "saving": "...",
+          "confidence": 0.84,
+          "confidence_basis": "..."
+        }
+
+        Parses into one canonical record per recommendation (primary equipment as target,
+        all adjustments in metadata).
+        """
+        import uuid
+
+        result = []
+        for rec in recommendations:
+            adjustments = rec.get("adjustments", [])
+            if not adjustments:
+                # Fallback: treat as flat recommendation format
+                result.append(self._normalise_recommendation(rec))
+                continue
+
+            title = rec.get("title", "")
+            reason = rec.get("reason", "")
+            confidence = rec.get("confidence", 0.0)
+            saving = rec.get("saving", "")
+            confidence_basis = rec.get("confidence_basis", "")
+            profile_goal = rec.get("profile_goal", "")
+
+            primary = adjustments[0]
+            eq_id = primary.get("equipment_id", "")
+            point = primary.get("point", "")
+            val = primary.get("recommended_value")
+
+            metadata = {
+                "group_id": str(uuid.uuid4()),
+                "group_recommendation": True,
+                "affected_equipment": [a.get("equipment_id") for a in adjustments],
+                "all_adjustments": adjustments,
+                "building_assessment": building_assessment,
+                "saving": saving,
+                "confidence_basis": confidence_basis,
+                "title": title,
+            }
+
+            canonical = {
+                "target_equipment": eq_id,
+                "action": {
+                    "point": point,
+                    "value": val,
+                    "current_value": primary.get("current_value"),
+                    "unit": primary.get("unit", ""),
+                },
+                "reason": reason,
+                "confidence": confidence,
+                "metadata": metadata,
+            }
+            result.append(canonical)
+
+        return result
 
     def _normalise_recommendation(self, raw: dict) -> dict:
         """
