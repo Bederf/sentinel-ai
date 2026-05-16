@@ -359,6 +359,13 @@ except: print('parse_err')
   bridge_telemetry=$(curl -sf -m 5 "$BRIDGE_BASE_URL/api/sites/site-002/telemetry" -H "Authorization: Bearer $BRIDGE_API_TOKEN" 2>/dev/null || echo "")
   if [[ -n "$bridge_telemetry" ]]; then
     policy_stage=$(echo "$bridge_telemetry" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('policy_stage','?'))" 2>/dev/null || echo "?")
+    # Fallback: query bridge policy endpoint directly (telemetry snapshot may lag behind state file)
+    if [[ "$policy_stage" == "?" || "$policy_stage" == "None" ]]; then
+      bridge_policy=$(curl -sf -m 5 "$BRIDGE_BASE_URL/api/sites/site-002/ipmvp/policy-state" -H "Authorization: Bearer $BRIDGE_TOKEN_SITE002" 2>/dev/null || echo "")
+      if [[ -n "$bridge_policy" ]]; then
+        policy_stage=$(echo "$bridge_policy" | python3 -c "import sys,json; print(json.load(sys.stdin).get('policy_stage','?'))" 2>/dev/null || echo "?")
+      fi
+    fi
     source_mode=$(echo "$bridge_telemetry" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('source_mode','?'))" 2>/dev/null || echo "?")
     if [[ "$policy_stage" == "commissioning" ]]; then
       check "Bridge policy_stage" 2 "commissioning (site still being onboarded)"

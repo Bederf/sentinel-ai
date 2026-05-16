@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -389,6 +390,24 @@ class SiteModePolicyService:
         if decision in ("would_promote", "would_fail_closed_demote", "would_demote"):
             from app.models.onboarding_phase import sync_site_phase_to_supabase
             await sync_site_phase_to_supabase(site_id, target_stage)
+
+            # Sync bridge policy stage when promotion happens
+            if decision == "would_promote":
+                try:
+                    import httpx
+                    bridge_url = f"http://10.99.0.1:8080/api/sites/{site_id}/ipmvp/policy-state"
+                    async with httpx.AsyncClient(timeout=10) as client:
+                        resp = await client.put(
+                            bridge_url,
+                            json={"policy_stage": target_stage},
+                            headers={"Authorization": f"Bearer {os.getenv('BRIDGE_API_TOKEN', '')}"},
+                        )
+                        if resp.is_success:
+                            logger.info("Bridge policy stage synced to %s for %s", target_stage, site_id)
+                        else:
+                            logger.warning("Bridge policy sync returned %s: %s", resp.status_code, resp.text[:200])
+                except Exception as e:
+                    logger.warning("Failed to sync bridge policy stage for %s: %s", site_id, e)
 
         return {
             "site_id": site_id,
