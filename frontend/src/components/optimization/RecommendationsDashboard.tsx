@@ -20,14 +20,13 @@ export const RecommendationsDashboard: React.FC<
   const [isAdvisory, setIsAdvisory] = useState(false)
 
   useEffect(() => {
-    // Fetch control tier
-    fetch(`/api/optimization/status/${siteId}`)
-      .then(r => r.json())
-      .then(d => {
+    // Fetch optimization status to determine control tier
+    import('@/lib/api').then(({ api }) => {
+      api.getOptimizationStatus(siteId).then((d: any) => {
         const mode = d?.optimization_settings?.mode || d?.optimization_status || '';
         setIsAdvisory(mode === 'advisory' || mode === 'shadow' || mode === 'monitor');
-      })
-      .catch(() => {});
+      }).catch(() => {});
+    }).catch(() => {});
   }, [siteId])
 
   useEffect(() => {
