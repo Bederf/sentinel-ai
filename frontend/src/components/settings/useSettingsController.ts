@@ -215,8 +215,8 @@ export function useSettingsController({ siteId, onError }: UseSettingsController
     setModuleSite(selectedSiteId, selectedSiteName);
     // Fetch site phase for control toggle gating
     import('@/lib/api').then(({ api }) =>
-      api.getSiteSettings?.(selectedSiteId).then((r: any) =>
-        setSitePhase(r.onboarding_phase || null)
+      api.getSiteMode(selectedSiteId).then((r: any) =>
+        setSitePhase((r as any).current_stage || null)
       ).catch(() => {})
     ).catch(() => {});
   }, [buildings, selectedSiteId, setModuleSite]);

@@ -166,7 +166,7 @@ function BuildingSystemsCard({ controller }: { controller: ReturnType<typeof use
                     card={card}
                     controlActive={controlActive}
                     loadingCard={loadingCard}
-                    onToggle={controller.toggleCard}
+                    onToggle={controller.handleFeatureToggle}
                     canToggleControl={canToggleControl}
                   />
                 </div>

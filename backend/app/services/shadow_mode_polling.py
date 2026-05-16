@@ -1181,6 +1181,36 @@ class ShadowModePollingService:
                     c = c[5:]
                 return c
 
+            def _letter_zone_to_numeric(code: str) -> str | None:
+                """Convert old letter-based or mixed zone codes to numeric standard.
+
+                L1-A → 101, L2-B → 202, L0-A → 001
+                B1-XXX → B01, R-XXX → R01
+                Returns None if the code doesn't match any known pattern.
+                """
+                import re
+                # L-pattern: FCU-L1-A → FCU-101, DALI-L2-B → DALI-202
+                m = re.match(r'^(.+)-L(\d)-([A-Z])$', code)
+                if m:
+                    prefix = m.group(1)
+                    floor = int(m.group(2))
+                    zone_num = ord(m.group(3)) - ord('A') + 1
+                    if 1 <= zone_num <= 5:
+                        zone_code = floor * 100 + zone_num
+                        return f"{prefix}-{zone_code:03d}"
+
+                # B1-pattern: CHILLER-B1-001 → CHILLER-B01, DALI-B1-CTRL → DALI-B01
+                m = re.match(r'^(.+)-B1-', code)
+                if m:
+                    return f"{m.group(1)}-B01"
+
+                # R-pattern: AHU-R-001 → AHU-R01, INV-R-001 → INV-R01
+                m = re.match(r'^(.+)-R-\d{3}$', code)
+                if m:
+                    return f"{m.group(1)}-R01"
+
+                return None
+
             db_norm_to_full: dict[str, str] = {}
             for dbc in db_full_codes:
                 db_norm_to_full.setdefault(_normalise(dbc), dbc)
@@ -1200,6 +1230,11 @@ class ShadowModePollingService:
                     bcode_norm = _normalise(bcode)
                     if bcode_norm in db_norm_to_full:
                         bridge_to_db[bcode] = db_norm_to_full[bcode_norm]
+                        continue
+                    # Try old format → new format: L1-A → 101 conversion
+                    converted = _letter_zone_to_numeric(bcode_norm)
+                    if converted and converted in db_norm_to_full:
+                        bridge_to_db[bcode] = db_norm_to_full[converted]
                         continue
                     # Try prefix match: bridge code as prefix of DB code
                     matched = None

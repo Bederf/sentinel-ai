@@ -870,6 +870,8 @@ function App() {
             <FleetInsights />
           ) : currentView === "digital-twin" ? (
             <div className="h-full"><DigitalTwin siteId={selectedSite?.id || siteId} /></div>
+          ) : currentView === "optimization" ? (
+            <OptimizationPage />
           ) : currentView === "compliance" ? (
             <CompliancePage />
           ) : (

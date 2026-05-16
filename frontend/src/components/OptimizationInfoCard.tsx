@@ -319,17 +319,7 @@ export function OptimizationInfoCard({
               className="text-lg font-semibold"
               style={{ color: "var(--color-sentinel-text-primary)" }}
             >
-              {mode === "automatic" ? "Auto" : mode === "auto_execute" ? "Auto" : mode === "monitor" ? "Monitor" : "Supervised"}
-            </div>
-            <div
-              className="text-xs"
-              style={{ color: "var(--color-sentinel-text-secondary)" }}
-            >
-              {mode === "automatic" || mode === "auto_execute"
-                ? "AI auto-applies"
-                : mode === "monitor"
-                  ? "View only"
-                  : "Human approval"}
+              {mode.charAt(0).toUpperCase() + mode.slice(1)}
             </div>
           </div>
 

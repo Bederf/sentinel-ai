@@ -5,6 +5,7 @@
  * Building tabs: All site-specific views, module-gated, shown inside SiteDetail
  */
 
+import { TrendingUp } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import {
   MessageSquare,
@@ -96,7 +97,7 @@ export const ADMIN_NAV_ITEMS: NavItem[] = [
  */
 export const ADDON_NAV_ITEMS: NavItem[] = [
   { id: "digital-twin", label: "Digital Twin", icon: Activity, description: "3D building visualization", category: "addon", requiredModule: "digital_twin" },
-  { id: "optimization", label: "AI Optimization", icon: TrendingUp, description: "Recommendations setpoint adjustments", category: "addon", requiredModule: "optimization" },
+  { id: "optimization", label: "AI Optimization", icon: TrendingUp, description: "Recommendations and setpoint adjustments", category: "addon" },
   { id: "financial",   label: "Financial",   icon: DollarSign,      description: "Contracts and billing",            category: "addon", requiredModule: "financial" },
   { id: "fleet-ml",   label: "Fleet ML",    icon: Brain,           description: "Cross-site analytics",             category: "addon", requiredModule: "fleet_ml" },
   { id: "compliance", label: "Compliance",  icon: ClipboardCheck,  description: "OHS, Fire, Electrical, Lift safety", category: "addon", requiredModule: "compliance" },

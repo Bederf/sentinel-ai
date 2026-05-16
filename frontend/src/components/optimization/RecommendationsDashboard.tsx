@@ -17,6 +17,18 @@ export const RecommendationsDashboard: React.FC<
   const [selectedRec, setSelectedRec] = useState<string | null>(null)
   const [rejectionReason, setRejectionReason] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [isAdvisory, setIsAdvisory] = useState(false)
+
+  useEffect(() => {
+    // Fetch control tier
+    fetch(`/api/optimization/status/${siteId}`)
+      .then(r => r.json())
+      .then(d => {
+        const mode = d?.optimization_settings?.mode || d?.optimization_status || '';
+        setIsAdvisory(mode === 'advisory' || mode === 'shadow' || mode === 'monitor');
+      })
+      .catch(() => {});
+  }, [siteId])
 
   useEffect(() => {
     loadRecommendations()
@@ -143,21 +155,21 @@ export const RecommendationsDashboard: React.FC<
                 className="text-base font-semibold"
                 style={{ color: "var(--color-sentinel-text-primary)" }}
               >
-                {rec.action_type}
+                {rec.recommendation_type?.replace(/_/g, " ") || "Recommendation"}
               </h3>
               <p
                 className="text-sm"
                 style={{ color: "var(--color-sentinel-text-secondary)" }}
               >
-                Target: {rec.target_equipment}
+                {rec.title?.split(":")[0]?.trim() || rec.title || "--"}
               </p>
             </div>
             <div className="flex gap-2">
               <span
                 className="px-3 py-1 rounded text-sm font-medium"
-                style={getRiskBadgeStyles(rec.risk_level)}
+                style={getRiskBadgeStyles(rec.priority || "low")}
               >
-                {rec.risk_level}
+                {rec.priority || "low"}
               </span>
               <span
                 className="px-3 py-1 rounded text-sm font-medium"
@@ -166,7 +178,7 @@ export const RecommendationsDashboard: React.FC<
                   color: "var(--color-sentinel-blue)",
                 }}
               >
-                Score: {typeof rec.multi_objective_score === 'number' ? rec.multi_objective_score.toFixed(2) : '--'}
+                Score: {typeof rec.confidence === 'number' ? (rec.confidence * 100).toFixed(0) + '%' : '--'}
               </span>
             </div>
           </div>
@@ -177,13 +189,13 @@ export const RecommendationsDashboard: React.FC<
               className="font-semibold text-xs uppercase tracking-wider mb-1"
               style={{ color: "var(--color-sentinel-text-secondary)" }}
             >
-              Reason
+              Details
             </h4>
             <p
               className="text-sm"
               style={{ color: "var(--color-sentinel-text-primary)" }}
             >
-              {rec.reason}
+              {rec.description || rec.title || "--"}
             </p>
           </div>
 
@@ -249,6 +261,18 @@ export const RecommendationsDashboard: React.FC<
           </div>
 
           {/* Actions */}
+          {isAdvisory ? (
+            <div
+              className="p-3 rounded text-center text-sm"
+              style={{
+                background: "rgba(245, 158, 11, 0.1)",
+                border: "1px solid rgba(245, 158, 11, 0.3)",
+                color: "var(--color-sentinel-amber)",
+              }}
+            >
+              Review and apply manually in BMS
+            </div>
+          ) : (
           <div className="flex gap-3">
             <button
               onClick={() => handleApprove(rec.id)}
@@ -271,6 +295,7 @@ export const RecommendationsDashboard: React.FC<
               Reject
             </button>
           </div>
+          )}
 
           {/* Rejection Modal */}
           {selectedRec === rec.id && (

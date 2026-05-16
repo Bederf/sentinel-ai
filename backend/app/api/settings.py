@@ -472,6 +472,21 @@ async def set_site_mode(
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail=f"No mode policy found for {site_id}")
 
+    current_stage = state.get("current_stage", "commissioning")
+
+    # Evaluate promotion gates — don't allow write if gates fail
+    eval_result = await svc.evaluate_site(site_id)
+    decision = eval_result.get("decision", "hold")
+    reasons = eval_result.get("reasons", [])
+
+    if decision == "hold" and canonical_stage != current_stage:
+        gate_target = canonical_stage
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot promote to '{gate_target}'. "
+                   f"Current: {current_stage}. Promotion gates not met: {'; '.join(reasons)}",
+        )
+
     state["current_stage"] = canonical_stage
     state["candidate_stage"] = None
     state["candidate_since"] = None
@@ -479,6 +494,20 @@ async def set_site_mode(
     state["violation_since"] = None
     state["last_evaluated_at"] = datetime.now(timezone.utc).isoformat()
     svc._save_state(site_id, state)
+
+    # Audit phase transition in phase_transition_log
+    try:
+        supabase = get_supabase_client()
+        supabase.table("phase_transition_log").insert({
+            "site_id": site_id,
+            "from_phase": state.get("current_stage", "unknown"),
+            "to_phase": canonical_stage,
+            "changed_by": auth.user_id or "system",
+            "reason": f"Manual phase change via settings API: {canonical_stage}",
+            "created_at": datetime.utcnow().isoformat(),
+        }).execute()
+    except Exception as e:
+        logger.warning("Failed to log phase transition for %s: %s", site_id, e)
 
     # Also persist to onboarding_phase_state.json so get_sites_from_supabase picks it up
     _save_phase_state_for_site(site_id, canonical_stage)
