@@ -1,22 +1,24 @@
 ---
+
 title: "Dashboard Fixes & South African English Setup"
 type: "guide"
 status: "draft"
-version: "1.0.0"
+version: "1.1.0"
 created: "2026-03-31"
-updated: "2026-03-31"
+updated: "2026-05-17"
 tags: ["sentinel", "documentation"]
 related: []
 domain: "bms"
 audience: "all"
 complexity: "intermediate"
-estimated_read_time: 10
+estimated_read_time: 12
 ---
 
 # Dashboard Fixes & South African English Setup
 
 **Phase:** 085 | **Date:** 2026-02-15 | **Status:** ✅ DEPLOYED
 
+**Updated:** 2026-05-17 with optimization status labels, energy intensity badge, and data freshness indicators.
 ---
 
 ## Issue 1: Empty Dashboard - Cards Not Showing
@@ -173,12 +175,17 @@ When production modules are available:
 
 ## Deployment Checklist
 
-- ✅ Frontend build: Successful (27.88s)
+- ✅ Frontend build: Successful (31.75s)
 - ✅ Module checks: Updated
 - ✅ Locale utilities: Created
 - ✅ Dashboard: Shows all cards
 - ✅ Customize feature: Working
 - ✅ South African formatting: Active
+- ✅ SiteCard optimization labels: 7 state mappings
+- ✅ Energy intensity badge: Annual calculation with SA benchmarks
+- ✅ Data freshness timestamp: Relative time display
+- ✅ Conditional "All Sites" toggle: Hidden with single site
+- ✅ Site Protection badge: "All healthy" state
 
 ---
 
@@ -191,7 +198,138 @@ When production modules are available:
 
 ---
 
+## Issue 3: SiteCard Optimization Status Labels (2026-05-17)
+
+### Problem
+The `SiteCard` component showed a generic "Not optimized" label for all non-optimized states, which was ambiguous and operationally meaningless.
+
+### Solution
+Expanded state mapping to show specific, actionable labels:
+
+| Backend State | Previous Label | New Label | Color | Meaning |
+|--------------|----------------|-----------|-------|---------|
+| `optimized` | "Optimized" | "Optimised" | Green | Successfully optimized |
+| `optimizing` | "Optimizing" | "Optimising..." | Amber | Optimization in progress |
+| `recommendation_pending` | "Not optimized" | **"Action required"** | Amber | Pending recommendations need approval |
+| `learning` | "Not optimized" | **"Learning"** | Blue | Site in onboarding phase, building models |
+| `disabled` | "Not optimized" | **"Paused"** | Gray | Optimization deliberately disabled |
+| `error` | "Not optimized" | **"Attention needed"** | Red | Error state (connection, etc.) |
+| `active` | "Not optimized" | **"Monitoring"** | Green | Optimization on, watching for patterns |
+
+### Files Modified
+- `frontend/src/components/SiteCard.tsx` - `OptimizationStatus` component (lines 67-96)
+
+---
+
+## Issue 4: Energy Analytics Enhancements (2026-05-17)
+
+### Problem
+The Energy Analytics panel had three UX gaps:
+1. No data freshness indicator (stale data looked live)
+2. No energy efficiency context (kWh number without benchmark)
+3. "All Sites" dropdown visible with only 1 site (dead UI)
+
+### Solution
+
+#### 4.1 Data Freshness Timestamp
+Added relative time indicator showing when data was last updated:
+- "Just now" (< 1 min)
+- "2 min ago", "1 hour ago", etc.
+- Full timestamp on hover
+
+**Implementation:**
+```typescript
+const [energyLastUpdated, setEnergyLastUpdated] = useState<Date | null>(null);
+// Updated on every successful data fetch
+setEnergyLastUpdated(new Date());
+```
+
+#### 4.2 Energy Intensity Badge (kWh/m²)
+Calculates and displays annual energy intensity with SA benchmark classification:
+
+**Formula:**
+```typescript
+const annualKwh = dailyKwh * 365;
+const intensity = totalSqm > 0 ? (annualKwh / totalSqm) : 0;
+```
+
+**SA Office Benchmarks (Annual kWh/m²):**
+- **Efficient:** < 120 (Green Star SA aligned)
+- **Typical:** 120-170 (SANS 10400-XA aligned)
+- **High:** > 170
+
+**Example for Site-002:**
+- 823,970 kWh/year ÷ 9,000 m² = **91 kWh/m² · Efficient**
+
+#### 4.3 Conditional "All Sites" Toggle
+The site filter dropdown only renders when `buildingsList.length > 1`:
+
+```typescript
+{buildingsList.length > 1 && (
+  <select>...</select>
+)}
+```
+
+### Files Modified
+- `frontend/src/components/Dashboard.tsx`
+  - Added `energyLastUpdated` state (line 164)
+  - Added `formatTimeAgo()` helper (lines 321-335)
+  - Added `energyIntensity` useMemo calculation (lines 337-357)
+  - Updated Energy Analytics panel header with badge, conditional filter, and timestamp (lines 634-707)
+
+---
+
+## Issue 5: Site Protection Status Badge (2026-05-17)
+
+### Problem
+The "0 elevated" badge in gray looked like a data absence, not a positive signal.
+
+### Solution
+- **When warningSites > 0:** Amber badge with "{count} elevated"
+- **When warningSites = 0:** Green badge with **"All healthy"**
+
+**Implementation:**
+```typescript
+<span style={{
+  background: warningSites > 0
+    ? "rgba(245, 158, 11, 0.15)"
+    : "rgba(34, 197, 94, 0.15)",
+  color: warningSites > 0
+    ? "var(--color-sentinel-amber)"
+    : "var(--color-sentinel-green)",
+}}>
+  {warningSites > 0 ? `${warningSites} elevated` : "All healthy"}
+</span>
+```
+
+### Files Modified
+- `frontend/src/components/Dashboard.tsx` - Site Protection panel header (lines 537-538)
+
+---
+
+## Testing
+
+### Energy Intensity Calculation
+```typescript
+// Site-002 example
+totalKwh: 823,970 kWh/year
+totalSqm: 9,000 m²
+intensity: 823,970 ÷ 9,000 = 91.5 kWh/m²/year
+classification: 91.5 < 120 → "Efficient"
+```
+
+### Verify at Runtime
+1. Open Dashboard → Energy Analytics panel
+2. Confirm badge shows: "{intensity} kWh/m² · {classification}"
+3. Hover timestamp → verify full datetime shown
+4. With 1 site: confirm "All Sites" dropdown hidden
+5. Site Protection: confirm "All healthy" in green (when 0 warnings)
+
+---
+
 ## See Also
 - `frontend/src/lib/locale.ts` - Locale utilities implementation
+- `frontend/src/components/SiteCard.tsx` - Site card with optimization status
+- `frontend/src/components/Dashboard.tsx` - Main dashboard component
 - `14-south-africa-context/` - South African context documentation
 - `CLAUDE.md` - Dashboard architecture overview

@@ -766,6 +766,20 @@ GET /api/optimization/status/site-002
 }
 ```
 
+**UI Labels (SiteCard Component):**
+
+The `optimization_status` field is displayed in the Dashboard's SiteCard with user-friendly labels:
+
+| API Status | UI Label | Color | User Meaning |
+|------------|----------|-------|--------------|
+| `optimized` | "Optimised" | Green | Successfully optimized |
+| `optimizing` | "Optimising..." | Amber | Optimization in progress |
+| `recommendation_pending` | "Action required" | Amber | Pending recommendations need approval |
+| `learning` | "Learning" | Blue | Site in onboarding, building models |
+| `disabled` | "Paused" | Gray | Optimization deliberately disabled |
+| `error` | "Attention needed" | Red | Error state requiring investigation |
+| `active` | "Monitoring" | Green | Optimization on, watching for patterns |
+
 ---
 
 ## Configuration

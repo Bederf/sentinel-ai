@@ -135,6 +135,9 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 #### Sustainability & ESG
 - **[Sustainability & ESG Module](04-features/29-sentinel-sustainability.md)** - Carbon emissions (Scope 1/2/3), energy efficiency benchmarks, Green Star SA self-assessment, per-system breakdown, solar offset, ESG scoring, report export (Phase 29 + Phase 111)
 
+#### Regulatory Compliance
+- **[Compliance Module](04-features/compliance-module.md)** - OHS Act, Fire Safety (SANS 10400-T/1475), Legionella Risk Management with MARGINAL tier, Electrical Certificate of Compliance tracking, Lift Safety inspections, audit trails
+
 #### Contract Management
 - **[Contract Management Module](04-features/48-contract-management.md)** - Portfolio KPIs, SLA compliance tracking, budget variance analysis, profitability dashboard (Phase 48)
 - **[SLA Monitoring & Profitability](04-features/50-52-commercial-analytics.md)** - SLA compliance tracking, profitability dashboards, and risk-based pricing (Phases 50-52)
@@ -163,6 +166,8 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 - [HVAC Systems Guide](05-bms-concepts/hvac-systems.md) - Chiller, AHU, FCU, VAV with schematics (Technician/Operator reference)
 
 ### 🛡️ Safety & Compliance
+- [Compliance Module](04-features/compliance-module.md) - OHS Act, Fire Safety, Legionella Risk, Electrical CoC, Lift Safety with audit trails
+- [Compliance API](03-api-reference/compliance-api.md) - API reference for compliance endpoints
 - [Safety Interlocks Engine](06-safety-compliance/safety-interlocks-engine.md) - Safety validation
 - [Audit Logging](06-safety-compliance/audit-logging.md) - Device control, login, and decision pipeline audit trail
 - [AEGIS Phase 1 Entry Gate](06-safety-compliance/aegis-phase1-entry-gate.md) - Mandatory readiness and sign-off checklist before enabling BESS writes

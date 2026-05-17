@@ -83,6 +83,16 @@ Breakdown by scope and building system (HVAC, lighting, other).
 
 Energy and carbon intensity with SA office benchmarks.
 
+**Benchmarks Used:**
+
+| Rating | Annual (kWh/m²/yr) | Monthly (kWh/m²/mo) | Source |
+|--------|-------------------|---------------------|--------|
+| Efficient | 120 | 10.0 | Green Star 5-6★ office |
+| Typical | 170 | 14.2 | SANS 10400-XA compliant baseline |
+| Poor | 230 | 19.2 | Pre-2011 stock |
+
+**Note:** Monthly values are annual/12. See [EnergyChart Benchmark Calculation](../04-features/energy-chart-benchmark-calculation.md) for dashboard implementation details.
+
 ### GET /green-star
 
 Green Star SA self-assessment (9 categories, 118 max points).

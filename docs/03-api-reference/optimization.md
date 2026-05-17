@@ -2,15 +2,15 @@
 title: "Optimization API"
 type: "reference"
 status: "draft"
-version: "1.0.0"
+version: "1.1.0"
 created: "2026-03-31"
-updated: "2026-03-31"
+updated: "2026-05-17"
 tags: ["sentinel", "documentation"]
 related: []
 domain: "bms"
 audience: "all"
 complexity: "intermediate"
-estimated_read_time: 10
+estimated_read_time: 12
 ---
 
 # Optimization API
@@ -46,6 +46,37 @@ Optimization API endpoints for HVAC load shedding, AI optimization, profile mana
 ### Measurement & Verification (M&V)
 - GET /optimization/mv/summary/{site_id} — Get M&V verification stats (accuracy, outcomes, rollbacks)
 - POST /optimization/mv/verify — Trigger pending verifications (call periodically)
+
+## Optimization Status Values
+
+The `GET /optimization/status/{site_id}` endpoint returns an `optimization_status` field with the following values:
+
+| Status | Description | Frontend Label | Color |
+|--------|-------------|----------------|-------|
+| `optimized` | Successfully applied optimization | "Optimised" | Green |
+| `optimizing` | Optimization in progress | "Optimising..." | Amber |
+| `recommendation_pending` | Pending recommendations awaiting approval | "Action required" | Amber |
+| `learning` | Site in onboarding phase, building baseline models | "Learning" | Blue |
+| `disabled` | Optimization deliberately disabled | "Paused" | Gray |
+| `error` | Error state (connection, Modbus, etc.) | "Attention needed" | Red |
+| `active` | Optimization enabled, operational, waiting for patterns | "Monitoring" | Green |
+| `unknown` | Status cannot be determined | "Pending" | Gray |
+
+**Status Derivation Logic:**
+```python
+if not optimization_enabled:
+    status = "disabled"
+elif last_recommendation and last_recommendation.status == "pending":
+    status = "recommendation_pending"
+elif last_optimization:
+    status = "optimized"
+elif error_message:
+    status = "error"
+elif onboarding_phase in ("commissioning", "shadow_live"):
+    status = "learning"
+else:
+    status = "active"
+```
 
 ## Tier Routing (Phase 82)
 
@@ -143,6 +174,42 @@ The ML context is inserted as a dedicated section between "Current Conditions" a
 | **Base Load Index** | `off_hours_kWh / total_daily_kWh` | < 0.15 excellent, > 0.40 poor |
 | **CDD** | `Σ max(0, T_hour - 18°C) / 24` | SA base temp 18°C |
 | **Efficiency Score** | Weighted composite (0-100) | EUI 35%, BLI 25%, setpoint 25%, CDD 15% |
+
+## Dashboard KPI: Potential Savings
+
+The "Potential Savings" KPI displayed on the dashboard is calculated from ML failure predictions:
+
+### Formula
+
+```
+Potential Savings = Σ(prediction.financial_impact.potential_loss_zar)
+WHERE prediction.severity IN ('critical', 'warning')
+```
+
+### Methodology
+
+1. **ML Failure Predictions:** LSTM forecasting + autoencoder anomaly detection identify at-risk equipment
+2. **Financial Impact Calculation:** Each prediction includes `potential_loss_zar` comprising:
+   - Equipment replacement cost (if failure occurs)
+   - Downtime cost (business interruption)
+   - Energy penalty (inefficient operation until failure)
+3. **Aggregation:** Sum across all critical/warning severity predictions
+4. **Currency:** ZAR (South African Rand)
+
+### Example
+
+If 3 predictions exist:
+- Chiller bearing failure: R1,200,000 potential loss
+- AHU belt degradation: R450,000 potential loss  
+- Pump cavitation: R1,016,000 potential loss
+
+**Total Potential Savings: R2,666,000**
+
+### Client Conversation
+
+**Peter Marshall asks:** "How did you arrive at R2.6M?"
+
+**Response:** "That's the sum of potential losses from 3 ML-flagged equipment risks. It includes replacement costs, downtime estimates, and energy penalties. If SENTINEL's preventive recommendations are actioned — scheduling the chiller bearing inspection, replacing the AHU belt, clearing the pump intake — those losses are avoided. The number updates daily as new predictions arrive and existing ones are resolved."
 
 ### Response Changes
 
