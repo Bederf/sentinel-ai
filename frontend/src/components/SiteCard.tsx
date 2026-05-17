@@ -69,13 +69,31 @@ function OptimizationStatus({ siteId, enabled }: OptimizationStatusProps) {
       ? "var(--color-sentinel-green)"
       : status?.state === "optimizing"
       ? "var(--color-sentinel-amber)"
+      : status?.state === "recommendation_pending"
+      ? "var(--color-sentinel-amber)"
+      : status?.state === "learning"
+      ? "var(--color-sentinel-blue)"
+      : status?.state === "error"
+      ? "var(--color-sentinel-red)"
+      : status?.state === "active"
+      ? "var(--color-sentinel-green)"
       : "var(--color-sentinel-text-secondary)";
   const label =
     status?.state === "optimized"
-      ? "Optimized"
+      ? "Optimised"
       : status?.state === "optimizing"
-      ? "Optimizing"
-      : "Not optimized";
+      ? "Optimising..."
+      : status?.state === "recommendation_pending"
+      ? "Action required"
+      : status?.state === "learning"
+      ? "Learning"
+      : status?.state === "disabled"
+      ? "Paused"
+      : status?.state === "error"
+      ? "Attention needed"
+      : status?.state === "active"
+      ? "Monitoring"
+      : "Pending";
 
   return (
     <div className="flex items-center gap-1 text-xs" style={{ color }}>

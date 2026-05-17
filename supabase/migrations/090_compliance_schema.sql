@@ -181,7 +181,7 @@ CREATE TABLE IF NOT EXISTS legionella_risk_assessment (
     equipment_id UUID REFERENCES equipment(id),
 
     -- Risk classification
-    risk_level TEXT NOT NULL CHECK (risk_level IN ('low', 'medium', 'high')) DEFAULT 'medium',
+    risk_level TEXT NOT NULL CHECK (risk_level IN ('low', 'medium', 'marginal', 'high')) DEFAULT 'medium',
 
     -- Risk factors
     water_temperature FLOAT, -- Celsius

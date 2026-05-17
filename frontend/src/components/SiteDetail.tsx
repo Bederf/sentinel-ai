@@ -1006,33 +1006,35 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
           </div>
         </div>
 
-        <div
-          className="rounded-md p-4"
-          style={{
-            background: "var(--color-sentinel-bg-panel)",
-            border: "1px solid var(--color-sentinel-border)",
-          }}
-        >
-          <div className="flex items-center gap-3">
-            <div
-              className="p-2 rounded"
-              style={{
-                background: "rgba(245, 158, 11, 0.15)",
-                color: "var(--color-sentinel-amber)",
-              }}
-            >
-              <Mail className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                Email
-              </p>
-              <p className="text-sm font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>
-                {site.contact_email || "N/A"}
-              </p>
+        {site.contact_email && (
+          <div
+            className="rounded-md p-4"
+            style={{
+              background: "var(--color-sentinel-bg-panel)",
+              border: "1px solid var(--color-sentinel-border)",
+            }}
+          >
+            <div className="flex items-center gap-3">
+              <div
+                className="p-2 rounded"
+                style={{
+                  background: "rgba(245, 158, 11, 0.15)",
+                  color: "var(--color-sentinel-amber)",
+                }}
+              >
+                <Mail className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                  Email
+                </p>
+                <p className="text-sm font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                  {site.contact_email}
+                </p>
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* ═══════════════════════════════════════════════════════════

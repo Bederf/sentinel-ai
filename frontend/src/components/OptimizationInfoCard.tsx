@@ -292,7 +292,9 @@ export function OptimizationInfoCard({
             >
               {monthlySavings?.applied_recommendations
                 ? `${monthlySavings.applied_recommendations} optimizations`
-                : "No optimizations yet"}
+                : effectivePhase === "shadow_live" || effectivePhase === "advisory"
+                  ? "Advisory mode — pending phase promotion"
+                  : "No optimizations yet"}
             </div>
           </div>
 

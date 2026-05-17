@@ -34,6 +34,7 @@ class RiskLevel(StrEnum):
     CRITICAL = "critical"
     HIGH = "high"
     MEDIUM = "medium"
+    MARGINAL = "marginal"  # 50-55°C transitional zone per SABS Legionella guidance
     LOW = "low"
 
 

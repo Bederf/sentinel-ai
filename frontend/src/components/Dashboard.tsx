@@ -161,6 +161,7 @@ export function Dashboard({ onViewChange, autoSelectSiteId, defaultBuildingTab: 
   const [energyLoading, setEnergyLoading] = useState(false);
   const [energyFilterSiteId, setEnergyFilterSiteId] = useState<string | null>(null);
   const [selectedDays, setSelectedDays] = useState<TimePeriod>(30);
+  const [energyLastUpdated, setEnergyLastUpdated] = useState<Date | null>(null);
 
   // KPI card order (draggable)
   const [kpiOrder, setKpiOrder] = useState<KPICardId[]>([
@@ -246,6 +247,7 @@ export function Dashboard({ onViewChange, autoSelectSiteId, defaultBuildingTab: 
         const response = await api.getEnergy(energyFilterSiteId, selectedDays);
         if (response.data.length > 0) {
           setEnergyData(response.data);
+          setEnergyLastUpdated(new Date());
           return;
         }
 
@@ -268,6 +270,7 @@ export function Dashboard({ onViewChange, autoSelectSiteId, defaultBuildingTab: 
           const rawTelemetry = await rawTelemetryResp.json();
           const fallbackSeries = buildFallbackEnergySeries(preferredSite, selectedDays, rawTelemetry?.power);
           setEnergyData(fallbackSeries);
+          setEnergyLastUpdated(new Date());
         } else {
           setEnergyData([]);
         }
@@ -315,6 +318,43 @@ export function Dashboard({ onViewChange, autoSelectSiteId, defaultBuildingTab: 
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(amount);
+
+  // Format relative time for data freshness indicator
+  const formatTimeAgo = (date: Date | null): string => {
+    if (!date) return '';
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    if (diffMins < 1) return 'Just now';
+    if (diffMins === 1) return '1 min ago';
+    if (diffMins < 60) return `${diffMins} min ago`;
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours === 1) return '1 hour ago';
+    if (diffHours < 24) return `${diffHours} hours ago`;
+    return `${Math.floor(diffHours / 24)} days ago`;
+  };
+
+  // Calculate energy intensity (kWh/m²) for selected site or all sites
+  const energyIntensity = useMemo(() => {
+    if (!energyData.length) return null;
+    const totalKwh = energyData.reduce((sum, d) => sum + (d.total_kwh || 0), 0);
+    const days = energyData.length;
+    const dailyKwh = days > 0 ? totalKwh / days : 0;
+    // Get sqm from selected site or sum of all sites
+    let totalSqm = 0;
+    if (energyFilterSiteId) {
+      const site = buildingsList.find((s: Site) => s.id === energyFilterSiteId);
+      totalSqm = site?.sqm || 5000; // fallback
+    } else {
+      totalSqm = buildingsList.reduce((sum: number, s: Site) => sum + (s.sqm || 0), 0) || 5000;
+    }
+    const monthlyKwh = dailyKwh * 30;
+    const intensity = totalSqm > 0 ? (monthlyKwh / totalSqm) : 0;
+    // SA benchmarks: efficient < 120, typical < 170
+    const classification = intensity < 120 ? 'Efficient' : intensity < 170 ? 'Typical' : 'High';
+    const classificationColor = intensity < 120 ? 'var(--color-sentinel-green)' : intensity < 170 ? 'var(--color-sentinel-amber)' : 'var(--color-sentinel-red)';
+    return { intensity: Math.round(intensity), classification, classificationColor };
+  }, [energyData, energyFilterSiteId, buildingsList]);
 
   // Handle site card click - navigate to /buildings/:siteId URL
   const handleSiteClick = (site: Site) => {
@@ -386,14 +426,10 @@ export function Dashboard({ onViewChange, autoSelectSiteId, defaultBuildingTab: 
         title: "Active Risks",
         value: stats.active_alerts || 0,
         icon: <Bell className="h-5 w-5" />,
-        // Show critical count if any
-        delta: stats.critical_alerts > 0
-          ? -(stats.critical_alerts * 10)
-          : undefined,
+        // Always show severity breakdown — zero critical is a positive signal
+        delta: stats.critical_alerts > 0 ? -(stats.critical_alerts * 10) : 0,
         isInverseTrend: true,
-        deltaText: stats.critical_alerts > 0
-          ? `${stats.critical_alerts} critical`
-          : undefined,
+        deltaText: `${stats.critical_alerts || 0} Critical · ${(stats.active_alerts || 0) - (stats.critical_alerts || 0)} Warning`,
         accentColor: "orange" as const,
         tooltip: "AI-detected risks requiring attention. Critical risks need immediate action; warnings are monitored.",
       },
@@ -403,7 +439,7 @@ export function Dashboard({ onViewChange, autoSelectSiteId, defaultBuildingTab: 
         icon: <DollarSign className="h-5 w-5" />,
         subtitle: "If all preventive actions taken",
         accentColor: "green" as const,
-        tooltip: "Estimated savings if all AI-recommended preventive maintenance actions are completed.",
+        tooltip: "Sum of potential_loss_zar from all critical/warning predictions. Based on equipment replacement costs + downtime estimates + energy penalty calculations from ML failure prediction models.",
       },
       'kpi-risk-predictions': {
         title: "Risk Predictions",
@@ -493,12 +529,12 @@ export function Dashboard({ onViewChange, autoSelectSiteId, defaultBuildingTab: 
                   className="text-xs px-2 py-1 rounded"
                   style={{
                     background:
-                      warningSites > 0 ? "rgba(245, 158, 11, 0.15)" : "rgba(148, 163, 184, 0.15)",
+                      warningSites > 0 ? "rgba(245, 158, 11, 0.15)" : "rgba(34, 197, 94, 0.15)",
                     color:
-                      warningSites > 0 ? "var(--color-sentinel-amber)" : "var(--color-sentinel-text-secondary)",
+                      warningSites > 0 ? "var(--color-sentinel-amber)" : "var(--color-sentinel-green)",
                   }}
                 >
-                  {warningSites} elevated
+                  {warningSites > 0 ? `${warningSites} elevated` : "All healthy"}
                 </span>
                 {hiddenSites.length > 0 && (
                   <>
@@ -597,26 +633,49 @@ export function Dashboard({ onViewChange, autoSelectSiteId, defaultBuildingTab: 
               title: "Energy Analytics",
               actions: (
                 <div className="flex items-center gap-4">
-                  {/* Site Filter */}
-                  <select
-                    value={energyFilterSiteId || ""}
-                    onChange={(e) => setEnergyFilterSiteId(e.target.value || null)}
-                    className="text-sm rounded px-3 py-1.5"
-                    style={{
-                      background: "var(--color-sentinel-bg-secondary)",
-                      border: "1px solid var(--color-sentinel-border)",
-                      color: "var(--color-sentinel-text-primary)",
-                    }}
-                  >
-                    <option value="">All Sites</option>
-                    {/* eslint-disable-next-line @typescript-eslint/ban-ts-comment */}
-                    {/* @ts-ignore - JSX.Element vs Element type mismatch */}
-                    {buildingsList.map((site: Site, _index: number) => (
-                      <option key={site.id} value={site.id}>
-                        {site.name}
-                      </option>
-                    ))}
-                  </select>
+                  {/* Energy Intensity Badge */}
+                  {energyIntensity && (
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="text-sm font-medium"
+                        style={{ color: "var(--color-sentinel-text-primary)" }}
+                      >
+                        {energyIntensity.intensity} kWh/m²
+                      </span>
+                      <span
+                        className="text-xs px-2 py-0.5 rounded"
+                        style={{
+                          background: `${energyIntensity.classificationColor}20`,
+                          color: energyIntensity.classificationColor,
+                        }}
+                      >
+                        {energyIntensity.classification}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Site Filter - hidden when only 1 site */}
+                  {buildingsList.length > 1 && (
+                    <select
+                      value={energyFilterSiteId || ""}
+                      onChange={(e) => setEnergyFilterSiteId(e.target.value || null)}
+                      className="text-sm rounded px-3 py-1.5"
+                      style={{
+                        background: "var(--color-sentinel-bg-secondary)",
+                        border: "1px solid var(--color-sentinel-border)",
+                        color: "var(--color-sentinel-text-primary)",
+                      }}
+                    >
+                      <option value="">All Sites</option>
+                      {/* eslint-disable-next-line @typescript-eslint/ban-ts-comment */}
+                      {/* @ts-ignore - JSX.Element vs Element type mismatch */}
+                      {buildingsList.map((site: Site, _index: number) => (
+                        <option key={site.id} value={site.id}>
+                          {site.name}
+                        </option>
+                      ))}
+                    </select>
+                  )}
 
                   {/* Time Period Tabs */}
                   <div
@@ -643,6 +702,17 @@ export function Dashboard({ onViewChange, autoSelectSiteId, defaultBuildingTab: 
                       </button>
                     ))}
                   </div>
+
+                  {/* Data Freshness Timestamp */}
+                  {energyLastUpdated && (
+                    <span
+                      className="text-xs"
+                      style={{ color: "var(--color-sentinel-text-secondary)" }}
+                      title={energyLastUpdated.toLocaleString()}
+                    >
+                      {formatTimeAgo(energyLastUpdated)}
+                    </span>
+                  )}
                 </div>
               ),
               accentColor: "var(--color-sentinel-amber)",

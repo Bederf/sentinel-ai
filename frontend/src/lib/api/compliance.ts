@@ -12,13 +12,24 @@ import { fetchApi } from './client'
  * Compliance domain types
  */
 export type ComplianceType = 'OHS' | 'Fire' | 'Electrical' | 'Legionella' | 'LiftSafety' | 'EmergencyLight'
-export type RiskLevel = 'critical' | 'high' | 'medium' | 'low'
+export type RiskLevel = 'critical' | 'high' | 'medium' | 'marginal' | 'low'
 export type AuditStatus = 'draft' | 'submitted' | 'approved' | 'remediation_pending' | 'closed'
+
+/**
+ * Audit trail fields for compliance records
+ */
+export interface AuditTrail {
+  recorded_by?: string
+  recorded_by_email?: string
+  recorded_at: string
+  updated_by?: string
+  updated_at?: string
+}
 
 /**
  * OHS Compliance
  */
-export interface OHSChecklistTask {
+export interface OHSChecklistTask extends AuditTrail {
   id: string
   site_code: string
   zone_id: string
@@ -37,7 +48,7 @@ export interface OHSChecklistTask {
 /**
  * Fire Equipment
  */
-export interface FireEquipmentItem {
+export interface FireEquipmentItem extends AuditTrail {
   id: string
   site_code: string
   equipment_type: 'extinguisher' | 'hose_reel' | 'hydrant' | 'alarm' | 'detector'
@@ -53,7 +64,7 @@ export interface FireEquipmentItem {
 /**
  * Emergency Light Testing
  */
-export interface EmergencyLight {
+export interface EmergencyLight extends AuditTrail {
   light_code: string
   location: string
   battery_health_percent: number
@@ -66,7 +77,7 @@ export interface EmergencyLight {
 /**
  * Legionella Risk Assessment
  */
-export interface LegionellaAssessment {
+export interface LegionellaAssessment extends AuditTrail {
   id: string
   tower_code: string
   water_temperature: number
@@ -80,7 +91,7 @@ export interface LegionellaAssessment {
 /**
  * Electrical Compliance
  */
-export interface ElectricalCertificate {
+export interface ElectricalCertificate extends AuditTrail {
   id: string
   site_code: string
   certificate_type: 'CoC_new_installation' | 'CoC_alterations' | 'SABS_inspection'
@@ -94,7 +105,7 @@ export interface ElectricalCertificate {
 /**
  * Lift Inspection
  */
-export interface LiftInspection {
+export interface LiftInspection extends AuditTrail {
   id: string
   lift_code: string
   inspection_type: 'periodic_6monthly' | 'annual_insurance' | 'after_repair'

@@ -178,8 +178,20 @@ function heroHeadline(state: CockpitState) {
   if (isWaitingState(state)) return 'Awaiting building signal'
   const sys = systemLabel(state.systemFilter)
   const prefix = sys ? `${sys} · ` : ''
-  if (state.primaryMetric.value === 'Stable') return `${prefix}Site operating within comfort and energy bands`
-  return `${prefix}${state.activeCondition.summary}`
+  if (state.primaryMetric.value === 'Stable') return `${prefix}All systems nominal`
+  // Truncate long summaries at word boundary to prevent mobile clipping
+  const summary = state.activeCondition.summary
+  const maxLen = 40
+  if (summary.length > maxLen) {
+    // Find last space before maxLen
+    const lastSpace = summary.lastIndexOf(' ', maxLen)
+    // If no space found (single long word) or space is too early, hard truncate at maxLen
+    if (lastSpace === -1 || lastSpace < 10) {
+      return `${prefix}${summary.slice(0, maxLen - 1)}…`
+    }
+    return `${prefix}${summary.slice(0, lastSpace)}…`
+  }
+  return `${prefix}${summary}`
 }
 
 function heroSubheadline(state: CockpitState) {

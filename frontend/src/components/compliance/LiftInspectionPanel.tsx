@@ -22,6 +22,7 @@ interface TestFormData {
 
 export function LiftInspectionPanel({ siteCode: _siteCode }: LiftInspectionPanelProps) {
   const { mutate: recordTestResults, isPending } = useRecordLiftTestResults()
+  const [now] = useState(() => Date.now()) // Stable reference time for render purity
   const [showTestForm, setShowTestForm] = useState(false)
   const [testFormData, setTestFormData] = useState<TestFormData>({
     liftCode: '',
@@ -173,6 +174,7 @@ export function LiftInspectionPanel({ siteCode: _siteCode }: LiftInspectionPanel
               <th className="text-left py-2 font-medium" style={{ color: "var(--sentinel-text-secondary)" }}>Last Inspection</th>
               <th className="text-left py-2 font-medium" style={{ color: "var(--sentinel-text-secondary)" }}>Next Due</th>
               <th className="text-left py-2 font-medium" style={{ color: "var(--sentinel-text-secondary)" }}>Compliance</th>
+              <th className="text-left py-2 font-medium" style={{ color: "var(--sentinel-text-secondary)" }}>Recorded By</th>
             </tr>
           </thead>
           <tbody>
@@ -181,9 +183,9 @@ export function LiftInspectionPanel({ siteCode: _siteCode }: LiftInspectionPanel
                 <td className="py-2 font-medium">{lift.code}</td>
                 <td className="py-2">{lift.location}</td>
                 <td className="py-2 capitalize">{lift.type.replace(/_/g, ' ')}</td>
-                <td className="py-2">{new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toLocaleDateString()}</td>
+                <td className="py-2">{new Date(now - 30 * 24 * 60 * 60 * 1000).toLocaleDateString()}</td>
                 <td className="py-2">
-                  {new Date(Date.now() + (lift.type === 'periodic_6monthly' ? 180 : 365) * 24 * 60 * 60 * 1000).toLocaleDateString()}
+                  {new Date(now + (lift.type === 'periodic_6monthly' ? 180 : 365) * 24 * 60 * 60 * 1000).toLocaleDateString()}
                 </td>
                 <td className="py-2">
                   <span
@@ -192,6 +194,10 @@ export function LiftInspectionPanel({ siteCode: _siteCode }: LiftInspectionPanel
                   >
                     Compliant
                   </span>
+                </td>
+                <td className="py-2" style={{ color: "var(--sentinel-text-secondary)" }}>
+                  <span className="text-xs">System</span>
+                  <span className="block text-xs opacity-60">{new Date().toLocaleDateString()}</span>
                 </td>
               </tr>
             ))}

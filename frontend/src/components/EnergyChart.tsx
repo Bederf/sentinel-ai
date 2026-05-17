@@ -191,7 +191,7 @@ export function EnergyChart({
           </div>
         </div>
 
-        {/* Total metric */}
+        {/* Total metric with benchmark */}
         <div className="text-right">
           <div className="flex items-center gap-1">
             <TrendingUp
@@ -220,6 +220,47 @@ export function EnergyChart({
           >
             Total consumption
           </span>
+          {/* Energy efficiency benchmark for SA commercial office */}
+          {grandTotal > 0 && days > 0 && (
+            <div className="text-xs mt-1" style={{ color: "var(--color-grafana-text-secondary)" }}>
+              {(() => {
+                // SA commercial office benchmarks (kWh/m²/month)
+                // NOTE: Placeholder values pending GBCSA/SAPOA verified data
+                // - 4.2 kWh/m² ≈ Green Star 5-6★ office (high efficiency)
+                // - 6.2 kWh/m² ≈ SANS 10400 compliant baseline
+                // - 8.5 kWh/m² ≈ Pre-2011 stock (poor)
+                // TODO: Replace with site-specific benchmarks from sustainability_api
+                const BENCHMARK_EFFICIENT = 4.2
+                const BENCHMARK_TYPICAL = 6.2
+                const BENCHMARK_POOR = 8.5
+                
+                const areaSqm = 9000 // Default building size
+                const daysInMonth = 30
+                const monthlyKwh = (grandTotal / days) * daysInMonth
+                const kwhPerSqm = monthlyKwh / areaSqm
+                
+                let badge: string
+                let color: string
+                if (kwhPerSqm <= BENCHMARK_EFFICIENT) {
+                  badge = "Efficient"
+                  color = "var(--color-grafana-green)"
+                } else if (kwhPerSqm <= BENCHMARK_TYPICAL) {
+                  badge = "Typical"
+                  color = "var(--color-grafana-yellow)"
+                } else {
+                  badge = "Above avg"
+                  color = "var(--color-grafana-red)"
+                }
+                
+                return (
+                  <span>
+                    {kwhPerSqm.toFixed(1)} kWh/m² ·{" "}
+                    <span style={{ color }}>{badge}</span>
+                  </span>
+                )
+              })()}
+            </div>
+          )}
         </div>
       </div>
 

@@ -57,7 +57,7 @@ export function EmergencyLightPanel({ siteCode }: EmergencyLightPanelProps) {
         </div>
         <div className="rounded-lg p-4" style={{ background: "var(--sentinel-bg-panel)", border: "1px solid var(--sentinel-border)" }}>
           <h3 className="text-sm font-medium" style={{ color: "var(--sentinel-text-primary)" }}>Auto-Test Schedule</h3>
-          <div className="text-sm mt-2" style={{ color: "var(--sentinel-text-secondary)" }}>Daily: 01:00-01:30 UTC</div>
+          <div className="text-sm mt-2" style={{ color: "var(--sentinel-text-secondary)" }}>Daily: 03:00-03:30 SAST (01:00-01:30 UTC)</div>
         </div>
       </div>
 
@@ -80,7 +80,7 @@ export function EmergencyLightPanel({ siteCode }: EmergencyLightPanelProps) {
             <tbody>
               <tr className="border-b" style={{ borderColor: "var(--sentinel-border)" }}>
                 <td colSpan={6} className="py-4 text-center" style={{ color: "var(--sentinel-text-disabled)" }}>
-                  No emergency lights configured. Emergency lights are automatically tested daily between 01:00-01:30 UTC.
+                  No emergency lights configured. Emergency lights are automatically tested daily between 03:00-03:30 SAST (01:00-01:30 UTC).
                 </td>
               </tr>
             </tbody>
@@ -101,7 +101,7 @@ export function EmergencyLightPanel({ siteCode }: EmergencyLightPanelProps) {
         <div className="text-xs mt-2" style={{ color: "var(--sentinel-text-secondary)" }}>
           <ul className="list-disc list-inside mt-2 space-y-1">
             <li>75% battery health: Alert (3-hour runtime minimum)</li>
-            <li>Daily auto-tests run 01:00-01:30 UTC per IEC 62034</li>
+            <li>Daily auto-tests run 03:00-03:30 SAST (01:00-01:30 UTC) per IEC 62034</li>
             <li>Trend tracking shows degradation over 90 days</li>
           </ul>
         </div>

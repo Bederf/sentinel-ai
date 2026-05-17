@@ -15,7 +15,9 @@ interface OHSPanelProps {
 export function OHSPanel({ siteCode }: OHSPanelProps) {
   const { mutate: generateChecklist, isPending } = useGenerateOhsChecklist()
 
+  // Zones should be fetched from API; deduplicate to prevent rendering duplicates
   const zones = ['Zone-001', 'Zone-100', 'Zone-200', 'Zone-101']
+  const uniqueZones = [...new Set(zones)]
 
   const handleGenerateChecklist = (zoneId: string) => {
     generateChecklist(
@@ -35,7 +37,7 @@ export function OHSPanel({ siteCode }: OHSPanelProps) {
         <span className="mt-2 mb-4 block" style={{ color: "var(--sentinel-text-secondary)" }}>Generate and track safety compliance across zones</span>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {zones.map((zone) => (
+          {uniqueZones.map((zone) => (
             <div key={zone} className="rounded-lg p-4" style={{ background: "var(--sentinel-bg-panel)", border: "1px solid var(--sentinel-border)" }}>
               <div className="flex justify-between items-center">
                 <div>

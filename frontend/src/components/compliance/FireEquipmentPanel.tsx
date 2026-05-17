@@ -1,4 +1,5 @@
 import { useFireEquipment, useScheduleFireInspection } from '@/lib/api/compliance'
+import { useState } from 'react'
 
 interface FireEquipmentPanelProps {
   siteCode: string
@@ -7,6 +8,7 @@ interface FireEquipmentPanelProps {
 export function FireEquipmentPanel({ siteCode }: FireEquipmentPanelProps) {
   const { data: equipment, isLoading } = useFireEquipment(siteCode)
   const { mutate: scheduleInspection } = useScheduleFireInspection()
+  const [now] = useState(() => Date.now()) // Stable reference time for render purity
 
   const handleScheduleInspection = (equipmentId: string) => {
     scheduleInspection(equipmentId)
@@ -24,7 +26,7 @@ export function FireEquipmentPanel({ siteCode }: FireEquipmentPanelProps) {
     <div className="space-y-6">
       <div className="rounded-lg p-4" style={{ background: "var(--sentinel-bg-panel)", border: "1px solid var(--sentinel-border)" }}>
         <h3 className="text-sm font-medium" style={{ color: "var(--sentinel-text-primary)" }}>Fire Equipment Inventory & Inspection Scheduling</h3>
-        <span className="text-sm mt-2 mb-4 block" style={{ color: "var(--sentinel-text-secondary)" }}>NFPA 10 & SABS 4066 Compliance</span>
+        <span className="text-sm mt-2 mb-4 block" style={{ color: "var(--sentinel-text-secondary)" }}>SANS 10400-T & SANS 1475 Compliance (NFPA 10 supplementary)</span>
 
         {equipment && equipment.length > 0 ? (
           <table className="w-full text-sm mt-4">
@@ -35,13 +37,14 @@ export function FireEquipmentPanel({ siteCode }: FireEquipmentPanelProps) {
                 <th className="text-left py-2 font-medium" style={{ color: "var(--sentinel-text-secondary)" }}>Last Inspection</th>
                 <th className="text-left py-2 font-medium" style={{ color: "var(--sentinel-text-secondary)" }}>Next Due</th>
                 <th className="text-left py-2 font-medium" style={{ color: "var(--sentinel-text-secondary)" }}>Status</th>
+                <th className="text-left py-2 font-medium" style={{ color: "var(--sentinel-text-secondary)" }}>Recorded By</th>
                 <th className="text-left py-2 font-medium" style={{ color: "var(--sentinel-text-secondary)" }}>Action</th>
               </tr>
             </thead>
             <tbody>
               {equipment.map((item) => {
                 const daysUntilDue = Math.ceil(
-                  (new Date(item.next_inspection_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+                  (new Date(item.next_inspection_date).getTime() - now) / (1000 * 60 * 60 * 24)
                 )
                 const isOverdue = daysUntilDue < 0
                 const isDueSoon = daysUntilDue < 30 && daysUntilDue >= 0
@@ -62,6 +65,10 @@ export function FireEquipmentPanel({ siteCode }: FireEquipmentPanelProps) {
                       >
                         {isOverdue ? 'OVERDUE' : isDueSoon ? 'DUE SOON' : 'OK'}
                       </span>
+                    </td>
+                    <td className="py-2" style={{ color: "var(--sentinel-text-secondary)" }}>
+                      <span className="text-xs">{item.recorded_by || item.inspector_name || 'System'}</span>
+                      <span className="block text-xs opacity-60">{item.recorded_at ? new Date(item.recorded_at).toLocaleDateString() : '-'}</span>
                     </td>
                     <td className="py-2">
                       <button
@@ -95,8 +102,7 @@ export function FireEquipmentPanel({ siteCode }: FireEquipmentPanelProps) {
       <div className="rounded-lg p-4" style={{ background: "rgba(239, 68, 68, 0.1)", borderLeft: "4px solid var(--sentinel-red)" }}>
         <h3 className="text-sm font-medium" style={{ color: "var(--sentinel-text-primary)" }}>Fire Safety Standards</h3>
         <span className="text-xs mt-2 block" style={{ color: "var(--sentinel-text-secondary)" }}>
-          Fire equipment is subject to 12-month inspection intervals per NFPA 10. Pressure tests validate
-          extinguisher integrity. Certification expiry must be tracked and renewed before expiration.
+          Primary: SANS 10400-T (fire protection in buildings) and SANS 1475 (portable fire extinguishers). 12-month inspection intervals. Pressure tests validate extinguisher integrity. NFPA 10 referenced as supplementary international guidance only.
         </span>
       </div>
     </div>

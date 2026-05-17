@@ -93,7 +93,7 @@ export function LegionellaPanel({ siteCode: _siteCode }: LegionellaPanelProps) {
         <h3 className="text-sm font-medium" style={{ color: "var(--sentinel-text-primary)" }}>Risk Assessment Matrix</h3>
         <span className="text-sm mt-2 mb-4 block" style={{ color: "var(--sentinel-text-secondary)" }}>Assessment based on water temperature and treatment history</span>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
           <div className="rounded-lg p-4" style={{ background: "rgba(239, 68, 68, 0.1)", borderLeft: "4px solid var(--sentinel-red)" }}>
             <div className="flex items-center justify-between">
               <div>
@@ -118,11 +118,23 @@ export function LegionellaPanel({ siteCode: _siteCode }: LegionellaPanelProps) {
             </div>
           </div>
 
+          <div className="rounded-lg p-4" style={{ background: "rgba(59, 130, 246, 0.1)", borderLeft: "4px solid var(--sentinel-blue)" }}>
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-medium" style={{ color: "var(--sentinel-text-primary)" }}>Marginal Risk</h3>
+                <span className="text-xs" style={{ color: "var(--sentinel-text-secondary)" }}>50-55°C — transitional zone</span>
+              </div>
+              <span className="text-xs px-2 py-0.5 rounded font-medium" style={{ background: "rgba(59, 130, 246, 0.15)", color: "var(--sentinel-blue)" }}>
+                ○
+              </span>
+            </div>
+          </div>
+
           <div className="rounded-lg p-4" style={{ background: "rgba(34, 197, 94, 0.1)", borderLeft: "4px solid var(--sentinel-green)" }}>
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-medium" style={{ color: "var(--sentinel-text-primary)" }}>Low Risk</h3>
-                <span className="text-xs" style={{ color: "var(--sentinel-text-secondary)" }}>&lt;20°C or &lt;30 days treated</span>
+                <span className="text-xs" style={{ color: "var(--sentinel-text-secondary)" }}>&lt;20°C or &gt;55°C or &lt;30 days treated</span>
               </div>
               <span className="text-xs px-2 py-0.5 rounded font-medium" style={{ background: "rgba(34, 197, 94, 0.15)", color: "var(--sentinel-green)" }}>
                 ✓
@@ -163,6 +175,15 @@ export function LegionellaPanel({ siteCode: _siteCode }: LegionellaPanelProps) {
               <td className="py-2">30 days</td>
               <td className="py-2">Bi-weekly</td>
             </tr>
+            <tr className="border-b" style={{ borderColor: "var(--sentinel-border)" }}>
+              <td className="py-2">
+                <span className="text-xs px-2 py-0.5 rounded font-medium" style={{ background: "rgba(59, 130, 246, 0.15)", color: "var(--sentinel-blue)" }}>
+                  Marginal
+                </span>
+              </td>
+              <td className="py-2">60 days</td>
+              <td className="py-2">Monthly</td>
+            </tr>
             <tr>
               <td className="py-2">
                 <span className="text-xs px-2 py-0.5 rounded font-medium" style={{ background: "rgba(34, 197, 94, 0.15)", color: "var(--sentinel-green)" }}>
@@ -181,6 +202,8 @@ export function LegionellaPanel({ siteCode: _siteCode }: LegionellaPanelProps) {
         <div className="text-xs mt-2" style={{ color: "var(--sentinel-text-secondary)" }}>
           <ul className="list-disc list-inside space-y-1 mt-2">
             <li>Temperature control: Maintain &lt;20°C (low) or &gt;55°C (hot water)</li>
+            <li>Danger zone: 20-45°C — immediate action required if untreated &gt;30 days</li>
+            <li>Transitional zone: 50-55°C — not safe, monitor closely</li>
             <li>Biocide treatment: 14-day to 90-day intervals based on risk</li>
             <li>UV systems and filtration for additional control</li>
             <li>Regular cleaning and descaling to remove biofilm</li>

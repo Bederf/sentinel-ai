@@ -97,7 +97,15 @@ function titleCase(value: string): string {
 
 function formatPostureLabel(posture: BuildingStatePayload['building_posture'] | string | null | undefined): string {
   if (!posture) return 'Waiting'
-  return titleCase(posture)
+  // Map internal posture states to clearer client-facing labels
+  const postureMap: Record<string, string> = {
+    'calm': 'Calm',
+    'drifting': 'Drifting — safe bounds',
+    'compensating': 'Compensating',
+    'strained': 'Strained',
+    'critical': 'Critical',
+  }
+  return postureMap[posture] || titleCase(posture)
 }
 
 function formatVoiceLabel(voice: BuildingStateNarrative['voice'] | string): string {
@@ -159,7 +167,11 @@ function buildFloorOrder(siteId: string, focusFloorId: string | null, affectedFl
 function locationSummary(narrative: BuildingStateNarrative | null): string {
   if (!narrative) return 'Whole building'
   const { epicenter, affected, propagation } = narrative.location
-  const affectedSummary = affected.length > 0 ? affected.join(' → ') : epicenter
+  // Avoid duplication: don't repeat epicenter when affected is empty
+  if (affected.length === 0) {
+    return `${epicenter} · ${titleCase(propagation)}`
+  }
+  const affectedSummary = affected.join(' → ')
   return `${epicenter} · ${affectedSummary} · ${titleCase(propagation)}`
 }
 

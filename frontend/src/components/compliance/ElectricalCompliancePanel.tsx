@@ -7,7 +7,7 @@
  */
 
 import { useElectricalCompliance, useTrackElectricalCertificate } from '@/lib/api/compliance'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 
 interface ElectricalCompliancePanelProps {
   siteCode: string
@@ -16,6 +16,7 @@ interface ElectricalCompliancePanelProps {
 export function ElectricalCompliancePanel({ siteCode }: ElectricalCompliancePanelProps) {
   const { data: complianceData, isLoading } = useElectricalCompliance(siteCode)
   const { mutate: trackCertificate, isPending } = useTrackElectricalCertificate()
+  const [now] = useState(() => Date.now()) // Stable reference time for render purity
   const [showAddForm, setShowAddForm] = useState(false)
   const [formData, setFormData] = useState({
     certificate_type: 'CoC_new_installation' as const,
@@ -164,12 +165,13 @@ export function ElectricalCompliancePanel({ siteCode }: ElectricalCompliancePane
                 <th className="text-left py-2 font-medium" style={{ color: "var(--sentinel-text-secondary)" }}>Issue Date</th>
                 <th className="text-left py-2 font-medium" style={{ color: "var(--sentinel-text-secondary)" }}>Expiry Date</th>
                 <th className="text-left py-2 font-medium" style={{ color: "var(--sentinel-text-secondary)" }}>Status</th>
+                <th className="text-left py-2 font-medium" style={{ color: "var(--sentinel-text-secondary)" }}>Recorded</th>
               </tr>
             </thead>
             <tbody>
               {certificates.map((cert) => {
                 const expiryDate = new Date(cert.expiry_date)
-                const daysUntilExpiry = Math.ceil((expiryDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+                const daysUntilExpiry = Math.ceil((expiryDate.getTime() - now) / (1000 * 60 * 60 * 24))
 
                 return (
                   <tr key={cert.id} className="border-b" style={{ borderColor: "var(--sentinel-border)" }}>
@@ -200,26 +202,41 @@ export function ElectricalCompliancePanel({ siteCode }: ElectricalCompliancePane
                         {cert.status || 'unknown'}
                       </span>
                     </td>
+                    <td className="py-2" style={{ color: "var(--sentinel-text-secondary)" }}>
+                      <span className="text-xs">{cert.recorded_by || 'System'}</span>
+                      <span className="block text-xs opacity-60">{cert.recorded_at ? new Date(cert.recorded_at).toLocaleDateString() : '-'}</span>
+                    </td>
                   </tr>
                 )
               })}
             </tbody>
           </table>
         ) : (
-          <div className="mt-4 p-4 text-center" style={{ color: "var(--sentinel-text-disabled)" }}>
-            No certificates recorded. Add a certificate above.
+          <div className="mt-4 p-6 rounded-lg text-center" style={{ background: "rgba(59, 130, 246, 0.05)", border: "1px dashed var(--sentinel-blue)" }}>
+            <h4 className="text-sm font-medium mb-2" style={{ color: "var(--sentinel-text-primary)" }}>Start with Electrical Compliance</h4>
+            <p className="text-xs mb-3" style={{ color: "var(--sentinel-text-secondary)" }}>
+              Electrical Certificate of Compliance (CoC) is required under the OHS Act.
+              Begin by adding your main distribution board certificate.
+            </p>
+            <button
+              className="px-3 py-1.5 text-xs rounded font-medium"
+              style={{ background: "var(--sentinel-blue)", color: "white" }}
+              onClick={() => setShowAddForm(true)}
+            >
+              Add First Certificate
+            </button>
           </div>
         )}
       </div>
 
       <div className="rounded-lg p-4" style={{ background: "var(--sentinel-bg-panel)", border: "1px solid var(--sentinel-border)" }}>
         <h3 className="text-sm font-medium" style={{ color: "var(--sentinel-text-primary)" }}>Certificate Validity Timeline</h3>
-        <span className="text-sm mt-2 mb-4 block" style={{ color: "var(--sentinel-text-secondary)" }}>5-year validity from issue date per SABS standard</span>
+        <span className="text-sm mt-2 mb-4 block" style={{ color: "var(--sentinel-text-secondary)" }}>Validity depends on installation type, occupancy changes, or DoL inspection. 5-year tracking is for administrative purposes only.</span>
 
         <div className="mt-4 space-y-2">
           {certificates.map((cert) => {
             const expiryDate = new Date(cert.expiry_date)
-            const daysUntilExpiry = Math.ceil((expiryDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+            const daysUntilExpiry = Math.ceil((expiryDate.getTime() - now) / (1000 * 60 * 60 * 24))
             const yearsLeft = (daysUntilExpiry / 365).toFixed(1)
 
             return (
@@ -255,10 +272,11 @@ export function ElectricalCompliancePanel({ siteCode }: ElectricalCompliancePane
         <h3 className="text-sm font-medium" style={{ color: "var(--sentinel-text-primary)" }}>SABS Certificate Requirements</h3>
         <div className="text-xs mt-2" style={{ color: "var(--sentinel-text-secondary)" }}>
           <ul className="list-disc list-inside space-y-1 mt-2">
-            <li>5-year validity from issue date for Certificate of Compliance (CoC)</li>
+            <li>CoC validity is context-dependent per OHS Act / SANS 10142-1 (installation type, occupancy changes, DoL discretion)</li>
+            <li>5-year tracking shown here is for administrative monitoring only — not a legal validity determination</li>
             <li>Covers new installations, alterations, and maintenance work</li>
             <li>Must be issued by SABS-accredited certifiers</li>
-            <li>Renewal alerts at 30-day and 90-day windows before expiry</li>
+            <li>Renewal alerts at 30-day and 90-day windows before tracking expiry</li>
           </ul>
         </div>
       </div>

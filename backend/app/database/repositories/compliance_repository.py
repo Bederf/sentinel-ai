@@ -238,18 +238,27 @@ class ComplianceRepository:
     async def assess_legionella_risk(
         self, tower_code: str, water_temp: float, last_treatment: datetime
     ) -> LegionellaRiskAssessment:
-        """Assess legionella risk level."""
-        # Risk matrix logic
+        """Assess legionella risk level per SABS Legionella guidance.
+
+        Risk Matrix:
+        - HIGH: 20-45°C AND >30 days since treatment (optimal growth + no control)
+        - MEDIUM: 20-45°C with recent treatment (≤30 days) OR 45-50°C
+        - MARGINAL: 50-55°C (transitional zone - not safe, monitor closely)
+        - LOW: <20°C OR >55°C (outside growth range)
+        """
         days_since_treatment = (datetime.now() - last_treatment).days
 
-        # High risk: optimal temp (20-45°C) + no treatment in 30 days
         if 20 <= water_temp <= 45 and days_since_treatment > 30:
+            # High risk: optimal growth temperature AND untreated for >30 days
             risk_level = RiskLevel.HIGH
-        # Medium risk: moderate conditions
-        elif 20 <= water_temp <= 45 or days_since_treatment > 30 or water_temp < 20:
+        elif (20 <= water_temp <= 45 and days_since_treatment <= 30) or (45 < water_temp <= 50):
+            # Medium risk: optimal temp but recently treated, OR warm zone 45-50°C
             risk_level = RiskLevel.MEDIUM
-        # Low risk: cold water or recent treatment
+        elif 50 < water_temp <= 55:
+            # Marginal risk: transitional zone 50-55°C (not safe, monitor closely)
+            risk_level = RiskLevel.MARGINAL
         else:
+            # Low risk: cold water (<20°C) or kill threshold (>55°C)
             risk_level = RiskLevel.LOW
 
         assessment_data = {
@@ -269,7 +278,14 @@ class ComplianceRepository:
         return LegionellaRiskAssessment(**result.data[0])
 
     async def create_legionella_maintenance_task(self, risk_assessment_id: str) -> InspectionSchedule:
-        """Create legionella maintenance task based on risk."""
+        """Create legionella maintenance task based on risk.
+
+        Treatment intervals per SABS Legionella guidance:
+        - HIGH: 14 days (aggressive treatment needed)
+        - MEDIUM: 30 days (regular monitoring)
+        - MARGINAL: 60 days (transitional zone - monthly cleaning)
+        - LOW: 90 days (routine monitoring)
+        """
         # Get risk assessment
         result = self.supabase.table("legionella_risk_assessment").select("*").eq("id", risk_assessment_id).execute()
 
@@ -286,6 +302,9 @@ class ComplianceRepository:
         elif risk_level == "medium":
             frequency_days = 30
             name_suffix = "Medium-Risk (30-day test)"
+        elif risk_level == "marginal":
+            frequency_days = 60
+            name_suffix = "Marginal-Risk (60-day monitoring)"
         else:
             frequency_days = 90
             name_suffix = "Low-Risk (90-day monitoring)"
