@@ -5,7 +5,7 @@ that flow through the existing quality gate -> tier routing -> approval ->
 COV -> audit pipeline.
 
 Phase 0: Writes are permanently blocked (aegis_bess_writer_enabled=False).
-All dispatch actions land in Tier 2 approval queue with write_status="blocked".
+All dispatch actions land in Tier 2 approval queue with write_status="blocked_by_gate".
 
 Phase 1 (future): Set aegis_bess_writer_enabled=True, implement Modbus writer.
 """
@@ -35,7 +35,6 @@ from app.services.solar_arbitrage_engine import (
     DispatchActionType,
     get_solar_arbitrage_engine,
 )
-from app.services.tier_routing_engine import TierRoutingEngine
 
 logger = logging.getLogger(__name__)
 
@@ -389,17 +388,31 @@ async def run_aegis_cycle(
         Recommendation dict if a proposal was created, None if idle.
     """
     try:
-        # 1. Get current BESS state from simulated state
-        from app.services.solar_dispatch_service import get_solar_dispatch_service
+        # 1. Get current BESS state from real sensor readings
+        from app.services.fcu_state_tracker_backend import SupabaseBackend
 
-        dispatch_svc = get_solar_dispatch_service()
-        current_soc = dispatch_svc._simulated_soc.get(site_id, 50.0)
+        backend = SupabaseBackend(site_id=site_id)
+        bess_readings = await backend.get_latest_reading("S002-BESS-B1-001", "soc_percent")
+
+        if bess_readings is None or bess_readings.get("value") is None:
+            logger.warning("AEGIS: No real BESS SOC data available for %s", site_id)
+            # Fail if no real data - no mock data allowed
+            return None
+
+        current_soc = float(bess_readings["value"])
+
+        # Get additional BESS telemetry if available
+        temp_readings = await backend.get_latest_reading("S002-BESS-B1-001", "temperature_c")
+        power_readings = await backend.get_latest_reading("S002-BESS-B1-001", "power_kw")
+
+        bess_temp = float(temp_readings["value"]) if temp_readings and temp_readings.get("value") else 25.0
+        bess_power = float(power_readings["value"]) if power_readings and power_readings.get("value") else 0.0
 
         bess_state = BESSState(
             soc_pct=current_soc,
-            temperature_c=25.0,  # Simulated ambient
-            power_kw=0.0,
-            grid_frequency_hz=50.0,
+            temperature_c=bess_temp,
+            power_kw=bess_power,
+            grid_frequency_hz=50.0,  # Would need grid meter data
         )
 
         # 2. Get dispatch action from arbitrage engine

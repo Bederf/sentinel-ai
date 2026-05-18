@@ -127,3 +127,54 @@ class SupabaseBackend(FCUStateTrackerBackend):
     def iter_zones(self):
         self._load_all()
         return self._cache.items()
+
+    async def get_latest_reading(self, equipment_code: str, sensor_type: str) -> dict | None:
+        """Get latest sensor reading for equipment from equipment_sensor_readings.
+
+        Args:
+            equipment_code: Equipment code (e.g., "S002-BESS-B1-001")
+            sensor_type: Sensor type (e.g., "soc_percent", "total_power_kw")
+
+        Returns:
+            Dict with value, recorded_at, unit or None if not found
+        """
+        self._ensure_client()
+        try:
+            # First get equipment_id from equipment table
+            equip_result = (
+                self._client.table("equipment")
+                .select("id")
+                .eq("code", equipment_code)
+                .eq("site_id", self._site_id)
+                .limit(1)
+                .execute()
+            )
+
+            if not equip_result.data:
+                logger.debug(f"[FCU-BACKEND] Equipment not found: {equipment_code}")
+                return None
+
+            equipment_id = equip_result.data[0]["id"]
+
+            # Get latest reading
+            reading_result = (
+                self._client.table("equipment_sensor_readings")
+                .select("value, recorded_at, unit")
+                .eq("equipment_id", equipment_id)
+                .eq("sensor_type", sensor_type)
+                .order("recorded_at", desc=True)
+                .limit(1)
+                .execute()
+            )
+
+            if reading_result.data:
+                row = reading_result.data[0]
+                return {
+                    "value": row.get("value"),
+                    "recorded_at": row.get("recorded_at"),
+                    "unit": row.get("unit"),
+                }
+            return None
+        except Exception as e:
+            logger.warning(f"[FCU-BACKEND] Failed to get reading for {equipment_code}/{sensor_type}: {e}")
+            return None

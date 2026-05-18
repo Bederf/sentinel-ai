@@ -1,6 +1,7 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Shield, AlertTriangle, Lock } from "lucide-react";
 import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { ALL_PHASES, PHASE_COLORS, PHASE_DESCRIPTIONS, PHASE_LABELS, type OnboardingPhase } from "@/lib/onboardingPhase";
 
@@ -29,15 +30,30 @@ export function OnboardingPhaseSettings({
   onError,
   onSuccess,
 }: OnboardingPhaseSettingsProps) {
+  const queryClient = useQueryClient();
   const [updating, setUpdating] = useState(false);
   const [selectedPhase, setSelectedPhase] = useState<OnboardingPhase | null>(null);
   const holdRef = useRef<{ timer: ReturnType<typeof setTimeout> | null; start: number }>({ timer: null, start: 0 });
   const [holdProgress, setHoldProgress] = useState(0);
 
+  // Force cache invalidation when selected site changes or component mounts
+  useEffect(() => {
+    if (selectedSiteId) {
+      // Invalidate buildings list cache to get fresh phase data
+      queryClient.invalidateQueries({ queryKey: ['buildings-list'] });
+    }
+  }, [selectedSiteId, queryClient]);
+
   const selectedSite = useMemo(
     () => sites.find((site) => site.id === selectedSiteId) ?? null,
     [sites, selectedSiteId],
   );
+  // Debug: log what phase we're receiving
+  useEffect(() => {
+    if (selectedSite) {
+      console.log('[OnboardingPhaseSettings] Site:', selectedSite.id, 'Phase:', selectedSite.onboarding_phase);
+    }
+  }, [selectedSite]);
   const currentPhase = (selectedSite?.onboarding_phase as OnboardingPhase) ?? "shadow";
   const confirmPhase = selectedPhase ?? currentPhase;
   const locked = readOnly || !selectedSiteId;
@@ -81,6 +97,9 @@ export function OnboardingPhaseSettings({
     setUpdating(true);
     try {
       await api.updateSitePhase(selectedSiteId, phase);
+      // Invalidate cache to force fresh data fetch
+      queryClient.invalidateQueries({ queryKey: ['buildings-list'] });
+      queryClient.invalidateQueries({ queryKey: ['site', selectedSiteId] });
       setSelectedPhase(null);
       onSuccess?.();
     } catch (error) {

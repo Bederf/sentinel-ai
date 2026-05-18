@@ -105,9 +105,9 @@ class ApiKeyCreateRequest(BaseModel):
 
 
 class RefreshTokenRequest(BaseModel):
-    """SECURITY: Refresh token must be in request body, not URL (Phase 75-07)"""
+    """SECURITY: Refresh token can be in HttpOnly cookie or request body (Phase 62.2)"""
 
-    refresh_token: str = Field(..., description="Valid refresh token")
+    refresh_token: str | None = Field(None, description="Valid refresh token (optional if using HttpOnly cookie)")
 
 
 class AccessRequestCreateRequest(BaseModel):
@@ -910,17 +910,17 @@ async def logout(request: Request, refresh_token: str | None = None):
 
 @router.post("/refresh")
 @limiter.limit("5/15minutes")
-async def refresh_access_token(request: Request, body: RefreshTokenRequest):
+async def refresh_access_token(request: Request, body: RefreshTokenRequest | None = None):
     """Refresh access token using a valid refresh token.
 
     Phase 65-02: Implements token rotation - old refresh token is invalidated,
     new access + refresh token pair is issued.
     Phase 65-04: Add audit logging for token refresh
-    Phase 75-07: SECURITY - Accept refresh_token in request body, not URL
+    Phase 62.2: SECURITY - Accept refresh_token from HttpOnly cookie first, then body
 
     Args:
         request: FastAPI request
-        body: Request body containing refresh_token (SECURITY: not in URL)
+        body: Optional request body containing refresh_token (fallback if no cookie)
 
     Returns:
         New access_token and refresh_token
@@ -929,7 +929,14 @@ async def refresh_access_token(request: Request, body: RefreshTokenRequest):
         HTTPException 401 if refresh token is invalid
     """
     source_ip = _extract_ip_address(request)
-    refresh_token = body.refresh_token
+    # Read from HttpOnly cookie first (new sessions with Phase 62.1+)
+    refresh_token = request.cookies.get("sentinel_refresh_token")
+    # Fall back to request body (backward compatibility for legacy sessions)
+    if not refresh_token and body:
+        refresh_token = body.refresh_token
+
+    if not refresh_token:
+        raise HTTPException(status_code=401, detail="No refresh token provided")
     payload = validate_jwt_token(refresh_token, required_token_type="refresh")
     if not payload:
         # Log failed refresh attempt

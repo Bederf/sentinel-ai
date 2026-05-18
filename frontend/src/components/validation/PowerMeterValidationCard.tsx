@@ -76,6 +76,10 @@ interface PowerMeterValidationCardProps {
   className?: string;
 }
 
+// VALIDATION DISABLED: Meter data mapping in progress
+// TODO: Re-enable when meter equipment IDs are mapped to sensor reading sources
+const VALIDATION_ENABLED = false;
+
 export function PowerMeterValidationCard({
   siteId = "site-002",
   className = "",
@@ -85,6 +89,13 @@ export function PowerMeterValidationCard({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // VALIDATION DISABLED: Skip fetching until meter data mapping is complete
+    if (!VALIDATION_ENABLED) {
+      setLoading(false);
+      setError("Power meter validation pending equipment data mapping");
+      return;
+    }
+
     const fetchValidation = async () => {
       try {
         setLoading(true);
@@ -101,10 +112,7 @@ export function PowerMeterValidationCard({
       }
     };
 
-    const interval = setInterval(fetchValidation, 30000);
     fetchValidation();
-
-    return () => clearInterval(interval);
   }, [siteId]);
 
   if (loading) {

@@ -1,0 +1,73 @@
+# Alertmanager Configuration - Routes to Sentry Telegram Bridge
+# All alerts route to the main manager bot (single destination)
+
+global:
+  resolve_timeout: 5m
+
+route:
+  group_by: ['alertname', 'severity', 'category']
+  group_wait: 10s
+  group_interval: 5m
+  repeat_interval: 4h
+  receiver: 'sentry-telegram'
+  routes:
+    # Critical alerts - immediate, no grouping delay
+    - match:
+        severity: critical
+      group_wait: 0s
+      repeat_interval: 15m
+      receiver: 'sentry-telegram-critical'
+
+    # Safety violations - highest priority
+    - match:
+        category: safety
+      group_wait: 0s
+      repeat_interval: 30m
+      receiver: 'sentry-telegram-critical'
+
+    # Info-level alerts - group tightly, infrequent repeats
+    - match:
+        severity: info
+      group_wait: 30s
+      group_interval: 10m
+      repeat_interval: 24h
+      receiver: 'sentry-telegram'
+
+receivers:
+  # All alerts → Manager bot via Sentry bridge
+  - name: 'sentry-telegram'
+    webhook_configs:
+      - url: 'http://sentry-bridge:9099'
+        send_resolved: true
+        max_alerts: 5
+
+  # Critical alerts → Same bridge but unbatched
+  - name: 'sentry-telegram-critical'
+    webhook_configs:
+      - url: 'http://sentry-bridge:9099'
+        send_resolved: true
+        max_alerts: 1
+
+# Inhibit rules - prevent alert spam during cascade failures
+inhibit_rules:
+  # If backend is down, suppress all alerts from that job
+  - source_match:
+      alertname: 'PrometheusTargetDown'
+      job: 'sentinel-governance'
+    target_match_re:
+      job: 'sentinel-governance|sentinel-discipline'
+
+  # If critical safety violation is firing, suppress warnings from same category
+  - source_match:
+      severity: 'critical'
+      category: 'safety'
+    target_match:
+      category: 'safety'
+    equal: ['site_id']
+
+  # If quality gate is blocking writes, suppress related drift/rollback warnings
+  - source_match:
+      alertname: 'SentinelQualityGateBlockWrites'
+    target_match:
+      category: 'ai-governance'
+    equal: ['site_id']

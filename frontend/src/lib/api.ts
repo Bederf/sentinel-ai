@@ -186,10 +186,34 @@ function notifyAuthExpired(): void {
 }
 
 function buildJsonAuthHeaders(token: string | null, headers?: HeadersInit): HeadersInit {
+  // Convert HeadersInit to plain object and remove any existing Authorization
+  let safeHeaders: Record<string, string> = {};
+  if (headers) {
+    if (headers instanceof Headers) {
+      headers.forEach((value, key) => {
+        if (key.toLowerCase() !== 'authorization') {
+          safeHeaders[key] = value;
+        }
+      });
+    } else if (Array.isArray(headers)) {
+      headers.forEach(([key, value]) => {
+        if (key.toLowerCase() !== 'authorization') {
+          safeHeaders[key] = value;
+        }
+      });
+    } else {
+      // Plain object
+      Object.entries(headers).forEach(([key, value]) => {
+        if (key.toLowerCase() !== 'authorization' && value !== undefined) {
+          safeHeaders[key] = value as string;
+        }
+      });
+    }
+  }
   return {
     "Content-Type": "application/json",
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    ...headers,
+    ...safeHeaders,
   };
 }
 
@@ -259,24 +283,35 @@ async function retryRateLimitedSafeRequest(
 }
 
 async function tryRefreshAccessToken(): Promise<string | null> {
-  const refreshToken = getRefreshToken();
-  if (!refreshToken) return null;
   if (refreshInFlight) return refreshInFlight;
 
   refreshInFlight = (async () => {
     try {
-      // SECURITY: Send refresh token in request body, NOT in URL (Phase 75-07)
+      // SECURITY: Browser sends HttpOnly cookie automatically with credentials:include
+      // No need to read cookie via JavaScript (impossible by design for HttpOnly cookies)
       const response = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ refresh_token: refreshToken }),
       });
-      if (!response.ok) return null;
+      if (!response.ok) {
+        clearAccessToken();
+        return null;
+      }
       const data = await response.json() as { access_token?: string; refresh_token?: string };
-      if (!data.access_token) return null;
-      setTokens(data.access_token, data.refresh_token);
+      if (!data.access_token) {
+        clearAccessToken();
+        return null;
+      }
+      // Store new access token in memory
+      setAccessToken(data.access_token);
+      // Store refresh token in localStorage for legacy sessions (if provided)
+      if (data.refresh_token) {
+        localStorage.setItem(REFRESH_TOKEN_KEY, data.refresh_token);
+      }
       return data.access_token;
     } catch {
+      clearAccessToken();
       return null;
     } finally {
       refreshInFlight = null;
@@ -337,7 +372,15 @@ async function fetchWithoutGetDedup(bucket: string, url: string, options?: Reque
 async function fetchWithGetDedup(bucket: string, dedupeKey: string, url: string, options?: RequestInit): Promise<Response> {
   const existing = inFlightGetRequests.get(dedupeKey);
   if (existing) {
-    return existing.then((response) => response.clone());
+    // Wait for the existing request but don't return 401s directly
+    // 401s need fresh auth attempts, not shared failures
+    const response = await existing.then((r) => r.clone());
+    if (response.status === 401) {
+      // Don't share 401 responses - let each request try auth independently
+      inFlightGetRequests.delete(dedupeKey);
+      return fetchWithAuthRetry(url, options, true);
+    }
+    return response;
   }
 
   const requestPromise = fetchWithAuthRetry(url, options, true);

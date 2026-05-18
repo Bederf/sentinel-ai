@@ -71,14 +71,27 @@ async def load_equipment_from_supabase() -> list[dict]:
         # Map equipment type to device_type
         raw_type = (eq.get("type") or "other").lower()
         type_map = {
-            "ahu": "hvac", "chiller": "hvac", "vav": "hvac", "fcu": "hvac",
-            "boiler": "hvac", "pump": "hvac", "cooling_tower": "hvac",
-            "dali": "lighting", "dali_controller": "lighting", "dali_zone": "lighting",
-            "lighting_zone": "lighting", "luminaire": "lighting",
-            "meter": "meter", "generator": "power", "ups": "power",
-            "inverter": "solar", "bess": "solar",
-            "zone_sensor": "sensor", "outdoor_air_sensor": "sensor",
-            "zone": "hvac", "general": "other",
+            "ahu": "hvac",
+            "chiller": "hvac",
+            "vav": "hvac",
+            "fcu": "hvac",
+            "boiler": "hvac",
+            "pump": "hvac",
+            "cooling_tower": "hvac",
+            "dali": "lighting",
+            "dali_controller": "lighting",
+            "dali_zone": "lighting",
+            "lighting_zone": "lighting",
+            "luminaire": "lighting",
+            "meter": "meter",
+            "generator": "power",
+            "ups": "power",
+            "inverter": "solar",
+            "bess": "solar",
+            "zone_sensor": "sensor",
+            "outdoor_air_sensor": "sensor",
+            "zone": "hvac",
+            "general": "other",
         }
         device_type = type_map.get(raw_type, raw_type)
 
@@ -254,9 +267,16 @@ class AIOptimizerService:
         if not current_conditions:
             current_conditions = await self._gather_current_conditions(site_id)
 
-        # Generate mock weather forecast if not provided
+        # Fetch real weather forecast if not provided
         if not weather_forecast:
-            weather_forecast = self._generate_mock_weather_forecast()
+            from app.services.weather_service import get_weather_forecast
+
+            weather_forecast = await get_weather_forecast(hours=4)
+            if not weather_forecast:
+                # Fail if no weather data available
+                raise RuntimeError(
+                    f"No weather forecast available for site {site_id}. Weather API not configured or failed."
+                )
 
         # Generate mock energy prices if not provided
         if not energy_prices:
@@ -429,6 +449,7 @@ class AIOptimizerService:
             # Use onboarding phase for quality gate mode (ingestion mode may differ)
             try:
                 from app.database.supabase_client import get_supabase_client
+
                 client = get_supabase_client()
                 phase_row = client.table("sites").select("onboarding_phase").eq("code", site_id).limit(1).execute()
                 mode = phase_row.data[0].get("onboarding_phase", "shadow_live") if phase_row.data else "shadow_live"
@@ -455,7 +476,7 @@ class AIOptimizerService:
             logger.error(
                 f"[AI-OPT] Quality gate evaluation failed for {site_id}: {e}. "
                 f"Recommendations will be flagged as unverified.",
-                exc_info=True
+                exc_info=True,
             )
             for rec in recommendation.recommendations:
                 rec["quality_gate_status"] = "unverified"
@@ -516,7 +537,7 @@ class AIOptimizerService:
                 f"[AI-OPT] Health feature enrichment failed for {site_id}: {e}. "
                 f"Recommendations will proceed without health severity signals. "
                 f"This may affect recommendation ranking accuracy.",
-                exc_info=True
+                exc_info=True,
             )
             # Add explicit marker so downstream knows health features are missing
             # (attached to recommendation object's metadata, not individual recs)
@@ -525,14 +546,19 @@ class AIOptimizerService:
         return recommendation
 
     async def _gather_current_conditions(self, site_id: str) -> dict[str, Any]:
-        """Gather current building conditions from devices and DALI sensors."""
+        """Gather current building conditions from devices, DALI sensors, and weather API."""
         try:
             devices = await device_manager.list_devices_by_site(site_id)
 
+            # Fetch real weather data first
+            from app.services.weather_service import get_current_weather
+
+            weather_data = await get_current_weather()
+
             conditions = {
                 "indoor_temp": 22.0,
-                "outdoor_temp": 28.0,
-                "humidity": 55.0,
+                "outdoor_temp": weather_data.get("outdoor_temp", 22.0) if weather_data else 22.0,
+                "humidity": weather_data.get("humidity", 50.0) if weather_data else 50.0,
                 "occupancy": "high",
                 "equipment_status": "normal",
                 "timestamp": datetime.now().isoformat(),
@@ -540,8 +566,8 @@ class AIOptimizerService:
                 # Track which readings are defaults vs live sensor data
                 "_data_sources": {
                     "indoor_temp": "default",
-                    "outdoor_temp": "default",
-                    "humidity": "default",
+                    "outdoor_temp": "weather_api" if weather_data else "default",
+                    "humidity": "weather_api" if weather_data else "default",
                     "occupancy": "default",
                     "solar": "unavailable",
                     "bess": "unavailable",
@@ -549,10 +575,18 @@ class AIOptimizerService:
                 },
             }
 
+            # Fail if no weather data available
+            if not weather_data:
+                raise RuntimeError(
+                    f"No weather data available for site {site_id}. "
+                    "OpenWeatherMap API not configured or failed. "
+                    "Set OPENWEATHER_API_KEY environment variable."
+                )
+
             # Try to get actual readings from HVAC devices
             found_indoor_temp = False
-            found_outdoor_temp = False
-            found_humidity = False
+            found_outdoor_temp = bool(weather_data)  # Already have from weather API
+            found_humidity = bool(weather_data)  # Already have from weather API
 
             for device in devices:
                 if device.device_type != DeviceType.HVAC:
@@ -879,7 +913,14 @@ class AIOptimizerService:
                 site_resp = sb.table("sites").select("id").eq("code", site_id).execute()
                 if site_resp.data:
                     site_uuid = site_resp.data[0]["id"]
-                    ipmvp = sb.table("ipmvp_energy").select("*").eq("site_id", site_id).order("timestamp", desc=True).limit(100).execute()
+                    ipmvp = (
+                        sb.table("ipmvp_energy")
+                        .select("*")
+                        .eq("site_id", site_id)
+                        .order("timestamp", desc=True)
+                        .limit(100)
+                        .execute()
+                    )
                     if ipmvp.data and len(ipmvp.data) > 10:
                         current_kwh = sum(r.get("import_kwh") or 0 for r in ipmvp.data[:96])
                         conditions["ipmvp"] = {
@@ -892,10 +933,13 @@ class AIOptimizerService:
             # ── Electrical aggregate from site telemetry ──────────────────
             try:
                 import httpx
+
                 bridge_site = site_id if site_id.startswith("site-") else site_id
-                token = (os.environ.get("BRIDGE_API_TOKEN_SITE002") or
-                         os.environ.get("BRIDGE_API_TOKEN") or
-                         "ScUAjUet7i2vvcE0fuzn6dsF3C+YRMWbf8yMWwdoYbw")
+                token = (
+                    os.environ.get("BRIDGE_API_TOKEN_SITE002")
+                    or os.environ.get("BRIDGE_API_TOKEN")
+                    or "ScUAjUet7i2vvcE0fuzn6dsF3C+YRMWbf8yMWwdoYbw"
+                )
                 # Use sync client — async is flaky with WireGuard bridge
                 with httpx.Client(timeout=10) as client:
                     url = f"http://10.99.0.1:8080/api/sites/{bridge_site}/telemetry"
@@ -918,7 +962,9 @@ class AIOptimizerService:
             try:
                 mod_resp = sb.table("site_modules").select("module_type,status").eq("site_id", site_id).execute()
                 if mod_resp.data:
-                    conditions["active_modules"] = [m["module_type"] for m in mod_resp.data if m.get("status") == "active"]
+                    conditions["active_modules"] = [
+                        m["module_type"] for m in mod_resp.data if m.get("status") == "active"
+                    ]
             except Exception:
                 conditions["active_modules"] = []
 
@@ -979,10 +1025,17 @@ class AIOptimizerService:
         if site_id:
             try:
                 from app.database.supabase_client import get_supabase_client
+
                 sb = get_supabase_client()
 
                 # Load demand charge and NMD from sites table
-                site_row = sb.table("sites").select("nmd_limit_kva,demand_charge_per_kva").eq("code", site_id).limit(1).execute()
+                site_row = (
+                    sb.table("sites")
+                    .select("nmd_limit_kva,demand_charge_per_kva")
+                    .eq("code", site_id)
+                    .limit(1)
+                    .execute()
+                )
                 if site_row.data:
                     s = site_row.data[0]
                     result["nmd_kva"] = s.get("nmd_limit_kva")
@@ -1007,17 +1060,19 @@ class AIOptimizerService:
                         band = "standard"
                         current = td.get("standard_zar_per_kwh", result["standard_rate"])
 
-                    result.update({
-                        "current_rate": current,
-                        "peak_rate": td.get("peak_zar_per_kwh", result["peak_rate"]),
-                        "off_peak_rate": td.get("offpeak_zar_per_kwh", result["off_peak_rate"]),
-                        "standard_rate": td.get("standard_zar_per_kwh", result["standard_rate"]),
-                        "band": band,
-                        "peak_hours": peak_hours,
-                        "weekday_only": weekday_only,
-                        "currency": "ZAR",
-                        "source": "ipmvp_tariff + sites",
-                    })
+                    result.update(
+                        {
+                            "current_rate": current,
+                            "peak_rate": td.get("peak_zar_per_kwh", result["peak_rate"]),
+                            "off_peak_rate": td.get("offpeak_zar_per_kwh", result["off_peak_rate"]),
+                            "standard_rate": td.get("standard_zar_per_kwh", result["standard_rate"]),
+                            "band": band,
+                            "peak_hours": peak_hours,
+                            "weekday_only": weekday_only,
+                            "currency": "ZAR",
+                            "source": "ipmvp_tariff + sites",
+                        }
+                    )
             except Exception as e:
                 logger.warning(f"Failed to load tariff data: {e}")
 
@@ -1342,7 +1397,9 @@ class AIOptimizerService:
         from app.database.repositories.equipment_repository import EquipmentRepository
         from app.database.supabase_client import get_supabase_client
 
-        logger.info(f"[AI-OPT] Running full equipment sweep for {site_id} (bypass_occupancy_gate={bypass_occupancy_gate})")
+        logger.info(
+            f"[AI-OPT] Running full equipment sweep for {site_id} (bypass_occupancy_gate={bypass_occupancy_gate})"
+        )
 
         results: list[dict] = []
 
@@ -1392,7 +1449,6 @@ class AIOptimizerService:
                 "timestamp": datetime.now().isoformat(),
                 "zone_occupancy": {},
             }
-            weather = self._generate_mock_weather_forecast()
             energy = self._get_energy_prices(site_id)
 
             # For each candidate, build a targeted prompt
@@ -1420,11 +1476,11 @@ Anomaly Score (IF): {anomaly}
 LSTM Anomaly Score: {lstm_anomaly}
 
 Current Conditions:
-- Indoor temp: {conditions.get('indoor_temp', 22)}°C
-- Outdoor temp: {conditions.get('outdoor_temp', 28)}°C
-- Humidity: {conditions.get('humidity', 55)}%
+- Indoor temp: {conditions.get("indoor_temp", 22)}°C
+- Outdoor temp: {conditions.get("outdoor_temp", 28)}°C
+- Humidity: {conditions.get("humidity", 55)}%
 
-Energy Pricing: R{energy.get('current_rate', 2.28)}/kWh (standard)
+Energy Pricing: R{energy.get("current_rate", 2.28)}/kWh (standard)
 
 Analyze this equipment and generate any needed maintenance or optimization
 recommendations. Consider:
@@ -1455,11 +1511,13 @@ If no action needed, return empty recommendations array.
                         continue
 
                     import re
+
                     json_match = re.search(r"\{[\s\S]*\}", response_text)
                     if not json_match:
                         continue
 
                     import json as _json
+
                     parsed = _json.loads(json_match.group())
                     recs = parsed.get("recommendations", [])
                     for rec in recs:
@@ -1616,7 +1674,7 @@ If no action needed, return empty recommendations array.
 Optimise for minimum energy cost.
 Current TOU: R{current_rate:.2f}/kWh ({band.upper()})
 Next tariff change: {next_change}
-{f'Demand charge: R{demand_charge:.2f}/kVA/month · NMD: {nmd} kVA' if demand_charge else ''}
+{f"Demand charge: R{demand_charge:.2f}/kVA/month · NMD: {nmd} kVA" if demand_charge else ""}
 Every recommendation must include ZAR saving estimate.
 Comfort may be relaxed within safe bounds.
 Equipment health is secondary unless failure is imminent.
@@ -1636,7 +1694,7 @@ Current TOU: R{current_rate:.2f}/kWh — cost context only.
             "balanced": f"""
 Balance cost, comfort, and asset health equally.
 Current TOU: R{current_rate:.2f}/kWh ({band.upper()})
-{f'Demand charge: R{demand_charge:.2f}/kVA/month · NMD: {nmd} kVA' if demand_charge else ''}
+{f"Demand charge: R{demand_charge:.2f}/kVA/month · NMD: {nmd} kVA" if demand_charge else ""}
 Prioritise actions that improve multiple dimensions simultaneously.
 """,
         }
@@ -1695,26 +1753,26 @@ If a pattern suggests a zone will empty soon, recommend action now.
                 direction = "above" if carbon["carbon_vs_baseline_kgco2"] > 0 else "below"
                 variance_line = f"vs baseline: {abs(carbon['carbon_vs_baseline_kgco2'])} kgCO2/h {direction}\n"
             blocks.append(f"""CARBON & ESG:
-Grid intensity: {carbon['grid_intensity_kgco2_kwh']} kgCO2/kWh (Eskom 2024)
-Building footprint: {carbon['building_kgco2_hour']} kgCO2/hour
-{variance_line}Renewable fraction: {carbon['renewable_fraction_pct']}% (solar)
-Solar carbon offset: {carbon['solar_offset_kgco2_hour']} kgCO2/hour
-Grid import: {carbon['grid_import_kw']} kW
-Source: {carbon['source']}
+Grid intensity: {carbon["grid_intensity_kgco2_kwh"]} kgCO2/kWh (Eskom 2024)
+Building footprint: {carbon["building_kgco2_hour"]} kgCO2/hour
+{variance_line}Renewable fraction: {carbon["renewable_fraction_pct"]}% (solar)
+Solar carbon offset: {carbon["solar_offset_kgco2_hour"]} kgCO2/hour
+Grid import: {carbon["grid_import_kw"]} kW
+Source: {carbon["source"]}
 """)
 
         elec = conditions.get("electrical")
         if elec:
             blocks.append(f"""ELECTRICAL:
-Total site load: {elec.get('total_kw', '?')} kW
-HVAC load: {elec.get('hvac_kw', '?')} kW
-Lighting load: {elec.get('lighting_kw', '?')} kW
-Solar generating: {elec.get('solar_kw', '?')} kW""")
+Total site load: {elec.get("total_kw", "?")} kW
+HVAC load: {elec.get("hvac_kw", "?")} kW
+Lighting load: {elec.get("lighting_kw", "?")} kW
+Solar generating: {elec.get("solar_kw", "?")} kW""")
         ipmvp = conditions.get("ipmvp")
         if ipmvp:
             blocks.append(f"""IPMVP BASELINE:
-Current consumption: {ipmvp.get('current_kwh', '?')} kWh (last 24h)
-Records available: {ipmvp.get('records_available', 0)}""")
+Current consumption: {ipmvp.get("current_kwh", "?")} kWh (last 24h)
+Records available: {ipmvp.get("records_available", 0)}""")
         return "\n\n".join(blocks) if blocks else "Extended telemetry not available."
 
     def _format_constraints(self, site: dict[str, Any], conditions: dict | None = None) -> str:
@@ -1733,7 +1791,7 @@ Records available: {ipmvp.get('records_available', 0)}""")
         sections = ["ACTIVE CONTROL MODULES \u2014 what you can recommend:"]
         sections.append("\n".join(allowed) if allowed else "No control modules active \u2014 advisory only")
         if blocked:
-            sections.append(f"\nINACTIVE MODULES \u2014 do not recommend:\n" + "\n".join(blocked))
+            sections.append("\nINACTIVE MODULES \u2014 do not recommend:\n" + "\n".join(blocked))
 
         sections.append("""
 AUTONOMOUS SYSTEMS (already running \u2014 do not duplicate):
@@ -1758,7 +1816,6 @@ SAFETY LIMITS:
         time_str = current_time.strftime("%H:%M")
         is_occupied = 7 <= current_time.hour < 18
         period = "occupied hours" if is_occupied else "after hours"
-        current_rate = energy_prices.get("current_rate", energy_prices.get("eskom_rate", 0))
 
         return f"""
 Current time: {time_str} SAST ({period})
@@ -2148,7 +2205,8 @@ Provide ONLY the JSON response, no additional text."""
                 if len(normalised_recommendations) > MAX_RECS:
                     logger.warning(
                         "[AI-OPT] Capping %d recommendations to %d (holistic limit)",
-                        len(normalised_recommendations), MAX_RECS,
+                        len(normalised_recommendations),
+                        MAX_RECS,
                     )
                     normalised_recommendations = normalised_recommendations[:MAX_RECS]
 
@@ -2251,9 +2309,7 @@ Provide ONLY the JSON response, no additional text."""
         )
         return clean
 
-    def _parse_holistic_recommendations(
-        self, recommendations: list[dict], building_assessment: str
-    ) -> list[dict]:
+    def _parse_holistic_recommendations(self, recommendations: list[dict], building_assessment: str) -> list[dict]:
         """Parse holistic recommendations with adjustments array into canonical format.
 
         The new format uses an 'adjustments' array per recommendation:
@@ -2284,7 +2340,6 @@ Provide ONLY the JSON response, no additional text."""
             confidence = rec.get("confidence", 0.0)
             saving = rec.get("saving", "")
             confidence_basis = rec.get("confidence_basis", "")
-            profile_goal = rec.get("profile_goal", "")
 
             primary = adjustments[0]
             eq_id = primary.get("equipment_id", "")
@@ -2295,7 +2350,7 @@ Provide ONLY the JSON response, no additional text."""
 
             # Parse saving text into expected_impact numeric fields
             saving_text = rec.get("saving", "")
-            cost_match = re.search(r'[RZ](\d+(?:[\s,.]\d+)?)', saving_text.replace(",", ""))
+            cost_match = re.search(r"[RZ](\d+(?:[\s,.]\d+)?)", saving_text.replace(",", ""))
             cost_val = float(cost_match.group(1)) if cost_match else 0.0
 
             metadata = {
@@ -2381,8 +2436,9 @@ Provide ONLY the JSON response, no additional text."""
         # Parse saving text into expected_impact numeric fields
         if "expected_impact" not in out:
             import re
+
             saving_text = out.get("metadata", {}).get("saving", "") or out.get("saving", "")
-            cost_match = re.search(r'[RZ](\d+(?:[\s,.]\d+)?)', saving_text.replace(",", ""))
+            cost_match = re.search(r"[RZ](\d+(?:[\s,.]\d+)?)", saving_text.replace(",", ""))
             if cost_match:
                 out["expected_impact"] = {"cost_zar": float(cost_match.group(1))}
 

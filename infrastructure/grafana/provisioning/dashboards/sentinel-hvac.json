@@ -1,0 +1,247 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "SENTINEL HVAC monitoring — zone temperatures, thermal runway, cooling/heating energy, and savings.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "id": 1,
+      "title": "Scrape Health",
+      "type": "stat",
+      "gridPos": { "h": 3, "w": 4, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "up{job=\"sentinel-backend\"}",
+          "legendFormat": "{{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "green", "value": 1 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 2,
+      "title": "Thermal Runway Warnings",
+      "type": "stat",
+      "gridPos": { "h": 3, "w": 4, "x": 4, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(sentinel_hvac_thermal_runway_warnings) or vector(0)",
+          "legendFormat": "Zones in warning"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 3 }
+            ]
+          },
+          "unit": "none"
+        }
+      }
+    },
+    {
+      "id": 3,
+      "title": "HVAC Savings (ZAR)",
+      "type": "stat",
+      "gridPos": { "h": 3, "w": 4, "x": 8, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(sentinel_hvac_savings_zar) or vector(0)",
+          "legendFormat": "Monthly savings"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "green", "value": 1000 }
+            ]
+          },
+          "unit": "currencyZAR"
+        }
+      }
+    },
+    {
+      "id": 4,
+      "title": "Zone Temperatures",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 3 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sentinel_hvac_zone_temp_celsius",
+          "legendFormat": "{{zone_name}} ({{site_id}})"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "celsius",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 20
+          }
+        }
+      }
+    },
+    {
+      "id": 5,
+      "title": "Temperature Deviation from Setpoint",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 3 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sentinel_hvac_zone_temp_deviation_celsius",
+          "legendFormat": "{{zone_id}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "celsius",
+          "custom": {
+            "lineWidth": 2
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 3 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 6,
+      "title": "Cooling Energy (kWh)",
+      "type": "timeseries",
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 11 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(sentinel_hvac_cooling_kwh[1h]) * 1000",
+          "legendFormat": "Cooling kWh/h"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "kwatth",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 30
+          }
+        }
+      }
+    },
+    {
+      "id": 7,
+      "title": "Heating Energy (kWh)",
+      "type": "timeseries",
+      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 11 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(sentinel_hvac_heating_kwh[1h]) * 1000",
+          "legendFormat": "Heating kWh/h"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "kwatth",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 30
+          }
+        }
+      }
+    },
+    {
+      "id": 8,
+      "title": "AHU Status",
+      "type": "table",
+      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 11 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sentinel_hvac_ahu_status",
+          "format": "table",
+          "legendFormat": ""
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "type": "value", "options": { "0": { "text": "Offline", "color": "red" } } },
+            { "type": "value", "options": { "1": { "text": "Healthy", "color": "green" } } },
+            { "type": "value", "options": { "2": { "text": "Degraded", "color": "yellow" } } },
+            { "type": "value", "options": { "3": { "text": "Critical", "color": "red" } } }
+          ]
+        }
+      }
+    }
+  ],
+  "refresh": "10s",
+  "tags": ["hvac", "sentinel", "building"],
+  "templating": {
+    "list": [
+      {
+        "name": "site",
+        "type": "query",
+        "query": "label_values(sentinel_hvac_zone_temp_celsius, site_id)",
+        "multi": true
+      }
+    ]
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "title": "SENTINEL HVAC Dashboard",
+  "uid": "sentinel-hvac",
+  "version": 1
+}

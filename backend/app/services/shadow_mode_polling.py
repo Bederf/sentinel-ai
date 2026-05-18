@@ -25,6 +25,7 @@ from typing import Any
 import httpx
 
 from app.core.site_resolver import normalize_site_id
+from app.services.health_rating_calculator import HealthRatingCalculator
 
 
 # ─── Equipment display name formatters ──────────────────────────────────────────
@@ -401,6 +402,22 @@ class ShadowModePollingService:
                     "sensor_readings": agg_readings,
                 }
 
+            # ── Map water telemetry to water meter equipment ─────────────────
+            total_m3 = water.get("total_m3")
+            water_readings: dict[str, float] = {}
+            if flow_lpm is not None:
+                water_readings["flow_rate_lpm"] = float(flow_lpm)
+            if pressure_bar is not None:
+                water_readings["pressure_bar"] = float(pressure_bar)
+            if total_m3 is not None:
+                water_readings["total_consumption_m3"] = float(total_m3)
+
+            if water_readings:
+                agg_states["S002-WATER-MTR-001"] = {
+                    "type": "water_meter",
+                    "sensor_readings": water_readings,
+                }
+
             # ── Map chiller telemetry to individual equipment ────────────────
             chiller_data = data.get("chiller", {})
             chiller_readings: dict[str, float] = {}
@@ -421,7 +438,6 @@ class ShadowModePollingService:
             if chiller_readings:
                 agg_states["S002-CHILLER-B1-001"] = {
                     "type": "chiller",
-                    "health_score": 72,
                     "sensor_readings": chiller_readings,
                 }
 
@@ -430,7 +446,6 @@ class ShadowModePollingService:
             if ct_fan is not None:
                 agg_states["S002-CT-R-001"] = {
                     "type": "cooling_tower",
-                    "health_score": 72,
                     "sensor_readings": {"fan_speed_pct": float(ct_fan)},
                 }
 
@@ -458,7 +473,6 @@ class ShadowModePollingService:
                 if ahu_readings:
                     agg_states[equip_code] = {
                         "type": "ahu",
-                        "health_score": 72,
                         "sensor_readings": ahu_readings,
                     }
 
@@ -472,6 +486,27 @@ class ShadowModePollingService:
                         "equip_online": float(equip_online),
                     },
                 }
+
+            # ── Map security telemetry to access control system ──────────────
+            security_data = data.get("security", {})
+            if security_data:
+                security_readings: dict[str, float] = {}
+                entries = security_data.get("entries")
+                denied = security_data.get("denied")
+                forced_door = security_data.get("forced_door")
+
+                if entries is not None:
+                    security_readings["entry_count"] = float(entries)
+                if denied is not None:
+                    security_readings["access_denied_count"] = float(denied)
+                if forced_door is not None:
+                    security_readings["forced_door_count"] = float(forced_door)
+
+                if security_readings:
+                    agg_states["S002-CCURE-SVR"] = {
+                        "type": "access_control_server",
+                        "sensor_readings": security_readings,
+                    }
 
             result["telemetry_fetched"] = True
 
@@ -499,6 +534,150 @@ class ShadowModePollingService:
         except Exception as e:
             logger.debug(f"[SHADOW] Occupancy poll skipped: {e}")
             errors.append(f"occupancy: {e}")
+
+        # ── 3c. Fetch BESS/Solar/Generator data from bridge objects ─────────
+        # Polls the BACnet object catalog for energy equipment telemetry
+        try:
+            async with httpx.AsyncClient(timeout=20.0) as client:
+                resp = await client.get(
+                    f"{base}/api/sites/{self.site_id}/objects",
+                    headers=headers,
+                )
+                resp.raise_for_status()
+                objects_data = resp.json()
+                objects = objects_data.get("objects", [])
+
+            # Group objects by equipment
+            energy_equipment: dict[str, dict[str, Any]] = {}
+            for obj in objects:
+                eq_id = obj.get("equipment_id", "")
+                # Filter for BESS, Solar, PV, Generator, Inverter equipment
+                if any(x in eq_id.upper() for x in ["BESS", "PV", "SOLAR", "GEN", "INV", "INVERTER"]):
+                    if eq_id not in energy_equipment:
+                        energy_equipment[eq_id] = {"type": obj.get("equipment_type", "unknown"), "readings": {}}
+                    point_name = obj.get("object_name", "")
+                    # Map key telemetry points
+                    if any(x in point_name.lower() for x in ["soc", "power", "voltage", "current", "temp", "energy", "status"]):
+                        # Note: objects endpoint returns metadata, not live values
+                        # We need to fetch the current value separately
+                        pass
+
+            # Fetch live values from /points endpoint for key energy equipment
+            energy_equipment_ids = [eq_id for eq_id in energy_equipment.keys() if any(
+                x in eq_id for x in ["BESS-B1-001", "PV-ARRAY", "GEN-B1"]
+            )]
+
+            for eq_id in energy_equipment_ids[:5]:  # Limit to top 5 to avoid timeout
+                try:
+                    # Fetch current point values for this equipment
+                    point_resp = await client.get(
+                        f"{base}/api/sites/{self.site_id}/points",
+                        headers=headers,
+                        params={"equipment_id": eq_id},
+                    )
+                    point_resp.raise_for_status()
+                    points_data = point_resp.json()
+                    points = points_data.get("points", [])
+
+                    readings: dict[str, float] = {}
+                    eq_type = "unknown"
+
+                    for point in points:
+                        point_name = point.get("name", "")
+                        value = point.get("value")
+
+                        # Map BESS telemetry
+                        if "BESS" in eq_id.upper():
+                            eq_type = "bess"
+                            if "soc_percent" in point_name.lower():
+                                readings["soc_pct"] = float(value)
+                            elif "charge_discharge_power_kw" in point_name.lower():
+                                readings["power_kw"] = float(value)
+                            elif "energy_stored_kwh" in point_name.lower():
+                                readings["energy_kwh"] = float(value)
+                            elif "battery_module_temp_max_c" in point_name.lower():
+                                readings["temp_max_c"] = float(value)
+                            elif "battery_voltage_dc_v" in point_name.lower():
+                                readings["voltage_v"] = float(value)
+
+                        # Map Solar/PV telemetry
+                        elif any(x in eq_id.upper() for x in ["PV", "SOLAR"]):
+                            eq_type = "solar"
+                            if "power_kw" in point_name.lower():
+                                readings["power_kw"] = float(value)
+                            elif "voltage_v" in point_name.lower():
+                                readings["voltage_v"] = float(value)
+                            elif "current_a" in point_name.lower():
+                                readings["current_a"] = float(value)
+
+                        # Map Generator telemetry
+                        elif "GEN" in eq_id.upper():
+                            eq_type = "generator"
+                            if "status" in point_name.lower():
+                                readings["status"] = float(1.0 if value in ["running", "on", "true", "1"] else 0.0)
+                            elif "health_score" in point_name.lower():
+                                readings["health_score"] = float(value) if value else 0.0
+
+                    if readings:
+                        agg_states[eq_id] = {
+                            "type": eq_type,
+                            "sensor_readings": readings,
+                        }
+
+                except Exception as e:
+                    logger.debug(f"[SHADOW] Energy equipment poll failed for {eq_id}: {e}")
+
+            # Also fetch detailed water meter points
+            try:
+                water_point_resp = await client.get(
+                    f"{base}/api/sites/{self.site_id}/points",
+                    headers=headers,
+                    params={"equipment_id": "S002-WATER-MTR-001"},
+                )
+                water_point_resp.raise_for_status()
+                water_points_data = water_point_resp.json()
+                water_points = water_points_data.get("points", [])
+
+                water_detailed_readings: dict[str, float] = {}
+                for point in water_points:
+                    point_name = point.get("name", "")
+                    value = point.get("value")
+                    if value is None:
+                        continue
+
+                    if "flow_rate" in point_name.lower() and "average" not in point_name.lower():
+                        water_detailed_readings["flow_rate_lps"] = float(value)
+                    elif "total_consumption_m3" in point_name.lower():
+                        water_detailed_readings["total_m3"] = float(value)
+                    elif "daily_consumption" in point_name.lower():
+                        water_detailed_readings["daily_m3"] = float(value)
+                    elif "monthly_consumption" in point_name.lower():
+                        water_detailed_readings["monthly_kl"] = float(value)
+                    elif "supply_pressure" in point_name.lower():
+                        water_detailed_readings["pressure_kpa"] = float(value)
+                    elif "supply_temperature" in point_name.lower():
+                        water_detailed_readings["temp_c"] = float(value)
+                    elif "leak_detected" in point_name.lower():
+                        water_detailed_readings["leak_detected"] = float(1.0 if value in ["true", "1", True] else 0.0)
+
+                if water_detailed_readings:
+                    # Merge with existing water meter readings or create new entry
+                    if "S002-WATER-MTR-001" in agg_states:
+                        agg_states["S002-WATER-MTR-001"]["sensor_readings"].update(water_detailed_readings)
+                    else:
+                        agg_states["S002-WATER-MTR-001"] = {
+                            "type": "water_meter",
+                            "sensor_readings": water_detailed_readings,
+                        }
+
+            except Exception as e:
+                logger.debug(f"[SHADOW] Water meter detailed poll failed: {e}")
+
+            result["energy_equipment_fetched"] = len([eq for eq in agg_states if any(x in eq for x in ["BESS", "PV", "GEN", "INV", "WATER"])])
+
+        except Exception as e:
+            logger.warning(f"[SHADOW] Energy equipment poll error: {e}")
+            errors.append(f"energy_equipment: {e}")
 
         # ── 4. Fetch fault alarms (Fault Classifier buffer) ──────────────────
         fault_count = 0

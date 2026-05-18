@@ -16,7 +16,8 @@ class RecommendationRepository:
         "id, site_id, timestamp, action_type, risk_level, target_equipment, "
         "action, reason, expected_impact, confidence, confidence_score, profile, "
         "multi_objective_score, status, requires_approval, approval_status, "
-        "approved_by, approved_at, approval_reason, executed_at, execution_result, rejection_reason"
+        "approved_by, approved_at, approval_reason, executed_at, execution_result, "
+        "rejection_reason, source, source_type"
     )
     _WRITE_COLUMNS = {
         "id",
@@ -42,6 +43,8 @@ class RecommendationRepository:
         "execution_result",
         "rejection_reason",
         "shadow_mode",
+        "source",
+        "source_type",
     }
 
     def __init__(self):

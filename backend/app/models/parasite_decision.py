@@ -69,13 +69,39 @@ class RejectionCategory(StrEnum):
 
 
 class WriteStatus(StrEnum):
-    """Status of the device write attempt."""
+    """Status of the device write attempt through PARASITE pipeline.
 
-    SUCCESS = "success"
+    Two-stage architecture:
+    - INTENT_LOGGED: TierRoutingEngine recorded intent (no BACnet write attempted)
+    - DISPATCHED: ApprovalService dispatched write to device_manager (in progress)
+    - SUCCEEDED: BACnet write completed successfully
+    - FAILED: BACnet write attempted but failed
+    - BLOCKED_BY_GATE: Phase/quality/safety gate blocked execution
+    """
+
+    INTENT_LOGGED = "intent_logged"
+    DISPATCHED = "dispatched"
+    SUCCEEDED = "succeeded"
     FAILED = "failed"
-    REJECTED = "rejected"
-    SKIPPED = "skipped"
-    BLOCKED = "blocked"  # AEGIS: write not attempted, awaiting ops CONFIRM
+    BLOCKED_BY_GATE = "blocked_by_gate"
+
+
+def _parse_write_status(value: str | None) -> WriteStatus | None:
+    """Parse write_status string to WriteStatus enum.
+
+    Args:
+        value: String value from database or None
+
+    Returns:
+        WriteStatus enum member or None if invalid/None
+    """
+    if value is None:
+        return None
+    try:
+        return WriteStatus(value)
+    except ValueError:
+        # Unknown status value - log and return None (fail-safe)
+        return None
 
 
 def _safe_json_value(value: Any) -> Any:
@@ -170,8 +196,10 @@ class ParasiteDecision:
     command_id: str | None = None  # Links set_value/read_value calls
     tier: str | None = None  # tier1, tier2, tier3
     decision_type: str | None = None  # tier2_approved, tier3_auto_execute, etc.
-    write_status: str | None = None  # WriteStatus value
-    write_attempt_count: int = 1
+    write_status: WriteStatus | None = None  # Device write lifecycle status
+    write_attempt_count: int = 0  # Actual BACnet write attempts dispatched (NOT intent records)
+    bacnet_write_dispatched: bool = False  # True only when write_device_value() is actually called
+    bacnet_write_succeeded: bool | None = None  # None=not attempted, True=success, False=failed
     failure_reason: str | None = None
 
     # --- Target identity (D) ---
@@ -266,8 +294,10 @@ class ParasiteDecision:
             "command_id": self.command_id,
             "tier": self.tier,
             "decision_type": self.decision_type,
-            "write_status": self.write_status,
+            "write_status": self.write_status.value if self.write_status else None,
             "write_attempt_count": self.write_attempt_count,
+            "bacnet_write_dispatched": self.bacnet_write_dispatched,
+            "bacnet_write_succeeded": self.bacnet_write_succeeded,
             "failure_reason": self.failure_reason,
             # Target identity
             "point_name": self.point_name,
@@ -331,8 +361,10 @@ class ParasiteDecision:
             command_id=data.get("command_id"),
             tier=data.get("tier"),
             decision_type=data.get("decision_type"),
-            write_status=data.get("write_status"),
-            write_attempt_count=data.get("write_attempt_count", 1),
+            write_status=_parse_write_status(data.get("write_status")),
+            write_attempt_count=data.get("write_attempt_count", 0),
+            bacnet_write_dispatched=data.get("bacnet_write_dispatched", False),
+            bacnet_write_succeeded=data.get("bacnet_write_succeeded"),
             failure_reason=data.get("failure_reason"),
             point_name=data.get("point_name"),
             control_point=data.get("control_point"),

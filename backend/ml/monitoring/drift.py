@@ -9,7 +9,7 @@ Phase 45-03: MLOps Monitoring and Success Metrics.
 
 import logging
 import math
-from datetime import datetime
+from datetime import datetime, timedelta, UTC
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -56,6 +56,119 @@ def _ks_statistic(sample_a: list[float], sample_b: list[float]) -> float:
     return round(max_diff, 4)
 
 
+# Equipment type → Supabase equipment_id prefixes → sensor features
+# Only equipment types with real sensor data are marked uses_real_data=true
+EQUIPMENT_TO_SENSORS: dict[str, dict[str, Any]] = {
+    "chiller": {
+        "equipment_ids": ["S002-CHILLER-B1-001"],
+        "features": ["chw_return_temp", "chw_supply_temp", "compressor_current_1",
+                     "compressor_current_2", "cond_return_temp", "cond_supply_temp",
+                     "condenser_flow", "staging_state"],
+        "uses_real_data": True,
+    },
+    "ahu": {
+        "equipment_ids": ["S002-AHU-001", "S002-AHU-002", "S002-AHU-201"],
+        "features": ["return_air_temp", "supply_air_temp", "fan_speed", "filter_dp"],
+        "uses_real_data": True,
+    },
+    "fcu": {
+        "equipment_ids": [f"S002-FCU-{u:03d}" for u in list(range(1, 6)) +
+                         list(range(101, 106)) + list(range(201, 206)) + list(range(301, 306))],
+        "features": ["room_temp", "co2_ppm"],
+        "uses_real_data": True,
+    },
+    "vav": {
+        "equipment_ids": [],
+        "features": [],
+        "uses_real_data": False,
+    },
+    "generator": {
+        "equipment_ids": [],
+        "features": [],
+        "uses_real_data": False,
+    },
+    "ups": {
+        "equipment_ids": [],
+        "features": [],
+        "uses_real_data": False,
+    },
+    "pump": {
+        "equipment_ids": [],
+        "features": [],
+        "uses_real_data": False,
+    },
+}
+
+
+def _get_supabase_sensor_data(
+    equipment_ids: list[str],
+    features: list[str],
+    window_hours: int = 12,
+) -> dict[str, list[float]]:
+    """Fetch sensor readings from Supabase for given equipment and features.
+
+    Groups by sensor_type across all equipment of that type, returning
+    the full list of values for each feature across the time window.
+
+    Args:
+        equipment_ids: List of equipment IDs to query (e.g. ["S002-CHILLER-B1-001"])
+        features: List of sensor_type values to collect (e.g. ["chw_return_temp"])
+        window_hours: How many hours of recent data to fetch (for current window)
+
+    Returns:
+        Dict mapping feature name → list of sensor values from Supabase
+    """
+    if not equipment_ids or not features:
+        return {}
+
+    result: dict[str, list[float]] = {f: [] for f in features}
+
+    try:
+        from app.database.supabase_client import get_supabase_client
+
+        client = get_supabase_client()
+    except Exception:
+        return {}
+
+    try:
+        from app.config.settings import settings  # noqa: F401 - needed to ensure settings loaded
+        now = datetime.now(UTC)
+        cutoff = now - timedelta(hours=window_hours)
+        cutoff_str = cutoff.isoformat()
+
+        # Build query: select sensor_type + value for matching equipment IDs
+        # Use .in_() for equipment_id filter
+        resp = (
+            client.table("equipment_sensor_readings")
+            .select("equipment_id, sensor_type, value")
+            .in_("equipment_id", equipment_ids)
+            .in_("sensor_type", features)
+            .gte("recorded_at", cutoff_str)
+            .order("recorded_at")
+            .execute()
+        )
+
+        if not resp.data:
+            return {}
+
+        # Group values by sensor_type
+        from collections import defaultdict
+
+        by_sensor: dict[str, list[float]] = defaultdict(list)
+        for row in resp.data:
+            val = row.get("value")
+            if val is not None:
+                try:
+                    by_sensor[row["sensor_type"]].append(float(val))
+                except (TypeError, ValueError):
+                    pass
+
+        return dict(by_sensor)
+
+    except Exception:
+        return {}
+
+
 def _generate_training_stats(equipment_type: str) -> dict[str, list[float]]:
     """Generate simulated training distribution statistics.
 
@@ -90,7 +203,6 @@ def _generate_training_stats(equipment_type: str) -> dict[str, list[float]]:
         },
     }
 
-    # Default distribution for types not explicitly defined
     default = {
         "temperature": [random.gauss(22.0, 2.0) for _ in range(100)],
         "power_kw": [random.gauss(50.0, 10.0) for _ in range(100)],
@@ -118,11 +230,8 @@ def _generate_current_stats(equipment_type: str, drift_amount: float = 0.0) -> d
     for feature, values in training.items():
         mean = sum(values) / len(values)
         std = math.sqrt(sum((x - mean) ** 2 for x in values) / len(values))
-
-        # Add drift: shift mean and increase variance
         drifted_mean = mean + (std * drift_amount * 1.5)
         drifted_std = std * (1.0 + drift_amount * 0.5)
-
         current[feature] = [random.gauss(drifted_mean, drifted_std) for _ in range(80)]
 
     return current
@@ -244,14 +353,27 @@ class DriftDetector:
 
         # Prometheus metrics instrumentation (best-effort)
         try:
-            from app.api.metrics import sentinel_model_drift_alerts
+            from app.api.metrics import sentinel_model_drift_alerts, sentinel_model_drift_score
+            from app.services.governance_metrics_collector import governance_metrics
 
-            # Set gauge per equipment type: 1 if drift detected, 0 if clean
             for result in feature_results:
+                eq_type = result["equipment_type"]
+                drift_detected = result["drift_detected"]
                 sentinel_model_drift_alerts.labels(
                     site_id="site-002",
-                    model_type=result["equipment_type"].upper(),
-                ).set(1 if result["drift_detected"] else 0)
+                    model_type=eq_type.upper(),
+                ).set(1 if drift_detected else 0)
+                # Compute aggregate drift score: ratio of drifted features to checked features
+                features_checked = result.get("features_checked", 0)
+                features_drifted = result.get("features_drifted", 0)
+                score = features_drifted / features_checked if features_checked > 0 else 0.0
+                sentinel_model_drift_score.labels(
+                    model_id=eq_type,
+                    model_type=eq_type.upper(),
+                ).set(score)
+                governance_metrics.record_drift_score(
+                    eq_type, eq_type.upper(), score
+                )
         except Exception:
             pass  # Metrics are best-effort, never block business logic
 
@@ -280,14 +402,69 @@ class DriftDetector:
         self._feature_baselines[equipment_type] = features
 
     def _get_training_stats(self, equipment_type: str) -> dict[str, list[float]]:
-        """Get training-time statistics for equipment type."""
+        """Get training-time statistics for equipment type.
+
+        Uses stored baseline if set; otherwise queries Supabase with a
+        long window and splits time-range in half (older half = baseline).
+        Falls back to synthetic for equipment types without real data.
+        """
         if equipment_type in self._feature_baselines:
             return self._feature_baselines[equipment_type]
-        return _generate_training_stats(equipment_type)
+
+        cfg = EQUIPMENT_TO_SENSORS.get(equipment_type, {})
+        if not cfg.get("uses_real_data", False):
+            return _generate_training_stats(equipment_type)
+
+        equipment_ids = cfg["equipment_ids"]
+        features = cfg["features"]
+        if not equipment_ids or not features:
+            return _generate_training_stats(equipment_type)
+
+        # Fetch all available data for this equipment type (up to 48h window)
+        sensor_data = _get_supabase_sensor_data(equipment_ids, features, window_hours=48)
+        if not sensor_data:
+            return _generate_training_stats(equipment_type)
+
+        # Split each feature's time series: first half = baseline, second half = current
+        baseline: dict[str, list[float]] = {}
+        for feat, values in sensor_data.items():
+            mid = len(values) // 2
+            if mid < 2:
+                return _generate_training_stats(equipment_type)
+            baseline[feat] = values[:mid]
+
+        return baseline
 
     def _get_current_stats(self, equipment_type: str) -> dict[str, list[float]]:
-        """Get current feature statistics for equipment type."""
-        return _generate_current_stats(equipment_type, drift_amount=0.05)
+        """Get current feature statistics for equipment type.
+
+        Queries Supabase with a long window and splits time-range in half
+        (newer half = current). Falls back to synthetic for types without
+        real data or insufficient readings.
+        """
+        cfg = EQUIPMENT_TO_SENSORS.get(equipment_type, {})
+        if not cfg.get("uses_real_data", False):
+            return _generate_current_stats(equipment_type, drift_amount=0.0)
+
+        equipment_ids = cfg["equipment_ids"]
+        features = cfg["features"]
+        if not equipment_ids or not features:
+            return _generate_current_stats(equipment_type, drift_amount=0.0)
+
+        # Fetch all available data for this equipment type (up to 48h window)
+        sensor_data = _get_supabase_sensor_data(equipment_ids, features, window_hours=48)
+        if not sensor_data:
+            return _generate_current_stats(equipment_type, drift_amount=0.0)
+
+        # Split each feature's time series: second half = current
+        current: dict[str, list[float]] = {}
+        for feat, values in sensor_data.items():
+            mid = len(values) // 2
+            if mid < 2:
+                return _generate_current_stats(equipment_type, drift_amount=0.0)
+            current[feat] = values[mid:]
+
+        return current
 
     def _get_recent_accuracy(self, model_type: str, days: int = 7) -> float:
         """Get recent prediction accuracy for model type.

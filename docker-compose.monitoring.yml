@@ -1,0 +1,189 @@
+# =============================================================================
+# SENTINEL BMS — Monitoring Stack (Grafana + Prometheus)
+# =============================================================================
+# Run with: docker compose -f docker-compose.monitoring.yml up -d
+# =============================================================================
+
+version: "3.8"
+
+services:
+  # Grafana - Visualization Dashboard
+  grafana:
+    image: grafana/grafana:10.4.1
+    container_name: sentinel-grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_ROOT_URL=https://grafana.sentinel-ai.co.za
+      - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-simple-json-datasource
+    volumes:
+      - ./infrastructure/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./infrastructure/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./infrastructure/grafana/provisioning/alerting:/etc/grafana/provisioning/alerting:ro
+      - grafana-data:/var/lib/grafana
+    networks:
+      - sentinel-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # Prometheus - Metrics Collection
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: sentinel-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=90d'
+      - '--storage.tsdb.min-block-duration=2h'
+      - '--storage.tsdb.max-block-duration=2h'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    volumes:
+      - ./infrastructure/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./infrastructure/prometheus/alerting-rules.yml:/etc/prometheus/alerting-rules.yml:ro
+      - prometheus-data:/prometheus
+    networks:
+      - sentinel-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # Node Exporter - Host metrics
+  node-exporter:
+    image: prom/node-exporter:v1.7.0
+    container_name: sentinel-node-exporter
+    restart: unless-stopped
+    expose:
+      - "9100"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.rootfs=/rootfs'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    networks:
+      - sentinel-network
+
+  # cAdvisor - Container metrics
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: sentinel-cadvisor
+    restart: unless-stopped
+    expose:
+      - "8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker:/var/lib/docker:ro
+      - /dev/disk:/dev/disk:ro
+    networks:
+      - sentinel-network
+
+  # Loki - Log Aggregation
+  loki:
+    image: grafana/loki:2.9.3
+    container_name: sentinel-loki
+    restart: unless-stopped
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/loki-config.yaml
+    volumes:
+      - ./infrastructure/loki/loki-config.yaml:/etc/loki/loki-config.yaml:ro
+      - loki-data:/loki
+    networks:
+      - sentinel-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:3100/ready || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  # Promtail - Log Collector
+  promtail:
+    image: grafana/promtail:2.9.3
+    container_name: sentinel-promtail
+    restart: unless-stopped
+    command: -config.file=/etc/promtail/promtail-config.yaml
+    volumes:
+      - ./infrastructure/promtail/promtail-config.yaml:/etc/promtail/promtail-config.yaml:ro
+      - /var/log:/var/log:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /opt/bms-intelligence/backend/app/data:/opt/bms-intelligence/backend/app/data:ro
+    depends_on:
+      - loki
+    networks:
+      - sentinel-network
+
+  # Alertmanager - Alert routing to Sentry Telegram
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: sentinel-alertmanager
+    restart: unless-stopped
+    ports:
+      - "9093:9093"
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+      - '--web.external-url=https://grafana.sentinel-ai.co.za/alertmanager'
+    volumes:
+      - ./infrastructure/prometheus/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager-data:/alertmanager
+    networks:
+      - sentinel-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:9093 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Sentry Bridge - Prometheus → Telegram webhook receiver
+  sentry-bridge:
+    image: python:3.11-slim
+    container_name: sentry-alert-bridge
+    restart: always  # Dead man's switch - must stay up
+    environment:
+      # Bot token from ~/.sentry/gateway/sentry.json
+      - SENTRY_BOT_TOKEN=***TELEGRAM_BOT_TOKEN_REDACTED***
+      - MANAGER_BOT_CHAT_ID=8359288792
+      - SHARED_SECRET=${ALERTMANAGER_SHARED_SECRET:-sentinel-default-secret-change-in-production}
+      - BRIDGE_PORT=9099
+      - DATA_FRESHNESS_THRESHOLD_MINUTES=5
+    entrypoint: ["sh", "-c", "pip install --quiet requests && python /app/sentry-bridge.py"]
+    volumes:
+      - ./infrastructure/prometheus/sentry-bridge.py:/app/sentry-bridge.py:ro
+      # Mount Sentry config for reference
+      - /home/bederf/.sentry/gateway/sentry.json:/etc/sentry/sentry.json:ro
+    # No ports exposed - internal Docker network only
+    networks:
+      - sentinel-network
+
+volumes:
+  grafana-data:
+  prometheus-data:
+  loki-data:
+  alertmanager-data:
+
+networks:
+  sentinel-network:
+    external: true

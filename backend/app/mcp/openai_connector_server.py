@@ -36,10 +36,11 @@ ALERTS_FILE = DATA_DIR / "alerts.json"
 SITES_DIR = DATA_DIR / "sites"
 
 # Base URL for document links (set from settings at runtime)
+# Priority: SENTINEL_PUBLIC_URL > backend_url > localhost fallback
 try:
     from app.config.settings import settings
 
-    BASE_URL = settings.backend_url or "http://localhost:9095"
+    BASE_URL = settings.sentinel_public_url or settings.backend_url or "http://localhost:9095"
 except Exception:
     BASE_URL = "http://localhost:9095"
 
@@ -220,7 +221,7 @@ def _build_building_document(building: dict, source: str = "supabase") -> dict[s
         "id": f"building-{site_id}",
         "title": f"Building: {building.get('name', site_id)}",
         "text": "\n".join(text_parts),
-        "url": f"{BASE_URL}/buildings/{site_id}",
+        "url": f"{BASE_URL}/api/buildings/{site_id}",
         "doc_type": "building",
         "metadata": {
             "site_id": site_id,
@@ -270,7 +271,7 @@ def _build_equipment_document(equipment: dict, source: str = "supabase") -> dict
         "id": f"equipment-{equip_id}",
         "title": f"Equipment: {equipment.get('name', equip_id)}",
         "text": "\n".join(text_parts),
-        "url": f"{BASE_URL}/equipment/{equip_id}",
+        "url": f"{BASE_URL}/api/equipment/{equip_id}",
         "doc_type": "equipment",
         "metadata": {
             "equipment_id": equip_id,
@@ -317,7 +318,7 @@ def _build_alert_document(alert: dict, source: str = "supabase") -> dict[str, An
         "id": f"alert-{alert_id}",
         "title": f"Alert: {alert.get('title', 'Unknown')} ({alert.get('severity', 'N/A')})",
         "text": "\n".join(text_parts),
-        "url": f"{BASE_URL}/alerts/{alert_id}",
+        "url": f"{BASE_URL}/api/alerts/{alert_id}",
         "doc_type": "alert",
         "metadata": {
             "alert_id": str(alert_id),
@@ -385,7 +386,7 @@ def _build_prediction_document(prediction: dict, source: str = "supabase") -> di
             f"Prediction: {prediction.get('prediction_type', 'Unknown')} - {equipment_name or 'Unknown Equipment'}"
         ),
         "text": "\n".join(text_parts),
-        "url": f"{BASE_URL}/predictions/{pred_id}",
+        "url": f"{BASE_URL}/api/predictions/{pred_id}",
         "doc_type": "prediction",
         "metadata": {
             "prediction_id": str(pred_id),
@@ -437,7 +438,7 @@ def _build_work_order_document(wo: dict, source: str = "supabase") -> dict[str, 
         "id": f"workorder-{wo_id}",
         "title": f"Work Order: {wo.get('title', wo_id)}",
         "text": "\n".join(text_parts),
-        "url": f"{BASE_URL}/work-orders/{wo_id}",
+        "url": f"{BASE_URL}/api/work-orders/{wo_id}",
         "doc_type": "work_order",
         "metadata": {
             "work_order_id": str(wo_id),
@@ -474,7 +475,7 @@ def _build_tech_document(doc: dict, source: str = "supabase") -> dict[str, Any]:
         "id": f"document-{doc_id}",
         "title": f"Document: {doc.get('title', doc_id)}",
         "text": "\n".join(text_parts),
-        "url": doc.get("source_url") or f"{BASE_URL}/documents/{doc_id}",
+        "url": doc.get("source_url") or f"{BASE_URL}/api/documents/{doc_id}",
         "doc_type": "technical_document",
         "metadata": {
             "document_id": str(doc_id),

@@ -8,6 +8,7 @@ Wired into BackgroundSchedulerService via add_data_freshness_monitor_job().
 """
 
 import logging
+import os
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, ClassVar
@@ -204,11 +205,17 @@ class DataFreshnessMonitor:
         target: int,
         sli_pass: bool,
     ) -> dict[str, Any]:
-        """Detect new breaches and resolve active ones."""
+        """Detect new breaches and resolve active ones.
+
+        Alert policy:
+        - Auto-recovery window: 10 minutes (600s)
+        - Only alert if breach persists beyond auto-recovery window (unrecoverable)
+        - Alert once per breach via Sentry Telegram bot to manager
+        """
         # Check for active (unresolved) breach
         active_breach_result = (
             supabase.table("data_freshness_breaches")
-            .select("id, breach_time")
+            .select("id, breach_time, alert_sent")
             .eq("site_id", site_id)
             .eq("data_source", data_source)
             .is_("resolved_at", None)
@@ -219,6 +226,7 @@ class DataFreshnessMonitor:
 
         active_breach = active_breach_result.data
         now = datetime.now(UTC)
+        AUTO_RECOVERY_WINDOW_SECONDS = 600  # 10 minutes
 
         if sli_pass and active_breach:
             # Breach is resolved
@@ -229,6 +237,10 @@ class DataFreshnessMonitor:
             supabase.table("data_freshness_breaches").update(
                 {"resolved_at": now.isoformat(), "duration_seconds": duration}
             ).eq("id", breach_id).execute()
+
+            # Send recovery notification if alert was previously sent
+            if active_breach[0].get("alert_sent"):
+                await self._send_recovery_notification(site_id, data_source, duration)
 
             return {"breach_started": False, "breach_resolved": True, "breach_duration_seconds": duration}
 
@@ -241,17 +253,39 @@ class DataFreshnessMonitor:
                     "age_seconds": age_seconds,
                     "sli_target": target,
                     "breach_time": now.isoformat(),
+                    "alert_sent": False,
                 }
             ).execute()
 
-            # Telegram alert for critical sources
-            if data_source in self._CRITICAL_SOURCES:
-                await self._send_freshness_alert(site_id, data_source, age_seconds, target)
+            # Don't alert immediately - wait for auto-recovery window
+            logger.info(
+                f"[FRESHNESS] Breach started for {data_source}@{site_id} - "
+                f"waiting {AUTO_RECOVERY_WINDOW_SECONDS}s auto-recovery window before alerting"
+            )
 
             return {"breach_started": True, "breach_resolved": False}
 
         elif not sli_pass and active_breach:
-            # Ongoing breach — still stale but already tracked
+            # Ongoing breach — check if we've exceeded auto-recovery window
+            breach_time = datetime.fromisoformat(active_breach[0]["breach_time"].replace("Z", "+00:00"))
+            breach_duration = int((now - breach_time).total_seconds())
+            alert_sent = active_breach[0].get("alert_sent", False)
+
+            # Alert only if:
+            # 1. Breach has persisted beyond auto-recovery window
+            # 2. Alert hasn't been sent yet for this breach
+            if (
+                breach_duration > AUTO_RECOVERY_WINDOW_SECONDS
+                and not alert_sent
+                and data_source in self._CRITICAL_SOURCES
+            ):
+                await self._send_unrecoverable_alert(site_id, data_source, age_seconds, target, breach_duration)
+
+                # Mark alert as sent
+                supabase.table("data_freshness_breaches").update(
+                    {"alert_sent": True}
+                ).eq("id", active_breach[0]["id"]).execute()
+
             return {"breach_started": False, "breach_resolved": False}
 
         # No breach state change
@@ -270,24 +304,35 @@ class DataFreshnessMonitor:
             return f"site-{site_id[1:]}"  # S002[1:] = '002' → site-002
         return site_id
 
-    async def _send_freshness_alert(self, site_id: str, data_source: str, age_seconds: int | None, target: int) -> None:
-        """Send Telegram alert for critical source breaches (bms_telemetry, anomalies).
+    async def _send_unrecoverable_alert(
+        self, site_id: str, data_source: str, age_seconds: int | None, target: int, breach_duration: int
+    ) -> None:
+        """Send Telegram alert for UNRECOVERABLE breach (persisted > 10 min).
 
-        Routes via Sentry gateway's default manager bot (***TELEGRAM_BOT_TOKEN_REDACTED***)
-        to preserve consistency with the .sentry tool ecosystem.
+        Routes via Sentry gateway's manager bot to notify that auto-recovery failed
+        and manual intervention is required.
         """
         try:
             import httpx
 
-            bot_token = "***TELEGRAM_BOT_TOKEN_REDACTED***"
-            chat_id = "8359288792"  # Manager operator chat ID
+            bot_token = os.environ.get("TELEGRAM_BOT_TOKEN", os.environ.get("SENTRY_BOT_TOKEN", ""))
+            chat_id = os.environ.get("TELEGRAM_CHAT_ID", "8359288792")  # Manager operator chat ID
+
+            if not bot_token:
+                logger.warning("[FRESHNESS] TELEGRAM_BOT_TOKEN not set - skipping Telegram alert")
+                self._fallback_log(site_id, data_source, age_seconds, target, "No bot token configured")
+                return
+
+            minutes_down = breach_duration // 60
 
             message = (
-                f"🚨 <b>Data Freshness Breach</b>\n\n"
-                f"<b>Source:</b> {data_source}\n"
+                f"🚨 <b>SENTRY ALERT: Telemetry Unrecoverable</b>\n\n"
                 f"<b>Site:</b> {site_id}\n"
-                f"<b>Age:</b> {age_seconds}s (target: {target}s)\n\n"
-                f"S002 may be offline. Check BMS backend."
+                f"<b>Source:</b> {data_source}\n"
+                f"<b>Duration:</b> {minutes_down} minutes\n"
+                f"<b>Status:</b> Auto-recovery failed\n\n"
+                f"⚠️ System has been down for over 10 minutes and has NOT auto-recovered.\n\n"
+                f"🔧 <b>Action Required:</b> Check BMS backend and bridge connectivity immediately."
             )
 
             async with httpx.AsyncClient(timeout=15.0) as client:
@@ -297,12 +342,49 @@ class DataFreshnessMonitor:
                 )
                 result = resp.json()
                 if not result.get("ok"):
-                    logger.warning(f"[FRESHNESS] Telegram alert failed: {result}")
+                    logger.warning(f"[FRESHNESS] Unrecoverable alert failed: {result}")
                     self._fallback_log(site_id, data_source, age_seconds, target, result)
+                else:
+                    logger.info(f"[FRESHNESS] Unrecoverable alert sent to manager for {site_id}")
 
         except Exception as e:
-            logger.warning(f"Failed to send freshness Telegram alert: {e}")
+            logger.warning(f"Failed to send unrecoverable alert: {e}")
             self._fallback_log(site_id, data_source, age_seconds, target, str(e))
+
+    async def _send_recovery_notification(self, site_id: str, data_source: str, duration_seconds: int) -> None:
+        """Send Telegram notification when breach is resolved (auto-recovered)."""
+        try:
+            import httpx
+
+            bot_token = os.environ.get("TELEGRAM_BOT_TOKEN", os.environ.get("SENTRY_BOT_TOKEN", ""))
+            chat_id = os.environ.get("TELEGRAM_CHAT_ID", "8359288792")  # Manager operator chat ID
+
+            if not bot_token:
+                logger.warning("[FRESHNESS] TELEGRAM_BOT_TOKEN not set - skipping Telegram alert")
+                self._fallback_log(site_id, data_source, age_seconds, target, "No bot token configured")
+                return
+
+            minutes = duration_seconds // 60
+
+            message = (
+                f"✅ <b>SENTRY: Telemetry Restored</b>\n\n"
+                f"<b>Site:</b> {site_id}\n"
+                f"<b>Source:</b> {data_source}\n"
+                f"<b>Duration:</b> {minutes} minutes\n\n"
+                f"System has auto-recovered and telemetry is flowing normally."
+            )
+
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                resp = await client.post(
+                    f"https://api.telegram.org/bot{bot_token}/sendMessage",
+                    json={"chat_id": chat_id, "text": message, "parse_mode": "HTML"},
+                )
+                result = resp.json()
+                if result.get("ok"):
+                    logger.info(f"[FRESHNESS] Recovery notification sent for {site_id}")
+
+        except Exception as e:
+            logger.warning(f"Failed to send recovery notification: {e}")
 
     def _fallback_log(self, site_id: str, data_source: str, age_seconds: int | None, target: int, error: Any) -> None:
         """Write failed alert to fallback file for manual recovery."""

@@ -121,7 +121,7 @@ class AlertResponse(BaseModel):
 
     id: str
     anomaly_id: str | None
-    equipment_id: str
+    equipment_id: str | None
     site_id: str
     type: str
     severity: str
@@ -143,6 +143,10 @@ class AlertResponse(BaseModel):
     device_id: str | None = None  # Maps to device manager for control navigation
     recommended_action: str | None = None
     operational_context: dict | None = None
+    # Additional fields from load_alerts
+    health_score: float | None = None
+    fault_codes: list[str] | None = None
+    is_database: bool | None = None
 
 
 class AlertListResponse(BaseModel):

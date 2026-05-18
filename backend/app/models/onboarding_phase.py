@@ -330,7 +330,7 @@ async def check_shadow_exit_criteria(site_id: str) -> dict:
             repo4 = ParasiteDecisionRepository()
             decisions = await repo4.get_decisions_since(limit=100)
             site_decisions = [d for d in decisions if d.get("site_id") == site_id]
-            completed = [d for d in site_decisions if d.get("write_status") in ("success", "blocked")]
+            completed = [d for d in site_decisions if d.get("write_status") in ("succeeded", "blocked_by_gate")]
             gate4_passed = len(completed) >= 3
             results.append(
                 {

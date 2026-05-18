@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS public.ipmvp_energy (
 CREATE INDEX IF NOT EXISTS idx_ipmvp_energy_site_ts
   ON public.ipmvp_energy (site_id, timestamp DESC);
 
+ALTER TABLE public.ipmvp_energy DROP CONSTRAINT IF EXISTS ipmvp_energy_unique;
 ALTER TABLE public.ipmvp_energy ADD CONSTRAINT ipmvp_energy_unique
   UNIQUE (site_id, timestamp);
 
@@ -34,6 +35,7 @@ CREATE TABLE IF NOT EXISTS public.ipmvp_oat (
 CREATE INDEX IF NOT EXISTS idx_ipmvp_oat_site_ts
   ON public.ipmvp_oat (site_id, timestamp DESC);
 
+ALTER TABLE public.ipmvp_oat DROP CONSTRAINT IF EXISTS ipmvp_oat_unique;
 ALTER TABLE public.ipmvp_oat ADD CONSTRAINT ipmvp_oat_unique
   UNIQUE (site_id, timestamp);
 
@@ -56,6 +58,7 @@ CREATE TABLE IF NOT EXISTS public.ipmvp_events (
 CREATE INDEX IF NOT EXISTS idx_ipmvp_events_site_ts
   ON public.ipmvp_events (site_id, timestamp DESC);
 
+ALTER TABLE public.ipmvp_events DROP CONSTRAINT IF EXISTS ipmvp_events_unique;
 ALTER TABLE public.ipmvp_events ADD CONSTRAINT ipmvp_events_unique
   UNIQUE (site_id, event_id);
 

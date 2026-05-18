@@ -17,6 +17,8 @@ COMMENT ON COLUMN public.commissioning_scorecards.scorecard_data IS 'Full scorec
 
 ALTER TABLE public.commissioning_scorecards ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Service role full access on commissioning_scorecards" ON public.commissioning_scorecards;
+
 CREATE POLICY "Service role full access on commissioning_scorecards"
   ON public.commissioning_scorecards
   FOR ALL

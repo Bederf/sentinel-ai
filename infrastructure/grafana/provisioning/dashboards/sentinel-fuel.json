@@ -1,0 +1,100 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "SENTINEL Fuel & Generator monitoring — runtime hours, fuel level, consumption rate, autonomy.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "id": 1,
+      "title": "Scrape Health",
+      "type": "stat",
+      "gridPos": { "h": 3, "w": 4, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "targets": [{ "refId": "A", "expr": "up{job=\"sentinel-backend\"}", "legendFormat": "{{instance}}" }],
+      "fieldConfig": { "defaults": { "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] } } }
+    },
+    {
+      "id": 2,
+      "title": "Fuel Level %",
+      "type": "gauge",
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "targets": [{ "refId": "A", "expr": "avg(sentinel_fuel_level_percent) or vector(0)", "legendFormat": "Avg %" }],
+      "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 100, "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "yellow", "value": 20 }, { "color": "green", "value": 50 }] } } }
+    },
+    {
+      "id": 3,
+      "title": "Autonomy (hours remaining)",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "targets": [{ "refId": "A", "expr": "sum(sentinel_fuel_autonomy_hours) or vector(0)", "legendFormat": "Hours" }],
+      "fieldConfig": { "defaults": { "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "yellow", "value": 24 }, { "color": "green", "value": 72 }] }, "unit": "none" } }
+    },
+    {
+      "id": 4,
+      "title": "Generator Runtime (hours)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "targets": [{ "refId": "A", "expr": "sentinel_fuel_generator_runtime_hours", "legendFormat": "{{generator_id}} ({{site_id}})" }],
+      "fieldConfig": { "defaults": { "unit": "none", "custom": { "lineWidth": 2, "fillOpacity": 30 } } }
+    },
+    {
+      "id": 5,
+      "title": "Fuel Level % by Tank",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "targets": [{ "refId": "A", "expr": "sentinel_fuel_level_percent", "legendFormat": "{{tank_id}}" }],
+      "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 100, "custom": { "lineWidth": 2, "fillOpacity": 30 }, "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "yellow", "value": 20 }, { "color": "green", "value": 50 }] } } }
+    },
+    {
+      "id": 6,
+      "title": "Fuel Consumption (L/h)",
+      "type": "timeseries",
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 12 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "targets": [{ "refId": "A", "expr": "sentinel_fuel_consumption_lph", "legendFormat": "{{generator_id}}" }],
+      "fieldConfig": { "defaults": { "unit": "none", "custom": { "lineWidth": 2, "fillOpacity": 30 } } }
+    },
+    {
+      "id": 7,
+      "title": "Fuel Cost (ZAR)",
+      "type": "timeseries",
+      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 12 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "targets": [{ "refId": "A", "expr": "sentinel_fuel_cost_zar", "legendFormat": "{{site_id}}" }],
+      "fieldConfig": { "defaults": { "unit": "currencyZAR", "custom": { "lineWidth": 2, "fillOpacity": 30 } } }
+    }
+  ],
+  "refresh": "60s",
+  "tags": ["fuel", "generator", "sentinel", "building"],
+  "templating": {
+    "list": [
+      { "name": "site", "type": "query", "query": "label_values(sentinel_fuel_generator_runtime_hours, site_id)", "multi": true }
+    ]
+  },
+  "time": { "from": "now-24h", "to": "now" },
+  "title": "SENTINEL Fuel & Generator Dashboard",
+  "uid": "sentinel-fuel",
+  "version": 1
+}

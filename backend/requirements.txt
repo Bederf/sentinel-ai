@@ -124,3 +124,7 @@ msal>=1.26.0                   # Microsoft Authentication Library for Outlook ca
 
 # Fuzzy String Matching (Phase 180 — Asset ID Resolver)
 rapidfuzz>=3.6.0               # token_set_ratio for equipment description fuzzy matching
+
+# ODS-E (Open Data Schema for Energy) Export (Phase 209)
+# Validation library for ODS-E v0.4.0 energy data export
+odse>=0.4.0                    # ODS-E schema validation for Asoba eSUMS integration

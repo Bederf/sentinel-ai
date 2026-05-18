@@ -309,6 +309,7 @@ async def list_focus_sessions(
                     "start_time": s.start_time.isoformat() + "Z",
                     "end_time": s.end_time.isoformat() + "Z" if s.end_time else None,
                     "is_active": s.is_active,
+                    "door_closed": s.door_closed,
                 },
                 **describe_focus_session_state(s),
             }
@@ -316,6 +317,33 @@ async def list_focus_sessions(
         ],
         "count": len(sessions),
     }
+
+
+@router.post("/focus-sessions/{session_id}/close")
+async def close_focus_session(
+    session_id: str,
+) -> dict[str, Any]:
+    """Manually close an active focus room session (admin override)."""
+    from app.services import occupancy_store
+    from datetime import datetime, timedelta, timezone
+
+    # SAST is UTC+2
+    SAST = timezone(timedelta(hours=2))
+
+    now = datetime.now(SAST).replace(tzinfo=None)
+    closed = occupancy_store.close_session(session_id, now, extended_threshold=7200)
+
+    if closed:
+        return {
+            "success": True,
+            "session_id": session_id,
+            "action": "session_closed",
+            "end_time": closed.end_time.isoformat() if closed.end_time else None,
+            "duration_seconds": closed.duration_seconds,
+            "extended_use": closed.extended_use,
+        }
+    else:
+        raise HTTPException(status_code=404, detail="Session not found or already closed")
 
 
 @router.get("/focus-analytics")

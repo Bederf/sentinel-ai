@@ -55,7 +55,10 @@ async def send_focus_overstay_alert(
             if concierges:
                 for c in concierges:
                     if c.mobile and c.mobile.strip():
-                        whatsapp_targets.append(c.mobile.strip())
+                        num = c.mobile.strip()
+                        if not num.startswith("+"):
+                            num = "+27" + num.lstrip("0")
+                        whatsapp_targets.append(num)
             if not whatsapp_targets and config and config.concierge_whatsapp:
                 whatsapp_targets.append(config.concierge_whatsapp.replace("whatsapp:", ""))
             if whatsapp_targets:
@@ -65,9 +68,10 @@ async def send_focus_overstay_alert(
                     f"⚠️ Focus Room Overstay Alert\n"
                     f"Site: {site_label}\n"
                     f"Room: {room_code}\n"
-                    f"Occupancy exceeded {max_allowed_minutes} minutes.\n"
-                    f"LED/relay is ON.\n"
-                    f"Cooldown: LED remains ON for {cooldown_minutes} minutes after room becomes vacant."
+                    f"Occupancy exceeded {max_allowed_minutes} min.\n\n"
+                    f"Is the room currently occupied?\n"
+                    f"Reply YES to confirm — session will continue.\n"
+                    f"Reply NO to end the session and release the room."
                 )
                 sent_any = False
                 import shutil
@@ -78,8 +82,7 @@ async def send_focus_overstay_alert(
                         env["SENTRY_CONFIG_DIR"] = "/home/bederf/.sentry/gateway"
                         result = subprocess.run(
                             [cli, "message", "send", "--channel", "whatsapp", "--target", target, "--message", body],
-                            capture_output=True, text=True, timeout=30, env=env,
-                            capture_output=True, text=True, timeout=30,
+                            capture_output=True, text=True, timeout=90, env=env,
                         )
                         if result.returncode == 0:
                             sent_any = True
@@ -133,6 +136,7 @@ async def process_focus_room_whatsapp_reply(
 
     # Try to match by replied-to message ID first
     room_code = ""
+    site_id = "site-002"
     if reply_to_message_id and reply_to_message_id in _focus_alert_messages:
         room_code = _focus_alert_messages[reply_to_message_id]
 
@@ -159,6 +163,7 @@ async def process_focus_room_whatsapp_reply(
             }
 
         room_code = all_sessions[0].get("room_code", "")
+        site_id = all_sessions[0].get("site_id", "site-002")
 
     active = occupancy_store.get_active_session(room_code) if room_code else None
     if not active:
@@ -170,17 +175,19 @@ async def process_focus_room_whatsapp_reply(
 
     if reply == "yes":
         occupancy_store.extend_overstay_grace(session_id, 10)
-        logger.info("Focus overstay grace +10min via WhatsApp concierge: room=%s", room_code)
+        from app.services.focus_room_relay_service import sync_focus_room_relay
+        sync_focus_room_relay(site_id=site_id, room_code=room_code)
+        logger.info("Focus overstay confirmed occupied — grace +10min via WhatsApp: room=%s", room_code)
         return {
             "handled": True,
-            "response_message": f"{room_code} — session extended by 10 minutes.",
+            "response_message": f"{room_code} — confirmed occupied. Grace period added. Red light released.",
         }
     else:
         occupancy_store.close_session(session_id, datetime.utcnow())
-        logger.info("Focus session closed via WhatsApp concierge: room=%s", room_code)
         from app.services.focus_room_relay_service import sync_focus_room_relay
-        sync_focus_room_relay(site_id="site-002", room_code=room_code)
+        sync_focus_room_relay(site_id=site_id, room_code=room_code)
+        logger.info("Focus session reset via WhatsApp (room vacant): room=%s", room_code)
         return {
             "handled": True,
-            "response_message": f"Recorded: {room_code} marked empty.",
+            "response_message": f"{room_code} — recorded vacant. Session ended, relay reset.",
         }

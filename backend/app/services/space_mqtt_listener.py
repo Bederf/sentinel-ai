@@ -6,11 +6,14 @@ import asyncio
 import json
 import logging
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from app.config.settings import settings
 from app.services.space_event_service import process_occupancy_event
+
+# SAST (South Africa Standard Time) is UTC+2
+SAST = timezone(timedelta(hours=2))
 
 logger = logging.getLogger(__name__)
 
@@ -102,10 +105,10 @@ def parse_mqtt_presence_message(topic: str, payload: bytes | str | dict[str, Any
         # Guard against firmware sending uptime_seconds as ts instead of epoch.
         # Any ts before 2020-01-01 (epoch 1577836800) is clearly uptime, not a real timestamp.
         if timestamp_raw > 1577836800:
-            parsed_timestamp = datetime.utcfromtimestamp(timestamp_raw)
+            parsed_timestamp = datetime.fromtimestamp(timestamp_raw, tz=SAST).replace(tzinfo=None)
         else:
             # Uptime value — use server receive time instead
-            parsed_timestamp = datetime.utcnow()
+            parsed_timestamp = datetime.now(SAST).replace(tzinfo=None)
     elif isinstance(timestamp_raw, str):
         try:
             parsed_timestamp = datetime.fromisoformat(timestamp_raw.replace("Z", "+00:00")).replace(tzinfo=None)

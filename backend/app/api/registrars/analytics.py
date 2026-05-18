@@ -23,6 +23,7 @@ from app.api import (
     load_forecast,
     local_chat,
     mcp,
+    mcp_asoba,
     mcp_openai,
     mcp_sse,
     ml_feedback,
@@ -30,6 +31,7 @@ from app.api import (
     ml_retraining,
     mlops,
     ocr,
+    odse_export,
     optimization,
     optimization_quality,
     peak_demand,
@@ -123,3 +125,9 @@ def register_analytics_routers(app: FastAPI) -> None:
         from app.api import rlm_orchestration
 
         app.include_router(rlm_orchestration.router, tags=["rlm"])
+
+    # ODS-E Export (Phase 209: Asoba eSUMS/Ona Platform integration)
+    app.include_router(odse_export.router, prefix="/api/integration/odse", tags=["ods-e"])
+
+    # Asoba Terminal API MCP Server (Phase 209: Bidirectional Asoba integration)
+    app.include_router(mcp_asoba.router, prefix="/api/mcp/asoba", tags=["asoba"])

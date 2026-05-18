@@ -258,7 +258,7 @@ class SentinelDataSync:
 
         # 2. Batch update equipment in Supabase (with ML scores now injected)
         try:
-            results["supabase_synced"] = self._batch_update_equipment(simulated_time, equipment_states)
+            results["supabase_synced"] = await self._batch_update_equipment(simulated_time, equipment_states)
         except Exception as e:
             results["errors"].append(f"supabase_sync: {e}")
 
@@ -283,7 +283,7 @@ class SentinelDataSync:
 
         return results
 
-    def _batch_update_equipment(
+    async def _batch_update_equipment(
         self,
         simulated_time: datetime,
         equipment_states: dict[str, dict[str, Any]],
@@ -291,6 +291,7 @@ class SentinelDataSync:
         """Batch update equipment operating_data, health_score, status in Supabase.
 
         Uses psycopg2 batch SQL for efficiency — one round-trip for all equipment.
+        Calculates health from sensor readings when pre-computed score is unavailable.
         """
         import psycopg2
 
@@ -309,12 +310,47 @@ class SentinelDataSync:
             else:
                 return "critical"
 
+        # Initialize health calculator for computing scores from sensors
+        from app.services.health_rating_calculator import HealthRatingCalculator
+        health_calc = HealthRatingCalculator()
+
+        # Get equipment metadata from DB for health calculations
+        equipment_codes = list(equipment_states.keys())
+        equipment_meta = {}
+        try:
+            from app.database.supabase_client import get_supabase_client
+            client = get_supabase_client()
+            resp = client.table("equipment").select("id, code, type, age_years, runtime_hours, operating_data").in_("code", equipment_codes).execute()
+            if resp.data:
+                equipment_meta = {eq["code"]: eq for eq in resp.data}
+        except Exception as e:
+            logger.warning(f"Could not fetch equipment metadata: {e}")
+
         updates = []
         for code, state in equipment_states.items():
             health_score = state.get("health_score")
             sensor_readings = state.get("sensor_readings", {})
             if not sensor_readings and health_score is None:
                 continue
+
+            # FIXED: Calculate health from sensor readings when no pre-computed score
+            if health_score is None and sensor_readings:
+                try:
+                    eq_meta = equipment_meta.get(code, {})
+                    # Get existing operating_data for anomaly scores
+                    existing_op = eq_meta.get("operating_data", {}) if isinstance(eq_meta.get("operating_data"), dict) else {}
+
+                    health_score = await health_calc.calculate_from_sensors(
+                        equipment_id=code,
+                        equipment=eq_meta,
+                        sensor_readings=sensor_readings,
+                        operating_data=existing_op,
+                    )
+                    if health_score is not None:
+                        logger.debug(f"Health calculated from sensors: {code}={health_score}")
+                except Exception as e:
+                    logger.warning(f"Failed to calculate health from sensors for {code}: {e}")
+                    # Continue with None - will skip update or use default
 
             # Blend LSTM anomaly into health_score when gate is met.
             # health_score from caller is the "base" rule-based score.
@@ -642,11 +678,15 @@ class SentinelDataSync:
             raise
 
 
-_sentinel_sync_instance: SentinelDataSync | None = None
+_sentinel_sync_instances: dict[str, SentinelDataSync] = {}
 
 
 def get_sentinel_data_sync(site_id: str | None = None) -> SentinelDataSync:
-    global _sentinel_sync_instance
-    if _sentinel_sync_instance is None:
-        _sentinel_sync_instance = SentinelDataSync(site_id=site_id)
-    return _sentinel_sync_instance
+    # Per-site cache — prevents singleton poisoning when different callers
+    # pass different site_id formats (site-002 vs S002) for the same site.
+    from app.core.site_resolver import get_primary_site_code
+
+    key = site_id or get_primary_site_code() or "unknown"
+    if key not in _sentinel_sync_instances:
+        _sentinel_sync_instances[key] = SentinelDataSync(site_id=key)
+    return _sentinel_sync_instances[key]

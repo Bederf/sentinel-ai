@@ -1,0 +1,108 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "SENTINEL Security monitoring — zone breaches, camera uptime, access events, alarm status.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "id": 1,
+      "title": "Scrape Health",
+      "type": "stat",
+      "gridPos": { "h": 3, "w": 4, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "targets": [{ "refId": "A", "expr": "up{job=\"sentinel-backend\"}", "legendFormat": "{{instance}}" }],
+      "fieldConfig": { "defaults": { "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] } } }
+    },
+    {
+      "id": 2,
+      "title": "Active Breaches",
+      "type": "stat",
+      "gridPos": { "h": 3, "w": 4, "x": 4, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "targets": [{ "refId": "A", "expr": "sum(sentinel_security_zone_breaches) or vector(0)", "legendFormat": "Breaches" }],
+      "fieldConfig": { "defaults": { "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] } } }
+    },
+    {
+      "id": 3,
+      "title": "Access Events (24h)",
+      "type": "stat",
+      "gridPos": { "h": 3, "w": 4, "x": 8, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "targets": [{ "refId": "A", "expr": "sum(sentinel_security_access_events) or vector(0)", "legendFormat": "Events" }],
+      "fieldConfig": { "defaults": { "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 100 }, { "color": "red", "value": 500 }] } } }
+    },
+    {
+      "id": 4,
+      "title": "Breaches by Zone",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 3 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "targets": [{ "refId": "A", "expr": "sentinel_security_zone_breaches", "legendFormat": "{{zone_id}} ({{site_id}})" }],
+      "fieldConfig": { "defaults": { "unit": "none", "custom": { "lineWidth": 2, "fillOpacity": 30 } } }
+    },
+    {
+      "id": 5,
+      "title": "Camera Uptime %",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 3 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "targets": [{ "refId": "A", "expr": "sentinel_security_camera_uptime_percent", "legendFormat": "{{camera_id}}" }],
+      "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 100, "custom": { "lineWidth": 2, "fillOpacity": 30 }, "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "yellow", "value": 80 }, { "color": "green", "value": 95 }] } } }
+    },
+    {
+      "id": 6,
+      "title": "Access Events by Type (24h)",
+      "type": "timeseries",
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 11 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "targets": [{ "refId": "A", "expr": "rate(sentinel_security_access_events_total[5m]) * 300", "legendFormat": "{{event_type}} ({{site_id}})" }],
+      "fieldConfig": { "defaults": { "unit": "none", "custom": { "lineWidth": 2, "fillOpacity": 30 } } }
+    },
+    {
+      "id": 7,
+      "title": "Alarm Status by Zone",
+      "type": "table",
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 11 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "targets": [{ "refId": "A", "expr": "sentinel_security_alarm_status", "format": "table", "legendFormat": "" }],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "type": "value", "options": { "0": { "text": "Disarmed", "color": "green" } } },
+            { "type": "value", "options": { "1": { "text": "Armed", "color": "yellow" } } },
+            { "type": "value", "options": { "2": { "text": "Triggered", "color": "red" } } }
+          ]
+        }
+      }
+    }
+  ],
+  "refresh": "30s",
+  "tags": ["security", "sentinel", "building"],
+  "templating": {
+    "list": [
+      { "name": "site", "type": "query", "query": "label_values(sentinel_security_zone_breaches, site_id)", "multi": true }
+    ]
+  },
+  "time": { "from": "now-24h", "to": "now" },
+  "title": "SENTINEL Security Dashboard",
+  "uid": "sentinel-security",
+  "version": 1
+}

@@ -59,11 +59,36 @@ export function OptimizationInfoCard({
   const isAdvisory = effectivePhase === "shadow_live" || effectivePhase === "advisory";
   const isAutoMode = mode === "automatic" && effectivePhase === "automatic";
 
+  // Sync mode with onboardingPhase prop when it changes
+  useEffect(() => {
+    if (onboardingPhase) {
+      setSitePhase(onboardingPhase);
+      // If phase is supervised, mode should be supervised too
+      if (onboardingPhase === "supervised") {
+        setMode("supervised");
+      }
+    }
+  }, [onboardingPhase]);
+
   // Always fetch optimization status (both modes run optimization)
   useEffect(() => {
     const fetchStatus = async () => {
       try {
-        const status = await api.getOptimizationStatus(siteId);
+        // Add timestamp to bypass cache
+        const timestamp = Date.now();
+        const response = await fetch(`/api/optimization/status/${siteId}?_t=${timestamp}`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('sentinel_token') || ''}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        const status = await response.json();
+        console.log('[OptimizationInfoCard] API Response:', {
+          mode: status.optimization_settings?.mode,
+          control_tier: status.optimization_settings?.control_tier,
+          onboarding_phase: status.onboarding_phase,
+          full_settings: status.optimization_settings
+        });
         setOptimizationStatus(status.optimization_status);
         setLastOptimization(status.last_optimization);
         setCurrentRecommendation(status.last_recommendation);
@@ -321,7 +346,7 @@ export function OptimizationInfoCard({
               className="text-lg font-semibold"
               style={{ color: "var(--color-sentinel-text-primary)" }}
             >
-              {mode.charAt(0).toUpperCase() + mode.slice(1)}
+              {isAdvisory ? "Advisory" : mode.charAt(0).toUpperCase() + mode.slice(1)}
             </div>
           </div>
 

@@ -1354,10 +1354,11 @@ async def get_optimization_status(site_id: str, request: Request) -> dict[str, A
         savings_summary = calculate_monthly_savings(history)
 
         # Build optimization_settings response
+        # Prefer control_tier as the authoritative field (synced with mode in phase promotion)
+        control_tier_value = raw_settings.get("control_tier") or raw_settings.get("mode", "advisory")
         normalized_settings = {
-            "mode": raw_settings.get("mode") or raw_settings.get("control_tier", "advisory"),
-            "active_profile": raw_settings.get("active_profile", "asset_preservation"),
-            "control_tier": raw_settings.get("control_tier") or raw_settings.get("mode", "advisory"),
+            "mode": control_tier_value,  # Return control_tier as mode for consistency
+            "control_tier": control_tier_value,
             "last_analysis": raw_settings.get("last_analysis"),
             "analysis_interval_minutes": raw_settings.get("analysis_interval_minutes", 15),
         }
@@ -1436,11 +1437,14 @@ async def toggle_optimization(site_id: str, request: ToggleRequest) -> dict[str,
             }
 
         # Toggle ON = automatic mode (AI auto-applies), Toggle OFF = supervised mode (human approves)
+        # Sync both mode and control_tier to prevent divergence (Fix: phase/control alignment)
         if request.enabled:
             site["optimization_settings"]["mode"] = "automatic"
+            site["optimization_settings"]["control_tier"] = "automatic"
             site["optimization_status"] = OptimizationStatus.UNKNOWN.value
         else:
             site["optimization_settings"]["mode"] = "supervised"
+            site["optimization_settings"]["control_tier"] = "supervised"
             site["optimization_status"] = OptimizationStatus.UNKNOWN.value
             site["last_recommendation"] = None
 

@@ -777,6 +777,17 @@ class BackgroundSchedulerService:
                         orch = _orch_mod_local._orchestrator_instance
                         is_sim = orch is not None and orch.running
 
+                        # FIX: Handle both flat format (recommended_value) and nested format (action.value)
+                        action_value = rec_dict.get("recommended_value")
+                        if action_value is None:
+                            action_value = rec_dict.get("action", {}).get("value")
+                        current_value = rec_dict.get("current_value")
+                        if current_value is None:
+                            current_value = rec_dict.get("action", {}).get("current_value")
+                        unit_value = rec_dict.get("unit", "")
+                        if not unit_value:
+                            unit_value = rec_dict.get("action", {}).get("unit", "")
+
                         rec = Recommendation(
                             site_id=site_id,
                             timestamp=datetime.utcnow(),
@@ -785,14 +796,14 @@ class BackgroundSchedulerService:
                             target_equipment=equipment_id,
                             action={
                                 "point": point_name,
-                                "value": rec_dict.get("recommended_value"),
+                                "value": action_value,
                                 "sim_hour": sim_now.strftime("%Y-%m-%d %H:%M") if is_sim else None,
                             },
                             reason=rec_dict.get("reason", ""),
                             expected_impact={
-                                "current_value": rec_dict.get("current_value"),
-                                "recommended_value": rec_dict.get("recommended_value"),
-                                "unit": rec_dict.get("unit", ""),
+                                "current_value": current_value,
+                                "recommended_value": action_value,
+                                "unit": unit_value,
                                 "energy_savings_percent": rec_dict.get("savings_kwh", 5),
                             },
                             confidence=str(confidence_num),
@@ -2191,32 +2202,36 @@ class BackgroundSchedulerService:
         Helps system adapt to changing building behaviors and conditions.
         """
         try:
+            from ml.monitoring.drift import EQUIPMENT_TYPES, get_drift_detector
             from ml.monitoring.triggers import RetrainingTrigger
 
             logger.debug("Running drift detection check...")
 
-            trigger = RetrainingTrigger()
-            result = trigger.evaluate_and_trigger()
+            detector = get_drift_detector()
 
-            # Update Prometheus drift gauge (Phase 127)
+            # Run feature drift detection and record scores to Prometheus
             try:
-                from app.api.metrics import sentinel_model_drift_alerts
-                from app.core.site_resolver import get_registered_site_ids
+                from app.api.metrics import sentinel_model_drift_alerts, sentinel_model_drift_score
+                from app.services.governance_metrics_collector import governance_metrics
 
-                # Count triggers per model_type
-                drift_counts: dict[str, int] = {}
-                for t in result.get("triggered", []):
-                    mt = t.get("model_type", "unknown").upper()
-                    drift_counts[mt] = drift_counts.get(mt, 0) + 1
-
-                # Set gauge for each registered site and model type
-                for site_id in get_registered_site_ids():
-                    for model_type in ["LSTM", "AUTOENCODER", "CLASSIFIER"]:
-                        sentinel_model_drift_alerts.labels(site_id=site_id, model_type=model_type).set(
-                            drift_counts.get(model_type, 0)
-                        )
+                for eq_type in EQUIPMENT_TYPES:
+                    result = detector.detect_feature_drift(eq_type)
+                    features_checked = result.get("features_checked", 0)
+                    features_drifted = result.get("features_drifted", 0)
+                    score = features_drifted / features_checked if features_checked > 0 else 0.0
+                    sentinel_model_drift_alerts.labels(
+                        site_id="site-002", model_type=eq_type.upper()
+                    ).set(1 if result.get("drift_detected") else 0)
+                    sentinel_model_drift_score.labels(
+                        model_id=eq_type, model_type=eq_type.upper()
+                    ).set(score)
+                    governance_metrics.record_drift_score(eq_type, eq_type.upper(), score)
             except Exception as metrics_err:
                 logger.debug(f"Drift metrics update skipped: {metrics_err}")
+
+            # Trigger retraining based on drift (uses same detector state)
+            trigger = RetrainingTrigger()
+            result = trigger.evaluate_and_trigger()
 
             if result.get("triggers_fired", 0) > 0:
                 logger.info(
@@ -3499,7 +3514,7 @@ class BackgroundSchedulerService:
 
                 # Check for illegal states (writes in Phase 0)
                 write_status = (d.get("write_status") or "").lower()
-                if write_status in ("success", "failed"):
+                if write_status in ("succeeded", "failed"):
                     illegal_state = "yes"
 
                 # Check pending > 30 min
@@ -3784,8 +3799,8 @@ class BackgroundSchedulerService:
             max_instances=1,
         )
         logger.info(
-            "Added equipment health snapshot job (%dh interval, first run at %s)",
-            interval_hours,
+            "Added equipment health snapshot job (%dm interval, first run at %s)",
+            interval_minutes,
             first_run.strftime("%H:%M:%S"),
         )
 
@@ -4286,6 +4301,75 @@ class BackgroundSchedulerService:
         from app.services.ghost_room_monitor import scan_due_ghost_bookings
 
         await scan_due_ghost_bookings()
+
+    def add_focus_overstay_check_job(self, interval_seconds: int = 120):
+        """Periodic check for focus room overstays — fires alerts for sessions past the limit."""
+        job_id = "focus_overstay_check"
+        self.scheduler.add_job(
+            func=self._run_focus_overstay_check,
+            trigger="interval",
+            seconds=interval_seconds,
+            id=job_id,
+            replace_existing=True,
+            name="Focus room overstay check",
+        )
+        logger.info(f"Focus overstay check scheduled every {interval_seconds}s")
+
+    def _run_focus_overstay_check(self):
+        try:
+            import asyncio
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                loop.run_until_complete(self._check_focus_overstays())
+            finally:
+                loop.close()
+        except Exception as e:
+            logger.warning(f"Focus overstay check failed: {e}")
+
+    async def _check_focus_overstays(self):
+        from app.database.supabase_client import get_supabase_client
+
+        sb = get_supabase_client()
+        if not sb:
+            return
+        try:
+            active = sb.table("space_focus_room_sessions").select("*").is_("end_time", None).execute()
+        except Exception:
+            return
+        from app.services.space_event_service import _overstay_alert_sent
+        from app.services.focus_room_notifier import send_focus_overstay_alert
+        from app.config.settings import settings
+        from app.services.focus_room_session_service import describe_focus_session_state
+
+        for session in (active.data or []):
+            session_id = session.get("session_id") or session.get("id", "")
+            if not session_id or session_id in _overstay_alert_sent:
+                continue
+            room_code = session.get("room_code", "")
+            site_id = session.get("site_id", "site-002")
+            from app.services import occupancy_store
+            from datetime import datetime, timedelta, timezone
+
+            active_sesh = occupancy_store.get_active_session(room_code)
+            if not active_sesh or active_sesh.session_id != session_id:
+                continue
+            # SAST is UTC+2 - use local time to match session timestamps
+            SAST = timezone(timedelta(hours=2))
+            state = describe_focus_session_state(active_sesh, now=datetime.now(SAST).replace(tzinfo=None))
+            if state.get("red_light_on"):
+                _overstay_alert_sent.add(session_id)
+                cooldown = max(1, int((settings.focus_red_light_cooldown_seconds or 300) / 60))
+                loop = asyncio.get_event_loop()
+                loop.create_task(
+                    send_focus_overstay_alert(
+                        site_id=site_id,
+                        room_code=room_code,
+                        max_allowed_minutes=max(1, int((settings.focus_extended_use_seconds or 7200) / 60)),
+                        cooldown_minutes=cooldown,
+                    )
+                )
+                logger.info("Focus overstay alert triggered via periodic check: %s", room_code)
 
     def add_focus_relay_reconcile_job(self, interval_seconds: int = 30):
         """Periodically reconcile focus-room relay state for cooldown expiry."""
@@ -5171,7 +5255,26 @@ def _run_recommendation_digest_sync(site_id: str = "site-002"):
                 eq = rec.target_equipment or rec.action_type or "unknown"
                 reason = rec.reason[:70] if rec.reason else ""
                 sev = rec.risk_level.value if hasattr(rec.risk_level, "value") else rec.risk_level or "info"
-                body = f"`{eq}` \u2014 {reason}\nSeverity: {sev}"
+
+                # Fetch manufacturer/model from Supabase
+                mfr_info = ""
+                try:
+                    from app.database.supabase_client import get_supabase_client
+                    sb = get_supabase_client()
+                    if sb and eq.startswith("S002-"):
+                        eq_resp = sb.table("equipment").select("manufacturer, model").eq("code", eq).execute()
+                        if eq_resp.data:
+                            eq_data = eq_resp.data[0]
+                            mfr = eq_data.get("manufacturer")
+                            model = eq_data.get("model")
+                            if mfr and model:
+                                mfr_info = f"{mfr} {model} | "
+                            elif mfr:
+                                mfr_info = f"{mfr} | "
+                except Exception:
+                    pass  # Silently skip if lookup fails
+
+                body = f"`{eq}` \u2014 {mfr_info}{reason}\nSeverity: {sev}"
                 rec_id = getattr(rec, "id", "") or ""
                 keyboard = InlineKeyboard(
                     rows=[
@@ -5194,77 +5297,9 @@ def _run_recommendation_digest_sync(site_id: str = "site-002"):
         logger.warning(f"Recommendation digest failed: {e}")
 
 
-    def add_focus_overstay_check_job(self, interval_seconds: int = 120):
-        """Periodic check for focus room overstays — fires alerts for sessions past the limit."""
-        job_id = "focus_overstay_check"
-        self.scheduler.add_job(
-            func=self._run_focus_overstay_check,
-            trigger="interval",
-            seconds=interval_seconds,
-            id=job_id,
-            replace_existing=True,
-            name="Focus room overstay check",
-        )
-        logger.info(f"Focus overstay check scheduled every {interval_seconds}s")
-
-    def _run_focus_overstay_check(self):
-        try:
-            import asyncio
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            try:
-                loop.run_until_complete(self._check_focus_overstays())
-            finally:
-                loop.close()
-        except Exception as e:
-            logger.warning(f"Focus overstay check failed: {e}")
-
-    async def _check_focus_overstays(self):
-        from app.database.supabase_client import get_supabase_client
-
-        sb = get_supabase_client()
-        if not sb:
-            return
-        try:
-            active = sb.table("space_focus_room_sessions").select("*").is_("end_time", None).execute()
-        except Exception:
-            return
-        from app.services.space_event_service import _overstay_alert_sent
-        from app.services.focus_room_notifier import send_focus_overstay_alert
-        from app.config.settings import settings
-        from app.services.focus_room_session_service import describe_focus_session_state
-
-        for session in (active.data or []):
-            session_id = session.get("session_id") or session.get("id", "")
-            if not session_id or session_id in _overstay_alert_sent:
-                continue
-            room_code = session.get("room_code", "")
-            site_id = session.get("site_id", "site-002")
-            from app.services import occupancy_store
-            from datetime import datetime, timezone
-
-            active_sesh = occupancy_store.get_active_session(room_code)
-            if not active_sesh or active_sesh.session_id != session_id:
-                continue
-            state = describe_focus_session_state(active_sesh, now=datetime.now(timezone.utc))
-            if state.get("red_light_on"):
-                _overstay_alert_sent.add(session_id)
-                cooldown = max(1, int((settings.focus_red_light_cooldown_seconds or 300) / 60))
-                loop = asyncio.get_event_loop()
-                loop.create_task(
-                    send_focus_overstay_alert(
-                        site_id=site_id,
-                        room_code=room_code,
-                        max_allowed_minutes=max(1, int((settings.focus_extended_use_seconds or 7200) / 60)),
-                        cooldown_minutes=cooldown,
-                    )
-                )
-                logger.info("Focus overstay alert triggered via periodic check: %s", room_code)
-
-
-    # -----------------------------------------------------------------
-    # BACnet Discovery Polling — detect equipment changes on site-002
-    # -----------------------------------------------------------------
+# -----------------------------------------------------------------
+# BACnet Discovery Polling — detect equipment changes on site-002
+# -----------------------------------------------------------------
 
     def add_bacnet_discovery_polling_job(self, interval_seconds: int = 21600, site_id: str = "site-002"):
         """Add a job to periodically discover BACnet devices and detect equipment changes.

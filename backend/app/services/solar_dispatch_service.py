@@ -14,7 +14,6 @@ to show BESS charging at night, discharging at peak, savings accumulating.
 
 import json
 import logging
-import random
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -210,10 +209,9 @@ class SolarDispatchService:
 
             rate = engine._get_band_rate(band_name, engine._get_season(sim_time))
 
-            # Add some realistic noise
-            noise = random.uniform(-0.2, 0.2)
-            solar_kw_noisy = max(0, solar_kw + solar_kw * noise * 0.05)
-            load_kw_noisy = load_kw + load_kw * noise * 0.02
+            # No noise - using real data only
+            solar_kw_noisy = solar_kw
+            load_kw_noisy = load_kw
 
             # Grid flows
             net_load = load_kw_noisy - solar_kw_noisy
@@ -386,35 +384,44 @@ class SolarDispatchService:
 
     # === Real SOC ===
 
-    async def get_current_soc_async(self, site_id: str) -> float:
-        """Get current BESS SOC, preferring real hardware reads when in live mode.
+    async def get_current_soc_async(self, site_id: str) -> float | None:
+        """Get current BESS SOC from Supabase sensor readings.
 
-        Falls back to simulated values when no hardware is connected.
+        Returns:
+            SOC percentage as float, or None if no real data available.
+            No simulated fallback - must have real sensor data.
         """
-        if settings.solar_connector_mode == "simulation":
-            return self._simulated_soc.get(site_id, 50.0)
-
         try:
-            from app.services.solar_ingestion_service import get_solar_ingestion_service
+            from app.services.fcu_state_tracker_backend import SupabaseBackend
 
-            svc = get_solar_ingestion_service()
-            bess = await svc.get_bess_status(site_id)
-            if bess and bess.soc_pct > 0:
-                self._last_real_soc[site_id] = bess.soc_pct
-                return bess.soc_pct
+            backend = SupabaseBackend(site_id=site_id)
+            bess_code = (
+                f"{site_id.replace('site-', 'S00')}-BESS-B1-001" if site_id.startswith("site-") else "S002-BESS-B1-001"
+            )
+
+            readings = await backend.get_latest_reading(bess_code, "soc_percent")
+            if readings and readings.get("value") is not None:
+                soc = float(readings["value"])
+                self._last_real_soc[site_id] = soc
+                logger.info("[BESS] Real SOC for %s: %.1f%%", site_id, soc)
+                return soc
+            else:
+                logger.warning("[BESS] No SOC data available for %s in equipment_sensor_readings", site_id)
+                return None
         except Exception as e:
-            logger.warning("Real SOC read failed for %s: %s", site_id, e)
+            logger.error("[BESS] Failed to read SOC for %s: %s", site_id, e)
+            return None
 
-        return self._simulated_soc.get(site_id, 50.0)
-
-    def get_current_soc_sync(self, site_id: str) -> float:
-        """Synchronous SOC accessor — returns last real SOC or simulated fallback.
+    def get_current_soc_sync(self, site_id: str) -> float | None:
+        """Synchronous SOC accessor — returns last real SOC or None.
 
         For use by sync callers like aegis_bridge.py.
+        Returns None if no real data available (no simulated fallback).
         """
         if site_id in self._last_real_soc:
             return self._last_real_soc[site_id]
-        return self._simulated_soc.get(site_id, 50.0)
+        logger.warning("[BESS] No cached SOC for %s - async fetch required", site_id)
+        return None
 
     # === MIP schedule integration ===
 
@@ -465,6 +472,35 @@ class SolarDispatchService:
         except Exception:
             return None
 
+    async def _get_real_solar_and_load(self, site_id: str) -> tuple[float, float] | None:
+        """Get real solar generation and building load from Supabase.
+
+        Returns:
+            (solar_kw, load_kw) tuple or None if no real data available.
+        """
+        try:
+            from app.services.fcu_state_tracker_backend import SupabaseBackend
+
+            backend = SupabaseBackend(site_id=site_id)
+
+            # Solar from S002-SOLAR-INV-001 total_power_kw
+            solar_readings = await backend.get_latest_reading("S002-SOLAR-INV-001", "total_power_kw")
+            solar_kw = float(solar_readings["value"]) if solar_readings and solar_readings.get("value") else 0.0
+
+            # Load from S002-SITE-AGG total_kw
+            load_readings = await backend.get_latest_reading("S002-SITE-AGG", "total_kw")
+            load_kw = float(load_readings["value"]) if load_readings and load_readings.get("value") else 0.0
+
+            if solar_readings or load_readings:
+                logger.debug("[DISPATCH] Real data for %s: solar=%.1f kW, load=%.1f kW", site_id, solar_kw, load_kw)
+                return (solar_kw, load_kw)
+            else:
+                logger.warning("[DISPATCH] No solar/load data available for %s", site_id)
+                return None
+        except Exception as e:
+            logger.error("[DISPATCH] Failed to read solar/load for %s: %s", site_id, e)
+            return None
+
     # === Dispatch execution ===
 
     async def execute_dispatch_cycle(self, site_id: str) -> DispatchEvent | None:
@@ -476,20 +512,22 @@ class SolarDispatchService:
         """
         engine = get_solar_arbitrage_engine()
 
-        # Get current state (real hardware SOC when in live mode)
+        # Get current SOC (must have real data)
         current_soc = await self._get_current_soc(site_id)
+        if current_soc is None:
+            logger.error("[DISPATCH] Cannot execute cycle - no real BESS SOC data for %s", site_id)
+            return None
+
         now = datetime.now(UTC)
         sast = now + timedelta(hours=2)
 
-        # Simulate solar and load based on time of day
-        profile = self._get_hourly_profile(engine)
-        hour_profile = profile.get(sast.hour, {})
-        solar_kw = hour_profile.get("solar_kw", 0)
-        load_kw = hour_profile.get("load_kw", 1800)
+        # Get real solar and load data
+        real_data = await self._get_real_solar_and_load(site_id)
+        if real_data is None:
+            logger.error("[DISPATCH] Cannot execute cycle - no real solar/load data for %s", site_id)
+            return None
 
-        # Add realistic noise
-        solar_kw *= random.uniform(0.9, 1.1)
-        load_kw *= random.uniform(0.95, 1.05)
+        solar_kw, load_kw = real_data
 
         # Try to read current interval from cached MIP schedule
         action = self._get_mip_dispatch_action(site_id, current_soc, solar_kw, load_kw, sast)
@@ -523,25 +561,26 @@ class SolarDispatchService:
                 timestamp=now,
             )
 
-        # Update simulated SOC
+        # Calculate projected SOC change (for logging only - real SOC comes from sensors)
         interval_hours = self.CYCLE_INTERVAL_MINUTES / 60.0
         soc_before = current_soc
+        projected_soc = current_soc
 
         if action.action == DispatchActionType.CHARGE.value:
             energy_kwh = action.power_kw * interval_hours
             soc_delta = (energy_kwh / self.BESS_CAPACITY_KWH) * 100
-            current_soc = min(self.BESS_MAX_SOC, current_soc + soc_delta)
+            projected_soc = min(self.BESS_MAX_SOC, current_soc + soc_delta)
         elif action.action == DispatchActionType.DISCHARGE.value:
             energy_kwh = action.power_kw * interval_hours
             soc_delta = (energy_kwh / self.BESS_CAPACITY_KWH) * 100
-            current_soc = max(self.BESS_MIN_SOC, current_soc - soc_delta)
+            projected_soc = max(self.BESS_MIN_SOC, current_soc - soc_delta)
         elif action.action == DispatchActionType.SOLAR_PRIORITY.value:
             charge_power = action.power_kw
             energy_kwh = charge_power * interval_hours * self.BESS_EFFICIENCY
             soc_delta = (energy_kwh / self.BESS_CAPACITY_KWH) * 100
-            current_soc = min(self.BESS_MAX_SOC, current_soc + soc_delta)
+            projected_soc = min(self.BESS_MAX_SOC, current_soc + soc_delta)
 
-        self._simulated_soc[site_id] = current_soc
+        # Note: Real SOC will be read from sensors on next cycle, not simulated
 
         # Calculate grid flows
         net_load = load_kw - solar_kw
@@ -559,7 +598,7 @@ class SolarDispatchService:
             action=action.action,
             power_kw=action.power_kw,
             soc_before_pct=soc_before,
-            soc_after_pct=current_soc,
+            soc_after_pct=projected_soc,
             tariff_band=action.tariff_band,
             rate_per_kwh=action.rate_per_kwh,
             reason=action.reason,
@@ -693,14 +732,19 @@ class SolarDispatchService:
 
     # === Dispatch status ===
 
-    def get_dispatch_status(self, site_id: str) -> DispatchStatus | None:
-        """Get current dispatch status for a site."""
+    async def get_dispatch_status(self, site_id: str) -> DispatchStatus | None:
+        """Get current dispatch status for a site using real sensor data."""
         engine = get_solar_arbitrage_engine()
 
         if site_id not in self._mode:
             return None
 
-        current_soc = self._simulated_soc.get(site_id, 50.0)
+        # Get real SOC from Supabase
+        current_soc = await self._get_current_soc(site_id)
+        if current_soc is None:
+            logger.warning("[DISPATCH] No real SOC data for status query on %s", site_id)
+            return None
+
         band = engine.get_current_tariff_band()
 
         # Load-shedding status (best-effort from EskomSePush)
@@ -774,10 +818,7 @@ class SolarDispatchService:
         self._mode[site_id] = "autonomous"
         self._started_at[site_id] = datetime.now(UTC).isoformat()
 
-        if site_id not in self._simulated_soc:
-            self._simulated_soc[site_id] = 50.0
-
-        logger.info("Started autonomous dispatch for site %s", site_id)
+        logger.info("Started autonomous dispatch for site %s (real sensor data mode)", site_id)
         return {
             "site_id": site_id,
             "mode": "autonomous",

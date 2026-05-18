@@ -320,6 +320,84 @@ class HealthRatingCalculator:
             snapshot_at=datetime.utcnow().isoformat() + "Z",
         )
 
+
+    async def calculate_from_sensors(
+        self,
+        equipment_id: str,
+        equipment: dict,
+        sensor_readings: dict,
+        operating_data: dict | None = None,
+    ) -> float | None:
+        """
+        Calculate health score from live sensor readings.
+
+        Used when no pre-computed health_score exists (e.g., shadow polling path).
+        Derives health from available telemetry signals rather than historical data.
+
+        Args:
+            equipment_id: Equipment code (e.g., 'S002-CHILLER-B1-001')
+            equipment: Equipment dict with type, age, runtime, etc.
+            sensor_readings: Live sensor data from bridge/telemetry
+            operating_data: Existing operating_data dict with anomaly scores
+
+        Returns:
+            Health score 0-100, or None if insufficient data
+        """
+        if not sensor_readings and not operating_data:
+            return None
+
+        op_data = operating_data or {}
+
+        # Component 1: Baseline alignment from sensor deviation
+        # Use temperature deviation if available
+        baseline_score = 75.0  # neutral default
+        room_temp = sensor_readings.get("room_temp") or sensor_readings.get("chw_return_temp") or sensor_readings.get("return_air_temp")
+        setpoint = sensor_readings.get("setpoint") or op_data.get("setpoint")
+        if room_temp is not None and setpoint is not None:
+            try:
+                deviation = abs(float(room_temp) - float(setpoint))
+                # 0°C deviation = 100, 5°C deviation = 50, 10°C deviation = 0
+                baseline_score = max(0.0, 100.0 - (deviation * 10.0))
+            except (ValueError, TypeError):
+                pass
+
+        # Component 2: Anomaly signal from Isolation Forest (inverted to health)
+        anomaly_score = op_data.get("anomaly_score") or sensor_readings.get("anomaly_score")
+        if anomaly_score is not None:
+            try:
+                anomaly_health = (1.0 - float(anomaly_score)) * 100.0
+            except (ValueError, TypeError):
+                anomaly_health = 80.0
+        else:
+            anomaly_health = 80.0  # neutral when no anomaly data
+
+        # Component 3: Service compliance from equipment record
+        days_since_service = await self._get_days_since_service(equipment_id)
+        service_interval = self._get_service_interval(equipment.get("type", ""))
+        service_score = self.calculate_service_compliance(days_since_service, service_interval)
+
+        # Component 4: Runtime / Age from equipment record
+        age_years = equipment.get("age_years")
+        expected_life = self._get_expected_life(equipment.get("type", ""))
+        runtime_hours = equipment.get("runtime_hours") or op_data.get("runtime_hours")
+        runtime_score = self.calculate_runtime_age(age_years, expected_life, runtime_hours)
+
+        # Component 5: Fault burden from recent alerts
+        critical_faults, warning_faults = await self._get_fault_counts(equipment_id)
+        fault_score = self.calculate_fault_burden(critical_faults, warning_faults)
+
+        # Weighted composition (anomaly_health substitutes for trend_momentum in live path)
+        # Weights: baseline 30%, anomaly 20%, service 20%, runtime 20%, fault 10%
+        weighted = (
+            baseline_score * 0.30 +
+            anomaly_health * 0.20 +
+            service_score * 0.20 +
+            runtime_score * 0.20 +
+            fault_score * 0.10
+        )
+
+        return round(max(0.0, min(100.0, weighted)), 2)
+
     # ------------------------------------------------------------------
     # Data Gathering Helpers (with try/except per source)
     # ------------------------------------------------------------------

@@ -395,6 +395,11 @@ function RailAction({ state, onApprove }: { state: CockpitState; onApprove?: () 
     )
   }
 
+  // Default operator path - differentiate from Action based on phase
+  const operatorPathText = state.site.onboardingPhase === 'supervised'
+    ? 'Confirm within 15 min · auto-escalate to FM if not acknowledged'
+    : state.decision.summary
+
   return (
     <div className="border-t border-white/8 px-5 py-4">
       <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-4">
@@ -402,7 +407,7 @@ function RailAction({ state, onApprove }: { state: CockpitState; onApprove?: () 
           <PlayIcon />
           <span>Operator path</span>
         </div>
-        <div className="mt-3 text-sm leading-6 text-slate-200">{state.decision.summary}</div>
+        <div className="mt-3 text-sm leading-6 text-slate-200">{operatorPathText}</div>
       </div>
     </div>
   )

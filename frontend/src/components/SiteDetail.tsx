@@ -1436,6 +1436,7 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
                               key={header}
                               className="text-left py-3 px-4 text-xs font-medium uppercase tracking-wider"
                               style={{ color: "var(--color-sentinel-text-secondary)" }}
+                              title={header === "Health" ? "ML cold-start baseline · real scores populate after 72h telemetry" : undefined}
                             >
                               {header}
                             </th>
@@ -1552,13 +1553,13 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
                                   <div
                                     className="h-full rounded-full"
                                     style={{
-                                      width: `${item.health_score}%`,
+                                      width: item.health_score != null ? `${item.health_score}%` : '0%',
                                       background: getStatusColor(item.status),
                                     }}
                                   />
                                 </div>
                                 <span className="text-sm font-medium w-10" style={{ color: "var(--color-sentinel-text-primary)" }}>
-                                  {item.health_score}%
+                                  {item.health_score != null ? `${item.health_score}%` : '—'}
                                 </span>
                               </div>
                             </td>
@@ -2108,11 +2109,11 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
                         </span>
                       </div>
                       <span className="text-sm font-bold" style={{ color: getStatusColor(selectedEquipment.status) }}>
-                        {selectedEquipment.health_score}%
+                        {selectedEquipment.health_score != null ? `${selectedEquipment.health_score}%` : '—'}
                       </span>
                     </div>
                     <div className="h-2 rounded-full overflow-hidden" style={{ background: "var(--color-sentinel-bg-canvas)" }}>
-                      <div className="h-full rounded-full transition-all" style={{ width: `${selectedEquipment.health_score}%`, background: getStatusColor(selectedEquipment.status) }} />
+                      <div className="h-full rounded-full transition-all" style={{ width: selectedEquipment.health_score != null ? `${selectedEquipment.health_score}%` : '0%', background: getStatusColor(selectedEquipment.status) }} />
                     </div>
                   </div>
 

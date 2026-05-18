@@ -1,0 +1,214 @@
+# SENTINEL BMS Alerting Rules
+# Critical alerts route to Telegram via Sentry bot
+
+groups:
+  # ─────────────────────────────────────────────────────────────────────────────
+  # CRITICAL: Safety & AI Governance (Immediate Response Required)
+  # ─────────────────────────────────────────────────────────────────────────────
+  - name: safety-critical
+    interval: 15s
+    rules:
+      - alert: SentinelSafetyViolation
+        expr: increase(sentinel_safety_violations_total[1m]) > 0
+        for: 0s  # Immediate
+        labels:
+          severity: critical
+          category: safety
+        annotations:
+          summary: "Safety boundary violation detected"
+          description: "{{ $value }} safety violation(s) detected in the last minute. Check equipment logs immediately."
+          runbook_url: "https://wiki.sentinel-ai.co.za/runbooks/safety-violation"
+
+      - alert: SentinelQualityGateBlockWrites
+        expr: sentinel_quality_gate_enforcement{enforcement="block_writes"} == 1
+        for: 0s
+        labels:
+          severity: critical
+          category: ai-governance
+        annotations:
+          summary: "Quality gate blocking all AI writes"
+          description: "Site {{ $labels.site_id }} has quality gate in BLOCK_WRITES mode. All AI write operations are suspended."
+          action: "Investigate quality gate failures and consider manual override if emergency."
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # WARNING: AI Governance & Model Health (Response within 15 min)
+  # ─────────────────────────────────────────────────────────────────────────────
+  - name: ai-governance-warning
+    interval: 30s
+    rules:
+      - alert: SentinelModelDriftPersistent
+        expr: sentinel_model_drift_alerts > 0
+        for: 1h
+        labels:
+          severity: warning
+          category: ml-ops
+        annotations:
+          summary: "Model drift active for >1 hour"
+          description: "Model {{ $labels.model_type }} at {{ $labels.site_id }} has been in drift state for over 1 hour."
+          action: "Review model performance and schedule retraining if accuracy below threshold."
+
+      - alert: SentinelHighRollbackRate
+        expr: rate(sentinel_rollback_total[1h]) > 2
+        for: 15m
+        labels:
+          severity: warning
+          category: ai-governance
+        annotations:
+          summary: "High rollback rate detected"
+          description: "{{ $value }} rollbacks/hour for {{ $labels.equipment_type }} at {{ $labels.site_id }}."
+          action: "Investigate equipment behavior and consider disabling automatic optimization."
+
+      - alert: SentinelQualityGateWarning
+        expr: |
+          (
+            rate(sentinel_quality_gate_evaluations_total{status="fail"}[5m])
+            /
+            rate(sentinel_quality_gate_evaluations_total[5m])
+          ) > 0.2
+          and
+          rate(sentinel_quality_gate_evaluations_total[5m]) > 0.01
+        for: 5m
+        labels:
+          severity: warning
+          category: ai-governance
+        annotations:
+          summary: "Quality gate fail rate >20%"
+          description: "{{ $value | humanizePercentage }} of quality gate evaluations are failing (min 0.01 eval/s)."
+          action: "Review data quality and system health."
+
+      - alert: SentinelCreditExhaustion
+        expr: |
+          (
+            increase(sentinel_recommendations_total[1h]) == 0
+            and
+            (hour() >= 7 and hour() < 19)
+            and
+            (day_of_week() >= 1 and day_of_week() < 6)
+          )
+        for: 30m
+        labels:
+          severity: critical
+          category: business-critical
+        annotations:
+          summary: "AI recommendations stopped - possible credit exhaustion"
+          description: "No AI recommendations generated in the last hour during business hours (Prometheus metric: sentinel_recommendations_total). Check Anthropic credits."
+          action: "Verify API credits at https://console.anthropic.com/ and top up if needed."
+          note: "This metric tracks Stage 1 (TierRoutingEngine) recommendations. For Stage 2 execution status, check parasite_decisions table."
+          runbook_url: "https://wiki.sentinel-ai.co.za/runbooks/credit-exhaustion"
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # WARNING: Security & Access Control (Response within 30 min)
+  # ─────────────────────────────────────────────────────────────────────────────
+  - name: security-warning
+    interval: 30s
+    rules:
+      - alert: SentinelBruteForceAttempt
+        expr: rate(sentinel_http_requests_total{status_code=~"401|403"}[5m]) > 10
+        for: 2m
+        labels:
+          severity: warning
+          category: security
+        annotations:
+          summary: "Possible brute force attack"
+          description: "{{ $value }} failed auth attempts/min from {{ $labels.instance }}."
+          action: "Check if IP should be blocked via Fail2Ban."
+
+      - alert: SentinelSuspiciousUserAgent
+        expr: increase(sentinel_tool_calls_total{tool_name=~".*sqlmap.*|.*burp.*|.*nikto.*"}[5m]) > 0
+        for: 0s
+        labels:
+          severity: warning
+          category: security
+        annotations:
+          summary: "Suspicious scanner detected"
+          description: "Automated scanning tool detected in requests."
+          action: "Review WAF logs and consider IP block."
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # INFO: System Health & Availability (Response within 4 hours)
+  # ─────────────────────────────────────────────────────────────────────────────
+  - name: system-info
+    interval: 60s
+    rules:
+      - alert: SentinelMetricsStale
+        expr: (time() - sentinel_metrics_last_updated_timestamp) > 180
+        for: 2m
+        labels:
+          severity: info
+          category: system-health
+        annotations:
+          summary: "Metrics data is stale"
+          description: "No metrics updates for {{ $labels.discipline }} in >3 minutes."
+          action: "Check adapter connectivity and Supabase write path."
+
+      - alert: PrometheusTargetDown
+        expr: up == 0
+        for: 2m
+        labels:
+          severity: info
+          category: system-health
+        annotations:
+          summary: "Prometheus scrape target down"
+          description: "Target {{ $labels.job }} at {{ $labels.instance }} is unreachable."
+          action: "Check if service is running and network connectivity."
+
+      - alert: SentinelMLGateCleared
+        expr: sentinel_ml_hours_ingested{site_id="site-002"} >= 72
+        for: 5m
+        labels:
+          severity: info
+          category: ml-ops
+        annotations:
+          summary: "S002 ML gate cleared — phase flip to Supervised now eligible"
+          description: "ml_hours_ingested={{ $value }}h. Execute phase flip via PATCH /api/sites/site-002/phase"
+          action: "ML training gate has crossed 72h threshold. Site is eligible to advance from advisory to supervised phase."
+
+      - alert: HighErrorRate
+        expr: rate(sentinel_http_requests_total{status_code=~"5.."}[5m]) / rate(sentinel_http_requests_total[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          category: system-health
+        annotations:
+          summary: "High 5xx error rate"
+          description: "{{ $value | humanizePercentage }} of requests are failing."
+          action: "Check application logs for errors."
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # CARDINALITY BUDGET ALERT (Self-monitoring)
+  # ─────────────────────────────────────────────────────────────────────────────
+  - name: prometheus-health
+    interval: 300s
+    rules:
+      - alert: PrometheusHighCardinality
+        expr: |
+          (
+            count(count by (site_id, tab_id) (sentinel_building_tab_active)) +
+            count(count by (site_id, card_id) (sentinel_building_card_visible))
+          ) > 500
+        for: 10m
+        labels:
+          severity: warning
+          category: ops
+        annotations:
+          summary: "Building metrics approaching cardinality limit"
+          description: "High cardinality detected in building page metrics. Consider aggregation."
+          action: "Review label cardinality - plan for aggregation at 50+ sites."
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # BRIDGE HEALTH (Dead Man's Switch)
+  # ─────────────────────────────────────────────────────────────────────────────
+  - name: bridge-health
+    interval: 60s
+    rules:
+      - alert: SentinelAlertBridgeDown
+        expr: sentry_bridge_up == 0
+        for: 2m
+        labels:
+          severity: critical
+          category: infrastructure
+        annotations:
+          summary: "Alert bridge is down - alerts not reaching Telegram"
+          description: "The Prometheus→Telegram bridge has been unreachable for >2 minutes. Alerts are being dropped."
+          action: "Check sentry-alert-bridge container: docker logs sentry-alert-bridge"
+          runbook_url: "https://wiki.sentinel-ai.co.za/runbooks/alert-bridge-down"

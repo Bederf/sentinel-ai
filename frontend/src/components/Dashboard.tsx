@@ -348,9 +348,9 @@ export function Dashboard({ onViewChange, autoSelectSiteId, defaultBuildingTab: 
     } else {
       totalSqm = buildingsList.reduce((sum: number, s: Site) => sum + (s.sqm || 0), 0) || 5000;
     }
-    const monthlyKwh = dailyKwh * 30;
-    const intensity = totalSqm > 0 ? (monthlyKwh / totalSqm) : 0;
-    // SA benchmarks: efficient < 120, typical < 170
+    const annualKwh = dailyKwh * 365;
+    const intensity = totalSqm > 0 ? (annualKwh / totalSqm) : 0;
+    // SA office benchmarks (annual kWh/m²): efficient < 120, typical < 170
     const classification = intensity < 120 ? 'Efficient' : intensity < 170 ? 'Typical' : 'High';
     const classificationColor = intensity < 120 ? 'var(--color-sentinel-green)' : intensity < 170 ? 'var(--color-sentinel-amber)' : 'var(--color-sentinel-red)';
     return { intensity: Math.round(intensity), classification, classificationColor };

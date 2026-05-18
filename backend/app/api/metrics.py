@@ -28,7 +28,7 @@ from prometheus_client import (
 
 from app.config.settings import settings
 from app.middleware.auth_middleware import require_auth
-from app.models.auth import AuthContext, AuthLevel
+from app.models.auth import AuthContext, AuthLevel, SentinelRole
 
 router = APIRouter()
 
@@ -94,7 +94,7 @@ sentinel_data_freshness_violations_total = Counter(
 sentinel_model_drift_alerts = Gauge(
     "sentinel_model_drift_alerts",
     "Active model drift alerts by site and model type",
-    labelnames=["site_id", "model_type"],
+    labelnames=["site_id", "model_type", "source", "data_sufficient"],
     registry=REGISTRY,
 )
 
@@ -274,7 +274,7 @@ sentinel_quality_gate_rule_evaluations_total = Counter(
 sentinel_model_drift_score = Gauge(
     "sentinel_model_drift_score",
     "Current drift score per model (0.0-1.0, higher = more drift)",
-    labelnames=["model_id", "model_type"],
+    labelnames=["model_id", "model_type", "source", "data_sufficient"],
     registry=REGISTRY,
 )
 
@@ -369,6 +369,129 @@ def _resolve_site_name(client, site_id: str) -> str:
         pass
     _site_name_cache[site_id] = site_id
     return site_id
+
+
+def _collect_drift_metrics() -> None:
+    """Collect ML drift scores by running feature drift detection on each scrape.
+
+    Queries Supabase for each equipment type and computes real KS-statistic drift
+    scores. Persists results to drift_detection_log table for trend durability.
+
+    Only emits metrics when both baseline and current windows have >= MIN_SAMPLES
+    readings per feature. Below that threshold the KS statistic is statistically
+    meaningless and the metric is suppressed (data_sufficient="false").
+    """
+    import logging
+
+    logger = logging.getLogger("sentinel.metrics")
+    # KS test unreliable below this sample count per feature window
+    MIN_SAMPLES = 30
+    try:
+        from ml.monitoring.drift import EQUIPMENT_TYPES, EQUIPMENT_TO_SENSORS
+
+        try:
+            from app.database.supabase_client import get_supabase_client
+
+            client = get_supabase_client()
+        except Exception:
+            client = None
+
+        for eq_type in EQUIPMENT_TYPES:
+            try:
+                cfg = EQUIPMENT_TO_SENSORS.get(eq_type, {})
+                uses_real_data = cfg.get("uses_real_data", False)
+
+                # Synthetic data: emit with source="synthetic", data_sufficient="true"
+                # (seeded distributions always have enough samples)
+                if not uses_real_data:
+                    score = 0.0  # synthetic fallback score — not real drift
+                    sentinel_model_drift_score.labels(
+                        model_id=eq_type, model_type=eq_type.upper(), source="synthetic", data_sufficient="true"
+                    ).set(score)
+                    sentinel_model_drift_alerts.labels(
+                        site_id="site-002", model_type=eq_type.upper(), source="synthetic", data_sufficient="true"
+                    ).set(0)
+                    if client is not None:
+                        try:
+                            client.table("drift_detection_log").insert(
+                                {
+                                    "equipment_type": eq_type,
+                                    "drift_detected": False,
+                                    "features_checked": 0,
+                                    "features_drifted": 0,
+                                    "score": score,
+                                    "source": "synthetic",
+                                }
+                            ).execute()
+                        except Exception:
+                            pass
+                    continue
+
+                # Real Supabase data path: fetch raw sensor values and check sample counts
+                from ml.monitoring.drift import _get_supabase_sensor_data
+
+                equipment_ids = cfg.get("equipment_ids", [])
+                features = cfg.get("features", [])
+                if not equipment_ids or not features:
+                    continue
+
+                sensor_data = _get_supabase_sensor_data(equipment_ids, features, window_hours=48)
+                if not sensor_data:
+                    # No data at all — suppress metric
+                    sentinel_model_drift_score.labels(
+                        model_id=eq_type, model_type=eq_type.upper(), source="supabase", data_sufficient="false"
+                    ).set(0)
+                    sentinel_model_drift_alerts.labels(
+                        site_id="site-002", model_type=eq_type.upper(), source="supabase", data_sufficient="false"
+                    ).set(0)
+                    continue
+
+                # Compute KS per feature using first-half=baseline, second-half=current
+                from ml.monitoring.drift import _ks_statistic
+
+                drifted_features = 0
+                checked_features = 0
+                sample_info = []
+                for feat, values in sensor_data.items():
+                    mid = len(values) // 2
+                    baseline = values[:mid]
+                    current = values[mid:]
+                    if len(baseline) < MIN_SAMPLES or len(current) < MIN_SAMPLES:
+                        sample_info.append(f"{feat}=insufficient(n={len(baseline)}/{len(current)})")
+                        continue
+                    checked_features += 1
+                    ks = _ks_statistic(baseline, current)
+                    if ks > 0.1:
+                        drifted_features += 1
+
+                data_sufficient = "true" if checked_features > 0 else "false"
+                score = drifted_features / checked_features if checked_features > 0 else 0.0
+
+                sentinel_model_drift_score.labels(
+                    model_id=eq_type, model_type=eq_type.upper(), source="supabase", data_sufficient=data_sufficient
+                ).set(score)
+                sentinel_model_drift_alerts.labels(
+                    site_id="site-002", model_type=eq_type.upper(), source="supabase", data_sufficient=data_sufficient
+                ).set(1 if drifted_features > 0 and data_sufficient == "true" else 0)
+
+                if client is not None:
+                    try:
+                        client.table("drift_detection_log").insert(
+                            {
+                                "equipment_type": eq_type,
+                                "drift_detected": drifted_features > 0 and data_sufficient == "true",
+                                "features_checked": checked_features,
+                                "features_drifted": drifted_features,
+                                "score": score,
+                                "source": "supabase",
+                            }
+                        ).execute()
+                    except Exception as insert_err:
+                        logger.debug(f"Drift log insert failed for {eq_type}: {insert_err}")
+            except Exception as exc:
+                logger.debug(f"Drift metric failed for {eq_type}: {exc}")
+    except Exception as e:
+        logger.debug(f"Drift metrics collection failed: {e}")
 
 
 def _collect_fm_metrics() -> None:
@@ -547,29 +670,54 @@ def _is_allowed(client_ip: str) -> bool:
 # ---------------------------------------------------------------------------
 # Endpoint
 # ---------------------------------------------------------------------------
+async def _metrics_bearer_auth(request: Request) -> AuthContext:
+    """Accept METRICS_BEARER_TOKEN as valid Bearer auth for Prometheus scraping.
+
+    This lets Prometheus scrape with: Authorization: Bearer <METRICS_BEARER_TOKEN>
+    while still supporting Supabase JWT tokens for browser/API access.
+    """
+    import hmac
+
+    auth_header = request.headers.get("authorization", "")
+    if auth_header.startswith("Bearer "):
+        token = auth_header[7:]
+        if settings.metrics_bearer_token and hmac.compare_digest(token, settings.metrics_bearer_token):
+            source_ip = request.headers.get("x-forwarded-for", "unknown")
+            return AuthContext(
+                user_id="prometheus",
+                role=SentinelRole.ADMIN,
+                auth_method="metrics_bearer",
+                source_ip=source_ip.split(",")[0].strip(),
+            )
+    # Fall back to Supabase JWT auth
+    return await require_auth(AuthLevel.AUTHENTICATED)(request)
+
+
 @router.get(
     "/metrics",
     response_class=PlainTextResponse,
     tags=["monitoring"],
     summary="Prometheus metrics endpoint",
     description="Returns AI governance metrics in Prometheus text exposition format.",
-    dependencies=[Depends(require_auth(AuthLevel.AUTHENTICATED))],
 )
 async def prometheus_metrics(
     request: Request,
-    auth: AuthContext = Depends(require_auth(AuthLevel.AUTHENTICATED)),
+    auth: AuthContext = Depends(_metrics_bearer_auth),
 ) -> PlainTextResponse:
     """Serve Prometheus-format metrics.
 
-    Requires AUTHENTICATED level (AUDITOR role or higher) for access.
-    Phase 168-01: Closed MONITORING-001 gap by adding authentication requirement.
+    Accepts METRICS_BEARER_TOKEN (Bearer) for Prometheus,
+    or Supabase JWT tokens for browser/API access.
     """
-    # Authentication check is done via require_auth dependency above
-    # client_ip check removed - role-based access now the primary control
-
     # Collect live FM metrics from Supabase (media wall dashboard)
     try:
         _collect_fm_metrics()
+    except Exception:
+        pass  # Never let metrics collection crash the endpoint
+
+    # Collect ML drift scores from Supabase sensor data (real drift detection)
+    try:
+        _collect_drift_metrics()
     except Exception:
         pass  # Never let metrics collection crash the endpoint
 

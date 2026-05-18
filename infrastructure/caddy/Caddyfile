@@ -1,9 +1,9 @@
 {
-  email bms@aimthelaw.co.za
+  email admin@sentinel-ai.co.za
 }
 
-# Main HTTPS reverse proxy for BMS Intelligence
-bms.aimthelaw.co.za {
+# Main HTTPS reverse proxy for SENTINEL BMS
+bms.sentinel-ai.co.za {
   # Security headers
   header / X-Frame-Options "SAMEORIGIN"
   header / X-Content-Type-Options "nosniff"
@@ -36,7 +36,28 @@ bms.aimthelaw.co.za {
   }
 }
 
+# Grafana Dashboard
+grafana.sentinel-ai.co.za {
+  reverse_proxy localhost:3000 {
+    header_up X-Real-IP {remote_host}
+  }
+}
+
+# Prometheus (internal only - no public access)
+# prometheus.sentinel-ai.co.za {
+#   reverse_proxy localhost:9090
+# }
+
 # Redirect www to non-www
+www.sentinel-ai.co.za {
+  redir https://sentinel-ai.co.za{uri} permanent
+}
+
+# Legacy redirect: aimthelaw → sentinel-ai
+bms.aimthelaw.co.za {
+  redir https://bms.sentinel-ai.co.za{uri} permanent
+}
+
 www.bms.aimthelaw.co.za {
-  redir https://bms.aimthelaw.co.za{uri} permanent
+  redir https://bms.sentinel-ai.co.za{uri} permanent
 }

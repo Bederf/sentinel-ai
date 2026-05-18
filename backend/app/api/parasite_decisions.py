@@ -294,7 +294,7 @@ async def aegis_dashboard(
     execution_mode: str | None = Query(None, description="Filter: blocked/shadow/live"),
     approval_outcome: str | None = Query(None, description="Filter: pending/approved/rejected"),
     dispatch_action_type: str | None = Query(None, description="Filter: charge/discharge/idle"),
-    write_status: str | None = Query(None, description="Filter: blocked/success/skipped"),
+    write_status: str | None = Query(None, description="Filter: blocked_by_gate/succeeded/intent_logged/failed"),
     auth: AuthContext = Depends(require_auth),
 ) -> dict[str, Any]:
     """AEGIS operations dashboard — 24h activity, KPIs, and pending proposals.
@@ -334,7 +334,14 @@ async def aegis_dashboard(
                 if (d.get("contributing_factors") or {}).get("dispatch_action_type") == dispatch_action_type
             ]
         if write_status:
-            filtered = [d for d in filtered if d.get("write_status") == write_status]
+            ws_val = write_status
+            if ws_val == "blocked":
+                ws_val = "blocked_by_gate"
+            elif ws_val == "success":
+                ws_val = "succeeded"
+            elif ws_val == "skipped":
+                ws_val = "intent_logged"
+            filtered = [d for d in filtered if d.get("write_status") == ws_val]
 
         # Separate pending proposals
         pending = [

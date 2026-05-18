@@ -94,6 +94,10 @@ class Settings(BaseSettings):
     # Backend URL (for external service health checks)
     backend_url: str = ""
 
+    # Public URL for MCP/document links (must be externally accessible)
+    # Example: https://bms.sentinel-ai.co.za
+    sentinel_public_url: str = Field(default="", validation_alias="SENTINEL_PUBLIC_URL")
+
     # Internal service key for service-to-service API auth (X-Internal-Service header)
     internal_service_key: str = Field(default="sentinel-internal", validation_alias="INTERNAL_SERVICE_KEY")
 
@@ -174,6 +178,10 @@ class Settings(BaseSettings):
     # Sentry bot API key (for authenticated access to /api/sites/* endpoints)
     sentry_bot_api_key: str = Field(default="", validation_alias="SENTRY_BOT_API_KEY")
     sentry_bot_cli: str = Field(default="sentry", validation_alias="SENTRY_BOT_CLI")
+
+    # Prometheus metrics bearer token (required for /metrics endpoint — no auth bypass)
+    # Prometheus must send: Authorization: Bearer <token>
+    metrics_bearer_token: str = Field(default="", validation_alias="METRICS_BEARER_TOKEN")
 
     # SIMBIOT Concept Evolution (FSI Public API) credentials
     simbiot_api_key: str = Field(default="", validation_alias=AliasChoices("SIMBIOT_API_KEY", "BRIDGE_API_TOKEN"))

@@ -24,7 +24,7 @@ LOCK_TABLE = "_migration_lock"
 
 
 def compute_checksum(path: Path) -> str:
-    return hashlib.md5(path.read_bytes()).hexdigest()
+    return hashlib.md5(path.read_bytes(), usedforsecurity=False).hexdigest()
 
 
 def get_db_connection():

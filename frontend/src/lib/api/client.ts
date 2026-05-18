@@ -69,32 +69,42 @@ function notifyAuthExpired(): void {
 // ============= Token Refresh with In-Flight Deduplication =============
 
 async function tryRefreshAccessToken(): Promise<string | null> {
-  const refreshToken = getRefreshToken();
-  if (!refreshToken) return null;
   if (refreshInFlight) return refreshInFlight;
 
   refreshInFlight = (async () => {
     try {
-      // SECURITY: Send refresh token in request body, NOT in URL (Phase 75-07)
-      // Never log this function or expose refreshToken variable
+      // SECURITY: Browser sends HttpOnly cookie automatically with credentials:include
+      // No need to read cookie via JavaScript (impossible by design for HttpOnly cookies)
       const response = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ refresh_token: refreshToken }),
       });
-      if (!response.ok) return null;
+      if (!response.ok) {
+        clearAccessToken();
+        return null;
+      }
       const data = (await response.json()) as {
         access_token?: string;
         refresh_token?: string;
       };
-      if (!data.access_token) return null;
-      setTokens(data.access_token, data.refresh_token);
+      if (!data.access_token) {
+        clearAccessToken();
+        return null;
+      }
+      // Store new access token in memory
+      setAccessToken(data.access_token);
+      // Store refresh token in localStorage for legacy sessions (if provided)
+      if (data.refresh_token) {
+        localStorage.setItem(REFRESH_TOKEN_KEY, data.refresh_token);
+      }
       return data.access_token;
     } catch (_error) {
       // Log error safely without exposing tokens
       if (import.meta.env.DEV) {
         secureConsoleLog.error('Token refresh failed');
       }
+      clearAccessToken();
       return null;
     } finally {
       refreshInFlight = null;

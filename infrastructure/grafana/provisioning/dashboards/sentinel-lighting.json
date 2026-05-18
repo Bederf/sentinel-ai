@@ -1,0 +1,103 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "SENTINEL Lighting monitoring — lux levels, fixture status, energy consumption, occupancy.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "id": 1,
+      "title": "Scrape Health",
+      "type": "stat",
+      "gridPos": { "h": 3, "w": 4, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "targets": [{ "refId": "A", "expr": "up{job=\"sentinel-backend\"}", "legendFormat": "{{instance}}" }],
+      "fieldConfig": { "defaults": { "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] } } }
+    },
+    {
+      "id": 2,
+      "title": "Fixtures On",
+      "type": "stat",
+      "gridPos": { "h": 3, "w": 4, "x": 4, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "targets": [{ "refId": "A", "expr": "sum(sentinel_lighting_fixtures_on) or vector(0)", "legendFormat": "On" }],
+      "fieldConfig": { "defaults": { "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 20 }, { "color": "red", "value": 50 }] } } }
+    },
+    {
+      "id": 3,
+      "title": "Lighting Energy (kWh)",
+      "type": "stat",
+      "gridPos": { "h": 3, "w": 4, "x": 8, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "targets": [{ "refId": "A", "expr": "sum(rate(sentinel_lighting_energy_kwh_total[1h])) * 1000 or vector(0)", "legendFormat": "kWh/h" }],
+      "fieldConfig": { "defaults": { "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 50 }, { "color": "red", "value": 100 }] }, "unit": "kwatth" } }
+    },
+    {
+      "id": 4,
+      "title": "Zone Lux Levels",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 3 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "targets": [{ "refId": "A", "expr": "sentinel_lighting_zone_lux", "legendFormat": "{{zone_name}} ({{site_id}})" }],
+      "fieldConfig": { "defaults": { "unit": "none", "custom": { "lineWidth": 2, "fillOpacity": 30 } } }
+    },
+    {
+      "id": 5,
+      "title": "Fixtures On vs Total",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 3 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "targets": [
+        { "refId": "A", "expr": "sentinel_lighting_fixtures_on", "legendFormat": "On {{zone_id}}" },
+        { "refId": "B", "expr": "sentinel_lighting_fixtures_total", "legendFormat": "Total {{zone_id}}" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "none", "custom": { "lineWidth": 2, "fillOpacity": 30 } } }
+    },
+    {
+      "id": 6,
+      "title": "Lighting Energy Rate (kWh/h)",
+      "type": "timeseries",
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 11 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "targets": [{ "refId": "A", "expr": "rate(sentinel_lighting_energy_kwh_total[1h]) * 1000", "legendFormat": "{{site_id}}" }],
+      "fieldConfig": { "defaults": { "unit": "kwatth", "custom": { "lineWidth": 2, "fillOpacity": 30 } } }
+    },
+    {
+      "id": 7,
+      "title": "Occupancy %",
+      "type": "timeseries",
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 11 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "targets": [{ "refId": "A", "expr": "sentinel_lighting_occupancy_percent", "legendFormat": "{{zone_id}}" }],
+      "fieldConfig": { "defaults": { "unit": "percent", "custom": { "lineWidth": 2, "fillOpacity": 30 } } }
+    }
+  ],
+  "refresh": "30s",
+  "tags": ["lighting", "sentinel", "building"],
+  "templating": {
+    "list": [
+      { "name": "site", "type": "query", "query": "label_values(sentinel_lighting_zone_lux, site_id)", "multi": true }
+    ]
+  },
+  "time": { "from": "now-6h", "to": "now" },
+  "title": "SENTINEL Lighting Dashboard",
+  "uid": "sentinel-lighting",
+  "version": 1
+}

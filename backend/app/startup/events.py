@@ -347,7 +347,11 @@ async def startup_event(app: FastAPI) -> None:
 
     scheduler_service.add_ghost_room_monitor_job(interval_seconds=60)
     if hasattr(scheduler_service, "add_focus_overstay_check_job"):
+        _logger.warning("REGISTERING: Focus overstay check job (every 2 min)")
         scheduler_service.add_focus_overstay_check_job(interval_seconds=120)  # Every 2 minutes
+        _logger.warning("REGISTERED: Focus overstay check job")
+    else:
+        _logger.error("MISSING: add_focus_overstay_check_job method not found")
 
     # Phase 207 SLA monitoring — milestone timer (fires every 5 min)
     scheduler_service.add_milestone_timer_job(interval_seconds=300)
@@ -937,29 +941,30 @@ async def startup_event(app: FastAPI) -> None:
         else:
             _logger.info("Site 002 data source disabled — simulation engine inactive")
 
-        # Shadow mode bridge polling — runs whenever edge mode is disabled.
-        # Polls the live bridge (10.99.0.1:8080) every 5 minutes and feeds data to
-        # SentinelMLFeeder so ML models stay current with real site telemetry.
-        # ML training runs in ALL modes (shadow, advisory, supervised, auto) continuously.
-        if not settings.edge_mode:
-            _logger.warning("SHADOW_MODE_DEBUG: condition TRUE, about to add shadow mode job")
-            try:
-                scheduler_service.add_shadow_mode_polling_job(interval_seconds=300, site_id="site-002")
-                _logger.info("Shadow mode bridge polling initialized (5min interval)")
-            except Exception as e:
-                _logger.error(f"Shadow mode polling initialization failed: {e}", exc_info=True)
+    # Shadow mode bridge polling — runs whenever edge mode is disabled.
+    # Polls the live bridge (10.99.0.1:8080) every 5 minutes and feeds data to
+    # SentinelMLFeeder so ML models stay current with real site telemetry.
+    # ML training runs in ALL modes (shadow, advisory, supervised, auto) continuously.
+    # Note: This runs INDEPENDENTLY of simulation settings — it's for live bridge data.
+    if not settings.edge_mode:
+        _logger.warning("SHADOW_MODE_DEBUG: condition TRUE, about to add shadow mode job")
+        try:
+            scheduler_service.add_shadow_mode_polling_job(interval_seconds=300, site_id="site-002")
+            _logger.info("Shadow mode bridge polling initialized (5min interval)")
+        except Exception as e:
+            _logger.error(f"Shadow mode polling initialization failed: {e}", exc_info=True)
 
-            # BACnet discovery polling — detects equipment changes on site-002's BACnet network.
-            # Queries the bridge object catalog every 6 hours and compares against
-            # known equipment records. New/missing devices are logged for review.
-            try:
-                scheduler_service.add_bacnet_discovery_polling_job(
-                    interval_seconds=21600,  # 6 hours
-                    site_id="site-002",
-                )
-                _logger.info("BACnet discovery polling initialized (6h interval)")
-            except Exception as e:
-                _logger.error(f"BACnet discovery polling initialization failed: {e}", exc_info=True)
+        # BACnet discovery polling — detects equipment changes on site-002's BACnet network.
+        # Queries the bridge object catalog every 6 hours and compares against
+        # known equipment records. New/missing devices are logged for review.
+        try:
+            scheduler_service.add_bacnet_discovery_polling_job(
+                interval_seconds=21600,  # 6 hours
+                site_id="site-002",
+            )
+            _logger.info("BACnet discovery polling initialized (6h interval)")
+        except Exception as e:
+            _logger.error(f"BACnet discovery polling initialization failed: {e}", exc_info=True)
 
         # Phase promotion evaluator — hourly Trust Ladder promotion check
         try:

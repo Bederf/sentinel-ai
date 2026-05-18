@@ -267,6 +267,124 @@ Health restored + alert resolved
 
 ---
 
+## 🤖 PARASITE Decision Pipeline (Two-Stage Architecture)
+
+### Overview
+
+The PARASITE (Predictive Automated Recommendation Action System with Intelligent Tiered Execution) pipeline uses a **two-stage architecture** that separates **decision intent** from **execution action**.
+
+**Critical Distinction:**
+- **Stage 1 (TierRoutingEngine):** Records what the system *would* do (intent logging)
+- **Stage 2 (ApprovalService):** Actually executes or blocks based on safety/phase gates
+
+### Stage 1: Decision Intent (TierRoutingEngine)
+
+**File:** `backend/app/services/tier_routing_engine.py`
+
+**Purpose:** Evaluate recommendations and determine the appropriate tier/action without executing.
+
+**Flow:**
+```
+AI Recommendation
+  ↓
+Extract confidence score
+  ↓
+Compare against thresholds (Tier2: 0.70, Tier3: 0.85)
+  ↓
+Route to tier1/tier2/tier3
+  ↓
+Create parasite_decision record with:
+  - write_status: "intent_logged"
+  - bacnet_write_dispatched: False
+  - write_attempt_count: 0
+  ↓
+Return TierRoutingResult to caller
+```
+
+**Key Point:** This stage NEVER executes BACnet writes. It only logs intent for audit purposes.
+
+### Stage 2: Execution Gate (ApprovalService)
+
+**File:** `backend/app/services/approval_service.py`
+
+**Purpose:** Execute or block decisions based on multiple safety gates.
+
+**Flow:**
+```
+TierRoutingResult
+  ↓
+Onboarding Phase Gate (effective_phase() check)
+  - Blocks: commissioning, shadow_live
+  - Allows: supervised, automatic
+  ↓
+Quality Gate Check (GateStatus)
+  - Blocks on FAIL
+  - Warns on WARN (allows Tier 2 only)
+  ↓
+Ingestion Mode Check
+  - Blocks Tier3: shadow_live mode
+  - Allows: live_control mode
+  ↓
+Safety Engine Validation
+  ↓
+BACnet Write Attempt
+  ↓
+Update parasite_decision:
+  - bacnet_write_dispatched: True
+  - write_status: "dispatched" | "succeeded" | "failed"
+  - write_attempt_count: 1 (actual attempt)
+```
+
+### Common Confusion: write_attempt_count
+
+**Problem:** The field name `write_attempt_count` with default=1 historically implied writes were attempted.
+
+**Reality:**
+- **Before fix:** Default value of 1 meant "intent recorded" (NOT actual write)
+- **After fix (2026-05-18):**
+  - `write_attempt_count` defaults to 0
+  - `bacnet_write_dispatched: bool` explicitly tracks actual BACnet writes
+  - `write_status: "intent_logged" | "dispatched" | "succeeded" | "failed"`
+
+**For Auditors:**
+```sql
+-- Intent records only (Stage 1, no execution)
+SELECT * FROM parasite_decisions
+WHERE bacnet_write_dispatched = FALSE;
+
+-- Actual execution attempts (Stage 2, BACnet writes)
+SELECT * FROM parasite_decisions
+WHERE bacnet_write_dispatched = TRUE;
+```
+
+### Phase Gate Enforcement
+
+**Feature Gates:** (`backend/app/models/onboarding_phase.py`)
+
+| Feature | Minimum Phase | Actual Check Location |
+|---------|--------------|----------------------|
+| recommendations_ui | advisory | Frontend visibility |
+| sentry_notifications | advisory | Alert dispatcher |
+| approve_reject | supervised | ApprovalService.execute_approval() |
+| **auto_apply** | **automatic** | **ApprovalService.auto_execute_recommendation()** |
+| concierge_dashboard | advisory | Dashboard API |
+
+**Current S002 Status (2026-05-18):**
+- Onboarding phase: "advisory"
+- Auto-apply gate: **BLOCKED** (requires "automatic")
+- Parasite decisions created: Yes (intent logging)
+- BACnet writes executed: **NO**
+
+### Files Involved
+
+- `backend/app/services/tier_routing_engine.py` - Stage 1: Intent routing
+- `backend/app/services/approval_service.py` - Stage 2: Execution gates
+- `backend/app/models/onboarding_phase.py` - Phase gate definitions
+- `backend/app/models/parasite_decision.py` - Decision record schema
+- `backend/app/database/repositories/parasite_decision_repository.py` - Persistence
+
+---
+
 ## 🎯 Redis Caching
 
 **Service:** `backend/app/services/cache_service.py`

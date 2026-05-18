@@ -1,0 +1,100 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "SENTINEL Water monitoring — consumption kL, flow rates, leaks, tank levels, cost.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "id": 1,
+      "title": "Scrape Health",
+      "type": "stat",
+      "gridPos": { "h": 3, "w": 4, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "targets": [{ "refId": "A", "expr": "up{job=\"sentinel-backend\"}", "legendFormat": "{{instance}}" }],
+      "fieldConfig": { "defaults": { "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] } } }
+    },
+    {
+      "id": 2,
+      "title": "Active Leaks",
+      "type": "stat",
+      "gridPos": { "h": 3, "w": 4, "x": 4, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "targets": [{ "refId": "A", "expr": "sum(sentinel_water_leaks_detected) or vector(0)", "legendFormat": "Leaks" }],
+      "fieldConfig": { "defaults": { "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] } } }
+    },
+    {
+      "id": 3,
+      "title": "Water Cost (ZAR)",
+      "type": "stat",
+      "gridPos": { "h": 3, "w": 4, "x": 8, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "targets": [{ "refId": "A", "expr": "sum(sentinel_water_cost_zar) or vector(0)", "legendFormat": "ZAR" }],
+      "fieldConfig": { "defaults": { "unit": "currencyZAR", "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 5000 }, { "color": "red", "value": 20000 }] } } }
+    },
+    {
+      "id": 4,
+      "title": "Consumption (kL)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 3 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "targets": [{ "refId": "A", "expr": "rate(sentinel_water_consumption_kl_total[1h]) * 1000", "legendFormat": "{{site_id}}" }],
+      "fieldConfig": { "defaults": { "unit": "none", "custom": { "lineWidth": 2, "fillOpacity": 30 } } }
+    },
+    {
+      "id": 5,
+      "title": "Flow Rate (L/h)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 3 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "targets": [{ "refId": "A", "expr": "sentinel_water_flow_rate_lph", "legendFormat": "{{zone_id}}" }],
+      "fieldConfig": { "defaults": { "unit": "none", "custom": { "lineWidth": 2, "fillOpacity": 30 } } }
+    },
+    {
+      "id": 6,
+      "title": "Tank Levels (%)",
+      "type": "timeseries",
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 11 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "targets": [{ "refId": "A", "expr": "sentinel_water_tank_level_percent", "legendFormat": "{{tank_id}}" }],
+      "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 100, "custom": { "lineWidth": 2, "fillOpacity": 30 }, "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "yellow", "value": 30 }, { "color": "green", "value": 60 }] } } }
+    },
+    {
+      "id": 7,
+      "title": "Water Cost Over Time (ZAR)",
+      "type": "timeseries",
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 11 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "targets": [{ "refId": "A", "expr": "sentinel_water_cost_zar", "legendFormat": "{{site_id}} {{period}}" }],
+      "fieldConfig": { "defaults": { "unit": "currencyZAR", "custom": { "lineWidth": 2, "fillOpacity": 30 } } }
+    }
+  ],
+  "refresh": "30s",
+  "tags": ["water", "sentinel", "building"],
+  "templating": {
+    "list": [
+      { "name": "site", "type": "query", "query": "label_values(sentinel_water_consumption_kl_total, site_id)", "multi": true }
+    ]
+  },
+  "time": { "from": "now-24h", "to": "now" },
+  "title": "SENTINEL Water Dashboard",
+  "uid": "sentinel-water",
+  "version": 1
+}

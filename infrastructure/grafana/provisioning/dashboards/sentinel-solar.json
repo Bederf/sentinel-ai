@@ -1,0 +1,120 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "SENTINEL Solar & BESS monitoring — PV generation, battery state of charge, self-consumption, export.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "id": 1,
+      "title": "Scrape Health",
+      "type": "stat",
+      "gridPos": { "h": 3, "w": 4, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "targets": [{ "refId": "A", "expr": "up{job=\"sentinel-backend\"}", "legendFormat": "{{instance}}" }],
+      "fieldConfig": { "defaults": { "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] } } }
+    },
+    {
+      "id": 2,
+      "title": "Current PV Generation (kW)",
+      "type": "stat",
+      "gridPos": { "h": 3, "w": 5, "x": 4, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "targets": [{ "refId": "A", "expr": "sum(sentinel_solar_pv_generation_kw) or vector(0)", "legendFormat": "kW" }],
+      "fieldConfig": { "defaults": { "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 5 }] }, "unit": "kwatth" } }
+    },
+    {
+      "id": 3,
+      "title": "Self-Consumption %",
+      "type": "gauge",
+      "gridPos": { "h": 3, "w": 5, "x": 9, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "targets": [{ "refId": "A", "expr": "avg(sentinel_solar_self_consumption_percent) or vector(0)", "legendFormat": "Avg %" }],
+      "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 100, "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "yellow", "value": 50 }, { "color": "green", "value": 75 }] } } }
+    },
+    {
+      "id": 4,
+      "title": "BESS State of Charge %",
+      "type": "gauge",
+      "gridPos": { "h": 3, "w": 5, "x": 14, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "targets": [{ "refId": "A", "expr": "avg(sentinel_bess_state_of_charge_percent) or vector(0)", "legendFormat": "SoC %" }],
+      "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 100, "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "yellow", "value": 20 }, { "color": "green", "value": 50 }] } } }
+    },
+    {
+      "id": 5,
+      "title": "PV Generation (kW)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 3 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "targets": [{ "refId": "A", "expr": "sentinel_solar_pv_generation_kw", "legendFormat": "{{panel_group}} ({{site_id}})" }],
+      "fieldConfig": { "defaults": { "unit": "kwatth", "custom": { "lineWidth": 2, "fillOpacity": 30 } } }
+    },
+    {
+      "id": 6,
+      "title": "BESS Charge/Discharge (kW)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 3 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "targets": [{ "refId": "A", "expr": "sentinel_bess_current_charge_kw", "legendFormat": "{{bess_unit}} ({{site_id}})" }],
+      "fieldConfig": { "defaults": { "unit": "kwatth", "custom": { "lineWidth": 2, "fillOpacity": 30 } } }
+    },
+    {
+      "id": 7,
+      "title": "Total Generation (kWh)",
+      "type": "timeseries",
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 11 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "targets": [{ "refId": "A", "expr": "rate(sentinel_solar_total_generation_kwh_total[1h]) * 1000", "legendFormat": "{{site_id}}" }],
+      "fieldConfig": { "defaults": { "unit": "kwatth", "custom": { "lineWidth": 2, "fillOpacity": 30 } } }
+    },
+    {
+      "id": 8,
+      "title": "Export vs Self-Consumption (kWh)",
+      "type": "timeseries",
+      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 11 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "targets": [
+        { "refId": "A", "expr": "rate(sentinel_solar_export_kwh_total[1h]) * 1000", "legendFormat": "Export {{site_id}}" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "kwatth", "custom": { "lineWidth": 2, "fillOpacity": 30 } } }
+    },
+    {
+      "id": 9,
+      "title": "BESS Charge Cycles",
+      "type": "stat",
+      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 11 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "targets": [{ "refId": "A", "expr": "sum(sentinel_bess_charge_cycles) or vector(0)", "legendFormat": "Cycles" }],
+      "fieldConfig": { "defaults": { "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 1000 }, { "color": "red", "value": 5000 }] } } }
+    }
+  ],
+  "refresh": "10s",
+  "tags": ["solar", "bess", "sentinel", "building"],
+  "templating": {
+    "list": [
+      { "name": "site", "type": "query", "query": "label_values(sentinel_solar_pv_generation_kw, site_id)", "multi": true }
+    ]
+  },
+  "time": { "from": "now-24h", "to": "now" },
+  "title": "SENTINEL Solar & BESS Dashboard",
+  "uid": "sentinel-solar",
+  "version": 1
+}

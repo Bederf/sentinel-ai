@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from app.config.settings import settings
-from app.models.parasite_decision import _safe_json_value
+from app.models.parasite_decision import WriteStatus, _safe_json_value
 
 logger = logging.getLogger(__name__)
 
@@ -113,9 +113,9 @@ class ParasiteDecisionRepository:
             if "updated_at" not in decision:
                 decision["updated_at"] = datetime.utcnow().isoformat()
 
-            # Default write_attempt_count
-            if "write_attempt_count" not in decision:
-                decision["write_attempt_count"] = 1
+            # Set initial write_status for intent records (NOT actual BACnet writes)
+            if "write_status" not in decision:
+                decision["write_status"] = WriteStatus.INTENT_LOGGED.value
 
             if not self._use_json and self.client:
                 # Save to Supabase
@@ -217,6 +217,58 @@ class ParasiteDecisionRepository:
             logger.error(f"Error marking decision as rolled back: {e}")
             raise
 
+    async def record_bacnet_write_dispatched(
+        self,
+        decision_id: str,
+        write_succeeded: bool | None = None,
+    ) -> dict:
+        """Record that an actual BACnet write was dispatched (NOT just intent logged).
+
+        This is called by ApprovalService ONLY when write_device_value() is actually
+        invoked. The initial parasite_decision record is created with write_status='intent_logged'
+        by TierRoutingEngine - that is NOT an actual write attempt.
+
+        Args:
+            decision_id: Decision ID
+            write_succeeded: True if write succeeded, False if failed, None if pending
+
+        Returns:
+            Updated decision record.
+        """
+        try:
+            # Determine write status based on result
+            if write_succeeded is None:
+                status = WriteStatus.DISPATCHED.value
+            elif write_succeeded:
+                status = WriteStatus.SUCCEEDED.value
+            else:
+                status = WriteStatus.FAILED.value
+
+            update_data = {
+                "bacnet_write_dispatched": True,
+                "write_status": status,
+                "write_attempt_count": 1,  # Actual BACnet write attempt
+                "bacnet_write_succeeded": write_succeeded,
+                "updated_at": datetime.utcnow().isoformat(),
+            }
+
+            if not self._use_json and self.client:
+                result = await self._supabase_update(decision_id, update_data)
+                if result:
+                    return result if isinstance(result, dict) else result[0]
+
+            # Fall back to JSON
+            self._load_all()
+            if decision_id in self._decisions:
+                self._decisions[decision_id].update(update_data)
+                self._save_all()
+                return self._decisions[decision_id]
+            raise KeyError(f"Decision {decision_id} not found")
+
+        except Exception as e:
+            logger.error(f"Error recording BACnet write dispatch for decision {decision_id}: {e}")
+            raise
+
     async def update_cov_status(
         self,
         decision_id: str,
@@ -301,7 +353,7 @@ class ParasiteDecisionRepository:
                 result = (
                     self.client.table("parasite_decisions")
                     .select("id", count="exact")
-                    .in_("write_status", ["success", "blocked"])
+                    .in_("write_status", [WriteStatus.SUCCEEDED.value, WriteStatus.BLOCKED_BY_GATE.value])
                     .is_("outcome_measured_at", "null")
                     .execute()
                 )
@@ -312,7 +364,8 @@ class ParasiteDecisionRepository:
             return sum(
                 1
                 for d in self._decisions.values()
-                if d.get("write_status") in ("success", "blocked") and d.get("outcome_measured_at") is None
+                if d.get("write_status") in (WriteStatus.SUCCEEDED.value, WriteStatus.BLOCKED_BY_GATE.value)
+                and d.get("outcome_measured_at") is None
             )
 
         except Exception as e:

@@ -14,9 +14,12 @@ No hardware or firmware changes — uses the same LD2410C OUT pin events.
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 from app.models.space_occupancy import FocusRoomSession
+
+# SAST (South Africa Standard Time) is UTC+2
+SAST = timezone(timedelta(hours=2))
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +41,11 @@ def describe_focus_session_state(
     Active sessions should expose current elapsed duration and whether the
     overstay red-light indicator should be on right now.
     """
-    current_time = now or datetime.utcnow()
+    # Use naive datetime to match session times from database
+    if now:
+        current_time = now.replace(tzinfo=None) if now.tzinfo else now
+    else:
+        current_time = datetime.now(SAST).replace(tzinfo=None)
     base_threshold = extended_use_seconds or _get_extended_use_seconds()
     cooldown_threshold = red_light_cooldown_seconds or _get_red_light_cooldown_seconds()
     grace_seconds = (session.overstay_grace_minutes or 0) * 60
@@ -109,7 +116,7 @@ def process_focus_room_event(
             sensor_id=sensor_id,
             source=source,
             start_time=timestamp,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(SAST),
             door_closed=door_closed,
         )
         occupancy_store.save_session(session)

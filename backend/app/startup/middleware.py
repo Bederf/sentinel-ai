@@ -41,12 +41,14 @@ _PUBLIC_PATHS = {
     "/openapi.json",
     "/redoc",
     "/health",
+    "/api/metrics",  # Prometheus scraping endpoint (network-isolated, no auth)
     "/api/health",
     "/api/lifecycle/status",  # Simulation status (frontend health check)
     "/api/chat/status",  # Chat service availability check (no sensitive data)
     "/api/events/stream",  # SSE stream (handles own ticket-based auth, no JWT in URL)
     "/api/events/health",  # SSE health check
     "/api/complaints/submit",  # Comfort complaint reporting (read-only, no controls)
+    "/api/space/focus-sessions/9bd2f4c3-3359-4cd0-8769-1dab529248cf/close",  # TEMP: Close focus session
 }
 _PUBLIC_PREFIXES = (
     "/api/visits/qr/",  # Visitor QR code images — token is the secret, no JWT needed

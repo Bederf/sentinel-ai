@@ -50,6 +50,8 @@ export function EnergyIntelligenceCard({ siteId, onNavigate }: EnergyIntelligenc
   const savings = status?.monthly_savings?.monthly_savings_zar ?? 0;
   const savingsPerHour = status?.monthly_savings?.savings_per_hour_zar ?? 0;
   const mode = status?.optimization_settings?.mode ?? 'supervised';
+  const onboardingPhase = status?.onboarding_phase ?? 'shadow';
+  const isAdvisory = onboardingPhase === 'shadow_live' || onboardingPhase === 'advisory';
   const applied = status?.monthly_savings?.applied_recommendations ?? 0;
 
   // Determine state — show active if any meaningful optimization data exists
@@ -104,7 +106,7 @@ export function EnergyIntelligenceCard({ siteId, onNavigate }: EnergyIntelligenc
       metrics={
         <>
           <ValueMetricBox label="Optimisations applied" value={`${applied}`} color={applied > 0 ? 'var(--color-sentinel-green)' : 'var(--color-sentinel-text-secondary)'} />
-          <ValueMetricBox label="Mode" value={mode === 'automatic' ? 'Auto' : 'Supervised'} color="var(--color-sentinel-blue)" />
+          <ValueMetricBox label="Mode" value={isAdvisory ? 'Advisory' : mode === 'automatic' ? 'Auto' : 'Supervised'} color="var(--color-sentinel-blue)" />
           <ValueMetricBox label="Savings rate" value={hasValue(savingsPerHour) ? `${formatCurrencyZAR(savingsPerHour)}/hr` : '—'} color="var(--color-sentinel-amber)" />
         </>
       }

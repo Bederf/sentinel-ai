@@ -1116,6 +1116,9 @@ class ApprovalService:
                         "safety_rules_triggered": safety_result.get("rules_triggered", []),
                         "rejection_category": "safety_block",
                         "confidence_score": routing_result.confidence_score,
+                        "decision_details": {
+                            "reasoning": routing_result.reason,
+                        },
                         "tool_metadata": {
                             "is_dangerous": sentinel_tool.is_dangerous,
                             "is_reversible": sentinel_tool.is_reversible,
@@ -1243,6 +1246,9 @@ class ApprovalService:
                         "gate_snapshot_id": getattr(gate_result, "snapshot_id", None),
                         "safety_result": "allowed",
                         "confidence_score": routing_result.confidence_score,
+                        "decision_details": {
+                            "reasoning": routing_result.reason,
+                        },
                         "tool_metadata": {
                             "is_dangerous": sentinel_tool.is_dangerous,
                             "is_reversible": sentinel_tool.is_reversible,
@@ -1426,6 +1432,9 @@ class ApprovalService:
                     "gate_snapshot_id": getattr(gate_result, "snapshot_id", None),
                     "safety_result": "allowed",
                     "confidence_score": routing_result.confidence_score,
+                    "decision_details": {
+                        "reasoning": routing_result.reason,
+                    },
                     "routing_source": recommendation.source or "optimization_api",
                     "audit_level": audit_level,
                     "context_snapshot": context_snapshot if audit_level == "critical" else {},

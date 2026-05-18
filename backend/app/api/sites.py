@@ -1241,7 +1241,7 @@ async def update_site_phase(site_id: str, request: PhaseUpdateRequest) -> PhaseU
                     },
                 )
 
-        # Policy gate check: block manual advancement if current stage's gates haven't passed
+        # Policy gate check: block manual advancement if gates haven't passed
         from app.services.site_mode_policy_service import SiteModePolicyService
 
         policy_service = SiteModePolicyService()

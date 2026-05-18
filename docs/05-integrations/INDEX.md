@@ -326,8 +326,10 @@ For questions:
 | HVAC_DALI_QUICKREF.md | 1.0 | Feb 14, 2026 | Complete |
 | HVAC_DALI_ARCHITECTURE.md | 1.0 | Feb 14, 2026 | Complete |
 | tridonic-dali-discovery.md | 1.1 | Feb 26, 2026 | Updated (CSV ingestion) |
-| INDEX.md (this file) | 1.2 | Feb 26, 2026 | Updated |
+| INDEX.md (this file) | 1.3 | May 18, 2026 | Updated (Asoba + ODS-E) |
 | sentry-desk-complaint-agent-spec.md | 1.0 | Feb 22, 2026 | Complete |
+| odse-export-endpoint-spec.md | 1.0 | May 18, 2026 | Implemented (Phase 209) |
+| asoba-mcp-server.md | 1.0 | May 18, 2026 | Implemented (Phase 209) |
 
 ---
 
@@ -339,6 +341,24 @@ For questions:
 - **Covers**: Goals, workflows, tools, data sources, complaint types, AI tier system, context/memory, events/state, error handling, metrics, open questions
 
 See also: [AI Recommendation Agent Spec](../08-ai-ml/ai-recommendation-agent-spec.md) for the backend PARASITE autonomous recommendation system.
+
+---
+
+## Asoba & ODS-E Integration
+
+### [ODS-E Export Endpoint Specification](odse-export-endpoint-spec.md)
+- **Status**: Implemented (Phase 209)
+- **Audience**: Backend engineers, integration specialists
+- **Covers**: ODS-E v0.4.0 compliant energy data export, dual format (JSON/CSV), Eskom Megaflex tariff classification, health score mapping, asset metadata export
+- **Endpoints**: `/api/integration/odse/export`, `/api/integration/odse/asset-metadata`
+- **Related**: [Asoba Terminal API MCP Server](asoba-mcp-server.md)
+
+### [Asoba Terminal API MCP Server](asoba-mcp-server.md)
+- **Status**: Implemented (Phase 209)
+- **Audience**: Backend engineers, AI integrators
+- **Covers**: MCP server wrapping Asoba's eSUMS/Ona Terminal API, 11 tools across fault detection, asset management, and ML intelligence, bidirectional Sentinel-Asoba integration
+- **Tools**: `asoba_get_ooda_summary`, `asoba_run_fault_detection`, `asoba_create_work_order`, etc.
+- **Related**: [ODS-E Export Endpoint Specification](odse-export-endpoint-spec.md), [SIMBIOT MCP Server](./simbiot-mcp-server.md)
 
 ---
 

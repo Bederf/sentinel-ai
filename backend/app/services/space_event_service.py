@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Any
+
+# SAST (South Africa Standard Time) is UTC+2
+SAST = timezone(timedelta(hours=2))
 
 from app.api.block_bookings import get_block_booking_config
 from app.models.space_occupancy import OccupancyEvent
@@ -88,7 +91,8 @@ async def process_occupancy_event(
     door_closed: bool | None = None,
 ) -> dict[str, Any]:
     """Persist an occupancy event and apply space-optimization rules."""
-    now = timestamp or datetime.now(timezone.utc)
+    # Use naive SAST datetime (remove timezone info for consistency with model)
+    now = timestamp or datetime.now(SAST).replace(tzinfo=None)
     event = OccupancyEvent(
         site_id=site_id,
         room_code=room_code,
@@ -96,7 +100,7 @@ async def process_occupancy_event(
         occupied=occupied,
         timestamp=now,
         source=source,
-        received_at=datetime.now(timezone.utc),
+        received_at=datetime.now(SAST).replace(tzinfo=None),
         moving=moving,
         stationary=stationary,
         distance_m=distance_m,

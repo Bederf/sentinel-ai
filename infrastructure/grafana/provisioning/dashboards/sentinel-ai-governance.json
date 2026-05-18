@@ -27,7 +27,7 @@
       "title": "Sentinel Scrape Health",
       "type": "stat",
       "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
-      "datasource": { "type": "prometheus", "uid": "ef6rbinrkeu4gd" },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
       "targets": [
         {
           "refId": "A",
@@ -52,7 +52,7 @@
       "title": "Quality Gate Evaluations (5m Rate)",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 6, "y": 0 },
-      "datasource": { "type": "prometheus", "uid": "ef6rbinrkeu4gd" },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
       "targets": [
         {
           "refId": "A",
@@ -66,7 +66,7 @@
       "title": "Safety Violations (24h Increase)",
       "type": "stat",
       "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
-      "datasource": { "type": "prometheus", "uid": "ef6rbinrkeu4gd" },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
       "targets": [
         {
           "refId": "A",
@@ -90,7 +90,7 @@
       "title": "Recommendations by Tier/Action (5m Rate)",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
-      "datasource": { "type": "prometheus", "uid": "ef6rbinrkeu4gd" },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
       "targets": [
         {
           "refId": "A",
@@ -104,7 +104,7 @@
       "title": "Approval Decisions (1h Rate)",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
-      "datasource": { "type": "prometheus", "uid": "ef6rbinrkeu4gd" },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
       "targets": [
         {
           "refId": "A",
@@ -118,7 +118,7 @@
       "title": "Model Drift Alerts",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 8, "x": 0, "y": 16 },
-      "datasource": { "type": "prometheus", "uid": "ef6rbinrkeu4gd" },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
       "targets": [
         {
           "refId": "A",
@@ -132,7 +132,7 @@
       "title": "Rollback Events (1h Rate)",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 8, "x": 8, "y": 16 },
-      "datasource": { "type": "prometheus", "uid": "ef6rbinrkeu4gd" },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
       "targets": [
         {
           "refId": "A",
@@ -146,7 +146,7 @@
       "title": "Sentinel Build Info",
       "type": "table",
       "gridPos": { "h": 8, "w": 8, "x": 16, "y": 16 },
-      "datasource": { "type": "prometheus", "uid": "ef6rbinrkeu4gd" },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
       "targets": [
         {
           "refId": "A",
@@ -168,7 +168,7 @@
       "title": "Quality Gate Pass/Fail by Rule",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 25 },
-      "datasource": { "type": "prometheus", "uid": "ef6rbinrkeu4gd" },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
       "targets": [
         {
           "refId": "A",
@@ -203,7 +203,7 @@
       "title": "Model Drift Score Trends",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 25 },
-      "datasource": { "type": "prometheus", "uid": "ef6rbinrkeu4gd" },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
       "targets": [
         {
           "refId": "A",
@@ -234,7 +234,7 @@
       "title": "Tool Error Rate by Type",
       "type": "barchart",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 33 },
-      "datasource": { "type": "prometheus", "uid": "ef6rbinrkeu4gd" },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
       "targets": [
         {
           "refId": "A",
@@ -248,7 +248,7 @@
       "title": "Approval Latency Distribution",
       "type": "histogram",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 33 },
-      "datasource": { "type": "prometheus", "uid": "ef6rbinrkeu4gd" },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
       "targets": [
         {
           "refId": "A",
@@ -270,7 +270,7 @@
       "title": "AI Cost per Route",
       "type": "barchart",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 41 },
-      "datasource": { "type": "prometheus", "uid": "ef6rbinrkeu4gd" },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
       "targets": [
         {
           "refId": "A",
@@ -307,7 +307,7 @@
       "title": "Retrieval Latency (p95/p99)",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 50 },
-      "datasource": { "type": "prometheus", "uid": "ef6rbinrkeu4gd" },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
       "targets": [
         {
           "refId": "A",
@@ -333,7 +333,7 @@
       "title": "Retrieval Hits/sec",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 6, "x": 12, "y": 50 },
-      "datasource": { "type": "prometheus", "uid": "ef6rbinrkeu4gd" },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
       "targets": [
         {
           "refId": "A",
@@ -352,7 +352,7 @@
       "title": "Fallback Rate",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 6, "x": 18, "y": 50 },
-      "datasource": { "type": "prometheus", "uid": "ef6rbinrkeu4gd" },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
       "targets": [
         {
           "refId": "A",

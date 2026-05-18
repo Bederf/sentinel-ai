@@ -225,20 +225,21 @@ export function EnergyChart({
             <div className="text-xs mt-1" style={{ color: "var(--color-grafana-text-secondary)" }}>
               {(() => {
                 // SA commercial office benchmarks (kWh/m²/month)
-                // NOTE: Placeholder values pending GBCSA/SAPOA verified data
-                // - 4.2 kWh/m² ≈ Green Star 5-6★ office (high efficiency)
-                // - 6.2 kWh/m² ≈ SANS 10400 compliant baseline
-                // - 8.5 kWh/m² ≈ Pre-2011 stock (poor)
-                // TODO: Replace with site-specific benchmarks from sustainability_api
-                const BENCHMARK_EFFICIENT = 4.2
-                const BENCHMARK_TYPICAL = 6.2
-                const BENCHMARK_POOR = 8.5
-                
-                const areaSqm = 9000 // Default building size
+                // See docs/04-features/energy-chart-benchmark-calculation.md for methodology
+                // Annual benchmarks from GBCSA/SANS 10400-XA:
+                // - 120 kWh/m²/year ≈ Green Star 5-6★ office (10/month)
+                // - 170 kWh/m²/year ≈ SANS compliant (14.2/month)
+                // - 230+ kWh/m²/year ≈ Pre-2011 stock (19.2/month)
+                // TODO: Pull site-specific GLA from building metadata API
+                const BENCHMARK_EFFICIENT = 10.0  // 120/12
+                const BENCHMARK_TYPICAL = 14.2    // 170/12
+                const BENCHMARK_POOR = 19.2       // 230/12
+
+                const areaSqm = 5400 // S002 GLA (not gross building area)
                 const daysInMonth = 30
                 const monthlyKwh = (grandTotal / days) * daysInMonth
                 const kwhPerSqm = monthlyKwh / areaSqm
-                
+
                 let badge: string
                 let color: string
                 if (kwhPerSqm <= BENCHMARK_EFFICIENT) {
@@ -251,7 +252,7 @@ export function EnergyChart({
                   badge = "Above avg"
                   color = "var(--color-grafana-red)"
                 }
-                
+
                 return (
                   <span>
                     {kwhPerSqm.toFixed(1)} kWh/m² ·{" "}

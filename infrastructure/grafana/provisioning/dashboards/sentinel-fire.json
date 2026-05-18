@@ -1,0 +1,114 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "SENTINEL Fire Safety monitoring — panel status, detector faults, evacuation readiness, extinguisher expiry.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "id": 1,
+      "title": "Scrape Health",
+      "type": "stat",
+      "gridPos": { "h": 3, "w": 4, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "targets": [{ "refId": "A", "expr": "up{job=\"sentinel-backend\"}", "legendFormat": "{{instance}}" }],
+      "fieldConfig": { "defaults": { "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] } } }
+    },
+    {
+      "id": 2,
+      "title": "Panels with Faults",
+      "type": "stat",
+      "gridPos": { "h": 3, "w": 4, "x": 4, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "targets": [{ "refId": "A", "expr": "count(sentinel_fire_detector_faults > 0) or vector(0)", "legendFormat": "Fault panels" }],
+      "fieldConfig": { "defaults": { "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] } } }
+    },
+    {
+      "id": 3,
+      "title": "Fire Panel Status",
+      "type": "stat",
+      "gridPos": { "h": 3, "w": 4, "x": 8, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "targets": [{ "refId": "A", "expr": "sum(sentinel_fire_panel_status)", "legendFormat": "Status" }],
+      "fieldConfig": { "defaults": { "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": 1 }, { "color": "yellow", "value": 2 }, { "color": "red", "value": 3 }] } } }
+    },
+    {
+      "id": 4,
+      "title": "Fire Panel Status by Panel",
+      "type": "table",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 3 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "targets": [{ "refId": "A", "expr": "sentinel_fire_panel_status", "format": "table", "legendFormat": "" }],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "type": "value", "options": { "0": { "text": "Offline", "color": "red" } } },
+            { "type": "value", "options": { "1": { "text": "Normal", "color": "green" } } },
+            { "type": "value", "options": { "2": { "text": "Fault", "color": "yellow" } } },
+            { "type": "value", "options": { "3": { "text": "Evacuation", "color": "red" } } }
+          ]
+        }
+      }
+    },
+    {
+      "id": 5,
+      "title": "Detector Faults per Panel",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 3 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "targets": [{ "refId": "A", "expr": "sentinel_fire_detector_faults", "legendFormat": "{{panel_id}}" }],
+      "fieldConfig": { "defaults": { "unit": "none", "custom": { "lineWidth": 2, "fillOpacity": 30 } } }
+    },
+    {
+      "id": 6,
+      "title": "Evacuation Status",
+      "type": "stat",
+      "gridPos": { "h": 3, "w": 8, "x": 16, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "targets": [{ "refId": "A", "expr": "sum(sentinel_fire_evacuation_status)", "legendFormat": "Evac status" }],
+      "fieldConfig": { "defaults": { "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": 0 }, { "color": "yellow", "value": 1 }, { "color": "red", "value": 2 }] } } }
+    },
+    {
+      "id": 7,
+      "title": "Extinguisher Expiry Countdown",
+      "type": "table",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 3 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "targets": [{ "refId": "A", "expr": "sentinel_fire_extinguisher_expiry_days", "format": "table", "legendFormat": "" }],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "yellow", "value": 30 }, { "color": "green", "value": 90 }] },
+          "unit": "none"
+        }
+      }
+    }
+  ],
+  "refresh": "60s",
+  "tags": ["fire", "sentinel", "building"],
+  "templating": {
+    "list": [
+      { "name": "site", "type": "query", "query": "label_values(sentinel_fire_panel_status, site_id)", "multi": true }
+    ]
+  },
+  "time": { "from": "now-1h", "to": "now" },
+  "title": "SENTINEL Fire Safety Dashboard",
+  "uid": "sentinel-fire",
+  "version": 1
+}
