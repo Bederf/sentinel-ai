@@ -22,7 +22,7 @@ from app.services.thermal_model import calculate_thermal_runway
 logger = logging.getLogger(__name__)
 
 # Constants
-MAX_DATA_AGE_SECONDS = 300  # 5 minutes
+MAX_DATA_AGE_SECONDS = 360  # 6 minutes — shadow mode polls every 5 min, allow 60s margin
 DDMP_MIN_LOAD_KW = 200.0  # 0.2 MW minimum for Commercial/Industrial Load Management (Eskom DDMP)
 DDMP_MIN_DURATION_MINUTES = 60  # 1 hour minimum
 
