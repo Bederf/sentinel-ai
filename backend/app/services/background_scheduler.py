@@ -855,11 +855,13 @@ class BackgroundSchedulerService:
         except Exception as e:
             logger.error(f"Failed to run optimization analysis: {e}")
 
-    def _generate_health_recommendations(self, site_ids, recommendation_repo) -> tuple[int, int]:
-        """Generate maintenance recommendations for degraded equipment using configured thresholds.
+    def _generate_health_recommendations(self, site_ids, prediction_repo) -> tuple[int, int]:
+        """Generate maintenance predictions for degraded equipment using configured thresholds.
 
-        Rule-based — no LLM call. Reads health thresholds from settings page
-        (Supabase system_settings → JSON settings → defaults).
+        Rule-based — no LLM call. Writes to predictions table instead of recommendations
+        (which is reserved for ai_optimization records that count toward the Trust Ladder gate).
+
+        Reads health thresholds from settings page (Supabase system_settings → JSON → defaults).
 
         Also creates dashboard alerts and sends Sentry/Telegram notifications
         for critical and warning equipment.
@@ -868,11 +870,6 @@ class BackgroundSchedulerService:
             (created_count, deduped_count)
         """
         from app.database.supabase_client import get_supabase_client
-        from app.models.recommendation import (
-            ActionRiskLevel,
-            Recommendation,
-            RecommendationStatus,
-        )
         from app.services.equipment_alert_service import get_equipment_alert_service
         from app.services.health_threshold_service import get_health_thresholds
 
@@ -885,20 +882,22 @@ class BackgroundSchedulerService:
         created = 0
         deduped = 0
 
-        # Maintenance actions by severity
+        # Maintenance actions by severity — maps to prediction severity field
         ACTIONS = {
             "critical": {
                 "action": "urgent_inspection",
                 "reason": "Health score below {t_critical}% — schedule urgent inspection and diagnostic. "
                 "Equipment may be at risk of failure. Check sensor readings, vibration, "
                 "and operating parameters.",
-                "risk": ActionRiskLevel.MEDIUM,
+                "probability": 75,
+                "timeframe_days": 7,
             },
             "warning": {
                 "action": "scheduled_maintenance",
                 "reason": "Health score below {t_warning}% — schedule preventive maintenance. "
                 "Inspect filters, bearings, connections, and calibration.",
-                "risk": ActionRiskLevel.LOW,
+                "probability": 55,
+                "timeframe_days": 30,
             },
         }
 
@@ -913,7 +912,7 @@ class BackgroundSchedulerService:
                 # Get degraded equipment (below healthy threshold)
                 eq_resp = (
                     sb.table("equipment")
-                    .select("code,type,health_score,status")
+                    .select("id,code,type,health_score,status")
                     .eq("site_id", site_uuid)
                     .lt("health_score", t_healthy)
                     .execute()
@@ -921,35 +920,18 @@ class BackgroundSchedulerService:
                 if not eq_resp.data:
                     continue
 
-                # Fetch existing PENDING recs for dedup
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                try:
-                    existing_pending = loop.run_until_complete(
-                        recommendation_repo.get_by_status(site_id, RecommendationStatus.PENDING, limit=500)
-                    )
-                finally:
-                    loop.close()
-
-                # Build dedup set: (equipment, action_point)
-                dedup_cutoff = datetime.now().replace(tzinfo=None) - timedelta(hours=48)
-                existing_keys: set[tuple[str, str]] = set()
-                for ex in existing_pending:
-                    ts = ex.timestamp
-                    if isinstance(ts, str):
-                        try:
-                            ts = datetime.fromisoformat(ts)
-                        except (ValueError, TypeError):
-                            continue
-                    if hasattr(ts, "tzinfo") and ts.tzinfo is not None:
-                        ts = ts.replace(tzinfo=None)
-                    if ts >= dedup_cutoff:
-                        action_point = ""
-                        if isinstance(ex.action, dict):
-                            action_point = ex.action.get("point", "")
-                        existing_keys.add((ex.target_equipment, action_point))
+                # Fetch existing active predictions for dedup
+                existing_active = (
+                    sb.table("predictions")
+                    .select("equipment_id")
+                    .eq("site_id", site_uuid)
+                    .eq("status", "active")
+                    .execute()
+                )
+                existing_eq_ids: set[str] = {r["equipment_id"] for r in existing_active.data}
 
                 for eq in eq_resp.data:
+                    eq_uuid = eq["id"]
                     code = eq["code"]
                     health = eq.get("health_score") or 100
                     eq_type = eq.get("type", "unknown")
@@ -963,75 +945,72 @@ class BackgroundSchedulerService:
                         continue  # Between warning and healthy — monitor only
 
                     action_info = ACTIONS[severity]
-                    point_name = f"health_{severity}"
 
-                    # Dedup check
-                    if (code, point_name) in existing_keys:
+                    # Dedup check — one active prediction per equipment
+                    if eq_uuid in existing_eq_ids:
                         deduped += 1
                         continue
 
                     reason = action_info["reason"].format(t_critical=t_critical, t_warning=t_warning)
+                    recommended_action = f"{code} ({eq_type}): health={health}% — {reason}"
+                    timeframe_days = action_info["timeframe_days"]
+                    probability = action_info["probability"]
 
-                    rec = Recommendation(
-                        site_id=site_id,
-                        timestamp=datetime.utcnow(),
-                        action_type="health_maintenance",
-                        risk_level=action_info["risk"],
-                        target_equipment=code,
-                        action={
-                            "point": point_name,
-                            "value": severity,
-                            "equipment_type": eq_type,
-                        },
-                        reason=f"{code} ({eq_type}): health={health}% — {reason}",
-                        expected_impact={
+                    prediction_data = {
+                        "site_id": site_uuid,
+                        "equipment_id": eq_uuid,
+                        "prediction_type": "health_maintenance",
+                        "probability_percent": probability,
+                        "confidence": "high",
+                        "predicted_failure_date": (datetime.now() + timedelta(days=timeframe_days)).isoformat(),
+                        "timeframe_days": timeframe_days,
+                        "severity": severity,
+                        "status": "active",
+                        "recommended_action": recommended_action,
+                        "evidence": {
                             "current_health": health,
                             "threshold": t_critical if severity == "critical" else t_warning,
                             "severity": severity,
                         },
-                        confidence=str(0.95),  # Rule-based, high confidence
-                        confidence_score=0.95,
-                        profile="health_rules",
-                        source="health_alert",
-                        source_type="rule_based",
-                        status=RecommendationStatus.PENDING,
-                        requires_approval=True,
-                    )
+                        "repair_cost_zar": None,
+                        "replacement_cost_zar": None,
+                        "downtime_cost_per_hour_zar": None,
+                        "potential_loss_zar": None,
+                    }
 
-                    loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(loop)
                     try:
-                        loop.run_until_complete(recommendation_repo.create(rec))
+                        prediction_repo.create(prediction_data)
                         created += 1
                         logger.warning(
-                            f"[HEALTH-REC] {code}: health={health}% [{severity.upper()}] — recommendation created"
+                            f"[HEALTH-PRED] {code}: health={health}% [{severity.upper()}] — prediction created"
                         )
-                        # Emit SSE toast event for new health recommendation
+                        # Emit SSE event for maintenance panel (reads from predictions)
                         try:
                             from app.services.event_emitter import get_event_emitter
 
                             emitter = get_event_emitter()
-                            loop.run_until_complete(
-                                emitter.emit_recommendation_created(
-                                    recommendation_id=rec.id,
-                                    site_id=rec.site_id,
-                                    action_type=rec.action_type,
-                                    reason=rec.reason or "",
-                                    confidence=rec.confidence or "medium",
-                                    risk_level=rec.risk_level.value if rec.risk_level else "medium",
-                                    target_equipment=rec.target_equipment,
+                            loop = asyncio.new_event_loop()
+                            asyncio.set_event_loop(loop)
+                            try:
+                                loop.run_until_complete(
+                                    emitter.emit_recommendation_created(
+                                        recommendation_id="",
+                                        site_id=site_id,
+                                        action_type="health_maintenance",
+                                        reason=recommended_action,
+                                        confidence="high",
+                                        risk_level=severity,
+                                        target_equipment=code,
+                                    )
                                 )
-                            )
+                            finally:
+                                loop.close()
                         except Exception as emit_err:
-                            logger.warning(f"Failed to emit recommendation_created SSE event: {emit_err}")
+                            logger.warning(f"Failed to emit SSE event: {emit_err}")
                     except Exception as e:
-                        logger.warning(f"[HEALTH-REC] Failed to persist for {code}: {e}")
-                    finally:
-                        loop.close()
+                        logger.warning(f"[HEALTH-PRED] Failed to persist for {code}: {e}")
 
                     # === DASHBOARD ALERT + SENTRY/TELEGRAM NOTIFICATION ===
-                    # Critical: immediate Telegram push + dashboard alert
-                    # Warning: dashboard alert + Telegram (cooldown-gated by alert_notifier)
                     try:
                         alert_svc = get_equipment_alert_service()
                         if severity == "critical":
@@ -1049,23 +1028,23 @@ class BackgroundSchedulerService:
                             severity=severity,
                             message=alert_msg,
                             alert_type="health_maintenance",
-                            notify_telegram=True,  # Both critical + warning; cooldown prevents spam
+                            notify_telegram=True,
                         )
                         if result.get("error"):
-                            logger.warning(f"[HEALTH-REC] Alert creation failed for {code}: {result['error']}")
+                            logger.warning(f"[HEALTH-PRED] Alert creation failed for {code}: {result['error']}")
                         else:
                             tg_status = "sent" if result.get("telegram_sent") else "skipped"
                             logger.warning(
-                                f"[HEALTH-REC] Alert created for {code} [{severity.upper()}], telegram={tg_status}"
+                                f"[HEALTH-PRED] Alert created for {code} [{severity.upper()}], telegram={tg_status}"
                             )
                     except Exception as e:
-                        logger.warning(f"[HEALTH-REC] Notification failed for {code}: {e}")
+                        logger.warning(f"[HEALTH-PRED] Notification failed for {code}: {e}")
 
             except Exception as e:
-                logger.warning(f"[HEALTH-REC] Error for {site_id}: {e}")
+                logger.warning(f"[HEALTH-PRED] Error for {site_id}: {e}")
 
         if created > 0:
-            logger.warning(f"[HEALTH-REC] {created} health recs created, {deduped} deduped")
+            logger.warning(f"[HEALTH-PRED] {created} predictions created, {deduped} deduped")
 
         return created, deduped
 

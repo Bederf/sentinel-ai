@@ -15,7 +15,7 @@ class PredictionRepository:
         "timeframe_days, confidence, "
         "repair_cost_zar, replacement_cost_zar, "
         "downtime_cost_per_hour_zar, potential_loss_zar, "
-        "created_at, updated_at"
+        "created_at, updated_at, recommended_action"
     )
 
     def __init__(self):
