@@ -1903,16 +1903,13 @@ class BackgroundSchedulerService:
         if building_assessment:
             lines.extend(["*Building state:*", f"{building_assessment}", ""])
         # Truncate reason at sentence boundary, not mid-word
-        _MAX_REASON = 400
+        _MAX_REASON = 350
         if len(reason) > _MAX_REASON:
             truncated = reason[:_MAX_REASON]
             last_period = truncated.rfind(". ")
             last_newline = truncated.rfind("\n")
             cutoff = max(last_period, last_newline)
-            if cutoff > 150:
-                reason = truncated[: cutoff + 1]
-            else:
-                reason = truncated.rstrip() + "…"
+            reason = truncated[: cutoff + 1] if cutoff > 150 else truncated.rstrip() + "…"
         lines.extend(["*Adjustments needed:*", *adj_lines, "", "*Why:*", reason, "", f"*Goal:* {profile}"])
         if saving:
             lines.append(f"*Saving:* {saving}")
