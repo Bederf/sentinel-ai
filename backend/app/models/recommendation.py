@@ -154,7 +154,7 @@ class Recommendation:
         Converts datetime objects to ISO format strings and enums to values.
         """
         return {
-            "id": self.target_equipment or self.id,
+            "id": self.id,
             "site_id": self.site_id,
             "timestamp": self.timestamp.isoformat() if isinstance(self.timestamp, datetime) else self.timestamp,
             "action_type": self.action_type,
