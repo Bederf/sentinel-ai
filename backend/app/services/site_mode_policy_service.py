@@ -253,6 +253,7 @@ class SiteModePolicyService:
         stages = set(policy.get("stage_order", []))
         try:
             from app.database.supabase_client import get_supabase_client
+
             client = get_supabase_client()
             result = client.table("sites").select("onboarding_phase").eq("code", site_id).execute()
             if result.data and result.data[0].get("onboarding_phase"):
@@ -386,15 +387,16 @@ class SiteModePolicyService:
         state["last_evaluated_at"] = _iso(now)
         self._save_state(site_id, state)
 
-        # Sync stage to Supabase so mode gates (which now read from Supabase) stay in sync
+        # Log policy decision to audit trail — NEVER write phase directly
+        # Policy engine is a scorer/evaluator, not a phase writer
         if decision in ("would_promote", "would_fail_closed_demote", "would_demote"):
-            from app.models.onboarding_phase import sync_site_phase_to_supabase
-            await sync_site_phase_to_supabase(site_id, target_stage)
+            await self._log_policy_decision(site_id, current_stage, target_stage, decision, reasons)
 
-            # Sync bridge policy stage when promotion happens
-            if decision == "would_promote":
+            # Sync bridge policy stage when promotion/demotion detected
+            if decision in ("would_promote", "would_demote"):
                 try:
                     import httpx
+
                     bridge_url = f"http://10.99.0.1:8080/api/sites/{site_id}/ipmvp/policy-state"
                     async with httpx.AsyncClient(timeout=10) as client:
                         resp = await client.put(
@@ -428,3 +430,43 @@ class SiteModePolicyService:
             "state_path": str(self._state_path(site_id)),
             "policy_path": str(self._policy_path(site_id)),
         }
+
+    async def _log_policy_decision(
+        self,
+        site_id: str,
+        from_stage: str,
+        to_stage: str,
+        decision: str,
+        reasons: list[str],
+    ) -> None:
+        """Log policy engine decision to policy_decision_log table.
+
+        The policy engine is a scorer/evaluator — it NEVER writes onboarding_phase.
+        This audit trail records what the policy engine recommended, not what
+        actually happened to the phase (which is the operator's call via PATCH).
+        """
+        from datetime import UTC
+
+        try:
+            from app.database.supabase_client import get_supabase_client
+
+            sb = get_supabase_client()
+            sb.table("policy_decision_log").insert(
+                {
+                    "site_id": site_id,
+                    "from_stage": from_stage,
+                    "to_stage": to_stage,
+                    "decision": decision,
+                    "reasons": reasons,
+                    "decided_at": datetime.now(UTC).isoformat(),
+                }
+            ).execute()
+            logger.info(
+                "Policy decision logged: %s %s→%s (%s)",
+                site_id,
+                from_stage,
+                to_stage,
+                decision,
+            )
+        except Exception as exc:
+            logger.warning("Failed to log policy decision for %s: %s", site_id, exc)
