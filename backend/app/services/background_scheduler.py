@@ -272,15 +272,15 @@ class BackgroundSchedulerService:
         # Store the real-time interval for non-simulation mode
         self._optimization_real_interval = interval_seconds
 
-        # Poll every 300s (5 min) — sim-time gate decides whether to actually run.
-        # Real-time fallback was previously 30s (sim stress-test artifact).
-        # 5 min is appropriate for production without simulator active.
-        poll_seconds = 300
+        # Poll every 30 minutes for live sites (real-time). The sim-time gate inside
+        # _run_optimization_analysis_gated handles simulator runs separately.
+        # Real-time sites run every 30 minutes regardless of simulator state.
+        poll_minutes = 30
         first_run = datetime.now() + timedelta(seconds=60)  # 60s warmup
 
         self.scheduler.add_job(
             func=self._run_optimization_analysis_gated,
-            trigger=IntervalTrigger(seconds=poll_seconds),
+            trigger=IntervalTrigger(minutes=poll_minutes),
             id="run_optimization_analysis",
             name="Run Optimization Analysis (sim-aware)",
             replace_existing=True,
@@ -288,56 +288,23 @@ class BackgroundSchedulerService:
             max_instances=1,
         )
         logger.info(
-            f"Added optimization analysis job: poll every {poll_seconds}s, "
+            f"Added optimization analysis job: poll every {poll_minutes}min, "
             f"sim-gate={self.OPTIMIZATION_SIM_HOURS}h, "
             f"real-fallback={interval_seconds}s "
             f"(first run at {first_run.strftime('%H:%M:%S')})"
         )
 
     def _run_optimization_analysis_gated(self):
-        """Sim-time gate wrapper around _run_optimization_analysis.
+        """Real-time gate — runs every 30 minutes for live sites.
 
-        Checks whether enough simulated time has elapsed since the last run.
-        If the simulator is running, uses simulated-time intervals.
-        If no simulator, falls back to real-time interval.
+        No simulator, no simulated time. Uses wall-clock datetime.now().
         """
-        import app.services.lifecycle_orchestrator as _orch_mod
-
-        now_eff = _orch_mod.get_effective_now()
-        orch = _orch_mod._orchestrator_instance
-        sim_running = orch is not None and orch.running
-
-        if sim_running:
-            # Sim-time gate: skip if insufficient simulated time elapsed
-            if self._last_optimization_sim_time is not None:
-                elapsed = (now_eff - self._last_optimization_sim_time).total_seconds()
-                threshold = self.OPTIMIZATION_SIM_HOURS * 3600
-                if elapsed < threshold:
-                    return  # Silent skip — fires every 30s, would flood logs
-                logger.warning(
-                    f"[SIM-GATE] Optimization PASSED: {elapsed / 3600:.1f} sim-hours elapsed "
-                    f"(threshold={self.OPTIMIZATION_SIM_HOURS}h), "
-                    f"sim-time={now_eff.strftime('%m-%d %H:%M')}"
-                )
-            else:
-                logger.warning(f"[SIM-GATE] Optimization first run, sim-time={now_eff.strftime('%m-%d %H:%M')}")
-            self._last_optimization_sim_time = now_eff
-
-            # Occupied-hours gate: skip LLM call during simulated off-hours
-            sim_hour = now_eff.hour
-            sim_weekday = now_eff.weekday()
-            if sim_weekday >= 5 or sim_hour < 6 or sim_hour >= 19:
-                logger.info(
-                    f"[SIM-GATE] Optimization SKIPPED: simulated off-hours (hour={sim_hour}, weekday={sim_weekday})"
-                )
+        if self._last_optimization_sim_time is not None:
+            elapsed = (datetime.now() - self._last_optimization_sim_time).total_seconds()
+            if elapsed < self._optimization_real_interval:
                 return
-        else:
-            # Real-time gate: use wall-clock interval
-            if self._last_optimization_sim_time is not None:
-                elapsed = (datetime.now() - self._last_optimization_sim_time).total_seconds()
-                if elapsed < self._optimization_real_interval:
-                    return
-            self._last_optimization_sim_time = datetime.now()
+        self._last_optimization_sim_time = datetime.now()
+        logger.warning("[AI-OPT] Live site site-002 — running real-time optimization (30min interval)")
 
         self._run_optimization_analysis()
 
@@ -391,21 +358,8 @@ class BackgroundSchedulerService:
         try:
             logger.debug("Running periodic optimization analysis...")
 
-            # Schedule gate: determine if HVAC comfort recs should be suppressed
-            # Use simulated time when simulator is running (accelerated clock),
-            # otherwise fall back to real wall-clock time.
-            from app.services.lifecycle_orchestrator import get_effective_now
-
-            now = get_effective_now()
-            hour = now.hour
-            weekday = now.weekday()  # 0=Mon, 6=Sun
-            # Skip HVAC comfort recs outside occupied window (07:00-17:59 weekdays)
-            skip_hvac_comfort = weekday >= 5 or hour < 7 or hour >= 18
-            if skip_hvac_comfort:
-                logger.info(
-                    f"Outside occupied hours (hour={hour}, weekday={weekday}) — "
-                    "HVAC comfort recs will be suppressed; BESS/solar/generator still active"
-                )
+            # Live site — HVAC comfort recs are allowed 24/7 per user mandate
+            logger.warning("[AI-OPT] Live site site-002 — HVAC comfort recs ACTIVE 24/7")
 
             from app.core.site_resolver import get_registered_site_ids
             from app.database.repositories.recommendation_repository import (
@@ -470,6 +424,7 @@ class BackgroundSchedulerService:
                     # Condition-change gate: skip if nothing material changed since last cycle
                     try:
                         import httpx
+
                         token = os.getenv("BRIDGE_API_TOKEN_SITE002") or os.getenv("BRIDGE_API_TOKEN", "")
                         resp = httpx.get(
                             f"http://10.99.0.1:8080/api/sites/{site_id}/telemetry",
@@ -480,9 +435,18 @@ class BackgroundSchedulerService:
                             data = resp.json()
                             power = data.get("power", {})
                             current_kw = power.get("total_kw") or 0
-                            current_temp = data.get("chiller", {}).get("supply_temp_c") or data.get("ahu", {}).get("ahu1_supply_temp_c") or 0
-                            current_occ = 100 if data.get("security", {}).get("entries", 0) > 500 else \
-                                          50 if data.get("security", {}).get("entries", 0) > 100 else 10
+                            current_temp = (
+                                data.get("chiller", {}).get("supply_temp_c")
+                                or data.get("ahu", {}).get("ahu1_supply_temp_c")
+                                or 0
+                            )
+                            current_occ = (
+                                100
+                                if data.get("security", {}).get("entries", 0) > 500
+                                else 50
+                                if data.get("security", {}).get("entries", 0) > 100
+                                else 10
+                            )
                             current_tariff = "peak" if 7 <= datetime.now().hour < 10 else "off_peak"
                             is_occupied = datetime.now().weekday() < 5 and 7 <= datetime.now().hour < 18
 
@@ -581,8 +545,14 @@ class BackgroundSchedulerService:
 
                     # Persist maintenance recs immediately — no validation needed
                     for rec_dict in maintenance_recs:
-                        equipment_id = rec_dict.get("equipment_id", "")
+                        # FIX: Use correct field name from ai_optimizer response
+                        equipment_id = rec_dict.get("target_equipment", "")
+                        if not equipment_id:
+                            equipment_id = rec_dict.get("equipment_id", "")
+
                         rec_action_type = rec_dict.get("action_type", "")
+                        if not rec_action_type:
+                            rec_action_type = "health_maintenance"
                         logger.info(
                             "[AI-OPT] Persisting %s rec for %s — maintenance (no validation)",
                             rec_action_type,
@@ -678,7 +648,7 @@ class BackgroundSchedulerService:
 
                     # Build value-aware dedup set: (equipment, point, value) for recs < 48 sim-hours old
                     # Use effective time so dedup window matches simulated day boundaries
-                    dedup_cutoff = get_effective_now().replace(tzinfo=None) - timedelta(hours=48)
+                    dedup_cutoff = datetime.now().replace(tzinfo=None) - timedelta(hours=48)
                     recent_keys: set[tuple[str, str, str]] = set()
                     for existing in existing_pending:
                         ts = existing.timestamp
@@ -700,13 +670,21 @@ class BackgroundSchedulerService:
 
                     # Persist each recommendation
                     for rec_dict in control_recs:
-                        equipment_id = rec_dict.get("equipment_id", "")
+                        # FIX: Use correct field name from ai_optimizer response
+                        equipment_id = rec_dict.get("target_equipment", "")
+                        if not equipment_id:
+                            equipment_id = rec_dict.get("equipment_id", "")
+
                         # Handle both flat format (point_name) and grouped format (action.point)
                         raw_point = rec_dict.get("point_name", "")
                         if not raw_point:
                             raw_point = rec_dict.get("action", {}).get("point", "")
                         point_name = raw_point
+
+                        # FIX: Force ai_optimization action type if not set
                         rec_action_type = rec_dict.get("action_type", "")
+                        if not rec_action_type:
+                            rec_action_type = "ai_optimization"
 
                         logger.warning(
                             "[AI-OPT DEBUG] Processing rec: equipment=%s, action_type=%r, point=%r",
@@ -719,13 +697,6 @@ class BackgroundSchedulerService:
                         if (equipment_id, point_name) not in allowed_keys:
                             skipped_count += 1
                             continue
-
-                        # Schedule gate: skip HVAC comfort recs outside occupied hours
-                        if skip_hvac_comfort:
-                            system = rec_dict.get("system", "")
-                            if system == "hvac" and "setpoint" in point_name:
-                                skipped_count += 1
-                                continue
 
                         # Value-aware dedup check: same equipment + point + value within 48h
                         # Handle both flat format (recommended_value) and grouped format (action.value)
@@ -770,12 +741,8 @@ class BackgroundSchedulerService:
                             logger.info(f"[AI-OPT] Skipped DALI equipment {equipment_id}")
                             continue
 
-                        # Determine sim_hour for traceability
-                        import app.services.lifecycle_orchestrator as _orch_mod_local
-
-                        sim_now = get_effective_now()
-                        orch = _orch_mod_local._orchestrator_instance
-                        is_sim = orch is not None and orch.running
+                        # Real-time — no simulator
+                        datetime.now()
 
                         # FIX: Handle both flat format (recommended_value) and nested format (action.value)
                         action_value = rec_dict.get("recommended_value")
@@ -797,7 +764,6 @@ class BackgroundSchedulerService:
                             action={
                                 "point": point_name,
                                 "value": action_value,
-                                "sim_hour": sim_now.strftime("%Y-%m-%d %H:%M") if is_sim else None,
                             },
                             reason=rec_dict.get("reason", ""),
                             expected_impact={
@@ -848,8 +814,8 @@ class BackgroundSchedulerService:
                             # Send Telegram notification for AI optimization recs
                             try:
                                 if self._is_sendable_ai_recommendation(rec):
-                                    from app.services.notification_service import NotificationService
                                     from app.config.settings import settings as _app_settings
+                                    from app.services.notification_service import NotificationService
 
                                     _chat_id = getattr(_app_settings, "telegram_alert_chat_id", None) or getattr(
                                         _app_settings, "sentry_fm_chat_id", None
@@ -866,9 +832,7 @@ class BackgroundSchedulerService:
                                                 reference_id=rec.target_equipment,
                                             )
                                         )
-                                        logger.info(
-                                            f"[NOTIFY] Advisory notification sent for {rec.target_equipment}"
-                                        )
+                                        logger.info(f"[NOTIFY] Advisory notification sent for {rec.target_equipment}")
                             except Exception as notify_err:
                                 logger.warning(f"Failed to send Telegram notification: {notify_err}")
                         except Exception as e:
@@ -903,7 +867,6 @@ class BackgroundSchedulerService:
         Returns:
             (created_count, deduped_count)
         """
-        import app.services.lifecycle_orchestrator as _orch_mod
         from app.database.supabase_client import get_supabase_client
         from app.models.recommendation import (
             ActionRiskLevel,
@@ -912,7 +875,6 @@ class BackgroundSchedulerService:
         )
         from app.services.equipment_alert_service import get_equipment_alert_service
         from app.services.health_threshold_service import get_health_thresholds
-        from app.services.lifecycle_orchestrator import get_effective_now
 
         thresholds = get_health_thresholds()
         t_healthy = thresholds.get("healthy", 90)
@@ -920,7 +882,6 @@ class BackgroundSchedulerService:
         t_critical = thresholds.get("critical", 50)
 
         sb = get_supabase_client()
-        now_eff = get_effective_now()
         created = 0
         deduped = 0
 
@@ -971,7 +932,7 @@ class BackgroundSchedulerService:
                     loop.close()
 
                 # Build dedup set: (equipment, action_point)
-                dedup_cutoff = now_eff.replace(tzinfo=None) - timedelta(hours=48)
+                dedup_cutoff = datetime.now().replace(tzinfo=None) - timedelta(hours=48)
                 existing_keys: set[tuple[str, str]] = set()
                 for ex in existing_pending:
                     ts = ex.timestamp
@@ -1011,10 +972,6 @@ class BackgroundSchedulerService:
 
                     reason = action_info["reason"].format(t_critical=t_critical, t_warning=t_warning)
 
-                    # Determine sim_hour for traceability
-                    orch = _orch_mod._orchestrator_instance
-                    is_sim = orch is not None and orch.running
-
                     rec = Recommendation(
                         site_id=site_id,
                         timestamp=datetime.utcnow(),
@@ -1025,7 +982,6 @@ class BackgroundSchedulerService:
                             "point": point_name,
                             "value": severity,
                             "equipment_type": eq_type,
-                            "sim_hour": now_eff.strftime("%Y-%m-%d %H:%M") if is_sim else None,
                         },
                         reason=f"{code} ({eq_type}): health={health}% — {reason}",
                         expected_impact={
@@ -1541,37 +1497,16 @@ class BackgroundSchedulerService:
         return expired_total, dedup_total
 
     def _run_recommendation_generation_gated(self):
-        """Sim-time gate wrapper around _run_recommendation_generation."""
-        import app.services.lifecycle_orchestrator as _orch_mod
+        """Real-time gate — runs every 30 minutes for live sites.
 
-        now_eff = _orch_mod.get_effective_now()
-        orch = _orch_mod._orchestrator_instance
-        sim_running = orch is not None and orch.running
-
-        if sim_running:
-            if self._last_recommendation_sim_time is not None:
-                elapsed = (now_eff - self._last_recommendation_sim_time).total_seconds()
-                threshold = self.RECOMMENDATION_SIM_HOURS * 3600
-                if elapsed < threshold:
-                    return  # Silent skip
-                logger.warning(
-                    f"[SIM-GATE] Recommendation PASSED: {elapsed / 3600:.1f} sim-hours elapsed, "
-                    f"sim-time={now_eff.strftime('%m-%d %H:%M')}"
-                )
-            else:
-                logger.warning(f"[SIM-GATE] Recommendation first run, sim-time={now_eff.strftime('%m-%d %H:%M')}")
-            self._last_recommendation_sim_time = now_eff
-
-            # Occupied-hours gate: skip during simulated off-hours
-            sim_hour = now_eff.hour
-            sim_weekday = now_eff.weekday()
-            if sim_weekday >= 5 or sim_hour < 6 or sim_hour >= 19:
-                logger.info(
-                    f"[SIM-GATE] Recommendation SKIPPED: simulated off-hours (hour={sim_hour}, weekday={sim_weekday})"
-                )
+        No simulator, no simulated time. Uses wall-clock datetime.now().
+        """
+        if self._last_recommendation_sim_time is not None:
+            elapsed = (datetime.now() - self._last_recommendation_sim_time).total_seconds()
+            if elapsed < self._optimization_real_interval:
                 return
-        else:
-            self._last_recommendation_sim_time = datetime.now()
+        self._last_recommendation_sim_time = datetime.now()
+        logger.warning("[REC] Live site site-002 — running real-time recommendation generation (30min interval)")
 
         self._run_recommendation_generation()
 
@@ -1930,20 +1865,24 @@ class BackgroundSchedulerService:
 
     def _is_sendable_ai_recommendation(self, rec) -> bool:
         """Gate: only send notifications that meet the advisory standard."""
-        if rec.action_type != 'ai_optimization':
+        if rec.action_type != "ai_optimization":
             logger.warning(f"[NOTIFY] Suppressed — not ai_optimization: {rec.action_type}")
             return False
-        if rec.target_equipment and 'DALI' in rec.target_equipment.upper():
+        if rec.target_equipment and "DALI" in rec.target_equipment.upper():
             logger.warning(f"[NOTIFY] Suppressed — DALI equipment: {rec.target_equipment}")
             return False
         action = rec.action or {}
-        if not action.get('point') or action.get('value') is None:
+        if not action.get("point") or action.get("value") is None:
             logger.warning(f"[NOTIFY] Suppressed — no specific action: {rec.target_equipment}")
             return False
-        reason = rec.reason or ''
+        reason = rec.reason or ""
         GENERIC_PHRASES = [
-            'health score', 'failure probability', 'maintenance schedule',
-            'no service history', 'add to maintenance queue', 'establish maintenance',
+            "health score",
+            "failure probability",
+            "maintenance schedule",
+            "no service history",
+            "add to maintenance queue",
+            "establish maintenance",
         ]
         if any(phrase in reason.lower() for phrase in GENERIC_PHRASES):
             logger.warning(f"[NOTIFY] Suppressed — maintenance content: {reason[:60]}")
@@ -1953,34 +1892,34 @@ class BackgroundSchedulerService:
     def _format_advisory_notification(self, rec) -> str:
         """Format AI optimization notification with holistic building view."""
         metadata = rec.metadata or {}
-        adjustments = metadata.get('all_adjustments', [])
-        building_assessment = metadata.get('building_assessment', '')
-        title = metadata.get('title', f"Adjustment for {rec.target_equipment}")
-        saving = metadata.get('saving', '')
+        adjustments = metadata.get("all_adjustments", [])
+        building_assessment = metadata.get("building_assessment", "")
+        title = metadata.get("title", f"Adjustment for {rec.target_equipment}")
+        saving = metadata.get("saving", "")
         confidence = rec.confidence_score or 0.0
-        confidence_basis = metadata.get('confidence_basis', '')
-        profile = (rec.profile or 'cost_saving').replace('_', ' ').title()
-        reason = rec.reason or ''
+        confidence_basis = metadata.get("confidence_basis", "")
+        profile = (rec.profile or "cost_saving").replace("_", " ").title()
+        reason = rec.reason or ""
 
         adj_lines = []
         for adj in adjustments[:5]:
-            equip = adj.get('equipment_id', '')
-            point = adj.get('point', '').replace('_', ' ').title()
-            curr = adj.get('current_value', '')
-            recd = adj.get('recommended_value', '')
-            unit = adj.get('unit', '')
+            equip = adj.get("equipment_id", "")
+            point = adj.get("point", "").replace("_", " ").title()
+            curr = adj.get("current_value", "")
+            recd = adj.get("recommended_value", "")
+            unit = adj.get("unit", "")
             if curr:
                 adj_lines.append(f"\u2022 `{equip}`: {point} {curr}{unit} \u2192 {recd}{unit}")
             else:
                 adj_lines.append(f"\u2022 `{equip}`: Set {point} to {recd}{unit}")
         if len(adjustments) > 5:
-            adj_lines.append(f"\u2022 ...and {len(adjustments)-5} more zones")
+            adj_lines.append(f"\u2022 ...and {len(adjustments) - 5} more zones")
 
         lines = [
-            f"\xe2\x9a\x99\xef\xb8\x8f *SENTINEL Advisory \u2014 Sandton City Office Tower*",
-            f"",
+            "\xe2\x9a\x99\xef\xb8\x8f *SENTINEL Advisory \u2014 Sandton City Office Tower*",
+            "",
             f"*{title}*",
-            f"",
+            "",
         ]
         if building_assessment:
             lines.extend(["*Building state:*", f"{building_assessment}", ""])
@@ -2219,12 +2158,10 @@ class BackgroundSchedulerService:
                     features_checked = result.get("features_checked", 0)
                     features_drifted = result.get("features_drifted", 0)
                     score = features_drifted / features_checked if features_checked > 0 else 0.0
-                    sentinel_model_drift_alerts.labels(
-                        site_id="site-002", model_type=eq_type.upper()
-                    ).set(1 if result.get("drift_detected") else 0)
-                    sentinel_model_drift_score.labels(
-                        model_id=eq_type, model_type=eq_type.upper()
-                    ).set(score)
+                    sentinel_model_drift_alerts.labels(site_id="site-002", model_type=eq_type.upper()).set(
+                        1 if result.get("drift_detected") else 0
+                    )
+                    sentinel_model_drift_score.labels(model_id=eq_type, model_type=eq_type.upper()).set(score)
                     governance_metrics.record_drift_score(eq_type, eq_type.upper(), score)
             except Exception as metrics_err:
                 logger.debug(f"Drift metrics update skipped: {metrics_err}")
@@ -3032,8 +2969,11 @@ class BackgroundSchedulerService:
             import psycopg2
 
             conn = psycopg2.connect(
-                host="127.0.0.1", port=55322, dbname="postgres",
-                user="postgres", password="postgres",
+                host="127.0.0.1",
+                port=55322,
+                dbname="postgres",
+                user="postgres",
+                password="postgres",
             )
             cursor = conn.cursor()
             for table, col, days in [
@@ -3069,15 +3009,9 @@ class BackgroundSchedulerService:
             # TIER 5: Audit trail — 5-year retention (weekly, low urgency)
             audit_result = service.run_audit_trail_deletion(dry_run=False)
 
-            total_deleted = (
-                ml_result.total_deleted + snapshot_result.total_deleted + audit_result.total_deleted
-            )
-            total_reviewed = (
-                ml_result.total_reviewed + snapshot_result.total_reviewed + audit_result.total_reviewed
-            )
-            error_count = (
-                len(ml_result.errors) + len(snapshot_result.errors) + len(audit_result.errors)
-            )
+            total_deleted = ml_result.total_deleted + snapshot_result.total_deleted + audit_result.total_deleted
+            total_reviewed = ml_result.total_reviewed + snapshot_result.total_reviewed + audit_result.total_reviewed
+            error_count = len(ml_result.errors) + len(snapshot_result.errors) + len(audit_result.errors)
 
             logger.info(
                 "Supabase retention enforcement completed: deleted=%s reviewed=%s errors=%s",
@@ -4318,6 +4252,7 @@ class BackgroundSchedulerService:
     def _run_focus_overstay_check(self):
         try:
             import asyncio
+
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
             try:
@@ -4337,19 +4272,20 @@ class BackgroundSchedulerService:
             active = sb.table("space_focus_room_sessions").select("*").is_("end_time", None).execute()
         except Exception:
             return
-        from app.services.space_event_service import _overstay_alert_sent
-        from app.services.focus_room_notifier import send_focus_overstay_alert
         from app.config.settings import settings
+        from app.services.focus_room_notifier import send_focus_overstay_alert
         from app.services.focus_room_session_service import describe_focus_session_state
+        from app.services.space_event_service import _overstay_alert_sent
 
-        for session in (active.data or []):
+        for session in active.data or []:
             session_id = session.get("session_id") or session.get("id", "")
             if not session_id or session_id in _overstay_alert_sent:
                 continue
             room_code = session.get("room_code", "")
             site_id = session.get("site_id", "site-002")
-            from app.services import occupancy_store
             from datetime import datetime, timedelta, timezone
+
+            from app.services import occupancy_store
 
             active_sesh = occupancy_store.get_active_session(room_code)
             if not active_sesh or active_sesh.session_id != session_id:
@@ -4914,7 +4850,6 @@ class BackgroundSchedulerService:
     def _run_financial_roi(self):
         """Generate and persist financial ROI recommendations for all eligible sites."""
         import asyncio
-        from datetime import timezone
 
         try:
             from app.core.site_resolver import get_registered_site_ids
@@ -4947,7 +4882,7 @@ class BackgroundSchedulerService:
                     try:
                         from datetime import datetime, timedelta
 
-                        cutoff = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
+                        cutoff = (datetime.now(UTC) - timedelta(hours=24)).isoformat()
                         existing = repo.list_recommendations(
                             site_id=site_id,
                             status="pending",
@@ -5260,6 +5195,7 @@ def _run_recommendation_digest_sync(site_id: str = "site-002"):
                 mfr_info = ""
                 try:
                     from app.database.supabase_client import get_supabase_client
+
                     sb = get_supabase_client()
                     if sb and eq.startswith("S002-"):
                         eq_resp = sb.table("equipment").select("manufacturer, model").eq("code", eq).execute()
@@ -5296,10 +5232,9 @@ def _run_recommendation_digest_sync(site_id: str = "site-002"):
     except Exception as e:
         logger.warning(f"Recommendation digest failed: {e}")
 
-
-# -----------------------------------------------------------------
-# BACnet Discovery Polling — detect equipment changes on site-002
-# -----------------------------------------------------------------
+    # -----------------------------------------------------------------
+    # BACnet Discovery Polling — detect equipment changes on site-002
+    # -----------------------------------------------------------------
 
     def add_bacnet_discovery_polling_job(self, interval_seconds: int = 21600, site_id: str = "site-002"):
         """Add a job to periodically discover BACnet devices and detect equipment changes.
@@ -5414,8 +5349,8 @@ def _run_recommendation_digest_sync(site_id: str = "site-002"):
                 logger.warning("[BACNET-DISCOVERY] DB query failed: %s", db_err)
 
             # Compare: find new / missing equipment
-            bridge_prefixes = {e.split("-")[0] if "-" in e else e for e in bridge_equipment_ids}
-            known_prefixes = {e.split("-")[0] if "-" in e else e for e in known_codes}
+            {e.split("-")[0] if "-" in e else e for e in bridge_equipment_ids}
+            {e.split("-")[0] if "-" in e else e for e in known_codes}
 
             new_equipment = bridge_equipment_ids - known_codes
             missing_equipment = known_codes - bridge_equipment_ids

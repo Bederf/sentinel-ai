@@ -36,6 +36,9 @@ Optimization API endpoints for HVAC load shedding, AI optimization, profile mana
 - GET /optimization/thermal-runway
 - POST /optimization/analyze-load-shedding
 
+### Demand Response (External)
+- **[GET /api/demand-response/curtailable-load](./demand-response-api.md)** — Real-time curtailable load signal for BESS/DR aggregators (DDMP compatible)
+
 ### Profile Management
 - GET /optimization/profiles — List available profiles
 - GET /optimization/settings/{site_id} — Get site profile config

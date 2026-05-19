@@ -9,7 +9,7 @@ Phase 45-03: MLOps Monitoring and Success Metrics.
 
 import logging
 import math
-from datetime import datetime, timedelta, UTC
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -19,6 +19,102 @@ KS_DRIFT_THRESHOLD = 0.1  # KS statistic above this = drift detected
 MODEL_DRIFT_THRESHOLD = 0.9  # Recent accuracy < 90% of historical = drift
 EQUIPMENT_TYPES = ["chiller", "ahu", "fcu", "vav", "generator", "ups", "pump"]
 MODEL_TYPES = ["lstm", "autoencoder"]
+
+# Occupancy schedule (SAST = UTC+2)
+OCCUPIED_HOURS_START = 6  # 06:00 SAST — occupied mode begins
+OCCUPIED_HOURS_END = 22  # 22:00 SAST — occupied mode ends
+
+# Minimum sample count per feature window before KS test is statistically meaningful
+MIN_SAMPLES_PER_WINDOW = 30
+
+# Lookup table for SA public holidays (pre-computed, matches site_holiday_service.py logic)
+_SA_HOLIDAYS_2026 = frozenset(
+    [
+        "2026-01-01",
+        "2026-03-21",
+        "2026-04-27",
+        "2026-05-01",
+        "2026-06-16",
+        "2026-08-09",
+        "2026-09-24",
+        "2026-12-16",
+        "2026-12-25",
+        "2026-12-26",
+        # Easter-based 2026: Easter Sunday = April 5
+        "2026-04-03",  # Good Friday
+        "2026-04-06",  # Easter Monday
+    ]
+)
+
+
+def _is_sa_holiday(target_date: date) -> bool:
+    """Return True if target_date is a SA public holiday."""
+    return target_date.isoformat() in _SA_HOLIDAYS_2026
+
+
+def _get_occupancy_mode(ts: datetime | str) -> str:
+    """Classify a UTC timestamp into occupancy mode (SAST hours).
+
+    Args:
+        ts: UTC timestamp (datetime or ISO string)
+
+    Returns:
+        "occupied"  — weekday 06:00-22:00 SAST
+        "unoccupied" — weekday 22:00-06:00 SAST
+        "holiday"   — SA public holiday (any hour)
+        "weekend"   — Saturday/Sunday (any hour, non-holiday)
+    """
+    dt = datetime.fromisoformat(ts.replace("Z", "+00:00")) if isinstance(ts, str) else ts
+
+    # UTC → SAST (UTC+2)
+    sa_hour = (dt.hour + 2) % 24
+    sa_weekday = dt.weekday()  # Monday=0, Sunday=6
+    sa_date = dt.date()
+
+    if _is_sa_holiday(sa_date):
+        return "holiday"
+    if sa_weekday >= 5:
+        return "weekend"
+    if OCCUPIED_HOURS_START <= sa_hour < OCCUPIED_HOURS_END:
+        return "occupied"
+    return "unoccupied"
+
+
+def _split_by_occupancy_mode(
+    values: list[float],
+    timestamps: list[str],
+    target_mode: str,
+) -> tuple[list[float], list[float]]:
+    """Split values into baseline (older half) and current (newer half),
+    filtering to the specified occupancy mode only.
+
+    Never compares occupied-to-unoccupied or weekday-to-weekend.
+
+    Args:
+        values: Parallel list of sensor values
+        timestamps: Parallel list of ISO timestamp strings (same length as values)
+        target_mode: "occupied" or "unoccupied"
+
+    Returns:
+        (baseline, current) — filtered to target_mode, split chronologically
+        at midpoint; empty lists if insufficient samples after filtering
+    """
+    if len(values) != len(timestamps):
+        return [], []
+
+    # Filter to target mode only
+    filtered = [(v, t) for v, t in zip(values, timestamps, strict=False) if _get_occupancy_mode(t) == target_mode]
+    if not filtered:
+        return [], []
+
+    # Sort by timestamp
+    filtered.sort(key=lambda x: x[1])
+    sorted_vals = [v for v, _ in filtered]
+
+    mid = len(sorted_vals) // 2
+    if mid < MIN_SAMPLES_PER_WINDOW:
+        return [], []
+    return sorted_vals[:mid], sorted_vals[mid:]
 
 
 def _ks_statistic(sample_a: list[float], sample_b: list[float]) -> float:
@@ -61,9 +157,16 @@ def _ks_statistic(sample_a: list[float], sample_b: list[float]) -> float:
 EQUIPMENT_TO_SENSORS: dict[str, dict[str, Any]] = {
     "chiller": {
         "equipment_ids": ["S002-CHILLER-B1-001"],
-        "features": ["chw_return_temp", "chw_supply_temp", "compressor_current_1",
-                     "compressor_current_2", "cond_return_temp", "cond_supply_temp",
-                     "condenser_flow", "staging_state"],
+        "features": [
+            "chw_return_temp",
+            "chw_supply_temp",
+            "compressor_current_1",
+            "compressor_current_2",
+            "cond_return_temp",
+            "cond_supply_temp",
+            "condenser_flow",
+            "staging_state",
+        ],
         "uses_real_data": True,
     },
     "ahu": {
@@ -72,8 +175,10 @@ EQUIPMENT_TO_SENSORS: dict[str, dict[str, Any]] = {
         "uses_real_data": True,
     },
     "fcu": {
-        "equipment_ids": [f"S002-FCU-{u:03d}" for u in list(range(1, 6)) +
-                         list(range(101, 106)) + list(range(201, 206)) + list(range(301, 306))],
+        "equipment_ids": [
+            f"S002-FCU-{u:03d}"
+            for u in list(range(1, 6)) + list(range(101, 106)) + list(range(201, 206)) + list(range(301, 306))
+        ],
         "features": ["room_temp", "co2_ppm"],
         "uses_real_data": True,
     },
@@ -103,25 +208,24 @@ EQUIPMENT_TO_SENSORS: dict[str, dict[str, Any]] = {
 def _get_supabase_sensor_data(
     equipment_ids: list[str],
     features: list[str],
-    window_hours: int = 12,
-) -> dict[str, list[float]]:
+    window_hours: int = 48,
+) -> dict[str, tuple[list[float], list[str]]]:
     """Fetch sensor readings from Supabase for given equipment and features.
 
     Groups by sensor_type across all equipment of that type, returning
-    the full list of values for each feature across the time window.
+    both values and timestamps for each feature. Timestamps are used
+    for occupancy-aware drift detection.
 
     Args:
         equipment_ids: List of equipment IDs to query (e.g. ["S002-CHILLER-B1-001"])
         features: List of sensor_type values to collect (e.g. ["chw_return_temp"])
-        window_hours: How many hours of recent data to fetch (for current window)
+        window_hours: How many hours of data to fetch (default 48h for two full days)
 
     Returns:
-        Dict mapping feature name → list of sensor values from Supabase
+        Dict mapping feature name → (values_list, timestamps_list)
     """
     if not equipment_ids or not features:
         return {}
-
-    result: dict[str, list[float]] = {f: [] for f in features}
 
     try:
         from app.database.supabase_client import get_supabase_client
@@ -132,15 +236,14 @@ def _get_supabase_sensor_data(
 
     try:
         from app.config.settings import settings  # noqa: F401 - needed to ensure settings loaded
+
         now = datetime.now(UTC)
         cutoff = now - timedelta(hours=window_hours)
         cutoff_str = cutoff.isoformat()
 
-        # Build query: select sensor_type + value for matching equipment IDs
-        # Use .in_() for equipment_id filter
         resp = (
             client.table("equipment_sensor_readings")
-            .select("equipment_id, sensor_type, value")
+            .select("equipment_id, sensor_type, value, recorded_at")
             .in_("equipment_id", equipment_ids)
             .in_("sensor_type", features)
             .gte("recorded_at", cutoff_str)
@@ -151,19 +254,25 @@ def _get_supabase_sensor_data(
         if not resp.data:
             return {}
 
-        # Group values by sensor_type
-        from collections import defaultdict
+        by_sensor: dict[str, tuple[list[float], list[str]]] = {}
+        for feat in features:
+            by_sensor[feat] = ([], [])
 
-        by_sensor: dict[str, list[float]] = defaultdict(list)
         for row in resp.data:
+            sensor_type = row.get("sensor_type")
             val = row.get("value")
-            if val is not None:
-                try:
-                    by_sensor[row["sensor_type"]].append(float(val))
-                except (TypeError, ValueError):
-                    pass
+            ts = row.get("recorded_at")
+            if sensor_type not in features:
+                continue
+            if val is None or ts is None:
+                continue
+            try:
+                by_sensor[sensor_type][0].append(float(val))
+                by_sensor[sensor_type][1].append(ts)
+            except (TypeError, ValueError):
+                pass
 
-        return dict(by_sensor)
+        return by_sensor
 
     except Exception:
         return {}
@@ -255,6 +364,9 @@ class DriftDetector:
     ) -> dict[str, Any]:
         """Compare current feature distributions to training distribution.
 
+        Occupancy-aware: only compares readings within the same operational
+        mode (occupied vs unoccupied). Never compares day-to-night readings.
+
         Args:
             equipment_type: Equipment type to check.
             threshold: KS statistic threshold for drift detection.
@@ -278,6 +390,9 @@ class DriftDetector:
             if score > threshold:
                 drifted_features.append(feature)
 
+        # Get the occupancy mode used for display in metrics/logs
+        current_mode = _get_occupancy_mode(datetime.now(UTC))
+
         result = {
             "equipment_type": equipment_type,
             "detected_at": datetime.now().isoformat(),
@@ -287,6 +402,7 @@ class DriftDetector:
             "threshold": threshold,
             "features_checked": len(drift_scores),
             "features_drifted": len(drifted_features),
+            "occupancy_mode": current_mode,
         }
 
         self._detection_history.append(result)
@@ -371,9 +487,7 @@ class DriftDetector:
                     model_id=eq_type,
                     model_type=eq_type.upper(),
                 ).set(score)
-                governance_metrics.record_drift_score(
-                    eq_type, eq_type.upper(), score
-                )
+                governance_metrics.record_drift_score(eq_type, eq_type.upper(), score)
         except Exception:
             pass  # Metrics are best-effort, never block business logic
 
@@ -405,8 +519,9 @@ class DriftDetector:
         """Get training-time statistics for equipment type.
 
         Uses stored baseline if set; otherwise queries Supabase with a
-        long window and splits time-range in half (older half = baseline).
-        Falls back to synthetic for equipment types without real data.
+        48h window and splits by occupancy mode (occupied vs unoccupied),
+        comparing within the same operational mode. Falls back to synthetic
+        for equipment types without real data.
         """
         if equipment_type in self._feature_baselines:
             return self._feature_baselines[equipment_type]
@@ -420,27 +535,33 @@ class DriftDetector:
         if not equipment_ids or not features:
             return _generate_training_stats(equipment_type)
 
-        # Fetch all available data for this equipment type (up to 48h window)
         sensor_data = _get_supabase_sensor_data(equipment_ids, features, window_hours=48)
         if not sensor_data:
             return _generate_training_stats(equipment_type)
 
-        # Split each feature's time series: first half = baseline, second half = current
-        baseline: dict[str, list[float]] = {}
-        for feat, values in sensor_data.items():
-            mid = len(values) // 2
-            if mid < 2:
-                return _generate_training_stats(equipment_type)
-            baseline[feat] = values[:mid]
+        # Determine current occupancy mode to decide which split to return
+        now_utc = datetime.now(UTC)
+        current_mode = _get_occupancy_mode(now_utc)
+        if current_mode not in ("occupied", "unoccupied"):
+            current_mode = "occupied"  # default to occupied for holiday/weekend
 
+        baseline: dict[str, list[float]] = {}
+        for feat, (values, timestamps) in sensor_data.items():
+            bl, cu = _split_by_occupancy_mode(values, timestamps, target_mode=current_mode)
+            if bl and cu:
+                baseline[feat] = bl
+
+        if not baseline:
+            return _generate_training_stats(equipment_type)
         return baseline
 
     def _get_current_stats(self, equipment_type: str) -> dict[str, list[float]]:
         """Get current feature statistics for equipment type.
 
-        Queries Supabase with a long window and splits time-range in half
-        (newer half = current). Falls back to synthetic for types without
-        real data or insufficient readings.
+        Queries Supabase with a 48h window and splits by occupancy mode,
+        returning the current (newer) half within the same operational mode
+        as the current time. Falls back to synthetic for types without real
+        data or insufficient readings.
         """
         cfg = EQUIPMENT_TO_SENSORS.get(equipment_type, {})
         if not cfg.get("uses_real_data", False):
@@ -451,19 +572,23 @@ class DriftDetector:
         if not equipment_ids or not features:
             return _generate_current_stats(equipment_type, drift_amount=0.0)
 
-        # Fetch all available data for this equipment type (up to 48h window)
         sensor_data = _get_supabase_sensor_data(equipment_ids, features, window_hours=48)
         if not sensor_data:
             return _generate_current_stats(equipment_type, drift_amount=0.0)
 
-        # Split each feature's time series: second half = current
-        current: dict[str, list[float]] = {}
-        for feat, values in sensor_data.items():
-            mid = len(values) // 2
-            if mid < 2:
-                return _generate_current_stats(equipment_type, drift_amount=0.0)
-            current[feat] = values[mid:]
+        now_utc = datetime.now(UTC)
+        current_mode = _get_occupancy_mode(now_utc)
+        if current_mode not in ("occupied", "unoccupied"):
+            current_mode = "occupied"
 
+        current: dict[str, list[float]] = {}
+        for feat, (values, timestamps) in sensor_data.items():
+            bl, cu = _split_by_occupancy_mode(values, timestamps, target_mode=current_mode)
+            if bl and cu:
+                current[feat] = cu
+
+        if not current:
+            return _generate_current_stats(equipment_type, drift_amount=0.0)
         return current
 
     def _get_recent_accuracy(self, model_type: str, days: int = 7) -> float:

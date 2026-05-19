@@ -69,6 +69,25 @@ def format_prediction_for_frontend(pred: dict) -> dict:
         "potential_loss_zar": pred.get("potential_loss_zar", 0),
     }
 
+    # Parse evidence to extract alarms count and last reading
+    evidence = _parse_json_field(pred.get("evidence"), {})
+
+    # Extract alarm count from evidence
+    alarm_count = 0
+    if evidence and "alarm_frequency" in evidence:
+        alarm_freq = evidence["alarm_frequency"]
+        if isinstance(alarm_freq, dict):
+            alarm_count = sum(alarm_freq.values())
+
+    # Extract last reading info from evidence
+    last_reading_value = None
+    last_reading_parameter = None
+    if evidence and "last_reading" in evidence:
+        last_reading = evidence["last_reading"]
+        if isinstance(last_reading, dict):
+            last_reading_value = last_reading.get("value")
+            last_reading_parameter = last_reading.get("parameter")
+
     return {
         "id": pred["code"],  # Use code as frontend ID
         "uuid": pred["id"],  # Keep UUID for reference
@@ -85,7 +104,7 @@ def format_prediction_for_frontend(pred: dict) -> dict:
         "timeframe_days": pred["timeframe_days"],
         "severity": severity,  # Mapped to system values
         # Evidence - parse JSON strings if needed (Supabase returns JSONB as strings)
-        "evidence": _parse_json_field(pred.get("evidence"), {}),
+        "evidence": evidence,
         "contributing_factors": _parse_json_field(pred.get("contributing_factors"), []),
         "similar_failures": _parse_json_field(pred.get("similar_failures"), []),
         # Financial
@@ -94,6 +113,11 @@ def format_prediction_for_frontend(pred: dict) -> dict:
         "status": pred.get("status", "active"),
         "recommended_action": pred.get("recommended_action"),
         "urgency": normalize_prediction_urgency(pred.get("urgency")) or pred.get("urgency"),
+        # Extracted fields for UI display
+        "alarms": alarm_count if alarm_count > 0 else None,
+        "last_reading": f"{last_reading_parameter}: {last_reading_value}"
+        if last_reading_parameter and last_reading_value is not None
+        else None,
     }
 
 

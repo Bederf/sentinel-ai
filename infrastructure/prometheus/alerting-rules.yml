@@ -37,7 +37,7 @@ groups:
     interval: 30s
     rules:
       - alert: SentinelModelDriftPersistent
-        expr: sentinel_model_drift_alerts > 0
+        expr: sentinel_model_drift_alerts{source="supabase", data_sufficient="true"} > 0
         for: 1h
         labels:
           severity: warning

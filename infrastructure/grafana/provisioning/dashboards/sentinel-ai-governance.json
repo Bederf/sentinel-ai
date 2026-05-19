@@ -122,7 +122,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sentinel_model_drift_alerts",
+          "expr": "sentinel_model_drift_alerts{source=\"supabase\", data_sufficient=\"true\"}",
           "legendFormat": "{{site_id}}/{{model_type}}"
         }
       ]
@@ -207,7 +207,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sentinel_model_drift_score",
+          "expr": "sentinel_model_drift_score{source=\"supabase\"}",
           "legendFormat": "{{model_id}} ({{model_type}})"
         }
       ],

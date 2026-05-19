@@ -10,6 +10,7 @@ Phase 2 (Control Implementation) per compliance.md roadmap.
 
 from __future__ import annotations
 
+import contextlib
 import ipaddress
 import os
 from datetime import UTC, datetime
@@ -297,6 +298,99 @@ sentinel_approval_latency_seconds = Histogram(
 
 # 29. (Removed — rejection rate computed from sentinel_approval_decisions_total counter)
 
+# ---------------------------------------------------------------------------
+# Phase 211 — Demand Response / DDMP Metrics (IES/LTM Integration)
+# ---------------------------------------------------------------------------
+
+# 30. Curtailable HVAC load (kW) - the core metric for DDMP
+sentinel_curtailable_load_kw = Gauge(
+    "sentinel_curtailable_load_kw",
+    "Current curtailable HVAC load in kW per site",
+    labelnames=["site_id", "customer"],
+    registry=REGISTRY,
+)
+
+# 31. Safe duration for curtailment (minutes)
+sentinel_safe_duration_minutes = Gauge(
+    "sentinel_safe_duration_minutes",
+    "Minutes until comfort breach if curtailed",
+    labelnames=["site_id"],
+    registry=REGISTRY,
+)
+
+# 32. Confidence score for curtailment prediction (0.0-0.95)
+sentinel_confidence_score = Gauge(
+    "sentinel_confidence_score",
+    "Confidence in curtailment prediction (0.0-0.95)",
+    labelnames=["site_id"],
+    registry=REGISTRY,
+)
+
+# 33. DDMP eligibility status (1 = eligible, 0 = not eligible)
+sentinel_ddmp_eligible = Gauge(
+    "sentinel_ddmp_eligible",
+    "DDMP eligibility status per site (1 = eligible)",
+    labelnames=["site_id"],
+    registry=REGISTRY,
+)
+
+# 34. Data freshness in seconds (for 503 logic visibility)
+sentinel_data_freshness_seconds = Gauge(
+    "sentinel_data_freshness_seconds",
+    "Seconds since last sensor reading",
+    labelnames=["site_id"],
+    registry=REGISTRY,
+)
+
+# 35. Thermal runway in minutes (comfort countdown)
+sentinel_thermal_runway_minutes = Gauge(
+    "sentinel_thermal_runway_minutes",
+    "Minutes until thermal comfort boundary breached",
+    labelnames=["site_id"],
+    registry=REGISTRY,
+)
+
+# 36. Zone coverage ratio (0.0-1.0)
+sentinel_zone_coverage_percent = Gauge(
+    "sentinel_zone_coverage_percent",
+    "Percentage of zones reporting data",
+    labelnames=["site_id"],
+    registry=REGISTRY,
+)
+
+# 37. BESS SOC percentage (if BESS present)
+sentinel_bess_soc_percent = Gauge(
+    "sentinel_bess_soc_percent",
+    "BESS State of Charge percentage (0-100)",
+    labelnames=["site_id", "battery_id"],
+    registry=REGISTRY,
+)
+
+# 38. DDMP event tracking
+ddmp_event_active = Gauge(
+    "sentinel_ddmp_event_active",
+    "DDMP curtailment event active per site (1 = active)",
+    labelnames=["site_id", "event_id"],
+    registry=REGISTRY,
+)
+
+# 39. API request metrics for demand response endpoint
+sentinel_demand_response_requests_total = Counter(
+    "sentinel_demand_response_requests_total",
+    "Total demand response API requests",
+    labelnames=["site_id", "status_code"],
+    registry=REGISTRY,
+)
+
+# 40. Demand response calculation duration
+sentinel_demand_response_duration_seconds = Histogram(
+    "sentinel_demand_response_duration_seconds",
+    "Demand response calculation duration",
+    labelnames=["site_id"],
+    buckets=[0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0],
+    registry=REGISTRY,
+)
+
 # 30. Token usage by route and site
 sentinel_ai_tokens_by_route_total = Counter(
     "sentinel_ai_tokens_by_route_total",
@@ -385,9 +479,8 @@ def _collect_drift_metrics() -> None:
 
     logger = logging.getLogger("sentinel.metrics")
     # KS test unreliable below this sample count per feature window
-    MIN_SAMPLES = 30
     try:
-        from ml.monitoring.drift import EQUIPMENT_TYPES, EQUIPMENT_TO_SENSORS
+        from ml.monitoring.drift import EQUIPMENT_TO_SENSORS, EQUIPMENT_TYPES
 
         try:
             from app.database.supabase_client import get_supabase_client
@@ -412,7 +505,7 @@ def _collect_drift_metrics() -> None:
                         site_id="site-002", model_type=eq_type.upper(), source="synthetic", data_sufficient="true"
                     ).set(0)
                     if client is not None:
-                        try:
+                        with contextlib.suppress(Exception):
                             client.table("drift_detection_log").insert(
                                 {
                                     "equipment_type": eq_type,
@@ -423,65 +516,41 @@ def _collect_drift_metrics() -> None:
                                     "source": "synthetic",
                                 }
                             ).execute()
-                        except Exception:
-                            pass
                     continue
 
-                # Real Supabase data path: fetch raw sensor values and check sample counts
-                from ml.monitoring.drift import _get_supabase_sensor_data
+                # Real Supabase data path: use the occupancy-aware drift detector
+                from ml.monitoring.drift import get_drift_detector
 
-                equipment_ids = cfg.get("equipment_ids", [])
-                features = cfg.get("features", [])
-                if not equipment_ids or not features:
+                detector = get_drift_detector()
+                try:
+                    result = detector.detect_feature_drift(eq_type)
+                except Exception as exc:
+                    logger.debug(f"DriftDetector failed for {eq_type}: {exc}")
                     continue
 
-                sensor_data = _get_supabase_sensor_data(equipment_ids, features, window_hours=48)
-                if not sensor_data:
-                    # No data at all — suppress metric
-                    sentinel_model_drift_score.labels(
-                        model_id=eq_type, model_type=eq_type.upper(), source="supabase", data_sufficient="false"
-                    ).set(0)
-                    sentinel_model_drift_alerts.labels(
-                        site_id="site-002", model_type=eq_type.upper(), source="supabase", data_sufficient="false"
-                    ).set(0)
-                    continue
+                features_checked = result.get("features_checked", 0) or 0
+                features_drifted = result.get("features_drifted", 0) or 0
+                score = features_drifted / features_checked if features_checked > 0 else 0.0
 
-                # Compute KS per feature using first-half=baseline, second-half=current
-                from ml.monitoring.drift import _ks_statistic
-
-                drifted_features = 0
-                checked_features = 0
-                sample_info = []
-                for feat, values in sensor_data.items():
-                    mid = len(values) // 2
-                    baseline = values[:mid]
-                    current = values[mid:]
-                    if len(baseline) < MIN_SAMPLES or len(current) < MIN_SAMPLES:
-                        sample_info.append(f"{feat}=insufficient(n={len(baseline)}/{len(current)})")
-                        continue
-                    checked_features += 1
-                    ks = _ks_statistic(baseline, current)
-                    if ks > 0.1:
-                        drifted_features += 1
-
-                data_sufficient = "true" if checked_features > 0 else "false"
-                score = drifted_features / checked_features if checked_features > 0 else 0.0
+                # Only emit "data_sufficient=true" when the detector actually ran
+                # (features_checked > 0 means it found enough same-mode samples)
+                data_sufficient = "true" if features_checked > 0 else "false"
 
                 sentinel_model_drift_score.labels(
                     model_id=eq_type, model_type=eq_type.upper(), source="supabase", data_sufficient=data_sufficient
                 ).set(score)
                 sentinel_model_drift_alerts.labels(
                     site_id="site-002", model_type=eq_type.upper(), source="supabase", data_sufficient=data_sufficient
-                ).set(1 if drifted_features > 0 and data_sufficient == "true" else 0)
+                ).set(1 if result.get("drift_detected") and data_sufficient == "true" else 0)
 
                 if client is not None:
                     try:
                         client.table("drift_detection_log").insert(
                             {
                                 "equipment_type": eq_type,
-                                "drift_detected": drifted_features > 0 and data_sufficient == "true",
-                                "features_checked": checked_features,
-                                "features_drifted": drifted_features,
+                                "drift_detected": result.get("drift_detected", False),
+                                "features_checked": features_checked,
+                                "features_drifted": features_drifted,
                                 "score": score,
                                 "source": "supabase",
                             }
@@ -623,6 +692,84 @@ def _collect_fm_metrics() -> None:
 
 
 # ---------------------------------------------------------------------------
+# DDMP / Demand Response metrics collection (Phase 211)
+# ---------------------------------------------------------------------------
+
+
+def _collect_ddmp_metrics() -> None:
+    """Collect Demand Response / DDMP metrics from latest API calculations.
+
+    This function queries the latest demand response calculations from Supabase
+    and exposes them as Prometheus metrics for IES/LTM integration dashboards.
+    """
+    import logging
+
+    try:
+        from app.database.supabase_client import get_supabase_client
+
+        client = get_supabase_client()
+        logger = logging.getLogger("sentinel.metrics")
+
+        # Get latest demand response calculation per site
+        resp = (
+            client.table("demand_response_calculations")
+            .select(
+                "site_id, curtailable_load_kw, safe_duration_minutes, confidence, "
+                "ddmp_eligible, data_freshness_seconds, thermal_runway_minutes, "
+                "zone_coverage_percent, bess_soc_pct, limiting_factor, calculated_at"
+            )
+            .order("calculated_at", desc=True)
+            .limit(100)
+            .execute()
+        )
+
+        logger.info(f"DDMP metrics: query returned {len(resp.data) if resp.data else 0} rows")
+
+        if resp.data:
+            # Track which sites we've seen (to only take latest per site)
+            seen_sites = set()
+
+            for calc in resp.data:
+                site_id = calc.get("site_id", "unknown")
+
+                # Skip if we already have a newer entry for this site
+                if site_id in seen_sites:
+                    continue
+                seen_sites.add(site_id)
+
+                # Set metrics with safe defaults
+                sentinel_curtailable_load_kw.labels(
+                    site_id=site_id,
+                    customer="sentinel-internal",  # Will be overridden per customer
+                ).set(calc.get("curtailable_load_kw", 0))
+
+                sentinel_safe_duration_minutes.labels(site_id=site_id).set(calc.get("safe_duration_minutes", 0))
+
+                sentinel_confidence_score.labels(site_id=site_id).set(calc.get("confidence", 0))
+
+                sentinel_ddmp_eligible.labels(site_id=site_id).set(1 if calc.get("ddmp_eligible", False) else 0)
+
+                sentinel_data_freshness_seconds.labels(site_id=site_id).set(calc.get("data_freshness_seconds", 9999))
+
+                sentinel_thermal_runway_minutes.labels(site_id=site_id).set(calc.get("thermal_runway_minutes", 0))
+
+                sentinel_zone_coverage_percent.labels(site_id=site_id).set(calc.get("zone_coverage_percent", 0))
+
+                # BESS SOC if available
+                bess_soc = calc.get("bess_soc_pct")
+                if bess_soc is not None:
+                    sentinel_bess_soc_percent.labels(site_id=site_id, battery_id="primary").set(bess_soc)
+
+            logger.info(f"DDMP metrics: collected for {len(seen_sites)} sites: {seen_sites}")
+        else:
+            logger.info("DDMP metrics: no data found in table")
+
+    except Exception as e:
+        # Fail silently - metrics collection should never break the endpoint
+        logging.getLogger("sentinel.metrics").warning(f"DDMP metrics collection failed: {e}", exc_info=True)
+
+
+# ---------------------------------------------------------------------------
 # Static info set once at import time
 # ---------------------------------------------------------------------------
 _MODE = os.getenv("SENTINEL_MODE", settings.resolved_ingestion_mode.value)
@@ -718,6 +865,12 @@ async def prometheus_metrics(
     # Collect ML drift scores from Supabase sensor data (real drift detection)
     try:
         _collect_drift_metrics()
+    except Exception:
+        pass  # Never let metrics collection crash the endpoint
+
+    # Collect DDMP / Demand Response metrics (Phase 211 — IES/LTM integration)
+    try:
+        _collect_ddmp_metrics()
     except Exception:
         pass  # Never let metrics collection crash the endpoint
 

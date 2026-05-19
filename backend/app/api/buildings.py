@@ -183,37 +183,76 @@ def _format_display_name(eq_type: str, eq_code: str) -> str:
     if code.isdigit():
         level = int(code[0])
         zone = int(code[1:])
-        if level == 0:
-            floor_name = "Ground"
-        else:
-            floor_name = f"Level {level}"
+        floor_name = "Ground" if level == 0 else f"Level {level}"
         return f"{eq_type} {floor_name} Zone {zone}"
 
     return f"{eq_type} {code}"
 
 
 def _normalize_equipment_name(eq: dict) -> str:
-    """Derive display name from equipment record.
+    """Return equipment code as the display name.
 
-    Uses the code (S002-{TYPE}-{LOC}) to generate a consistent name.
-    Falls back to the stored name if the code pattern doesn't match.
+    Simply returns the equipment code (e.g., S002-INV-R01) without
+    generating long descriptive names.
     """
-    code = eq.get("code", "")
-    current_name = eq.get("name", "")
+    return eq.get("code", eq.get("id", "Unknown"))
 
-    # Try to parse S002-{TYPE}-{LOC} pattern
-    parts = code.split("-")
-    if len(parts) >= 3 and parts[0] == "S002":
-        type_part = parts[1].upper()
-        loc_part = "-".join(parts[2:])
-        return _format_display_name(type_part, loc_part)
 
-    # Fallback: clean up existing name (remove "S002 " prefix)
-    cleaned = current_name.replace("S002 ", "").strip()
-    if cleaned and cleaned != code:
-        return cleaned
+def _extract_location_from_code(eq_code: str) -> str:
+    """Extract location from equipment code.
 
-    return current_name or code
+    Format: S002-{TYPE}-{LOCATION}
+
+    Location codes:
+      - B01, B02 → Basement Zone 1, 2
+      - R01, R02 → Roof Zone 1, 2
+      - 001-099 → Ground Level Zone X
+      - 101-199 → Level 1 Zone X
+      - 201-299 → Level 2 Zone X
+      - 301-399 → Level 3 Zone X
+      - G-XXX → Ground Zone XXX
+    """
+    if not eq_code or "-" not in eq_code:
+        return ""
+
+    parts = eq_code.split("-")
+    if len(parts) < 3:
+        return ""
+
+    # Location is everything after the type (parts[1])
+    loc_parts = parts[2:]
+    loc_code = "-".join(loc_parts)
+
+    # Handle different location formats
+    loc_upper = loc_code.upper()
+
+    # Basement: B01, B02
+    if loc_upper.startswith("B") and len(loc_upper) >= 2 and loc_upper[1:].isdigit():
+        zone_num = loc_upper[1:].lstrip("0") or "0"
+        return f"Basement Zone {zone_num}"
+
+    # Roof: R01, R02
+    if loc_upper.startswith("R") and len(loc_upper) >= 2 and loc_upper[1:].isdigit():
+        zone_num = loc_upper[1:].lstrip("0") or "0"
+        return f"Roof Zone {zone_num}"
+
+    # Ground prefix: G-XXX
+    if loc_upper.startswith("G-"):
+        zone = loc_parts[0][2:] if len(loc_parts[0]) > 2 else loc_parts[1] if len(loc_parts) > 1 else ""
+        return f"Ground Zone {zone}"
+
+    # Numeric levels: XXX
+    if loc_code.isdigit():
+        num = int(loc_code)
+        level = num // 100
+        zone = num % 100
+        if level == 0:
+            return f"Ground Zone {zone}"
+        else:
+            return f"Level {level} Zone {zone}"
+
+    # Return as-is for unrecognized formats
+    return loc_code
 
 
 def _is_device_controllable(device_id: str, equipment_points: dict) -> bool:
@@ -327,9 +366,7 @@ async def list_sites(current_user: dict | None = None) -> dict:
 
             # Step 2: resolve UUIDs → site codes
             if uuids:
-                codes_response = (
-                    supabase.table("sites").select("code").in_("id", uuids).execute()
-                )
+                codes_response = supabase.table("sites").select("code").in_("id", uuids).execute()
                 accessible_codes = {row["code"] for row in (codes_response.data or [])}
             else:
                 accessible_codes = set()
@@ -370,12 +407,8 @@ async def list_sites(current_user: dict | None = None) -> dict:
                         .execute()
                     )
                     if alerts.data:
-                        has_critical_alert = any(
-                            a.get("severity") == "critical" for a in alerts.data
-                        )
-                        has_warning_alert = any(
-                            a.get("severity") == "warning" for a in alerts.data
-                        )
+                        has_critical_alert = any(a.get("severity") == "critical" for a in alerts.data)
+                        has_warning_alert = any(a.get("severity") == "warning" for a in alerts.data)
                         if has_critical_alert:
                             info["status"] = "critical"
                         elif has_warning_alert:
@@ -1171,9 +1204,11 @@ async def get_site_equipment(site_id: str, auth: AuthContext = Depends(require_s
                     "occupancy_sensor": "Sensors",
                     "zone_sensor": "Sensors",
                     "outdoor_air_sensor": "Sensors",
-                    "vav": "HVAC", "VAV": "HVAC",
+                    "vav": "HVAC",
+                    "VAV": "HVAC",
                     "ahu": "HVAC",
-                    "fcu": "HVAC", "FCU": "HVAC",
+                    "fcu": "HVAC",
+                    "FCU": "HVAC",
                     "chiller": "HVAC",
                     "split_unit": "HVAC",
                     "cooling_tower": "HVAC",
@@ -1264,6 +1299,12 @@ async def get_site_equipment(site_id: str, auth: AuthContext = Depends(require_s
                         bool(synced_controllable) if isinstance(synced_controllable, bool) else inferred_controllable
                     )
 
+                # Extract location from equipment code
+                eq_code = eq.get("code", "")
+                extracted_location = _extract_location_from_code(eq_code)
+                # Use extracted location if DB location is empty
+                location = eq.get("location", "") or extracted_location
+
                 equipment_list.append(
                     {
                         "id": eq.get("code", eq.get("id")),
@@ -1274,7 +1315,7 @@ async def get_site_equipment(site_id: str, auth: AuthContext = Depends(require_s
                         "category": category,
                         "status": status,
                         "health_score": health,
-                        "location": eq.get("location", ""),
+                        "location": location,
                         "site_id": site_code,
                         "site_name": site_name,
                         "details": {

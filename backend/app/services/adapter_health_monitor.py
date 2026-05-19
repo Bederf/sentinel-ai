@@ -273,14 +273,134 @@ class AdapterHealthMonitor:
         except Exception as e:
             logger.error(f"Failed to write adapter health alert: {e}")
 
+    # BACnet alarm type mapping for intelligent descriptions
+    _BACNET_ALARM_TYPES: dict[str, str] = {
+        # Temperature-related
+        "temp_hi": "High temperature detected",
+        "temp_high": "High temperature detected",
+        "temp_lo": "Low temperature detected",
+        "temp_low": "Low temperature detected",
+        "temp_crit": "Critical temperature threshold exceeded",
+        "high_temp": "High temperature alarm",
+        "low_temp": "Low temperature alarm",
+        "freeze": "Freeze protection alarm",
+        # Pressure-related
+        "filter_dp": "Filter differential pressure high - check/replace filter",
+        "filter_hi": "Filter clogged - maintenance required",
+        "dp_hi": "High differential pressure",
+        "pressure_hi": "High pressure alarm",
+        "pressure_lo": "Low pressure alarm",
+        # Fan/Vibration
+        "fan_fail": "Fan failure detected",
+        "vib_warn": "Elevated vibration - bearing wear suspected",
+        "vib_crit": "Critical vibration - immediate inspection required",
+        "belt_fail": "Drive belt failure or slippage",
+        # Power/Electrical
+        "power_loss": "Power loss or phase failure",
+        "overcurrent": "Overcurrent condition",
+        "undervoltage": "Undervoltage condition",
+        "compressor_fail": "Compressor failure or high amp draw",
+        # Flow/Level
+        "flow_lo": "Low flow detected",
+        "flow_fail": "Flow failure - pump or valve issue",
+        "level_hi": "High level alarm",
+        "level_lo": "Low level alarm",
+        # General
+        "fault": "Equipment fault condition active",
+        "offline": "Equipment communication lost",
+        "sensor_fail": "Sensor failure or out of range",
+        "maintenance": "Maintenance reminder - service due",
+    }
+
+    def _generate_alarm_description(self, alarm: dict[str, Any]) -> tuple[str, str]:
+        """Generate meaningful title and message from alarm data.
+
+        Returns: (title, message) with intelligent fallbacks
+        """
+        # Extract fields
+        code = alarm.get("code") or alarm.get("alarm_code") or ""
+        raw_msg = alarm.get("message") or alarm.get("description") or alarm.get("alarm_text") or ""
+        equipment_id = alarm.get("equipment_id") or alarm.get("equipment_code") or ""
+        object_type = alarm.get("object_type") or ""
+        point_name = alarm.get("point_name") or ""
+
+        # If we have a good message already, use it
+        if raw_msg and len(raw_msg) > 10 and "BACnet alarm" not in raw_msg:
+            if code:
+                return f"Equipment fault: {code}", raw_msg
+            return "Equipment fault detected", raw_msg
+
+        # Try to extract equipment type from equipment_id (e.g., S002-AHU-001)
+        equipment_type = "Equipment"
+        equipment_name = equipment_id
+        if equipment_id and "-" in equipment_id:
+            parts = equipment_id.split("-")
+            if len(parts) >= 2:
+                type_code = parts[1].upper()
+                type_map = {
+                    "AHU": "Air Handling Unit",
+                    "FCU": "Fan Coil Unit",
+                    "VAV": "VAV Box",
+                    "CHILLER": "Chiller",
+                    "CT": "Cooling Tower",
+                    "PUMP": "Pump",
+                    "BESS": "Battery",
+                    "GEN": "Generator",
+                    "UPS": "UPS",
+                }
+                equipment_type = type_map.get(type_code, type_code)
+                equipment_name = f"{equipment_type} {parts[2]}" if len(parts) > 2 else equipment_id
+
+        # Try to map alarm code to description
+        description = None
+        code_lower = code.lower().replace("-", "_").replace(" ", "_")
+
+        # Direct mapping
+        if code_lower in self._BACNET_ALARM_TYPES:
+            description = self._BACNET_ALARM_TYPES[code_lower]
+        else:
+            # Try partial matching
+            for key, desc in self._BACNET_ALARM_TYPES.items():
+                if key in code_lower or code_lower in key:
+                    description = desc
+                    break
+
+        # If still no description, try object_type or point_name
+        if not description:
+            combined = f"{object_type} {point_name}".lower()
+            if "temp" in combined or "temperature" in combined:
+                description = "Temperature out of normal range"
+            elif "filter" in combined or "dp" in combined:
+                description = "Filter maintenance may be required"
+            elif "fan" in combined:
+                description = "Fan performance issue detected"
+            elif "pressure" in combined:
+                description = "Pressure outside normal operating range"
+            elif "flow" in combined:
+                description = "Flow rate anomaly detected"
+            else:
+                description = "Equipment operating outside normal parameters"
+
+        # Build title
+        title = f"{equipment_type} alert: {code}" if code else f"{equipment_type} fault detected"
+
+        # Build message
+        if equipment_id:
+            message = f"{equipment_name} ({equipment_id}): {description}. Review equipment status and perform maintenance if needed."
+        else:
+            message = f"{description}. Equipment ID unknown - check BMS for details."
+
+        return title, message
+
     async def _write_bridge_alerts(self, site_id: str, alarms: list[dict[str, Any]]) -> None:
         """Write active bridge alarms to the alerts table for cockpit posture.
 
         Deduplicates by alarm code + source to avoid flooding on repeated polls.
         Only writes alarms from the last poll cycle that are still active.
         """
-        from app.database.supabase_client import get_supabase_client
         import uuid
+
+        from app.database.supabase_client import get_supabase_client
 
         if not alarms:
             return
@@ -304,10 +424,13 @@ class AdapterHealthMonitor:
         rows_to_insert = []
 
         for alarm in alarms:
-            code = alarm.get("code") or alarm.get("alarm_code") or ""
-            alarm_msg = alarm.get("message") or alarm.get("description") or alarm.get("alarm_text") or ""
+            alarm.get("code") or alarm.get("alarm_code") or ""
+
+            # Generate intelligent title and message
+            title, message = self._generate_alarm_description(alarm)
+
             # Dedupe key
-            dedupe_key = f"{code}:{alarm_msg[:80]}"
+            dedupe_key = f"{title}:{message[:80]}"
             if dedupe_key in seen_keys:
                 continue
             seen_keys.add(dedupe_key)
@@ -325,13 +448,7 @@ class AdapterHealthMonitor:
             equipment_id = alarm.get("equipment_id") or alarm.get("equipment_code") or None
             if equipment_id:
                 try:
-                    eq_row = (
-                        supabase.table("equipment")
-                        .select("id")
-                        .eq("code", equipment_id)
-                        .maybe_single()
-                        .execute()
-                    )
+                    eq_row = supabase.table("equipment").select("id").eq("code", equipment_id).maybe_single().execute()
                     if eq_row.data:
                         equipment_id = eq_row.data["id"]
                 except Exception:
@@ -345,8 +462,8 @@ class AdapterHealthMonitor:
                     "type": "fault",
                     "severity": severity,
                     "status": "active",
-                    "title": f"Bridge fault: {code}" if code else "Bridge fault",
-                    "message": alarm_msg or f"BACnet alarm from bridge (code={code})",
+                    "title": title,
+                    "message": message,
                     "created_at": now.isoformat(),
                     "updated_at": now.isoformat(),
                 }

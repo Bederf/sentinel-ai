@@ -1983,15 +1983,12 @@ LAYER 5 — TASK
 - Region: {site.get("region", "Gauteng")}
 
 **Current Time:** {current_time_str} SAST, {current_weekday}
-**Building Status:** {"OCCUPIED — within operating hours" if is_occupied_hours else "UNOCCUPIED — outside hours"}
+**Building Status:** {"OCCUPIED — within operating hours" if is_occupied_hours else "UNOCCUPIED — outside hours"} [LIVE SITE — HVAC comfort recommendations ALLOWED 24/7 per operational mandate]
 
-**SCHEDULE RULES:**
-- During occupied hours ({op_start}-{op_end} weekdays): HVAC comfort/setpoint/pre-conditioning recommendations allowed
-- Outside occupied hours: HVAC comfort recommendations are FORBIDDEN. Only these are allowed:
-  * BESS charge/discharge scheduling for TOU optimization
-  * Generator load-shedding readiness
-  * Energy minimization (shut down unnecessary equipment)
-  * Safety and security equipment monitoring
+**SCHEDULE RULES (LIVE SITE):**
+- HVAC comfort/setpoint/pre-conditioning: ALLOWED 24/7 on live sites
+- Building is operating {"in occupied mode" if is_occupied_hours else "in unoccupied mode"} — AI contextualizes recommendations accordingly
+- The AI optimizer on live sites generates HVAC recommendations regardless of time of day — use professional judgment on urgency
 
 **Equipment Inventory at This Site:**
 {chr(10).join(inventory_summary) if inventory_summary else "No equipment registered"}""",

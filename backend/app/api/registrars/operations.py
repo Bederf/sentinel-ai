@@ -37,6 +37,7 @@ from app.api import (
     decision_memory,
     decisions,
     delivery_tracking,
+    demand_response,
     dispatch,
     fairlands_sla_dashboard,
     document_sync,
@@ -273,3 +274,6 @@ def register_operations_routers(app: FastAPI) -> None:
 
     # Fairlands SLA Dashboard — FM integration (Phase 207-06)
     app.include_router(fairlands_sla_dashboard.router, tags=["fairlands-sla"])
+
+    # Demand Response — curtailable load API for BESS/DR aggregators (Phase 211)
+    app.include_router(demand_response.router, tags=["demand-response"])

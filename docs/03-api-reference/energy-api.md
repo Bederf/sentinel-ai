@@ -28,6 +28,7 @@ The Energy API provides endpoints for energy consumption analysis, optimization 
 **Related Docs:**
 - [Phase 084: Energy Rules Engine](../04-features/PHASE_084_ENERGY_RULES_ENGINE.md) - Rules implementation details
 - [Phase 083: Energy Comparison API](../04-features/PHASE_083_ENERGY_COMPARISON_API.md) - Card visualization
+- [Demand Response API](./demand-response-api.md) - Real-time curtailable load for BESS/DR aggregators (Phase 211)
 
 ---
 

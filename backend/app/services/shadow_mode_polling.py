@@ -25,8 +25,6 @@ from typing import Any
 import httpx
 
 from app.core.site_resolver import normalize_site_id
-from app.services.health_rating_calculator import HealthRatingCalculator
-
 
 # ─── Equipment display name formatters ──────────────────────────────────────────
 
@@ -90,10 +88,7 @@ def _format_display_name(eq_type: str, eq_code: str) -> str:
     if code.isdigit():
         level = int(code[0])  # first digit = floor number
         zone = int(code[1:])  # remaining digits = zone within floor
-        if level == 0:
-            floor_name = "Ground"
-        else:
-            floor_name = f"Level {level}"
+        floor_name = "Ground" if level == 0 else f"Level {level}"
         return f"{eq_type} {floor_name} Zone {zone}"
 
     # Fallback: just title-case the code
@@ -453,9 +448,9 @@ class ShadowModePollingService:
             # Bridge telemetry ahu1/ahu2/ahu3 maps to zone-code format in Supabase
             ahu_data = data.get("ahu", {})
             ahu_map = {
-                "ahu1": "S002-AHU-001",    # Basement AHU
-                "ahu2": "S002-AHU-002",    # Rooftop AHU
-                "ahu3": "S002-AHU-201",    # Level 2 AHU
+                "ahu1": "S002-AHU-001",  # Basement AHU
+                "ahu2": "S002-AHU-002",  # Rooftop AHU
+                "ahu3": "S002-AHU-201",  # Level 2 AHU
             }
             ahu_field_map = {
                 "supply_temp_c": "supply_air_temp",
@@ -557,15 +552,18 @@ class ShadowModePollingService:
                         energy_equipment[eq_id] = {"type": obj.get("equipment_type", "unknown"), "readings": {}}
                     point_name = obj.get("object_name", "")
                     # Map key telemetry points
-                    if any(x in point_name.lower() for x in ["soc", "power", "voltage", "current", "temp", "energy", "status"]):
+                    if any(
+                        x in point_name.lower()
+                        for x in ["soc", "power", "voltage", "current", "temp", "energy", "status"]
+                    ):
                         # Note: objects endpoint returns metadata, not live values
                         # We need to fetch the current value separately
                         pass
 
             # Fetch live values from /points endpoint for key energy equipment
-            energy_equipment_ids = [eq_id for eq_id in energy_equipment.keys() if any(
-                x in eq_id for x in ["BESS-B1-001", "PV-ARRAY", "GEN-B1"]
-            )]
+            energy_equipment_ids = [
+                eq_id for eq_id in energy_equipment if any(x in eq_id for x in ["BESS-B1-001", "PV-ARRAY", "GEN-B1"])
+            ]
 
             for eq_id in energy_equipment_ids[:5]:  # Limit to top 5 to avoid timeout
                 try:
@@ -673,7 +671,9 @@ class ShadowModePollingService:
             except Exception as e:
                 logger.debug(f"[SHADOW] Water meter detailed poll failed: {e}")
 
-            result["energy_equipment_fetched"] = len([eq for eq in agg_states if any(x in eq for x in ["BESS", "PV", "GEN", "INV", "WATER"])])
+            result["energy_equipment_fetched"] = len(
+                [eq for eq in agg_states if any(x in eq for x in ["BESS", "PV", "GEN", "INV", "WATER"])]
+            )
 
         except Exception as e:
             logger.warning(f"[SHADOW] Energy equipment poll error: {e}")
@@ -698,8 +698,8 @@ class ShadowModePollingService:
                 sync = get_sentinel_data_sync(site_id=normalize_site_id(self.site_id, to_supabase=True))
 
                 # Recency filter — only alarms within alarm_recency_window_minutes are current signal
+
                 from app.config.settings import settings as app_settings
-                from datetime import timezone
 
                 stale_count = 0
                 active_alarms_for_db: list[dict[str, Any]] = []
@@ -710,8 +710,8 @@ class ShadowModePollingService:
                         try:
                             alarm_time = datetime.fromisoformat(alarm_time_str.replace("Z", "+00:00"))
                             if alarm_time.tzinfo is None:
-                                alarm_time = alarm_time.replace(tzinfo=timezone.utc)
-                            age_minutes = (datetime.now(tz=timezone.utc) - alarm_time).total_seconds() / 60
+                                alarm_time = alarm_time.replace(tzinfo=UTC)
+                            age_minutes = (datetime.now(tz=UTC) - alarm_time).total_seconds() / 60
                             if age_minutes > app_settings.alarm_recency_window_minutes:
                                 stale_count += 1
                                 is_stale = True
@@ -733,6 +733,12 @@ class ShadowModePollingService:
                         await monitor._write_bridge_alerts(self.site_id, active_alarms_for_db)
                     except Exception as e:
                         logger.warning(f"[SHADOW] Failed to write bridge alarms to alerts table: {e}")
+
+                    # Also persist to equipment_fault_events for prediction generation
+                    try:
+                        await self._persist_fault_events(active_alarms_for_db)
+                    except Exception as e:
+                        logger.warning(f"[SHADOW] Failed to persist fault events: {e}")
 
                 fault_count = len(alarms) - stale_count
                 logger.info(
@@ -963,6 +969,87 @@ class ShadowModePollingService:
             "ml_hours_ingested": last.get("ml_hours_ingested"),
             "bridge_data_source": "remote_bridge",
         }
+
+    async def _persist_fault_events(self, alarms: list[dict[str, Any]]) -> None:
+        """Persist fault events to equipment_fault_events table for prediction generation.
+
+        This makes fault data available to the prediction calculator so it can
+        include alarm_frequency in prediction evidence.
+        """
+
+        from app.database.supabase_client import get_supabase_client
+
+        supabase = get_supabase_client()
+
+        # Resolve site UUID
+        try:
+            site_row = supabase.table("sites").select("id").eq("code", self.site_id).execute()
+            if not site_row.data:
+                return
+            site_row.data[0]["id"]
+        except Exception as e:
+            logger.warning(f"[SHADOW] Could not resolve site UUID: {e}")
+            return
+
+        # Build bridge site code (S002 format)
+        bridge_site_id = self.site_id.replace("site-", "S").upper()
+
+        rows_to_insert = []
+        for alarm in alarms:
+            # Extract equipment code
+            equip_code = alarm.get("equipment_id") or alarm.get("equipment_code") or ""
+            obj_id = alarm.get("object_id") or ""
+
+            # Try to parse equipment code from various fields
+            if not equip_code and obj_id:
+                # Parse from object_id like "S002-AHU-B01-001-supply_air_temp"
+                parts = obj_id.split("-")
+                if len(parts) >= 4 and parts[0].startswith("S"):
+                    equip_code = "-".join(parts[:4])
+
+            # Parse alarm timestamp
+            alarm_time_str = alarm.get("timestamp") or alarm.get("time")
+            recorded_at = datetime.now(UTC).isoformat()
+            if alarm_time_str:
+                try:
+                    alarm_time = datetime.fromisoformat(alarm_time_str.replace("Z", "+00:00"))
+                    recorded_at = alarm_time.isoformat()
+                except (ValueError, TypeError):
+                    pass
+
+            # Extract alarm code/event type
+            event_type = alarm.get("event_type") or alarm.get("alarm_class") or alarm.get("event_state", "UNKNOWN")
+            alarm_code = alarm.get("code") or alarm.get("alarm_code") or event_type
+
+            # Extract message
+            message = alarm.get("active_text") or alarm.get("message_text") or alarm.get("description", "")
+            if not message:
+                message = alarm.get("message", "Fault detected")
+
+            rows_to_insert.append(
+                {
+                    "site_id": bridge_site_id,
+                    "equipment_code": equip_code or "UNKNOWN",
+                    "alarm_code": alarm_code,
+                    "event_type": event_type,
+                    "severity": alarm.get("severity") or alarm.get("priority", "warning"),
+                    "message": message[:500],  # Truncate to avoid overflow
+                    "recorded_at": recorded_at,
+                    "raw_data": alarm,
+                }
+            )
+
+        if not rows_to_insert:
+            return
+
+        try:
+            # Insert fault events (upsert to avoid duplicates)
+            supabase.table("equipment_fault_events").upsert(
+                rows_to_insert, on_conflict="site_id,equipment_code,alarm_code,recorded_at"
+            ).execute()
+            logger.info(f"[SHADOW] Persisted {len(rows_to_insert)} fault events to equipment_fault_events")
+        except Exception as e:
+            logger.warning(f"[SHADOW] Failed to insert fault events: {e}")
 
     def _upsert_log_source(self, equipment_state_count: int) -> None:
         """Create or update a log_sources entry reflecting bridge polling activity.
@@ -1368,23 +1455,24 @@ class ShadowModePollingService:
                 Returns None if the code doesn't match any known pattern.
                 """
                 import re
+
                 # L-pattern: FCU-L1-A → FCU-101, DALI-L2-B → DALI-202
-                m = re.match(r'^(.+)-L(\d)-([A-Z])$', code)
+                m = re.match(r"^(.+)-L(\d)-([A-Z])$", code)
                 if m:
                     prefix = m.group(1)
                     floor = int(m.group(2))
-                    zone_num = ord(m.group(3)) - ord('A') + 1
+                    zone_num = ord(m.group(3)) - ord("A") + 1
                     if 1 <= zone_num <= 5:
                         zone_code = floor * 100 + zone_num
                         return f"{prefix}-{zone_code:03d}"
 
                 # B1-pattern: CHILLER-B1-001 → CHILLER-B01, DALI-B1-CTRL → DALI-B01
-                m = re.match(r'^(.+)-B1-', code)
+                m = re.match(r"^(.+)-B1-", code)
                 if m:
                     return f"{m.group(1)}-B01"
 
                 # R-pattern: AHU-R-001 → AHU-R01, INV-R-001 → INV-R01
-                m = re.match(r'^(.+)-R-\d{3}$', code)
+                m = re.match(r"^(.+)-R-\d{3}$", code)
                 if m:
                     return f"{m.group(1)}-R01"
 
