@@ -327,12 +327,21 @@ class EquipmentRepository:
         """Update equipment health score.
 
         Args:
-            equipment_id: Equipment code
+            equipment_id: Equipment code or UUID
             health_score: New health score (0-100)
 
         Returns:
             Updated equipment or None if not found
         """
+        # Detect UUID vs code — update by UUID directly if UUID format
+        if self._is_uuid(equipment_id):
+            response = (
+                self.client.table("equipment").update({"health_score": health_score}).eq("id", equipment_id).execute()
+            )
+            if response.data:
+                CacheInvalidation.on_equipment_change(equipment_code=response.data[0].get("code"))
+                return response.data[0]
+            return None
         return self.update(equipment_id, {"health_score": health_score})
 
     def update_service_provider(
