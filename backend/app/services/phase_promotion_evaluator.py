@@ -303,7 +303,13 @@ class PhasePromotionEvaluator:
             if not site_uuid:
                 return GateResult(gate=gate, passed=False, value=None, threshold=threshold)
             try:
-                rows = client.table("recommendations").select("id", count="exact").eq("site_id", site_id).execute()
+                rows = (
+                    client.table("recommendations")
+                    .select("id", count="exact")
+                    .eq("site_id", site_id)
+                    .eq("action_type", "ai_optimization")
+                    .execute()
+                )
                 count = rows.count if hasattr(rows, "count") else len(rows.data or [])
                 return GateResult(gate=gate, passed=count >= threshold, value=count, threshold=threshold)
             except Exception as e:
