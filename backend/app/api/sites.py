@@ -372,6 +372,19 @@ def db_to_site_dict(
         "active_alerts": alert_count,
     }
 
+    # Derive site status from equipment_status and alert_count
+    if equipment_status:
+        if equipment_status.get("critical", 0) > 0 or alert_count > 5:
+            result["status"] = "critical"
+        elif equipment_status.get("warning", 0) > 0 or alert_count > 0:
+            result["status"] = "warning"
+        else:
+            result["status"] = "normal"
+    elif alert_count > 0:
+        result["status"] = "warning"
+    else:
+        result["status"] = "normal"
+
     # Include equipment status breakdown if available
     if equipment_status:
         result["equipment_status"] = equipment_status
@@ -1284,19 +1297,25 @@ async def update_site_phase(site_id: str, request: PhaseUpdateRequest) -> PhaseU
             raise HTTPException(status_code=500, detail=f"Supabase write failed: {e}") from e
 
         # Write phase transition to dedicated immutable log table
-        log_response = client.table("phase_transition_log").insert(
-            {
-                "site_id": site_id,
-                "from_phase": previous_phase,
-                "to_phase": requested,
-                "changed_by": request.changed_by
-                if hasattr(request, "changed_by") and request.changed_by
-                else "system",
-                "reason": request.reason if hasattr(request, "reason") else None,
-            }
-        ).execute()
+        log_response = (
+            client.table("phase_transition_log")
+            .insert(
+                {
+                    "site_id": site_id,
+                    "from_phase": previous_phase,
+                    "to_phase": requested,
+                    "changed_by": request.changed_by
+                    if hasattr(request, "changed_by") and request.changed_by
+                    else "system",
+                    "reason": request.reason if hasattr(request, "reason") else None,
+                }
+            )
+            .execute()
+        )
         if not log_response.data:
-            raise HTTPException(status_code=500, detail=f"Audit trail failed: could not record phase transition for {site_id}")
+            raise HTTPException(
+                status_code=500, detail=f"Audit trail failed: could not record phase transition for {site_id}"
+            )
 
         # Sync optimization_settings to match the new phase
         phase_mode_map = {
@@ -1497,7 +1516,6 @@ async def get_site(
             return SiteResponse(
                 **site,
                 location=site.get("address", ""),
-                status=status,
                 last_phase_transition=last_phase_transition,
                 **bridge_status,
             )
