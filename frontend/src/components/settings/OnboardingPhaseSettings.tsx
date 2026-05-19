@@ -97,7 +97,14 @@ export function OnboardingPhaseSettings({
     setUpdating(true);
     try {
       await api.updateSitePhase(selectedSiteId, phase);
-      // Invalidate cache to force fresh data fetch
+      // Optimistically update the buildings-list cache so the new phase
+      // appears immediately without waiting for the async refetch
+      queryClient.setQueryData(['buildings-list', selectedSiteId], (old: any) => {
+        if (!old) return old;
+        return old.map?.((site: any) =>
+          site.id === selectedSiteId ? { ...site, onboarding_phase: phase } : site
+        ) ?? old;
+      });
       queryClient.invalidateQueries({ queryKey: ['buildings-list'] });
       queryClient.invalidateQueries({ queryKey: ['site', selectedSiteId] });
       setSelectedPhase(null);
