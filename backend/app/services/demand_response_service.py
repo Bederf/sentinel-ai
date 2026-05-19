@@ -258,10 +258,14 @@ class DemandResponseService:
         """Get current site temperature from sensor readings."""
         try:
             client = get_supabase_client()
+            # Normalize to Supabase format: site-002 → S002
+            from app.core.site_resolver import normalize_site_id
+
+            supabase_site_id = normalize_site_id(site_id, to_supabase=True)
             response = (
                 client.table("equipment_sensor_readings")
                 .select("value, recorded_at")
-                .eq("site_id", site_id)
+                .eq("site_id", supabase_site_id)
                 .ilike("metric_name", "%temp%")
                 .order("recorded_at", desc=True)
                 .limit(1)
@@ -398,10 +402,14 @@ class DemandResponseService:
                 return 0.0
 
             # Sum power readings for this equipment
+            # Normalize to Supabase format: site-002 → S002
+            from app.core.site_resolver import normalize_site_id
+
+            supabase_site_id = normalize_site_id(site_id, to_supabase=True)
             power_response = (
                 client.table("equipment_sensor_readings")
                 .select("value")
-                .eq("site_id", site_id)
+                .eq("site_id", supabase_site_id)
                 .in_("equipment_id", equipment_codes)
                 .ilike("sensor_type", "%power%")
                 .gte("recorded_at", (datetime.now(UTC) - timedelta(minutes=5)).isoformat())
@@ -438,10 +446,14 @@ class DemandResponseService:
         """Get seconds since last sensor reading."""
         try:
             client = get_supabase_client()
+            # Normalize to Supabase format: site-002 → S002
+            from app.core.site_resolver import normalize_site_id
+
+            supabase_site_id = normalize_site_id(site_id, to_supabase=True)
             response = (
                 client.table("equipment_sensor_readings")
                 .select("recorded_at")
-                .eq("site_id", site_id)
+                .eq("site_id", supabase_site_id)
                 .order("recorded_at", desc=True)
                 .limit(1)
                 .execute()
