@@ -409,7 +409,7 @@ class PhasePromotionEvaluator:
                     client.table("adapter_health_current")
                     .select("uptime_24h_percent")
                     .eq("site_id", site_id_for_queries)
-                    .eq("adapter_type", "bridge")
+                    .eq("adapter_type", "shadow_bridge")
                     .limit(1)
                     .execute()
                 )

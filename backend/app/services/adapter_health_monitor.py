@@ -96,25 +96,29 @@ class AdapterHealthMonitor:
     # ------------------------------------------------------------------
 
     async def _check_shadow_bridge(self, site_id: str, shadow: Any) -> AdapterHealthRecord:
-        """Check ShadowModePollingService bridge connectivity."""
+        """Check ShadowModePollingService bridge connectivity.
+
+        Uses SIMBIOT's live health probe (actual HTTP request to bridge) rather
+        than ShadowModePollingService.status, which only reflects whether poll()
+        has ever been called — not whether the bridge is actually reachable now.
+        """
         start = time.perf_counter()
         try:
-            status = shadow.status
+            from app.services.simbiot_service import simbiot_service
+
+            simbiot_status = await simbiot_service.get_site_status(site_id)
             latency_ms = (time.perf_counter() - start) * 1000
 
-            if isinstance(status, dict) and status.get("connected"):
-                is_healthy = True
-                error_message = None
-                metadata = {
-                    "poll_count": status.get("poll_count"),
-                    "ml_hours_ingested": status.get("ml_hours_ingested"),
-                    "bridge_data_source": status.get("bridge_data_source"),
-                }
-            else:
-                is_healthy = False
-                reason = status.get("reason", "unknown") if isinstance(status, dict) else "unknown"
-                error_message = f"bridge disconnected: {reason}"
-                metadata = {}
+            connected = (
+                simbiot_status.get("status") in ("connected", "ok") or simbiot_status.get("site_available") is True
+            )
+            is_healthy = connected
+            error_message = None if is_healthy else f"bridge unreachable: {simbiot_status.get('status', 'unknown')}"
+            metadata = {
+                "site_available": simbiot_status.get("site_available"),
+                "telemetry_fresh": simbiot_status.get("telemetry_fresh"),
+                "last_telemetry_at": simbiot_status.get("last_telemetry_at"),
+            }
 
             consecutive = await self._count_consecutive_failures(site_id, "shadow_bridge")
 
