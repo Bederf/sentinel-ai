@@ -297,6 +297,7 @@ function riskLevelFromBand(band: string): CockpitTwinRiskLevel {
 }
 
 function buildTwinFloors(
+  siteId: string,
   floorOrder: string[],
   focusFloorId: string | null,
   urgencyScore: number,
@@ -325,7 +326,7 @@ function buildTwinFloors(
   const anchorIndex = focusFloorId ? floorOrder.indexOf(focusFloorId) : -1
 
   return floorOrder.map((floorId, index) => {
-    const isManaged = (SITE_TOWER_PROFILES['site-002']?.managedFloors ?? []).includes(floorId)
+    const isManaged = (SITE_TOWER_PROFILES[siteId]?.managedFloors ?? []).includes(floorId)
     const isDirectlyAffected = directlyAffectedFloors.has(floorId)
 
     // Spread calculated for directly affected floors only; non-affected floors
@@ -727,6 +728,7 @@ export function mapCockpitState(
       consumptionIntensity,
       focusFloorId,
       floors: buildTwinFloors(
+        summary.siteId,
         floorOrder,
         focusFloorId,
         urgencyScore,
